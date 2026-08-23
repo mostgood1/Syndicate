@@ -29,16 +29,24 @@ zero markets is indistinguishable from a venue that lists nothing, which is the
 exact confusion this module was built to resolve.
 
 --------------------------------------------------------------------------
-PRICES ARE CENTS OF PROBABILITY, NOT ODDS
+PRICES ARE DOLLARS OF PROBABILITY, NOT CENTS AND NOT ODDS
 --------------------------------------------------------------------------
 
-A Kalshi contract settles at $1. Its price in cents IS the implied probability:
-62c means the market says 62%. That is not an American price and must never be
-compared to one directly -- the board's whole comparison layer speaks American
-odds, and handing it a 62 would read as +62 (a 61.7% -> 38% error).
+VERIFIED 2026-08-23T03:11:22Z by the boot probe, and it corrected me: the
+fields are `yes_ask_dollars` / `no_ask_dollars`, not `yes_ask` in cents. A
+Kalshi contract settles at $1, so a price in DOLLARS *is* the probability
+directly -- 0.62 means the market says 62%, with no division.
 
-The conversion is exact arithmetic and IS unit-tested here, because it is the
-one part of this module that does not depend on the endpoint being right.
+**This was a 100x error caught before it shipped.** The first version divided by
+100 on the assumption of cents; fed 0.62 it would have returned 0.0062 and
+rendered a 62% market as 0.6%, then handed that to a comparison layer that would
+have accepted it silently. That is precisely why `probe()` reports the shape
+instead of parsing it -- the parser would have "worked".
+
+The value is still not an American price and must never be compared to one
+directly: the board speaks American odds, and 0.62 read as odds is meaningless.
+Both conversions are exact arithmetic and unit-tested, because they are the part
+that does not depend on the endpoint.
 """
 
 from __future__ import annotations
@@ -51,6 +59,10 @@ from collections.abc import Mapping
 from typing import Any
 
 __all__ = [
+    "dollars_to_probability",
+    "dollars_to_american",
+    "probability_to_american",
+    "series_from_ticker",
     "cents_to_probability",
     "cents_to_american",
     "normalize_market",
@@ -74,24 +86,33 @@ _MARKETS_PATH = "/markets"
 
 # The fields this module reads. Named here so the whole schema assumption is one
 # object, and so `probe()` can diff it against what actually arrives.
+# VERIFIED against the live API 2026-08-23. The previous list was written from
+# memory and got 10 of 17 names wrong, including the price fields.
 _MARKET_FIELDS = (
     "ticker",
     "event_ticker",
-    "series_ticker",
+    "market_type",
     "title",
-    "subtitle",
+    "yes_sub_title",
+    "no_sub_title",
     "status",
-    "yes_bid",
-    "yes_ask",
-    "no_bid",
-    "no_ask",
-    "last_price",
-    "volume",
+    "yes_bid_dollars",
+    "yes_ask_dollars",
+    "no_bid_dollars",
+    "no_ask_dollars",
+    "last_price_dollars",
+    "previous_price_dollars",
+    "volume_fp",
+    "volume_24h_fp",
+    "open_interest_fp",
+    "liquidity_dollars",
     "open_time",
     "close_time",
+    "expiration_time",
     "strike_type",
-    "floor_strike",
-    "cap_strike",
+    "custom_strike",
+    "result",
+    "rules_primary",
 )
 
 
@@ -99,12 +120,33 @@ class KalshiError(RuntimeError):
     """Raised when the fetch cannot be trusted -- never swallowed into an empty list."""
 
 
-def cents_to_probability(cents: Any) -> float | None:
-    """A Kalshi price in cents IS the implied probability. 62c -> 0.62.
+def dollars_to_probability(dollars: Any) -> float | None:
+    """A Kalshi price in DOLLARS is the implied probability directly. 0.62 -> 0.62.
 
-    Returns None outside (0, 100): 0 and 100 are not tradeable prices, they are
-    a settled or absent market, and treating either as a probability produces an
+    No division: the contract settles at $1, so the price and the probability
+    are the same number in different clothes. The earlier cents assumption
+    divided by 100 here and would have rendered every market at 1% of its true
+    probability.
+
+    Returns None outside (0, 1): 0 and 1 are not tradeable prices, they are a
+    settled or absent market, and treating either as a probability produces an
     infinite or zero-payout bet downstream.
+    """
+    try:
+        value = float(dollars)
+    except (TypeError, ValueError):
+        return None
+    if value != value or not (0.0 < value < 1.0):
+        return None
+    return value
+
+
+def cents_to_probability(cents: Any) -> float | None:
+    """Kept for the cents-denominated fields, if any turn out to exist.
+
+    NOT the main path any more -- the live API returns `*_dollars`. Retained
+    rather than deleted because a second price convention appearing later should
+    meet an existing tested function instead of a fresh guess.
     """
     try:
         value = float(cents)
@@ -115,20 +157,41 @@ def cents_to_probability(cents: Any) -> float | None:
     return value / 100.0
 
 
-def cents_to_american(cents: Any) -> int | None:
-    """Kalshi cents -> American odds, so the board's comparison layer can read it.
+def probability_to_american(probability: float | None) -> int | None:
+    """Implied probability -> American odds, so the board's layer can read it.
 
-    THE CONVERSION THE REST OF THIS SYSTEM DEPENDS ON. Passing 62 through
-    unconverted would be read as `+62` by every consumer -- a 61.7% implied
-    probability rendered as 38%. Exact arithmetic, and tested.
+    THE CONVERSION THE REST OF THIS SYSTEM DEPENDS ON. A raw Kalshi price handed
+    to a consumer expecting American odds is meaningless -- 0.62 is not +0.62 of
+    anything. Exact arithmetic, and tested.
     """
-    probability = cents_to_probability(cents)
     if probability is None:
         return None
     if probability >= 0.5:
         # Favourite: negative American odds.
         return int(round(-100.0 * probability / (1.0 - probability)))
     return int(round(100.0 * (1.0 - probability) / probability))
+
+
+def dollars_to_american(dollars: Any) -> int | None:
+    """Kalshi's dollar price straight to American odds."""
+    return probability_to_american(dollars_to_probability(dollars))
+
+
+def cents_to_american(cents: Any) -> int | None:
+    """Back-compat for the cents path. See `cents_to_probability`."""
+    return probability_to_american(cents_to_probability(cents))
+
+
+def series_from_ticker(ticker: Any) -> str | None:
+    """Kalshi markets carry NO `series_ticker` -- the probe proved that, 2000 of
+    2000 absent. The series is the prefix of the ticker before the first dash
+    (`KXMLBGAME-25AUG22NYYBOS-NYY` -> `KXMLBGAME`), which is what makes grouping
+    possible at all."""
+    text = str(ticker or "").strip()
+    if not text:
+        return None
+    head = text.split("-", 1)[0].strip()
+    return head or None
 
 
 def normalize_market(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -147,10 +210,12 @@ def normalize_market(raw: Mapping[str, Any]) -> dict[str, Any]:
             out[field] = None
             missing.append(field)
     # Derived, so a caller never has to know Kalshi's price convention.
-    out["yes_probability"] = cents_to_probability(raw.get("yes_ask"))
-    out["yes_american"] = cents_to_american(raw.get("yes_ask"))
-    out["no_probability"] = cents_to_probability(raw.get("no_ask"))
-    out["no_american"] = cents_to_american(raw.get("no_ask"))
+    out["yes_probability"] = dollars_to_probability(raw.get("yes_ask_dollars"))
+    out["yes_american"] = dollars_to_american(raw.get("yes_ask_dollars"))
+    out["no_probability"] = dollars_to_probability(raw.get("no_ask_dollars"))
+    out["no_american"] = dollars_to_american(raw.get("no_ask_dollars"))
+    # Derived, because the API does not supply it -- see `series_from_ticker`.
+    out["series"] = series_from_ticker(raw.get("ticker"))
     out["missing_fields"] = missing
     return out
 
@@ -252,7 +317,7 @@ def fetch_markets(
     }
 
 
-def discover(*, limit: int = 200, max_pages: int = 10) -> dict[str, Any]:
+def discover(*, limit: int = 1000, max_pages: int = 40) -> dict[str, Any]:
     """What does Kalshi actually list right now, grouped by series?
 
     THE DISCOVERY CALL, and deliberately UNFILTERED. Fetching by
@@ -264,12 +329,17 @@ def discover(*, limit: int = 200, max_pages: int = 10) -> dict[str, Any]:
 
     `by_series` is the answer to the question the OddsAPI numbers could not
     reach: whether Kalshi lists player props at all, and at what volume.
+
+    The caps were raised after the first live run returned `markets=2000
+    pages=10 truncated=True` -- the catalogue is bigger than the page limit, and
+    a truncated listing read as the whole thing would understate Kalshi exactly
+    the way OddsAPI's feed did.
     """
     report = fetch_markets(status="open", limit=limit, max_pages=max_pages)
     by_series: dict[str, int] = {}
     titled: dict[str, str] = {}
     for market in report.get("markets") or ():
-        series = str(market.get("series_ticker") or "") or "<absent>"
+        series = market.get("series") or "<absent>"
         by_series[series] = by_series.get(series, 0) + 1
         # One example title per series, so a ticker like KXMLBGAME is readable
         # without a second lookup.
