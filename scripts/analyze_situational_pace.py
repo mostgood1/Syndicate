@@ -116,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     # honestly labelled `0-120s` and is sampled at a single point inside it.
     # Printing the set stops that label being read as a range that was swept.
     cell_lefts: dict[tuple, set] = defaultdict(set)
+    overtime_windows = 0
     team_shots: dict[str, dict[str, float]] = defaultdict(
         lambda: {"fg2": 0.0, "fg3": 0.0, "ft": 0.0, "tov": 0.0, "poss": 0.0,
                  "pts": 0.0, "pts_sq": 0.0})
@@ -192,6 +193,19 @@ def main(argv: list[str] | None = None) -> int:
                 margin = sum(float(r.get("sign") or 0.0) * float(r.get("weight") or 0.0)
                              for r in scoring if float(r["clock_seconds"]) <= t)
                 _, _, left = period_bounds(args.league, t)
+                # **OVERTIME IS NOT THE FINAL MINUTE, AND IT ARRIVES SELECTED.**
+                # `period_bounds` folds OT into the last regulation period and
+                # reports left=0, which lands in the `0-120s` bucket. The
+                # `left_vals` diagnostic caught it immediately in production:
+                # [0, 60] in the margin=0-5 and 5-10 late cells and [60] in the
+                # two wider ones -- because only CLOSE games reach overtime. So
+                # the close-and-late cells were mixing two regimes, and the
+                # contamination was correlated with the very axis being
+                # measured. Skipped and counted rather than silently folded in.
+                if left <= 0.0:
+                    overtime_windows += 1
+                    t += WINDOW
+                    continue
                 mkey = _bucket(abs(margin), MARGIN_BUCKETS)
                 lkey = _bucket(left, LEFT_BUCKETS)
                 if mkey is None or lkey is None:
@@ -225,7 +239,8 @@ def main(argv: list[str] | None = None) -> int:
         print("[situational] NO GAMES", flush=True)
         return 3
 
-    print(f"[situational] SEASON league={args.league} games={games}", flush=True)
+    print(f"[situational] SEASON league={args.league} games={games} "
+          f"overtime_windows_skipped={overtime_windows}", flush=True)
     print("[situational] PACE (possessions/min) and PPP by |margin| x seconds-left", flush=True)
     for mkey in MARGIN_BUCKETS:
         for lkey in LEFT_BUCKETS:
