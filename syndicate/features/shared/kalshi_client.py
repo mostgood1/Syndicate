@@ -434,6 +434,14 @@ def discover_series(*, category: str | None = None) -> dict[str, Any]:
             # One row's keys, to check the field names before anything parses
             # them. `kalshi_client`'s first live run got 10 of 17 wrong.
             "row_keys": sorted(rows[0].keys()) if rows and isinstance(rows[0], Mapping) else [],
+            # ticker -> title. A ticker says what a series is CALLED; the title
+            # says what it IS, and "player prop" versus "game line" is the
+            # difference between a bet we can grade and one we must refuse.
+            "titles": {
+                str(row.get("ticker") or row.get("series_ticker") or "").strip(): str(row.get("title") or "")
+                for row in rows
+                if isinstance(row, Mapping)
+            },
         }
 
     return {"status": "error", "category": category, "errors": errors}

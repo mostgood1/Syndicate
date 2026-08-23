@@ -783,7 +783,24 @@ def _kalshi_series_catalogue_at_boot() -> None:
                 flush=True,
             )
             return
-        for token in ("WNBA", "NBA", "MLB", "NFL", "NHL"):
+        # TITLES, not just tickers. `KXWNBATEAMTOTAL` is legible; most are not,
+        # and the question tonight is which of the 91 is a PLAYER PROP -- the
+        # only shape that can be joined on (player, market, line) and graded
+        # without an event mapping that does not exist. A ticker list cannot
+        # answer that and a title list can.
+        titled = report.get("titles") or {}
+        for token in ("WNBA",):
+            found = series_matching([token], tickers)
+            print(
+                f"[live_odds_worker] KALSHI_SPORT {token} n={len(found)}",
+                flush=True,
+            )
+            for ticker in found:
+                print(
+                    f"[live_odds_worker] KALSHI_SERIES {ticker} :: {str(titled.get(ticker) or '')[:70]}",
+                    flush=True,
+                )
+        for token in ("NBA", "MLB", "NFL", "NHL"):
             found = series_matching([token], tickers)
             print(
                 f"[live_odds_worker] KALSHI_SPORT {token} series={found[:12]} n={len(found)}",
