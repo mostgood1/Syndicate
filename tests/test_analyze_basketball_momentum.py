@@ -170,6 +170,23 @@ def test_causality_check_reports_a_reason_when_the_feed_is_unusable() -> None:
     assert "pressure" in result["reason"]
 
 
+def test_causality_check_separates_distinct_instants_from_duplicate_rows() -> None:
+    """**HALFTIME MAKES `compared` LIE, and this is the guard.**
+
+    Measured on the live slate (2026-08-23 00:04:07Z and 00:08:47Z): two
+    consecutive captures emitted byte-identical blocks because the game clock is
+    frozen at the end of a period and ESPN's feed adds no plays. Every tick
+    through the break appends another duplicate row, so `compared` climbs while
+    the number of instants actually verified does not.
+    """
+    summary = _long_game()
+    rows = _captured_rows(summary, [400.0, 700.0, 700.0, 700.0, 1000.0])
+    result = causality_check(rows, summary, league_code="wnba", event_id="401")
+    assert result["compared"] == 5
+    assert result["distinct_as_of"] == 3
+    assert result["mismatches"] == 0
+
+
 def test_causality_check_skips_ticks_that_carry_no_series() -> None:
     """A tick with no pressure block is not a mismatch -- it is not comparable."""
     summary = _long_game()

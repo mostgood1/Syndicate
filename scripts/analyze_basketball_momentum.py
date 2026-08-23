@@ -231,6 +231,7 @@ def causality_check(
         return {"ok": False, "reason": "no pressure rows in the retrospective feed"}
 
     compared = 0
+    distinct_as_of: set[float] = set()
     mismatches: list[dict[str, Any]] = []
     for row in rows:
         block = ((row.get("games") or {}).get(event_id)) or {}
@@ -247,6 +248,7 @@ def causality_check(
             axis_key="clock_seconds",
         )
         compared += 1
+        distinct_as_of.add(round(float(as_of), 3))
         # `momentum_at` rounds to 4dp, so an exact match is the expectation.
         if abs(float(recomputed) - float(current)) > 1e-4:
             mismatches.append({
@@ -258,6 +260,18 @@ def causality_check(
     return {
         "ok": True,
         "compared": compared,
+        # **`compared` OVERSTATES how much was actually checked, and by a lot.**
+        # Measured 2026-08-23 00:04:07Z and 00:08:47Z: two consecutive captures
+        # of a live WNBA game emitted BYTE-IDENTICAL blocks (`events=117`,
+        # `as_of_s=1198.0`) because the game was at halftime -- the clock is
+        # frozen at the end of the period and ESPN's feed adds no plays. Every
+        # tick through a ~15-minute break appends another duplicate row.
+        #
+        # Those rows re-verify the same instant, so counting them as separate
+        # comparisons makes a thin check look thorough. `distinct_as_of` is the
+        # number of DIFFERENT instants actually covered, and it is the figure to
+        # quote.
+        "distinct_as_of": len(distinct_as_of),
         "mismatches": len(mismatches),
         "examples": mismatches[:5],
     }
@@ -329,6 +343,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             rows, summary, league_code=args.league, event_id=event_id
         )
         _report(f"CAUSALITY event={event_id}", causal)
+        if causal.get("ok") and causal.get("distinct_as_of", 0) < 3:
+            # Say it rather than let a thin check read as a clean one.
+            print(
+                f"[momentum_phase_c] THIN event={event_id} "
+                f"only {causal.get('distinct_as_of')} distinct instants across "
+                f"{causal.get('compared')} rows -- duplicates, not coverage",
+                flush=True,
+            )
         if causal.get("mismatches"):
             # A failed causality check invalidates the sweep that follows, so it
             # sets the exit code even though the sweep may still print.
