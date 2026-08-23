@@ -60,8 +60,24 @@ from syndicate.features.shared.momentum_core import momentum_at
 # The sweep grid. Seconds are the axis soccer chose; possessions are the axis
 # that would port across NBA/WNBA/NCAAB pace regimes without re-tuning, which is
 # the whole reason both were published (scope section 7, decision 1).
-HALF_LIVES_SECONDS = (60.0, 90.0, 120.0, 180.0)
-HALF_LIVES_POSSESSIONS = (4.0, 6.0, 8.0, 12.0)
+# **THE GRID GOES OUT TO A FULL QUARTER, because the live readings said it
+# had to.** Measured on the 2026-08-22 WNBA slate at the 120s half-life this
+# shipped with: `current` moved x4.5 UP and later x0.30 DOWN, each inside 55
+# SECONDS of game clock. A quantity that swings three- to four-fold in under a
+# minute is describing "right now".
+#
+# But the horizons being predicted are a QUARTER (600s) and a HALF (1200s) --
+# those are the markets the live slate actually discovered (`spreads_q4`,
+# `totals_h2`). Asking a 120s half-life about the next ten minutes is asking a
+# fast signal a slow question, and a grid topping out at 180s could only ever
+# have returned "no signal" for the interval markets without saying why.
+#
+# So the sweep now spans 60s (twitchy) to 600s (a whole quarter), and the
+# possessions axis spans 4 to 40 -- roughly the same range in the units a
+# basketball game actually advances in (~4 combined possessions per minute,
+# measured 7/7 last night).
+HALF_LIVES_SECONDS = (60.0, 120.0, 180.0, 300.0, 600.0)
+HALF_LIVES_POSSESSIONS = (4.0, 8.0, 12.0, 20.0, 40.0)
 # **HORIZONS ARE THE INTERVALS ACTUALLY TRADED, not round numbers.**
 #
 # The stated purpose of this signal is to inform INTERVAL BETS -- moneyline,
