@@ -174,10 +174,68 @@ def test_late_split_prices_only_the_final_minute_differently() -> None:
 
 def test_league_late_is_reported_and_can_win(tmp_path, capsys) -> None:
     """**REACHABILITY BEFORE CORRECTNESS.** A model that is computed but never
-    compared is indistinguishable from one that is broken."""
+    compared is indistinguishable from one that is broken.
+
+    Judged against `LATE_SPLIT_VS_FLAT`, never `..._CONFOUNDED` -- the confounded
+    line moves the pace source and the mechanism together, so a win there is not
+    evidence about the mechanism."""
     out = _run(_write(tmp_path, _days(10), late_multiplier=3.0), capsys)
-    assert "league_late=" in out, out
-    assert "LATE_SPLIT_VS_LEAGUE" in out, out
-    assert _field(out, "LATE_SPLIT_VS_LEAGUE", "improvement") > 0.0, (
+    assert "league_flat=" in out and "league_late=" in out, out
+    assert "LATE_SPLIT_VS_FLAT" in out, out
+    assert _field(out, "LATE_SPLIT_VS_FLAT", "improvement") > 0.0, (
         "with pace tripled in the final minute, pricing it separately must beat "
-        "pricing it like any other minute")
+        "a single blended league rate")
+
+
+def test_the_control_differs_from_the_mechanism_by_the_mechanism_alone() -> None:
+    """**THE WHOLE POINT OF `league_flat`.** With no late lift the control and
+    the mechanism must agree exactly; with one they must not. If they agreed
+    always, the comparison would be vacuous -- and if they differed even when
+    the rates are identical, it would be measuring something else."""
+    flat = {"pace_normal": 4.0, "ppp_normal": 1.1, "pace_late": 4.0, "ppp_late": 1.1,
+            "pace_all": 4.0, "league_ppp": 1.1}
+    for left in (30.0, 90.0, 300.0, 599.0):
+        assert interval._league_flat_projection(left, flat) == pytest.approx(
+            interval._league_late_projection(left, flat)), left
+
+    lifted = dict(flat, pace_late=8.0, pace_all=4.4)
+    assert interval._league_flat_projection(30.0, lifted) != pytest.approx(
+        interval._league_late_projection(30.0, lifted))
+
+
+def test_the_control_uses_the_BLENDED_pace_not_the_normal_one() -> None:
+    """**A MUTATION THAT SURVIVED THE FIRST DRAFT OF THESE TESTS.** Swapping
+    `pace_all` for `pace_normal` inside the control passed everything -- and it
+    is the worst possible bug here, because it makes the control under-project
+    the final minute and hands the mechanism a win by construction.
+
+    Pinned against an explicit expected value, with all three rates distinct so
+    picking the wrong one cannot coincide with the right answer."""
+    rates = {"pace_normal": 3.0, "ppp_normal": 1.0, "pace_late": 9.0, "ppp_late": 1.0,
+             "pace_all": 4.0, "league_ppp": 2.0}
+    assert interval._league_flat_projection(120.0, rates) == pytest.approx(
+        4.0 * 2.0 * 2.0), "must be pace_all x minutes x league_ppp"
+    assert interval._league_flat_projection(120.0, rates) != pytest.approx(
+        3.0 * 2.0 * 2.0), "and must NOT be pace_normal"
+    assert interval._league_flat_projection(120.0, rates) != pytest.approx(
+        9.0 * 2.0 * 2.0), "nor pace_late"
+
+
+def test_blended_pace_sits_between_the_normal_and_late_rates(tmp_path, capsys) -> None:
+    """`pace_all` is what a single-rate model would use. If it did not lie
+    between the two it is not a blend of them, and the control is not a control."""
+    out = _run(_write(tmp_path, _days(10), late_multiplier=2.0), capsys)
+    normal = _field(out, "FITTED_RATES", "pace_normal")
+    late = _field(out, "FITTED_RATES", "pace_late")
+    blended = _field(out, "FITTED_RATES", "pace_all")
+    assert normal < blended < late, (normal, blended, late)
+
+
+def test_the_pace_source_knob_is_reported_separately(tmp_path, capsys) -> None:
+    """Two knobs, two lines. A single number covering both is what made the
+    first held-out result unreadable."""
+    out = _run(_write(tmp_path, _days(10), late_multiplier=2.0), capsys)
+    assert "PACE_SOURCE" in out, out
+    assert "LATE_SPLIT_VS_FLAT" in out, out
+    assert "LATE_SPLIT_VS_LEAGUE_RATE_CONFOUNDED" in out, (
+        "the confounded comparison stays, but must be NAMED as confounded")

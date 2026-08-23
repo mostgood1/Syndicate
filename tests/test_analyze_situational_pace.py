@@ -219,3 +219,44 @@ def test_points_per_possession_variance_separates_steady_from_streaky(tmp_path, 
 
     assert _field(lines["steady"], "ppp_sd") == pytest.approx(0.0, abs=1e-3)
     assert _field(lines["streaky"], "ppp_sd") == pytest.approx(2.0, abs=1e-3)
+
+
+def test_overtime_is_skipped_not_folded_into_the_final_minute(tmp_path, capsys) -> None:
+    """**PRODUCTION CAUGHT THIS, NOT A FIXTURE.** `period_bounds` folds overtime
+    into the last regulation period and reports left=0, which lands in the
+    `0-120s` bucket. The first run with `left_vals` printed [0, 60] in the
+    margin=0-5 and 5-10 late cells and [60] in the two wider ones -- because
+    only CLOSE games reach overtime. So the contamination was correlated with
+    the axis being measured, which is the worst kind.
+
+    Every prior test here uses a 2400s fixture and could not see it. This one
+    plays overtime."""
+    pressure, scoring = [], []
+    poss = t = 0.0
+    margin = 0.0
+    while t < 2700:                          # regulation plus one overtime
+        poss += 1.0
+        sign = 1.0 if margin <= 0 else -1.0
+        pressure.append({"clock_seconds": t, "possession_index": poss, "sign": sign,
+                         "weight": 1.0, "type": "shot_attempt_2",
+                         "team": "IND" if sign > 0 else "NYL"})
+        scoring.append({"clock_seconds": t, "possession_index": poss,
+                        "team": "IND" if sign > 0 else "NYL",
+                        "sign": sign, "weight": 2.0})
+        margin += sign * 2.0
+        t += 12.0
+    path = momentum_events_path(tmp_path, league_code="wnba", date_str="2026-05-01")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"games": {
+        f"g{i}": {"pressure": pressure, "narrator": scoring,
+                  "home_tri": "IND", "away_tri": "NYL"} for i in range(25)}}))
+
+    out = _run(tmp_path, capsys)
+    skipped = int(out.split("overtime_windows_skipped=")[1].split()[0])
+    assert skipped > 0, f"overtime windows must be counted, got {skipped}\n{out}"
+
+    for line in out.splitlines():
+        if "CELL " in line and "left=0-120s" in line:
+            vals = line.split("left_vals=")[1].strip()
+            assert vals == "[60]", (
+                f"the final-minute cell must hold regulation ONLY, got {vals}")
