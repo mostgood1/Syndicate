@@ -237,3 +237,35 @@ def test_a_market_with_no_series_is_labelled_not_dropped(monkeypatch):
     monkeypatch.setattr(mod, "_get", lambda url, **kw: {
         "markets": [{"yes_ask_dollars": 0.5}], "cursor": None})
     assert mod.discover()["by_series"]["<absent>"] == 1
+
+
+# --- parlay combinations must not be counted as catalogue ------------------
+
+
+def test_combinatorial_series_are_identified():
+    """MEASURED 2026-08-23: 39,793 of the first 40,000 open markets are
+    multi-leg parlay combinations, and they truncated the listing before it
+    reached most single markets."""
+    from syndicate.features.shared.kalshi_client import is_combinatorial_series
+
+    assert is_combinatorial_series("KXMVECROSSCATEGORY") is True
+    assert is_combinatorial_series("KXMVECROSSCATEGORY0") is True
+    assert is_combinatorial_series("KXMLBKS") is False
+    assert is_combinatorial_series(None) is False
+
+
+def test_discover_separates_singles_from_parlays(monkeypatch):
+    """The board does not bet parlays. Counting them as catalogue would both
+    overstate Kalshi's size and bury the markets that matter."""
+    import syndicate.features.shared.kalshi_client as mod
+
+    monkeypatch.setattr(mod, "_get", lambda url, **kw: {"markets": [
+        {"ticker": "KXMVECROSSCATEGORY-1", "yes_ask_dollars": 0.5},
+        {"ticker": "KXMVECROSSCATEGORY-2", "yes_ask_dollars": 0.5},
+        {"ticker": "KXMLBKS-A", "title": "Abbott: 7+ strikeouts?", "yes_ask_dollars": 0.44},
+    ], "cursor": None})
+    report = mod.discover()
+    assert report["combinatorial_markets"] == 2
+    assert report["by_series_singles"] == {"KXMLBKS": 1}
+    # The raw listing still carries everything -- nothing is hidden, only split.
+    assert report["by_series"]["KXMVECROSSCATEGORY"] == 2

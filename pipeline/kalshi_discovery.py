@@ -93,10 +93,16 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
         print(f"[kalshi_discovery] DISCOVER_ERROR {type(exc).__name__}: {exc}", flush=True)
         return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
 
-    top = list(report.get("by_series", {}).items())[:15]
+    # Report SINGLES separately from the raw listing. The unfiltered top_series
+    # is 99.5% parlay combinations and reading it as the catalogue would repeat,
+    # in a new way, the same mistake as reading OddsAPI's view as Kalshi's.
+    singles = report.get("by_series_singles") or {}
+    top = list(singles.items())[:15]
     print(
         "[kalshi_discovery] LISTED"
         f" markets={report.get('count')}"
+        f" singles={sum(singles.values())}"
+        f" combinatorial={report.get('combinatorial_markets')}"
         f" series={report.get('series_count')}"
         f" pages={report.get('pages')}"
         # `truncated` matters: a capped listing under-reports what Kalshi has,
@@ -109,4 +115,26 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
     )
     for series, example in list((report.get("series_examples") or {}).items())[:15]:
         print(f"[kalshi_discovery] SERIES {series} :: {example}", flush=True)
+
+    # TRUE COUNTS PER SERIES. The unfiltered listing truncates before it reaches
+    # most single markets, so its per-series numbers are floors, not counts.
+    # Asking for each series by name is the only way to know what Kalshi really
+    # lists in the families this board bets.
+    from syndicate.features.shared.kalshi_client import KalshiError as _KErr
+    from syndicate.features.shared.kalshi_client import fetch_series
+
+    for series in list(singles):
+        try:
+            one = fetch_series(series)
+            print(
+                f"[kalshi_discovery] SERIES_FULL {series}"
+                f" markets={one.get('count')}"
+                f" truncated={one.get('truncated')}",
+                flush=True,
+            )
+        except _KErr as exc:
+            # Named per series: a filter the API rejects is a different fact
+            # from a series that is genuinely empty.
+            print(f"[kalshi_discovery] SERIES_FULL_FAILED {series} {exc}", flush=True)
+
     return {"status": "ok", "report": report}

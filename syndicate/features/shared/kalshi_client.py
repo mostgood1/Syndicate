@@ -63,6 +63,8 @@ __all__ = [
     "dollars_to_american",
     "probability_to_american",
     "series_from_ticker",
+    "is_combinatorial_series",
+    "fetch_series",
     "cents_to_probability",
     "cents_to_american",
     "normalize_market",
@@ -317,6 +319,30 @@ def fetch_markets(
     }
 
 
+# Multi-leg parlay combinations. MEASURED 2026-08-23: 39,793 of the first
+# 40,000 open markets (99.5%) sit in these series, and they TRUNCATED the
+# listing -- real single markets are pushed past the page cap by combinatorial
+# noise. The board does not bet parlays, so counting them as catalogue would
+# both overstate Kalshi's size and hide the markets that matter.
+_COMBINATORIAL_SERIES_PREFIXES = ("KXMVECROSSCATEGORY",)
+
+
+def is_combinatorial_series(series: Any) -> bool:
+    text = str(series or "").strip().upper()
+    return any(text.startswith(prefix) for prefix in _COMBINATORIAL_SERIES_PREFIXES)
+
+
+def fetch_series(series_ticker: str, *, limit: int = 1000, max_pages: int = 10) -> dict[str, Any]:
+    """One series, asked for by name.
+
+    Necessary because the unfiltered listing is 99.5% parlay combinations: the
+    single markets this board could actually bet are past the page cap, so
+    counting them from `discover()` measures the cap rather than the catalogue.
+    Asking per series is the only way to get a true count.
+    """
+    return fetch_markets(series_ticker=series_ticker, limit=limit, max_pages=max_pages)
+
+
 def discover(*, limit: int = 1000, max_pages: int = 40) -> dict[str, Any]:
     """What does Kalshi actually list right now, grouped by series?
 
@@ -346,6 +372,16 @@ def discover(*, limit: int = 1000, max_pages: int = 40) -> dict[str, Any]:
         if series not in titled and market.get("title"):
             titled[series] = str(market.get("title"))[:80]
     report["by_series"] = dict(sorted(by_series.items(), key=lambda kv: -kv[1]))
+    # The catalogue WITHOUT parlay combinations -- what is actually bettable as
+    # a single market, which is the only part this board could ever use.
+    report["by_series_singles"] = {
+        series: count
+        for series, count in report["by_series"].items()
+        if not is_combinatorial_series(series)
+    }
+    report["combinatorial_markets"] = sum(
+        count for series, count in by_series.items() if is_combinatorial_series(series)
+    )
     report["series_examples"] = titled
     report["series_count"] = len(by_series)
     return report
