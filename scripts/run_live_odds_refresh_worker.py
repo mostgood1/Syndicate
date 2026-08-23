@@ -719,6 +719,89 @@ def _run_tick() -> dict[str, object] | None:
         return None
 
 
+def _execution_interval_seconds() -> int:
+    """How often to place, at most. Five minutes unless told otherwise.
+
+    NOT the loop interval. This worker ticks as fast as 60s once a game is live,
+    and a placer on that cadence would re-examine a plan far more often than the
+    plan changes. The ledger refuses duplicates by key, so a faster cadence
+    would cost nothing but noise -- but noise in the one log a person reads
+    while money is moving is not free.
+    """
+    raw = os.environ.get("SYNDICATE_EXECUTION_INTERVAL_SECONDS")
+    try:
+        parsed = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return 300
+    return parsed if parsed > 0 else 300
+
+
+_LAST_EXECUTION_AT: float | None = None
+
+
+def _run_execution_tick() -> None:
+    """Place today's committed plan, on this worker, on its own clock.
+
+    WHY HERE. `execute_portfolio`'s own contract says live placement must never
+    run inside `refresh-worker`: that service has 110 OOM kills on record and
+    restarts mid-job, and a restart between submit and record is exactly what
+    the ledger's write-ahead exists to survive rather than to invite. This
+    worker is the other long-lived process, so this is where a live placer
+    belongs.
+
+    NOT `inline=True`. That flag makes `run_execution` refuse live mode
+    structurally, which is correct on refresh-worker and would make this
+    function silently pointless here.
+
+    DARK BY DEFAULT and gated four separate ways before anything is sent:
+    `SYNDICATE_EXECUTION_ENABLED`, then `SYNDICATE_EXECUTION_MODE=live`, then
+    `SYNDICATE_EXECUTION_LIVE_ARMED`, then the caps and the kill switch inside
+    `run_execution` itself. Absent any of them this is a no-op that costs one
+    dict lookup, the same relationship as the disk-maintenance call above.
+    """
+    global _LAST_EXECUTION_AT
+
+    try:
+        from pipeline.execute_portfolio import execution_enabled
+
+        if not execution_enabled():
+            return
+
+        now = time.monotonic()
+        interval = _execution_interval_seconds()
+        if _LAST_EXECUTION_AT is not None and (now - _LAST_EXECUTION_AT) < interval:
+            return
+        _LAST_EXECUTION_AT = now
+
+        from pipeline.execute_portfolio import run_execution
+        from syndicate.features.shared.timezone import central_today_iso
+
+        result = run_execution(central_today_iso())
+        print(
+            "[live_odds_worker] EXECUTION"
+            f" status={result.get('status')}"
+            f" reason={result.get('reason')}"
+            f" mode={result.get('mode')}"
+            f" venue={result.get('venue')}"
+            f" placed={result.get('placed')}"
+            f" duplicates={result.get('duplicates')}"
+            # Named refusals, so a cap that stopped a good slate and a plan with
+            # nothing bettable never share a number.
+            f" refused={result.get('refused')}"
+            f" spent={result.get('spent')}"
+            f" limits={result.get('limits')}",
+            flush=True,
+        )
+    except Exception as exc:
+        # A placer that raises must not take down the odds refresh this worker
+        # exists for. Named, because a silent absence and a crashed placer are
+        # different faults.
+        print(
+            f"[live_odds_worker] EXECUTION_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _start_live_lens_reports() -> None:
     try:
         _log_worker_memory("start_live_lens_reports_before")
@@ -855,6 +938,7 @@ def main() -> int:
                 run_disk_maintenance()
             except Exception as exc:
                 print(f"[live_odds_worker] DISK_MAINTENANCE_ERROR {type(exc).__name__}: {exc}", flush=True)
+            _run_execution_tick()
             # Use the adaptive interval (900s idle/pregame, 60s once a game is
             # actually live -- see _live_refresh_loop_interval_for_meta) rather
             # than the fixed base interval. Sleeping a fixed 60s regardless of
