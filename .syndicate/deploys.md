@@ -24396,3 +24396,57 @@ in the way that is not: it maps two spellings of ONE team onto each other and
 can never swap which side is home. A test pins that a reversed card still fails
 closed. A missing panel is a small bug; a confidently reversed one is a wrong
 answer, and soccer's `#160` is exactly that failure.
+
+## 2026-08-23 — WHAT THE 2026-08-22 WNBA SLATE ACTUALLY TAUGHT US
+
+**Nothing about whether momentum predicts anything. Phase C has never run**, and
+cannot be run from a Claude Code session: the jsonl lives on the worker and web
+disks (not in the checkout — `find` confirms), and ESPN is 403 from the sandbox.
+It needs a one-shot job ON the worker, reporting through the log collector.
+
+What WAS measured, from 7 real SHAPE lines across 2 games:
+
+### 1. The possession estimator is accurate AND slightly biased
+
+Ratios against ~160 combined possessions per 40 min: **1.033, 1.043, 1.017,
+1.012, 1.012, 1.035, 1.028**. Seven of seven within 4.3%, across two games and
+the full arc of one (19 → 37 minutes).
+
+**But all seven are ABOVE 1.0, mean ~1.026.** That is a systematic ~2.6%
+overcount, not noise — most likely the `0.44*FTA` coefficient or the OREB
+subtraction. Irrelevant to a chart; it needs naming before this feeds a price.
+
+### 2. The two decay axes agreed 7 of 7
+
+Including a sign flip BETWEEN games (game 1 negative throughout, game 2
+positive). That is the premise the possessions axis exists for: one half-life
+that ports across NBA/WNBA/NCAAB without re-tuning per pace regime.
+
+### 3. THE SIGNAL IS FAST AND THE GRID WAS SLOW — a real design error, caught
+
+At the shipped 120s half-life, game 1: `current` moved **x4.5 UP** and later
+**x0.30 DOWN**, each inside **55 seconds of game clock**.
+
+The horizons being predicted are a QUARTER (600s) and a HALF (1200s) — the
+markets the slate itself discovered (`spreads_q4`, `totals_h2`). A 120s
+half-life asked about the next ten minutes is a fast signal answering a slow
+question, and the grid topped out at 180s. **It could only ever have returned
+"no signal" for the interval markets, and would not have said why** — a falsely
+negative result indistinguishable from a real one. Grid widened to 60-600s and
+4-40 possessions.
+
+### 4. THE SAMPLE IS FAR THINNER THAN THE PROBE COUNT SUGGESTS
+
+Probes sit on a 30s grid, so at a 600s horizon they overlap 20-fold:
+
+    600s horizon:   55 probes/game, but only ~3 NON-OVERLAPPING windows/game
+    1200s horizon:  35 probes/game, but only ~1
+
+Across last night's ~3 games that is **~9 independent quarter-length windows and
+~3 half-length ones.** A correlation quoted on n=165 would be quoting an
+overlap artefact. This is `CLAUDE.md`'s coverage rule in a new place: report the
+number the result actually rests on, not the row count.
+
+**So a Phase C run on one night cannot settle anything.** It can only reject a
+signal so strong it would be visible in a dozen windows, or motivate collecting
+more nights. Say which before running it.
