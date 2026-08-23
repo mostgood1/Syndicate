@@ -402,6 +402,14 @@ def build_layer2_shortlist(
                         f"considered={live_stats.get('rows_live_considered')} "
                         f"projected={live_stats.get('rows_live_projected')} "
                         f"edged={live_stats.get('rows_live_edged')} "
+                        # `#539`. NEXT TO `edged`, never added to it. The two are
+                        # different strengths of evidence -- a two-sided de-vig
+                        # versus one book's measured hold -- and the whole point
+                        # of the modelled path is that soccer's live tier could
+                        # otherwise never carry a number. Printed even when zero,
+                        # because "the rule is live and matched nothing" and "the
+                        # rule is not deployed" must not look alike.
+                        f"edged_modelled={live_stats.get('rows_live_edged_modelled')} "
                         f"prob_withheld={live_stats.get('rows_live_prob_withheld')} "
                         f"lens_indexed={live_stats.get('snapshot_rows_indexed')} "
                         f"lens_live_games={live_stats.get('live_games_in_snapshot')} "
