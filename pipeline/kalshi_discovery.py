@@ -82,6 +82,37 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
         print(f"[kalshi_discovery] PROBE_ERROR {type(exc).__name__}: {exc}", flush=True)
         return {"status": "error", "reason": f"probe_error: {exc}"}
 
+    # AUTHENTICATED READ, once per boot, and READ-ONLY BY CONSTRUCTION.
+    # `probe_auth` asks for the account balance; there is no argument to it that
+    # places anything, and nothing in this module can trade.
+    #
+    # Here rather than in a one-off script because signing has never once
+    # executed against Kalshi -- the agent proxy 403s CONNECT from a dev
+    # container -- so the worker is the only place that can answer whether it
+    # works. It reports the response KEYS, never the values: a balance is not a
+    # secret but it has no business in a line whose job is to confirm a
+    # signature verified.
+    #
+    # No credential means a NAMED skip and no HTTP call at all, so this is inert
+    # until someone deliberately configures one.
+    try:
+        from syndicate.features.shared.kalshi_auth import probe_auth
+
+        auth = probe_auth()
+        print(
+            "[kalshi_discovery] AUTH_PROBE"
+            f" status={auth.get('status')}"
+            f" reason={auth.get('reason')}"
+            f" detail={auth.get('detail')}"
+            f" keys={auth.get('keys')}"
+            f" balance_present={auth.get('balance_present')}",
+            flush=True,
+        )
+    except Exception as exc:
+        # Non-fatal: a signing failure must not cost the read-only discovery
+        # that runs beside it and needs no credential at all.
+        print(f"[kalshi_discovery] AUTH_PROBE_ERROR {type(exc).__name__}: {exc}", flush=True)
+
     try:
         report = discover()
     except KalshiError as exc:
