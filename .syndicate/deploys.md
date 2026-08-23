@@ -25261,3 +25261,45 @@ verify: **CLEAR.** Best model on held-out dates is `league_late` — pure league
 constants, final minute priced apart. Bucket curve 1.59 / 2.18 / 2.61 / 3.91 /
 5.05. `game_pace` is best in NO bucket. `league_rate` still edges `league_late`
 at 60-120s (2.13 vs 2.18, n=688) — noted, not modelled around.
+
+### 23:14-23:19Z — `SCOREBOARD_STATES` answered its question in 22 minutes, and the answer is NO BUG
+
+    23:14:55Z  SCOREBOARD_STATES league=wnba date=2026-08-23 in=2 post=1 pre=1
+    23:19:33Z  SCOREBOARD_STATES league=wnba date=2026-08-23 in=3 post=1
+
+**The afternoon `events_total=4 live_events=0` was games that had not tipped.**
+Not a stuck state, not a predicate bug. I had written that "four games cannot
+all avoid a 2:46pm-to-6:42pm window" — they could, because this slate is a
+late-evening one and three of the four tipped after 23:00Z. **My reasoning was
+wrong and the instrument was right**, which is the outcome that argues for
+shipping instruments instead of diagnoses.
+
+Capture on the live slate is healthy:
+
+    fetched=3 games=3 with_series=3
+    SHAPE event=401857170 events=42 as_of_s=524.0 as_of_poss=27.76
+          sec_pts=9 sec_now=-0.7948 poss_pts=14 poss_now=-0.7954 narrator=yes
+    appended .../live_lens/live_momentum_2026-08-23.jsonl
+
+Both decay axes agree in sign and move together, the clock tracks, and the
+append is landing.
+
+### DEPLOY DELIBERATELY NOT TAKEN — three games are live
+
+The market-join coverage probe (PR #25, merged as `15b4f4bb`) is ready and is
+**NOT** being deployed. `live-odds-worker` restarting now would interrupt
+momentum capture on three in-progress games. Claim `5f6d8ccbd765a956` was
+acquired at 23:21:55Z, the slate was checked, and the claim was **released
+without deploying** rather than held idle against other sessions.
+
+**This is the cost I paid twice today by not checking** — once with a
+three-hour-stale reading, once on an expired claim. Both were survivable only
+because nothing was live. Something is live now, so the deploy waits.
+
+**And waiting is not merely defensive: tonight's slate is the asset.**
+`live_momentum_<date>.jsonl` is the CLOCK BRIDGE the join requires, and it is
+being written right now for three games. Deploying into that would destroy
+part of the very data the probe is meant to measure.
+
+Queued for after the slate: `SYNDICATE_WNBA_MARKET_JOIN_PROBE=2026-08-11..
+2026-08-24` on `live-odds-worker`, once `live_events=0`.
