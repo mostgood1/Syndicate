@@ -24660,3 +24660,35 @@ There is no play-level history in this repo — measured, not assumed:
     one WNBA season   ~1.8 min -> ~1,144 quarter outcomes
 
 Roughly seventy nights of live capture, for about two minutes of fetching.
+
+## 2026-08-23 16:47:55Z — live-odds-worker `0f58cf02` — season pull RETRY after a 400
+
+- **deploy:** `dep-da5i8eu417fc73fj0lr0`
+- **verify:** PENDING — `WROTE date=... games=N rows=N` in place of `SCOREBOARD_FAILED`.
+
+### THE FIRST ATTEMPT 400'd ON EVERY DATE, AND IT WAS A RETYPED URL
+
+    [backfill] SCOREBOARD_FAILED date=2026-06-19 HTTPError: HTTP Error 400
+
+...repeated across the whole range at 16:04Z. `_SPORT_PATH["wnba"]` is already
+`"sports/basketball/wnba"`; the backfill rewrote the scoreboard URL by hand and
+prefixed `sports/` a second time, so every request went to
+`.../v2/sports/sports/basketball/wnba/scoreboard`.
+
+**NOT the 403 UA trap this subsystem documents at length.** A plain 400, from a
+URL typed wrong ten lines from one that already worked. The lesson is narrower
+and more useful than "be careful with ESPN hosts": *a URL that is known to work
+is reused, not retyped.* There is now one `scoreboard_url()` and both callers
+share it — pinned by a test asserting they are the SAME FUNCTION OBJECT, so the
+divergence cannot come back.
+
+### THE FAILURE DESIGN EARNED ITS KEEP ON ITS FIRST REAL OUTING
+
+Every date failed FAST and was NAMED; nothing hung; no sentinel was written;
+and the run exited **3, not 0**.
+
+That last one is what mattered. Exiting 0 would have written the sentinel and
+marked the season permanently "done" having fetched nothing — the exact "silent
+empty run mistaken for an off-season" case the exit code was written for. It
+fired correctly the first time it was needed, which is more than most such
+guards ever get to prove.
