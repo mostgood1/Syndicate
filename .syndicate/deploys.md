@@ -25128,3 +25128,74 @@ verify: PENDING, two readings, both from this deploy's logs —
   - `[situational] TEAM_SPREAD`, on whether three-point share spreads wider than
     points per possession — i.e. whether team identity belongs in an interval
     total's VARIANCE rather than its centre.
+
+### verify for `dep-da5neee417fc7382de70` — 22:46:50Z — HELD-OUT, and the answer needs a caveat
+
+    [interval] SEASON games=282 train_games=193 test_games=89 train_days=69/99
+               league_ppp=1.1169
+    [interval] FITTED_RATES late_window=60s pace_normal=3.756 ppp_normal=1.1181
+               pace_late=4.681 ppp_late=1.1078 pace_lift=1.246x
+
+    BUCKET left=0-60s    n=356  naive_zero=2.00  league_rate=1.82 game_pace=1.68 league_late=1.59 best=league_late
+    BUCKET left=60-120s  n=712  naive_zero=6.00  league_rate=2.13 game_pace=2.15 league_late=2.19 best=league_rate
+    BUCKET left=120-240s n=1424 naive_zero=13.00 league_rate=2.88 game_pace=3.25 league_late=2.65 best=league_late
+    BUCKET left=240-420s n=2136 naive_zero=24.00 league_rate=4.03 game_pace=4.48 league_late=3.98 best=league_late
+    BUCKET left=420-600s n=2136 naive_zero=38.00 league_rate=5.73 game_pace=6.79 league_late=5.12 best=league_late
+
+    GAME_PACE_VS_LEAGUE  improvement=-0.373 -- game pace does NOT help
+    LATE_SPLIT_VS_LEAGUE improvement=+0.177 -- the final-minute split helps
+
+**THE PRE-REGISTERED CRITERION IS MET AND I AM NOT CLAIMING THE MECHANISM.**
+`league_late` wins 4 of 5 buckets and +0.177 points on dates it was not fitted
+on. But it differs from `league_rate` in TWO ways — `league_rate` uses THIS
+GAME's pace for the possession count and only borrows league efficiency, while
+`league_late` uses neither — so the win is not attributable.
+
+Two readings say the pace source is doing most of it:
+- the LARGEST absolute gain is at `left=420-600s` (5.73 -> 5.12), where at most
+  60 of 600 seconds are late and the mechanism can barely apply;
+- `left=60-120s` got WORSE (2.13 -> 2.19), which a real final-minute effect
+  should not do.
+
+`league_flat` (blended league pace, league PPP, no split) shipped in PR #23 as
+the matched control, reported as `PACE_SOURCE` and `LATE_SPLIT_VS_FLAT`. The old
+line is renamed `..._CONFOUNDED` so it cannot be quoted as evidence.
+
+**CORRECTION TO A NUMBER I GAVE.** I reported the final minute as "~17% faster"
+from the situational table (4.52/3.87). The clean fit — where `pace_normal`
+excludes the late windows entirely rather than averaging bucket medians — says
+**1.246x, ~25%**. The larger figure is the better-founded one.
+
+### and the TEAM question, answered against my own stated prior
+
+    [situational] TEAM_SPREAD teams=15 three_share=0.279-0.449 (1.61x)
+                  ppp=1.039-1.204 (1.16x) ppp_sd=0.993-1.102 (1.11x)
+
+I predicted three-point share would be a VARIANCE parameter — a 3 at ~33% and a
+2 at ~47% are worth nearly the same per attempt, so share should move the tail
+and not the centre. **Measured, it is the other way round.** Team scoring MEAN
+spreads 1.16x (1.039 to 1.204 points per possession) while team scoring SD
+spreads only 1.11x (0.993 to 1.102). The mean moves more than the tail.
+
+That is a cleaner result than the hypothesis would have been: **team identity
+belongs in the CENTRE of an interval total, not its uncertainty.** 0.165 points
+per possession across ~20 possessions per team per quarter is ~3.3 points of
+quarter total between the league's extremes — material against a line that moves
+in half-points.
+
+### and a contamination the new diagnostic caught on its first run
+
+    CELL margin=0-5    left=0-120s left_vals=[0, 60]
+    CELL margin=5-10   left=0-120s left_vals=[0, 60]
+    CELL margin=10-20  left=0-120s left_vals=[60]
+    CELL margin=20-999 left=0-120s left_vals=[60]
+
+`left=0` is OVERTIME — `period_bounds` folds OT into the last regulation period
+and returns left=0.0, which buckets as `0-120s`. It appears in exactly the two
+CLOSE cells because only close games reach overtime, so the contamination was
+correlated with the axis being measured. Excluded and counted in PR #23.
+
+**The `left_vals` line was added an hour earlier for a different reason** — to
+stop `left=0-120s` being read as a swept range when it is one sampled point. It
+found a bug it was not looking for, on its first production run. Cheap
+diagnostics that state what a number IS keep paying out.
