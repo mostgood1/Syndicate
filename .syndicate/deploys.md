@@ -24074,6 +24074,129 @@ consecutive rows as equally spaced will be wrong by a factor of ~4 across that
 gap. Phase C reads `as_of_seconds` off each row and works in game time; row
 index is not a clock.
 
+
+## 2026-08-23 00:25:16Z -- refresh-worker `473f55fa` -- #524 order->close CLV grader
+
+what: `syndicate/features/shared/order_clv.py` wired into `run_portfolio_commit`,
+printing `[order_clv] ORDER_CLV ...` every slate. Grades placed orders against
+the CLOSE -- Stage C's literal gate input, which nothing could compute before.
+
+claim: held by this lane throughout, `target=d5014346`, 35 min at deploy time.
+live was `71d518a4` (a peer's, live 00:23:42Z); `merge-base --is-ancestor` TRUE,
+so cumulative. Waited for their deploy to settle rather than stacking on an
+`update_in_progress`.
+
+cost: near-zero, and by luck rather than planning -- the worker had just
+restarted, 3 processes at **29.1%** memory, one single-game `tip_off_window` sim
+(pk 823261). Cheapest window of the night.
+
+### THE MARK FIX IS CONFIRMED -- the reading `#522` owed
+
+    LIVE_MARKS 00:21:51Z orders=35 marked=8 toward=5 against=1
+      avg_clv_pct=10.3277 reasons={'marked': 8, 'market_not_on_board': 27}
+
+Against the pre-fix baseline of `marked=0` (23:41:55Z, `book_no_longer_quoting:
+21`) and `marked=1-2 of 29` (23:52-23:58). **`book_no_longer_quoting` is now
+ZERO**: the residual 27 are `market_not_on_board`, i.e. games that started. That
+split is the proof -- when the market is on the board, our book is quoting it and
+it marks. The defect was the join, exactly as diagnosed.
+
+**THE NUMBER IS NOT A RESULT AND MUST NOT BE QUOTED AS ONE.** `avg_clv_pct
+=10.3277` is n=8, taken at 00:21 against a FINISHED slate, so whatever remains
+quotable may be stale or settling rather than a live line. The join being
+correct says nothing about whether an 8-sample tail-end average means anything.
+**Owed: a MID-SLATE reading before anyone reads anything into the value.**
+
+### CORRECTION TO THE 23:23Z ENTRY -- the claim did not protect anything
+
+That entry concluded "a hold is exactly when to hold the claim". I then held it
+for 35 minutes with `target=` set, and a peer deployed refresh-worker anyway at
+00:17:33Z. **The claim is ADVISORY for MCP deploys, not binding.**
+`.claude/settings.json` matches `deploy-guard.py` on `"Bash|PowerShell"`, so an
+MCP `trigger_deploy` never consults `deploy_claim` at all.
+
+Holding it is still right -- it is the only state another session can read, and
+it does bind Bash-driven deploys -- but I stated it as protection and it is not.
+If binding coverage is wanted, the guard needs a matcher for the Render MCP tool
+names; that is a settings change and nobody's lane tonight.
+
+verify: **SATISFIED 00:48:00Z, instance `-jbwkx`:**
+
+    [order_clv] ORDER_CLV date=2026-08-22 orders=39 resolved=4 markets=3
+      same_book_n=4 same_book_avg_clv_pct=2.1573 same_book_beat=3
+      reasons={'no_close_for_market': 35, 'resolved': 4}
+
+The grader works end to end, and all 4 pairs are SAME-BOOK -- better than
+`clv_join`'s own 150-opening measurement, which recorded `same_book n=0`. So a
+placed order carries enough identity to make the unbiased comparison, which is
+the one Stage C's headline requires. **n=4 is not a result and the +2.1573 must
+not be quoted as one.**
+
+**THE FINDING IS THE 35, AND IT REFRAMES STAGE C.** The pre-registered failure
+mode was `resolved=0` meaning the odds-history shard was not reaching this
+service. It is 4, not 0, so the shard arrives. This is instead the capture-side
+gap `compute_clv_for_date` already documents: of 78 openings, 32 missed because
+the market was in history but OUR BOOK was not, and 18 because the family is
+absent from history entirely (`h2h_lay`, `totals_alt`, `h2h_3_way`,
+`spreads_alt`). Tonight's orders are full of exactly those families.
+
+So the Stage C constraint I reported earlier -- "7-8 positions/night makes
+per-market n=50 take months" -- was the wrong constraint. **The binding one is
+that odds history does not capture the market families the portfolio bets in.**
+At 4 graded bets per slate across 3 markets the gate is not months away, it is
+unreachable on the current capture, and widening the slate would not fix it.
+
+**AND I FLATTENED THE ATTRIBUTION I HAD.** `order_clv`'s own comment says
+`compute_clv_for_date` counts WHY each opening went unresolved and that the
+detail is "preserved there rather than flattened into this one name" -- then the
+code keeps only `rows` and discards `unresolved`. So `no_close_for_market: 35`
+is a number without the split that already exists one layer down. Same shape as
+the bug the named reasons caught in `position_marks`. **NEXT: carry `unresolved`
+through, so 35 splits into our-book-absent vs family-untracked -- different
+problems with different remedies (book coverage vs capturing those families or
+excluding them from the gate).**
+
+superseded OWED line, kept for the record: `resolved=N` with N > 0. Expect N=0 for
+today and non-zero for the PRIOR date: a close only exists once a market has
+stopped moving, which is why this runs over the ledger and not over today's
+positions. `resolved=0` with `reasons={'no_close_for_market': N}` on a date whose
+games finished hours ago would mean the odds-history shard is not reaching this
+service, NOT that the grader is wrong.
+
+## 2026-08-23 00:45-00:49Z — refresh-worker `33bd5150` — `#523` soccer live-state join + `#525` row budget — DEPLOYED, OUTCOME NOT YET MEASURED
+
+`lane layer2-sim-view-and-live-projection`, claim `32799d0dcab084c1` (taken with
+`--force`: my own earlier claim was still held at 38.6 min and this is the same
+lane re-entering, not a break-in on another session). `dep-da545hou01pc73du9i70`
+live 00:49:21Z.
+
+**`#523` IS CONFIRMED LIVE, by lineage rather than by effect.** My earlier deploy
+of it (`dep-da53o7ajobas73deqkt0`, live 00:23:42Z) was `deactivated` at 00:28:57Z
+— superseded by a peer's `473f55fa`, NOT rolled back. Checked rather than assumed:
+`git merge-base --is-ancestor 6952bb9d 473f55fa` passes, so the fix survived the
+supersession, and this deploy carries it too.
+
+**WHAT IS NOT MEASURED, and I am not going to imply otherwise.** No
+`LAYER2_BOARD_HEALTH` line has been emitted in the 24 minutes since this went
+live. The worker is alive and doing real work — instance `wl6f8`, no traceback,
+no OOM, no `WORKER_SHUTDOWN` — but it is grinding through the 2026-08-23 card
+build (`resolved_date: 2026-08-23`, `cards_context_*` stages, memory 87.1% with
+`climb_mb_per_s: 39.1`). The day rollover is expensive and it is holding the
+shortlist. So all three readings this deploy exists to produce are still pending:
+
+    #523   LIVE_PROJECTION_JOIN sport=soccer considered=   must exceed 0
+                                                            (was 0 with
+                                                             lens_live_games=6)
+           LAYER2_BOARD_HEALTH sport=soccer live_rows=      must exceed 3
+    #525   KEYVALUE_WRITE_LARGE size_bytes=                 must stay ~5.7MB
+           SHORTLIST_SHED_TO_FIT                            must NOT appear
+
+**24 minutes without a shortlist is itself worth a second look** — the cold-boot
+window recorded in this ledger is 10-19 minutes. It may be nothing more than the
+rollover, and this is the first rollover observed at 400 rows/sport with four
+sports live. If the next check still shows none, that is a finding in its own
+right and not a slow build.
+
 ## 2026-08-23 01:14Z — ALL THREE SERVICES `fb39476c` — `#514` momentum reaches a card
 
 - **web** `dep-da54iv0u01pc73dvjutg` · **live-odds-worker** `dep-da54j33bc2fs73fq82cg` · **refresh-worker** `dep-da54j48u01pc73dvkgcg`

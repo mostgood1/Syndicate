@@ -786,7 +786,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `WNBA_SCOPED_SMART_SIM_RESIM_TRIGGERED matchups=GSV-MIN`. Unowned as far as this lane knows.
 - Blocked by: none.
 
-### soccer-board-mlb-parity — OPEN, UNOWNED (session `f98be73b` checkpointed 2026-08-22 22:3xZ) — **`#518` FOTMOB MOMENTUM BUILT, TESTED, DEPLOYED — live-odds-worker `94a16efe`, live 22:18:35Z. The event-signal sweep (momentum/xG/shot pressure) was killed by a null control (23 real vs 16.4 mean null); a pooled 60-120s model DOES carry signal, driven by FotMob's own momentum series, and it is DIRECTIONAL (which team scores next, dAUC +0.071) not whether/how-many/when (+0.0007). Production's ESPN-commentary momentum proxy carries NO signal at any half-life 30s-1800s — retired, not fixed. 5,552-match dataset committed (`reports/soccer_backtest/fotmob_2y.json.gz`).** OWED: the FotMob match-id join has never resolved a real fixture — next window is 6 MLS kickoffs 2026-08-23T01:30Z, check documented in `deploys.md`. Full detail: `state.md [soccer-live-momentum]`, `log/2026-08-22.md` 22:0x-22:3xZ entry. — opened 2026-08-20 — session f98be73b-b686-42b7-bdf9-248ab97f65b7
+### soccer-board-mlb-parity — OPEN, UNOWNED (session `f98be73b` checkpointed 2026-08-22 23:2xZ) — **TWO THINGS DEPLOYED TONIGHT. (1) `#518` FOTMOB MOMENTUM — live-odds-worker `94a16efe`, live 22:18:35Z: the event-signal sweep (momentum/xG/shot pressure) was killed by a null control, but a pooled 60-120s model IS real and DIRECTIONAL (which team scores next, dAUC +0.071), driven by FotMob's own momentum series; production's ESPN proxy carries NO signal at any half-life — retired. 5,552-match dataset committed. (2) COMPACT CARD REDESIGN — web `a1dc1e9a`, live 23:08:55Z, VERIFIED ON PRODUCTION HTML: pregame cards show sim-projected totals + BTTS/goals/corners/top-score; final cards RECONCILE those same facts against the real result (19 hit/62 miss on today's slate, spot-checked by hand).** OWED: (a) the FotMob join has never resolved a real fixture — MLS kickoff 2026-08-23T01:30Z is the first test; (b) the live-odds market-pricing pilot sits at 1.46 SE, n=106, needs ~2 more match-days. Full detail: `state.md [soccer-live-momentum]` + `[soccer-compact-cards]`, `log/2026-08-22.md` 22:0x-23:1xZ entries. — opened 2026-08-20 — session f98be73b-b686-42b7-bdf9-248ab97f65b7
 - Goal (unchanged): `/soccer` serves a date-scoped board whose cards carry the
   same information classes MLB's do, and whose live tier updates during a match.
 - **OWED, and not claimed as done:**
@@ -805,6 +805,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
      sits at 1.46 SE, n=106 — needs ~2 more match-days of capture to resolve.
 - Files: `syndicate/features/shared/{board_enrichment,soccer_live_gameline_source,soccer_projections,layer2_board,publication_adapter,live_lens_loop}.py`,
   `syndicate/features/soccer/{cards.py,features/live_lens.py,features/lineups.py,ingestion/fotmob_*.py}`,
+  `syndicate/templates/shared/_scoreboard_strip_soccer.html`, `syndicate/static/shared/dense_cards.css`,
   `scripts/{build_soccer_artifacts,backtest_soccer_live_totals,poll_soccer_live_state,soccer_*}.py`,
   `tests/test_soccer_*`, `tests/test_fotmob_*`.
 - **NOT IN THIS LANE:** `syndicate/features/soccer/sim_engine/`, adapters,

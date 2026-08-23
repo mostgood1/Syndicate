@@ -45,6 +45,14 @@ would be wrong in both directions at once. Every movement number goes through
 function the CLV path uses -- one convention for one quantity, so this page can
 never disagree with the ledger it previews.
 
+**THE TWO PAPER BOOKS ARE MARKED TOGETHER AND REPORTED APART.** `paper2` writes
+its venue-restricted orders into the SAME ledger, distinguished only by `venue`.
+Marking them in one pass is right -- they are re-priced against the same board --
+but a single `avg_clv_pct` over both describes neither portfolio, and it is the
+comparison between them that paper2 exists to produce. So `by_venue` carries a
+separate movement figure per book, and the pooled average is kept only as the
+whole-ledger number it actually is.
+
 WHY THE WORKER DOES THIS. Marking needs the current board, and the web service
 does not compute -- a request handler indexing ~1,200 rows per pageview is the
 recompute the architecture forbids. `run_portfolio_commit` already holds those
@@ -146,6 +154,9 @@ def mark_orders_to_board(
                     "opening_key": key,
                     "taken_price": taken,
                     "taken_book": taken_book,
+                    # Which portfolio placed it: `paper` unrestricted,
+                    # `paper:kalshi` for paper2.
+                    "venue": order.get("venue"),
                     "marked_at": marked_at,
                     "reason": reason,
                     **extra,
@@ -216,8 +227,34 @@ def mark_orders_to_board(
         # page is being read to answer. Stage C does the weighted version
         # against the close, where it belongs.
         "avg_clv_pct": round(sum(clv_points) / len(clv_points), 4) if clv_points else None,
+        # PER BOOK. The pooled `avg_clv_pct` above is the whole ledger's and
+        # describes neither portfolio on its own once paper2 is running.
+        "by_venue": _by_venue(marks),
         "marks": marks,
     }
+
+
+def _by_venue(marks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    buckets: dict[str, list[Mapping[str, Any]]] = {}
+    for mark in marks:
+        buckets.setdefault(str(mark.get("venue") or ""), []).append(mark)
+    out: list[dict[str, Any]] = []
+    for venue, group in sorted(buckets.items()):
+        clvs = [m["clv_pct"] for m in group if m.get("clv_pct") is not None]
+        out.append(
+            {
+                "venue": venue,
+                # `n` is marked orders, not orders seen: an unmarked order
+                # contributes nothing to the average and must not inflate its
+                # denominator.
+                "n": len(clvs),
+                "orders": len(group),
+                "avg_clv_pct": round(sum(clvs) / len(clvs), 4) if clvs else None,
+                "moved_toward": sum(1 for c in clvs if c > 0),
+                "moved_against": sum(1 for c in clvs if c < 0),
+            }
+        )
+    return out
 
 
 def marks_report_line(report: Mapping[str, Any]) -> str:
@@ -231,4 +268,5 @@ def marks_report_line(report: Mapping[str, Any]) -> str:
         f" against={report.get('moved_against')}"
         f" avg_clv_pct={report.get('avg_clv_pct')}"
         f" reasons={report.get('reasons')}"
+        f" by_venue={[(e.get('venue'), e.get('n'), e.get('avg_clv_pct')) for e in (report.get('by_venue') or [])]}"
     )

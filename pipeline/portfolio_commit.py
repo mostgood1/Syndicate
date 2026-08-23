@@ -23,6 +23,14 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from syndicate.features.shared.portfolio_commit import commit_portfolio
+from syndicate.features.shared.venue_scope import (
+    scope_rows_to_venue,
+    venue_scope_report_line,
+)
+from syndicate.features.shared.order_clv import (
+    clv_for_orders,
+    order_clv_report_line,
+)
 from syndicate.features.shared.position_marks import (
     mark_orders_to_board,
     marks_report_line,
@@ -56,6 +64,46 @@ def portfolio_plan_path(selected_date: str) -> Path:
     # `portfolio_settings._settings_path` for the date-free form.
     suffix = str(selected_date or "").strip().replace("-", "_")
     return reports_root() / "intelligence" / f"portfolio_plan_{suffix}.json"
+
+
+def portfolio_plan_path_for_venue(selected_date: str, venue: str) -> Path:
+    """`paper2`'s artifact -- a SEPARATE file, never a field on the main plan.
+
+    Two portfolios that answer different questions must not share a document:
+    `/portfolio/paper` reads the unrestricted plan and would otherwise have to
+    know which positions were which, and Stage C's per-market aggregates would
+    silently mix a best-book book with a Kalshi-only one. Same date-tokened
+    shape and the same 10-day TTL reasoning as the main plan.
+    """
+    suffix = str(selected_date or "").strip().replace("-", "_")
+    token = str(venue or "").strip().lower().replace("-", "_")
+    return reports_root() / "intelligence" / f"portfolio_plan_{token}_{suffix}.json"
+
+
+def read_portfolio_plan_for_venue(
+    selected_date: str | None, venue: str
+) -> dict[str, Any] | None:
+    normalized = str(selected_date or "").strip()
+    if not normalized:
+        return None
+    payload = read_json_file(portfolio_plan_path_for_venue(normalized, venue))
+    return payload if isinstance(payload, dict) else None
+
+
+def paper2_venue() -> str:
+    """The venue `paper2` scopes to. Default `kalshi`, empty disables.
+
+    Defaults ON rather than dark, and the reasoning differs from a normal new
+    job: this places nothing by itself (the execution flag still gates that),
+    writes one small artifact, and its ENTIRE value is a comparison that only
+    accrues with elapsed time. A flag defaulting off would mean it silently
+    collects nothing while looking installed -- `#284`'s "absent is not off"
+    read in the direction that costs data rather than money.
+    """
+    raw = os.environ.get("SYNDICATE_PAPER2_VENUE")
+    if raw is None:
+        return "kalshi"
+    return str(raw).strip().lower()
 
 
 def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
@@ -195,6 +243,32 @@ def run_portfolio_commit(
     except Exception as exc:
         print(f"[portfolio_commit] LIVE_MARKS_FAILED date={normalized} error={exc}", flush=True)
 
+    # STAGE C'S GATE INPUT: what our placed orders got against the CLOSE.
+    # Distinct from the join below, which is orders -> OPENING. A close only
+    # exists once a market has stopped moving, so most of the day this resolves
+    # nothing for today and everything for yesterday -- which is why it runs
+    # over the ledger rather than over today's positions, and why an unresolved
+    # row is named rather than dropped.
+    try:
+        from syndicate.features.shared.execution_ledger import _load as _load_ledger_for_clv
+
+        dated_orders = [
+            order
+            for order in (_load_ledger_for_clv().get("orders") or [])
+            if order.get("selected_date") == normalized
+        ]
+        if dated_orders:
+            order_clv = clv_for_orders(dated_orders, date=normalized)
+            print(order_clv_report_line(order_clv), flush=True)
+            # `rows` dropped from the artifact for the same reason as the join
+            # below: it duplicates every order against an 8MB ceiling. The
+            # per-market aggregates are what a reader needs, and they carry `n`.
+            plan["order_clv"] = {
+                key: value for key, value in order_clv.items() if key != "rows"
+            }
+    except Exception as exc:
+        print(f"[portfolio_commit] ORDER_CLV_FAILED date={normalized} error={exc}", flush=True)
+
     clv_join = None
     try:
         report = join_positions_to_openings(plan.get("positions") or [], date=normalized)
@@ -228,7 +302,62 @@ def run_portfolio_commit(
         f"refusals={plan.get('refusals')}",
         flush=True,
     )
-    return {"status": "ok", "date": normalized, "plan": plan, "clv_join": clv_join}
+    # ---- paper2: the same pipeline, restricted to one venue's prices --------
+    #
+    # Answers the question Stage D's plan says to answer with numbers rather
+    # than in advance: the legally automatable venues trade mostly
+    # moneyline/spread/total, while this board's edge is in props. If the
+    # venue-scoped book has no edge, no placer is worth writing.
+    #
+    # Runs AFTER the main plan is on disk, and wrapped, so the comparison can
+    # never cost the portfolio it is being compared against.
+    venue_plan = None
+    venue = paper2_venue()
+    if venue:
+        try:
+            scoped, scope_refusals = scope_rows_to_venue(rows, venue)
+            print(
+                venue_scope_report_line(venue, len(rows), len(scoped), scope_refusals),
+                flush=True,
+            )
+            venue_plan = commit_portfolio(
+                scoped,
+                selected_date=normalized,
+                settings=resolve_settings(),
+                settled_sample_size_by_sport=settled_sample_size_by_sport,
+            )
+            venue_plan["venue"] = venue
+            venue_plan["venue_scope_refusals"] = scope_refusals
+            venue_plan["job_state"] = dict(plan.get("job_state") or {})
+            write_json_file(portfolio_plan_path_for_venue(normalized, venue), venue_plan)
+            venue_totals = venue_plan.get("totals") or {}
+            main_totals = plan.get("totals") or {}
+            print(
+                f"[portfolio_commit] PAPER2_PLAN_WRITTEN date={normalized} venue={venue} "
+                f"rows_in={len(scoped)} positions={venue_totals.get('positions')} "
+                f"staked=${venue_totals.get('staked_dollars')} "
+                # Side by side on ONE line, because the comparison IS the
+                # deliverable and reading it off two lines invites pairing the
+                # wrong two runs.
+                f"vs_unrestricted_positions={main_totals.get('positions')} "
+                f"vs_unrestricted_staked=${main_totals.get('staked_dollars')} "
+                f"refusals={venue_plan.get('refusals')}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                f"[portfolio_commit] PAPER2_FAILED date={normalized} venue={venue} error={exc}",
+                flush=True,
+            )
+
+    return {
+        "status": "ok",
+        "date": normalized,
+        "plan": plan,
+        "clv_join": clv_join,
+        "venue_plan": venue_plan,
+        "venue": venue or None,
+    }
 
 
 def main() -> int:

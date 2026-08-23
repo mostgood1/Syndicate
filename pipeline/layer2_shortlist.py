@@ -132,10 +132,12 @@ def build_layer2_shortlist(
             # because `c324447d` proved these files do not move together.
             try:
                 from syndicate.features.shared.board_enrichment import (
+                    attach_live_game_state_from_lens,
                     attach_live_gamelines_for_sport,
                     attach_live_projections_for_sport,
                 )
             except ImportError:
+                attach_live_game_state_from_lens = None  # type: ignore[assignment]
                 attach_live_gamelines_for_sport = None  # type: ignore[assignment]
                 attach_live_projections_for_sport = None  # type: ignore[assignment]
             from syndicate.features.shared.book_grid import build_book_grid
@@ -297,6 +299,45 @@ def build_layer2_shortlist(
             enrichment: dict[str, object] = {}
             for step, fn in (
                 ("game_state", lambda: attach_game_state(grid, sport=sport, selected_date=selected_date)),
+                # `#523`. THE THIRD MISSING JOIN, and the comment above this loop
+                # already names the shape: two joins "ran only for the serve-time
+                # endpoint" and were added here. `attach_live_game_state_from_lens`
+                # is the one that was left, and it is the one the other two depend
+                # on.
+                #
+                # `book_grid_artifact.py:221` runs it and says why the POSITION
+                # matters (`#413`): `live_edge_policy` decides whether a row may
+                # carry an edge by reading `game.state`, so the correction has to
+                # land while it can still change an answer. Same position here --
+                # after the chip join, before projections.
+                #
+                # WHY IT WAS INVISIBLE, and why MLB never showed it: MLB's chips
+                # are StatsAPI-derived and already carry a real live status, so
+                # `attach_game_state` alone is enough and MLB's live tier worked.
+                # Soccer's chips come from `_unsimulated_game`, which defaults
+                # `status_state` to `"pre"` for every league the sim does not
+                # cover -- nine of ten. Only this correction ever makes those rows
+                # live, and it was not running.
+                #
+                # MEASURED 2026-08-22 23:58:21Z, the reading that found it:
+                #
+                #     LIVE_PROJECTION_JOIN sport=soccer considered=0 projected=0
+                #                          lens_indexed=864 lens_live_games=6
+                #
+                # Six live matches indexed and ZERO rows considered.
+                # `attach_live_gamelines` counts a row only after
+                # `game.state in {live, in_progress}` (`live_gameline_join.py:807`),
+                # so `considered=0` is not a join that priced nothing -- it is a
+                # join no row reached. Soccer `live_rows` had been 0 on the board
+                # across three separate readings while its quote age fell 32x.
+                (
+                    "live_game_state",
+                    (
+                        (lambda: attach_live_game_state_from_lens(grid, sport=sport, selected_date=selected_date))
+                        if attach_live_game_state_from_lens is not None
+                        else None
+                    ),
+                ),
                 ("projections", lambda: attach_projections(grid, sport=sport, selected_date=selected_date)),
                 ("margin_model", lambda: attach_margin_model(grid)),
                 # Same functions the serve-time endpoint calls

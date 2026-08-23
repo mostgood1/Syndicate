@@ -251,6 +251,30 @@ for `momentum.source == "fotmob"` with a real match id on at least one game --
 a silent 0% resolve rate looks identical to a quiet slate. Full detail:
 `.syndicate/deploys.md` 2026-08-22 22:18:35Z entry.
 
+## [soccer-compact-cards] Pregame + final compact cards redesigned and DEPLOYED, verified on production HTML (2026-08-22)
+
+**Web live 23:08:55Z, SHA `a1dc1e9a`, confirmed via Render API + a direct
+fetch of production HTML** (not just a health check). Two changes to
+`_scoreboard_strip_soccer.html`, both in `syndicate/features/soccer/cards.py`
++ `syndicate/static/shared/dense_cards.css`:
+
+- **Pregame compact card** now shows date/time, away/home rows with each
+  side's sim-projected total, and a BTTS/goals/corners/top-sim-score facts
+  grid (`_compact_pregame_facts`). Verified: `/soccer/cards?date=2026-08-23`
+  served 24/24 cards with the new markup.
+- **Final compact card** now RECONCILES those same four facts against the
+  real result (`_compact_final_reconciliation`) -- graded only where a real
+  market line existed; an uncaptured market reports projected-vs-actual with
+  no fabricated hit/miss. Verified: `/soccer/cards?date=2026-08-22` served 38
+  finals with real hit/miss counts (19 hit / 62 miss); one card spot-checked
+  by hand (Man Utd vs Hull City) matched the expected grading exactly,
+  including the "no market line -> no verdict" rule.
+
+Both reuse the SAME `_compact_pregame_facts(...)` call (hoisted to a local
+before the per-game dict's `return`), so the two cards can never show
+disagreeing projections for one match. 29 new tests. Deploy measurement:
+`.syndicate/deploys.md` 2026-08-22 23:08:55Z entry.
+
 ## [refresh-worker-memory] MEMORY — refresh-worker: THE OOM IS FIXED; A SLOW RATCHET REMAINS `[verified 2026-08-17, superseding four earlier sections]`
 
 **This section replaces the 08-16 "allocator still unnamed" narrative entirely.

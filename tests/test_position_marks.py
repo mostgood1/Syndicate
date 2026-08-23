@@ -203,3 +203,33 @@ def test_report_line_names_the_counters_worth_acting_on():
     assert "LIVE_MARKS" in line
     for token in ("orders=", "marked=", "toward=", "against=", "avg_clv_pct=", "reasons="):
         assert token in line, token
+
+
+def test_marks_are_split_per_paper_book():
+    """One pooled avg_clv_pct over both portfolios describes neither, and the
+    comparison between them is what paper2 exists to produce."""
+    taken = _row(price=-110)
+    now = _row(price=-130)
+    orders = [
+        _order(taken, idempotency_key="k1", venue="paper"),
+        _order(taken, idempotency_key="k2", venue="paper:kalshi"),
+    ]
+    report = mark_orders_to_board(orders, [now])
+    by_venue = {e["venue"]: e for e in report["by_venue"]}
+    assert set(by_venue) == {"paper", "paper:kalshi"}
+    assert by_venue["paper"]["n"] == 1
+    assert by_venue["paper:kalshi"]["n"] == 1
+
+
+def test_by_venue_n_counts_MARKED_orders_not_orders_seen():
+    """An unmarked order contributes nothing to the average and must not
+    inflate its denominator."""
+    taken = _row(price=-110)
+    orders = [
+        _order(taken, idempotency_key="k1", venue="paper"),
+        _order(taken, idempotency_key="k2", venue="paper", opening_key=None, event_id=None),
+    ]
+    report = mark_orders_to_board(orders, [_row(price=-130)])
+    entry = report["by_venue"][0]
+    assert entry["orders"] == 2
+    assert entry["n"] == 1

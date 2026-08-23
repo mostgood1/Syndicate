@@ -1,5 +1,230 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#525` — **The board's row budget is now the WHOLE board's, and a payload that will not fit sheds its worst rows instead of freezing. The NCAAF cliff is removed by construction. FIXED IN CODE, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23, user request
+
+> **RENUMBERED from `#524`, the FIFTH id collision today.** A peer took 524
+> for Stage C order grading and pushed first; their own commit message records
+> having been renumbered off 523 by this entry's predecessor an hour earlier.
+> Two sessions appending to the top of one file cannot allocate ids by reading
+> it — the read and the write are not atomic, and today that raced five times.
+> Code comments and tests were renumbered with this entry.
+
+
+**THE READING.** Production, 2026-08-23T00:0xZ, four sports all at the 400/sport cap:
+
+    LAYER2_SHORTLIST rows=1600
+    KEYVALUE_WRITE_LARGE size_bytes=5,747,257 max_bytes=8,388,608     68.5%
+
+3,592 bytes/row. Headroom 2,641,351 B ≈ **735 rows — less than two more sports
+at cap.** It was 4,434,665 B (52.9%) at 20:56Z, so it grew 30% in three hours,
+and both drivers were mine: the 100 → 400 cap raise and the refresh fix that
+took NFL from 23 rows to 400.
+
+    now, 4 sports        1,600 rows   5.75 MB   68.5%
+    + ncaaf   ~08-29     2,000 rows   ~7.19 MB  86%
+    + ncaab   November   2,400 rows   ~8.62 MB  BREACH
+
+**The cliff is on the CALENDAR.** It arrives whether or not anyone edits this
+code, and `per_sport` alone cannot prevent it because it scales the payload with
+the number of sports in season — a fact nobody sets and nobody reviews.
+
+**AND IT ARRIVES AS THE WORST AVAILABLE FAILURE.** At `>= _keyvalue_max_bytes`
+`write_json_file` RAISES, and both call sites of `write_layer2_shortlist` catch
+it and return (`intelligence_state.py:3609`, `:4970`). The worker keeps running,
+keeps rebuilding, keeps failing to persist, and the board serves its LAST
+SUCCESSFUL shortlist indefinitely. A crash restarts; a caught refusal does not.
+It presents as "the board is stale", which is the same symptom as a dozen
+unrelated causes.
+
+**FIX 1 — a total budget, allocated by water-filling.** `SYNDICATE_LAYER2_ROWS_TOTAL`,
+default **1600 = exactly today's measured board**, so this is a NO-OP on a
+four-sport slate and only binds when a fifth arrives. `per_sport` stays, as a
+CEILING: it is what stops soccer's 20,025 grid rows owning the whole budget.
+
+Water-filling rather than `total // n`, because a flat share wastes the budget:
+NFL held 275 of a 400 allowance tonight while soccer had 20,025 to offer. Each
+sport gets the smaller of its fair share and what it actually has; what the small
+sports cannot use is re-divided among the ones still asking. Deterministic — the
+remainder of an uneven split lands in the same place every build, or two
+identical pools would produce two different boards.
+
+Under-spending the total is sometimes CORRECT and is tested as such: four sports
+with one holding 23 rows caps out at 1,223 against a 1,600 budget, because
+spending the rest would mean breaching the per-sport ceiling.
+
+**FIX 2 — shed, do not freeze.** Over the ceiling, drop the lowest-ranked rows
+until it fits (rows arrive ranked, so this costs the least valuable first),
+stamp `rows_shed_for_keyvalue` onto the payload, and log `SHORTLIST_SHED_TO_FIT`.
+A smaller board beats a frozen one, and a shed board declares itself rather than
+reading as a thin slate. Never raises: a rescue path that can throw is worse than
+the bug it rescues.
+
+**A BUG MY OWN TEST CAUGHT, worth recording because the first version shipped the
+failure it was written to prevent.** The impossible-case guard was
+`keep >= original`. With a 5,035-byte fixed cost against a 950-byte target,
+`keep` computes to 0, `0 >= 1` is False, and the rescue path shed the board to
+**zero rows** — turning "frozen but populated" into "fresh and empty", which is
+worse than the bug and is precisely the silently-empty failure this repo guards
+against everywhere else. The condition is `base >= target`: if `cards`/`openings`
+alone exceed the ceiling, no number of rows helps, and that needs a different fix
+(move them to their own keys) rather than a shed that cannot work.
+
+**Tests:** `tests/test_shortlist_row_budget.py` (18). Two of my assertions were
+wrong about the arithmetic and the allocator was right — recorded in the test
+bodies rather than quietly corrected, because "the test was wrong" is the more
+common outcome and pretending otherwise teaches the wrong lesson.
+
+**STILL OPEN, and it is the next lever if this is not enough:** the payload is
+not only rows. `cards`, `openings_records`, `clv_openings` and the coverage
+payloads are a large fixed cost that no row budget touches. Moving them to their
+own keyvalue keys is the second reduction and the one that would make the shed
+path unreachable rather than merely rare.
+
+**Verify after deploy:** `KEYVALUE_WRITE_LARGE size_bytes` must stay flat when
+NCAAF joins on ~08-29 — the number to watch is that it does NOT rise toward 7MB.
+`SHORTLIST_SHED_TO_FIT` must NOT appear; if it does, fix 1 failed and fix 2
+caught it.
+### `#524` — **Stage C's gate input now exists: placed orders graded against the CLOSE, per market and per book-scope, with `n` on every aggregate. The chain was one hop short.** — lane `portfolio-decision-and-execution`, 2026-08-23, user request
+
+`clv_opening_ledger` records an opening; `clv_join.compute_clv_for_date` pairs it
+with a close; `#522` connected a committed position to its opening. **Nothing
+connected a PLACED ORDER to a close**, so *did this bet beat the closing line* —
+the literal Stage C gate — could not be computed for a single bet we made.
+
+`syndicate/features/shared/order_clv.py`, wired into `run_portfolio_commit`,
+printing `[order_clv] ORDER_CLV ...` every slate.
+
+**IT COMPOSES, IT DOES NOT RE-RESOLVE.** `compute_clv_for_date` emits one row per
+opening carrying `key`; orders carry `opening_key`; the join is a dict lookup.
+A second copy of close resolution would mean a second copy of the arrow-of-time
+check, the side-aware stamp logic and the different-book fallback — each of which
+cost a measurement. The arrow-of-time one especially: 25 of 25 rows once paired a
+close captured BEFORE the opening and produced a confident `avg_clv_pct
+= -5.215` out of unrelated instants.
+
+**WHAT DIFFERS FROM THE OPENING'S CLV: the price.** `compute_clv_for_date` asks
+what the market did from its first published price. This asks what WE got, from
+the price actually filled — `fill_price` over `requested_price`, because grading
+the request credits us with slippage we never got. Both are carried per row;
+the gap between them is what our TIMING was worth, a different question from
+whether the pick was right.
+
+**SCOPE IS NEVER POOLED, AND THIS IS THE LOAD-BEARING PART.** Measured
+2026-08-14 across 150 openings: `different_book_close` +6.206 avg (29/32 beat),
+`book_agnostic_close` +2.716 (18/27), `same_book` **n=0**. Our book's entry
+against another book's close compares a best-of-N draw to a single draw and is
+biased upward regardless of whether the bet was good. Every aggregate is
+per-scope; the log headline is same-book only, with `same_book_n=` beside it. A
+blended number would be higher than any bet deserved. Note `close_book_scope` is
+stamped only when a FALLBACK was used, so **absent means same-book** — a test
+pins that, because defaulting it to "unknown" would relabel the cleanest rows as
+the dirtiest.
+
+**PER MARKET, NOT POOLED**, with `n` as the first field of every aggregate.
+`_SAMPLE_SIZE_FOR_FULL_CREDIBILITY = 50` is per market, and `learnings.md`
+2026-08-20 records pooling overstating significance 3.4x by counting rows as
+bets. A market with n=2 must not read like a result.
+
+**THE ARITHMETIC PROBLEM I RAISED AND DID NOT SILENTLY "FIX".** Slates commit
+7-8 positions across mlb/nfl/soccer/wnba and many markets, so per-market n=50 is
+months. I did not touch the threshold: it is a documented constant with a stated
+rationale and changing it is the owner's call, not a side effect of building the
+plumbing. What this does instead is make the accumulation rate VISIBLE —
+`by_market` shows exactly how many graded bets each market has — so the decision
+is taken against a number rather than an assumption.
+
+16 tests, weighted toward "a number that looks like a result": blended scopes,
+two-bet market averages, the opening's CLV standing in for ours.
+
+**OWED:** `[order_clv] ORDER_CLV ... resolved=N same_book_n=M` on refresh-worker
+with N > 0. Expect N=0 for most of the day and non-zero for the PRIOR date —
+a close only exists once a market has stopped moving, which is why this runs
+over the ledger rather than over today's positions.
+
+### `#523` — **Soccer's live tier was never reached: the shortlist runs a DIFFERENT enrichment chain from the artifact build, and the one join it was missing is the one the other two depend on. FIXED IN CODE, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+`#521` made soccer's prices 32x fresher and `live_rows` stayed 0 across three
+readings. This is why, and it is not the reason `#520` guessed.
+
+**THE READING THAT FOUND IT** (refresh-worker, 2026-08-22 23:58:21Z):
+
+    LIVE_PROJECTION_JOIN sport=soccer considered=0 projected=0
+                         lens_indexed=864 lens_live_games=6
+
+Six live matches in the index, 864 entries, and **zero rows considered**.
+`attach_live_gamelines` increments `considered` only AFTER
+`game.state in {live, in_progress}` (`live_gameline_join.py:807`), so this is not
+a join that priced nothing — it is a join no row reached. The distinction is the
+whole diagnosis, and it exists only because the counter was placed after the gate
+rather than before it.
+
+**THE CAUSE.** Two paths stamp a row's `game.state`:
+
+    book_grid_artifact.py:215   attach_game_state
+    book_grid_artifact.py:221   attach_live_game_state_from_lens   <-- and its
+                                comment says WHY it is here: `#413`,
+                                `live_edge_policy` reads `game.state`, so the
+                                correction must land while it can still change
+                                an answer
+    layer2_shortlist.py:299     attach_game_state
+                                ...no live-state correction at all...
+
+**MLB HID IT.** MLB's chips are StatsAPI-derived and already carry a real live
+status, so `attach_game_state` alone suffices — MLB had 276 live rows on the same
+board. Soccer's chips come from `_unsimulated_game` (`soccer/cards.py`), which
+defaults `status_state` to `"pre"` for every league the sim does not cover, i.e.
+nine of ten. Only the correction ever makes those rows live, and it was not
+running. A sport-specific dependency on a shared step, where the sport that works
+is the one that does not need it.
+
+**THE COMMENT ABOVE THAT LOOP ALREADY DESCRIBED THIS BUG.** It records two joins
+that "ran only for the serve-time endpoint" and were added to the shortlist —
+`#350`'s fix. A third was left behind, and it is the one the other two READ. A
+partial fix to a drift is how the drift survives, and the note explaining the
+drift is what made the remainder look intentional.
+
+**Fixed** by registering `attach_live_game_state_from_lens` in the shortlist's
+enrichment loop, between `game_state` and `projections`, imported in the OPTIONAL
+block so a rollback costs the live tier and not the whole sport's enrichment.
+
+**Test:** `tests/test_shortlist_enrichment_parity.py` compares the two chains as
+SETS rather than asserting a hand-copied list that would rot the same way, pins
+`#413`'s ordering on BOTH paths, and guards the guard (if both paths lost the call
+the set difference would be empty and report nothing). 5 of its 6 fail against the
+pre-fix file.
+
+**NOT YET MEASURED.** Whether soccer rows then price is a separate question from
+whether they are seen. `considered` should become non-zero; `projected`/`edged`
+may still be 0 for their own reasons, and `#503`'s pricing gap is still open.
+Verify with the same line: `LIVE_PROJECTION_JOIN sport=soccer considered=` > 0,
+then `LAYER2_BOARD_HEALTH sport=soccer live_rows=` > 3.
+
+---
+
+**A CORRECTION TO WHAT `#521` REPORTED ABOUT NFL.** That entry said NFL projection
+coverage "fell 100% -> 10%" and called it the thing to look at next. That framing
+was wrong in two ways, and the second one matters:
+
+1. **Nothing was displaced.** NFL published 275 rows against a 400 cap, so it was
+   not competing for slots. Projected rows went 23 -> 27; the denominator grew by
+   248 and the numerator did not shrink. A rate fell, nothing was lost.
+2. **The unprojected rows are unprojected ON PURPOSE.** `nfl_game_projections.py`
+   applies `live_edge_policy` at the stamp point, and its comment is explicit:
+   NFL has no live re-sim, and "a pregame full-game total priced against a market
+   that has already watched 55 minutes of football is not an edge, it is the
+   score." Measured there: 5 live NFL rows once carried edges of +2.70/-7.03
+   against 34.5-39.5 totals. The guard now fires 248 times a build.
+
+The grid-level join confirms it: `PREGAME_PROJECTION_JOIN sport=nfl
+considered=1427 projected=1021` = **71.5%**, against 10% on the published board.
+The projections exist; the policy withholds them from live rows, correctly.
+
+So this is a guard working, not a regression — and reporting it as a regression
+would have sent someone to fix a coverage gap that is a safety feature. The real
+open item is narrower and should be stated as itself: **NFL has no live re-sim**,
+so its live rows rank on market signals alone (`edged=7` of 275). That is a
+feature request, not a defect.
+
 ### `#522` — **Stage C's precondition was missing and nobody would have noticed until the analysis returned empty: NOTHING joined a committed position to the opening price recorded for its market. Built, plus live marks and three page defects. NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-22, user request
 
 **THE GAP.** `clv_opening_ledger` has been recording openings all along —
@@ -90,10 +315,23 @@ but its opening was never recorded. Deploy held 2026-08-22T23:0x–23:1xZ:
 refresh-worker was running `run_mlb_daily_sim_job.py` (tip-off window, then
 `evening_next_day_sim` for 08-23), and deploying kills an in-flight sim.
 
-**STORAGE NOTE for whoever sizes the window.** `opening_ledger_path` is
-`{date}.jsonl` — **date-tokened, so a 10-day TTL** in the keyvalue store
-(`#284`/`#508`). Stage C's accumulation window has a hard ceiling of ~10 days
-unless openings are copied somewhere durable first.
+**STORAGE — I GOT THIS WRONG FIRST AND IT MATTERS WHICH WAY.** I claimed the
+opening ledger takes the keyvalue store's 10-day TTL because
+`opening_ledger_path` is `{date}.jsonl`, and told the owner Stage C had a
+~10-day ceiling and a running clock. **That is false.** The date-token TTL rule
+applies to `write_json_file`, which routes through `refresh_state_store` to
+keyvalue; `record_openings` writes with `path.open("a")` — plain disk I/O on the
+worker's 50GB mounted disk — and separately calls `publish_hot_artifact`. It is
+also absent from `artifact_retention`'s patterns, and retention is opt-in and
+off by default (`SYNDICATE_ARTIFACT_RETENTION_ENABLED`, module docstring:
+"Nothing ever deleted").
+
+So openings are durable and there is no clock. **The direction of the error is
+the bad part:** it invented urgency and would have bought a "fix" for a
+non-problem, and it was one grep from being checked. The rule the `#284` block
+already states — *check the code's default for any key you touch* — generalises:
+check the WRITE PATH before reasoning about a storage policy, because two files
+in the same directory can have different ones.
 
 ### `#521` — **The 60s live refresh was notional: 5 of 52 ticks launched, and the ones that did spent the budget on a sim. FOUR FIXES IN CODE, TESTED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, user decision ("all sports, when live should refresh every 60 seconds across all markets in the most economical way")
 
