@@ -120,10 +120,32 @@ def build_momentum_block(
         as_of_sec = float(as_of_seconds) if as_of_seconds is not None else last_seconds
         as_of_poss = max((float(row["possession_index"]) for row in pressure if float(row["clock_seconds"]) <= as_of_sec), default=0.0)
 
+        # **THE TRICODES, SO THE BLOCK CAN BE JOINED BY SOMETHING OTHER THAN
+        # ITS OWN KEY.** The artifact is keyed by ESPN event id, and the
+        # consumer does not always have one: a WNBA card whose game is not in
+        # play carries `"AWY@HOM"` or an opaque hash in `event_id`
+        # (`_wnba_row_game_id`), because only `_supplement_games_with_live_
+        # state` repairs it and only for live rows. First production reading of
+        # the card join was `blocks=2 attached=0`.
+        #
+        # `_team_index` has already resolved both sides here -- the sign on
+        # every row depends on it -- so recording them costs nothing and makes
+        # the block self-describing rather than joinable only by a key the
+        # reader may not hold.
+        teams = sorted({str(row.get("team") or "").strip() for row in pressure} - {""})
+        home_side = next(
+            (str(row.get("team") or "").strip() for row in pressure
+             if float(row.get("sign") or 0.0) > 0.0),
+            None,
+        )
+        away_side = next((t for t in teams if t != home_side), None)
+
         block: dict[str, Any] = {
             "schema": SCHEMA,
             "supported": True,
             "reason": None,
+            "home_tri": home_side,
+            "away_tri": away_side,
             "events": len(pressure),
             "as_of_seconds": round(as_of_sec, 3),
             "as_of_possessions": round(as_of_poss, 3),

@@ -62,7 +62,19 @@ from syndicate.features.shared.momentum_core import momentum_at
 # the whole reason both were published (scope section 7, decision 1).
 HALF_LIVES_SECONDS = (60.0, 90.0, 120.0, 180.0)
 HALF_LIVES_POSSESSIONS = (4.0, 6.0, 8.0, 12.0)
-HORIZONS_SECONDS = (60.0, 120.0, 180.0)
+# **HORIZONS ARE THE INTERVALS ACTUALLY TRADED, not round numbers.**
+#
+# The stated purpose of this signal is to inform INTERVAL BETS -- moneyline,
+# spread and over/under on a segment of the game. So the horizon has to be the
+# segment a book actually prices, or the correlation answers a question nobody
+# can bet. Observed live on the WNBA slate 2026-08-23, the discovered market
+# keys for NYL@IND were `h2h_q4`, `spreads_q4`, `totals_q4`, `h2h_h2`,
+# `spreads_h2`, `totals_h2` -- quarters and halves.
+#
+# 600s is a WNBA quarter, 1200s a half. The two short ones stay because a
+# signal that only shows up over a full quarter and not at all over three
+# minutes is a different (and more suspicious) finding than one that does both.
+HORIZONS_SECONDS = (60.0, 180.0, 600.0, 1200.0)
 
 # Probes are placed on a grid rather than at every event, so a stretch with many
 # events does not dominate the correlation purely by being dense.
@@ -120,6 +132,40 @@ def forward_margin(
     return total
 
 
+def forward_total(
+    scoring_rows: Sequence[Mapping[str, Any]],
+    probe: float,
+    horizon: float,
+    *,
+    axis_key: str = "clock_seconds",
+) -> float:
+    """UNSIGNED points by both sides in `(probe, probe + horizon]` -- the
+    over/under outcome.
+
+    **`forward_margin` CANNOT ANSWER A TOTAL, and the difference is the whole
+    point of measuring both.** Margin is who outscored whom; a 14-2 quarter and
+    a 26-14 quarter have the same margin and wildly different totals. Momentum
+    is a signed, side-relative quantity, so there is no reason to assume it
+    carries the same information about both -- it could easily predict WHO
+    scores next while saying nothing about HOW MUCH gets scored, which is
+    exactly the split soccer measured on its own momentum series (directional
+    dAUC +0.071, whether/how-many/when +0.0007).
+
+    Same exclusive-left boundary as `forward_margin`, for the same reason: an
+    event at the probe instant is what we knew, not what happened next.
+    """
+    total = 0.0
+    for row in scoring_rows:
+        try:
+            t = float(row[axis_key])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if t <= probe or t > probe + horizon:
+            continue
+        total += abs(float(row.get("weight") or 0.0))
+    return total
+
+
 def sweep_game(
     summary: Mapping[str, Any],
     *,
@@ -148,7 +194,12 @@ def sweep_game(
             t += PROBE_STEP_SECONDS
         if len(probes) < 3:
             continue
-        outcomes = [forward_margin(scoring, p, horizon) for p in probes]
+        # BOTH OUTCOMES, because they are different bets. `margin` is the
+        # ML/spread question (who outscores whom); `total` is the over/under
+        # question (how much gets scored). A signed signal has no automatic
+        # claim on the second.
+        margins = [forward_margin(scoring, p, horizon) for p in probes]
+        totals = [forward_total(scoring, p, horizon) for p in probes]
         for half_life in HALF_LIVES_SECONDS:
             values = [
                 momentum_at(pressure, p, half_life_seconds=half_life,
@@ -160,7 +211,13 @@ def sweep_game(
                 "half_life": half_life,
                 "horizon_seconds": horizon,
                 "n": len(probes),
-                "r": _pearson(values, outcomes),
+                "r_margin": _pearson(values, margins),
+                # Momentum is SIGNED and a total is not, so the sensible
+                # predictor of a total is its MAGNITUDE -- "is anyone imposing
+                # themselves" rather than "which side". Both are reported:
+                # signed-vs-total is the null this is measured against.
+                "r_total": _pearson(values, totals),
+                "r_total_abs": _pearson([abs(v) for v in values], totals),
             })
 
     # --- POSSESSIONS AXIS -------------------------------------------------
@@ -176,7 +233,8 @@ def sweep_game(
             t += PROBE_STEP_SECONDS
         if len(probes) < 3:
             continue
-        outcomes = [forward_margin(scoring, p, horizon) for p in probes]
+        margins = [forward_margin(scoring, p, horizon) for p in probes]
+        totals = [forward_total(scoring, p, horizon) for p in probes]
         poss_at_probe = [
             max((float(r["possession_index"]) for r in pressure
                  if float(r["clock_seconds"]) <= p), default=0.0)
@@ -193,7 +251,9 @@ def sweep_game(
                 "half_life": half_life,
                 "horizon_seconds": horizon,
                 "n": len(probes),
-                "r": _pearson(values, outcomes),
+                "r_margin": _pearson(values, margins),
+                "r_total": _pearson(values, totals),
+                "r_total_abs": _pearson([abs(v) for v in values], totals),
             })
 
     return {
@@ -366,12 +426,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"last_s={swept['last_seconds']} last_poss={swept['last_possessions']}",
             flush=True,
         )
+        def _fmt(value: float | None) -> str:
+            return "NA" if value is None else f"{value:+.4f}"
+
         for cell in swept["grid"]:
-            r = cell["r"]
             print(
                 f"[momentum_phase_c] CELL event={event_id} axis={cell['axis']} "
                 f"hl={cell['half_life']} horizon={cell['horizon_seconds']} "
-                f"n={cell['n']} r={'NA' if r is None else round(r, 4)}",
+                f"n={cell['n']} "
+                f"r_margin={_fmt(cell['r_margin'])} "
+                f"r_total={_fmt(cell['r_total'])} "
+                f"r_total_abs={_fmt(cell['r_total_abs'])}",
                 flush=True,
             )
     return exit_code

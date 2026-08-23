@@ -24162,3 +24162,133 @@ stopped moving, which is why this runs over the ledger and not over today's
 positions. `resolved=0` with `reasons={'no_close_for_market': N}` on a date whose
 games finished hours ago would mean the odds-history shard is not reaching this
 service, NOT that the grader is wrong.
+
+## 2026-08-23 00:45-00:49Z — refresh-worker `33bd5150` — `#523` soccer live-state join + `#525` row budget — DEPLOYED, OUTCOME NOT YET MEASURED
+
+`lane layer2-sim-view-and-live-projection`, claim `32799d0dcab084c1` (taken with
+`--force`: my own earlier claim was still held at 38.6 min and this is the same
+lane re-entering, not a break-in on another session). `dep-da545hou01pc73du9i70`
+live 00:49:21Z.
+
+**`#523` IS CONFIRMED LIVE, by lineage rather than by effect.** My earlier deploy
+of it (`dep-da53o7ajobas73deqkt0`, live 00:23:42Z) was `deactivated` at 00:28:57Z
+— superseded by a peer's `473f55fa`, NOT rolled back. Checked rather than assumed:
+`git merge-base --is-ancestor 6952bb9d 473f55fa` passes, so the fix survived the
+supersession, and this deploy carries it too.
+
+**WHAT IS NOT MEASURED, and I am not going to imply otherwise.** No
+`LAYER2_BOARD_HEALTH` line has been emitted in the 24 minutes since this went
+live. The worker is alive and doing real work — instance `wl6f8`, no traceback,
+no OOM, no `WORKER_SHUTDOWN` — but it is grinding through the 2026-08-23 card
+build (`resolved_date: 2026-08-23`, `cards_context_*` stages, memory 87.1% with
+`climb_mb_per_s: 39.1`). The day rollover is expensive and it is holding the
+shortlist. So all three readings this deploy exists to produce are still pending:
+
+    #523   LIVE_PROJECTION_JOIN sport=soccer considered=   must exceed 0
+                                                            (was 0 with
+                                                             lens_live_games=6)
+           LAYER2_BOARD_HEALTH sport=soccer live_rows=      must exceed 3
+    #525   KEYVALUE_WRITE_LARGE size_bytes=                 must stay ~5.7MB
+           SHORTLIST_SHED_TO_FIT                            must NOT appear
+
+**24 minutes without a shortlist is itself worth a second look** — the cold-boot
+window recorded in this ledger is 10-19 minutes. It may be nothing more than the
+rollover, and this is the first rollover observed at 400 rows/sport with four
+sports live. If the next check still shows none, that is a finding in its own
+right and not a slow build.
+
+## 2026-08-23 01:14Z — ALL THREE SERVICES `fb39476c` — `#514` momentum reaches a card
+
+- **web** `dep-da54iv0u01pc73dvjutg` · **live-odds-worker** `dep-da54j33bc2fs73fq82cg` · **refresh-worker** `dep-da54j48u01pc73dvkgcg`
+- **holder:** lane `basketball-live-momentum`
+- **commit:** `fb39476c`, a peer's `Merge origin/main` that landed between my merge
+  and the trigger. Verified `--is-ancestor` BOTH ways before deploying: on
+  `origin/main`, and containing my `c0472bbf`. Main moved under me twice tonight;
+  checking the SHA Render actually picked is the step that keeps that harmless.
+- **verify:** PENDING — `[wnba_cards] MOMENTUM_ATTACHED date=... blocks=N attached=N`
+  with `attached > 0`, on a live game.
+
+### THE PROCESS CHECK RAN BEFORE THE TRIGGER THIS TIME, AND IT PAID
+
+At 00:37Z refresh-worker was mid-`run_mlb_daily_sim_job.py --sims 1000` over 15
+game_pks. **I held that service and shipped only web + live-odds-worker**, which
+are where the reported symptom lived. By 01:11Z the sim had cleared — process
+table down to `run_refresh_worker.py` alone — so the third service went out on
+its own, costing nothing.
+
+An hour earlier I made the same trade blind, checked the table AFTER triggering,
+and got away with it only because the expensive job happened not to be running.
+Same check, ordered correctly, turned an unavoidable cost into no cost.
+
+### WHAT SHIPPED
+
+**Momentum had been captured since 23:19:54Z and rendered nowhere.** Two silent
+reasons: `soccer/cards.py:2215` was the ONLY setter of `shared_momentum` in the
+repo, and `live_lens_loop.py` assigned the poll's payload to a local it never
+read. The template half was already done, so this was a join.
+
+Wired at **both** live paths. The ESPN-only shortcut (`cards.py:3651`) returns
+early and skips the main attach loop, and it is the branch taken on a live slate
+with no odds-rich artifacts yet — exactly when the chart is most wanted. Wiring
+only the main loop would have left it missing precisely there, looking like the
+feature did not work.
+
+**Soccer's labels deliberately NOT reused.** Its 40/60/80 bands are FotMob's
+0-100 scale fitted against measured goal-rate lift, and its own docstring
+forbids reuse on another scale. Basketball's `current` is unbounded: tonight's
+real values were -0.67, -3.03, -4.55, -1.35 — all below 40, so copying the bands
+renders "Balanced" forever. A feature that never errors and never says anything
+is the neutral-default trap in display form. The label states DIRECTION only and
+the payload carries `scale: uncalibrated_relative_to_game_peak`.
+
+### THE PURPOSE CHANGED WHAT PHASE C MEASURES
+
+The user states momentum is meant to inform **interval bets — ML, spread,
+over/under**. That is a betting input, and the analyzer was measuring half of it:
+`forward_margin` answers ML and spread, and NOTHING answered over/under. Margin
+structurally cannot — a 14-2 window and a 26-14 window have identical margin and
+wildly different totals. Added `forward_total` plus `r_total_abs` (momentum is
+signed, a total is not, so magnitude is the sensible predictor).
+
+Horizons are now **the intervals actually traded**: the live slate discovered
+`h2h_q4`/`spreads_q4`/`totals_q4`/`h2h_h2`/`spreads_h2`/`totals_h2`, so 600s and
+1200s. 60/120/180s answered a question no book will take.
+
+**NOT A MODEL INPUT, and the gap is stated:** `model_engine_standard.md` requires
+re-fitting the rates a new mechanism displaces, and records two mechanisms
+together producing a NEGATIVE interaction in 4 of 4 markets. This ships a chart.
+
+### FOLLOW-UP 01:23Z — the missing measurement is a RESTART RATE problem, not a slow build
+
+Still no `LAYER2_BOARD_HEALTH` 34 minutes after `33bd5150` went live, and the
+reason is visible in the instance id rather than in any error. refresh-worker
+instances tonight, in order:
+
+    k9x6c -> g94l9 -> 76gjr -> sxsww -> fw947 -> wl6f8 -> mvkzn
+
+**Seven instances.** Between mine and peers', refresh-worker was replaced roughly
+every 20 minutes all evening. The cold-boot shortlist cadence recorded in this
+ledger is **10-19 minutes**, so restarts have been arriving on the same order as
+the time the worker needs to produce its first shortlist. Each one resets the
+clock, and the build that was 26 minutes in at 01:15Z (`cards_context_end`,
+memory 92.3%) was thrown away before it reached the shortlist.
+
+So the pending readings for `#523` and `#525` are pending because the worker has
+not been allowed to finish a cycle, not because the fixes did nothing and not
+because it is wedged: at 01:23Z the new instance is healthy (65.7% memory, down
+from 92.3%) and already rebuilding the soccer board contract.
+
+**THIS IS THE OPERATIONAL FINDING, and it outranks either fix for the next
+session.** A worker whose first useful output takes 10-19 minutes cannot be
+deployed every 20 and still be measured — and tonight *every* verification in
+this file had to wait on a window that kept being cut short. Deploy verification
+and deploy frequency are in direct tension here, and nothing currently arbitrates
+them: the claim serialises deploys but says nothing about leaving room for the
+thing the previous deploy was supposed to prove.
+
+Cheapest next step is to check whether that cadence is inherent or incidental --
+the 2026-08-23 rollover build is genuinely expensive and tonight was unusually
+busy, so this may be a bad evening rather than a standing property. Either way it
+should be measured before the next round of deploys, because it is the reason
+tonight produced fixes that are shipped and unproven rather than shipped and
+verified.
