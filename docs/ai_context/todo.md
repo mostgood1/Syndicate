@@ -1,5 +1,66 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#527` — **A Kalshi-native board with its own hourly clock, and openings recorded from LOOKAHEAD markets — the first CLV reference that is genuinely early. IN CODE, TESTED, NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-23, user request ("this should begin a regular cadence specific to kalshi since we are limited by oddsapi calls. we can even get lookahead lines so we get true opening lines for clv")
+
+**Two problems, one shape.** `#526`-era Kalshi work joined Kalshi's prices to the
+Layer 2 board and got `matched=0` — not a join bug, a clock: at 04:22 the board
+had rolled to European soccer while Kalshi was already quoting the next MLB
+slate. And every Kalshi price we had ever fetched was discarded on the next
+fetch, so "has this line moved" was unanswerable no matter how often we asked.
+
+**What is now true:**
+
+- `syndicate/features/shared/kalshi_board.py` keeps a bounded per-ticker price
+  series and a Kalshi-native board grouped by close DAY (not close timestamp —
+  a night game closes after midnight UTC, `#370` in a new place). Tomorrow's
+  slate is visible from Kalshi now, without waiting for OddsAPI to carry it.
+- **The opening is an immutable field, not `points[0]`.** This is the whole
+  point of the file and the one thing in it that had to be designed rather than
+  written. Trimming is oldest-first and oldest-first IS the opening, so
+  measuring movement from the first surviving point would have silently
+  redefined every CLV number from "since the open" to "since some arbitrary
+  hour" once the window filled — with **no visible change in the output**.
+  `opening_yes`/`opened_at` are written once, on first sight.
+- **Lookahead is why this beats OddsAPI as a CLV reference.** OddsAPI's
+  "opening" is whenever we happened to poll. Kalshi lists markets days out, so a
+  first sight here really is near the open.
+- `too_new` is a separate counter from `unmoved`. One observation is a price,
+  not a movement; folding it into zero-movement puts "we have not watched long
+  enough" (wait) and "this has not moved" (conclude) in one bucket.
+- **Kalshi keeps its own clock.** `run_kalshi_odds_refresh` now owns the
+  interval (`SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS`, default 3600) against a
+  PERSISTED stamp, so a worker restart does not reset it. It used to run every
+  board build — a ~3min cadence set by OddsAPI's rate limit, which has no
+  business deciding how often we hit a different venue.
+- In between it returns **`cached`, not `skipped`** — the board still gets
+  prices, it just does not get an HTTP call.
+- **A failed fetch neither blanks the board nor starts the clock.** Stamping
+  `fetched_at` on a failure would serve zero markets from a "fresh" artifact for
+  an hour. Failures write `attempted_at` and back off on their own shorter clock
+  (`FAILED_RETRY_SECONDS = 600`) — ungated retries every 3min against a venue
+  that rate-limits us is how the 2026-08-23 `http_429`s happened.
+- `SYNDICATE_KALSHI_SERIES` widens the priced series **without a deploy**. A new
+  series' history only starts when we first ask for it, and a `render.yaml` edit
+  fires `blueprint_sync` (`#284`).
+
+**Tests:** `tests/test_kalshi_board.py` (10), `tests/test_kalshi_odds_cadence.py`
+(12). The load-bearing one is
+`test_the_opening_survives_the_window_filling`.
+
+**NOT VERIFIED IN PRODUCTION.** Kalshi is unreachable from this container — the
+agent proxy 403s CONNECT to all three hosts — so the live smoke returned
+`all_hosts_failed` and every Kalshi reading in this entry is from unit tests.
+The worker reaches Kalshi (that is where `FETCHED markets=132` came from). What
+to read after deploy: `[kalshi_odds] HISTORY`, `BY_GAME_DATE`, `MOVES`, and
+`CACHED` appearing between hourly `FETCHED` lines.
+
+**Still open:** the Kalshi↔board join has never matched on a live MLB slate
+(`#526`-era `matched=0` was the clock, and that is now guarded, but a positive
+match is still unmeasured). Auto-execution remains unbuilt — it needs RSA
+request signing, per-order/day caps, a kill switch, and daily reconciliation,
+and it stays gated on `settled_count > 0` (`#502`).
+
+
 ### `#526` — **The blotter had no mobile layout at all: a 880px table panned sideways on a 390px phone. Now a labelled card per row. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23, user report
 
 `table.board-blotter` carries `min-width: 880px` inside an `overflow-x: auto`

@@ -5119,10 +5119,18 @@ class IntelligenceStateService:
             except Exception as exc:
                 print(f"[intelligence_state] KALSHI_DISCOVERY_FAILED error={exc}", flush=True)
 
-            # KALSHI'S OWN PRICES, refreshed every board build rather than once
-            # per boot: a price reused for hours is a memory, not a quote. Then
-            # joined to the shortlist to produce the first Kalshi coverage
-            # number that is actually about Kalshi.
+            # KALSHI'S OWN PRICES, on Kalshi's own cadence. Called every board
+            # build, but `run_kalshi_odds_refresh` owns the interval (hourly by
+            # default) and serves the cached markets in between -- the board
+            # build's ~3min period is set by OddsAPI's rate limit and has no
+            # business deciding how often we hit a different venue. Then joined
+            # to the shortlist to produce the first Kalshi coverage number that
+            # is actually about Kalshi.
+            #
+            # The refresh also records each price into the Kalshi-native
+            # history, which is where tomorrow's lookahead lines become the
+            # OPENING prices a CLV grade needs -- those exist days before the
+            # OddsAPI board carries the slate at all.
             kalshi_markets: list = []
             try:
                 from pipeline.kalshi_odds_refresh import join_to_board, run_kalshi_odds_refresh
