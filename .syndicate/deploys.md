@@ -24761,3 +24761,40 @@ exists per row; the fit must use it.
 the lane was opened to answer. Deliberately NOT chained to the verify passing:
 a sweep that only runs on a clean check has an ambiguous absence, unable to
 distinguish "clean but unrun" from "blocked". Two flags, two readings.
+
+## 2026-08-23 ~17:56Z — HOW TO READ THE POOLED SWEEP, WRITTEN BEFORE IT RETURNS
+
+Recorded ahead of the result deliberately. Choosing a threshold after seeing 40
+correlations is how a noise grid becomes a discovery.
+
+### 1. THE REPORTED `n` IS NOT THE EVIDENCE
+
+Probes sit on a 30s grid, so at a 600s horizon they overlap 20-fold. ~15,000
+probes across 282 games is **~846 independent quarter windows** and **~282
+independent half windows**. Any significance judged on the probe count is
+judged on an overlap artefact — the same error `live-game-line-projection`
+makes reporting n=985 on `games_with_outcome: 3`.
+
+### 2. THE NOISE FLOOR FOR 40 CELLS, SIMULATED
+
+The strongest of 40 correlations is not one correlation. Under PURE NOISE
+(400 trials):
+
+    effective n = 846   median strongest |r| = 0.082   95th pct = 0.111
+    effective n = 282   median strongest |r| = 0.142   95th pct = 0.184
+
+**So a best cell below ~0.11 at the quarter horizon, or ~0.18 at the half, is
+indistinguishable from chance.** That is the bar, set before the data.
+
+### 3. A RAW CORRELATION CANNOT SEPARATE PREDICTION FROM MECHANISM
+
+Pressure deliberately EXCLUDES points — that is what the two-series split is
+for. But it still counts shot ATTEMPTS, and a team attempting more shots both
+scores more pressure AND has more chances to score. Some of any `r_margin` is
+therefore mechanical rather than predictive.
+
+The clean question is whether momentum adds anything BEYOND the current scoring
+rate, which is a partial correlation and **the grid does not compute one**. So
+a positive result here is a reason to run that test, not a result in itself.
+A negative result is more informative: if the raw correlation is already at the
+noise floor, the partial one cannot rescue it.
