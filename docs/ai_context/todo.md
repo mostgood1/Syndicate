@@ -1,5 +1,62 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#523` — **Stage C's gate input now exists: placed orders graded against the CLOSE, per market and per book-scope, with `n` on every aggregate. The chain was one hop short.** — lane `portfolio-decision-and-execution`, 2026-08-23, user request
+
+`clv_opening_ledger` records an opening; `clv_join.compute_clv_for_date` pairs it
+with a close; `#522` connected a committed position to its opening. **Nothing
+connected a PLACED ORDER to a close**, so *did this bet beat the closing line* —
+the literal Stage C gate — could not be computed for a single bet we made.
+
+`syndicate/features/shared/order_clv.py`, wired into `run_portfolio_commit`,
+printing `[order_clv] ORDER_CLV ...` every slate.
+
+**IT COMPOSES, IT DOES NOT RE-RESOLVE.** `compute_clv_for_date` emits one row per
+opening carrying `key`; orders carry `opening_key`; the join is a dict lookup.
+A second copy of close resolution would mean a second copy of the arrow-of-time
+check, the side-aware stamp logic and the different-book fallback — each of which
+cost a measurement. The arrow-of-time one especially: 25 of 25 rows once paired a
+close captured BEFORE the opening and produced a confident `avg_clv_pct
+= -5.215` out of unrelated instants.
+
+**WHAT DIFFERS FROM THE OPENING'S CLV: the price.** `compute_clv_for_date` asks
+what the market did from its first published price. This asks what WE got, from
+the price actually filled — `fill_price` over `requested_price`, because grading
+the request credits us with slippage we never got. Both are carried per row;
+the gap between them is what our TIMING was worth, a different question from
+whether the pick was right.
+
+**SCOPE IS NEVER POOLED, AND THIS IS THE LOAD-BEARING PART.** Measured
+2026-08-14 across 150 openings: `different_book_close` +6.206 avg (29/32 beat),
+`book_agnostic_close` +2.716 (18/27), `same_book` **n=0**. Our book's entry
+against another book's close compares a best-of-N draw to a single draw and is
+biased upward regardless of whether the bet was good. Every aggregate is
+per-scope; the log headline is same-book only, with `same_book_n=` beside it. A
+blended number would be higher than any bet deserved. Note `close_book_scope` is
+stamped only when a FALLBACK was used, so **absent means same-book** — a test
+pins that, because defaulting it to "unknown" would relabel the cleanest rows as
+the dirtiest.
+
+**PER MARKET, NOT POOLED**, with `n` as the first field of every aggregate.
+`_SAMPLE_SIZE_FOR_FULL_CREDIBILITY = 50` is per market, and `learnings.md`
+2026-08-20 records pooling overstating significance 3.4x by counting rows as
+bets. A market with n=2 must not read like a result.
+
+**THE ARITHMETIC PROBLEM I RAISED AND DID NOT SILENTLY "FIX".** Slates commit
+7-8 positions across mlb/nfl/soccer/wnba and many markets, so per-market n=50 is
+months. I did not touch the threshold: it is a documented constant with a stated
+rationale and changing it is the owner's call, not a side effect of building the
+plumbing. What this does instead is make the accumulation rate VISIBLE —
+`by_market` shows exactly how many graded bets each market has — so the decision
+is taken against a number rather than an assumption.
+
+16 tests, weighted toward "a number that looks like a result": blended scopes,
+two-bet market averages, the opening's CLV standing in for ours.
+
+**OWED:** `[order_clv] ORDER_CLV ... resolved=N same_book_n=M` on refresh-worker
+with N > 0. Expect N=0 for most of the day and non-zero for the PRIOR date —
+a close only exists once a market has stopped moving, which is why this runs
+over the ledger rather than over today's positions.
+
 ### `#522` — **Stage C's precondition was missing and nobody would have noticed until the analysis returned empty: NOTHING joined a committed position to the opening price recorded for its market. Built, plus live marks and three page defects. NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-22, user request
 
 **THE GAP.** `clv_opening_ledger` has been recording openings all along —
@@ -90,10 +147,23 @@ but its opening was never recorded. Deploy held 2026-08-22T23:0x–23:1xZ:
 refresh-worker was running `run_mlb_daily_sim_job.py` (tip-off window, then
 `evening_next_day_sim` for 08-23), and deploying kills an in-flight sim.
 
-**STORAGE NOTE for whoever sizes the window.** `opening_ledger_path` is
-`{date}.jsonl` — **date-tokened, so a 10-day TTL** in the keyvalue store
-(`#284`/`#508`). Stage C's accumulation window has a hard ceiling of ~10 days
-unless openings are copied somewhere durable first.
+**STORAGE — I GOT THIS WRONG FIRST AND IT MATTERS WHICH WAY.** I claimed the
+opening ledger takes the keyvalue store's 10-day TTL because
+`opening_ledger_path` is `{date}.jsonl`, and told the owner Stage C had a
+~10-day ceiling and a running clock. **That is false.** The date-token TTL rule
+applies to `write_json_file`, which routes through `refresh_state_store` to
+keyvalue; `record_openings` writes with `path.open("a")` — plain disk I/O on the
+worker's 50GB mounted disk — and separately calls `publish_hot_artifact`. It is
+also absent from `artifact_retention`'s patterns, and retention is opt-in and
+off by default (`SYNDICATE_ARTIFACT_RETENTION_ENABLED`, module docstring:
+"Nothing ever deleted").
+
+So openings are durable and there is no clock. **The direction of the error is
+the bad part:** it invented urgency and would have bought a "fix" for a
+non-problem, and it was one grep from being checked. The rule the `#284` block
+already states — *check the code's default for any key you touch* — generalises:
+check the WRITE PATH before reasoning about a storage policy, because two files
+in the same directory can have different ones.
 
 ### `#521` — **The 60s live refresh was notional: 5 of 52 ticks launched, and the ones that did spent the budget on a sim. FOUR FIXES IN CODE, TESTED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-22, user decision ("all sports, when live should refresh every 60 seconds across all markets in the most economical way")
 
