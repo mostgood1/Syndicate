@@ -24196,3 +24196,64 @@ window recorded in this ledger is 10-19 minutes. It may be nothing more than the
 rollover, and this is the first rollover observed at 400 rows/sport with four
 sports live. If the next check still shows none, that is a finding in its own
 right and not a slow build.
+
+## 2026-08-23 01:14Z — ALL THREE SERVICES `fb39476c` — `#514` momentum reaches a card
+
+- **web** `dep-da54iv0u01pc73dvjutg` · **live-odds-worker** `dep-da54j33bc2fs73fq82cg` · **refresh-worker** `dep-da54j48u01pc73dvkgcg`
+- **holder:** lane `basketball-live-momentum`
+- **commit:** `fb39476c`, a peer's `Merge origin/main` that landed between my merge
+  and the trigger. Verified `--is-ancestor` BOTH ways before deploying: on
+  `origin/main`, and containing my `c0472bbf`. Main moved under me twice tonight;
+  checking the SHA Render actually picked is the step that keeps that harmless.
+- **verify:** PENDING — `[wnba_cards] MOMENTUM_ATTACHED date=... blocks=N attached=N`
+  with `attached > 0`, on a live game.
+
+### THE PROCESS CHECK RAN BEFORE THE TRIGGER THIS TIME, AND IT PAID
+
+At 00:37Z refresh-worker was mid-`run_mlb_daily_sim_job.py --sims 1000` over 15
+game_pks. **I held that service and shipped only web + live-odds-worker**, which
+are where the reported symptom lived. By 01:11Z the sim had cleared — process
+table down to `run_refresh_worker.py` alone — so the third service went out on
+its own, costing nothing.
+
+An hour earlier I made the same trade blind, checked the table AFTER triggering,
+and got away with it only because the expensive job happened not to be running.
+Same check, ordered correctly, turned an unavoidable cost into no cost.
+
+### WHAT SHIPPED
+
+**Momentum had been captured since 23:19:54Z and rendered nowhere.** Two silent
+reasons: `soccer/cards.py:2215` was the ONLY setter of `shared_momentum` in the
+repo, and `live_lens_loop.py` assigned the poll's payload to a local it never
+read. The template half was already done, so this was a join.
+
+Wired at **both** live paths. The ESPN-only shortcut (`cards.py:3651`) returns
+early and skips the main attach loop, and it is the branch taken on a live slate
+with no odds-rich artifacts yet — exactly when the chart is most wanted. Wiring
+only the main loop would have left it missing precisely there, looking like the
+feature did not work.
+
+**Soccer's labels deliberately NOT reused.** Its 40/60/80 bands are FotMob's
+0-100 scale fitted against measured goal-rate lift, and its own docstring
+forbids reuse on another scale. Basketball's `current` is unbounded: tonight's
+real values were -0.67, -3.03, -4.55, -1.35 — all below 40, so copying the bands
+renders "Balanced" forever. A feature that never errors and never says anything
+is the neutral-default trap in display form. The label states DIRECTION only and
+the payload carries `scale: uncalibrated_relative_to_game_peak`.
+
+### THE PURPOSE CHANGED WHAT PHASE C MEASURES
+
+The user states momentum is meant to inform **interval bets — ML, spread,
+over/under**. That is a betting input, and the analyzer was measuring half of it:
+`forward_margin` answers ML and spread, and NOTHING answered over/under. Margin
+structurally cannot — a 14-2 window and a 26-14 window have identical margin and
+wildly different totals. Added `forward_total` plus `r_total_abs` (momentum is
+signed, a total is not, so magnitude is the sensible predictor).
+
+Horizons are now **the intervals actually traded**: the live slate discovered
+`h2h_q4`/`spreads_q4`/`totals_q4`/`h2h_h2`/`spreads_h2`/`totals_h2`, so 600s and
+1200s. 60/120/180s answered a question no book will take.
+
+**NOT A MODEL INPUT, and the gap is stated:** `model_engine_standard.md` requires
+re-fitting the rates a new mechanism displaces, and records two mechanisms
+together producing a NEGATIVE interaction in 4 of 4 markets. This ships a chart.
