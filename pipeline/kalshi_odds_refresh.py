@@ -327,6 +327,34 @@ def record_and_report(markets: list[dict[str, Any]]) -> dict[str, Any]:
     dates = board_by_game_date(markets)
     print(f"[kalshi_odds] BY_GAME_DATE {dates.get('by_date_series')}", flush=True)
 
+    # WHICH FIELD IS THE GAME DATE? Measured 2026-08-23: all 154 markets across
+    # two series reported the same `close_time` date, and 137 different pitchers
+    # do not all pitch on one day -- so `close_time` is very likely a settlement
+    # deadline rather than first pitch, and grouping by it is grouping by the
+    # wrong thing. Rather than guess which of `open_time`/`close_time`/
+    # `expiration_time`/the ticker carries it, print one market's date fields
+    # verbatim and let the next run say. This is the same choice `probe()` made
+    # for the price fields, which is what caught the 100x error.
+    seen_series: set[str] = set()
+    for market in markets:
+        series = str(market.get("series") or "")
+        if series in seen_series:
+            continue
+        seen_series.add(series)
+        print(
+            "[kalshi_odds] DATE_FIELDS"
+            f" series={series}"
+            f" ticker={market.get('ticker')}"
+            f" event_ticker={market.get('event_ticker')}"
+            f" open={market.get('open_time')}"
+            f" close={market.get('close_time')}"
+            f" expiration={market.get('expiration_time')}"
+            f" title={str(market.get('title'))[:70]!r}",
+            flush=True,
+        )
+        if len(seen_series) >= 3:
+            break
+
     try:
         moves = movement_report(top=8)
     except Exception as exc:

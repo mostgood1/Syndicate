@@ -63,11 +63,22 @@ __all__ = [
 
 KILL_SWITCH_PATH_NAME = "execution_kill_switch.json"
 
-# Deliberately small. These are the numbers a first funded week should survive
-# being wrong about, not the numbers a confident system would choose.
+# LIVE defaults, deliberately small. These are the numbers a first funded week
+# should survive being wrong about, not the numbers a confident system would
+# choose.
 _DEFAULT_MAX_ORDER_DOLLARS = 25.0
 _DEFAULT_MAX_DAY_DOLLARS = 100.0
 _DEFAULT_MAX_DAY_ORDERS = 10
+
+# PAPER defaults, deliberately INERT. The mechanism must run on paper -- a cap
+# whose first exercise is with money on it has not been tested -- but the
+# NUMBERS must not, because the paper books exist to record what the strategy
+# would have done. Capping them at the live limits would silently truncate the
+# tail of every slate and make the ledger evidence about the cap instead of
+# about the strategy. Set the env vars to bind them.
+_DEFAULT_PAPER_MAX_ORDER_DOLLARS = 10_000.0
+_DEFAULT_PAPER_MAX_DAY_DOLLARS = 1_000_000.0
+_DEFAULT_PAPER_MAX_DAY_ORDERS = 10_000
 
 # Statuses that mean the venue may have seen this order. See the module note.
 _SPENT_STATUSES = {"submitted", "filled", "failed"}
@@ -91,12 +102,30 @@ def _int_env(name: str, default: int) -> int:
     return int(value)
 
 
-def limits() -> dict[str, Any]:
-    """The caps in force, as data, so a log line can state them."""
+def limits(mode: str | None = None) -> dict[str, Any]:
+    """The caps in force, as data, so a log line can state them.
+
+    The same env vars govern both modes -- one place to configure -- but the
+    DEFAULTS differ, because "untested" and "unlimited" are not the same worry.
+    """
+    from syndicate.features.shared.execution_ledger import LIVE, execution_mode
+
+    resolved = mode or execution_mode()
+    paper = resolved != LIVE
     return {
-        "max_order_dollars": _float_env("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", _DEFAULT_MAX_ORDER_DOLLARS),
-        "max_day_dollars": _float_env("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS", _DEFAULT_MAX_DAY_DOLLARS),
-        "max_day_orders": _int_env("SYNDICATE_EXECUTION_MAX_DAY_ORDERS", _DEFAULT_MAX_DAY_ORDERS),
+        "mode": resolved,
+        "max_order_dollars": _float_env(
+            "SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS",
+            _DEFAULT_PAPER_MAX_ORDER_DOLLARS if paper else _DEFAULT_MAX_ORDER_DOLLARS,
+        ),
+        "max_day_dollars": _float_env(
+            "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS",
+            _DEFAULT_PAPER_MAX_DAY_DOLLARS if paper else _DEFAULT_MAX_DAY_DOLLARS,
+        ),
+        "max_day_orders": _int_env(
+            "SYNDICATE_EXECUTION_MAX_DAY_ORDERS",
+            _DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS,
+        ),
     }
 
 
@@ -140,19 +169,29 @@ def kill_switch_engaged() -> dict[str, Any]:
     return {"engaged": False, "source": "clear"}
 
 
-def spent_today(selected_date: str, *, venue: str | None = None) -> dict[str, Any]:
-    """Dollars and order count already committed for `selected_date`, LIVE only.
+def spent_today(
+    selected_date: str, *, venue: str | None = None, mode: str | None = None
+) -> dict[str, Any]:
+    """Dollars and order count already committed for `selected_date`.
 
     Read from the LEDGER rather than from the plan. A worker restart mid-slate
     would otherwise start the day's budget over, which is the one way a per-day
     cap can be enforced everywhere and still not hold.
+
+    Scoped by MODE and optionally by VENUE, because the books are separate
+    ledgers sharing one file: paper's spend must not consume live's budget, and
+    `paper` must not consume `paper:kalshi`'s -- the two paper books exist to be
+    compared, and a shared budget would make each one's size depend on the
+    other's. Defaults to LIVE, so a caller that forgets to say gets the
+    strictest reading rather than a pooled one.
     """
     from syndicate.features.shared.execution_ledger import LIVE, _load
 
+    resolved_mode = mode or LIVE
     dollars = 0.0
     count = 0
     for order in (_load().get("orders") or []):
-        if str(order.get("mode")) != LIVE:
+        if str(order.get("mode")) != resolved_mode:
             continue
         if str(order.get("selected_date") or "") != str(selected_date):
             continue
@@ -187,7 +226,7 @@ def check_order(
     from syndicate.features.shared.execution_ledger import LIVE, execution_mode
 
     resolved_mode = mode or execution_mode()
-    caps = limits()
+    caps = limits(resolved_mode)
     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
 
     if stake <= 0:
@@ -202,7 +241,15 @@ def check_order(
         }
 
     selected_date = str(getattr(request, "selected_date", "") or "")
-    used = dict(already) if already is not None else spent_today(selected_date)
+    used = (
+        dict(already)
+        if already is not None
+        else spent_today(
+            selected_date,
+            venue=str(getattr(request, "venue", "") or "") or None,
+            mode=resolved_mode,
+        )
+    )
     if float(used.get("dollars") or 0.0) + stake > caps["max_day_dollars"]:
         return {
             "allowed": False,

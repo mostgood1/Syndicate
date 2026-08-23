@@ -327,3 +327,74 @@ def test_the_commit_runs_after_the_shortlist_it_derives_from():
     assert source.index("write_layer2_shortlist(str(selected_date") < source.index(
         "from pipeline.portfolio_commit import run_portfolio_commit"
     )
+
+
+# --------------------------------------------------------------------------
+# The guard: caps and the kill switch, wired into the run
+# --------------------------------------------------------------------------
+
+
+def test_the_day_order_cap_stops_the_tail_of_a_slate_and_names_why(monkeypatch):
+    _write_plan(monkeypatch, [_row(), _row(event_id="evt-2"), _row(event_id="evt-3")])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_ORDERS", "2")
+    from pipeline import execute_portfolio as runner
+
+    result = runner.run_execution("2026-08-22")
+    assert result["placed"] == 2
+    # A single `skipped` count cannot tell a plan that named nothing bettable
+    # from a cap that stopped a good slate, and those want opposite responses.
+    assert result["refused"] == {"over_max_day_orders": 1}
+
+
+def test_the_default_paper_caps_do_not_change_what_the_paper_book_records(monkeypatch):
+    _write_plan(monkeypatch, [_row(), _row(event_id="evt-2"), _row(event_id="evt-3")])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    result = runner.run_execution("2026-08-22")
+    # The paper books exist to record what the strategy would have done.
+    assert result["placed"] == 3
+    assert result["refused"] == {}
+
+
+def test_a_re_run_does_not_charge_duplicates_against_the_cap(monkeypatch):
+    _write_plan(monkeypatch, [_row(), _row(event_id="evt-2")])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_ORDERS", "2")
+    from pipeline import execute_portfolio as runner
+
+    assert runner.run_execution("2026-08-22")["placed"] == 2
+    second = runner.run_execution("2026-08-22")
+    # A duplicate places nothing, so charging it would let a re-run exhaust a
+    # budget it never spent.
+    assert second["duplicates"] == 2
+    assert second["refused"] == {}
+
+
+def test_the_running_total_is_seeded_from_the_ledger_not_from_zero(monkeypatch):
+    _write_plan(monkeypatch, [_row(), _row(event_id="evt-2")])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_ORDERS", "3")
+    from pipeline import execute_portfolio as runner
+
+    first = runner.run_execution("2026-08-22")
+    assert first["placed"] == 2
+
+    _write_plan(monkeypatch, [_row(event_id=f"evt-{n}") for n in range(1, 5)])
+    second = runner.run_execution("2026-08-22")
+    # A restart mid-slate must not hand the day its budget back: 2 already
+    # placed against a cap of 3 leaves room for exactly one more.
+    assert second["placed"] == 1
+    assert second["refused"] == {"over_max_day_orders": 1}
+    assert second["duplicates"] == 2
+
+
+def test_the_run_states_the_limits_it_applied(monkeypatch):
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    result = runner.run_execution("2026-08-22")
+    assert result["limits"]["mode"] == "paper"
+    assert result["spent"]["orders"] == 1

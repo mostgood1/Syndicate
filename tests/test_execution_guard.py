@@ -38,54 +38,86 @@ def _request(stake=10.0, date="2026-08-24"):
     )
 
 
-def test_absent_config_gives_the_restrictive_defaults_not_no_limit():
-    caps = guard.limits()
+def test_absent_config_gives_the_restrictive_defaults_in_live_mode():
+    caps = guard.limits("live")
     # #284's lesson applied to money: absent is not off.
     assert caps["max_order_dollars"] == 25.0
     assert caps["max_day_dollars"] == 100.0
     assert caps["max_day_orders"] == 10
 
 
+def test_paper_defaults_are_inert_so_the_ledger_records_the_strategy():
+    caps = guard.limits("paper")
+    # The MECHANISM runs on paper; the NUMBERS must not. Capping the paper books
+    # at the live limits would truncate the tail of every slate and make the
+    # ledger evidence about the cap instead of about the strategy.
+    assert caps["max_day_dollars"] >= 1_000_000.0
+    assert caps["max_day_orders"] >= 10_000
+
+
+def test_the_same_env_vars_bind_both_modes(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_ORDERS", "3")
+    # One place to configure, two sets of defaults.
+    assert guard.limits("paper")["max_day_orders"] == 3
+    assert guard.limits("live")["max_day_orders"] == 3
+
+
 def test_an_unparseable_cap_falls_back_to_the_default(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "twenty-five")
-    assert guard.limits()["max_order_dollars"] == 25.0
+    assert guard.limits("live")["max_order_dollars"] == 25.0
 
 
 def test_a_non_positive_cap_is_a_typo_not_a_policy(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS", "0")
     # 0 would mean "never trade" and -1 would mean nothing at all; neither is a
     # thing anybody types on purpose into a cap.
-    assert guard.limits()["max_day_dollars"] == 100.0
+    assert guard.limits("live")["max_day_dollars"] == 100.0
 
 
 def test_an_oversized_order_is_refused_by_name():
-    result = guard.check_order(_request(stake=40.0), already={"dollars": 0, "orders": 0})
+    result = guard.check_order(
+        _request(stake=40.0), mode="live", already={"dollars": 0, "orders": 0}
+    )
     assert result["allowed"] is False
     assert result["reason"] == "over_max_order_dollars"
 
 
 def test_the_day_dollar_cap_counts_what_is_already_spent():
-    result = guard.check_order(_request(stake=20.0), already={"dollars": 95.0, "orders": 2})
+    result = guard.check_order(
+        _request(stake=20.0), mode="live", already={"dollars": 95.0, "orders": 2}
+    )
     assert result["reason"] == "over_max_day_dollars"
 
 
 def test_the_day_order_cap_is_separate_from_the_dollar_cap():
-    result = guard.check_order(_request(stake=1.0), already={"dollars": 5.0, "orders": 10})
+    result = guard.check_order(
+        _request(stake=1.0), mode="live", already={"dollars": 5.0, "orders": 10}
+    )
     # Ten $1 bets is nothing in dollars and still ten decisions from a model
     # that has settled zero of them.
     assert result["reason"] == "over_max_day_orders"
 
 
 def test_a_within_limits_order_is_allowed_and_says_what_the_limits_were():
-    result = guard.check_order(_request(stake=10.0), already={"dollars": 0, "orders": 0})
+    result = guard.check_order(
+        _request(stake=10.0), mode="live", already={"dollars": 0, "orders": 0}
+    )
     assert result["allowed"] is True
     assert result["limits"]["max_day_dollars"] == 100.0
 
 
-def test_caps_apply_in_paper_mode_too():
-    # A cap whose first real exercise is with money on it has not been tested.
-    result = guard.check_order(_request(stake=999.0), mode="paper", already={"dollars": 0, "orders": 0})
+def test_the_cap_MECHANISM_runs_in_paper_mode_too(monkeypatch):
+    """A cap whose first real exercise is with money on it has not been tested.
+
+    So the check runs on paper and refuses by the same names -- what differs is
+    only the default it compares against.
+    """
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "25")
+    result = guard.check_order(
+        _request(stake=999.0), mode="paper", already={"dollars": 0, "orders": 0}
+    )
     assert result["allowed"] is False
+    assert result["reason"] == "over_max_order_dollars"
 
 
 def test_the_env_kill_switch_engages():
@@ -210,3 +242,30 @@ def test_paper_orders_do_not_consume_the_live_budget(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "paper")
     execution_ledger.place_order(_request(stake=12.0))
     assert guard.spent_today("2026-08-24") == {"dollars": 0.0, "orders": 0}
+
+
+def test_paper_spend_does_not_consume_the_live_budget_and_vice_versa(monkeypatch):
+    from syndicate.features.shared import execution_ledger
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "paper")
+    execution_ledger.place_order(_request(stake=12.0))
+
+    assert guard.spent_today("2026-08-24", mode="paper")["dollars"] == 12.0
+    assert guard.spent_today("2026-08-24", mode="live")["dollars"] == 0.0
+    # The default is the strictest reading, not a pooled one.
+    assert guard.spent_today("2026-08-24")["dollars"] == 0.0
+
+
+def test_the_two_paper_books_do_not_share_a_budget(monkeypatch):
+    from dataclasses import replace
+
+    from syndicate.features.shared import execution_ledger
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "paper")
+    execution_ledger.place_order(replace(_request(stake=12.0), venue="paper"))
+    execution_ledger.place_order(replace(_request(stake=7.0), venue="paper:kalshi"))
+
+    # They exist to be compared. A shared budget would make each one's size
+    # depend on the other's.
+    assert guard.spent_today("2026-08-24", venue="paper", mode="paper")["dollars"] == 12.0
+    assert guard.spent_today("2026-08-24", venue="paper:kalshi", mode="paper")["dollars"] == 7.0
