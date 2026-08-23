@@ -54,10 +54,41 @@ a guard passing against a deliberate bypass is implausible.
 6 refusals, which hold both ways and guard a future widening rather than this
 change). Plus 2 in `test_modelled_fair_edge.py`.
 
-**Verify after deploy:** `LIVE_PROJECTION_JOIN sport=soccer edged_modelled=` must
-exceed 0 while `edged=` stays 0 — that pairing is the signature of the rule firing
-on exactly the population it was scoped to. Then `LAYER2_BOARD_HEALTH
-sport=soccer` should show live rows carrying a number for the first time.
+**DEPLOYED AND MEASURED `6bba203a7`, live 2026-08-23T23:20:44Z. The rule fires.
+The number reaches nothing.**
+
+First post-deploy build, 23:27:49Z: `LIVE_PROJECTION_JOIN sport=soccer
+considered=343 projected=43 edged=0 edged_modelled=38`. That pairing is exactly
+the signature — the de-vig path stayed at zero as it must on a one-sided market,
+and 38 rows that had no number at all now have one. `one_sided_quote`, **110** on
+the 2026-08-22 reading, is gone from `edge_why` entirely.
+
+`LAYER2_BOARD_HEALTH sport=soccer rows=348 pregame_proj=172 live_proj=0
+no_proj=176 live_rows=2 edged=171`. **`live_proj=0`. Zero of the 38 reached the
+board**, so the half of the criterion a user would notice did not come true.
+
+**`edge_vs_modelled_fair_pct` HAS NO CONSUMER ANYWHERE.** It is written by
+`soccer_projections`, `prop_projections`, and now this join, and read by nothing:
+`_model_edge_for` (`layer2_board.py:1018`) accepts `edge_vs_market_pct` by name
+and only that, and the field does not appear in a single `.js` or `.html` under
+`syndicate/`. It cannot rank and it cannot display.
+
+This is `#444`'s shape — *a producer returning a new key does not make it
+visible* — reproduced in the commit that quotes `#444`. I wired the COUNTER and
+checked the counter was reported, which is the easy half; the FIELD the counter
+counts is the half that had to reach a consumer. **The pregame path has had the
+same hole since 2026-08-17**, so the mechanism described as "already approved for
+pregame" has never put a number on a board either.
+
+`live_rows=2` (one live match in the lens) is a second, independent limit and is
+NOT the explanation — a slate full of live soccer would publish rows whose
+modelled edge no ranking term and no template can see.
+
+**NEXT, and it is not another deploy:** give the field a consumer. The four
+refusals stand — a modelled hold must never be mistaken for a two-sided de-vig —
+so the consumer has to take it as its OWN labelled term, NOT by widening
+`_model_edge_for`'s name check, which is the one change that would quietly undo
+the distinction this whole item exists to preserve.
 
 ### `#538` — **The soccer live edge is closed as a DIAGNOSIS: the one-sidedness is real in the vendor data, 0 of 2,544. What remains is a PRICING DECISION and it is the user's.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
 
