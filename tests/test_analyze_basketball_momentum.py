@@ -17,6 +17,7 @@ import pytest
 from scripts.analyze_basketball_momentum import _pearson
 from scripts.analyze_basketball_momentum import causality_check
 from scripts.analyze_basketball_momentum import forward_margin
+from scripts.analyze_basketball_momentum import forward_total
 from scripts.analyze_basketball_momentum import sweep_game
 from syndicate.features.shared.basketball_momentum_artifacts import build_momentum_payload
 
@@ -89,6 +90,53 @@ def test_forward_margin_signs_both_sides() -> None:
         {"clock_seconds": 120.0, "sign": -1.0, "weight": 3.0},
     ]
     assert forward_margin(rows, 100.0, 60.0) == pytest.approx(-1.0)
+
+
+# ---------------------------------------------------------------------------
+# forward_total -- the over/under outcome, which margin cannot answer
+# ---------------------------------------------------------------------------
+
+def test_a_total_is_not_a_margin() -> None:
+    """**The reason both are measured.** A 14-2 window and a 26-14 window have
+    the SAME margin and wildly different totals, so a signal that predicts one
+    has no automatic claim on the other."""
+    lopsided = [
+        {"clock_seconds": 110.0, "sign": 1.0, "weight": 14.0},
+        {"clock_seconds": 120.0, "sign": -1.0, "weight": 2.0},
+    ]
+    high_scoring = [
+        {"clock_seconds": 110.0, "sign": 1.0, "weight": 26.0},
+        {"clock_seconds": 120.0, "sign": -1.0, "weight": 14.0},
+    ]
+    assert forward_margin(lopsided, 100.0, 60.0) == forward_margin(high_scoring, 100.0, 60.0)
+    assert forward_total(lopsided, 100.0, 60.0) == 16.0
+    assert forward_total(high_scoring, 100.0, 60.0) == 40.0
+
+
+def test_forward_total_ignores_the_sign() -> None:
+    rows = [
+        {"clock_seconds": 110.0, "sign": 1.0, "weight": 3.0},
+        {"clock_seconds": 120.0, "sign": -1.0, "weight": 2.0},
+    ]
+    assert forward_total(rows, 100.0, 60.0) == 5.0
+    assert forward_margin(rows, 100.0, 60.0) == 1.0
+
+
+def test_forward_total_shares_the_exclusive_left_boundary() -> None:
+    """Same outcome-leak guard as the margin: an event AT the probe is what we
+    knew, not what happened next."""
+    rows = [{"clock_seconds": 100.0, "sign": 1.0, "weight": 2.0}]
+    assert forward_total(rows, 100.0, 60.0) == 0.0
+    assert forward_total(rows, 99.0, 60.0) == 2.0
+
+
+def test_horizons_cover_the_intervals_that_are_actually_traded() -> None:
+    """Quarters and halves, not round numbers. The live WNBA slate discovered
+    `spreads_q4`/`totals_q4`/`spreads_h2`/`totals_h2` -- 600s and 1200s."""
+    from scripts.analyze_basketball_momentum import HORIZONS_SECONDS
+
+    assert 600.0 in HORIZONS_SECONDS, "a WNBA quarter"
+    assert 1200.0 in HORIZONS_SECONDS, "a WNBA half"
 
 
 # ---------------------------------------------------------------------------
@@ -217,8 +265,12 @@ def test_sweep_states_a_reason_rather_than_returning_an_empty_grid() -> None:
     assert "need both" in swept["reason"]
 
 
-def test_sweep_r_is_none_or_in_range() -> None:
+def test_sweep_reports_margin_and_total_separately() -> None:
+    """ML/spread and over/under are different bets and get different columns."""
     swept = sweep_game(_long_game(), league_code="wnba")
+    assert swept["grid"], "the fixture must produce at least one cell"
     for cell in swept["grid"]:
-        r = cell["r"]
-        assert r is None or -1.0 <= r <= 1.0
+        for key in ("r_margin", "r_total", "r_total_abs"):
+            assert key in cell, f"every cell needs {key}"
+            r = cell[key]
+            assert r is None or -1.0 <= r <= 1.0

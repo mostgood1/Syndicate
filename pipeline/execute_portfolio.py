@@ -88,7 +88,11 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
 
 
 def run_execution(
-    selected_date: str, *, force: bool = False, inline: bool = False
+    selected_date: str,
+    *,
+    force: bool = False,
+    inline: bool = False,
+    venue_scope: str | None = None,
 ) -> dict[str, Any]:
     """Place today's committed plan. Returns a status payload, never raises.
 
@@ -107,6 +111,16 @@ def run_execution(
     Enforced HERE rather than by configuration, because "set the env var
     correctly" is exactly the guarantee that failed on 2026-08-22 when an
     unrecognised value for a different key silently meant something else.
+
+    **`venue_scope` places `paper2`'s venue-restricted plan instead of the
+    unrestricted one.** The two books must stay separable at every level or the
+    comparison they exist for is destroyed, so a scoped run reads a different
+    plan artifact AND books its orders under a different `venue`
+    (`paper:kalshi`, not `paper`). `idempotency_key` already includes `venue`,
+    so the same position placed in both books yields two distinct keys and
+    neither is refused as the other's duplicate -- a property worth stating
+    because if it were false, paper2 would silently suppress the main book's
+    orders rather than fail visibly.
     """
     normalized = str(selected_date or "").strip()
     if not normalized:
@@ -153,7 +167,14 @@ def run_execution(
 
     from pipeline.portfolio_commit import read_portfolio_plan
 
-    plan = read_portfolio_plan(normalized)
+    # Resolved before the plan read: it decides WHICH plan is read.
+    scope = str(venue_scope or "").strip().lower()
+    if scope:
+        from pipeline.portfolio_commit import read_portfolio_plan_for_venue
+
+        plan = read_portfolio_plan_for_venue(normalized, scope)
+    else:
+        plan = read_portfolio_plan(normalized)
     if not isinstance(plan, dict):
         print(f"[execute_portfolio] NO_PLAN date={normalized}", flush=True)
         return {"status": "skipped", "reason": "no_plan", "date": normalized}
@@ -163,6 +184,10 @@ def run_execution(
         return {"status": "skipped", "reason": "plan_has_no_positions_key", "date": normalized}
 
     venue = PAPER_VENUE if mode != LIVE else str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").strip()
+    if scope:
+        # Suffixed rather than replaced: the record must still say PAPER at a
+        # glance, and `mode` alone would not distinguish the two paper books.
+        venue = f"{venue}:{scope}"
     if mode == LIVE and not venue:
         return {"status": "skipped", "reason": "live_mode_with_no_venue_configured", "date": normalized}
 

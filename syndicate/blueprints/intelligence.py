@@ -3249,7 +3249,12 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
     three different states with three different fixes, and a bare "nothing here"
     would read as the first when it is usually the third.
     """
-    from pipeline.portfolio_commit import portfolio_commit_enabled, read_portfolio_plan
+    from pipeline.portfolio_commit import (
+        paper2_venue,
+        portfolio_commit_enabled,
+        read_portfolio_plan,
+        read_portfolio_plan_for_venue,
+    )
     from syndicate.features.shared.execution_ledger import (
         execution_mode,
         ledger_summary,
@@ -3280,6 +3285,38 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # otherwise look like "no bets" instead of "cannot see the bets".
         _LOGGER.exception("PAPER_LEDGER_READ_FAILURE date=%s", selected_date)
         ledger_error = f"{type(exc).__name__}: {exc}"
+
+    # The venue-restricted book. Read the same way and just as fail-safe: a
+    # missing paper2 must degrade to "not running" and never take down the
+    # portfolio it is being compared against.
+    venue = paper2_venue()
+    venue_plan = None
+    if venue:
+        try:
+            venue_plan = read_portfolio_plan_for_venue(selected_date, venue)
+        except Exception:
+            _LOGGER.exception("PAPER2_PLAN_READ_FAILURE date=%s", selected_date)
+
+    venue_totals = (venue_plan or {}).get("totals") or {}
+    scope_refusals = (venue_plan or {}).get("venue_scope_refusals") or {}
+    scoped_in = int((venue_plan or {}).get("rows_in", 0) or 0)
+    # Coverage is the Stage D number: what share of the board this venue quotes
+    # at all. DERIVED from the refusal counts rather than stored separately, so
+    # it can never disagree with them.
+    considered = scoped_in + sum(int(v or 0) for v in scope_refusals.values())
+    paper2 = {
+        "venue": venue or None,
+        "plan_present": isinstance(venue_plan, dict),
+        "positions": venue_totals.get("positions"),
+        "staked_dollars": venue_totals.get("staked_dollars"),
+        "sim_share_of_staked": venue_totals.get("sim_share_of_staked"),
+        "rows_in": scoped_in,
+        "venue_not_quoting": int(scope_refusals.get("venue_not_quoting", 0) or 0),
+        "coverage": round(scoped_in / considered, 4) if considered else None,
+        "scope_refusals": scope_refusals,
+        "refusals": (venue_plan or {}).get("refusals") or {},
+        "rows": (venue_plan or {}).get("positions") or [],
+    }
 
     job_state = (plan or {}).get("job_state") or {}
     positions = (plan or {}).get("positions") or []
@@ -3331,6 +3368,16 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # request handler. Absent on plans committed before the join existed,
         # which is why the page distinguishes "no join" from "matched nothing".
         "clv_join": (plan or {}).get("clv_join") or {},
+        # PAPER2 -- the venue-restricted book, on the SAME page as the
+        # unrestricted one.
+        #
+        # Deliberately the opposite call from keeping `/portfolio/paper` off
+        # `/portfolio`, and for a reason that does not contradict it. That split
+        # exists because simulated positions beside REAL ones can be mistaken
+        # for bets the user placed. These two are both paper, neither is a
+        # wager, and they exist ONLY to be compared -- putting them on separate
+        # pages would defeat the entire purpose of building the second one.
+        "paper2": paper2,
         "rows": rows,
         "orphan_orders": [
             {**order, "mark": marks_by_order.get(str(order.get("idempotency_key") or ""))}

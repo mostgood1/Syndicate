@@ -490,7 +490,25 @@ def compute_clv_for_date(
 
     rows: list[dict[str, Any]] = []
     unresolved: dict[str, int] = {}
+    # PER-KEY, not just counted. The counts alone say HOW MANY openings failed
+    # and never WHICH, so a caller holding a specific opening -- a placed bet,
+    # say -- can only report "no close" and not why. `order_clv` hit exactly
+    # that: 35 of 39 orders unresolved under one flat name, while the reason for
+    # each was known here and thrown away. Same list, keyed.
+    unresolved_rows: list[dict[str, Any]] = []
     by_source: dict[str, int] = {}
+
+    def _unresolve(opening: Mapping[str, Any], reason: str) -> None:
+        unresolved[reason] = unresolved.get(reason, 0) + 1
+        unresolved_rows.append(
+            {
+                "key": opening.get("key"),
+                "sport": opening.get("sport"),
+                "market": opening.get("market"),
+                "bookmaker": opening.get("bookmaker"),
+                "reason": reason,
+            }
+        )
     for opening in openings:
         key = _history_key(opening)
         state = markets.get(key) if key else None
@@ -565,7 +583,7 @@ def compute_clv_for_date(
             resolved["unresolved_reason"] = "unkeyable_opening"
         reason = resolved.get("unresolved_reason")
         if reason:
-            unresolved[reason] = unresolved.get(reason, 0) + 1
+            _unresolve(opening, reason)
             continue
         # When a same-book pair was found, CLV must use OUR price at THAT book,
         # not the best-book headline price -- otherwise the comparison is
@@ -591,7 +609,7 @@ def compute_clv_for_date(
         open_at = _parse_ts(opening.get("captured_at"))
         close_at = _parse_ts(resolved.get("close_captured_at"))
         if open_at and close_at and close_at <= open_at:
-            unresolved["close_precedes_open"] = unresolved.get("close_precedes_open", 0) + 1
+            _unresolve(opening, "close_precedes_open")
             continue
 
         open_price = resolved.get("open_price_override")
@@ -599,7 +617,7 @@ def compute_clv_for_date(
             open_price = opening.get("price")
         clv = clv_pct_from_prices(open_price, resolved.get("close_price"))
         if clv is None:
-            unresolved["clv_uncomputable"] = unresolved.get("clv_uncomputable", 0) + 1
+            _unresolve(opening, "clv_uncomputable")
             continue
         source = str(resolved.get("close_source") or "unknown")
         by_source[source] = by_source.get(source, 0) + 1
@@ -730,6 +748,9 @@ def compute_clv_for_date(
         "openings": len(openings),
         "resolved": resolved_count,
         "unresolved_reasons": unresolved,
+        # The same failures, keyed, so a caller holding one opening can say WHY
+        # rather than only that it failed.
+        "unresolved_rows": unresolved_rows,
         "by_close_source": by_source,
         # Same-book only. None means no unbiased comparison was available.
         "avg_clv_pct": headline["avg_clv_pct"],

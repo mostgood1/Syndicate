@@ -29,6 +29,16 @@ biased upward regardless of whether the bet was good. So every aggregate here is
 reported PER SCOPE, and the headline is same-book only. A single blended CLV
 number would be exactly the flattering, wrong statistic Stage C exists to avoid.
 
+**VENUE IS PART OF A BOOK'S IDENTITY AND IS ALWAYS IN THE GROUPING.** `paper2`
+places its venue-restricted orders into the SAME ledger as the unrestricted
+book, distinguished only by `venue` (`paper` vs `paper:kalshi`). Grouping by
+market alone would drop a Kalshi bet and a DraftKings bet on the same market
+into one bucket and average them -- destroying the exact comparison paper2
+exists to produce, while still printing a confident per-market number. So
+`venue` is forced into every aggregate on the same footing as
+`close_book_scope`: both name WHICH BOOK OF BETS a number describes, and a
+number that does not know which book it is about is not a measurement.
+
 **AGGREGATED PER MARKET, NOT POOLED.** `_SAMPLE_SIZE_FOR_FULL_CREDIBILITY = 50`
 is per market for a reason, and `learnings.md` 2026-08-20 records pooling
 overstating significance 3.4x by counting rows as if they were bets. `n` rides
@@ -86,6 +96,7 @@ def clv_for_orders(
     *,
     date: str,
     clv_rows: Sequence[Mapping[str, Any]] | None = None,
+    unresolved_rows: Sequence[Mapping[str, Any]] | None = None,
     root: Any = None,
 ) -> dict[str, Any]:
     """Grade each order against the close. Per order, then per market, per scope.
@@ -108,6 +119,7 @@ def clv_for_orders(
             }
         )
         collected: list[Mapping[str, Any]] = []
+        collected_unresolved: list[Mapping[str, Any]] = []
         for sport in sports:
             try:
                 report = compute_clv_for_date(date, sport, root=root)
@@ -117,13 +129,29 @@ def clv_for_orders(
                 # the honest reading rather than a crash or a silent zero.
                 continue
             collected.extend(report.get("rows") or [])
+            # THE ATTRIBUTION, carried rather than discarded. An earlier version
+            # of this function kept only `rows` and reported a flat
+            # `no_close_for_market: 35` -- a number with no remedy attached,
+            # while the reason for each of those 35 was already computed one
+            # layer down. "Our book is absent from odds history" and "this
+            # market family is not tracked at all" look identical under one name
+            # and need completely different fixes.
+            collected_unresolved.extend(report.get("unresolved_rows") or [])
         clv_rows = collected
+        if unresolved_rows is None:
+            unresolved_rows = collected_unresolved
 
     by_key: dict[str, Mapping[str, Any]] = {}
     for row in clv_rows or ():
         key = row.get("key")
         if isinstance(key, str) and key:
             by_key.setdefault(key, row)
+
+    unresolved_by_key: dict[str, str] = {}
+    for row in unresolved_rows or ():
+        key = row.get("key")
+        if isinstance(key, str) and key:
+            unresolved_by_key.setdefault(key, str(row.get("reason") or ""))
 
     graded: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
@@ -145,6 +173,9 @@ def clv_for_orders(
                     "side": order.get("side"),
                     "player_name": order.get("player_name"),
                     "book": order.get("book"),
+                    # WHICH BOOK OF BETS this order belongs to -- `paper` for
+                    # the unrestricted portfolio, `paper:kalshi` for paper2.
+                    "venue": order.get("venue"),
                     "entry_price": entry,
                     "stake_dollars": _as_float(order.get("fill_stake_dollars"))
                     or _as_float(order.get("requested_stake_dollars")),
@@ -161,11 +192,20 @@ def clv_for_orders(
             continue
         row = by_key.get(key)
         if row is None:
-            # No close resolved for this market. `compute_clv_for_date` counts
-            # WHY under its own `unresolved` -- market absent from history, close
-            # preceding the open, and so on -- and that detail is preserved
-            # there rather than flattened into this one name.
-            _row(REASON_NO_CLOSE, close_price=None, clv_pct=None, close_book_scope=None)
+            # No close for this market -- and WHY, when the resolver told us.
+            # `no_close_reason` distinguishes `no_market_in_history` (this
+            # family is not tracked: h2h_lay, totals_alt, h2h_3_way,
+            # spreads_alt) from `close_precedes_open` (a real close exists but
+            # predates our opening) from an opening the resolver never saw at
+            # all (None -- our book absent from the shard). Three different
+            # problems; only the flat name made them look like one.
+            _row(
+                REASON_NO_CLOSE,
+                close_price=None,
+                clv_pct=None,
+                close_book_scope=None,
+                no_close_reason=unresolved_by_key.get(key),
+            )
             continue
 
         close_price = row.get("close_price")
@@ -196,10 +236,27 @@ def clv_for_orders(
         "orders": len(orders),
         "resolved": len(resolved),
         "reasons": dict(sorted(reasons.items())),
+        # WHY the unresolved ones failed, counted. `None` means the resolver
+        # produced no row for that key at all, which is our book being absent
+        # from the shard rather than a named refusal.
+        "no_close_reasons": _no_close_reasons(graded),
         "by_market": _aggregate(resolved, ("sport", "market")),
         "by_scope": _aggregate(resolved, ("close_book_scope",)),
+        # The paper2 comparison, as its own top-level view rather than something
+        # to reconstruct by filtering `by_market`.
+        "by_venue": _aggregate(resolved, ("venue",)),
         "rows": graded,
     }
+
+
+def _no_close_reasons(graded: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for row in graded:
+        if row.get("reason") != REASON_NO_CLOSE:
+            continue
+        name = row.get("no_close_reason") or "opening_not_in_resolver"
+        out[str(name)] = out.get(str(name), 0) + 1
+    return dict(sorted(out.items()))
 
 
 def _aggregate(rows: Sequence[Mapping[str, Any]], keys: Sequence[str]) -> list[dict[str, Any]]:
@@ -209,15 +266,20 @@ def _aggregate(rows: Sequence[Mapping[str, Any]], keys: Sequence[str]) -> list[d
     average that blends a same-book close with another book's is the biased
     number this module exists to keep separate.
     """
+    # Both of these are forced into the bucket whether or not the caller asked
+    # for them, because each names WHICH BOOK a number is about: `venue` says
+    # which portfolio placed it, `close_book_scope` says what it was compared
+    # against. Averaging across either produces a confident number describing
+    # nothing in particular.
+    forced = [key for key in ("venue", "close_book_scope") if key not in keys]
     buckets: dict[tuple, list[Mapping[str, Any]]] = {}
     for row in rows:
         bucket = tuple(str(row.get(key) or "") for key in keys)
-        if "close_book_scope" not in keys:
-            bucket = bucket + (str(row.get("close_book_scope") or ""),)
+        bucket = bucket + tuple(str(row.get(key) or "") for key in forced)
         buckets.setdefault(bucket, []).append(row)
 
     out: list[dict[str, Any]] = []
-    labels = list(keys) + ([] if "close_book_scope" in keys else ["close_book_scope"])
+    labels = list(keys) + forced
     for bucket, group in sorted(buckets.items()):
         clvs = [row["clv_pct"] for row in group if row.get("clv_pct") is not None]
         beats = sum(1 for row in group if row.get("beat_close"))
@@ -242,12 +304,13 @@ def _aggregate(rows: Sequence[Mapping[str, Any]], keys: Sequence[str]) -> list[d
 
 def order_clv_report_line(report: Mapping[str, Any]) -> str:
     """One log line. `logger.info` never reaches Render's collector -- print this."""
-    same_book = [
-        entry
-        for entry in (report.get("by_scope") or [])
-        if entry.get("close_book_scope") == SCOPE_SAME_BOOK
-    ]
-    headline = same_book[0] if same_book else {}
+    # The headline is the UNRESTRICTED book's same-book number. paper2 gets its
+    # own field rather than being averaged in: they are two portfolios and one
+    # average of them describes neither.
+    scoped = report.get("by_scope") or []
+    same_book = [e for e in scoped if e.get("close_book_scope") == SCOPE_SAME_BOOK]
+    headline = next((e for e in same_book if ":" not in str(e.get("venue") or "")), {})
+    paper2 = [e for e in same_book if ":" in str(e.get("venue") or "")]
     return (
         "[order_clv] ORDER_CLV"
         f" date={report.get('date')}"
@@ -260,4 +323,7 @@ def order_clv_report_line(report: Mapping[str, Any]) -> str:
         f" same_book_avg_clv_pct={headline.get('avg_clv_pct')}"
         f" same_book_beat={headline.get('beat_close', 0)}"
         f" reasons={report.get('reasons')}"
+        # The split that turns "35 unresolved" into something with a remedy.
+        f" no_close={report.get('no_close_reasons')}"
+        f" paper2={[(e.get('venue'), e.get('n'), e.get('avg_clv_pct')) for e in paper2]}"
     )
