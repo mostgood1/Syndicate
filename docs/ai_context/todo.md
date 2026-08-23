@@ -1,5 +1,89 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#523` — **Soccer's live tier was never reached: the shortlist runs a DIFFERENT enrichment chain from the artifact build, and the one join it was missing is the one the other two depend on. FIXED IN CODE, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+`#521` made soccer's prices 32x fresher and `live_rows` stayed 0 across three
+readings. This is why, and it is not the reason `#520` guessed.
+
+**THE READING THAT FOUND IT** (refresh-worker, 2026-08-22 23:58:21Z):
+
+    LIVE_PROJECTION_JOIN sport=soccer considered=0 projected=0
+                         lens_indexed=864 lens_live_games=6
+
+Six live matches in the index, 864 entries, and **zero rows considered**.
+`attach_live_gamelines` increments `considered` only AFTER
+`game.state in {live, in_progress}` (`live_gameline_join.py:807`), so this is not
+a join that priced nothing — it is a join no row reached. The distinction is the
+whole diagnosis, and it exists only because the counter was placed after the gate
+rather than before it.
+
+**THE CAUSE.** Two paths stamp a row's `game.state`:
+
+    book_grid_artifact.py:215   attach_game_state
+    book_grid_artifact.py:221   attach_live_game_state_from_lens   <-- and its
+                                comment says WHY it is here: `#413`,
+                                `live_edge_policy` reads `game.state`, so the
+                                correction must land while it can still change
+                                an answer
+    layer2_shortlist.py:299     attach_game_state
+                                ...no live-state correction at all...
+
+**MLB HID IT.** MLB's chips are StatsAPI-derived and already carry a real live
+status, so `attach_game_state` alone suffices — MLB had 276 live rows on the same
+board. Soccer's chips come from `_unsimulated_game` (`soccer/cards.py`), which
+defaults `status_state` to `"pre"` for every league the sim does not cover, i.e.
+nine of ten. Only the correction ever makes those rows live, and it was not
+running. A sport-specific dependency on a shared step, where the sport that works
+is the one that does not need it.
+
+**THE COMMENT ABOVE THAT LOOP ALREADY DESCRIBED THIS BUG.** It records two joins
+that "ran only for the serve-time endpoint" and were added to the shortlist —
+`#350`'s fix. A third was left behind, and it is the one the other two READ. A
+partial fix to a drift is how the drift survives, and the note explaining the
+drift is what made the remainder look intentional.
+
+**Fixed** by registering `attach_live_game_state_from_lens` in the shortlist's
+enrichment loop, between `game_state` and `projections`, imported in the OPTIONAL
+block so a rollback costs the live tier and not the whole sport's enrichment.
+
+**Test:** `tests/test_shortlist_enrichment_parity.py` compares the two chains as
+SETS rather than asserting a hand-copied list that would rot the same way, pins
+`#413`'s ordering on BOTH paths, and guards the guard (if both paths lost the call
+the set difference would be empty and report nothing). 5 of its 6 fail against the
+pre-fix file.
+
+**NOT YET MEASURED.** Whether soccer rows then price is a separate question from
+whether they are seen. `considered` should become non-zero; `projected`/`edged`
+may still be 0 for their own reasons, and `#503`'s pricing gap is still open.
+Verify with the same line: `LIVE_PROJECTION_JOIN sport=soccer considered=` > 0,
+then `LAYER2_BOARD_HEALTH sport=soccer live_rows=` > 3.
+
+---
+
+**A CORRECTION TO WHAT `#521` REPORTED ABOUT NFL.** That entry said NFL projection
+coverage "fell 100% -> 10%" and called it the thing to look at next. That framing
+was wrong in two ways, and the second one matters:
+
+1. **Nothing was displaced.** NFL published 275 rows against a 400 cap, so it was
+   not competing for slots. Projected rows went 23 -> 27; the denominator grew by
+   248 and the numerator did not shrink. A rate fell, nothing was lost.
+2. **The unprojected rows are unprojected ON PURPOSE.** `nfl_game_projections.py`
+   applies `live_edge_policy` at the stamp point, and its comment is explicit:
+   NFL has no live re-sim, and "a pregame full-game total priced against a market
+   that has already watched 55 minutes of football is not an edge, it is the
+   score." Measured there: 5 live NFL rows once carried edges of +2.70/-7.03
+   against 34.5-39.5 totals. The guard now fires 248 times a build.
+
+The grid-level join confirms it: `PREGAME_PROJECTION_JOIN sport=nfl
+considered=1427 projected=1021` = **71.5%**, against 10% on the published board.
+The projections exist; the policy withholds them from live rows, correctly.
+
+So this is a guard working, not a regression — and reporting it as a regression
+would have sent someone to fix a coverage gap that is a safety feature. The real
+open item is narrower and should be stated as itself: **NFL has no live re-sim**,
+so its live rows rank on market signals alone (`edged=7` of 275). That is a
+feature request, not a defect.
+
 ### `#522` — **Stage C's precondition was missing and nobody would have noticed until the analysis returned empty: NOTHING joined a committed position to the opening price recorded for its market. Built, plus live marks and three page defects. NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-22, user request
 
 **THE GAP.** `clv_opening_ledger` has been recording openings all along —
