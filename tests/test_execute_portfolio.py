@@ -398,3 +398,41 @@ def test_the_run_states_the_limits_it_applied(monkeypatch):
     result = runner.run_execution("2026-08-22")
     assert result["limits"]["mode"] == "paper"
     assert result["spent"]["orders"] == 1
+
+
+# --------------------------------------------------------------------------
+# The commit's live bet-status block -- which never once ran
+# --------------------------------------------------------------------------
+
+
+def test_the_commit_populates_live_bet_status(monkeypatch, capsys):
+    """MEASURED 2026-08-23T17:12:31Z, every cycle:
+
+        [portfolio_commit] BET_STATUS_FAILED date=2026-08-23
+          error=cannot access local variable '_load_ledger_for_clv'
+                where it is not associated with a value
+
+    The block called a name bound by a `from ... import ... as` TWENTY LINES
+    BELOW it. Python treats a name assigned anywhere in a function as local for
+    the whole function, so the read raised `UnboundLocalError` on every run --
+    swallowed by the block's own `except`, printed as a FAILED line nobody was
+    grepping for, and rendered on the page as an honest-looking blank.
+
+    A feature that looks installed and has never executed is the failure mode
+    this repo keeps rediscovering, so this test runs the real code path.
+    """
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    runner.run_execution("2026-08-22")
+
+    from pipeline import portfolio_commit as commit
+
+    capsys.readouterr()
+    result = commit.run_portfolio_commit("2026-08-22")
+    printed = capsys.readouterr().out
+
+    assert "BET_STATUS_FAILED" not in printed, printed
+    # Present, and reached far enough to have counted the orders it was given.
+    assert "bet_status" in (result.get("plan") or {})

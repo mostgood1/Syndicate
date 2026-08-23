@@ -170,9 +170,18 @@ def settle_orders(
     already = 0
     reasons: dict[str, int] = {}
     outcomes: dict[str, int] = {}
+    # WHICH markets we cannot grade, by name. The reason counter stays a stable
+    # low-cardinality key (`unmapped_market`); this is the detail beside it.
+    # `unmapped_market: 15` is a number nobody can act on -- the market NAMES
+    # are the difference between "add five mappings" and another round of
+    # guessing at which five.
+    unmapped: dict[str, int] = {}
 
-    def _refuse(reason: str) -> None:
+    def _refuse(reason: str, market: Any = None) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
+        if market is not None:
+            name = str(market or "<absent>")
+            unmapped[name] = unmapped.get(name, 0) + 1
 
     for order in orders:
         if order.get("outcome"):
@@ -190,7 +199,8 @@ def settle_orders(
         if resolved.get("unavailable_reason"):
             # The feed's own vocabulary, passed through rather than flattened:
             # `no_game_pk`, `no_feed` and `no_stat` are three different jobs.
-            _refuse(str(resolved["unavailable_reason"]))
+            reason = str(resolved["unavailable_reason"])
+            _refuse(reason, order.get("market") if reason == "unmapped_market" else None)
             continue
 
         status = resolve_bet_status(
@@ -235,6 +245,11 @@ def settle_orders(
         f" ungraded={reasons}",
         flush=True,
     )
+    if unmapped:
+        print(
+            f"[paper_settlement] UNMAPPED_MARKETS date={normalized} {dict(sorted(unmapped.items(), key=lambda kv: -kv[1]))}",
+            flush=True,
+        )
     return {
         "status": "ok",
         "date": normalized,
@@ -243,6 +258,7 @@ def settle_orders(
         "already_graded": already,
         "outcomes": outcomes,
         "ungraded": reasons,
+        "unmapped_markets": dict(sorted(unmapped.items(), key=lambda kv: -kv[1])),
     }
 
 

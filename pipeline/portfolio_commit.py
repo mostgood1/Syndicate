@@ -354,9 +354,22 @@ def run_portfolio_commit(
         )
         from syndicate.features.shared.bet_status_mlb import mlb_status_resolver
 
+        # ITS OWN IMPORT. This block used to call `_load_ledger_for_clv()`,
+        # which is bound by a `from ... import ... as` TWENTY LINES BELOW, in
+        # the ORDER_CLV block. Python sees an assignment anywhere in the
+        # function and treats the name as local for the whole of it, so this
+        # read raised `UnboundLocalError` on every single cycle -- caught by
+        # this block's own `except` and printed as BET_STATUS_FAILED.
+        #
+        # So live bet status NEVER ONCE WORKED from the day it was written, and
+        # it failed in the shape that is hardest to notice: a feature that looks
+        # installed, a log line nobody was grepping for, and a page column that
+        # renders an honest-looking blank. Measured 2026-08-23T17:12:31Z.
+        from syndicate.features.shared.execution_ledger import _load as _load_ledger
+
         status_orders = [
             order
-            for order in (_load_ledger_for_clv().get("orders") or [])
+            for order in (_load_ledger().get("orders") or [])
             if order.get("selected_date") == normalized
         ]
         if status_orders:

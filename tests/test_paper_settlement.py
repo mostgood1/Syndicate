@@ -241,3 +241,34 @@ def test_an_unfilled_order_is_not_counted_as_a_loss(monkeypatch):
     # Charging the strategy for a bet it does not hold.
     assert result["ungraded"] == {settle.REASON_NOT_FILLED: 1}
     assert settle.settlement_summary(DATE)["total"]["lost"] == 0
+
+
+def test_an_unmapped_market_is_reported_BY_NAME(monkeypatch):
+    """`unmapped_market: 15` is a number nobody can act on.
+
+    The market names are the difference between "add five mappings" and another
+    round of guessing at which five.
+    """
+    _place(key="a")
+    _place(key="b")
+
+    def resolver(order):
+        return {"unavailable_reason": "unmapped_market"}
+
+    from syndicate.features.shared.execution_ledger import _load, _persist
+
+    state = _load()
+    state["orders"][0]["market"] = "batter_doubles"
+    state["orders"][1]["market"] = "h2h"
+    _persist(state)
+
+    result = settle.settle_orders(DATE, resolver=resolver)
+    assert result["ungraded"] == {"unmapped_market": 2}
+    assert set(result["unmapped_markets"]) == {"batter_doubles", "h2h"}
+
+
+def test_only_unmapped_market_contributes_names(monkeypatch):
+    _place()
+    result = settle.settle_orders(DATE, resolver=_resolver(None, unavailable="no_live_feed"))
+    # A missing feed says nothing about the market vocabulary.
+    assert result["unmapped_markets"] == {}
