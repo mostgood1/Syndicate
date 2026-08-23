@@ -24257,3 +24257,55 @@ Horizons are now **the intervals actually traded**: the live slate discovered
 **NOT A MODEL INPUT, and the gap is stated:** `model_engine_standard.md` requires
 re-fitting the rates a new mechanism displaces, and records two mechanisms
 together producing a NEGATIVE interaction in 4 of 4 markets. This ships a chart.
+
+## 2026-08-23 01:25Z — web + live-odds-worker `010bd4e0` — `#514` the momentum join
+
+- **web** `dep-da54nt2jobas73dhnasg` · **live-odds-worker** `dep-da54nuijobas73dhnglg`
+- **holder:** lane `basketball-live-momentum`
+- **verify:** PENDING — `MOMENTUM_ATTACHED ... matched=N attached=N` holding STEADY
+  across consecutive card builds, rather than flickering between 0 and 2.
+
+### THE FIRST CARD-JOIN READING, AND THE DIAGNOSIS I GOT WRONG
+
+Momentum reached a card for the first time at **01:23:27Z** (`attached=2`). But
+the surrounding builds on the SAME instance, same minute, same three games and
+same two blocks, read `attached=0`:
+
+    01:23:00  attached=0
+    01:23:01  attached=0
+    01:23:27  attached=2   <-- works
+    01:23:58  attached=0
+    01:23:59  attached=0
+
+**I had written that the cause was probably a game no longer in play carrying
+the artifact-form id. That was wrong, and the intermittency is what disproved
+it** — a game-state explanation cannot flip twice in 60 seconds. It is
+PATH-dependent: `_wnba_row_game_id` gives an artifact-only card `"AWY@HOM"` or
+an opaque hash, and only `_supplement_games_with_live_state` repairs it to
+ESPN's. Different callers build their `games` list by different routes, so some
+carry ESPN ids and some do not, seconds apart.
+
+The alias handling I had been careful about was correct and entirely
+irrelevant: there was no id to alias.
+
+**FIX:** the block now records `home_tri`/`away_tri` (free — `_team_index` had
+already resolved both sides, the sign on every row depends on it), and the card
+falls back to the `(away, home)` pair the rest of that module already joins on.
+Fallback, NOT replacement, with the id tried first and a test pinning that
+order — a fallback that shadows a real key is worse than none.
+
+### WHAT THE INSTRUMENT DID AND DID NOT DO
+
+`blocks` beside `attached` earned its place: a bare `attached=0` reads
+identically to "no games in play", and I would have gone looking at the
+producer instead of the join.
+
+But it stopped one level short — `attached=0` could not separate "no id
+matched" from "matched, chart returned None". Two bugs, one number: the exact
+ambiguity the pair was added to remove, reintroduced one level down. Split
+`matched` out and added `MOMENTUM_NO_JOIN` printing both key sets, **shipped
+alone** before the fix so the instrument could not be confused with the guess.
+
+That ordering is also what caught the wrong diagnosis. Watching the counter
+across builds showed the flicker; shipping the guess alongside it would have
+"fixed" the problem and left the real cause unnamed.
