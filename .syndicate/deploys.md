@@ -24904,3 +24904,48 @@ adjustments to it — not a per-game average replacing it.
 
 `analyze_situational_pace` measures whether the situational half of that is real
 before anything is modelled.
+
+## 2026-08-23 18:57-19:21Z — refresh-worker `411d1112` — `#530`/`#531`/`#536` — ALL THREE ANSWERED, and the answer moves the owner
+
+`lane layer2-sim-view-and-live-projection`, claim `3860045c9fcedfc2` (re-acquired
+with `--force`: my own earlier claim had EXPIRED at 80.6 min, same lane
+re-entering). `dep-da5k5d2jobas73f0dbv0`, instance `gh2cp`, healthy at 63.5%.
+
+**verify, 19:21:05Z:**
+
+    LIVE_PROJECTION_JOIN sport=soccer considered=1269 projected=125 edged=0
+      miss_player=0 miss_market=0 miss_line=583 miss_line_match=13 miss_not_live=548
+      edge_why={'no_fair_value_one_sided_quote': 110,
+                'no_fair_value_devig_failed': 15}
+
+**`#536` DID ITS JOB — and the answer is not the one I expected.** 110 of 125
+(88%) are `one_sided_quote`: the book quotes the OVER and nothing else, so no
+de-vig is possible and no amount of downstream work will produce an edge.
+**`consensus_present_devig_returned_none` is ZERO** — there is no broken-de-vig
+population at all. The residual 15 are the flat fallback, i.e. rows that reached
+the join with a pregame basis but no stamped reason, so they came from a path
+other than soccer's `_price_against_market`. Small, and now the only unattributed
+bucket.
+
+**THIS SETTLES `#530`, WHICH IS NOT THE SAME AS SAYING IT PRODUCED EDGES.** The
+ordering fix was correct and is proven correct in isolation (4 tests fail against
+the pre-fix file; a live row with two consensus sides now gets a fair value). It
+did not raise `edged` because 88% of live soccer prop quotes have only one side to
+de-vig. Those two facts are compatible and both need saying — the fix removed a
+real blocker that was hiding behind a bigger one.
+
+**THE OWNER MOVES.** "Why is soccer's live edge zero" is no longer a pricing or a
+plumbing question. It is: *does the soccer prop fetch capture the UNDER side?*
+`scripts/fetch_soccer_oddsapi_props_local.py` handles `over_price`/`under_price`,
+so the shape exists; whether OddsAPI returns an under for `player_shots`, and
+whether it survives to `consensus`, is unmeasured and is the next thing to read.
+
+**`#531` CONFIRMED AGAIN, more strongly.** `miss_market` is 0 for the second
+consecutive reading while `miss_not_live=548` and `miss_line=583` carry the whole
+population — both structurally impossible to observe before. The pre-`#531`
+number, `miss_market=620`, would have sent the next reader to the alias map for a
+cause that does not exist.
+
+**Not measured:** whether `edged` ever exceeds 0 for soccer. That needs a live
+match whose prop quote is two-sided, and the European Sunday slate was closing as
+this landed. Deferred by the calendar, not by a gap in the instrument.

@@ -41,7 +41,30 @@ Sibling of `todo_id_reconcile.py`, which answers the other question — every id
 ever issued lives in exactly one of the two files. That one audits after the
 fact; this prevents the collision.
 
-### `#536` — **`#530` fixed the ordering and `edged` stayed 0. `no_fair_value_devig_failed` is ONE NAME OVER TWO STATES, again — now split. FIXED, NOT DEPLOYED.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+### `#536` — **ANSWERED 19:21:05Z: 110 of 125 withheld live soccer rows are ONE-SIDED QUOTES; the broken-de-vig population is ZERO. The owner moves to the odds fetch.**
+
+**ANSWER, 19:21:05Z, `411d1112`:**
+
+    edge_why={'no_fair_value_one_sided_quote': 110, 'no_fair_value_devig_failed': 15}
+    miss_player=0 miss_market=0 miss_line=583 miss_line_match=13 miss_not_live=548
+
+110 of 125 (88%) are one-sided: the book quotes the OVER and nothing else, so no
+de-vig exists and nothing downstream can produce an edge.
+`consensus_present_devig_returned_none` is **ZERO** — there is no broken-de-vig
+population. The residual 15 are the flat fallback, so they reached the join from a
+path other than soccer's `_price_against_market`; small, and now the only
+unattributed bucket.
+
+**This settles `#530` without saying it produced edges.** The ordering fix is
+correct and proven so in isolation; it did not raise `edged` because most live
+soccer prop quotes have one side. Both are true and the fix removed a real blocker
+that was hiding behind a bigger one.
+
+**NEXT OWNER — the odds fetch, not the projection layer.** The question is now
+"does the soccer prop fetch capture the UNDER side?".
+`scripts/fetch_soccer_oddsapi_props_local.py` handles `over_price`/`under_price`,
+so the shape exists; whether OddsAPI returns an under for `player_shots`, and
+whether it survives into `consensus`, is UNMEASURED and is the next thing to read.
 
 `#530` shipped and the post-deploy reading (18:32:21Z / 18:35:53Z) is:
 
