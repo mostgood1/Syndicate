@@ -24716,3 +24716,48 @@ run on FIXTURES. Proving the substrate on synthetic rows proved the logic, not
 the feed. The next reading is that guard on real data, and a season is exactly
 the size of thing that embarrasses a design which looked fine on 300 synthetic
 rows.
+
+## 2026-08-23 17:10:03Z — THE LEAKAGE GUARD PASSES ON REAL DATA
+
+    [verify] SEASON dates=99 games=282 projection_rows=21065
+    [verify] LEAKAGE games_checked=282 probes_compared=12429 state_fields_that_MOVED=0 PASS
+    [verify] PACE per_min p10=3.52 median=3.87 p90=4.22
+    [verify] POSSESSIONS_AT_END median=153.0 n=282
+    [verify] FWD_600_COMPLETE 15425/21065 (73.2%)
+
+**Zero leaking fields across 12,429 probe comparisons on 282 real games.** The
+guard had only ever run on fixtures, which proved the logic and not the feed.
+It now means something, and it means something because it was shown to FAIL
+first: injecting one state field that sees the whole feed moves 215 of 215
+probes and exits 5.
+
+### A CORRECTION: MY "2.6% HIGH" ESTIMATOR BIAS WAS AN ARTEFACT
+
+This morning, from 7 readings across 2 games, I reported the possession
+estimator as "systematically ~2.6% HIGH" — ratios 1.012..1.043 against 160
+combined possessions per 40 min.
+
+**That 160 was an assumption I supplied, not a measurement.** Across 282 games
+the estimator lands at a median of **153.0** at the final buzzer, and pace
+(3.87/min x 40 = 154.8) agrees with it. So the estimator is internally
+consistent, and the "bias" was a bias in my reference constant.
+
+What is now measured: internal consistency, and ~153 combined possessions per
+WNBA game. Whether 153 matches TRUE WNBA pace needs an external reference I do
+not have and must not assert from memory. The earlier claim should not be
+carried forward.
+
+### THE ONE FINDING THAT CONSTRAINS ANY FIT
+
+**Only 73.2% of rows have a COMPLETE 600s forward window.** More than a quarter
+run past the end of the captured game. A truncated window looks like a
+low-scoring one, so a fit trained on all rows learns "late game means low
+totals" — which is false and would price fourth-quarter totals badly. The flag
+exists per row; the fit must use it.
+
+### NEXT: THE SWEEP, GATED SEPARATELY ON PURPOSE
+
+`SYNDICATE_WNBA_MOMENTUM_SWEEP` runs the pooled correlation grid — the question
+the lane was opened to answer. Deliberately NOT chained to the verify passing:
+a sweep that only runs on a clean check has an ambiguous absence, unable to
+distinguish "clean but unrun" from "blocked". Two flags, two readings.
