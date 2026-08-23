@@ -24761,3 +24761,99 @@ exists per row; the fit must use it.
 the lane was opened to answer. Deliberately NOT chained to the verify passing:
 a sweep that only runs on a clean check has an ambiguous absence, unable to
 distinguish "clean but unrun" from "blocked". Two flags, two readings.
+
+## 2026-08-23 ~17:56Z — HOW TO READ THE POOLED SWEEP, WRITTEN BEFORE IT RETURNS
+
+Recorded ahead of the result deliberately. Choosing a threshold after seeing 40
+correlations is how a noise grid becomes a discovery.
+
+### 1. THE REPORTED `n` IS NOT THE EVIDENCE
+
+Probes sit on a 30s grid, so at a 600s horizon they overlap 20-fold. ~15,000
+probes across 282 games is **~846 independent quarter windows** and **~282
+independent half windows**. Any significance judged on the probe count is
+judged on an overlap artefact — the same error `live-game-line-projection`
+makes reporting n=985 on `games_with_outcome: 3`.
+
+### 2. THE NOISE FLOOR FOR 40 CELLS, SIMULATED
+
+The strongest of 40 correlations is not one correlation. Under PURE NOISE
+(400 trials):
+
+    effective n = 846   median strongest |r| = 0.082   95th pct = 0.111
+    effective n = 282   median strongest |r| = 0.142   95th pct = 0.184
+
+**So a best cell below ~0.11 at the quarter horizon, or ~0.18 at the half, is
+indistinguishable from chance.** That is the bar, set before the data.
+
+### 3. A RAW CORRELATION CANNOT SEPARATE PREDICTION FROM MECHANISM
+
+Pressure deliberately EXCLUDES points — that is what the two-series split is
+for. But it still counts shot ATTEMPTS, and a team attempting more shots both
+scores more pressure AND has more chances to score. Some of any `r_margin` is
+therefore mechanical rather than predictive.
+
+The clean question is whether momentum adds anything BEYOND the current scoring
+rate, which is a partial correlation and **the grid does not compute one**. So
+a positive result here is a reason to run that test, not a result in itself.
+A negative result is more informative: if the raw correlation is already at the
+noise floor, the partial one cannot rescue it.
+
+## 2026-08-23 18:01:46Z — **THE ANSWER: BASKETBALL MOMENTUM CARRIES NO SIGNAL**
+
+    [momentum_phase_c] POOLED games=282 probes=65084 cells=40
+    [momentum_phase_c] STRONGEST_MARGIN axis=seconds hl=60.0 horizon=60.0
+                       r=-0.0327 n=20501 games=282
+
+**282 games. 40 cells. 3 outcome measures. 120 correlations. NOT ONE clears the
+noise floor.**
+
+    r_margin      max |r| = 0.0327   (seconds, hl 60s, horizon 60s)
+    r_total       max |r| = 0.0453   (seconds, hl 600s, horizon 1200s)
+    r_total_abs   max |r| = 0.0613   (possessions, hl 12, horizon 600s)
+
+    LARGEST ANYWHERE                = 0.0613
+    PRE-REGISTERED NOISE FLOOR      = 0.082 median, 0.111 p95
+
+    cells of 120 above the median floor: 0
+    cells of 120 above the p95 floor:    0
+
+**The strongest thing in the entire grid is WEAKER than what pure noise across
+40 cells typically produces.** The bar was written down BEFORE the run — see the
+pre-registration entry above — precisely so this could not be reinterpreted
+afterwards.
+
+### THIS IS THE SAME ANSWER SOCCER GOT
+
+`soccer-board-mlb-parity`, 2026-08-22: *"Production's ESPN-commentary momentum
+proxy carries NO signal at any half-life 30s-1800s — retired, not fixed."*
+
+Two sports, two independent taxonomies, two independent measurements, same
+result. That is no longer a quirk of one implementation.
+
+### WHAT IS AND IS NOT RULED OUT
+
+**RULED OUT:** decayed pressure momentum, as constructed here, predicting
+interval margin or totals — at half-lives 60-600s and 4-40 possessions, on both
+axes, over horizons of 60s to a full half. That covers every knob this design
+has.
+
+**NOT RULED OUT:** that FotMob-style momentum (a vendor's own fitted series,
+which soccer measured as directional at dAUC +0.071) would do better; that a
+partial correlation controlling for current scoring rate would surface something
+the raw one hides — though with the raw values this far below noise, there is
+almost nothing for a partial to rescue.
+
+### WHAT THIS SAVES, WHICH IS THE POINT
+
+Momentum was about to become an input to live ML/spread/total pricing. That
+would have required re-fitting the rates it displaced (`model_engine_standard.md`
+records two mechanisms together producing a NEGATIVE interaction in 4 of 4
+markets), and it would have been re-fitting a calibrated engine around noise.
+
+**The chart on the WNBA card stays** — it is descriptive, its label states
+DIRECTION only, and its payload already declares
+`scale: uncalibrated_relative_to_game_peak`. Every one of those choices was made
+on the assumption this number might come back at zero. It did.
+
+**IT MUST NOT FEED A PRICE.** That is now a measured constraint, not caution.
