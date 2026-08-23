@@ -90,3 +90,51 @@ def test_team_shooting_profile_recovers_the_injected_three_share(tmp_path, capsy
 def test_no_games_exits_three(tmp_path, capsys) -> None:
     assert situational.main(["--league", "wnba", "--start", "2026-05-01",
                              "--end", "2026-05-01", "--data-root", str(tmp_path)]) == 3
+
+
+def test_pooled_estimators_are_not_medians_of_per_window_ratios() -> None:
+    """**THE STATISTIC ITSELF.** The first season run reported ppp=1.031 in three
+    unrelated cells and ft_share=0.286 (=2/7) in every late cell -- agreement
+    that looked measured and was an artifact of taking a MEDIAN over ~4-possession
+    windows, whose ratios live on a coarse lattice. Free throws were worse: most
+    windows have none, so a median reads 0.000 until the zero share crosses one
+    half, then jumps.
+
+    This pins the fix directly. A cell where 60% of windows are scoreless and
+    40% score heavily has a per-window median of 0, and a real pooled rate."""
+    cell = {"windows": 100.0, "poss": 400.0, "points": 480.0, "ft": 60.0, "fga": 240.0}
+    assert situational._pace(cell) == pytest.approx(4.0)
+    assert situational._ppp(cell) == pytest.approx(1.2)
+    assert situational._ft_share(cell) == pytest.approx(0.2)
+
+    empty = {"windows": 0.0, "poss": 0.0, "points": 0.0, "ft": 0.0, "fga": 0.0}
+    assert situational._pace(empty) == 0.0
+    assert situational._ppp(empty) == 0.0
+    assert situational._ft_share(empty) == 0.0
+
+
+def test_free_throw_share_survives_zero_inflation(tmp_path, capsys) -> None:
+    """A median would report 0.000 here; the pooled rate must not."""
+    pressure, scoring = [], []
+    poss = t = 0.0
+    while t < 2400:
+        poss += 1.0
+        # Every fifth minute is a free-throw burst; the rest are field goals.
+        kind = "free_throw" if int(t // 60) % 5 == 4 else "shot_attempt_2"
+        pressure.append({"clock_seconds": t, "possession_index": poss, "sign": 1.0,
+                         "weight": 1.0, "type": kind, "team": "IND"})
+        scoring.append({"clock_seconds": t, "sign": 1.0 if int(t) % 2 else -1.0,
+                        "weight": 2.0})
+        t += 12.0
+    path = momentum_events_path(tmp_path, league_code="wnba", date_str="2026-05-01")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"games": {
+        f"g{i}": {"pressure": pressure, "narrator": scoring,
+                  "home_tri": "IND", "away_tri": "NYL"} for i in range(25)}}))
+
+    out = _run(tmp_path, capsys)
+    shares = [float(line.split("ft_share=")[1].split()[0])
+              for line in out.splitlines() if "CELL " in line]
+    assert shares, "cells must be emitted"
+    assert max(shares) > 0.05, (
+        f"one minute in five is all free throws; a pooled share must see it, got {shares}")
