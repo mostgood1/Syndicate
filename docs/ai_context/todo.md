@@ -1,5 +1,62 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#528` — **`settled_count = 0` was never a data problem: nothing had ever graded a WAGER. Grader built, plus the vocabulary drift that had silently disabled monotone early-decision for every MLB pitcher prop. IN CODE, TESTED, DEPLOYING.** — lane `portfolio-decision-and-execution`, 2026-08-23, user report ("the paper endpoint didnt reconcile any of the bets that were placed - i want to see how it performed for yestrday")
+
+**The trap that hid it for weeks.** `execution_ledger` stamps `settled_at` in
+`complete_order` — the instant a paper fill is written, **seconds after the bet
+is placed and hours before the game ends**. It means *the ORDER reached a
+terminal state at the venue*, not *the BET was decided*. Every record had one.
+So the ledger looked settled while nothing had ever asked whether a bet won, and
+`#502`'s `settled_count = 0` read as a broken pipeline for as long as it has been
+reported. **Nothing was broken. Nobody had written the grader.** The new field is
+`graded_at` precisely so the two clocks can never be confused again.
+
+**What now exists** (`syndicate/features/shared/paper_settlement.py`):
+
+- Grades only what is DECIDED — a final game, or a monotone market already past
+  its line — and leaves the rest ungraded **with a named reason**. "Not graded
+  yet" and "lost" are the two facts a performance number must never blur.
+- **Grades once, immutably.** A later feed read can differ (a stat correction, a
+  cache miss returning nothing). A ledger that changes its mind about a settled
+  bet is not a record; the immutability is what makes the number quotable.
+- **A push is not a loss.** `resolve_bet_status` reports a final tie as
+  `live_tied` with `decided=True`. Folding that into losses would have
+  understated every figure this produces.
+- **P&L from `fill_price`/`fill_stake_dollars`, never the requested ones.** The
+  difference is slippage; grading against the request credits the strategy with a
+  price it did not get.
+- ROI on **settled stake only** — pending stake would dilute it with bets that
+  have not happened. `None` rather than `0.0` when nothing has settled: 0.0% on
+  zero bets and 0.0% on fifty are the same string and opposite facts.
+
+**THE BUG FOUND WHILE WIRING IT, which is the more important half.**
+`bet_status._MONOTONE_MARKETS` listed `pitcher_strikeouts` and `pitcher_outs`.
+`market_keys` canonicalises those to **`strikeouts`** and **`outs`** (`#224`),
+and the board emits the canonical form — so `is_monotone_market("strikeouts")`
+was **False**. The early-decision mechanism, the entire reason that module
+exists, **has been switched off for every MLB pitcher prop**: silent, tests
+passing, reporting `live_behind` on bets that were already mathematically won.
+
+That is the **third** place this same vocabulary drift appeared in one day
+(`#527` fixed it in the join and in the price resolver). The pattern is now
+explicit: **any module holding its own list of market names will drift from
+`market_keys`.** `test_every_monotone_name_is_the_one_the_board_emits` ties the
+set to `market_keys` so it cannot happen a fourth time. Prefer canonicalising on
+lookup where a sport is available; where it is not (this function takes none),
+hold both spellings AND a test that derives one from the other.
+
+**Wiring:** settlement runs on the worker for **today and yesterday**,
+regardless of whether a commit happened that cycle — yesterday's bets settle long
+after yesterday's plan stops being written, and a night game finishes after
+midnight UTC under the previous slate date (`#370`). Re-running is free.
+
+**NOT YET MEASURED IN PRODUCTION.** Whether yesterday actually grades depends on
+cached final feeds (`fetch_if_missing=False`) and it is **MLB-only** — a
+non-MLB order returns `unmapped_market`. Both are visible in the `ungraded`
+counts rather than as a small number with no explanation. Read
+`[paper_settlement] SETTLED` after the deploy.
+
+
 ### `#527` — **A Kalshi-native board with its own hourly clock, and openings recorded from LOOKAHEAD markets — the first CLV reference that is genuinely early. IN CODE, TESTED, NOT DEPLOYED.** — lane `portfolio-decision-and-execution`, 2026-08-23, user request ("this should begin a regular cadence specific to kalshi since we are limited by oddsapi calls. we can even get lookahead lines so we get true opening lines for clv")
 
 **Two problems, one shape.** `#526`-era Kalshi work joined Kalshi's prices to the
