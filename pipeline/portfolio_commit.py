@@ -365,7 +365,7 @@ def run_portfolio_commit(
             bet_status_report_line,
             statuses_for_orders,
         )
-        from syndicate.features.shared.bet_status_mlb import mlb_status_resolver
+        from syndicate.features.shared.paper_settlement import _default_resolver
 
         # ITS OWN IMPORT. This block used to call `_load_ledger_for_clv()`,
         # which is bound by a `from ... import ... as` TWENTY LINES BELOW, in
@@ -386,14 +386,11 @@ def run_portfolio_commit(
             if order.get("selected_date") == normalized
         ]
         if status_orders:
-            mlb_resolve = mlb_status_resolver(normalized)
-
-            def _resolve(order):
-                if str(order.get("sport") or "").strip().lower() == "mlb":
-                    return mlb_resolve(order)
-                return {"unavailable_reason": f"no_resolver_for_{order.get('sport')}"}
-
-            statuses = statuses_for_orders(status_orders, resolver=_resolve)
+            # THE SAME DISPATCHER SETTLEMENT USES. Two copies of "which resolver
+            # for which sport" is two places to add WNBA and one place to forget
+            # -- and the live column and the settled record disagreeing about
+            # what is resolvable would be worse than either being wrong alone.
+            statuses = statuses_for_orders(status_orders, resolver=_default_resolver(normalized))
             print(bet_status_report_line(statuses), flush=True)
             plan["bet_status"] = statuses
     except Exception as exc:

@@ -160,8 +160,6 @@ def settle_orders(
 
     if resolver is None:
         resolver = _default_resolver(normalized)
-        if resolver is None:
-            return {"status": "skipped", "reason": "no_resolver", "date": normalized}
 
     state = _load()
     orders = [o for o in (state.get("orders") or []) if o.get("selected_date") == normalized]
@@ -263,11 +261,43 @@ def settle_orders(
 
 
 def _default_resolver(selected_date: str):
-    """MLB's resolver, or None. Named so a missing sport is not a silent zero."""
-    try:
-        from syndicate.features.shared.bet_status_mlb import mlb_status_resolver
+    """One resolver per sport, dispatched by the order's own `sport`.
 
-        return mlb_status_resolver(selected_date)
+    Built lazily and cached, so a slate with no WNBA never reads a WNBA
+    artifact and a slate with no MLB never touches a schedule. Each sport's
+    failure is its own: an unavailable WNBA box must not stop MLB grading, which
+    is why each is constructed inside its own guard.
+
+    A sport with no resolver returns a NAMED reason rather than nothing, so the
+    ungraded counts stay a work list rather than a mystery.
+    """
+    builders = {
+        "mlb": lambda: _build("syndicate.features.shared.bet_status_mlb", "mlb_status_resolver", selected_date),
+        "wnba": lambda: _build("syndicate.features.shared.bet_status_wnba", "wnba_status_resolver", selected_date),
+    }
+    cache: dict[str, Any] = {}
+
+    def resolve(order):
+        sport = str(order.get("sport") or "").strip().lower()
+        builder = builders.get(sport)
+        if builder is None:
+            return {"unavailable_reason": f"no_resolver_for_{sport or 'unknown_sport'}"}
+        if sport not in cache:
+            cache[sport] = builder()
+        resolver = cache[sport]
+        if resolver is None:
+            return {"unavailable_reason": f"resolver_unavailable_for_{sport}"}
+        return resolver(order)
+
+    return resolve
+
+
+def _build(module_name: str, factory_name: str, selected_date: str):
+    """Import and construct one sport's resolver, or None. Never raises."""
+    try:
+        import importlib
+
+        return getattr(importlib.import_module(module_name), factory_name)(selected_date)
     except Exception:
         return None
 

@@ -120,10 +120,31 @@ def _restore_pem_armor(text: str) -> str:
     if len(lines) < 2 or not all(_BASE64_LINE.match(line) for line in lines):
         return text
     body = "\n".join(lines)
-    # PKCS#8 first because it is what Kalshi issues and what `load_pem_private_key`
-    # prefers; the caller tries this string and reports the failure if it is
-    # wrong, rather than this function guessing twice and hiding which worked.
+    # BOTH ARMORS ARE TRIED, and which one worked is reported.
+    #
+    # MEASURED 2026-08-23T22:49:33Z: the PKCS#8 armor restored cleanly --
+    # `header='-----BEGIN PRIVATE KEY-----' has_end_marker=True lines=27` -- and
+    # STILL raised ValueError. A well-formed PKCS#8 wrapper around a PKCS#1 body
+    # is exactly that: structurally perfect, semantically wrong. So the caller
+    # gets the armor that actually parses rather than the one I guessed first.
+    for label in ("PRIVATE KEY", "RSA PRIVATE KEY"):
+        candidate = f"-----BEGIN {label}-----\n{body}\n-----END {label}-----"
+        if _parses(candidate):
+            return candidate
+    # Neither parsed. Return the PKCS#8 form so the failure is reported against
+    # a definite shape rather than against the bare body.
     return f"-----BEGIN PRIVATE KEY-----\n{body}\n-----END PRIVATE KEY-----"
+
+
+def _parses(pem: str) -> bool:
+    """Does this text load as a private key? No exception escapes."""
+    try:
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+        load_pem_private_key(pem.encode("utf-8"), password=None)
+        return True
+    except BaseException:  # noqa: BLE001 -- a broken install raises PanicException
+        return False
 
 
 # PEM headers we can name without revealing anything. The BODY is never touched.

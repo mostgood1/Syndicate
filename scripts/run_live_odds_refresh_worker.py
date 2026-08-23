@@ -719,6 +719,166 @@ def _run_tick() -> dict[str, object] | None:
         return None
 
 
+def _kalshi_auth_probe_at_boot() -> None:
+    """Can THIS service sign? Asked here because the answer is per-service.
+
+    `refresh-worker` proving its credentials work says nothing about this
+    worker: different service, different env block. And this is the one that
+    places orders, so "can it sign" has to be answered before it is armed
+    rather than discovered on the first submit -- where a 401 does not tell you
+    whether the ORDER or the AUTH was rejected.
+
+    Read-only: `probe_auth` asks for the balance. Nothing here can trade.
+    """
+    try:
+        from syndicate.features.shared.kalshi_auth import probe_auth
+
+        result = probe_auth()
+        print(
+            "[live_odds_worker] KALSHI_AUTH_PROBE"
+            f" status={result.get('status')}"
+            f" reason={result.get('reason')}"
+            f" detail={result.get('detail')}"
+            f" key_shape={result.get('key_shape')}"
+            # Keys, never values.
+            f" keys={result.get('keys')}"
+            f" balance_present={result.get('balance_present')}",
+            flush=True,
+        )
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] KALSHI_AUTH_PROBE_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _kalshi_series_catalogue_at_boot() -> None:
+    """Which series does Kalshi list -- now asked with a SIGNED read.
+
+    The unauthenticated catalogue call returned `http_429` from both public
+    hosts while an authenticated call succeeded in the same minute. `_get` now
+    signs when a credential is present, so this is the same question asked from
+    a quota we are actually entitled to.
+    """
+    try:
+        from syndicate.features.shared.kalshi_client import discover_series, series_matching
+
+        report = discover_series()
+        tickers = report.get("tickers") or []
+        print(
+            "[live_odds_worker] KALSHI_SERIES_CATALOGUE"
+            f" status={report.get('status')}"
+            f" count={report.get('count')}"
+            f" container={report.get('container_key')}"
+            f" payload_keys={report.get('payload_keys')}"
+            f" row_keys={report.get('row_keys')}"
+            f" errors={report.get('errors')}",
+            flush=True,
+        )
+        if report.get("status") != "ok":
+            # No per-sport lines on a failed catalogue: `n=0` would read as
+            # "Kalshi does not list it" when the truth is "we could not ask".
+            print(
+                "[live_odds_worker] KALSHI_SPORT_UNKNOWN reason=catalogue_unavailable",
+                flush=True,
+            )
+            return
+        for token in ("WNBA", "NBA", "MLB", "NFL", "NHL"):
+            found = series_matching([token], tickers)
+            print(
+                f"[live_odds_worker] KALSHI_SPORT {token} series={found[:12]} n={len(found)}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] KALSHI_SERIES_CATALOGUE_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _execution_interval_seconds() -> int:
+    """How often to place, at most. Five minutes unless told otherwise.
+
+    NOT the loop interval. This worker ticks as fast as 60s once a game is live,
+    and a placer on that cadence would re-examine a plan far more often than the
+    plan changes. The ledger refuses duplicates by key, so a faster cadence
+    would cost nothing but noise -- but noise in the one log a person reads
+    while money is moving is not free.
+    """
+    raw = os.environ.get("SYNDICATE_EXECUTION_INTERVAL_SECONDS")
+    try:
+        parsed = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return 300
+    return parsed if parsed > 0 else 300
+
+
+_LAST_EXECUTION_AT: float | None = None
+
+
+def _run_execution_tick() -> None:
+    """Place today's committed plan, on this worker, on its own clock.
+
+    WHY HERE. `execute_portfolio`'s own contract says live placement must never
+    run inside `refresh-worker`: that service has 110 OOM kills on record and
+    restarts mid-job, and a restart between submit and record is exactly what
+    the ledger's write-ahead exists to survive rather than to invite. This
+    worker is the other long-lived process, so this is where a live placer
+    belongs.
+
+    NOT `inline=True`. That flag makes `run_execution` refuse live mode
+    structurally, which is correct on refresh-worker and would make this
+    function silently pointless here.
+
+    DARK BY DEFAULT and gated four separate ways before anything is sent:
+    `SYNDICATE_EXECUTION_ENABLED`, then `SYNDICATE_EXECUTION_MODE=live`, then
+    `SYNDICATE_EXECUTION_LIVE_ARMED`, then the caps and the kill switch inside
+    `run_execution` itself. Absent any of them this is a no-op that costs one
+    dict lookup, the same relationship as the disk-maintenance call above.
+    """
+    global _LAST_EXECUTION_AT
+
+    try:
+        from pipeline.execute_portfolio import execution_enabled
+
+        if not execution_enabled():
+            return
+
+        now = time.monotonic()
+        interval = _execution_interval_seconds()
+        if _LAST_EXECUTION_AT is not None and (now - _LAST_EXECUTION_AT) < interval:
+            return
+        _LAST_EXECUTION_AT = now
+
+        from pipeline.execute_portfolio import run_execution
+        from syndicate.features.shared.timezone import central_today_iso
+
+        result = run_execution(central_today_iso())
+        print(
+            "[live_odds_worker] EXECUTION"
+            f" status={result.get('status')}"
+            f" reason={result.get('reason')}"
+            f" mode={result.get('mode')}"
+            f" venue={result.get('venue')}"
+            f" placed={result.get('placed')}"
+            f" duplicates={result.get('duplicates')}"
+            # Named refusals, so a cap that stopped a good slate and a plan with
+            # nothing bettable never share a number.
+            f" refused={result.get('refused')}"
+            f" spent={result.get('spent')}"
+            f" limits={result.get('limits')}",
+            flush=True,
+        )
+    except Exception as exc:
+        # A placer that raises must not take down the odds refresh this worker
+        # exists for. Named, because a silent absence and a crashed placer are
+        # different faults.
+        print(
+            f"[live_odds_worker] EXECUTION_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _start_live_lens_reports() -> None:
     try:
         _log_worker_memory("start_live_lens_reports_before")
@@ -838,6 +998,8 @@ def main() -> int:
     recycled_for_uptime = False
 
     try:
+        _kalshi_auth_probe_at_boot()
+        _kalshi_series_catalogue_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)
@@ -855,6 +1017,7 @@ def main() -> int:
                 run_disk_maintenance()
             except Exception as exc:
                 print(f"[live_odds_worker] DISK_MAINTENANCE_ERROR {type(exc).__name__}: {exc}", flush=True)
+            _run_execution_tick()
             # Use the adaptive interval (900s idle/pregame, 60s once a game is
             # actually live -- see _live_refresh_loop_interval_for_meta) rather
             # than the fixed base interval. Sleeping a fixed 60s regardless of

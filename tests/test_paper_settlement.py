@@ -272,3 +272,75 @@ def test_only_unmapped_market_contributes_names(monkeypatch):
     result = settle.settle_orders(DATE, resolver=_resolver(None, unavailable="no_live_feed"))
     # A missing feed says nothing about the market vocabulary.
     assert result["unmapped_markets"] == {}
+
+
+# --------------------------------------------------------------------------
+# Per-sport dispatch -- WNBA joins MLB
+# --------------------------------------------------------------------------
+
+
+def test_each_sport_gets_its_own_resolver(monkeypatch):
+    seen = []
+
+    def fake_build(module, factory, date):
+        def resolve(order):
+            seen.append((order.get("sport"), module))
+            return {"current_value": 9.0, "is_final": True, "started": True}
+        return resolve
+
+    monkeypatch.setattr(settle, "_build", fake_build)
+    dispatch = settle._default_resolver(DATE)
+
+    dispatch({"sport": "mlb"})
+    dispatch({"sport": "wnba"})
+    assert [s for s, _ in seen] == ["mlb", "wnba"]
+    assert "bet_status_mlb" in seen[0][1]
+    assert "bet_status_wnba" in seen[1][1]
+
+
+def test_a_sport_with_no_resolver_is_named_not_silent():
+    verdict = settle._default_resolver(DATE)({"sport": "soccer"})
+    # The ungraded counts stay a work list rather than a mystery.
+    assert verdict["unavailable_reason"] == "no_resolver_for_soccer"
+
+
+def test_one_sports_broken_resolver_does_not_stop_another(monkeypatch):
+    def fake_build(module, factory, date):
+        if "wnba" in module:
+            return None  # artifact unreadable, say
+        return lambda order: {"current_value": 9.0, "is_final": True, "started": True}
+
+    monkeypatch.setattr(settle, "_build", fake_build)
+    dispatch = settle._default_resolver(DATE)
+
+    assert dispatch({"sport": "wnba"})["unavailable_reason"] == "resolver_unavailable_for_wnba"
+    # MLB keeps grading regardless.
+    assert dispatch({"sport": "mlb"})["current_value"] == 9.0
+
+
+def test_a_wnba_bet_now_grades_end_to_end(monkeypatch, tmp_path):
+    """The whole point: a WNBA order used to come back `not_an_mlb_order`."""
+    import json
+
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    box = tmp_path / "wnba_source" / "data" / "live" / f"live_player_box_{DATE}.json"
+    box.parent.mkdir(parents=True, exist_ok=True)
+    box.write_text(
+        json.dumps({"payload": {"games": [{"event_id": "evt-w", "players": [
+            {"player": "A'ja Wilson", "pts": 24, "reb": 8, "ast": 3, "threes_made": 1}]}]}}),
+        encoding="utf-8",
+    )
+
+    place_order(
+        OrderRequest(
+            position_key="w1", selected_date=DATE, venue="paper", sport="wnba",
+            event_id="evt-w", market="player_points", side="over",
+            requested_price=-110.0, requested_stake_dollars=10.0, line=19.5,
+            player_name="A'ja Wilson",
+        )
+    )
+
+    result = settle.settle_orders(DATE)
+    # Points only rise, so the over is decided the moment it crosses — no
+    # game-status field required.
+    assert result["outcomes"] == {"won": 1}

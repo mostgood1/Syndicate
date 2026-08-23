@@ -247,3 +247,29 @@ def test_a_complete_pem_is_never_touched(monkeypatch, keypair):
     result = kalshi_auth.load_credentials()
     assert result["status"] == "ok"
     # No repair attempted on a value that already has its armor.
+
+
+def test_a_pkcs1_body_gets_pkcs1_armor_not_the_one_I_guessed_first(monkeypatch):
+    """MEASURED 2026-08-23T22:49:33Z, after the first armor repair shipped:
+
+        header='-----BEGIN PRIVATE KEY-----' has_end_marker=True
+        lines=27 armor_restored=True  ->  still ValueError
+
+    A well-formed PKCS#8 wrapper around a PKCS#1 body is structurally perfect
+    and semantically wrong, which is why the repair has to be verified by
+    PARSING rather than by looking right.
+    """
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        NoEncryption,
+        PrivateFormat,
+    )
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    for fmt in (PrivateFormat.PKCS8, PrivateFormat.TraditionalOpenSSL):
+        pem = key.private_bytes(Encoding.PEM, fmt, NoEncryption()).decode("ascii")
+        body = "\n".join(l for l in pem.splitlines() if l and not l.startswith("-----"))
+        monkeypatch.setenv("KALSHI_API_KEY_ID", "abc")
+        monkeypatch.setenv("KALSHI_PRIVATE_KEY", body)
+        assert kalshi_auth.load_credentials()["status"] == "ok", fmt
