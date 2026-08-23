@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#538` — **The soccer live edge is closed as a DIAGNOSIS: the one-sidedness is real in the vendor data, 0 of 2,544. What remains is a PRICING DECISION and it is the user's.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
+
+`#536` measured 110 of 125 live soccer rows withheld as `one_sided_quote`. This
+confirms that independently, offline, from the raw vendor mirror — and then walks
+the chain to the one thing left.
+
+**THE VENDOR DATA, `data/soccer_source/mls/props/2026-07-19.csv`, 5,066 rows:**
+
+    market            rows   with under_price
+    Shots             2544          0
+    Shots On Target   1304          0
+    Anytime Goalscorer 449          0   (a YES market; expected)
+
+**Zero percent**, from a source with no connection to the production counter.
+
+**IT IS NOT A PARSING BUG AND NOT A CLOBBER**, both of which were live
+hypotheses. `_side_key` maps "under" correctly. The write is
+`if side == "under": under_price else: over_price`, and that `else` catches an
+UNPARSED side too — so a mislabelled under would be filed as an over and, since
+`aggregated` keys on `(player, line)`, would clobber the real one. Tested two
+ways:
+
+  * **Price ladder by line** (n=2,544): 0.5 median **-250**, then +162, +450,
+    +350, +600, +1200, +1600, +2000 — monotonic, and **zero favourites at 5.5+**.
+    A mixed-in under at 7.5 shots would sit near -2000. It is a clean over ladder.
+  * **Duplicate `(player, line, book)` keys: 0.** A clobber needs the same key
+    twice.
+
+So OddsAPI genuinely returns only the over for soccer shot props at these books.
+**`edged=0` there is CORRECT BEHAVIOUR.** A de-vig needs two sides; there is one.
+
+**THE DECISION, AND WHY I DID NOT TAKE IT.** `_price_against_market` already has
+a one-sided path: `modelled_fair_edge` prices against a MODELLED fair in its own
+column, a `[USER DECISION 2026-08-17, audit recommendation 4]` covering 1,131
+pregame rows. Its comment says explicitly:
+
+> DELIBERATELY NOT wired into the `live_reason` branch above. That refusal is
+> about the row being LIVE, and it holds whichever fair is used — a modelled fair
+> does not make a live PREGAME projection priceable.
+
+That reasoning is correct **for a pregame projection**. It does not obviously
+cover the case that now exists: a row whose projection comes from the LIVE
+RE-SIM. `live_edge_policy`'s own docstring draws exactly that line — "the
+predicate is the projection's BASIS, not the game's state… a projection that
+itself knows the score… is precisely the thing worth ranking".
+
+**So the open question is: should a live-aware soccer projection on a one-sided
+market be priced against the modelled fair?** Arguments both ways, stated
+honestly:
+
+  * FOR — it is the only way soccer's live tier ever carries a number, the
+    mechanism exists and is already user-approved for pregame, and the projection
+    is genuinely live-aware rather than stale.
+  * AGAINST — a modelled fair is one book's measured hold, not a two-sided
+    de-vig; `book_margin_model` forbids mixing the two; and live markets move
+    fastest, so the weakest evidence would be applied where the error is largest.
+    `#340` fixed a live-edge leak across three sports and this is adjacent to it.
+
+**NOT TAKEN.** It is a pricing decision with real money behind it and a prior
+user decision scoped deliberately to pregame. Widening that scope is the user's
+call, not a side effect of a diagnosis.
+
+**What is settled and should not be re-litigated:** soccer live rows ARE seen
+(`#523`), ARE projected, and CANNOT be de-vig-edged because the market has one
+side. Nobody should look at the projection layer, the alias map, or the de-vig
+again for this.
+
 ### `#537` — **TODO ids were allocated by a read-then-write race. Eight collisions in one session. Now atomic. FIXED, tooling only.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
 
 Ids were allocated by reading `todo.md`, taking the largest and adding one. The
