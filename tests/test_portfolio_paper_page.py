@@ -350,3 +350,94 @@ def test_an_orphan_also_gets_its_live_mark(paper_env):
 def test_a_position_with_no_mark_carries_none_rather_than_a_fake_one(paper_env):
     paper_env["plan"] = _plan(positions=[_position()])
     assert _payload(paper_env)["rows"][0]["mark"] is None
+
+
+# --- paper2, the venue-restricted book ------------------------------------
+
+
+@pytest.fixture
+def paper2_env(paper_env, monkeypatch):
+    import pipeline.portfolio_commit as commit_mod
+
+    state = {"venue": "kalshi", "plan": None}
+    monkeypatch.setattr(commit_mod, "paper2_venue", lambda: state["venue"])
+    monkeypatch.setattr(
+        commit_mod, "read_portfolio_plan_for_venue", lambda date, venue: state["plan"]
+    )
+    return state
+
+
+def _venue_plan(positions=None, **overrides):
+    plan = {
+        "venue": "kalshi",
+        "positions": positions or [],
+        "rows_in": 40,
+        "totals": {"positions": len(positions or []), "staked_dollars": 8.0,
+                   "sim_share_of_staked": 0.5},
+        "refusals": {"below_min_ev_pct": 36},
+        "venue_scope_refusals": {"venue_not_quoting": 1460},
+    }
+    plan.update(overrides)
+    return plan
+
+
+def test_paper2_coverage_is_derived_from_the_refusals(paper2_env):
+    """Derived, not stored, so it can never disagree with the counts beside it."""
+    paper2_env["plan"] = _venue_plan()
+    p2 = _payload(paper2_env)["paper2"]
+    # 40 scoped of (40 + 1460) considered.
+    assert p2["coverage"] == pytest.approx(40 / 1500, abs=1e-4)
+    assert p2["venue_not_quoting"] == 1460
+
+
+def test_paper2_absent_degrades_to_not_running(paper2_env):
+    p2 = _payload(paper2_env)["paper2"]
+    assert p2["plan_present"] is False
+    assert p2["rows"] == []
+    assert p2["coverage"] is None
+
+
+def test_paper2_disabled_reports_no_venue(paper2_env):
+    paper2_env["venue"] = ""
+    p2 = _payload(paper2_env)["paper2"]
+    assert p2["venue"] is None
+    assert p2["plan_present"] is False
+
+
+def test_a_paper2_read_failure_does_not_take_down_the_main_portfolio(paper2_env, monkeypatch):
+    """The comparison must never break the thing it is comparing against."""
+    import pipeline.portfolio_commit as commit_mod
+
+    def boom(_date, _venue):
+        raise RuntimeError("venue plan corrupt")
+
+    monkeypatch.setattr(commit_mod, "read_portfolio_plan_for_venue", boom)
+    paper2_env["plan"] = _venue_plan()
+    payload = _payload(paper2_env)
+    assert payload["paper2"]["plan_present"] is False
+    # The unrestricted side is untouched.
+    assert payload["commit_enabled"] is True
+
+
+def test_zero_paper2_positions_is_an_answer_not_a_gap(app_client, paper2_env):
+    """40 quoted and none clearing the gates IS the Stage D answer."""
+    paper2_env["plan"] = _venue_plan(positions=[])
+    body = app_client.get(f"/portfolio/paper?date={DATE}").data.decode("utf-8")
+    assert "none</strong> cleared the gates" in body
+
+
+def test_paper2_rows_show_the_price_cost_of_the_restriction(app_client, paper2_env):
+    paper2_env["plan"] = _venue_plan(
+        positions=[
+            _position(
+                book="kalshi",
+                price=-130.0,
+                unrestricted_price=-110.0,
+                unrestricted_bookmaker="draftkings",
+            )
+        ]
+    )
+    body = app_client.get(f"/portfolio/paper?date={DATE}").data.decode("utf-8")
+    assert "-130" in body
+    assert "-110" in body
+    assert "draftkings" in body

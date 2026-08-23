@@ -363,6 +363,52 @@ window.SyndicatePaperPortfolioPulse = (function () {
     `).join("");
   }
 
+  // Mirrors portfolio_paper.html's paper2 section. Only the tiles and the
+  // empty-state are re-rendered live; the positions table is server-rendered
+  // and changes at most once per board build, which the pulse already reloads
+  // the rest of the page against.
+  function renderPaper2(data) {
+    const section = document.getElementById("paper2-section");
+    if (!section) return;
+    const p2 = data.paper2 || {};
+    section.hidden = !p2.venue;
+    if (!p2.venue) return;
+    const tiles = section.querySelector(".paper-tiles");
+    if (!tiles || !p2.plan_present) return;
+    const totals = data.totals || {};
+    const quoted = (p2.rows_in || 0) + (p2.venue_not_quoting || 0);
+    const spec = [
+      {
+        label: `${String(p2.venue).toUpperCase()} coverage`,
+        value: pct0OrDash(p2.coverage),
+        meta: `${p2.rows_in || 0} of ${quoted} candidates quoted`,
+        valueClass: isNum(p2.coverage) && p2.coverage < 0.25 ? " warn" : "",
+      },
+      {
+        label: "Positions",
+        value: String(p2.positions || 0),
+        meta: `vs ${totals.positions || 0} unrestricted`,
+      },
+      {
+        label: "Staked",
+        value: usd(p2.staked_dollars),
+        meta: `vs ${usd(totals.staked_dollars)} unrestricted`,
+      },
+      {
+        label: "Sim share of stake",
+        value: pctSigned1OrDash(p2.sim_share_of_staked),
+        meta: `vs ${pctSigned1OrDash(totals.sim_share_of_staked)} unrestricted`,
+      },
+    ];
+    tiles.innerHTML = spec.map((tile) => `
+      <div class="paper-tile">
+        <div class="paper-tile__label">${escapeHtml(tile.label)}</div>
+        <div class="paper-tile__value${tile.valueClass || ""}">${escapeHtml(tile.value)}</div>
+        <div class="paper-tile__meta">${escapeHtml(tile.meta)}</div>
+      </div>
+    `).join("");
+  }
+
   function renderAll(data) {
     renderBanner(data);
     renderLedgerError(data);
@@ -370,6 +416,7 @@ window.SyndicatePaperPortfolioPulse = (function () {
     renderPositions(data);
     renderRefusals(data);
     renderOrphans(data);
+    renderPaper2(data);
   }
 
   let lastSuccessAt = null;
