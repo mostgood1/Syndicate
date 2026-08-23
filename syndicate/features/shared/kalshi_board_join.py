@@ -56,12 +56,23 @@ __all__ = [
     "kalshi_price_resolver",
 ]
 
-# Kalshi series -> the board's market vocabulary. VERIFIED from the live
-# listing 2026-08-23; both map onto families the sim already models and that
-# `bet_status_mlb` can resolve a live value for.
-_SERIES_TO_MARKET: dict[str, str] = {
-    "KXMLBKS": "pitcher_strikeouts",
-    "KXMLBOUTS": "pitcher_outs",
+# Kalshi series -> the board's market vocabulary. Each series maps to a TUPLE
+# of accepted board names, tried in order, because the two feeds disagree and
+# the disagreement is the whole join.
+#
+# MEASURED 2026-08-23T14:1xZ, once the board finally carried MLB. Kalshi's
+# `KXMLBKS` titles parse to `pitcher_strikeouts`; the board's own key sample the
+# same second read `strikeouts|jake bennett|4.5` and `outs|cal quantrill|15.5`.
+# Cal Quantrill was on BOTH sides of that log line under two different market
+# names -- which is as close to a labelled answer as this ever gets.
+#
+# The `pitcher_*` spellings are KEPT rather than replaced. They were what this
+# module was written against, other sports' feeds use the prefixed form, and
+# dropping a name because one slate did not use it is guessing in the opposite
+# direction. A tuple costs one dict lookup per miss.
+_SERIES_TO_MARKETS: dict[str, tuple[str, ...]] = {
+    "KXMLBKS": ("strikeouts", "pitcher_strikeouts"),
+    "KXMLBOUTS": ("outs", "pitcher_outs"),
 }
 
 # "Andrew Abbott: 7+ strikeouts?" / "Andrew Abbott: 17+ Outs Recorded?"
@@ -71,6 +82,11 @@ _PROP_TITLE = re.compile(
 
 REASON_UNPARSEABLE_TITLE = "unparseable_title"
 REASON_WRONG_DATE = "market_closes_on_another_date"
+# Split out from the above: this one means the player, market and line all
+# matched a board row and ONLY the date disagreed. Same refusal, opposite
+# diagnosis -- one says Kalshi is quoting a slate we are not looking at, the
+# other says our date field is wrong.
+REASON_WOULD_MATCH_WRONG_DATE = "would_match_but_wrong_date"
 REASON_UNMAPPED_SERIES = "unmapped_series"
 REASON_NO_BOARD_ROW = "no_matching_board_row"
 REASON_NO_PRICE = "no_kalshi_price"
@@ -113,9 +129,20 @@ def parse_prop_title(title: Any) -> dict[str, Any] | None:
     }
 
 
+def series_to_markets(series: Any) -> tuple[str, ...]:
+    """Every board market name this series could be called. Empty if unknown.
+
+    Explicit table, never a prefix rule -- an unknown series is refused rather
+    than guessed at from its ticker.
+    """
+    return _SERIES_TO_MARKETS.get(str(series or "").strip().upper(), ())
+
+
 def series_to_market(series: Any) -> str | None:
-    """Explicit table, never a prefix rule. An unknown series is refused."""
-    return _SERIES_TO_MARKET.get(str(series or "").strip().upper())
+    """The PRIMARY board name for a series, or None. Kept for callers that want
+    one label rather than the set of aliases the join tries."""
+    names = series_to_markets(series)
+    return names[0] if names else None
 
 
 def threshold_to_line(threshold: Any) -> float | None:
@@ -239,18 +266,9 @@ def join_kalshi_to_board(
 
     wanted_date = str(selected_date or "").strip()[:10]
     for market in kalshi_markets:
-        if wanted_date:
-            # `close_time` is when the contract stops trading, which for a game
-            # market is that game. Compared on the DATE only: a night game
-            # closes after midnight UTC, so an exact timestamp comparison would
-            # drop precisely the games this board is mostly about (`#370`).
-            close_date = str(market.get("close_time") or "")[:10]
-            if close_date and close_date != wanted_date:
-                _refuse(REASON_WRONG_DATE)
-                continue
         series = market.get("series")
-        board_market = series_to_market(series)
-        if board_market is None:
+        candidate_markets = series_to_markets(series)
+        if not candidate_markets:
             _refuse(REASON_UNMAPPED_SERIES)
             continue
         parsed = parse_prop_title(market.get("title"))
@@ -262,7 +280,31 @@ def join_kalshi_to_board(
             _refuse(REASON_UNPARSEABLE_TITLE)
             continue
 
-        rows = by_key.get((board_market, parsed["player_key"], line))
+        board_market = None
+        rows = None
+        for name in candidate_markets:
+            found = by_key.get((name, parsed["player_key"], line))
+            if found:
+                board_market, rows = name, found
+                break
+
+        # THE DATE CHECK RUNS AFTER THE KEY LOOKUP, not before it. Ordering it
+        # first is cheaper and it is what this module shipped with -- and it
+        # cost a whole diagnostic cycle: `market_closes_on_another_date: 213`
+        # swallowed every market before anything could report whether the NAMES
+        # agreed, so one wrong assumption hid another. Refusing late means one
+        # run answers both questions: `would_match_but_wrong_date` says the key
+        # is right and only the calendar disagrees, while `no_matching_board_row`
+        # says the key is still wrong.
+        if wanted_date:
+            # `close_time` compared on the DATE only -- a night game closes
+            # after midnight UTC (`#370`). Whether `close_time` is first pitch
+            # at all is UNVERIFIED; see `kalshi_odds_refresh`'s DATE_FIELDS.
+            close_date = str(market.get("close_time") or "")[:10]
+            if close_date and close_date != wanted_date:
+                _refuse(REASON_WOULD_MATCH_WRONG_DATE if rows else REASON_WRONG_DATE)
+                continue
+
         if not rows:
             _refuse(REASON_NO_BOARD_ROW)
             continue
@@ -316,12 +358,16 @@ def join_kalshi_to_board(
     # side is what turns that into a fixable observation.
     kalshi_keys: list[str] = []
     for market in kalshi_markets:
-        board_market = series_to_market(market.get("series"))
         parsed = parse_prop_title(market.get("title"))
-        if board_market and parsed:
-            line = threshold_to_line(parsed["threshold"])
-            kalshi_keys.append(f"{board_market}|{parsed['player_key']}|{line}")
-        if len(kalshi_keys) >= 5:
+        if not parsed:
+            continue
+        line = threshold_to_line(parsed["threshold"])
+        # EVERY alias, not just the primary. Printing one name while the join
+        # tries two would make a sample that cannot be compared to the board
+        # keys beside it -- which is the one job this line has.
+        for name in series_to_markets(market.get("series")):
+            kalshi_keys.append(f"{name}|{parsed['player_key']}|{line}")
+        if len(kalshi_keys) >= 6:
             break
     board_keys = [f"{k[0]}|{k[1]}|{k[2]}" for k in list(by_key)[:5]]
     # The board's market vocabulary, counted -- if `pitcher_strikeouts` is not

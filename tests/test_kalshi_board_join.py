@@ -74,11 +74,34 @@ def test_names_normalise_across_accents_and_punctuation():
 
 
 def test_series_mapping_is_explicit_and_refuses_the_unknown():
-    assert series_to_market("KXMLBKS") == "pitcher_strikeouts"
-    assert series_to_market("KXMLBOUTS") == "pitcher_outs"
+    from syndicate.features.shared.kalshi_board_join import series_to_markets
+
+    # MEASURED 2026-08-23T14:1xZ: the board's own key sample read
+    # `strikeouts|jake bennett|4.5` and `outs|cal quantrill|15.5` while Kalshi's
+    # titles parsed to `pitcher_strikeouts`. The primary is now the board's name.
+    assert series_to_market("KXMLBKS") == "strikeouts"
+    assert series_to_market("KXMLBOUTS") == "outs"
     # Parlay series and anything unrecognised must never be guessed into a market.
     assert series_to_market("KXMVECROSSCATEGORY") is None
     assert series_to_market("KXNEWTHING") is None
+    assert series_to_markets("KXNEWTHING") == ()
+
+
+def test_both_spellings_of_a_market_are_accepted():
+    """The prefixed names are KEPT, not replaced.
+
+    They were what this module was written against and other feeds use them;
+    dropping a name because one slate did not use it is guessing in the opposite
+    direction.
+    """
+    from syndicate.features.shared.kalshi_board_join import series_to_markets
+
+    assert series_to_markets("KXMLBKS") == ("strikeouts", "pitcher_strikeouts")
+
+    market = _kalshi(title="Andrew Abbott: 7+ strikeouts?")
+    for name in ("strikeouts", "pitcher_strikeouts"):
+        report = join_kalshi_to_board([market], [_row(market=name)])
+        assert report["matched"] == 1, name
 
 
 # --- the join --------------------------------------------------------------
@@ -211,14 +234,42 @@ def test_a_market_closing_on_another_date_is_refused():
     board had rolled to European soccer. Nothing matched — correct, but only by
     luck that the vocabularies did not overlap. A pitcher with the same line on
     two different days WOULD have matched the wrong game."""
-    from syndicate.features.shared.kalshi_board_join import REASON_WRONG_DATE
+    from syndicate.features.shared.kalshi_board_join import REASON_WOULD_MATCH_WRONG_DATE
 
     market = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
     row = _row(player="Lake Bachar", line=5.5)
     assert join_kalshi_to_board([market], [row], selected_date="2026-08-24")["matched"] == 1
     stale = join_kalshi_to_board([market], [row], selected_date="2026-08-22")
     assert stale["matched"] == 0
-    assert stale["reasons"][REASON_WRONG_DATE] == 1
+    # The player, market and line all matched -- ONLY the date disagreed, and
+    # that is a different diagnosis from a market nothing on the board pairs.
+    assert stale["reasons"][REASON_WOULD_MATCH_WRONG_DATE] == 1
+
+
+def test_a_wrong_date_and_a_wrong_key_are_counted_separately():
+    """The ordering bug that cost a whole diagnostic cycle.
+
+    The date check used to run FIRST, so `market_closes_on_another_date: 213`
+    swallowed every market before anything could report whether the names
+    agreed -- one wrong assumption hiding another. Refusing late means one run
+    answers both questions.
+    """
+    from syndicate.features.shared.kalshi_board_join import (
+        REASON_WOULD_MATCH_WRONG_DATE,
+        REASON_WRONG_DATE,
+    )
+
+    pairs = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
+    unpaired = _kalshi(
+        title="Nobody Here: 6+ strikeouts?",
+        close_time="2026-08-24T02:10:00Z",
+        ticker="KXMLBKS-25AUG24NOBODY-6",
+    )
+    report = join_kalshi_to_board(
+        [pairs, unpaired], [_row(player="Lake Bachar", line=5.5)], selected_date="2026-08-22"
+    )
+    assert report["reasons"][REASON_WOULD_MATCH_WRONG_DATE] == 1
+    assert report["reasons"][REASON_WRONG_DATE] == 1
 
 
 def test_the_date_is_compared_on_the_DAY_not_the_timestamp():

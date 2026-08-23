@@ -179,15 +179,19 @@ def _resolver_from_markets(markets):
     from syndicate.features.shared.kalshi_board_join import (
         kalshi_price_resolver,
         parse_prop_title,
-        series_to_market,
+        series_to_markets,
         threshold_to_line,
     )
 
     matches = []
     for market in markets:
-        board_market = series_to_market(market.get("series"))
+        # EVERY alias gets an entry. The resolver is keyed by the BOARD's market
+        # name, and which of `strikeouts` / `pitcher_strikeouts` that is comes
+        # from the board, not from here -- registering only the primary would
+        # leave the venue scope refusing rows the join can pair.
+        board_markets = series_to_markets(market.get("series"))
         parsed = parse_prop_title(market.get("title"))
-        if board_market is None or parsed is None:
+        if not board_markets or parsed is None:
             # Unmapped series and unreadable titles are skipped here rather than
             # guessed -- the join module already refuses them by name.
             continue
@@ -198,7 +202,9 @@ def _resolver_from_markets(markets):
         # the gap between them is the spread.
         for side, price_key in (("over", "yes_american"), ("under", "no_american")):
             price = market.get(price_key)
-            if price is not None:
+            if price is None:
+                continue
+            for board_market in board_markets:
                 matches.append(
                     {
                         "market": board_market,

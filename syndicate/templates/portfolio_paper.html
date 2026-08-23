@@ -574,9 +574,16 @@
                   </span>
                 </td>
                 <td class="primary">{% if row.price is not none %}{{ "%+d"|format(row.price|int) }}{% else %}—{% endif %}</td>
+                {# `.get`, not attribute access: a position written before the
+                   venue-scope fields were carried through simply has no such
+                   key, and under StrictUndefined `row.unrestricted_price` on
+                   that dict is a 500 rather than a blank cell. It was a 500 --
+                   the column read a field the position never carried, and the
+                   first slate where paper2 produced a row took the page down. #}
+                {% set best_price = row.get('unrestricted_price') %}
                 <td>
-                  {% if row.unrestricted_price is not none %}{{ "%+d"|format(row.unrestricted_price|int) }}{% else %}—{% endif %}
-                  <span class="paper-table__sub">{{ row.unrestricted_bookmaker or '' }}</span>
+                  {% if best_price is not none %}{{ "%+d"|format(best_price|int) }}{% else %}—{% endif %}
+                  <span class="paper-table__sub">{{ row.get('unrestricted_bookmaker') or '' }}</span>
                 </td>
                 <td>${{ "%.2f"|format(row.stake_dollars or 0) }}</td>
                 <td class="{{ 'pos' if (row.ev_pct or 0) > 0 else ('neg' if (row.ev_pct or 0) < 0 else '') }}">
