@@ -233,10 +233,38 @@ def normalize_market(raw: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _signed_headers_or_none(url: str) -> dict[str, str] | None:
+    """Auth headers when a credential is configured, else None.
+
+    WHY SIGN A PUBLIC READ. Measured 2026-08-23T22:53Z: both unauthenticated
+    hosts returned `http_429` for `/series` and `/markets` while an
+    AUTHENTICATED `/portfolio/balance` succeeded in the same minute, from the
+    same process. Anonymous reads are on a tighter quota than signed ones, so
+    signing a read we are entitled to make is the difference between a catalogue
+    we can enumerate and one we cannot.
+
+    Returns None rather than raising when there is no credential: these
+    endpoints are genuinely public and must keep working unauthenticated.
+    """
+    try:
+        from syndicate.features.shared.kalshi_auth import auth_headers, load_credentials
+
+        creds = load_credentials()
+        if creds.get("status") != "ok":
+            return None
+        return auth_headers("GET", url, credentials=creds)
+    except Exception:
+        # A signing failure must never cost us the unauthenticated read that
+        # worked before this function existed.
+        return None
+
+
 def _get(url: str, *, timeout: float = 20.0) -> dict[str, Any]:
-    request = urllib.request.Request(
-        url, headers={"Accept": "application/json", "User-Agent": "syndicate/1.0"}
-    )
+    headers = {"Accept": "application/json", "User-Agent": "syndicate/1.0"}
+    signed = _signed_headers_or_none(url)
+    if signed:
+        headers.update(signed)
+    request = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))

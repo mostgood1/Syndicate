@@ -719,6 +719,83 @@ def _run_tick() -> dict[str, object] | None:
         return None
 
 
+def _kalshi_auth_probe_at_boot() -> None:
+    """Can THIS service sign? Asked here because the answer is per-service.
+
+    `refresh-worker` proving its credentials work says nothing about this
+    worker: different service, different env block. And this is the one that
+    places orders, so "can it sign" has to be answered before it is armed
+    rather than discovered on the first submit -- where a 401 does not tell you
+    whether the ORDER or the AUTH was rejected.
+
+    Read-only: `probe_auth` asks for the balance. Nothing here can trade.
+    """
+    try:
+        from syndicate.features.shared.kalshi_auth import probe_auth
+
+        result = probe_auth()
+        print(
+            "[live_odds_worker] KALSHI_AUTH_PROBE"
+            f" status={result.get('status')}"
+            f" reason={result.get('reason')}"
+            f" detail={result.get('detail')}"
+            f" key_shape={result.get('key_shape')}"
+            # Keys, never values.
+            f" keys={result.get('keys')}"
+            f" balance_present={result.get('balance_present')}",
+            flush=True,
+        )
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] KALSHI_AUTH_PROBE_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _kalshi_series_catalogue_at_boot() -> None:
+    """Which series does Kalshi list -- now asked with a SIGNED read.
+
+    The unauthenticated catalogue call returned `http_429` from both public
+    hosts while an authenticated call succeeded in the same minute. `_get` now
+    signs when a credential is present, so this is the same question asked from
+    a quota we are actually entitled to.
+    """
+    try:
+        from syndicate.features.shared.kalshi_client import discover_series, series_matching
+
+        report = discover_series()
+        tickers = report.get("tickers") or []
+        print(
+            "[live_odds_worker] KALSHI_SERIES_CATALOGUE"
+            f" status={report.get('status')}"
+            f" count={report.get('count')}"
+            f" container={report.get('container_key')}"
+            f" payload_keys={report.get('payload_keys')}"
+            f" row_keys={report.get('row_keys')}"
+            f" errors={report.get('errors')}",
+            flush=True,
+        )
+        if report.get("status") != "ok":
+            # No per-sport lines on a failed catalogue: `n=0` would read as
+            # "Kalshi does not list it" when the truth is "we could not ask".
+            print(
+                "[live_odds_worker] KALSHI_SPORT_UNKNOWN reason=catalogue_unavailable",
+                flush=True,
+            )
+            return
+        for token in ("WNBA", "NBA", "MLB", "NFL", "NHL"):
+            found = series_matching([token], tickers)
+            print(
+                f"[live_odds_worker] KALSHI_SPORT {token} series={found[:12]} n={len(found)}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] KALSHI_SERIES_CATALOGUE_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _execution_interval_seconds() -> int:
     """How often to place, at most. Five minutes unless told otherwise.
 
@@ -921,6 +998,8 @@ def main() -> int:
     recycled_for_uptime = False
 
     try:
+        _kalshi_auth_probe_at_boot()
+        _kalshi_series_catalogue_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)

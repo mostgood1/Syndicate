@@ -269,3 +269,70 @@ def test_discover_separates_singles_from_parlays(monkeypatch):
     assert report["by_series_singles"] == {"KXMLBKS": 1}
     # The raw listing still carries everything -- nothing is hidden, only split.
     assert report["by_series"]["KXMVECROSSCATEGORY"] == 2
+
+
+def test_a_public_read_is_signed_when_a_credential_exists(monkeypatch):
+    """MEASURED 2026-08-23T22:53Z: both unauthenticated hosts returned http_429
+    for /series and /markets while an AUTHENTICATED /portfolio/balance succeeded
+    in the same minute, from the same process. Anonymous reads sit on a tighter
+    quota, so signing a read we are entitled to make is the difference between a
+    catalogue we can enumerate and one we cannot."""
+    from syndicate.features.shared import kalshi_client
+
+    monkeypatch.setattr(
+        kalshi_client,
+        "_signed_headers_or_none",
+        lambda url: {"KALSHI-ACCESS-KEY": "k", "KALSHI-ACCESS-SIGNATURE": "s"},
+    )
+    seen = {}
+
+    class _Resp:
+        def read(self):
+            return b'{"markets": []}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(request, timeout=None):
+        seen["headers"] = dict(request.headers)
+        return _Resp()
+
+    monkeypatch.setattr(kalshi_client.urllib.request, "urlopen", fake_urlopen)
+    kalshi_client._get("https://x/trade-api/v2/markets")
+    # urllib title-cases header names.
+    assert any(k.lower() == "kalshi-access-key" for k in seen["headers"])
+
+
+def test_an_unsigned_read_still_works_with_no_credential(monkeypatch):
+    from syndicate.features.shared import kalshi_client
+
+    monkeypatch.setattr(kalshi_client, "_signed_headers_or_none", lambda url: None)
+
+    class _Resp:
+        def read(self):
+            return b'{"markets": []}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(kalshi_client.urllib.request, "urlopen", lambda r, timeout=None: _Resp())
+    # These endpoints are genuinely public and must keep working unauthenticated.
+    assert kalshi_client._get("https://x/trade-api/v2/markets") == {"markets": []}
+
+
+def test_a_signing_failure_never_costs_the_unauthenticated_read(monkeypatch):
+    from syndicate.features.shared import kalshi_client
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_auth.load_credentials",
+        lambda: (_ for _ in ()).throw(RuntimeError("key exploded")),
+    )
+    # Returns None rather than propagating, so the read that worked before this
+    # function existed still works.
+    assert kalshi_client._signed_headers_or_none("https://x/trade-api/v2/markets") is None
