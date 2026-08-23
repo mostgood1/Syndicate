@@ -25261,3 +25261,74 @@ verify: **CLEAR.** Best model on held-out dates is `league_late` — pure league
 constants, final minute priced apart. Bucket curve 1.59 / 2.18 / 2.61 / 3.91 /
 5.05. `game_pace` is best in NO bucket. `league_rate` still edges `league_late`
 at 60-120s (2.13 vs 2.18, n=688) — noted, not modelled around.
+
+---
+
+## 2026-08-23 — refresh-worker `6bba203a7`: the modelled live edge fires on exactly its population, and reaches nothing
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da5nuu6417fc7383rn20`, live `23:20:44Z`. Commit `6bba203a7`, on
+`origin/main` and containing `b427a825` (`#539`) — checked with
+`git merge-base --is-ancestor`, then confirmed in the deployed tree itself
+(`git show 6bba203a:...` → 3 `edged_modelled` sites in the join, 1 in the log
+line) rather than trusting the ancestry alone. Trigger `api` (MCP), so the
+claim I held on `refresh-worker` was advisory: the deploy-guard hook matches
+`Bash|PowerShell` and does not see an MCP deploy. Preflight could not run at
+all — no `RENDER_API_KEY` in this shell.
+
+**verify (the half that passed):** first post-deploy board build, `23:27:49Z`:
+
+```
+[layer2_shortlist] LIVE_PROJECTION_JOIN sport=soccer
+  considered=343 projected=43 edged=0 edged_modelled=38 prob_withheld=0
+  lens_indexed=144 lens_live_games=1
+  edge_withheld=5 edge_why={'no_fair_value_devig_failed': 5}
+```
+
+`edged=0 edged_modelled=38` is the exact pairing `#539` was scoped to produce:
+the de-vig path stayed at zero, as it must when the market is one-sided, and
+the modelled path took 38 rows that had no number at all before. The
+`one_sided_quote` bucket, which was **110** on the 2026-08-22 reading, is now
+absent from `edge_why` entirely — those rows are priced, not withheld. The
+5 that remain are the residual `devig_failed` population `#530` left behind,
+untouched by this change on purpose.
+
+**verify (the half that FAILED, and it is the half that matters to a user):**
+
+```
+[layer2_shortlist] LAYER2_BOARD_HEALTH sport=soccer
+  rows=348 pregame_proj=172 live_proj=0 no_proj=176 live_rows=2 edged=171
+```
+
+I wrote the criterion as "then `LAYER2_BOARD_HEALTH sport=soccer` should show
+live rows carrying a number for the first time". It does not. `live_proj=0`.
+**38 modelled edges exist and zero of them reached the board.**
+
+**Root cause found, and it is not the 38.** `edge_vs_modelled_fair_pct`
+(`book_margin_model.EDGE_FIELD`) is WRITTEN by three producers —
+`soccer_projections`, `prop_projections`, and now `live_projection_join` — and
+READ BY NOTHING. `_model_edge_for` (`layer2_board.py:1018`) accepts
+`edge_vs_market_pct` and only that, by name, deliberately. A grep for the field
+across every `.js` and `.html` in `syndicate/` returns zero hits. So the number
+cannot rank and cannot display; it is a value in an artifact nobody consults.
+
+This is `#444`'s shape exactly — *a producer returning a new key does not make
+it visible* — and I quoted that lesson in the very commit that reproduced it. I
+reported the new counter and checked that the counter was wired, which is the
+easy half of `#444`; the field the counter counts is the half that had to reach
+a consumer, and I did not check it. **This has also been silently true of the
+PREGAME path since 2026-08-17**, so the mechanism the user was told "already
+exists and is approved for pregame" has never actually put a number on a board
+either.
+
+`live_rows=2` on 348 published soccer rows is a second, independent limit —
+`lens_live_games=1`, so there was one live match in the lens to draw from —
+but it is NOT the explanation, and I am not resting on it. Even a build with
+plenty of live soccer would publish `live_proj` rows whose modelled edge no
+ranking term and no template can see.
+
+**Open obligation.** Deploying is not the fix here; the consumer is. Filed as a
+follow-up on `#539` rather than closed. Nothing about the four refusals changes
+— the modelled number must stay distinguishable from a de-vig — so the consumer
+has to accept it as its OWN labelled term, not by widening
+`_model_edge_for`'s name check.
