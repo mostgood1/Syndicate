@@ -60,9 +60,13 @@ __all__ = [
     "KalshiError",
 ]
 
-# Hosts to try in order. Kalshi consolidated onto the elections host; the older
-# trading host is kept as a fallback so a move does not read as an outage.
+# Hosts to try in order. `external-api` is the one the owner supplied from
+# Kalshi's own docs and is CORRECT; the other two are hosts I guessed before
+# asking, kept only as fallbacks so a future move does not read as an outage.
+# The guessed ones going first is exactly the kind of thing that turns "wrong
+# base URL" into "venue lists nothing", so the verified host leads.
 _BASE_URLS = (
+    "https://external-api.kalshi.com/trade-api/v2",
     "https://api.elections.kalshi.com/trade-api/v2",
     "https://trading-api.kalshi.com/trade-api/v2",
 )
