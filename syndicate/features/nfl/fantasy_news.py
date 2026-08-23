@@ -508,21 +508,50 @@ def news_archive_path(day: str) -> Path:
     return nfl_artifact_output_root() / "fantasy" / "news_archive" / f"nfl_news_{day}.json"
 
 
+def _article_dedupe_key(article: dict[str, Any]) -> str:
+    """Identity for "is this the same story", not "is this the same row".
+
+    ESPN's feed is polled by the same daily job that captures whatever is
+    currently on it -- so a story that stays newsworthy for a week is
+    archived once PER DAY it was still there, not once. ``id`` is what ESPN
+    itself uses to identify the article; the headline is the fallback for the
+    rare row that predates the field or omits it (`capture_news_snapshot`
+    already falls back the same way when it stores the id).
+    """
+    return str(article.get("id") or article.get("headline") or "")
+
+
 def recent_news_by_player(season: int, *, days: int = 21) -> dict[str, list[dict[str, Any]]]:
     """``gsis_id -> recent articles``, newest first, from the ARCHIVE.
 
     Reads only published archive files, never the network: this is on the web
     request path, and a page that fetches a third-party feed per request is
     both slow and a dependency on someone else's uptime.
+
+    DEDUPES ACROSS DAYS, deliberately. The capture job polls the SAME live
+    feed on every run, so a story sitting in ESPN's "recent" window for
+    several days gets one archive row per day it was captured -- attaching
+    every row would turn one headline into a wall of copies of itself in the
+    Buzz popup, with the actual distinct stories pushed out by the `[:6]`
+    truncation in `fantasy.py`. The dedupe key is the article's own identity
+    (`_article_dedupe_key`), never the day it happened to be captured on.
     """
-    from datetime import date, timedelta
+    from datetime import timedelta, timezone
     from syndicate.features.nfl.sources import default_nfl_source_root
 
     root = default_nfl_source_root() / "fantasy" / "news_archive"
     out: dict[str, list[dict[str, Any]]] = {}
+    seen: dict[str, set[str]] = {}
     if not root.is_dir():
         return out
-    today = date.today()
+    # `date.today()` follows the PROCESS timezone, not necessarily UTC --
+    # flagged by `tests/test_slate_date_timezone_discipline.py` (`#518`).
+    # `capture_news_snapshot` stamps `captured_date` from
+    # `datetime.now(timezone.utc)`, which is what `nfl_news_{day}.json` files
+    # are actually named after, so the walk-back has to start from THAT clock
+    # -- switching to `central_today()` would look back from the wrong day
+    # for several hours around each UTC midnight and miss the newest file.
+    today = datetime.now(timezone.utc).date()
     for offset in range(days):
         day = (today - timedelta(days=offset)).isoformat()
         path = root / f"nfl_news_{day}.json"
@@ -533,7 +562,13 @@ def recent_news_by_player(season: int, *, days: int = 21) -> dict[str, list[dict
         except (OSError, ValueError):
             continue
         for article in payload.get("articles") or []:
+            key = _article_dedupe_key(article)
             for player_id in article.get("players") or []:
+                seen_keys = seen.setdefault(player_id, set())
+                if key and key in seen_keys:
+                    continue
+                if key:
+                    seen_keys.add(key)
                 out.setdefault(player_id, []).append(article)
     for entries in out.values():
         entries.sort(key=lambda item: item.get("published") or "", reverse=True)
