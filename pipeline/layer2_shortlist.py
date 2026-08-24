@@ -605,6 +605,49 @@ def build_layer2_shortlist(
     # same rows. Sentinel rather than None-as-default, because None is a
     # MEANINGFUL value here and a plain `horizon_days=None` default would make
     # the Forward view unreachable while looking like it was the default.
+    # RE-PRICE FROM THE VENUES BEFORE THE GATES RUN.
+    #
+    # MEASURED 2026-08-24 23:23Z, once the drop counters were made visible:
+    #
+    #   LAYER2_SHORTLIST rows=0 considered=8600
+    #     beyond_horizon=2416 beyond_quote_age=6184 stale_kickoff=0
+    #
+    # 71.9% of the board died on `beyond_quote_age` -- a 14h ceiling
+    # (`SHORTLIST_MAX_QUOTE_AGE_SECONDS`) against OddsAPI quotes that were 13.9h
+    # old. The board was not broken and the model was not starved; the prices
+    # were simply too old to act on, and every sport but soccer has a tighter
+    # ceiling than soccer's 24h.
+    #
+    # Kalshi and Polymarket US both publish their own `fetched_at` and both
+    # refresh on minutes, not hours (Polymarket measured `slate_age_s=857`
+    # against a 900s cadence). So a row priced from a venue is MINUTES old and
+    # clears both ceilings ON MERIT -- which is the difference between fixing
+    # the freshness and widening a gate to admit stale prices onto games that
+    # have already started.
+    #
+    # ONLY ROWS ACTUALLY PRICED FROM A VENUE ARE RESTAMPED. `apply_venue_quotes`
+    # returns everything else untouched, still carrying its real age, so this
+    # cannot launder staleness through the gate built to catch it.
+    try:
+        from syndicate.features.shared.venue_quote_fanin import apply_venue_quotes
+
+        repriced = apply_venue_quotes(opportunities, str(selected_date or ""))
+        opportunities = list(repriced.get("rows") or opportunities)
+        print(
+            f"[layer2_shortlist] VENUE_REPRICE rows_in={repriced.get('rows_in')} "
+            f"stamped={repriced.get('stamped')} unstamped={repriced.get('unstamped')} "
+            # `unstamped` is the number that predicts whether this helped: those
+            # rows keep whatever age they had and will still be gated on it.
+            f"sports={repriced.get('sports')} "
+            f"ceiling_s={repriced.get('ceiling_seconds_by_sport')} "
+            f"by_source={repriced.get('by_source')} "
+            f"selected_by_source={repriced.get('selected_by_source')}",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 -- never fatal to the build
+        # A venue feed being unreachable must cost the reprice, not the board.
+        print(f"[layer2_shortlist] VENUE_REPRICE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
     try:
         if horizon_days is _UNSET:
             shortlist = select_shortlist(opportunities)

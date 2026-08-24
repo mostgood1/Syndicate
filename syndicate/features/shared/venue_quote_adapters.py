@@ -319,9 +319,17 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         if not isinstance(entry, Mapping):
             continue
         american = _as_float(entry.get("american") or entry.get("price"))
+        # THE SAME KEY SHAPE AS EVERY OTHER SOURCE. The first cut used the
+        # shard's own market key -- `event_id=...|home_team=...|market=h2h|
+        # side=Draw|book=draftkings` -- which shares no key space with the
+        # venue adapters, so `select_quote` could never have compared an
+        # OddsAPI quote against a Kalshi one. Two sources on different keys do
+        # not contend; they just never meet, and the freshest-wins rule this
+        # module is built on would have been silently inert.
         quotes.append(
             Quote(
-                key=str(market_key),
+                key=quote_key(sport, entry.get("market"), entry.get("side"),
+                              _as_float(entry.get("line"))),
                 source="oddsapi",
                 sport=str(sport or ""),
                 market=str(entry.get("market") or ""),

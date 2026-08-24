@@ -242,11 +242,16 @@ def test_only_rows_we_actually_priced_are_stamped():
     -refreshing timestamps would launder staleness through a gate designed to
     catch it -- worse than the empty board this exists to fix."""
     now = time.time()
-    collected = {"quotes": {"mlb|h2h|home": _q("kalshi", key="mlb|h2h|home", age=10, now=now)}}
+    # Keys are DERIVED from the row the same way the adapters build them, so
+    # the fixture uses real board-row fields rather than a pre-set key.
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    home_key = quote_key("mlb", "h2h", "home", None)
+    collected = {"quotes": {home_key: _q("kalshi", key=home_key, age=10, now=now)}}
     result = mod.apply_venue_quotes(
-        [{"key": "mlb|h2h|home", "quote": {"book_age_seconds": 50000.0}},
-         {"key": "mlb|h2h|away", "quote": {"book_age_seconds": 50000.0}}],
-        "mlb", "2026-08-24", collected=collected, now=now,
+        [{"sport": "mlb", "market": "h2h", "side": "home", "quote": {"book_age_seconds": 50000.0}},
+         {"sport": "mlb", "market": "h2h", "side": "away", "quote": {"book_age_seconds": 50000.0}}],
+        "2026-08-24", collected_by_sport={"mlb": collected}, now=now,
     )
     assert result["stamped"] == 1
     assert result["unstamped"] == 1
@@ -260,8 +265,96 @@ def test_the_applier_reports_what_would_still_be_gated():
     now = time.time()
     collected = {"quotes": {}, "ceiling_seconds": 6 * 3600, "by_source": {}, "selected_by_source": {}}
     result = mod.apply_venue_quotes(
-        [{"key": "a"}, {"key": "b"}], "mlb", "2026-08-24", collected=collected, now=now,
+        [{"key": "a"}, {"key": "b"}], "2026-08-24", collected_by_sport={"mlb": collected}, now=now,
     )
     assert result["rows_in"] == 2
     assert result["stamped"] == 0
     assert result["unstamped"] == 2
+
+
+def test_every_source_uses_ONE_key_space():
+    """Two sources on different keys do not contend -- they never meet, and the
+    freshest-wins rule this module is built on is silently inert. The OddsAPI
+    adapter first used the shard's own market key
+    (`event_id=...|market=h2h|side=Draw|book=draftkings`), which shares no key
+    space with the venue adapters."""
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    expected = quote_key("mlb", "h2h", "home", None)
+    assert expected == "mlb|h2h|home"
+    # A line is part of the identity: a -1.5 and a -2.5 spread are different
+    # bets, and collapsing them prices one at the other's number.
+    assert quote_key("mlb", "spreads", "home", -1.5) != quote_key("mlb", "spreads", "home", -2.5)
+
+
+def test_a_row_whose_key_matches_a_quote_is_repriced_across_sources():
+    """The point of one key space: a Kalshi quote and an OddsAPI quote for the
+    same bet contend, and the fresher wins."""
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    now = time.time()
+    key = quote_key("mlb", "h2h", "home", None)
+    result = mod.apply_venue_quotes(
+        [{"sport": "mlb", "market": "h2h", "side": "home"}],
+        "2026-08-24", now=now,
+        collected_by_sport={"mlb": {"quotes": {key: _q("polymarket_us", key=key, age=4.0, now=now)}}},
+    )
+    assert result["stamped"] == 1
+    assert result["rows"][0]["price_source"] == "polymarket_us"
+
+
+def test_quotes_are_collected_PER_SPORT_not_once_for_the_board():
+    """The row set spans every active sport, while every ceiling, artifact and
+    adapter is per-sport. One collect_quotes call for the whole board would
+    price MLB rows against whichever sport was passed in -- a WRONG price
+    rather than a missing one."""
+    asked: list[str] = []
+
+    def fake_collect(sport, _date, now=None):
+        asked.append(sport)
+        return {"quotes": {}, "ceiling_seconds": 6 * 3600, "by_source": {}}
+
+    import syndicate.features.shared.venue_quote_fanin as fanin
+
+    original = fanin.collect_quotes
+    try:
+        fanin.collect_quotes = fake_collect
+        result = fanin.apply_venue_quotes(
+            [{"sport": "mlb", "market": "h2h", "side": "home"},
+             {"sport": "wnba", "market": "h2h", "side": "home"},
+             {"sport": "mlb", "market": "totals", "side": "over", "line": 8.5}],
+            "2026-08-24",
+        )
+    finally:
+        fanin.collect_quotes = original
+    # Once per DISTINCT sport, not once per row.
+    assert sorted(asked) == ["mlb", "wnba"]
+    assert result["sports"] == ["mlb", "wnba"]
+
+
+def test_one_sports_venue_failure_does_not_cost_the_others(monkeypatch):
+    import syndicate.features.shared.venue_quote_fanin as fanin
+
+    now = time.time()
+    key = "wnba|h2h|home"
+
+    def flaky(sport, _date, now=None):
+        if sport == "mlb":
+            raise RuntimeError("kalshi unreachable")
+        return {"quotes": {key: _q("kalshi", key=key, age=5.0, now=now)}, "ceiling_seconds": 21600}
+
+    monkeypatch.setattr(fanin, "collect_quotes", flaky)
+    result = fanin.apply_venue_quotes(
+        [{"sport": "mlb", "market": "h2h", "side": "home"},
+         {"sport": "wnba", "market": "h2h", "side": "home"}],
+        "2026-08-24", now=now,
+    )
+    assert result["stamped"] == 1
+    assert result["rows"][1]["price_source"] == "kalshi"
+
+
+def test_a_row_with_no_sport_is_left_alone():
+    result = mod.apply_venue_quotes([{"market": "h2h", "side": "home"}], "2026-08-24",
+                                    collected_by_sport={})
+    assert result["stamped"] == 0
+    assert result["rows"][0] == {"market": "h2h", "side": "home"}

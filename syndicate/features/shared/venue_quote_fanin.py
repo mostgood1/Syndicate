@@ -351,32 +351,63 @@ def stamp_candidate_freshness(candidate: dict[str, Any], quote: Quote | None) ->
 
 def apply_venue_quotes(
     rows: Sequence[Mapping[str, Any]],
-    sport: str,
     selected_date: str,
     *,
-    collected: Mapping[str, Any] | None = None,
+    collected_by_sport: Mapping[str, Mapping[str, Any]] | None = None,
     now: float | None = None,
 ) -> dict[str, Any]:
     """Re-price rows from the freshest venue quote available, and report it.
+
+    GROUPS BY SPORT AND COLLECTS ONCE PER SPORT. The row set spans every active
+    sport, while every ceiling, artifact and adapter is per-sport -- a single
+    `collect_quotes` call for the whole board would price MLB rows against
+    whichever sport happened to be passed in, which is a wrong price rather
+    than a missing one.
 
     ONLY ROWS WE ACTUALLY PRICED ARE STAMPED. A row with no venue quote is
     returned untouched and stays as stale as it really is. Blanket-refreshing
     timestamps would launder staleness through a gate designed to catch it,
     which is the one outcome worse than the empty board this exists to fix.
     """
-    payload = collected if collected is not None else collect_quotes(sport, selected_date, now=now)
-    quotes = payload.get("quotes") or {}
+    from syndicate.features.shared.venue_quote_adapters import quote_key
 
+    by_sport: dict[str, Mapping[str, Any]] = dict(collected_by_sport or {})
     out: list[Mapping[str, Any]] = []
     stamped = 0
+    per_source: dict[str, int] = {}
+    ceilings: dict[str, int] = {}
+    source_status: dict[str, Any] = {}
+
     for row in rows:
-        key = row.get("venue_quote_key") or row.get("key")
-        quote = quotes.get(str(key)) if key else None
+        sport = str(row.get("sport") or "").strip().lower()
+        if not sport:
+            out.append(row)
+            continue
+        if sport not in by_sport:
+            try:
+                by_sport[sport] = collect_quotes(sport, selected_date, now=now)
+            except Exception:
+                # One sport's venue failure must not cost the others' rows.
+                by_sport[sport] = {"quotes": {}}
+        payload = by_sport[sport]
+        ceilings.setdefault(sport, payload.get("ceiling_seconds"))
+        if sport not in source_status and payload.get("by_source"):
+            source_status[sport] = payload.get("by_source")
+
+        # DERIVED from the row, not read off it. A board row carries no
+        # `venue_quote_key`, so requiring one would have matched nothing and
+        # reported a confident `stamped=0` -- the "zero that looks like a
+        # working feed" failure this module documents three times over.
+        key = row.get("venue_quote_key") or quote_key(
+            sport, row.get("market"), row.get("side"), _as_float_or_none(row.get("line"))
+        )
+        quote = (payload.get("quotes") or {}).get(str(key))
         if quote is None:
             out.append(row)
             continue
         out.append(stamp_candidate_freshness(dict(row), quote))
         stamped += 1
+        per_source[quote.source] = per_source.get(quote.source, 0) + 1
 
     return {
         "rows": out,
@@ -385,10 +416,20 @@ def apply_venue_quotes(
         # The number that predicts whether this actually helped. Rows left
         # unstamped keep whatever age they had and will be gated on it.
         "unstamped": len(rows) - stamped,
-        "by_source": payload.get("by_source"),
-        "selected_by_source": payload.get("selected_by_source"),
-        "ceiling_seconds": payload.get("ceiling_seconds"),
+        "sports": sorted(by_sport.keys()),
+        "ceiling_seconds_by_sport": ceilings,
+        "selected_by_source": per_source,
+        "by_source": source_status,
     }
+
+
+def _as_float_or_none(value: Any) -> float | None:
+    try:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _iso(epoch: float) -> str:
