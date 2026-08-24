@@ -64,13 +64,18 @@ _PROP_TITLE = re.compile(
 # disagreeing about what happened.
 from syndicate.features.shared.kalshi_catalogue import (  # noqa: E402
     REASON_COMBINATORIAL,
+    game_date_from_ticker,
     REASON_OUT_OF_SCOPE,
     REASON_UNMAPPED_SERIES,
     REASON_UNMAPPED_STAT,
     REASON_UNREADABLE_TITLE,
 )
 
-REASON_WRONG_DATE = "market_closes_on_another_date"
+# Renamed from `market_closes_on_another_date`, which named the field the
+# check USED rather than the fact it asserts -- and that field turned out to be
+# the wrong one. A reason string that describes a mechanism goes stale the
+# moment the mechanism is corrected; this one describes the finding.
+REASON_WRONG_DATE = "market_is_for_another_date"
 # Split out from the above: this one means the player, market and line all
 # matched a board row and ONLY the date disagreed. Same refusal, opposite
 # diagnosis -- one says Kalshi is quoting a slate we are not looking at, the
@@ -82,6 +87,10 @@ REASON_NO_PRICE = "no_kalshi_price"
 # refusal: these are markets we CAN read and CANNOT yet place, so the number is
 # the size of the game-lines gap rather than a defect.
 REASON_NEEDS_EVENT_MAPPING = "needs_event_mapping"
+# A market whose ticker carries no readable game date. Separated from every
+# other refusal because it is the ONLY one that would previously have been
+# silently mis-dated instead of refused.
+REASON_UNDATABLE = "no_game_date_in_ticker"
 
 
 def normalize_person(value: Any) -> str:
@@ -322,11 +331,23 @@ def join_kalshi_to_board(
         # is right and only the calendar disagrees, while `no_matching_board_row`
         # says the key is still wrong.
         if wanted_date:
-            # `close_time` compared on the DATE only -- a night game closes
-            # after midnight UTC (`#370`). Whether `close_time` is first pitch
-            # at all is UNVERIFIED; see `kalshi_odds_refresh`'s DATE_FIELDS.
-            close_date = str(market.get("close_time") or "")[:10]
-            if close_date and close_date != wanted_date:
+            # THE GAME DATE COMES FROM THE TICKER, NOT FROM `close_time`.
+            # `close_time` is a SETTLEMENT deadline days after the event --
+            # `KXMLBHR-26AUG242140MINATH-...` closes 2026-08-28 for a game on
+            # the 24th -- so comparing it to the board's slate date refused
+            # every market on every build: `matched=0 reasons={
+            # 'market_closes_on_another_date': 190}` for hours, straight
+            # through a live slate. The DATE_FIELDS probe was printing the
+            # disproof the whole time; nothing had read it.
+            game_date = game_date_from_ticker(market.get("ticker"))
+            if game_date is None:
+                # NO FALLBACK TO `close_time`. Falling back would reinstate the
+                # bug this replaces, and it would do it silently on exactly the
+                # markets whose identity we understand least. An undatable
+                # market gets its own reason so the count is visible.
+                _refuse(REASON_UNDATABLE)
+                continue
+            if game_date != wanted_date:
                 _refuse(REASON_WOULD_MATCH_WRONG_DATE if rows else REASON_WRONG_DATE)
                 continue
 

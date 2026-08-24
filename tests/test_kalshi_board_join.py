@@ -32,7 +32,13 @@ def test_names_normalise_across_accents_and_punctuation():
 
 def _kalshi(title="Andrew Abbott: 7+ strikeouts?", series="KXMLBKS", **kw):
     market = {
-        "ticker": "KXMLBKS-25AUG22ABBOTT-7",
+        # THE GAME DATE LIVES HERE, and this fixture is shaped like the real
+        # thing for that reason: `KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-8`,
+        # measured in production 2026-08-23T23:51Z. Until 2026-08-24 these
+        # tests passed a date via `close_time` and the join read it there --
+        # which is why a suite this size stayed green while production matched
+        # ZERO markets for hours.
+        "ticker": "KXMLBKS-26AUG22ABBOTT-7",
         "series": series,
         "title": title,
         "yes_american": -120,
@@ -152,14 +158,16 @@ def test_the_price_resolver_is_keyed_as_tightly_as_the_join():
 # --- the join must stay inside one slate -----------------------------------
 
 
-def test_a_market_closing_on_another_date_is_refused():
+def test_a_market_for_another_date_is_refused():
     """MEASURED 2026-08-23T04:22Z: Kalshi was quoting tomorrow's MLB while the
     board had rolled to European soccer. Nothing matched — correct, but only by
     luck that the vocabularies did not overlap. A pitcher with the same line on
     two different days WOULD have matched the wrong game."""
     from syndicate.features.shared.kalshi_board_join import REASON_WOULD_MATCH_WRONG_DATE
 
-    market = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
+    market = _kalshi(
+        title="Lake Bachar: 6+ strikeouts?", ticker="KXMLBKS-26AUG24BACHAR-6"
+    )
     row = _row(player="Lake Bachar", line=5.5)
     assert join_kalshi_to_board([market], [row], selected_date="2026-08-24")["matched"] == 1
     stale = join_kalshi_to_board([market], [row], selected_date="2026-08-22")
@@ -182,11 +190,11 @@ def test_a_wrong_date_and_a_wrong_key_are_counted_separately():
         REASON_WRONG_DATE,
     )
 
-    pairs = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
+    pairs = _kalshi(
+        title="Lake Bachar: 6+ strikeouts?", ticker="KXMLBKS-26AUG24BACHAR-6"
+    )
     unpaired = _kalshi(
-        title="Nobody Here: 6+ strikeouts?",
-        close_time="2026-08-24T02:10:00Z",
-        ticker="KXMLBKS-25AUG24NOBODY-6",
+        title="Nobody Here: 6+ strikeouts?", ticker="KXMLBKS-26AUG24NOBODY-6"
     )
     report = join_kalshi_to_board(
         [pairs, unpaired], [_row(player="Lake Bachar", line=5.5)], selected_date="2026-08-22"
@@ -195,28 +203,72 @@ def test_a_wrong_date_and_a_wrong_key_are_counted_separately():
     assert report["reasons"][REASON_WRONG_DATE] == 1
 
 
-def test_the_date_is_compared_on_the_DAY_not_the_timestamp():
-    """A night game closes after midnight UTC. An exact timestamp comparison
-    would drop precisely the games this board is mostly about (#370)."""
-    market = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
+def test_close_time_is_a_settlement_deadline_and_must_not_date_the_market():
+    """THE BUG THAT COST A WHOLE SLATE, reproduced from the production reading.
+
+        ticker  KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2
+        open    2026-08-23T23:11:00Z
+        close   2026-08-28T01:40:00Z      <- FOUR DAYS after the game
+        expiration 2026-08-28T01:40:00Z
+
+    Kalshi closes a market days after the event so late settlement data can
+    land. The join compared `close_time[:10]` against the slate date, so it
+    refused everything -- `matched=0 reasons={'market_closes_on_another_date':
+    190}`, on every build for hours, straight through a live slate.
+
+    The game is on the 24th and this must match on the 24th, with a
+    `close_time` four days later sitting right there in the market.
+    """
+    market = _kalshi(
+        title="Lake Bachar: 6+ strikeouts?",
+        ticker="KXMLBKS-26AUG242140MINATH-BACHAR-6",
+        close_time="2026-08-28T01:40:00Z",
+    )
     row = _row(player="Lake Bachar", line=5.5)
     assert join_kalshi_to_board([market], [row], selected_date="2026-08-24")["matched"] == 1
+
+
+def test_a_wnba_ticker_without_a_start_time_still_dates():
+    """Two ticker shapes are in production and only the date is common to both.
+
+    `KXWNBAPTS-26AUG23LVTOR-TORJALLEMAND22-15` has no `HHMM` after the date;
+    `KXMLBHR-26AUG242140MINATH-...` does. A parser that required the time would
+    have dated every MLB market and no WNBA one -- and WNBA was the slate this
+    was built for.
+    """
+    market = _kalshi(
+        title="Julie Allemand: 15+ points",
+        series="KXWNBAPTS",
+        ticker="KXWNBAPTS-26AUG23LVTOR-TORJALLEMAND22-15",
+    )
+    row = _row(player="Julie Allemand", line=14.5, market="player_points", sport="wnba")
+    assert join_kalshi_to_board([market], [row], selected_date="2026-08-23")["matched"] == 1
 
 
 def test_no_selected_date_skips_the_check_rather_than_guessing():
     """A caller that does not know the slate date gets the old behaviour, not a
     silent filter."""
-    market = _kalshi(title="Lake Bachar: 6+ strikeouts?", close_time="2026-08-24T02:10:00Z")
+    market = _kalshi(title="Lake Bachar: 6+ strikeouts?")
     assert join_kalshi_to_board([market], [_row(player="Lake Bachar", line=5.5)])["matched"] == 1
 
 
-def test_a_market_with_no_close_time_is_not_dropped_by_the_date_check():
-    """Absent is not wrong-date. Refusing it would hide markets for a reason
-    that has nothing to do with the slate."""
-    market = _kalshi(title="Lake Bachar: 6+ strikeouts?")
-    assert join_kalshi_to_board(
+def test_an_undatable_ticker_is_refused_by_name_never_dated_from_close_time():
+    """No fallback. Falling back to `close_time` would reinstate the bug, and
+    would do it silently on exactly the markets we understand least."""
+    from syndicate.features.shared.kalshi_board_join import REASON_UNDATABLE
+
+    market = _kalshi(
+        title="Lake Bachar: 6+ strikeouts?",
+        ticker="KXMLBKS-NOTADATE-6",
+        # A `close_time` that WOULD have matched, so a fallback would show up
+        # as a match rather than as this refusal.
+        close_time="2026-08-24T02:10:00Z",
+    )
+    report = join_kalshi_to_board(
         [market], [_row(player="Lake Bachar", line=5.5)], selected_date="2026-08-24"
-    )["matched"] == 1
+    )
+    assert report["matched"] == 0
+    assert report["reasons"][REASON_UNDATABLE] == 1
 
 
 # --- multi-sport, via the catalogue ----------------------------------------

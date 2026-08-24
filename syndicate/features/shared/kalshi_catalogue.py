@@ -42,10 +42,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from datetime import date
 from typing import Any
 
 __all__ = [
     "SERIES_SPORT",
+    "game_date_from_ticker",
     "sport_for_series",
     "sport_for_ticker",
     "auto_series_from_catalogue",
@@ -165,6 +167,67 @@ _SPORT_TOKENS: tuple[tuple[str, str], ...] = (
 # them is a market this system must not auto-register -- a game line has no
 # player to join on and needs an event mapping that does not exist.
 _PLAYER_PROP_TITLE = re.compile(r"\bplayer\s+(?P<stat>[A-Za-z0-9 +'-]+)$", re.IGNORECASE)
+
+
+# The game date, which lives in the EVENT segment of the ticker and nowhere
+# else. Two shapes are in production, both measured 2026-08-23T23:51Z:
+#
+#   KXWNBAPTS-26AUG23LVTOR-TORJALLEMAND22-15     event `26AUG23LVTOR`
+#   KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2     event `26AUG242140MINATH`
+#
+# MLB carries a start time after the date, WNBA does not, so only the leading
+# `YYMMMDD` is common to both -- and that is all a date comparison needs. The
+# time is deliberately NOT parsed: whether `2140` is Eastern or UTC is not
+# settled by any reading I have, and a date taken from Kalshi's own labelling
+# of the event does not depend on the answer.
+_EVENT_DATE = re.compile(r"^(?P<yy>\d{2})(?P<mon>[A-Z]{3})(?P<dd>\d{2})")
+_MONTHS = {
+    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+}
+
+
+def game_date_from_ticker(ticker: Any) -> str | None:
+    """The date the game is played, as `YYYY-MM-DD`, or None if unreadable.
+
+    NOT `close_time`, WHICH IS A SETTLEMENT DEADLINE. This is the correction to
+    a wrong assumption that cost a whole slate. `kalshi_board_join` compared
+    `close_time[:10]` against the board's date and refused everything that
+    disagreed; the comment there said the assumption was unverified. Measured:
+
+        ticker  KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2
+        open    2026-08-23T23:11:00Z
+        close   2026-08-28T01:40:00Z      <- FOUR DAYS after the game
+        expiration 2026-08-28T01:40:00Z
+
+    Kalshi closes a market days after the event so late settlement data can
+    land. So the date check refused 100% of markets, on every build for hours:
+    `matched=0 reasons={'market_closes_on_another_date': 190}`. Nothing was
+    wrong with the names, the prices or the parsing -- the join was comparing
+    a game date against a settlement date and they never agree.
+
+    Returns None rather than guessing. A caller must refuse an undatable market
+    with its own named reason: falling back to `close_time` would restore
+    exactly the bug this replaces.
+    """
+    text = str(ticker or "").strip().upper()
+    parts = text.split("-")
+    if len(parts) < 2:
+        return None
+    match = _EVENT_DATE.match(parts[1])
+    if not match:
+        return None
+    month = _MONTHS.get(match.group("mon"))
+    if month is None:
+        return None
+    try:
+        # `26` is 2026. Kalshi has no markets from 1926 and none listed beyond
+        # a few days out, so the century is not ambiguous in practice.
+        return date(2000 + int(match.group("yy")), month, int(match.group("dd"))).isoformat()
+    except ValueError:
+        # A real date shape that is not a real date (`26FEB30`). Unreadable is
+        # the honest answer; inventing March 2nd is not.
+        return None
 
 
 def sport_for_ticker(ticker: Any) -> str | None:

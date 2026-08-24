@@ -763,6 +763,11 @@ def _kalshi_series_catalogue_at_boot() -> None:
     try:
         from syndicate.features.shared.kalshi_client import discover_series, series_matching
 
+        # Imported HERE, not inside the auto-registration `try` below. A name
+        # bound inside a try is unbound on the except path, and that is exactly
+        # how `BET_STATUS_FAILED` shipped a block that had never once executed.
+        from syndicate.features.shared.kalshi_catalogue import sport_for_series
+
         report = discover_series()
         tickers = report.get("tickers") or []
         print(
@@ -826,9 +831,20 @@ def _kalshi_series_catalogue_at_boot() -> None:
                     flush=True,
                 )
         for token in ("NBA", "MLB", "NFL", "NHL"):
+            # SUBSTRING MATCH, and the line says so. `KXWNBAPTS` contains
+            # "NBA", so it appears under NBA here -- which read, in a log, as
+            # the classifier having made exactly the mistake `_SPORT_TOKENS`
+            # exists to prevent, and cost a diagnostic detour to disprove. The
+            # classifier is `sport_for_series`; this is a catalogue census. A
+            # diagnostic that cannot be told apart from the bug it is near is
+            # worse than no diagnostic.
             found = series_matching([token], tickers)
+            classified = [t for t in found if sport_for_series(t) == token.lower()]
             print(
-                f"[live_odds_worker] KALSHI_SPORT {token} series={found[:12]} n={len(found)}",
+                f"[live_odds_worker] KALSHI_SPORT {token}"
+                f" ticker_substring_n={len(found)}"
+                f" classified_n={len(classified)}"
+                f" classified={classified[:12]}",
                 flush=True,
             )
     except Exception as exc:

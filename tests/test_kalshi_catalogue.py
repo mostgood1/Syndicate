@@ -230,3 +230,52 @@ def test_register_reports_what_was_ADDED_not_what_was_seen():
         assert "KXTESTPTS" in cat.all_series()
     finally:
         cat._DISCOVERED.clear()
+
+
+# --------------------------------------------------------------------------
+# The game date, which is in the TICKER and was being read from `close_time`
+# --------------------------------------------------------------------------
+
+
+def test_the_game_date_comes_out_of_the_ticker():
+    """Both production shapes, copied verbatim from the 2026-08-23T23:51Z logs."""
+    from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
+
+    # WNBA: no start time after the date.
+    assert game_date_from_ticker("KXWNBAPTS-26AUG23LVTOR-TORJALLEMAND22-15") == "2026-08-23"
+    # MLB: `2140` between the date and the teams.
+    assert game_date_from_ticker("KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2") == "2026-08-24"
+    assert game_date_from_ticker("KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-8") == "2026-08-24"
+
+
+def test_an_unreadable_ticker_returns_none_rather_than_a_guess():
+    """None is what makes the caller refuse by name. Every one of these would
+    have been silently mis-dated off `close_time` under the old code."""
+    from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
+
+    assert game_date_from_ticker("KXMLBKS") is None          # no event segment
+    assert game_date_from_ticker("KXMLBKS-GARBAGE-6") is None  # not a date
+    assert game_date_from_ticker("KXMLBKS-26XXX24MIN-6") is None  # not a month
+    assert game_date_from_ticker("KXMLBKS-26FEB30MIN-6") is None  # not a real day
+    assert game_date_from_ticker("") is None
+    assert game_date_from_ticker(None) is None
+
+
+def test_the_month_is_read_as_a_name_not_a_number():
+    """`26AUG24` is August 24th, not the 26th of an eighth month. Getting this
+    backwards produces a plausible date every time and would never crash."""
+    from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
+
+    assert game_date_from_ticker("KXMLBKS-26AUG24TEAM-1") == "2026-08-24"
+    assert game_date_from_ticker("KXMLBKS-26DEC01TEAM-1") == "2026-12-01"
+    assert game_date_from_ticker("KXMLBKS-27JAN31TEAM-1") == "2027-01-31"
+
+
+def test_every_hand_registered_series_dates_from_a_realistic_ticker():
+    """A registry entry whose tickers cannot be dated prices nothing, and does
+    it silently -- the exact failure mode this whole change is fixing."""
+    from syndicate.features.shared.kalshi_catalogue import SERIES_SPORT, game_date_from_ticker
+
+    for series in SERIES_SPORT:
+        ticker = f"{series}-26AUG23LVTOR-TORPLAYER22-15"
+        assert game_date_from_ticker(ticker) == "2026-08-23", series
