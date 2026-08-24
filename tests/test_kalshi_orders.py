@@ -631,3 +631,58 @@ def test_the_venue_fill_cost_outranks_our_reconstruction():
     })
     assert seen["fill_cost_dollars"] == 1.80
     assert seen["fill_price"] == 0.6
+
+
+def test_the_cancel_route_hangs_off_the_write_path(monkeypatch):
+    """The asymmetry is real and cost a 410 to learn once already:
+
+        POST   /portfolio/events/orders          create
+        DELETE /portfolio/events/orders/{id}     cancel
+        GET    /portfolio/orders                 list
+        GET    /portfolio/orders/{id}            read one
+
+    Assuming DELETE followed the READS would 404 silently while the order kept
+    resting -- worse than the create 410, because nothing about the order
+    changes to say so."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.setenv("KALSHI_API_BASE", "https://example.test/trade-api/v2")
+    assert mod._order_cancel_url("abc") == (
+        "https://example.test/trade-api/v2/portfolio/events/orders/abc"
+    )
+    assert mod._orders_url() == "https://example.test/trade-api/v2/portfolio/events/orders"
+    assert mod._order_read_url("abc") == (
+        "https://example.test/trade-api/v2/portfolio/orders/abc"
+    )
+
+
+def test_a_failed_cancel_is_named_not_raised(monkeypatch):
+    """A cancel that fails must leave the order alone: it is still resting, it
+    can still fill, and recording it dead frees a key the venue still holds."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("http_410")
+
+    monkeypatch.setattr("syndicate.features.shared.kalshi_auth.signed_request", boom)
+    result = mod.cancel_order("abc")
+    assert result["status"] == "error"
+    assert "http_410" in result["reason"]
+
+
+def test_cancelling_nothing_is_refused():
+    from syndicate.features.shared.kalshi_orders import cancel_order
+
+    assert cancel_order("")["reason"] == "no_order_id"
+
+
+def test_both_price_legs_are_carried_through():
+    """Which leg we are paying depends on our side, which the view does not
+    know -- and Kalshi hands over both, so guessing is unnecessary."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "resting", "fill_count_fp": "0.00",
+                             "yes_price_dollars": "0.4600",
+                             "no_price_dollars": "0.5400"})
+    assert seen["yes_price"] == 0.46
+    assert seen["no_price"] == 0.54

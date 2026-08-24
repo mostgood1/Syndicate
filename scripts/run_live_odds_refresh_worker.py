@@ -912,6 +912,13 @@ def _kalshi_series_catalogue_at_boot() -> None:
         )
 
 
+def _cancel_stale_enabled() -> bool:
+    """Default ON. A stale resting order is not a neutral thing to leave: it
+    cannot fill, and it blocks its own replacement. `off`/`0`/`false` disables."""
+    raw = str(os.environ.get("SYNDICATE_EXECUTION_CANCEL_STALE") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def _live_ledger_at_boot() -> None:
     """Print every LIVE order the ledger holds, with the venue's own error.
 
@@ -970,6 +977,22 @@ def _live_ledger_at_boot() -> None:
         from syndicate.features.shared.execution_ledger import reconcile_live_orders
 
         reconciled = reconcile_live_orders()
+
+        # THEN PULL THE DEAD ONES OFF THE BOOK. Separate call, separate log,
+        # because this is the only VENUE WRITE outside order placement -- a
+        # read pass that quietly cancelled things would be the wrong shape to
+        # run anywhere.
+        #
+        # Gated, and defaulting ON only because a resting order that has aged
+        # out at a price the market has left behind cannot fill and holds its
+        # own idempotency key hostage. `off` restores the old behaviour.
+        if _cancel_stale_enabled() and reconciled.get("resting"):
+            from syndicate.features.shared.execution_ledger import (
+                cancel_stale_resting_orders,
+            )
+
+            cancel_stale_resting_orders(reconciled["resting"])
+
         if reconciled.get("changed"):
             # Re-read: the rows printed below are now stale by exactly the
             # corrections we just made, and a report of the pre-correction

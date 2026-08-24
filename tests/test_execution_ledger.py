@@ -929,3 +929,150 @@ def test_a_row_nothing_could_be_said_about_is_not_stamped(monkeypatch):
 
     assert mod.reconcile_live_orders()["stamped"] == 0
     assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+
+# --------------------------------------------------------------------------
+# Cancelling a resting order the market has left behind
+# --------------------------------------------------------------------------
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _resting_row(**overrides):
+    row = {
+        "idempotency_key": "k1",
+        "order_id": "ord-x",
+        "ticker": "KXMLBKS-TEST",
+        "side": "under",
+        "yes_price": 0.46,
+        "no_price": 0.54,
+        "submitted_at": "2020-01-01T00:00:00Z",
+    }
+    row.update(overrides)
+    return row
+
+
+def _prices(monkeypatch, *, market: float | None, cancels: list):
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setattr(
+        mod, "_market_price_for_side",
+        lambda ticker, side: market,
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_orders.cancel_order",
+        lambda order_id: (cancels.append(order_id) or {"status": "ok", "order": {}}),
+    )
+
+
+def test_a_stale_resting_order_is_cancelled(monkeypatch):
+    """MEASURED 2026-08-24: the Zebby Matthews order rested from ~12:58Z at
+    $0.54 for NO while the market moved to $0.56. It could not fill and held
+    its own idempotency key hostage, so the marketable-limit path could not
+    re-place it either."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=0.56, cancels=cancels)
+
+    result = mod.cancel_stale_resting_orders([_resting_row()])
+    assert result["cancelled"] == 1
+    assert cancels == ["ord-x"]
+
+
+def test_a_young_order_is_left_to_work(monkeypatch):
+    """A limit that has not filled is not automatically wrong -- that is what a
+    limit is for. Cancelling on the first tick would churn the book and never
+    let a good price come to us."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=0.56, cancels=cancels)
+
+    result = mod.cancel_stale_resting_orders([_resting_row(submitted_at=_now_iso())])
+    assert result["cancelled"] == 0
+    assert result["too_young"] == 1
+    assert cancels == []
+
+
+def test_an_order_still_at_the_market_is_left_alone(monkeypatch):
+    """Age alone is not staleness. An old order at a price that still exists
+    can still fill."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=0.54, cancels=cancels)
+
+    result = mod.cancel_stale_resting_orders([_resting_row()])
+    assert result["at_market"] == 1
+    assert cancels == []
+
+
+def test_no_price_means_no_cancel(monkeypatch):
+    """Cancelling on an unreadable price is acting on the ABSENCE of
+    information, which is the failure this whole layer keeps refusing."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=None, cancels=cancels)
+
+    result = mod.cancel_stale_resting_orders([_resting_row()])
+    assert result["unreadable"] == 1
+    assert cancels == []
+
+
+def test_a_failed_cancel_leaves_the_order_alone(monkeypatch):
+    """The order is still resting and can still fill. Marking it dead would
+    free a key the venue still holds -- how one bet becomes two."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setattr(mod, "_market_price_for_side", lambda ticker, side: 0.56)
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_orders.cancel_order",
+        lambda order_id: {"status": "error", "reason": "KalshiAuthError: http_410"},
+    )
+
+    result = mod.cancel_stale_resting_orders([_resting_row()])
+    assert result["failed"] == 1
+    assert result["cancelled"] == 0
+
+
+def test_the_cancel_pass_is_bounded(monkeypatch):
+    """A bad rule must not empty the book before anyone reads a log."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=0.56, cancels=cancels)
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_CANCELS", "2")
+
+    rows = [_resting_row(idempotency_key=f"k{i}", order_id=f"ord-{i}") for i in range(5)]
+    assert mod.cancel_stale_resting_orders(rows)["cancelled"] == 2
+    assert len(cancels) == 2
+
+
+def test_the_side_decides_which_leg_is_ours():
+    """Kalshi hands over both legs; which one we are paying depends on our
+    side, and reading the wrong one compares a price to its own complement."""
+    from syndicate.features.shared.execution_ledger import _resting_price_for_side
+
+    assert _resting_price_for_side(_resting_row(side="under")) == 0.54
+    assert _resting_price_for_side(_resting_row(side="over")) == 0.46
+
+
+def test_the_ledger_is_not_written_by_the_cancel(monkeypatch):
+    """The next reconciliation pass reads the venue, sees `canceled`, and moves
+    the row through the one path allowed to change a status -- the venue's own
+    word. Writing it here would be believing our own API call over the book."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="uncancelled", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-c")
+    cancels = []
+    _prices(monkeypatch, market=0.56, cancels=cancels)
+
+    mod.cancel_stale_resting_orders([_resting_row(idempotency_key=key, order_id="ord-c")])
+    assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED

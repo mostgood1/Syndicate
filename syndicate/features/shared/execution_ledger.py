@@ -69,6 +69,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any, Callable, Mapping
 
 from syndicate.features.shared.refresh_state_store import (
@@ -751,6 +752,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     unknown = 0
     implausible = 0
     stamped = 0
+    resting: list[dict[str, Any]] = []
 
     for order in candidates:
         key = str(order.get("idempotency_key") or "")
@@ -841,6 +843,17 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         elif venue_state == "resting":
             # THE PHANTOM-FILL REPAIR. The order exists and has traded nothing,
             # so every fill field on it is a number nobody should believe.
+            resting.append(
+                {
+                    "idempotency_key": key,
+                    "order_id": seen.get("order_id"),
+                    "ticker": order.get("venue_ticker") or seen.get("ticker"),
+                    "side": order.get("side"),
+                    "yes_price": seen.get("yes_price"),
+                    "no_price": seen.get("no_price"),
+                    "submitted_at": order.get("submitted_at"),
+                }
+            )
             after = STATUS_SUBMITTED
             new_fields = {
                 "status": after,
@@ -935,6 +948,10 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         "unknown": unknown,
         "implausible": implausible,
         "stamped": stamped,
+        # Handed out rather than acted on here: reconciliation READS the venue
+        # and must stay something safe to run anywhere. Cancelling is a WRITE,
+        # and it gets its own call and its own log line.
+        "resting": resting,
         "orders": changed,
     }
 
@@ -964,6 +981,186 @@ def _reconciled_recently(order: Mapping[str, Any], *, within_seconds: float) -> 
     if seen.tzinfo is None:
         seen = seen.replace(tzinfo=timezone.utc)
     return (datetime.now(timezone.utc) - seen).total_seconds() <= within_seconds
+
+
+def _age_seconds(stamp: Any) -> float | None:
+    text = str(stamp or "").strip()
+    if not text:
+        return None
+    try:
+        seen = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - seen).total_seconds()
+
+
+def _market_price_for_side(ticker: Any, side: Any) -> float | None:
+    """What we would PAY, right now, on our leg of this market."""
+    from syndicate.features.shared.kalshi_client import fetch_market
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    try:
+        contract_side = _side_to_kalshi(side)
+    except Exception:
+        return None
+    read = fetch_market(str(ticker or ""))
+    if read.get("status") != "ok":
+        return None
+    market = read.get("market") or {}
+    field = "yes_ask_dollars" if contract_side == "yes" else "no_ask_dollars"
+    try:
+        value = float(market.get(field))
+    except (TypeError, ValueError):
+        return None
+    return value if 0.0 < value < 1.0 else None
+
+
+def _resting_price_for_side(row: Mapping[str, Any]) -> float | None:
+    """What we are resting at, on our leg. Kalshi hands over both legs."""
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    try:
+        contract_side = _side_to_kalshi(row.get("side"))
+    except Exception:
+        return None
+    price = row.get("yes_price") if contract_side == "yes" else row.get("no_price")
+    try:
+        value = float(price)
+    except (TypeError, ValueError):
+        return None
+    return value if 0.0 < value < 1.0 else None
+
+
+def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Pull resting orders off the book once their price has stopped existing.
+
+    ------------------------------------------------------------------
+    WHY AGE AND PRICE, AND WHY BOTH
+    ------------------------------------------------------------------
+
+    A limit order that has not filled is not automatically wrong -- that is
+    what a limit is for, and cancelling one the moment the market ticks would
+    churn the book and never let a good price come to us. What makes one dead
+    is that it has sat there long enough to have had its chance AND the market
+    has left the price behind. Either alone is a bad rule; together they name
+    exactly the order nobody would leave standing.
+
+    MEASURED 2026-08-24: the Zebby Matthews order rested from ~12:58Z at $0.54
+    for NO while the market moved to $0.56. It could not fill at that price and
+    was never going to, and it held its own idempotency key hostage -- so the
+    marketable-limit path could not re-place it either, because the ledger
+    correctly saw a live order at the venue.
+
+    ------------------------------------------------------------------
+    WHAT MAKES A VENUE WRITE SAFE TO RUN ON A LOOP
+    ------------------------------------------------------------------
+
+    - NO PRICE, NO CANCEL. If the live market cannot be read, the order stays.
+      Cancelling on an unreadable price is acting on the absence of
+      information, which is the failure this whole layer keeps refusing.
+    - A FAILED CANCEL CHANGES NOTHING. The order is still resting and can
+      still fill; marking it dead would free a key the venue still holds, and
+      that is how one bet becomes two. Only a successful DELETE moves the row.
+    - BOUNDED PER PASS. `SYNDICATE_EXECUTION_MAX_CANCELS` (default 3) caps it,
+      so a bad rule cannot empty the book before anyone reads a log.
+    - Every cancel is logged by name, including the refusals.
+
+    Cancelling costs nothing at Kalshi -- an unfilled order carries no fee --
+    so the asymmetry runs the right way: a cancel we should not have made costs
+    a re-place, a fill we should not have taken costs the stake.
+    """
+    from syndicate.features.shared.kalshi_orders import cancel_order
+
+    max_age = _float_env("SYNDICATE_EXECUTION_RESTING_MAX_AGE_SECONDS", 900.0)
+    band = _float_env("SYNDICATE_EXECUTION_RESTING_PRICE_BAND", 0.01)
+    limit = int(_float_env("SYNDICATE_EXECUTION_MAX_CANCELS", 3.0))
+
+    cancelled: list[dict[str, Any]] = []
+    too_young = 0
+    at_market = 0
+    unreadable = 0
+    failed = 0
+
+    for row in resting:
+        if len(cancelled) >= limit:
+            print(
+                f"[execution_ledger] CANCEL_CAPPED limit={limit}"
+                " -- remaining resting orders left for the next pass",
+                flush=True,
+            )
+            break
+
+        age = _age_seconds(row.get("submitted_at"))
+        if age is None or age < max_age:
+            too_young += 1
+            continue
+
+        resting_price = _resting_price_for_side(row)
+        market_price = _market_price_for_side(row.get("ticker"), row.get("side"))
+        if resting_price is None or market_price is None:
+            unreadable += 1
+            print(
+                f"[execution_ledger] CANCEL_SKIPPED_NO_PRICE key={row.get('idempotency_key')}"
+                f" ticker={row.get('ticker')} resting={resting_price} market={market_price}",
+                flush=True,
+            )
+            continue
+
+        drift = round(market_price - resting_price, 4)
+        if abs(drift) < band:
+            at_market += 1
+            continue
+
+        print(
+            f"[execution_ledger] CANCEL_STALE key={row.get('idempotency_key')}"
+            f" ticker={row.get('ticker')} side={row.get('side')}"
+            f" resting={resting_price} market={market_price} drift={drift:+}"
+            f" age_s={age:.0f}",
+            flush=True,
+        )
+        result = cancel_order(row.get("order_id"))
+        if result.get("status") != "ok":
+            failed += 1
+            print(
+                f"[execution_ledger] CANCEL_FAILED key={row.get('idempotency_key')}"
+                f" reason={result.get('reason')} -- order left resting",
+                flush=True,
+            )
+            continue
+        cancelled.append(
+            {
+                "idempotency_key": row.get("idempotency_key"),
+                "ticker": row.get("ticker"),
+                "resting_price": resting_price,
+                "market_price": market_price,
+                "drift": drift,
+                "age_seconds": round(age, 0),
+            }
+        )
+
+    # THE LEDGER IS NOT UPDATED HERE. The next reconciliation pass reads the
+    # venue, sees `canceled`, and moves the row to `rejected` through the one
+    # path that is allowed to change a status -- the venue's own word. Writing
+    # it here would be this module believing its own API call over the book,
+    # which is the habit that produced the phantom fill.
+    if cancelled or failed or unreadable:
+        print(
+            f"[execution_ledger] CANCEL_PASS resting={len(resting)}"
+            f" cancelled={len(cancelled)} failed={failed} unreadable={unreadable}"
+            f" too_young={too_young} at_market={at_market}",
+            flush=True,
+        )
+    return {
+        "status": "ok",
+        "cancelled": len(cancelled),
+        "failed": failed,
+        "unreadable": unreadable,
+        "too_young": too_young,
+        "at_market": at_market,
+        "orders": cancelled,
+    }
 
 
 def unreconciled_orders() -> list[dict[str, Any]]:
