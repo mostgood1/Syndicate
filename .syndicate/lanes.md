@@ -1461,6 +1461,24 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   venue_ticker` for `venue=polymarket` today, so the new submitter branch is
   real but currently unreachable in production. Named rather than built here,
   same discipline as the rest of this lane's honesty about unbuilt pieces.
+  **CORRECTED same evening, per that lane's own acknowledgment
+  (`.syndicate/deploys.md`, 2026-08-24 22:20Z):** `_polymarket_resolve_market`
+  first called `polymarket_us_markets.fetch_game_markets()` LIVE, on the
+  reasoning that no single-market fetch exists on this venue. That made it a
+  SECOND independent live caller of the same venue -- `venue_quote_adapters.py`
+  states outright that this is a documented incident class (`#139/#144`,
+  `#148`) and already reads the persisted artifact instead. Rewritten to read
+  `polymarket_us_markets.GAME_SLATE_ARTIFACT`
+  (`reports/intelligence/polymarket_us_games.json`, 900s cadence, written by
+  that lane's `persist_game_slate`) rather than the venue. Also fixed a real
+  bug this forced into the open: the artifact's persisted rows carry NO `id`
+  field (`_SLATE_STORAGE_FIELDS` has `slug`, not `id`) -- the original design
+  keyed `venue_ticker` on `id` and would have refused every real lookup. Now
+  keyed on `slug` directly, which is also what `order_body` needs, so no
+  separate id->slug translation exists to drift out of sync. 3 new/renamed
+  tests replace the live-fetch ones, including one that fails loudly if this
+  function ever calls the venue directly again. 188 tests green across the
+  four affected suites.
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
   `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
   intelligence_state (reads `read_layer2_shortlist`).

@@ -771,12 +771,15 @@ def test_venue_submitter_polymarket_returns_an_adapter(monkeypatch):
     assert callable(submitter)
 
 
-def _polymarket_row(*, market_id="pm1", teams=("White Sox", "Rangers"),
+def _polymarket_row(*, slug="aec-mlb-tex-chw-2026-08-24", teams=("White Sox", "Rangers"),
                      prices=("0.55", "0.45"), tick="0.001", min_qty="1",
                      orderable=True):
+    # The PERSISTED shape -- `polymarket_us_markets._SLATE_STORAGE_FIELDS`.
+    # No `id` field: the artifact never carried one, so this fixture does not
+    # either, on purpose (a fixture that includes a field the real artifact
+    # never has would hide exactly the bug this rewrite fixed).
     return {
-        "id": market_id,
-        "slug": "aec-mlb-tex-chw-2026-08-24",
+        "slug": slug,
         "outcomes": list(teams),
         "outcomePrices": list(prices),
         "orderPriceMinTickSize": tick,
@@ -787,9 +790,11 @@ def _polymarket_row(*, market_id="pm1", teams=("White Sox", "Rangers"),
 
 class _PolyReq:
     """CHW is home, TEX is away -- same alias pair
-    `tests/test_kalshi_polymarket_arb.py` already relies on."""
+    `tests/test_kalshi_polymarket_arb.py` already relies on. `venue_ticker`
+    holds the Polymarket SLUG (see `_polymarket_resolve_market`'s own
+    docstring on why -- the artifact carries no `id`)."""
 
-    venue_ticker = "pm1"
+    venue_ticker = "aec-mlb-tex-chw-2026-08-24"
     side = "home"
     home_team = "CHW"
     away_team = "TEX"
@@ -797,21 +802,22 @@ class _PolyReq:
     requested_price = 0.55
 
 
-def _fetch_env(monkeypatch, *, status="ok", markets=None, raises=None):
-    from syndicate.features.shared import polymarket_us_markets
+def _artifact_env(monkeypatch, *, markets=None, raises=None, fetched_at=1787600000.0):
+    from syndicate.features.shared import refresh_state_store
     import pipeline.execute_portfolio as runner
 
-    def fake_fetch(**kwargs):
+    def fake_read(path):
         if raises is not None:
             raise raises
-        return {"status": status, "markets": markets if markets is not None else [_polymarket_row()]}
+        rows = markets if markets is not None else [_polymarket_row()]
+        return {"fetched_at": fetched_at, "markets": rows, "count": len(rows)}
 
-    monkeypatch.setattr(polymarket_us_markets, "fetch_game_markets", fake_fetch)
+    monkeypatch.setattr(refresh_state_store, "read_json_file", fake_read)
     return runner
 
 
-def test_resolves_the_live_price_for_our_named_team(monkeypatch):
-    runner = _fetch_env(monkeypatch)
+def test_resolves_the_artifact_price_for_our_named_team(monkeypatch):
+    runner = _artifact_env(monkeypatch)
     resolved = runner._polymarket_resolve_market(_PolyReq())
     # CHW (home, requested) is "White Sox" in outcomes[0] at 0.55.
     assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1")
@@ -821,7 +827,7 @@ def test_the_away_side_gets_the_away_price_not_positional(monkeypatch):
     """Outcomes listed in the OPPOSITE order from home/away still resolve by
     team identity, not array position -- same discipline
     `kalshi_polymarket_arb.join_kalshi_polymarket_moneylines` already proves."""
-    runner = _fetch_env(monkeypatch, markets=[
+    runner = _artifact_env(monkeypatch, markets=[
         _polymarket_row(teams=("Rangers", "White Sox"), prices=("0.42", "0.58"))
     ])
 
@@ -832,14 +838,14 @@ def test_the_away_side_gets_the_away_price_not_positional(monkeypatch):
     assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.42, "0.001", "1")
 
 
-def test_no_venue_ticker_refuses_without_a_fetch(monkeypatch):
-    from syndicate.features.shared import polymarket_us_markets
+def test_no_venue_ticker_refuses_without_reading_the_artifact(monkeypatch):
+    from syndicate.features.shared import refresh_state_store
     import pipeline.execute_portfolio as runner
 
-    def explode(**kwargs):
-        raise AssertionError("fetched the catalogue with no market id to look for")
+    def explode(path):
+        raise AssertionError("read the artifact with no slug to look for")
 
-    monkeypatch.setattr(polymarket_us_markets, "fetch_game_markets", explode)
+    monkeypatch.setattr(refresh_state_store, "read_json_file", explode)
 
     class _NoTicker(_PolyReq):
         venue_ticker = None
@@ -847,18 +853,38 @@ def test_no_venue_ticker_refuses_without_a_fetch(monkeypatch):
     assert runner._polymarket_resolve_market(_NoTicker()) is None
 
 
-def test_fetch_failure_refuses_cleanly(monkeypatch):
-    runner = _fetch_env(monkeypatch, raises=RuntimeError("network down"))
+def test_never_calls_the_venue_directly(monkeypatch):
+    """The whole point of the artifact rewrite: this function must not become
+    a second independent caller of `polymarket_us_markets` (a documented
+    incident class per `venue_quote_adapters.py`'s own header)."""
+    from syndicate.features.shared import polymarket_us_markets
+
+    def explode(**kwargs):
+        raise AssertionError("called the venue directly instead of reading the artifact")
+
+    monkeypatch.setattr(polymarket_us_markets, "fetch_game_markets", explode)
+    monkeypatch.setattr(polymarket_us_markets, "fetch_markets", explode)
+    runner = _artifact_env(monkeypatch)
+    assert runner._polymarket_resolve_market(_PolyReq()) == (
+        "aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1"
+    )
+
+
+def test_artifact_read_failure_refuses_cleanly(monkeypatch):
+    runner = _artifact_env(monkeypatch, raises=RuntimeError("keyvalue unreachable"))
     assert runner._polymarket_resolve_market(_PolyReq()) is None
 
 
-def test_fetch_not_ok_refuses_cleanly(monkeypatch):
-    runner = _fetch_env(monkeypatch, status="error", markets=[])
+def test_empty_artifact_refuses_cleanly(monkeypatch):
+    from syndicate.features.shared import refresh_state_store
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setattr(refresh_state_store, "read_json_file", lambda path: {})
     assert runner._polymarket_resolve_market(_PolyReq()) is None
 
 
 def test_market_not_found_refuses(monkeypatch):
-    runner = _fetch_env(monkeypatch, markets=[_polymarket_row(market_id="other")])
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(slug="other-slug")])
     assert runner._polymarket_resolve_market(_PolyReq()) is None
 
 
@@ -866,23 +892,23 @@ def test_not_orderable_refuses(monkeypatch):
     """`orderable` is `trimmed_row`'s own signal that tick size and minimum
     quantity are BOTH present -- never inferred, per `polymarket_us_orders`'s
     own header."""
-    runner = _fetch_env(monkeypatch, markets=[_polymarket_row(orderable=False)])
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(orderable=False)])
     assert runner._polymarket_resolve_market(_PolyReq()) is None
 
 
 def test_unreadable_outcomes_refuses(monkeypatch):
-    runner = _fetch_env(monkeypatch, markets=[_polymarket_row(teams=("Only One",), prices=("0.5",))])
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(teams=("Only One",), prices=("0.5",))])
     assert runner._polymarket_resolve_market(_PolyReq()) is None
 
 
 def test_a_polymarket_price_that_moved_too_far_REFUSES(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
-    runner = _fetch_env(monkeypatch, markets=[
+    runner = _artifact_env(monkeypatch, markets=[
         _polymarket_row(teams=("White Sox", "Rangers"), prices=("0.90", "0.10"))
     ])
 
     class _MovedReq(_PolyReq):
-        requested_price = 0.55  # live 0.90, +0.35 drift, past 0.03
+        requested_price = 0.55  # artifact 0.90, +0.35 drift, past 0.03
 
     with pytest.raises(Exception) as excinfo:
         runner._polymarket_resolve_market(_MovedReq())
@@ -891,7 +917,7 @@ def test_a_polymarket_price_that_moved_too_far_REFUSES(monkeypatch):
 
 def test_a_polymarket_price_that_moved_in_our_favour_is_taken(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
-    runner = _fetch_env(monkeypatch, markets=[
+    runner = _artifact_env(monkeypatch, markets=[
         _polymarket_row(teams=("White Sox", "Rangers"), prices=("0.40", "0.60"))
     ])
 
@@ -909,7 +935,7 @@ def test_venue_submitter_polymarket_end_to_end(monkeypatch):
     from syndicate.features.shared import polymarket_us_orders
     import pipeline.execute_portfolio as runner
 
-    _fetch_env(monkeypatch)
+    _artifact_env(monkeypatch)
 
     calls = []
 
