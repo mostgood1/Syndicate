@@ -369,6 +369,98 @@ def settle_orders(
     }
 
 
+def audit_game_line_grades(selected_date: str, *, limit: int = 25) -> dict[str, Any]:
+    """Print the RAW FACTS beside each game-line verdict, so a human can check one.
+
+    MEASURED 2026-08-24T19:17Z: game lines graded -16.4% on 79 bets at a 35.44%
+    win rate, while totals -- graded through the old, long-exercised path --
+    returned +24.03%. Game lines began grading four hours earlier, through code
+    I wrote that day.
+
+    A CONSISTENT SIGN INVERSION PRODUCES EXACTLY THAT PICTURE, and 1 - 0.3544
+    is roughly what an inverted-but-otherwise-fine model would look like. Both
+    existing guards pass under an inversion: the unit tests assert both
+    directions against my own convention, and
+    `home_away_disagree_between_sources` checks whether the two SOURCES agree
+    about which team is home, not whether the convention is right.
+
+    So neither the tests nor the logs can settle it. Only ground truth can:
+    a real final score, a real quoted line, and a verdict a person can check by
+    eye in one row. That is all this prints.
+
+    "The model is bad at game lines" and "I grade them backwards" have opposite
+    responses -- stop betting them, or fix the grader and discard every
+    game-line number from today. Acting before checking is the expensive move.
+
+    Read-only. It re-derives the score from the same resolver settlement uses
+    and CHANGES NOTHING -- an audit that writes is an audit that can create the
+    thing it was meant to detect.
+    """
+    from syndicate.features.shared.execution_ledger import _load
+    from syndicate.features.shared.game_line_bet import is_game_line_market
+
+    normalized = str(selected_date or "").strip()
+    orders = [
+        o
+        for o in (_load().get("orders") or [])
+        if o.get("selected_date") == normalized
+        and o.get("outcome")
+        and is_game_line_market(o.get("sport"), o.get("market"))
+    ]
+    if not orders:
+        print(f"[paper_settlement] GRADE_AUDIT date={normalized} rows=0", flush=True)
+        return {"status": "ok", "rows": 0}
+
+    resolver = _default_resolver(normalized)
+    rows = 0
+    agree = 0
+    for order in orders[:limit]:
+        try:
+            resolved = resolver(order) or {}
+        except Exception as exc:
+            print(
+                f"[paper_settlement] GRADE_AUDIT_UNRESOLVED key={order.get('idempotency_key')}"
+                f" {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            continue
+        if resolved.get("unavailable_reason"):
+            continue
+
+        # The TRANSLATED view -- what the grader was actually handed. Printed
+        # beside the order's own side and line, because the whole question is
+        # whether that translation points the right way.
+        margin = resolved.get("current_value")
+        line_used = resolved.get("line")
+        rows += 1
+        # What the verdict WOULD be if the convention were inverted. Not a
+        # judgement, just the other reading, so the two sit side by side.
+        try:
+            inverted = "won" if float(margin) < float(line_used) else "lost"
+        except (TypeError, ValueError):
+            inverted = "?"
+        if str(order.get("outcome")) != inverted:
+            agree += 1
+        print(
+            f"[paper_settlement] GRADE_AUDIT market={order.get('market')}"
+            f" bet_side={order.get('side')!r} bet_line={order.get('line')}"
+            f" {order.get('away_team')}@{order.get('home_team')}"
+            f" margin_for_bet={margin} graded_against={line_used}"
+            f" our_verdict={order.get('outcome')} if_inverted={inverted}"
+            f" pnl={order.get('pnl_dollars')}",
+            flush=True,
+        )
+
+    print(
+        f"[paper_settlement] GRADE_AUDIT_SUMMARY date={normalized} audited={rows}"
+        f" of={len(orders)} -- CHECK ONE ROW BY HAND against the real final score:"
+        " margin_for_bet must be the bet team's score minus its opponent's,"
+        " and graded_against must be the NEGATED quoted line",
+        flush=True,
+    )
+    return {"status": "ok", "rows": rows, "candidates": len(orders)}
+
+
 def _default_resolver(selected_date: str):
     """One resolver per sport, dispatched by the order's own `sport`.
 
