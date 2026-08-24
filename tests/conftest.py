@@ -48,6 +48,91 @@ def _isolate_intelligence_state(tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_reports_root(tmp_path_factory, monkeypatch):
+    """Point the WHOLE reports tree at a scratch dir, for every test.
+
+    The two fixtures below this one, and the one above it, each patched a
+    single artifact after it was caught dirtying the working tree. That is
+    three rounds of the same fix, and the fourth was already queued: one run of
+    `tests/test_kalshi_odds_cadence.py` and `tests/test_execute_portfolio.py`
+    together left ELEVEN tracked files modified -- seven sport manifests, the
+    refresh state, the OddsAPI quota, a live-lens capture and the Kalshi
+    markets artifact. Patching each of those in turn would not have ended
+    either, because the list depends on test ORDER: the cadence file alone
+    dirties two of them, the pair dirties eleven, and pytest-randomly means the
+    set changes between runs.
+
+    Everything in that list resolves its path through ONE function --
+    `refresh_state_store.reports_root()` -- which already honours
+    `SYNDICATE_REPORTS_ROOT`. So the fix belongs at that seam rather than at
+    each of its callers, and a new artifact added next month is covered without
+    anyone remembering to add a fixture.
+
+    **Why the tree being clean is worth a suite-wide fixture.** These files are
+    TRACKED and must stay tracked -- the manifests and `intelligence_state`
+    are the worker->web artifact transport (`#43`), and `kalshi_markets.json`
+    is `execute_portfolio`'s price fallback. They cannot be gitignored. So the
+    alternative to isolating them is a working tree that is dirty after every
+    test run, in files that look machine-generated and plausible. `335dca07`
+    is what happens next: one `git add -A` swept exactly this class and
+    rewrote all eight sport manifests' `artifact_paths` to point at a local
+    checkout. Committing locally-computed values on top of production-shaped
+    data is not a cosmetic problem.
+
+    A test that genuinely needs the repo's committed reports sets
+    `SYNDICATE_REPORTS_ROOT` itself, or patches the path it cares about --
+    both take precedence over this default, which is why the many tests that
+    already do so are unaffected.
+    """
+    root = tmp_path_factory.mktemp("reports_root")
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(root))
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _isolate_kalshi_markets_artifact(tmp_path_factory):
+    """THE THIRD INSTANCE OF THE SAME DEFECT. See the two fixtures around it.
+
+    A full `pytest tests/` run rewrote the tracked
+    `reports/intelligence/kalshi_markets.json`, because
+    `run_kalshi_odds_refresh` resolves its path through `reports_root()` and
+    several tests reach it indirectly through `intelligence_state`'s loop
+    rather than calling it themselves. `tests/test_kalshi_odds_cadence.py`
+    isolates it correctly and was never the problem, which is exactly why a
+    per-file fix would not have worked.
+
+    **What the churn actually was, and why committing it would be worse than
+    noise.** This dev container cannot reach Kalshi -- every host 403s at the
+    proxy -- so the file came back as a set of `all_hosts_failed` records with
+    fresh timestamps. Committing that writes THIS SANDBOX's connectivity into
+    an artifact whose whole job is to describe what the VENUE is quoting in
+    production. It is not stale data; it is data about the wrong machine, in a
+    file nobody would re-read closely because it looks machine-generated and
+    correct.
+
+    Tracked, and must stay tracked: `execute_portfolio` reads it as the price
+    fallback when a live venue read fails, so it cannot be gitignored the way
+    a scratch byproduct could. `335dca07` is what happens when this class of
+    dirt meets a `git add -A` -- eight sport manifests rewritten to a local
+    checkout path. A clean tree after a test run is the thing that prevents it.
+
+    Tests that care about this path patch it themselves, which takes
+    precedence over this default.
+    """
+    from unittest.mock import patch as _patch
+
+    from pipeline import kalshi_odds_refresh
+
+    markets_dir = tmp_path_factory.mktemp("kalshi_markets")
+    with _patch.object(
+        kalshi_odds_refresh,
+        "markets_artifact_path",
+        return_value=markets_dir / "kalshi_markets.json",
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_prediction_ledger(tmp_path_factory):
     # The suite was writing this dev machine's REAL data/prediction_ledger.json.
     # intelligence.py:7706 calls record_prediction() on every query, and
