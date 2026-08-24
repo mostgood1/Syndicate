@@ -356,3 +356,93 @@ def test_discovery_failure_never_takes_down_the_refresh(monkeypatch):
     result = mod.ensure_series_discovered(force=True)
     assert result["status"] == "error"
     assert "network down" in result["reason"]
+
+
+# --------------------------------------------------------------------------
+# Hot series: the markets we have money in must not wait behind 150 we don't
+# --------------------------------------------------------------------------
+
+
+def test_a_series_with_an_open_order_is_hot(monkeypatch):
+    """MEASURED 2026-08-24: 155 series against a cap of 12 a tick is ~13 ticks
+    to sweep, so any quote can be ~26 minutes old. Harmless for a series nobody
+    trades; unacceptable for one with a resting order against it — and the old
+    queue ordered by AGE alone, so it could not tell them apart.
+
+    Derived from the LEDGER so it follows the money: no list to maintain, and a
+    series stops being hot when its order stops being open.
+    """
+    import pipeline.kalshi_odds_refresh as mod
+    import syndicate.features.shared.execution_ledger as ledger
+
+    monkeypatch.delenv("SYNDICATE_KALSHI_HOT_SERIES", raising=False)
+    monkeypatch.setattr(
+        ledger, "_load",
+        lambda: {"orders": [
+            {"status": "submitted", "venue_ticker": "KXMLBKS-26AUG242140MINATH-X"},
+        ]},
+    )
+    assert "KXMLBKS" in mod.hot_series()
+
+
+def test_a_settled_or_dead_order_is_not_hot(monkeypatch):
+    """A rejected order is not money at risk, and a graded one no longer cares
+    what the price is. Neither should hold a refresh slot."""
+    import pipeline.kalshi_odds_refresh as mod
+    import syndicate.features.shared.execution_ledger as ledger
+
+    monkeypatch.delenv("SYNDICATE_KALSHI_HOT_SERIES", raising=False)
+    monkeypatch.setattr(
+        ledger, "_load",
+        lambda: {"orders": [
+            {"status": "rejected", "venue_ticker": "KXMLBHR-26AUG242140MINATH-X"},
+            {"status": "failed", "venue_ticker": "KXMLBOUTS-26AUG242140MINATH-X"},
+            {"status": "filled", "outcome": "won",
+             "venue_ticker": "KXWNBAPTS-26AUG23LVTOR-X"},
+        ]},
+    )
+    assert mod.hot_series() == set()
+
+
+def test_an_unreadable_ledger_degrades_to_the_ordinary_schedule(monkeypatch):
+    """A hot list we cannot compute must not stop the refresh — the cold
+    schedule is a worse outcome than no refresh at all is."""
+    import pipeline.kalshi_odds_refresh as mod
+    import syndicate.features.shared.execution_ledger as ledger
+
+    monkeypatch.delenv("SYNDICATE_KALSHI_HOT_SERIES", raising=False)
+
+    def boom():
+        raise RuntimeError("keyvalue down")
+
+    monkeypatch.setattr(ledger, "_load", boom)
+    assert mod.hot_series() == set()
+
+
+def test_a_series_can_be_marked_hot_before_we_trade_it(monkeypatch):
+    """For a market we want watched closely before there is an order on it."""
+    import pipeline.kalshi_odds_refresh as mod
+    import syndicate.features.shared.execution_ledger as ledger
+
+    monkeypatch.setattr(ledger, "_load", lambda: {"orders": []})
+    monkeypatch.setenv("SYNDICATE_KALSHI_HOT_SERIES", "kxwnbapts, KXMLBKS")
+    assert mod.hot_series() == {"KXWNBAPTS", "KXMLBKS"}
+
+
+def test_the_hot_clock_is_shorter_than_the_cold_one(monkeypatch):
+    """The whole point: a series carrying money is not the same kind of thing
+    as one of the 142 game-line series we have never priced."""
+    import pipeline.kalshi_odds_refresh as mod
+
+    monkeypatch.delenv("SYNDICATE_KALSHI_HOT_REFRESH_SECONDS", raising=False)
+    assert mod.hot_refresh_interval_seconds() < mod.refresh_interval_seconds()
+
+
+def test_a_bad_hot_interval_falls_back_rather_than_disabling(monkeypatch):
+    """Zero would mean 'never', which is the opposite of what someone typing it
+    intends — the same trap `_int_env` has for the order caps."""
+    import pipeline.kalshi_odds_refresh as mod
+
+    for bad in ("0", "-5", "soon", ""):
+        monkeypatch.setenv("SYNDICATE_KALSHI_HOT_REFRESH_SECONDS", bad)
+        assert mod.hot_refresh_interval_seconds() == 30

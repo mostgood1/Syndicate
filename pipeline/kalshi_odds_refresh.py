@@ -196,6 +196,73 @@ def series_per_tick() -> int:
     return parsed if parsed > 0 else DEFAULT_SERIES_PER_TICK
 
 
+def hot_refresh_interval_seconds() -> int:
+    """How often a HOT series may be re-fetched. Much shorter than the rest.
+
+    A series carrying real money is not the same kind of thing as one of the
+    142 game-line series we have never priced, and giving them one clock is
+    what produced ~26-minute-old quotes on the only markets that mattered.
+    """
+    raw = (os.environ.get("SYNDICATE_KALSHI_HOT_REFRESH_SECONDS") or "").strip()
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        return 30
+    return parsed if parsed > 0 else 30
+
+
+def hot_series() -> set[str]:
+    """Series we have MONEY or a POSITION in, and must not price off a stale quote.
+
+    THE ECONOMY PROBLEM, measured 2026-08-24: 155 series against a cap of 12 a
+    tick means ~13 ticks to sweep, so any given quote can be ~26 minutes old.
+    That is harmless for a series nobody is trading and unacceptable for one
+    with a resting order against it -- and the old queue could not tell them
+    apart, because it ordered by AGE alone.
+
+    Derived from the LEDGER rather than configured, so it follows the money
+    automatically: a series stops being hot when its order stops being open,
+    with no list for anyone to update. `SYNDICATE_KALSHI_HOT_SERIES` adds to it
+    for a series we want watched before we have traded it.
+
+    Fails to the EMPTY SET, never to an exception: a hot list we cannot compute
+    must degrade to the ordinary schedule, not stop the refresh.
+    """
+    found: set[str] = set()
+
+    extra = (os.environ.get("SYNDICATE_KALSHI_HOT_SERIES") or "").strip()
+    for token in extra.replace(",", " ").split():
+        if token:
+            found.add(token.strip().upper())
+
+    try:
+        from syndicate.features.shared.execution_ledger import (
+            STATUS_FILLED,
+            STATUS_SUBMITTED,
+            _load,
+        )
+        from syndicate.features.shared.kalshi_client import series_from_ticker
+
+        for order in (_load().get("orders") or []):
+            # OPEN means the venue may still act on it, or we hold it and it is
+            # not yet graded. A rejected or failed order is not money at risk.
+            if str(order.get("status") or "") not in {STATUS_SUBMITTED, STATUS_FILLED}:
+                continue
+            if order.get("outcome"):
+                # Already graded -- the price no longer decides anything.
+                continue
+            series = series_from_ticker(order.get("venue_ticker"))
+            if series:
+                found.add(str(series).strip().upper())
+    except Exception as exc:
+        print(
+            f"[kalshi_odds] HOT_SERIES_UNAVAILABLE {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+    return found
+
+
 def _due_series(state: dict[str, Any], wanted: tuple[str, ...], interval: int) -> list[str]:
     """Which series have not been fetched within `interval`, oldest first.
 
@@ -352,6 +419,16 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
 
     wanted = sports_series()
     interval = refresh_interval_seconds()
+
+    # HOT FIRST, on their own shorter clock. Without this a series with a
+    # resting order waits behind up to 150 nobody is trading, because the queue
+    # ordered by age alone and could not tell the two apart.
+    hot = hot_series() & set(wanted)
+    hot_due = (
+        list(hot)
+        if force
+        else _due_series(state, tuple(sorted(hot)), hot_refresh_interval_seconds())
+    )
     due = wanted if force else _due_series(state, wanted, interval)
 
     # A failed series backs off on its OWN shorter clock. Without this a venue
@@ -361,7 +438,21 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         due = [s for s in due if not _backing_off(per_series.get(s) or {}, interval)]
 
     cap = series_per_tick()
-    fetching = due if force else due[:cap]
+    if force:
+        fetching = due
+    else:
+        # Hot series are fetched IN ADDITION to the cap, not out of it. They
+        # are few -- bounded by the per-day order cap -- and letting them
+        # consume the cold budget would starve discovery of exactly the markets
+        # we are not yet trading but might.
+        cold = [s for s in due if s not in set(hot_due)]
+        fetching = hot_due + cold[:cap]
+    if hot_due:
+        print(
+            f"[kalshi_odds] HOT_SERIES n={len(hot_due)} series={sorted(hot_due)[:8]}"
+            f" interval_s={hot_refresh_interval_seconds()}",
+            flush=True,
+        )
 
     fetched: dict[str, Any] = {}
     for series in fetching:
