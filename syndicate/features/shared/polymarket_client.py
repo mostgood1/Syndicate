@@ -77,9 +77,17 @@ _MARKETS_PATH = "/markets"
 # The fields this module reads off a Gamma `/markets` row. Named here so the
 # whole schema assumption is one object and `probe()` can diff it against what
 # actually arrives -- same discipline `kalshi_client._MARKET_FIELDS` uses, and
-# for the same reason: this list is RESEARCHED, not called, and the Kalshi
-# module's first live run got 10 of 17 field names wrong against material
-# written the identical way.
+# for the same reason: this list was originally RESEARCHED, not called, and
+# the Kalshi module's first live run got 10 of 17 field names wrong against
+# material written the identical way.
+#
+# VERIFIED against a live response 2026-08-24T17:24:49Z (refresh-worker boot
+# probe, `.syndicate/deploys.md` same date): 16 of 18 fields matched exactly.
+# The two that did not are fixed here -- `minimum_tick_size` was actually
+# `orderPriceMinTickSize`, `neg_risk` was actually `negRisk`. Every field this
+# module's `normalize_market`/`decode_outcomes` actually price off of
+# (`outcomes`, `outcomePrices`, `clobTokenIds`, `question`, `conditionId`,
+# `active`, `closed`, `volume`, `liquidity`, `endDate`) was already right.
 _MARKET_FIELDS = (
     "id",
     "conditionId",
@@ -97,8 +105,8 @@ _MARKET_FIELDS = (
     "archived",
     "endDate",
     "enableOrderBook",
-    "minimum_tick_size",
-    "neg_risk",
+    "orderPriceMinTickSize",
+    "negRisk",
 )
 
 
