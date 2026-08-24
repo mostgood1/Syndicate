@@ -25982,6 +25982,57 @@ today).
 
 ---
 
+### 2026-08-24 19:38:48Z — refresh-worker `d8fabc82` — Novig odds-refresh artifact FINALLY persists, two bugs deep
+
+**verify: `[novig_odds] REFRESHED date=2026-08-23 previous_date=None count=29469
+is_stale_by_days=1 status_filter=['active']` with NO `WRITE_FAILED` line
+following it**, refresh-worker `2w5fs`, `d8fabc82` (PR #37 + #39, contains
+`c9b0758262` which shipped PR #36 itself).
+
+The pipeline from PR #36 (`19:10:41Z` earlier tonight) never actually wrote
+`novig_markets.json` once, on its first two live cycles, for two SEPARATE
+reasons found back to back:
+
+1. **`Object of type Decimal is not JSON serializable`** (PR #37).
+   `normalize_market_row` deliberately returns `Decimal` for
+   `open_interest`/`daily_volume`; `write_json_file`'s plain `json.dumps`
+   choked on it. Fixed with a `_json_safe()` pass (Decimal -> str) right
+   before every write.
+2. **`9128668 bytes exceeds 8388608`** (PR #39), the VERY NEXT cycle after
+   fix #1 shipped. A full day's 29,469-row catalogue does not fit
+   `refresh_state_store`'s ~8MB keyvalue ceiling (`#60` in
+   `docs/ai_context/todo.md`). Fixed by trimming each persisted row to 8
+   fields (dropping the per-row `date`, 100% redundant with the snapshot's
+   own top-level one, and the OHLC intraday fields, which are not what this
+   pipeline exists to serve -- the closing line is). ~6.4MB for the same
+   real row count, ~2MB of headroom.
+
+**Both fixes verified in the SAME cycle, post-redeploy: REFRESHED with no
+WRITE_FAILED.** The artifact should now actually be on disk for the first
+time since the pipeline shipped -- next check should read
+`reports_root()/intelligence/novig_markets.json` directly to confirm, not
+just the absence of a failure line.
+
+**A structural finding for whoever picks up board-wiring next, Novig
+specifically: the public CSV mirror is genuinely ANONYMIZED at the game/
+player/team level.** `reportTicker`/`contractSeries` name a CATEGORY
+("NCAAF-SPREAD", "MLB-AL_CENTRAL_DIVISION_WINNER") never a specific game,
+team, player or line, and `marketId`/`outcomeId` are opaque UUIDs. There is
+no field in `markets.csv` or `trades.csv` this pipeline could use to join a
+row to a specific board bet -- unlike Kalshi's ticker or Polymarket's
+free-text question, both of which encode enough to build a join
+(`kalshi_board_join.py` already does; Polymarket's does not exist yet, per
+`polymarket_odds_refresh.py`'s own header). The credentialed REST tier
+(`GET /emm/markets/{marketId}`) DOES carry `description`/`league`/`eventId`
+and could support a join, but needs `NOVIG_CLIENT_ID`/`NOVIG_CLIENT_SECRET`
+-- founder-gated, "does not exist yet" per this lane's own
+`.syndicate/lanes.md` entry. So Novig's artifact is real and now actually
+persisting, but it can price a CATEGORY-level signal only, not a specific
+bet -- `_venue_price_resolver()` in `pipeline/portfolio_commit.py` cannot
+be extended for Novig with what is currently reachable.
+
+---
+
 ### 2026-08-24 19:29:14Z — Polymarket US credentials WORK, and the schema is confirmed
 
 **verify: `[live_odds_worker] POLYMARKET_US_AUTH ok=True
