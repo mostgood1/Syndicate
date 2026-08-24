@@ -356,3 +356,87 @@ def test_prop_candidates_reports_what_it_CANNOT_price():
     assert by_ticker["KXEPLGOALS"]["sport"] is None
     # Not a player prop at all -- never a candidate.
     assert "KXWNBATOTAL" not in by_ticker
+
+
+# --------------------------------------------------------------------------
+# Game-line titles -- the 302 that came back `unreadable_title`
+# --------------------------------------------------------------------------
+
+
+def test_the_game_line_titles_kalshi_actually_uses_parse():
+    """Every title here is COPIED VERBATIM from production, 2026-08-24T02:12Z.
+
+    The first build after game-line series were registered returned
+    `unreadable_title: 302` — the existing `_TEAM_SPREAD` was written against
+    "Will the X win by over N runs?" and Kalshi says "X wins by over N runs?".
+    Close enough to look handled, different enough to match nothing, which is
+    why the count was 302 rather than a partial number.
+    """
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    full = _parse_title("Texas wins by over 3.5 runs?")
+    assert full["stat_text"] == "spreads"
+    assert full["subject"] == "Texas"
+    assert full["line"] == 3.5
+
+    # The PERIOD suffix is the board's own (`spreads_1st_5_innings`), not a
+    # spelling invented here -- one only Kalshi's side understands joins to
+    # nothing.
+    f5 = _parse_title("Texas wins first 5 innings by over 2.5 runs?")
+    assert f5["stat_text"] == "spreads_1st_5_innings"
+
+    total = _parse_title("First 5 innings: Over 6.5 runs")
+    assert total["stat_text"] == "totals_1st_5_innings"
+    # A total names no team, so the game must come from the ticker.
+    assert total["subject"] is None
+
+    # A TEAM total is not the game total -- conflating them prices one side's
+    # runs as though they were both sides'.
+    team = _parse_title("Will Texas score over 7.5 runs?")
+    assert team["stat_text"] == "team_totals"
+    assert team["subject"] == "Texas"
+
+
+def test_a_period_the_board_cannot_key_is_refused_not_flattened():
+    """`9th inning: Over 1.5 runs` has no board key. Dropping the period and
+    calling it a game total would be a bet on a different thing entirely."""
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    assert _parse_title("9th inning: Over 1.5 runs") is None
+
+
+def test_the_tie_leg_is_refused():
+    """A draw is a THIRD outcome. The board carries no MLB first-innings
+    three-way, and reading it as either side of a two-way line would price the
+    wrong wager."""
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    assert _parse_title("first 5 innings tie") is None
+
+
+def test_a_spread_is_never_read_as_a_moneyline():
+    """`_MONEYLINE` is `<team> wins`, and every one of these contains "wins".
+    A spread read as a moneyline is a bet on a different outcome at a
+    confident price -- the ordering in `_parse_title` is what prevents it."""
+    from syndicate.features.shared.kalshi_catalogue import (
+        GRAMMAR_TEAM_SPREAD,
+        _parse_title,
+    )
+
+    for title in (
+        "Texas wins by over 3.5 runs?",
+        "Texas wins first 5 innings by over 2.5 runs?",
+    ):
+        assert _parse_title(title)["grammar"] == GRAMMAR_TEAM_SPREAD
+
+
+def test_a_futures_market_still_refuses():
+    """Division winners have no game date in the ticker and no game to join."""
+    from syndicate.features.shared.kalshi_catalogue import (
+        _parse_title,
+        game_date_from_ticker,
+    )
+
+    assert _parse_title("Will Texas be the 2026 AL West Division Winner") is None
+    # And the ticker cannot be dated either -- two independent refusals.
+    assert game_date_from_ticker("KXMLBALWEST-26-TEX") is None

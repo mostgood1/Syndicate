@@ -152,6 +152,64 @@ _TEAM_SPREAD = re.compile(
 # "Mexico wins" / "Yadong Song wins"
 _MONEYLINE = re.compile(r"^\s*(?P<team>.+?)\s+wins\s*\??\s*$", re.IGNORECASE)
 
+# --------------------------------------------------------------------------
+# THE GAME-LINE GRAMMARS KALSHI ACTUALLY USES, read from production titles
+# 2026-08-24T02:12Z. The three above were written against a different wording
+# and matched NONE of them -- 302 markets came back `unreadable_title` on the
+# first build after game-line series were registered.
+#
+#   KXMLBSPREAD       'Texas wins by over 3.5 runs?'
+#   KXMLBF5SPREAD     'Texas wins first 5 innings by over 2.5 runs?'
+#   KXMLBF5TOTAL      'First 5 innings: Over 6.5 runs'
+#   KXMLBTEAMTOTAL    'Will Texas score over 7.5 runs?'
+#   KXMLBINNINGTOTAL  '9th inning: Over 1.5 runs'
+#   KXMLBF5           'first 5 innings tie'
+#
+# `_TEAM_SPREAD` above wants "Will the X win by ..."; these say "X wins by ...".
+# Close enough to look handled and different enough to match nothing, which is
+# why the count was 302 and not a partial number.
+# --------------------------------------------------------------------------
+
+# The period phrase MLB uses, and the board's own suffix for it. Only the
+# prefixes OddsAPI actually carries (`_1st_5_innings` and friends) are here --
+# a 9th-inning total has no board key, so it must refuse rather than acquire a
+# spelling that joins to nothing.
+_INNINGS_PERIOD = {
+    "1": "1st_1_innings",
+    "3": "1st_3_innings",
+    "5": "1st_5_innings",
+    "7": "1st_7_innings",
+}
+
+# "Texas wins by over 3.5 runs?" / "Texas wins first 5 innings by over 2.5 runs?"
+_TEAM_SPREAD_WINS_BY = re.compile(
+    r"^\s*(?P<team>.+?)\s+wins\s+(?:first\s+(?P<innings>\d+)\s+innings\s+)?"
+    r"by\s+(?P<direction>over|under)\s+(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# "First 5 innings: Over 6.5 runs"  (a TOTAL -- names no team)
+_PERIOD_TOTAL = re.compile(
+    r"^\s*first\s+(?P<innings>\d+)\s+innings\s*:\s*(?P<direction>over|under)\s+"
+    r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# "Will Texas score over 7.5 runs?"  (a TEAM total -- names the team)
+_TEAM_SCORES = re.compile(
+    r"^\s*will\s+(?:the\s+)?(?P<team>.+?)\s+score\s+(?P<direction>over|under)\s+"
+    r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# "first 5 innings tie" -- the DRAW leg of a three-way. Recognised so it stops
+# counting as unreadable, and refused below: a draw is a third outcome and the
+# board carries no MLB first-innings three-way market to join it to. Reading it
+# as either side of a two-way line would be a bet on a different thing.
+_INNINGS_TIE = re.compile(
+    r"^\s*first\s+(?P<innings>\d+)\s+innings\s+tie\s*\??\s*$", re.IGNORECASE
+)
+
 
 # Ticker token -> sport. ORDER MATTERS AND IS THE WHOLE TRAP: "KXWNBAREB"
 # contains "NBA", so a naive scan registers every WNBA series as NBA and prices
@@ -527,6 +585,55 @@ def _parse_title(title: str) -> dict[str, Any] | None:
             "line": threshold_to_line(match.group("threshold")),
             "side": "over",
         }
+
+    # BEFORE `_TEAM_SPREAD` and `_MONEYLINE`. "Texas wins first 5 innings by
+    # over 2.5 runs?" contains "wins", and a looser pattern reading it as a
+    # moneyline would price the game winner as though it were a run line.
+    match = _TEAM_SPREAD_WINS_BY.match(title)
+    if match:
+        innings = match.group("innings")
+        period = _INNINGS_PERIOD.get(str(innings)) if innings else None
+        if innings and period is None:
+            # A period the board has no key for. Refused rather than flattened
+            # onto the full-game spread, which is a different wager.
+            return None
+        return {
+            "grammar": GRAMMAR_TEAM_SPREAD,
+            "subject": match.group("team").strip(),
+            "stat_text": f"spreads_{period}" if period else "spreads",
+            "line": float(match.group("line")),
+            "side": match.group("direction").strip().lower(),
+        }
+
+    match = _PERIOD_TOTAL.match(title)
+    if match:
+        period = _INNINGS_PERIOD.get(str(match.group("innings")))
+        if period is None:
+            return None
+        return {
+            "grammar": GRAMMAR_TEAM_TOTAL,
+            # Names no team -- the game comes from the ticker.
+            "subject": None,
+            "stat_text": f"totals_{period}",
+            "line": float(match.group("line")),
+            "side": match.group("direction").strip().lower(),
+        }
+
+    match = _TEAM_SCORES.match(title)
+    if match:
+        return {
+            "grammar": GRAMMAR_TEAM_SPREAD,
+            "subject": match.group("team").strip(),
+            # A TEAM total, not the game total -- a different market, and
+            # conflating them would price one side's runs as both sides'.
+            "stat_text": "team_totals",
+            "line": float(match.group("line")),
+            "side": match.group("direction").strip().lower(),
+        }
+
+    if _INNINGS_TIE.match(title):
+        # Readable and deliberately unpriceable -- see the pattern's comment.
+        return None
 
     match = _TEAM_SPREAD.match(title)
     if match:
