@@ -25979,3 +25979,41 @@ the expensive move.
 
 Claims force-released again (container restart lost the tokens; third time
 today).
+
+---
+
+### 2026-08-24 19:29:14Z — Polymarket US credentials WORK, and the schema is confirmed
+
+**verify: `[live_odds_worker] POLYMARKET_US_AUTH ok=True
+base=https://api.polymarket.us count=1`**, live-odds-worker instance `bz244`,
+`dc3655067`. Signed Ed25519 reads against `/v1/markets` succeed with the
+credentials the user set on this worker.
+
+**The real row schema, verbatim** — this is what a market join gets written
+from, and it settles several things that were assumptions this afternoon:
+
+    active, archived, category, closed, comboEnabled, createdAt, description,
+    endDate, ep3Status, ep3SyncedAt, feeCoefficient, gameStartTime, hidden, id,
+    manualActivation, marketSides, marketType, minimumTradeQty,
+    orderPriceMinTickSize, outcomePrices, outcomes, question, slug,
+    sportsMarketType, sportsMarketTypeV2, startDate, status, tags, updatedAt
+
+- **`minimumTradeQty` and `orderPriceMinTickSize` are both present.** These are
+  the two `order_body` REQUIRES and refuses without, on the documentation's own
+  instruction not to infer them. Confirmed rather than hoped.
+- **`feeCoefficient` is published per market.** Kalshi's fees were modelled as
+  zero until today and cost ~1.9% on the first real fill. Here the coefficient
+  is available before the order, so fees can be in the sizing from the start
+  rather than retrofitted after a surprise.
+- **`sportsMarketType` AND `sportsMarketTypeV2`** both exist. Two of them, so
+  the join must pick one deliberately rather than whichever it sees first.
+- **`gameId` and `line` are NOT in this row**, though the docs list them as
+  sports fields. The probe did not filter `categories=sports` and `count=1`, so
+  this may simply be a non-sports market. **NOT ESTABLISHED either way** — a
+  filtered probe settles it, and the join design depends on the answer.
+
+**NOT verified:** anything on the write path. No order has been built or sent,
+`_venue_submitter` is not wired, and `probe_auth` is read-only by construction.
+
+Claim force-released (fourth time today — the token does not survive a
+container restart of the holding session).
