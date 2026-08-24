@@ -105,6 +105,22 @@ def _looks_like_tricode(value: str) -> bool:
     return 2 <= len(value) <= 4 and value.isalpha()
 
 
+def _unmappable(*names: Any) -> set[str]:
+    """Only the side(s) the map could not resolve.
+
+    The first version printed the whole pair -- `Minnesota Lynx@Portland Fire` --
+    which names one team that maps fine and one that does not, and reads as
+    though both are the problem. I misread my own output that way on the first
+    production run. The fix list should contain what actually needs fixing.
+    """
+    out = set()
+    for name in names:
+        text = str(name or "").strip()
+        if text and not _looks_like_tricode(_canonical_wnba_tri(text)):
+            out.add(text)
+    return out
+
+
 # The intervals a book actually prices, per `period_lines._PERIODS`.
 INTERVAL_SEGMENTS = ("q1", "q2", "q3", "q4", "h1", "h2")
 # Markets that carry a LINE worth projecting against. Moneyline has no number.
@@ -160,7 +176,7 @@ def _state_coverage(root: Path, league: str, day: str) -> dict[str, Any]:
         if key:
             keys.add(key)
         else:
-            unmapped.add(f"{value.get('away_tri')}@{value.get('home_tri')}")
+            unmapped.update(_unmappable(value.get("home_tri"), value.get("away_tri")))
     return {"games": usable, "events": keys, "unmapped": unmapped}
 
 
@@ -224,7 +240,7 @@ def _quote_coverage(day: str) -> dict[str, Any]:
             # **NAMED, NOT DROPPED.** An unmappable team is how a real overlap
             # becomes a silent zero -- Toronto and Portland are 2026 expansion
             # sides and are absent from the canonical map's full-name entries.
-            unmapped.add(f"{row.get('away_team')}@{row.get('home_team')}")
+            unmapped.update(_unmappable(row.get("home_team"), row.get("away_team")))
         book = str(row.get("bookmaker") or "").strip()
         if book:
             books.add(book)

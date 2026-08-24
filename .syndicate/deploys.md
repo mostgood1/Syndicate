@@ -25591,3 +25591,56 @@ say JOINABLE on more than that however the key behaves. What it CAN settle is
 whether those two dates join at all, and what the unmapped team names are. A
 market result resting on 2 dates is not a backtest and will not be reported as
 one.
+
+### verify for `dep-da65odjbc2fs73b14agg` — 15:03:51Z — **JOINABLE on ONE date**
+
+    FAMILY state(momentum_events)  dates=11 window=2026-08-12..2026-08-23
+    FAMILY bridge(live_momentum)   dates=2  window=2026-08-22..2026-08-23
+    FAMILY quotes(book_quotes)     dates=13 window=2026-08-12..2026-08-24
+    USABLE_DATES n=1 window=2026-08-23..2026-08-23 dates=['2026-08-23']
+    VERDICT JOINABLE on 1 date(s)                                    exit=0
+
+**THE MATCHUP KEY WAS THE BUG, CONFIRMED.** `event_overlap` went from **0 on all
+fourteen dates** to **21 games across eleven dates**. The zero was two id spaces,
+not two slates without games in common.
+
+**AND THE RESULT IS THE MLB TRAP, EXACTLY.** `CLAUDE.md` records four MLB
+families whose windows looked like months and intersected on ONE usable date.
+Three basketball families, 11 / 2 / 13 dates, intersecting on **one**:
+`2026-08-23`. The probe exists because I would otherwise have built the join,
+run it, and reported a market result computed on a single date.
+
+**The binding constraint is the clock bridge and nothing else.** Quotes are
+plentiful (6,301 interval rows and 45 capture instants per event on 08-23) and
+state covers 11 dates. `live_momentum_<date>.jsonl` covers 2, and one of those
+(08-22) has `state_games=0` — the cumulative events artifact was never written
+for it, since the two-artifact split shipped on the 23rd.
+
+So the usable set is one date, and **two cheap things could move it**:
+  - backfill `momentum_events_2026-08-22.json` → 08-22 becomes usable → 2 dates;
+  - if ESPN plays carry a wall clock, the bridge can be REBUILT for all 11 state
+    dates. `PLAY_FIELDS` (committed, not yet deployed) answers that on the next
+    live slate. It has not fired: today reads `pre=2`, nothing has tipped.
+
+### UNMAPPED delivered, on its first run
+
+    UNMAPPED 2026-08-12 ['Toronto Tempo@Dallas Wings', 'Minnesota Lynx@Portland Fire']
+    UNMAPPED 2026-08-23 ['Las Vegas Aces@Toronto Tempo', 'Washington Mystics@Portland Fire']
+
+**Toronto Tempo and Portland Fire, on 7 of 13 dates** — the 2026 expansion
+sides, absent from `_canonical_wnba_tri`, their games dropping out of the join
+while reading as "no quotes for that game". Now mapped to TOR/POR from the
+reading rather than from a guess about their names.
+
+On `2026-08-23` specifically that is not cosmetic: the one usable date has
+`state_games=2 quote_events=2 event_overlap=1` **plus two unmapped pairs**, so
+the fix should raise the games available on the only date the join has.
+
+**A CAVEAT NOT TO LOSE:** interval quote volume steps ~5x at **2026-08-20**
+(~850–1550 rows and 8–14 instants/event before, ~4500–6300 and 30–52 after).
+Dates on either side of that are not equivalent and must not be pooled without
+finding out what changed.
+
+verify: **CLEAR** — the probe answered its question and the answer is "one
+date". A market result on one date is not a backtest and will not be reported
+as one.
