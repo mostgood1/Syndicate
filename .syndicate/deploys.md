@@ -26495,3 +26495,62 @@ Polymarket — the venue label on someone else's prices. Any historical
 **DO NOT TRANSACT YET.** Two things must land first: a board carrying the
 sports these venues quote, and a real Polymarket price resolver.
 
+
+---
+
+### 2026-08-24 21:52Z — WHY THE BOARD WENT SOCCER-ONLY: the MLB sim is starved by `intelligence_pipeline_busy`
+
+Traced backward through the pipeline rather than from the board. The first
+stage that is actually zero is NOT the odds.
+
+**Odds are fine. Predictions are fine.**
+
+```
+[home] MLB_GAME_MARKET_ROWS_DIAG game_pk=823097 has_markets_ml=True
+       has_markets_totals=True has_predictions_full=True home_win_prob=0.402
+CONTAINER_MEMORY {"sport":"mlb","game_count":10,"stage":"board_contract_end"}
+```
+
+Ten MLB games on the board contract, with moneyline AND totals markets and
+full predictions. So OddsAPI coverage is not the gap, and neither is the
+sweep — `SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,soccer` keeps MLB every tick.
+
+**The zero is recommendation rows:** `MLB_GAMES_STAGE_MS games=10 ...
+per_game_reco_rows=0`.
+
+**And the cause is the sim never getting a slot:**
+
+```
+MLB_SIM_TICK mlbDailySim={"launched": false, "reason": "intelligence_pipeline_busy"}
+  21:42:43, 21:43:18, 21:44:55, 21:52:14 ...
+MLB_SIM_TICK mlbDailySim={"ok": true, "pid": 116, "reason": "fingerprint_change",
+  "command": [... --date 2026-08-24 --sims 1000 --workers 2
+              --only-game-pks 823097,823828,824235,824557,824964]}   21:50:26
+```
+
+Blocked on nearly every tick. The one launch in that window was PARTIAL —
+`--only-game-pks` names 5 of the 10 games — and by 21:52:14 `process_count=2`,
+so pid 116 was already gone.
+
+**The chain, end to end:** MLB sim starved → no recommendations →
+`per_game_reco_rows=0` → the 235 portfolio rows are soccer-only (soccer's
+pipeline is separate and does run) → `VENUE_SCOPE scoped=0` for all four
+venues → nothing to execute.
+
+**So the venue work is not the blocker and neither is Polymarket.** Kalshi's
+join is built, Polymarket's catalogue is fully reachable; both are matching
+against a board that has no US-sport rows to match.
+
+**NOT ESTABLISHED, deliberately:** why `intelligence_pipeline_busy` is
+near-permanent, and whether the 21:50 partial run completed. Also worth
+weighing: ~10 deploys across parallel sessions today, and CLAUDE.md's standing
+warning that deploying kills an in-flight MLB sim. That is a plausible
+contributor and I have NOT measured it.
+
+**Method note:** the first two attempts to prove "no MLB odds refresh ran"
+used a Render log text filter that silently matched nothing — the POSITIVE
+CONTROL (searching for a command I had already seen in the same window) also
+returned zero, which is the only reason the false negative was caught. That
+filter appears to OR tokens rather than match substrings. Do not read a zero
+from it without a control.
+
