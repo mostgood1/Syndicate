@@ -58,6 +58,8 @@ from typing import Any
 __all__ = [
     "contracts_for_stake",
     "order_body",
+    "order_body_v2",
+    "build_order_body",
     "submit_order",
     "kalshi_submitter",
     "OrderBuildError",
@@ -195,7 +197,88 @@ def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str,
 # Kept overridable because the replacement path is not yet known here: the docs
 # host is blocked from this environment, and inventing a route would repeat the
 # mistake this comment records. One env var moves it, no deploy.
-_DEFAULT_ORDER_PATH = "/portfolio/orders"
+_DEFAULT_ORDER_PATH = "/portfolio/events/orders"
+
+
+# The v2 order body, from the contract the owner supplied 2026-08-24. Every
+# field below appears in that sample; nothing here is inferred from a
+# neighbouring endpoint, which is what produced the 410 and the price-unit
+# guess before it.
+#
+#   POST /trade-api/v2/portfolio/events/orders
+#   {"ticker": "...", "client_order_id": "...", "side": "bid",
+#    "count": "10.00", "price": "0.5600",
+#    "time_in_force": "good_till_canceled",
+#    "self_trade_prevention_type": "taker_at_cross",
+#    "post_only": false, "cancel_order_on_pause": false,
+#    "reduce_only": false, "subaccount": 0, "exchange_index": 0}
+#
+# STRINGS, not numbers. `count` and `price` are quoted decimals in the sample,
+# and a JSON number where a string is expected is a rejection whose message
+# will not say which field it meant.
+_V2_TIME_IN_FORCE = "good_till_canceled"
+_V2_SELF_TRADE_PREVENTION = "taker_at_cross"
+
+
+def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
+    """The body `POST /portfolio/events/orders` takes. PURE -- no clock, no net.
+
+    `side` is the one field this cannot derive. The sample shows `"bid"` and
+    nothing in it distinguishes buying YES from buying NO -- there is no yes/no
+    field in the contract as supplied. Those are opposite bets, so the NO side
+    REFUSES by name rather than being sent as a bid and hoped about: an
+    inverted side is a real position on the outcome we did not choose, at a
+    price that looks deliberate.
+    """
+    ticker = str(getattr(request, "venue_ticker", "") or "").strip()
+    if not ticker:
+        raise OrderBuildError("no_venue_ticker")
+
+    if price_dollars is None:
+        raise OrderBuildError("no_price_dollars")
+    price = float(price_dollars)
+    if price <= 0 or price >= 1:
+        raise OrderBuildError(f"price_out_of_range: {price}")
+
+    contract_side = _side_to_kalshi(getattr(request, "side", None))
+    if contract_side != "yes":
+        # See the docstring. Buying NO has no expression in the supplied
+        # contract, and guessing one is a bet on the opposite outcome.
+        raise OrderBuildError(f"v2_no_side_unmapped: {contract_side}")
+
+    count = contracts_for_stake(
+        float(getattr(request, "requested_stake_dollars", 0.0) or 0.0), price
+    )
+
+    from syndicate.features.shared.execution_ledger import idempotency_key
+
+    return {
+        "ticker": ticker,
+        "client_order_id": idempotency_key(request),
+        "side": "bid",
+        # Quoted decimals, matching the sample exactly.
+        "count": f"{count:.2f}",
+        "price": f"{price:.4f}",
+        "time_in_force": _V2_TIME_IN_FORCE,
+        "self_trade_prevention_type": _V2_SELF_TRADE_PREVENTION,
+        "post_only": False,
+        "cancel_order_on_pause": False,
+        "reduce_only": False,
+        "subaccount": 0,
+        "exchange_index": 0,
+    }
+
+
+def build_order_body(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
+    """Whichever contract is selected. v2 by default -- v1 is confirmed dead.
+
+    `KALSHI_ORDER_CONTRACT=v1` restores the old body for the old route, kept
+    only so a rollback is possible without a deploy.
+    """
+    contract = (os.environ.get("KALSHI_ORDER_CONTRACT") or "v2").strip().lower()
+    if contract == "v1":
+        return order_body(request, price_dollars=price_dollars)
+    return order_body_v2(request, price_dollars=price_dollars)
 
 
 def _orders_url() -> str:
@@ -222,7 +305,7 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
     """
     from syndicate.features.shared.kalshi_auth import signed_request
 
-    body = order_body(request, price_dollars=price_dollars)
+    body = build_order_body(request, price_dollars=price_dollars)
     url = _orders_url()
     # THE REQUEST, BEFORE THE RESPONSE. If Kalshi rejects the body, the error
     # alone cannot say which field it disliked -- and this is the one call in
@@ -232,8 +315,8 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         f"[kalshi_orders] SUBMIT url={url}"
         f" ticker={body.get('ticker')} side={body.get('side')}"
         f" count={body.get('count')}"
-        f" price_fields={[k for k in body if k.endswith('_price') or k.endswith('_price_dollars')]}"
-        f" price_value={[v for k, v in body.items() if k.endswith('_price') or k.endswith('_price_dollars')]}",
+        f" price={body.get('price') or [v for k, v in body.items() if 'price' in k]}"
+        f" tif={body.get('time_in_force')}",
         flush=True,
     )
     response = signed_request("POST", url, body=body)
@@ -243,15 +326,19 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
     # response where the response says so, and from the request only where it
     # does not -- a partial fill recorded as a full one is a position size we
     # believe and do not hold.
+    # `count` is a QUOTED DECIMAL in the v2 body ("8.00"), so `int()` on it
+    # raises -- which would turn a successful submit into a `failed` record
+    # after the money had already moved, the worst possible place to throw.
+    requested = int(float(body["count"]))
     filled = order.get("filled_count")
-    contracts = int(filled) if filled is not None else int(body["count"])
+    contracts = int(float(filled)) if filled is not None else requested
     return {
         "status": str(order.get("status") or "filled"),
         "venue_order_id": order.get("order_id") or order.get("id"),
         "fill_price": price_dollars,
         "fill_stake_dollars": round(contracts * float(price_dollars or 0.0), 2),
         "contracts": contracts,
-        "requested_contracts": int(body["count"]),
+        "requested_contracts": requested,
     }
 
 

@@ -258,12 +258,85 @@ def test_an_absolute_url_override_wins_outright(monkeypatch):
     assert mod._orders_url() == "https://api.elections.kalshi.com/trade-api/v2/orders"
 
 
-def test_the_default_is_unchanged(monkeypatch):
-    """Not silently repointed at a guessed route. The replacement is unknown
-    here — the docs host is blocked from this environment — and inventing one
-    would repeat exactly the mistake the 410 just exposed."""
+def test_the_default_route_is_the_supplied_one_not_a_guess(monkeypatch):
+    """Written when the replacement was unknown and the default had to stay on
+    the dead route rather than a guessed one. The owner then supplied the real
+    contract, so the default is now `/portfolio/events/orders` — read off a
+    sample, still not inferred."""
     from syndicate.features.shared import kalshi_orders as mod
 
     for key in ("KALSHI_ORDER_URL", "KALSHI_ORDER_PATH", "KALSHI_API_BASE"):
         monkeypatch.delenv(key, raising=False)
-    assert mod._orders_url().endswith("/trade-api/v2/portfolio/orders")
+    assert mod._orders_url().endswith("/trade-api/v2/portfolio/events/orders")
+
+
+# --------------------------------------------------------------------------
+# The v2 order contract, from the sample the owner supplied 2026-08-24
+# --------------------------------------------------------------------------
+
+
+def test_the_v2_body_matches_the_supplied_contract(monkeypatch):
+    """Field-for-field against the sample, because every previous order-shape
+    belief in this module was inferred from a neighbouring endpoint and every
+    one of them was wrong."""
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    body = build_order_body(_req(), price_dollars=0.56)
+
+    assert body["side"] == "bid"
+    # QUOTED DECIMALS. A JSON number where a string is expected is a rejection
+    # whose message will not say which field it meant.
+    assert body["price"] == "0.5600"
+    assert isinstance(body["count"], str) and body["count"].endswith(".00")
+    assert body["time_in_force"] == "good_till_canceled"
+    assert body["self_trade_prevention_type"] == "taker_at_cross"
+    assert body["post_only"] is False
+    assert body["reduce_only"] is False
+    assert body["subaccount"] == 0
+    assert body["exchange_index"] == 0
+    # The v1 fields are GONE, not merely unused — sending them alongside the
+    # new ones is how a request gets rejected for a reason nobody can read.
+    for dead in ("action", "type", "yes_price", "no_price", "yes_price_dollars"):
+        assert dead not in body
+
+
+def test_the_no_side_refuses_rather_than_guessing_bid(monkeypatch):
+    """THE SAFETY PROPERTY. The supplied contract shows `"side": "bid"` and
+    carries no yes/no field, so buying NO has no expression we can point to.
+    Sending it as a bid anyway would be a real position on the opposite
+    outcome, at a price that looks deliberate."""
+    from syndicate.features.shared.kalshi_orders import OrderBuildError, build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    with pytest.raises(OrderBuildError) as excinfo:
+        build_order_body(_req(side="under"), price_dollars=0.56)
+    assert "v2_no_side_unmapped" in str(excinfo.value)
+
+
+def test_v2_is_the_default_because_v1_is_confirmed_dead(monkeypatch):
+    """v1 returns http_410 `deprecated_v1_order_endpoint`. Defaulting to it
+    would be defaulting to a guaranteed failure."""
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    assert build_order_body(_req(), price_dollars=0.56)["side"] == "bid"
+
+
+def test_v1_remains_reachable_for_rollback(monkeypatch):
+    """Kept only so a rollback needs no deploy."""
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.setenv("KALSHI_ORDER_CONTRACT", "v1")
+    monkeypatch.delenv("KALSHI_ORDER_PRICE_UNIT", raising=False)
+    body = build_order_body(_req(), price_dollars=0.56)
+    assert body["side"] == "yes"
+    assert body["yes_price_dollars"] == 0.56
+
+
+def test_the_default_route_is_the_v2_one(monkeypatch):
+    from syndicate.features.shared import kalshi_orders as mod
+
+    for key in ("KALSHI_ORDER_URL", "KALSHI_ORDER_PATH", "KALSHI_API_BASE"):
+        monkeypatch.delenv(key, raising=False)
+    assert mod._orders_url().endswith("/trade-api/v2/portfolio/events/orders")
