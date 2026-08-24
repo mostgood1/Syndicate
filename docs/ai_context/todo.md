@@ -258,6 +258,31 @@ fixtures in the board's window sit in week 2 and get no chip.
 differently, and 78 cards now resolve only via its canonical key. But it was
 never going to touch the 222, because those fixtures have no chip to join to.
 
+**CONFIRMED IN PRODUCTION 2026-08-24T20:36:39Z** — the enriched line
+piggybacked another session's deploy (`8b7c5f87`, live 20:29:32Z), no deploy of
+its own:
+
+```
+CHIP_JOIN_COVERAGE sport=soccer chips=96
+  chip_dates=['2026-08-22','2026-08-23','2026-08-24',...,'2026-08-29']
+  cards=342 by_matchup=7 by_canonical=57 no_chip_available=251 unknown_no_key=27
+```
+
+`chip_dates` still opens on **08-22 and 08-23**, the played matchday — the phase
+offset, in production, exactly as measured locally. Only **64 of 342** cards
+(19%) resolve a chip at all.
+
+And the offset is WORSENING WITHIN THE DAY, which the two readings show and
+neither alone could: `by_matchup` fell **94 -> 7** between 15:34Z and 20:36Z.
+Those 94 were the played matchday's fixtures still inside the board's window at
+midday; by evening the board has rolled forward and they are gone. So the
+board's chip coverage decays as the week moves away from the resolved matchday
+and is worst exactly when the next slate is what people are betting.
+
+`unknown_no_key` rose **6 -> 27**: a separate and much smaller alias-map
+population (`Feyenoord` -> artifacts say "Feyenoord Rotterdam"), fixable the way
+`#540` was, and NOT the main cause.
+
 **THE FIX (not yet made, and it has a cost worth deciding on):** the provider
 must cover the board's HORIZON, not the current matchday — `week` AND `week+1`
 at minimum. That doubles `build_cards_page_context` calls (10 -> 20) and
