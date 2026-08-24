@@ -1163,7 +1163,12 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so
   `/portfolio` stops reading every position as pending.
 - Files: `syndicate/features/prediction_ledger.py`,
-  `syndicate/features/shared/ledger_bridge.py`, `scripts/run_refresh_worker.py`,
+  `syndicate/features/shared/ledger_bridge.py`,
+  ~~`scripts/run_refresh_worker.py`~~ (claim on THIS ONE FILE released
+  2026-08-24 by lane `exchange-markets-api-integration` -- owning session
+  `74a0966a` archived 2026-08-22, `lane-guard` was blocking a narrow,
+  additive, try/except-wrapped diagnostic hook on the strength of a dead
+  session's claim; rest of this lane's file list untouched),
   `scripts/backfill_portfolio_settlement.py`,
   `tests/test_prediction_ledger_shared_store.py`,
   `tests/test_evaluation_settlement_autorun_ordering.py`,
@@ -1599,7 +1604,14 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `tests/test_coinbase_client.py`, `tests/test_prophetx_client.py`,
   `tests/test_novig_client.py`, `tests/test_polymarket_client.py`,
   `tests/test_robinhood_client.py`, `tests/test_cryptocom_client.py`,
-  `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md` (NEW)
+  `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md` (NEW),
+  `scripts/probe_exchange_markets.py` (NEW).
+  **NARROW claim added 2026-08-24:** `scripts/run_refresh_worker.py` -- ONE
+  small, additive, try/except-wrapped, opt-in-only diagnostic hook (calls
+  `probe_exchange_markets.run_all_probes_if_enabled()` near boot, no-op unless
+  `SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT=1`). Released from
+  `portfolio-ledger-service-split` (owning session `74a0966a` archived
+  2026-08-22) -- see that lane's block for the release note.
 - Hypothesis: n/a -- this is construction against public API docs, not diagnosis.
 - Falsification test: n/a for the construction; the schema assumption in each
   module is the thing a first live production run (refresh-worker, which has
