@@ -26717,3 +26717,55 @@ this load rises through the week toward the matchday.
 pass at all. That is the actual question for whoever fixes it — the answer is
 probably a cache keyed on mtime, since the shards only change when a refresh
 unit writes one.
+
+
+---
+
+### 2026-08-24 — the odds-history caching fix: NOT taken, and my own cost claim was WRONG
+
+Checked `lanes.md` and then measured. Two independent reasons not to do it, and
+the second refutes something I said earlier in this session.
+
+**1. It is not free.** `syndicate/features/intelligence.py` and
+`odds_control_plane.py` are unclaimed, so the edit itself would be legal — but
+the OPEN lane `layer2-sim-view-and-live-projection` lists
+`pipeline/intelligence_state.py` and `scripts/refresh_odds_sources.py` in its
+`Files:`, and its own stated current question is **"the ODDS FETCH."** That is
+the same subsystem. Claims were retired in the 2026-08-18 orphan sweep so
+nothing would block me mechanically; the lane protocol still says surface it
+rather than edit across it.
+
+Also: `load_odds_history_payload_for_sport` ALREADY takes a `cache` parameter
+(`odds_control_plane.py:148`) and `intelligence.py:2998` simply does not pass
+one. So the "fix" looks like a one-liner — but the safe version is an
+intra-build cache, and there is no intra-build duplication to remove (each
+shard is read once per build). The version that would matter is a CROSS-build
+cache with mtime invalidation, in a loader whose own docstring documents a
+2026-08-04 incident where a stale copy shadowed a fresh one and every MLB
+candidate silently got `history_points=0`. That is the exact failure a
+careless mtime cache reintroduces.
+
+**2. IT WOULD NOT HELP, AND MY EARLIER CLAIM WAS WRONG.** I wrote that
+re-reading ~8.3MB every ~73s was "the cost" holding the guard. The trace
+timestamps are nanosecond-precision and say otherwise:
+
+```
+21:53:33.109754887  2026-08-26    120,337 B
+21:53:33.114291438  2026-08-27    194,665 B   +4.5 ms
+21:53:33.125552243  2026-08-28    742,052 B  +11.3 ms
+21:53:33.183592197  2026-08-29  4,797,451 B  +58.0 ms
+21:53:33.200727575  2026-08-30  1,466,836 B  +17.1 ms
+```
+
+**All five shards: 91 ms. The 4.8MB one: 58 ms. Against a 73,000 ms cycle —
+0.12%.** Reading and parsing 4.8MB of JSON is simply fast. Caching it would
+save 91ms out of 73 seconds and change nothing about the starvation.
+
+I inferred "big file, read often, therefore expensive" from size and cadence
+without timing it. The data to refute that was in the same log lines I had
+already quoted.
+
+**SO THE REAL QUESTION IS STILL OPEN:** what holds `_execution_guard` for the
+other ~99.9% of the cycle. That needs a profile of the board build, not another
+guess from artifact sizes. Nothing was changed.
+
