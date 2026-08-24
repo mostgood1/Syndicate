@@ -129,6 +129,59 @@ def test_a_real_markets_row_carries_decimal_fields_and_the_write_still_lands(mon
     # parses via `Decimal(str(...))` rather than `float()` in the first place.
     assert stored_market["open_interest"] == "9.25"
     assert stored_market["daily_volume"] == "420.73"
+    # The OHLC intraday fields and the per-row `date` (redundant with the
+    # snapshot's own top-level `date`) are NOT persisted -- see
+    # `_trimmed_for_storage`'s docstring-comment for why.
+    assert "open_probability" not in stored_market
+    assert "high_probability" not in stored_market
+    assert "low_probability" not in stored_market
+    assert "date" not in stored_market
+
+
+def test_a_full_catalogue_fits_under_the_keyvalue_store_size_ceiling(monkeypatch):
+    """Measured 2026-08-24, the very next production cycle after the Decimal
+    fix above: a real full day's catalogue (29,469 rows, un-trimmed) came in
+    at 9,128,668 bytes -- over `refresh_state_store`'s ~8MB ceiling (#60 in
+    docs/ai_context/todo.md), so the fix above just traded one WRITE_FAILED
+    for another. This proves the trim actually buys enough headroom: a
+    synthetic catalogue built at the SAME row count and field richness as the
+    real one that failed must serialize under the ceiling after the fix.
+    """
+    import json
+
+    row_template = {
+        "market_id": "019fddfe-aaaa-bbbb-cccc-0123456789ab",
+        "report_ticker": "NCAAF-SPREAD",
+        "open_interest": "12.50",
+        "daily_volume": "420.73",
+        "open_probability": 0.505,
+        "high_probability": 0.55,
+        "low_probability": 0.49,
+        "close_probability": 0.512,
+        "close_american": -108,
+        "status": "active",
+        "traded_today": True,
+        "date": "2026-08-23",
+    }
+    snapshot = _snapshot(date="2026-08-23", count=1)
+    snapshot["markets"] = [dict(row_template) for _ in range(29469)]
+    snapshot["count"] = len(snapshot["markets"])
+    _stub(monkeypatch, snapshot)
+
+    result = mod.run_novig_odds_refresh()
+    assert result["status"] == "ok"
+
+    path = mod.markets_artifact_path()
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    state = read_json_file(path)
+    # Persisted at all -- the size-ceiling failure, like the Decimal one
+    # above, presented as a silent drop (WRITE_FAILED logged, no raise).
+    assert state is not None
+    assert len(state["snapshot"]["markets"]) == 29469
+
+    serialized = json.dumps(mod._json_safe(state), separators=(",", ":"))
+    assert len(serialized.encode("utf-8")) < 8 * 1024 * 1024
 
 
 def test_a_second_call_within_the_interval_is_cached_and_does_not_call_the_client(monkeypatch):

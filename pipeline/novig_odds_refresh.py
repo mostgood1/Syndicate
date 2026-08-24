@@ -83,6 +83,37 @@ def markets_artifact_path():
     return reports_root() / "intelligence" / "novig_markets.json"
 
 
+# The fields a board join actually needs from a CLOSING LINE -- deliberately
+# NOT every field `normalize_market_row` produces. Measured 2026-08-24, the
+# very next cycle after the Decimal fix above: a full day's ~29,469-row
+# catalogue serialized to 9,128,668 bytes, over `refresh_state_store`'s
+# ~8MB keyvalue ceiling (#60 in docs/ai_context/todo.md -- "shrink the
+# payload... rather than raising the ceiling", enforced exactly because three
+# prior outages were each an unbounded payload in different clothes). This is
+# the shrink: `date` is dropped because it is 100% redundant with the
+# snapshot's own top-level `date` (every row in one day's markets.csv shares
+# it); `open_probability`/`high_probability`/`low_probability` are dropped
+# because they are the day's INTRADAY movement, and this module's whole
+# purpose (see file header) is the CLOSING line, not a trade history --
+# `fetch_latest_markets_snapshot()` still returns the full OHLC row directly
+# to any caller that wants it, this trim applies ONLY to what gets persisted
+# to (and returned alongside) the shared artifact.
+_MARKET_ROW_KEYS_TO_PERSIST = (
+    "market_id",
+    "report_ticker",
+    "open_interest",
+    "daily_volume",
+    "close_probability",
+    "close_american",
+    "status",
+    "traded_today",
+)
+
+
+def _trimmed_for_storage(market: dict[str, Any]) -> dict[str, Any]:
+    return {key: market.get(key) for key in _MARKET_ROW_KEYS_TO_PERSIST}
+
+
 def _json_safe(value: Any) -> Any:
     """Recursively replace `Decimal` with its exact string form so
     `write_json_file`'s plain `json.dumps` can serialize it.
@@ -205,6 +236,11 @@ def run_novig_odds_refresh(*, force: bool = False) -> dict[str, Any]:
             print(f"[novig_odds] WRITE_FAILED error={exc}", flush=True)
         return {"status": "cached", "snapshot": state.get("snapshot")}
 
+    # Trim BEFORE persisting -- see `_trimmed_for_storage`'s docstring-comment
+    # above. `result["markets"]` (the return value) is reassigned to the same
+    # trimmed rows so the artifact and the direct caller see one consistent
+    # shape, not a richer in-memory result than what actually got stored.
+    result["markets"] = [_trimmed_for_storage(m) for m in (result.get("markets") or [])]
     state["snapshot"] = result
     try:
         write_json_file(path, _json_safe(state))
