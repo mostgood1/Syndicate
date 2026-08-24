@@ -78,7 +78,7 @@ from typing import Any, Iterable, Mapping
 
 __all__ = [
     "fetch_markets",
-    "fetch_league_events",
+    "fetch_league_slate",
     "fetch_teams",
     "team_alias_index",
     "is_sporting_row",
@@ -86,7 +86,7 @@ __all__ = [
     "league_slug_for_sport",
     "SPORTS_FIELDS",
     "ORDER_REQUIRED_FIELDS",
-    "LEAGUE_SLUGS",
+    "DOCUMENTED_LEAGUE_SLUGS",
 ]
 
 # A large page, because the pagination mechanism is unknown and one round trip
@@ -204,7 +204,7 @@ def fetch_markets(*, limit: int = _DEFAULT_LIMIT, active: bool = True) -> dict[s
 
 
 # --------------------------------------------------------------------------
-# THE SPORTS API -- a league-scoped slate instead of a filtered catalogue
+# THE SPORTS API -- a league-scoped slate, PAGED over the sibling module
 # --------------------------------------------------------------------------
 #
 # `GET /v2/leagues/{slug}/events` returns one league's events directly, which
@@ -213,52 +213,59 @@ def fetch_markets(*, limit: int = _DEFAULT_LIMIT, active: bool = True) -> dict[s
 # cycle), and `limit`/`offset` are DOCUMENTED here, so paging is a mechanism
 # rather than the guess `/v1/markets` still requires.
 #
+# THE ROUTE ITSELF LIVES IN `polymarket_us_sports_client`, which a parallel
+# session built from the same user-supplied docs. That module owns URL
+# construction, the Syndicate-sport -> league-slug mapping, and the single-page
+# signed GET; it also covers `/v2/sports/{slug}/events`, which this file does
+# not need. Reimplementing any of that here would give the codebase two
+# `fetch_league_events` with DIFFERENT argument meanings -- theirs takes a
+# Polymarket slug, a pager takes a Syndicate sport key -- which is a footgun
+# for exactly the reason the two Polymarket AUTH modules are kept apart.
+#
+# So this adds only what that module does not have and this file's callers
+# need: paging to exhaustion, extraction of the markets hanging off each
+# event, and the orderability check. Named `fetch_league_slate` rather than
+# `fetch_league_events` so the two are never confused at a call site.
+#
 # `fetch_markets` above is kept regardless. It is the only route whose response
 # shape has actually been observed, and it carries `orderPriceMinTickSize` and
 # `minimumTradeQty` -- so if an event's nested markets turn out not to carry
 # those, the catalogue is where they come from.
 
-_LEAGUE_EVENTS_PATH = "/v2/leagues/{slug}/events"
-_TEAMS_PROVIDER_PATH = "/v1/sports/teams/provider"
-
-# Two documented providers. Which of them is actually populated for a given
-# league has not been observed, so it is overridable without a deploy -- the
-# same escape hatch `POLYMARKET_US_ORDER_PATH` exists for, and for the same
-# reason: Kalshi's route moved and cost an http_410 to discover.
-DEFAULT_TEAM_PROVIDER = "PROVIDER_SPORTRADAR"
-
-# Syndicate sport -> Polymarket league slug, and whether that slug is
-# DOCUMENTED or merely assumed from the same convention. The distinction is
-# kept because an empty slate means completely different things either way: for
-# a documented slug it is "no games today", for an assumed one it is most
+# The docs' own examples: "League slug (e.g., nfl, nba, mlb)". Everything else
+# in the sibling module's mapping is a guess at the same convention. Kept as a
+# set here because an empty slate means completely different things either way:
+# for a documented slug it is "no games today", for a guessed one it is most
 # likely "the slug is wrong". Collapsing them would make a typo look like an
 # off day, which is the absence/failure confusion this layer exists to prevent.
-LEAGUE_SLUGS: dict[str, tuple[str, bool]] = {
-    # Documented verbatim: "League slug (e.g., nfl, nba, mlb)".
-    "mlb": ("mlb", True),
-    "nba": ("nba", True),
-    "nfl": ("nfl", True),
-    # Assumed from the same convention. Never confirmed against the venue.
-    "nhl": ("nhl", False),
-    "wnba": ("wnba", False),
-    "ncaaf": ("ncaaf", False),
-    "ncaab": ("ncaab", False),
-}
+DOCUMENTED_LEAGUE_SLUGS = frozenset({"nfl", "nba", "mlb"})
 
 
 def league_slug_for_sport(sport: Any) -> tuple[str | None, bool]:
-    """`(slug, documented)`. An unknown sport returns `(None, False)`."""
-    return LEAGUE_SLUGS.get(str(sport or "").strip().lower(), (None, False))
+    """`(slug, documented)`. An unknown sport returns `(None, False)`.
+
+    The mapping itself belongs to `polymarket_us_sports_client` -- one source
+    of truth for which slug a sport uses. This only adds whether that slug is
+    documented or guessed.
+    """
+    from syndicate.features.shared.polymarket_us_sports_client import (
+        syndicate_sport_to_polymarket_league,
+    )
+
+    slug = syndicate_sport_to_polymarket_league(str(sport or ""))
+    return slug, bool(slug in DOCUMENTED_LEAGUE_SLUGS)
 
 
 def _event_markets(event: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     """The markets hanging off an event, wherever the venue puts them.
 
     The response shape of the events route has NOT been observed -- the docs
-    describe its parameters and not its body. Rather than assume one key, this
-    looks in the plausible places and reports finding none, so the first live
-    run corrects it from data instead of returning a slate with no prices and
-    no explanation.
+    describe its parameters and not its body, and the sibling module's live
+    probe ran on refresh-worker, where the credential is absent, so it returned
+    `credentials_absent` for all seven leagues and learned nothing about the
+    body. Rather than assume one key, this looks in the plausible places and
+    COUNTS the misses, so the first run with a working credential corrects it
+    from data instead of returning a slate with no prices and no explanation.
     """
     for key in ("markets", "Markets", "marketList"):
         value = event.get(key)
@@ -267,7 +274,14 @@ def _event_markets(event: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return []
 
 
-def fetch_league_events(
+def _events_from_payload(payload: Mapping[str, Any]) -> list[Mapping[str, Any]] | None:
+    for key in ("events", "data", "results"):
+        if isinstance(payload.get(key), list):
+            return [e for e in payload[key] if isinstance(e, Mapping)]
+    return None
+
+
+def fetch_league_slate(
     sport: Any,
     *,
     limit: int = 100,
@@ -279,30 +293,23 @@ def fetch_league_events(
     `event_type` defaults to `sport` (the documented default) rather than
     `futures`: a futures market has no game to join a board row to.
     """
-    from syndicate.features.shared import polymarket_us_auth as auth
+    from syndicate.features.shared import polymarket_us_sports_client as sports
 
     slug, documented = league_slug_for_sport(sport)
     if slug is None:
         return {"status": "skipped", "reason": f"no_league_slug_for_sport: {sport}", "events": []}
-    if not auth.credentials_present():
-        return {"status": "skipped", "reason": "credentials_absent", "events": []}
 
-    path = _LEAGUE_EVENTS_PATH.format(slug=slug)
     events: list[Mapping[str, Any]] = []
     pages = 0
     truncated = False
     payload_keys: list[str] = []
 
     for page in range(int(max_pages)):
-        offset = page * int(limit)
-        url = f"{auth.BASE_URL}{path}?limit={int(limit)}&offset={offset}&type={event_type}"
-        try:
-            payload = auth.signed_request("GET", url)
-        except Exception as exc:
-            reason = (
-                str(exc) if isinstance(exc, auth.PolymarketUSAuthError)
-                else f"{type(exc).__name__}: {exc}"
-            )
+        result = sports.fetch_league_events(
+            slug, limit=int(limit), offset=page * int(limit), type_=event_type
+        )
+        if result.get("status") != "ok":
+            reason = str(result.get("reason") or "unknown")
             # A failure on page 0 is a failure. A failure on page 3 still has
             # three real pages in hand, so it degrades to a partial result that
             # SAYS it is partial rather than throwing away what was fetched.
@@ -312,23 +319,24 @@ def fetch_league_events(
                     "league_slug": slug, "slug_documented": documented,
                 }
             truncated = True
-            payload_keys = payload_keys or []
             break
 
-        pages += 1
+        payload = result.get("payload")
+        if not isinstance(payload, Mapping):
+            return {
+                "status": "error", "reason": f"payload_not_an_object: {type(payload).__name__}",
+                "events": [], "league_slug": slug, "slug_documented": documented,
+            }
         payload_keys = sorted(payload.keys())
-        batch = None
-        for key in ("events", "data", "results"):
-            if isinstance(payload.get(key), list):
-                batch = payload[key]
-                break
+        batch = _events_from_payload(payload)
         if batch is None:
             return {
                 "status": "error",
                 "reason": f"events_key_absent: payload_keys={payload_keys}",
                 "events": [], "league_slug": slug, "slug_documented": documented,
             }
-        events.extend(e for e in batch if isinstance(e, Mapping))
+        pages += 1
+        events.extend(batch)
         if len(batch) < int(limit):
             break
     else:
@@ -340,7 +348,8 @@ def fetch_league_events(
     return {
         "status": "ok",
         "league_slug": slug,
-        # See LEAGUE_SLUGS: an empty slate reads differently for an assumed slug.
+        # See DOCUMENTED_LEAGUE_SLUGS: an empty slate reads differently for a
+        # guessed slug than for a documented one.
         "slug_documented": documented,
         "events": events,
         "event_count": len(events),
@@ -349,9 +358,9 @@ def fetch_league_events(
         "markets": trimmed,
         "market_count": len(trimmed),
         "orderable": sum(1 for m in trimmed if m.get("orderable")),
-        # If this is 0 while `event_count` is not, the events route nests its
-        # markets somewhere `_event_markets` does not look -- a named, visible
-        # gap rather than a silently priceless slate.
+        # If this is nonzero while `market_count` is 0, the events route nests
+        # its markets somewhere `_event_markets` does not look -- a named,
+        # visible gap rather than a silently priceless slate.
         "events_without_markets": sum(1 for e in events if not _event_markets(e)),
         "payload_keys": payload_keys,
         "event_keys": sorted(events[0].keys()) if events else None,
@@ -370,6 +379,14 @@ def fetch_league_events(
 # that is a different kind of operation from fuzzy string similarity: it can be
 # exact, and an unmatched name is then a real fact rather than a threshold.
 
+
+_TEAMS_PROVIDER_PATH = "/v1/sports/teams/provider"
+
+# Two documented providers. Which of them is actually populated for a given
+# league has not been observed, so it is overridable without a deploy -- the
+# same escape hatch `POLYMARKET_US_ORDER_PATH` exists for, and for the same
+# reason: Kalshi's route moved and cost an http_410 to discover.
+DEFAULT_TEAM_PROVIDER = "PROVIDER_SPORTRADAR"
 
 _TEAM_NAME_FIELDS = ("name", "abbreviation", "displayAbbreviation", "alias", "safeName")
 

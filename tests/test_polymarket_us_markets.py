@@ -7,6 +7,8 @@ which is what let `kalshi_orders` survive its contract changing underneath it.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from syndicate.features.shared import polymarket_us_markets as mod
@@ -229,10 +231,24 @@ def test_the_politics_only_catalogue_is_visible_as_zero_sporting_of_many(monkeyp
 
 
 def _arm(monkeypatch, responder):
+    """Stub the SIBLING module's single-page fetch.
+
+    `fetch_league_slate` is a pager over `polymarket_us_sports_client`, which
+    owns URL construction and the slug mapping. Stubbing there rather than at
+    `signed_request` keeps this file testing the paging and extraction it
+    actually adds, instead of re-testing their URL builder.
+    """
     from syndicate.features.shared import polymarket_us_auth as auth
+    from syndicate.features.shared import polymarket_us_sports_client as sports
 
     monkeypatch.setattr(auth, "credentials_present", lambda: True)
-    monkeypatch.setattr(auth, "signed_request", responder)
+
+    def one_page(slug, *, limit=None, offset=None, type_=None, section=None):
+        url = f"https://api.polymarket.us/v2/leagues/{slug}/events?limit={limit}&offset={offset}&type={type_}"
+        payload = responder("GET", url)
+        return {"status": "ok", "payload": payload, "url": url}
+
+    monkeypatch.setattr(sports, "fetch_league_events", one_page)
 
 
 def test_the_slate_is_requested_per_league_rather_than_filtered_from_everything(monkeypatch):
@@ -246,9 +262,40 @@ def test_the_slate_is_requested_per_league_rather_than_filtered_from_everything(
         return {"events": []}
 
     _arm(monkeypatch, responder)
-    mod.fetch_league_events("mlb")
+    mod.fetch_league_slate("mlb")
     assert "/v2/leagues/mlb/events" in seen[0]
     assert seen[0].startswith("https://api.polymarket.us/")
+
+
+def test_the_route_is_NOT_reimplemented_here(monkeypatch):
+    """A parallel session already owns `/v2/leagues/{slug}/events`, its URL
+    builder, and the sport -> slug mapping. Two `fetch_league_events` with
+    different argument meanings -- theirs a Polymarket slug, a pager a
+    Syndicate sport key -- is a footgun for the same reason the two Polymarket
+    AUTH modules are kept apart. So this module pages over theirs and is named
+    differently."""
+    from syndicate.features.shared import polymarket_us_sports_client as sports
+
+    assert not hasattr(mod, "fetch_league_events")
+    calls: list[Any] = []
+
+    def one_page(slug, **kw):
+        calls.append((slug, kw))
+        return {"status": "ok", "payload": {"events": []}, "url": "u"}
+
+    monkeypatch.setattr(sports, "fetch_league_events", one_page)
+    mod.fetch_league_slate("mlb", limit=7)
+    assert calls and calls[0][0] == "mlb"
+    assert calls[0][1]["limit"] == 7
+
+
+def test_the_slug_mapping_has_one_source_of_truth():
+    """The mapping lives in the sibling module. This only adds whether the slug
+    is documented or guessed, which that module records as a comment rather
+    than a value."""
+    assert mod.league_slug_for_sport("mlb") == ("mlb", True)
+    assert mod.league_slug_for_sport("nhl") == ("nhl", False)
+    assert mod.league_slug_for_sport("kabaddi") == (None, False)
 
 
 def test_the_default_event_type_is_sport_not_futures(monkeypatch):
@@ -259,7 +306,7 @@ def test_the_default_event_type_is_sport_not_futures(monkeypatch):
         return {"events": []}
 
     _arm(monkeypatch, responder)
-    mod.fetch_league_events("mlb")
+    mod.fetch_league_slate("mlb")
     assert "type=sport" in seen[0]
 
 
@@ -277,7 +324,7 @@ def test_pagination_uses_the_documented_limit_and_offset(monkeypatch):
         return {"events": [{"id": f"e-{offset}-{i}"} for i in range(2)]}
 
     _arm(monkeypatch, responder)
-    result = mod.fetch_league_events("mlb", limit=2)
+    result = mod.fetch_league_slate("mlb", limit=2)
     assert [u.split("?")[1] for u in seen] == [
         "limit=2&offset=0&type=sport",
         "limit=2&offset=2&type=sport",
@@ -291,37 +338,58 @@ def test_pagination_uses_the_documented_limit_and_offset(monkeypatch):
 
 def test_exhausting_the_page_budget_reports_truncated_rather_than_looking_complete(monkeypatch):
     _arm(monkeypatch, lambda _m, _u, **_k: {"events": [{"id": "e"}, {"id": "e2"}]})
-    result = mod.fetch_league_events("mlb", limit=2, max_pages=3)
+    result = mod.fetch_league_slate("mlb", limit=2, max_pages=3)
     assert result["pages"] == 3
     assert result["truncated"] is True
 
 
-def test_a_failure_partway_through_keeps_the_pages_already_fetched(monkeypatch):
-    """Three real pages in hand is not the same as a failed fetch, and throwing
-    them away to report a clean error loses real data."""
+def _arm_pages(monkeypatch, pages):
+    """`pages` is a list of sibling-module results, one per requested page."""
+    from syndicate.features.shared import polymarket_us_sports_client as sports
+
     calls = {"n": 0}
 
-    def responder(_m, _url, **_k):
+    def one_page(_slug, **_kw):
+        index = calls["n"]
         calls["n"] += 1
-        if calls["n"] > 2:
-            raise RuntimeError("connection reset")
-        return {"events": [{"id": f"e{calls['n']}"}, {"id": f"f{calls['n']}"}]}
+        return pages[index] if index < len(pages) else pages[-1]
 
-    _arm(monkeypatch, responder)
-    result = mod.fetch_league_events("mlb", limit=2)
+    monkeypatch.setattr(sports, "fetch_league_events", one_page)
+
+
+def _ok(*ids):
+    return {"status": "ok", "payload": {"events": [{"id": i} for i in ids]}, "url": "u"}
+
+
+def test_a_failure_partway_through_keeps_the_pages_already_fetched(monkeypatch):
+    """Two real pages in hand is not the same as a failed fetch, and throwing
+    them away to report a clean error loses real data."""
+    _arm_pages(monkeypatch, [
+        _ok("e1", "f1"),
+        _ok("e2", "f2"),
+        {"status": "error", "reason": "connection reset", "url": "u"},
+    ])
+    result = mod.fetch_league_slate("mlb", limit=2)
     assert result["status"] == "ok"
     assert result["event_count"] == 4
     assert result["truncated"] is True
 
 
 def test_a_failure_on_the_first_page_is_an_error(monkeypatch):
-    def boom(*_a, **_k):
-        raise RuntimeError("connection reset")
-
-    _arm(monkeypatch, boom)
-    result = mod.fetch_league_events("mlb")
+    _arm_pages(monkeypatch, [{"status": "error", "reason": "connection reset", "url": "u"}])
+    result = mod.fetch_league_slate("mlb")
     assert result["status"] == "error"
     assert "connection reset" in result["reason"]
+
+
+def test_credentials_absent_arrives_through_the_sibling_module(monkeypatch):
+    """That module returns `credentials_absent` as a named error rather than
+    raising -- measured on refresh-worker, where the credential is not set and
+    all seven leagues reported exactly that."""
+    _arm_pages(monkeypatch, [{"status": "error", "reason": "credentials_absent", "url": "u"}])
+    result = mod.fetch_league_slate("mlb")
+    assert result["status"] == "error"
+    assert result["reason"] == "credentials_absent"
 
 
 def test_an_assumed_league_slug_is_flagged_as_assumed(monkeypatch):
@@ -329,15 +397,15 @@ def test_an_assumed_league_slug_is_flagged_as_assumed(monkeypatch):
     one: "no games today" versus "the slug is wrong". Collapsing them makes a
     typo look like an off day."""
     _arm(monkeypatch, lambda *_a, **_k: {"events": []})
-    assert mod.fetch_league_events("mlb")["slug_documented"] is True
-    assert mod.fetch_league_events("nba")["slug_documented"] is True
-    assert mod.fetch_league_events("nhl")["slug_documented"] is False
-    assert mod.fetch_league_events("wnba")["slug_documented"] is False
+    assert mod.fetch_league_slate("mlb")["slug_documented"] is True
+    assert mod.fetch_league_slate("nba")["slug_documented"] is True
+    assert mod.fetch_league_slate("nhl")["slug_documented"] is False
+    assert mod.fetch_league_slate("wnba")["slug_documented"] is False
 
 
 def test_an_unknown_sport_is_a_named_refusal_not_a_guessed_slug(monkeypatch):
     _arm(monkeypatch, lambda *_a, **_k: {"events": []})
-    result = mod.fetch_league_events("kabaddi")
+    result = mod.fetch_league_slate("kabaddi")
     assert result["status"] == "skipped"
     assert "no_league_slug_for_sport" in result["reason"]
 
@@ -350,14 +418,14 @@ def test_events_whose_markets_are_nested_elsewhere_are_COUNTED_not_silently_pric
         {"id": "e-1", "markets": [_row()]},
         {"id": "e-2", "somethingElse": [_row(id="m-9")]},
     ]})
-    result = mod.fetch_league_events("mlb")
+    result = mod.fetch_league_slate("mlb")
     assert result["market_count"] == 1
     assert result["events_without_markets"] == 1
 
 
 def test_a_missing_events_key_is_named(monkeypatch):
     _arm(monkeypatch, lambda *_a, **_k: {"unexpected": []})
-    result = mod.fetch_league_events("mlb")
+    result = mod.fetch_league_slate("mlb")
     assert result["status"] == "error"
     assert "events_key_absent" in result["reason"]
 
@@ -417,7 +485,12 @@ def test_the_team_provider_is_overridable_without_a_deploy(monkeypatch):
         seen.append(url)
         return {"teams": []}
 
-    _arm(monkeypatch, responder)
+    # The teams route calls `signed_request` directly -- it is not a paged
+    # events route, so it does not go through the sibling module.
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request", responder)
     mod.fetch_teams("mlb")
     assert "provider=PROVIDER_SPORTRADAR" in seen[0]
     assert "league=MLB" in seen[0]
@@ -427,9 +500,8 @@ def test_the_team_provider_is_overridable_without_a_deploy(monkeypatch):
     assert "provider=PROVIDER_SPORTSDATAIO" in seen[1]
 
 
-def test_absent_credentials_skip_both_sports_routes(monkeypatch):
+def test_absent_credentials_skip_the_teams_route(monkeypatch):
     from syndicate.features.shared import polymarket_us_auth as auth
 
     monkeypatch.setattr(auth, "credentials_present", lambda: False)
-    assert mod.fetch_league_events("mlb")["reason"] == "credentials_absent"
     assert mod.fetch_teams("mlb")["reason"] == "credentials_absent"

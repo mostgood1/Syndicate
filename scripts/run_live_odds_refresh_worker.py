@@ -826,7 +826,7 @@ def _polymarket_us_slate_probe_at_boot() -> None:
             return
 
         for sport in ("mlb", "wnba", "nfl"):
-            slate = pm.fetch_league_events(sport, limit=100, max_pages=3)
+            slate = pm.fetch_league_slate(sport, limit=100, max_pages=3)
             print(
                 f"[live_odds_worker] POLYMARKET_US_SLATE sport={sport}"
                 f" status={slate.get('status')}"
