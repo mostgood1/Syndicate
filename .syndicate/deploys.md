@@ -26554,3 +26554,58 @@ returned zero, which is the only reason the false negative was caught. That
 filter appears to OR tokens rather than match substrings. Do not read a zero
 from it without a control.
 
+
+---
+
+### 2026-08-24 21:54Z — OddsAPI token EXONERATED. The pipeline is busy re-reading ~8MB of soccer odds history every ~73s.
+
+**Hypothesis tested (user's):** OddsAPI is returning nothing because the token
+expired. **EXONERATED — it is serving live data right now.**
+
+```
+INTEL_TRACE {"event":"odds_history_input","sport":"soccer","present":true,
+  "shard_key":"2026-08-29","entry_count":2107,"bytes":4797451,
+  "mtime":1787607689.108,
+  "sample_market_keys":[... "home_team=Bayern Munich|away_team=VfB Stuttgart|
+   market=h2h|side=Bayern Munich|book=draftkings" ...]}
+```
+
+`mtime 1787607689` is 2026-08-24T21:41:29Z — thirteen minutes before the read.
+Real draftkings/fanduel h2h quotes for Real Madrid, Celta Vigo, Bayern Munich.
+An expired token would fail for soccer identically, and soccer is the ONLY
+thing on the board. So the credential is live and the fetch works.
+
+**WHAT IS ACTUALLY HOLDING THE GUARD.** `intelligence_pipeline_busy()` is not
+about OddsAPI at all — it is `_execution_guard.locked()`, i.e. "the board build
+is computing in this process right now" (`pipeline/intelligence_state.py:305`).
+It is true because the build is genuinely running, near-continuously.
+
+The trace says what it is chewing on. FIVE soccer odds-history shards, all
+FUTURE dates, re-read on a ~73-second loop (21:53:33 then 21:54:46, identical
+set):
+
+| shard | entries | bytes |
+|---|---|---|
+| 2026-08-26 | 38 | 120,337 |
+| 2026-08-27 | 72 | 194,665 |
+| 2026-08-28 | 314 | 742,052 |
+| 2026-08-29 | **2,107** | **4,797,451** |
+| 2026-08-30 | 641 | 1,466,836 |
+
+**~8.3 MB per pass, every ~73 seconds**, and each shard is resolved against
+THREE candidate paths (`odds_control_plane`, `soccer_source/artifacts`,
+`soccer_source/tracking`) — so the file-stat work is 15 paths, not 5.
+
+That is the starvation source. `MLB_SIM_TICK` reports
+`mlbDailySim: {"launched": false, "reason": "intelligence_pipeline_busy"}` on
+nearly every tick because the guard is almost never free.
+
+**Note the shards are 08-26..08-30 — none is today.** The pipeline is doing
+this volume of work for fixtures two to six days out while today's MLB slate
+gets no sim.
+
+**NOT ESTABLISHED:** why five future shards are loaded every cycle rather than
+cached or narrowed, and whether 2026-08-29's 2,107 entries (4.8MB, one day of
+soccer player props) is expected or itself a bug. Both are the next question,
+and both are in soccer's ingestion path, not the venue work.
+
