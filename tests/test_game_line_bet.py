@@ -22,6 +22,7 @@ from syndicate.features.shared.game_line_bet import (
     REASON_NO_SCORES,
     REASON_NO_SPREAD_LINE,
     REASON_SIDE_NOT_A_TEAM,
+    REASON_HOME_AWAY_DISAGREE,
     REASON_UNKNOWN_GAME_MARKET,
     game_line_view,
     is_game_line_market,
@@ -270,3 +271,89 @@ def test_no_game_line_market_is_monotone(market):
     from syndicate.features.shared.bet_status import is_monotone_market
 
     assert not is_monotone_market(market)
+
+
+# --------------------------------------------------------------------------
+# Positional sides -- the vocabulary the board actually writes
+# --------------------------------------------------------------------------
+#
+# MEASURED 2026-08-24T16:36Z, one tick after game-line grading shipped:
+#
+#   before  ungraded={'unmapped_market': 80, ...}
+#   after   ungraded={'side_not_a_team_in_this_game': 77, ...}
+#
+# The markets reached the translator and it could not read their sides. It had
+# been written from the SOCCER odds history (`side=Levante`, `side=Draw`), and
+# the board writes `home -1.5` -- `clv_opening_ledger` documents the key that
+# way, and `layer2_board` and `basketball_market_board` both emit it.
+
+
+def test_a_positional_side_resolves():
+    """`home`/`away`, not a club name. 77 of 80 orders on the first live slate."""
+    view = _view(market="spreads", side="home", line=-1.5, home_score=5, away_score=3)
+    assert view.get("unavailable_reason") is None
+    assert view["current_value"] == 2
+    assert _grade(view)["status"] == STATUS_WON
+
+    away = _view(market="spreads", side="away", line=1.5, home_score=5, away_score=3)
+    assert away["current_value"] == -2
+    assert _grade(away)["status"] == STATUS_LOST
+
+
+def test_a_positional_moneyline_resolves():
+    assert _grade(_view(side="home", home_score=5, away_score=3))["status"] == STATUS_WON
+    assert _grade(_view(side="away", home_score=5, away_score=3))["status"] == STATUS_LOST
+
+
+def test_both_vocabularies_agree_on_the_same_bet():
+    """The whole point: `home` and the home club's NAME are the same wager, and
+    must grade identically. If these ever diverge, one of the two paths is
+    reading a different team."""
+    by_name = _view(market="spreads", side=HOME, line=-1.5, home_score=5, away_score=3)
+    by_slot = _view(market="spreads", side="home", line=-1.5, home_score=5, away_score=3)
+    assert by_name["current_value"] == by_slot["current_value"]
+    assert _grade(by_name)["status"] == _grade(by_slot)["status"]
+
+
+def test_a_positional_side_is_refused_when_the_sources_disagree():
+    """`home` means the ODDS PROVIDER's home team; the scores come from the
+    sport's own feed. They agree in practice -- which side is at home is a
+    scheduled fact, not a naming judgement -- but an inverted game line is a
+    confident wrong verdict on every bet in the game, so the disagreement is
+    named rather than resolved by trusting either source."""
+    view = game_line_view(
+        sport="mlb", market="spreads", side="home", line=-1.5,
+        # The FEED has Boston at home...
+        home_team=AWAY, away_team=HOME, home_score=5, away_score=3,
+        draw_possible=False,
+        # ...the ORDER says Miami is.
+        expect_home=HOME, expect_away=AWAY,
+    )
+    assert view["unavailable_reason"] == REASON_HOME_AWAY_DISAGREE
+
+
+def test_a_positional_side_is_accepted_when_the_sources_agree():
+    view = game_line_view(
+        sport="mlb", market="spreads", side="home", line=-1.5,
+        home_team=HOME, away_team=AWAY, home_score=5, away_score=3,
+        draw_possible=False, expect_home=HOME, expect_away=AWAY,
+    )
+    assert view["current_value"] == 2
+
+
+def test_a_positional_side_still_works_with_no_names_to_check():
+    """Orders written before `home_team` joined the ledger's lean fields carry
+    none. Refusing those would ground every positional bet rather than catch
+    anything -- the feed's assignment is the only one available."""
+    view = game_line_view(
+        sport="mlb", market="h2h", side="home", line=None,
+        home_team=HOME, away_team=AWAY, home_score=5, away_score=3,
+        draw_possible=False, expect_home=None, expect_away=None,
+    )
+    assert view["current_value"] == 2
+
+
+def test_a_positional_draw_is_still_a_draw():
+    view = _view(market="h2h", side="draw", home_score=1, away_score=1,
+                 draw_possible=True)
+    assert _grade(view)["status"] == STATUS_WON

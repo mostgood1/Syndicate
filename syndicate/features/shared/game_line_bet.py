@@ -84,6 +84,7 @@ __all__ = [
     "REASON_SIDE_NOT_A_TEAM",
     "REASON_NO_SCORES",
     "REASON_NO_SPREAD_LINE",
+    "REASON_HOME_AWAY_DISAGREE",
 ]
 
 # Named refusals. Each one sends the next person somewhere different, which is
@@ -92,6 +93,10 @@ REASON_UNKNOWN_GAME_MARKET = "unmapped_game_market"
 REASON_SIDE_NOT_A_TEAM = "side_not_a_team_in_this_game"
 REASON_NO_SCORES = "no_team_scores"
 REASON_NO_SPREAD_LINE = "no_spread_line"
+# The order says `home`/`away`, and the two sources disagree about which team
+# that is. Refused rather than resolved by trusting either: a positional side
+# graded against the wrong club is a confident inverted verdict.
+REASON_HOME_AWAY_DISAGREE = "home_away_disagree_between_sources"
 
 # Markets decided by the SCOREBOARD rather than by a player's line, and by the
 # score of ONE side rather than the combined total (`totals` is already handled
@@ -105,6 +110,17 @@ _SPREAD_MARKETS = frozenset({"spreads", "spreads_alt", "spread", "handicap"})
 _ALWAYS_THREE_WAY = frozenset({"h2h_3_way"})
 
 _DRAW_TOKENS = frozenset({"draw", "tie", "x", "the draw"})
+
+# POSITIONAL SIDES. The board writes `home -1.5`, not `Houston Astros -1.5` --
+# `clv_opening_ledger` documents the key that way and `layer2_board` and
+# `basketball_market_board` both emit it. MEASURED 2026-08-24T16:36Z, one tick
+# after game-line grading shipped: `unmapped_market: 80` became
+# `side_not_a_team_in_this_game: 77`. The markets reached the translator and
+# the translator could not read their sides, because it had been written from
+# the SOCCER odds history (`side=Levante`, `side=Draw`) and both forms are
+# real.
+_HOME_TOKENS = frozenset({"home", "home_team", "h"})
+_AWAY_TOKENS = frozenset({"away", "away_team", "a", "road"})
 
 
 def _canonical_market(sport: Any, market: Any) -> str:
@@ -139,8 +155,16 @@ def _is_draw_side(side: Any) -> bool:
 def _margin_for_side(
     *, sport: Any, side: Any, home_team: Any, away_team: Any,
     home_score: float, away_score: float,
-) -> float | None:
+    expect_home: Any = None, expect_away: Any = None,
+) -> tuple[float | None, str | None]:
     """Score difference from the perspective of the team the bet is on.
+
+    `(margin, reason)` -- exactly one of them is set.
+
+    TWO SIDE VOCABULARIES, BOTH REAL. The board writes `home`/`away` for game
+    lines; soccer's odds history writes the club name, and `Draw`. Supporting
+    only the second is what produced 77 refusals on the first slate after
+    game-line grading shipped.
 
     Team names go through `team_aliases.canonical_team`, never a local map --
     it is the single club resolver (`#218`), and two normalisers that disagree
@@ -148,19 +172,45 @@ def _margin_for_side(
     """
     from syndicate.features.shared.team_aliases import canonical_team
 
+    token = str(side or "").strip().lower()
+
+    if token in _HOME_TOKENS or token in _AWAY_TOKENS:
+        wants_home = token in _HOME_TOKENS
+        # A POSITIONAL SIDE IS ONLY AS GOOD AS THE TWO SOURCES AGREEING.
+        # `home` means the odds provider's home team; the scores come from the
+        # sport's own feed. They agree in practice -- which side is at home is
+        # a scheduled fact, not a naming judgement -- but "in practice" is not
+        # a guarantee, and an inverted game line is a confident wrong verdict
+        # on every bet in the game. So when the order carries its own names,
+        # they are checked against the feed's.
+        expected = canonical_team(sport, expect_home if wants_home else expect_away)
+        other = canonical_team(sport, expect_away if wants_home else expect_home)
+        if expected is not None or other is not None:
+            actual = canonical_team(sport, home_team if wants_home else away_team)
+            if actual is not None and expected is not None and actual != expected:
+                return None, REASON_HOME_AWAY_DISAGREE
+            if actual is not None and expected is None and other is not None and actual == other:
+                # The order's names are present and the feed has them the other
+                # way round. Same disagreement, seen from the other end.
+                return None, REASON_HOME_AWAY_DISAGREE
+        # No names on the order to check against: the feed's assignment is the
+        # only one available, and refusing here would ground every positional
+        # bet rather than catch anything.
+        return (home_score - away_score if wants_home else away_score - home_score), None
+
     wanted = canonical_team(sport, side)
     home = canonical_team(sport, home_team)
     away = canonical_team(sport, away_team)
     if wanted is None:
-        return None
+        return None, REASON_SIDE_NOT_A_TEAM
     if home is not None and wanted == home:
-        return home_score - away_score
+        return home_score - away_score, None
     if away is not None and wanted == away:
-        return away_score - home_score
+        return away_score - home_score, None
     # The side names a club, but not one of THIS game's two. Refused rather
     # than defaulted to either team: picking one produces a confident verdict
     # on the wrong bet, which is worse than no verdict at all.
-    return None
+    return None, REASON_SIDE_NOT_A_TEAM
 
 
 def game_line_view(
@@ -174,6 +224,8 @@ def game_line_view(
     home_score: Any,
     away_score: Any,
     draw_possible: bool,
+    expect_home: Any = None,
+    expect_away: Any = None,
 ) -> dict[str, Any]:
     """`{current_value, side, line}` for the grader, or `{unavailable_reason}`.
 
@@ -209,12 +261,13 @@ def game_line_view(
             "line": 0.5,
         }
 
-    margin = _margin_for_side(
+    margin, reason = _margin_for_side(
         sport=sport, side=side, home_team=home_team, away_team=away_team,
         home_score=home, away_score=away,
+        expect_home=expect_home, expect_away=expect_away,
     )
     if margin is None:
-        return {"unavailable_reason": REASON_SIDE_NOT_A_TEAM}
+        return {"unavailable_reason": reason or REASON_SIDE_NOT_A_TEAM}
 
     if is_moneyline:
         # Two-way: level is a PUSH and the stake comes back (draw-no-bet, and

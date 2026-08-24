@@ -374,6 +374,12 @@ def mlb_status_resolver(selected_date: str):
                 away_team=away_name,
                 home_score=home_runs,
                 away_score=away_runs,
+                # THE ORDER'S OWN NAMES, for the positional-side cross-check
+                # only. `home` means the odds provider's home team while the
+                # scores come from statsapi; the two agree in practice, and
+                # "in practice" is not something to grade money on silently.
+                expect_home=order.get("home_team"),
+                expect_away=order.get("away_team"),
                 # BASEBALL DOES NOT DRAW. A regulation game plays until someone
                 # is ahead, so a moneyline here is two-way and a level score is
                 # a push rather than a loss. Passed explicitly rather than
