@@ -26769,3 +26769,59 @@ already quoted.
 other ~99.9% of the cycle. That needs a profile of the board build, not another
 guess from artifact sizes. Nothing was changed.
 
+
+---
+
+### 2026-08-24 — ROOT CAUSE: the intelligence guard is held across the 60s inter-cycle sleep
+
+Profiled the board build. It is not slow. The guard is simply never released.
+
+**The structure** (`pipeline/intelligence_state.py`, indent in the margin):
+
+```
+5631   8 | while not self._stop.is_set():
+5803  12 |     try:
+5805  20 |         guard_acquired = self._execution_guard.acquire(blocking=False)
+      .. |         ... board build ... (odds_history reads measured at 91 ms)
+5991  20 |         self._condition.wait(timeout=self._interval_seconds)   <-- GUARD HELD
+5992  12 |     finally:
+5994  20 |         self._execution_guard.release()
+```
+
+`self._condition.wait(timeout=self._interval_seconds)` at line 5991 sits INSIDE
+the guarded region. The `finally` that releases is at indent 12, so the release
+happens only after that wait returns.
+
+**`SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS = "60"` on all three
+services** (render.yaml lines 154, 507, 886). So every iteration holds the lock
+for `build_time + 60s`, and the lock is free only in the microscopic window
+between `release()` at the end of one iteration and `acquire()` at the start of
+the next. Observed cycle ~73s = ~13s of build plus the 60s sleep.
+
+**That is ~100% duty cycle on a lock whose own docstring (line 306) says it
+means "True while the board build is actively computing in THIS process."** It
+does not mean that. It means "the loop is alive."
+
+**This explains the whole chain**, and it explains why every size-based theory
+failed: MLB sim starved (`mlbDailySim: intelligence_pipeline_busy` on nearly
+every tick, one win at 21:50:26 catching the release window) -> no
+recommendations -> `per_game_reco_rows=0` -> board rows soccer-only -> all four
+venue books `scoped=0` -> nothing to execute.
+
+**The fix is to release before sleeping and re-acquire after** — the wait
+belongs outside the guarded region. The two guards were designed for "strict
+alternation rather than overlap" (line 313); holding one through its own idle
+period is not alternation, it is permanent occupancy.
+
+**NOT DONE, DELIBERATELY.** `pipeline/intelligence_state.py` is claimed by the
+OPEN lane `layer2-sim-view-and-live-projection`, whose current question is the
+odds fetch in the same subsystem. Surfacing rather than editing across it, per
+the lane protocol. This is a small diff with a large blast radius — it changes
+how two background loops interleave on both workers — and it belongs to whoever
+holds that lane.
+
+**Method note, third correction this session:** I twice inferred the cost from
+artifact SIZE (`sporting=500`, the 4.8MB shard) and was wrong both times. The
+answer came from reading the control flow around the lock, not from measuring
+data volume. The reads were never the problem; the sleep was.
+
