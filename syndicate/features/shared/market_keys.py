@@ -113,6 +113,102 @@ _BASKETBALL: dict[str, str] = {
     "3s": "player_threes",
 }
 
+# --------------------------------------------------------------------------
+# PERIODS AND ALTERNATES, added 2026-08-24.
+#
+# Kalshi lists a game's intervals as their own series -- `KXWNBA1QTOTAL`
+# ("1st Quarter Total"), `KXWNBA2HSPREAD` ("2nd Half Spread"), `KXWNBA2H`
+# ("2nd Half Winner") -- and the board already carries the matching keys
+# (`totals_q1`, `spreads_h2`, `h2h_h2`). Nothing joined them because the
+# vocabulary stopped at the full-game words.
+#
+# SUFFIXES ARE THE BOARD'S, NOT INVENTED: q1..q4 quarters, h1/h2 halves,
+# p1..p3 hockey periods, `_alt` for alternate lines. All are already in use in
+# this repo, which is what makes them the right spelling -- a period key that
+# only Kalshi's side understands joins to nothing.
+_PERIOD_SUFFIX: dict[str, str] = {
+    "1st quarter": "q1", "first quarter": "q1", "1q": "q1", "q1": "q1",
+    "2nd quarter": "q2", "second quarter": "q2", "2q": "q2", "q2": "q2",
+    "3rd quarter": "q3", "third quarter": "q3", "3q": "q3", "q3": "q3",
+    "4th quarter": "q4", "fourth quarter": "q4", "4q": "q4", "q4": "q4",
+    "1st half": "h1", "first half": "h1", "1h": "h1", "h1": "h1",
+    "2nd half": "h2", "second half": "h2", "2h": "h2", "h2": "h2",
+    "1st period": "p1", "first period": "p1", "p1": "p1",
+    "2nd period": "p2", "second period": "p2", "p2": "p2",
+    "3rd period": "p3", "third period": "p3", "p3": "p3",
+}
+
+# The market word, once the period has been stripped off the front.
+_GAME_CORE: dict[str, str] = {
+    "winner": "h2h",
+    "moneyline": "h2h",
+    "money line": "h2h",
+    "ml": "h2h",
+    "h2h": "h2h",
+    "spread": "spreads",
+    "spreads": "spreads",
+    "ats": "spreads",
+    "run line": "spreads",
+    "runline": "spreads",
+    "puck line": "spreads",
+    "puckline": "spreads",
+    "total": "totals",
+    "totals": "totals",
+    "over/under": "totals",
+    "ou": "totals",
+}
+
+
+def canonical_game_market(text: Any) -> str | None:
+    """A game-line market name, period and alternate included, or None.
+
+    Separate from `canonical_market_key` because the grammar is different: this
+    one PARSES rather than looks up, since "2nd Half Spread" is a period and a
+    market word rather than a phrase any table could enumerate.
+
+    None is a real answer and the caller must refuse on it. A game line joined
+    to the wrong period is the same class of error as one joined to the wrong
+    game -- a confidently-priced bet on something else entirely.
+    """
+    token = _normalize(text)
+    if not token:
+        return None
+
+    alt = False
+    for marker in ("alternate ", "alt "):
+        if token.startswith(marker):
+            alt, token = True, token[len(marker):].strip()
+    for marker in (" alternate", " alt"):
+        if token.endswith(marker):
+            alt, token = True, token[: -len(marker)].strip()
+
+    # THREE-WAY IS ITS OWN MARKET, not a moneyline with a footnote. A draw is a
+    # third outcome, so pricing it as `h2h` would misstate every soccer line.
+    three_way = False
+    for marker in ("3 way", "three way", "3way"):
+        if marker in token:
+            three_way = True
+            token = token.replace(marker, " ").strip()
+
+    period = ""
+    for phrase, suffix in _PERIOD_SUFFIX.items():
+        if token.startswith(phrase + " "):
+            period, token = suffix, token[len(phrase):].strip()
+            break
+
+    core = _GAME_CORE.get(token)
+    if core is None:
+        return None
+    if three_way:
+        # Only a moneyline has a three-way form.
+        return "h2h_3_way" if core == "h2h" and not period else None
+    if period:
+        # `_alt` and a period together are not a shape the board carries, so it
+        # is refused rather than spelled into existence.
+        return None if alt else f"{core}_{period}"
+    return f"{core}_alt" if alt else core
+
+
 # Game-level markets are the same three words in every sport, which is why they
 # are not per-sport. "ATS"/"run line"/"puck line" are the same wager as a spread.
 _GAME: dict[str, str] = {

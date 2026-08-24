@@ -41,7 +41,7 @@ like, so one daily discovery run is the whole discovery loop.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
 
@@ -49,6 +49,10 @@ __all__ = [
     "SERIES_SPORT",
     "game_date_from_ticker",
     "prop_candidates",
+    "event_blob_from_ticker",
+    "match_event_blob",
+    "game_market_from_title",
+    "auto_game_series_from_catalogue",
     "sport_for_series",
     "sport_for_ticker",
     "auto_series_from_catalogue",
@@ -231,6 +235,89 @@ def game_date_from_ticker(ticker: Any) -> str | None:
         return None
 
 
+def event_blob_from_ticker(ticker: Any) -> str | None:
+    """The TEAM part of the event segment: `26AUG242140MINATH` -> `MINATH`.
+
+    The date, and MLB's optional four-digit start time, are stripped off the
+    front; whatever remains identifies the two clubs. Returns None when the
+    segment has no readable date, because without one the remainder is not
+    reliably the team blob.
+
+    DELIBERATELY NOT SPLIT INTO TWO TEAMS HERE. `MINATH` is MIN+ATH and `LVTOR`
+    is LV+TOR, but nothing in the string says where the boundary is, and club
+    codes vary in length. Splitting it needs a per-sport registry of Kalshi's
+    own codes, which we do not have and would be guessing at -- and a wrong
+    split pairs a bet with the wrong game, which is the one failure this whole
+    module is built to prevent. `match_event_blob` inverts the problem instead.
+    """
+    text = str(ticker or "").strip().upper()
+    parts = text.split("-")
+    if len(parts) < 2:
+        return None
+    segment = parts[1]
+    match = _EVENT_DATE.match(segment)
+    if not match:
+        return None
+    rest = segment[len(match.group(0)):]
+    # MLB carries HHMM after the date; WNBA does not. Strip exactly four
+    # leading digits when present -- a club code is never all digits.
+    if len(rest) >= 4 and rest[:4].isdigit():
+        rest = rest[4:]
+    return rest or None
+
+
+def _blob_for(away: Any, home: Any) -> str:
+    def _clean(value: Any) -> str:
+        return "".join(ch for ch in str(value or "").upper() if ch.isalnum())
+
+    return f"{_clean(away)}{_clean(home)}"
+
+
+def match_event_blob(
+    blob: Any, games: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Which of OUR games is `blob`? Returns the answer AND how sure it is.
+
+    THE INVERSION. Rather than splitting Kalshi's concatenated codes -- which
+    needs a registry we do not have -- this builds `AWAY+HOME` from each game
+    WE already know about and looks for the blob among them. Our own schedule
+    supplies the boundary that the string omits, so no guess is required.
+
+    Every outcome is named, and only `ok` is usable:
+
+      ok         exactly one of our games produces this blob
+      no_match   none does. Usually our club codes differ from Kalshi's
+                 (`OAK` vs `ATH`), which is an ALIAS to add, not a bet to make
+      ambiguous  more than one does -- a doubleheader, or two clubs whose codes
+                 concatenate the same way. Refused: a coin flip between two
+                 real games is worse than no bet, because it looks like a bet
+
+    `no_match` being common is expected at first and is exactly the measurement
+    that says which aliases to add. It must never soften into a best guess.
+    """
+    wanted = "".join(ch for ch in str(blob or "").upper() if ch.isalnum())
+    if not wanted:
+        return {"status": "no_match", "reason": "empty_blob"}
+
+    hits = [
+        game
+        for game in (games or [])
+        if _blob_for(game.get("away_team"), game.get("home_team")) == wanted
+    ]
+    if not hits:
+        return {"status": "no_match", "blob": wanted}
+    if len(hits) > 1:
+        return {"status": "ambiguous", "blob": wanted, "count": len(hits)}
+    game = hits[0]
+    return {
+        "status": "ok",
+        "blob": wanted,
+        "event_id": game.get("event_id"),
+        "home_team": game.get("home_team"),
+        "away_team": game.get("away_team"),
+    }
+
+
 def sport_for_ticker(ticker: Any) -> str | None:
     """The sport a series ticker names, or None. Longest token first."""
     text = str(ticker or "").strip().upper()
@@ -321,6 +408,58 @@ def prop_candidates(titles: Mapping[str, Any]) -> list[dict[str, Any]]:
             }
         )
     found.sort(key=lambda c: (c["sport"] or "~unmapped", c["ticker"]))
+    return found
+
+
+def game_market_from_title(title: Any) -> str | None:
+    """The game-line market a series title names, or None.
+
+    Kalshi prefixes every title with the competition -- "Women's Pro Basketball
+    1st Quarter Total" -- so the market is the TAIL, not the whole string. The
+    longest tail that resolves wins, because "Total" and "1st Quarter Total"
+    both resolve and only the longer one is right.
+
+    Bounded at four words: the longest real phrase is "1st Quarter Spread" at
+    three, and letting it run further would start swallowing competition names
+    that happen to end in a market word.
+    """
+    from syndicate.features.shared.market_keys import canonical_game_market
+
+    words = str(title or "").strip().split()
+    if not words:
+        return None
+    for size in range(min(4, len(words)), 0, -1):
+        resolved = canonical_game_market(" ".join(words[-size:]))
+        if resolved:
+            return resolved
+    return None
+
+
+def auto_game_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]:
+    """Game-line series Kalshi lists that we can name -- totals, spreads,
+    moneylines, and their quarter/half/period and alternate forms.
+
+    SEPARATE FROM THE PLAYER-PROP DISCOVERY because the two have different
+    identities and different risks. A prop names a human and a human plays one
+    game a day, so its title is a complete identity. A game line names no team
+    at all, so it can only be placed once the EVENT is resolved from the
+    ticker -- which is why `kalshi_board_join` keeps these behind
+    `SYNDICATE_KALSHI_GAME_LINES` and refuses an unresolved one by name.
+
+    Registering the series is therefore not the same as agreeing to bet it. It
+    only makes the market legible enough to be counted.
+    """
+    found: dict[str, str] = {}
+    for ticker, title in (titles or {}).items():
+        key = str(ticker).strip().upper()
+        if key in SERIES_OUT_OF_SCOPE:
+            continue
+        sport = sport_for_ticker(key)
+        if not sport:
+            continue
+        if game_market_from_title(title) is None:
+            continue
+        found[key] = sport
     return found
 
 

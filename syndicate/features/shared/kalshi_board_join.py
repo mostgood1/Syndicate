@@ -87,10 +87,56 @@ REASON_NO_PRICE = "no_kalshi_price"
 # refusal: these are markets we CAN read and CANNOT yet place, so the number is
 # the size of the game-lines gap rather than a defect.
 REASON_NEEDS_EVENT_MAPPING = "needs_event_mapping"
+# The game-line resolution outcomes, each counted by name. `unmatched` is the
+# one that says which club-code ALIASES to add; `ambiguous` means two of our
+# own games produce the same code pair (a doubleheader) and must never be
+# guessed between. `disabled` means it WOULD have resolved and the flag is off,
+# which is what makes the measurement readable before anything is priced.
+REASON_EVENT_UNMATCHED = "event_not_on_our_board"
+REASON_EVENT_AMBIGUOUS = "event_matches_two_games"
+REASON_GAME_LINES_DISABLED = "game_lines_disabled"
 # A market whose ticker carries no readable game date. Separated from every
 # other refusal because it is the ONLY one that would previously have been
 # silently mis-dated instead of refused.
 REASON_UNDATABLE = "no_game_date_in_ticker"
+
+
+def game_lines_enabled() -> bool:
+    """Are game lines allowed to be PRICED? Absent means no.
+
+    Off by default and read per call rather than at import, so the flag can be
+    turned on without a code deploy once the resolution numbers justify it.
+    """
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_KALSHI_GAME_LINES") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _resolve_event(
+    market: Mapping[str, Any], board_rows: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Which of our games this game-line market belongs to."""
+    from syndicate.features.shared.kalshi_catalogue import (
+        event_blob_from_ticker,
+        match_event_blob,
+    )
+
+    blob = event_blob_from_ticker(market.get("ticker"))
+    if not blob:
+        return {"status": "no_match", "reason": "no_blob"}
+    # DISTINCT GAMES ONLY. The board carries one row per market per game, so
+    # feeding every row in would make an ordinary slate look ambiguous.
+    seen: dict[str, dict[str, Any]] = {}
+    for row in board_rows:
+        event_id = str(row.get("event_id") or "")
+        if event_id and event_id not in seen:
+            seen[event_id] = {
+                "event_id": event_id,
+                "home_team": row.get("home_team"),
+                "away_team": row.get("away_team"),
+            }
+    return match_event_blob(blob, list(seen.values()))
 
 
 def normalize_person(value: Any) -> str:
@@ -308,10 +354,37 @@ def join_kalshi_to_board(
         if verdict.get("needs_event_identity"):
             # A player prop names a human, and a human plays one game a day, so
             # (player, market, line) is a complete identity. A total names
-            # neither team -- pairing it needs `event_ticker` mapped to our
-            # event id, which does not exist yet. REFUSED rather than attempted:
-            # a total joined to the wrong game is a confidently-priced bet on
-            # strangers.
+            # NEITHER team, so pairing it needs the game -- and the game is in
+            # the ticker, which is where the game date turned out to be too:
+            # `KXMLBHR-26AUG242140MINATH-...` is MIN at ATH.
+            #
+            # GATED OFF BY DEFAULT. The identity is resolved by matching
+            # Kalshi's concatenated club codes against OUR schedule
+            # (`match_event_blob`), and how often our codes agree with Kalshi's
+            # is UNMEASURED -- `OAK` against `ATH` is a real possibility and
+            # every such gap is an alias nobody has written yet. So the resolver
+            # runs and REPORTS on every build, and the flag decides only whether
+            # a resolved game may be priced. That way the measurement arrives
+            # before the money does, which is the opposite of how tonight went.
+            #
+            # A total joined to the wrong game is a confidently-priced bet on
+            # strangers, so `ambiguous` and `no_match` are refused by name and
+            # never softened into a best guess.
+            resolution = _resolve_event(market, board_rows)
+            status = str(resolution.get("status") or "")
+            if status != "ok":
+                _refuse(
+                    REASON_EVENT_AMBIGUOUS
+                    if status == "ambiguous"
+                    else REASON_EVENT_UNMATCHED
+                )
+                continue
+            if not game_lines_enabled():
+                # RESOLVED, and still not priced. Counted separately from the
+                # unresolved ones so the log answers "would this work?" while
+                # the answer is still free.
+                _refuse(REASON_GAME_LINES_DISABLED)
+                continue
             _refuse(REASON_NEEDS_EVENT_MAPPING)
             continue
 

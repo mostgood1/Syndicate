@@ -850,6 +850,33 @@ def _kalshi_series_catalogue_at_boot() -> None:
                 flush=True,
             )
 
+        # GAME-LINE SERIES, registered so they can be COUNTED. Registering is
+        # not agreeing to bet them: `kalshi_board_join` keeps game lines behind
+        # `SYNDICATE_KALSHI_GAME_LINES` and refuses an unresolved event by name.
+        # This only makes totals, spreads, moneylines and their quarter/half and
+        # alternate forms legible enough to measure.
+        try:
+            from syndicate.features.shared.kalshi_catalogue import (
+                auto_game_series_from_catalogue,
+                register_discovered,
+            )
+
+            game_found = auto_game_series_from_catalogue(titled)
+            game_result = register_discovered(game_found)
+            by_sport: dict[str, int] = {}
+            for sport in game_found.values():
+                by_sport[sport] = by_sport.get(sport, 0) + 1
+            print(
+                f"[live_odds_worker] KALSHI_GAME_SERIES found={len(game_found)}"
+                f" added={len(game_result.get('added') or {})} by_sport={by_sport}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] KALSHI_GAME_SERIES_ERROR {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         for token in ("WNBA",):
             found = series_matching([token], tickers)
             print(

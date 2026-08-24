@@ -307,7 +307,7 @@ def test_a_game_line_is_refused_because_its_title_names_no_game():
     id -- which does not exist. A total joined to the wrong game is a
     confidently-priced bet on strangers."""
     from syndicate.features.shared import kalshi_catalogue as cat
-    from syndicate.features.shared.kalshi_board_join import REASON_NEEDS_EVENT_MAPPING
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_UNMATCHED
 
     cat.SERIES_SPORT["KXTESTTOTAL"] = "mlb"
     try:
@@ -315,6 +315,139 @@ def test_a_game_line_is_refused_because_its_title_names_no_game():
         report = join_kalshi_to_board([market], [_row()])
         assert report["matched"] == 0
         # Counted separately: this is the SIZE OF THE GAP, not a defect.
-        assert report["reasons"][REASON_NEEDS_EVENT_MAPPING] == 1
+        # The reason is now specific -- this fixture's ticker carries a player
+        # name where the club codes go, so the event resolves to nothing on our
+        # board rather than merely "we have no mapping at all".
+        assert report["reasons"][REASON_EVENT_UNMATCHED] == 1
     finally:
         del cat.SERIES_SPORT["KXTESTTOTAL"]
+
+
+# --------------------------------------------------------------------------
+# Game lines: the event identity was in the ticker all along
+# --------------------------------------------------------------------------
+
+
+def _total(ticker="KXTESTTOTAL-26AUG242140MINATH-8", **kw):
+    """A real Kalshi total. The TITLE grammar is the one this file already
+    carried from production (`Over 7.5 runs scored?`); the TICKER is the shape
+    measured 2026-08-23T23:51Z. Neither is invented here -- a fixture that
+    guesses at Kalshi's wording tests only my imagination, which is how three
+    game-date tests passed while production matched zero."""
+    market = {
+        "ticker": ticker,
+        "series": "KXTESTTOTAL",
+        "title": "Over 7.5 runs scored?",
+        "yes_american": -110,
+        "no_american": -110,
+    }
+    market.update(kw)
+    return market
+
+
+def _game_row(**kw):
+    row = {
+        "sport": "mlb",
+        "event_id": "evt-1",
+        "market": "totals",
+        "away_team": "MIN",
+        "home_team": "ATH",
+        "side": "Over",
+        "line": 7.5,
+    }
+    row.update(kw)
+    return row
+
+
+def _with_total_series(fn):
+    from syndicate.features.shared import kalshi_catalogue as cat
+
+    cat.SERIES_SPORT["KXTESTTOTAL"] = "mlb"
+    try:
+        return fn()
+    finally:
+        cat.SERIES_SPORT.pop("KXTESTTOTAL", None)
+
+
+def test_game_lines_resolve_but_stay_unpriced_by_default(monkeypatch):
+    """The measurement arrives BEFORE the money. The resolver runs on every
+    build so the log can answer "would this work?", and the flag decides only
+    whether a resolved game may be priced -- the opposite of the first live
+    night, where the first measurement was a real order."""
+    from syndicate.features.shared.kalshi_board_join import REASON_GAME_LINES_DISABLED
+
+    monkeypatch.delenv("SYNDICATE_KALSHI_GAME_LINES", raising=False)
+    report = _with_total_series(
+        lambda: join_kalshi_to_board([_total()], [_game_row()], selected_date="2026-08-24")
+    )
+    assert report["matched"] == 0
+    assert report["reasons"][REASON_GAME_LINES_DISABLED] == 1
+
+
+def test_a_game_we_do_not_have_is_refused_by_its_own_name(monkeypatch):
+    """`event_not_on_our_board` is the count that says which club-code ALIASES
+    to add -- our `OAK` against Kalshi's `ATH`. It must never soften into a
+    best guess."""
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_UNMATCHED
+
+    monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "1")
+    report = _with_total_series(
+        lambda: join_kalshi_to_board(
+            [_total(ticker="KXTESTTOTAL-26AUG242140NYYBOS-8")],
+            [_game_row()],
+            selected_date="2026-08-24",
+        )
+    )
+    assert report["matched"] == 0
+    assert report["reasons"][REASON_EVENT_UNMATCHED] == 1
+
+
+def test_a_doubleheader_is_refused_rather_than_guessed(monkeypatch):
+    """Two real games behind one code pair. A coin flip between them is worse
+    than no bet, because it looks exactly like a bet."""
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_AMBIGUOUS
+
+    monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "1")
+    report = _with_total_series(
+        lambda: join_kalshi_to_board(
+            [_total()],
+            [_game_row(event_id="evt-1"), _game_row(event_id="evt-2")],
+            selected_date="2026-08-24",
+        )
+    )
+    assert report["matched"] == 0
+    assert report["reasons"][REASON_EVENT_AMBIGUOUS] == 1
+
+
+def test_the_game_line_flag_actually_changes_behaviour(monkeypatch):
+    """Reachability before correctness: `off != on`. Four inert features in one
+    session were caught by this check and by nothing else."""
+    from syndicate.features.shared.kalshi_board_join import REASON_GAME_LINES_DISABLED
+
+    monkeypatch.delenv("SYNDICATE_KALSHI_GAME_LINES", raising=False)
+    off = _with_total_series(
+        lambda: join_kalshi_to_board([_total()], [_game_row()], selected_date="2026-08-24")
+    )
+    monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "1")
+    on = _with_total_series(
+        lambda: join_kalshi_to_board([_total()], [_game_row()], selected_date="2026-08-24")
+    )
+    assert off["reasons"].get(REASON_GAME_LINES_DISABLED) == 1
+    assert on["reasons"].get(REASON_GAME_LINES_DISABLED) is None
+
+
+def test_only_distinct_games_are_considered(monkeypatch):
+    """The board carries one row per market per game, so feeding every row in
+    would make an ordinary slate look like a doubleheader."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "1")
+    rows = [
+        _game_row(market="totals", line=7.5),
+        _game_row(market="spreads", line=-1.5),
+        _game_row(market="h2h", line=0.0),
+    ]
+    report = _with_total_series(
+        lambda: join_kalshi_to_board([_total()], rows, selected_date="2026-08-24")
+    )
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_AMBIGUOUS
+
+    assert report["reasons"].get(REASON_EVENT_AMBIGUOUS) is None
