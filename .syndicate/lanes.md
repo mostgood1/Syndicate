@@ -1965,13 +1965,30 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `run_arb_scan` calls it (and fails loudly if it ever calls `fetch_markets`
   directly again). 24/24 green (was 23). Files: `syndicate/features/shared/
   kalshi_polymarket_arb.py`, `tests/test_kalshi_polymarket_arb.py`,
-  `scripts/probe_kalshi_polymarket_arb.py`. **Not yet run live** -- the
-  same-evening finding two entries up (`.syndicate/deploys.md`, 21:52Z/
-  21:54Z) is that the board is soccer-only today because the MLB sim is
-  starved by `intelligence_pipeline_busy` (soccer odds-history re-reads
-  eating the execution guard), which this fetch fix does not touch -- a
-  live re-run of this scan today would still show `matched_games=0` for
-  that unrelated, upstream reason, not because this fix failed.
+  `scripts/probe_kalshi_polymarket_arb.py`.
+  **VERIFIED LIVE 2026-08-24T22:33:36Z, deploy `dep-da6cbd61egvs73b4bi50`:
+  `polymarket_moneylines_resolved` went 0 -> 687**, direct before/after
+  confirmation this fetch fix works in production (only 2 structural
+  refusals out of 689 rows seen). `matched_games` stayed 0 as predicted --
+  the board-starvation cause named below is unrelated to this fix and was
+  not touched by it. Probe flag off, redeploy confirmed live 22:38:02Z,
+  deploy claim (refresh-worker, token `ffcb3cbe7d79fad9`) released. Full
+  readout `.syndicate/deploys.md` same timestamp.
+- **THE END-TO-END GAP THIS SESSION FLAGGED CLOSED, SAME EVENING, BY THE
+  OWNING LANE -- not this session's work, recorded here because it directly
+  answers this lane's own "still missing" note above.**
+  `portfolio_commit.py::_venue_price_resolver` returning `(None, None)` for
+  every venue but Kalshi was named, in this session's `_polymarket_resolve_
+  market` docstring and PR #52, as the one piece needed before a Polymarket
+  order could reach the wired submitter end to end. Commit `04fd2c90`
+  ("Price the `paper:polymarket` book from Polymarket, not from the
+  aggregator") adds `_polymarket_price_resolver` and a new
+  `polymarket_board_join.py`, reading the SAME `polymarket_us_games.json`
+  artifact this lane's submitter reads; `polymarket_ticker_resolver`
+  returns the market's `slug` -- exactly what `venue_ticker` needs to be for
+  `_polymarket_resolve_market` to find it. Merged into this branch cleanly,
+  121 tests green. Not independently live-verified by this session -- that
+  lane's own claim and its own verification to run.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

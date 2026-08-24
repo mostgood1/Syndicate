@@ -26983,3 +26983,58 @@ so the `paper:polymarket` book is priced from the AGGREGATOR, not from
 Polymarket. Their revert was right — that is a board-join resolver across every
 market type, not a single-market lookup — and it means the Polymarket PRICING
 gap is unowned by them and owned here.
+
+---
+
+## 2026-08-24T22:38:02Z -- Offset-range fix (PR #51) verified live: polymarket_moneylines_resolved 0 -> 687
+
+**Deploy `dep-da6cbd61egvs73b4bi50` (commit `798e7126`, carries both PR #51
+and PR #52) confirmed live at 22:32:47Z.** Boot-probe log line, 22:33:36Z:
+
+    [kalshi_polymarket_arb] SCAN date=2026-08-24 result={'status': 'ok',
+    'date': '2026-08-24', 'kalshi_discovery': 'ok',
+    'kalshi_moneylines_resolved': 0, 'kalshi_refusals': {},
+    'polymarket_moneylines_resolved': 687,
+    'polymarket_refusals': {'not_two_sided:2v1': 1, 'price_out_of_range': 1},
+    'matched_games': 0, 'join_refusals': {}, 'opportunities': [],
+    'flagged_count': 0, 'fee_buffer_used': 0.04}
+
+**`polymarket_moneylines_resolved` went from 0 to 687** -- direct before/after
+confirmation that pointing the scan's Polymarket fetch at the real
+game-market offset range (PR #51, `fetch_game_markets` instead of one page
+at offset 0) works in production. Only 2 refusals out of 687+2, both
+structural (`not_two_sided:2v1` -- a market with an unexpected outcome
+count; `price_out_of_range` -- a price outside `(0,1)`), not evidence of a
+join defect.
+
+`kalshi_moneylines_resolved` and `matched_games` remain 0 -- unrelated to
+this fix, same cause as every earlier entry tonight: the board is
+soccer-only right now (MLB sim starved by `intelligence_pipeline_busy`), so
+there is no US-sport board row for Kalshi's own real moneylines to resolve
+against, and nothing on that side to join Polymarket's 687 against either.
+
+**Cleanup completed:** `SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT`
+flipped back to `0`, redeploy `dep-da6cdu3bc2fs73d2krk0` confirmed live
+22:38:02Z. Deploy claim (refresh-worker, token `ffcb3cbe7d79fad9`) released.
+
+**Same evening, unprompted: the portfolio-decision-and-execution lane closed
+the gap this session's PR #52 explicitly left open.** `_polymarket_resolve_
+market`'s own docstring (and this session's lane note) named
+`portfolio_commit.py::_venue_price_resolver` returning `(None, None)` for
+every venue but Kalshi as "the one piece still missing before a Polymarket
+order can reach the wired submitter end to end." Commit `04fd2c90` ("Price
+the `paper:polymarket` book from Polymarket, not from the aggregator") adds
+`_polymarket_price_resolver` + a new `polymarket_board_join.py` module,
+reading the SAME `polymarket_us_games.json` artifact this session's
+`_polymarket_resolve_market` reads, and `polymarket_ticker_resolver` returns
+the market's `slug` -- exactly the field `venue_ticker` needs to be for this
+session's submitter wiring to resolve it. **Merged into this branch cleanly,
+121 tests green (`test_execute_portfolio.py`, `test_portfolio_commit.py`,
+`test_polymarket_board_join.py`).** Not independently verified live by this
+session -- that lane's own claim, its own verification to do -- but the
+plumbing gap flagged tonight now appears closed on both ends.
+
+verify: `[kalshi_polymarket_arb] SCAN ... 'polymarket_moneylines_resolved':
+687 ...` in production logs at 22:33:36Z, up from `0` at every prior run
+today (21:26:00Z, 21:44:47Z, 22:04:10.986216985Z entries, all `polymarket_
+moneylines_resolved: 0`).
