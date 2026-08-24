@@ -228,6 +228,40 @@ def _game_has_started(feed: Mapping[str, Any]) -> bool:
     return str(state or "").strip().lower() in {"live", "final"}
 
 
+def _team_runs(feed: Mapping[str, Any]) -> tuple[float, float] | None:
+    """(home, away) runs, or None if either is missing.
+
+    Both or neither: a half-known score is not a score, and a missing away
+    total read as zero is a shutout that did not happen.
+    """
+    linescore = (feed.get("liveData") or {}).get("linescore") or {}
+    teams = linescore.get("teams") or {}
+    home = (teams.get("home") or {}).get("runs")
+    away = (teams.get("away") or {}).get("runs")
+    if home is None or away is None:
+        return None
+    try:
+        return float(home), float(away)
+    except (TypeError, ValueError):
+        return None
+
+
+def _feed_team_names(feed: Mapping[str, Any]) -> tuple[Any, Any]:
+    """(home, away) as the FEED names them.
+
+    Taken from the feed rather than from the order, deliberately. The order's
+    `home_team`/`away_team` came from the odds provider and are what the
+    schedule join already matched on -- but the SCORES come from this payload,
+    and pairing a score with a name from a different source is how a game gets
+    graded backwards. The two names travel with the two numbers.
+    """
+    teams = (feed.get("gameData") or {}).get("teams") or {}
+    return (
+        (teams.get("home") or {}).get("name"),
+        (teams.get("away") or {}).get("name"),
+    )
+
+
 def _combined_score(feed: Mapping[str, Any]) -> float | None:
     linescore = (feed.get("liveData") or {}).get("linescore") or {}
     teams = linescore.get("teams") or {}
@@ -250,6 +284,7 @@ def mlb_status_resolver(selected_date: str):
     reason the board build got slower.
     """
     from syndicate.features.mlb.box_score_stats import final_stat_value, load_final_feed
+    from syndicate.features.shared.game_line_bet import game_line_view, is_game_line_market
 
     # Built ONCE per resolver, on first use. Reading the schedule file per order
     # would turn a 58-order settle into 58 file reads for one unchanging answer.
@@ -300,10 +335,15 @@ def mlb_status_resolver(selected_date: str):
         # blockers counted BEFORE kickoff, not discovered after it.
         market = str(order.get("market") or "").strip().lower()
         is_game_total = market in _GAME_TOTAL_MARKETS
-        mapped = None if is_game_total else _stat_for_market(market)
-        if not is_game_total and mapped is None:
-            # Spreads, moneylines and every prop family not listed. Named rather
-            # than guessed -- a wrong stat produces a confident wrong verdict.
+        # SPREADS AND MONEYLINES ARE SCOREBOARD BETS, not player lines. They
+        # refused with `unmapped_market` until 2026-08-24 -- 41 spreads, 31
+        # h2h and 2 spreads_alt on a single slate, permanently ungraded --
+        # because the lookup below only ever knew player stats.
+        is_game_line = is_game_line_market("mlb", market)
+        mapped = None if (is_game_total or is_game_line) else _stat_for_market(market)
+        if not (is_game_total or is_game_line) and mapped is None:
+            # Every prop family not listed. Named rather than guessed -- a
+            # wrong stat produces a confident wrong verdict.
             return {"unavailable_reason": REASON_UNMAPPED_MARKET}
 
         feed = _feed(game_pk)
@@ -318,6 +358,40 @@ def mlb_status_resolver(selected_date: str):
             if total is None:
                 return {"unavailable_reason": REASON_NO_STAT}
             return {"current_value": total, "is_final": is_final, "started": started}
+
+        if is_game_line:
+            runs = _team_runs(feed)
+            if runs is None:
+                return {"unavailable_reason": REASON_NO_STAT}
+            home_runs, away_runs = runs
+            home_name, away_name = _feed_team_names(feed)
+            view = game_line_view(
+                sport="mlb",
+                market=market,
+                side=order.get("side"),
+                line=order.get("line"),
+                home_team=home_name,
+                away_team=away_name,
+                home_score=home_runs,
+                away_score=away_runs,
+                # BASEBALL DOES NOT DRAW. A regulation game plays until someone
+                # is ahead, so a moneyline here is two-way and a level score is
+                # a push rather than a loss. Passed explicitly rather than
+                # inferred from the market name, because production shows
+                # soccer using the SAME name (`h2h`) three-way.
+                draw_possible=False,
+            )
+            if view.get("unavailable_reason"):
+                return view
+            # `side` and `line` are RESTATED for the grader -- see
+            # `paper_settlement`. The order still records what was bet.
+            return {
+                "current_value": view["current_value"],
+                "side": view["side"],
+                "line": view["line"],
+                "is_final": is_final,
+                "started": started,
+            }
 
         group, stat = mapped
         value = final_stat_value(

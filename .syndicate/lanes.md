@@ -1647,7 +1647,9 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Probe scripts run and fail as designed (named refusal, non-zero exit,
   no crash) against the same agent-proxy denial every venue host hits. Full
   per-venue evidence: `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`,
-  `docs/ai_context/todo.md #542`. **OWED:** a `probe_*` run from refresh-worker
+  `docs/ai_context/todo.md #544` (renumbered from #542 on merge -- another lane
+  took #542/#543 first on `main`; see `scripts/todo_id_alloc.py`, which exists
+  for exactly this race). **OWED:** a `probe_*` run from refresh-worker
   (real outbound access) to confirm or correct every schema assumption, same as
   Kalshi's own first live run corrected 10 of 17 field names.
 

@@ -421,3 +421,91 @@ def test_an_absent_fee_is_charged_as_zero_not_refused():
     )
     assert graded["graded"] is True
     assert graded["pnl_dollars"] == pytest.approx(100.0 / 11.0, abs=1e-3)
+
+
+# --------------------------------------------------------------------------
+# Game lines reaching a graded outcome, through settle_orders itself
+# --------------------------------------------------------------------------
+
+
+def test_a_spread_order_grades_end_to_end(monkeypatch, tmp_path):
+    """The 80 orders a slate could never grade. This is the whole path: the
+    ledger record as it is actually written (side = a team NAME, line = the
+    quoted handicap), through `settle_orders`, to a stored outcome and P&L."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared.paper_settlement import settle_orders
+
+    request = ledger.OrderRequest(
+        position_key="spread-1", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e1", market="spreads",
+        # AS THE BOARD WRITES IT: the side is a club, not a direction.
+        side="Houston Astros", line=-1.5,
+        requested_price=-110.0, requested_stake_dollars=10.0,
+        home_team="Houston Astros", away_team="Seattle Mariners",
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+
+    # Houston won by 3, covering -1.5.
+    result = settle_orders(
+        "2026-08-22",
+        resolver=lambda order: {"current_value": 3, "side": "over", "line": 1.5,
+                                "is_final": True, "started": True},
+    )
+    assert result["graded"] == 1
+    assert result["outcomes"] == {"won": 1}
+
+    graded = ledger.find_order(ledger.idempotency_key(request))
+    assert graded["outcome"] == "won"
+    # -110 stake $10 -> $9.09 profit. The American-odds path is untouched by
+    # the probability-dollar work.
+    assert graded["pnl_dollars"] == pytest.approx(100.0 / 11.0, abs=1e-3)
+
+
+def test_the_resolver_can_restate_side_and_line_but_the_ORDER_cannot_change(
+    monkeypatch, tmp_path
+):
+    """The order records what was BET. A spread was bet on a club, and the
+    ledger must keep saying so however the grader needed it phrased -- the
+    record is the durable account of the position, not a scratch pad for the
+    grading step."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared.paper_settlement import settle_orders
+
+    request = ledger.OrderRequest(
+        position_key="spread-2", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e2", market="h2h", side="Seattle Mariners",
+        requested_price=-110.0, requested_stake_dollars=10.0,
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+    settle_orders(
+        "2026-08-22",
+        resolver=lambda order: {"current_value": -3, "side": "over", "line": 0.0,
+                                "is_final": True, "started": True},
+    )
+
+    stored = ledger.find_order(ledger.idempotency_key(request))
+    assert stored["side"] == "Seattle Mariners"
+    assert stored["outcome"] == "lost"
+
+
+def test_a_player_prop_ignores_the_override_path(monkeypatch, tmp_path):
+    """A resolver that says nothing about side or line leaves the order's own
+    fields in charge -- so every prop that already graded is untouched."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared.paper_settlement import settle_orders
+
+    request = ledger.OrderRequest(
+        position_key="prop-1", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e3", market="strikeouts", side="over", line=4.5,
+        player_name="Framber Valdez",
+        requested_price=-110.0, requested_stake_dollars=10.0,
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+    settle_orders(
+        "2026-08-22",
+        resolver=lambda order: {"current_value": 7, "is_final": True, "started": True},
+    )
+    assert ledger.find_order(ledger.idempotency_key(request))["outcome"] == "won"

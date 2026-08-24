@@ -46,6 +46,11 @@ __all__ = ["wnba_status_resolver"]
 REASON_NO_EVENT_ID = "no_event_id"
 REASON_NO_BOX = "no_live_box_for_date"
 REASON_GAME_NOT_IN_BOX = "game_not_in_live_box"
+# The market IS gradeable in principle -- `game_line_bet` handles spreads and
+# moneylines for any sport that can supply two team scores. This capture is a
+# PLAYER box and has none, so the fix is upstream in the capture rather than a
+# missing entry in a table here.
+REASON_NO_TEAM_SCORES = "no_team_scores_in_player_box"
 REASON_UNMAPPED_MARKET = "unmapped_market"
 REASON_PLAYER_NOT_FOUND = "player_not_in_box"
 REASON_NO_STAT = "stat_not_in_box"
@@ -95,6 +100,7 @@ def wnba_status_resolver(selected_date: str):
     The box is read ONCE per resolver, not once per order: a slate of forty
     orders must not mean forty reads of one unchanging artifact.
     """
+    from syndicate.features.shared.game_line_bet import is_game_line_market
     from syndicate.features.shared.wnba_live_prop_rows import normalize_name
 
     cache: dict[str, Any] = {}
@@ -120,6 +126,19 @@ def wnba_status_resolver(selected_date: str):
         box_key = _MARKET_TO_BOX_KEY.get(market)
         sum_keys = _MARKET_TO_BOX_SUM.get(market)
         if box_key is None and sum_keys is None:
+            # A GAME LINE IS NOT AN UNMAPPED PROP, and lumping the two together
+            # is what made this invisible. `game_line_bet` can grade spreads
+            # and moneylines for any sport that supplies two team scores; this
+            # artifact is a PLAYER box and carries none, so the blocker is the
+            # capture, not the vocabulary.
+            #
+            # MLB gained game-line grading on 2026-08-24; WNBA did not, and
+            # this reason is the difference between "add four market names"
+            # (wrong, and would have been tried) and "the box needs team
+            # scores in it" (right). Reported honestly rather than made to
+            # look like the same fix.
+            if is_game_line_market("wnba", market):
+                return {"unavailable_reason": REASON_NO_TEAM_SCORES}
             return {"unavailable_reason": REASON_UNMAPPED_MARKET}
 
         event_id = str(order.get("event_id") or "").strip()

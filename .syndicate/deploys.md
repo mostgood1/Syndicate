@@ -25732,3 +25732,45 @@ generation is. And the 46c order still rests while the market moved to 44c;
 its ledger row is `submitted`, so the marketable-limit path treats a re-place
 as a duplicate. Cancelling it at the venue is the unblock, and that needs a
 decision rather than a guess.
+
+---
+
+### 2026-08-24 15:49:54Z — THE FIRST FILL THE SYSTEM DETECTED BY ITSELF
+
+Not a deploy entry. The measurement the whole reconciliation layer was built
+to produce, and the first one that did not need a human looking at the Kalshi
+UI to notice.
+
+    COUNT_FIELDS fill_count_fp='3.00' initial_count_fp='3.00'
+      remaining_count_fp='0.00' taker_fees_dollars='0.026300'
+      taker_fill_cost_dollars='1.500000' status='executed'
+    RECONCILED key=6d236014493f616c7a0b5aad
+      ticker=KXMLBKS-26AUG241840BOSMIA-MIASALCANTARA22-5
+      submitted->filled venue_status='executed' contracts=3 fill_price=0.5
+      fees=0.0263
+
+Sandy Alcantara over 4.5 strikeouts, 3 contracts at $0.50, $1.50 + $0.0263 fee
+(1.75%). The user confirmed it independently on Kalshi; the ledger had it
+already.
+
+**Every piece of the day's work is exercised in those two lines:**
+
+- The order was placed by the marketable-limit path after the stale 46¢ order
+  was cancelled — the cancel, the `rejected` reclassification, and the
+  re-place all ran without intervention.
+- `submitted -> filled` is the transition the submit response CANNOT report,
+  because it was written before the fill. Without the venue read this position
+  would have been real and invisible for its whole life. That was the stated
+  reason for building it and it happened on the first order.
+- `fill_count_fp='3.00'` confirms `_fp` is a quoted decimal, not a
+  fixed-point scale. `implausible=0`. The bound never fired and the question
+  is closed rather than guarded.
+- `fees=0.0263` is the first fee this system has ever booked. Every P&L
+  number before today modelled it as zero.
+- `fill_price=0.5` from `taker_fill_cost_dollars / fill_count`, i.e. Kalshi's
+  own arithmetic rather than ours.
+
+**Still owed:** settlement has never graded a Kalshi fill. `profit_per_dollar`
+now picks probability-dollar math over American odds and nets the fee, but no
+production run has exercised it. First contract to settle is the proof; until
+then that path is tested and unmeasured.

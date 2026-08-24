@@ -245,10 +245,23 @@ def settle_orders(
             _refuse(reason, order.get("market") if reason == "unmapped_market" else None)
             continue
 
+        # THE RESOLVER MAY RESTATE `side` AND `line`, and for game lines it must.
+        #
+        # A spread arrives on the order as `side="Texas Rangers", line=-1.5` and
+        # a moneyline as `side="Levante", line=None`. Neither is expressible in
+        # the grader's over/under vocabulary, which is why 80 of 171 orders on
+        # 2026-08-23 refused with `unmapped_market` and always would have.
+        # `game_line_bet` translates them into a value, a direction and a
+        # number; the ORDER cannot be rewritten (it records what was actually
+        # bet), so the translation has to arrive here.
+        #
+        # Falls back to the order's own fields, so every player prop is
+        # untouched by this and the resolver only speaks up when it has
+        # something different to say.
         status = resolve_bet_status(
             market=order.get("market"),
-            side=order.get("side"),
-            line=order.get("line"),
+            side=resolved.get("side", order.get("side")),
+            line=resolved.get("line", order.get("line")),
             current_value=resolved.get("current_value"),
             is_final=bool(resolved.get("is_final")),
             started=bool(resolved.get("started", True)),

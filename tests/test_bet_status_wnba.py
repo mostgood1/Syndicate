@@ -183,3 +183,27 @@ def test_the_box_is_read_once_per_resolver_not_once_per_order(_isolated, monkeyp
         resolve(_order())
     # Forty orders must not mean forty reads of one unchanging artifact.
     assert reads["n"] == 1
+
+
+def test_a_game_line_names_the_CAPTURE_as_the_blocker_not_the_vocabulary(monkeypatch):
+    """`unmapped_market` on a spread would send the next person to add four
+    market names to a table, which would not work: `game_line_bet` already
+    grades spreads for any sport that can supply two team scores, and this
+    artifact is a PLAYER box that carries none.
+
+    MLB gained game-line grading on 2026-08-24 and WNBA did not. The reason
+    string is the difference between the two fixes."""
+    from syndicate.features.shared import bet_status_wnba as mod
+
+    resolve = mod.wnba_status_resolver("2026-08-22")
+    for market in ("spreads", "h2h", "h2h_3_way", "spreads_alt"):
+        out = resolve({"sport": "wnba", "market": market, "side": "Las Vegas Aces"})
+        assert out["unavailable_reason"] == mod.REASON_NO_TEAM_SCORES, market
+
+
+def test_an_actually_unknown_market_still_says_so(monkeypatch):
+    from syndicate.features.shared import bet_status_wnba as mod
+
+    resolve = mod.wnba_status_resolver("2026-08-22")
+    out = resolve({"sport": "wnba", "market": "player_double_double", "side": "over"})
+    assert out["unavailable_reason"] == mod.REASON_UNMAPPED_MARKET
