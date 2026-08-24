@@ -236,3 +236,131 @@ def test_a_game_total_is_still_graded_from_the_scoreboard(schedule, monkeypatch)
     verdict = resolve({**_order(), "sport": "mlb", "market": "totals"})
     assert verdict.get("unavailable_reason") is None
     assert verdict["current_value"] == 8.0
+
+
+# --------------------------------------------------------------------------
+# Game lines, end to end through the real resolver
+# --------------------------------------------------------------------------
+#
+# MEASURED 2026-08-24, every settlement cycle:
+#
+#     UNMAPPED_MARKETS date=2026-08-23
+#       {'spreads': 41, 'h2h': 31, 'h2h_3_way': 6, 'spreads_alt': 2}
+#
+# Scoreboard bets went through a lookup that only ever knew player stats.
+
+
+def _feed(home_runs, away_runs, *, state="Final",
+          home="Houston Astros", away="Seattle Mariners"):
+    return {
+        "gameData": {
+            "status": {"abstractGameState": state},
+            "teams": {"home": {"name": home}, "away": {"name": away}},
+        },
+        "liveData": {
+            "linescore": {"teams": {"home": {"runs": home_runs},
+                                    "away": {"runs": away_runs}}}
+        },
+    }
+
+
+@pytest.fixture
+def resolver(schedule, monkeypatch):
+    """The real resolver, with only the FEED READ stubbed.
+
+    The schedule join, the market dispatch, the team resolution and the
+    translation all run for real -- stubbing further up would test the stub.
+    """
+    schedule.append(_game(777001, "Houston Astros", "Seattle Mariners"))
+    feeds: dict = {}
+
+    def build(feed):
+        feeds["payload"] = feed
+        monkeypatch.setattr(
+            "syndicate.features.mlb.box_score_stats.load_final_feed",
+            lambda date, pk, fetch_if_missing=True: feeds.get("payload"),
+        )
+        return mod.mlb_status_resolver("2026-08-22")
+
+    return build
+
+
+def _mlb_order(**kw):
+    order = {
+        "sport": "mlb",
+        "home_team": "Houston Astros",
+        "away_team": "Seattle Mariners",
+        "commence_time": "2026-08-22T23:10:00Z",
+    }
+    order.update(kw)
+    return order
+
+
+def test_a_spread_resolves_instead_of_refusing_as_unmapped(resolver):
+    """The exact refusal that produced `spreads: 41`."""
+    resolve = resolver(_feed(6, 3))
+    out = resolve(_mlb_order(market="spreads", side="Houston Astros", line=-1.5))
+
+    assert out.get("unavailable_reason") is None
+    # RESTATED for the grader: the order still records `side="Houston Astros"`.
+    assert out["side"] == "over"
+    assert out["line"] == 1.5
+    assert out["current_value"] == 3
+    assert out["is_final"] is True
+
+
+def test_a_moneyline_resolves(resolver):
+    resolve = resolver(_feed(6, 3))
+    out = resolve(_mlb_order(market="h2h", side="Houston Astros", line=None))
+    assert out.get("unavailable_reason") is None
+    assert out["current_value"] == 3 and out["line"] == 0.0
+
+
+def test_the_losing_side_of_the_same_game_reads_negative(resolver):
+    resolve = resolver(_feed(6, 3))
+    out = resolve(_mlb_order(market="h2h", side="Seattle Mariners", line=None))
+    assert out["current_value"] == -3
+
+
+def test_the_scores_are_paired_with_the_FEED_s_own_team_names(resolver):
+    """The scores come from this payload, so the names must too. Pairing a
+    score with a name from the odds provider is how a game gets graded
+    backwards -- and the two sources genuinely disagree on club naming."""
+    resolve = resolver(_feed(6, 3, home="Seattle Mariners", away="Houston Astros"))
+    # The FEED says Seattle is home and won 6-3, whatever the order believes.
+    out = resolve(_mlb_order(market="h2h", side="Seattle Mariners", line=None))
+    assert out["current_value"] == 3
+
+
+def test_a_game_with_no_linescore_yet_is_a_named_absence(resolver):
+    """Not a zero-zero draw."""
+    resolve = resolver(_feed(None, None, state="Preview"))
+    out = resolve(_mlb_order(market="spreads", side="Houston Astros", line=-1.5))
+    assert out["unavailable_reason"] == mod.REASON_NO_STAT
+
+
+def test_an_in_progress_game_line_is_not_final(resolver):
+    resolve = resolver(_feed(8, 0, state="Live"))
+    out = resolve(_mlb_order(market="spreads", side="Houston Astros", line=-1.5))
+    assert out["is_final"] is False
+    assert out["started"] is True
+
+
+def test_a_player_prop_still_takes_the_player_path(resolver, monkeypatch):
+    """The game-line branch must not swallow the props that already worked."""
+    # Patched BEFORE the resolver is built: it binds `final_stat_value` at
+    # closure-construction time, so a later patch never reaches it.
+    monkeypatch.setattr(
+        "syndicate.features.mlb.box_score_stats.final_stat_value",
+        lambda feed, group, stat, player_name: 7,
+    )
+    resolve = resolver(_feed(6, 3))
+    out = resolve(_mlb_order(market="strikeouts", side="over", line=4.5,
+                             player_name="Framber Valdez"))
+    assert out["current_value"] == 7
+
+
+def test_an_unknown_market_is_still_refused_by_name(resolver):
+    resolve = resolver(_feed(6, 3))
+    out = resolve(_mlb_order(market="batter_stolen_bases", side="over", line=0.5))
+    assert out["unavailable_reason"] == mod.REASON_UNMAPPED_MARKET
