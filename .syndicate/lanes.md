@@ -1115,6 +1115,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
 ### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **Soccer's live tier chased end to end and ANSWERED: 88% of live prop quotes are ONE-SIDED, so the edge cannot exist downstream. `#503` retired — it was a misplaced `return`, not a pricing call. The question is now the ODDS FETCH.**
+
+- **NARROW CARVE-OUT taken 2026-08-24 ~23:0xZ by lane `portfolio-decision-and-execution`** (session 9324a3e5), at the user's explicit direction to "find where the 8,694 go". **ONE PRINT STATEMENT, log-only, zero behaviour change**: `pipeline/intelligence_state.py`'s `LAYER2_SHORTLIST` line now also prints `beyond_horizon`, `stale_kickoff`, `beyond_quote_age`, `implausible_book`, `excluded_market`, `uninformative_ev` and `beyond_game_cap`. **Nothing new is computed** — `select_shortlist` already returns all seven; they were simply never printed, so `rows=0 considered=8694 below_floor=0` was undiagnosable. That is the failure `layer2_board.py`'s own comments name three times (`#373`, `#391`, `#397`). No other line in either file touched. Back it out and hand it over if it collides with anything in flight.
 - Narrative, evidence, dead ends: `.syndicate/log/2026-08-22.md` and
   `log/2026-08-23.md` (two blocks). Subject facts: `state.md
   [live-refresh-ownership]` and `[shortlist-payload-budget]`.

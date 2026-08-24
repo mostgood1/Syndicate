@@ -5105,6 +5105,32 @@ class IntelligenceStateService:
                 # one hop earlier, and it cost three investigations there.
                 f"below_floor={layer2_shortlist.get('rows_below_value_floor')} "
                 f"admitted_by_blend={layer2_shortlist.get('rows_admitted_by_blend')} "
+                # EVERY OTHER DROP COUNTER, because `rows=0 considered=8694
+                # below_floor=0` was unreadable without them. MEASURED
+                # 2026-08-24 23:02Z: 8,694 opportunities became zero rows while
+                # the only two counters on this line both said zero, so the
+                # board looked broken when the rows may simply have aged out of
+                # a finished slate.
+                #
+                # `select_shortlist` ALREADY computes and returns all of these
+                # -- `rows_beyond_horizon`, `rows_stale_kickoff`,
+                # `rows_beyond_quote_age`, `rows_implausible_book`,
+                # `rows_excluded_market`, `rows_uninformative_ev`,
+                # `rows_beyond_game_cap`. Nothing new is counted here; they were
+                # simply never printed, so eight rules trimmed silently.
+                #
+                # That is the exact failure `layer2_board.py`'s own comments
+                # name three separate times (`#373`, `#391`, `#397`): "a rule
+                # that trims silently is a rule nobody can tell apart from a
+                # thin slate". The counters shipped with their rules as that
+                # discipline requires; the LOG LINE never caught up.
+                f"beyond_horizon={layer2_shortlist.get('rows_beyond_horizon')} "
+                f"stale_kickoff={layer2_shortlist.get('rows_stale_kickoff')} "
+                f"beyond_quote_age={layer2_shortlist.get('rows_beyond_quote_age')} "
+                f"implausible_book={layer2_shortlist.get('rows_implausible_book')} "
+                f"excluded_market={layer2_shortlist.get('rows_excluded_market')} "
+                f"uninformative_ev={layer2_shortlist.get('rows_uninformative_ev')} "
+                f"beyond_game_cap={layer2_shortlist.get('rows_beyond_game_cap')} "
                 f"sports={layer2_shortlist.get('active_sports')}",
                 flush=True,
             )
