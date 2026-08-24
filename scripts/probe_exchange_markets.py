@@ -87,25 +87,22 @@ def run_all_probes_if_enabled() -> dict[str, Any] | None:
     return results
 
 
-def run_novig_csv_diagnosis_if_enabled(*, limit: int = 4000) -> dict[str, Any] | None:
-    """A SEPARATE, one-off diagnostic -- not part of the routine probe above.
-
-    `fetch_daily_csv` 403'd on its first live call (`.syndicate/deploys.md`
-    2026-08-24T17:24:50Z). This fires several candidate URL shapes/headers to
-    find out WHY, rather than guessing a fix. Its own flag
-    (`SYNDICATE_NOVIG_CSV_DIAGNOSE_ON_BOOT`) so it never rides along on an
-    ordinary schema-verification boot -- it makes ~14 requests, one-time
-    investigative cost, not a routine one.
+def run_novig_csv_snapshot_probe_if_enabled(*, limit: int = 4000) -> dict[str, Any] | None:
+    """Verify the REAL, dated CSV structure (`/reporting/trade-data/...`,
+    real docs.novig.com content supplied 2026-08-24) against a live response
+    -- the flat-path guess this replaced (`diagnose_daily_csv_403`, since
+    deleted) never had a chance to succeed; this checks the fix, not a
+    hypothesis. Own flag so it never rides along on the routine six-venue
+    probe above.
     """
-    if not _env_bool("SYNDICATE_NOVIG_CSV_DIAGNOSE_ON_BOOT", default=False):
+    if not _env_bool("SYNDICATE_NOVIG_CSV_SNAPSHOT_PROBE_ON_BOOT", default=False):
         return None
-    from syndicate.features.shared.novig_client import diagnose_daily_csv_403
+    from syndicate.features.shared.novig_client import fetch_latest_markets_snapshot
 
-    print("[novig_csv_diagnose] STARTING", flush=True)
-    result = diagnose_daily_csv_403()
-    for attempt in result.get("attempts", []):
-        print(f"[novig_csv_diagnose] ATTEMPT " + json.dumps(attempt, default=str)[:limit], flush=True)
-    print("[novig_csv_diagnose] DONE", flush=True)
+    print("[novig_csv_snapshot] STARTING", flush=True)
+    result = fetch_latest_markets_snapshot()
+    print("[novig_csv_snapshot] RESULT " + json.dumps(result, default=str)[:limit], flush=True)
+    print("[novig_csv_snapshot] DONE", flush=True)
     return result
 
 

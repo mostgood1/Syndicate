@@ -17,16 +17,32 @@ records for Kalshi) found Novig exposes THREE structurally different things,
 and conflating any two of them would misrepresent what this module can
 actually do:
 
-1. **`data.novig.com` -- documented as a public, no-auth, CDN-served daily CSV
-   mirror** (`trades.csv`, `markets.csv`). **CORRECTED 2026-08-24T17:24:50Z**:
-   the first live call from refresh-worker got `http_403` on
-   `markets.csv`, not the 200 this docstring originally assumed from research
-   alone. Not yet root-caused -- could be a wrong path, a missing header this
-   client doesn't send, or the "public" characterization being wrong outright.
-   Treat this tier as UNVERIFIED again until that is resolved; `fetch_daily_csv()`
-   still implements it (unchanged, since there is nothing to fix without
-   knowing WHY it 403'd) and `probe()` still reports the real response rather
-   than hiding the failure.
+1. **`data.novig.com` -- public, no-auth, CDN-served daily CSV mirror**
+   (`trades.csv`, `markets.csv`). **RESOLVED 2026-08-24, twice over.** The
+   first live call from refresh-worker got `http_403` on a flat
+   `{base}/markets.csv` -- a path this module invented from a paraphrase
+   ("two anonymized files for every trading day"), not read from real docs.
+   The user then supplied the actual documented structure directly:
+   **files are DATED and INDEXED, not flat.**
+
+       GET /reporting/trade-data/index.json                -- which dates exist
+       GET /reporting/trade-data/{date}/trades.csv          -- one trading day
+       GET /reporting/trade-data/{date}/markets.csv         -- one trading day
+
+   The flat path was never going to exist; the 403 was CDN default-deny on a
+   missing key, not an auth problem or a wrong header, confirming the
+   `diagnose_daily_csv_403` hypothesis that never got to run. That diagnostic
+   is RETIRED (deleted, not merely superseded) now that the real shape is
+   known rather than guessed at -- keeping it would have meant maintaining
+   dead speculative code alongside a definitive fix.
+
+   **THIS IS END-OF-DAY DATA, NOT LIVE ODDS.** Each day "publishes shortly
+   after midnight Eastern" for the PRIOR trading day -- a closing-line /
+   historical feed. `fetch_latest_markets_snapshot()` exists to populate
+   Syndicate's odds from this, and its docstring repeats this warning because
+   presenting yesterday's close as a current price is the exact "stale data
+   read as fresh" failure this repo's own `CLAUDE.md` names as a standing
+   trap (`Render is the source of truth` section).
 2. **The official "NBX API"** (`docs.novig.com`, REST under
    `api.novig.us/nbx/v1|v2`, OAuth2 client-credentials) -- Novig's own
    documented, versioned, supported API. Confirmed by multiple independent
@@ -106,12 +122,18 @@ from typing import Any
 
 __all__ = [
     "probability_to_american",
+    "cents_to_probability",
+    "cents_to_american",
     "normalize_market",
+    "normalize_trade_row",
+    "normalize_market_row",
     "load_credentials",
     "fetch_open_markets",
     "fetch_market",
+    "fetch_trade_data_index",
+    "latest_market_date",
     "fetch_daily_csv",
-    "diagnose_daily_csv_403",
+    "fetch_latest_markets_snapshot",
     "probe",
     "NovigError",
 ]
@@ -171,7 +193,20 @@ _ORDER_CANCEL_PATH = "/emm/orders"  # CONFIRMED path prefix ({base}/emm/orders/{
 _RATE_LIMIT_HEADERS_ARE_MILLISECONDS = True
 
 # Tier 1: the genuinely public, no-auth CSV mirror. Historical/EOD, not live.
-_DAILY_CSV_BASE = "https://data.novig.com"
+# CONFIRMED structure 2026-08-24 (real docs.novig.com content, supplied
+# directly): dated files under a fixed reporting root, indexed by a manifest
+# that tracks trades' and markets' available dates SEPARATELY -- the two
+# publish independently, so a date can have a markets snapshot with no trades
+# file (a day that failed trade validation is withheld; its market census is
+# not).
+_TRADE_DATA_BASE = "https://data.novig.com/reporting/trade-data"
+_INDEX_PATH = "/index.json"
+
+# markets.csv `status` values that accept new orders right now, per the
+# documented enum (active/closed/determined/finalized). Used to filter a
+# snapshot down to markets actually worth pricing -- a closed/determined/
+# finalized market has a real close price but nothing to quote.
+_MARKET_STATUS_TRADEABLE = frozenset({"active"})
 
 # The fields a `GET /emm/markets/{marketId}` row carries. CORRECTED
 # 2026-08-24 against real `docs.novig.com` page content supplied directly
@@ -224,6 +259,167 @@ def _as_probability(value: Any) -> float | None:
     if parsed != parsed or not (0.0 < parsed < 1.0):
         return None
     return parsed
+
+
+def cents_to_probability(cents: Any) -> float | None:
+    """A `markets.csv` OHLC price -- CENTS, 0.0-100.0, one decimal -- to a
+    probability. **A DIFFERENT CONVENTION from `probability_to_american`'s
+    input**, which is the REST tier's already-0-1 decimal probability. The
+    docs' own example: "a close of 47.5 is a probability of 0.475." Mixing
+    the two conventions -- handing a CSV cents value to something expecting
+    0-1 already, or vice versa -- is a 100x error of exactly the shape
+    `kalshi_client`'s dollars-vs-cents bug was, which is why this is a
+    separate, named function rather than a shared `_as_probability` reused
+    across both tiers.
+
+    Empty string (the documented value for "no trades that day") and values
+    outside (0, 100) return None -- 0 and 100 are a resolved-or-impossible
+    price the same way 0/1 are for the REST tier's convention.
+    """
+    if cents is None or cents == "":
+        return None
+    try:
+        parsed = float(cents)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed or not (0.0 < parsed < 100.0):
+        return None
+    return parsed / 100.0
+
+
+def cents_to_american(cents: Any) -> int | None:
+    """A `markets.csv` OHLC price straight to American odds."""
+    return probability_to_american(cents_to_probability(cents))
+
+
+def _decimal_or_none(value: Any) -> Any:
+    """A CSV numeric field, parsed via `Decimal(str(...))` rather than
+    `float()` -- `cost`/`qty`/`openInterest`/`dailyVolume` are documented as
+    carrying FULL NUMERIC PRECISION, and a raw float parse is exactly the
+    class of error `novig_orders.cash_units_for_stake` was fixed for in this
+    same lane (`12.345` misrepresented in binary float). Returns `None` for
+    an empty string or an unparseable value -- never `Decimal("0")`, which
+    would claim a real zero where the field was simply absent.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    if value is None or value == "":
+        return None
+    try:
+        return Decimal(str(value))
+    except InvalidOperation:
+        return None
+
+
+def normalize_trade_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    """One `trades.csv` row (one SIDE of a trade -- see module header:
+    every trade appears as one TAKER row plus one MAKER row per
+    counterparty), typed and with the documented derived fields computed.
+
+    `price` = `cost / qty` -- "the price one side paid, a probability
+    between 0 and 1" per the docs' own words, computed here rather than left
+    for every caller to derive and possibly get backwards (e.g. `qty / cost`,
+    which is NOT a probability and would not even be bounded).
+    """
+    cost = _decimal_or_none(row.get("cost"))
+    qty = _decimal_or_none(row.get("qty"))
+    price = None
+    if cost is not None and qty is not None and qty != 0:
+        price = float(cost / qty)
+    return {
+        "timestamp": row.get("timestamp"),
+        "outcome_id": row.get("outcomeId"),
+        "market_id": row.get("marketId"),
+        "contract_series": row.get("contractSeries"),
+        "league": row.get("league") or None,  # documented empty for a COMBO
+        "market_type": row.get("marketType") or None,  # documented empty for a COMBO
+        "trade_type": row.get("tradeType"),  # STRAIGHT | COMBO
+        "legs": int(row["legs"]) if str(row.get("legs") or "").strip().isdigit() else None,
+        "cost": cost,
+        "qty": qty,
+        "side": row.get("side"),  # TAKER | MAKER
+        "price_probability": price,
+        "price_american": probability_to_american(price) if price is not None else None,
+    }
+
+
+def normalize_market_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    """One `markets.csv` row -- a market's daily census, whether or not it
+    traded. OHLC fields are CENTS (`cents_to_probability`), not the REST
+    tier's 0-1 decimal -- see that function's docstring for why the
+    distinction is load-bearing. Empty OHLC strings (documented: "no trades
+    that day") become `None` throughout, never a silent 0.0 that would read
+    as a real price.
+    """
+    close_probability = cents_to_probability(row.get("close"))
+    return {
+        "date": row.get("date"),
+        "market_id": row.get("marketId"),
+        "report_ticker": row.get("reportTicker"),
+        "open_interest": _decimal_or_none(row.get("openInterest")),
+        "daily_volume": _decimal_or_none(row.get("dailyVolume")),
+        "open_probability": cents_to_probability(row.get("open")),
+        "high_probability": cents_to_probability(row.get("high")),
+        "low_probability": cents_to_probability(row.get("low")),
+        "close_probability": close_probability,
+        "close_american": probability_to_american(close_probability) if close_probability is not None else None,
+        "status": row.get("status"),  # active | closed | determined | finalized
+        "traded_today": row.get("open") not in (None, ""),
+    }
+
+
+def fetch_latest_markets_snapshot(
+    *, status_filter: frozenset[str] | None = _MARKET_STATUS_TRADEABLE, timeout: float = 20.0
+) -> dict[str, Any]:
+    """THE ENTRY POINT for "populate our odds from the public CSV mirror."
+
+    Resolves the latest published `markets.csv` date from the index, fetches
+    it, and normalizes every row. **THIS IS THE PRIOR TRADING DAY'S CLOSE,
+    NOT A LIVE PRICE** -- see module header. A caller building a live or
+    pregame board from this is mis-using it; a caller building closing-line
+    history, CLV comparisons, or a slow-moving reference price is using it
+    correctly. The returned `date` and `is_stale_by_days` (calendar days
+    between the snapshot date and today, UTC) exist so a consuming board can
+    refuse to render this as current rather than silently doing so.
+
+    `status_filter=None` returns every market regardless of status (useful
+    for historical/closed-market analysis); the default keeps only `active`
+    markets, i.e. ones that could still be quoted.
+    """
+    from datetime import date as _date, datetime, timezone
+
+    index = fetch_trade_data_index(timeout=timeout)
+    if index.get("status") != "ok":
+        return {"status": "error", "reason": index.get("reason", "index_fetch_failed")}
+
+    resolved_date = latest_market_date(index)
+    if resolved_date.get("status") != "ok":
+        return {"status": "error", "reason": resolved_date.get("reason")}
+    target_date = resolved_date["date"]
+
+    csv_result = fetch_daily_csv("markets", target_date, timeout=timeout)
+    if csv_result.get("status") != "ok":
+        return {"status": "error", "reason": csv_result.get("reason"), "date": target_date}
+
+    rows = [normalize_market_row(r) for r in csv_result.get("rows") or []]
+    if status_filter is not None:
+        rows = [r for r in rows if r.get("status") in status_filter]
+
+    try:
+        snapshot_date = _date.fromisoformat(target_date)
+        is_stale_by_days = (datetime.now(timezone.utc).date() - snapshot_date).days
+    except ValueError:
+        is_stale_by_days = None
+
+    return {
+        "status": "ok",
+        "date": target_date,
+        "is_stale_by_days": is_stale_by_days,
+        "status_filter": sorted(status_filter) if status_filter is not None else None,
+        "markets": rows,
+        "count": len(rows),
+        "available_market_dates": index.get("market_dates"),
+    }
 
 
 def normalize_market(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -415,18 +611,78 @@ def fetch_market(market_id: str) -> dict[str, Any]:
     return {"status": "ok", "url": url, "market": market}
 
 
-def fetch_daily_csv(name: str, *, timeout: float = 20.0) -> dict[str, Any]:
-    """Tier 1: the genuinely public, no-auth daily CSV mirror.
+def fetch_trade_data_index(*, timeout: float = 20.0) -> dict[str, Any]:
+    """The manifest: which dates have a `trades.csv`, which have a
+    `markets.csv`. The two are tracked SEPARATELY (`dates` vs `marketDates`)
+    because they publish independently -- a day whose trades failed
+    validation is withheld while its market census still ships.
 
-    `name` is `"trades"` or `"markets"` -- the two dumps research found
-    documented at `docs.novig.com/api-reference/trade-data`. This is
-    END-OF-DAY tape, never a live quote; a caller wanting current prices needs
-    tier 2, credentials or not. Runnable today, unlike `fetch_open_markets`.
+    `marketDates` is absent on manifests predating that field -- read as an
+    empty list, per the documented behaviour, not as a fetch failure.
+    """
+    url = f"{_TRADE_DATA_BASE}{_INDEX_PATH}"
+    try:
+        raw_body = _get(url, headers={"Accept": "application/json"}, timeout=timeout)
+        payload = json.loads(raw_body.decode("utf-8"))
+    except NovigError as exc:
+        return {"status": "error", "reason": str(exc), "url": url}
+    except (ValueError, UnicodeDecodeError) as exc:
+        return {"status": "error", "reason": f"undecodable_response: {exc}", "url": url}
+    if not isinstance(payload, Mapping):
+        return {"status": "error", "reason": f"unexpected_shape: got {type(payload).__name__}", "url": url}
+
+    dates = payload.get("dates")
+    market_dates = payload.get("marketDates")
+    if not isinstance(dates, list):
+        return {"status": "error", "reason": "no_dates_array", "url": url}
+
+    return {
+        "status": "ok",
+        "url": url,
+        "dates": sorted(str(d) for d in dates),
+        # Documented absence-means-empty, not a missing-field refusal --
+        # this key genuinely may not exist yet on an older manifest.
+        "market_dates": sorted(str(d) for d in market_dates) if isinstance(market_dates, list) else [],
+    }
+
+
+def latest_market_date(index: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The most recent date `markets.csv` is published for, or a NAMED
+    reason there isn't one. Fetches the index itself when not given one, so
+    a caller doing one thing can call this alone."""
+    manifest = index if index is not None else fetch_trade_data_index()
+    if manifest.get("status") != "ok":
+        return {"status": "error", "reason": manifest.get("reason", "index_fetch_failed")}
+    dates = manifest.get("market_dates") or []
+    if not dates:
+        return {"status": "error", "reason": "no_market_dates_published"}
+    return {"status": "ok", "date": dates[-1]}
+
+
+def _daily_csv_url(name: str, date: str) -> str:
+    return f"{_TRADE_DATA_BASE}/{date}/{name}.csv"
+
+
+def fetch_daily_csv(name: str, date: str, *, timeout: float = 20.0) -> dict[str, Any]:
+    """Tier 1: the genuinely public, no-auth daily CSV mirror -- ONE
+    dated file. `name` is `"trades"` or `"markets"`; `date` is `YYYY-MM-DD`
+    and must come from `fetch_trade_data_index()` (or `latest_market_date()`)
+    rather than guessed -- an unpublished date 403s the same way the old
+    flat-path guess did, for the same underlying reason (CDN default-deny on
+    a missing key).
+
+    Rows are returned as RAW STRINGS from the CSV, not type-converted --
+    `normalize_trade_row` / `normalize_market_row` do that, deliberately
+    separate, so a parsing assumption can be wrong without this function
+    needing to change.
     """
     key = str(name or "").strip().lower()
     if key not in ("trades", "markets"):
         return {"status": "error", "reason": "invalid_name", "name": name}
-    url = f"{_DAILY_CSV_BASE}/{key}.csv"
+    day = str(date or "").strip()
+    if not day:
+        return {"status": "error", "reason": "no_date"}
+    url = _daily_csv_url(key, day)
     try:
         raw_body = _get(url, headers={"Accept": "text/csv"}, timeout=timeout)
     except NovigError as exc:
@@ -441,92 +697,11 @@ def fetch_daily_csv(name: str, *, timeout: float = 20.0) -> dict[str, Any]:
         "status": "ok",
         "url": url,
         "name": key,
+        "date": day,
         "count": len(rows),
         "columns": reader.fieldnames or [],
         "rows": rows,
     }
-
-
-def diagnose_daily_csv_403(*, timeout: float = 15.0) -> dict[str, Any]:
-    """WHY does `fetch_daily_csv` 403 -- wrong path, wrong header, or wrong
-    about "public" entirely? Tries several candidates and reports the HTTP
-    status of EACH, rather than committing to one guess.
-
-    Measured 2026-08-24T17:24:50Z: `{base}/markets.csv` (the flat, undated
-    path `fetch_daily_csv` sends) returned `http_403`. Independent research
-    since then found the product description "two anonymized files for
-    EVERY TRADING DAY" -- language that reads as one dated file per day, not
-    one evergreen file at a fixed name, which is a real candidate explanation
-    for a 403 on an object that may simply not exist at that key (common CDN/
-    object-storage behaviour: a default-deny bucket policy returns 403 for a
-    missing key rather than 404). NOT CONFIRMED -- this diagnostic exists to
-    check that hypothesis against a live response rather than rewrite
-    `fetch_daily_csv` on the strength of a search-engine paraphrase.
-
-    Deliberately separate from `fetch_daily_csv`: that function's contract
-    (one name in, one parsed CSV or a named error out) stays stable for any
-    caller while this one is free to fire several requests and report all of
-    them. Nothing here becomes the real implementation until one candidate is
-    confirmed to return real CSV content.
-    """
-    from datetime import datetime, timedelta, timezone
-
-    today = datetime.now(timezone.utc).date()
-    # A few trading-day candidates, in case "today" itself has no file yet
-    # (weekend, or the file lands with a lag) -- tried oldest-shape-agnostic,
-    # newest date first.
-    dates = [today - timedelta(days=offset) for offset in range(0, 4)]
-
-    candidates: list[tuple[str, str]] = [("flat_no_date", f"{_DAILY_CSV_BASE}/markets.csv")]
-    for d in dates:
-        iso = d.isoformat()
-        candidates.append((f"path_date_{iso}", f"{_DAILY_CSV_BASE}/{iso}/markets.csv"))
-        candidates.append((f"suffix_date_{iso}", f"{_DAILY_CSV_BASE}/markets-{iso}.csv"))
-        candidates.append((f"nested_date_{iso}", f"{_DAILY_CSV_BASE}/markets/{iso}.csv"))
-
-    # One header variant per URL is enough to test the "WAF blocks a
-    # non-browser User-Agent" hypothesis without doubling the request count --
-    # applied to the flat path only, since that is the one candidate every
-    # source agrees should exist if the naming guesses above are all wrong.
-    header_variants = {
-        "flat_no_date": [
-            {"Accept": "text/csv", "User-Agent": "syndicate/1.0"},
-            {
-                "Accept": "text/csv,*/*",
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-                ),
-            },
-        ]
-    }
-
-    results: list[dict[str, Any]] = []
-    for label, url in candidates:
-        variants = (
-            [(f"variant_{i}", h) for i, h in enumerate(header_variants[label])]
-            if label in header_variants
-            else [("default", {"Accept": "text/csv"})]
-        )
-        for header_label, headers in variants:
-            entry: dict[str, Any] = {"label": label, "header_variant": header_label, "url": url}
-            request = urllib.request.Request(url, headers=headers)
-            try:
-                with urllib.request.urlopen(request, timeout=timeout) as response:
-                    body = response.read()
-                entry["status"] = "ok"
-                entry["http_status"] = response.status
-                entry["byte_length"] = len(body)
-                entry["looks_like_csv"] = b"," in body[:200] and b"<html" not in body[:200].lower()
-            except urllib.error.HTTPError as exc:
-                entry["status"] = "error"
-                entry["http_status"] = exc.code
-            except Exception as exc:  # noqa: BLE001 -- a diagnostic must never crash the caller
-                entry["status"] = "error"
-                entry["error"] = f"{type(exc).__name__}: {exc}"
-            results.append(entry)
-
-    return {"checked_at": time.time(), "attempts": results}
 
 
 def probe(*, league: str | None = None) -> dict[str, Any]:
@@ -563,16 +738,30 @@ def probe(*, league: str | None = None) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001 -- a probe must never crash the caller
             result["tier2_official_rest"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"}
 
-    csv_result = fetch_daily_csv("markets")
+    index_result = fetch_trade_data_index()
+    if index_result.get("status") != "ok":
+        result["tier1_daily_csv"] = {"status": "error", "stage": "index", **index_result}
+        return result
+
+    resolved = latest_market_date(index_result)
+    if resolved.get("status") != "ok":
+        result["tier1_daily_csv"] = {"status": "error", "stage": "latest_market_date", **resolved}
+        return result
+
+    csv_result = fetch_daily_csv("markets", resolved["date"])
     if csv_result.get("status") == "ok":
         result["tier1_daily_csv"] = {
             "status": "ok",
+            "date": resolved["date"],
             "url": csv_result.get("url"),
             "columns": csv_result.get("columns"),
             "count": csv_result.get("count"),
             "sample_row": csv_result.get("rows", [None])[0],
+            "sample_normalized": (
+                normalize_market_row(csv_result["rows"][0]) if csv_result.get("rows") else None
+            ),
         }
     else:
-        result["tier1_daily_csv"] = csv_result
+        result["tier1_daily_csv"] = {"stage": "markets_csv", **csv_result}
 
     return result

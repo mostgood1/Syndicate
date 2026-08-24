@@ -1,5 +1,16 @@
 # SCOPE — Novig order automation (Stage D, this lane's venue)
 
+**PAUSED 2026-08-24, same day, explicit user decision:** "We can't automate
+novig end to end for buying but we should use public endpoint/data to
+populate our odds." Buy-side automation (this whole document) is NOT being
+pursued further right now. `novig_orders.py` (`order_body`/`submit_order`)
+stays exactly as built below -- correct, tested, safe by construction (never
+reports a fill, paper-mode-first is structural) -- but nothing wires it to
+`_venue_submitter` and no live order is planned. The active Novig work moved
+to the public CSV mirror as an odds-population source; see
+`novig_client.py`'s module header and `.syndicate/lanes.md`'s
+`exchange-markets-api-integration` entry for that.
+
 Drafted 2026-08-24, lane `exchange-markets-api-integration`, in response to
 "start scoping novig" — the first of the three real-API venues from this
 lane (polymarket / novig / prophetx) to get an order-automation design, per

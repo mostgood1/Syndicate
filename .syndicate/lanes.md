@@ -1710,10 +1710,47 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   tested place. Files: `syndicate/features/shared/novig_orders.py` (NEW),
   `tests/test_novig_orders.py` (NEW), `syndicate/features/shared/novig_client.py`,
   `tests/test_novig_client.py`, `.syndicate/scope_2026-08-24_novig_order_automation.md`.
-  Also added, separate concern, same session: `novig_client.diagnose_daily_csv_403()`
-  (NEW) + a second boot-hook flag (`SYNDICATE_NOVIG_CSV_DIAGNOSE_ON_BOOT`) in
-  `scripts/probe_exchange_markets.py`, to chase the CSV-tier 403 from the
-  earlier live probe -- not yet run in production.
+  Then `novig_orders.submit_order()` was BUILT (still same day): sends the
+  real POST, handles 429/HTTP/network/undecodable-response errors as a new
+  `NovigOrderError`, and -- because the docs' own words say a 201 means
+  "placed in the queue," not executed -- reports every accepted order as
+  `submitted`, **never `filled`**, returning the raw undecoded response
+  rather than parsing it. 30 tests total (was 16). PR #34, merged.
+- **SCOPE PIVOT 2026-08-24, same day, user decision: Novig buy-side
+  automation is OFF.** "We can't automate novig end to end for buying but we
+  should use public endpoint/data to populate our odds." `novig_orders.py`
+  (order_body/submit_order) stays as built -- verified, tested, not deployed
+  toward live orders -- but the active work becomes the PUBLIC CSV MIRROR as
+  an odds-population source, not order execution.
+- **THE CSV 403 IS RESOLVED, FOR REAL THIS DAY** -- the user supplied the
+  actual documented structure directly, which explains everything the
+  earlier flat-path guess (`{base}/markets.csv`) got wrong: files are DATED
+  and INDEXED under `data.novig.com/reporting/trade-data/`
+  (`/index.json` -> `dates`/`marketDates`; `/{date}/trades.csv`;
+  `/{date}/markets.csv`). The flat path 403'd because it was never going to
+  exist -- CDN default-deny on a missing key, not an auth or header problem.
+  `diagnose_daily_csv_403()` (the earlier candidate-URL diagnostic) is
+  DELETED, not merely superseded -- the real shape replaced the need to
+  guess. **A THIRD price convention found and kept separate**: the CSV's
+  OHLC fields are CENTS 0.0-100.0 (one decimal), NOT the REST tier's 0-1
+  decimal probability -- `cents_to_probability`/`cents_to_american` are new,
+  distinct functions from `probability_to_american`, with a test asserting
+  the two conventions are NOT interchangeable (same 0.62 read each way gives
+  different American odds). `cost`/`qty`/`openInterest`/`dailyVolume` parsed
+  via `Decimal(str(...))`, matching `novig_orders.cash_units_for_stake`'s
+  already-fixed float-precision lesson. **THIS IS END-OF-DAY DATA** --
+  published "shortly after midnight Eastern" for the PRIOR trading day, a
+  closing-line/historical feed, never a live price; `fetch_latest_markets_snapshot()`
+  (the odds-population entry point) returns `is_stale_by_days` explicitly so
+  a consuming board cannot mistake it for current. 29 new tests
+  (`tests/test_novig_csv_data.py`), pinned against the REAL example rows
+  supplied (STRAIGHT/COMBO trades, order-book/COMBO/no-trades-today markets).
+  Files: `syndicate/features/shared/novig_client.py`,
+  `tests/test_novig_csv_data.py` (NEW), `scripts/probe_novig.py`,
+  `scripts/probe_exchange_markets.py`, `scripts/run_refresh_worker.py`
+  (narrow claim, already held). Not yet run in production -- next boot-flag
+  probe is `SYNDICATE_NOVIG_CSV_SNAPSHOT_PROBE_ON_BOOT=1`, replacing the
+  deleted diagnostic's flag.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
