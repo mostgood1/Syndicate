@@ -27097,3 +27097,62 @@ indicating a real bug would be `slug_unparseable` or
 `side_not_an_outcome_of_this_market`. Both of those are **absent entirely** —
 zero slugs failed to parse across 7,940 markets.
 
+
+---
+
+### 2026-08-24 23:02:42Z — the 132 `outcomes_unreadable` are ONE MARKET PER SIDE, all WTA tennis. The refusal was right.
+
+**verify:**
+
+```
+POLYMARKET_BOARD_JOIN markets=7940 indexed=2593 board_rows=0 matched=0
+  refusals={'market_type_not_a_game_line': 4288,
+            'segment_market_not_full_game': 927,
+            'outcomes_count_mismatch': 132}
+  shapes=[{'slug':'asc-wta-alypar-petmar-2026-08-24-gs-neg-2pt5','type':'SPREAD',
+           'outcomes':'["+2.50","-2.50"]','prices':'["0.5100"]'}, ...]
+```
+
+**ALL 132 are `outcomes_count_mismatch`.** Zero `outcomes_field_missing`, zero
+`outcomes_not_a_json_list`, zero `outcomes_empty`, zero `price_not_numeric`.
+Nothing is malformed — the split resolved it in one run.
+
+**THE CAUSE IS THE VENUE'S DATA MODEL, not a bad quote.** Polymarket US lists
+EACH SIDE OF A SPREAD AS ITS OWN MARKET, quoting only that side:
+
+    asc-wta-...-gs-neg-2pt5   outcomes ["+2.50","-2.50"]   prices ["0.5100"]
+    asc-wta-...-gs-pos-2pt5   outcomes ["+2.50","-2.50"]   prices ["0.6"]
+
+Same pair of outcomes, two slugs, two different single prices. `outcomes` lists
+both handicaps for CONTEXT; `outcomePrices` carries the one price for the side
+the SLUG names. Note also the outcomes are the LINE ITSELF (`+2.50`/`-2.50`),
+not team names, which is a second shape this join has never seen.
+
+**AND POSITIONAL PAIRING WOULD HAVE BEEN WRONG.** Checked against the sample:
+
+    ...gs-neg-2pt5   slug=neg   outcomes[0]=+2.50   -> WRONG SIDE
+    ...gs-neg-5pt5   slug=neg   outcomes[0]=-5.50   -> ok
+    ...gs-pos-5pt5   slug=pos   outcomes[0]=+5.50   -> ok
+    ...gs-neg-2pt5   slug=neg   outcomes[0]=-2.50   -> ok
+    ...gs-pos-2pt5   slug=pos   outcomes[0]=+2.50   -> ok
+
+**The array order does NOT reliably match the slug's side — 1 of 5 sampled rows
+would have been priced on the opposite side of the spread.** That is exactly
+the failure the refusal was holding the line against, and it is now measured
+rather than argued. Had I paired `prices[0]` to `outcomes[0]`, roughly a fifth
+of these would be real orders on the wrong handicap at a confident price.
+
+**IMPACT ON COVERAGE: NONE.** Every sampled row is **WTA tennis** —
+`asc-wta-alypar-petmar`, `asc-wta-clatau-renzar`. Tennis is not one of
+Syndicate's sports (mlb, nba, wnba, nhl, nfl, ncaaf, ncaab, soccer), so these
+132 are markets for a sport the board never asks about. 1.7% of the catalogue,
+0% of anything we would price.
+
+**BOUND ON THAT CLAIM:** the sample is 6 of 132. All six are WTA; I have not
+established that the other 126 are. If a covered sport ever appears in this
+counter, the per-side model above is what would have to be built — and the
+correct build reads the side from the SLUG, never from array position.
+
+**Still `board_rows=0`**, so the resolver remains unexercised. That is the
+staleness chain, not this.
+
