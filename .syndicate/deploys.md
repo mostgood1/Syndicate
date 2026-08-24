@@ -26408,3 +26408,38 @@ this scan:**
 Probe flag (`SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT`) set back to `0`,
 redeploy triggered. Deploy claim (refresh-worker, token `5bde3ff6440857af`)
 to be released once confirmed live.
+
+---
+
+### 2026-08-24 21:45:58Z — live-odds-worker `0be6d2c25` — FULL Polymarket US game slate reached
+
+**verify:**
+
+```
+POLYMARKET_US_GAMES status=ok start_offset=17513 boundary_probes=15
+  monotonic=True games=7585 futures=1267 rows=8914 pages=18
+  duplicate_ids=0 truncated=False orderable=8852
+  game_types=['SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME','SPORTS_MARKET_TYPE_MONEYLINE',
+              'SPORTS_MARKET_TYPE_PROP','SPORTS_MARKET_TYPE_SPREAD',
+              'SPORTS_MARKET_TYPE_TOTAL']
+  window=2026-08-24T01:37:22Z..2026-09-07T23:30:00Z
+```
+
+**`truncated=False` is the coverage claim.** Paging ran to the END of the
+collection, not to a page budget. 7,585 game markets, 8,852 of 8,914 rows
+orderable, window starts TODAY.
+
+`monotonic=True` means the partition assumption the binary search rests on was
+checked and held; `duplicate_ids=0` means offset paging is real over 18 pages.
+Boundary found at 17513 in 15 probes — and note it is 17513, not the 16000
+sampled an hour earlier, which is exactly why it is searched and not
+hardcoded.
+
+**FIVE game types, not one.** `DRAWABLE_OUTCOME` is soccer three-way, which is
+what `game_line_bet.py`'s half-point trick already handles. This is the third
+correction to my own claim about this venue's coverage: I said moneyline-only
+from a 500-row settled sample, then moneyline+spread, and it is five.
+
+**The whole venue is now reachable in ~33 signed calls** (15 boundary probes +
+18 pages) — no filter needed beyond `closed=false`.
+
