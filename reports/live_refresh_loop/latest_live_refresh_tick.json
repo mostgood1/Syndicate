@@ -1,30 +1,23 @@
 {
-  "startedAt": "2026-08-05T02:31:21Z",
-  "date": "2026-07-19",
-  "phase": "live",
-  "adaptive": false,
-  "anyLive": null,
+  "startedAt": "2026-08-24T02:42:07Z",
+  "date": "2026-07-13",
+  "phase": "pregame",
+  "adaptive": true,
+  "anyLive": false,
   "regions": "us",
   "executionMode": "source",
   "mode": "fast",
   "simRerunTriggered": false,
   "skipMirror": true,
-  "sports": "mlb,wnba",
+  "sports": "active",
   "mlbStatcastRefresh": {
     "launched": false,
     "reason": "disabled"
   },
-  "oddsRefreshWnbaSkipped": {
-    "reason": "mlb_daily_sim_still_running",
-    "headroom": null,
-    "skippedForSeconds": 99999.0,
-    "starvationOverrideEnabled": false,
-    "forcedThrough": false
-  },
   "ok": true,
   "result": {
     "ok": true,
-    "pid": 4242
+    "state": "running"
   },
-  "finishedAt": "2026-08-04T21:31:22-05:00"
+  "finishedAt": "2026-08-23T21:42:14-05:00"
 }

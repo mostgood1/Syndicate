@@ -154,6 +154,15 @@ data/*_source/manifests/mirror_refresh*.json
 
 # Keep the evaluation ledger local; it is generated data and too large for GitHub history.
 reports/intelligence/evaluation_ledger.jsonl
+# RUNTIME EXECUTION STATE, never source. The ledger is the record of real
+# orders and `execution_state` is the worker's heartbeat; both are written per
+# process on Render's disk, and a copy from someone's laptop committed here
+# would masquerade as a cold-start artifact production could read. Added
+# 2026-08-24 after a test run swept both into two commits via `git add -A`.
+reports/intelligence/execution_ledger.json
+reports/intelligence/execution_state.json
+reports/intelligence/kalshi_markets.json
+reports/intelligence/kalshi_market_history.json
 reports/intelligence/evaluation_ledger_chunks/
 # Same class as the chunks above: a per-date JSONL ledger the shortlist WRITES
 # at runtime (`clv_openings`/`openings_records` in its payload). In production
