@@ -26408,3 +26408,60 @@ this scan:**
 Probe flag (`SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT`) set back to `0`,
 redeploy triggered. Deploy claim (refresh-worker, token `5bde3ff6440857af`)
 to be released once confirmed live.
+
+---
+
+## 2026-08-24T21:44:47Z -- Kalshi discovery-timing fix (PR #50) verified live
+
+**Fix confirmed working.** Deploy `dep-da6bkkqjobas73bjevlg`
+(`0be6d2c257ddefa03b60e44c2e1dee61bdb99ae8`) live, boot-probe log line:
+
+    [kalshi_polymarket_arb] SCAN date=2026-08-24 result={'status': 'ok',
+    'date': '2026-08-24', 'kalshi_discovery': 'ok',
+    'kalshi_moneylines_resolved': 0, 'kalshi_refusals': {},
+    'polymarket_moneylines_resolved': 0, 'polymarket_refusals': {},
+    'matched_games': 0, 'join_refusals': {}, 'opportunities': [],
+    'flagged_count': 0, 'fee_buffer_used': 0.04}
+
+`kalshi_discovery: 'ok'` is the whole fix -- that key did not exist at all
+in the prior run (2026-08-24T21:26:00Z, same file, above). `run_arb_scan()`
+now calls `kalshi_odds_refresh.ensure_series_discovered()` itself before
+resolving Kalshi markets, so this process no longer depends on
+`start_intelligence_state_background_loop()` having already run. The
+"was `_DISCOVERED` populated by the time this hook fires" question from
+the prior entry is answered: it now populates it itself, first.
+
+**`kalshi_moneylines_resolved` is still 0, but this is now explained by a
+DIFFERENT, independent fact -- not a re-occurrence of the discovery-timing
+bug.** The real, separate production path (`kalshi_odds_refresh.py`'s own
+`BOARD_JOIN`, unrelated to this module, runs continuously via the
+intelligence-state loop) is ALSO logging `matched=0` right now, same
+831-market catalogue:
+
+    [kalshi_odds] BOARD_JOIN kalshi_markets=831 board_rows=235 matched=0
+    reasons={'event_not_on_our_board': 330, 'market_is_for_another_date': 122,
+    'no_matching_board_row': 163, 'unreadable_title': 216}
+    (21:41:39Z, same instance that then served the 21:44:47Z arb scan)
+
+An hour earlier (20:36:45Z) the same BOARD_JOIN matched 62 of 831 against
+742 board rows. `board_rows` has since fallen to 235 and `matched` to 0 --
+current-state drift in the board's own row count feeding both paths, not a
+symptom of the arb module's discovery call. Since this second path bypasses
+`classify_market`/`GRAMMAR_MONEYLINE` entirely (it title-matches directly),
+the fact that it is ALSO at zero moneyline matches right now is strong
+evidence this is a real, current Kalshi/board-join gap today, not an
+artifact of my module's classification path. Not chased further here --
+out of scope for the discovery-timing question that was asked; the next
+diagnostic step, if picked up, is why `board_rows` fell from 742 to 235 in
+under an hour and whether that alone explains `matched` going to 0.
+
+Cleanup completed: `SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT` flipped
+back to `0`, redeploy `dep-da6bo6btqb8s738im3s0` (which also picked up the
+other session's Polymarket US full-paging fix, commit `678bbf51`, 7,585
+game markets reached, `truncated=False`) confirmed `live` at 21:51:37Z.
+Deploy claim (refresh-worker, token `5bde3ff6440857af`) released.
+
+verify: `[kalshi_polymarket_arb] SCAN ... 'kalshi_discovery': 'ok' ...`
+present in production logs at 21:44:47Z, where the prior run at 21:26:00Z
+had no `kalshi_discovery` key at all -- direct before/after confirmation of
+PR #50's fix.
