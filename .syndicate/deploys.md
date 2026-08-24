@@ -25332,3 +25332,28 @@ follow-up on `#539` rather than closed. Nothing about the four refusals changes
 — the modelled number must stay distinguishable from a de-vig — so the consumer
 has to accept it as its OWN labelled term, not by widening
 `_model_edge_for`'s name check.
+
+## 2026-08-24T00:00Z — web `d44f62357` — live portfolio page
+
+**What:** `/portfolio/live` + `/api/portfolio/live`, and a `mode != live` filter
+on the paper payload (a live order would otherwise have rendered under
+"Simulated fills only… nothing here is a real wager").
+
+**Claim/preflight:** claim held by `kalshi-live`, released. `deploy_preflight.py`
+could NOT run — `RENDER_API_KEY` is not set in this container. Did the two
+checks it does by hand instead: `d44f62357` is on `origin/main`, and the
+live web commit at trigger time (`60ca2486b`) is an ancestor of it, so the
+deploy is cumulative rather than a revert of a peer's merge.
+
+**verify:** UNVERIFIED IN PRODUCTION, and named as such rather than assumed.
+Deploy reached `status=live` at 23:58:27Z, which proves it BUILT and nothing
+more. Both measurement channels are closed in this container right now:
+Render log reads are refused by the permission classifier, and HTTPS to
+`syndicate-an21.onrender.com` gets a 403 on CONNECT from the agent proxy
+(`recentRelayFailures`, 23:56–23:58Z). The reading that would close this is
+`GET /api/portfolio/live` returning `execution_mode` and an `orders` array —
+one request, whenever a channel reopens.
+
+**Local evidence, which is not production evidence:** 68 tests over the two
+portfolio pages, including that a live order does not appear on
+`/portfolio/paper` in the payload or the rendered HTML.
