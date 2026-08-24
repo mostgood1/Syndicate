@@ -852,3 +852,52 @@ def test_a_row_with_no_recorded_score_says_so_rather_than_printing_blanks(
     )
     mod.audit_game_line_grades("2026-08-22")
     assert "score=<not_recorded>" in capsys.readouterr().out
+
+
+def test_the_audit_announces_rows_the_display_limit_never_examined(capsys, monkeypatch):
+    """MEASURED 2026-08-24: `audited=25 of=79 skipped={}` is literally true and
+    reads as "54 rows were refused without a reason". They were never examined
+    -- `orders[:limit]` stopped first. A bound on coverage that does not
+    announce itself makes a partial audit look like a complete one, which is
+    the same failure as an unnamed skip in better clothes."""
+    from syndicate.features.shared import paper_settlement as mod
+
+    orders = [
+        {"selected_date": "2026-08-23", "sport": "mlb", "market": "h2h",
+         "outcome": "lost", "settled_value": -1.0, "side": "away",
+         "pnl_dollars": -4.0, "line": None}
+        for _ in range(9)
+    ]
+    from syndicate.features.shared import execution_ledger
+    monkeypatch.setattr(execution_ledger, "_load", lambda: {"orders": orders})
+    mod.audit_game_line_grades("2026-08-23", limit=3)
+    summary = [
+        line for line in capsys.readouterr().out.splitlines()
+        if "GRADE_AUDIT_SUMMARY" in line
+    ]
+    assert summary, "no summary line"
+    assert "audited=3" in summary[0]
+    assert "of=9" in summary[0]
+    assert "not_examined=6" in summary[0]
+    assert "display limit=3" in summary[0]
+
+
+def test_a_fully_examined_audit_does_not_claim_a_limit(capsys, monkeypatch):
+    """`not_examined=0` with no parenthetical -- a limit that never bound is
+    not a caveat worth printing."""
+    from syndicate.features.shared import paper_settlement as mod
+
+    orders = [
+        {"selected_date": "2026-08-23", "sport": "mlb", "market": "h2h",
+         "outcome": "won", "settled_value": 2.0, "side": "home",
+         "pnl_dollars": 9.0, "line": None}
+    ]
+    from syndicate.features.shared import execution_ledger
+    monkeypatch.setattr(execution_ledger, "_load", lambda: {"orders": orders})
+    mod.audit_game_line_grades("2026-08-23", limit=25)
+    summary = [
+        line for line in capsys.readouterr().out.splitlines()
+        if "GRADE_AUDIT_SUMMARY" in line
+    ]
+    assert "not_examined=0" in summary[0]
+    assert "display limit" not in summary[0]

@@ -796,6 +796,72 @@ def _polymarket_us_auth_probe_at_boot() -> None:
         )
 
 
+def _polymarket_us_slate_probe_at_boot() -> None:
+    """What the US venue actually lists for today's leagues, by SHAPE.
+
+    WHY THIS IS NOT `_polymarket_catalogue_at_boot`. That one pulls
+    `gamma-api.polymarket.com` -- the GLOBAL, on-chain exchange. The funded
+    account and the working credential are on `api.polymarket.us`. Pricing an
+    edge on one book and filling it on the other is the "different money" error
+    the auth modules were split in two to prevent, and at the odds layer it does
+    not fail loudly: it produces plausible edges against prices that do not
+    exist where the order lands.
+
+    It stayed invisible because the global pull returned `count=100 sporting=0`
+    on every cycle -- so no join was ever attempted, so nobody discovered the
+    prices were from the wrong exchange.
+
+    READ-ONLY, and it reports shapes rather than parsing them: the value
+    vocabulary of `sportsMarketTypeV2`, whether the events route nests its
+    markets where we look, and whether the rows carry the tick size and minimum
+    quantity `order_body` REFUSES to infer. Those are the four facts the join
+    needs and none of them has been observed.
+    """
+    try:
+        from syndicate.features.shared import polymarket_us_markets as pm
+        from syndicate.features.shared.polymarket_us_auth import credentials_present
+
+        if not credentials_present():
+            print("[live_odds_worker] POLYMARKET_US_SLATE status=credentials_absent", flush=True)
+            return
+
+        for sport in ("mlb", "wnba", "nfl"):
+            slate = pm.fetch_league_events(sport, limit=100, max_pages=3)
+            print(
+                f"[live_odds_worker] POLYMARKET_US_SLATE sport={sport}"
+                f" status={slate.get('status')}"
+                f" slug={slate.get('league_slug')} documented={slate.get('slug_documented')}"
+                f" events={slate.get('event_count')} markets={slate.get('market_count')}"
+                f" orderable={slate.get('orderable')}"
+                f" no_markets={slate.get('events_without_markets')}"
+                f" truncated={slate.get('truncated')}"
+                f" types={slate.get('sports_market_types')}"
+                f" payload_keys={slate.get('payload_keys')}"
+                f" event_keys={slate.get('event_keys')}"
+                f" reason={slate.get('reason')}",
+                flush=True,
+            )
+
+        # The alias table that would replace the fuzzy match behind the
+        # game-line join's measured `side_not_a_team_in_this_game: 77`.
+        teams = pm.fetch_teams("mlb")
+        index = pm.team_alias_index(teams.get("teams") or [])
+        print(
+            f"[live_odds_worker] POLYMARKET_US_TEAMS status={teams.get('status')}"
+            f" provider={teams.get('provider')} count={teams.get('count')}"
+            f" aliases={len(index)}"
+            f" payload_keys={teams.get('payload_keys')}"
+            f" row_keys={teams.get('row_keys')}"
+            f" reason={teams.get('reason')}",
+            flush=True,
+        )
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] POLYMARKET_US_SLATE_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _game_line_grade_audit_at_boot() -> None:
     """Print the raw facts behind each game-line verdict, once, for eyeballing.
 
@@ -1376,6 +1442,7 @@ def main() -> int:
         # executes is the failure mode this file has already had twice.
         _polymarket_catalogue_at_boot()
         _polymarket_us_auth_probe_at_boot()
+        _polymarket_us_slate_probe_at_boot()
         _game_line_grade_audit_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():

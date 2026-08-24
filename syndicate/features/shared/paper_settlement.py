@@ -472,9 +472,17 @@ def audit_game_line_grades(selected_date: str, *, limit: int = 25) -> dict[str, 
             flush=True,
         )
 
+    # THE DISPLAY LIMIT, STATED. `audited=25 of=79 skipped={}` is literally
+    # true and reads as "54 rows were refused without a reason" -- when in fact
+    # they were never examined, because `orders[:limit]` stopped first. A bound
+    # on coverage that does not announce itself makes a partial audit look like
+    # a complete one, which is the same failure as an unnamed skip wearing
+    # better clothes.
+    not_examined = max(0, len(orders) - int(limit))
     print(
         f"[paper_settlement] GRADE_AUDIT_SUMMARY date={normalized} audited={rows}"
         f" of={len(orders)} skipped={skipped}"
+        f" not_examined={not_examined}{f' (display limit={int(limit)})' if not_examined else ''}"
         " -- CHECK ONE ROW BY HAND: margin_used must be the BET TEAM's score"
         " minus its opponent's, and our_verdict must be `won` exactly when"
         " margin_used > must_beat",
