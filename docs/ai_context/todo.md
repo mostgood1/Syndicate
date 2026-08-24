@@ -1,5 +1,79 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#542` — **We can now BET game lines that we cannot GRADE. 98 of 171 orders on one slate are permanently ungraded, and every performance number rests on the 73 that are left.** — lane `portfolio-decision-and-execution`, 2026-08-24
+
+MEASURED on refresh-worker, 15:43:19Z, the same line every cycle:
+
+    [paper_settlement] SETTLED date=2026-08-23 orders=171 graded=0
+      already_graded=71 outcomes={}
+      ungraded={'no_resolver_for_soccer': 5, 'unmapped_market': 80,
+                'game_not_in_live_box': 11, 'stat_not_in_feed': 2,
+                'order_not_filled': 2}
+    [paper_settlement] UNMAPPED_MARKETS date=2026-08-23
+      {'spreads': 41, 'h2h': 31, 'h2h_3_way': 6, 'spreads_alt': 2}
+
+**PLAYER PROPS GRADE. GAME LINES DO NOT.** The sport resolvers produce a
+player stat from the live feed; nothing produces a GAME-level `current_value`
+(final score, margin, winner), so `spreads`, `h2h`, `h2h_3_way` and
+`spreads_alt` refuse by name every cycle and always will.
+
+**This got worse today, by my own hand.** The Kalshi work in this lane added
+game lines — including period markets and alternates — to the pull and the
+join specifically so they could be bet. The betting half shipped and the
+scoring half does not exist, so the system's ability to take a position now
+extends strictly further than its ability to find out whether the position was
+right. That is the wrong direction for the asymmetry to run.
+
+**Why the counters do not show it as a problem.** `graded=0` reads as "nothing
+finished yet" and is indistinguishable at a glance from "nothing CAN finish".
+The `ungraded={...}` breakdown beside it is the only thing that separates them,
+and `already_graded=71` sitting next to `orders=171` looks like progress rather
+than a ceiling. The named refusals are doing their job — `UNMAPPED_MARKETS`
+prints the market NAMES, which is exactly the difference between "add four
+resolvers" and another round of guessing — but nothing treats the ratio as a
+health signal.
+
+**What is NOT established:** whether the 73 graded orders reach the evaluation
+layer at all. `[INTEL_TRACE] evaluation_reliability_profile` prints
+`sample_size: 0, settled_count: 0` on every cycle. That trace may be scoped
+(`sport: null`) rather than global, so it is a signal to check, not a proven
+second break. Check before assuming either reading.
+
+**The fix is four resolvers, not a redesign:** a game-level resolver per sport
+returning final score and margin, dispatched the same way the player-stat
+resolvers already are (`_default_resolver`). `bet_status` already knows
+`spreads` is non-monotone and refuses to grade it early, so the grading
+arithmetic is in place; only the VALUE is missing.
+
+---
+
+### `#543` — **`requested_price` holds American odds on Kalshi rows whose `fill_price` holds probability dollars. Two units, adjacent columns, same row.** — lane `portfolio-decision-and-execution`, 2026-08-24
+
+MEASURED 15:03:38Z:
+
+    LIVE_LEDGER_ROW ... venue=kalshi ticker=KXMLBKS-...-MINZMATTHEWS52-5
+      side=under line=4.5 price=-117.0 stake=1.5 fill_price=None
+
+`price=-117.0` is American; the order was actually placed at $0.54. The board
+prices in American odds and `requested_price` is copied straight from it, while
+`fill_price` now comes back from Kalshi in dollars.
+
+**This already made one guard inert.** `_requested_contracts` (the bound that
+refuses to book more contracts than an order could have bought) computes a
+count only when `0 < requested_price < 1`, so on every real Kalshi row it
+returns `None` and the bound never applies. It did not matter — `fill_count_fp`
+turned out to be a plain decimal — but the guard that was written to cover that
+unknown does not, in production, cover anything.
+
+`profit_per_dollar` (`#542`'s neighbour) now disambiguates the two units by
+range at grading time, which is correct as far as it goes and is still a
+workaround for one column meaning two things.
+
+**Not yet decided:** whether to carry `requested_price_dollars` alongside, or
+to store the venue's own unit per row with an explicit `price_unit` field. The
+second is the honest shape; the first is cheaper and does not touch the paper
+book.
+
 ### `#541` — **The compact-card chip join is now MEASURED. It had been found twice by a person looking at the board and reported by nothing.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
 MLS `#365` (2026-08-22) and La Liga `#540` (2026-08-24) were the same defect:
