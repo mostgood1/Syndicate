@@ -28,6 +28,33 @@ nothing from `polymarket_us_orders.py` -- discovery must never gain the
 ability to place an order by accident of a shared import.
 
 --------------------------------------------------------------------------
+BOTH DOCUMENTED FAMILIES ARE CONFIRMED DEAD ON THIS DEPLOYMENT -- READ
+`polymarket_us_markets.py` FOR THE FULL MEASUREMENT, NOT JUST THIS NOTE
+--------------------------------------------------------------------------
+
+Measured 2026-08-24T20:17:59Z, refresh-worker, real credential (an earlier
+run that only reported `credentials_absent` ran on a service with no
+credential set): all seven `GET /v2/leagues/{slug}/events` calls here
+returned `http_404` with the SAME gRPC-shaped body,
+`{"code":5,"message":"The server was unable to process your request."}` --
+identical across every slug, which reads as the `/v2/leagues/*` route itself
+not being registered rather than any one slug being wrong.
+
+A parallel session (`polymarket_us_markets.py`, same day) then measured
+`/v1/sports/teams/provider` ALSO 404s on this deployment, ruling out most of
+the LEGACY `/v1/sports*` family this module's own header once flagged as the
+next thing to try -- see that module's `probe_v1_sports_routes` for the full,
+more complete measurement (four routes tested, not just this module's
+`/v2/leagues/*`) and its own conclusion: `/v1/markets` (this venue's ONE
+confirmed-live route) already carries `sportsMarketTypeV2`/`gameStartTime`/
+every field a join needs, so the sporting slate is reached by filtering that
+catalogue structurally rather than chasing a dedicated Sports API that does
+not appear to be live on this account. This module's own `fetch_league_events`
+still works exactly as documented WHENEVER `/v2/leagues/*` becomes reachable
+(a different host, a different account tier, or a later API-side fix) -- it
+is not deleted, just not the path a join should be built against today.
+
+--------------------------------------------------------------------------
 THE ENDPOINT SHAPE IS DOCUMENTED THIS TIME -- THE ROW SCHEMA IS NOT
 --------------------------------------------------------------------------
 
