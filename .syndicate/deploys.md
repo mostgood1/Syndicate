@@ -26465,3 +26465,96 @@ verify: `[kalshi_polymarket_arb] SCAN ... 'kalshi_discovery': 'ok' ...`
 present in production logs at 21:44:47Z, where the prior run at 21:26:00Z
 had no `kalshi_discovery` key at all -- direct before/after confirmation of
 PR #50's fix.
+
+**UPDATE, same evening, other session's entries immediately below: the
+"why board_rows fell from 742 to 235" question this entry left open IS
+answered there.** The board is soccer-only today (all 235 rows); Kalshi/
+Polymarket are quoting MLB/NFL. Not a board-join regression -- there is
+simply no US-sport board row for either venue's real markets to match
+right now. That explains BOTH `kalshi_moneylines_resolved=0` here (this
+scan's board rows come from the same `read_layer2_shortlist` source) and
+the real `BOARD_JOIN`'s `matched=0`.
+
+### 2026-08-24 21:45:58Z — live-odds-worker `0be6d2c25` — FULL Polymarket US game slate reached
+
+**verify:**
+
+```
+POLYMARKET_US_GAMES status=ok start_offset=17513 boundary_probes=15
+  monotonic=True games=7585 futures=1267 rows=8914 pages=18
+  duplicate_ids=0 truncated=False orderable=8852
+  game_types=['SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME','SPORTS_MARKET_TYPE_MONEYLINE',
+              'SPORTS_MARKET_TYPE_PROP','SPORTS_MARKET_TYPE_SPREAD',
+              'SPORTS_MARKET_TYPE_TOTAL']
+  window=2026-08-24T01:37:22Z..2026-09-07T23:30:00Z
+```
+
+**`truncated=False` is the coverage claim.** Paging ran to the END of the
+collection, not to a page budget. 7,585 game markets, 8,852 of 8,914 rows
+orderable, window starts TODAY.
+
+`monotonic=True` means the partition assumption the binary search rests on was
+checked and held; `duplicate_ids=0` means offset paging is real over 18 pages.
+Boundary found at 17513 in 15 probes — and note it is 17513, not the 16000
+sampled an hour earlier, which is exactly why it is searched and not
+hardcoded.
+
+**FIVE game types, not one.** `DRAWABLE_OUTCOME` is soccer three-way, which is
+what `game_line_bet.py`'s half-point trick already handles. This is the third
+correction to my own claim about this venue's coverage: I said moneyline-only
+from a 500-row settled sample, then moneyline+spread, and it is five.
+
+**The whole venue is now reachable in ~33 signed calls** (15 boundary probes +
+18 pages) — no filter needed beyond `closed=false`.
+
+
+---
+
+### 2026-08-24 21:41Z — THE BOARD IS SOCCER-ONLY TODAY. Neither venue matches, and it is not the venues' fault.
+
+Asked: do we have full Polymarket access, is it matched to the L1/L2 board,
+and is Kalshi matched. Measured, in order:
+
+**1. Polymarket coverage — COMPLETE.** `games=7585 truncated=False pages=18
+duplicate_ids=0`, five game types, window starting today. Paging ran to the
+end of the collection. Nothing is missing.
+
+**2. Every venue book is EMPTY, all four of them:**
+
+```
+VENUE_SCOPE venue=kalshi     rows_in=235 scoped=0 refusals={'venue_not_quoting': 235}
+VENUE_SCOPE venue=novig      rows_in=235 scoped=0 refusals={'venue_not_quoting': 235}
+VENUE_SCOPE venue=prophetx   rows_in=235 scoped=0 refusals={'venue_not_quoting': 235}
+VENUE_SCOPE venue=polymarket rows_in=235 scoped=0 refusals={'venue_not_quoting': 235}
+```
+
+**3. THE ROOT CAUSE, and it is in Layer 1/2, not the venues:**
+
+```
+JOIN_KEYS kalshi=['spreads_1st_5_innings|texas|2.5', ...]  board=[]
+  board_markets={'alternate_totals_corners': 164, 'h2h': 29, 'totals': 23, 'btts': 19}
+JOIN_EVENTS board=['ADO Den HaagFeyenoord','AngersAuxerre','GenoaLazio', ...]
+```
+
+**All 235 board rows are SOCCER** — corners, both-teams-to-score, and h2h for
+Dutch/French/German/Italian fixtures. Kalshi is quoting MLB the same minute
+(`KXMLBF5SPREAD-26AUG241940TEXCWS`, `PHISEA`). Polymarket has 7,585 markets
+across NFL/MLB/soccer. The venues quote US sport; the board has none to match.
+
+`BOARD_JOIN kalshi_markets=831 board_rows=235 matched=0` with
+`event_not_on_our_board: 330` says the same thing from the other side.
+
+**So "the venue is not quoting" is TRUE AND MISLEADING** — the refusal names
+the venue when the gap is the board. Worth fixing: the counter should be able
+to say "no board row of this sport existed" separately from "the venue does
+not quote this row".
+
+**4. A SECOND, INDEPENDENT GAP.** `portfolio_commit._venue_price_resolver`
+returns `(None, None)` for every venue but Kalshi (`pipeline/portfolio_commit.py:170`).
+There is no `polymarket_board_join`. So even with a US-sport board, the
+`paper:polymarket` book would be priced from the AGGREGATOR, not from
+Polymarket — the venue label on someone else's prices. Any historical
+`paper:polymarket` P&L is not a Polymarket result.
+
+**DO NOT TRANSACT YET.** Two things must land first: a board carrying the
+sports these venues quote, and a real Polymarket price resolver.

@@ -85,6 +85,8 @@ __all__ = [
     "probe_v1_sports_routes",
     "probe_market_query_params",
     "probe_offset_landscape",
+    "find_first_game_offset",
+    "fetch_game_markets",
     "team_alias_index",
     "is_sporting_row",
     "is_game_market_row",
@@ -981,6 +983,122 @@ def probe_offset_landscape(
         "first_game_offset": first_game_offset,
         "samples": samples,
     }
+
+
+def find_first_game_offset(
+    *, ceiling: int = 40000, probe_limit: int = 5, max_probes: int = 20,
+) -> dict[str, Any]:
+    """Binary-search the offset where game markets begin.
+
+    MEASURED 2026-08-24T21:36:46Z, the `closed=false` ordering is PARTITIONED:
+
+        0..12000   season-level -- sports futures, then politics, then culture
+        16000      SPORTS_MARKET_TYPE_SPREAD   asc-nfl-nyg-nyj-2026-08-28...
+        18000      SPORTS_MARKET_TYPE_PROP     astatc-nfl-lar-lac-2026-08-27...
+        20000      SPORTS_MARKET_TYPE_TOTAL    tsc-nfl-tb-jax-2026-08-28-1q...
+        24000      PROP + TOTAL                astatc-mlb-pit-sd-2026-08-24...
+        28000      empty -- past the end
+
+    So the game slate is a contiguous block at the HIGH end, consistent with
+    ids being assigned as markets are created.
+
+    HARDCODING 16000 WOULD BREAK QUIETLY. Ids grow as the venue lists markets,
+    so that boundary moves every day, and a stale constant would start the
+    scan inside the futures block (wasted pages) or past the first games
+    (silently missing part of the slate). Six or seven probes of five rows
+    find it every time instead.
+
+    The search assumes the partition above holds. That assumption is CHECKED,
+    not trusted: `monotonic` is False if a probe finds games below the
+    discovered boundary, which is the one way this could return a wrong answer
+    confidently.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    if not auth.credentials_present():
+        return {"status": "skipped", "reason": "credentials_absent"}
+
+    probes = 0
+    seen: dict[int, bool] = {}
+
+    def _has_games(offset: int) -> bool | None:
+        nonlocal probes
+        if offset in seen:
+            return seen[offset]
+        if probes >= max_probes:
+            return None
+        probes += 1
+        url = (f"{auth.BASE_URL}/v1/markets?limit={int(probe_limit)}"
+               f"&offset={int(offset)}&{_LIVE_FILTER}")
+        try:
+            payload = auth.signed_request("GET", url)
+        except Exception:
+            return None
+        rows = [r for r in (payload.get("markets") or []) if isinstance(r, Mapping)]
+        # An empty page is past the end: no games there, and the search should
+        # move DOWN, which `False` achieves correctly.
+        found = any(is_game_market_row(r) for r in rows)
+        seen[offset] = found
+        return found
+
+    low, high = 0, int(ceiling)
+    while low < high:
+        mid = (low + high) // 2
+        found = _has_games(mid)
+        if found is None:
+            return {"status": "error", "reason": f"probe_failed_at_offset_{mid}", "probes": probes}
+        if found:
+            high = mid
+        else:
+            low = mid + 1
+
+    boundary = low if seen.get(low) or _has_games(low) else None
+    # THE ASSUMPTION, CHECKED. If any offset BELOW the boundary had games, the
+    # collection is not partitioned and this answer is not trustworthy.
+    monotonic = not any(found for off, found in seen.items() if boundary is not None and off < boundary)
+    return {
+        "status": "ok",
+        "first_game_offset": boundary,
+        "probes": probes,
+        "monotonic": monotonic,
+        "sampled": dict(sorted(seen.items())),
+    }
+
+
+def fetch_game_markets(
+    *, limit: int = 500, max_pages: int = 30, start_offset: int | None = None,
+) -> dict[str, Any]:
+    """The joinable game slate: find where it starts, then page to the end.
+
+    `start_offset=None` locates the boundary with `find_first_game_offset`
+    rather than trusting a constant -- see that function for why 16000 is not
+    hardcoded.
+    """
+    if start_offset is None:
+        located = find_first_game_offset()
+        if located.get("status") != "ok" or located.get("first_game_offset") is None:
+            return {
+                "status": "error",
+                "reason": f"no_game_offset: {located.get('reason') or located.get('status')}",
+                "markets": [],
+            }
+        start_offset = int(located["first_game_offset"])
+        boundary_probes = located.get("probes")
+        monotonic = located.get("monotonic")
+    else:
+        boundary_probes, monotonic = 0, None
+
+    result = fetch_markets(limit=limit, max_pages=max_pages, offset=start_offset)
+    if result.get("status") != "ok":
+        return result
+    result["start_offset"] = start_offset
+    result["boundary_probes"] = boundary_probes
+    result["boundary_monotonic"] = monotonic
+    # Keep only the joinable rows here -- this function's whole purpose.
+    result["markets"] = [m for m in (result.get("markets") or [])
+                         if m.get("sportsMarketTypeV2")
+                         and "FUTURE" not in str(m.get("sportsMarketTypeV2")).upper()]
+    return result
 
 
 def probe_v1_sports_routes() -> dict[str, Any]:

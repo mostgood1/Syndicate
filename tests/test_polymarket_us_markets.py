@@ -1101,3 +1101,84 @@ def test_the_game_type_vocabulary_is_reported(monkeypatch):
     assert result["games"] == 2
     assert result["futures"] == 1
     assert result["game_types"] == ["SPORTS_MARKET_TYPE_MONEYLINE", "SPORTS_MARKET_TYPE_SPREAD"]
+
+
+# ==========================================================================
+# Locating the game block without hardcoding where it starts
+# ==========================================================================
+
+
+def _partitioned(monkeypatch, boundary):
+    """Season-level below `boundary`, game markets from it up to an end."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        if offset >= 27000:
+            return {"markets": []}
+        kind = ("SPORTS_MARKET_TYPE_SPREAD" if offset >= boundary
+                else "SPORTS_MARKET_TYPE_FUTURE")
+        return {"markets": [_row(id=f"m-{offset}", category="sports",
+                                 sportsMarketTypeV2=kind,
+                                 gameStartTime="2026-08-28T23:30:00Z")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+
+
+def test_the_boundary_is_FOUND_rather_than_hardcoded(monkeypatch):
+    """MEASURED 2026-08-24T21:36:46Z: games begin at 16000. Ids grow as the
+    venue lists markets, so that boundary moves every day -- a stale constant
+    starts the scan inside the futures block, or past the first games and
+    silently misses part of the slate."""
+    _partitioned(monkeypatch, 16000)
+    result = mod.find_first_game_offset()
+    assert result["first_game_offset"] == 16000
+    # And it costs a handful of probes, not a linear sweep.
+    assert result["probes"] <= 20
+
+
+def test_a_moved_boundary_is_found_too(monkeypatch):
+    """The point of searching: tomorrow it is somewhere else."""
+    _partitioned(monkeypatch, 9000)
+    assert mod.find_first_game_offset()["first_game_offset"] == 9000
+
+
+def test_the_partition_assumption_is_CHECKED_not_trusted(monkeypatch):
+    """Binary search is only valid if the collection is partitioned. If games
+    appear below the discovered boundary it is not, and the answer cannot be
+    trusted -- so that is reported rather than assumed away."""
+    _partitioned(monkeypatch, 16000)
+    result = mod.find_first_game_offset()
+    assert result["monotonic"] is True
+
+
+def test_a_collection_with_no_games_reports_no_offset(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request", lambda *_a, **_k: {"markets": [
+        _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")]})
+    assert mod.find_first_game_offset()["first_game_offset"] is None
+
+
+def test_fetch_game_markets_starts_at_the_located_boundary(monkeypatch):
+    _partitioned(monkeypatch, 16000)
+    result = mod.fetch_game_markets(limit=500, max_pages=2)
+    assert result["status"] == "ok"
+    assert result["start_offset"] == 16000
+    # And it returns only joinable rows -- the function's whole purpose.
+    assert result["markets"]
+    assert all("FUTURE" not in str(m.get("sportsMarketTypeV2")) for m in result["markets"])
+
+
+def test_fetch_game_markets_refuses_when_no_boundary_exists(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request", lambda *_a, **_k: {"markets": [
+        _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")]})
+    result = mod.fetch_game_markets()
+    assert result["status"] == "error"
+    assert "no_game_offset" in result["reason"]
