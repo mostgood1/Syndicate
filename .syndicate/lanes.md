@@ -1428,7 +1428,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/opportunity_signals.py`,
   `scripts/score_sim_weight_impact.py`,
   `tests/test_layer2_blend_admission.py`,
-  `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`,
   `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
   `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`,
   `syndicate/templates/portfolio_paper.html`,
@@ -1438,6 +1437,48 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/position_marks.py`,
   `tests/test_clv_position_join.py`,
   `tests/test_position_marks.py`
+- **NARROW CARVE-OUT released 2026-08-24 to `exchange-markets-api-integration`
+  (session 71a74bb7)**, at the user's explicit direction after this lane's own
+  owning session was found live and mid-task (`session_01Sia2rPD72eFTriy28azzs2`,
+  "Reading the pregame sweep interval per sport") and the lane-guard hook
+  offered no narrower mechanism than a whole-file release: `pipeline/
+  execute_portfolio.py` -- `_venue_submitter`, adding one `elif name ==
+  "polymarket":` branch (wiring `polymarket_us_orders.polymarket_us_submitter`)
+  plus a new `_polymarket_resolve_market` helper -- and `tests/
+  test_execute_portfolio.py`, new tests only, appended after the existing
+  Kalshi price-resolution block, none of the existing tests edited. The rest
+  of both files — everything this lane already built — is NOT touched. That
+  session was messaged with the exact scope of this edit before any code
+  change landed. Reclaim by re-adding both paths to the Files: list above
+  whenever this lane wants them back; nothing here removes this lane's
+  ownership going forward, only this one narrow slice tonight.
+  **`pipeline/portfolio_commit.py` stayed on this lane's list, untouched** --
+  its `_venue_price_resolver` (Kalshi-only price/ticker resolver, built from
+  the WHOLE board-join across every market type this lane resolves, not a
+  single-market lookup) is materially bigger scope than what was asked, and
+  is the one piece still missing before a Polymarket order can reach the
+  wired submitter above end to end: nothing populates `OrderRequest.
+  venue_ticker` for `venue=polymarket` today, so the new submitter branch is
+  real but currently unreachable in production. Named rather than built here,
+  same discipline as the rest of this lane's honesty about unbuilt pieces.
+  **CORRECTED same evening, per that lane's own acknowledgment
+  (`.syndicate/deploys.md`, 2026-08-24 22:20Z):** `_polymarket_resolve_market`
+  first called `polymarket_us_markets.fetch_game_markets()` LIVE, on the
+  reasoning that no single-market fetch exists on this venue. That made it a
+  SECOND independent live caller of the same venue -- `venue_quote_adapters.py`
+  states outright that this is a documented incident class (`#139/#144`,
+  `#148`) and already reads the persisted artifact instead. Rewritten to read
+  `polymarket_us_markets.GAME_SLATE_ARTIFACT`
+  (`reports/intelligence/polymarket_us_games.json`, 900s cadence, written by
+  that lane's `persist_game_slate`) rather than the venue. Also fixed a real
+  bug this forced into the open: the artifact's persisted rows carry NO `id`
+  field (`_SLATE_STORAGE_FIELDS` has `slug`, not `id`) -- the original design
+  keyed `venue_ticker` on `id` and would have refused every real lookup. Now
+  keyed on `slug` directly, which is also what `order_body` needs, so no
+  separate id->slug translation exists to drift out of sync. 3 new/renamed
+  tests replace the live-fetch ones, including one that fails loudly if this
+  function ever calls the venue directly again. 188 tests green across the
+  four affected suites.
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
   `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
   intelligence_state (reads `read_layer2_shortlist`).

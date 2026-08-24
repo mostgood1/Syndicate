@@ -756,6 +756,208 @@ def test_no_price_anywhere_returns_none_so_the_order_refuses(monkeypatch):
     assert runner._kalshi_price_for(_Req()) is None
 
 
+# --------------------------------------------------------------------------
+# Polymarket wired into _venue_submitter
+# --------------------------------------------------------------------------
+
+
+def test_venue_submitter_polymarket_returns_an_adapter(monkeypatch):
+    """The one thing this test guards: `polymarket` used to fall through to
+    `None`, same as any other unmapped venue name. It must not any more."""
+    import pipeline.execute_portfolio as runner
+
+    submitter = runner._venue_submitter("polymarket")
+    assert submitter is not None
+    assert callable(submitter)
+
+
+def _polymarket_row(*, slug="aec-mlb-tex-chw-2026-08-24", teams=("White Sox", "Rangers"),
+                     prices=("0.55", "0.45"), tick="0.001", min_qty="1",
+                     orderable=True):
+    # The PERSISTED shape -- `polymarket_us_markets._SLATE_STORAGE_FIELDS`.
+    # No `id` field: the artifact never carried one, so this fixture does not
+    # either, on purpose (a fixture that includes a field the real artifact
+    # never has would hide exactly the bug this rewrite fixed).
+    return {
+        "slug": slug,
+        "outcomes": list(teams),
+        "outcomePrices": list(prices),
+        "orderPriceMinTickSize": tick,
+        "minimumTradeQty": min_qty,
+        "orderable": orderable,
+    }
+
+
+class _PolyReq:
+    """CHW is home, TEX is away -- same alias pair
+    `tests/test_kalshi_polymarket_arb.py` already relies on. `venue_ticker`
+    holds the Polymarket SLUG (see `_polymarket_resolve_market`'s own
+    docstring on why -- the artifact carries no `id`)."""
+
+    venue_ticker = "aec-mlb-tex-chw-2026-08-24"
+    side = "home"
+    home_team = "CHW"
+    away_team = "TEX"
+    sport = "mlb"
+    requested_price = 0.55
+
+
+def _artifact_env(monkeypatch, *, markets=None, raises=None, fetched_at=1787600000.0):
+    from syndicate.features.shared import refresh_state_store
+    import pipeline.execute_portfolio as runner
+
+    def fake_read(path):
+        if raises is not None:
+            raise raises
+        rows = markets if markets is not None else [_polymarket_row()]
+        return {"fetched_at": fetched_at, "markets": rows, "count": len(rows)}
+
+    monkeypatch.setattr(refresh_state_store, "read_json_file", fake_read)
+    return runner
+
+
+def test_resolves_the_artifact_price_for_our_named_team(monkeypatch):
+    runner = _artifact_env(monkeypatch)
+    resolved = runner._polymarket_resolve_market(_PolyReq())
+    # CHW (home, requested) is "White Sox" in outcomes[0] at 0.55.
+    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1")
+
+
+def test_the_away_side_gets_the_away_price_not_positional(monkeypatch):
+    """Outcomes listed in the OPPOSITE order from home/away still resolve by
+    team identity, not array position -- same discipline
+    `kalshi_polymarket_arb.join_kalshi_polymarket_moneylines` already proves."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(teams=("Rangers", "White Sox"), prices=("0.42", "0.58"))
+    ])
+
+    class _AwayReq(_PolyReq):
+        side = "away"
+
+    resolved = runner._polymarket_resolve_market(_AwayReq())
+    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.42, "0.001", "1")
+
+
+def test_no_venue_ticker_refuses_without_reading_the_artifact(monkeypatch):
+    from syndicate.features.shared import refresh_state_store
+    import pipeline.execute_portfolio as runner
+
+    def explode(path):
+        raise AssertionError("read the artifact with no slug to look for")
+
+    monkeypatch.setattr(refresh_state_store, "read_json_file", explode)
+
+    class _NoTicker(_PolyReq):
+        venue_ticker = None
+
+    assert runner._polymarket_resolve_market(_NoTicker()) is None
+
+
+def test_never_calls_the_venue_directly(monkeypatch):
+    """The whole point of the artifact rewrite: this function must not become
+    a second independent caller of `polymarket_us_markets` (a documented
+    incident class per `venue_quote_adapters.py`'s own header)."""
+    from syndicate.features.shared import polymarket_us_markets
+
+    def explode(**kwargs):
+        raise AssertionError("called the venue directly instead of reading the artifact")
+
+    monkeypatch.setattr(polymarket_us_markets, "fetch_game_markets", explode)
+    monkeypatch.setattr(polymarket_us_markets, "fetch_markets", explode)
+    runner = _artifact_env(monkeypatch)
+    assert runner._polymarket_resolve_market(_PolyReq()) == (
+        "aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1"
+    )
+
+
+def test_artifact_read_failure_refuses_cleanly(monkeypatch):
+    runner = _artifact_env(monkeypatch, raises=RuntimeError("keyvalue unreachable"))
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_empty_artifact_refuses_cleanly(monkeypatch):
+    from syndicate.features.shared import refresh_state_store
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setattr(refresh_state_store, "read_json_file", lambda path: {})
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_market_not_found_refuses(monkeypatch):
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(slug="other-slug")])
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_not_orderable_refuses(monkeypatch):
+    """`orderable` is `trimmed_row`'s own signal that tick size and minimum
+    quantity are BOTH present -- never inferred, per `polymarket_us_orders`'s
+    own header."""
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(orderable=False)])
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_unreadable_outcomes_refuses(monkeypatch):
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(teams=("Only One",), prices=("0.5",))])
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_a_polymarket_price_that_moved_too_far_REFUSES(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(teams=("White Sox", "Rangers"), prices=("0.90", "0.10"))
+    ])
+
+    class _MovedReq(_PolyReq):
+        requested_price = 0.55  # artifact 0.90, +0.35 drift, past 0.03
+
+    with pytest.raises(Exception) as excinfo:
+        runner._polymarket_resolve_market(_MovedReq())
+    assert "polymarket_slippage" in str(excinfo.value)
+
+
+def test_a_polymarket_price_that_moved_in_our_favour_is_taken(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(teams=("White Sox", "Rangers"), prices=("0.40", "0.60"))
+    ])
+
+    class _CheaperReq(_PolyReq):
+        requested_price = 0.55
+
+    resolved = runner._polymarket_resolve_market(_CheaperReq())
+    assert resolved[1] == 0.40
+
+
+def test_venue_submitter_polymarket_end_to_end(monkeypatch):
+    """The full seam: `_venue_submitter("polymarket")` returns an adapter that
+    actually calls `polymarket_us_orders.submit_order` with the resolved
+    market, not a stub that never reaches it."""
+    from syndicate.features.shared import polymarket_us_orders
+    import pipeline.execute_portfolio as runner
+
+    _artifact_env(monkeypatch)
+
+    calls = []
+
+    def fake_submit_order(request, **kwargs):
+        calls.append(kwargs)
+        return {"status": "submitted", "venue_order_id": "o1", "venue_status": None,
+                "fill_price": None, "fill_stake_dollars": None, "contracts": 0,
+                "requested_contracts": 1.0}
+
+    monkeypatch.setattr(polymarket_us_orders, "submit_order", fake_submit_order)
+
+    submitter = runner._venue_submitter("polymarket")
+    result = submitter(_PolyReq())
+    assert result["status"] == "submitted"
+    assert calls == [{
+        "price_dollars": 0.55,
+        "market_slug": "aec-mlb-tex-chw-2026-08-24",
+        "tick_size": "0.001",
+        "minimum_trade_qty": "1",
+    }]
+
+
 def _record(status, **extra):
     row = {"status": status, "idempotency_key": "k", "venue_ticker": "KX-T",
            "sport": "mlb", "market": "strikeouts", "player_name": "X",

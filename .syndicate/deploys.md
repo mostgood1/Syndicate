@@ -26983,4 +26983,3 @@ so the `paper:polymarket` book is priced from the AGGREGATOR, not from
 Polymarket. Their revert was right — that is a board-join resolver across every
 market type, not a single-market lookup — and it means the Polymarket PRICING
 gap is unowned by them and owned here.
-
