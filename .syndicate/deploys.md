@@ -26262,3 +26262,51 @@ now traded three times today.
 Probe flag (`SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT`) set back to `0`,
 redeploy triggered. Deploy claim (refresh-worker, token `b89496aa53797228`)
 to be released once that redeploy is confirmed live.
+### 2026-08-24 20:28:07Z — live-odds-worker `7481b17b6` — the Sports API is wholly absent; `/v1/markets` carries the slate but the naive query returns SETTLED 2025 games
+
+**verify: `POLYMARKET_US_V1 route=sports status=error reason=http_404`,
+same for `route=teams` and `route=teams_provider_no_league`**, instance `nwzqm`.
+
+So all three untested legacy routes 404 too. **Eleven routes now tested across
+both documented families — seven `/v2/leagues/*`, four `/v1/sports*` — and
+every one returns `{"code":5}` NOT_FOUND while `/v1/markets` succeeds in the
+same second.** The Sports API is not on this deployment. The parallel session's
+`efc37ba76` reached that conclusion from a single provider-variant 404, which
+did not support it; the conclusion was right anyway and is now measured.
+Correct answer, unsound inference — worth separating, because the same
+reasoning applied to `/v1/markets` would have written off the one route that
+works.
+
+**`/v1/markets` carries the sporting slate, with every field an order needs:**
+
+```
+POLYMARKET_US_CATALOGUE status=ok sporting=500 of=500 orderable=500
+  truncated=True types=['SPORTS_MARKET_TYPE_MONEYLINE']
+  market_types=['moneyline'] categories=['sports']
+```
+
+`sportsMarketTypeV2`'s value vocabulary, never observed before now:
+**`SPORTS_MARKET_TYPE_MONEYLINE`**, and that is the ONLY value in 500 rows.
+No spread, no total. `tick=0.001`, `min_qty=1` on every row.
+
+**The slug is a real join key** — `aec-nfl-lac-ten-2025-11-02` is
+league + away + home + date, and `outcomes` carries team nicknames
+(`["Titans","Chargers"]`) while `question` carries cities
+(`Los Angeles vs. Tennessee`). That is a better join than fuzzy name matching
+and it does not need the 404'd teams table.
+
+**THE TRAP, and it is the one this repo keeps hitting.** `sporting=500 of=500
+orderable=500` reads as a full, healthy slate. Every sampled row is
+`start='2025-11-02'` with `prices=["1","0"]` — **settled NFL games from last
+season**, priced at certainty, returned under `active=true`. `truncated=True`,
+so the 500 are the first page of something larger and the ordering is not
+recency. A join built on this query would price today's board against games
+that finished nine months ago, and every counter on the line would look right.
+
+**Next, and NOT yet done:** find how `/v1/markets` pages or filters to the
+current slate. `payload_keys=['markets']` — no cursor, no total. Candidates:
+an `offset` param (the Sports API documented `limit`/`offset`, so the venue
+uses that convention), a `status` filter, or a `gameStartTime` bound. Until
+that is answered the catalogue is NOT usable for pricing, and `orderable=500`
+must not be read as "500 bets available".
+
