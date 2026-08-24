@@ -18,6 +18,8 @@ deposited where nothing reads it.
 
 from __future__ import annotations
 
+import time
+
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -146,7 +148,75 @@ def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _venue_price_resolver(venue: str):
+def _polymarket_price_resolver(selected_date: str | None):
+    """`(price_resolver, ticker_resolver)` for Polymarket US, or `(None, None)`.
+
+    Until this existed, `_venue_price_resolver` returned `(None, None)` for
+    every venue but Kalshi, so the `paper:polymarket` book was priced from the
+    AGGREGATOR -- a venue label on someone else's prices. Any
+    `paper:polymarket` P&L recorded before this is not a Polymarket result.
+
+    `(None, None)` on every failure path, never a partial resolver: falling back
+    to the aggregator is the documented, understood behaviour, while a resolver
+    built from half a slate would price some rows at the venue and some at the
+    aggregator with no way to tell which from the outside.
+    """
+    try:
+        from syndicate.features.shared.polymarket_board_join import (
+            join_polymarket_to_board,
+            load_polymarket_markets,
+            polymarket_price_resolver,
+            polymarket_ticker_resolver,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[portfolio_commit] POLYMARKET_RESOLVER_UNAVAILABLE {type(exc).__name__}: {exc}", flush=True)
+        return (None, None)
+
+    markets, fetched_at = load_polymarket_markets()
+    if not markets:
+        # The artifact is written by live-odds-worker's slate tick. Absent means
+        # that has not run here yet -- named, so it is not read as "Polymarket
+        # quotes nothing".
+        print("[portfolio_commit] POLYMARKET_RESOLVER status=no_slate_artifact", flush=True)
+        return (None, None)
+
+    try:
+        board_rows = _board_rows_for_join(selected_date)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[portfolio_commit] POLYMARKET_RESOLVER_BOARD_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return (None, None)
+
+    joined = join_polymarket_to_board(markets, board_rows)
+    age = None if fetched_at is None else round(time.time() - float(fetched_at), 1)
+    print(
+        f"[portfolio_commit] POLYMARKET_BOARD_JOIN markets={joined.get('polymarket_markets')} "
+        f"indexed={joined.get('indexed')} board_rows={joined.get('board_rows')} "
+        f"matched={joined.get('matched')} slate_age_s={age} "
+        f"refusals={joined.get('refusals')}",
+        flush=True,
+    )
+    matches = joined.get("matches") or []
+    if not matches:
+        return (None, None)
+    return polymarket_price_resolver(matches), polymarket_ticker_resolver(matches)
+
+
+def _board_rows_for_join(selected_date: str | None) -> list[dict]:
+    """The same shortlist rows the commit is about to price.
+
+    Read here rather than threaded through, so the join is built against the
+    board actually being committed. A join made against a different read would
+    pair tonight's rows with a pairing computed from another board -- the
+    stale-pairing mistake `clv_join`'s arrow-of-time check exists to catch.
+    """
+    from pipeline.intelligence_state import read_layer2_shortlist
+
+    shortlist = read_layer2_shortlist(str(selected_date or ""))
+    rows = (shortlist or {}).get("rows") if isinstance(shortlist, dict) else None
+    return [r for r in (rows or []) if isinstance(r, dict)]
+
+
+def _venue_price_resolver(venue: str, selected_date: str | None = None):
     """`(price_resolver, ticker_resolver)` for a venue, or `(None, None)`.
 
     BOTH ARE BUILT FROM ONE SET OF MATCHES. Building them separately would let
@@ -157,17 +227,24 @@ def _venue_price_resolver(venue: str):
     Price rows from the VENUE's own feed, or `(None, None)` to fall back to
     OddsAPI.
 
-    Kalshi only for now, and deliberately quiet about it: a venue with no direct
-    feed keeps behaving exactly as before rather than erroring, and the
-    difference surfaces as `price_source` on the rows instead of as a special
-    case in the caller.
+    Kalshi and Polymarket US have direct feeds. A venue with none keeps behaving
+    exactly as before rather than erroring, and the difference surfaces as
+    `price_source` on the rows instead of as a special case in the caller.
+
+    NOVIG DELIBERATELY HAS NONE, and that is a capability gap rather than an
+    omission: its public CSV mirror is anonymized at the game/player/team level
+    (measured 2026-08-24), so `reportTicker` names a CATEGORY and can never
+    price a named bet. The credentialed REST tier could.
 
     The join is rebuilt from the freshest fetched markets on every call. Carrying
     a join made against an older board would pair tonight's rows with a pairing
     computed from a different board -- the stale-pairing mistake `clv_join`'s
     arrow-of-time check exists to catch, in a new costume.
     """
-    if str(venue or "").strip().lower() != "kalshi":
+    normalized_venue = str(venue or "").strip().lower()
+    if normalized_venue == "polymarket":
+        return _polymarket_price_resolver(selected_date)
+    if normalized_venue != "kalshi":
         return (None, None)
     try:
         payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
@@ -473,7 +550,7 @@ def run_portfolio_commit(
             # THE VENUE'S OWN PRICES, where we have them. Only Kalshi has a
             # direct feed today; every other venue falls back to the aggregator,
             # and `price_source` on each scoped row records which was used.
-            venue_price_resolver, venue_ticker_resolver = _venue_price_resolver(venue)
+            venue_price_resolver, venue_ticker_resolver = _venue_price_resolver(venue, normalized)
             scoped, scope_refusals = scope_rows_to_venue(
                 rows,
                 venue,

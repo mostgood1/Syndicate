@@ -480,3 +480,69 @@ def test_sim_coverage_counts_rows_that_carried_a_probability_edge():
     assert coverage["rows_with_sim_edge"] == 2
     assert coverage["rows_without_sim_edge"] == 2
     assert coverage["share_with_sim_edge"] == 0.5
+
+
+# ==========================================================================
+# The Polymarket price resolver -- paper:polymarket stops being a label on
+# the aggregator's prices
+# ==========================================================================
+
+
+def test_polymarket_now_gets_a_resolver_where_it_used_to_get_None(monkeypatch):
+    """`_venue_price_resolver` returned `(None, None)` for every venue but
+    Kalshi, so the paper:polymarket book was priced from the AGGREGATOR -- a
+    venue label on someone else's prices."""
+    from pipeline import portfolio_commit as mod
+
+    board = [{"market": "h2h", "side": "Padres", "line": None, "sport": "mlb",
+              "home": "San Diego Padres", "away": "Pittsburgh Pirates",
+              "selected_date": "2026-08-24"}]
+    market = {"slug": "aec-mlb-pit-sd-2026-08-24",
+              "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+              "outcomes": '["Pirates","Padres"]', "outcomePrices": '["0.45","0.55"]',
+              "orderPriceMinTickSize": 0.01, "minimumTradeQty": 1}
+
+    from syndicate.features.shared import polymarket_board_join as join_mod
+
+    monkeypatch.setattr(join_mod, "load_polymarket_markets", lambda: ([market], 1787600000.0))
+    monkeypatch.setattr(mod, "_board_rows_for_join", lambda _d: board)
+
+    price, ticker = mod._venue_price_resolver("polymarket", "2026-08-24")
+    assert price is not None and ticker is not None
+    assert price(board[0]) == -122
+    assert ticker(board[0])["slug"] == "aec-mlb-pit-sd-2026-08-24"
+
+
+def test_an_absent_slate_falls_back_rather_than_half_pricing(monkeypatch):
+    """`(None, None)` on every failure path, never a partial resolver. Falling
+    back to the aggregator is documented and understood; a resolver built from
+    half a slate would price some rows at the venue and some at the aggregator
+    with no way to tell which from the outside."""
+    from pipeline import portfolio_commit as mod
+    from syndicate.features.shared import polymarket_board_join as join_mod
+
+    monkeypatch.setattr(join_mod, "load_polymarket_markets", lambda: ([], None))
+    assert mod._venue_price_resolver("polymarket", "2026-08-24") == (None, None)
+
+
+def test_no_matches_falls_back_rather_than_returning_an_empty_resolver(monkeypatch):
+    from pipeline import portfolio_commit as mod
+    from syndicate.features.shared import polymarket_board_join as join_mod
+
+    market = {"slug": "aec-nfl-lac-ten-2026-08-24",
+              "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+              "outcomes": '["Chargers","Titans"]', "outcomePrices": '["0.5","0.5"]'}
+    monkeypatch.setattr(join_mod, "load_polymarket_markets", lambda: ([market], 1.0))
+    monkeypatch.setattr(mod, "_board_rows_for_join", lambda _d: [
+        {"market": "h2h", "side": "Padres", "sport": "mlb", "home": "San Diego Padres",
+         "away": "Pittsburgh Pirates", "selected_date": "2026-08-24"}])
+    assert mod._venue_price_resolver("polymarket", "2026-08-24") == (None, None)
+
+
+def test_kalshi_and_the_other_venues_are_unchanged(monkeypatch):
+    """The Kalshi path and the quiet fallback for venues with no direct feed
+    must behave exactly as before."""
+    from pipeline import portfolio_commit as mod
+
+    assert mod._venue_price_resolver("novig", "2026-08-24") == (None, None)
+    assert mod._venue_price_resolver("prophetx", "2026-08-24") == (None, None)
