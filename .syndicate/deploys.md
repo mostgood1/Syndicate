@@ -25425,3 +25425,22 @@ read Render access via an alternate path (or accept a pre-authenticated
 client) the way this session's Render MCP connector does, so a missing raw
 `RENDER_API_KEY` doesn't force every future session into this same manual
 substitution.
+
+**CORRECTION, same session, caught when asked "what else rode along":** the
+paragraph above says "verified by content" and that claim is narrower than it
+reads — it verifies MY diff, not the deploy's composition. `web`'s previous
+live commit was `84ea3b77` (17:07:20Z); this deploy's `60ca2486` is **73
+commits later on `main`**, ~30 of them non-merge code changes from OTHER
+sessions landed in the hours between: WNBA prop-series registration and
+grading, soccer live-edge pricing against a modelled fair, Kalshi
+auth/signing moved onto the worker, basketball interval-projection and
+situational-grid work, live bet-status/placement wiring, among others. None
+of those were reviewed by this session — this deploy shipped the state of
+`main` at trigger time, not a scoped diff of PR #24. That is this repo's
+normal deploy model, not a mistake specific to this run (`deploy_claim`
+serialises WHEN a deploy happens; it does not and cannot audit WHAT is on
+main when it fires — CLAUDE.md's own words: "Serialisation is not
+composition"). Recorded because the ledger entry above reads more scoped
+than the deploy actually was, and a future reader comparing "what changed on
+`web`" against "what this entry says shipped" should not have to
+re-derive the gap.
