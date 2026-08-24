@@ -26825,3 +26825,56 @@ artifact SIZE (`sporting=500`, the 4.8MB shard) and was wrong both times. The
 answer came from reading the control flow around the lock, not from measuring
 data volume. The reads were never the problem; the sleep was.
 
+
+---
+
+### 2026-08-24 21:57Z — "why is the pipeline empty": TWO separate problems, and more venue feeds fixes neither
+
+**The shortlist never considers MLB at all:**
+
+```
+[intelligence_state] LAYER2_SHORTLIST date=2026-08-24 rows=176 considered=9112
+  below_floor=16 admitted_by_blend=1 sports=['soccer']
+[layer2_shortlist] LAYER2_BOARD_HEALTH sport=soccer rows=176
+  pregame_proj=26 live_proj=0 no_proj=150 edged=26
+  age_p50s=50090 age_p90s=50117 age_maxs=50371
+```
+
+`sports=['soccer']`, `considered=9112` — every candidate is soccer. MLB is not
+rejected; it CONTRIBUTES NOTHING. Consistent with the starved sim.
+
+**PROBLEM 1 — no MLB rows. The binding constraint is the MODEL side, not the
+price side.** Soccer proves it: of 176 rows, `pregame_proj=26` and `no_proj=150`
+— and `edged=26`. EXACTLY the rows with a projection are the rows with an edge.
+A row with a price and no model view yields nothing.
+
+So MLB has prices (`has_markets_ml=True`, `has_markets_totals=True`) and no
+projection reaching Layer 2, because `mlbDailySim` is starved by the guard held
+across its own 60s sleep. **Adding Polymarket/Kalshi/Novig price feeds gives
+more prices for rows that still have no model view. It cannot create an edge,
+and it cannot create a single MLB row.**
+
+**PROBLEM 2 — and the user's staleness instinct IS onto something real, just
+not the emptiness.** Those `age_*s` fields are seconds:
+
+    age_p50s 50,090s = 13.9 h    age_maxs 50,371s = 14.0 h
+
+**Every soccer board row is priced on odds ~14 hours old.** There is no
+staleness guard REJECTING them — the opposite, 14-hour-old quotes are being
+admitted and edged. That is a genuine defect and it is where fresher venue
+feeds would help. It is NOT why the pipeline is empty.
+
+**SO THE VENUE WORK IS NECESSARY BUT NOT SUFFICIENT, AND IT IS MOSTLY DONE.**
+Kalshi's join exists; Polymarket's full slate (7,585 game markets) is reachable.
+Both are already correct. They are matching against a board with no US-sport
+rows, and no amount of additional venue plumbing changes that.
+
+**Order of operations that actually unblocks execution:**
+1. Release the guard before the sleep (`intelligence_state.py:5991`) — MLB sim
+   runs, MLB projections reach Layer 2, MLB rows appear. Owned by the OPEN lane
+   `layer2-sim-view-and-live-projection`.
+2. THEN the existing Kalshi/Polymarket joins have US-sport rows to price, and
+   `VENUE_SCOPE scoped=` becomes non-zero for the first time.
+3. Separately, chase the 14-hour odds age — that is where a direct venue feed
+   genuinely beats OddsAPI.
+
