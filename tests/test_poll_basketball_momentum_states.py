@@ -110,3 +110,68 @@ def test_it_asks_the_shared_scoreboard_url(scoreboard) -> None:
     poller.live_event_ids("wnba", "2026-08-23")
     assert seen["url"] == poller.scoreboard_url("wnba", "2026-08-23")
     assert "/sports/sports/" not in seen["url"]
+
+
+# --------------------------------------------------------------------------
+# The play-field probe -- what decides whether the clock bridge can be rebuilt
+
+
+@pytest.fixture(autouse=True)
+def _reset_play_fields():
+    poller._play_fields_reported = False
+    yield
+    poller._play_fields_reported = False
+
+
+def test_it_prints_the_whole_key_set_not_a_guessed_field(capsys) -> None:
+    """**A PROBE THAT ONLY LOOKS FOR `wallclock` REPORTS ITS OWN VOCABULARY.**
+    The field may be spelled something else entirely, and the point is to learn
+    ESPN's names rather than confirm mine."""
+    poller.report_play_fields({"plays": [
+        {"id": "1", "period": {"number": 1}, "clock": {"displayValue": "9:12"},
+         "scoreValue": 2, "wallclock": "2026-08-24T23:11:04Z"}]})
+    out = capsys.readouterr().out
+    assert "PLAY_FIELDS" in out
+    for key in ("'clock'", "'period'", "'scoreValue'", "'wallclock'"):
+        assert key in out, f"{key} missing from {out}"
+
+
+def test_it_surfaces_clock_candidates_with_their_values(capsys) -> None:
+    """The names alone do not say whether the field is usable -- an empty or
+    malformed stamp bridges nothing. Values come too."""
+    poller.report_play_fields({"plays": [
+        {"id": "1", "wallclock": "2026-08-24T23:11:04Z", "scoreValue": 2}]})
+    out = capsys.readouterr().out
+    assert "PLAY_CLOCK_CANDIDATES" in out
+    assert "2026-08-24T23:11:04Z" in out, out
+
+
+def test_a_feed_with_no_wall_clock_says_so_by_omission(capsys) -> None:
+    """The negative result matters as much: if ESPN carries no wall clock, the
+    only cure for the 2-date bridge is waiting for slates, and that is worth
+    knowing before anyone waits."""
+    poller.report_play_fields({"plays": [
+        {"id": "1", "period": {"number": 1}, "scoreValue": 2}]})
+    out = capsys.readouterr().out
+    assert "PLAY_FIELDS" in out
+    assert "PLAY_CLOCK_CANDIDATES {}" in out, out
+
+
+def test_it_fires_at_most_once_per_process(capsys) -> None:
+    """Once per process, not once per game per tick -- this runs every 2.5
+    minutes against a live slate."""
+    summary = {"plays": [{"id": "1", "wallclock": "x"}]}
+    assert poller.report_play_fields(summary) is True
+    capsys.readouterr()
+    assert poller.report_play_fields(summary) is False
+    assert capsys.readouterr().out == ""
+
+
+def test_an_empty_or_malformed_feed_does_not_consume_the_one_shot(capsys) -> None:
+    """**THE ONE-SHOT MUST NOT BE SPENT ON A GAME THAT HAD NO PLAYS.** A slate's
+    first fetch can be a game that has not tipped; burning the probe there means
+    the answer never arrives and the log looks like it was asked."""
+    for empty in ({}, {"plays": []}, {"plays": None}, {"plays": ["not-a-dict"]}):
+        assert poller.report_play_fields(empty) is False
+    assert capsys.readouterr().out == ""
+    assert poller.report_play_fields({"plays": [{"id": "1"}]}) is True

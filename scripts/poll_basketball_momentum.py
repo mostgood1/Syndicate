@@ -30,7 +30,7 @@ import os
 import sys
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -206,6 +206,7 @@ _sweep_started = False
 _interval_started = False
 _situational_started = False
 _join_probe_started = False
+_play_fields_reported = False
 
 
 def _backfill_sentinel(out_root: Path, league: str, spec: str) -> Path:
@@ -542,6 +543,44 @@ def maybe_start_join_probe(league: str, out_root: Path) -> bool:
     return True
 
 
+def report_play_fields(summary: Mapping[str, Any]) -> bool:
+    """Print the field names on ONE play, once per process.
+
+    **THE CLOCK BRIDGE IS THE BINDING CONSTRAINT ON THE MARKET JOIN, AND THIS
+    LINE IS WHAT SAYS WHETHER IT CAN BE REBUILT.** The join needs game-clock
+    seconds placed against wall-clock quote captures. Only
+    `live_momentum_<date>.jsonl` carries both, and it exists for 2 dates against
+    14 of quotes -- so today the join rests on 2 dates, which is not a backtest.
+
+    If ESPN's plays carry their own wall clock, the season backfill can add it
+    and twelve more dates become joinable at once. If they do not, the only cure
+    is waiting for slates, and that is worth knowing before anyone waits.
+
+    Nothing in this repo reads such a field today, and ESPN is unreachable from
+    a Claude Code session (403 at CONNECT, organization proxy policy), so this
+    is measured on the worker rather than assumed from memory. Prints the whole
+    key set, not just a yes/no on one guessed name -- the field may be spelled
+    something else entirely, and a probe that only looks for `wallclock` would
+    report its own vocabulary rather than ESPN's.
+    """
+    global _play_fields_reported
+    if _play_fields_reported:
+        return False
+    plays = summary.get("plays")
+    if not isinstance(plays, list) or not plays:
+        return False
+    play = next((p for p in plays if isinstance(p, dict)), None)
+    if play is None:
+        return False
+    _play_fields_reported = True
+    keys = sorted(str(k) for k in play.keys())
+    clocky = {k: play[k] for k in keys
+              if any(t in k.lower() for t in ("wall", "time", "date", "stamp"))}
+    print(f"[basketball_momentum] PLAY_FIELDS keys={keys}", flush=True)
+    print(f"[basketball_momentum] PLAY_CLOCK_CANDIDATES {clocky!r}", flush=True)
+    return True
+
+
 def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -> dict[str, Any]:
     # Fires at most once per process, and returns immediately -- the work runs
     # on a daemon thread so a live slate is never waiting on history.
@@ -562,9 +601,16 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
     # Four games would have multiplied the peak for no benefit: each summary is
     # read once, reduced to a few dozen sampled points, and never needed again.
     missing: list[str] = []
+
+    def _fetch_and_probe(event_id: str) -> dict[str, Any]:
+        summary = fetch_summary(league, event_id)
+        if isinstance(summary, dict):
+            report_play_fields(summary)
+        return summary
+
     payload = build_momentum_payload_streamed(
         event_ids,
-        lambda event_id: fetch_summary(league, event_id),
+        _fetch_and_probe,
         league_code=league,
         date_str=date_str,
         on_missing=missing.append,
