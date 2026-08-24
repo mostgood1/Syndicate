@@ -459,6 +459,10 @@ def _venue_submitter(venue: str):
         from syndicate.features.shared.kalshi_orders import kalshi_submitter
 
         return kalshi_submitter(_kalshi_price_for)
+    if name == "polymarket":
+        from syndicate.features.shared.polymarket_us_orders import polymarket_us_submitter
+
+        return polymarket_us_submitter(_polymarket_resolve_market)
     return None
 
 
@@ -573,6 +577,171 @@ def _artifact_price(ticker: str, key: str) -> float | None:
         if str(market.get("ticker") or "") == ticker:
             return dollars_to_probability(market.get(key))
     return None
+
+
+def _decode_polymarket_list(value: Any) -> list[Any] | None:
+    """`outcomes`/`outcomePrices` arrive as either a real list or a JSON-
+    encoded string, depending on which layer last touched the row. Small and
+    duplicated from `kalshi_polymarket_arb._decode_list` on purpose: that is a
+    private helper of another lane's module, and this file's own contract is
+    that a price-and-side resolver here never reaches across a lane boundary
+    for logic it can own in six lines.
+    """
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            import json
+
+            decoded = json.loads(value)
+        except (TypeError, ValueError):
+            return None
+        return decoded if isinstance(decoded, list) else None
+    return None
+
+
+# Same vocabulary `kalshi_orders._side_to_kalshi` and
+# `polymarket_us_orders._side_to_outcome` already use for `request.side` --
+# not invented here, reused so all three venues agree on what "the home-ish
+# side" means.
+_HOME_LIKE_SIDES = {"yes", "over", "home"}
+
+
+def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
+    """`(slug, price, tick_size, min_qty)` for one Polymarket US position, live
+    -- or `None` to refuse cleanly, which `polymarket_us_submitter` turns into
+    an `OrderBuildError` (recorded as failed, never sent at a price nobody
+    chose, same discipline `_kalshi_price_for` returning `None` uses).
+
+    --------------------------------------------------------------------------
+    NO SINGLE-MARKET FETCH IS CONFIRMED ON THIS VENUE
+    --------------------------------------------------------------------------
+
+    Kalshi has `fetch_market(ticker)`, one signed call. `polymarket_us_markets`'s
+    own header records every route this codebase has tried on `api.polymarket.us`
+    and none of them is "one market by id" -- so this reads the WHOLE open game
+    catalogue (`fetch_game_markets`, ~33 signed calls measured 2026-08-24) and
+    finds the one row by id. Slow and expensive per order; worth caching once
+    real volume exists. There is no cheaper VERIFIED way to get
+    `orderPriceMinTickSize`/`minimumTradeQty`, which `polymarket_us_orders.
+    order_body` refuses to infer from anything but the market's own live
+    response (see that module's header) -- and no persisted artifact exists to
+    fall back to the way Kalshi's `kalshi_markets.json` does, because nothing
+    in this codebase yet writes one for Polymarket.
+
+    --------------------------------------------------------------------------
+    NOTHING POPULATES `request.venue_ticker` FOR POLYMARKET YET
+    --------------------------------------------------------------------------
+
+    Read here as the Polymarket market's `id` -- the SAME field Kalshi's own
+    ticker resolver populates with a Kalshi ticker (`OrderRequest.venue_ticker`:
+    "the venue's contract id"). `portfolio_commit.py::_venue_price_resolver`'s
+    polymarket branch is what would populate it; until that exists, a
+    polymarket position reaching here has an empty `venue_ticker` and this
+    refuses immediately. Wiring `_venue_submitter` is necessary but not
+    sufficient on its own -- this function exists so the day that resolver
+    lands, live Polymarket orders are one field away rather than unbuilt.
+
+    --------------------------------------------------------------------------
+    WHICH PRICE, NOT WHICH `outcomeSide`
+    --------------------------------------------------------------------------
+
+    This function only selects the live price for OUR named team --
+    `request.home_team`/`away_team` matched against the market's `outcomes`
+    via `kalshi_board_join._side_for_team`, the SAME resolver
+    `kalshi_polymarket_arb.py` already uses and tests for the identical
+    problem (Polymarket's `outcomes` carry bare team names, never "yes"/"no",
+    and never a guaranteed array order). Whether that team is
+    `OUTCOME_SIDE_YES` or `_NO` on Polymarket's own books is decided by
+    `polymarket_us_orders._side_to_outcome` from `request.side` directly, not
+    here -- and that YES/NO convention is itself UNVERIFIED against a real
+    venue response (no live order has ever been placed on this venue). Getting
+    the PRICE right for the wrong `outcomeSide` would still buy the wrong side
+    at a price never quoted for it, so this is named rather than assumed away.
+    """
+    from syndicate.features.shared import polymarket_us_markets
+    from syndicate.features.shared.kalshi_board_join import _side_for_team
+
+    market_id = str(getattr(request, "venue_ticker", "") or "").strip()
+    if not market_id:
+        print("[execute_portfolio] POLYMARKET_NO_MARKET_ID -- venue_ticker unset", flush=True)
+        return None
+
+    try:
+        result = polymarket_us_markets.fetch_game_markets()
+    except Exception as exc:
+        print(
+            f"[execute_portfolio] POLYMARKET_LIVE_FETCH_ERROR id={market_id}"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return None
+    if result.get("status") != "ok":
+        print(
+            f"[execute_portfolio] POLYMARKET_LIVE_FETCH_NOT_OK id={market_id}"
+            f" reason={result.get('reason')}",
+            flush=True,
+        )
+        return None
+
+    row = next((m for m in (result.get("markets") or []) if str(m.get("id")) == market_id), None)
+    if row is None:
+        print(f"[execute_portfolio] POLYMARKET_MARKET_NOT_FOUND id={market_id}", flush=True)
+        return None
+    if not row.get("orderable"):
+        # `orderable` is `trimmed_row`'s own check that tick size and minimum
+        # quantity are BOTH present -- see `polymarket_us_markets.trimmed_row`.
+        print(f"[execute_portfolio] POLYMARKET_MARKET_NOT_ORDERABLE id={market_id}", flush=True)
+        return None
+
+    slug = str(row.get("slug") or "").strip()
+    outcomes = _decode_polymarket_list(row.get("outcomes"))
+    prices = _decode_polymarket_list(row.get("outcomePrices"))
+    if not slug or not (isinstance(outcomes, list) and isinstance(prices, list)) or len(
+        outcomes
+    ) != 2 or len(prices) != 2:
+        print(f"[execute_portfolio] POLYMARKET_OUTCOMES_UNREADABLE id={market_id}", flush=True)
+        return None
+
+    resolution = {
+        "home_team": getattr(request, "home_team", None),
+        "away_team": getattr(request, "away_team", None),
+    }
+    sport = getattr(request, "sport", None)
+    wants_home = str(getattr(request, "side", "") or "").strip().lower() in _HOME_LIKE_SIDES
+
+    live = None
+    for name, price in zip(outcomes, prices):
+        side = _side_for_team(name, resolution, sport=sport)
+        if side is not None and (side == "home") == wants_home:
+            try:
+                live = float(price)
+            except (TypeError, ValueError):
+                live = None
+            break
+    if live is None:
+        print(
+            f"[execute_portfolio] POLYMARKET_SIDE_UNRESOLVED id={market_id}"
+            f" side={getattr(request, 'side', None)}",
+            flush=True,
+        )
+        return None
+
+    planned = getattr(request, "requested_price", None)
+    if planned is not None:
+        drift = round(live - float(planned), 4)
+        if drift > max_slippage_dollars():
+            raise _SlippageExceeded(
+                f"polymarket_slippage: id={market_id} planned={planned} live={live}"
+                f" drift={drift:+.4f} max={max_slippage_dollars()}"
+            )
+        print(
+            f"[execute_portfolio] POLYMARKET_LIVE_PRICE id={market_id} planned={planned}"
+            f" live={live} drift={drift:+.4f}",
+            flush=True,
+        )
+
+    return (slug, live, row.get("orderPriceMinTickSize"), row.get("minimumTradeQty"))
 
 
 def _status_of(request: OrderRequest) -> str | None:
