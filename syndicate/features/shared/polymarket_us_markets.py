@@ -1197,6 +1197,30 @@ def _normalise_team(value: Any) -> str:
 
 GAME_SLATE_ARTIFACT = ("intelligence", "polymarket_us_games.json")
 
+# `refresh_state_store`'s keyvalue backend refuses a write past this.
+_KEYVALUE_CEILING_BYTES = 8 * 1024 * 1024
+
+# EXACTLY what the fan-in adapter and the order builder read, and nothing else.
+# Measured 2026-08-24: the full trimmed row is 4.9MB across 7,585 markets --
+# under the ceiling but with thin headroom on a slate that grows toward a
+# matchday. These fields are 2.1MB, 43% of that.
+#
+#   outcomes/outcomePrices/sportsMarketTypeV2/line   the quote
+#   slug/gameStartTime                               the join key
+#   orderPriceMinTickSize/minimumTradeQty            what order_body REFUSES
+#                                                    to infer
+_SLATE_STORAGE_FIELDS = (
+    "slug", "sportsMarketTypeV2", "outcomes", "outcomePrices", "line",
+    "gameStartTime", "orderPriceMinTickSize", "minimumTradeQty", "orderable",
+)
+
+
+def _slate_row_for_storage(row: Mapping[str, Any]) -> dict[str, Any]:
+    """The persisted row. Drops `question`, `description`, `tags`, `category`
+    and the rest -- readable from the venue on demand, and none of them is read
+    by anything downstream of this artifact."""
+    return {key: row[key] for key in _SLATE_STORAGE_FIELDS if key in row}
+
 
 def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, Any]:
     """Fetch the joinable slate and write it for the fan-in to read.
@@ -1219,7 +1243,7 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, An
     if slate.get("status") != "ok":
         return {"status": "error", "reason": slate.get("reason"), "written": False, "kept_previous": True}
 
-    markets = slate.get("markets") or []
+    markets = [_slate_row_for_storage(m) for m in (slate.get("markets") or [])]
     payload = {
         "fetched_at": _time.time(),
         "markets": markets,
@@ -1230,6 +1254,22 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, An
         "game_start_min": slate.get("game_start_min"),
         "game_start_max": slate.get("game_start_max"),
     }
+    # SIZE IS CHECKED BEFORE THE WRITE, not discovered by its failure.
+    # `refresh_state_store`'s keyvalue backend refuses past ~8MB, and #60's
+    # rule is "shrink the payload rather than raise the ceiling" -- Novig hit
+    # exactly this at 9,128,668 bytes on 2026-08-24 and had to trim after the
+    # outage. Measured here: the full trimmed row is 4.9MB at 7,585 markets and
+    # GROWS toward a matchday, so the lean row (2.1MB, 43%) is what persists.
+    import json as _json
+
+    size_bytes = len(_json.dumps(payload))
+    if size_bytes > _KEYVALUE_CEILING_BYTES:
+        return {
+            "status": "too_large_to_persist",
+            "reason": f"{size_bytes} bytes exceeds {_KEYVALUE_CEILING_BYTES}",
+            "count": len(markets), "bytes": size_bytes, "written": False,
+        }
+
     path = reports_root().joinpath(*GAME_SLATE_ARTIFACT)
     try:
         write_json_file(path, payload)
@@ -1247,6 +1287,10 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, An
         "status": "ok",
         "written": True,
         "count": len(markets),
+        # Reported every run so growth toward the ceiling is visible BEFORE it
+        # becomes a write failure, which is how Novig's was found.
+        "bytes": size_bytes,
+        "headroom_bytes": _KEYVALUE_CEILING_BYTES - size_bytes,
         "truncated": slate.get("truncated"),
         "game_types": slate.get("game_types"),
     }

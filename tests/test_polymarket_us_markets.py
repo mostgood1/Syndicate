@@ -1208,6 +1208,10 @@ def test_the_slate_is_written_with_its_own_fetched_at(monkeypatch, tmp_path):
     assert written["payload"]["fetched_at"] > 0
     assert written["payload"]["count"] == 1
     assert str(written["path"]).endswith("polymarket_us_games.json")
+    # And the size is REPORTED every run, so growth toward the ceiling is
+    # visible before it becomes a write failure -- which is how Novig's was found.
+    assert result["bytes"] > 0
+    assert result["headroom_bytes"] == 8 * 1024 * 1024 - result["bytes"]
 
 
 def test_a_failed_fetch_KEEPS_the_previous_slate(monkeypatch):
@@ -1237,3 +1241,45 @@ def test_a_failed_WRITE_is_distinct_from_a_failed_fetch(monkeypatch, tmp_path):
     assert result["status"] == "fetched_not_written"
     assert result["count"] == 1
     assert "8388608" in result["reason"]
+
+
+def test_the_persisted_row_keeps_only_what_downstream_READS(monkeypatch, tmp_path):
+    """MEASURED 2026-08-24: the full trimmed row is 4.9MB across 7,585 markets
+    -- under the 8MB keyvalue ceiling but thin, on a slate that grows toward a
+    matchday. The lean row is 2.1MB. #60's rule is "shrink the payload rather
+    than raise the ceiling"."""
+    written = {}
+    from syndicate.features.shared import refresh_state_store
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+    monkeypatch.setattr(refresh_state_store, "write_json_file",
+                        lambda path, payload: written.update({"payload": payload}))
+    rich = _row(question="Will the Yankees win?", description="x" * 400,
+                tags=["mlb"], category="sports", status="MARKET_STATUS_OPEN")
+    monkeypatch.setattr(mod, "fetch_game_markets",
+                        lambda **_k: {"status": "ok", "markets": [mod.trimmed_row(rich)]})
+    mod.persist_game_slate()
+    stored = written["payload"]["markets"][0]
+    # Everything the fan-in adapter and order_body read.
+    for keep in ("slug", "sportsMarketTypeV2", "outcomes", "outcomePrices",
+                 "orderPriceMinTickSize", "minimumTradeQty", "gameStartTime"):
+        assert keep in stored, keep
+    # Nothing else.
+    for drop in ("question", "description", "tags", "category", "status"):
+        assert drop not in stored, drop
+
+
+def test_a_slate_over_the_keyvalue_ceiling_REFUSES_before_writing(monkeypatch, tmp_path):
+    """Checked before the write rather than discovered by its failure. Novig
+    hit exactly this at 9,128,668 bytes and had to trim after the outage."""
+    from syndicate.features.shared import refresh_state_store
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+    monkeypatch.setattr(refresh_state_store, "write_json_file",
+                        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not write")))
+    huge = [mod.trimmed_row(_row(id=f"m-{i}", slug="s" * 900)) for i in range(12000)]
+    monkeypatch.setattr(mod, "fetch_game_markets", lambda **_k: {"status": "ok", "markets": huge})
+    result = mod.persist_game_slate()
+    assert result["status"] == "too_large_to_persist"
+    assert result["written"] is False
+    assert "exceeds" in result["reason"]

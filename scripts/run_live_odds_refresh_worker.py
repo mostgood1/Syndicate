@@ -829,6 +829,71 @@ def _print_param_probe(pm) -> None:
             )
 
 
+def _polymarket_us_slate_refresh_tick() -> None:
+    """Persist the Polymarket US game slate on a cadence, like Kalshi's.
+
+    WHY A WRITER AT ALL. `venue_quote_adapters` reads ARTIFACTS, never venue
+    APIs -- a second independent caller for one venue is a documented incident
+    class here (`#139/#144` MLB, `#148` soccer). Kalshi already writes
+    `intelligence/kalshi_markets.json` with its own `fetched_at`; OddsAPI
+    writes `odds_history` shards. Polymarket had no equivalent, so its adapter
+    refused by name on every cycle. This is that missing writer.
+
+    Cadence is deliberate, not free: the slate costs ~33 signed calls (a
+    binary-searched boundary plus ~18 pages). At the default 900s that is ~130
+    calls an hour, against a venue whose rate limits nobody here has measured.
+
+    THE ARTIFACT GOES OVER THE SHARED KEYVALUE BACKEND, not the HTTP
+    allowlist. `write_json_file` under `reports/` is how `kalshi_markets.json`
+    already crosses services (`artifact_publisher.py:35`'s own comment says so
+    for `intelligence_state.json`), which is why this needs no
+    HOT_ARTIFACT_PATTERNS entry -- and why the ~8MB ceiling applies instead.
+    """
+    import os
+
+    if (os.environ.get("SYNDICATE_POLYMARKET_US_SLATE_REFRESH_ENABLED") or "1").strip().lower() in {"0", "false", "no", "off"}:
+        return
+    interval = 900
+    raw = str(os.environ.get("SYNDICATE_POLYMARKET_US_SLATE_INTERVAL_SECONDS") or "").strip()
+    if raw:
+        try:
+            interval = max(120, int(raw))
+        except ValueError:
+            pass
+
+    global _POLYMARKET_SLATE_LAST_RUN
+    now = time.time()
+    if _POLYMARKET_SLATE_LAST_RUN and (now - _POLYMARKET_SLATE_LAST_RUN) < interval:
+        return
+    _POLYMARKET_SLATE_LAST_RUN = now
+
+    try:
+        from syndicate.features.shared import polymarket_us_markets as pm
+        from syndicate.features.shared.polymarket_us_auth import credentials_present
+
+        if not credentials_present():
+            print("[live_odds_worker] POLYMARKET_US_SLATE_WRITE status=credentials_absent", flush=True)
+            return
+        result = pm.persist_game_slate()
+        print(
+            f"[live_odds_worker] POLYMARKET_US_SLATE_WRITE status={result.get('status')}"
+            f" written={result.get('written')} count={result.get('count')}"
+            f" bytes={result.get('bytes')} headroom={result.get('headroom_bytes')}"
+            f" truncated={result.get('truncated')}"
+            f" game_types={result.get('game_types')}"
+            f" reason={result.get('reason')}",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 -- never fatal to the loop
+        print(
+            f"[live_odds_worker] POLYMARKET_US_SLATE_WRITE_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+_POLYMARKET_SLATE_LAST_RUN: float = 0.0
+
+
 def _polymarket_us_slate_probe_at_boot() -> None:
     """What the US venue actually lists for sport, by SHAPE.
 
@@ -1628,6 +1693,9 @@ def main() -> int:
         _polymarket_catalogue_at_boot()
         _polymarket_us_auth_probe_at_boot()
         _polymarket_us_slate_probe_at_boot()
+        # The WRITER, not the probe: the probe reports shape once at boot, this
+        # keeps the artifact fresh for the fan-in to read.
+        _polymarket_us_slate_refresh_tick()
         _game_line_grade_audit_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
