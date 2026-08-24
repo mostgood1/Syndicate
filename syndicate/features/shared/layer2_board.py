@@ -884,6 +884,23 @@ def _as_float(value: Any) -> float | None:
         return None
 
 
+def _canonical_team_key(sport: str, name: str) -> str | None:
+    """Canonical club name for the chip join, or None if unresolvable.
+
+    Deliberately swallowing: this feeds a DISPLAY join. A club the alias map
+    has never heard of must degrade to the existing name-based lookups, not
+    take out the row it is stamped on.
+    """
+    if not sport or not name:
+        return None
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+
+        return canonical_team(sport, name)
+    except Exception:
+        return None
+
+
 def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, float], str | None]:
     """No-vig fair probability per side, and how it was obtained.
 
@@ -1787,6 +1804,23 @@ def layer2_rows_to_board_cards(
                 "home_team": home,
                 "away_team": away,
                 "matchup": f"{away} @ {home}" if home and away else "",
+                # THE JOIN KEY THE CHIP CARRIES TOO. `matchup` is built from the
+                # ODDS FEED's spelling and the live-scoreboard chip is built
+                # from the league artifacts' spelling; for most clubs those
+                # differ only cosmetically and the browser's normalisation
+                # bridges them, but for some they are simply DIFFERENT NAMES
+                # ("Athletic Bilbao" / "Athletic Club") and no normalisation
+                # can or should bridge that -- see `_side_key` in
+                # `game_chip_scoreboard.py` for the measurement and for why
+                # trying is what collapses Manchester United into City.
+                #
+                # `canonical_team` is the server's own alias map and resolves
+                # both spellings to one name, so stamping it on BOTH sides of
+                # the join lets them match without either feed changing.
+                # None where the map cannot resolve the club; the browser's
+                # existing indexes still apply, so this only ever adds a join.
+                "home_key": _canonical_team_key(sport, home),
+                "away_key": _canonical_team_key(sport, away),
                 "commence_time": row.get("commence_time"),
                 "event_id": row.get("event_id"),
                 "game_pk": row.get("event_id"),

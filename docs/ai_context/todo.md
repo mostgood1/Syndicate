@@ -1,5 +1,76 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#540` — **La Liga compact cards showed mismatched team names: two clubs the browser's normalisation can NEVER join, now joined on the server's own alias map.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
+
+Reported: "we have some la liga compact game card mismatched team names for
+today". `#365` had already closed the MLS case (accents, punctuation,
+club-type affixes) with a normalised chip index. This is the residue that
+normalisation cannot reach.
+
+**MEASURED, not reasoned.** Built the real chips (`build_game_chips` for
+2026-08-24, soccer) and ran the page's OWN `chipForGame` — extracted from
+`intelligence.html` — over the La Liga week's fixtures in odds-feed spelling:
+**9 of 13 joined, 4 did not, 0 joined WRONG.** All four misses were two clubs:
+
+```
+odds feed "Athletic Bilbao"                vs chip "Athletic Club"
+odds feed "Real Racing Club de Santander"  vs chip "Racing Santander"
+```
+
+A card with no chip prints `game.matchup` verbatim, so those four rendered
+full odds-feed club names beside cards showing tri-codes. That is the reported
+mismatch — the two feeds name the same club differently and the board showed
+both spellings on one strip.
+
+**NO AMOUNT OF NORMALISATION FIXES THIS, and widening it is the trap.**
+Matching "athletic bilbao" to "athletic club" means dropping a city qualifier,
+which is exactly what collapses Manchester United into Manchester City —
+`normalizeClubName` pins those two clubs for that reason. The remaining gap is
+not a spelling difference; it is two names.
+
+**THE MAP ALREADY EXISTED, SERVER-SIDE.** `team_aliases.canonical_team`
+resolves BOTH spellings of BOTH clubs to one name — `_SOCCER_VENDOR_NAME_ALIASES`
+carries `"athletic bilbao"` and `"real racing club de santander"`, each entry
+quoted from a production reading. The browser was approximating a lookup the
+server could just answer. So both sides of the join now carry its answer:
+`chip.away.key`/`chip.home.key` (`game_chip_scoreboard._side_key`) and
+`row.away_key`/`row.home_key` (`layer2_board._canonical_team_key`), and
+`chipForGame` consults a canonical index BEFORE the normalised one.
+
+**After: 13 of 13, 0 unchipped, 0 mismatched** — and three fixtures moved off
+the loose approximation onto the lookup. All 98 soccer chips resolve both keys.
+
+**COLLISIONS GUARDED, same as the loose index.** Two chips on one canonical key
+are both removed, never resolved arbitrarily — two fixtures between the same
+clubs in one chip window (two legs, a cup tie, an MLB doubleheader) is exactly
+that case, and a wrong chip attaches one game's score to another game's card.
+
+**`#444` CHECKED THIS TIME, EMPIRICALLY.** I had just reproduced `#444` in
+`#539` by wiring a counter and never checking the field reached a consumer. So
+here: built a real card through `layer2_rows_to_board_cards` and asserted
+`home_key == "athletic club"` from the odds-feed spelling end to end, rather
+than reading the serializer and concluding.
+
+**Exonerated along the way, and worth recording so nobody re-opens it:** the
+La Liga club set (Racing Santander, Málaga, Deportivo La Coruña present;
+Girona, Mallorca absent) looked like a wrong-league pull. It is not —
+`PREGAME_PROJECTION_JOIN` shows `unmatched_by_league={'primeira_liga': 3}` with
+NO la_liga entry, so the odds feed and the sim agree on the fixture set, and
+the alias map names Racing Santander explicitly.
+
+**Tests:** `tests/js/game_chip_canonical_join.test.mjs` (15 — including the
+order contract, the collision guard, and assertions that both clubs still MISS
+without keys, which is what pins the keys as load-bearing);
+`tests/test_chip_canonical_join_key.py` (6). Updated the exact-shape assertion
+in `test_game_chip_scoreboard.py`.
+
+**Pre-existing reds, confirmed by stashing this change and re-running:**
+`test_wnba_cards_keyvalue_backend` and `test_wnba_refresh_runner` game-cards
+keyvalue tests. Not from this work.
+
+**Verify after deploy:** the four La Liga fixtures above render tri-codes
+(SEV @ ATH, ATH @ BAR, RAC @ GET, ELC @ RAC) instead of full club names.
+
 ### `#539` — **A one-sided LIVE soccer market is now priced against the MODELLED fair. `[USER DECISION 2026-08-23]` — the pregame refusal stands, and the distinction is the projection's BASIS.** — lane `layer2-sim-view-and-live-projection`, 2026-08-23
 
 `#538` closed the diagnosis and left one decision. The user took it, endorsing the
