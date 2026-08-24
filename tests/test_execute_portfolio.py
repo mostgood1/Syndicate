@@ -754,3 +754,69 @@ def test_no_price_anywhere_returns_none_so_the_order_refuses(monkeypatch):
 
     _price_env(monkeypatch, live_status="down", artifact=None)
     assert runner._kalshi_price_for(_Req()) is None
+
+
+def _record(status, **extra):
+    row = {"status": status, "idempotency_key": "k", "venue_ticker": "KX-T",
+           "sport": "mlb", "market": "strikeouts", "player_name": "X",
+           "side": "over", "line": 4.5, "requested_price": 0.5,
+           "requested_stake_dollars": 1.53, "fill_price": None, "error": None}
+    row.update(extra)
+    return row
+
+
+def test_a_resting_order_counts_as_PLACED_not_as_nothing(monkeypatch):
+    """MEASURED 2026-08-24T15:38:23Z. A real order went to Kalshi -- Sandy
+    Alcantara over 4.5 Ks, 3 contracts at $0.50 -- and the run reported
+    `placed=0 duplicates=0 retried=0 skipped=0 refused={}`. Every counter zero,
+    an order sitting at the venue.
+
+    The phantom-fill fix caused it. Before that fix a submit response defaulted
+    to `filled`, so counting fills happened to count placements too; once a
+    resting order correctly recorded `submitted`, the count went silent.
+    Making the STATUS honest made the COUNT dishonest, because the count was
+    using the status as a proxy for a different question. A correct fix that
+    breaks its neighbour is still a break.
+
+    Placed means the venue took it. Filled means it traded. A limit order that
+    rests all afternoon is the first and not the second, and both facts have to
+    be readable off one line."""
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    monkeypatch.setattr(runner, "place_order",
+                        lambda request, submit=None: _record("submitted"))
+    result = runner.run_execution("2026-08-22")
+
+    assert result["placed"] == 1, result
+    assert result["filled"] == 0
+    assert result["failed"] == 0
+
+
+def test_a_fill_counts_as_both_placed_and_filled(monkeypatch):
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    monkeypatch.setattr(runner, "place_order",
+                        lambda request, submit=None: _record("filled"))
+    result = runner.run_execution("2026-08-22")
+    assert result["placed"] == 1
+    assert result["filled"] == 1
+
+
+def test_a_failed_order_is_neither_placed_nor_invisible(monkeypatch):
+    """`failed` means the venue may hold it, so it charges the budget -- and it
+    is not a placement. Reported by name rather than left to be inferred from
+    a `spent` that moved while every other counter stayed at zero, which is
+    the pair of numbers that took reading the source to interpret."""
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    monkeypatch.setattr(runner, "place_order",
+                        lambda request, submit=None: _record("failed", error="boom"))
+    result = runner.run_execution("2026-08-22")
+    assert result["placed"] == 0
+    assert result["failed"] == 1
