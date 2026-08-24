@@ -278,6 +278,14 @@ def settle_orders(
         order["outcome"] = verdict["outcome"]
         order["pnl_dollars"] = verdict["pnl_dollars"]
         order["settled_value"] = verdict["settled_value"]
+        # THE SCOREBOARD, where the resolver supplied one. `settled_value` is
+        # the margin, and a margin is self-consistent under an inverted sign
+        # convention -- so it can never falsify one. The two raw scores can,
+        # and storing them is what makes the grade audit self-service instead
+        # of a request for someone to go and look a game up.
+        for field in ("home_score", "away_score", "home_name", "away_name"):
+            if resolved.get(field) is not None:
+                order[field] = resolved[field]
         # NOT `settled_at` -- that is the venue's clock and is already stamped.
         # See the module docstring; conflating them is the whole reason this
         # number read as zero.
@@ -437,10 +445,20 @@ def audit_game_line_grades(selected_date: str, *, limit: int = 25) -> dict[str, 
             inverted = "won" if float(margin) < threshold else "lost"
         except (TypeError, ValueError):
             threshold, inverted = None, "?"
+        # THE SCOREBOARD FIRST, where we have it. A row carrying the real
+        # final score is checkable on sight; one carrying only a margin
+        # requires trusting the convention under test.
+        home_score, away_score = order.get("home_score"), order.get("away_score")
+        score = (
+            f" score={order.get('away_name') or order.get('away_team')} {away_score}"
+            f" - {home_score} {order.get('home_name') or order.get('home_team')}"
+            if home_score is not None and away_score is not None
+            else " score=<not_recorded>"
+        )
         print(
             f"[paper_settlement] GRADE_AUDIT market={order.get('market')}"
             f" bet_side={order.get('side')!r} bet_line={line_used}"
-            f" {order.get('away_team')}@{order.get('home_team')}"
+            f"{score}"
             f" margin_used={margin} must_beat={threshold}"
             f" our_verdict={order.get('outcome')} if_inverted={inverted}"
             f" pnl={order.get('pnl_dollars')}",
