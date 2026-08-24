@@ -26352,3 +26352,59 @@ boot is the brute-force fallback and should be the last resort.
 **Polymarket cannot price anything until (3) is answered.** `orderable=2000`
 is true and useless — every one of those games is over.
 
+
+---
+
+### 2026-08-24 21:26:00Z — refresh-worker `f5627f70` — Kalshi-vs-Polymarket arb scan runs clean end to end, zero matched games, and both reasons are already explained elsewhere
+
+**verify: `[kalshi_polymarket_arb] SCAN date=2026-08-24 result={'status': 'ok',
+'kalshi_moneylines_resolved': 0, 'kalshi_refusals': {},
+'polymarket_moneylines_resolved': 0, 'polymarket_refusals': {},
+'matched_games': 0, ..., 'flagged_count': 0}`**, refresh-worker `dwq7f`,
+`f5627f70`.
+
+**The pipeline itself worked.** Artifact reads (board rows via
+`read_layer2_shortlist`, Kalshi's persisted catalogue), the one live
+Polymarket US call, and the join all completed with no exception and no
+named refusal anywhere -- `kalshi_refusals`/`polymarket_refusals`/
+`join_refusals` are all `{}`, not populated-with-reasons. That is a genuine
+plumbing confirmation, separate from today's zero result.
+
+**Zero is explained by two independent, already-known facts, not a bug in
+this scan:**
+
+1. **`polymarket_moneylines_resolved=0`** -- this scan calls
+   `polymarket_us_markets.fetch_markets(open_only=True, drop_settled=True,
+   max_pages=1)`, i.e. the FIRST page at offset 0. The other session's
+   `f5627f70`/`d2c9c5f76` entries (same file, immediately above) measured
+   in the same window that the open catalogue's first ~16,000 rows are
+   futures/politics/culture, and the actual game slate (moneyline AND
+   spread, first real hit an NFL game at offset 16000) lives at the high
+   end of the id-ordered range. A single page at offset 0 cannot reach it.
+   **Not yet fixed here** -- their own paging strategy for reaching the
+   game-market region is still being tuned in real time (`8000-28000`
+   sampling, as of their last commit); pointing this scan's `offset`/
+   `max_pages` at it is the right next step once that settles, not before.
+
+2. **`kalshi_moneylines_resolved=0`, with `kalshi_refusals={}` -- meaning
+   NOT ONE Kalshi market in today's artifact was even classified as
+   `grammar=GRAMMAR_MONEYLINE`.** `kalshi_catalogue.SERIES_SPORT` (the hand
+   registry `classify_market` checks first) has ZERO moneyline series
+   registered -- every entry is a player-prop series
+   (`KXMLBKS`/`KXMLBOUTS`/`KXMLBHR`/`KXWNBAREB`/`PTS`/`AST`/`3PT`).
+   `sport_for_series` falls back to `_DISCOVERED`, a PER-PROCESS dict
+   populated only when a live catalogue scan has already run
+   (`register_discovered`/`auto_series_from_catalogue`) in this same
+   process. Whether that has happened by the time this boot hook fires is
+   UNMEASURED -- if it has not, every real Kalshi moneyline market
+   (h2h game winners plainly exist on Kalshi) is silently refused at
+   `unmapped_series` before this scan's own classification even runs, and
+   `classify_market` gives no way to tell "moneyline, unmapped" from "not a
+   moneyline at all" apart after that refusal -- the title is never parsed.
+   **Not yet measured or fixed** -- the next diagnostic step is checking
+   whether `_DISCOVERED` is populated by the time this hook runs, not
+   guessing at a fix.
+
+Probe flag (`SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT`) set back to `0`,
+redeploy triggered. Deploy claim (refresh-worker, token `5bde3ff6440857af`)
+to be released once confirmed live.
