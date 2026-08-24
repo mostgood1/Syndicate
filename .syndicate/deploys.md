@@ -26558,3 +26558,117 @@ Polymarket — the venue label on someone else's prices. Any historical
 
 **DO NOT TRANSACT YET.** Two things must land first: a board carrying the
 sports these venues quote, and a real Polymarket price resolver.
+
+
+---
+
+### 2026-08-24 21:52Z — WHY THE BOARD WENT SOCCER-ONLY: the MLB sim is starved by `intelligence_pipeline_busy`
+
+Traced backward through the pipeline rather than from the board. The first
+stage that is actually zero is NOT the odds.
+
+**Odds are fine. Predictions are fine.**
+
+```
+[home] MLB_GAME_MARKET_ROWS_DIAG game_pk=823097 has_markets_ml=True
+       has_markets_totals=True has_predictions_full=True home_win_prob=0.402
+CONTAINER_MEMORY {"sport":"mlb","game_count":10,"stage":"board_contract_end"}
+```
+
+Ten MLB games on the board contract, with moneyline AND totals markets and
+full predictions. So OddsAPI coverage is not the gap, and neither is the
+sweep — `SWEEP_OWNERSHIP_EXCLUDED kept=mlb,wnba,soccer` keeps MLB every tick.
+
+**The zero is recommendation rows:** `MLB_GAMES_STAGE_MS games=10 ...
+per_game_reco_rows=0`.
+
+**And the cause is the sim never getting a slot:**
+
+```
+MLB_SIM_TICK mlbDailySim={"launched": false, "reason": "intelligence_pipeline_busy"}
+  21:42:43, 21:43:18, 21:44:55, 21:52:14 ...
+MLB_SIM_TICK mlbDailySim={"ok": true, "pid": 116, "reason": "fingerprint_change",
+  "command": [... --date 2026-08-24 --sims 1000 --workers 2
+              --only-game-pks 823097,823828,824235,824557,824964]}   21:50:26
+```
+
+Blocked on nearly every tick. The one launch in that window was PARTIAL —
+`--only-game-pks` names 5 of the 10 games — and by 21:52:14 `process_count=2`,
+so pid 116 was already gone.
+
+**The chain, end to end:** MLB sim starved → no recommendations →
+`per_game_reco_rows=0` → the 235 portfolio rows are soccer-only (soccer's
+pipeline is separate and does run) → `VENUE_SCOPE scoped=0` for all four
+venues → nothing to execute.
+
+**So the venue work is not the blocker and neither is Polymarket.** Kalshi's
+join is built, Polymarket's catalogue is fully reachable; both are matching
+against a board that has no US-sport rows to match.
+
+**NOT ESTABLISHED, deliberately:** why `intelligence_pipeline_busy` is
+near-permanent, and whether the 21:50 partial run completed. Also worth
+weighing: ~10 deploys across parallel sessions today, and CLAUDE.md's standing
+warning that deploying kills an in-flight MLB sim. That is a plausible
+contributor and I have NOT measured it.
+
+**Method note:** the first two attempts to prove "no MLB odds refresh ran"
+used a Render log text filter that silently matched nothing — the POSITIVE
+CONTROL (searching for a command I had already seen in the same window) also
+returned zero, which is the only reason the false negative was caught. That
+filter appears to OR tokens rather than match substrings. Do not read a zero
+from it without a control.
+
+
+---
+
+### 2026-08-24 21:54Z — OddsAPI token EXONERATED. The pipeline is busy re-reading ~8MB of soccer odds history every ~73s.
+
+**Hypothesis tested (user's):** OddsAPI is returning nothing because the token
+expired. **EXONERATED — it is serving live data right now.**
+
+```
+INTEL_TRACE {"event":"odds_history_input","sport":"soccer","present":true,
+  "shard_key":"2026-08-29","entry_count":2107,"bytes":4797451,
+  "mtime":1787607689.108,
+  "sample_market_keys":[... "home_team=Bayern Munich|away_team=VfB Stuttgart|
+   market=h2h|side=Bayern Munich|book=draftkings" ...]}
+```
+
+`mtime 1787607689` is 2026-08-24T21:41:29Z — thirteen minutes before the read.
+Real draftkings/fanduel h2h quotes for Real Madrid, Celta Vigo, Bayern Munich.
+An expired token would fail for soccer identically, and soccer is the ONLY
+thing on the board. So the credential is live and the fetch works.
+
+**WHAT IS ACTUALLY HOLDING THE GUARD.** `intelligence_pipeline_busy()` is not
+about OddsAPI at all — it is `_execution_guard.locked()`, i.e. "the board build
+is computing in this process right now" (`pipeline/intelligence_state.py:305`).
+It is true because the build is genuinely running, near-continuously.
+
+The trace says what it is chewing on. FIVE soccer odds-history shards, all
+FUTURE dates, re-read on a ~73-second loop (21:53:33 then 21:54:46, identical
+set):
+
+| shard | entries | bytes |
+|---|---|---|
+| 2026-08-26 | 38 | 120,337 |
+| 2026-08-27 | 72 | 194,665 |
+| 2026-08-28 | 314 | 742,052 |
+| 2026-08-29 | **2,107** | **4,797,451** |
+| 2026-08-30 | 641 | 1,466,836 |
+
+**~8.3 MB per pass, every ~73 seconds**, and each shard is resolved against
+THREE candidate paths (`odds_control_plane`, `soccer_source/artifacts`,
+`soccer_source/tracking`) — so the file-stat work is 15 paths, not 5.
+
+That is the starvation source. `MLB_SIM_TICK` reports
+`mlbDailySim: {"launched": false, "reason": "intelligence_pipeline_busy"}` on
+nearly every tick because the guard is almost never free.
+
+**Note the shards are 08-26..08-30 — none is today.** The pipeline is doing
+this volume of work for fixtures two to six days out while today's MLB slate
+gets no sim.
+
+**NOT ESTABLISHED:** why five future shards are loaded every cycle rather than
+cached or narrowed, and whether 2026-08-29's 2,107 entries (4.8MB, one day of
+soccer player props) is expected or itself a bug. Both are the next question,
+and both are in soccer's ingestion path, not the venue work.
