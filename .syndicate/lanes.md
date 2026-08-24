@@ -1787,6 +1787,57 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   heavily-claimed board files (`layer2_board.py` et al.) and needs a design
   decision on how a closing-line (not live) price should be presented
   alongside live odds; out of scope for what was asked this round.
+- **NOVIG'S ARTIFACT WRITE FIXED, TWO BUGS DEEP, 2026-08-24 19:38:48Z** (PRs
+  #37/#39; full readout `.syndicate/deploys.md` same timestamp). The pipeline
+  above ran in production for the first time and never actually persisted
+  `novig_markets.json` -- first `Object of type Decimal is not JSON
+  serializable` (Decimal fields from `normalize_market_row`, fixed with a
+  `_json_safe()` pass), then, the VERY NEXT cycle after that fix, `9128668
+  bytes exceeds 8388608` (`#60`'s keyvalue ceiling; fixed by trimming each
+  persisted row to 8 fields, dropping the per-row `date` and OHLC intraday
+  fields). Both confirmed fixed in the same post-redeploy cycle. **Structural
+  finding, not an engineering gap: Novig's public CSV is anonymized at the
+  game/player/team level** -- `reportTicker`/`contractSeries` name a category
+  only, `marketId`/`outcomeId` are opaque UUIDs, so this artifact CANNOT feed
+  a per-bet price resolver (`_venue_price_resolver()` in
+  `pipeline/portfolio_commit.py`, claimed by `portfolio-decision-and-
+  execution`) the way Kalshi's ticker or Polymarket's question text can. The
+  credentialed REST tier that could carry `description`/`league`/`eventId`
+  needs `NOVIG_CLIENT_ID`/`NOVIG_CLIENT_SECRET`, which this lane does not
+  have (see the NOVIG ORDER-AUTOMATION entry above).
+- **POLYMARKET US SPORTS API CLIENT BUILT 2026-08-24** (PR #41), from
+  Sports API/Sports (Legacy) API reference pages the user pasted verbatim --
+  `GET /v2/leagues/{slug}/events`, `GET /v2/sports/{slug}/events`, plus the
+  legacy `/v1/sports*` family. Built because the GLOBAL venue's catalogue
+  (`polymarket_client.py`, this lane's own file) came back `sporting=0` of
+  100 on its most recent live production pull -- the venue's general
+  `/markets` listing is not where its sports coverage lives, if it has any at
+  all; this is the endpoint family aimed specifically at that question.
+  `syndicate/features/shared/polymarket_us_sports_client.py` (NEW) reuses
+  `polymarket_us_auth.signed_request` (a file this lane does NOT own --
+  `polymarket_us_auth.py`/`polymarket_us_orders.py` belong to the concurrently
+  running Polymarket-order-automation session, branch `relaxed-knuth-38xts4`;
+  nothing there was edited, only imported read-only) and imports nothing from
+  `polymarket_us_orders.py` -- discovery must never gain order-placement
+  ability by accident of a shared import. `nfl`/`nba`/`mlb` league slugs are
+  the docs' own documented examples; `wnba`/`nhl`/`ncaaf`/`ncaab` are an
+  UNVERIFIED guess at the same pattern, marked as such in the mapping's own
+  comment; soccer deliberately absent (no documented slug, no single
+  Syndicate league key). `probe_league()`/`probe_all_leagues()` report the
+  SHAPE an event row actually has -- the endpoints are documented, the row
+  schema is not. Wired into `scripts/probe_exchange_markets.py`'s existing
+  boot-probe rotation (this lane's own file). 29 new tests. **OWED: a live
+  probe run** -- deploy claim `b89496aa53797228` held on refresh-worker,
+  `SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT=1` set and a redeploy triggered
+  (`dep-da6a4861egvs739tqrd0`), result not yet read as of this checkpoint.
+  Whether `POLYMARKET_US_API_KEY_ID`/`PRIVATE_KEY` are even present on
+  refresh-worker (as opposed to only on live-odds-worker, where the other
+  session confirmed them working) is itself unknown -- `credentials_absent`
+  is an expected, informative possible outcome of this probe, not a failure.
+  This is the piece the user's Kalshi-vs-Polymarket arb-detection ask needs
+  next: nothing joins the two venues to a common board-row identity yet, and
+  building that join before this probe reports real field names would repeat
+  the exact mistake Kalshi's own join cost a day recovering from.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
