@@ -755,3 +755,108 @@ def test_the_price_fallback_still_applies_when_status_is_absent():
 ])
 def test_the_resolved_markers_are_matched_case_insensitively(status):
     assert mod.is_settled_row(_row(status=status)) is True
+
+
+# ==========================================================================
+# WHICH QUERY PARAMS DOES /v1/markets HONOUR?
+# ==========================================================================
+
+
+def _sig_rows(first_id="m-1", start="2025-10-31T00:15:00Z", n=2):
+    return [_row(id=f"{first_id}" if i == 0 else f"other-{i}", gameStartTime=start)
+            for i in range(n)]
+
+
+def test_the_negative_control_decides_whether_IGNORED_means_anything(monkeypatch):
+    """If the API silently discards unknown query params -- normal
+    grpc-gateway behaviour -- then every "ignored" row is uninformative, and a
+    table read without knowing that is worse than no table. The verdict is
+    COMPUTED here rather than left to a reader."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    # Everything returns the same rows -- including the bogus param.
+    monkeypatch.setattr(auth, "signed_request", lambda *_a, **_k: {"markets": _sig_rows()})
+    result = mod.probe_market_query_params()
+    assert result["control_outcome"] == "ignored"
+    assert result["ignored_is_meaningful"] is False
+
+
+def test_a_rejected_control_makes_ignored_informative(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        if "zzz_not_a_real_param" in url:
+            raise auth.PolymarketUSAuthError("http_400: unknown field")
+        return {"markets": _sig_rows()}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.probe_market_query_params()
+    assert result["control_outcome"] == "rejected"
+    assert result["ignored_is_meaningful"] is True
+
+
+def test_a_param_that_changes_the_response_is_reported_as_honoured(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        if "order=desc" in url:
+            # A different first row is the sharpest tell of a real change.
+            return {"markets": _sig_rows(first_id="newest", start="2026-08-24T23:05:00Z")}
+        return {"markets": _sig_rows()}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.probe_market_query_params()
+    assert "order_desc" in result["honoured"]
+    assert result["results"]["order_desc"]["signature"]["first_id"] == "newest"
+    # And an unchanged one is not claimed as a win.
+    assert result["results"]["sort_desc"]["outcome"] == "ignored"
+
+
+def test_known_valid_values_separate_a_bad_PARAM_from_a_bad_VALUE(monkeypatch):
+    """`status=MARKET_STATUS_RESOLVED` uses a value the venue itself returned.
+    If that is honoured, status filtering works and only the name of the OPEN
+    value is missing -- a far smaller question than guessing both at once."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        if "status=MARKET_STATUS_RESOLVED" in url:
+            return {"markets": _sig_rows(first_id="resolved-only", n=1)}
+        if "status=MARKET_STATUS_OPEN" in url:
+            return {"markets": []}
+        return {"markets": _sig_rows()}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.probe_market_query_params()
+    assert "status_resolved_known" in result["honoured"]
+    # An empty result is a CHANGE, not a failure -- it is the answer "that
+    # value matches nothing", which is exactly what we want to learn.
+    assert result["results"]["status_open"]["outcome"] == "honoured"
+    assert result["results"]["status_open"]["signature"]["count"] == 0
+
+
+def test_a_failed_baseline_refuses_rather_than_comparing_to_nothing(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def boom(*_a, **_k):
+        raise auth.PolymarketUSAuthError("http_500")
+
+    monkeypatch.setattr(auth, "signed_request", boom)
+    result = mod.probe_market_query_params()
+    assert result["status"] == "error"
+    assert "baseline_failed" in result["reason"]
+
+
+def test_absent_credentials_are_named(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: False)
+    assert mod.probe_market_query_params()["reason"] == "credentials_absent"

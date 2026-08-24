@@ -82,6 +82,7 @@ __all__ = [
     "fetch_league_slate",
     "fetch_teams",
     "probe_v1_sports_routes",
+    "probe_market_query_params",
     "team_alias_index",
     "is_sporting_row",
     "trimmed_row",
@@ -627,6 +628,157 @@ def fetch_teams(league: Any, *, provider: str | None = None) -> dict[str, Any]:
         "count": len(teams),
         "payload_keys": sorted(payload.keys()),
         "row_keys": sorted(teams[0].keys()) if teams else None,
+    }
+
+
+# --------------------------------------------------------------------------
+# WHICH QUERY PARAMETERS DOES `/v1/markets` ACTUALLY HONOUR?
+# --------------------------------------------------------------------------
+#
+# The blocker measured 2026-08-24T20:46:21Z: 2,000 rows deep the window is
+# still `2025-10-31..2026-01-13`, ascending, `truncated=True`, while today is
+# 2026-08-24. Today's slate is roughly 6,000-8,000 rows in. Paging blindly to
+# ~16 pages on every boot is the brute-force fallback; a filter or a sort would
+# make it one request.
+#
+# TWO DESIGN CHOICES MAKE THIS PROBE WORTH RUNNING, and without them it would
+# produce a table of results that cannot be interpreted:
+#
+#   1. A NEGATIVE CONTROL. `zzz_not_a_real_param` is sent deliberately. If the
+#      API REJECTS it, then "this param was ignored" is real evidence the param
+#      is unsupported. If the API silently IGNORES it, then every "ignored"
+#      result below is uninformative -- it means only that this API discards
+#      unknown query params, which is the normal grpc-gateway behaviour and
+#      would make the whole table meaningless. Interpreting the results without
+#      knowing which world we are in is exactly the mistake that produced the
+#      `sporting=500` reading.
+#
+#   2. KNOWN-VALID VALUES WHERE POSSIBLE. `status=MARKET_STATUS_RESOLVED` and
+#      `sportsMarketTypeV2=SPORTS_MARKET_TYPE_MONEYLINE` are values the venue
+#      itself returned. Sending those separates "the PARAM is unsupported" from
+#      "the VALUE was wrong", which guessing both at once cannot do. If
+#      `status=` is honoured with the resolved value, then status filtering
+#      works and only the name of the OPEN value is missing -- a much smaller
+#      question.
+
+# `(label, query fragment)`. Grouped by hypothesis so a result table reads as
+# an argument rather than a list.
+_MARKET_PARAM_CANDIDATES: tuple[tuple[str, str], ...] = (
+    # NEGATIVE CONTROL -- read this row first, see (1) above.
+    ("control_bogus_param", "zzz_not_a_real_param=1"),
+    # Does filtering work AT ALL? Known-valid values, see (2) above.
+    ("status_resolved_known", "status=MARKET_STATUS_RESOLVED"),
+    ("type_moneyline_known", "sportsMarketTypeV2=SPORTS_MARKET_TYPE_MONEYLINE"),
+    ("category_sports_known", "category=sports"),
+    # Guesses at the value that means "not resolved".
+    ("status_open", "status=MARKET_STATUS_OPEN"),
+    ("status_active", "status=MARKET_STATUS_ACTIVE"),
+    ("status_unspecified", "status=MARKET_STATUS_UNSPECIFIED"),
+    # Boolean ROW FIELDS. These are real keys on every row
+    # (active/archived/closed/hidden), and a gateway commonly exposes row
+    # fields as filters -- a better-than-random guess.
+    ("closed_false", "closed=false"),
+    ("closed_true", "closed=true"),
+    ("archived_false", "archived=false"),
+    ("hidden_false", "hidden=false"),
+    ("active_true", "active=true"),
+    ("active_false", "active=false"),
+    # Ordering. Any of these reaching today's slate makes paging unnecessary.
+    ("order_desc", "order=desc"),
+    ("sort_desc", "sort=desc"),
+    ("sort_by_start", "sortBy=gameStartTime"),
+    ("sort_direction_desc", "sortDirection=desc"),
+    ("descending_true", "descending=true"),
+    ("reverse_true", "reverse=true"),
+    # Time bounds, in the naming styles this API has already shown.
+    ("game_start_min", "gameStartTimeMin=2026-08-01T00:00:00Z"),
+    ("min_game_start", "minGameStartTime=2026-08-01T00:00:00Z"),
+    ("start_date", "startDate=2026-08-01T00:00:00Z"),
+    ("start_after", "gameStartTimeAfter=2026-08-01T00:00:00Z"),
+)
+
+
+def _query_signature(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """What a response looked like, compactly enough to compare two of them."""
+    starts = sorted(str(r.get("gameStartTime") or "") for r in rows if r.get("gameStartTime"))
+    return {
+        "count": len(rows),
+        # The first id is the sharpest single tell: a different first row means
+        # a different ordering or a different filter, even at equal counts.
+        "first_id": str(rows[0].get("id")) if rows else None,
+        "start_min": starts[0] if starts else None,
+        "start_max": starts[-1] if starts else None,
+        "statuses": sorted({str(r.get("status")) for r in rows if r.get("status")})[:5],
+    }
+
+
+def probe_market_query_params(*, limit: int = 5) -> dict[str, Any]:
+    """Send each candidate parameter and report which CHANGE the response.
+
+    Three outcomes, kept distinct because they imply different next steps:
+
+        rejected   the call failed -- the param is understood and disallowed,
+                   or the value is malformed
+        ignored    identical signature to the baseline
+        honoured   different signature -- the param did something
+
+    `ignored` is only meaningful if `control_bogus_param` is REJECTED. If the
+    control is also ignored, this API discards unknown query params and no
+    `ignored` row below carries information. That verdict is computed here
+    rather than left to a reader.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    if not auth.credentials_present():
+        return {"status": "skipped", "reason": "credentials_absent"}
+
+    def _fetch(extra: str | None) -> dict[str, Any]:
+        url = f"{auth.BASE_URL}/v1/markets?limit={int(limit)}"
+        if extra:
+            url += f"&{extra}"
+        try:
+            payload = auth.signed_request("GET", url)
+        except Exception as exc:
+            reason = (
+                str(exc) if isinstance(exc, auth.PolymarketUSAuthError)
+                else f"{type(exc).__name__}: {exc}"
+            )
+            return {"outcome": "rejected", "reason": reason[:200]}
+        rows = payload.get("markets")
+        if not isinstance(rows, list):
+            return {"outcome": "rejected", "reason": f"markets_key_absent: {sorted(payload.keys())}"}
+        return {"outcome": "ok", "signature": _query_signature(
+            [r for r in rows if isinstance(r, Mapping)])}
+
+    baseline = _fetch(None)
+    if baseline.get("outcome") != "ok":
+        # No baseline means nothing below can be compared to anything.
+        return {"status": "error", "reason": f"baseline_failed: {baseline.get('reason')}"}
+
+    results: dict[str, Any] = {}
+    for label, fragment in _MARKET_PARAM_CANDIDATES:
+        probe = _fetch(fragment)
+        if probe.get("outcome") == "rejected":
+            results[label] = {"outcome": "rejected", "reason": probe.get("reason"), "query": fragment}
+            continue
+        signature = probe.get("signature") or {}
+        changed = signature != baseline.get("signature")
+        results[label] = {
+            "outcome": "honoured" if changed else "ignored",
+            "query": fragment,
+            "signature": signature if changed else None,
+        }
+
+    control = results.get("control_bogus_param", {}).get("outcome")
+    return {
+        "status": "ok",
+        "baseline": baseline.get("signature"),
+        # THE VERDICT, computed rather than left to the reader. See (1).
+        "control_outcome": control,
+        "ignored_is_meaningful": control == "rejected",
+        "honoured": sorted(k for k, v in results.items() if v.get("outcome") == "honoured"),
+        "rejected": sorted(k for k, v in results.items() if v.get("outcome") == "rejected"),
+        "results": results,
     }
 
 
