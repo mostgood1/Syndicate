@@ -977,3 +977,75 @@ def test_games_and_futures_are_counted_SEPARATELY(monkeypatch):
     assert result["futures"] == 2
     # The only number that means "a board row could be priced against this".
     assert result["games"] == 1
+
+
+# ==========================================================================
+# WHERE do game markets live in the closed=false ordering?
+# ==========================================================================
+
+
+def test_the_offset_landscape_locates_the_first_game_market(monkeypatch):
+    """MEASURED 2026-08-24T21:18:53Z: games=0 futures=1644 across the first
+    2,000 rows, while moneylines are known to exist here. Deeper or absent are
+    completely different answers, and a linear sweep is the expensive way to
+    tell them apart -- this samples ~8 offsets at 5 rows each."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        kind = ("SPORTS_MARKET_TYPE_MONEYLINE" if offset >= 8000
+                else "SPORTS_MARKET_TYPE_FUTURE")
+        return {"markets": [_row(id=f"m-{offset}", category="sports",
+                                 sportsMarketTypeV2=kind)]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.probe_offset_landscape()
+    assert result["first_game_offset"] == 8000
+    assert result["samples"]["0"]["games"] == 0
+    assert result["samples"]["8000"]["games"] == 1
+
+
+def test_no_game_markets_anywhere_reports_None_rather_than_a_number(monkeypatch):
+    """`None` is the answer "the open set contains no game markets", which is a
+    completely different next step from "they start at offset N"."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request", lambda *_a, **_k: {"markets": [
+        _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")]})
+    assert mod.probe_offset_landscape()["first_game_offset"] is None
+
+
+def test_an_offset_past_the_end_is_reported_as_empty_not_failed(monkeypatch):
+    """How big the collection is, which is worth knowing."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        return {"markets": [] if offset >= 4000 else [_row()]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    samples = mod.probe_offset_landscape()["samples"]
+    assert samples["4000"]["status"] == "empty"
+    assert samples["4000"]["note"] == "past_end_of_collection"
+
+
+def test_one_offset_failing_does_not_stop_the_rest(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        if "offset=2000" in url:
+            raise auth.PolymarketUSAuthError("http_500")
+        return {"markets": [_row(category="sports",
+                                 sportsMarketTypeV2="SPORTS_MARKET_TYPE_MONEYLINE")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.probe_offset_landscape()
+    assert result["samples"]["2000"]["status"] == "error"
+    assert result["first_game_offset"] == 0

@@ -932,6 +932,23 @@ def _polymarket_us_slate_probe_at_boot() -> None:
                 flush=True,
             )
 
+        # WHERE do game markets live in the `closed=false` ordering?
+        # games=0 across the first 2,000 rows, and moneylines are known to
+        # exist here (the unfiltered query returns them). Deeper, or absent?
+        # Samples ~8 offsets at 5 rows each rather than sweeping linearly.
+        landscape = pm.probe_offset_landscape()
+        print(
+            f"[live_odds_worker] POLYMARKET_US_OFFSETS status={landscape.get('status')}"
+            f" first_game_offset={landscape.get('first_game_offset')}"
+            f" reason={landscape.get('reason')}",
+            flush=True,
+        )
+        for offset, sample in (landscape.get("samples") or {}).items():
+            print(
+                f"[live_odds_worker] POLYMARKET_US_OFFSET at={offset} {sample}",
+                flush=True,
+            )
+
         # WHICH QUERY PARAMS DOES `/v1/markets` HONOUR?
         # ANSWERED 2026-08-24T20:56:41Z: `closed=false`. `fetch_markets` sends
         # it now, so this is behind a flag rather than ~25 signed calls a boot.

@@ -84,6 +84,7 @@ __all__ = [
     "fetch_teams",
     "probe_v1_sports_routes",
     "probe_market_query_params",
+    "probe_offset_landscape",
     "team_alias_index",
     "is_sporting_row",
     "is_game_market_row",
@@ -876,6 +877,73 @@ def probe_market_query_params(*, limit: int = 5) -> dict[str, Any]:
         "honoured": sorted(k for k, v in results.items() if v.get("outcome") == "honoured"),
         "rejected": sorted(k for k, v in results.items() if v.get("outcome") == "rejected"),
         "results": results,
+    }
+
+
+def probe_offset_landscape(
+    *, offsets: tuple[int, ...] = (0, 1000, 2000, 4000, 8000, 16000, 32000, 64000),
+    limit: int = 5,
+) -> dict[str, Any]:
+    """WHERE in the `closed=false` ordering do game markets live?
+
+    MEASURED 2026-08-24T21:18:53Z: `games=0 futures=1644` across the first
+    2,000 rows. Moneylines are known to EXIST on this venue -- the unfiltered
+    query returned them for 2025-11 games -- so they are either deeper in this
+    ordering or absent from the open set. Those have completely different
+    consequences and a linear sweep is the expensive way to tell them apart.
+
+    So this SAMPLES the ordering instead: ~8 requests of 5 rows each, spread
+    across the offset range, reporting what type of market lives at each depth.
+    That locates the moneylines (or establishes their absence) for a fraction
+    of the cost of paging to them, and the shape of the result also says
+    whether the ordering is by id, by date, or by type.
+
+    An offset past the end returns an empty page, which is itself the answer to
+    "how big is this collection" -- reported rather than treated as a failure.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    if not auth.credentials_present():
+        return {"status": "skipped", "reason": "credentials_absent"}
+
+    samples: dict[str, Any] = {}
+    first_game_offset: int | None = None
+    for offset in offsets:
+        url = f"{auth.BASE_URL}/v1/markets?limit={int(limit)}&offset={int(offset)}&{_LIVE_FILTER}"
+        try:
+            payload = auth.signed_request("GET", url)
+        except Exception as exc:
+            reason = (
+                str(exc) if isinstance(exc, auth.PolymarketUSAuthError)
+                else f"{type(exc).__name__}: {exc}"
+            )
+            samples[str(offset)] = {"status": "error", "reason": reason[:200]}
+            continue
+        rows = [r for r in (payload.get("markets") or []) if isinstance(r, Mapping)]
+        if not rows:
+            # PAST THE END, which is a real answer about the collection's size
+            # rather than a failure to report.
+            samples[str(offset)] = {"status": "empty", "note": "past_end_of_collection"}
+            continue
+        games = [r for r in rows if is_game_market_row(r)]
+        if games and first_game_offset is None:
+            first_game_offset = offset
+        samples[str(offset)] = {
+            "status": "ok",
+            "count": len(rows),
+            "games": len(games),
+            "types": sorted({sports_market_type(r) for r in rows if sports_market_type(r)}),
+            "categories": sorted({str(r.get("category")) for r in rows if r.get("category")}),
+            "first_id": str(rows[0].get("id")),
+            "first_slug": str(rows[0].get("slug"))[:60],
+            "start_min": min((str(r.get("gameStartTime") or "") for r in rows if r.get("gameStartTime")), default=None),
+        }
+    return {
+        "status": "ok",
+        # The number that decides the next step: an offset to page from, or
+        # None meaning the open set genuinely contains no game markets.
+        "first_game_offset": first_game_offset,
+        "samples": samples,
     }
 
 
