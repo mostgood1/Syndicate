@@ -205,6 +205,12 @@ def spent_today(
                 if order.get("fill_stake_dollars") is not None
                 else order.get("requested_stake_dollars") or 0.0
             )
+            # FEES COME OUT OF THE SAME BALANCE. A daily cap that counts only
+            # stake is a cap the account can exceed -- ~1.9% on the first real
+            # Kalshi fill, which compounds across a slate. Absent means the
+            # venue reported none, which is true of every venue but Kalshi and
+            # of any Kalshi order not yet reconciled.
+            dollars += float(order.get("fees_dollars") or 0.0)
         except (TypeError, ValueError):
             # An unparseable stake is counted as an ORDER but not as dollars,
             # and that asymmetry is stated rather than silent: dropping it from

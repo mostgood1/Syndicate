@@ -148,6 +148,7 @@ _LEAN_FIELDS = (
     "status",
     "fill_price",
     "fill_stake_dollars",
+    "fees_dollars",
     "settled_at",
     "venue_order_id",
     "error",
@@ -361,6 +362,10 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "status": STATUS_SUBMITTED,
         "fill_price": None,
         "fill_stake_dollars": None,
+        # Present from creation so a summary cannot mistake "no such key" for
+        # "no fee" -- the same reason `outcome` is None rather than absent.
+        # Filled in by reconciliation from the venue's own charge.
+        "fees_dollars": None,
         "settled_at": None,
         "venue_order_id": None,
         "error": None,
@@ -622,6 +627,31 @@ def reclassify_presend_failures() -> dict[str, Any]:
     return {"status": "ok", "reclassified": len(changed), "orders": changed}
 
 
+def _requested_contracts(order: Mapping[str, Any]) -> int | None:
+    """How many contracts the stake could have bought, at the price we asked.
+
+    The upper bound on any honest fill. Derived rather than stored because the
+    ledger records dollars and a price, not a count -- `contracts_for_stake`
+    does this same floor at order-build time, and this must agree with it.
+    """
+    from syndicate.features.shared.kalshi_orders import contracts_for_stake
+
+    try:
+        stake = float(order.get("requested_stake_dollars") or 0.0)
+        price = float(order.get("requested_price") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if stake <= 0 or not 0.0 < price < 1.0:
+        # An American-odds price (or none at all) means this is not a Kalshi
+        # order priced in probability dollars, and the bound cannot be
+        # computed. No bound is better than a wrong one.
+        return None
+    try:
+        return contracts_for_stake(stake, price)
+    except Exception:
+        return None
+
+
 def _venue_reader(venue: str):
     """The read side of a venue adapter. Only Kalshi has one."""
     if str(venue or "").strip().lower().startswith("kalshi"):
@@ -719,6 +749,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     changed: list[dict[str, Any]] = []
     not_found = 0
     unknown = 0
+    implausible = 0
 
     for order in candidates:
         key = str(order.get("idempotency_key") or "")
@@ -743,8 +774,36 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
 
         before = str(order.get("status") or "")
         if venue_state == "filled":
-            after = STATUS_FILLED
             contracts = seen.get("filled_count")
+
+            # A FILL CANNOT BE LARGER THAN THE ORDER. `fill_count_fp` carries
+            # an undocumented `_fp` suffix -- if it turns out to be a
+            # fixed-point scale rather than a plain count, a 2-contract fill
+            # arrives as some large number and booking it claims a position
+            # orders of magnitude beyond anything the stake could buy.
+            #
+            # This invariant holds whatever `_fp` means, and is worth keeping
+            # once it is known: no venue can fill more than was asked for, so a
+            # count that exceeds the request is a PARSE failure, never a trade.
+            # Refused by name and left untouched, in the same spirit as
+            # `unknown` -- a number we cannot believe must not become a
+            # position, and must not silently become zero either.
+            requested_contracts = _requested_contracts(order)
+            if (
+                contracts is not None
+                and requested_contracts is not None
+                and contracts > requested_contracts
+            ):
+                implausible += 1
+                print(
+                    f"[execution_ledger] RECONCILE_COUNT_IMPLAUSIBLE key={key}"
+                    f" venue_count={contracts} requested={requested_contracts}"
+                    " -- left untouched; check the `_fp` unit",
+                    flush=True,
+                )
+                continue
+
+            after = STATUS_FILLED
             # The venue's own fill price where it gave one, ours where it did
             # not. Never the requested price when the venue disagrees with it:
             # a fill at a better price is money we would otherwise not book.
@@ -753,8 +812,13 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 price = order.get("fill_price")
             if price is None:
                 price = order.get("requested_price")
-            stake = None
-            if contracts is not None and price is not None:
+
+            # WHAT KALSHI BILLED, in preference to what we can reconstruct.
+            # `count * price` was always arithmetic over two numbers we parsed;
+            # `taker_fill_cost_dollars + maker_fill_cost_dollars` is the charge
+            # itself.
+            stake = seen.get("fill_cost_dollars")
+            if stake is None and contracts is not None and price is not None:
                 try:
                     stake = round(int(contracts) * float(price), 2)
                 except (TypeError, ValueError):
@@ -764,6 +828,13 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "fill_price": price,
                 "fill_stake_dollars": stake,
                 "contracts": contracts,
+                # FEES ARE REAL MONEY AND WERE MODELLED AS ZERO EVERYWHERE.
+                # Kalshi took $0.02 on a $1.08 fill -- ~1.9%, against edges
+                # this system will happily act on at 3%. They arrive on every
+                # order read (`taker_fees_dollars`, `maker_fees_dollars`), so
+                # the only reason they were absent from the ledger is that
+                # nothing carried them across.
+                "fees_dollars": seen.get("fees_dollars"),
                 "error": None,
             }
         elif venue_state == "resting":
@@ -775,6 +846,10 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "fill_price": None,
                 "fill_stake_dollars": None,
                 "contracts": 0,
+                # Nothing traded, so nothing was charged. Left as None rather
+                # than 0.0: "no fee because no fill" and "a fill that cost
+                # nothing" are different claims.
+                "fees_dollars": None,
             }
         else:  # dead
             # Cancelled or expired with nothing filled: no exposure, no
@@ -787,6 +862,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "fill_price": None,
                 "fill_stake_dollars": None,
                 "contracts": 0,
+                "fees_dollars": None,
                 "error": f"venue_{seen.get('venue_status') or 'dead'}",
             }
 
@@ -814,6 +890,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "venue_status": seen.get("venue_status"),
                 "contracts": order.get("contracts"),
                 "fill_price": order.get("fill_price"),
+                "fees_dollars": order.get("fees_dollars"),
             }
         )
 
@@ -824,13 +901,14 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 f"[execution_ledger] RECONCILED key={row['idempotency_key']}"
                 f" ticker={row['ticker']} {row['from']}->{row['to']}"
                 f" venue_status={row['venue_status']!r}"
-                f" contracts={row['contracts']} fill_price={row['fill_price']}",
+                f" contracts={row['contracts']} fill_price={row['fill_price']}"
+                f" fees={row['fees_dollars']}",
                 flush=True,
             )
     print(
         f"[execution_ledger] RECONCILE venue={venue} candidates={len(candidates)}"
         f" venue_orders={len(read.get('orders') or [])} changed={len(changed)}"
-        f" not_found={not_found} unknown={unknown}",
+        f" not_found={not_found} unknown={unknown} implausible={implausible}",
         flush=True,
     )
     return {
@@ -839,6 +917,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         "changed": len(changed),
         "not_found": not_found,
         "unknown": unknown,
+        "implausible": implausible,
         "orders": changed,
     }
 

@@ -519,6 +519,24 @@ def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
             f"[kalshi_orders] ORDERS_READ n={len(orders)} keys={sorted(orders[0].keys())}",
             flush=True,
         )
+        # THE VALUES OF THE COUNT AND MONEY FIELDS, for the first order only.
+        # The keys log settled the field NAMES and immediately raised the next
+        # question it could not answer: `_fp` is undocumented, and whether
+        # `fill_count_fp` is 2 or 2000000 for a 2-contract fill decides whether
+        # a booked position is right or six orders of magnitude wrong. One
+        # production line settles it.
+        #
+        # These are our own order sizes and fees, not credentials. Scoped to
+        # the count and money fields for that reason -- the whole order carries
+        # ids and account fields that have no business in a log.
+        sample = orders[0]
+        watched = _COUNT_FILLED_FIELDS + _COUNT_INITIAL_FIELDS + _COUNT_REMAINING_FIELDS
+        watched += _FEE_FIELDS + _FILL_COST_FIELDS + ("status", "yes_price_dollars", "no_price_dollars")
+        print(
+            "[kalshi_orders] COUNT_FIELDS "
+            + " ".join(f"{f}={sample.get(f)!r}" for f in watched if f in sample),
+            flush=True,
+        )
     else:
         print("[kalshi_orders] ORDERS_READ n=0", flush=True)
     return {"status": "ok", "orders": orders}
@@ -533,14 +551,24 @@ def _int_or_none(value: Any) -> int | None:
         return None
 
 
+def _float_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _price_or_none(value: Any) -> float | None:
     """A Kalshi price as PROBABILITY DOLLARS, whichever unit it arrived in.
 
-    An order read may quote cents (`54`) or dollars (`0.54`), and the two are
-    100x apart -- the exact error `kalshi_client`'s first live run found in the
-    market read. Anything above 1 is therefore cents; anything at or below 1 is
-    already dollars. The boundary is unambiguous because a probability price
-    cannot exceed $1.
+    The order read quotes `yes_price_dollars` / `no_price_dollars`, so dollars
+    is the documented unit -- but this is the fallback path for the fields that
+    are NOT suffixed, where a cents quote is possible. Anything above 1 is
+    therefore cents; anything at or below 1 is already dollars. The boundary is
+    unambiguous because a probability price cannot exceed $1, and the 100x
+    error is one the first live market read actually made.
     """
     if value is None:
         return None
@@ -553,8 +581,55 @@ def _price_or_none(value: Any) -> float | None:
     return round(number / 100.0, 4) if number > 1 else round(number, 4)
 
 
+# THE REAL FIELD NAMES, read off a live response at 2026-08-24T14:37:16Z.
+#
+#   ['action', 'book_side', 'client_order_id', 'created_time', 'exchange_index',
+#    'fill_count_fp', 'initial_count_fp', 'last_update_time',
+#    'maker_fees_dollars', 'maker_fill_cost_dollars', 'no_price_dollars',
+#    'order_id', 'outcome_side', 'remaining_count_fp',
+#    'self_trade_prevention_type', 'side', 'status', 'subaccount_number',
+#    'taker_fees_dollars', 'taker_fill_cost_dollars', 'ticker', 'type',
+#    'user_id', 'yes_price_dollars']
+#
+# Not one of the three count spellings guessed here beforehand was right. The
+# earlier spellings are KEPT as fallbacks rather than deleted: they cost
+# nothing, and this contract has now moved once.
+_COUNT_FILLED_FIELDS = ("fill_count_fp", "filled_count", "fill_count")
+_COUNT_INITIAL_FIELDS = ("initial_count_fp", "initial_count")
+_COUNT_REMAINING_FIELDS = ("remaining_count_fp", "remaining_count")
+_FEE_FIELDS = ("taker_fees_dollars", "maker_fees_dollars")
+_FILL_COST_FIELDS = ("taker_fill_cost_dollars", "maker_fill_cost_dollars")
+
+
+def _first_present(order: Mapping[str, Any], fields: tuple[str, ...]) -> Any:
+    for field in fields:
+        if order.get(field) is not None:
+            return order.get(field)
+    return None
+
+
+def _sum_present(order: Mapping[str, Any], fields: tuple[str, ...]) -> float | None:
+    """Total across fields, or None if NOT ONE of them is present.
+
+    None and 0.0 are different answers here. Kalshi splits fees and fill cost
+    across a maker and a taker leg, and an order that filled entirely as a
+    taker carries a real 0.0 on the maker leg -- so a sum of the present legs
+    is the total. But an order carrying NEITHER leg has told us nothing, and
+    reporting that as $0.00 of fees is a fee we would then never charge.
+    """
+    total = 0.0
+    seen = False
+    for field in fields:
+        value = _float_or_none(order.get(field))
+        if value is None:
+            continue
+        seen = True
+        total += value
+    return round(total, 6) if seen else None
+
+
 def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
-    """One Kalshi order, reduced to the four facts the ledger needs.
+    """One Kalshi order, reduced to the facts the ledger needs.
 
     `state` is our vocabulary, not Kalshi's: `filled`, `resting`, `dead`, or
     `unknown`. UNKNOWN IS A REAL ANSWER and is why this returns a state rather
@@ -566,18 +641,34 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     describes the remainder; the contracts that traded are a position we hold.
     So the fill count is read first and outranks the status -- reading them the
     other way round is how a real position gets reconciled away to zero.
+
+    ------------------------------------------------------------------
+    WHAT `_fp` MEANS IS NOT KNOWN, AND IS NOT GUESSED
+    ------------------------------------------------------------------
+
+    `fill_count_fp` and friends are the real field names, but the suffix is
+    undocumented here -- plausibly "floating point", plausibly a fixed-point
+    integer with a scale. If it is a scale, a 2-contract fill reads as some
+    large number, and booking it would claim a position orders of magnitude
+    larger than anything we could have bought.
+
+    Two things make that safe without knowing the answer. The raw values are
+    logged (`COUNT_FIELDS`), so one production read settles it. And
+    `reconcile_live_orders` refuses to book more contracts than the order
+    requested -- an invariant that holds regardless of the scale, and which is
+    worth having even once the scale is known.
     """
     raw_status = str(order.get("status") or "").strip().lower()
 
-    filled = _int_or_none(order.get("filled_count"))
+    filled = _int_or_none(_first_present(order, _COUNT_FILLED_FIELDS))
     if filled is None:
         taker = _int_or_none(order.get("taker_fill_count")) or 0
         maker = _int_or_none(order.get("maker_fill_count")) or 0
         if taker or maker:
             filled = taker + maker
     if filled is None:
-        initial = _int_or_none(order.get("initial_count"))
-        remaining = _int_or_none(order.get("remaining_count"))
+        initial = _int_or_none(_first_present(order, _COUNT_INITIAL_FIELDS))
+        remaining = _int_or_none(_first_present(order, _COUNT_REMAINING_FIELDS))
         if initial is not None and remaining is not None:
             filled = max(initial - remaining, 0)
 
@@ -596,17 +687,29 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     else:
         state = "unknown"
 
+    # WHAT WE ACTUALLY PAID, from the venue's own arithmetic rather than ours.
+    # `count * price` was always a reconstruction; this is the number Kalshi
+    # billed. It also makes the fill price a division rather than a guess about
+    # which of `yes_price_dollars` / `no_price_dollars` is our leg.
+    fill_cost = _sum_present(order, _FILL_COST_FIELDS)
+    fees = _sum_present(order, _FEE_FIELDS)
+
     price = None
-    for field in ("average_fill_price", "avg_fill_price", "fill_price", "price", "yes_price"):
-        price = _price_or_none(order.get(field))
-        if price is not None:
-            break
+    if fill_cost is not None and filled:
+        price = round(fill_cost / filled, 4)
+    if price is None:
+        for field in ("average_fill_price", "avg_fill_price", "fill_price"):
+            price = _price_or_none(order.get(field))
+            if price is not None:
+                break
 
     return {
         "state": state,
         "venue_status": raw_status or None,
         "filled_count": filled,
         "fill_price": price,
+        "fill_cost_dollars": fill_cost,
+        "fees_dollars": fees,
         "order_id": order.get("order_id") or order.get("id"),
         "client_order_id": order.get("client_order_id"),
         "ticker": order.get("ticker"),
