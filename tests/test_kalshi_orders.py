@@ -284,7 +284,7 @@ def test_the_v2_body_matches_the_supplied_contract(monkeypatch):
     monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
     body = build_order_body(_req(), price_dollars=0.56)
 
-    assert body["side"] == "bid"
+    assert body["side"] == "bid"  # `_req` is an over
     # QUOTED DECIMALS. A JSON number where a string is expected is a rejection
     # whose message will not say which field it meant.
     assert body["price"] == "0.5600"
@@ -301,17 +301,57 @@ def test_the_v2_body_matches_the_supplied_contract(monkeypatch):
         assert dead not in body
 
 
-def test_the_no_side_refuses_rather_than_guessing_bid(monkeypatch):
-    """THE SAFETY PROPERTY. The supplied contract shows `"side": "bid"` and
-    carries no yes/no field, so buying NO has no expression we can point to.
-    Sending it as a bid anyway would be a real position on the opposite
-    outcome, at a price that looks deliberate."""
+def test_an_under_is_an_ask_at_the_complement(monkeypatch):
+    """Kalshi quotes this endpoint entirely from the YES leg:
+
+        "bid means buy YES, ask means sell YES. (Selling YES is economically
+         equivalent to buying NO at 1 - price...)"
+
+    So an under is not `side: no` — no such value exists — it is an ASK at the
+    complement. Asserted by side AND price, because a count alone cannot tell a
+    correct order from one on the opposite outcome.
+    """
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    over = build_order_body(_req(side="over"), price_dollars=0.40)
+    under = build_order_body(_req(side="under"), price_dollars=0.40)
+
+    assert over["side"] == "bid" and over["price"] == "0.4000"
+    assert under["side"] == "ask" and under["price"] == "0.6000"
+
+
+def test_the_count_does_NOT_invert_with_the_price(monkeypatch):
+    """THE EASY THING TO GET WRONG, and the reason it has its own test.
+
+    Buying NO at $0.40 is selling YES at $0.60, but the capital committed is
+    still $0.40 per contract. Sizing off the quoted 0.60 would buy ~33% fewer
+    contracts than the stake was sized for — silently, on every under, with
+    nothing in the response to reveal it.
+    """
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    over = build_order_body(_req(side="over"), price_dollars=0.40)
+    under = build_order_body(_req(side="under"), price_dollars=0.40)
+
+    # Same stake, same price paid per contract, so the same size both ways.
+    assert under["count"] == over["count"]
+    assert float(under["count"]) == float(_req().requested_stake_dollars) // 0.40
+
+
+def test_a_price_leaving_no_complement_refuses(monkeypatch):
+    """A NO price so close to $1 that the YES quote rounds to zero has no
+    order behind it. $0.9999 is NOT that case — its complement is $0.0001, a
+    dreadful bet but a structurally valid one, and the builder is not the place
+    to have opinions about value."""
     from syndicate.features.shared.kalshi_orders import OrderBuildError, build_order_body
 
     monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
-    with pytest.raises(OrderBuildError) as excinfo:
-        build_order_body(_req(side="under"), price_dollars=0.56)
-    assert "v2_no_side_unmapped" in str(excinfo.value)
+    assert build_order_body(_req(side="under"), price_dollars=0.9999)["price"] == "0.0001"
+
+    with pytest.raises(OrderBuildError):
+        build_order_body(_req(side="under"), price_dollars=0.999999)
 
 
 def test_v2_is_the_default_because_v1_is_confirmed_dead(monkeypatch):

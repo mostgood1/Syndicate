@@ -223,12 +223,9 @@ _V2_SELF_TRADE_PREVENTION = "taker_at_cross"
 def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
     """The body `POST /portfolio/events/orders` takes. PURE -- no clock, no net.
 
-    `side` is the one field this cannot derive. The sample shows `"bid"` and
-    nothing in it distinguishes buying YES from buying NO -- there is no yes/no
-    field in the contract as supplied. Those are opposite bets, so the NO side
-    REFUSES by name rather than being sent as a bid and hoped about: an
-    inverted side is a real position on the outcome we did not choose, at a
-    price that looks deliberate.
+    Both sides are expressible, and neither is a guess: Kalshi quotes this
+    endpoint entirely from the YES leg, so an over is a `bid` at our price and
+    an under is an `ask` at its complement. See the comment on `book_side`.
     """
     ticker = str(getattr(request, "venue_ticker", "") or "").strip()
     if not ticker:
@@ -240,25 +237,42 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
     if price <= 0 or price >= 1:
         raise OrderBuildError(f"price_out_of_range: {price}")
 
+    # EVERYTHING IS QUOTED FROM THE YES SIDE. Kalshi's contract:
+    #
+    #   "bid means buy YES, ask means sell YES. (Selling YES is economically
+    #    equivalent to buying NO at 1 - price, but this endpoint quotes
+    #    everything from the YES side.)"
+    #
+    # So an UNDER is not "side: no" -- there is no such value. It is an ASK at
+    # the complement of the price we want to pay for NO.
     contract_side = _side_to_kalshi(getattr(request, "side", None))
-    if contract_side != "yes":
-        # See the docstring. Buying NO has no expression in the supplied
-        # contract, and guessing one is a bet on the opposite outcome.
-        raise OrderBuildError(f"v2_no_side_unmapped: {contract_side}")
+    stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
 
-    count = contracts_for_stake(
-        float(getattr(request, "requested_stake_dollars", 0.0) or 0.0), price
-    )
+    if contract_side == "yes":
+        book_side = "bid"
+        quote_price = price
+    else:
+        book_side = "ask"
+        quote_price = round(1.0 - price, 4)
+        if quote_price <= 0 or quote_price >= 1:
+            raise OrderBuildError(f"complement_out_of_range: {quote_price}")
+
+    # THE COUNT DOES NOT INVERT, AND THIS IS THE EASY THING TO GET WRONG.
+    # Buying NO at $0.40 is selling YES at $0.60, but the capital committed is
+    # still $0.40 per contract -- so the size comes from the price we PAY, not
+    # from the price we quote. Dividing the stake by 0.60 here would buy ~33%
+    # fewer contracts than the stake was sized for, silently, on every under.
+    count = contracts_for_stake(stake, price)
 
     from syndicate.features.shared.execution_ledger import idempotency_key
 
     return {
         "ticker": ticker,
         "client_order_id": idempotency_key(request),
-        "side": "bid",
+        "side": book_side,
         # Quoted decimals, matching the sample exactly.
         "count": f"{count:.2f}",
-        "price": f"{price:.4f}",
+        "price": f"{quote_price:.4f}",
         "time_in_force": _V2_TIME_IN_FORCE,
         "self_trade_prevention_type": _V2_SELF_TRADE_PREVENTION,
         "post_only": False,
