@@ -26237,3 +26237,28 @@ contract and starts working by repointing `POLYMARKET_US_API_BASE`.
 returned `http_404`. The key is now on refresh-worker too. Nobody in this lane
 put it there.
 
+
+---
+
+### 2026-08-24 20:17:59Z — refresh-worker `c729b874` — same finding, independently, from the other side
+
+**verify: `[exchange_markets_probe] POLYMARKET_US_SPORTS` -- all seven leagues
+`http_404` with the identical gRPC body `{"code":5,"message":"The server was
+unable to process your request."}`**, refresh-worker `lqz5m`. Referenced by
+the other session's entry above (their `hvpj6` measurement on live-odds-worker,
+same minute) as the earlier `credentials_absent` reading that "moved" once the
+user set the credential here too.
+
+Started building the exact same next test the other session was already
+mid-shipping -- a `/v1/sports*` legacy-family probe -- and found their commit
+(`7481b17b6`, tested FOUR routes including `/v1/sports/teams/provider`, not
+just the plain list this lane would have tried) on `main` before pushing.
+Discarded the duplicate functional code; kept only a documentation update to
+`polymarket_us_sports_client.py`'s own header pointing at their fuller
+measurement, rather than shipping a second, less complete probe of the same
+question. Same reciprocal-deference pattern this lane and that session have
+now traded three times today.
+
+Probe flag (`SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT`) set back to `0`,
+redeploy triggered. Deploy claim (refresh-worker, token `b89496aa53797228`)
+to be released once that redeploy is confirmed live.
