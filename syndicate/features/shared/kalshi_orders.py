@@ -72,7 +72,16 @@ _MIN_CONTRACTS = 1
 
 
 class OrderBuildError(ValueError):
-    """The request cannot become a valid order. Raised BEFORE anything is sent."""
+    """The request cannot become a valid order. Raised BEFORE anything is sent.
+
+    `venue_contacted = False` is the machine-readable half of that sentence,
+    and `place_order` reads it to record these as REJECTED rather than FAILED.
+    The docstring alone said the same thing and no code could act on it, so
+    every build error was charged against the live daily budget as though it
+    might have reached Kalshi.
+    """
+
+    venue_contacted = False
 
 
 def contracts_for_stake(stake_dollars: float, price_dollars: float) -> int:

@@ -45,6 +45,27 @@ def _row(**overrides):
     return row
 
 
+def _write_live_plan(monkeypatch, rows, venue="kalshi"):
+    """A venue-scoped plan, which is the only book live mode may place.
+
+    Added 2026-08-24: `run_execution` now refuses live mode without a venue
+    scope, after the worker spent a night pointed at the unrestricted plan and
+    tried to put a soccer total on Kalshi.
+
+    The venue plan is served from the committed one rather than priced through
+    `venue_scope`. These tests are about the ARM, the inline refusal and the
+    adapter lookup; making each of them depend on a venue actually quoting the
+    fixture row would couple three unrelated guards to a pricing path and give
+    all of them the same way to fail for the wrong reason.
+    """
+    plan = _write_plan(monkeypatch, rows)
+    monkeypatch.setattr(
+        "pipeline.portfolio_commit.read_portfolio_plan_for_venue",
+        lambda date, scope: plan,
+    )
+    return plan
+
+
 def _write_plan(monkeypatch, rows):
     monkeypatch.setenv("SYNDICATE_PORTFOLIO_COMMIT_ENABLED", "1")
     monkeypatch.setattr(
@@ -226,12 +247,12 @@ def test_paper_mode_is_not_blocked_by_a_stranded_order(monkeypatch):
 def test_force_does_not_bypass_the_live_arm(monkeypatch):
     """`force` skips the enablement flag only. A convenience flag that can reach
     real money is not a convenience."""
-    _write_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row()])
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
     from pipeline import execute_portfolio as runner
 
-    result = runner.run_execution("2026-08-22", force=True)
+    result = runner.run_execution("2026-08-22", force=True, venue_scope="kalshi")
     assert result["status"] == "ok"
     # Every order rejected for want of the arm; nothing filled.
     assert result["placed"] == 0
@@ -278,13 +299,13 @@ def test_inline_still_runs_paper(monkeypatch):
 def test_the_non_inline_path_is_unchanged(monkeypatch):
     """A standalone run (its own service, or the CLI) keeps full live capability
     -- the refusal must not leak into the path that is allowed to place."""
-    _write_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row()])
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
     from pipeline import execute_portfolio as runner
 
-    result = runner.run_execution("2026-08-22")
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
     assert result["status"] == "ok"
     assert result["mode"] == "live"
     # Rejected for want of the arm, NOT refused for being inline.
@@ -444,14 +465,14 @@ def test_the_commit_populates_live_bet_status(monkeypatch, capsys):
 
 
 def test_live_mode_against_a_venue_with_no_adapter_stops_with_a_reason(monkeypatch):
-    _write_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row()])
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "draftkings")
     from pipeline import execute_portfolio as runner
 
-    result = runner.run_execution("2026-08-22")
+    result = runner.run_execution("2026-08-22", venue_scope="draftkings")
     # Falling through to a paper fill wearing a live `mode` would put a record
     # in the ledger claiming money moved when none did.
     assert result["status"] == "skipped"
@@ -508,3 +529,44 @@ def test_a_position_with_no_contract_yields_an_order_the_adapter_refuses(monkeyp
     with pytest.raises(OrderBuildError) as excinfo:
         order_body(request, price_dollars=0.62)
     assert "no_venue_ticker" in str(excinfo.value)
+
+
+# --------------------------------------------------------------------------
+# Live must not place the UNRESTRICTED plan at one venue
+# --------------------------------------------------------------------------
+
+
+def test_live_without_a_venue_scope_is_refused(monkeypatch):
+    """MEASURED 2026-08-24T00:34Z, with real money armed.
+
+    The worker called `run_execution(date)` with no scope, so live mode read
+    the unrestricted plan and tried to place a SOCCER TOTAL and an MLB SPREAD
+    on Kalshi -- positions priced at other books, carrying no Kalshi ticker,
+    that the join had never paired. Both died at order build, so nothing
+    reached the venue; that was the last guard in the chain doing the work
+    rather than a design.
+    """
+    import pipeline.execute_portfolio as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+
+    result = mod.run_execution("2026-08-24")
+    assert result["status"] == "skipped"
+    assert result["reason"] == "live_mode_requires_venue_scope"
+
+
+def test_paper_without_a_scope_is_still_fine(monkeypatch):
+    """The refusal is LIVE-only. Paper's whole job is the unrestricted book,
+    and blocking it would turn a safety guard into an outage."""
+    import pipeline.execute_portfolio as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "paper")
+    monkeypatch.delenv("SYNDICATE_EXECUTION_LIVE_ARMED", raising=False)
+
+    result = mod.run_execution("2026-08-24")
+    # Whatever it does about the plan, it must not be refused for the scope.
+    assert result.get("reason") != "live_mode_requires_venue_scope"

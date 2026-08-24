@@ -278,3 +278,50 @@ def test_the_summary_counts_money_only_for_filled_orders():
     assert summary["filled_stake_dollars"] == pytest.approx(12.50)
     assert summary["unreconciled"] == 1
     del record
+
+
+# --------------------------------------------------------------------------
+# An order that never reached the venue is REJECTED, not FAILED
+# --------------------------------------------------------------------------
+
+
+def test_a_pre_send_refusal_is_rejected_not_failed(monkeypatch, tmp_path):
+    """MEASURED 2026-08-24T00:34Z: two orders that never left the process were
+    recorded `failed` and charged $7.02 against a $40 daily cap.
+
+    `failed` means "may have reached the venue" -- it blocks the next run as
+    unreconciled and burns budget. An adapter that raises BEFORE sending says
+    so with `venue_contacted = False`, and that must produce `rejected`, the
+    status for a refusal made without a venue call. A systematic build error
+    would otherwise spend a whole day's budget without one request reaching
+    Kalshi, and the day would end looking like it had traded.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+    from syndicate.features.shared.kalshi_orders import OrderBuildError
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    def never_sent(_request):
+        raise OrderBuildError("no_live_price: None")
+
+    request = _request(position_key="pre-send-1")
+    record = mod.place_order(request, submit=never_sent, mode=mod.LIVE)
+    assert record["status"] == mod.STATUS_REJECTED
+    assert "no_live_price" in record["error"]
+
+
+def test_an_exception_that_says_nothing_is_still_failed(monkeypatch):
+    """Fail SAFE. An adapter that blew up mid-request may well have sent it, so
+    silence about `venue_contacted` must keep the conservative reading."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    def blew_up(_request):
+        raise RuntimeError("connection reset mid-POST")
+
+    request = _request(position_key="ambiguous-1")
+    record = mod.place_order(request, submit=blew_up, mode=mod.LIVE)
+    assert record["status"] == mod.STATUS_FAILED

@@ -180,6 +180,34 @@ def run_execution(
 
     # Resolved before the plan read: it decides WHICH plan is read.
     scope = str(venue_scope or "").strip().lower()
+
+    # LIVE MUST READ THE VENUE-RESTRICTED PLAN. Measured 2026-08-24T00:34Z: the
+    # worker called `run_execution(date)` with no scope, so live mode read the
+    # UNRESTRICTED plan and tried to place a SOCCER TOTAL and an MLB SPREAD on
+    # Kalshi -- markets the join never paired, carrying no venue ticker and
+    # priced at some other book. Both failed at order build, so nothing reached
+    # the venue; that was the last guard in the chain doing the work, not a
+    # design.
+    #
+    # The unrestricted plan is a different book with a different meaning: its
+    # prices come from whichever bookmaker was best, and a position in it is
+    # not a claim that THIS venue quotes the market at all. Sending it to one
+    # venue is a category error, and the failure mode if a price ever did
+    # resolve is a real bet on a market nothing matched to the board row.
+    #
+    # Refused rather than defaulted, because guessing the scope here would make
+    # the wrong plan reachable again through a different door.
+    if mode == LIVE and not scope:
+        print(
+            "[execute_portfolio] LIVE_WITHOUT_VENUE_SCOPE date="
+            f"{normalized} -- refusing to place the unrestricted plan at one venue",
+            flush=True,
+        )
+        return {
+            "status": "skipped",
+            "reason": "live_mode_requires_venue_scope",
+            "date": normalized,
+        }
     if scope:
         from pipeline.portfolio_commit import read_portfolio_plan_for_venue
 
@@ -195,9 +223,16 @@ def run_execution(
         return {"status": "skipped", "reason": "plan_has_no_positions_key", "date": normalized}
 
     venue = PAPER_VENUE if mode != LIVE else str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").strip()
-    if scope:
+    if scope and mode != LIVE:
         # Suffixed rather than replaced: the record must still say PAPER at a
         # glance, and `mode` alone would not distinguish the two paper books.
+        #
+        # PAPER ONLY. In live mode the venue IS the scope -- suffixing produced
+        # `kalshi:kalshi`, which resolves to no adapter, so the first live run
+        # after the scope became mandatory would have refused every order with
+        # `no_adapter_for_venue:kalshi:kalshi`. Caught by the existing live
+        # tests the moment the scope was threaded through, which is the whole
+        # reason they name the adapter lookup explicitly.
         venue = f"{venue}:{scope}"
     if mode == LIVE and not venue:
         return {"status": "skipped", "reason": "live_mode_with_no_venue_configured", "date": normalized}

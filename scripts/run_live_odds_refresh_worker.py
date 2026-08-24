@@ -958,7 +958,14 @@ def _run_execution_tick() -> None:
         from pipeline.execute_portfolio import run_execution
         from syndicate.features.shared.timezone import central_today_iso
 
-        result = run_execution(central_today_iso())
+        # THE VENUE-RESTRICTED PLAN, named explicitly. Without this the call
+        # read the unrestricted plan and tried to place a soccer total and an
+        # MLB spread on Kalshi (2026-08-24T00:34Z) -- positions priced at other
+        # books, carrying no Kalshi ticker, that only the order builder stopped.
+        # `run_execution` now refuses live mode without a scope, so this is the
+        # explicit half of a guard that fails closed on both sides.
+        venue = str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").strip().lower()
+        result = run_execution(central_today_iso(), venue_scope=venue or None)
         print(
             "[live_odds_worker] EXECUTION"
             f" status={result.get('status')}"

@@ -433,9 +433,26 @@ def place_order(
         # The order STAYS recorded and is marked failed rather than deleted. A
         # submit that raised may still have reached the venue, so the record is
         # the only thing that makes reconciliation possible.
+        #
+        # UNLESS THE ADAPTER SAYS IT NEVER GOT THERE. An adapter can raise
+        # before sending anything -- a stake below one contract, a price out of
+        # range, no venue price at all -- and it marks those `venue_contacted =
+        # False`. Those are REJECTED, which is the status for a refusal made
+        # without a venue call: not charged against the day's budget, and not
+        # blocking the next run as unreconciled.
+        #
+        # The distinction is not cosmetic. Measured 2026-08-24T00:34Z: two
+        # orders that never left the process were recorded `failed` and charged
+        # $7.02 against a $40 daily cap. A systematic build error would have
+        # spent an entire day's budget without one request reaching Kalshi, and
+        # the day would have ended looking like it had traded.
+        #
+        # Default is TRUE -- an exception that says nothing about whether it
+        # sent is treated as though it might have.
+        contacted = bool(getattr(exc, "venue_contacted", True))
         return complete_order(
             record["idempotency_key"],
-            status=STATUS_FAILED,
+            status=STATUS_FAILED if contacted else STATUS_REJECTED,
             error=f"{type(exc).__name__}: {exc}",
         ) or record
 
