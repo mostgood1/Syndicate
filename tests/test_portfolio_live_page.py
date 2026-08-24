@@ -89,6 +89,12 @@ def live_env(monkeypatch):
     monkeypatch.setattr(ledger_mod, "live_execution_armed", lambda: state["armed"])
     monkeypatch.setattr(exec_mod, "execution_enabled", lambda: state["execution"])
     monkeypatch.setattr(guard_mod, "kill_switch_engaged", lambda: state["kill_switch"])
+    # NO WORKER STAMP BY DEFAULT. The page prefers `execution_state.json` when
+    # the worker has written one, and a real one can be sitting on disk from an
+    # earlier run -- these tests drive the web-env fallback and must not pass or
+    # fail on whether that file happens to exist. The tests that DO exercise the
+    # stamp override this themselves.
+    monkeypatch.setattr(ledger_mod, "read_execution_state", lambda: None)
     # The paper page reads these too; a live-only test must not depend on
     # whatever plan happens to be on disk.
     monkeypatch.setattr(commit_mod, "read_portfolio_plan", lambda date: None)
