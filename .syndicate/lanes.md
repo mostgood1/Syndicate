@@ -1849,6 +1849,88 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   needed for its own order automation. The arb comparison itself is not yet
   built by anyone; it should be built once that join lands, not duplicated
   from scratch here.
+- **KALSHI-VS-POLYMARKET ARB DETECTION BUILT 2026-08-24, user-authorized**
+  ("Yes, build the Kalshi-vs-Polymarket arb detection"). New module
+  `syndicate/features/shared/kalshi_polymarket_arb.py` (PR #47, extended PR
+  #50) -- detection only, cannot place an order on either venue. Scoped to
+  moneyline ONLY: `sportsMarketTypeV2` carried exactly one value across 2,000
+  real Polymarket rows (`SPORTS_MARKET_TYPE_MONEYLINE`), so spread/total is
+  currently unobservable on that venue, not merely unbuilt. Kalshi's own
+  event identity (`event_blob_from_ticker`/`match_event_blob` against
+  `read_layer2_shortlist` board rows) drives the join; the match itself
+  reuses `kalshi_board_join._side_for_team` -- **a real bug caught before
+  merge**: the first draft used `team_aliases.canonical_team` directly on
+  Polymarket's `outcomes`, which returns `None` for bare nicknames
+  ("Titans"), only resolving codes/full names. `_side_for_team`'s
+  token-subset fallback handles it; a test proves the join survives
+  Polymarket listing its two teams in the OPPOSITE order from Kalshi's
+  ticker blob. Every match reports `raw_edge` AND `edge_after_buffer` (after
+  `DEFAULT_FEE_BUFFER=0.04`, explicitly an unmeasured placeholder for BOTH
+  venues' combined costs, not either one's real schedule). 23 tests.
+  New files: `tests/test_kalshi_polymarket_arb.py` (NEW),
+  `scripts/probe_kalshi_polymarket_arb.py` (NEW). Narrow claim added:
+  `scripts/run_refresh_worker.py` -- one more small, additive, opt-in-only
+  boot hook (`SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT`).
+  **FIRST LIVE RUN found a real bug in THIS module, root-caused and fixed
+  same day (user: "look into the Kalshi discovery-timing question").**
+  `kalshi_moneylines_resolved=0` with `kalshi_refusals={}` -- not one Kalshi
+  market was even attempted, because `kalshi_catalogue.SERIES_SPORT` (the
+  hand registry `classify_market` checks first) has ZERO moneyline series;
+  the fallback `_DISCOVERED` dict is populated only by
+  `ensure_series_discovered()`/`run_kalshi_discovery()`, both normally
+  reached via `start_intelligence_state_background_loop()` -- which this
+  boot hook, in `run_refresh_worker.py`'s own linear `main()`, runs ~120
+  lines BEFORE. Fixed (PR #50): `run_arb_scan()` now calls
+  `ensure_series_discovered()` itself first (idempotent, never fatal),
+  surfacing `kalshi_discovery: ok/skipped/error` on the result so a future
+  zero-result run is diagnosable from the log line alone. **VERIFIED LIVE
+  2026-08-24T21:44:47Z**: `kalshi_discovery: 'ok'` now present where the
+  prior run had no such key at all -- direct before/after confirmation.
+  `kalshi_moneylines_resolved` is STILL 0, but now for a documented,
+  DIFFERENT reason (full readout `.syndicate/deploys.md` same timestamp):
+  the real, independent production Kalshi board-join
+  (`kalshi_odds_refresh.py`'s own `BOARD_JOIN`) is ALSO logging `matched=0`
+  on the same 831-market catalogue right now, `board_rows` having fallen
+  from 742 to 235 in under an hour -- current-state drift, not this
+  module's bug, and not chased further here (out of scope for what was
+  asked). `polymarket_moneylines_resolved=0` remains explained by the
+  earlier-known cause: this scan's Polymarket fetch is one page at offset
+  0, and the real game-market region starts far deeper in the id-ordered
+  catalogue (the other session's paging-strategy work, referenced above,
+  is what resolves this -- their latest commit reports the full 7,585-row
+  game slate reached with `truncated=False`; pointing this scan's fetch at
+  their now-stable range is the natural next step, not yet done). Probe
+  flag turned back off, redeploy confirmed live 21:51:37Z, deploy claim
+  (refresh-worker, token `5bde3ff6440857af`) released.
+- **POLYMARKET FETCH POINTED AT THE REAL OFFSET RANGE, 2026-08-24, user-
+  requested** ("point the arb scan's Polymarket fetch at the real offset
+  range" -- the "natural next step, not yet done" from the entry directly
+  above). `run_arb_scan()` switched from
+  `polymarket_us_markets.fetch_markets(open_only=True, drop_settled=True,
+  max_pages=1)` (one page at offset 0 -- structurally could only ever see
+  season-level futures/politics/culture, never a real game) to
+  `polymarket_us_markets.fetch_game_markets()` -- the other session's
+  boundary-locating (binary search, re-checked every call, never a
+  hardcoded offset since ids and the boundary both move daily) page-to-
+  exhaustion function. Full slate reachable in ~33 signed calls per the
+  same day's measurement (`games=7585 truncated=False`). Corrected two
+  now-stale claims in the module's own header while here: the "single page
+  at offset 0" description, and a "no spread/total exists on this venue"
+  claim that was actually a sampling artifact of only ever having read the
+  first 2,000 id-ordered (season-level) rows -- the venue carries all five
+  game types; this module still scopes to moneyline only because that is
+  what is built and tested, not because the data is missing. Tests updated
+  to monkeypatch `fetch_game_markets`; one new regression test asserts
+  `run_arb_scan` calls it (and fails loudly if it ever calls `fetch_markets`
+  directly again). 24/24 green (was 23). Files: `syndicate/features/shared/
+  kalshi_polymarket_arb.py`, `tests/test_kalshi_polymarket_arb.py`,
+  `scripts/probe_kalshi_polymarket_arb.py`. **Not yet run live** -- the
+  same-evening finding two entries up (`.syndicate/deploys.md`, 21:52Z/
+  21:54Z) is that the board is soccer-only today because the MLB sim is
+  starved by `intelligence_pipeline_busy` (soccer odds-history re-reads
+  eating the execution guard), which this fetch fix does not touch -- a
+  live re-run of this scan today would still show `matched_games=0` for
+  that unrelated, upstream reason, not because this fix failed.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

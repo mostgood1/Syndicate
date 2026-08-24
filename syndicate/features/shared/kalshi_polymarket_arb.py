@@ -18,12 +18,17 @@ WHY MONEYLINE, AND ONLY MONEYLINE
 --------------------------------------------------------------------------
 
 Measured 2026-08-24T20:46:21Z (`.syndicate/deploys.md`): `sportsMarketTypeV2`
-carried exactly ONE value across 2,000 real Polymarket US rows --
-`SPORTS_MARKET_TYPE_MONEYLINE`. No spread, no total. So a spread/total
-comparison is not merely unbuilt, it is currently unobservable on this venue
--- there is nothing on the Polymarket side to join a Kalshi spread to. This
-module scopes to moneyline because that is what actually exists to compare,
-not as a first phase of something wider that has been designed already.
+carried exactly ONE value across the first 2,000 real Polymarket US rows --
+`SPORTS_MARKET_TYPE_MONEYLINE`. **That was a sampling artifact of paging from
+offset 0, corrected same day**: the venue's game slate also carries SPREAD,
+TOTAL and PROP markets (`.syndicate/deploys.md`, 2026-08-24T21:45:58Z --
+`game_types=[..MONEYLINE,PROP,SPREAD,TOTAL,DRAWABLE_OUTCOME]`), just not in
+the first 2,000 id-ordered rows this module's earlier read happened to see.
+So spread/total ARE observable on this venue -- a Kalshi spread now has
+something real to join to. This module still scopes to moneyline only
+because that is the one market type built and tested here; widening to
+spread/total is a real next step, not started, not because the data does
+not exist.
 
 --------------------------------------------------------------------------
 THE JOIN IS DRIVEN FROM KALSHI'S SIDE, ON PURPOSE
@@ -438,8 +443,20 @@ def run_arb_scan(
     """The end-to-end scan for one slate date: reads Kalshi's persisted
     catalogue and the board's own rows (both already-computed artifacts, no
     new fetch), then calls Polymarket US's catalogue LIVE (the one piece with
-    no standing artifact yet) via `polymarket_us_markets.fetch_markets` --
-    read-only import, never touches `polymarket_us_orders`.
+    no standing artifact yet) via `polymarket_us_markets.fetch_game_markets`
+    -- read-only import, never touches `polymarket_us_orders`.
+
+    **Was a single page at offset 0 -- fixed same day the coverage gap was
+    measured.** The open (`closed=false`) catalogue is id-ordered with the
+    real game slate (moneyline/spread/total/prop) as a contiguous block at
+    the HIGH end -- season-level futures/politics/culture fill the low end.
+    A single page at offset 0 could see only futures, never a game.
+    `fetch_game_markets` (the other session's, `polymarket_us_markets.py`)
+    binary-searches the boundary each call rather than trusting a constant
+    (ids grow daily, so the boundary moves -- measured 17513 one hour, 16000
+    the hour before) and pages to exhaustion from there. Measured
+    2026-08-24T21:45:58Z: `games=7585 truncated=False pages=18
+    duplicate_ids=0`, the full slate, ~33 signed calls total.
 
     Never raises for a missing input -- reports which stage is empty by name,
     same discipline every artifact-dependent function in this lane uses,
@@ -469,7 +486,7 @@ def run_arb_scan(
     try:
         from syndicate.features.shared import polymarket_us_markets
 
-        pm_result = polymarket_us_markets.fetch_markets(open_only=True, drop_settled=True, max_pages=1)
+        pm_result = polymarket_us_markets.fetch_game_markets()
     except Exception as exc:
         return {"status": "error", "reason": f"polymarket_fetch_failed: {type(exc).__name__}: {exc}"}
     if pm_result.get("status") != "ok":

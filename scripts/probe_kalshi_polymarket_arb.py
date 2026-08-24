@@ -3,8 +3,11 @@
 production inputs, and print what it finds.
 
 DETECTION ONLY -- this reads two already-computed artifacts (the board's own
-rows, Kalshi's markets) and makes ONE live, read-only call to Polymarket US
-(`polymarket_us_markets.fetch_markets`). Nothing here can place an order.
+rows, Kalshi's markets) and makes a handful of live, read-only calls to
+Polymarket US (`polymarket_us_markets.fetch_game_markets`, which locates the
+real game-market offset range and pages to the end of it -- see that
+function's docstring for why the offset cannot be hardcoded). Nothing here
+can place an order.
 
     python scripts/probe_kalshi_polymarket_arb.py --date 2026-08-24
     python scripts/probe_kalshi_polymarket_arb.py --date 2026-08-24 --fee-buffer 0.02
