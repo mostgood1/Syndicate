@@ -141,3 +141,76 @@ def test_the_adapter_never_sends_when_the_body_cannot_be_built(monkeypatch):
     monkeypatch.setattr("syndicate.features.shared.kalshi_auth.signed_request", explode)
     with pytest.raises(orders.OrderBuildError):
         orders.submit_order(_request(ticker=None), price_dollars=0.62)
+
+
+# --------------------------------------------------------------------------
+# The price field: the one order-contract assumption nothing has tested
+# --------------------------------------------------------------------------
+
+
+def _req(**kw):
+    from syndicate.features.shared.execution_ledger import OrderRequest
+
+    base = dict(
+        position_key="p", selected_date="2026-08-24", venue="kalshi", sport="mlb",
+        event_id="e1", market="spreads", side="over", requested_price=150.0,
+        requested_stake_dollars=5.0, line=3.5,
+        venue_ticker="KXMLBSPREAD-26AUG241940TEXCWS-TEX4",
+    )
+    base.update(kw)
+    return OrderRequest(**base)
+
+
+def test_the_price_unit_is_switchable_without_a_deploy(monkeypatch):
+    """Kalshi's v2 order contract has long taken `yes_price` in INTEGER CENTS;
+    this module sends `yes_price_dollars`, a spelling inferred from the MARKET
+    READ fields. Nothing has confirmed the write side agrees — the endpoint has
+    never been reached, because both live attempts died at order build.
+
+    An inference from a neighbouring field, never checked against the thing it
+    describes, is exactly the game-date bug (`close_time` read as first pitch)
+    and the title-grammar bug. So it is switchable, and one real response
+    settles it.
+    """
+    from syndicate.features.shared.kalshi_orders import order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_PRICE_UNIT", raising=False)
+    assert order_body(_req(), price_dollars=0.42)["yes_price_dollars"] == 0.42
+
+    monkeypatch.setenv("KALSHI_ORDER_PRICE_UNIT", "cents")
+    body = order_body(_req(), price_dollars=0.42)
+    assert body["yes_price"] == 42
+    assert "yes_price_dollars" not in body
+
+
+def test_cents_are_an_integer_not_a_rounded_float(monkeypatch):
+    """`42.0` and `42` are different JSON. A float where an integer is expected
+    is a rejection whose message will not say so."""
+    from syndicate.features.shared.kalshi_orders import order_body
+
+    monkeypatch.setenv("KALSHI_ORDER_PRICE_UNIT", "cents")
+    value = order_body(_req(), price_dollars=0.42)["yes_price"]
+    assert isinstance(value, int) and not isinstance(value, bool)
+
+
+def test_a_price_outside_one_contract_refuses_in_cents_too(monkeypatch):
+    """A contract settles at $1, so a price outside 1-99c is not a price —
+    and the cents path must not lose that check."""
+    from syndicate.features.shared.kalshi_orders import OrderBuildError, order_body
+
+    monkeypatch.setenv("KALSHI_ORDER_PRICE_UNIT", "cents")
+    for bad in (0.0, 1.5):
+        with pytest.raises(OrderBuildError):
+            order_body(_req(), price_dollars=bad)
+
+
+def test_the_side_still_decides_which_price_field_is_sent(monkeypatch):
+    """An `under` is a NO buy, and the price belongs on the no field. Putting
+    it on the yes field prices the opposite outcome."""
+    from syndicate.features.shared.kalshi_orders import order_body
+
+    monkeypatch.setenv("KALSHI_ORDER_PRICE_UNIT", "cents")
+    body = order_body(_req(side="under"), price_dollars=0.42)
+    assert body["side"] == "no"
+    assert body["no_price"] == 42
+    assert "yes_price" not in body

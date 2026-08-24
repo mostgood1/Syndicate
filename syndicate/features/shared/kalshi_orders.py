@@ -152,7 +152,29 @@ def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str,
         # Sent so a retry after a lost response is Kalshi's duplicate to reject.
         "client_order_id": idempotency_key(request),
     }
-    body[f"{side}_price_dollars"] = round(price, 4)
+    # THE PRICE FIELD, AND THE ONE ASSUMPTION NOTHING HAS TESTED.
+    #
+    # Kalshi's v2 order contract has long taken `yes_price`/`no_price` as
+    # INTEGER CENTS (1-99). This module sends `*_price_dollars`, which exists
+    # in newer API surfaces -- and that spelling was inferred from the MARKET
+    # READ fields, which are dollars. Nothing has ever confirmed the write side
+    # agrees, because the endpoint has never been reached: both live attempts
+    # so far died at `OrderBuildError` before a request was assembled.
+    #
+    # An inference from a neighbouring field, never checked against the thing
+    # it describes, is the exact shape of the game-date bug (`close_time` read
+    # as first pitch) and the title-grammar bug ("Will the X win by..." against
+    # "X wins by..."). So it is switchable rather than argued about, and the
+    # first real response settles it -- `submit_order` logs which form it sent.
+    unit = (os.environ.get("KALSHI_ORDER_PRICE_UNIT") or ORDER_PRICE_UNIT).strip().lower()
+    if unit == "cents":
+        cents = int(round(price * 100))
+        if not 1 <= cents <= 99:
+            # A contract settles at $1, so a price outside 1-99c is not a price.
+            raise OrderBuildError(f"price_out_of_range_cents: {cents}")
+        body[f"{side}_price"] = cents
+    else:
+        body[f"{side}_price_dollars"] = round(price, 4)
     return body
 
 
@@ -173,7 +195,20 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
     from syndicate.features.shared.kalshi_auth import signed_request
 
     body = order_body(request, price_dollars=price_dollars)
-    response = signed_request("POST", _orders_url(), body=body)
+    url = _orders_url()
+    # THE REQUEST, BEFORE THE RESPONSE. If Kalshi rejects the body, the error
+    # alone cannot say which field it disliked -- and this is the one call in
+    # the system whose contract is still inferred rather than confirmed. Price
+    # and count are the fields in question; nothing here is a credential.
+    print(
+        f"[kalshi_orders] SUBMIT url={url}"
+        f" ticker={body.get('ticker')} side={body.get('side')}"
+        f" count={body.get('count')}"
+        f" price_fields={[k for k in body if k.endswith('_price') or k.endswith('_price_dollars')]}"
+        f" price_value={[v for k, v in body.items() if k.endswith('_price') or k.endswith('_price_dollars')]}",
+        flush=True,
+    )
+    response = signed_request("POST", url, body=body)
     order = response.get("order") or response
 
     # `count` is what we ASKED for; the fill can be partial. Reported from the
