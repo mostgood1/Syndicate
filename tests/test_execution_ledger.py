@@ -876,3 +876,56 @@ def test_fees_are_charged_against_the_daily_budget(monkeypatch):
     )
     mod.reconcile_live_orders()
     assert guard.spent_today("2026-08-22", mode=mod.LIVE)["dollars"] == 1.10
+
+
+def test_an_unchanged_order_is_still_marked_as_read(monkeypatch):
+    """MEASURED 2026-08-24T15:04:08Z. The first version persisted only when
+    something MOVED, so `reconciled_at` was discarded in exactly the steady
+    state it exists for: a resting order read successfully, agreeing with the
+    ledger, and therefore never marked as read. `RECONCILE ... changed=0` and
+    `BLOCKED_ON_UNRECONCILED count=1` fired in the same second on the same
+    order, and live execution stayed jammed.
+
+    'Nothing changed' and 'nothing was learned' are different facts."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="steady-stamp", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-11")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-11", "client_order_id": key,
+                                "status": "resting", "fill_count_fp": 0}]),
+    )
+
+    # First pass settles the row into the steady state. The SECOND is the one
+    # production was stuck in: read, agreed, and dropped on the floor.
+    mod.reconcile_live_orders()
+    monkeypatch.setenv("SYNDICATE_EXECUTION_RECONCILE_FRESH_SECONDS", "0.0001")
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+    monkeypatch.delenv("SYNDICATE_EXECUTION_RECONCILE_FRESH_SECONDS")
+    result = mod.reconcile_live_orders()
+    assert result["changed"] == 0
+    assert result["stamped"] == 1
+    # The stamp survived the write, which is the whole point.
+    assert mod.find_order(key)["reconciled_at"] is not None
+    assert mod.unreconciled_orders() == []
+
+
+def test_a_row_nothing_could_be_said_about_is_not_stamped(monkeypatch):
+    """`not_found` and `unknown` learn nothing, so they must not refresh the
+    freshness stamp -- that would turn 'we could not read it' into 'we read it
+    and it is fine', which is how a stranded order stops blocking without
+    anyone having checked it."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="silent", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-12")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-12", "client_order_id": key,
+                                "status": "quantum_superposition"}]),
+    )
+
+    assert mod.reconcile_live_orders()["stamped"] == 0
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]

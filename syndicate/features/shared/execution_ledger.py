@@ -750,6 +750,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     not_found = 0
     unknown = 0
     implausible = 0
+    stamped = 0
 
     for order in candidates:
         key = str(order.get("idempotency_key") or "")
@@ -872,11 +873,24 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
             "venue_order_id": seen.get("order_id") or order.get("venue_order_id"),
             "reconciled_at": _utc_now(),
         }
-        # Only a REAL difference counts as a change. Re-stamping an unchanged
+        # Only a REAL difference counts as a CHANGE. Re-stamping an unchanged
         # row every tick would make the log say work happened on every pass and
         # make "did anything move" unanswerable.
+        #
+        # BUT THE STAMP IS STILL WRITTEN. Measured 2026-08-24T15:04:08Z: the
+        # first version persisted only when something moved, so `reconciled_at`
+        # was discarded in exactly the steady state it exists for -- a resting
+        # order read successfully, agreeing with the ledger, and therefore never
+        # marked as read. `RECONCILE ... changed=0` and
+        # `BLOCKED_ON_UNRECONCILED count=1` fired in the same second, on the
+        # same order, and live execution stayed jammed.
+        #
+        # "Nothing changed" and "nothing was learned" are different facts. The
+        # freshness stamp records the second one, and it is the whole basis on
+        # which a known-resting order stops blocking.
         moved = any(order.get(field) != value for field, value in new_fields.items())
         order.update(stamp)
+        stamped += 1
         if not moved:
             continue
         if before != after:
@@ -894,8 +908,9 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
             }
         )
 
-    if changed:
+    if stamped:
         _persist(state)
+    if changed:
         for row in changed:
             print(
                 f"[execution_ledger] RECONCILED key={row['idempotency_key']}"
@@ -908,7 +923,8 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     print(
         f"[execution_ledger] RECONCILE venue={venue} candidates={len(candidates)}"
         f" venue_orders={len(read.get('orders') or [])} changed={len(changed)}"
-        f" not_found={not_found} unknown={unknown} implausible={implausible}",
+        f" not_found={not_found} unknown={unknown} implausible={implausible}"
+        f" stamped={stamped}",
         flush=True,
     )
     return {
@@ -918,6 +934,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         "not_found": not_found,
         "unknown": unknown,
         "implausible": implausible,
+        "stamped": stamped,
         "orders": changed,
     }
 
