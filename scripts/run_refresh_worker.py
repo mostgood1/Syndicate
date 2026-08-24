@@ -4225,6 +4225,30 @@ def main() -> int:
         start_background_loop_if_enabled()
     except Exception as exc:
         print(f"[refresh_worker] NOVIG_ODDS_REFRESH_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # ONE-SHOT diagnostic: run the Kalshi-vs-Polymarket US moneyline arb scan
+    # once against real production inputs (see
+    # syndicate/features/shared/kalshi_polymarket_arb.py -- detection only,
+    # never places an order). No-op unless
+    # SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT=1; unset again once the
+    # first real result is read, same pattern every other probe in this file
+    # uses -- this is not meant to become a standing boot hook.
+    try:
+        import os as _os
+
+        if str(_os.environ.get("SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT") or "").strip().lower() in {
+            "1", "true", "yes", "on",
+        }:
+            from datetime import datetime, timezone
+
+            from syndicate.features.shared.kalshi_polymarket_arb import run_arb_scan
+
+            _arb_date = _os.environ.get("SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_DATE") or datetime.now(
+                timezone.utc
+            ).date().isoformat()
+            _arb_result = run_arb_scan(selected_date=_arb_date)
+            print(f"[kalshi_polymarket_arb] SCAN date={_arb_date} result={_arb_result}", flush=True)
+    except Exception as exc:
+        print(f"[refresh_worker] KALSHI_POLYMARKET_ARB_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
     # NOTE: Polymarket's odds refresh (pipeline/polymarket_odds_refresh.py)
     # deliberately gets NO hook here -- another session already built and
     # wired it into scripts/run_live_odds_refresh_worker.py's own boot
