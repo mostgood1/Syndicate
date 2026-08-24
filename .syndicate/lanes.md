@@ -1163,7 +1163,12 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so
   `/portfolio` stops reading every position as pending.
 - Files: `syndicate/features/prediction_ledger.py`,
-  `syndicate/features/shared/ledger_bridge.py`, `scripts/run_refresh_worker.py`,
+  `syndicate/features/shared/ledger_bridge.py`,
+  ~~`scripts/run_refresh_worker.py`~~ (claim on THIS ONE FILE released
+  2026-08-24 by lane `exchange-markets-api-integration` -- owning session
+  `74a0966a` archived 2026-08-22, `lane-guard` was blocking a narrow,
+  additive, try/except-wrapped diagnostic hook on the strength of a dead
+  session's claim; rest of this lane's file list untouched),
   `scripts/backfill_portfolio_settlement.py`,
   `tests/test_prediction_ledger_shared_store.py`,
   `tests/test_evaluation_settlement_autorun_ordering.py`,
@@ -1577,6 +1582,93 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   quarter boundary and into OT.
 - Blocked by: none for Phase A. Phase B is blocked on scope §7 decisions 1 and 2;
   Phase C is blocked on a live WNBA slate (NBA out of season until autumn 2026).
+
+### exchange-markets-api-integration — OPEN — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
+- Goal: read-only market/odds-pulling client modules for six prediction/event-market
+  venues -- coinbase, prophetx, novig, polymarket, robinhood, crypto.com ("OG") --
+  each following `kalshi_client.py`'s pattern (single-place schema assumption,
+  `probe()` reports the shape that actually came back rather than parsing blind,
+  named refusal never a silent empty list). A second session is doing the Kalshi
+  order-automation build end to end; this lane is deliberately the OTHER venues,
+  market-data pull only -- no order placement, no credentials that can write.
+- Files (all NEW, no existing file touched):
+  `syndicate/features/shared/coinbase_client.py`,
+  `syndicate/features/shared/prophetx_client.py`,
+  `syndicate/features/shared/novig_client.py`,
+  `syndicate/features/shared/polymarket_client.py`,
+  `syndicate/features/shared/robinhood_client.py`,
+  `syndicate/features/shared/cryptocom_client.py`,
+  `scripts/probe_coinbase.py`, `scripts/probe_prophetx.py`,
+  `scripts/probe_novig.py`, `scripts/probe_polymarket.py`,
+  `scripts/probe_robinhood.py`, `scripts/probe_cryptocom.py`,
+  `tests/test_coinbase_client.py`, `tests/test_prophetx_client.py`,
+  `tests/test_novig_client.py`, `tests/test_polymarket_client.py`,
+  `tests/test_robinhood_client.py`, `tests/test_cryptocom_client.py`,
+  `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md` (NEW),
+  `scripts/probe_exchange_markets.py` (NEW).
+  **NARROW claim added 2026-08-24:** `scripts/run_refresh_worker.py` -- ONE
+  small, additive, try/except-wrapped, opt-in-only diagnostic hook (calls
+  `probe_exchange_markets.run_all_probes_if_enabled()` near boot, no-op unless
+  `SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT=1`). Released from
+  `portfolio-ledger-service-split` (owning session `74a0966a` archived
+  2026-08-22) -- see that lane's block for the release note.
+- Hypothesis: n/a -- this is construction against public API docs, not diagnosis.
+- Falsification test: n/a for the construction; the schema assumption in each
+  module is the thing a first live production run (refresh-worker, which has
+  outbound access this sandbox does not -- confirmed 2026-08-24, every venue host
+  403s CONNECT through the agent proxy, same as Kalshi) can falsify. `probe()`
+  in each module exists to make that falsification cheap and visible.
+- Verification: `python -m pytest tests/test_coinbase_client.py
+  tests/test_prophetx_client.py tests/test_novig_client.py
+  tests/test_polymarket_client.py tests/test_robinhood_client.py
+  tests/test_cryptocom_client.py` green locally (pure-function unit/odds-conversion
+  coverage only -- network calls cannot be exercised from this sandbox). Schema
+  correctness itself stays UNVERIFIED until a `probe_*` script runs from a host
+  with outbound access, same caveat `kalshi_client.py`'s header carries.
+- Blocked by: none.
+- **SHIPPED 2026-08-24, VERIFIED LOCALLY, NOT YET LIVE.** All six modules built.
+  Research (parallel WebSearch/WebFetch passes, one per venue) changed the shape
+  of the work: only polymarket (public, documented, no-auth) and novig/prophetx
+  (real but PARTNER-GATED -- no self-serve credential) have anything resembling
+  their own API. **coinbase and robinhood have NO distinct API at all** -- both
+  are broker/reseller front ends over Kalshi (and, for Robinhood, also
+  ForecastEx/Rothera) -- so `coinbase_client.py` / `robinhood_client.py` report
+  that finding and delegate to the other session's `kalshi_client.py` read-only
+  surface rather than fabricating an endpoint, clearly labelled
+  (`coinbase_predict_via_kalshi`, `robinhood_..._via_kalshi_partial`) so neither
+  is ever mistaken for the venue's own confirmed catalogue. **crypto.com "OG"**
+  (a real platform, `OG.com`, launched 2026-02-03 via CDNA) has no public
+  REST/WebSocket yet -- `cryptocom_client.py` reports the finding and rejects
+  one uncorroborated third-party-advertised endpoint by name. 53 unit tests
+  green (`polymarket_client.probability_to_american` needed a range guard the
+  first test run caught -- it divided by zero on `probability=0/1`, since
+  unlike `kalshi_client`'s version this one is public/`__all__`-exported and
+  callable directly rather than always reached through a validating caller).
+  Probe scripts run and fail as designed (named refusal, non-zero exit,
+  no crash) against the same agent-proxy denial every venue host hits. Full
+  per-venue evidence: `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`,
+  `docs/ai_context/todo.md #544` (renumbered from #542 on merge -- another lane
+  took #542/#543 first on `main`; see `scripts/todo_id_alloc.py`, which exists
+  for exactly this race). **OWED:** a `probe_*` run from refresh-worker
+  (real outbound access) to confirm or correct every schema assumption, same as
+  Kalshi's own first live run corrected 10 of 17 field names.
+- **NOVIG ORDER-AUTOMATION SCOPED 2026-08-24, not started.**
+  `.syndicate/scope_2026-08-24_novig_order_automation.md` -- read against the
+  OTHER session's live Kalshi automation build (`kalshi_orders.py`,
+  `execution_guard.py`, `execution_ledger.py`), which turned out to be fully
+  venue-agnostic: Novig's entire surface is two new files
+  (`novig_auth.py`, `novig_orders.py`) plus one `elif` in
+  `pipeline/execute_portfolio.py::_venue_submitter` (claimed by
+  `portfolio-decision-and-execution`, not yet narrow-claimed -- premature
+  before there is a `novig_orders.py` to wire in). Price unit and order
+  identity (`outcomeId` + `index`, never array position) CONFIRMED against
+  real `docs.novig.com` pages this time, not just third-party write-ups. The
+  **order WRITE endpoint could not be found by any search** -- the single
+  most important unknown, Novig's equivalent of the sample payload Kalshi's
+  owner had to supply by hand. **Blocked on a partner credential that does
+  not exist yet** (`NOVIG_CLIENT_ID`/`NOVIG_CLIENT_SECRET`, founder-gated,
+  no self-serve) and on the still-open legal/ToS review question from
+  `todo.md #544`'s own NEXT section.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

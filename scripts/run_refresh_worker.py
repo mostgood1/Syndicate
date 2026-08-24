@@ -4200,6 +4200,19 @@ def main() -> int:
         print("[refresh_worker] SHUTDOWN_RECORDER_INSTALLED", flush=True)
     except Exception as exc:
         print(f"[refresh_worker] SHUTDOWN_RECORDER_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # ONE-TIME, OPT-IN schema probe for the exchange-market client modules
+    # built in lane `exchange-markets-api-integration` (`todo.md #542`) --
+    # narrow claim on this file, surfaced in `.syndicate/lanes.md`. A no-op
+    # unless SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT=1 is set; this service is
+    # the one with real outbound access to verify schemas that were written
+    # against research rather than a live call. Never touches the refresh
+    # loop below. See `scripts/probe_exchange_markets.py`.
+    try:
+        from scripts.probe_exchange_markets import run_all_probes_if_enabled
+
+        run_all_probes_if_enabled()
+    except Exception as exc:
+        print(f"[refresh_worker] EXCHANGE_MARKETS_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
     # #285. Cap glibc arenas BEFORE the loops spawn threads -- `mallopt` only
     # governs arenas created after it returns, so this is worthless if it moves
     # later in main(). The trim proved allocator retention is real (1109.6MB
