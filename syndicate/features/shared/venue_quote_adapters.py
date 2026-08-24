@@ -197,9 +197,32 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
     if fetched_at is None:
         return SourceOutcome(source="polymarket_us", status="error", reason="no_fetched_at_or_mtime")
 
+    # FILTER BY SPORT FIRST. Measured 2026-08-24 23:45Z, the first live run:
+    #
+    #   mlb  polymarket_us quotes=7040     nfl     polymarket_us quotes=7040
+    #   wnba polymarket_us quotes=7040     soccer  polymarket_us quotes=7040
+    #
+    # The same 7,040 for every sport, because this adapter took `sport` only to
+    # BUILD THE KEY and never to select rows. So an NFL market was keyed
+    # `mlb|h2h|Chargers` when called for mlb -- a WRONG PRICE if a name ever
+    # collided across sports, not a missing one.
+    #
+    # It did not bite: Kalshi was fresher (654s vs 4272s) and won all 237
+    # selections, so no Polymarket quote was used. That is a timing accident,
+    # not a safeguard.
+    #
+    # The league is in the slug -- `aec-mlb-pit-sd-2026-08-24` -- which is the
+    # same structured key the board join reads, so the two cannot disagree.
+    from syndicate.features.shared.polymarket_board_join import parse_slug
+
+    wanted_league = str(sport or "").strip().lower()
+
     quotes: list[Quote] = []
     for row in rows:
         if not isinstance(row, Mapping):
+            continue
+        parsed_slug = parse_slug(row.get("slug"))
+        if parsed_slug is None or str(parsed_slug.get("league") or "").lower() != wanted_league:
             continue
         parsed = _polymarket_sides(row)
         if not parsed:
@@ -223,7 +246,7 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
     return SourceOutcome(
         source="polymarket_us",
         status="ok" if quotes else "no_rows",
-        reason=None if quotes else "no_polymarket_row_parsed_for_this_sport",
+        reason=None if quotes else f"no_polymarket_row_for_league_{sport}",
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )

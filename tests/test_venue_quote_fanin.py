@@ -358,3 +358,46 @@ def test_a_row_with_no_sport_is_left_alone():
                                     collected_by_sport={})
     assert result["stamped"] == 0
     assert result["rows"][0] == {"market": "h2h", "side": "home"}
+
+
+# ==========================================================================
+# The Polymarket adapter must SELECT by sport, not just key by it
+# ==========================================================================
+
+
+def test_the_polymarket_adapter_filters_the_slate_BY_SPORT(monkeypatch):
+    """MEASURED 2026-08-24 23:45Z: polymarket_us reported quotes=7040 for mlb,
+    wnba, nfl AND soccer -- the same 7,040 every time, because `sport` was used
+    only to BUILD THE KEY and never to select rows. An NFL market keyed
+    `mlb|h2h|Chargers` is a WRONG price, not a missing one."""
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    slate = {
+        "fetched_at": time.time(),
+        "markets": [
+            {"slug": "aec-mlb-pit-sd-2026-08-24", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+             "outcomes": '["Pirates","Padres"]', "outcomePrices": '["0.45","0.55"]'},
+            {"slug": "aec-nfl-lac-ten-2026-08-28", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+             "outcomes": '["Chargers","Titans"]', "outcomePrices": '["0.5","0.5"]'},
+        ],
+    }
+    monkeypatch.setattr(adapters, "_artifact", lambda _p: (slate, time.time()))
+
+    mlb = adapters.polymarket_us_outcome("mlb", "2026-08-24")
+    nfl = adapters.polymarket_us_outcome("nfl", "2026-08-28")
+    assert len(mlb.quotes) == 2 and all(q.key.startswith("mlb|") for q in mlb.quotes)
+    assert len(nfl.quotes) == 2 and all(q.key.startswith("nfl|") for q in nfl.quotes)
+    # And no cross-contamination: the NFL teams never appear under mlb.
+    assert not any("chargers" in q.key or "titans" in q.key for q in mlb.quotes)
+
+
+def test_a_sport_the_venue_does_not_quote_reports_no_rows_by_name(monkeypatch):
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    slate = {"fetched_at": time.time(), "markets": [
+        {"slug": "aec-mlb-pit-sd-2026-08-24", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+         "outcomes": '["Pirates","Padres"]', "outcomePrices": '["0.45","0.55"]'}]}
+    monkeypatch.setattr(adapters, "_artifact", lambda _p: (slate, time.time()))
+    outcome = adapters.polymarket_us_outcome("nhl", "2026-08-24")
+    assert outcome.status == "no_rows"
+    assert "nhl" in outcome.reason
