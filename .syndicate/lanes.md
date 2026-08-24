@@ -1691,6 +1691,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   ("ProphetX Play", which reads like a separate embeddable widget) --
   this has to be resolved in the partner conversation, not guessed.**
   Same blockers as Novig otherwise: no credential, legal/ToS review open.
+- **NOVIG'S ORDER-WRITE ENDPOINT RESOLVED 2026-08-24 (same day) -- the user
+  supplied real `docs.novig.com` page content directly** (REST Endpoints/
+  Rate Limits/URLs, and Place Order), not another research pass. Scope doc
+  updated in place. `syndicate/features/shared/novig_orders.py` (NEW) now
+  has `order_body()` + `cash_units_for_stake()`, pure and unit-tested against
+  the exact documented contract (`POST /emm/orders/place`, body `{outcomeId,
+  price, qty, currency, tif, ttl?, flags?}`) -- 16 tests. `submit_order` (the
+  actual network call) deliberately NOT written -- the response shape of a
+  placed order was not supplied. `novig_client._MARKET_FIELDS` corrected
+  against the same real content (three invented names replaced); confirmed
+  `fetch_market(market_id)` added. **New open questions, both flagged rather
+  than guessed:** whether `qty` means risked or to-win, and the cancel
+  endpoint's HTTP method (path confirmed, verb assumed = DELETE). **A real
+  unit trap caught before it could bite:** `Retry-After`/`X-RateLimit-Reset`
+  on a Novig 429 are MILLISECONDS not seconds --
+  `novig_orders.backoff_seconds_from_headers` divides by 1000 in exactly one
+  tested place. Files: `syndicate/features/shared/novig_orders.py` (NEW),
+  `tests/test_novig_orders.py` (NEW), `syndicate/features/shared/novig_client.py`,
+  `tests/test_novig_client.py`, `.syndicate/scope_2026-08-24_novig_order_automation.md`.
+  Also added, separate concern, same session: `novig_client.diagnose_daily_csv_403()`
+  (NEW) + a second boot-hook flag (`SYNDICATE_NOVIG_CSV_DIAGNOSE_ON_BOOT`) in
+  `scripts/probe_exchange_markets.py`, to chase the CSV-tier 403 from the
+  earlier live probe -- not yet run in production.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

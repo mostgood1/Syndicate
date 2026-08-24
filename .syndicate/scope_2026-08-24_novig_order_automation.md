@@ -3,10 +3,25 @@
 Drafted 2026-08-24, lane `exchange-markets-api-integration`, in response to
 "start scoping novig" — the first of the three real-API venues from this
 lane (polymarket / novig / prophetx) to get an order-automation design, per
-this lane's own stated NEXT step (`todo.md #544`). **Not started. No lane
-extension claimed, no code written.** This is a scope: it exists to surface
-what is known, what is genuinely unknown, and what is blocked, before any of
-it gets built.
+this lane's own stated NEXT step (`todo.md #544`). This is a scope: it exists
+to surface what is known, what is genuinely unknown, and what is blocked,
+before any of it gets built.
+
+**UPDATE 2026-08-24, same day — the user supplied real `docs.novig.com` page
+content directly** (the "REST Endpoints / Rate Limits & URL's" and "Place
+order" pages), not another research pass. This resolved §2's single biggest
+gap: **the order-WRITE endpoint, previously "NOT FOUND", is now CONFIRMED
+with an exact field-level contract.** `syndicate/features/shared/novig_orders.py`
+now exists — `order_body()` (pure, unit-tested, matches the documented
+`POST /emm/orders/place` schema exactly) and `cash_units_for_stake()` are
+built; `submit_order` (the actual network call) is DELIBERATELY still not
+written, because the response shape for a placed order was not part of what
+was supplied — see the updated table below and `novig_orders.py`'s own
+header for exactly what is confirmed vs still assumed. `novig_client.py`'s
+`_MARKET_FIELDS` was also corrected against the same real content (three
+invented field names — `market_type`, `is_consensus`, `scheduled_start` —
+replaced with the real ones), and a confirmed `fetch_market(market_id)` was
+added alongside the still-unconfirmed listing endpoint.
 
 Everything below is measured against the OTHER session's live Kalshi
 automation build (`kalshi_auth.py`, `kalshi_orders.py`, `execution_guard.py`,
@@ -61,13 +76,18 @@ real response says so.
 
 | Question | Status | Detail |
 |---|---|---|
-| Price unit | **CONFIRMED (docs)** | `docs.novig.com/api-reference/data-model`: prices are decimal probabilities 0.001–0.999, "the stake per $1.00 payout" — 0.524 means $0.524 staked to win $1.00. **Same convention as Kalshi's dollars**, so `novig_client.probability_to_american` (already written, tested) is very likely also `novig_orders`'s conversion — but a market READ field and an ORDER WRITE field agreeing is exactly the assumption that produced Kalshi's 100x error, so this still wants a live check before being trusted for a write. |
-| Order identity | **CONFIRMED (docs)** | `docs.novig.com/api-reference/outcome-ids`: an order targets an `outcomeId` (a UUID), **never a market ID**, and each outcome carries an `index` field that must be used to determine side — "the order of outcomes in an array does not determine their meaning." A side-mapping bug here is the exact class of error `kalshi_orders.py`'s `_side_to_kalshi` refuses-by-name rather than defaults; Novig's version needs the same discipline, keyed on `index`, not position. |
-| Order READ endpoints | **CONFIRMED (docs), names only** | `/orders`, `/fills`, `/transactions` exist as user-history endpoints, max 256 items/request (default 100). This is `kalshi_orders.fetch_orders`'s counterpart, endpoint NAME confirmed, response SHAPE not. |
-| **Order WRITE endpoint** | **NOT FOUND** | No search surfaced a `POST /orders` (or equivalent) path, method, or request body — the single most important fact for automation and the one this scope could not establish. This is the Novig equivalent of the sample payload Kalshi's owner had to supply by hand after the documented route 410'd; nothing here plays that role yet. |
-| Order size unit | **UNKNOWN** | Kalshi orders in CONTRACTS (a $1-payout unit, floored from the stake). Whether Novig's write contract wants a contract/share count, a dollar stake directly, or something else is not established by anything found. |
-| Sandbox/demo environment | **UNKNOWN** | Kalshi has a documented demo host (`demo-api.kalshi.co`) that a build can point at before risking a funded account. Nothing found confirms or denies one for Novig. |
-| Auth mechanics beyond OAuth2 | **PARTIALLY CONFIRMED** | `novig_client.py`'s `load_credentials()`/`_fetch_token()` already implement the client-credentials exchange against `docs.novig.com`'s described flow ("secure OAuth 2.0 authentication ... get your access token and start trading in minutes"). Whether a SIGNED request (à la Kalshi's RSA-PSS per-call signature) is ALSO required on top of the bearer token is not established — Kalshi needed both; assuming Novig needs only the bearer token because the docs describe it as sufficient for "trading" is a real research gap, not a confirmed fact. |
+| Price unit | **CONFIRMED, now on BOTH sides** | Originally docs-research-only; the order-write contract independently documents `price` as "decimal probability, up to 3 decimal places" — the same convention as the read side, confirmed rather than merely corroborated. `novig_orders.order_body` rounds to 3dp per the documented constraint. |
+| Order identity | **CONFIRMED (docs)** | An order targets an `outcomeId` (a UUID), never a market ID — matches the real `POST /emm/orders/place` schema field-for-field. The `index`-not-position warning from the original research stands for reading outcomes off a market; `order_body` itself just takes the id as given (via `request.venue_ticker`, reused from Kalshi's field). |
+| Order READ endpoints | **CONFIRMED (docs), names + rate limits, response shape still not** | `emm/fills/all`, `emm/orders/all`, `emm/transactions` (32 burst / 512 per 60s), `emm/orders/{orderId}` (cancel, 512/s) — real paths and limits now known. The response FIELD NAMES for an order/fill object are still not — `venue_order_view` is deliberately not written for this reason; see `novig_orders.py` header. |
+| **Order WRITE endpoint** | **CONFIRMED, field-level** | `POST https://api.novig.us/nbx/v2/emm/orders/place`, Bearer-token auth, body `{outcomeId, price, qty, currency, tif, ttl?, flags?}` — real schema with types, constraints and a worked `curl` example. `novig_orders.order_body()` implements this exactly, pure and unit-tested (16 tests, `tests/test_novig_orders.py`). |
+| Order size unit | **CONFIRMED, and it's a DIFFERENT model from Kalshi's** | `qty` is MINIMAL CURRENCY UNITS, not a contract count — for `currency="CASH"`, 1 unit = $0.01 (independent of price, unlike Kalshi where price determines the contract count from a stake). A separate `currency="COIN"` denomination also exists, meaning and real-money-ness UNCONFIRMED. See `novig_orders.py`'s header for the full reasoning and the new open question this creates (below). |
+| **NEW: does `qty` mean risked or to-win?** | **UNRESOLVED** | Not stated in anything supplied. `cash_units_for_stake` assumes RISKED (the conventional P2P-exchange reading), flagged as an assumption, not a confirmed fact — the one thing a future live order or a direct question to Novig should settle before real money moves. |
+| **NEW: response shape of a placed order** | **UNCONFIRMED** | Only the HTTP status (201, "Order placed successfully") was supplied — no field names for the created order/wager object. `submit_order` (the network call + response parsing) is deliberately NOT written in `novig_orders.py` for this exact reason. |
+| **NEW: cancel endpoint's HTTP method** | **UNCONFIRMED** | Path confirmed (`{base}/emm/orders/{orderId}`, rate-limited 512/s); the rate-limit table names it "(Order cancellation)" without stating the verb. DELETE is assumed (REST convention), not read. |
+| **NEW: rate limits** | **CONFIRMED, with one internal disagreement flagged** | Full table now known (order placement 64/s per one part of the source, 32/s per another part of the SAME source — noted, not silently picked; batch 64/s; cancel 512/s; kill-switch 1/30s; history tier 32 burst/512 sustained; everything else 256/s). **`Retry-After` and `X-RateLimit-Reset` on a 429 are MILLISECONDS, not seconds** — `novig_orders.backoff_seconds_from_headers` exists specifically because this is the same unit-trap shape as Kalshi's 100x price error. |
+| **NEW: Novig's own kill switch** | **CONFIRMED to exist, not integrated** | `emm/kill`, rate-limited to once per 30s — a VENUE-SIDE panic button, structurally separate from this repo's `execution_guard.kill_switch_engaged()`. Not wired to anything; noted as a future integration candidate, not built. |
+| Sandbox/demo environment | **CONFIRMED** | `PROD https://api.novig.us/nbx/v2`, **`QA https://api-qa.novig.us/nbx/v2`** — the QA host was previously unknown; `novig_client._QA_API_BASE` now records it, not yet wired into a `NOVIG_API_BASE`-style override the way `kalshi_client`'s Kalshi demo host is. |
+| Auth mechanics beyond OAuth2 | **STRENGTHENED, still not fully closed** | The order-placement `curl` example shows a single `Authorization: Bearer $TOKEN` header and nothing else — no additional per-request signature field in the documented example, unlike Kalshi's RSA-PSS. This is stronger evidence than before that bearer-token-only is sufficient, but it is still evidence from a documented EXAMPLE, not a live call that actually succeeded. |
 
 ## 3. The precondition this scope cannot get past: no credential exists
 
@@ -97,19 +117,23 @@ execute the moment a credential exists, not so it can be built blind first.
    refuses by name without credentials) and diff its live response against
    `_MARKET_FIELDS`/`_OUTCOME_FIELDS` — this repeats `kalshi_client.probe()`'s
    role and is strictly cheaper than guessing at the order body next.
-3. **`novig_orders.py`, built AFTER an order-write endpoint is confirmed**,
-   not before. Kalshi's `order_body_v2` exists only because the owner
-   supplied a real sample payload by hand after the documented route 410'd —
-   inventing a Novig equivalent from nothing, the way this repo's Kalshi
-   build explicitly says NOT to do a second time, would repeat exactly the
-   mistake `kalshi_orders.py`'s header warns against. **If Novig's own
-   onboarding for a partner credential includes an OpenAPI 3.1 spec or a
-   sample payload (the docs mention an OpenAPI 3.1 spec exists), get that
-   FIRST and build `order_body` from it, pure and unit-tested, the same way
-   `kalshi_orders.order_body_v2` is.**
-4. **`novig_submitter()`**, matching `kalshi_submitter`'s shape exactly —
-   bound to a live-price resolver, raises rather than sends at an unpriced
-   contract.
+3. ~~**`novig_orders.py`, built AFTER an order-write endpoint is
+   confirmed**~~ **DONE 2026-08-24.** The user supplied the real contract
+   directly; `order_body()` and `cash_units_for_stake()` exist, pure and
+   unit-tested (16 tests), matching `kalshi_orders.order_body_v2`'s own
+   pattern of building from a real documented/supplied payload rather than
+   inference. `submit_order` (the actual network call + response parsing) is
+   still NOT written — the response shape of a placed order was not part of
+   what was supplied, and guessing it now would repeat the exact mistake
+   `kalshi_orders.py`'s header warns against, just one step later in the
+   pipeline than before.
+4. ~~**`novig_submitter()`**~~ **PARTIALLY DONE.** `novig_orders.novig_submitter`
+   exists, matches `kalshi_submitter`'s shape, and correctly raises
+   `no_live_price` when unpriced — but its inner call raises
+   `NotImplementedError` rather than actually submitting, because step 3's
+   `submit_order` doesn't exist yet. Wiring `_venue_submitter` (step 5) to
+   this today would be a submitter that always fails loudly, which is the
+   correct failure mode for "not ready" but is not the same as "ready."
 5. **One `elif` in `_venue_submitter`.** Narrow-claim
    `pipeline/execute_portfolio.py` at this point, following the same
    released-stale-claim or explicit-narrow-claim precedent already used

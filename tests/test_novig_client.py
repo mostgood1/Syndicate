@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from syndicate.features.shared.novig_client import (
+    fetch_market,
     load_credentials,
     normalize_market,
     probability_to_american,
@@ -52,12 +53,17 @@ def test_load_credentials_ok_with_both(monkeypatch):
 
 
 def test_normalize_market_reports_missing_fields_and_normalizes_outcomes():
+    """Field names here match the real `GET /emm/markets/{marketId}` schema
+    (docs.novig.com content obtained 2026-08-24), not the original
+    research-only guess -- `market_type`/`is_consensus`/`scheduled_start`
+    do not exist in the real response."""
     row = normalize_market(
         {
             "id": "evt-1",
             "league": "MLB",
-            "type": "Game",
-            "status": "OPEN_PREGAME",
+            "type": "TOTAL",
+            "status": "OPEN",
+            "description": "NYY v BOS Total",
             "outcomes": [
                 {"type": "moneyline_home", "last": "0.62"},
                 {"type": "moneyline_away", "last": "0.38"},
@@ -65,8 +71,10 @@ def test_normalize_market_reports_missing_fields_and_normalizes_outcomes():
         }
     )
     assert row["league"] == "MLB"
+    assert row["description"] == "NYY v BOS Total"
     # Fields never supplied above must still be present and counted.
-    assert "scheduled_start" in row["missing_fields"]
+    assert "eventId" in row["missing_fields"]
+    assert "settledAt" in row["missing_fields"]
     assert len(row["outcomes"]) == 2
     assert row["outcomes"][0]["probability"] == pytest.approx(0.62)
     assert row["outcomes"][0]["american"] == -163
@@ -76,6 +84,20 @@ def test_normalize_market_reports_absent_outcomes_by_name():
     row = normalize_market({"id": "evt-1"})
     assert row["outcomes"] == []
     assert "outcomes" in row["missing_fields"]
+
+
+def test_fetch_market_refuses_by_name_without_a_credential(monkeypatch):
+    monkeypatch.delenv("NOVIG_CLIENT_ID", raising=False)
+    monkeypatch.delenv("NOVIG_CLIENT_SECRET", raising=False)
+    result = fetch_market("123e4567-e89b-12d3-a456-426614174000")
+    assert result == {"status": "unavailable", "reason": "no_client_id"}
+
+
+def test_fetch_market_refuses_by_name_without_a_market_id(monkeypatch):
+    monkeypatch.setenv("NOVIG_CLIENT_ID", "abc")
+    monkeypatch.setenv("NOVIG_CLIENT_SECRET", "def")
+    result = fetch_market("")
+    assert result == {"status": "error", "reason": "no_market_id"}
 
 
 def test_normalize_market_falls_back_to_available_when_last_is_absent():
