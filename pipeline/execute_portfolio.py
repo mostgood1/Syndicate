@@ -406,31 +406,116 @@ def _venue_submitter(venue: str):
     return None
 
 
-def _kalshi_price_for(request) -> float | None:
-    """The CURRENT Kalshi ask for this contract, in dollars.
+def max_slippage_dollars() -> float:
+    """How far worse than the planned price we will still pay, in dollars.
 
-    Re-read at submit time rather than taken from the plan, and that is
-    deliberate even though the plan's price is what the EV was computed from:
-    the limit price we send has to be one Kalshi is actually showing, or the
-    order rests unfilled. The gap between the two IS the slippage, and
-    `execution_ledger` records both so it stays visible.
+    A MARKETABLE LIMIT WITHOUT THIS IS "PAY ANYTHING". Repricing to whatever
+    the venue currently shows is how the order fills; refusing to bound it is
+    how it fills at a price the edge was never computed against. Three cents
+    by default on a contract that settles at a dollar -- roughly a 3% band.
     """
-    from syndicate.features.shared.kalshi_client import dollars_to_probability
-    from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+    raw = (os.environ.get("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS") or "").strip()
+    try:
+        parsed = float(raw)
+    except (TypeError, ValueError):
+        return 0.03
+    return parsed if parsed > 0 else 0.03
+
+
+def _kalshi_price_for(request) -> float | None:
+    """The price to send: the venue's CURRENT ask, bounded by slippage.
+
+    A MARKETABLE LIMIT. This used to read `kalshi_markets.json` and call that
+    "re-read at submit time" -- but the artifact refreshes 12 series a tick
+    across 155, so its ask can be ~26 minutes old. Measured 2026-08-24: we sent
+    $0.54 because that was the artifact's ask; the live ask was $0.56, and the
+    order rested unfilled.
+
+    A resting order is worse than a missed one. It fills only if the market
+    comes back to our stale price -- which is the market moving AGAINST the
+    thesis -- so a standing limit at a price we no longer believe is a free
+    option written to everyone else.
+
+    So: read the live ask and pay it, unless it has moved further than
+    `max_slippage_dollars` from what the plan priced. Beyond that the edge is
+    not the edge we sized, and refusing is the honest answer.
+
+    Falls back to the artifact ONLY when the live read fails, and says so --
+    a stale price is better than no order, but the two must not be confused.
+    """
+    from syndicate.features.shared.kalshi_client import dollars_to_probability, fetch_market
 
     ticker = str(getattr(request, "venue_ticker", "") or "").strip()
     if not ticker:
         return None
+    side = str(getattr(request, "side", "") or "").strip().lower()
+    key = "no_ask_dollars" if side in {"under", "no"} else "yes_ask_dollars"
+
+    planned = _artifact_price(ticker, key)
+
+    live = None
+    try:
+        result = fetch_market(ticker)
+        if result.get("status") == "ok":
+            live = dollars_to_probability((result.get("market") or {}).get(key))
+        else:
+            print(
+                f"[execute_portfolio] LIVE_PRICE_UNAVAILABLE ticker={ticker}"
+                f" reason={result.get('reason')}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[execute_portfolio] LIVE_PRICE_ERROR ticker={ticker}"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+    if live is None:
+        # The artifact, explicitly labelled. Not silently -- an order priced off
+        # a 26-minute-old quote should be visible as such in the one log a
+        # person reads while money is moving.
+        print(
+            f"[execute_portfolio] PRICE_FROM_ARTIFACT ticker={ticker} price={planned}",
+            flush=True,
+        )
+        return planned
+
+    if planned is not None:
+        drift = round(live - planned, 4)
+        if drift > max_slippage_dollars():
+            # WORSE than planned by more than we allow. Refused by raising, so
+            # the order is recorded with a reason rather than silently skipped.
+            raise _SlippageExceeded(
+                f"slippage: planned={planned} live={live} drift={drift:+.4f}"
+                f" max={max_slippage_dollars()}"
+            )
+        print(
+            f"[execute_portfolio] LIVE_PRICE ticker={ticker} planned={planned}"
+            f" live={live} drift={drift:+.4f}",
+            flush=True,
+        )
+    return live
+
+
+class _SlippageExceeded(Exception):
+    """The live price moved past the tolerance. Never reached the venue."""
+
+    venue_contacted = False
+
+
+def _artifact_price(ticker: str, key: str) -> float | None:
+    """The last price the refresh recorded. The FALLBACK, not the source."""
+    from syndicate.features.shared.kalshi_client import dollars_to_probability
+    from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
     try:
         payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json") or {}
     except Exception:
         return None
     for market in payload.get("markets") or []:
-        if str(market.get("ticker") or "") != ticker:
-            continue
-        side = str(getattr(request, "side", "") or "").strip().lower()
-        key = "no_ask_dollars" if side in {"under", "no"} else "yes_ask_dollars"
-        return dollars_to_probability(market.get(key))
+        if str(market.get("ticker") or "") == ticker:
+            return dollars_to_probability(market.get(key))
     return None
 
 

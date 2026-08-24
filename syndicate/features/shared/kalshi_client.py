@@ -366,6 +366,43 @@ def fetch_markets(
 _COMBINATORIAL_SERIES_PREFIXES = ("KXMVECROSSCATEGORY",)
 
 
+def fetch_market(ticker: str) -> dict[str, Any]:
+    """ONE market, live, at the moment of asking. Never the artifact.
+
+    THE ARTIFACT IS NOT A PRICE, it is a price from up to ~26 minutes ago:
+    155 series refresh 12 per tick, so the per-series clock never drains.
+    Measured 2026-08-24 -- an order was sent at $0.54 because that was the ask
+    when the artifact was last written, while the live ask was $0.56. It rested
+    unfilled, which is the good outcome; the bad one is filling at a price the
+    edge was never computed against.
+
+    So the SUBMIT path reads the venue directly. This costs one request per
+    order actually placed -- at most ten a day under the caps -- which is a
+    different budget entirely from refreshing every series every cycle.
+
+    Returns `{"status": "ok", "market": {...}}` or a NAMED failure. Absent is
+    not zero: a caller must refuse rather than price off nothing.
+    """
+    key = str(ticker or "").strip()
+    if not key:
+        return {"status": "error", "reason": "no_ticker"}
+
+    errors: list[str] = []
+    for base in _BASE_URLS:
+        url = f"{base}{_MARKETS_PATH}/{key}"
+        try:
+            payload = _get(url)
+        except Exception as exc:
+            errors.append(f"{type(exc).__name__}: {exc}")
+            continue
+        raw = payload.get("market") or payload
+        if not isinstance(raw, Mapping) or not raw.get("ticker"):
+            errors.append(f"unexpected_shape:{sorted(payload)[:6]}")
+            continue
+        return {"status": "ok", "market": normalize_market(raw), "base": base}
+    return {"status": "error", "reason": "; ".join(errors) or "no_base_responded"}
+
+
 def is_combinatorial_series(series: Any) -> bool:
     text = str(series or "").strip().upper()
     return any(text.startswith(prefix) for prefix in _COMBINATORIAL_SERIES_PREFIXES)

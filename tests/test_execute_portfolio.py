@@ -664,3 +664,93 @@ def test_a_retry_is_charged_against_the_cap(monkeypatch):
     result = runner.run_execution("2026-08-22", venue_scope="kalshi")
     assert result["placed"] == 0
     assert "over_max_order_dollars" in result["refused"]
+
+
+# --------------------------------------------------------------------------
+# Marketable limit: pay the LIVE ask, bounded by slippage
+# --------------------------------------------------------------------------
+
+
+def _price_env(monkeypatch, *, live=None, live_status="ok", artifact=None):
+    from syndicate.features.shared import kalshi_client
+    import pipeline.execute_portfolio as runner
+
+    def fetch_market(ticker):
+        if live_status != "ok":
+            return {"status": "error", "reason": live_status}
+        return {"status": "ok", "market": {"ticker": ticker, "no_ask_dollars": live}}
+
+    monkeypatch.setattr(kalshi_client, "fetch_market", fetch_market)
+    monkeypatch.setattr(runner, "_artifact_price", lambda t, k: artifact)
+
+
+class _Req:
+    venue_ticker = "KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-5"
+    side = "under"
+
+
+def test_the_live_ask_is_used_not_the_artifact(monkeypatch):
+    """MEASURED 2026-08-24. `_kalshi_price_for` read `kalshi_markets.json` and
+    called it "re-read at submit time" — but 155 series refresh 12 a tick, so
+    that ask can be ~26 minutes old. We sent $0.54 from the artifact while the
+    live ask was $0.56, and the order rested unfilled.
+    """
+    import pipeline.execute_portfolio as runner
+
+    _price_env(monkeypatch, live=0.56, artifact=0.54)
+    assert runner._kalshi_price_for(_Req()) == 0.56
+
+
+def test_a_price_that_moved_too_far_REFUSES(monkeypatch):
+    """A marketable limit without a bound is "pay anything". Beyond the
+    tolerance the edge is not the edge we sized, and refusing is honest."""
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
+    _price_env(monkeypatch, live=0.62, artifact=0.54)  # +0.08, past 0.03
+    with pytest.raises(Exception) as excinfo:
+        runner._kalshi_price_for(_Req())
+    assert "slippage" in str(excinfo.value)
+
+
+def test_a_price_that_moved_in_our_FAVOUR_is_taken(monkeypatch):
+    """Drift is directional. A cheaper ask is not slippage."""
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
+    _price_env(monkeypatch, live=0.40, artifact=0.54)
+    assert runner._kalshi_price_for(_Req()) == 0.40
+
+
+def test_a_slippage_refusal_never_reached_the_venue(monkeypatch):
+    """So it records as `rejected` — uncharged and retryable — rather than
+    `failed`, which would hold budget for an order that was never sent."""
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.01")
+    _price_env(monkeypatch, live=0.90, artifact=0.54)
+    try:
+        runner._kalshi_price_for(_Req())
+    except Exception as exc:
+        assert getattr(exc, "venue_contacted", True) is False
+
+
+def test_the_artifact_is_the_fallback_and_says_so(monkeypatch, capsys):
+    """A stale price beats no order — but the two must never be confused, so
+    the fallback announces itself in the log money moves through."""
+    import pipeline.execute_portfolio as runner
+
+    _price_env(monkeypatch, live_status="429 rate limited", artifact=0.54)
+    assert runner._kalshi_price_for(_Req()) == 0.54
+    out = capsys.readouterr().out
+    assert "PRICE_FROM_ARTIFACT" in out
+    assert "LIVE_PRICE_UNAVAILABLE" in out
+
+
+def test_no_price_anywhere_returns_none_so_the_order_refuses(monkeypatch):
+    """`kalshi_submitter` raises on None, so the order is recorded with a
+    reason rather than sent at a price nobody chose."""
+    import pipeline.execute_portfolio as runner
+
+    _price_env(monkeypatch, live_status="down", artifact=None)
+    assert runner._kalshi_price_for(_Req()) is None
