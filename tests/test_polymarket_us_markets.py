@@ -1049,3 +1049,55 @@ def test_one_offset_failing_does_not_stop_the_rest(monkeypatch):
     result = mod.probe_offset_landscape()
     assert result["samples"]["2000"]["status"] == "error"
     assert result["first_game_offset"] == 0
+
+
+def test_a_SPREAD_is_a_game_market_even_though_only_MONEYLINE_was_known():
+    """MEASURED 2026-08-24T21:26:36Z at offset 16000:
+    types=['SPORTS_MARKET_TYPE_SPREAD'], slug
+    'asc-nfl-nyg-nyj-2026-08-28-pos-1pt5' -- Giants at Jets, four days out.
+
+    The allowlist version knew only MONEYLINE and reported games=0 on a page
+    full of real NFL spreads. That is the "guessed constant returns zero
+    indistinguishably from absence" failure, hit at a third layer."""
+    spread = _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_SPREAD",
+                  gameStartTime="2026-08-28T23:30:00Z")
+    assert mod.is_game_market_row(spread) is True
+
+
+def test_an_UNSEEN_game_market_type_is_included_not_excluded():
+    """Exclusion, not an allowlist. An over-count is visible in the sample rows;
+    an under-count reads as "the venue does not offer this"."""
+    for unseen in ("SPORTS_MARKET_TYPE_TOTAL", "SPORTS_MARKET_TYPE_PLAYER_PROP",
+                   "SPORTS_MARKET_TYPE_SOMETHING_NEW"):
+        row = _row(category="sports", sportsMarketTypeV2=unseen,
+                   gameStartTime="2026-08-28T23:30:00Z")
+        assert mod.is_game_market_row(row) is True, unseen
+
+
+def test_season_level_types_are_still_excluded():
+    for season in ("SPORTS_MARKET_TYPE_FUTURE", "SPORTS_MARKET_TYPE_CHAMPION",
+                   "SPORTS_MARKET_TYPE_AWARD", "SPORTS_MARKET_TYPE_SEASON_WINS"):
+        row = _row(category="sports", sportsMarketTypeV2=season,
+                   gameStartTime="2026-09-07T00:00:00Z")
+        assert mod.is_game_market_row(row) is False, season
+
+
+def test_a_row_with_no_game_start_is_not_a_game_market():
+    """A season-level market with no type would otherwise pass on category."""
+    row = _row(category="sports", sportsMarketTypeV2=None, gameStartTime=None)
+    assert mod.is_game_market_row(row) is False
+
+
+def test_the_game_type_vocabulary_is_reported(monkeypatch):
+    _stub(monkeypatch, {"markets": [
+        _row(id="g-1", category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_MONEYLINE",
+             gameStartTime="2026-08-28T23:30:00Z"),
+        _row(id="g-2", category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_SPREAD",
+             gameStartTime="2026-08-28T23:30:00Z"),
+        _row(id="f-1", category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE",
+             gameStartTime="2026-09-07T00:00:00Z"),
+    ]})
+    result = mod.fetch_markets()
+    assert result["games"] == 2
+    assert result["futures"] == 1
+    assert result["game_types"] == ["SPORTS_MARKET_TYPE_MONEYLINE", "SPORTS_MARKET_TYPE_SPREAD"]

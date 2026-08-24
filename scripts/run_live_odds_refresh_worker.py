@@ -902,6 +902,7 @@ def _polymarket_us_slate_probe_at_boot() -> None:
             f"[live_odds_worker] POLYMARKET_US_CATALOGUE status={catalogue.get('status')}"
             f" sporting={catalogue.get('sporting')}"
             f" games={catalogue.get('games')} futures={catalogue.get('futures')}"
+            f" game_types={catalogue.get('game_types')}"
             f" settled={catalogue.get('settled')} live={catalogue.get('live')}"
             f" rows={catalogue.get('total_rows')} pages={catalogue.get('pages')}"
             f" duplicate_ids={catalogue.get('duplicate_ids')}"
@@ -936,7 +937,12 @@ def _polymarket_us_slate_probe_at_boot() -> None:
         # games=0 across the first 2,000 rows, and moneylines are known to
         # exist here (the unfiltered query returns them). Deeper, or absent?
         # Samples ~8 offsets at 5 rows each rather than sweeping linearly.
-        landscape = pm.probe_offset_landscape()
+        landscape = pm.probe_offset_landscape(
+            # MEASURED 2026-08-24T21:26:36Z: game markets start around 16000
+            # and the collection ends between 16000 and 32000. Sampling near
+            # that boundary is worth more than another look at offset 0.
+            offsets=(0, 8000, 12000, 16000, 18000, 20000, 24000, 28000),
+        )
         print(
             f"[live_odds_worker] POLYMARKET_US_OFFSETS status={landscape.get('status')}"
             f" first_game_offset={landscape.get('first_game_offset')}"

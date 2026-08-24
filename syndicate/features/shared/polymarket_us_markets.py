@@ -88,6 +88,8 @@ __all__ = [
     "team_alias_index",
     "is_sporting_row",
     "is_game_market_row",
+    "MONEYLINE_MARKET_TYPE",
+    "SPREAD_MARKET_TYPE",
     "sports_market_type",
     "trimmed_row",
     "league_slug_for_sport",
@@ -148,8 +150,29 @@ SPORTS_CATEGORY = "sports"
 # interchangeable: a future ("World Series Champion", `outcomes: ["Yes","No"]`)
 # has no game to join a board row to, while a moneyline
 # (`outcomes: ["Titans","Chargers"]`) does.
-GAME_MARKET_TYPE = "SPORTS_MARKET_TYPE_MONEYLINE"
+MONEYLINE_MARKET_TYPE = "SPORTS_MARKET_TYPE_MONEYLINE"
+SPREAD_MARKET_TYPE = "SPORTS_MARKET_TYPE_SPREAD"
 FUTURES_MARKET_TYPE = "SPORTS_MARKET_TYPE_FUTURE"
+
+# MEASURED 2026-08-24T21:26:36Z, offset 16000 of the `closed=false` ordering:
+#
+#   types=['SPORTS_MARKET_TYPE_SPREAD'] categories=['sports']
+#   first_slug='asc-nfl-nyg-nyj-2026-08-28-pos-1pt5'
+#   start_min='2026-08-28T23:30:00Z'
+#
+# A real game market -- NFL, Giants at Jets, four days out, spread +1.5 -- and
+# a market TYPE never seen before. The previous definition allowlisted
+# MONEYLINE alone, from the only value observed at the time, so it counted this
+# as `games=0`: the exact "guessed constant returns zero indistinguishably from
+# absence" failure this module has hit at three different layers now.
+#
+# So the test is now an EXCLUSION. A game market is a sports market that is not
+# season-level and is tied to a specific start time. That admits SPREAD, an
+# unseen TOTAL, and anything else the venue adds, and it fails toward
+# INCLUSION -- which for a counter is the safe direction, because an
+# over-count is visible in the sample rows while an under-count reads as "the
+# venue does not offer this".
+_SEASON_LEVEL_TYPE_MARKERS = ("FUTURE", "CHAMPION", "AWARD", "SEASON")
 
 
 def sports_market_type(row: Mapping[str, Any]) -> str:
@@ -183,12 +206,24 @@ def is_game_market_row(row: Mapping[str, Any]) -> bool:
     """A GAME market -- the only kind a board row can join to.
 
     A future is a sports market and cannot be joined: "World Series Champion"
-    with `outcomes: ["Yes","No"]` has no game. A moneyline carries the two
-    teams (`["Titans","Chargers"]`) and a `gameStartTime` that identifies one.
-    Counting them together is how `sporting=2000` looked like a usable slate
-    while containing no joinable row at all.
+    with `outcomes: ["Yes","No"]` has no game. A moneyline or a spread carries
+    a `gameStartTime` that identifies one. Counting them together is how
+    `sporting=1644` looked like a usable slate while containing no joinable row.
+
+    Defined by EXCLUSION rather than an allowlist. See
+    `_SEASON_LEVEL_TYPE_MARKERS`: the allowlist version knew only MONEYLINE and
+    reported `games=0` on a page full of real NFL spreads.
     """
-    return is_sporting_row(row) and sports_market_type(row) == GAME_MARKET_TYPE
+    if not is_sporting_row(row):
+        return False
+    market_type = sports_market_type(row)
+    if market_type and any(m in market_type for m in _SEASON_LEVEL_TYPE_MARKERS):
+        return False
+    if market_type and any(m in market_type for m in _NON_SPORT_TYPE_MARKERS):
+        return False
+    # Tied to a specific game. A season-level market with no type would
+    # otherwise slip through on category alone.
+    return bool(str(row.get("gameStartTime") or "").strip())
 
 
 def trimmed_row(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -422,7 +457,8 @@ def fetch_markets(
         # GAME markets only -- the joinable ones. A slate of futures is a
         # sports catalogue with nothing a board row can be priced against.
         "games": len(games),
-        "futures": sum(1 for r in sporting if sports_market_type(r) == FUTURES_MARKET_TYPE),
+        "futures": sum(1 for r in sporting if not is_game_market_row(r)),
+        "game_types": _distinct(games, "sportsMarketTypeV2"),
         # THE THREE NUMBERS THAT WERE ONE. `live` is the only usable count.
         "settled": len(settled),
         "live": len(live),
