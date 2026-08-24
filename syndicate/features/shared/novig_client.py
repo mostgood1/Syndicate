@@ -46,15 +46,50 @@ actually do:
    surface, it belongs in tier 2, not smuggled in as tier 1.
 
 --------------------------------------------------------------------------
-PRICES ARE PROBABILITY, NOT AMERICAN ODDS -- BUT LESS CERTAIN THAN KALSHI'S
+PRICES ARE PROBABILITY, NOT AMERICAN ODDS -- NOW CONFIRMED ON THE WRITE SIDE TOO
 --------------------------------------------------------------------------
 
-Two independent third-party sources describe Novig's outcome `last` /
-`available` fields identically: **de-vigged probabilities** (over + under =~
-1.0), not American or decimal odds. That is what `probability_to_american`
-below assumes. Unlike Kalshi's dollars-as-probability convention (verified
-against a live response) this is corroborated-but-unread -- `probe()` exists
-so the first live call checks it rather than assuming it.
+Two independent third-party sources originally described Novig's outcome
+`last` / `available` READ fields as de-vigged probabilities (over + under =~
+1.0). **CORRECTED FROM "corroborated-but-unread" 2026-08-24**: real
+`docs.novig.com` content for the ORDER-PLACEMENT contract documents `price`
+explicitly as "decimal probability, up to 3 decimal places" -- the same
+convention, now confirmed independently on the write side rather than only
+inferred from the read side. That is what `probability_to_american` below
+assumes. `probe()` still exists to check the READ fields' exact names
+against a live response -- the unit convention is settled, the field names
+are not.
+
+--------------------------------------------------------------------------
+ORDER SIZE IS `qty` -- MINIMAL CURRENCY UNITS, NOT DOLLARS AND NOT CONTRACTS
+--------------------------------------------------------------------------
+
+CONFIRMED from the same real content: `POST /emm/orders/place` takes
+`outcomeId` (UUID), `price` (decimal probability), `qty` (positive integer,
+MINIMAL CURRENCY UNITS -- for `currency: "CASH"`, 1 unit = $0.01, so a $5.00
+order sends `qty: 500`; for `currency: "COIN"`, 1 unit = 1 Novig Coin, a
+SEPARATE, non-real-money denomination), `currency` (`"CASH"` or `"COIN"`,
+required), `tif` (`GTC`/`GTT`/`IOC`/`FOK`), and optionally `ttl` (milliseconds,
+`GTT` only) and `flags` (an 8-char metadata string). Bearer-token auth, same
+credential as the read side.
+
+**THIS IS A DIFFERENT SIZING MODEL FROM KALSHI'S, and the difference matters
+for whoever builds `novig_orders.py`.** Kalshi buys N *contracts* at a price,
+floored from a dollar stake (`kalshi_orders.contracts_for_stake`). Novig's
+`qty` is a currency amount directly -- there is no floor-to-a-whole-contract
+step, and `qty` does not depend on `price` at all. **UNRESOLVED**: whether
+`qty` represents the amount RISKED or the amount to WIN is not stated in
+anything read so far -- on a P2P exchange this is usually the risked stake
+(mirroring how a market order's `count` works on Kalshi), but that is an
+assumption carried into `novig_orders.py`'s design, not a confirmed fact,
+and it is the one thing a future live call or a direct question to Novig
+should settle before real money moves.
+
+**RATE LIMITS AND THEIR UNIT TRAP** are documented in `_MARKET_BY_ID_PATH`'s
+neighbouring comment block below -- `Retry-After` and `X-RateLimit-Reset` on
+a 429 are MILLISECONDS, not seconds, which is exactly the class of error
+(`kalshi_client`'s 100x price bug, `kalshi_auth`'s timestamp-unit assumption)
+this repo has already paid for twice.
 """
 
 from __future__ import annotations
@@ -74,34 +109,94 @@ __all__ = [
     "normalize_market",
     "load_credentials",
     "fetch_open_markets",
+    "fetch_market",
     "fetch_daily_csv",
+    "diagnose_daily_csv_403",
     "probe",
     "NovigError",
 ]
 
 # Tier 2: the official, documented, OAuth-gated REST API.
+# PROD/QA hosts CONFIRMED verbatim from real docs.novig.com content
+# 2026-08-24 -- `_API_BASE` already had the right value from earlier
+# research; `_QA_API_BASE` is new and lets a future credential be tested
+# against QA before anything touches PROD, the same caution Kalshi's demo
+# host exists for.
 _API_BASE = "https://api.novig.us/nbx/v2"
+_QA_API_BASE = "https://api-qa.novig.us/nbx/v2"
 _TOKEN_URL = "https://api.novig.us/nbx/v1/auth/emm-token"
+# UNCONFIRMED -- the real docs content obtained 2026-08-24 documented
+# `GET /emm/markets/{marketId}` (single market, see `fetch_market`) and
+# `POST /emm/orders/place`, but no "list open markets" endpoint. This path
+# is the original research-only guess, kept because refusing to page at all
+# would be a worse default than a possibly-wrong path that `fetch_open_markets`
+# already reports failures from by name.
 _MARKETS_PATH = "/emm/markets/open"
+_MARKET_BY_ID_PATH = "/emm/markets"  # CONFIRMED: {base}/emm/markets/{marketId}, GET, rate limit 128/s
+_ORDER_PLACE_PATH = "/emm/orders/place"  # CONFIRMED, see order_body() below
+_ORDER_CANCEL_PATH = "/emm/orders"  # CONFIRMED path prefix ({base}/emm/orders/{orderId}); HTTP method NOT
+# stated in the rate-limit table's row name ("Order cancellation") -- DELETE
+# is the REST convention and is what this module assumes, but it is an
+# assumption, not a read fact, unlike the path itself.
+
+# Rate limits, CONFIRMED verbatim from real docs.novig.com content 2026-08-24.
+# Not enforced by this module (no client-side throttle here) -- recorded so a
+# future novig_orders.py submitter can rate-limit itself rather than
+# discover these the way Kalshi discovered its http_429s.
+#
+#   emm/orders/place (single)         1s / 64   (the endpoint's own page says
+#                                                 "32 requests per second" --
+#                                                 BOTH numbers appear in the
+#                                                 source content and disagree;
+#                                                 note both, trust neither
+#                                                 alone, and rate-limit to the
+#                                                 lower one, 32/s, until a live
+#                                                 429 settles which is real)
+#   emm/orders/batch                  1s / 64
+#   emm/orders/{orderId} (cancel)     1s / 512
+#   emm/kill (Novig's OWN kill switch -- a venue-side panic button, distinct
+#             from this repo's execution_guard.kill_switch_engaged(); not
+#             wired to anything here yet)                       30s / 1
+#   emm/fills/all, emm/orders/all, emm/transactions              32 burst,
+#                                                                 512/60s sustained
+#   everything else                    1s / 256
+#
+# 429 RESPONSES CARRY `Retry-After` AND `X-RateLimit-Reset` IN MILLISECONDS,
+# NOT SECONDS. A value of 73 means wait 73ms. Feeding either header straight
+# into a helper that assumes HTTP's usual seconds convention is the exact
+# shape of Kalshi's 100x price error and `kalshi_auth`'s millisecond-vs-second
+# timestamp assumption -- both already burned this repo once. Any future
+# backoff logic in `novig_orders.py` must divide by 1000, explicitly, with a
+# test pinning it.
+_RATE_LIMIT_HEADERS_ARE_MILLISECONDS = True
 
 # Tier 1: the genuinely public, no-auth CSV mirror. Historical/EOD, not live.
 _DAILY_CSV_BASE = "https://data.novig.com"
 
-# The fields this module reads off a market/outcome row -- RESEARCHED from
-# convergent third-party repos referencing Novig's own GraphQL schema, never
-# read from a live response. `kalshi_client`'s first live run corrected 10 of
-# 17 field names written the identical way; treat this list with the same
-# suspicion until `probe()` runs from a host that can reach Novig.
+# The fields a `GET /emm/markets/{marketId}` row carries. CORRECTED
+# 2026-08-24 against real `docs.novig.com` page content supplied directly
+# (not search-engine paraphrase) -- the previous list (`market_type`,
+# `is_consensus`, `scheduled_start`) was RESEARCHED, not read, and none of
+# those three names exist in the real schema. The real flat fields:
+# `id`, `description`, `status` (OPEN/CLOSED/SETTLED), `type` (MONEY/SPREAD/
+# TOTAL/RUSHING_ATTEMPTS/etc -- confirming Novig lists PLAYER PROPS, not just
+# game lines), `league`, `volume`, `eventId`, `strike` (nullable), `settledAt`
+# (nullable). `outcomeIds`, `outcomes`, `event`, `player`, `playerId`,
+# `competitor` are nested/array shapes handled separately, not flattened here.
 _MARKET_FIELDS = (
     "id",
-    "league",
-    "type",
+    "description",
     "status",
-    "scheduled_start",
-    "market_type",
-    "is_consensus",
+    "type",
+    "league",
+    "volume",
+    "eventId",
     "strike",
+    "settledAt",
 )
+# Still UNVERIFIED against a live response, still `_OUTCOME_FIELDS`'
+# original research-only guess -- the pasted docs described the market object
+# and the order-placement contract, not one outcome row's own field names.
 _OUTCOME_FIELDS = ("type", "last", "available")
 
 
@@ -285,6 +380,41 @@ def fetch_open_markets(*, league: str | None = None, market_type: str = "MONEY")
     }
 
 
+def fetch_market(market_id: str) -> dict[str, Any]:
+    """ONE market, by id. CONFIRMED endpoint (`GET /emm/markets/{marketId}`,
+    real docs.novig.com content 2026-08-24) -- unlike `fetch_open_markets`'s
+    listing path, this one's existence is not a guess. Still requires the
+    same credential; still refuses by name without one.
+    """
+    creds = load_credentials()
+    if creds.get("status") != "ok":
+        return {"status": "unavailable", "reason": creds.get("reason")}
+
+    key = str(market_id or "").strip()
+    if not key:
+        return {"status": "error", "reason": "no_market_id"}
+
+    try:
+        token = _fetch_token(creds)
+    except NovigError as exc:
+        return {"status": "error", "reason": str(exc)}
+
+    url = f"{_API_BASE}{_MARKET_BY_ID_PATH}/{key}"
+    try:
+        raw_body = _get(url, headers={"Authorization": f"Bearer {token}"})
+        payload = json.loads(raw_body.decode("utf-8"))
+    except NovigError as exc:
+        return {"status": "error", "reason": str(exc), "url": url}
+    except (ValueError, UnicodeDecodeError) as exc:
+        return {"status": "error", "reason": f"undecodable_response: {exc}", "url": url}
+
+    if not isinstance(payload, Mapping):
+        return {"status": "error", "reason": f"unexpected_shape: got {type(payload).__name__}", "url": url}
+
+    market = normalize_market(payload)
+    return {"status": "ok", "url": url, "market": market}
+
+
 def fetch_daily_csv(name: str, *, timeout: float = 20.0) -> dict[str, Any]:
     """Tier 1: the genuinely public, no-auth daily CSV mirror.
 
@@ -315,6 +445,88 @@ def fetch_daily_csv(name: str, *, timeout: float = 20.0) -> dict[str, Any]:
         "columns": reader.fieldnames or [],
         "rows": rows,
     }
+
+
+def diagnose_daily_csv_403(*, timeout: float = 15.0) -> dict[str, Any]:
+    """WHY does `fetch_daily_csv` 403 -- wrong path, wrong header, or wrong
+    about "public" entirely? Tries several candidates and reports the HTTP
+    status of EACH, rather than committing to one guess.
+
+    Measured 2026-08-24T17:24:50Z: `{base}/markets.csv` (the flat, undated
+    path `fetch_daily_csv` sends) returned `http_403`. Independent research
+    since then found the product description "two anonymized files for
+    EVERY TRADING DAY" -- language that reads as one dated file per day, not
+    one evergreen file at a fixed name, which is a real candidate explanation
+    for a 403 on an object that may simply not exist at that key (common CDN/
+    object-storage behaviour: a default-deny bucket policy returns 403 for a
+    missing key rather than 404). NOT CONFIRMED -- this diagnostic exists to
+    check that hypothesis against a live response rather than rewrite
+    `fetch_daily_csv` on the strength of a search-engine paraphrase.
+
+    Deliberately separate from `fetch_daily_csv`: that function's contract
+    (one name in, one parsed CSV or a named error out) stays stable for any
+    caller while this one is free to fire several requests and report all of
+    them. Nothing here becomes the real implementation until one candidate is
+    confirmed to return real CSV content.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    today = datetime.now(timezone.utc).date()
+    # A few trading-day candidates, in case "today" itself has no file yet
+    # (weekend, or the file lands with a lag) -- tried oldest-shape-agnostic,
+    # newest date first.
+    dates = [today - timedelta(days=offset) for offset in range(0, 4)]
+
+    candidates: list[tuple[str, str]] = [("flat_no_date", f"{_DAILY_CSV_BASE}/markets.csv")]
+    for d in dates:
+        iso = d.isoformat()
+        candidates.append((f"path_date_{iso}", f"{_DAILY_CSV_BASE}/{iso}/markets.csv"))
+        candidates.append((f"suffix_date_{iso}", f"{_DAILY_CSV_BASE}/markets-{iso}.csv"))
+        candidates.append((f"nested_date_{iso}", f"{_DAILY_CSV_BASE}/markets/{iso}.csv"))
+
+    # One header variant per URL is enough to test the "WAF blocks a
+    # non-browser User-Agent" hypothesis without doubling the request count --
+    # applied to the flat path only, since that is the one candidate every
+    # source agrees should exist if the naming guesses above are all wrong.
+    header_variants = {
+        "flat_no_date": [
+            {"Accept": "text/csv", "User-Agent": "syndicate/1.0"},
+            {
+                "Accept": "text/csv,*/*",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+                ),
+            },
+        ]
+    }
+
+    results: list[dict[str, Any]] = []
+    for label, url in candidates:
+        variants = (
+            [(f"variant_{i}", h) for i, h in enumerate(header_variants[label])]
+            if label in header_variants
+            else [("default", {"Accept": "text/csv"})]
+        )
+        for header_label, headers in variants:
+            entry: dict[str, Any] = {"label": label, "header_variant": header_label, "url": url}
+            request = urllib.request.Request(url, headers=headers)
+            try:
+                with urllib.request.urlopen(request, timeout=timeout) as response:
+                    body = response.read()
+                entry["status"] = "ok"
+                entry["http_status"] = response.status
+                entry["byte_length"] = len(body)
+                entry["looks_like_csv"] = b"," in body[:200] and b"<html" not in body[:200].lower()
+            except urllib.error.HTTPError as exc:
+                entry["status"] = "error"
+                entry["http_status"] = exc.code
+            except Exception as exc:  # noqa: BLE001 -- a diagnostic must never crash the caller
+                entry["status"] = "error"
+                entry["error"] = f"{type(exc).__name__}: {exc}"
+            results.append(entry)
+
+    return {"checked_at": time.time(), "attempts": results}
 
 
 def probe(*, league: str | None = None) -> dict[str, Any]:
