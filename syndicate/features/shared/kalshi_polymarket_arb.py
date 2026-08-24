@@ -1,0 +1,465 @@
+"""Detect price divergence between Kalshi and Polymarket US on the SAME
+two-team moneyline -- the piece the user asked for once both venues had a
+real, joinable catalogue.
+
+--------------------------------------------------------------------------
+DETECTION ONLY. NOTHING HERE PLACES AN ORDER, ON EITHER VENUE.
+--------------------------------------------------------------------------
+
+This module reports where two venues disagree on the same bet, with enough
+detail (both raw prices, the fee assumption, the join path) for a human to
+decide whether to act on it. Turning a detected gap into two real orders is a
+separate, harder problem -- it needs BOTH fills to land (a one-sided fill is
+not an arb, it is a naked position) and neither venue's order module is wired
+to this one. That is future work, explicitly not started here.
+
+--------------------------------------------------------------------------
+WHY MONEYLINE, AND ONLY MONEYLINE
+--------------------------------------------------------------------------
+
+Measured 2026-08-24T20:46:21Z (`.syndicate/deploys.md`): `sportsMarketTypeV2`
+carried exactly ONE value across 2,000 real Polymarket US rows --
+`SPORTS_MARKET_TYPE_MONEYLINE`. No spread, no total. So a spread/total
+comparison is not merely unbuilt, it is currently unobservable on this venue
+-- there is nothing on the Polymarket side to join a Kalshi spread to. This
+module scopes to moneyline because that is what actually exists to compare,
+not as a first phase of something wider that has been designed already.
+
+--------------------------------------------------------------------------
+THE JOIN IS DRIVEN FROM KALSHI'S SIDE, ON PURPOSE
+--------------------------------------------------------------------------
+
+Kalshi's own event identity (which two teams, which game) is resolved from
+`event_blob_from_ticker`/`match_event_blob` against Syndicate's OWN board
+rows (`pipeline.intelligence_state.read_layer2_shortlist`) -- the same
+resolver `kalshi_board_join.py` already uses for game lines, reused rather
+than reimplemented so a fix to alias matching there is not silently missed
+here.
+
+Polymarket's `slug` (`aec-nfl-lac-ten-2025-11-02`) is NOT parsed for team
+identity or order, deliberately -- ONE real example is not a grammar, and
+guessing which slug position is home vs away from a sample of one is exactly
+the mistake `kalshi_board_join.py`'s own header describes Kalshi costing a
+full day on. `outcomes` (real team names, e.g. `["Titans","Chargers"]`) is
+used instead, matched by NAME through `team_aliases.canonical_team` -- the
+same resolver, same alias maps, both venues. The two Polymarket outcomes are
+compared as a SET against Kalshi's resolved (home, away) set, then assigned to
+home/away individually by name -- never by array position, matching the
+"never assume positional order" rule `kalshi_board_join._side_for_team`
+already documents for exactly this class of bug.
+
+--------------------------------------------------------------------------
+FEES ARE A CONSERVATIVE PLACEHOLDER, NOT A MEASURED SCHEDULE
+--------------------------------------------------------------------------
+
+Neither venue's real fee formula is in this codebase. Kalshi's was measured
+at ~1.9% on exactly ONE real fill (`.syndicate/deploys.md`, elsewhere this
+session) -- a data point, not a schedule. Polymarket US carries a per-market
+`feeCoefficient`, but its UNITS have never been observed against a real trade
+(percentage? bps? a raw multiplier?), so this module does NOT compute a
+precise net-of-fees edge from it. Every opportunity is reported at TWO tiers:
+`raw_edge` (the price gap before any fee -- real, but overstates what is
+capturable) and `edge_after_buffer` (after `DEFAULT_FEE_BUFFER`, a single
+conservative placeholder covering both venues' unknown costs combined). Only
+`edge_after_buffer` should be read as an actionable signal, and even that
+needs a human to verify real fees before anything gets executed on it.
+`feeCoefficient` rides on the output raw, unconverted, so a reviewer can
+sanity-check it against a real fill once one exists.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any, Mapping, Sequence
+
+__all__ = [
+    "KalshiPolymarketArbError",
+    "DEFAULT_FEE_BUFFER",
+    "resolve_kalshi_moneylines",
+    "resolve_polymarket_moneylines",
+    "join_kalshi_polymarket_moneylines",
+    "detect_arb_opportunities",
+    "run_arb_scan",
+]
+
+_MONEYLINE_TYPE = "SPORTS_MARKET_TYPE_MONEYLINE"
+
+# See the module header's FEES section. This is NOT a measured number for
+# either venue -- it exists so a raw price gap smaller than typical combined
+# vig/fees is not reported as though it were capturable.
+DEFAULT_FEE_BUFFER = 0.04
+
+
+class KalshiPolymarketArbError(RuntimeError):
+    """Raised only where continuing would report a result never actually
+    computed from real inputs."""
+
+
+def resolve_kalshi_moneylines(
+    kalshi_markets: Sequence[Mapping[str, Any]],
+    board_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Every Kalshi moneyline market, resolved to a real game.
+
+    Returns `{"markets": [...], "refusals": {reason: count}}` -- a market
+    that is not a moneyline at all is simply not counted (most of Kalshi's
+    catalogue is props; that is not a refusal, it is the wrong question for
+    this scan). A moneyline that IS found but cannot be resolved to a real
+    game, dated, or priced counts under a named refusal, same discipline
+    `join_kalshi_to_board` uses for the identical reason: "Kalshi has nothing
+    to compare" and "our resolver is broken" must never share a number.
+    """
+    from syndicate.features.shared.kalshi_board_join import _side_for_team
+    from syndicate.features.shared.kalshi_catalogue import (
+        GRAMMAR_MONEYLINE,
+        classify_market,
+        event_blob_from_ticker,
+        game_date_from_ticker,
+        match_event_blob,
+    )
+    from syndicate.features.shared.opportunity_signals import implied_probability
+
+    # Candidate games per sport, deduped by event_id -- the same shape
+    # `kalshi_board_join._resolve_event` builds from board rows.
+    games_by_sport: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in board_rows or []:
+        sport = str(row.get("sport") or "").strip().lower()
+        event_id = str(row.get("event_id") or "").strip()
+        if not sport or not event_id:
+            continue
+        games_by_sport.setdefault(sport, {}).setdefault(
+            event_id,
+            {
+                "event_id": event_id,
+                "home_team": row.get("home_team"),
+                "away_team": row.get("away_team"),
+            },
+        )
+
+    resolved: list[dict[str, Any]] = []
+    reasons: dict[str, int] = {}
+
+    def _refuse(reason: str) -> None:
+        reasons[reason] = reasons.get(reason, 0) + 1
+
+    for market in kalshi_markets or []:
+        verdict = classify_market(market)
+        if verdict.get("status") != "ok" or verdict.get("grammar") != GRAMMAR_MONEYLINE:
+            continue
+
+        sport = verdict.get("sport")
+        blob = event_blob_from_ticker(verdict.get("ticker"))
+        if not blob:
+            _refuse("no_blob")
+            continue
+
+        games = list((games_by_sport.get(sport) or {}).values())
+        resolution = match_event_blob(blob, games, sport=sport)
+        if resolution.get("status") != "ok":
+            _refuse(f"event_{resolution.get('status') or 'unresolved'}")
+            continue
+
+        game_date = game_date_from_ticker(verdict.get("ticker"))
+        if not game_date:
+            _refuse("undatable")
+            continue
+
+        side = _side_for_team(verdict.get("subject"), resolution, sport=sport)
+        if side is None:
+            _refuse("team_side_unresolved")
+            continue
+
+        named_probability = implied_probability(market.get("yes_american"))
+        other_probability = implied_probability(market.get("no_american"))
+        if named_probability is None:
+            _refuse("no_price")
+            continue
+
+        if side == "home":
+            home_probability, away_probability = named_probability, other_probability
+        else:
+            away_probability, home_probability = named_probability, other_probability
+
+        resolved.append(
+            {
+                "sport": sport,
+                "event_id": resolution["event_id"],
+                "home_team": resolution["home_team"],
+                "away_team": resolution["away_team"],
+                "game_date": game_date,
+                "home_probability": home_probability,
+                "away_probability": away_probability,
+                "ticker": verdict.get("ticker"),
+            }
+        )
+
+    return {"markets": resolved, "refusals": reasons}
+
+
+def _decode_list(value: Any) -> list[Any] | None:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except (TypeError, ValueError):
+            return None
+        return decoded if isinstance(decoded, list) else None
+    return None
+
+
+def resolve_polymarket_moneylines(markets: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Every Polymarket US moneyline row, with its two teams and prices.
+
+    Input is `polymarket_us_markets.trimmed_row` output (or the raw venue
+    row -- both carry the same field names). Does NOT filter live/settled
+    itself -- pass `drop_settled=True` to the caller that built `markets`
+    (`polymarket_us_markets.fetch_markets`), since that module already owns
+    the settled/live distinction and reimplementing it here risks the two
+    drifting apart.
+    """
+    resolved: list[dict[str, Any]] = []
+    reasons: dict[str, int] = {}
+
+    def _refuse(reason: str) -> None:
+        reasons[reason] = reasons.get(reason, 0) + 1
+
+    for row in markets or []:
+        if row.get("sportsMarketTypeV2") != _MONEYLINE_TYPE:
+            continue
+
+        outcomes = _decode_list(row.get("outcomes"))
+        prices = _decode_list(row.get("outcomePrices"))
+        if not (isinstance(outcomes, list) and isinstance(prices, list)):
+            _refuse("outcomes_undecodable")
+            continue
+        if len(outcomes) != 2 or len(prices) != 2:
+            _refuse(f"not_two_sided:{len(outcomes)}v{len(prices)}")
+            continue
+
+        try:
+            price_a = float(prices[0])
+            price_b = float(prices[1])
+        except (TypeError, ValueError):
+            _refuse("bad_price")
+            continue
+        if not (0.0 < price_a < 1.0 and 0.0 < price_b < 1.0):
+            _refuse("price_out_of_range")
+            continue
+
+        game_start = str(row.get("gameStartTime") or "")
+        game_date = game_start[:10] if len(game_start) == 20 and game_start[10] == "T" else None
+        if not game_date:
+            _refuse("no_game_start")
+            continue
+
+        resolved.append(
+            {
+                "market_id": row.get("id"),
+                "teams": [(outcomes[0], price_a), (outcomes[1], price_b)],
+                "game_date": game_date,
+                "fee_coefficient": row.get("feeCoefficient"),
+                "tick": row.get("orderPriceMinTickSize"),
+                "min_qty": row.get("minimumTradeQty"),
+                "status": row.get("status"),
+            }
+        )
+
+    return {"markets": resolved, "refusals": reasons}
+
+
+def join_kalshi_polymarket_moneylines(
+    kalshi_resolved: Sequence[Mapping[str, Any]],
+    polymarket_resolved: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Pair each resolved Kalshi moneyline with the Polymarket moneyline for
+    the SAME game -- matched by team identity + date, never by slug position
+    (see module header). A Kalshi game with no Polymarket counterpart, or vice
+    versa, is expected and common; only genuine ambiguity (two Polymarket
+    rows matching the same Kalshi game) is refused rather than guessed at.
+
+    **REUSES `kalshi_board_join._side_for_team` FOR THE MATCH ITSELF, NOT
+    `team_aliases.canonical_team` DIRECTLY.** `canonical_team` needs a name
+    the alias map's keys actually contain -- codes or full names ("CWS",
+    "chicago white sox") -- and Polymarket's real `outcomes` field carries
+    bare NICKNAMES ("Titans", "Chargers"), which `canonical_team` returns
+    `None` for. `_side_for_team` already solves exactly this (it is how
+    Kalshi's own city-only titles, "Texas wins?", get resolved against a
+    game's two full names) via a token-subset match, so it is reused here
+    rather than re-solving the identical problem with a function that does
+    not handle it.
+    """
+    from syndicate.features.shared.kalshi_board_join import _side_for_team
+
+    by_date: dict[str, list[Mapping[str, Any]]] = {}
+    for row in polymarket_resolved or []:
+        by_date.setdefault(row["game_date"], []).append(row)
+
+    matches: list[dict[str, Any]] = []
+    reasons: dict[str, int] = {}
+
+    def _refuse(reason: str) -> None:
+        reasons[reason] = reasons.get(reason, 0) + 1
+
+    for k in kalshi_resolved or []:
+        sport = k["sport"]
+        resolution = {"home_team": k["home_team"], "away_team": k["away_team"]}
+
+        hits = []
+        for p in by_date.get(k["game_date"], []):
+            sides = {_side_for_team(name, resolution, sport=sport) for name, _ in p["teams"]}
+            if sides == {"home", "away"}:
+                hits.append(p)
+        if not hits:
+            _refuse("no_polymarket_match")
+            continue
+        if len(hits) > 1:
+            _refuse("ambiguous_polymarket_match")
+            continue
+        p = hits[0]
+
+        # WHICH polymarket outcome is home vs away -- by NAME (via
+        # `_side_for_team`), never position.
+        home_probability_pm = away_probability_pm = None
+        for name, price in p["teams"]:
+            side = _side_for_team(name, resolution, sport=sport)
+            if side == "home":
+                home_probability_pm = price
+            elif side == "away":
+                away_probability_pm = price
+        if home_probability_pm is None or away_probability_pm is None:
+            _refuse("polymarket_side_unresolved")
+            continue
+
+        matches.append(
+            {
+                "sport": sport,
+                "event_id": k["event_id"],
+                "home_team": k["home_team"],
+                "away_team": k["away_team"],
+                "game_date": k["game_date"],
+                "kalshi_home_probability": k["home_probability"],
+                "kalshi_away_probability": k["away_probability"],
+                "kalshi_ticker": k["ticker"],
+                "polymarket_home_probability": home_probability_pm,
+                "polymarket_away_probability": away_probability_pm,
+                "polymarket_market_id": p["market_id"],
+                "polymarket_fee_coefficient": p["fee_coefficient"],
+                "polymarket_tick": p["tick"],
+                "polymarket_min_qty": p["min_qty"],
+            }
+        )
+
+    return {"matches": matches, "refusals": reasons}
+
+
+def detect_arb_opportunities(
+    matches: Sequence[Mapping[str, Any]],
+    *,
+    fee_buffer: float = DEFAULT_FEE_BUFFER,
+) -> list[dict[str, Any]]:
+    """For every matched game, the cost of buying the complementary sides on
+    opposite venues -- both cross-venue combinations, since either could be
+    the cheap one.
+
+    A combo's cost under 1.0 is a raw arithmetic edge (buy both sides, one is
+    guaranteed to pay $1, total cost is `combo`). `fee_buffer` is subtracted
+    from 1.0 before comparing -- see module header: this is a conservative
+    placeholder, not either venue's real fee schedule, and a flagged
+    opportunity still needs manual fee verification before anything acts on
+    it. Every match is returned (not just flagged ones), each carrying both
+    combo costs and whether either cleared the buffered threshold -- so a
+    caller can see how close a near-miss was, not just a binary yes/no.
+    """
+    threshold = 1.0 - float(fee_buffer)
+    results: list[dict[str, Any]] = []
+    for m in matches:
+        combo_home_kalshi = m["kalshi_home_probability"] + m["polymarket_away_probability"]
+        combo_away_kalshi = m["kalshi_away_probability"] + m["polymarket_home_probability"]
+
+        best_combo, best_cost = (
+            ("home_on_kalshi_away_on_polymarket", combo_home_kalshi)
+            if combo_home_kalshi <= combo_away_kalshi
+            else ("away_on_kalshi_home_on_polymarket", combo_away_kalshi)
+        )
+        results.append(
+            {
+                **m,
+                "combo_home_on_kalshi_away_on_polymarket": combo_home_kalshi,
+                "combo_away_on_kalshi_home_on_polymarket": combo_away_kalshi,
+                "best_combo": best_combo,
+                "best_combo_cost": best_cost,
+                "raw_edge": 1.0 - best_cost,
+                "edge_after_buffer": threshold - best_cost,
+                "is_opportunity": best_cost < threshold,
+                "fee_buffer_used": fee_buffer,
+            }
+        )
+    return results
+
+
+def run_arb_scan(
+    *,
+    selected_date: str,
+    fee_buffer: float = DEFAULT_FEE_BUFFER,
+) -> dict[str, Any]:
+    """The end-to-end scan for one slate date: reads Kalshi's persisted
+    catalogue and the board's own rows (both already-computed artifacts, no
+    new fetch), then calls Polymarket US's catalogue LIVE (the one piece with
+    no standing artifact yet) via `polymarket_us_markets.fetch_markets` --
+    read-only import, never touches `polymarket_us_orders`.
+
+    Never raises for a missing input -- reports which stage is empty by name,
+    same discipline every artifact-dependent function in this lane uses,
+    because "Kalshi has no markets today" and "the artifact read failed" need
+    to stay distinguishable.
+    """
+    from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
+    try:
+        from pipeline.intelligence_state import read_layer2_shortlist
+
+        shortlist = read_layer2_shortlist(selected_date)
+    except Exception as exc:
+        return {"status": "error", "reason": f"shortlist_read_failed: {type(exc).__name__}: {exc}"}
+    board_rows = (shortlist or {}).get("rows")
+    if not isinstance(board_rows, list):
+        return {"status": "error", "reason": "no_board_rows", "date": selected_date}
+
+    try:
+        kalshi_payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
+    except Exception as exc:
+        return {"status": "error", "reason": f"kalshi_artifact_read_failed: {type(exc).__name__}: {exc}"}
+    kalshi_markets = (kalshi_payload or {}).get("markets")
+    if not isinstance(kalshi_markets, list):
+        return {"status": "error", "reason": "no_kalshi_markets"}
+
+    try:
+        from syndicate.features.shared import polymarket_us_markets
+
+        pm_result = polymarket_us_markets.fetch_markets(open_only=True, drop_settled=True, max_pages=1)
+    except Exception as exc:
+        return {"status": "error", "reason": f"polymarket_fetch_failed: {type(exc).__name__}: {exc}"}
+    if pm_result.get("status") != "ok":
+        return {"status": "error", "reason": f"polymarket_fetch_not_ok: {pm_result.get('reason')}"}
+    polymarket_rows = pm_result.get("markets") or []
+
+    kalshi_resolved = resolve_kalshi_moneylines(kalshi_markets, board_rows)
+    polymarket_resolved = resolve_polymarket_moneylines(polymarket_rows)
+    joined = join_kalshi_polymarket_moneylines(kalshi_resolved["markets"], polymarket_resolved["markets"])
+    opportunities = detect_arb_opportunities(joined["matches"], fee_buffer=fee_buffer)
+
+    flagged = [o for o in opportunities if o["is_opportunity"]]
+    return {
+        "status": "ok",
+        "date": selected_date,
+        "kalshi_moneylines_resolved": len(kalshi_resolved["markets"]),
+        "kalshi_refusals": kalshi_resolved["refusals"],
+        "polymarket_moneylines_resolved": len(polymarket_resolved["markets"]),
+        "polymarket_refusals": polymarket_resolved["refusals"],
+        "matched_games": len(joined["matches"]),
+        "join_refusals": joined["refusals"],
+        "opportunities": opportunities,
+        "flagged_count": len(flagged),
+        "fee_buffer_used": fee_buffer,
+    }
