@@ -5745,3 +5745,48 @@ not contain my work. It did.
 object exists (`git cat-file -t`) first, and let the error surface. A tool that
 cannot answer must not be allowed to answer "no" — the two are different, and on
 a deploy check the wrong one triggers a needless redeploy or a revert war.
+
+## 2026-08-24 — A PRE-FLIGHT CHECK DOES NOT SURVIVE A TURN BOUNDARY. Three times in one session.
+
+Three deploys of `live-odds-worker` / `refresh-worker` fired on a stale
+"is anything live" reading and/or an expired `deploy_claim`:
+
+| fired | check was taken | gap | claim age at fire |
+|---|---|---|---|
+| 2026-08-23 19:23Z | 19:35Z (same turn) | ok | ok |
+| 2026-08-23 22:42Z | 19:35Z | **3h 07m** | expired 219 min |
+| 2026-08-24 14:43Z | **2026-08-24 01:34Z** | **13h 09m** | expired **790 min** |
+
+**All three were harmless, and that is luck, not process.** `live_events=0` held
+each time. The third is the one that proves the mechanism, because I had written
+the check into the reminder *specifically to prevent this* — step 1 was "check
+`live_events` IMMEDIATELY before firing — not a stale reading". I ran it, it
+said `post=4`, and then the session sat idle for thirteen hours between that
+tool call and the deploy call. **Following the instruction perfectly still
+produced a 13-hour-stale check.**
+
+**RULE: freshness is measured in TURNS, not in intent.** An agent session can
+idle for an unbounded time between any two tool calls, so "immediately before"
+is not something the agent can promise by ordering its own steps. Only two
+things actually establish it:
+
+1. **Re-read the guard in the same assistant turn that issues the deploy**, with
+   no user message, no notification, and no background-task wake in between. If
+   anything intervenes, the reading is void — re-take it.
+2. **Re-check the claim's REMAINING TTL at fire time**, never its age at
+   acquisition. `deploy_claim.py status` prints it; `acquire` returning a token
+   proves nothing about the moment you deploy.
+
+**COROLLARY, and it is the load-bearing half: a scheduled check-in cannot carry
+a pre-flight in its prompt.** The reminder that fired at 01:34Z listed the check
+as step 1 and the deploy as step 3, and the gap opened *between the steps*. A
+wake-up prompt can carry the INTENT to deploy; the safety reading has to be
+re-taken by the turn that actually fires, or it is decoration. Write scheduled
+prompts so the check and the fire are one step, and so a failed or stale check
+re-schedules rather than proceeds.
+
+**Why this outranks "just be careful":** `deploy_preflight.py` exists to enforce
+exactly this and has been unable to run all session (`RENDER_API_KEY not set`).
+With the real gate dead, the by-hand substitute inherited a property the gate
+does not have — it can go stale silently — and nothing in the environment
+reports that. Three for three.

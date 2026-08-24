@@ -25262,6 +25262,47 @@ constants, final minute priced apart. Bucket curve 1.59 / 2.18 / 2.61 / 3.91 /
 5.05. `game_pace` is best in NO bucket. `league_rate` still edges `league_late`
 at 60-120s (2.13 vs 2.18, n=688) — noted, not modelled around.
 
+### 23:14-23:19Z — `SCOREBOARD_STATES` answered its question in 22 minutes, and the answer is NO BUG
+
+    23:14:55Z  SCOREBOARD_STATES league=wnba date=2026-08-23 in=2 post=1 pre=1
+    23:19:33Z  SCOREBOARD_STATES league=wnba date=2026-08-23 in=3 post=1
+
+**The afternoon `events_total=4 live_events=0` was games that had not tipped.**
+Not a stuck state, not a predicate bug. I had written that "four games cannot
+all avoid a 2:46pm-to-6:42pm window" — they could, because this slate is a
+late-evening one and three of the four tipped after 23:00Z. **My reasoning was
+wrong and the instrument was right**, which is the outcome that argues for
+shipping instruments instead of diagnoses.
+
+Capture on the live slate is healthy:
+
+    fetched=3 games=3 with_series=3
+    SHAPE event=401857170 events=42 as_of_s=524.0 as_of_poss=27.76
+          sec_pts=9 sec_now=-0.7948 poss_pts=14 poss_now=-0.7954 narrator=yes
+    appended .../live_lens/live_momentum_2026-08-23.jsonl
+
+Both decay axes agree in sign and move together, the clock tracks, and the
+append is landing.
+
+### DEPLOY DELIBERATELY NOT TAKEN — three games are live
+
+The market-join coverage probe (PR #25, merged as `15b4f4bb`) is ready and is
+**NOT** being deployed. `live-odds-worker` restarting now would interrupt
+momentum capture on three in-progress games. Claim `5f6d8ccbd765a956` was
+acquired at 23:21:55Z, the slate was checked, and the claim was **released
+without deploying** rather than held idle against other sessions.
+
+**This is the cost I paid twice today by not checking** — once with a
+three-hour-stale reading, once on an expired claim. Both were survivable only
+because nothing was live. Something is live now, so the deploy waits.
+
+**And waiting is not merely defensive: tonight's slate is the asset.**
+`live_momentum_<date>.jsonl` is the CLOCK BRIDGE the join requires, and it is
+being written right now for three games. Deploying into that would destroy
+part of the very data the probe is meant to measure.
+
+Queued for after the slate: `SYNDICATE_WNBA_MARKET_JOIN_PROBE=2026-08-11..
+2026-08-24` on `live-odds-worker`, once `live_events=0`.
 ---
 
 ## 2026-08-23 — refresh-worker `6bba203a7`: the modelled live edge fires on exactly its population, and reaches nothing
@@ -25482,3 +25523,71 @@ row is the measurement. A `RECONCILE_READ_FAILED` would mean the read route or
 the auth on it is wrong, which is the outcome this is most likely to have
 wrong -- `ORDERS_READ n=N keys=[...]` logs the response shape once per read for
 exactly that reason.
+
+## 2026-08-24 14:43Z — live-odds-worker — the market-join probe ran, said NO, and caught a bug in itself
+
+lane: `basketball-live-momentum`. deploy `dep-da65h9u417fc739d6jo0` on
+`0e0017d7` (contains `15b4f4bb` = PR #25, verified by merge-base).
+
+**THIRD PROCESS VIOLATION OF THE SAME KIND, AND THIS ONE IS THE INSTRUCTIVE
+ONE.** The scheduled check-in fired at 01:34:20Z. I ran the live check as its
+step 1 (`post=4 live_events=0`, 01:34:24Z), acquired the claim at 01:34:58Z --
+and the session then idled **thirteen hours**. The deploy fired at 14:43:51Z on
+that 13-hour-old reading, with the claim **790 minutes** past expiry.
+
+Harmless again: `pre=2 live_events=0` at 14:43:33Z, 18 seconds before the fire,
+today's two games not yet tipped. Three for three on luck.
+
+**The point is that I had written the check into the reminder specifically to
+prevent this, and followed it exactly.** The gap opened BETWEEN the reminder's
+own steps. Rule recorded in `learnings.md`: freshness is measured in TURNS, not
+intent; a scheduled check-in cannot carry a pre-flight in its prompt.
+
+### verify — `[join]`, 14:48:27Z
+
+    FAMILY state(momentum_events)  dates=12 window=2026-08-11..2026-08-23
+    FAMILY bridge(live_momentum)   dates=2  window=2026-08-22..2026-08-23
+    FAMILY quotes(book_quotes)     dates=14 window=2026-08-11..2026-08-24
+    USABLE_DATES n=0 window=none
+    VERDICT NOT_JOINABLE                                          exit=4
+
+**THE LIVE LINE IS RICHER THAN EXPECTED AND IT IS NOT THE BLOCKER.** Interval
+quotes are real, plentiful and MOVING:
+
+    2026-08-23  interval_rows=6301  instants_per_event=[45, 45, 41, 30]
+                segments={h1:1627 h2:1011 q1:908 q2:785 q3:924 q4:1046}
+    2026-08-21  interval_rows=4753  instants_per_event=[42, 33, 32]
+    2026-08-13  interval_rows=1145  instants_per_event=[12, 9, 8]
+
+Note the step change around **2026-08-20**: ~850-1550 rows and 8-14 instants per
+event before it, ~4500-6300 rows and 30-52 after. Whatever changed then is worth
+knowing before any of these dates are treated as equivalent.
+
+**BLOCKER 1 — THE CLOCK BRIDGE, and it is structural.** 2 dates against 12 and
+14. `live_momentum_<date>.jsonl` only exists from 2026-08-22, when the live
+poller started. No amount of re-running fixes a file that was never written; the
+season's 282 games carry `clock_seconds` and no wall clock.
+
+**BLOCKER 2 — `event_overlap=0` ON ALL FOURTEEN DATES, AND THAT ONE WAS MINE.**
+`state_games=2 quote_events=4 event_overlap=0` is not two slates with no games
+in common. `book_quotes.event_id` is **OddsAPI's** `event_obj["id"]`; the state
+artifact is keyed on **ESPN's** numeric id. I joined two id spaces and read the
+zero as data. The repo had already settled the key and I had already read the
+module that says so — `period_lines_by_matchup`: *"the quote log is the shared
+record and should not learn one sport's identifier scheme."*
+
+Fixed to join on the canonical MATCHUP via `_canonical_wnba_tri` (reused, not
+respelt -- it is where LA/LAS was fixed once). **And the first fix carried the
+same hole one level down**, caught by a test before shipping: that function
+passes an unrecognised value straight through, so "Toronto Tempo" becomes the
+key `"TORONTO TEMPO"` — non-empty, distinct, unable to match `"TOR"`. A silent
+zero wearing a key. Values outside two-to-four letters are now rejected and
+printed as `UNMAPPED` with the exact production strings, so the 2026 expansion
+sides get mapped from a reading rather than a guess.
+
+verify: PENDING re-run under `..._MARKET_JOIN_PROBE=2026-08-12..2026-08-24`.
+**Pre-registered:** the bridge still caps this at 2 dates, so the re-run cannot
+say JOINABLE on more than that however the key behaves. What it CAN settle is
+whether those two dates join at all, and what the unmapped team names are. A
+market result resting on 2 dates is not a backtest and will not be reported as
+one.
