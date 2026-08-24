@@ -796,6 +796,39 @@ def _polymarket_us_auth_probe_at_boot() -> None:
         )
 
 
+def _print_param_probe(pm) -> None:
+    """Which `/v1/markets` query params the venue honours. DIAGNOSTIC.
+
+    Behind `SYNDICATE_POLYMARKET_US_PARAM_PROBE=1` because it costs ~25 signed
+    calls and it has already answered its question: `closed=false` is the
+    filter that reaches the current slate. Kept because the same technique
+    settles the next unknown parameter cheaply.
+
+    Read `control=` FIRST. Measured 2026-08-24T20:56:41Z it came back
+    `ignored`, meaning this API silently discards unknown query params -- so
+    every `ignored` verdict is uninformative and only `honoured` rows carry
+    information. That is why the control exists.
+    """
+    params = pm.probe_market_query_params()
+    print(
+        f"[live_odds_worker] POLYMARKET_US_PARAMS status={params.get('status')}"
+        f" control={params.get('control_outcome')}"
+        f" ignored_is_meaningful={params.get('ignored_is_meaningful')}"
+        f" honoured={params.get('honoured')}"
+        f" rejected={params.get('rejected')}"
+        f" baseline={params.get('baseline')}"
+        f" reason={params.get('reason')}",
+        flush=True,
+    )
+    for label, row in (params.get("results") or {}).items():
+        if row.get("outcome") == "honoured":
+            print(
+                f"[live_odds_worker] POLYMARKET_US_PARAM_HIT {label}"
+                f" query={row.get('query')!r} signature={row.get('signature')}",
+                flush=True,
+            )
+
+
 def _polymarket_us_slate_probe_at_boot() -> None:
     """What the US venue actually lists for sport, by SHAPE.
 
@@ -898,34 +931,11 @@ def _polymarket_us_slate_probe_at_boot() -> None:
                 flush=True,
             )
 
-        # WHICH QUERY PARAMS DOES `/v1/markets` HONOUR? The blocker is that
-        # 2,000 rows deep the window is still 2025-10..2026-01 while today is
-        # 2026-08 -- today's slate is ~6,000-8,000 rows in, and a filter or a
-        # sort would make that one request instead of ~16 pages every boot.
-        #
-        # Read `control=` FIRST. If the bogus param is `ignored` rather than
-        # `rejected`, this API silently discards unknown query params and NO
-        # `ignored` verdict below carries information.
-        params = pm.probe_market_query_params()
-        print(
-            f"[live_odds_worker] POLYMARKET_US_PARAMS status={params.get('status')}"
-            f" control={params.get('control_outcome')}"
-            f" ignored_is_meaningful={params.get('ignored_is_meaningful')}"
-            f" honoured={params.get('honoured')}"
-            f" rejected={params.get('rejected')}"
-            f" baseline={params.get('baseline')}"
-            f" reason={params.get('reason')}",
-            flush=True,
-        )
-        # Only the ones that DID something, with what they returned -- the
-        # ignored ones are the bulk and say nothing worth a line each.
-        for label, row in (params.get("results") or {}).items():
-            if row.get("outcome") == "honoured":
-                print(
-                    f"[live_odds_worker] POLYMARKET_US_PARAM_HIT {label}"
-                    f" query={row.get('query')!r} signature={row.get('signature')}",
-                    flush=True,
-                )
+        # WHICH QUERY PARAMS DOES `/v1/markets` HONOUR?
+        # ANSWERED 2026-08-24T20:56:41Z: `closed=false`. `fetch_markets` sends
+        # it now, so this is behind a flag rather than ~25 signed calls a boot.
+        if (os.environ.get("SYNDICATE_POLYMARKET_US_PARAM_PROBE") or "").strip() == "1":
+            _print_param_probe(pm)
 
         # THE LEGACY `/v1` SPORTS ROUTES, which are NOT covered by the 404
         # above. Only `/v1/sports/teams/provider` was tested -- the `provider`

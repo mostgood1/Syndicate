@@ -860,3 +860,66 @@ def test_absent_credentials_are_named(monkeypatch):
 
     monkeypatch.setattr(auth, "credentials_present", lambda: False)
     assert mod.probe_market_query_params()["reason"] == "credentials_absent"
+
+
+# ==========================================================================
+# `closed=false`, NOT `active=true` -- the filter that reaches today
+# ==========================================================================
+
+
+def test_the_live_filter_is_closed_false(monkeypatch):
+    """MEASURED 2026-08-24T20:56:41Z: `closed=false` returned row id 7898 with
+    gameStartTime 2026-09-07 and status MARKET_STATUS_OPEN in ONE request,
+    where the unfiltered query was still in 2025-11 two thousand rows deep."""
+    seen: list[str] = []
+
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        seen.append(url)
+        return {"markets": []}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    mod.fetch_markets()
+    assert "closed=false" in seen[0]
+    # And `active` is NOT sent by default: it is the server default anyway and
+    # returns RESOLVED rows, which is what made 500 settled games look healthy.
+    assert "active=" not in seen[0]
+
+
+def test_active_is_only_sent_when_explicitly_asked_for(monkeypatch):
+    """`active` stays reachable for diagnostics -- it is a real parameter, just
+    not the one that means "tradeable" on this venue."""
+    seen: list[str] = []
+
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request",
+                        lambda _m, url, **_k: seen.append(url) or {"markets": []})
+    mod.fetch_markets(active=False)
+    assert "active=false" in seen[0]
+    seen.clear()
+    mod.fetch_markets(active=True)
+    assert "active=true" in seen[0]
+
+
+def test_the_live_filter_can_be_turned_off_to_see_everything(monkeypatch):
+    seen: list[str] = []
+
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request",
+                        lambda _m, url, **_k: seen.append(url) or {"markets": []})
+    mod.fetch_markets(open_only=False)
+    assert "closed=" not in seen[0]
+
+
+def test_the_open_status_value_is_recorded():
+    """Observed in the same response. Useful for READING rows -- `status=` as a
+    query param is not honoured, so it cannot filter."""
+    assert mod.MARKET_STATUS_OPEN == "MARKET_STATUS_OPEN"
+    assert mod.is_settled_row(_row(status=mod.MARKET_STATUS_OPEN)) is False

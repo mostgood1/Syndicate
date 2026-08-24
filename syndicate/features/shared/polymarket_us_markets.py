@@ -79,6 +79,7 @@ from typing import Any, Iterable, Mapping
 __all__ = [
     "fetch_markets",
     "is_settled_row",
+    "MARKET_STATUS_OPEN",
     "fetch_league_slate",
     "fetch_teams",
     "probe_v1_sports_routes",
@@ -207,10 +208,31 @@ def _game_start(row: Mapping[str, Any]) -> str:
     return str(row.get("gameStartTime") or "")
 
 
+# MEASURED 2026-08-24T20:56:41Z. `closed=false` is the filter that reaches the
+# CURRENT slate: one request returned row id 7898 with
+# `gameStartTime=2026-09-07` and `status=MARKET_STATUS_OPEN`, where the
+# unfiltered query was still in 2025-11 two thousand rows deep.
+#
+# `active` is NOT that filter and is actively misleading here. `active=true` is
+# the server default (it returned the identical signature to no param at all)
+# and yields MARKET_STATUS_RESOLVED rows; `active=false` yields resolved rows
+# from a different window. So on this venue `active` does not mean "tradeable"
+# and `closed` is the field that does -- which is why 500 settled games came
+# back under `active=true` and looked like a healthy slate.
+_LIVE_FILTER = "closed=false"
+
+# The open-status value, finally observed in that same response. Recorded
+# because `status=` as a QUERY PARAM is not honoured (see
+# `probe_market_query_params`), so this is useful for reading rows, not for
+# filtering them.
+MARKET_STATUS_OPEN = "MARKET_STATUS_OPEN"
+
+
 def fetch_markets(
     *,
     limit: int = _DEFAULT_LIMIT,
-    active: bool = True,
+    open_only: bool = True,
+    active: bool | None = None,
     offset: int = 0,
     max_pages: int = 1,
     drop_settled: bool = False,
@@ -235,7 +257,19 @@ def fetch_markets(
 
     `drop_settled` filters them out; it is OFF by default so a caller that has
     not thought about it gets the full picture rather than a silently narrowed
-    one, and the `settled` count is always reported either way.
+    one, and the `settled` count is always reported either way. It is now a
+    SECOND line of defence rather than the primary one: `open_only` sends
+    `closed=false`, which is the filter the venue actually honours.
+
+    --------------------------------------------------------------------------
+    `closed`, NOT `active`
+    --------------------------------------------------------------------------
+
+    `open_only=True` sends `closed=false`. Measured 2026-08-24T20:56:41Z, that
+    is the parameter that reaches the current slate, and `active` is not:
+    `active=true` is the server default and returns MARKET_STATUS_RESOLVED
+    rows. That is why the first version of this function pulled 500 settled
+    NFL games under `active=true` and reported them as a healthy slate.
 
     --------------------------------------------------------------------------
     PAGING, WHICH IS STILL A GUESS ON THIS ROUTE
@@ -267,8 +301,10 @@ def fetch_markets(
     for page in range(max(1, int(max_pages))):
         page_offset = int(offset) + page * int(limit)
         url = f"{auth.BASE_URL}/v1/markets?limit={int(limit)}&offset={page_offset}"
-        if active:
-            url += "&active=true"
+        if open_only:
+            url += f"&{_LIVE_FILTER}"
+        if active is not None:
+            url += f"&active={'true' if active else 'false'}"
         try:
             payload = auth.signed_request("GET", url)
         except Exception as exc:
