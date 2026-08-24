@@ -343,6 +343,15 @@ def settle_orders(
                 f" by_venue={[(b.get('venue'), b.get('settled'), b.get('pnl_dollars'), b.get('roi_pct')) for b in summary.get('by_venue') or []]}",
                 flush=True,
             )
+            # The two cuts that separate best-of-N EV inflation from market-mix.
+            # See `settlement_summary`. Printed on their own line so the venue
+            # line stays readable and so a grep for one does not drag in three.
+            for cut in ("by_market_family", "by_sport"):
+                rows_out = [
+                    (b.get("key"), b.get("settled"), b.get("pnl_dollars"), b.get("roi_pct"), b.get("win_pct"))
+                    for b in summary.get(cut) or []
+                ]
+                print(f"[paper_settlement] PNL_CUT {scope} {cut}={rows_out}", flush=True)
     except Exception as exc:
         # NEVER FATAL. Grading already happened and is persisted; a reporting
         # failure must not undo it or stop the next date.
@@ -471,4 +480,94 @@ def settlement_summary(
         "selected_date": selected_date,
         "total": total,
         "by_venue": [by_venue[k] for k in sorted(by_venue)],
+        # TWO MORE CUTS, because `by_venue` alone cannot answer the question it
+        # raises. MEASURED 2026-08-24: the unrestricted `paper` book returned
+        # -4.25% while four of five venue-scoped books were positive -- and a
+        # venue label cannot distinguish the two explanations for that:
+        #
+        #   A. BEST-OF-N EV INFLATION. The unrestricted board prices at the
+        #      best book across N and computes `ev_pct` against it, so a single
+        #      stale or erroneous quote inflates the edge and admits a row whose
+        #      true edge is ~0. `venue_scope` REPRICES at the venue's own quote
+        #      and re-runs the same min-EV gate, so those rows never enter a
+        #      venue book. That would make the loss a selection artefact.
+        #
+        #   B. COMPOSITION. The automatable venues quote mostly moneyline,
+        #      spread and total on major games, while the props the sim is
+        #      built around are largely absent from them (`venue_scope`'s own
+        #      docstring, and 95.5% of the OddsAPI spend). So the unrestricted
+        #      book is prop-heavy and the venue books are game-line-heavy, and
+        #      "the unrestricted book loses" could simply be "props lose"
+        #      wearing a venue label.
+        #
+        # A and B need opposite fixes -- tighten the price gate, or stop betting
+        # a market family -- so guessing between them is expensive. Splitting by
+        # market family and by sport separates them in one reading.
+        #
+        # NOTE the price cannot be the cause either way: the unrestricted book
+        # is PAID at the best-book price it was sized against, and a better
+        # price cannot lose money on a wager it wins. Whatever is happening is
+        # about WHICH bets are taken, not what they were booked at.
+        "by_market_family": _grouped(rows, _market_family),
+        "by_sport": _grouped(rows, lambda o: str(o.get("sport") or "unknown")),
     }
+
+
+def _market_family(order: Mapping[str, Any]) -> str:
+    """`game_line`, `game_total` or `player_prop`.
+
+    Three rather than two: a total is a scoreboard bet like a spread, but it
+    needs no team resolution and is modelled completely differently, so folding
+    it into either neighbour would blur the comparison this exists to make.
+    """
+    from syndicate.features.shared.game_line_bet import is_game_line_market
+
+    sport = order.get("sport")
+    market = str(order.get("market") or "").strip().lower()
+    if is_game_line_market(sport, market):
+        return "game_line"
+    if market.startswith("totals") or market in {"total", "team_totals"}:
+        return "game_total"
+    return "player_prop"
+
+
+def _grouped(rows: Sequence[Mapping[str, Any]], key_fn) -> list[dict[str, Any]]:
+    """Settled counts and money per group, in the same shape as `by_venue`.
+
+    Unsettled rows are counted as `pending` and contribute NO money -- the same
+    rule the venue breakdown uses, so the three cuts are directly comparable
+    rather than three slightly different questions.
+    """
+    buckets: dict[str, dict[str, Any]] = {}
+    for order in rows:
+        try:
+            key = str(key_fn(order) or "unknown")
+        except Exception:
+            key = "unknown"
+        bucket = buckets.setdefault(
+            key,
+            {"key": key, "orders": 0, "settled": 0, "won": 0, "lost": 0, "push": 0,
+             "staked_dollars": 0.0, "pnl_dollars": 0.0, "pending": 0},
+        )
+        bucket["orders"] += 1
+        outcome = str(order.get("outcome") or "")
+        if not outcome:
+            if str(order.get("status") or "") == "filled":
+                bucket["pending"] += 1
+            continue
+        bucket["settled"] += 1
+        bucket[outcome] = bucket.get(outcome, 0) + 1
+        bucket["staked_dollars"] += _as_float(order.get("fill_stake_dollars")) or 0.0
+        bucket["pnl_dollars"] += _as_float(order.get("pnl_dollars")) or 0.0
+
+    for bucket in buckets.values():
+        bucket["staked_dollars"] = round(bucket["staked_dollars"], 2)
+        bucket["pnl_dollars"] = round(bucket["pnl_dollars"], 2)
+        bucket["roi_pct"] = (
+            round(100.0 * bucket["pnl_dollars"] / bucket["staked_dollars"], 2)
+            if bucket["staked_dollars"] > 0
+            else None
+        )
+        decided = bucket["won"] + bucket["lost"]
+        bucket["win_pct"] = round(100.0 * bucket["won"] / decided, 2) if decided else None
+    return [buckets[k] for k in sorted(buckets)]
