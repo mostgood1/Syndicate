@@ -25774,3 +25774,55 @@ already.
 now picks probability-dollar math over American odds and nets the fee, but no
 production run has exercised it. First contract to settle is the proof; until
 then that path is tested and unmeasured.
+
+### 2026-08-24 17:24:49Z — FIRST LIVE PROBE, exchange-markets-api-integration: polymarket schema mostly right, Novig's public CSV is NOT public, ProphetX/Novig REST correctly gated
+
+`SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT=1` set on refresh-worker
+(`dep-da67qqbtqb8s7387ejt0`, commit `efbfb7f41d` = PR #30 merged), one boot,
+then unset again (`dep-da67tnek1f9s73dhap8g`). Deploy claim taken and released
+cleanly; a genuine in-flight deploy on the same service (`dep-da67nfnqj5pc73eqgpj0`,
+another lane's game-line-grading work) was checked and waited out first --
+`deploy_preflight.py` itself could not run (no `RENDER_API_KEY` in this
+session), so the in-flight-deploy and process-safety checks were done by hand
+against the Render API directly (`list_deploys`, `list_logs`) rather than
+skipped.
+
+**POLYMARKET -- `ok: true`, 5 live markets, real sample.** 16 of 18
+`_MARKET_FIELDS` matched exactly. Two did not:
+`minimum_tick_size` -> actual field is `orderPriceMinTickSize`;
+`neg_risk` -> actual field is `negRisk`. Every field this lane's `probe()`
+and `normalize_market()` actually key off for pricing (`outcomes`,
+`outcomePrices`, `clobTokenIds`, `question`, `conditionId`, `active`,
+`closed`, `volume`, `liquidity`, `endDate`) is CONFIRMED CORRECT. Fix owed:
+rename the two constants in `_MARKET_FIELDS`.
+
+**NOVIG -- tier 2 (OAuth REST) correctly refused (`no_client_id`), no call
+attempted, exactly as designed.** Tier 1 (the "genuinely public, no-auth"
+daily CSV mirror this lane's research and scope doc both asserted) returned
+**`http_403` on `https://data.novig.com/markets.csv`.** This CORRECTS the
+scope doc and module docstring's confidence in that tier -- it is not
+actually anonymously fetchable as documented (wrong path, needs a header/
+referer this module does not send, or the "genuinely public" characterization
+was wrong). Not yet root-caused; `novig_client.py`'s header and
+`scope_2026-08-24_novig_order_automation.md` both need a correction pass
+before either is read as settled.
+
+**PROPHETX -- correctly refused (`no_api_token`), no call attempted.** Nothing
+to correct; this is the designed behaviour with no credential.
+
+**CRYPTOCOM_OG -- landing-page check succeeded** (`http_status: 200`,
+141,789 bytes, `mentions_predictions: true`, `mentions_coming_soon: true`).
+CONFIRMS the scope doc's finding as still true right now: no public REST/
+WebSocket has shipped. Working as designed -- this was always meant to be
+re-checked periodically, not fixed.
+
+**Net result: the discipline paid for itself on the first run**, same as
+`kalshi_client.py`'s own history -- one venue's schema assumption (Polymarket)
+was 89% right and cheaply fixed by name; one tier's "public" claim (Novig CSV)
+was wrong and is now a stated correction instead of a silent bad assumption;
+two venues correctly did nothing because they have no credential, which is
+the intended behaviour, not a gap.
+
+**Owed:** the two Polymarket field-name fixes; a root-cause pass on the Novig
+CSV 403 (try a different path/header, or downgrade the scope doc's confidence
+on that tier if it turns out not to be public at all).

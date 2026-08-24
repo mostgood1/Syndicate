@@ -17,10 +17,16 @@ records for Kalshi) found Novig exposes THREE structurally different things,
 and conflating any two of them would misrepresent what this module can
 actually do:
 
-1. **`data.novig.com` -- genuinely public, no auth, CDN-served daily CSV
-   dumps** (`trades.csv`, `markets.csv`). This is END-OF-DAY / historical tape,
-   not a live quote. `fetch_daily_csv()` implements THIS tier -- it is the one
-   thing in this module runnable today with no credential and no ToS question.
+1. **`data.novig.com` -- documented as a public, no-auth, CDN-served daily CSV
+   mirror** (`trades.csv`, `markets.csv`). **CORRECTED 2026-08-24T17:24:50Z**:
+   the first live call from refresh-worker got `http_403` on
+   `markets.csv`, not the 200 this docstring originally assumed from research
+   alone. Not yet root-caused -- could be a wrong path, a missing header this
+   client doesn't send, or the "public" characterization being wrong outright.
+   Treat this tier as UNVERIFIED again until that is resolved; `fetch_daily_csv()`
+   still implements it (unchanged, since there is nothing to fix without
+   knowing WHY it 403'd) and `probe()` still reports the real response rather
+   than hiding the failure.
 2. **The official "NBX API"** (`docs.novig.com`, REST under
    `api.novig.us/nbx/v1|v2`, OAuth2 client-credentials) -- Novig's own
    documented, versioned, supported API. Confirmed by multiple independent
