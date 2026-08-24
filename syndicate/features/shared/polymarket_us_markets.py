@@ -87,6 +87,8 @@ __all__ = [
     "probe_offset_landscape",
     "find_first_game_offset",
     "fetch_game_markets",
+    "persist_game_slate",
+    "GAME_SLATE_ARTIFACT",
     "team_alias_index",
     "is_sporting_row",
     "is_game_market_row",
@@ -1182,3 +1184,69 @@ def team_alias_index(teams: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
 def _normalise_team(value: Any) -> str:
     text = str(value or "").strip().lower()
     return "".join(ch for ch in text if ch.isalnum())
+
+
+# --------------------------------------------------------------------------
+# PERSISTENCE -- so the fan-in reads an ARTIFACT, not this venue's API
+# --------------------------------------------------------------------------
+#
+# `venue_quote_adapters` deliberately never calls a venue API: a second
+# independent caller for one venue is a documented incident class here
+# (`#139/#144` for MLB, `#148` for soccer). So the slate has to land somewhere
+# a reader can find it, with a timestamp it can defend.
+
+GAME_SLATE_ARTIFACT = ("intelligence", "polymarket_us_games.json")
+
+
+def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, Any]:
+    """Fetch the joinable slate and write it for the fan-in to read.
+
+    Writes `fetched_at` INTO the payload rather than relying on the file's
+    mtime. An artifact republished unchanged gets a fresh mtime while its
+    contents are hours old -- `PUBLISH_SKIPPED_UNCHANGED` and the artifact-pull
+    sweep both touch files that way -- and trusting mtime there would launder
+    stale odds as fresh, which is the exact failure the fan-in exists to catch.
+
+    A failed fetch LEAVES THE PREVIOUS SLATE IN PLACE. Clearing it would turn
+    "we could not reach Polymarket" into "Polymarket lists nothing", and those
+    need opposite responses.
+    """
+    import time as _time
+
+    from syndicate.features.shared.refresh_state_store import reports_root, write_json_file
+
+    slate = fetch_game_markets(limit=limit, max_pages=max_pages)
+    if slate.get("status") != "ok":
+        return {"status": "error", "reason": slate.get("reason"), "written": False, "kept_previous": True}
+
+    markets = slate.get("markets") or []
+    payload = {
+        "fetched_at": _time.time(),
+        "markets": markets,
+        "count": len(markets),
+        "start_offset": slate.get("start_offset"),
+        "truncated": slate.get("truncated"),
+        "game_types": slate.get("game_types"),
+        "game_start_min": slate.get("game_start_min"),
+        "game_start_max": slate.get("game_start_max"),
+    }
+    path = reports_root().joinpath(*GAME_SLATE_ARTIFACT)
+    try:
+        write_json_file(path, payload)
+    except Exception as exc:  # noqa: BLE001 -- reported, never raised into the loop
+        # Same shape as Novig's 8MB keyvalue ceiling failure: the fetch
+        # succeeded and the caller can still use the result; only the cache is
+        # missing, and saying which is what makes it diagnosable.
+        return {
+            "status": "fetched_not_written",
+            "reason": f"{type(exc).__name__}: {exc}",
+            "count": len(markets),
+            "written": False,
+        }
+    return {
+        "status": "ok",
+        "written": True,
+        "count": len(markets),
+        "truncated": slate.get("truncated"),
+        "game_types": slate.get("game_types"),
+    }

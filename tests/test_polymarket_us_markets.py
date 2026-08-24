@@ -1182,3 +1182,58 @@ def test_fetch_game_markets_refuses_when_no_boundary_exists(monkeypatch):
     result = mod.fetch_game_markets()
     assert result["status"] == "error"
     assert "no_game_offset" in result["reason"]
+
+
+# ==========================================================================
+# Persisting the slate so the fan-in can read an artifact, not the API
+# ==========================================================================
+
+
+def test_the_slate_is_written_with_its_own_fetched_at(monkeypatch, tmp_path):
+    """An artifact republished unchanged gets a fresh mtime while its contents
+    are hours old -- PUBLISH_SKIPPED_UNCHANGED and the artifact-pull sweep both
+    touch files that way. Trusting mtime would launder stale odds as fresh."""
+    written = {}
+
+    from syndicate.features.shared import refresh_state_store
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+    monkeypatch.setattr(refresh_state_store, "write_json_file",
+                        lambda path, payload: written.update({"path": path, "payload": payload}))
+    monkeypatch.setattr(mod, "fetch_game_markets",
+                        lambda **_k: {"status": "ok", "markets": [_row()], "truncated": False,
+                                      "game_types": ["SPORTS_MARKET_TYPE_MONEYLINE"]})
+    result = mod.persist_game_slate()
+    assert result["status"] == "ok" and result["written"] is True
+    assert written["payload"]["fetched_at"] > 0
+    assert written["payload"]["count"] == 1
+    assert str(written["path"]).endswith("polymarket_us_games.json")
+
+
+def test_a_failed_fetch_KEEPS_the_previous_slate(monkeypatch):
+    """Clearing it would turn "we could not reach Polymarket" into "Polymarket
+    lists nothing", and those need opposite responses."""
+    monkeypatch.setattr(mod, "fetch_game_markets",
+                        lambda **_k: {"status": "error", "reason": "http_500"})
+    result = mod.persist_game_slate()
+    assert result["status"] == "error"
+    assert result["kept_previous"] is True
+    assert result["written"] is False
+
+
+def test_a_failed_WRITE_is_distinct_from_a_failed_fetch(monkeypatch, tmp_path):
+    """The fetch succeeded and the caller can still use the result; only the
+    cache is missing. Same shape as Novig's 8MB keyvalue ceiling failure."""
+    from syndicate.features.shared import refresh_state_store
+
+    def boom(*_a, **_k):
+        raise RuntimeError("exceeds 8388608")
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+    monkeypatch.setattr(refresh_state_store, "write_json_file", boom)
+    monkeypatch.setattr(mod, "fetch_game_markets",
+                        lambda **_k: {"status": "ok", "markets": [_row()]})
+    result = mod.persist_game_slate()
+    assert result["status"] == "fetched_not_written"
+    assert result["count"] == 1
+    assert "8388608" in result["reason"]
