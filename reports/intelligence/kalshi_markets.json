@@ -1,0 +1,24 @@
+{
+  "series": {
+    "KXMLBHR": {
+      "attempted_at": "2026-08-24T13:20:12Z",
+      "strategy": "failed",
+      "reason": "all_hosts_failed: https://external-api.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>; https://api.elections.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>; https://trading-api.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    "KXMLBKS": {
+      "attempted_at": "2026-08-24T13:20:13Z",
+      "strategy": "failed",
+      "reason": "all_hosts_failed: https://external-api.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>; https://api.elections.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>; https://trading-api.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    "KXMLBOUTS": {
+      "attempted_at": "2026-08-24T13:20:14Z",
+      "strategy": "failed",
+      "reason": "all_hosts_failed: https://external-api.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>; https://api.elections.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>; https://trading-api.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    "KXWNBAREB": {
+      "attempted_at": "2026-08-24T13:20:15Z",
+      "strategy": "failed",
+      "reason": "all_hosts_failed: https://external-api.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>; https://api.elections.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>; https://trading-api.kalshi.com/trade-api/v2: URLError: <urlopen error Tunnel connection failed: 403 Forbidden>"
+    }
+  }
+}

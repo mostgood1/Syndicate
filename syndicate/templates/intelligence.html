@@ -1788,6 +1788,11 @@
   let gameChipsById = new Map();
   let gameChipsByMatchup = new Map();
   let gameChipsByMatchupLoose = new Map();
+  // The AUTHORITATIVE index: canonical club names stamped by the server's own
+  // alias map on BOTH the chip and the board row. Consulted before the
+  // normalised index because it is a lookup, not an approximation -- see
+  // `_side_key` in game_chip_scoreboard.py.
+  let gameChipsByCanonical = new Map();
 
   // Strip what the two providers disagree about and nothing else: accents, and
   // the club-type words that one side spells and the other omits. Deliberately
@@ -1854,6 +1859,8 @@
       const byMatchup = new Map();
       const byMatchupLoose = new Map();
       const looseCollisions = new Set();
+      const byCanonical = new Map();
+      const canonicalCollisions = new Set();
       for (const chip of chips) {
         const sport = String(chip.sport || "").toLowerCase();
         const key = String(chip.game_key || "").trim();
@@ -1892,6 +1899,30 @@
         // live score to another game's card, which is worse than the full name
         // it replaces. Collisions are recorded and then removed rather than
         // resolved arbitrarily.
+        // CANONICAL FIRST. `#365`'s normalisation bridges spelling
+        // differences; it cannot bridge two different NAMES for one club, and
+        // widening it until it could is what collapses Manchester United into
+        // Manchester City. Measured 2026-08-24 on the real La Liga week: 9 of
+        // 13 fixtures joined and the 4 that did not were "Athletic Bilbao" vs
+        // "Athletic Club" and "Real Racing Club de Santander" vs "Racing
+        // Santander" -- their cards printed the odds-feed name verbatim beside
+        // cards showing tri-codes, which is the reported mismatch.
+        //
+        // Collisions are removed here for the SAME reason as the loose index
+        // below: two chips on one key would attach one game's score to another
+        // game's card. Two fixtures between the same clubs in one chip window
+        // (two legs, a cup tie) is exactly that case, so it is guarded rather
+        // than assumed away.
+        const awayKey = String((chip.away || {}).key || "").trim().toLowerCase();
+        const homeKey = String((chip.home || {}).key || "").trim().toLowerCase();
+        if (awayKey && homeKey) {
+          const canonical = `${sport}|${awayKey} @ ${homeKey}`;
+          if (byCanonical.has(canonical)) {
+            canonicalCollisions.add(canonical);
+          } else {
+            byCanonical.set(canonical, chip);
+          }
+        }
         if (awayName && homeName) {
           const loose = `${sport}|${normalizeClubName(awayName)} @ ${normalizeClubName(homeName)}`;
           if (byMatchupLoose.has(loose)) {
@@ -1902,9 +1933,11 @@
         }
       }
       for (const key of looseCollisions) byMatchupLoose.delete(key);
+      for (const key of canonicalCollisions) byCanonical.delete(key);
       gameChipsById = byId;
       gameChipsByMatchup = byMatchup;
       gameChipsByMatchupLoose = byMatchupLoose;
+      gameChipsByCanonical = byCanonical;
       gameChipsLoadedOnce = true;
       renderBoardBody();
     } catch (err) {
@@ -1949,6 +1982,17 @@
     const matchup = String(group.matchup || "").trim().toLowerCase();
     const exact = gameChipsByMatchup.get(`${sport}|${matchup}`);
     if (exact) return exact;
+    // Before the normalised index, because this is a LOOKUP and that is an
+    // approximation. Both sides were stamped by the same server-side alias map
+    // (`canonical_team`), so a hit here means the two feeds named the same
+    // club, not that two names happened to reduce alike. Rows predating the
+    // stamp carry no keys and fall through exactly as before.
+    const awayKey = String(group.awayKey || "").trim().toLowerCase();
+    const homeKey = String(group.homeKey || "").trim().toLowerCase();
+    if (awayKey && homeKey) {
+      const canonical = gameChipsByCanonical.get(`${sport}|${awayKey} @ ${homeKey}`);
+      if (canonical) return canonical;
+    }
     // Last resort only. See the normalized index in `loadGameChips` for why it
     // exists and why it is consulted after both exact lookups rather than
     // instead of them.
@@ -2041,6 +2085,11 @@
           // "-" card. Fall back to the candidate's own date field so every
           // real game gets a visible date even without chip hydration.
           fallbackDate: String(item.game_date || item.source_board_date || item.context_label || "").slice(0, 10) || null,
+          // Canonical club names from the server's alias map, carried so
+          // `chipForGame` can join on them. Absent on older rows, which is why
+          // every consumer treats them as optional rather than required.
+          awayKey: String(item.away_key || "").trim().toLowerCase() || null,
+          homeKey: String(item.home_key || "").trim().toLowerCase() || null,
         });
       }
       const group = groups.get(key);
