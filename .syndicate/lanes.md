@@ -1652,6 +1652,23 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   for exactly this race). **OWED:** a `probe_*` run from refresh-worker
   (real outbound access) to confirm or correct every schema assumption, same as
   Kalshi's own first live run corrected 10 of 17 field names.
+- **NOVIG ORDER-AUTOMATION SCOPED 2026-08-24, not started.**
+  `.syndicate/scope_2026-08-24_novig_order_automation.md` -- read against the
+  OTHER session's live Kalshi automation build (`kalshi_orders.py`,
+  `execution_guard.py`, `execution_ledger.py`), which turned out to be fully
+  venue-agnostic: Novig's entire surface is two new files
+  (`novig_auth.py`, `novig_orders.py`) plus one `elif` in
+  `pipeline/execute_portfolio.py::_venue_submitter` (claimed by
+  `portfolio-decision-and-execution`, not yet narrow-claimed -- premature
+  before there is a `novig_orders.py` to wire in). Price unit and order
+  identity (`outcomeId` + `index`, never array position) CONFIRMED against
+  real `docs.novig.com` pages this time, not just third-party write-ups. The
+  **order WRITE endpoint could not be found by any search** -- the single
+  most important unknown, Novig's equivalent of the sample payload Kalshi's
+  owner had to supply by hand. **Blocked on a partner credential that does
+  not exist yet** (`NOVIG_CLIENT_ID`/`NOVIG_CLIENT_SECRET`, founder-gated,
+  no self-serve) and on the still-open legal/ToS review question from
+  `todo.md #544`'s own NEXT section.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
