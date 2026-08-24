@@ -133,10 +133,74 @@ _GAME: dict[str, str] = {
     "ou": "totals",
 }
 
+# --------------------------------------------------------------------------
+# FOOTBALL and SOCCER, added 2026-08-24 to open Kalshi beyond MLB/WNBA.
+#
+# Until now only mlb/nba/wnba had any vocabulary here, which is why the Kalshi
+# boot census read `KALSHI_SPORT NFL ticker_substring_n=317 classified_n=0`:
+# 317 NFL series listed and not one classified. `auto_series_from_catalogue`
+# requires `canonical_market_key(sport, stat)` to resolve before it will
+# register a series, so a sport with no map can never discover anything however
+# player-shaped its titles are. The gap was in this file, not in the discovery.
+#
+# The VALUES are OddsAPI's keys, because that is what the board emits and the
+# join compares against -- taken from what the repo already uses
+# (`player_pass_yds`, `player_reception_yds`, `player_anytime_td`), never
+# invented here. The KEYS are the stat wordings a title might carry; Kalshi's
+# exact wording is reported by `prop_candidates` rather than assumed, and any
+# spelling this table misses shows up there as an unmapped stat instead of
+# silently joining to the wrong market.
+_FOOTBALL: dict[str, str] = {
+    "passing yards": "player_pass_yds",
+    "pass yards": "player_pass_yds",
+    "pass yds": "player_pass_yds",
+    "passing touchdowns": "player_pass_tds",
+    "passing tds": "player_pass_tds",
+    "pass tds": "player_pass_tds",
+    "passing attempts": "player_pass_attempts",
+    "pass attempts": "player_pass_attempts",
+    "passing completions": "player_pass_completions",
+    "completions": "player_pass_completions",
+    "interceptions thrown": "player_pass_interceptions",
+    "passing interceptions": "player_pass_interceptions",
+    "rushing yards": "player_rush_yds",
+    "rush yards": "player_rush_yds",
+    "rush yds": "player_rush_yds",
+    "rushing attempts": "player_rush_attempts",
+    "rush attempts": "player_rush_attempts",
+    "carries": "player_rush_attempts",
+    "receiving yards": "player_reception_yds",
+    "reception yards": "player_reception_yds",
+    "reception yds": "player_reception_yds",
+    "receptions": "player_receptions",
+    "catches": "player_receptions",
+    "touchdowns": "player_anytime_td",
+    "anytime touchdown": "player_anytime_td",
+    "anytime td": "player_anytime_td",
+    "touchdown": "player_anytime_td",
+}
+
+_SOCCER: dict[str, str] = {
+    "goals": "player_goals",
+    "goal": "player_goals",
+    "anytime goalscorer": "player_goal_scorer_anytime",
+    "goalscorer": "player_goal_scorer_anytime",
+    "to score": "player_goal_scorer_anytime",
+    "assists": "player_assists",
+    "shots": "player_shots",
+    "shots on target": "player_shots_on_target",
+    "shots on goal": "player_shots_on_goal",
+}
+
 _BY_SPORT: dict[str, dict[str, str]] = {
     "mlb": _MLB,
     "nba": _BASKETBALL,
     "wnba": _BASKETBALL,
+    # NCAAF shares the football vocabulary. The STATS are identical; only the
+    # rosters differ, and rosters are not this table's concern.
+    "nfl": _FOOTBALL,
+    "ncaaf": _FOOTBALL,
+    "soccer": _SOCCER,
 }
 
 

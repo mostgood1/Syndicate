@@ -819,6 +819,37 @@ def _kalshi_series_catalogue_at_boot() -> None:
                 flush=True,
             )
 
+        # THE PROP CANDIDATES, MAPPED OR NOT. This is what tells us which
+        # series to add for a new sport, and it prints the ones we CANNOT price
+        # as well as the ones we can -- a list of only what already works
+        # cannot distinguish "Kalshi does not list it" from "we have no
+        # vocabulary for it", which is exactly how 317 NFL series sat behind
+        # `classified_n=0`. Soccer can only surface here: Kalshi names those
+        # series by COMPETITION, so there is no sport token to add until the
+        # real prefixes have been seen.
+        try:
+            from syndicate.features.shared.kalshi_catalogue import prop_candidates
+
+            candidates = prop_candidates(titled)
+            unmapped = [c for c in candidates if not c.get("market")]
+            print(
+                f"[live_odds_worker] KALSHI_PROP_CANDIDATES n={len(candidates)}"
+                f" mapped={len(candidates) - len(unmapped)} unmapped={len(unmapped)}",
+                flush=True,
+            )
+            for cand in unmapped[:60]:
+                print(
+                    f"[live_odds_worker] KALSHI_PROP_UNMAPPED sport={cand.get('sport')}"
+                    f" stat={cand.get('stat')!r} ticker={cand.get('ticker')}"
+                    f" title={cand.get('title')!r}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] KALSHI_PROP_CANDIDATES_ERROR {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         for token in ("WNBA",):
             found = series_matching([token], tickers)
             print(

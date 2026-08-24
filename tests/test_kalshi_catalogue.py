@@ -279,3 +279,80 @@ def test_every_hand_registered_series_dates_from_a_realistic_ticker():
     for series in SERIES_SPORT:
         ticker = f"{series}-26AUG23LVTOR-TORPLAYER22-15"
         assert game_date_from_ticker(ticker) == "2026-08-23", series
+
+
+# --------------------------------------------------------------------------
+# Football and soccer: the vocabulary that was missing entirely
+# --------------------------------------------------------------------------
+
+
+def test_football_and_soccer_stats_resolve_to_the_boards_own_keys():
+    """`KALSHI_SPORT NFL ticker_substring_n=317 classified_n=0` -- 317 series
+    listed and none classifiable, because `market_keys` had no football map at
+    all. Discovery requires the stat to resolve, so a sport with no vocabulary
+    can never register anything however player-shaped its titles are.
+
+    The expected VALUES are OddsAPI's keys, which is what the board emits and
+    what the join compares against. Asserting the exact key is the point: a map
+    to a plausible-but-wrong name would join to nothing and look like Kalshi
+    simply not quoting the market.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    assert canonical_market_key("nfl", "Passing Yards") == "player_pass_yds"
+    assert canonical_market_key("nfl", "Rushing Yards") == "player_rush_yds"
+    assert canonical_market_key("nfl", "Receiving Yards") == "player_reception_yds"
+    assert canonical_market_key("nfl", "Receptions") == "player_receptions"
+    assert canonical_market_key("nfl", "Anytime Touchdown") == "player_anytime_td"
+    # NCAAF shares the football vocabulary -- same stats, different rosters.
+    assert canonical_market_key("ncaaf", "Passing Yards") == "player_pass_yds"
+    assert canonical_market_key("soccer", "Goals") == "player_goals"
+    assert canonical_market_key("soccer", "Shots on Target") == "player_shots_on_target"
+    assert canonical_market_key("soccer", "Anytime Goalscorer") == "player_goal_scorer_anytime"
+
+
+def test_a_football_series_now_auto_discovers():
+    """The end-to-end consequence: with a vocabulary, discovery keeps it."""
+    from syndicate.features.shared.kalshi_catalogue import auto_series_from_catalogue
+
+    found = auto_series_from_catalogue(
+        {
+            "KXNFLPASSYDS": "Pro Football Player Passing Yards",
+            "KXNCAAFRUSHYDS": "College Football Player Rushing Yards",
+            # Still refused: a game line has no player to join on.
+            "KXNFLGAMETOTAL": "Pro Football Game Total",
+        }
+    )
+    assert found.get("KXNFLPASSYDS") == "nfl"
+    assert found.get("KXNCAAFRUSHYDS") == "ncaaf"
+    assert "KXNFLGAMETOTAL" not in found
+
+
+def test_prop_candidates_reports_what_it_CANNOT_price():
+    """A list of only what already works cannot tell "Kalshi does not list it"
+    from "we have no vocabulary for it" -- the confusion that hid 317 NFL
+    series. Both failure modes have to be visible and distinguishable."""
+    from syndicate.features.shared.kalshi_catalogue import prop_candidates
+
+    by_ticker = {
+        c["ticker"]: c
+        for c in prop_candidates(
+            {
+                "KXNFLPASSYDS": "Pro Football Player Passing Yards",
+                "KXNFLKICKRET": "Pro Football Player Kick Return Yards",
+                "KXEPLGOALS": "English Premier League Player Goals",
+                "KXWNBATOTAL": "Women's Pro Basketball Total",
+            }
+        )
+    }
+
+    # Mapped.
+    assert by_ticker["KXNFLPASSYDS"]["market"] == "player_pass_yds"
+    # Sport known, stat not in the table -- a spelling to add.
+    assert by_ticker["KXNFLKICKRET"]["sport"] == "nfl"
+    assert by_ticker["KXNFLKICKRET"]["market"] is None
+    # Ticker carries no token we recognise. This is the ONLY way soccer can
+    # surface: Kalshi names those series by competition, never "soccer".
+    assert by_ticker["KXEPLGOALS"]["sport"] is None
+    # Not a player prop at all -- never a candidate.
+    assert "KXWNBATOTAL" not in by_ticker

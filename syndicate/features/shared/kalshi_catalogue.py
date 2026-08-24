@@ -48,6 +48,7 @@ from typing import Any
 __all__ = [
     "SERIES_SPORT",
     "game_date_from_ticker",
+    "prop_candidates",
     "sport_for_series",
     "sport_for_ticker",
     "auto_series_from_catalogue",
@@ -273,6 +274,53 @@ def auto_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]:
         if canonical_market_key(sport, match.group("stat").strip()) is None:
             continue
         found[str(ticker).strip().upper()] = sport
+    return found
+
+
+def prop_candidates(titles: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Every series whose TITLE looks like a player prop, mapped or not.
+
+    THE MEASUREMENT THAT PRECEDES A MAPPING. `auto_series_from_catalogue`
+    returns only what already resolves, so a sport we cannot price is invisible
+    in its output -- indistinguishable from a sport Kalshi does not list. That
+    is the absence/failure confusion again, and it hid 317 NFL series behind
+    `classified_n=0` for as long as football had no vocabulary.
+
+    This reports the candidates BEFORE either filter, with the reason each one
+    fails, so the gap is readable:
+
+      - `sport=None`  the ticker carries no token we recognise. This is how
+                      soccer surfaces at all: Kalshi names soccer series by
+                      COMPETITION (`KXEPL...`, `KXUCL...`), never by the word
+                      soccer, so there is no token to add until we have seen
+                      the real prefixes.
+      - `market=None` the sport is known and the STAT is not in `market_keys`.
+                      A spelling to add, and until it is added the series is
+                      refused rather than guessed at.
+
+    Bounded by the shape of the pattern: only titles ending "Player <stat>"
+    reach the list, which is a small subset of 13,389 series.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    found: list[dict[str, Any]] = []
+    for ticker, title in (titles or {}).items():
+        text = str(title or "").strip()
+        match = _PLAYER_PROP_TITLE.search(text)
+        if not match:
+            continue
+        stat = match.group("stat").strip()
+        sport = sport_for_ticker(ticker)
+        found.append(
+            {
+                "ticker": str(ticker).strip().upper(),
+                "title": text,
+                "stat": stat,
+                "sport": sport,
+                "market": canonical_market_key(sport, stat) if sport else None,
+            }
+        )
+    found.sort(key=lambda c: (c["sport"] or "~unmapped", c["ticker"]))
     return found
 
 
