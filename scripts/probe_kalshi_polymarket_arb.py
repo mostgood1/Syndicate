@@ -40,6 +40,7 @@ def main() -> int:
     print(
         "[kalshi_polymarket_arb] SCAN"
         f" date={result['date']}"
+        f" kalshi_discovery={result.get('kalshi_discovery')}"
         f" kalshi_moneylines={result['kalshi_moneylines_resolved']}"
         f" kalshi_refusals={result['kalshi_refusals']}"
         f" polymarket_moneylines={result['polymarket_moneylines_resolved']}"
