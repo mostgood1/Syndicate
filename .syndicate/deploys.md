@@ -26114,3 +26114,49 @@ P&L is wrong, and the fix is the sign in `game_line_bet._margin_for_side`.
 because the ledger stores `settled_value` and not the scoreboard. Carrying
 home/away scores through `grade_order` would make this self-service and remove
 the need to ask anyone. That is the fix worth making regardless of the answer.
+
+---
+
+### 2026-08-24 20:01:37Z — refresh-worker `026ce8a4` — Polymarket US Sports API probe: real endpoint shape, credentials_absent on this service
+
+**verify: `[exchange_markets_probe] POLYMARKET_US_SPORTS {"nfl": {"status":
+"error", "reason": "credentials_absent", "url":
+"https://api.polymarket.us/v2/leagues/nfl/events?limit=3"}, ...}` for all
+seven mapped leagues**, refresh-worker `rxmpm`, `026ce8a4` (PR #41).
+
+`POLYMARKET_US_API_KEY_ID`/`POLYMARKET_US_PRIVATE_KEY` are NOT set on
+refresh-worker -- only on live-odds-worker, where the other session already
+confirmed them working (`POLYMARKET_US_AUTH ok=True`, this file
+2026-08-24T19:29:14Z). Every league reports the SAME named refusal, exactly
+as `probe_league`/`_get_events` are designed to -- no crash, no silent
+empty result. **This is not a bug, it is the credential simply not being on
+this service.** The URL construction itself is confirmed correct
+(`/v2/leagues/{slug}/events?limit=3`, matching the user-supplied docs
+exactly), which is the one thing this probe COULD verify without a working
+credential.
+
+**Still genuinely unknown: whether these endpoints actually return sports
+events, and what an event row looks like.** That needs either (a) the same
+credential added to refresh-worker, or (b) this probe (or an equivalent)
+run from live-odds-worker, where the credential already works -- neither
+attempted yet, both require a decision this session did not make
+unilaterally (adding a credential nobody handed to this lane; touching a
+service another session is actively deploying to).
+
+Probe flag (`SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT`) set back to `0` and
+a redeploy triggered immediately after reading this result -- diagnostic,
+not a standing feature, same discipline every prior probe run this session
+used. Deploy claim (refresh-worker, token `b89496aa53797228`) held through
+this cycle, to be released once the flag-off redeploy is confirmed live.
+
+**Also visible in the same probe cycle, NOT an anomaly on inspection:**
+`probe()`'s own `tier1_daily_csv` reports `count=60862` for the same
+`date=2026-08-23` file the refresh pipeline reported `count=29469` for
+earlier. These are two different counting stages, not a contradiction --
+`probe()` counts every row `fetch_daily_csv` returns (every status:
+active/closed/determined/finalized), while the refresh pipeline's count is
+AFTER `status_filter=['active']` is applied. 29,469 of the file's 60,862
+rows are currently `active`; the rest are settled/inactive. Stated here only
+because the two counts sitting near each other in the same probe output
+could otherwise read as a discrepancy to a future reader who has not traced
+where each number comes from.
