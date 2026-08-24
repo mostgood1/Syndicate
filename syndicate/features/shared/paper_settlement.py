@@ -354,10 +354,17 @@ def settle_orders(
             # The two cuts that separate best-of-N EV inflation from market-mix.
             # See `settlement_summary`. Printed on their own line so the venue
             # line stays readable and so a grep for one does not drag in three.
-            for cut in ("by_market_family", "by_sport"):
+            for cut in ("by_market_family", "by_sport", "by_venue_family"):
                 rows_out = [
                     (b.get("key"), b.get("settled"), b.get("pnl_dollars"), b.get("roi_pct"), b.get("win_pct"))
+                    # SETTLED ROWS ONLY. The cross is |venues| x 3 buckets and
+                    # most of them are empty; a line that is mostly `(_, 0,
+                    # 0.0, None, None)` buries the four numbers being compared.
+                    # The other two cuts stay unfiltered -- they are small, and
+                    # a family with zero settled rows is itself informative
+                    # there (it is the composition claim, stated directly).
                     for b in summary.get(cut) or []
+                    if cut != "by_venue_family" or b.get("settled")
                 ]
                 print(f"[paper_settlement] PNL_CUT {scope} {cut}={rows_out}", flush=True)
     except Exception as exc:
@@ -617,7 +624,31 @@ def settlement_summary(
         # about WHICH bets are taken, not what they were booked at.
         "by_market_family": _grouped(rows, _market_family),
         "by_sport": _grouped(rows, lambda o: str(o.get("sport") or "unknown")),
+        # THE CROSS, which is the cut that actually decides between A and B.
+        # `by_market_family` alone cannot: if the unrestricted book is
+        # prop-heavy and the venue books are game-line-heavy, then a bad
+        # `player_prop` number is consistent with BOTH explanations -- with A
+        # if props are where the best-of-N inflation lands, and with B if props
+        # are simply a losing family everywhere. Holding the family fixed and
+        # varying the venue separates them in one reading:
+        #
+        #   paper/game_line vs kalshi/game_line differing  -> A (repricing)
+        #   both game_line books agreeing, props differing -> B (composition)
+        #
+        # Same bucket shape as the other cuts, so the numbers are directly
+        # comparable rather than three slightly different questions.
+        "by_venue_family": _grouped(rows, _venue_family),
     }
+
+
+def _venue_family(order: Mapping[str, Any]) -> str:
+    """`<venue>/<market_family>` -- the cross, as one key.
+
+    Slash-joined rather than a nested dict because `_grouped` is the thing that
+    has already been checked against `by_venue`, and a second aggregation path
+    would be a second place for the pending/settled rule to drift.
+    """
+    return f"{str(order.get('venue') or 'unknown')}/{_market_family(order)}"
 
 
 def _market_family(order: Mapping[str, Any]) -> str:

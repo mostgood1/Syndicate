@@ -643,9 +643,35 @@ def test_the_cuts_agree_with_the_total():
     ]
     summary = settlement_summary(orders=orders)
     total = summary["total"]["pnl_dollars"]
-    for cut in ("by_venue", "by_market_family", "by_sport"):
+    for cut in ("by_venue", "by_market_family", "by_sport", "by_venue_family"):
         assert round(sum(b["pnl_dollars"] for b in summary[cut]), 2) == total, cut
         assert sum(b["settled"] for b in summary[cut]) == summary["total"]["settled"], cut
+
+
+def test_the_cross_holds_the_family_fixed_and_varies_the_venue():
+    """The cut that actually decides between EV inflation and market mix.
+
+    `by_market_family` alone cannot: a bad `player_prop` number is consistent
+    with BOTH -- with inflation if props are where best-of-N lands, and with
+    composition if props simply lose everywhere. Comparing the SAME family
+    across two venues separates them, because repricing is a venue property and
+    a losing family is not.
+    """
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    summary = settlement_summary(orders=[
+        # Same family, two venues, opposite results -> repricing, not mix.
+        _settled(market="h2h", venue="paper", outcome="lost", pnl_dollars=-10.0),
+        _settled(market="h2h", venue="paper:kalshi", outcome="won", pnl_dollars=9.09),
+        _settled(market="batter_hits", venue="paper", outcome="won", pnl_dollars=9.09),
+    ])
+    cross = {b["key"]: b for b in summary["by_venue_family"]}
+    assert cross["paper/game_line"]["pnl_dollars"] == -10.0
+    assert cross["paper:kalshi/game_line"]["pnl_dollars"] == 9.09
+    assert cross["paper/player_prop"]["settled"] == 1
+    # The venue that never quoted a prop has no prop bucket at all -- absence,
+    # which is the composition claim stated directly rather than as a zero.
+    assert "paper:kalshi/player_prop" not in cross
 
 
 def test_an_unsettled_row_is_pending_in_every_cut_and_moves_no_money():
