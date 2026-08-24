@@ -26878,3 +26878,64 @@ rows, and no amount of additional venue plumbing changes that.
 3. Separately, chase the 14-hour odds age — that is where a direct venue feed
    genuinely beats OddsAPI.
 
+
+---
+
+### 2026-08-24 22:09Z — THE BOARD IS SOCCER-ONLY BECAUSE OF A 6h vs 24h STALENESS CEILING. User's hypothesis CONFIRMED; my sim-starvation framing was at best second-order.
+
+**The rejection is explicit and I had already been shown it:**
+
+```
+[recommendation_engine] FILTER_CANDIDATES sport=all in=255 out=144
+  rejected={"edge_below_threshold": 36, "stale_beyond_sla": 75}
+[intelligence_state] CANDIDATE_SLATE_FILTER considered=144 kept=73
+  no_slate=0 not_today=65 no_match=6
+```
+
+**75 of 255 candidates rejected as `stale_beyond_sla`.**
+
+**THE CEILING IS PER-SPORT AND THE ASYMMETRY IS DECISIVE.**
+`_candidate_freshness_ceiling_seconds` = `_pregame_sweep_interval_seconds(sport) * 3`,
+and `_PREGAME_SWEEP_INTERVAL_DEFAULTS = {"soccer": 8*3600}` with
+`_PREGAME_SWEEP_INTERVAL_FALLBACK = 2*3600`:
+
+| sport | sweep | ceiling |
+|---|---|---|
+| mlb | 2 h | **6 h** |
+| wnba | 2 h | **6 h** |
+| soccer | 8 h | **24 h** |
+
+**Measured board-row odds age: `age_p50s=50090` = 13.9 hours.**
+
+At ~14h old: soccer (14 < 24) **survives**; MLB and WNBA (14 > 6) are
+**rejected**. That is not a coincidence — it exactly reproduces
+`sports=['soccer']`. The games ARE there (10 MLB, 2 WNBA on the board
+contract, `has_markets_ml=True`); their candidates are thrown out for age.
+
+**WHY THE ODDS ARE 14h OLD — two real, independent contributors, and I am
+NOT yet claiming which dominates:**
+
+1. **Nobody refreshes today's MLB odds.** The all-sports refresh runs
+   `--sports mlb,wnba,nfl,ncaaf,soccer --date 2026-08-25` — TOMORROW. The only
+   `--date 2026-08-24` refreshes are `--sports soccer`. Today's MLB/WNBA odds
+   were last written when 08-24 was still "tomorrow", i.e. ~14h ago.
+2. The starved `mlbDailySim` (guard held across its 60s sleep), which would
+   also leave candidate `last_updated` stale.
+
+Both are real. (1) alone is sufficient and is the simpler explanation.
+
+**WHERE I WAS WRONG.** I told the user the staleness instinct was "a second,
+separate problem" and "not why the pipeline is empty." It IS why. The
+`stale_beyond_sla: 75` counter was in a log line I had already pulled, and I
+read past it because I had already committed to the sim-starvation story.
+
+**Note the guard that makes this silent:** the rejection only fires when
+`pipeline_looks_healthy` (`manifest_age <= ceiling`). So the manifest is fresh
+while the candidates behind it are not — the pipeline reports healthy and drops
+75 candidates.
+
+**AND THIS CHANGES THE VENUE ANSWER.** Fresh direct feeds from
+Kalshi/Polymarket/Novig WOULD fix this, contrary to what I said: they replace
+14h-old OddsAPI quotes with live ones, putting MLB/WNBA candidates under the 6h
+ceiling. The user's proposed direction was right.
+
