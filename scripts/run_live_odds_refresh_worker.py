@@ -797,7 +797,7 @@ def _polymarket_us_auth_probe_at_boot() -> None:
 
 
 def _polymarket_us_slate_probe_at_boot() -> None:
-    """What the US venue actually lists for today's leagues, by SHAPE.
+    """What the US venue actually lists for sport, by SHAPE.
 
     WHY THIS IS NOT `_polymarket_catalogue_at_boot`. That one pulls
     `gamma-api.polymarket.com` -- the GLOBAL, on-chain exchange. The funded
@@ -811,18 +811,105 @@ def _polymarket_us_slate_probe_at_boot() -> None:
     on every cycle -- so no join was ever attempted, so nobody discovered the
     prices were from the wrong exchange.
 
+    --------------------------------------------------------------------------
+    THE SPORTS API ROUTES 404 ON THIS HOST. MEASURED, NOT ASSUMED.
+    --------------------------------------------------------------------------
+
+    2026-08-24T20:18:37Z, live-odds-worker `hvpj6`, ONE BOOT, ONE CREDENTIAL,
+    0.6 seconds end to end:
+
+        .602  GET /v1/markets                      ok=True, 29 row keys
+        .752  GET /v2/leagues/mlb/events           http_404  code 5 NOT_FOUND
+        .901  GET /v2/leagues/wnba/events          http_404
+       38.100 GET /v2/leagues/nfl/events           http_404
+       38.240 GET /v1/sports/teams/provider        http_404
+
+    The three DOCUMENTED league slugs (`nfl`/`nba`/`mlb`) 404 identically to
+    the four guessed ones, which rules out a bad slug: the ROUTE is absent. And
+    a signed read of `/v1/markets` succeeding in the same second rules out the
+    credential, the clock and the signature. The user-supplied Sports API docs
+    describe a different host from the trading API.
+
+    So this probe asks the route that EXISTS. `/v1/markets` carries
+    `sportsMarketTypeV2`, `gameStartTime`, `orderPriceMinTickSize` and
+    `minimumTradeQty` -- every field the join and the order need -- so the
+    sporting slate is reachable by filtering it structurally, which is what
+    `fetch_markets` does.
+
+    The 404'd routes stay behind `SYNDICATE_POLYMARKET_US_SPORTS_PROBE=1`:
+    diagnostic, not a standing feature. Re-probing a confirmed 404 on every
+    boot is noise that would bury the line that matters, but deleting the call
+    would lose the ability to re-check cheaply if the host is found.
+
     READ-ONLY, and it reports shapes rather than parsing them: the value
-    vocabulary of `sportsMarketTypeV2`, whether the events route nests its
-    markets where we look, and whether the rows carry the tick size and minimum
-    quantity `order_body` REFUSES to infer. Those are the four facts the join
-    needs and none of them has been observed.
+    vocabulary of `sportsMarketTypeV2` has still never been observed, and a
+    guessed constant would return zero rows indistinguishably from a venue that
+    lists no sport.
     """
+    import os
+
     try:
         from syndicate.features.shared import polymarket_us_markets as pm
         from syndicate.features.shared.polymarket_us_auth import credentials_present
 
         if not credentials_present():
             print("[live_odds_worker] POLYMARKET_US_SLATE status=credentials_absent", flush=True)
+            return
+
+        # THE ROUTE THAT WORKS.
+        catalogue = pm.fetch_markets(limit=500)
+        print(
+            f"[live_odds_worker] POLYMARKET_US_CATALOGUE status={catalogue.get('status')}"
+            f" sporting={catalogue.get('count')} of={catalogue.get('total_rows')}"
+            f" orderable={catalogue.get('orderable')}"
+            f" truncated={catalogue.get('truncated')}"
+            f" types={catalogue.get('sports_market_types')}"
+            f" market_types={catalogue.get('market_types')}"
+            f" categories={catalogue.get('categories')}"
+            f" row_keys={catalogue.get('row_keys')}"
+            f" reason={catalogue.get('reason')}",
+            flush=True,
+        )
+        # A SAMPLE, so the join is designed from real text rather than a guess
+        # at what a question or slug looks like. Keys and short values only.
+        for row in (catalogue.get("markets") or [])[:5]:
+            print(
+                f"[live_odds_worker] POLYMARKET_US_MARKET"
+                f" slug={row.get('slug')!r} type={row.get('sportsMarketTypeV2')!r}"
+                f" start={row.get('gameStartTime')!r} outcomes={row.get('outcomes')!r}"
+                f" prices={row.get('outcomePrices')!r}"
+                f" tick={row.get('orderPriceMinTickSize')!r}"
+                f" min_qty={row.get('minimumTradeQty')!r}"
+                f" orderable={row.get('orderable')}"
+                f" question={str(row.get('question'))[:90]!r}",
+                flush=True,
+            )
+
+        # THE LEGACY `/v1` SPORTS ROUTES, which are NOT covered by the 404
+        # above. Only `/v1/sports/teams/provider` was tested -- the `provider`
+        # VARIANT -- and `/v1/sports` and `/v1/sports/teams` share the prefix
+        # that works for `/v1/markets`. "That variant needs different
+        # arguments" and "no sports data on this host" are different claims
+        # with opposite consequences, so this asks rather than assuming.
+        v1 = pm.probe_v1_sports_routes()
+        for name, route in (v1.get("routes") or {}).items():
+            print(
+                f"[live_odds_worker] POLYMARKET_US_V1 route={name}"
+                f" status={route.get('status')} count={route.get('count')}"
+                f" payload_keys={route.get('payload_keys')}"
+                f" row_keys={route.get('row_keys')}"
+                f" reason={route.get('reason')}",
+                flush=True,
+            )
+
+        if not (os.environ.get("SYNDICATE_POLYMARKET_US_SPORTS_PROBE") or "").strip() == "1":
+            # See the docstring: confirmed 404, re-checkable on demand.
+            print(
+                "[live_odds_worker] POLYMARKET_US_SLATE status=skipped"
+                " reason=sports_routes_404_on_this_host_measured_2026-08-24T20:18:37Z"
+                " (set SYNDICATE_POLYMARKET_US_SPORTS_PROBE=1 to re-check)",
+                flush=True,
+            )
             return
 
         for sport in ("mlb", "wnba", "nfl"):
@@ -834,25 +921,18 @@ def _polymarket_us_slate_probe_at_boot() -> None:
                 f" events={slate.get('event_count')} markets={slate.get('market_count')}"
                 f" orderable={slate.get('orderable')}"
                 f" no_markets={slate.get('events_without_markets')}"
-                f" truncated={slate.get('truncated')}"
                 f" types={slate.get('sports_market_types')}"
                 f" payload_keys={slate.get('payload_keys')}"
                 f" event_keys={slate.get('event_keys')}"
                 f" reason={slate.get('reason')}",
                 flush=True,
             )
-
-        # The alias table that would replace the fuzzy match behind the
-        # game-line join's measured `side_not_a_team_in_this_game: 77`.
         teams = pm.fetch_teams("mlb")
         index = pm.team_alias_index(teams.get("teams") or [])
         print(
             f"[live_odds_worker] POLYMARKET_US_TEAMS status={teams.get('status')}"
             f" provider={teams.get('provider')} count={teams.get('count')}"
-            f" aliases={len(index)}"
-            f" payload_keys={teams.get('payload_keys')}"
-            f" row_keys={teams.get('row_keys')}"
-            f" reason={teams.get('reason')}",
+            f" aliases={len(index)} reason={teams.get('reason')}",
             flush=True,
         )
     except Exception as exc:

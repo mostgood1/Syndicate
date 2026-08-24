@@ -505,3 +505,58 @@ def test_absent_credentials_skip_the_teams_route(monkeypatch):
 
     monkeypatch.setattr(auth, "credentials_present", lambda: False)
     assert mod.fetch_teams("mlb")["reason"] == "credentials_absent"
+
+
+# --------------------------------------------------------------------------
+# The legacy /v1 sports routes -- NOT covered by the measured 404
+# --------------------------------------------------------------------------
+
+
+def test_the_v1_probe_asks_the_routes_the_404_did_not_cover(monkeypatch):
+    """Concluding "the Sports API is not on this host" from four tested routes
+    was an overreach. `/v1/sports/teams/provider` is the PROVIDER VARIANT;
+    `/v1/sports` and `/v1/sports/teams` were never tried and share the prefix
+    that demonstrably works for `/v1/markets`."""
+    seen: list[str] = []
+
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        seen.append(url)
+        return {"sports": [{"sport": "baseball", "series": "12"}]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.probe_v1_sports_routes()
+    assert any(u.endswith("/v1/sports") for u in seen)
+    assert any(u.endswith("/v1/sports/teams") for u in seen)
+    assert result["routes"]["sports"]["row_keys"] == ["series", "sport"]
+    assert result["routes"]["sports"]["count"] == 1
+
+
+def test_one_route_404ing_does_not_stop_the_others(monkeypatch):
+    """The whole point is comparing them. A route that dies must not take the
+    comparison with it."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        if url.endswith("/v1/sports"):
+            raise auth.PolymarketUSAuthError("http_404: not found")
+        return {"teams": [{"id": 1, "name": "New York Yankees"}]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    routes = mod.probe_v1_sports_routes()["routes"]
+    assert routes["sports"]["status"] == "error"
+    assert "http_404" in routes["sports"]["reason"]
+    assert routes["teams"]["status"] == "ok"
+    assert routes["teams"]["count"] == 1
+
+
+def test_the_v1_probe_names_absent_credentials(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: False)
+    assert mod.probe_v1_sports_routes()["reason"] == "credentials_absent"

@@ -80,6 +80,7 @@ __all__ = [
     "fetch_markets",
     "fetch_league_slate",
     "fetch_teams",
+    "probe_v1_sports_routes",
     "team_alias_index",
     "is_sporting_row",
     "trimmed_row",
@@ -204,8 +205,54 @@ def fetch_markets(*, limit: int = _DEFAULT_LIMIT, active: bool = True) -> dict[s
 
 
 # --------------------------------------------------------------------------
-# THE SPORTS API -- a league-scoped slate, PAGED over the sibling module
+# THE SPORTS API -- 404 ON THIS HOST. MEASURED 2026-08-24T20:18:37Z.
 # --------------------------------------------------------------------------
+#
+# READ THIS BEFORE BUILDING ANYTHING ON `fetch_league_slate`. FOUR of the
+# user-supplied Sports API routes return HTTP 404 from `api.polymarket.us`.
+# One boot, one credential, 0.6 seconds end to end (live-odds-worker `hvpj6`):
+#
+#     .602  GET /v1/markets                 ok=True, 29 row keys
+#     .752  GET /v2/leagues/mlb/events      http_404  {"code":5}  NOT_FOUND
+#     .901  GET /v2/leagues/wnba/events     http_404
+#   38.100  GET /v2/leagues/nfl/events      http_404
+#   38.240  GET /v1/sports/teams/provider   http_404
+#
+# Two things that rules out, which is why it is worth stating at this length:
+#
+#   * NOT the slug. `nfl`/`nba`/`mlb` are the docs' OWN examples and they 404
+#     identically to the four guessed ones. The route is absent, not the league.
+#   * NOT the credential, the clock, or the signature. A signed read of
+#     `/v1/markets` succeeded in the SAME SECOND, on the same instance, through
+#     the same `signed_request`. gRPC code 5 is NOT_FOUND, not UNAUTHENTICATED.
+#
+# WHAT IT DOES *NOT* RULE OUT, and an earlier draft of this comment wrongly
+# claimed it did: the rest of the LEGACY `/v1` sports routes. Four routes were
+# tested, not the doc set. `/v1/sports/teams/provider` is the `provider`
+# VARIANT, and these are untried:
+#
+#     GET /v1/sports                    all sports + their series ids
+#     GET /v1/sports/teams              teams, with no provider argument
+#     GET /v1/sports/{seriesId}/events  events for a series
+#
+# They matter because they share the `/v1` prefix that demonstrably works on
+# this host, while everything confirmed dead is either `/v2` or carries the
+# `provider` sub-path. A 404 on `/v1/sports/teams/provider` is as consistent
+# with "that variant needs different arguments" as with "no sports data here",
+# and those have opposite consequences. `probe_v1_sports_routes` below asks.
+#
+# The code below is KEPT rather than deleted -- it is correct against the
+# documented contract, and the moment the right host is found it works by
+# pointing `POLYMARKET_US_API_BASE` at it. What must not happen is a future
+# session rediscovering this 404 from scratch, or worse, reading an empty slate
+# as "the venue lists no sport".
+#
+# USE `fetch_markets` INSTEAD. `/v1/markets` works and carries
+# `sportsMarketTypeV2`, `gameStartTime`, `orderPriceMinTickSize` and
+# `minimumTradeQty` -- every field the join and the order need.
+#
+# --------------------------------------------------------------------------
+# (original design notes, still accurate about the CONTRACT)
 #
 # `GET /v2/leagues/{slug}/events` returns one league's events directly, which
 # is strictly better than pulling `/v1/markets` and filtering: it cannot be
@@ -435,6 +482,54 @@ def fetch_teams(league: Any, *, provider: str | None = None) -> dict[str, Any]:
         "payload_keys": sorted(payload.keys()),
         "row_keys": sorted(teams[0].keys()) if teams else None,
     }
+
+
+def probe_v1_sports_routes() -> dict[str, Any]:
+    """Ask the LEGACY `/v1` sports routes what they return, by shape.
+
+    Exists because concluding "the Sports API is not on this host" from four
+    tested routes was an overreach. `/v1/sports` and `/v1/sports/teams` share
+    the prefix that works for `/v1/markets`; everything confirmed 404 is either
+    `/v2` or the `provider` sub-path. Those are different claims with opposite
+    consequences, so this asks rather than assumes.
+
+    READ-ONLY. Reports status and keys, never parses.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    if not auth.credentials_present():
+        return {"status": "skipped", "reason": "credentials_absent"}
+
+    out: dict[str, Any] = {}
+    for name, path in (
+        ("sports", "/v1/sports"),
+        ("teams", "/v1/sports/teams"),
+        ("teams_provider_no_league", "/v1/sports/teams/provider?provider=PROVIDER_SPORTRADAR"),
+    ):
+        url = f"{auth.BASE_URL}{path}"
+        try:
+            payload = auth.signed_request("GET", url)
+        except Exception as exc:
+            reason = (
+                str(exc) if isinstance(exc, auth.PolymarketUSAuthError)
+                else f"{type(exc).__name__}: {exc}"
+            )
+            out[name] = {"status": "error", "reason": reason[:300], "url": url}
+            continue
+        rows = None
+        for key in ("sports", "teams", "data", "results"):
+            if isinstance(payload.get(key), list):
+                rows = payload[key]
+                break
+        sample = rows[0] if rows else None
+        out[name] = {
+            "status": "ok",
+            "url": url,
+            "payload_keys": sorted(payload.keys()),
+            "count": len(rows) if rows is not None else None,
+            "row_keys": sorted(sample.keys()) if isinstance(sample, Mapping) else None,
+        }
+    return {"status": "ok", "routes": out}
 
 
 def team_alias_index(teams: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
