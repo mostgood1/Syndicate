@@ -391,3 +391,60 @@ def test_reclassify_is_idempotent(monkeypatch):
     assert mod.reclassify_presend_failures()["status"] == "ok"
     second = mod.reclassify_presend_failures()
     assert second["reclassified"] == 0
+
+
+def test_a_deprecated_endpoint_410_is_recoverable(monkeypatch):
+    """MEASURED 2026-08-24T08:01Z. A real, correctly built order — Zebby
+    Matthews under 4.5 strikeouts, $1.58, valid ticker and price — reached
+    Kalshi and died on http_410 `deprecated_v1_order_endpoint`.
+
+    Recorded `failed`, it can never be retried: `place_order` finds the
+    idempotency key, returns the record, and never contacts the venue. A dead
+    route would poison every position it touched, permanently, and charge the
+    day's budget for each. The 410 is proof the route is gone and nothing was
+    created behind it, so it reclassifies to `rejected` — uncharged, retryable.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    def dead_route(_request):
+        raise RuntimeError("boom")
+
+    request = _request(position_key="gone-410")
+    record = mod.place_order(request, submit=dead_route, mode=mod.LIVE)
+    mod.complete_order(
+        record["idempotency_key"],
+        status=mod.STATUS_FAILED,
+        error=(
+            'KalshiAuthError: http_410: .../portfolio/orders: '
+            '{"error":{"code":"deprecated_v1_order_endpoint"}}'
+        ),
+    )
+
+    assert mod.reclassify_presend_failures()["reclassified"] >= 1
+    assert mod.find_order(record["idempotency_key"])["status"] == mod.STATUS_REJECTED
+
+
+def test_a_server_error_is_NOT_reclassified(monkeypatch):
+    """A 500 may well have been processed. Only the deprecated-endpoint 410 is
+    proof of non-delivery; anything else keeps the conservative reading."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    def boom(_request):
+        raise RuntimeError("x")
+
+    request = _request(position_key="keep-500")
+    record = mod.place_order(request, submit=boom, mode=mod.LIVE)
+    mod.complete_order(
+        record["idempotency_key"],
+        status=mod.STATUS_FAILED,
+        error="KalshiAuthError: http_500: internal error",
+    )
+
+    mod.reclassify_presend_failures()
+    assert mod.find_order(record["idempotency_key"])["status"] == mod.STATUS_FAILED

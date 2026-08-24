@@ -568,7 +568,23 @@ def reclassify_presend_failures() -> dict[str, Any]:
         error = str(order.get("error") or "")
         # The prefix IS the evidence. `OrderBuildError` is raised before the
         # request is assembled, so it cannot have reached a venue.
-        if not error.startswith("OrderBuildError:"):
+        #
+        # A 410 on a DEPRECATED ENDPOINT is the same kind of proof from the
+        # other end: the route is gone, so nothing was created behind it.
+        # Measured 2026-08-24T08:01Z -- a real, correctly built order (Zebby
+        # Matthews under 4.5 strikeouts, $1.58) died there, and because the
+        # ledger records it `failed` it can never be retried: `place_order`
+        # finds the key, returns the record, and never contacts the venue.
+        # A dead route would otherwise poison every position it touched,
+        # permanently, and charge the day's budget for each one.
+        #
+        # NARROW ON PURPOSE. Only this code, not 4xx or 5xx generally -- a 500
+        # may well have been processed, and a status we cannot prove is safe
+        # stays `failed`.
+        recoverable = error.startswith("OrderBuildError:") or (
+            "http_410" in error and "deprecated_v1_order_endpoint" in error
+        )
+        if not recoverable:
             continue
         order["status"] = STATUS_REJECTED
         order["reclassified_at"] = _utc_now()
