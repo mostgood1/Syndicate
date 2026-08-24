@@ -237,6 +237,7 @@ def run_execution(
     if mode == LIVE and not venue:
         return {"status": "skipped", "reason": "live_mode_with_no_venue_configured", "date": normalized}
 
+    from syndicate.features.shared.execution_ledger import STATUS_REJECTED
     from syndicate.features.shared.execution_guard import (
         check_order,
         guarded_submit,
@@ -277,6 +278,7 @@ def run_execution(
 
     placed = 0
     duplicates = 0
+    retried = 0
     skipped = 0
     # Every refusal is COUNTED BY NAME. A single `skipped` number cannot tell a
     # plan that named nothing bettable from a cap that stopped a good slate, and
@@ -294,10 +296,19 @@ def run_execution(
             continue
 
         before = _status_of(request)
-        if before is None:
-            # Checked only for orders that would be NEWLY placed. A duplicate
-            # places nothing, so charging it against the cap would let a re-run
-            # exhaust a budget it never spent.
+        # A REJECTED order never reached the venue, so a fresh attempt is a
+        # PLACEMENT, not a duplicate. Measured 2026-08-24T12:58Z: the retry
+        # unblock worked and the order really was submitted -- and this branch
+        # still counted it `duplicates=1` and `continue`d PAST the LIVE_ORDER
+        # log, so a real order went to Kalshi and its outcome was never
+        # recorded anywhere a person could read. Invisible is the one thing an
+        # order that moves money must never be.
+        retryable = before is None or before == STATUS_REJECTED
+        if retryable:
+            # Checked for anything that would be NEWLY placed, retries
+            # included -- a retry spends, so it must be charged. A duplicate
+            # places nothing, and charging that would let a re-run exhaust a
+            # budget it never spent.
             verdict = check_order(request, mode=mode, already=used)
             if not verdict.get("allowed"):
                 reason = str(verdict.get("reason"))
@@ -306,9 +317,11 @@ def run_execution(
                 continue
 
         record = place_order(request, submit=submitter)
-        if before is not None:
+        if not retryable:
             duplicates += 1
             continue
+        if before == STATUS_REJECTED:
+            retried += 1
         status = str(record.get("status") or "")
         if mode == LIVE:
             # EVERY LIVE ORDER GETS A LINE, whatever happened to it. Measured
@@ -348,7 +361,7 @@ def run_execution(
     print(
         f"[execute_portfolio] EXECUTED date={normalized} mode={mode} venue={venue} "
         f"armed={live_execution_armed()} positions={len(positions)} placed={placed} "
-        f"duplicates={duplicates} skipped={skipped} refused={refused} "
+        f"duplicates={duplicates} retried={retried} skipped={skipped} refused={refused} "
         f"spent={used} summary={summary}",
         flush=True,
     )
@@ -362,6 +375,10 @@ def run_execution(
         # A re-run places nothing new. This is the number that proves the
         # idempotency works in production rather than only in a test.
         "duplicates": duplicates,
+        # Orders that had been REJECTED and were attempted again. Counted apart
+        # from `placed` so a retry storm is visible rather than looking like
+        # ordinary volume.
+        "retried": retried,
         "skipped": skipped,
         "refused": refused,
         "spent": used,

@@ -570,3 +570,97 @@ def test_paper_without_a_scope_is_still_fine(monkeypatch):
     result = mod.run_execution("2026-08-24")
     # Whatever it does about the plan, it must not be refused for the scope.
     assert result.get("reason") != "live_mode_requires_venue_scope"
+
+
+def test_a_retried_order_is_counted_and_LOGGED_not_swallowed(monkeypatch):
+    """MEASURED 2026-08-24T12:58Z. The retry unblock worked — a real order went
+    to Kalshi:
+
+        SUBMIT url=.../portfolio/events/orders
+          ticker=KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-5
+          side=ask count=2.00 price=0.4600
+
+    and this branch still counted it `duplicates=1` and `continue`d PAST the
+    LIVE_ORDER log. A real order moved and its outcome was recorded nowhere a
+    person could read. Invisible is the one thing an order that moves money
+    must never be.
+    """
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared.execution_ledger import (
+        LIVE, STATUS_REJECTED, complete_order, find_order, idempotency_key, place_order,
+    )
+
+    _write_live_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+
+    submitted = []
+
+    def submitter(request):
+        submitted.append(request)
+        return {"status": "filled", "fill_price": 0.46, "fill_stake_dollars": 0.92}
+
+    monkeypatch.setattr(runner, "_venue_submitter", lambda venue: submitter)
+
+    first = runner.run_execution("2026-08-22", venue_scope="kalshi")
+    assert first["placed"] == 1
+
+    # Force the pre-retry state: rejected, never reached the venue.
+    key = None
+    for order in first.get("summary", {}).get("by_status", {}) or {}:
+        pass
+    from syndicate.features.shared.execution_ledger import _load
+
+    for order in _load().get("orders") or []:
+        if order.get("venue", "").startswith("kalshi"):
+            key = order["idempotency_key"]
+    assert key
+    complete_order(key, status=STATUS_REJECTED, error="dead route")
+
+    submitted.clear()
+    second = runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    assert submitted, "a rejected order must actually reach the venue again"
+    # Counted as a PLACEMENT, not a duplicate — and surfaced separately so a
+    # retry storm is visible rather than looking like ordinary volume.
+    assert second["retried"] == 1
+    assert second["duplicates"] == 0
+    assert second["placed"] == 1
+
+
+def test_a_retry_is_charged_against_the_cap(monkeypatch):
+    """A retry spends, so it must be charged. Only a true duplicate — which
+    places nothing — may go uncharged."""
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared.execution_ledger import (
+        LIVE, STATUS_REJECTED, complete_order, _load, complete_order,
+    )
+
+    _write_live_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+    monkeypatch.setattr(
+        runner, "_venue_submitter",
+        lambda venue: (lambda r: {"status": "filled", "fill_price": 0.46,
+                                  "fill_stake_dollars": 0.92}),
+    )
+    runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    key = None
+    for order in _load().get("orders") or []:
+        if str(order.get("venue", "")).startswith("kalshi"):
+            key = order["idempotency_key"]
+    complete_order(key, status=STATUS_REJECTED, error="dead route")
+
+    # A cap the retry cannot clear. Note it is a DOLLAR cap: `_int_env` treats
+    # a non-positive order count as a typo and falls back to the default, so
+    # `MAX_DAY_ORDERS=0` would silently not bind — a guard that reads zero as
+    # "no limit" is worth knowing about, and this test would have hidden it.
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "0.01")
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
+    assert result["placed"] == 0
+    assert "over_max_order_dollars" in result["refused"]
