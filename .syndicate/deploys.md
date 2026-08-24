@@ -25925,3 +25925,57 @@ time, so a clean `release` refused twice today. The claim file is not durable
 across a restart of the session holding it, which makes `--force` on one's own
 lane routine rather than exceptional — worth fixing or worth documenting, but
 not worth pretending is clean.
+
+---
+
+### 2026-08-24 19:17:33Z — THE ANSWER WAS NEITHER HYPOTHESIS. It is game lines vs totals.
+
+**verify: `[paper_settlement] PNL_CUT all_time by_market_family=[('game_line',
+79, -83.75, -16.4, 35.44), ('game_total', 71, 110.59, 24.03, 53.52),
+('player_prop', 19, -5.41, -6.01, 42.11)]`**, refresh-worker `6zngl`, in
+`4dd35ab04` (contains `909c0385b`, ancestry verified).
+
+I offered two explanations for the unrestricted book's -4.25% and wrote the
+decision rule before seeing the data. Both were wrong:
+
+- **NOT composition-by-props.** `player_prop` is 19 settled at -6.01%. Too few
+  to be evidence of anything, and nowhere near enough to move the book.
+- **NOT cleanly best-of-N inflation** either, because the split is not between
+  venues at all.
+
+**The book is profitable ONLY because of totals.** +110.59 (totals) -83.75
+(game lines) -5.41 (props) = +21.43, which reconciles exactly to the all-time
+figure. Take totals out and the book loses money.
+
+**`by_sport` rules out a sport confound:** mlb 169 settled, soccer 0, wnba 0.
+Everything settled so far is baseball.
+
+**THE VENUE SPLIT IS PROBABLY MIX, NOT REPRICING.** `paper:novig` +23.94% and
+`paper:prophetx` -13.48% now look like totals-heavy and game-line-heavy books
+respectively, not like evidence about the price gate. NOT ESTABLISHED: the two
+cuts are separate, not crossed. Settling it needs P&L by (venue x family),
+which the existing `_grouped` helper already makes a two-line change.
+
+**THE FINDING I WOULD NOT ACT ON YET, AND THE REASON.** A 35.44% win rate on
+79 game lines is not merely bad, it is bad in a specific and suspicious
+direction -- and **these are the bets my own code started grading four hours
+ago**. Totals grade through the old, long-exercised path and are positive;
+game lines grade through `game_line_bet`, shipped today, and are the ones
+losing. A systematically inverted spread sign would produce exactly this
+picture, and 1 - 0.3544 = 0.6456 is roughly what an inverted-but-otherwise-fine
+model would look like.
+
+The sign is unit-tested in both directions and `home_away_disagree_between_sources`
+never fired across 77 orders -- but that guard tests whether the two SOURCES
+agree about which team is home, not whether my convention is right. Both tests
+would pass under a consistent inversion.
+
+**The discriminating check is cheap and is the next thing to do:** take one
+graded spread out of the ledger, look up the real final score, and grade it by
+hand. That separates "the model is bad at game lines" (stop betting them) from
+"I am grading them backwards" (fix the grader, and every game-line number
+today is wrong). Those have opposite responses, so acting before checking is
+the expensive move.
+
+Claims force-released again (container restart lost the tokens; third time
+today).
