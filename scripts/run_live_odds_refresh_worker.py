@@ -900,8 +900,9 @@ def _polymarket_us_slate_probe_at_boot() -> None:
         catalogue = pm.fetch_markets(limit=500, max_pages=4)
         print(
             f"[live_odds_worker] POLYMARKET_US_CATALOGUE status={catalogue.get('status')}"
-            f" sporting={catalogue.get('sporting')} settled={catalogue.get('settled')}"
-            f" live={catalogue.get('live')}"
+            f" sporting={catalogue.get('sporting')}"
+            f" games={catalogue.get('games')} futures={catalogue.get('futures')}"
+            f" settled={catalogue.get('settled')} live={catalogue.get('live')}"
             f" rows={catalogue.get('total_rows')} pages={catalogue.get('pages')}"
             f" duplicate_ids={catalogue.get('duplicate_ids')}"
             f" orderable={catalogue.get('orderable')}"

@@ -86,6 +86,8 @@ __all__ = [
     "probe_market_query_params",
     "team_alias_index",
     "is_sporting_row",
+    "is_game_market_row",
+    "sports_market_type",
     "trimmed_row",
     "league_slug_for_sport",
     "SPORTS_FIELDS",
@@ -121,17 +123,71 @@ _KEEP = (
 )
 
 
-def is_sporting_row(row: Mapping[str, Any]) -> bool:
-    """Does this row carry sports structure at all?
+# MEASURED 2026-08-24T21:07:04Z, the first run through `closed=false`:
+#
+#   sporting=2000 types=['SPORTS_MARKET_TYPE_FUTURE',
+#                        'SPORTS_MARKET_TYPE_UNSPECIFIED']
+#   categories=['crypto','culture','finance','geopolitics','macro',
+#               'politics','sports','technology']
+#
+# `sporting=2000` was WRONG, and wrong the same way `sporting=500` was. The
+# presence test counted crypto, politics and macro markets as sporting,
+# because they carry `sportsMarketTypeV2` with the value
+# `SPORTS_MARKET_TYPE_UNSPECIFIED` -- a field that is PRESENT and means "not a
+# sports market". Presence was the right test while no value had been
+# observed; now that the vocabulary is known, it is the wrong one.
+_NON_SPORT_TYPE_MARKERS = ("UNSPECIFIED", "UNKNOWN")
 
-    Presence, not value. `gameStartTime` alone is enough: a market tied to a
-    specific game start is a game market whatever the venue calls its type.
+# The category vocabulary, observed in that same response. `sports` is the one
+# that matters; the rest are listed so a future reader can see this was read
+# off the venue rather than guessed.
+SPORTS_CATEGORY = "sports"
+
+# Game-level vs season-level. Both are genuinely sports and they are NOT
+# interchangeable: a future ("World Series Champion", `outcomes: ["Yes","No"]`)
+# has no game to join a board row to, while a moneyline
+# (`outcomes: ["Titans","Chargers"]`) does.
+GAME_MARKET_TYPE = "SPORTS_MARKET_TYPE_MONEYLINE"
+FUTURES_MARKET_TYPE = "SPORTS_MARKET_TYPE_FUTURE"
+
+
+def sports_market_type(row: Mapping[str, Any]) -> str:
+    return str(row.get("sportsMarketTypeV2") or "").strip().upper()
+
+
+def is_sporting_row(row: Mapping[str, Any]) -> bool:
+    """Is this a sports market at all?
+
+    Was a PRESENCE test, because no value of `sportsMarketTypeV2` had ever been
+    observed and matching a guessed constant would have returned zero rows
+    indistinguishably from a venue with no sport. Both facts are now measured,
+    so the test uses them: a type of `*_UNSPECIFIED` is present and means NOT
+    sport, and `category` carries a real `sports` value.
     """
-    for field in SPORTS_FIELDS:
-        value = row.get(field)
-        if value not in (None, "", [], {}):
-            return True
-    return False
+    category = str(row.get("category") or "").strip().lower()
+    if category:
+        return category == SPORTS_CATEGORY
+
+    market_type = sports_market_type(row)
+    if market_type:
+        return not any(marker in market_type for marker in _NON_SPORT_TYPE_MARKERS)
+
+    # No category and no type: fall back to the original structural signal. A
+    # market tied to a specific game start is a game market whatever else is
+    # missing.
+    return bool(str(row.get("gameStartTime") or "").strip())
+
+
+def is_game_market_row(row: Mapping[str, Any]) -> bool:
+    """A GAME market -- the only kind a board row can join to.
+
+    A future is a sports market and cannot be joined: "World Series Champion"
+    with `outcomes: ["Yes","No"]` has no game. A moneyline carries the two
+    teams (`["Titans","Chargers"]`) and a `gameStartTime` that identifies one.
+    Counting them together is how `sporting=2000` looked like a usable slate
+    while containing no joinable row at all.
+    """
+    return is_sporting_row(row) and sports_market_type(row) == GAME_MARKET_TYPE
 
 
 def trimmed_row(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -349,6 +405,7 @@ def fetch_markets(
         truncated = True
 
     sporting = [r for r in rows if is_sporting_row(r)]
+    games = [r for r in sporting if is_game_market_row(r)]
     settled = [r for r in sporting if is_settled_row(r)]
     live = [r for r in sporting if not is_settled_row(r)]
     chosen = live if drop_settled else sporting
@@ -361,6 +418,10 @@ def fetch_markets(
         "count": len(trimmed),
         "total_rows": len(rows),
         "sporting": len(sporting),
+        # GAME markets only -- the joinable ones. A slate of futures is a
+        # sports catalogue with nothing a board row can be priced against.
+        "games": len(games),
+        "futures": sum(1 for r in sporting if sports_market_type(r) == FUTURES_MARKET_TYPE),
         # THE THREE NUMBERS THAT WERE ONE. `live` is the only usable count.
         "settled": len(settled),
         "live": len(live),

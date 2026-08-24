@@ -90,17 +90,16 @@ def test_this_module_never_imports_the_global_client():
 # --------------------------------------------------------------------------
 
 
-def test_a_sporting_row_is_recognised_by_STRUCTURE_not_by_a_guessed_constant():
-    """No value of `sportsMarketTypeV2` has ever come back from the venue --
-    the probe returned one row and it was politics. Matching a guessed constant
-    would return zero rows indistinguishably from a venue that lists no sport,
-    which is exactly the failure this module corrects, one layer down."""
-    assert mod.is_sporting_row(_row(sportsMarketTypeV2="ANYTHING_AT_ALL"))
-    assert mod.is_sporting_row(_row(sportsMarketTypeV2="A_VALUE_NOBODY_PREDICTED"))
-    # `gameStartTime` alone is enough: a market tied to a specific game start
-    # is a game market whatever the venue calls its type.
-    row = _row(sportsMarketTypeV2=None, sportsMarketType=None)
+def test_a_sporting_row_is_recognised_by_the_OBSERVED_vocabulary():
+    """This was a PRESENCE test while no value of `sportsMarketTypeV2` had ever
+    been observed -- a guessed constant would have returned zero rows
+    indistinguishably from a venue with no sport. Both facts are measured now,
+    so the test uses them."""
+    row = _row(category=None, sportsMarketTypeV2="SPORTS_MARKET_TYPE_MONEYLINE")
     assert mod.is_sporting_row(row)
+    # `gameStartTime` alone still carries it when nothing else is present.
+    bare = _row(category=None, sportsMarketTypeV2=None, sportsMarketType=None)
+    assert mod.is_sporting_row(bare)
 
 
 def test_a_non_sporting_row_is_excluded():
@@ -923,3 +922,58 @@ def test_the_open_status_value_is_recorded():
     query param is not honoured, so it cannot filter."""
     assert mod.MARKET_STATUS_OPEN == "MARKET_STATUS_OPEN"
     assert mod.is_settled_row(_row(status=mod.MARKET_STATUS_OPEN)) is False
+
+
+# ==========================================================================
+# UNSPECIFIED is present and means NOT SPORT; futures are not joinable
+# ==========================================================================
+
+
+def test_an_UNSPECIFIED_type_is_not_a_sports_market(monkeypatch):
+    """MEASURED 2026-08-24T21:07:04Z: `sporting=2000` with
+    categories=['crypto','culture','finance','geopolitics','macro','politics',
+    'sports','technology']. The presence test counted crypto and politics as
+    sporting because they carry `sportsMarketTypeV2` with the value
+    SPORTS_MARKET_TYPE_UNSPECIFIED -- a field that is PRESENT and means "not a
+    sports market". Same failure as `sporting=500`, one layer along."""
+    crypto = _row(category="crypto", sportsMarketTypeV2="SPORTS_MARKET_TYPE_UNSPECIFIED")
+    assert mod.is_sporting_row(crypto) is False
+    no_category = _row(category=None, sportsMarketTypeV2="SPORTS_MARKET_TYPE_UNSPECIFIED")
+    assert mod.is_sporting_row(no_category) is False
+
+
+def test_the_category_decides_when_it_is_present():
+    """`category` carries a real `sports` value, observed alongside seven
+    non-sport categories."""
+    assert mod.is_sporting_row(_row(category="sports")) is True
+    for other in ("politics", "crypto", "macro", "geopolitics", "finance"):
+        assert mod.is_sporting_row(_row(category=other)) is False, other
+
+
+def test_a_FUTURE_is_a_sports_market_but_NOT_a_joinable_game():
+    """"World Series Champion" with outcomes ["Yes","No"] has no game to join a
+    board row to. A moneyline carries the two teams and a gameStartTime that
+    identifies one. Counting them together is how sporting=2000 looked like a
+    usable slate while containing no joinable row."""
+    future = _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE",
+                  outcomes=["Yes", "No"], question="World Series Champion")
+    assert mod.is_sporting_row(future) is True
+    assert mod.is_game_market_row(future) is False
+
+    game = _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_MONEYLINE",
+                outcomes=["Titans", "Chargers"])
+    assert mod.is_game_market_row(game) is True
+
+
+def test_games_and_futures_are_counted_SEPARATELY(monkeypatch):
+    _stub(monkeypatch, {"markets": [
+        _row(id="f-1", category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE"),
+        _row(id="f-2", category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE"),
+        _row(id="g-1", category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_MONEYLINE"),
+        _row(id="x-1", category="politics", sportsMarketTypeV2="SPORTS_MARKET_TYPE_UNSPECIFIED"),
+    ]})
+    result = mod.fetch_markets()
+    assert result["sporting"] == 3
+    assert result["futures"] == 2
+    # The only number that means "a board row could be priced against this".
+    assert result["games"] == 1
