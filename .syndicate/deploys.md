@@ -26160,3 +26160,34 @@ rows are currently `active`; the rest are settled/inactive. Stated here only
 because the two counts sitting near each other in the same probe output
 could otherwise read as a discrepancy to a future reader who has not traced
 where each number comes from.
+## 2026-08-24 19:58Z — scoreboard passthrough, both workers
+
+- **SHA** `f5890594879325b943f6c4dd6f0b14f5b7da43ea` (`main`). Contains my
+  `a4ede840d`; verified with `git merge-base --is-ancestor` BEFORE deploying,
+  not assumed. A parallel session's merge landed between my claim and my
+  trigger — the fourth time today — and serialisation is not composition.
+- **Services** refresh-worker `dep-da6a1oe1egvs739tjnmg`, live-odds-worker
+  `dep-da6a2oijobas73bfcpf0`. Both needed: refresh-worker stores the scores at
+  grade time, live-odds-worker prints them in the audit.
+- **verify:** `GRADE_AUDIT ... score=<not_recorded> margin_used=-5.0
+  must_beat=-1.0 our_verdict=lost if_inverted=won` at 19:58:56Z, and
+  `GRADE_AUDIT_SUMMARY date=2026-08-23 audited=25 of=79`. The field renders.
+  `<not_recorded>` is the CORRECT reading for these rows — all 79 were graded
+  before the passthrough existed and keep only their margins. The next slate
+  stamps real scores.
+- **Still open:** the game-line sign. A margin cannot falsify its own sign, so
+  2026-08-23 still needs one external score (DET@KC, TOR@NYY). Confirmed the
+  local mirror cannot supply it: no `data/mlb_source/raw/statsapi/feed_live/`
+  at all, and nothing under `data/` for that date but weather and a WNBA
+  snapshot — exactly the lossy-mirror trap CLAUDE.md documents.
+- **Found while reading the output:** `audited=25 of=79 skipped={}` was a
+  silent cap — `orders[:limit]` truncates at 25 and the other 54 were never
+  examined, not refused. Now reports `not_examined=`. Fixed in `72807607f`,
+  not yet deployed.
+- Both claims released cleanly with their tokens passed explicitly. Worth
+  recording because a bare `release` REFUSED both — the process that acquired
+  them is gone, so the tokens are no longer in its environment even though the
+  lane is the same. `--token <value>` is the correct move there, not `--force`:
+  it proves ownership rather than overriding it. Five token losses today; the
+  tokens are worth pasting into the lane when acquired.
+
