@@ -1826,18 +1826,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Syndicate league key). `probe_league()`/`probe_all_leagues()` report the
   SHAPE an event row actually has -- the endpoints are documented, the row
   schema is not. Wired into `scripts/probe_exchange_markets.py`'s existing
-  boot-probe rotation (this lane's own file). 29 new tests. **OWED: a live
-  probe run** -- deploy claim `b89496aa53797228` held on refresh-worker,
-  `SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT=1` set and a redeploy triggered
-  (`dep-da6a4861egvs739tqrd0`), result not yet read as of this checkpoint.
-  Whether `POLYMARKET_US_API_KEY_ID`/`PRIVATE_KEY` are even present on
-  refresh-worker (as opposed to only on live-odds-worker, where the other
-  session confirmed them working) is itself unknown -- `credentials_absent`
-  is an expected, informative possible outcome of this probe, not a failure.
-  This is the piece the user's Kalshi-vs-Polymarket arb-detection ask needs
-  next: nothing joins the two venues to a common board-row identity yet, and
-  building that join before this probe reports real field names would repeat
-  the exact mistake Kalshi's own join cost a day recovering from.
+  boot-probe rotation (this lane's own file). 29 new tests.
+  **LIVE PROBE RUN, TWICE, RESOLVED 2026-08-24: BOTH DOCUMENTED SPORTS API
+  FAMILIES ARE DEAD ON THIS ACCOUNT.** First pass (`credentials_absent` --
+  `POLYMARKET_US_API_KEY_ID`/`PRIVATE_KEY` were not on refresh-worker) told
+  the user, who then set them. Second pass, all seven leagues: `http_404`
+  with an identical gRPC `{"code":5,...}` NOT_FOUND body -- a route absent
+  from this deployment, not a bad slug. The other session (Polymarket-order-
+  automation, `relaxed-knuth-38xts4`) independently hit the same wall on
+  `live-odds-worker` within the same minute and tested further
+  (`/v1/sports/teams/provider` also 404s; `/v1/markets` is the one route
+  that works and already carries every field a join needs). This lane
+  started building the identical next probe and found their more complete
+  commit first -- discarded the duplicate, kept only a docstring pointer to
+  their measurement in `polymarket_us_sports_client.py`'s header (PR #44).
+  Fourth reciprocal-deference trade with that session today. Probe flag
+  turned back off, deploy claim `b89496aa53797228` released, full readout
+  `.syndicate/deploys.md` 2026-08-24 20:17:59Z and 20:18:37Z entries.
+  **Consequence for the user's Kalshi-vs-Polymarket arb ask:** the dedicated
+  Sports API this module targets is not the path -- the other session's
+  `/v1/markets`-filtered approach is, and it is already building the join
+  needed for its own order automation. The arb comparison itself is not yet
+  built by anyone; it should be built once that join lands, not duplicated
+  from scratch here.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
