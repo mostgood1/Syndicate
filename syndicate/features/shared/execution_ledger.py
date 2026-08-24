@@ -622,14 +622,279 @@ def reclassify_presend_failures() -> dict[str, Any]:
     return {"status": "ok", "reclassified": len(changed), "orders": changed}
 
 
+def _venue_reader(venue: str):
+    """The read side of a venue adapter. Only Kalshi has one."""
+    if str(venue or "").strip().lower().startswith("kalshi"):
+        from syndicate.features.shared.kalshi_orders import fetch_orders, venue_order_view
+
+        return fetch_orders, venue_order_view
+    return None, None
+
+
+def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[str, Any]:
+    """Correct the live ledger from what the VENUE says, not from what we sent.
+
+    ------------------------------------------------------------------
+    WHY THIS EXISTS AND WHY IT IS NOT OPTIONAL
+    ------------------------------------------------------------------
+
+    A submit response describes the moment of submission. It cannot describe
+    what the order did afterwards, and a limit order's whole point is that it
+    does something afterwards. Two failures follow from treating the submit as
+    the final word, and we have now had one of each:
+
+    1. MEASURED 2026-08-24T13:12Z -- our ledger read `filled` for an order
+       Kalshi showed as resting with `Filled: 0`. Found by the USER looking at
+       the Kalshi UI. No log said anything was wrong, because from inside the
+       process nothing was: we had recorded exactly what we decided to record.
+    2. The mirror image, which has not bitten yet and will: an order correctly
+       recorded `submitted`, which FILLS an hour later. Settlement never grades
+       it, P&L never books it, and the position is real the entire time.
+
+    Neither is fixable by writing the submit path more carefully. Both need a
+    second read.
+
+    ------------------------------------------------------------------
+    THE VENUE IS THE AUTHORITY -- BUT ONLY WHEN IT ANSWERS
+    ------------------------------------------------------------------
+
+    A FETCH FAILURE MUST NEVER MODIFY A RECORD. Absence in a failed read is not
+    absence at the venue, and the difference is a live position deleted out of
+    our own books. So: a failed fetch returns an error and changes nothing; an
+    order missing from a SUCCESSFUL read is counted `not_found` and still
+    changes nothing, because the list is capped at `limit` and an older order
+    legitimately ages out of it. Only a positive statement about a specific
+    order can move that order.
+
+    `unknown` is treated the same way. A venue status we have never mapped is
+    not evidence in either direction, and guessing is what produced (1).
+
+    Idempotent: a second pass over unchanged orders reports zero changes.
+    """
+    fetch, view = _venue_reader(venue)
+    if fetch is None:
+        return {"status": "skipped", "reason": f"no_reader_for_venue:{venue}"}
+
+    state = _load()
+    orders = state.get("orders") or []
+    candidates = [
+        o
+        for o in orders
+        if str(o.get("mode") or "") == LIVE
+        and str(o.get("status") or "") in (STATUS_SUBMITTED, STATUS_FILLED)
+        and o.get("outcome") is None
+        and str(o.get("venue") or "").strip().lower().startswith(str(venue).strip().lower())
+    ]
+    if not candidates:
+        return {"status": "ok", "candidates": 0, "changed": 0, "orders": []}
+
+    read = fetch(limit=limit)
+    if read.get("status") != "ok":
+        # Reported, not raised, and NOTHING WRITTEN. The caller is a periodic
+        # loop; a venue that is briefly unreachable must leave the ledger
+        # exactly as it found it.
+        print(
+            f"[execution_ledger] RECONCILE_READ_FAILED venue={venue}"
+            f" candidates={len(candidates)} reason={read.get('reason')}",
+            flush=True,
+        )
+        return {
+            "status": "error",
+            "reason": read.get("reason"),
+            "candidates": len(candidates),
+            "changed": 0,
+        }
+
+    by_client: dict[str, dict[str, Any]] = {}
+    by_venue_id: dict[str, dict[str, Any]] = {}
+    for raw in read.get("orders") or []:
+        seen = view(raw)
+        client = str(seen.get("client_order_id") or "").strip()
+        if client:
+            by_client[client] = seen
+        venue_id = str(seen.get("order_id") or "").strip()
+        if venue_id:
+            by_venue_id[venue_id] = seen
+
+    changed: list[dict[str, Any]] = []
+    not_found = 0
+    unknown = 0
+
+    for order in candidates:
+        key = str(order.get("idempotency_key") or "")
+        # OUR key first. `client_order_id` IS the idempotency key by
+        # construction, so it matches even for an order whose submit response
+        # was lost and whose venue id we therefore never learned -- the case
+        # the write-ahead record exists for.
+        seen = by_client.get(key) or by_venue_id.get(str(order.get("venue_order_id") or ""))
+        if seen is None:
+            not_found += 1
+            continue
+
+        venue_state = seen.get("state")
+        if venue_state == "unknown":
+            unknown += 1
+            print(
+                f"[execution_ledger] RECONCILE_UNKNOWN_STATUS key={key}"
+                f" venue_status={seen.get('venue_status')!r} -- left untouched",
+                flush=True,
+            )
+            continue
+
+        before = str(order.get("status") or "")
+        if venue_state == "filled":
+            after = STATUS_FILLED
+            contracts = seen.get("filled_count")
+            # The venue's own fill price where it gave one, ours where it did
+            # not. Never the requested price when the venue disagrees with it:
+            # a fill at a better price is money we would otherwise not book.
+            price = seen.get("fill_price")
+            if price is None:
+                price = order.get("fill_price")
+            if price is None:
+                price = order.get("requested_price")
+            stake = None
+            if contracts is not None and price is not None:
+                try:
+                    stake = round(int(contracts) * float(price), 2)
+                except (TypeError, ValueError):
+                    stake = None
+            new_fields = {
+                "status": after,
+                "fill_price": price,
+                "fill_stake_dollars": stake,
+                "contracts": contracts,
+                "error": None,
+            }
+        elif venue_state == "resting":
+            # THE PHANTOM-FILL REPAIR. The order exists and has traded nothing,
+            # so every fill field on it is a number nobody should believe.
+            after = STATUS_SUBMITTED
+            new_fields = {
+                "status": after,
+                "fill_price": None,
+                "fill_stake_dollars": None,
+                "contracts": 0,
+            }
+        else:  # dead
+            # Cancelled or expired with nothing filled: no exposure, no
+            # position, and the idempotency key is free again. `rejected` is
+            # the status that means exactly that, and it releases the budget
+            # this order has been charging.
+            after = STATUS_REJECTED
+            new_fields = {
+                "status": after,
+                "fill_price": None,
+                "fill_stake_dollars": None,
+                "contracts": 0,
+                "error": f"venue_{seen.get('venue_status') or 'dead'}",
+            }
+
+        stamp = {
+            **new_fields,
+            "venue_status": seen.get("venue_status"),
+            "venue_order_id": seen.get("order_id") or order.get("venue_order_id"),
+            "reconciled_at": _utc_now(),
+        }
+        # Only a REAL difference counts as a change. Re-stamping an unchanged
+        # row every tick would make the log say work happened on every pass and
+        # make "did anything move" unanswerable.
+        moved = any(order.get(field) != value for field, value in new_fields.items())
+        order.update(stamp)
+        if not moved:
+            continue
+        if before != after:
+            order["reconciled_from"] = before
+        changed.append(
+            {
+                "idempotency_key": key,
+                "ticker": order.get("venue_ticker"),
+                "from": before,
+                "to": after,
+                "venue_status": seen.get("venue_status"),
+                "contracts": order.get("contracts"),
+                "fill_price": order.get("fill_price"),
+            }
+        )
+
+    if changed:
+        _persist(state)
+        for row in changed:
+            print(
+                f"[execution_ledger] RECONCILED key={row['idempotency_key']}"
+                f" ticker={row['ticker']} {row['from']}->{row['to']}"
+                f" venue_status={row['venue_status']!r}"
+                f" contracts={row['contracts']} fill_price={row['fill_price']}",
+                flush=True,
+            )
+    print(
+        f"[execution_ledger] RECONCILE venue={venue} candidates={len(candidates)}"
+        f" venue_orders={len(read.get('orders') or [])} changed={len(changed)}"
+        f" not_found={not_found} unknown={unknown}",
+        flush=True,
+    )
+    return {
+        "status": "ok",
+        "candidates": len(candidates),
+        "changed": len(changed),
+        "not_found": not_found,
+        "unknown": unknown,
+        "orders": changed,
+    }
+
+
+def _float_env(name: str, default: float) -> float:
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    # Non-positive is read as a typo rather than as "zero window". A zero here
+    # would mean every reconciliation is instantly stale, i.e. the exact
+    # behaviour the setting exists to change, reached by fat-fingering it.
+    return value if value > 0 else default
+
+
+def _reconciled_recently(order: Mapping[str, Any], *, within_seconds: float) -> bool:
+    stamp = str(order.get("reconciled_at") or "").strip()
+    if not stamp:
+        return False
+    try:
+        seen = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - seen).total_seconds() <= within_seconds
+
+
 def unreconciled_orders() -> list[dict[str, Any]]:
-    """Orders left in the write-ahead state -- sent, or possibly sent, with an
-    unknown result. A restart mid-submit produces exactly these, and they must
-    be checked against the venue rather than retried."""
+    """Orders whose result is UNKNOWN -- sent, or possibly sent, with nothing
+    since. A restart mid-submit produces exactly these, and they must be
+    checked against the venue rather than retried.
+
+    A RESTING ORDER WE HAVE JUST READ FROM THE VENUE IS NOT ONE OF THESE, and
+    the distinction is load-bearing. `submitted` carries two meanings that look
+    identical in the ledger: "we do not know what happened" and "we know
+    precisely what happened -- it is sitting on the book unfilled". The first
+    must block a new live slate, because placing on top of it risks doubling.
+    The second must not, or the first limit order that rests for an afternoon
+    jams live execution until someone edits the ledger by hand.
+
+    `reconcile_live_orders` is what tells them apart, and its stamp is what is
+    read here. The freshness window matters: a reconciliation from yesterday
+    says nothing about now, so a stale stamp falls back to blocking. Blocking
+    is the safe direction and stays the default for everything this cannot
+    positively account for.
+    """
+    window = _float_env("SYNDICATE_EXECUTION_RECONCILE_FRESH_SECONDS", 900.0)
     return [
         order
         for order in _load().get("orders") or []
         if order.get("status") == STATUS_SUBMITTED
+        and not _reconciled_recently(order, within_seconds=window)
     ]
 
 

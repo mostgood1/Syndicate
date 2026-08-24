@@ -155,6 +155,29 @@ def run_execution(
             "date": normalized,
         }
 
+    # ASK THE VENUE FIRST. Everything below this line reasons about our own
+    # ledger -- the stranded-order gate, the daily budget, the duplicate check
+    # -- and all of it is only as true as the ledger is. A resting order that
+    # filled since the last run is a position we hold and do not know about; a
+    # phantom fill is a position we do not hold and do believe in. Both are
+    # corrected here, before any decision is made on top of them.
+    #
+    # Live only: paper orders have no venue to ask.
+    #
+    # NEVER FATAL. A venue that will not answer leaves the ledger untouched and
+    # the run continues under the conservative reading -- which is exactly what
+    # the gate below enforces, since an unreconciled order still blocks.
+    if mode == LIVE:
+        try:
+            from syndicate.features.shared.execution_ledger import reconcile_live_orders
+
+            reconcile_live_orders()
+        except Exception as exc:
+            print(
+                f"[execute_portfolio] RECONCILE_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
     # UNRECONCILED ORDERS BLOCK A NEW RUN, in live mode only. An order left in
     # the write-ahead state was sent, or may have been, with an unknown result.
     # Placing a fresh slate on top of that risks doubling it. Paper mode cannot

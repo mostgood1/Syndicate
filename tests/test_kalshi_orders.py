@@ -464,3 +464,110 @@ def test_a_partial_fill_counts_what_actually_filled(monkeypatch):
     assert out["status"] == "filled"
     assert out["contracts"] == 1
     assert out["fill_stake_dollars"] == 0.54
+
+
+# --------------------------------------------------------------------------
+# Reading the venue back
+# --------------------------------------------------------------------------
+
+
+def test_the_read_routes_hang_off_the_same_base(monkeypatch):
+    """`GET /portfolio/orders` and `GET /portfolio/orders/{id}`. This shares a
+    prefix with the POST that returns 410 for creation -- reading is fine
+    there, only the create verb moved. Written down because guessing that
+    route is how the 410 happened."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.setenv("KALSHI_API_BASE", "https://example.test/trade-api/v2")
+    assert mod._orders_list_url(100) == (
+        "https://example.test/trade-api/v2/portfolio/orders?limit=100"
+    )
+    assert mod._order_read_url("abc") == (
+        "https://example.test/trade-api/v2/portfolio/orders/abc"
+    )
+
+
+def test_a_read_failure_is_named_not_raised(monkeypatch):
+    """Reconciliation runs over the whole open book; one unreadable response
+    must not stop the rest, and must never look like an empty book."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("connection reset")
+
+    monkeypatch.setattr("syndicate.features.shared.kalshi_auth.signed_request", boom)
+    result = mod.fetch_orders()
+    assert result["status"] == "error"
+    assert "RuntimeError" in result["reason"]
+    assert "orders" not in result
+
+
+def test_a_response_without_an_orders_array_is_an_error(monkeypatch):
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_auth.signed_request",
+        lambda *a, **k: {"cursor": "x"},
+    )
+    assert mod.fetch_orders()["reason"] == "no_orders_array"
+
+
+def test_a_resting_order_is_not_a_fill():
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "resting", "filled_count": 0, "order_id": "o1"})
+    assert seen["state"] == "resting"
+    assert not seen["filled_count"]
+
+
+def test_an_unmapped_status_stays_unknown():
+    """UNKNOWN IS A REAL ANSWER. Collapsing it into either 'it traded' or 'it
+    didn't' is the mistake that booked a position we never held."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    assert venue_order_view({"status": "who_knows"})["state"] == "unknown"
+
+
+def test_the_fill_count_is_derived_when_it_is_not_given():
+    """Three spellings, one fact. The response shape has never been seen live,
+    and `kalshi_client`'s first live run corrected ten field names."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    assert venue_order_view({"status": "executed", "filled_count": 3})["filled_count"] == 3
+    assert venue_order_view(
+        {"status": "executed", "taker_fill_count": 2, "maker_fill_count": 1}
+    )["filled_count"] == 3
+    assert venue_order_view(
+        {"status": "canceled", "initial_count": 5, "remaining_count": 4}
+    )["filled_count"] == 1
+
+
+def test_a_partial_fill_outranks_a_cancelled_status():
+    """The cancel describes the remainder; the contracts that traded are a
+    position we hold."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "canceled", "filled_count": 1})
+    assert seen["state"] == "filled"
+    assert seen["filled_count"] == 1
+
+
+def test_an_executed_order_with_no_readable_count_is_still_filled():
+    """Reported as filled with an unknown count rather than as zero contracts,
+    which would be a lie in the direction that loses a position."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "executed"})
+    assert seen["state"] == "filled"
+    assert seen["filled_count"] is None
+
+
+def test_prices_are_read_as_dollars_whichever_unit_they_arrive_in():
+    """A probability price cannot exceed $1, so the boundary is unambiguous --
+    and the 100x error is the one `kalshi_client` actually made."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    assert venue_order_view({"status": "executed", "filled_count": 1,
+                             "average_fill_price": 46})["fill_price"] == 0.46
+    assert venue_order_view({"status": "executed", "filled_count": 1,
+                             "average_fill_price": 0.46})["fill_price"] == 0.46

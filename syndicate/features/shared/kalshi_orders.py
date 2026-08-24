@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import math
 import os
+from collections.abc import Mapping
 from typing import Any
 
 __all__ = [
@@ -61,6 +62,9 @@ __all__ = [
     "order_body_v2",
     "build_order_body",
     "submit_order",
+    "fetch_order",
+    "fetch_orders",
+    "venue_order_view",
     "kalshi_submitter",
     "OrderBuildError",
 ]
@@ -76,6 +80,13 @@ _MIN_CONTRACTS = 1
 # `pending`, `canceled`, or anything unrecognised -- is not a fill, and is
 # recorded as `submitted` rather than guessed into one.
 _VENUE_FILLED_STATUSES = frozenset({"executed", "filled", "matched", "closed"})
+
+# ...and the two other things a venue status can mean. Split rather than
+# lumped into "not filled", because they have opposite consequences: a RESTING
+# order may still trade and must stay in the ledger untouched, while a DEAD one
+# never will and frees both its budget and its idempotency key.
+_VENUE_RESTING_STATUSES = frozenset({"resting", "pending", "open", "queued", "accepted", "active"})
+_VENUE_DEAD_STATUSES = frozenset({"canceled", "cancelled", "expired", "rejected"})
 
 
 class OrderBuildError(ValueError):
@@ -396,6 +407,209 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         "fill_stake_dollars": round(contracts * float(price_dollars or 0.0), 2),
         "contracts": contracts,
         "requested_contracts": requested,
+    }
+
+
+# ---------------------------------------------------------------------------
+# READING THE VENUE. The ledger is a claim; this is the fact.
+# ---------------------------------------------------------------------------
+#
+# MEASURED 2026-08-24T13:12Z: our ledger said `filled` for an order that was
+# RESTING on Kalshi with `Filled: 0`. The submit path has been corrected so it
+# never defaults to a fill again, but the correction only governs orders placed
+# from now on -- and it cannot govern the interesting case at all, which is an
+# order whose state CHANGES after we stop looking. A resting order that fills
+# ten minutes later is a real position that our ledger will never learn about
+# from the submit response, because that response was written before the fill.
+#
+# So the ledger has to be refreshed FROM the venue, not merely written
+# carefully. These two reads are that source.
+
+
+def _read_base() -> str:
+    from syndicate.features.shared.kalshi_auth import _base_url
+
+    return _base_url()
+
+
+def _order_read_path() -> str:
+    path = (os.environ.get("KALSHI_ORDER_READ_PATH") or "/portfolio/orders").strip()
+    return path if path.startswith("/") else f"/{path}"
+
+
+def _order_read_url(order_id: str) -> str:
+    return f"{_read_base().rstrip('/')}{_order_read_path()}/{order_id}"
+
+
+def _orders_list_url(limit: int) -> str:
+    return f"{_read_base().rstrip('/')}{_order_read_path()}?limit={int(limit)}"
+
+
+def _unwrap_order(payload: Any) -> dict[str, Any] | None:
+    if isinstance(payload, Mapping):
+        inner = payload.get("order")
+        if isinstance(inner, Mapping):
+            return dict(inner)
+        return dict(payload)
+    return None
+
+
+def fetch_order(order_id: Any) -> dict[str, Any]:
+    """What the VENUE says about one order.
+
+        GET /trade-api/v2/portfolio/orders/{order_id}
+
+    Note this shares a prefix with the POST route that returns 410 for
+    creation. Reading is fine there; only the create verb moved. Learned by
+    taking the 410 in production, so it is written down rather than left to be
+    rediscovered.
+
+    Returns a NAMED failure rather than raising: reconciliation runs over every
+    open order, and one unreadable order must not stop the rest.
+    """
+    from syndicate.features.shared.kalshi_auth import signed_request
+
+    key = str(order_id or "").strip()
+    if not key:
+        return {"status": "error", "reason": "no_order_id"}
+    try:
+        payload = signed_request("GET", _order_read_url(key))
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+    order = _unwrap_order(payload)
+    if order is None:
+        return {"status": "error", "reason": f"unexpected_shape:{type(payload).__name__}"}
+    return {"status": "ok", "order": order}
+
+
+def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
+    """Every recent order, one call.
+
+        GET /trade-api/v2/portfolio/orders?limit=100
+
+    The LIST is the primary instrument for reconciliation and the single read
+    is the fallback: one call covers the whole open book, so a pass over N open
+    orders costs one request rather than N. It also answers the case a
+    per-order read cannot -- an order we hold no id for, because the submit
+    response was lost.
+
+    Same contract as `fetch_order`: named failure, never a raise, never an
+    empty list standing in for an error. An empty `orders` on a FAILED read
+    would read as "the venue holds nothing", which is the exact confusion that
+    would wipe a live position out of the ledger.
+    """
+    from syndicate.features.shared.kalshi_auth import signed_request
+
+    try:
+        payload = signed_request("GET", _orders_list_url(limit))
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+    if not isinstance(payload, Mapping):
+        return {"status": "error", "reason": f"unexpected_shape:{type(payload).__name__}"}
+    raw = payload.get("orders")
+    if not isinstance(raw, list):
+        return {"status": "error", "reason": "no_orders_array"}
+    orders = [dict(o) for o in raw if isinstance(o, Mapping)]
+    # THE SHAPE, ONCE. This response has never been seen; `kalshi_client`'s
+    # first live run corrected ten field names, and the same reporting is what
+    # caught them. Keys only -- an order carries no credential, but it does
+    # carry our own positions, and the log is not the place for them.
+    if orders:
+        print(
+            f"[kalshi_orders] ORDERS_READ n={len(orders)} keys={sorted(orders[0].keys())}",
+            flush=True,
+        )
+    else:
+        print("[kalshi_orders] ORDERS_READ n=0", flush=True)
+    return {"status": "ok", "orders": orders}
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _price_or_none(value: Any) -> float | None:
+    """A Kalshi price as PROBABILITY DOLLARS, whichever unit it arrived in.
+
+    An order read may quote cents (`54`) or dollars (`0.54`), and the two are
+    100x apart -- the exact error `kalshi_client`'s first live run found in the
+    market read. Anything above 1 is therefore cents; anything at or below 1 is
+    already dollars. The boundary is unambiguous because a probability price
+    cannot exceed $1.
+    """
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number <= 0:
+        return None
+    return round(number / 100.0, 4) if number > 1 else round(number, 4)
+
+
+def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
+    """One Kalshi order, reduced to the four facts the ledger needs.
+
+    `state` is our vocabulary, not Kalshi's: `filled`, `resting`, `dead`, or
+    `unknown`. UNKNOWN IS A REAL ANSWER and is why this returns a state rather
+    than a boolean -- a status we have never seen must not be collapsed into
+    either "it traded" or "it didn't", and reconciliation leaves those rows
+    exactly as they are.
+
+    A PARTIAL FILL THAT WAS THEN CANCELLED IS A FILL. The cancelled status
+    describes the remainder; the contracts that traded are a position we hold.
+    So the fill count is read first and outranks the status -- reading them the
+    other way round is how a real position gets reconciled away to zero.
+    """
+    raw_status = str(order.get("status") or "").strip().lower()
+
+    filled = _int_or_none(order.get("filled_count"))
+    if filled is None:
+        taker = _int_or_none(order.get("taker_fill_count")) or 0
+        maker = _int_or_none(order.get("maker_fill_count")) or 0
+        if taker or maker:
+            filled = taker + maker
+    if filled is None:
+        initial = _int_or_none(order.get("initial_count"))
+        remaining = _int_or_none(order.get("remaining_count"))
+        if initial is not None and remaining is not None:
+            filled = max(initial - remaining, 0)
+
+    if filled:
+        state = "filled"
+    elif raw_status in _VENUE_FILLED_STATUSES:
+        # Executed with no count we could read -- the trade happened, the size
+        # did not survive the parse. Reported as filled with an unknown count
+        # rather than as zero contracts, which would be a lie in the direction
+        # that loses a position.
+        state = "filled"
+    elif raw_status in _VENUE_RESTING_STATUSES:
+        state = "resting"
+    elif raw_status in _VENUE_DEAD_STATUSES:
+        state = "dead"
+    else:
+        state = "unknown"
+
+    price = None
+    for field in ("average_fill_price", "avg_fill_price", "fill_price", "price", "yes_price"):
+        price = _price_or_none(order.get(field))
+        if price is not None:
+            break
+
+    return {
+        "state": state,
+        "venue_status": raw_status or None,
+        "filled_count": filled,
+        "fill_price": price,
+        "order_id": order.get("order_id") or order.get("id"),
+        "client_order_id": order.get("client_order_id"),
+        "ticker": order.get("ticker"),
     }
 
 

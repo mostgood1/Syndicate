@@ -961,6 +961,30 @@ def _live_ledger_at_boot() -> None:
             flush=True,
         )
 
+    # THEN ASK KALSHI WHAT IT ACTUALLY HOLDS. Reclassification above corrects
+    # rows from what we KNOW happened locally; this corrects them from what the
+    # VENUE says, which is the only account that can see a resting order fill
+    # after we stopped watching it. Runs on this worker because this is where
+    # the Kalshi credentials live and where the ledger is already being read.
+    try:
+        from syndicate.features.shared.execution_ledger import reconcile_live_orders
+
+        reconciled = reconcile_live_orders()
+        if reconciled.get("changed"):
+            # Re-read: the rows printed below are now stale by exactly the
+            # corrections we just made, and a report of the pre-correction
+            # state is worse than no report.
+            orders = [
+                o
+                for o in (_load().get("orders") or [])
+                if str(o.get("mode") or "") == LIVE
+            ]
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] LEDGER_RECONCILE_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
     print(f"[live_odds_worker] LIVE_LEDGER n={len(orders)}", flush=True)
     for order in orders[-25:]:
         print(

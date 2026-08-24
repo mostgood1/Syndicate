@@ -518,3 +518,264 @@ def test_a_failed_order_is_never_retried(monkeypatch):
     calls = []
     mod.place_order(request, submit=lambda _r: calls.append(1), mode=mod.LIVE)
     assert not calls
+
+
+# --------------------------------------------------------------------------
+# Reconciliation: the venue is the authority on our own ledger
+# --------------------------------------------------------------------------
+
+
+def _live_order(mod, monkeypatch, *, key: str, status: str, **fields):
+    """A live order in the ledger, forced into a given post-submit state."""
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    request = _request(position_key=key, venue="kalshi", venue_ticker="KX-TEST-1")
+    record, _ = mod.record_order(request, mode=mod.LIVE)
+    mod.complete_order(record["idempotency_key"], status=status, **fields)
+    return record["idempotency_key"]
+
+
+def _reader(orders, *, ok: bool = True):
+    """Stand in for the Kalshi read side, in the shape `_venue_reader` returns."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    def fetch(*, limit=100):
+        if not ok:
+            return {"status": "error", "reason": "KalshiAuthError: http_503"}
+        return {"status": "ok", "orders": list(orders)}
+
+    return fetch, venue_order_view
+
+
+def test_a_phantom_fill_is_corrected_to_submitted(monkeypatch):
+    """MEASURED 2026-08-24T13:12Z, and found by the USER looking at the Kalshi
+    UI rather than by any log. Our ledger read `filled` at $0.54 for an order
+    Kalshi showed as resting with `Filled: 0` -- a position we booked, graded
+    and would have reported P&L on, and never held."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(
+        mod, monkeypatch, key="phantom", status=mod.STATUS_FILLED,
+        fill_price=0.54, fill_stake_dollars=1.08, venue_order_id="ord-1",
+    )
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-1", "client_order_id": key,
+                                "status": "resting", "filled_count": 0,
+                                "remaining_count": 2, "initial_count": 2}]),
+    )
+
+    result = mod.reconcile_live_orders()
+    assert result["changed"] == 1
+
+    fixed = mod.find_order(key)
+    assert fixed["status"] == mod.STATUS_SUBMITTED
+    # Every fill field is a number nobody should believe, so none survives.
+    assert fixed["fill_price"] is None
+    assert fixed["fill_stake_dollars"] is None
+    assert fixed["contracts"] == 0
+    assert fixed["reconciled_from"] == mod.STATUS_FILLED
+
+
+def test_a_resting_order_that_filled_later_is_booked(monkeypatch):
+    """The mirror image, and the one the submit path can NEVER catch: the
+    response was written before the fill happened. Without this read the
+    position is real and invisible for its whole life."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="late-fill", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-2")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-2", "client_order_id": key,
+                                "status": "executed", "filled_count": 2,
+                                "average_fill_price": 44}]),
+    )
+
+    assert mod.reconcile_live_orders()["changed"] == 1
+    filled = mod.find_order(key)
+    assert filled["status"] == mod.STATUS_FILLED
+    assert filled["contracts"] == 2
+    # 44 arrived as CENTS and must be booked as $0.44 -- the 100x error
+    # `kalshi_client`'s first live run found on the market read.
+    assert filled["fill_price"] == 0.44
+    assert filled["fill_stake_dollars"] == 0.88
+
+
+def test_a_cancelled_order_frees_its_budget(monkeypatch):
+    """Cancelled with nothing filled is no exposure and no position, so the
+    idempotency key is free again and `rejected` is the status that says so."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="cancelled", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-3")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-3", "client_order_id": key,
+                                "status": "canceled", "filled_count": 0}]),
+    )
+
+    assert mod.reconcile_live_orders()["changed"] == 1
+    assert mod.find_order(key)["status"] == mod.STATUS_REJECTED
+
+
+def test_a_partial_fill_that_was_cancelled_is_still_a_fill(monkeypatch):
+    """The cancelled status describes the REMAINDER. The contracts that traded
+    are a position we hold, and reading the status before the count is how a
+    real position gets reconciled away to zero."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="partial", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-4")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-4", "client_order_id": key,
+                                "status": "canceled", "filled_count": 1,
+                                "average_fill_price": 0.46}]),
+    )
+
+    assert mod.reconcile_live_orders()["changed"] == 1
+    row = mod.find_order(key)
+    assert row["status"] == mod.STATUS_FILLED
+    assert row["contracts"] == 1
+
+
+def test_a_failed_read_changes_nothing(monkeypatch):
+    """Absence in a FAILED read is not absence at the venue, and the difference
+    is a live position deleted out of our own books."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="unreachable", status=mod.STATUS_FILLED,
+                      fill_price=0.46, fill_stake_dollars=0.92, venue_order_id="ord-5")
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: _reader([], ok=False))
+
+    result = mod.reconcile_live_orders()
+    assert result["status"] == "error"
+    assert result["changed"] == 0
+    assert mod.find_order(key)["status"] == mod.STATUS_FILLED
+    assert mod.find_order(key)["fill_price"] == 0.46
+
+
+def test_an_order_missing_from_the_list_is_left_alone(monkeypatch):
+    """The list is capped, so an older order legitimately ages out of it.
+    Only a POSITIVE statement about a specific order may move that order."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="aged-out", status=mod.STATUS_FILLED,
+                      fill_price=0.46, fill_stake_dollars=0.92, venue_order_id="ord-6")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "someone-else", "client_order_id": "other",
+                                "status": "resting"}]),
+    )
+
+    result = mod.reconcile_live_orders()
+    assert result["not_found"] == 1
+    assert result["changed"] == 0
+    assert mod.find_order(key)["status"] == mod.STATUS_FILLED
+
+
+def test_an_unmapped_venue_status_is_not_guessed(monkeypatch):
+    """A status we have never seen is not evidence in either direction.
+    Guessing is precisely what produced the phantom fill."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="strange", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-7")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-7", "client_order_id": key,
+                                "status": "quantum_superposition"}]),
+    )
+
+    result = mod.reconcile_live_orders()
+    assert result["unknown"] == 1
+    assert result["changed"] == 0
+    assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
+
+
+def test_reconciliation_is_idempotent(monkeypatch):
+    """It runs on every refresh tick, so a second pass over unchanged orders
+    must report zero -- otherwise 'did anything move' is unanswerable."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="steady", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-8")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-8", "client_order_id": key,
+                                "status": "resting", "filled_count": 0}]),
+    )
+
+    mod.reconcile_live_orders()
+    assert mod.reconcile_live_orders()["changed"] == 0
+
+
+def test_paper_orders_are_never_reconciled(monkeypatch):
+    """There is no venue to ask."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    request = _request(position_key="paper-1", venue="kalshi")
+    record, _ = mod.record_order(request, mode=mod.PAPER)
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "x", "client_order_id": record["idempotency_key"],
+                                "status": "executed", "filled_count": 9}]),
+    )
+
+    assert mod.reconcile_live_orders()["candidates"] == 0
+    assert mod.find_order(record["idempotency_key"])["status"] == mod.STATUS_SUBMITTED
+
+
+# --------------------------------------------------------------------------
+# The stranded-order gate, after reconciliation exists
+# --------------------------------------------------------------------------
+
+
+def test_a_known_resting_order_does_not_block_the_next_run(monkeypatch):
+    """`submitted` carries two meanings. 'We do not know what happened' must
+    block a new live slate; 'it is sitting on the book unfilled, we just asked'
+    must not, or the first limit order that rests for an afternoon jams live
+    execution until someone hand-edits the ledger."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="known-resting", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-9")
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-9", "client_order_id": key,
+                                "status": "resting", "filled_count": 0}]),
+    )
+    mod.reconcile_live_orders()
+
+    assert mod.unreconciled_orders() == []
+
+
+def test_a_stale_reconciliation_blocks_again(monkeypatch):
+    """A reading from yesterday says nothing about now. Blocking is the safe
+    direction and stays the default for anything this cannot account for."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="stale", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-10")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-10", "client_order_id": key,
+                                "status": "resting", "filled_count": 0}]),
+    )
+    mod.reconcile_live_orders()
+    assert mod.unreconciled_orders() == []
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_RECONCILE_FRESH_SECONDS", "0.0001")
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+
+def test_an_unreconciled_order_still_blocks(monkeypatch):
+    """The property the gate exists for, unchanged: a submit with no venue
+    reading behind it risks doubling and must stop the run."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="never-read", status=mod.STATUS_SUBMITTED)
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
