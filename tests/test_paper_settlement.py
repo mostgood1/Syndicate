@@ -657,3 +657,105 @@ def test_an_unsettled_row_is_pending_in_every_cut_and_moves_no_money():
         assert summary[cut][0]["pending"] == 1
         assert summary[cut][0]["pnl_dollars"] == 0.0
         assert summary[cut][0]["roi_pct"] is None
+
+
+def test_the_grade_audit_prints_the_facts_and_writes_nothing(monkeypatch, tmp_path, capsys):
+    """Game lines returned -16.4% on 79 bets while totals returned +24.03%,
+    and game lines are the ones graded by code shipped the same day. A
+    consistent sign inversion looks exactly like that and passes every guard
+    already in place — the unit tests assert both directions against my own
+    convention, and the home/away guard checks source agreement, not whether
+    the convention is right.
+
+    So the audit prints ground truth: the bet's own side and line, the margin
+    the grader was handed, and the verdict — plus what the verdict would be
+    inverted, so the two sit side by side for a person to check."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared import paper_settlement as mod
+
+    request = ledger.OrderRequest(
+        position_key="audit-1", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e1", market="spreads", side="home", line=-1.5,
+        requested_price=-110.0, requested_stake_dollars=10.0,
+        home_team="Houston Astros", away_team="Seattle Mariners",
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+    mod.settle_orders(
+        "2026-08-22",
+        resolver=lambda o: {"current_value": 3, "side": "over", "line": 1.5,
+                            "is_final": True, "started": True},
+    )
+    key = ledger.idempotency_key(request)
+    before = dict(ledger.find_order(key))
+
+    result = mod.audit_game_line_grades("2026-08-22")
+    out = capsys.readouterr().out
+
+    assert result["rows"] == 1
+    assert "GRADE_AUDIT" in out
+    # From the LEDGER, not a re-derivation. `settled_value` is the margin the
+    # grader actually used; recomputing could disagree with what was stored,
+    # and then the audit reports a third thing rather than auditing the second.
+    assert "margin_used=3" in out
+    assert "must_beat=1.5" in out
+    assert "our_verdict=won" in out
+    # The other reading, side by side. Not a judgement — the point is that a
+    # person can see both without re-deriving one.
+    assert "if_inverted=lost" in out
+    # AN AUDIT THAT WRITES CAN CREATE THE THING IT WAS MEANT TO DETECT.
+    assert ledger.find_order(key) == before
+
+
+def test_the_grade_audit_ignores_props_and_totals(monkeypatch, tmp_path, capsys):
+    """Totals grade through the old, long-exercised path and are not what is
+    in question."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared import paper_settlement as mod
+
+    for market in ("totals", "batter_hits"):
+        request = ledger.OrderRequest(
+            position_key=f"skip-{market}", selected_date="2026-08-22", venue="paper",
+            sport="mlb", event_id="e2", market=market, side="over", line=8.5,
+            requested_price=-110.0, requested_stake_dollars=10.0,
+        )
+        ledger.place_order(request, mode=ledger.PAPER)
+    mod.settle_orders(
+        "2026-08-22",
+        resolver=lambda o: {"current_value": 9, "is_final": True, "started": True},
+    )
+    assert mod.audit_game_line_grades("2026-08-22")["rows"] == 0
+    assert "rows=0" in capsys.readouterr().out
+
+
+def test_a_skipped_row_says_WHY(monkeypatch, tmp_path, capsys):
+    """MEASURED 2026-08-24T19:29Z: the first version printed `audited=0 of=79`
+    and no reason, because every row hit a bare `continue`. A diagnostic that
+    refuses silently, in a repo whose whole discipline is named refusals --
+    it made the audit itself unauditable."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared import paper_settlement as mod
+
+    request = ledger.OrderRequest(
+        position_key="skip-why", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e9", market="spreads", side="home", line=-1.5,
+        requested_price=-110.0, requested_stake_dollars=10.0,
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+    # Graded, but with no settled_value -- the shape the audit must explain
+    # rather than silently drop.
+    ledger.complete_order(ledger.idempotency_key(request), status=ledger.STATUS_FILLED,
+                          fill_price=-110.0, fill_stake_dollars=10.0)
+    state = ledger._load()
+    for row in state["orders"]:
+        if row.get("idempotency_key") == ledger.idempotency_key(request):
+            row["outcome"] = "won"
+            row["settled_value"] = None
+    ledger._persist(state)
+
+    result = mod.audit_game_line_grades("2026-08-22")
+    assert result["rows"] == 0
+    assert result["skipped"] == {"no_settled_value": 1}
+    assert "skipped={'no_settled_value': 1}" in capsys.readouterr().out

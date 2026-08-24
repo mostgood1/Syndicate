@@ -752,6 +752,76 @@ def _kalshi_auth_probe_at_boot() -> None:
         )
 
 
+def _polymarket_us_auth_probe_at_boot() -> None:
+    """Does the Polymarket US credential work, and what shape does a read take?
+
+    A DIFFERENT EXCHANGE from `_polymarket_catalogue_at_boot` below, which pulls
+    the global on-chain venue's public catalogue. This one is `api.polymarket.us`
+    -- different host, different auth, and different MONEY. They are separate
+    functions for that reason.
+
+    Read-only: it asks for one market. Nothing here can place an order, and the
+    probe reports the SHAPE that came back rather than parsing it -- the choice
+    that caught Kalshi's ten wrong field names and its 100x price error before
+    either reached an order.
+    """
+    try:
+        from syndicate.features.shared.polymarket_us_auth import credentials_present, probe_auth
+
+        if not credentials_present():
+            # ABSENCE, NAMED. Distinct from a credential that exists and fails;
+            # they need completely different responses and must never share a
+            # line. Not an error -- the venue is simply not configured here.
+            print(
+                "[live_odds_worker] POLYMARKET_US_AUTH status=credentials_absent",
+                flush=True,
+            )
+            return
+        report = probe_auth()
+        print(
+            f"[live_odds_worker] POLYMARKET_US_AUTH ok={report.get('ok')}"
+            f" base={report.get('base_url')}"
+            f" payload_keys={report.get('payload_keys')}"
+            f" row_keys={report.get('row_keys')}"
+            f" count={report.get('count')}"
+            f" reason={report.get('reason')}",
+            flush=True,
+        )
+    except Exception as exc:
+        # Type only, never the exception's full text -- a credential failure is
+        # the one place a stack string can carry key material.
+        print(
+            f"[live_odds_worker] POLYMARKET_US_AUTH_FAILED {type(exc).__name__}",
+            flush=True,
+        )
+
+
+def _game_line_grade_audit_at_boot() -> None:
+    """Print the raw facts behind each game-line verdict, once, for eyeballing.
+
+    Game lines returned -16.4% on 79 bets at a 35.44% win rate while totals
+    returned +24.03% -- and game lines are the ones this session's own code
+    started grading hours earlier. A consistent sign inversion looks exactly
+    like that, and passes every guard already in place.
+
+    Boot-time and one-shot: this is a question being asked, not a monitor.
+    """
+    try:
+        from datetime import date, timedelta
+
+        from syndicate.features.shared.paper_settlement import audit_game_line_grades
+
+        # Yesterday's slate is the one with settled game lines on it; today's
+        # are mostly still in progress.
+        for offset in (1, 0):
+            audit_game_line_grades((date.today() - timedelta(days=offset)).isoformat())
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] GRADE_AUDIT_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _polymarket_catalogue_at_boot() -> None:
     """What does Polymarket actually list, and can any of it be joined?
 
@@ -1305,6 +1375,8 @@ def main() -> int:
         # value is the QUESTION sample, and a diagnostic that silently never
         # executes is the failure mode this file has already had twice.
         _polymarket_catalogue_at_boot()
+        _polymarket_us_auth_probe_at_boot()
+        _game_line_grade_audit_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)
