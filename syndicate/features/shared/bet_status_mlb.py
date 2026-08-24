@@ -397,6 +397,19 @@ def mlb_status_resolver(selected_date: str):
                 "line": view["line"],
                 "is_final": is_final,
                 "started": started,
+                # THE SCOREBOARD, carried so a verdict can be checked without
+                # a second source. `settled_value` records the MARGIN, which is
+                # self-consistent under an inverted convention and therefore
+                # cannot detect one -- confirmed 2026-08-24, when the grade
+                # audit was internally correct on all 25 rows and still could
+                # not answer whether the sign was right.
+                #
+                # Two raw scores plus the feed's own team names settle it in a
+                # glance, with no lookup and nobody's memory involved.
+                "home_score": home_runs,
+                "away_score": away_runs,
+                "home_name": home_name,
+                "away_name": away_name,
             }
 
         group, stat = mapped

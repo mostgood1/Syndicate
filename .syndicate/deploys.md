@@ -26030,3 +26030,87 @@ and could support a join, but needs `NOVIG_CLIENT_ID`/`NOVIG_CLIENT_SECRET`
 persisting, but it can price a CATEGORY-level signal only, not a specific
 bet -- `_venue_price_resolver()` in `pipeline/portfolio_commit.py` cannot
 be extended for Novig with what is currently reachable.
+
+---
+
+### 2026-08-24 19:29:14Z — Polymarket US credentials WORK, and the schema is confirmed
+
+**verify: `[live_odds_worker] POLYMARKET_US_AUTH ok=True
+base=https://api.polymarket.us count=1`**, live-odds-worker instance `bz244`,
+`dc3655067`. Signed Ed25519 reads against `/v1/markets` succeed with the
+credentials the user set on this worker.
+
+**The real row schema, verbatim** — this is what a market join gets written
+from, and it settles several things that were assumptions this afternoon:
+
+    active, archived, category, closed, comboEnabled, createdAt, description,
+    endDate, ep3Status, ep3SyncedAt, feeCoefficient, gameStartTime, hidden, id,
+    manualActivation, marketSides, marketType, minimumTradeQty,
+    orderPriceMinTickSize, outcomePrices, outcomes, question, slug,
+    sportsMarketType, sportsMarketTypeV2, startDate, status, tags, updatedAt
+
+- **`minimumTradeQty` and `orderPriceMinTickSize` are both present.** These are
+  the two `order_body` REQUIRES and refuses without, on the documentation's own
+  instruction not to infer them. Confirmed rather than hoped.
+- **`feeCoefficient` is published per market.** Kalshi's fees were modelled as
+  zero until today and cost ~1.9% on the first real fill. Here the coefficient
+  is available before the order, so fees can be in the sizing from the start
+  rather than retrofitted after a surprise.
+- **`sportsMarketType` AND `sportsMarketTypeV2`** both exist. Two of them, so
+  the join must pick one deliberately rather than whichever it sees first.
+- **`gameId` and `line` are NOT in this row**, though the docs list them as
+  sports fields. The probe did not filter `categories=sports` and `count=1`, so
+  this may simply be a non-sports market. **NOT ESTABLISHED either way** — a
+  filtered probe settles it, and the join design depends on the answer.
+
+**NOT verified:** anything on the write path. No order has been built or sent,
+`_venue_submitter` is not wired, and `probe_auth` is read-only by construction.
+
+Claim force-released (fourth time today — the token does not survive a
+container restart of the holding session).
+
+---
+
+### 2026-08-24 19:36:34Z — GRADE_AUDIT works; the sign question needs ONE real score
+
+**verify: `GRADE_AUDIT_SUMMARY date=2026-08-23 audited=25 of=79 skipped={}`**,
+live-odds-worker `m97kh`, `a59e4081a`. The ledger-read version audits cleanly
+where the resolver version reported `audited=0` with no reason.
+
+**The arithmetic is internally correct on every row read.** Sample:
+
+    h2h    away  MIN@SD   margin=-7.0  must_beat=0.0   lost
+    spreads away MIN@SD   margin=-7.0  must_beat=-1.0  lost   (line +1.0)
+    h2h    home  DET@KC   margin=+4.0  must_beat=0.0   won
+    spreads away NYM@CWS  margin=-1.0  must_beat=1.0   lost   (line -1.0)
+
+`must_beat` is the negated line every time, `won` appears exactly when
+`margin > must_beat`, and the two MIN@SD rows agree with each other across
+different markets on the same game. The grader is self-consistent.
+
+**WHAT IS STILL NOT ESTABLISHED, AND WHY I DID NOT SETTLE IT.** Self-consistency
+cannot detect a sign inversion -- an inverted convention is consistent with
+itself. Only a real final score can, and I have none: the proxy denies every
+outbound host, and inventing a plausible score to "check" against would be
+worse than leaving it open.
+
+**One structural signal, stated as a signal and not a finding:** of the 14
+distinct rows read, 9 are `bet_side='away'` and ALL NINE carry a negative
+margin -- i.e. every away bet lost. The two `home` bets split 1-1. If away bets
+were near coin-flips that is roughly a 1-in-500 run. It is ALSO exactly what
+you would see if the model bets away underdogs and away underdogs lost that
+day, which is unremarkable. The two readings are indistinguishable from here.
+
+**THE DECISIVE CHECK, needing one lookup:**
+
+    DET@KC  2026-08-23 -- we assert Kansas City (home) won by 4
+    TOR@NYY 2026-08-23 -- we assert Toronto (away) lost by 5
+
+Both right -> the grader is correct and game lines really are -16.4% on 79
+bets. Both reversed -> every game-line number today is wrong, the +$21.43 book
+P&L is wrong, and the fix is the sign in `game_line_bet._margin_for_side`.
+
+**Owed improvement:** the audit prints the MARGIN but not the raw scores,
+because the ledger stores `settled_value` and not the scoreboard. Carrying
+home/away scores through `grade_order` would make this self-service and remove
+the need to ask anyone. That is the fix worth making regardless of the answer.
