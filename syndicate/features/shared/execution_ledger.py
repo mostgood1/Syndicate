@@ -465,6 +465,59 @@ def place_order(
     ) or record
 
 
+def reclassify_presend_failures() -> dict[str, Any]:
+    """Correct orders recorded `failed` that never reached the venue.
+
+    NOT A DELETE, AND DELIBERATELY SO. The two rows this exists for are real
+    events: the system decided to bet, built an order, and the builder refused
+    it before any request was sent. That happened, and a ledger that forgets it
+    stops being a record -- the same reason a graded bet is never re-graded.
+
+    What is WRONG is the status. `failed` means "may have reached the venue",
+    so `spent_today` charges it and `unreconciled_orders` can block the next
+    live run. `rejected` is the status for a refusal made without a venue call.
+    The code now records this correctly (adapters raise with
+    `venue_contacted = False`), but rows written before that fix carry the old
+    status and keep charging a budget nothing spent -- $7.02 of a $40 daily cap
+    on 2026-08-24, for two orders that never left the process.
+
+    NARROW ON PURPOSE. Only `failed` rows whose error names a build error are
+    touched, because that prefix is itself the proof no request was sent -- it
+    is raised while assembling the order. Anything else keeps the conservative
+    reading: a status we cannot prove is safe stays `failed`.
+
+    Idempotent -- a corrected row is no longer `failed`, so a second call is a
+    no-op. Returns what it changed, including the zero.
+    """
+    state = _load()
+    changed: list[dict[str, Any]] = []
+    for order in state.get("orders") or []:
+        if str(order.get("status") or "") != STATUS_FAILED:
+            continue
+        error = str(order.get("error") or "")
+        # The prefix IS the evidence. `OrderBuildError` is raised before the
+        # request is assembled, so it cannot have reached a venue.
+        if not error.startswith("OrderBuildError:"):
+            continue
+        order["status"] = STATUS_REJECTED
+        order["reclassified_at"] = _utc_now()
+        # The original status is kept rather than overwritten silently: a
+        # correction nobody can see is indistinguishable from a rewrite.
+        order["reclassified_from"] = STATUS_FAILED
+        changed.append(
+            {
+                "idempotency_key": order.get("idempotency_key"),
+                "selected_date": order.get("selected_date"),
+                "stake_dollars": order.get("requested_stake_dollars"),
+                "error": error,
+            }
+        )
+
+    if changed:
+        _persist(state)
+    return {"status": "ok", "reclassified": len(changed), "orders": changed}
+
+
 def unreconciled_orders() -> list[dict[str, Any]]:
     """Orders left in the write-ahead state -- sent, or possibly sent, with an
     unknown result. A restart mid-submit produces exactly these, and they must

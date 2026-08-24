@@ -325,3 +325,69 @@ def test_an_exception_that_says_nothing_is_still_failed(monkeypatch):
     request = _request(position_key="ambiguous-1")
     record = mod.place_order(request, submit=blew_up, mode=mod.LIVE)
     assert record["status"] == mod.STATUS_FAILED
+
+
+# --------------------------------------------------------------------------
+# Correcting pre-send failures written before adapters declared contact
+# --------------------------------------------------------------------------
+
+
+def test_a_presend_failure_is_reclassified_not_deleted(monkeypatch):
+    """The row is a real event -- the system decided to bet and the builder
+    refused before sending. Deleting it would make the ledger stop being a
+    record. Only the STATUS was wrong: `failed` charges the daily budget for
+    an order that never left the process ($7.02 of a $40 cap on 2026-08-24)."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    def never_sent(_request):
+        raise RuntimeError("boom")
+
+    request = _request(position_key="reclass-1")
+    record = mod.place_order(request, submit=never_sent, mode=mod.LIVE)
+    # Force the pre-fix shape: failed, with a build error.
+    mod.complete_order(
+        record["idempotency_key"],
+        status=mod.STATUS_FAILED,
+        error="OrderBuildError: no_live_price: None",
+    )
+
+    result = mod.reclassify_presend_failures()
+    assert result["reclassified"] == 1
+
+    fixed = mod.find_order(record["idempotency_key"])
+    assert fixed["status"] == mod.STATUS_REJECTED
+    # The correction is VISIBLE -- one nobody can see is a rewrite.
+    assert fixed["reclassified_from"] == mod.STATUS_FAILED
+    assert fixed["error"] == "OrderBuildError: no_live_price: None"
+
+
+def test_a_real_venue_failure_is_left_alone(monkeypatch):
+    """A status we cannot PROVE is safe stays `failed`. Only the
+    `OrderBuildError` prefix is evidence that no request was sent."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    def blew_up(_request):
+        raise RuntimeError("connection reset mid-POST")
+
+    request = _request(position_key="reclass-keep")
+    record = mod.place_order(request, submit=blew_up, mode=mod.LIVE)
+    assert record["status"] == mod.STATUS_FAILED
+
+    mod.reclassify_presend_failures()
+    assert mod.find_order(record["idempotency_key"])["status"] == mod.STATUS_FAILED
+
+
+def test_reclassify_is_idempotent(monkeypatch):
+    """A corrected row is no longer `failed`, so a second call changes nothing.
+    It runs at every boot, so this is the property that makes that safe."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    assert mod.reclassify_presend_failures()["status"] == "ok"
+    second = mod.reclassify_presend_failures()
+    assert second["reclassified"] == 0

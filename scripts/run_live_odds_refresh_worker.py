@@ -941,6 +941,26 @@ def _live_ledger_at_boot() -> None:
         )
         return
 
+    # CORRECT BEFORE REPORTING. Rows written before adapters declared
+    # `venue_contacted` carry `failed` for orders that never left the process,
+    # and `failed` charges the daily budget and can block the next live run.
+    # Idempotent, so this is a no-op on every boot after the first.
+    try:
+        from syndicate.features.shared.execution_ledger import reclassify_presend_failures
+
+        fixed = reclassify_presend_failures()
+        if fixed.get("reclassified"):
+            print(
+                f"[live_odds_worker] LEDGER_RECLASSIFIED n={fixed.get('reclassified')}"
+                f" orders={fixed.get('orders')}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] LEDGER_RECLASSIFY_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
     print(f"[live_odds_worker] LIVE_LEDGER n={len(orders)}", flush=True)
     for order in orders[-25:]:
         print(
