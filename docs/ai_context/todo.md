@@ -52,10 +52,29 @@ weeks, the de-duplication, a missing next week not costing the current one).
 Updated two stale assertions in `test_sport_data_provider.py` that pinned the
 single-week behaviour this change deliberately replaces.
 
-**Pre-existing reds, unchanged:** the two WNBA game-cards keyvalue tests.
+**Pre-existing reds: FIVE, not the two I first reported.** My `-k` selector
+covered `chip|scoreboard|game_card|shortlist|soccer_card|sport_data_provider`
+and I reported "only the two known WNBA reds" off it — but I had edited
+`pipeline/intelligence_state.py` and `syndicate/blueprints/home.py`, whose tests
+that selector never ran. A wider background sweep surfaced three more:
+`test_daily_update_smoke::test_home_dashboard_payload_exposes_live_lens_link`
+and two in `test_intelligence_state`. **All three fail identically at the parent
+commit `133eb536`, checked in a detached worktree — none are mine.**
+
+The first attempt to check that proved NOTHING and nearly passed as evidence:
+`git stash` with an already-clean tree stashed nothing, so the "before" run was
+the same commit as the "after" run and produced an identical result that looked
+like confirmation. Caught by `git stash pop` reporting "No stash entries found".
+**A before/after comparison where both sides are the same tree always agrees.**
+
 `tests/test_polymarket_us_auth.py` fails COLLECTION in this environment
 (`ModuleNotFoundError: _cffi_backend`) — another session's file, an env issue,
 not a result.
+
+**THE SELECTOR LESSON, which has now cost twice:** `#539` shipped with a guard
+test that a `-k` filter had skipped, and this run reported a clean surface that
+excluded two files the change edited. Choose `-k` from the FILES TOUCHED, not
+from the topic being worked on.
 
 **NOT YET DEPLOYED.** Needs both services: worker to publish, web to read.
 **Verify after deploy:** `GAME_CHIPS_PUBLISHED date=... chips=` in the worker
