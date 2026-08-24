@@ -25642,9 +25642,40 @@ from `changed`. **Not yet verified in production** — that needs a
 `RECONCILE ... changed=0 stamped=1` followed by an `EXECUTED` rather than a
 `BLOCKED_ON_UNRECONCILED`.
 
-**Still unverified:** what `_fp` means. Undocumented, and if it is a
-fixed-point scale rather than a plain count then a 2-contract fill arrives as
-a large number. Guarded two ways rather than guessed: `COUNT_FIELDS` logs the
-raw values on the next read, and reconciliation refuses to book more contracts
-than the order requested (`RECONCILE_COUNT_IMPLAUSIBLE`), an invariant that
-holds whatever the unit turns out to be.
+**VERIFIED 15:16:55Z / 15:17:03Z.** The stamp fix works in production:
+
+    15:13:34Z  RECONCILE ... changed=0 (no stamped= field -- old build)
+    15:13:34Z  BLOCKED_ON_UNRECONCILED count=1 keys=['c3f45504fce2767694a0e73e']
+    15:16:55Z  RECONCILE ... changed=0 ... stamped=1
+    15:17:03Z  RECONCILE ... changed=0 ... stamped=1
+    15:17:03Z  EXECUTED date=2026-08-24 mode=live venue=kalshi armed=True
+               positions=0 placed=0 duplicates=0 retried=0 skipped=0 refused={}
+
+Same order, same resting state, eight minutes apart: blocked before, executed
+after. Live execution is no longer jammed by a known-resting order.
+
+**`_fp` IS ANSWERED, and it is the harmless reading.** Measured 15:13:15Z:
+
+    COUNT_FIELDS fill_count_fp='0.00' initial_count_fp='2.00'
+      remaining_count_fp='2.00' taker_fees_dollars='0.000000'
+      maker_fees_dollars='0.000000' taker_fill_cost_dollars='0.000000'
+      maker_fill_cost_dollars='0.000000' status='resting'
+      yes_price_dollars='0.4600' no_price_dollars='0.5400'
+
+Quoted decimal STRINGS holding plain counts -- the same convention as the
+`count: "2.00"` we send on create. Not a fixed-point scale, so a 2-contract
+order reads as 2. `int(float("2.00"))` already handled it. The
+`RECONCILE_COUNT_IMPLAUSIBLE` bound stays: it cost nothing, and it is the
+guard that made shipping the unknown safe in the first place.
+
+The prices confirm the order is what we meant: our ask sits at
+`yes_price_dollars='0.4600'`, i.e. buying NO at $0.54. Fees read
+`0.000000` because nothing has filled -- the fee wiring is untested against a
+nonzero charge and will stay so until a fill lands.
+
+**Still open:** the live plan is producing `positions=0`, so nothing is being
+placed. Reconciliation and the gate are no longer the constraint -- candidate
+generation is. And the 46c order still rests while the market moved to 44c;
+its ledger row is `submitted`, so the marketable-limit path treats a re-place
+as a duplicate. Cancelling it at the venue is the unblock, and that needs a
+decision rather than a guess.
