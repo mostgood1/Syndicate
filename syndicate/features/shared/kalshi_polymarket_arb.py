@@ -41,12 +41,44 @@ identity or order, deliberately -- ONE real example is not a grammar, and
 guessing which slug position is home vs away from a sample of one is exactly
 the mistake `kalshi_board_join.py`'s own header describes Kalshi costing a
 full day on. `outcomes` (real team names, e.g. `["Titans","Chargers"]`) is
-used instead, matched by NAME through `team_aliases.canonical_team` -- the
-same resolver, same alias maps, both venues. The two Polymarket outcomes are
-compared as a SET against Kalshi's resolved (home, away) set, then assigned to
-home/away individually by name -- never by array position, matching the
-"never assume positional order" rule `kalshi_board_join._side_for_team`
-already documents for exactly this class of bug.
+used instead, matched by NAME through `kalshi_board_join._side_for_team` --
+NOT `team_aliases.canonical_team` directly, because Polymarket's real
+`outcomes` field carries bare NICKNAMES ("Titans", not "Tennessee Titans" or
+"TEN"), which `canonical_team` alone returns `None` for. `_side_for_team`
+already solves exactly this (it is how Kalshi's own city-only titles, "Texas
+wins?", get resolved against a game's two full names) via a token-subset
+match, reused rather than re-solved. The two Polymarket outcomes are checked
+against Kalshi's resolved (home, away) pair individually, never assigned by
+array position -- see `join_kalshi_polymarket_moneylines`'s own docstring for
+the full reasoning and the test that proves it (Polymarket's two teams listed
+in the OPPOSITE order from Kalshi's ticker blob still join correctly).
+
+--------------------------------------------------------------------------
+KALSHI'S SERIES REGISTRY IS PER-PROCESS STATE -- THIS MODULE OWNS ENSURING
+IT IS POPULATED, RATHER THAN HOPING SOMETHING ELSE ALREADY DID
+--------------------------------------------------------------------------
+
+`kalshi_catalogue.classify_market` resolves a market's sport via
+`SERIES_SPORT` (a small hand-registered dict, ZERO moneyline series in it --
+every entry is a player-prop series) falling back to `_DISCOVERED`, a
+MODULE-LEVEL dict populated only by `kalshi_odds_refresh.ensure_series_
+discovered()` or `kalshi_discovery.run_kalshi_discovery()`, both of which are
+normally reached through Kalshi's own refresh cycle or the intelligence-state
+board-build loop -- NEITHER of which is guaranteed to have run yet by the
+time this module's scan runs. Measured 2026-08-24T21:26:00Z
+(`.syndicate/deploys.md`): a boot-probe run of this scan, in
+`scripts/run_refresh_worker.py`, executes ~120 lines before that file even
+calls `start_intelligence_state_background_loop()` -- so `_DISCOVERED` was
+provably empty, and `kalshi_moneylines_resolved` came back 0 with
+`kalshi_refusals={}` (not one Kalshi market was even attempted, because
+`classify_market` refused every one of them at `unmapped_series` before ever
+parsing a title). `run_arb_scan` now calls
+`kalshi_odds_refresh.ensure_series_discovered()` itself, first -- it is
+idempotent (`_DISCOVERY_DONE`-guarded, "once per process") and cheap to call
+defensively, and its own docstring already invites exactly this: "any process
+that prices Kalshi gets the same series list." A scan that resolves zero
+Kalshi moneylines should mean Kalshi genuinely has none today, not that this
+process asked before the catalogue was ever read.
 
 --------------------------------------------------------------------------
 FEES ARE A CONSERVATIVE PLACEHOLDER, NOT A MEASURED SCHEDULE
@@ -444,6 +476,19 @@ def run_arb_scan(
         return {"status": "error", "reason": f"polymarket_fetch_not_ok: {pm_result.get('reason')}"}
     polymarket_rows = pm_result.get("markets") or []
 
+    # MUST run before resolve_kalshi_moneylines -- see module header. Without
+    # it, every Kalshi moneyline is refused at `unmapped_series` before its
+    # title is ever parsed, on any process that has not already priced Kalshi
+    # once. Idempotent (`_DISCOVERY_DONE`-guarded) and never fatal: a failed
+    # catalogue read still lets the hand-registered series (props) resolve,
+    # same as `run_kalshi_odds_refresh`'s own tolerance for this failure.
+    try:
+        from pipeline.kalshi_odds_refresh import ensure_series_discovered
+
+        discovery = ensure_series_discovered()
+    except Exception as exc:
+        discovery = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+
     kalshi_resolved = resolve_kalshi_moneylines(kalshi_markets, board_rows)
     polymarket_resolved = resolve_polymarket_moneylines(polymarket_rows)
     joined = join_kalshi_polymarket_moneylines(kalshi_resolved["markets"], polymarket_resolved["markets"])
@@ -453,6 +498,7 @@ def run_arb_scan(
     return {
         "status": "ok",
         "date": selected_date,
+        "kalshi_discovery": discovery.get("status"),
         "kalshi_moneylines_resolved": len(kalshi_resolved["markets"]),
         "kalshi_refusals": kalshi_resolved["refusals"],
         "polymarket_moneylines_resolved": len(polymarket_resolved["markets"]),

@@ -311,3 +311,68 @@ def test_run_arb_scan_end_to_end_with_stubbed_inputs(monkeypatch):
     assert result["polymarket_moneylines_resolved"] == 1
     assert result["matched_games"] == 1
     assert len(result["opportunities"]) == 1
+
+
+def test_run_arb_scan_calls_discovery_before_resolving_kalshi_markets(monkeypatch):
+    """Measured 2026-08-24T21:26:00Z (.syndicate/deploys.md): a boot-probe run
+    of this scan executed before `_DISCOVERED` had ever been populated in that
+    process, so every real Kalshi moneyline was refused at `unmapped_series`
+    before its title was even parsed -- kalshi_refusals came back `{}`, not
+    because nothing was wrong but because classify_market never got that far.
+    This is the regression test for the fix: ensure_series_discovered() must
+    be called, and its result surfaced, before resolve_kalshi_moneylines runs.
+    """
+    calls = []
+
+    def _fake_ensure_series_discovered():
+        calls.append("discovery")
+        return {"status": "ok", "added": {"props": 0, "games": 0}}
+
+    monkeypatch.setattr(
+        "pipeline.kalshi_odds_refresh.ensure_series_discovered", _fake_ensure_series_discovered
+    )
+    monkeypatch.setattr(
+        "pipeline.intelligence_state.read_layer2_shortlist", lambda date: {"rows": []}
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_file", lambda path: {"markets": []}
+    )
+
+    from syndicate.features.shared import polymarket_us_markets
+
+    monkeypatch.setattr(
+        polymarket_us_markets, "fetch_markets", lambda **kw: {"status": "ok", "markets": []}
+    )
+
+    result = mod.run_arb_scan(selected_date="2026-08-24")
+    assert calls == ["discovery"]
+    assert result["kalshi_discovery"] == "ok"
+
+
+def test_a_failed_discovery_does_not_break_the_scan(monkeypatch):
+    """`ensure_series_discovered` reaching a real network failure must not
+    take the whole scan down -- the hand-registered series (props) still
+    resolve, same tolerance `run_kalshi_odds_refresh` itself has for this."""
+
+    def _fake_ensure_series_discovered():
+        raise RuntimeError("catalogue_unreachable")
+
+    monkeypatch.setattr(
+        "pipeline.kalshi_odds_refresh.ensure_series_discovered", _fake_ensure_series_discovered
+    )
+    monkeypatch.setattr(
+        "pipeline.intelligence_state.read_layer2_shortlist", lambda date: {"rows": []}
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_file", lambda path: {"markets": []}
+    )
+
+    from syndicate.features.shared import polymarket_us_markets
+
+    monkeypatch.setattr(
+        polymarket_us_markets, "fetch_markets", lambda **kw: {"status": "ok", "markets": []}
+    )
+
+    result = mod.run_arb_scan(selected_date="2026-08-24")
+    assert result["status"] == "ok"
+    assert result["kalshi_discovery"] == "error"
