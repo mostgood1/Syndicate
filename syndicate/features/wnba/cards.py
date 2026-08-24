@@ -306,6 +306,14 @@ def _canonical_wnba_tri(team_tri: str) -> str:
         "ATLANTADREAM": "ATL",
         "CHICAGOSKY": "CHI",
         "GOLDENSTATEVALKYRIES": "GSV",
+        # 2026 expansion. Added from a PRODUCTION READING, not a guess: the
+        # market-join probe printed `UNMAPPED ... ['Toronto Tempo@Dallas Wings',
+        # 'Minnesota Lynx@Portland Fire']` on 7 of 13 dates, which is exactly
+        # the silent zero it was built to surface -- the quote log carries full
+        # names, this map did not know these two, and their games dropped out of
+        # the join while reading as "no quotes for that game".
+        "TORONTOTEMPO": "TOR",
+        "PORTLANDFIRE": "POR",
     }
     return mapped.get(value, mapped.get(compact, value))
 

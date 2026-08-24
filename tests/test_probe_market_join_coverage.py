@@ -348,15 +348,42 @@ def test_home_and_away_are_not_interchangeable(tmp_path, capsys) -> None:
 
 
 def test_an_unmappable_team_is_NAMED_not_silently_dropped(tmp_path, capsys) -> None:
-    """**A SILENT ZERO IS THE FAILURE MODE OF EVERY JOIN IN THIS LANE.** An
-    expansion side missing from the canonical map would drop out of the overlap
-    and read as "that game has no quotes". The exact strings must be printed so
-    the map can be fixed from production rather than from a guess."""
+    """**A SILENT ZERO IS THE FAILURE MODE OF EVERY JOIN IN THIS LANE.** A team
+    missing from the canonical map drops out of the overlap and reads as "that
+    game has no quotes". The exact strings must be printed so the map is fixed
+    from production rather than from a guess.
+
+    It worked: this test originally used "Toronto Tempo" and "Portland Fire",
+    the line printed them on 7 of 13 production dates, and they are now IN the
+    map -- so the fixture uses a name nobody has, or it would be asserting that
+    a fixed bug is still broken."""
     _write_state(tmp_path)
     _write_bridge(tmp_path)
+    _write_quotes(tmp_path, [dict(q, home_team="Nowhere Nonesuch",
+                                  away_team="Indiana Fever")
+                             for q in _moving_quotes()])
+    _, out = _run(tmp_path, capsys)
+    assert "UNMAPPED" in out, out
+    assert "Nowhere Nonesuch" in out, out
+    assert "Indiana Fever" not in out.split("UNMAPPED")[1].split("\n")[0], (
+        "only the side that FAILED to map belongs on the fix list -- printing "
+        "its mappable opponent alongside it reads as though both are broken, "
+        "which is how I misread my own first production run")
+
+
+def test_the_2026_expansion_sides_map(tmp_path, capsys) -> None:
+    """Pinned from production. `UNMAPPED` reported exactly these two, on 7 of 13
+    dates, and their games were dropping out of the join."""
+    _write_state(tmp_path, event="401857200")
+    _write_bridge(tmp_path, event="401857200")
+    path = momentum_events_path(tmp_path, league_code="wnba", date_str=DAY)
+    doc = json.loads(path.read_text())
+    doc["games"]["401857200"]["home_tri"] = "TOR"
+    doc["games"]["401857200"]["away_tri"] = "POR"
+    path.write_text(json.dumps(doc))
     _write_quotes(tmp_path, [dict(q, home_team="Toronto Tempo",
                                   away_team="Portland Fire")
                              for q in _moving_quotes()])
     _, out = _run(tmp_path, capsys)
-    assert "UNMAPPED" in out, out
-    assert "Portland Fire@Toronto Tempo" in out, out
+    assert "event_overlap=1" in out, out
+    assert "UNMAPPED" not in out, out
