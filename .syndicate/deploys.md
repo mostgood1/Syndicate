@@ -26191,3 +26191,49 @@ where each number comes from.
   it proves ownership rather than overriding it. Five token losses today; the
   tokens are worth pasting into the lane when acquired.
 
+
+---
+
+### 2026-08-24 20:18:37Z — live-odds-worker `c729b8745` — the Polymarket US Sports API routes 404; `/v1/markets` does not
+
+**verify: one boot, one credential, 0.6 seconds end to end, instance `hvpj6`:**
+
+```
+.602  GET /v1/markets                ok=True  29 row keys
+.752  GET /v2/leagues/mlb/events     http_404  {"code":5}  NOT_FOUND
+.901  GET /v2/leagues/wnba/events    http_404
+38.100 GET /v2/leagues/nfl/events    http_404
+38.240 GET /v1/sports/teams/provider http_404
+```
+
+**What this rules out.** NOT the slug: `nfl`/`nba`/`mlb` are the docs' own
+examples and 404 identically to the four guessed ones, so the ROUTE is absent,
+not the league. NOT the credential, clock or signature: `/v1/markets` succeeded
+0.15s earlier on the same instance through the same `signed_request`, and gRPC
+code 5 is NOT_FOUND rather than UNAUTHENTICATED.
+
+**What it does NOT rule out — I got this wrong first time and the user caught
+it.** I reported "the documented Sports API route does not exist on this host".
+FOUR ROUTES WERE TESTED, NOT THE DOC SET. `/v1/sports/teams/provider` is the
+`provider` VARIANT; `/v1/sports` and `/v1/sports/teams` were never tried, and
+they share the `/v1` prefix that demonstrably works here. Everything confirmed
+dead is either `/v2` or carries the `provider` sub-path. A 404 on the provider
+variant is as consistent with "that variant needs different arguments" as with
+"no sports data on this host" — opposite consequences. `probe_v1_sports_routes`
+(`7481b17b6`) asks; result pending.
+
+**Consequence for the odds path.** `/v1/markets` carries `sportsMarketTypeV2`,
+`gameStartTime`, `orderPriceMinTickSize` and `minimumTradeQty` — every field
+the join and the order need — so the sporting slate is reachable by filtering
+it structurally. The boot probe now calls `fetch_markets` and prints five real
+market rows so the join gets designed from real text. The 404'd routes moved
+behind `SYNDICATE_POLYMARKET_US_SPORTS_PROBE=1`: re-probing a known 404 every
+boot buries the line that matters, and deleting the call would lose the cheap
+re-check. `fetch_league_slate` is KEPT — it is correct against the documented
+contract and starts working by repointing `POLYMARKET_US_API_BASE`.
+
+**Credentials moved.** The other session's 20:01Z probe returned
+`credentials_absent` on refresh-worker for all seven leagues; the 20:17:58Z run
+returned `http_404`. The key is now on refresh-worker too. Nobody in this lane
+put it there.
+
