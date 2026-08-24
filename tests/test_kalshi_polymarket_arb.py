@@ -295,15 +295,13 @@ def test_run_arb_scan_end_to_end_with_stubbed_inputs(monkeypatch):
 
     from syndicate.features.shared import polymarket_us_markets
 
-    def _fake_fetch_markets(**kwargs):
-        assert kwargs["open_only"] is True
-        assert kwargs["drop_settled"] is True
+    def _fake_fetch_game_markets(**kwargs):
         return {
             "status": "ok",
             "markets": [_polymarket_row(teams=("White Sox", "Rangers"), prices=("0.55", "0.45"))],
         }
 
-    monkeypatch.setattr(polymarket_us_markets, "fetch_markets", _fake_fetch_markets)
+    monkeypatch.setattr(polymarket_us_markets, "fetch_game_markets", _fake_fetch_game_markets)
 
     result = mod.run_arb_scan(selected_date="2026-08-24")
     assert result["status"] == "ok"
@@ -311,6 +309,43 @@ def test_run_arb_scan_end_to_end_with_stubbed_inputs(monkeypatch):
     assert result["polymarket_moneylines_resolved"] == 1
     assert result["matched_games"] == 1
     assert len(result["opportunities"]) == 1
+
+
+def test_run_arb_scan_uses_the_real_offset_range_not_a_single_page_at_zero(monkeypatch):
+    """Measured 2026-08-24T20:46:21Z (.syndicate/deploys.md): a single page at
+    offset 0 of the open (`closed=false`) catalogue sees ONLY season-level
+    futures/politics/culture -- the real game slate is a contiguous block far
+    deeper (boundary 16000-17513, moving daily as ids are assigned). Calling
+    `fetch_markets(max_pages=1)` could therefore never see a real moneyline,
+    which is why `polymarket_moneylines_resolved` came back 0 on this scan's
+    first live runs even once Kalshi's own side was fixed. Regression test for
+    the fix: `run_arb_scan` must call `fetch_game_markets` -- the boundary-
+    locating, page-to-exhaustion function -- not `fetch_markets` directly.
+    """
+    monkeypatch.setattr(
+        "pipeline.intelligence_state.read_layer2_shortlist", lambda date: {"rows": []}
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.refresh_state_store.read_json_file", lambda path: {"markets": []}
+    )
+
+    from syndicate.features.shared import polymarket_us_markets
+
+    calls = []
+    monkeypatch.setattr(
+        polymarket_us_markets,
+        "fetch_game_markets",
+        lambda **kw: (calls.append(kw), {"status": "ok", "markets": []})[1],
+    )
+
+    def _fail_if_called(**kwargs):
+        raise AssertionError("run_arb_scan must call fetch_game_markets, not fetch_markets directly")
+
+    monkeypatch.setattr(polymarket_us_markets, "fetch_markets", _fail_if_called)
+
+    result = mod.run_arb_scan(selected_date="2026-08-24")
+    assert result["status"] == "ok"
+    assert len(calls) == 1
 
 
 def test_run_arb_scan_calls_discovery_before_resolving_kalshi_markets(monkeypatch):
@@ -341,7 +376,7 @@ def test_run_arb_scan_calls_discovery_before_resolving_kalshi_markets(monkeypatc
     from syndicate.features.shared import polymarket_us_markets
 
     monkeypatch.setattr(
-        polymarket_us_markets, "fetch_markets", lambda **kw: {"status": "ok", "markets": []}
+        polymarket_us_markets, "fetch_game_markets", lambda **kw: {"status": "ok", "markets": []}
     )
 
     result = mod.run_arb_scan(selected_date="2026-08-24")
@@ -370,7 +405,7 @@ def test_a_failed_discovery_does_not_break_the_scan(monkeypatch):
     from syndicate.features.shared import polymarket_us_markets
 
     monkeypatch.setattr(
-        polymarket_us_markets, "fetch_markets", lambda **kw: {"status": "ok", "markets": []}
+        polymarket_us_markets, "fetch_game_markets", lambda **kw: {"status": "ok", "markets": []}
     )
 
     result = mod.run_arb_scan(selected_date="2026-08-24")
