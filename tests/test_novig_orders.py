@@ -11,11 +11,13 @@ from types import SimpleNamespace
 import pytest
 
 from syndicate.features.shared.novig_orders import (
+    NovigOrderError,
     OrderBuildError,
     backoff_seconds_from_headers,
     cash_units_for_stake,
     novig_submitter,
     order_body,
+    submit_order,
 )
 
 
@@ -166,8 +168,121 @@ def test_novig_submitter_raises_no_live_price_without_one():
         submitter(_request())
 
 
-def test_novig_submitter_is_not_wired_to_a_network_call_yet():
-    """Deliberately unimplemented past body-building -- see module header."""
+def test_novig_submitter_reaches_submit_order_and_refuses_by_name_without_a_credential(monkeypatch):
+    """Without a credential this must fail at the FIRST possible point --
+    before any network call, never a silent no-op."""
+    monkeypatch.delenv("NOVIG_CLIENT_ID", raising=False)
+    monkeypatch.delenv("NOVIG_CLIENT_SECRET", raising=False)
     submitter = novig_submitter(lambda request: 0.62, currency="CASH")
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(OrderBuildError, match="no_credential"):
         submitter(_request())
+
+
+# --- submit_order -------------------------------------------------------------
+
+
+class _FakeHTTPResponse:
+    def __init__(self, *, status, body, headers=None):
+        self.status = status
+        self._body = body
+        self.headers = headers or {}
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+def _with_credential(monkeypatch):
+    monkeypatch.setenv("NOVIG_CLIENT_ID", "abc")
+    monkeypatch.setenv("NOVIG_CLIENT_SECRET", "def")
+    monkeypatch.setattr(
+        "syndicate.features.shared.novig_client._fetch_token", lambda creds, **kw: "tok_123"
+    )
+
+
+def test_submit_order_refuses_by_name_without_a_credential(monkeypatch):
+    monkeypatch.delenv("NOVIG_CLIENT_ID", raising=False)
+    monkeypatch.delenv("NOVIG_CLIENT_SECRET", raising=False)
+    with pytest.raises(OrderBuildError, match="no_credential"):
+        submit_order(_request(), price=0.62, currency="CASH")
+
+
+def test_submit_order_never_reports_filled_on_a_201(monkeypatch):
+    """THE ONE THING THIS FUNCTION EXISTS TO GET RIGHT. The documented
+    contract says 201 means 'placed in the queue', not executed -- a status
+    of 'filled' here would be Kalshi's exact booked-a-position-that-was-
+    resting bug, on a contract with even less confirmed shape."""
+    _with_credential(monkeypatch)
+    response = _FakeHTTPResponse(status=201, body=b'{"orderId": "ord-1"}')
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **kw: response)
+
+    result = submit_order(_request(), price=0.62, currency="CASH")
+    assert result["status"] == "submitted"
+    assert result["status"] != "filled"
+    assert result["http_status"] == 201
+    assert result["raw_response"] == {"orderId": "ord-1"}
+    assert result["response_keys"] == ["orderId"]
+    assert result["contracts"] == 0
+    assert result["requested_contracts"] == 500
+
+
+def test_submit_order_raises_novig_order_error_on_429_with_parsed_backoff(monkeypatch):
+    import urllib.error
+
+    _with_credential(monkeypatch)
+
+    def _raise_429(*a, **kw):
+        raise urllib.error.HTTPError(
+            "url", 429, "too many requests", {"Retry-After": "500"}, None
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", _raise_429)
+    with pytest.raises(NovigOrderError, match="http_429"):
+        submit_order(_request(), price=0.62, currency="CASH")
+
+
+def test_submit_order_raises_novig_order_error_on_other_http_errors(monkeypatch):
+    import urllib.error
+
+    _with_credential(monkeypatch)
+
+    def _raise_500(*a, **kw):
+        raise urllib.error.HTTPError("url", 500, "server error", {}, None)
+
+    monkeypatch.setattr("urllib.request.urlopen", _raise_500)
+    with pytest.raises(NovigOrderError, match="http_500"):
+        submit_order(_request(), price=0.62, currency="CASH")
+
+
+def test_submit_order_raises_novig_order_error_on_a_network_failure(monkeypatch):
+    _with_credential(monkeypatch)
+
+    def _raise(*a, **kw):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr("urllib.request.urlopen", _raise)
+    with pytest.raises(NovigOrderError, match="TimeoutError"):
+        submit_order(_request(), price=0.62, currency="CASH")
+
+
+def test_submit_order_raises_novig_order_error_on_an_undecodable_response(monkeypatch):
+    _with_credential(monkeypatch)
+    response = _FakeHTTPResponse(status=201, body=b"not json")
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **kw: response)
+    with pytest.raises(NovigOrderError, match="undecodable_response"):
+        submit_order(_request(), price=0.62, currency="CASH")
+
+
+def test_novig_submitter_never_reports_filled_end_to_end(monkeypatch):
+    _with_credential(monkeypatch)
+    response = _FakeHTTPResponse(status=201, body=b"{}")
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **kw: response)
+
+    submitter = novig_submitter(lambda request: 0.62, currency="CASH")
+    result = submitter(_request())
+    assert result["status"] == "submitted"

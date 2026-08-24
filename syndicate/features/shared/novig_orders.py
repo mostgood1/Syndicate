@@ -66,26 +66,53 @@ than at every call site that might otherwise assume the HTTP-typical seconds
 convention -- the same class of bug as Kalshi's 100x price error.
 
 --------------------------------------------------------------------------
-STILL UNCONFIRMED
+STILL UNCONFIRMED, AND `submit_order` IS WRITTEN AROUND THAT
 --------------------------------------------------------------------------
 
 - The cancel endpoint's HTTP method (path confirmed: `{base}/emm/orders/
   {orderId}`; DELETE assumed, not read).
-- The response shape of a successful order (only the 201 status code and
+- **The response shape of a successful order.** Only the 201 status code and
   "Order placed successfully" were documented -- no field names for the
-  created order/wager object).
+  created order/wager object. The docs' OWN words make this the correct
+  thing to be cautious about: "A successful response indicates that the
+  order was placed in the QUEUE, but does not guarantee that it will be
+  filled or placed on the order book. To reliably ensure an order has been
+  executed, consume messages from the matching tape." **A 201 is therefore
+  NEVER read as a fill here** -- `submit_order` reports every accepted order
+  as `submitted` (the write-ahead state), the same discipline
+  `kalshi_orders.submit_order`'s header describes after its own
+  `filled`-by-default bug booked a position that was actually resting.
+  Reconciliation (reading the matching tape / `emm/fills/all`) is a SEPARATE,
+  not-yet-written concern.
 - The response shape of `emm/fills/all` / `emm/orders/all` /
-  `emm/transactions` (endpoint names and rate limits confirmed; field names
-  not). `venue_order_view` -- the function that would map a Novig order onto
-  this repo's `filled`/`resting`/`dead`/`unknown` vocabulary, the way
-  `kalshi_orders.venue_order_view` does -- is DELIBERATELY NOT WRITTEN here
-  for exactly this reason: writing it now would mean guessing field names
-  Kalshi's own build got wrong on its first three attempts, on a contract
-  even less documented than Kalshi's was.
+  `emm/transactions` (endpoint names, rate limits AND their tiered burst/
+  sustained headers confirmed; field names not). `venue_order_view` -- the
+  function that would map a Novig order onto this repo's `filled`/`resting`/
+  `dead`/`unknown` vocabulary the way `kalshi_orders.venue_order_view` does
+  -- is DELIBERATELY NOT WRITTEN here for exactly this reason.
+
+--------------------------------------------------------------------------
+`submit_order` REPORTS THE RAW RESPONSE SHAPE -- IT DOES NOT PARSE IT
+--------------------------------------------------------------------------
+
+Same discipline `kalshi_client.probe()` and `polymarket_client.probe()` use,
+applied to a WRITE call rather than a read for the first time in this lane.
+On a 2xx, the decoded body's top-level keys are captured
+(`response_keys`) and the WHOLE decoded body is returned
+(`raw_response`) rather than picked apart -- because picking specific
+fields out of an unconfirmed shape is exactly how Kalshi's build defaulted
+an unrecognised status to `filled`. The first real submit is the
+verification step this repo's own culture requires before trusting more of
+the shape: read `raw_response`'s keys, update `venue_order_view` from what
+actually came back, THEN parse it.
 """
 
 from __future__ import annotations
 
+import json
+import os
+import urllib.error
+import urllib.request
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
@@ -93,8 +120,10 @@ __all__ = [
     "cash_units_for_stake",
     "order_body",
     "backoff_seconds_from_headers",
+    "submit_order",
     "novig_submitter",
     "OrderBuildError",
+    "NovigOrderError",
 ]
 
 # Confirmed from real docs.novig.com content, 2026-08-24. See module header.
@@ -115,6 +144,17 @@ class OrderBuildError(ValueError):
     """
 
     venue_contacted = False
+
+
+class NovigOrderError(RuntimeError):
+    """A submit call that reached (or tried to reach) the venue and failed.
+
+    Distinct from `OrderBuildError`: this means `venue_contacted` is
+    ambiguous or true, so `place_order` records it as `failed` and KEEPS the
+    record for reconciliation -- the request may still have landed even
+    though the response was lost or malformed. `OrderBuildError` means we
+    never sent anything; this means we can no longer be sure.
+    """
 
 
 def cash_units_for_stake(stake_dollars: float, *, currency: str = "CASH") -> int:
@@ -245,6 +285,129 @@ def backoff_seconds_from_headers(headers: Any) -> float | None:
     return None
 
 
+def _order_place_url() -> str:
+    from syndicate.features.shared.novig_client import _API_BASE
+
+    override = (os.environ.get("NOVIG_API_BASE") or "").strip()
+    base = override or _API_BASE
+    return f"{base.rstrip('/')}{_ORDER_PLACE_PATH}"
+
+
+def submit_order(request: Any, *, price: float, currency: str, timeout: float = 10.0) -> dict[str, Any]:
+    """Send ONE order. Returns the shape `place_order` expects from an
+    adapter: `{"status": ..., "venue_order_id": ..., "fill_price": ...,
+    "fill_stake_dollars": ..., "contracts": ..., "requested_contracts": ...}`
+    -- same keys `kalshi_orders.submit_order` returns, so `place_order` does
+    not need to know which venue it is talking to.
+
+    `timeout=10.0`, not the module's usual longer default: the documented
+    server-side timeout is 5 SECONDS, and a client timeout shorter than that
+    would report a submit as failed while the venue was still working on
+    accepting it -- ambiguous in exactly the direction `NovigOrderError`
+    exists to keep out of the ledger as a false REJECTED. 10s gives the
+    server's own 5s room to actually respond before this gives up.
+
+    NEVER RETURNS `status: "filled"`. The documented contract itself says a
+    201 means "placed in the queue," not executed -- see module header. Every
+    successful submit here is `"submitted"`, exactly the write-ahead state
+    `kalshi_orders.submit_order`'s own docstring names as the correct
+    default for "the venue has it, the outcome is not known here." Deciding
+    fills is reconciliation's job, and reconciliation does not exist yet
+    (see `venue_order_view`'s absence, module header).
+
+    Raises `NovigOrderError` on anything that reached the venue and did not
+    return a clean 2xx -- `place_order` marks those `failed` and KEEPS the
+    record, because a raised submit may still have landed.
+    """
+    from syndicate.features.shared.novig_client import NovigError, _fetch_token, load_credentials
+
+    creds = load_credentials()
+    if creds.get("status") != "ok":
+        # Unlike a network failure, a missing credential means NOTHING was
+        # sent -- OrderBuildError, not NovigOrderError, so this is recorded
+        # REJECTED rather than FAILED-and-retried.
+        raise OrderBuildError(f"no_credential: {creds.get('reason')}")
+    try:
+        token = _fetch_token(creds)
+    except NovigError as exc:
+        raise OrderBuildError(f"no_credential: token_fetch_failed: {exc}") from exc
+
+    body = order_body(request, price=price, currency=currency)
+    url = _order_place_url()
+
+    # THE REQUEST, BEFORE THE RESPONSE -- and never the token. If Novig
+    # rejects the body, this line is what tells us which field it disliked;
+    # if the process dies before a response arrives, this is the only record
+    # that anything was attempted. Same reasoning `kalshi_orders.submit_order`
+    # gives for printing before sending.
+    print(
+        f"[novig_orders] SUBMIT url={url} outcomeId={body['outcomeId']}"
+        f" price={body['price']} qty={body['qty']} currency={body['currency']}"
+        f" tif={body['tif']}",
+        flush=True,
+    )
+
+    payload = json.dumps(body).encode("utf-8")
+    http_request = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(http_request, timeout=timeout) as response:
+            raw_body = response.read()
+            status_code = response.status
+            response_headers = response.headers
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8")[:400]
+        except Exception:
+            detail = "<unreadable>"
+        if exc.code == 429:
+            backoff = backoff_seconds_from_headers(exc.headers)
+            raise NovigOrderError(f"http_429 backoff_seconds={backoff}: {detail}") from exc
+        raise NovigOrderError(f"http_{exc.code}: {detail}") from exc
+    except Exception as exc:
+        raise NovigOrderError(f"{type(exc).__name__}: {exc}") from exc
+
+    try:
+        decoded = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise NovigOrderError(f"undecodable_response: {exc}") from exc
+
+    # THE SHAPE, ONCE -- reported, not parsed. Same role `kalshi_orders`'
+    # `ORDERS_READ` log line played the first time it read a real order back:
+    # this is the line that turns "guessed at the response" into "read it".
+    response_keys = sorted(decoded.keys()) if isinstance(decoded, dict) else None
+    print(
+        f"[novig_orders] SUBMIT_RESPONSE http_status={status_code}"
+        f" response_keys={response_keys}",
+        flush=True,
+    )
+
+    return {
+        # NEVER "filled" -- see docstring.
+        "status": "submitted",
+        "http_status": status_code,
+        "venue_order_id": None,  # UNKNOWN which key holds this; see raw_response.
+        "fill_price": None,
+        "fill_stake_dollars": None,
+        "contracts": 0,
+        "requested_contracts": body["qty"],
+        "raw_response": decoded,
+        "response_keys": response_keys,
+        "rate_limit_remaining": (
+            response_headers.get("X-RateLimit-Remaining") if response_headers else None
+        ),
+    }
+
+
 def novig_submitter(price_for, *, currency: str):
     """An adapter bound to a price resolver, matching `kalshi_submitter`'s
     shape for `place_order(submit=...)`.
@@ -254,22 +417,12 @@ def novig_submitter(price_for, *, currency: str):
     not yet claimed by this lane) decides once which denomination this
     submitter trades in, rather than trusting it to be threaded correctly
     through every individual order.
-
-    NOT WIRED TO A NETWORK CALL. `submit_order` (the `signed_request`-style
-    POST + response handling `kalshi_orders.submit_order` implements) is
-    deliberately not written yet -- see module header's "STILL UNCONFIRMED"
-    section on why guessing the response shape now would repeat exactly the
-    mistake this repo's own Kalshi build corrected three times over.
     """
 
     def _submit(request):
         price = price_for(request)
         if price is None:
             raise OrderBuildError(f"no_live_price: {getattr(request, 'venue_ticker', None)}")
-        body = order_body(request, price=float(price), currency=currency)
-        raise NotImplementedError(
-            "novig_orders.submit_order is not implemented -- the order body "
-            f"({body}) is ready, the network call is not. See module header."
-        )
+        return submit_order(request, price=float(price), currency=currency)
 
     return _submit
