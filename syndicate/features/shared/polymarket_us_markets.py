@@ -78,6 +78,7 @@ from typing import Any, Iterable, Mapping
 
 __all__ = [
     "fetch_markets",
+    "is_settled_row",
     "fetch_league_slate",
     "fetch_teams",
     "probe_v1_sports_routes",
@@ -150,57 +151,184 @@ def _distinct(rows: Iterable[Mapping[str, Any]], field: str) -> list[str]:
     return sorted(seen)[:20]
 
 
-def fetch_markets(*, limit: int = _DEFAULT_LIMIT, active: bool = True) -> dict[str, Any]:
-    """One signed read of the US catalogue, reported by shape.
+def is_settled_row(row: Mapping[str, Any]) -> bool:
+    """Is this market already resolved?
+
+    MEASURED 2026-08-24T20:28:07Z: the first 500 rows of
+    `/v1/markets?active=true&limit=500` were ALL NFL games from `2025-11-02`
+    with `outcomePrices` of `["1","0"]` or `["0","1"]` -- settled games from
+    last season, priced at certainty, returned under `active=true`.
+
+    So `active` does not mean unresolved on this venue, and a price at exactly
+    0 or 1 is the reliable tell: a live market cannot be certain. This is a
+    PRICE test rather than a `status` test because the `status` vocabulary has
+    not been observed -- `fetch_markets` reports it so the next run can use it
+    directly, but nothing depends on a guessed value in the meantime.
+    """
+    prices = row.get("outcomePrices")
+    if isinstance(prices, str):
+        try:
+            import json
+
+            prices = json.loads(prices)
+        except Exception:
+            return False
+    if not isinstance(prices, list) or not prices:
+        return False
+    values: list[float] = []
+    for price in prices:
+        try:
+            values.append(float(price))
+        except (TypeError, ValueError):
+            return False
+    return any(v <= 0.0 or v >= 1.0 for v in values)
+
+
+def _game_start(row: Mapping[str, Any]) -> str:
+    return str(row.get("gameStartTime") or "")
+
+
+def fetch_markets(
+    *,
+    limit: int = _DEFAULT_LIMIT,
+    active: bool = True,
+    offset: int = 0,
+    max_pages: int = 1,
+    drop_settled: bool = False,
+) -> dict[str, Any]:
+    """One or more signed reads of the US catalogue, reported by shape.
+
+    --------------------------------------------------------------------------
+    THE COUNT THAT LOOKS RIGHT AND IS NOT
+    --------------------------------------------------------------------------
+
+    The first production run of this function returned
+    `sporting=500 of=500 orderable=500 truncated=True` -- which reads as a full,
+    healthy slate and was 500 games that finished nine months earlier. A join
+    built on it would price today's board against settled results, and every
+    counter on the log line would look correct.
+
+    So the report now separates three different things that were one number:
+
+        sporting     rows that are sports markets at all
+        settled      of those, already resolved (see `is_settled_row`)
+        live         sporting and NOT settled -- the only usable count
+
+    `drop_settled` filters them out; it is OFF by default so a caller that has
+    not thought about it gets the full picture rather than a silently narrowed
+    one, and the `settled` count is always reported either way.
+
+    --------------------------------------------------------------------------
+    PAGING, WHICH IS STILL A GUESS ON THIS ROUTE
+    --------------------------------------------------------------------------
+
+    `payload_keys=['markets']` -- no cursor, no total. `offset` is used because
+    the venue's own Sports API documents `limit`/`offset`, so it is the house
+    convention rather than an invention. IT IS UNVERIFIED HERE. If the venue
+    ignores it, every page returns the same rows, so `duplicate_ids` counts
+    repeats across pages: a non-zero value means offset did nothing and the
+    pagination is wrong, which is otherwise invisible.
 
     Never raises for a venue problem -- this runs inside a refresh loop, and a
     venue being unreachable must degrade to a NAMED refusal rather than take
-    the loop down. `credentials_absent` and a failed call are separate reasons
-    because they need completely different responses.
+    the loop down.
     """
     from syndicate.features.shared import polymarket_us_auth as auth
 
     if not auth.credentials_present():
         return {"status": "skipped", "reason": "credentials_absent", "markets": []}
 
-    url = f"{auth.BASE_URL}/v1/markets?limit={int(limit)}"
-    if active:
-        url += "&active=true"
-    try:
-        payload = auth.signed_request("GET", url)
-    except Exception as exc:
-        reason = str(exc) if isinstance(exc, auth.PolymarketUSAuthError) else f"{type(exc).__name__}: {exc}"
-        return {"status": "error", "reason": reason, "markets": []}
+    rows: list[Mapping[str, Any]] = []
+    seen_ids: set[str] = set()
+    duplicate_ids = 0
+    pages = 0
+    truncated = False
+    payload_keys: list[str] = []
 
-    rows = payload.get("markets")
-    if not isinstance(rows, list):
-        # The one key the probe confirmed. If it is gone, say so by name rather
-        # than returning an empty catalogue, which reads as "no markets".
-        return {
-            "status": "error",
-            "reason": f"markets_key_absent: payload_keys={sorted(payload.keys())}",
-            "markets": [],
-        }
+    for page in range(max(1, int(max_pages))):
+        page_offset = int(offset) + page * int(limit)
+        url = f"{auth.BASE_URL}/v1/markets?limit={int(limit)}&offset={page_offset}"
+        if active:
+            url += "&active=true"
+        try:
+            payload = auth.signed_request("GET", url)
+        except Exception as exc:
+            reason = (
+                str(exc) if isinstance(exc, auth.PolymarketUSAuthError)
+                else f"{type(exc).__name__}: {exc}"
+            )
+            if not rows:
+                return {"status": "error", "reason": reason, "markets": []}
+            truncated = True
+            break
 
-    sporting = [r for r in rows if isinstance(r, Mapping) and is_sporting_row(r)]
-    trimmed = [trimmed_row(r) for r in sporting]
+        batch = payload.get("markets")
+        if not isinstance(batch, list):
+            # The one key the probe confirmed. If it is gone, say so by name
+            # rather than returning an empty catalogue, which reads as "no
+            # markets".
+            if not rows:
+                return {
+                    "status": "error",
+                    "reason": f"markets_key_absent: payload_keys={sorted(payload.keys())}",
+                    "markets": [],
+                }
+            truncated = True
+            break
+
+        payload_keys = sorted(payload.keys())
+        pages += 1
+        for row in batch:
+            if not isinstance(row, Mapping):
+                continue
+            row_id = str(row.get("id") or "")
+            if row_id and row_id in seen_ids:
+                duplicate_ids += 1
+                continue
+            if row_id:
+                seen_ids.add(row_id)
+            rows.append(row)
+        if len(batch) < int(limit):
+            break
+    else:
+        truncated = True
+
+    sporting = [r for r in rows if is_sporting_row(r)]
+    settled = [r for r in sporting if is_settled_row(r)]
+    live = [r for r in sporting if not is_settled_row(r)]
+    chosen = live if drop_settled else sporting
+    trimmed = [trimmed_row(r) for r in chosen]
+    starts = sorted(_game_start(r) for r in sporting if _game_start(r))
+    live_starts = sorted(_game_start(r) for r in live if _game_start(r))
     return {
         "status": "ok",
         "markets": trimmed,
         "count": len(trimmed),
         "total_rows": len(rows),
-        # Exactly the page we asked for means we cannot tell whether there is
-        # more. Reported rather than silently accepted as the whole catalogue.
-        "truncated": len(rows) >= int(limit),
+        "sporting": len(sporting),
+        # THE THREE NUMBERS THAT WERE ONE. `live` is the only usable count.
+        "settled": len(settled),
+        "live": len(live),
+        "pages": pages,
+        "truncated": truncated,
+        # Non-zero means `offset` did nothing and paging is wrong -- otherwise
+        # invisible, because every page would simply look full.
+        "duplicate_ids": duplicate_ids,
         "orderable": sum(1 for r in trimmed if r.get("orderable")),
-        # THE POINT OF THE FIRST RUN. No value of these has ever been observed,
-        # so the next pass designs the sport/market mapping from what is really
-        # there instead of from a guess that would return zero.
+        # The window actually covered, which is what makes "these are last
+        # season's games" legible at a glance instead of needing a sample.
+        "game_start_min": starts[0] if starts else None,
+        "game_start_max": starts[-1] if starts else None,
+        "live_start_min": live_starts[0] if live_starts else None,
+        "live_start_max": live_starts[-1] if live_starts else None,
         "sports_market_types": _distinct(sporting, "sportsMarketTypeV2"),
         "market_types": _distinct(sporting, "marketType"),
         "categories": _distinct(sporting, "category"),
-        "payload_keys": sorted(payload.keys()),
-        "row_keys": sorted(rows[0].keys()) if rows and isinstance(rows[0], Mapping) else None,
+        # Never observed. Reported so the next run can filter on `status`
+        # directly instead of inferring resolution from the price.
+        "statuses": _distinct(sporting, "status"),
+        "payload_keys": payload_keys,
+        "row_keys": sorted(rows[0].keys()) if rows else None,
     }
 
 

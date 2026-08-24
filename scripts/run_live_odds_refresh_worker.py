@@ -856,23 +856,36 @@ def _polymarket_us_slate_probe_at_boot() -> None:
             print("[live_odds_worker] POLYMARKET_US_SLATE status=credentials_absent", flush=True)
             return
 
-        # THE ROUTE THAT WORKS.
-        catalogue = pm.fetch_markets(limit=500)
+        # THE ROUTE THAT WORKS -- paged, and reporting SETTLED separately.
+        #
+        # The first run of this printed `sporting=500 of=500 orderable=500`,
+        # which reads as a full healthy slate and was 500 NFL games that
+        # finished nine months earlier, priced at certainty under
+        # `active=true`. `live` is the only usable count; `duplicate_ids`
+        # catches a venue that ignores `offset`, which is otherwise invisible
+        # because every page simply looks full.
+        catalogue = pm.fetch_markets(limit=500, max_pages=4)
         print(
             f"[live_odds_worker] POLYMARKET_US_CATALOGUE status={catalogue.get('status')}"
-            f" sporting={catalogue.get('count')} of={catalogue.get('total_rows')}"
+            f" sporting={catalogue.get('sporting')} settled={catalogue.get('settled')}"
+            f" live={catalogue.get('live')}"
+            f" rows={catalogue.get('total_rows')} pages={catalogue.get('pages')}"
+            f" duplicate_ids={catalogue.get('duplicate_ids')}"
             f" orderable={catalogue.get('orderable')}"
             f" truncated={catalogue.get('truncated')}"
+            f" window={catalogue.get('game_start_min')}..{catalogue.get('game_start_max')}"
+            f" live_window={catalogue.get('live_start_min')}..{catalogue.get('live_start_max')}"
             f" types={catalogue.get('sports_market_types')}"
             f" market_types={catalogue.get('market_types')}"
             f" categories={catalogue.get('categories')}"
-            f" row_keys={catalogue.get('row_keys')}"
+            f" statuses={catalogue.get('statuses')}"
             f" reason={catalogue.get('reason')}",
             flush=True,
         )
-        # A SAMPLE, so the join is designed from real text rather than a guess
-        # at what a question or slug looks like. Keys and short values only.
-        for row in (catalogue.get("markets") or [])[:5]:
+        # A SAMPLE OF THE LIVE ROWS, not the first rows -- the first rows are
+        # exactly the settled ones that made the last run look healthy.
+        live_sample = pm.fetch_markets(limit=500, max_pages=4, drop_settled=True)
+        for row in (live_sample.get("markets") or [])[:5]:
             print(
                 f"[live_odds_worker] POLYMARKET_US_MARKET"
                 f" slug={row.get('slug')!r} type={row.get('sportsMarketTypeV2')!r}"

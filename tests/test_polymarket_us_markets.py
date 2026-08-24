@@ -560,3 +560,153 @@ def test_the_v1_probe_names_absent_credentials(monkeypatch):
 
     monkeypatch.setattr(auth, "credentials_present", lambda: False)
     assert mod.probe_v1_sports_routes()["reason"] == "credentials_absent"
+
+
+# ==========================================================================
+# SETTLED vs LIVE -- the count that looked right and was not
+# ==========================================================================
+
+
+def _settled_row(**kw):
+    row = _row(outcomePrices=["1", "0"], gameStartTime="2025-11-02T18:00:00Z")
+    row.update(kw)
+    return row
+
+
+def test_a_market_priced_at_certainty_is_settled():
+    """MEASURED 2026-08-24: the first 500 rows of
+    /v1/markets?active=true&limit=500 were ALL NFL games from 2025-11-02 priced
+    ["1","0"] -- settled games from last season, returned under active=true. So
+    `active` does not mean unresolved on this venue, and a price at exactly 0
+    or 1 is the reliable tell: a live market cannot be certain."""
+    assert mod.is_settled_row(_settled_row()) is True
+    assert mod.is_settled_row(_row(outcomePrices=["0", "1"])) is True
+    assert mod.is_settled_row(_row(outcomePrices=["0.55", "0.45"])) is False
+
+
+def test_prices_arrive_as_a_JSON_STRING_not_a_list():
+    """The venue sends `outcomePrices` as `'["1","0"]'`. Treating that string as
+    a list would make every row unparseable and therefore never settled --
+    which fails toward "everything is live", the wrong direction."""
+    assert mod.is_settled_row(_row(outcomePrices='["1","0"]')) is True
+    assert mod.is_settled_row(_row(outcomePrices='["0.55","0.45"]')) is False
+
+
+def test_an_unparseable_price_is_not_claimed_to_be_settled():
+    for prices in (None, "", "not-json", [], ["abc"]):
+        assert mod.is_settled_row(_row(outcomePrices=prices)) is False
+
+
+def test_settled_and_live_are_reported_SEPARATELY_from_sporting(monkeypatch):
+    """`sporting=500 of=500 orderable=500` read as a full healthy slate and was
+    500 games that finished nine months earlier. Three different things were
+    one number; `live` is the only usable one."""
+    _stub(monkeypatch, {"markets": [
+        _settled_row(id="s-1"), _settled_row(id="s-2"),
+        _row(id="l-1", outcomePrices=["0.55", "0.45"], gameStartTime="2026-08-24T23:05:00Z"),
+    ]})
+    result = mod.fetch_markets()
+    assert result["sporting"] == 3
+    assert result["settled"] == 2
+    assert result["live"] == 1
+
+
+def test_settled_rows_are_kept_by_default_and_dropped_only_on_request(monkeypatch):
+    """Off by default: a caller who has not thought about it should get the
+    full picture rather than a silently narrowed one."""
+    rows = [_settled_row(id="s-1"),
+            _row(id="l-1", outcomePrices=["0.55", "0.45"])]
+    _stub(monkeypatch, {"markets": rows})
+    assert mod.fetch_markets()["count"] == 2
+    _stub(monkeypatch, {"markets": rows})
+    assert mod.fetch_markets(drop_settled=True)["count"] == 1
+
+
+def test_the_game_start_window_is_reported_so_stale_data_is_legible(monkeypatch):
+    """"These are last season's games" should be readable off the log line
+    without needing a sample row."""
+    _stub(monkeypatch, {"markets": [
+        _settled_row(id="s-1", gameStartTime="2025-11-02T18:00:00Z"),
+        _row(id="l-1", outcomePrices=["0.5", "0.5"], gameStartTime="2026-08-24T23:05:00Z"),
+    ]})
+    result = mod.fetch_markets()
+    assert result["game_start_min"] == "2025-11-02T18:00:00Z"
+    assert result["game_start_max"] == "2026-08-24T23:05:00Z"
+    # And the LIVE window separately -- the one that says whether today is there.
+    assert result["live_start_min"] == "2026-08-24T23:05:00Z"
+
+
+# --------------------------------------------------------------------------
+# Paging, which is a guess on this route
+# --------------------------------------------------------------------------
+
+
+def test_offset_advances_across_pages(monkeypatch):
+    seen: list[str] = []
+
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        seen.append(url)
+        off = int(url.split("offset=")[1].split("&")[0])
+        return {"markets": [_row(id=f"m-{off}-{i}") for i in range(2)]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    mod.fetch_markets(limit=2, max_pages=3)
+    assert [int(u.split("offset=")[1].split("&")[0]) for u in seen] == [0, 2, 4]
+
+
+def test_a_venue_that_IGNORES_offset_is_caught_by_duplicate_ids(monkeypatch):
+    """`offset` is the house convention from the venue's own Sports API docs,
+    but it is UNVERIFIED on this route. If the venue ignores it every page
+    returns the same rows, and every page looks full -- invisible without
+    this counter."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(
+        auth, "signed_request",
+        lambda *_a, **_k: {"markets": [_row(id="same-1"), _row(id="same-2")]},
+    )
+    result = mod.fetch_markets(limit=2, max_pages=3)
+    assert result["duplicate_ids"] == 4
+    assert result["total_rows"] == 2
+
+
+def test_a_short_page_ends_paging_without_claiming_truncation(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request", lambda *_a, **_k: {"markets": [_row()]})
+    result = mod.fetch_markets(limit=50, max_pages=5)
+    assert result["pages"] == 1
+    assert result["truncated"] is False
+
+
+def test_a_failure_after_real_pages_keeps_them(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    calls = {"n": 0}
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(*_a, **_k):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise auth.PolymarketUSAuthError("http_500")
+        return {"markets": [_row(id="a"), _row(id="b")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.fetch_markets(limit=2, max_pages=3)
+    assert result["status"] == "ok"
+    assert result["total_rows"] == 2
+    assert result["truncated"] is True
+
+
+def test_the_status_vocabulary_is_reported_since_it_has_never_been_observed(monkeypatch):
+    """Resolution is currently inferred from the PRICE. If `status` turns out to
+    say it directly, that is better -- but nothing may depend on a guessed
+    value before one is seen."""
+    _stub(monkeypatch, {"markets": [_row(status="STATUS_OPEN"), _row(id="m-2", status="STATUS_RESOLVED")]})
+    assert mod.fetch_markets()["statuses"] == ["STATUS_OPEN", "STATUS_RESOLVED"]
