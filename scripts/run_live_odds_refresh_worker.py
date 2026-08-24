@@ -752,6 +752,51 @@ def _kalshi_auth_probe_at_boot() -> None:
         )
 
 
+def _polymarket_catalogue_at_boot() -> None:
+    """What does Polymarket actually list, and can any of it be joined?
+
+    HERE RATHER THAN BESIDE THE KALSHI REFRESH, and that is a compromise worth
+    stating. The natural home is `intelligence_state`'s refresh block, next to
+    `run_kalshi_odds_refresh` -- but that file is claimed by an open lane
+    (`layer2-sim-view-and-live-projection`) and the lane guard refused the
+    edit, correctly. This worker is this lane's own, so the pull lands here and
+    the move can happen when that lane closes.
+
+    THE POINT IS THE SAMPLE. `paper:polymarket` reports +21.41% on 14 settled
+    bets priced from the ODDS FEED's view of the venue -- roughly 1.5% of a
+    slate -- so that edge is claimed at a price nothing has checked against
+    Polymarket's own book. Fixing it needs a join, and Polymarket has no
+    tickers at all: free-text questions against ERC-1155 token ids. The
+    QUESTION lines this prints are what that join gets written from.
+
+    Kalshi is the argument for doing it this way round. Its grammar was
+    guessed twice -- "Will the X win by over N runs?" against a real "Texas
+    wins by over 3.5 runs?", and `close_time` against a game date encoded in
+    the event ticker -- and cost a day of `unreadable_title: 302` and
+    `matched=0` before anyone read a real one.
+
+    Read-only: Gamma and the CLOB price endpoint need no key, no wallet and no
+    signature. Nothing reachable from here can place an order.
+    """
+    try:
+        from pipeline.polymarket_odds_refresh import run_polymarket_odds_refresh
+
+        result = run_polymarket_odds_refresh(force=True)
+        print(
+            f"[live_odds_worker] POLYMARKET_CATALOGUE status={result.get('status')}"
+            f" count={result.get('count')} sporting={result.get('sporting')}"
+            f" truncated={result.get('truncated')} reason={result.get('reason')}",
+            flush=True,
+        )
+    except Exception as exc:
+        # Named and contained, like every other optional boot diagnostic in
+        # this file. A venue we cannot reach must not stop the worker booting.
+        print(
+            f"[live_odds_worker] POLYMARKET_CATALOGUE_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _kalshi_series_catalogue_at_boot() -> None:
     """Which series does Kalshi list -- now asked with a SIGNED read.
 
@@ -1255,6 +1300,11 @@ def main() -> int:
         # a probe after another probe's `return` is how the auth check went
         # three restarts without running.
         _live_ledger_at_boot()
+        # Same reasoning, one line later: this sits AFTER the calls that own
+        # early returns, so nothing above it can prevent it running. The whole
+        # value is the QUESTION sample, and a diagnostic that silently never
+        # executes is the failure mode this file has already had twice.
+        _polymarket_catalogue_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)
