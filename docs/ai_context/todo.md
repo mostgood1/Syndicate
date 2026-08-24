@@ -210,8 +210,61 @@ build returned almost nothing" (an outage). A number nobody can act on is not
 telemetry. Those two fields are what turned the hypothesis above from plausible
 to refuted, in one reading.
 
-**NEXT:** diagnose why `build_game_chips` yields 98 chips against 400 soccer
-cards. That is now a number on a line, not a thing someone has to notice.
+**DIAGNOSED 2026-08-24, AND MY OWN STATED HYPOTHESIS WAS WRONG TWICE.**
+
+Wrong #1: "the chip build returned almost nothing." It did not. 98 chips is a
+FULL matchday for each of ten leagues (mls 16, epl 10, la_liga 13, bundesliga 1,
+serie_a 11, ligue_1 9, eredivisie 8, primeira_liga 9, championship 13,
+belgian 8 — summing to exactly 98). Nothing is missing from the build.
+
+Wrong #2: I then "sized the gap" by comparing chip COUNTS against fixture
+COUNTS in the board's window and got 98 vs 105, concluding only 7 were
+uncovered. That compared totals, not identities, and the reassurance was
+false. Redone by fixture identity: **only 33 of the 98 chips fall inside the
+board's window at all, and 72 of the 105 fixtures in that window have no
+chip.**
+
+**THE ACTUAL CAUSE IS A PHASE OFFSET, and one reading shows it whole:**
+
+```
+chip fixtures by date        board horizon = 2026-08-24 .. 08-30
+  2026-08-22   37     <- already played
+  2026-08-23   28     <- already played
+  2026-08-24    5   in window
+  2026-08-25    1   in window
+  ...
+  2026-08-30    9   in window
+```
+
+**65 of 98 chips are for fixtures that had already been played.**
+`_SoccerDataProvider.games` resolves ONE week per league via
+`default_week(league, season, reference_date=today)` and returns only that
+matchday. On a Monday, the matchday containing "now" is the one that finished
+over the WEEKEND. The board's odds horizon runs the other way — the next seven
+days, i.e. next weekend. The two barely intersect.
+
+`primeira_liga` is the control that proves it: 9 chips, 9 in window, **0**
+uncovered — the one league whose resolved week happens to align. Every other
+league is offset. `championship` is the extreme: 13 chips, 1 in window, 11
+window fixtures unchipped.
+
+Bundesliga's `1` is NOT a bug: week 1 of the 2026 schedule genuinely holds one
+fixture (the season opener, Stuttgart @ Bayern 08-28); weeks 2-6 hold 9, 9, 9,
+8, 9. `default_week` resolves bundesliga to week 1, so 8 of the 9 Bundesliga
+fixtures in the board's window sit in week 2 and get no chip.
+
+**This is a different and much larger cause than `#540`.** `#540` was real —
+4 La Liga fixtures INSIDE the chip window whose clubs the two feeds named
+differently, and 78 cards now resolve only via its canonical key. But it was
+never going to touch the 222, because those fixtures have no chip to join to.
+
+**THE FIX (not yet made, and it has a cost worth deciding on):** the provider
+must cover the board's HORIZON, not the current matchday — `week` AND `week+1`
+at minimum. That doubles `build_cards_page_context` calls (10 -> 20) and
+`build_game_chips` runs on the WEB service, which the architecture rule says
+does no heavy computation. So the fix should probably be: widen the week span,
+and confirm the existing `_CACHE_TTL_SECONDS` absorbs the added cost, or move
+the chip build behind the worker's artifact like everything else.
 
 ### `#540` — **La Liga compact cards showed mismatched team names: two clubs the browser's normalisation can NEVER join, now joined on the server's own alias map.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
