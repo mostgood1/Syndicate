@@ -1036,6 +1036,20 @@ def _run_execution_tick() -> None:
         from pipeline.execute_portfolio import run_execution
         from syndicate.features.shared.timezone import central_today_iso
 
+        # STAMP THE SWITCHES WHERE WEB CAN SEE THEM. They are env vars on THIS
+        # process; the web service has none of them and reading its own env
+        # reports `mode=paper armed=no` on a live, armed book. Written every
+        # tick so `recorded_at` doubles as a heartbeat.
+        try:
+            from syndicate.features.shared.execution_ledger import record_execution_state
+
+            record_execution_state(recorded_by="live-odds-worker")
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] EXECUTION_STATE_STAMP_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         # THE VENUE-RESTRICTED PLAN, named explicitly. Without this the call
         # read the unrestricted plan and tried to place a soccer total and an
         # MLB spread on Kalshi (2026-08-24T00:34Z) -- positions priced at other

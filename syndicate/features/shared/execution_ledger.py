@@ -465,6 +465,77 @@ def place_order(
     ) or record
 
 
+def execution_state_path():
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    # NO DATE TOKEN: a date-tokened path takes the keyvalue store's 10-day TTL,
+    # and this must survive a quiet week. Same choice as the ledger itself.
+    return reports_root() / "intelligence" / "execution_state.json"
+
+
+def record_execution_state(*, recorded_by: str) -> dict[str, Any]:
+    """Stamp THIS process's execution switches and caps where web can read them.
+
+    THE WEB SERVICE CANNOT ANSWER THIS QUESTION. The switches and the caps are
+    environment variables on the WORKER; the web process has none of them, so
+    reading its own env reports `mode=paper armed=no job=off` and the DEFAULT
+    caps -- all true of web, and all worthless to a person looking at a live
+    book. Measured 2026-08-24: `/portfolio/live` showed "LIVE MODE OFF" and
+    "$25 per order / $100 a day" while the worker was live, armed, and capped
+    at $10 and $40.
+
+    This is the identical defect the paper page had in August, when it printed
+    "COMMIT JOB off" beside filled orders it had just rendered. The fix there
+    was for the worker to stamp `job_state` into the plan and for the page to
+    say which source it was showing; this is that fix for the live surface.
+
+    Written on every execution tick rather than at boot, so `recorded_at` is
+    also a heartbeat: state from forty minutes ago is not current state, and
+    the page can say so instead of presenting it as now.
+    """
+    from syndicate.features.shared.execution_guard import kill_switch_engaged, limits
+    from syndicate.features.shared.refresh_state_store import write_json_file
+    from pipeline.execute_portfolio import execution_enabled
+
+    try:
+        switch = kill_switch_engaged()
+    except Exception as exc:
+        # Fail closed, and say why -- an unreadable switch is an engaged one.
+        switch = {"engaged": True, "source": "read_failed", "detail": type(exc).__name__}
+
+    mode = execution_mode()
+    state = {
+        "recorded_by": str(recorded_by),
+        "recorded_at": _utc_now(),
+        "execution_mode": mode,
+        "live_armed": live_execution_armed(),
+        "execution_enabled": execution_enabled(),
+        "kill_switch": switch,
+        "limits": limits(mode),
+        "venue": str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").strip(),
+    }
+    try:
+        write_json_file(execution_state_path(), state)
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+    return {"status": "ok", **state}
+
+
+def read_execution_state() -> dict[str, Any] | None:
+    """The worker's stamped state, or None if it has never written one.
+
+    None is a real answer and the caller must render it as "we do not know",
+    never as "off" -- those license opposite actions.
+    """
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    try:
+        state = read_json_file(execution_state_path())
+    except Exception:
+        return None
+    return state if isinstance(state, dict) and state.get("recorded_at") else None
+
+
 def reclassify_presend_failures() -> dict[str, Any]:
     """Correct orders recorded `failed` that never reached the venue.
 

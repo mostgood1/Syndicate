@@ -289,3 +289,87 @@ def test_the_api_and_the_page_read_the_same_payload(app_client, live_env):
     assert data["execution_mode"] == "live"
     assert data["live_armed"] is True
     assert len(data["orders"]) == 1
+
+
+# --------------------------------------------------------------------------
+# The switches must report the WORKER, not this web process
+# --------------------------------------------------------------------------
+
+
+def test_the_page_shows_the_workers_switches_not_the_webs(app_client, live_env, monkeypatch):
+    """MEASURED 2026-08-24: `/portfolio/live` read "LIVE MODE OFF", "Mode
+    paper", "Armed no" and caps of $25/$100 while live-odds-worker was live,
+    armed and capped at $10/$40.
+
+    Every one of those was true of the WEB process, which has none of the
+    execution env vars, and worthless to a person looking at a live book. It is
+    the same defect the paper page had with "COMMIT JOB off" beside filled
+    orders, and it needs the same fix: the worker stamps its state and the page
+    reports that.
+    """
+    import syndicate.features.shared.execution_ledger as ledger_mod
+
+    # Web's own env says nothing is on...
+    live_env["execution"] = False
+    live_env["mode"] = "paper"
+    live_env["armed"] = False
+    # ...while the worker reports live, armed, and the real caps.
+    monkeypatch.setattr(
+        ledger_mod,
+        "read_execution_state",
+        lambda: {
+            "recorded_by": "live-odds-worker",
+            "recorded_at": "2026-08-24T02:00:00Z",
+            "execution_mode": "live",
+            "live_armed": True,
+            "execution_enabled": True,
+            "kill_switch": {"engaged": False},
+            "limits": {"max_order_dollars": 10.0, "max_day_dollars": 40.0, "max_day_orders": 10},
+        },
+    )
+
+    payload = intelligence_bp._live_portfolio_payload(DATE)
+    assert payload["execution_mode"] == "live"
+    assert payload["live_armed"] is True
+    assert payload["state_source"] == "worker"
+    assert payload["limits"]["max_order_dollars"] == 10.0
+
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "LIVE — REAL MONEY" in body
+    assert "$10" in body
+    assert "live-odds-worker" in body
+
+
+def test_no_worker_stamp_is_reported_as_unknown_not_as_off(app_client, live_env, monkeypatch):
+    """"The worker has not reported" and "execution is off" are different facts
+    with opposite responses, and an unlabelled fallback renders them the same."""
+    import syndicate.features.shared.execution_ledger as ledger_mod
+
+    monkeypatch.setattr(ledger_mod, "read_execution_state", lambda: None)
+    payload = intelligence_bp._live_portfolio_payload(DATE)
+    assert payload["state_source"] == "web_env"
+
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "worker has not reported" in body
+    assert "Treat them as unknown, not as off" in body
+
+
+def test_a_stale_stamp_says_so(app_client, live_env, monkeypatch):
+    """A stopped worker's last known state looks identical to its current one."""
+    import syndicate.features.shared.execution_ledger as ledger_mod
+
+    monkeypatch.setattr(
+        ledger_mod,
+        "read_execution_state",
+        lambda: {
+            "recorded_by": "live-odds-worker",
+            "recorded_at": "2020-01-01T00:00:00Z",
+            "execution_mode": "live",
+            "live_armed": True,
+            "execution_enabled": True,
+            "kill_switch": {"engaged": False},
+            "limits": {"max_order_dollars": 10.0, "max_day_dollars": 40.0, "max_day_orders": 10},
+        },
+    )
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "may be stale" in body

@@ -69,8 +69,34 @@
       {# Engaged is the SAFE state, so it is not painted as an error. #}
       <span class="live-flag__value {{ 'off' if switch.get('engaged') else 'on' }}">
         {{ 'ENGAGED' if switch.get('engaged') else 'clear' }}</span></span>
+    {# WHERE THESE NUMBERS COME FROM. The switches live on the worker; this
+       page used to read the WEB process's env and print "LIVE MODE OFF" over a
+       live, armed book with the wrong caps. Naming the source is what stops a
+       reader trusting the wrong process's view. #}
+    <span class="live-flag"><span class="live-flag__label">Source</span>
+      {% if L.state_source == 'worker' %}
+        <span class="live-flag__value {{ 'off' if (L.state_age_seconds or 0) > 900 else 'on' }}">
+          {{ L.state_recorded_by or 'worker' }}{% if L.state_age_seconds is not none %} · {{ (L.state_age_seconds // 60) }}m ago{% endif %}</span>
+      {% else %}
+        <span class="live-flag__value off" title="The worker has not reported. These are the WEB service's own settings, which are not what places orders.">web env (worker silent)</span>
+      {% endif %}</span>
     <span class="live-links"><a href="/portfolio/paper">Paper book</a> · <a href="/api/portfolio/live">JSON</a></span>
   </div>
+
+  {% if L.state_source != 'worker' %}
+    <div class="live-error">
+      <strong>The worker has not reported its execution state.</strong>
+      The switches and caps below are this web service's own environment, which is
+      <strong>not</strong> what decides whether orders are placed — that is
+      live-odds-worker's. Treat them as unknown, not as off.
+    </div>
+  {% elif (L.state_age_seconds or 0) > 900 %}
+    <div class="live-error">
+      Worker last reported <strong>{{ (L.state_age_seconds // 60) }} minutes ago</strong>.
+      These settings may be stale — a stopped worker's last known state looks
+      identical to its current one.
+    </div>
+  {% endif %}
 
   {% if L.ledger_error %}
     <div class="live-error">

@@ -3514,6 +3514,7 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
         STATUS_SUBMITTED,
         execution_mode,
         live_execution_armed,
+        read_execution_state,
         _load,
     )
     from syndicate.features.shared.execution_guard import kill_switch_engaged, limits
@@ -3548,11 +3549,51 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
     # see first -- they must be checked against the venue rather than retried.
     unreconciled = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
 
-    switch = {}
+    # THE WORKER'S STATE, NOT THIS PROCESS'S. The switches and caps are env
+    # vars on live-odds-worker; the web service has none of them, so reading
+    # its own env reported `mode=paper armed=no job=off` and the DEFAULT caps
+    # ($25/$100) on a book that was live, armed and capped at $10/$40. That is
+    # the same defect the paper page had with "COMMIT JOB off", and the same
+    # fix: the worker stamps its state, and the page says which source it is
+    # showing rather than presenting web's environment as the truth.
+    stamped = None
     try:
-        switch = kill_switch_engaged()
-    except Exception as exc:
-        switch = {"engaged": True, "source": "read_failed", "detail": type(exc).__name__}
+        stamped = read_execution_state()
+    except Exception:
+        _LOGGER.exception("EXECUTION_STATE_READ_FAILURE")
+
+    if stamped:
+        switch = stamped.get("kill_switch") or {}
+        payload_state = {
+            "execution_mode": stamped.get("execution_mode"),
+            "live_armed": bool(stamped.get("live_armed")),
+            "execution_enabled": bool(stamped.get("execution_enabled")),
+            "kill_switch": switch,
+            "limits": stamped.get("limits") or {},
+            "state_source": "worker",
+            "state_recorded_by": stamped.get("recorded_by"),
+            "state_recorded_at": stamped.get("recorded_at"),
+            "state_age_seconds": _seconds_since(stamped.get("recorded_at")),
+        }
+    else:
+        # NEVER SILENTLY web's env. Absent a stamp we show this process's view
+        # and label it, because "the worker has not reported" and "execution is
+        # off" are different facts with opposite responses.
+        try:
+            switch = kill_switch_engaged()
+        except Exception as exc:
+            switch = {"engaged": True, "source": "read_failed", "detail": type(exc).__name__}
+        payload_state = {
+            "execution_mode": execution_mode(),
+            "live_armed": live_execution_armed(),
+            "execution_enabled": execution_enabled(),
+            "kill_switch": switch,
+            "limits": limits(LIVE),
+            "state_source": "web_env",
+            "state_recorded_by": None,
+            "state_recorded_at": None,
+            "state_age_seconds": None,
+        }
 
     return {
         "date": selected_date,
@@ -3561,15 +3602,29 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
         "settlement": settlement,
         "settlement_error": settlement_error,
         "unreconciled": unreconciled,
-        # The four switches that decide whether anything can be placed, read
-        # HERE rather than assumed -- this is the web process, so they describe
-        # the web's env and say so on the page.
-        "execution_mode": execution_mode(),
-        "live_armed": live_execution_armed(),
-        "execution_enabled": execution_enabled(),
-        "kill_switch": switch,
-        "limits": limits(LIVE),
+        **payload_state,
     }
+
+
+def _seconds_since(stamp: Any) -> int | None:
+    """Age of a UTC stamp in seconds, or None if unreadable.
+
+    The age is what turns a stamp into a heartbeat: state from forty minutes
+    ago is not current state, and a page that cannot tell the difference will
+    show a dead worker's last known settings as though they were now.
+    """
+    from datetime import datetime, timezone as _tz
+
+    text = str(stamp or "").strip()
+    if not text:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=_tz.utc)
+    return max(0, int((datetime.now(_tz.utc) - moment).total_seconds()))
 
 
 @intelligence_bp.get("/api/portfolio/live")
