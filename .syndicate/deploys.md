@@ -25444,3 +25444,41 @@ composition"). Recorded because the ledger entry above reads more scoped
 than the deploy actually was, and a future reader comparing "what changed on
 `web`" against "what this entry says shipped" should not have to
 re-derive the gap.
+
+---
+
+## 2026-08-24 — live-odds-worker `0e0017d7b`: the ledger now asks Kalshi what it holds
+
+**Deployed:** `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`), deploy
+`dep-da65btjbc2fs73b039a0`, triggered `14:32:22Z`. Commit `0e0017d7b`, on
+`origin/main` (branch fast-forwarded main before triggering). Trigger `api`
+(MCP).
+
+**Claim:** `deploy_claim.py acquire --service live-odds-worker --holder
+portfolio-decision-and-execution`, token `3083438d58d0ff77` — it replaced an
+expired `kalshi-live` claim 789 min old.
+
+**Preflight: NOT RUN, and this is a substitution, not a pass.**
+`deploy_preflight.py` exits on `RENDER_API_KEY not set in the environment or
+.env`; this container reaches Render through the MCP connector instead, which
+the script cannot use. Substituted by hand: `list_deploys` showed
+`4a023f566` live with nothing in flight, and the target SHA is a descendant of
+it on `main`. That covers OFF_MAIN and in-flight; it does NOT cover the job
+liveness and blast-radius checks preflight also does. The gap is the same one
+already recorded in the 08-23 `web` entry, still owed.
+
+**A SECOND DEPLOY OF THE SAME COMMIT** appeared at `14:43:51Z`
+(`dep-da65h9u417fc739d6jo0`), which this session did not trigger. Recorded
+because an unexplained deploy is exactly the thing CLAUDE.md says is findable
+and should be looked up rather than assumed benign. Same SHA, so composition is
+unaffected either way.
+
+**verify:** _(open obligation)_ — the reading that will prove this worked is a
+`[execution_ledger] RECONCILE venue=kalshi candidates=N venue_orders=M ...`
+line on live-odds-worker, followed by a `RECONCILED key=... filled->submitted`
+for `KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-5`. That order is resting and
+unfilled at Kalshi while our ledger says `filled`; the correction of that one
+row is the measurement. A `RECONCILE_READ_FAILED` would mean the read route or
+the auth on it is wrong, which is the outcome this is most likely to have
+wrong -- `ORDERS_READ n=N keys=[...]` logs the response shape once per read for
+exactly that reason.
