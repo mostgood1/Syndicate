@@ -854,6 +854,53 @@ def _kalshi_series_catalogue_at_boot() -> None:
         )
 
 
+def _live_ledger_at_boot() -> None:
+    """Print every LIVE order the ledger holds, with the venue's own error.
+
+    A BOOT DUMP RATHER THAN AN ENDPOINT, because the endpoint is not always
+    reachable and a real position is not something to be unable to look at.
+    Added 2026-08-24 after the first real order this system sent failed and the
+    reason -- written to the ledger by `place_order` -- had no reader anywhere
+    in the logs. Read-only, and bounded: live orders are capped per day by
+    `execution_guard`, so this cannot become the 4.9GB log the shadow ledger
+    once was.
+    """
+    try:
+        from syndicate.features.shared.execution_ledger import LIVE, _load
+
+        orders = [
+            o
+            for o in (_load().get("orders") or [])
+            if str(o.get("mode") or "") == LIVE
+        ]
+    except Exception as exc:
+        # An unreadable ledger is NOT "no live orders" and must never print as
+        # one -- that is the same absence/failure confusion the live page
+        # exists to keep apart.
+        print(
+            f"[live_odds_worker] LIVE_LEDGER_UNREADABLE {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return
+
+    print(f"[live_odds_worker] LIVE_LEDGER n={len(orders)}", flush=True)
+    for order in orders[-25:]:
+        print(
+            f"[live_odds_worker] LIVE_LEDGER_ROW date={order.get('selected_date')}"
+            f" status={order.get('status')} venue={order.get('venue')}"
+            f" ticker={order.get('venue_ticker')}"
+            f" sport={order.get('sport')} market={order.get('market')}"
+            f" player={order.get('player_name')!r}"
+            f" side={order.get('side')} line={order.get('line')}"
+            f" price={order.get('requested_price')}"
+            f" stake={order.get('requested_stake_dollars')}"
+            f" fill_price={order.get('fill_price')}"
+            f" outcome={order.get('outcome')}"
+            f" error={order.get('error')!r}",
+            flush=True,
+        )
+
+
 def _execution_interval_seconds() -> int:
     """How often to place, at most. Five minutes unless told otherwise.
 
@@ -1058,6 +1105,10 @@ def main() -> int:
     try:
         _kalshi_auth_probe_at_boot()
         _kalshi_series_catalogue_at_boot()
+        # BEFORE the catalogue's early returns could ever swallow it -- placing
+        # a probe after another probe's `return` is how the auth check went
+        # three restarts without running.
+        _live_ledger_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)

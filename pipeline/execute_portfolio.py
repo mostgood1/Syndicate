@@ -275,6 +275,28 @@ def run_execution(
             duplicates += 1
             continue
         status = str(record.get("status") or "")
+        if mode == LIVE:
+            # EVERY LIVE ORDER GETS A LINE, whatever happened to it. Measured
+            # 2026-08-24T00:23:47Z: the first real order this system ever sent
+            # FAILED, and the only trace was `placed=0 ... spent={'dollars':
+            # 4.39, 'orders': 1}` -- a pair of numbers that reads identically to
+            # "nothing was attempted", because `placed` counts fills and `spent`
+            # charges anything that may have reached the venue. Telling those
+            # apart took reading this function's source. The venue's own reason
+            # for refusing real money is the most valuable string in the system
+            # and it was being written to the ledger and never printed.
+            print(
+                f"[execute_portfolio] LIVE_ORDER status={status}"
+                f" venue={venue} ticker={record.get('venue_ticker')}"
+                f" sport={record.get('sport')} market={record.get('market')}"
+                f" player={record.get('player_name')!r}"
+                f" side={record.get('side')} line={record.get('line')}"
+                f" price={record.get('requested_price')}"
+                f" stake={record.get('requested_stake_dollars')}"
+                f" fill_price={record.get('fill_price')}"
+                f" error={record.get('error')!r}",
+                flush=True,
+            )
         if status in {"filled"}:
             placed += 1
         # Charged for anything that MAY have reached the venue, matching
