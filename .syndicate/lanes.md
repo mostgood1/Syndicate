@@ -1748,9 +1748,45 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Files: `syndicate/features/shared/novig_client.py`,
   `tests/test_novig_csv_data.py` (NEW), `scripts/probe_novig.py`,
   `scripts/probe_exchange_markets.py`, `scripts/run_refresh_worker.py`
-  (narrow claim, already held). Not yet run in production -- next boot-flag
-  probe is `SYNDICATE_NOVIG_CSV_SNAPSHOT_PROBE_ON_BOOT=1`, replacing the
-  deleted diagnostic's flag.
+  (narrow claim, already held).
+- **THE ODDS-REFRESH PIPELINE ITSELF, same day.** User: "build the odds
+  refresh pipeline for novig." `pipeline/novig_odds_refresh.py` (NEW) --
+  read against `kalshi_odds_refresh.py`'s shape but deliberately SIMPLER:
+  Novig publishes once a day, not continuously, so this is one hourly
+  manifest-check clock rather than Kalshi's per-series due-queue/hot-series/
+  per-tick-cap machinery. The multi-thousand-row CSV is only re-fetched when
+  the manifest actually names a NEW date; `"cached"` on this pipeline can
+  mean "up to ~24h old, and that's the freshest Novig has" -- a materially
+  different meaning than Kalshi's `"cached"`, stated explicitly in the
+  module header so a future reader does not import Kalshi's assumption.
+  Recurring background thread (`start_background_loop_if_enabled`), NOT a
+  tick inside `run_refresh_worker.py`'s own main loop -- that loop is
+  Kalshi's real-money cadence and this lane holds only a narrow claim on
+  that file for small additive boot hooks, so a self-contained daemon
+  thread (same pattern `syndicate/app.py::_bootstrap_render_data` already
+  uses) gets real hourly recurrence without widening this lane's footprint
+  in a file another lane depends on for something with real money behind
+  it. **OFF BY DEFAULT** (`SYNDICATE_NOVIG_ODDS_REFRESH_ON_BOOT`) even
+  though the refresh function itself defaults enabled -- one deliberate
+  opt-in before a new recurring background job goes unconditional, per this
+  repo's own measure-first culture. The superseded one-shot boot probe
+  (`run_novig_csv_snapshot_probe_if_enabled`,
+  `SYNDICATE_NOVIG_CSV_SNAPSHOT_PROBE_ON_BOOT`) is DELETED, not kept
+  alongside -- the recurring pipeline's first cycle does strictly more than
+  that probe ever did. 10 new tests (`tests/test_novig_odds_cadence.py`):
+  cadence gating, unchanged-date short-circuit, failed-check backoff, a
+  last-good-snapshot survives one bad manifest read. `scripts/probe_novig.py
+  --refresh` is the manual trigger (force=True, no waiting for the clock).
+  Files: `pipeline/novig_odds_refresh.py` (NEW),
+  `tests/test_novig_odds_cadence.py` (NEW), `scripts/probe_novig.py`,
+  `scripts/probe_exchange_markets.py`, `scripts/run_refresh_worker.py`
+  (narrow claim, unchanged scope). **Not yet run in production** -- next
+  step is `SYNDICATE_NOVIG_ODDS_REFRESH_ON_BOOT=1` on refresh-worker and a
+  read of the first `[novig_odds] REFRESHED` line. **Still explicitly NOT
+  done: joining this artifact onto the actual board** -- that touches
+  heavily-claimed board files (`layer2_board.py` et al.) and needs a design
+  decision on how a closing-line (not live) price should be presented
+  alongside live odds; out of scope for what was asked this round.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

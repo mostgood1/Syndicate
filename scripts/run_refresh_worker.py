@@ -4213,16 +4213,18 @@ def main() -> int:
         run_all_probes_if_enabled()
     except Exception as exc:
         print(f"[refresh_worker] EXCHANGE_MARKETS_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
-    # ONE-TIME, OPT-IN check of Novig's public CSV mirror against its REAL,
-    # dated structure (docs.novig.com content supplied 2026-08-24, replacing
-    # an earlier flat-path guess that 403'd). No-op unless
-    # SYNDICATE_NOVIG_CSV_SNAPSHOT_PROBE_ON_BOOT=1. Same narrow claim as above.
+    # OPT-IN recurring refresh of Novig's public daily markets snapshot
+    # (docs.novig.com content supplied 2026-08-24). A daemon thread on its
+    # own hourly clock, started here and then self-contained -- never touches
+    # the refresh loop below. No-op unless
+    # SYNDICATE_NOVIG_ODDS_REFRESH_ON_BOOT=1. Same narrow claim as above.
+    # See `pipeline/novig_odds_refresh.py`.
     try:
-        from scripts.probe_exchange_markets import run_novig_csv_snapshot_probe_if_enabled
+        from pipeline.novig_odds_refresh import start_background_loop_if_enabled
 
-        run_novig_csv_snapshot_probe_if_enabled()
+        start_background_loop_if_enabled()
     except Exception as exc:
-        print(f"[refresh_worker] NOVIG_CSV_SNAPSHOT_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
+        print(f"[refresh_worker] NOVIG_ODDS_REFRESH_START_FAILED {type(exc).__name__}: {exc}", flush=True)
     # #285. Cap glibc arenas BEFORE the loops spawn threads -- `mallopt` only
     # governs arenas created after it returns, so this is worthless if it moves
     # later in main(). The trim proved allocator retention is real (1109.6MB

@@ -15,6 +15,12 @@ published date via the index unless `--date` is given explicitly.
     python scripts/probe_novig.py --csv trades --date 2026-08-23
     python scripts/probe_novig.py --index
     python scripts/probe_novig.py --snapshot
+    python scripts/probe_novig.py --refresh
+
+`--refresh` runs `pipeline/novig_odds_refresh.py`'s ACTUAL cadence-aware
+pipeline (the one `SYNDICATE_NOVIG_ODDS_REFRESH_ON_BOOT=1` starts as a
+recurring background loop) once, with `force=True` -- the manual trigger for
+testing the pipeline without waiting for its hourly clock.
 """
 
 from __future__ import annotations
@@ -44,8 +50,27 @@ def main() -> int:
     parser.add_argument(
         "--snapshot", action="store_true", help="fetch_latest_markets_snapshot() -- the odds-population entry point"
     )
+    parser.add_argument(
+        "--refresh", action="store_true", help="run the cadence-aware refresh pipeline once, forced"
+    )
     parser.add_argument("--league", default=None)
     args = parser.parse_args()
+
+    if args.refresh:
+        from pipeline.novig_odds_refresh import run_novig_odds_refresh
+
+        report = run_novig_odds_refresh(force=True)
+        snapshot = report.get("snapshot") or {}
+        print(
+            "[novig] REFRESH"
+            f" status={report.get('status')}"
+            f" date={snapshot.get('date')}"
+            f" count={snapshot.get('count')}"
+            f" is_stale_by_days={snapshot.get('is_stale_by_days')}"
+            f" reason={report.get('reason')}",
+            flush=True,
+        )
+        return 0 if report.get("status") in ("ok", "cached") else 1
 
     if args.index:
         report = fetch_trade_data_index()
