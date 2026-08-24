@@ -709,6 +709,56 @@ def build_layer2_shortlist(
     if cards_compat_note:
         shortlist["cards_compat_note"] = cards_compat_note
 
+    # `#541`. CAN EVERY CARD FIND ITS CHIP? Twice this defect has been found by
+    # a person looking at the board -- MLS 2026-08-22, La Liga 2026-08-24 --
+    # and both times every count on this line was healthy while some cards
+    # printed full club names because they resolved no chip. The join runs in
+    # the BROWSER, so nothing server-side ever saw it. This is the reading that
+    # makes it visible without a user noticing first.
+    #
+    # WHOLLY GUARDED. Coverage telemetry must never be able to cost the board:
+    # building chips reads artifacts, and a bad slate, a missing league or a
+    # slow read has to leave the shortlist exactly as it found it.
+    try:
+        from syndicate.features.shared.chip_join_coverage import chip_join_coverage
+        from syndicate.features.shared.game_chip_scoreboard import build_game_chips
+
+        _cards = shortlist.get("cards") or []
+        _sports = sorted({str(c.get("sport") or c.get("sport_slug") or "").strip().lower()
+                          for c in _cards if isinstance(c, Mapping)} - {""})
+        if _cards and _sports:
+            _chips = build_game_chips(selected_date, _sports)
+            _coverage = chip_join_coverage(_cards, _chips)
+            shortlist["chip_join_coverage"] = _coverage
+            for _sport, _b in sorted((_coverage.get("by_sport") or {}).items()):
+                print(
+                    f"[layer2_shortlist] CHIP_JOIN_COVERAGE sport={_sport} "
+                    f"cards={_b.get('cards')} by_id={_b.get('by_id')} "
+                    f"by_matchup={_b.get('by_matchup')} by_canonical={_b.get('by_canonical')} "
+                    # THE TWO THAT MATTER, and they have different owners:
+                    # `no_chip_available` is the chip window (the card WILL
+                    # print its matchup verbatim), `needs_fallback` is the
+                    # alias map (it is one spelling away from that).
+                    f"needs_fallback={_b.get('needs_fallback')} "
+                    f"no_chip_available={_b.get('no_chip_available')} "
+                    # Should be 0 forever after the canonical keys shipped. A
+                    # non-zero value means cards are reaching the board from a
+                    # path that does not stamp them, which is a different bug
+                    # from either of the two above.
+                    f"unknown_no_key={_b.get('unknown_no_key')} "
+                    # The SPELLINGS. Every fix here has been an alias entry,
+                    # and an alias entry needs the exact string each feed used
+                    # -- "Athletic Bilbao" vs "Athletic Club" was the entire
+                    # finding, and no count could have said it.
+                    f"samples={_b.get('samples')}",
+                    flush=True,
+                )
+    except Exception as exc:  # pragma: no cover - telemetry must never break the board
+        print(
+            f"[layer2_shortlist] CHIP_JOIN_COVERAGE_UNAVAILABLE {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
     # Both numbers, so "no movement on the board" is attributable: 0 openings
     # loaded is a different fact from openings loaded and nothing having moved.
     # BOTH numbers, because either alone is unattributable -- the third time

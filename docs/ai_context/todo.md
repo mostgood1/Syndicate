@@ -1,5 +1,65 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#541` — **The compact-card chip join is now MEASURED. It had been found twice by a person looking at the board and reported by nothing.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
+
+MLS `#365` (2026-08-22) and La Liga `#540` (2026-08-24) were the same defect:
+a card resolved no chip and fell through to printing `game.matchup` verbatim.
+Both times **every count on `LAYER2_BOARD_HEALTH` was healthy** while the board
+was visibly wrong, and the only detector was a human noticing that some cards
+showed tri-codes and others showed "Real Racing Club de Santander".
+
+Nothing server-side could see it: **the join runs in the BROWSER**
+(`chipForGame`). So the worker now builds the chips it would serve and reports
+whether each card can reach one — `CHIP_JOIN_COVERAGE`, beside the board-health
+line it already prints.
+
+**IT MEASURES COVERAGE, IT DOES NOT REIMPLEMENT THE JOIN.** Mirroring
+`chipForGame`'s fuzzy last resort here would be a second implementation of one
+number — the drift that retired `book_grid`. So only the DETERMINISTIC keys are
+evaluated (id → exact matchup → exact names → canonical), and the rest is
+reported honestly rather than predicted.
+
+**FOUR BUCKETS, EACH WITH A DIFFERENT OWNER** — the whole value is that a
+wrong label sends the next person to the wrong place:
+
+  * `by_id` / `by_matchup` / `by_canonical` — WHICH route resolved it. A single
+    `matched` total would hide a board that resolves entirely by the fuzzy
+    fallback and is one rename from the reported defect.
+  * `no_chip_available` — keys present, no chip for the fixture. This card WILL
+    print its matchup verbatim. Owner: the chip window.
+  * `needs_fallback` — a chip exists but no deterministic key reaches it (a
+    dropped canonical collision — two legs, a cup tie). Owner: the collision.
+  * `unknown_no_key` — the card carries no canonical keys, so we CANNOT tell.
+    Should read 0 forever now that `#540` shipped.
+
+**MY FIRST VERSION REPORTED `no_chip_available` FOR KEYLESS CARDS** — asserting
+a chip does not exist on the strength of not having looked. Caught by running
+it against a simulated pre-`#540` world, where it confidently made a claim it
+had no basis for. A diagnostic that guesses is worse than one that abstains,
+because the guess is what gets acted on. Now its own bucket, and pinned by
+`test_a_keyless_card_is_never_reported_as_having_no_chip`.
+
+**DROPPED `by_league` rather than ship a field that always says "unknown".** A
+board CARD carries `sport`/`sport_slug` and no league at all (checked). The
+`samples` name the fixtures instead, which identifies the league to a reader
+and — more importantly — gives the exact SPELLING each feed used, since every
+fix here has been an alias entry.
+
+**A `date_str` NAMEERROR ALMOST SHIPPED SILENTLY.** The enclosing parameter is
+`selected_date`. The whole block is `try/except` (telemetry must never cost the
+board), so it would have printed `CHIP_JOIN_COVERAGE_UNAVAILABLE` on every
+build forever — telemetry that never works, which is the exact failure this
+item exists to prevent. Caught by executing the REAL block out of the source
+file rather than testing the helper it calls.
+
+**Tests:** `tests/test_chip_join_coverage.py` (9 — every bucket exercised,
+including the collision path, which the first draft of that test silently
+missed because the exact-name index answered first).
+
+**Verify after deploy:** `CHIP_JOIN_COVERAGE sport=soccer` with
+`no_chip_available=0 unknown_no_key=0`. A non-zero `unknown_no_key` means cards
+are reaching the board from a path that does not stamp the keys.
+
 ### `#540` — **La Liga compact cards showed mismatched team names: two clubs the browser's normalisation can NEVER join, now joined on the server's own alias map.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
 Reported: "we have some la liga compact game card mismatched team names for
