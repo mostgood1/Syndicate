@@ -82,7 +82,7 @@ real response says so.
 | **Order WRITE endpoint** | **CONFIRMED, field-level** | `POST https://api.novig.us/nbx/v2/emm/orders/place`, Bearer-token auth, body `{outcomeId, price, qty, currency, tif, ttl?, flags?}` — real schema with types, constraints and a worked `curl` example. `novig_orders.order_body()` implements this exactly, pure and unit-tested (16 tests, `tests/test_novig_orders.py`). |
 | Order size unit | **CONFIRMED, and it's a DIFFERENT model from Kalshi's** | `qty` is MINIMAL CURRENCY UNITS, not a contract count — for `currency="CASH"`, 1 unit = $0.01 (independent of price, unlike Kalshi where price determines the contract count from a stake). A separate `currency="COIN"` denomination also exists, meaning and real-money-ness UNCONFIRMED. See `novig_orders.py`'s header for the full reasoning and the new open question this creates (below). |
 | **NEW: does `qty` mean risked or to-win?** | **UNRESOLVED** | Not stated in anything supplied. `cash_units_for_stake` assumes RISKED (the conventional P2P-exchange reading), flagged as an assumption, not a confirmed fact — the one thing a future live order or a direct question to Novig should settle before real money moves. |
-| **NEW: response shape of a placed order** | **UNCONFIRMED** | Only the HTTP status (201, "Order placed successfully") was supplied — no field names for the created order/wager object. `submit_order` (the network call + response parsing) is deliberately NOT written in `novig_orders.py` for this exact reason. |
+| **NEW: response shape of a placed order** | **UNCONFIRMED, but `submit_order` is BUILT AROUND that** | Only the HTTP status (201, "Order placed successfully") was supplied — no field names for the created order/wager object, and the docs' own words say a 201 means "placed in the QUEUE," not executed. `submit_order` (2026-08-24, `novig_orders.py`) reports every accepted order as `status: "submitted"` — never `"filled"` — and returns the whole decoded body as `raw_response` rather than parsing specific fields out of it. First real order is the verification step: read `response_keys`, THEN write `venue_order_view`. |
 | **NEW: cancel endpoint's HTTP method** | **UNCONFIRMED** | Path confirmed (`{base}/emm/orders/{orderId}`, rate-limited 512/s); the rate-limit table names it "(Order cancellation)" without stating the verb. DELETE is assumed (REST convention), not read. |
 | **NEW: rate limits** | **CONFIRMED, with one internal disagreement flagged** | Full table now known (order placement 64/s per one part of the source, 32/s per another part of the SAME source — noted, not silently picked; batch 64/s; cancel 512/s; kill-switch 1/30s; history tier 32 burst/512 sustained; everything else 256/s). **`Retry-After` and `X-RateLimit-Reset` on a 429 are MILLISECONDS, not seconds** — `novig_orders.backoff_seconds_from_headers` exists specifically because this is the same unit-trap shape as Kalshi's 100x price error. |
 | **NEW: Novig's own kill switch** | **CONFIRMED to exist, not integrated** | `emm/kill`, rate-limited to once per 30s — a VENUE-SIDE panic button, structurally separate from this repo's `execution_guard.kill_switch_engaged()`. Not wired to anything; noted as a future integration candidate, not built. |
@@ -127,17 +127,19 @@ execute the moment a credential exists, not so it can be built blind first.
    what was supplied, and guessing it now would repeat the exact mistake
    `kalshi_orders.py`'s header warns against, just one step later in the
    pipeline than before.
-4. ~~**`novig_submitter()`**~~ **PARTIALLY DONE.** `novig_orders.novig_submitter`
-   exists, matches `kalshi_submitter`'s shape, and correctly raises
-   `no_live_price` when unpriced — but its inner call raises
-   `NotImplementedError` rather than actually submitting, because step 3's
-   `submit_order` doesn't exist yet. Wiring `_venue_submitter` (step 5) to
-   this today would be a submitter that always fails loudly, which is the
-   correct failure mode for "not ready" but is not the same as "ready."
+4. ~~**`novig_submitter()`**~~ **DONE 2026-08-24.** `novig_orders.submit_order`
+   sends the real POST, handles 429s (backoff parsed correctly, ms→s),
+   HTTP errors, network errors, and undecodable responses as named
+   `NovigOrderError`s, and reports every accepted order as `submitted` —
+   never `filled`, per the documented "placed in the queue" semantics.
+   `novig_submitter` wires a price resolver to it, matching `kalshi_submitter`.
+   30 tests, all mocked (`urllib.request.urlopen` — no network call from this
+   session, same constraint as everywhere else in this lane).
 5. **One `elif` in `_venue_submitter`.** Narrow-claim
    `pipeline/execute_portfolio.py` at this point, following the same
    released-stale-claim or explicit-narrow-claim precedent already used
-   twice in this lane.
+   twice in this lane. **NOT YET DONE — this is the actual remaining gap**
+   between "the adapter exists" and "the plan can place a real Novig order."
 6. **Paper mode first, exactly as Kalshi's own build requires structurally**
    (`place_order`'s `mode != LIVE` branch is unconditional and venue-blind) —
    a Novig paper book proves the wiring before `SYNDICATE_EXECUTION_LIVE_ARMED`
