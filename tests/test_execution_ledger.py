@@ -448,3 +448,73 @@ def test_a_server_error_is_NOT_reclassified(monkeypatch):
 
     mod.reclassify_presend_failures()
     assert mod.find_order(record["idempotency_key"])["status"] == mod.STATUS_FAILED
+
+
+def test_a_rejected_order_can_be_retried(monkeypatch):
+    """MEASURED 2026-08-24T12:46Z. The dead-route 410 was correctly
+    reclassified `rejected` and its $1.58 released — and the next tick still
+    said `placed=0 duplicates=1`, because the RECORD still existed and
+    `record_order` returned created=False.
+
+    Freeing the budget without freeing the retry is half a fix: the order could
+    never be placed again, on a route that now works.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    request = _request(position_key="retry-me")
+    first = mod.place_order(request, submit=lambda _r: (_ for _ in ()).throw(RuntimeError("x")), mode=mod.LIVE)
+    mod.complete_order(first["idempotency_key"], status=mod.STATUS_REJECTED, error="dead route")
+
+    calls = []
+
+    def submit(_request):
+        calls.append(1)
+        return {"status": "filled", "fill_price": 0.4, "fill_stake_dollars": 4.8}
+
+    second = mod.place_order(request, submit=submit, mode=mod.LIVE)
+    assert calls, "a rejected order must reach the venue on a retry"
+    assert second["status"] == mod.STATUS_FILLED
+
+
+def test_a_filled_order_is_never_retried(monkeypatch):
+    """The whole point of the idempotency key. `filled`, `submitted` and
+    `failed` all mean the venue may hold this order — re-sending any of them is
+    how one bet becomes two."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    request = _request(position_key="no-retry")
+    mod.place_order(
+        request,
+        submit=lambda _r: {"status": "filled", "fill_price": 0.4, "fill_stake_dollars": 4.8},
+        mode=mod.LIVE,
+    )
+
+    calls = []
+    mod.place_order(request, submit=lambda _r: calls.append(1), mode=mod.LIVE)
+    assert not calls, "a filled order must never be re-sent"
+
+
+def test_a_failed_order_is_never_retried(monkeypatch):
+    """`failed` means the submit raised and MAY have arrived. Conservative by
+    construction — only an explicit reclassification can free it."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    request = _request(position_key="failed-stays")
+
+    def boom(_r):
+        raise RuntimeError("connection reset mid-POST")
+
+    mod.place_order(request, submit=boom, mode=mod.LIVE)
+
+    calls = []
+    mod.place_order(request, submit=lambda _r: calls.append(1), mode=mod.LIVE)
+    assert not calls

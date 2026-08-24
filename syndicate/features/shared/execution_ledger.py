@@ -307,9 +307,26 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
     """
     key = idempotency_key(request)
     state = _load()
-    for order in state.get("orders") or []:
-        if order.get("idempotency_key") == key:
+    orders = state.get("orders") or []
+    for index, order in enumerate(orders):
+        if order.get("idempotency_key") != key:
+            continue
+        if str(order.get("status") or "") != STATUS_REJECTED:
             return order, False
+        # A REJECTED ORDER NEVER REACHED THE VENUE, so re-attempting it cannot
+        # double anything -- and refusing to is how a transient refusal becomes
+        # permanent. Measured 2026-08-24T12:46Z: the Zebby Matthews order was
+        # correctly reclassified `rejected` after the dead-route 410, its $1.58
+        # was released, and the very next tick still reported
+        # `placed=0 duplicates=1` -- because the RECORD still existed. Freeing
+        # the budget without freeing the retry is half a fix.
+        #
+        # Only `rejected`. `filled`, `submitted` and `failed` all mean the
+        # venue may hold this order, and re-sending any of them is how one bet
+        # becomes two.
+        orders.pop(index)
+        state["orders"] = orders
+        break
 
     record = {
         "idempotency_key": key,
