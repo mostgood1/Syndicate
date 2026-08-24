@@ -83,6 +83,33 @@ def markets_artifact_path():
     return reports_root() / "intelligence" / "novig_markets.json"
 
 
+def _json_safe(value: Any) -> Any:
+    """Recursively replace `Decimal` with its exact string form so
+    `write_json_file`'s plain `json.dumps` can serialize it.
+
+    Measured 2026-08-24, first production cycle: `normalize_market_row`
+    deliberately returns `Decimal` for `open_interest`/`daily_volume` (see
+    its docstring -- the same precision discipline `cash_units_for_stake`
+    was fixed for), and that Decimal rode all the way into `state["snapshot"]`
+    unconverted, so every write of this artifact failed with `Object of type
+    Decimal is not JSON serializable` -- the fetch succeeded (REFRESHED,
+    count=29469) but nothing was ever persisted to disk. `str(Decimal(...))`
+    round-trips exactly (unlike `float`, which is the precision loss this
+    Decimal choice exists to avoid) -- a reader that needs to compute with it
+    calls `Decimal(value)` again, same as it would with the in-process
+    normalized row.
+    """
+    from decimal import Decimal
+
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 def _now_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -154,7 +181,7 @@ def run_novig_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         state["last_check_reason"] = result.get("reason")
         print(f"[novig_odds] CHECK_FAILED reason={result.get('reason')}", flush=True)
         try:
-            write_json_file(path, state)
+            write_json_file(path, _json_safe(state))
         except Exception as exc:
             print(f"[novig_odds] WRITE_FAILED error={exc}", flush=True)
         # The LAST GOOD snapshot, if there is one -- a manifest hiccup must
@@ -173,14 +200,14 @@ def run_novig_odds_refresh(*, force: bool = False) -> dict[str, Any]:
             flush=True,
         )
         try:
-            write_json_file(path, state)
+            write_json_file(path, _json_safe(state))
         except Exception as exc:
             print(f"[novig_odds] WRITE_FAILED error={exc}", flush=True)
         return {"status": "cached", "snapshot": state.get("snapshot")}
 
     state["snapshot"] = result
     try:
-        write_json_file(path, state)
+        write_json_file(path, _json_safe(state))
     except Exception as exc:
         print(f"[novig_odds] WRITE_FAILED error={exc}", flush=True)
 

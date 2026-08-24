@@ -89,6 +89,48 @@ def test_first_run_fetches_and_stores_the_snapshot(monkeypatch):
     assert state["checked_at"]
 
 
+def test_a_real_markets_row_carries_decimal_fields_and_the_write_still_lands(monkeypatch):
+    """Measured 2026-08-24, first production cycle: `normalize_market_row`
+    (see `novig_client.py`) deliberately returns `Decimal` for
+    `open_interest`/`daily_volume`, and that rode unconverted into
+    `write_json_file`'s plain `json.dumps`, which raised `Object of type
+    Decimal is not JSON serializable` on every single write -- the fetch
+    itself succeeded (REFRESHED, count=29469) but nothing was ever
+    persisted. `test_first_run_fetches_and_stores_the_snapshot` above did
+    not catch it because its stubbed snapshot never contains a Decimal --
+    this one does, matching what `normalize_market_row` actually returns.
+    """
+    from decimal import Decimal
+
+    snapshot = _snapshot(date="2026-08-24")
+    snapshot["markets"] = [
+        {
+            "market_id": "m1",
+            "report_ticker": "MLB-MONEY",
+            "open_interest": Decimal("9.25"),
+            "daily_volume": Decimal("420.73"),
+            "close_probability": 0.51,
+        }
+    ]
+    _stub(monkeypatch, snapshot)
+
+    result = mod.run_novig_odds_refresh()
+    assert result["status"] == "ok"
+
+    path = mod.markets_artifact_path()
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    state = read_json_file(path)
+    # Persisted at all -- the bug this guards against silently dropped the
+    # write while still reporting a WRITE_FAILED-only symptom, not a raise.
+    assert state is not None
+    stored_market = state["snapshot"]["markets"][0]
+    # Round-trips through str, not float -- the whole reason `_decimal_or_none`
+    # parses via `Decimal(str(...))` rather than `float()` in the first place.
+    assert stored_market["open_interest"] == "9.25"
+    assert stored_market["daily_volume"] == "420.73"
+
+
 def test_a_second_call_within_the_interval_is_cached_and_does_not_call_the_client(monkeypatch):
     calls = _stub(monkeypatch, _snapshot(date="2026-08-23"))
     mod.run_novig_odds_refresh()
