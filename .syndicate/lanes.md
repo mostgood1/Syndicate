@@ -1614,6 +1614,30 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   correctness itself stays UNVERIFIED until a `probe_*` script runs from a host
   with outbound access, same caveat `kalshi_client.py`'s header carries.
 - Blocked by: none.
+- **SHIPPED 2026-08-24, VERIFIED LOCALLY, NOT YET LIVE.** All six modules built.
+  Research (parallel WebSearch/WebFetch passes, one per venue) changed the shape
+  of the work: only polymarket (public, documented, no-auth) and novig/prophetx
+  (real but PARTNER-GATED -- no self-serve credential) have anything resembling
+  their own API. **coinbase and robinhood have NO distinct API at all** -- both
+  are broker/reseller front ends over Kalshi (and, for Robinhood, also
+  ForecastEx/Rothera) -- so `coinbase_client.py` / `robinhood_client.py` report
+  that finding and delegate to the other session's `kalshi_client.py` read-only
+  surface rather than fabricating an endpoint, clearly labelled
+  (`coinbase_predict_via_kalshi`, `robinhood_..._via_kalshi_partial`) so neither
+  is ever mistaken for the venue's own confirmed catalogue. **crypto.com "OG"**
+  (a real platform, `OG.com`, launched 2026-02-03 via CDNA) has no public
+  REST/WebSocket yet -- `cryptocom_client.py` reports the finding and rejects
+  one uncorroborated third-party-advertised endpoint by name. 53 unit tests
+  green (`polymarket_client.probability_to_american` needed a range guard the
+  first test run caught -- it divided by zero on `probability=0/1`, since
+  unlike `kalshi_client`'s version this one is public/`__all__`-exported and
+  callable directly rather than always reached through a validating caller).
+  Probe scripts run and fail as designed (named refusal, non-zero exit,
+  no crash) against the same agent-proxy denial every venue host hits. Full
+  per-venue evidence: `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`,
+  `docs/ai_context/todo.md #542`. **OWED:** a `probe_*` run from refresh-worker
+  (real outbound access) to confirm or correct every schema assumption, same as
+  Kalshi's own first live run corrected 10 of 17 field names.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

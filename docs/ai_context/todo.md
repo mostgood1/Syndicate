@@ -1,5 +1,47 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#542` — **Market/odds pull built for the other five exchange venues; the sixth (Coinbase) doesn't need one -- it IS Kalshi.** — lane `exchange-markets-api-integration`, 2026-08-24
+
+User asked for read-only market/odds client modules -- coinbase, prophetx,
+novig, polymarket, robinhood, crypto.com ("OG") -- as the layer BEFORE the
+order-automation phase another session is building end to end for Kalshi.
+Same discipline `kalshi_client.py` established: single-place schema
+assumptions, `probe()` reports the raw shape rather than parsing blind, a
+failed fetch is a NAMED error, never a silent empty list. Every venue host
+403s CONNECT through this session's agent proxy (confirmed for all six,
+same denial recorded for Kalshi), so nothing here is verified against a live
+response -- that is `refresh-worker`'s job on the first production run, via
+`scripts/probe_<venue>.py`, one per venue.
+
+**RESEARCH CHANGED THE SHAPE OF THE WORK.** Six parallel research passes
+(WebSearch/WebFetch) found this is NOT six symmetric integrations:
+
+| venue | finding |
+|---|---|
+| **polymarket** | Genuinely public, documented, no-auth API (Gamma + CLOB). Built for real -- the strongest module in this batch. |
+| **novig** | Real docs (`docs.novig.com`), OAuth-gated official REST -- **founder-gated, not self-serve**. Built for real, refuses by name without a credential. A genuinely public no-auth EOD CSV mirror (`data.novig.com`) also exists and is implemented as a second tier. An undocumented internal GraphQL endpoint several third-party scrapers use was found and DELIBERATELY NOT implemented -- unpublished, ToS status unclear. |
+| **prophetx** | Real docs (`docs.prophetx.co`), a documented read-only "Affiliate API" -- **also partner-gated, no self-serve signup**. Built for real; the production base URL is UNCONFIRMED (only a sandbox host was verified), so it is a required env override, never a guessed default. |
+| **coinbase** | **"Coinbase Predict" has no Coinbase-branded API at all.** It is a broker layer (Coinbase Financial Markets) over KALSHI's own exchange -- Kalshi supplies every contract and all liquidity, and Coinbase's UI surfaces Kalshi's own `KX`-prefixed tickers directly. `coinbase_client.py` reports this finding and delegates to the other session's `kalshi_client.py` (read-only surface only) rather than fabricating a nonexistent endpoint. |
+| **robinhood** | **No public API, official or reverse-engineered, for event contracts** -- consistent with Robinhood's historical stance on equities/options. Contracts are resold from KalshiEX (primary), ForecastEx, and the newly acquired Rothera (ex-MIAXdx). `robinhood_client.py` reports the finding and offers the same Kalshi pass-through as a KNOWINGLY PARTIAL slice (ForecastEx/Rothera-sourced contracts have no known public path at all). |
+| **crypto.com "OG"** | Real, live platform -- **OG.com**, spun out 2026-02-03, regulated via CDNA (tied to the earlier Nadex acquisition). No public REST/WebSocket has shipped; Crypto.com's own Exchange API page reportedly lists Predictions REST/WebSocket as "coming soon" with only FIX (institutional) available now. `cryptocom_client.py` reports the finding and REJECTS one uncorroborated third-party-advertised endpoint by name rather than building against it. Its `probe()` is the one script in this batch worth re-running periodically, since "coming soon" is a moving target. |
+
+**VERIFICATION.** 53 new unit tests (pure-function conversions, normalization,
+credential-refusal paths) pass locally --
+`python -m pytest tests/test_coinbase_client.py tests/test_prophetx_client.py
+tests/test_novig_client.py tests/test_polymarket_client.py
+tests/test_robinhood_client.py tests/test_cryptocom_client.py`. Schema
+correctness for polymarket/novig/prophetx and the two probe-attempt paths
+(coinbase/robinhood's Kalshi pass-through, crypto.com's landing-page check)
+are UNVERIFIED against a live response -- same caveat every module in this
+batch inherits from `kalshi_client.py`. Full research + per-venue evidence:
+`.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`.
+
+**NEXT.** Once schemas are confirmed from a host with real outbound access,
+this lane's stated next phase is the order-automation layer for whichever of
+polymarket/novig/prophetx clears legal/ToS review -- converging on the other
+session's Kalshi build (`kalshi_auth.py`, `kalshi_board.py`,
+`venue_scope.py`) as the reference shape, not reinventing it.
+
 ### `#541` — **The compact-card chip join is now MEASURED. It had been found twice by a person looking at the board and reported by nothing.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
 MLS `#365` (2026-08-22) and La Liga `#540` (2026-08-24) were the same defect:
