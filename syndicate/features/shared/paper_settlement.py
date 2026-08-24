@@ -305,6 +305,49 @@ def settle_orders(
             f"[paper_settlement] UNMAPPED_MARKETS date={normalized} {dict(sorted(unmapped.items(), key=lambda kv: -kv[1]))}",
             flush=True,
         )
+
+    # THE MONEY, BESIDE THE COUNTS.
+    #
+    # `SETTLED` above reports how many bets were graded and why the rest were
+    # not. It has never reported what any of it WON OR LOST -- that figure
+    # existed only on `/portfolio/paper`, which is a web page, and the web
+    # service is unreachable from the worker that computes this. So the one
+    # question the whole settlement layer exists to answer ("is this working")
+    # could only be asked from a browser, by a person, one date at a time.
+    #
+    # MEASURED 2026-08-24T17:39Z: game-line grading landed and the slate went
+    # from 71 graded to 150, `outcomes={'lost': 49, 'won': 28}` -- and there
+    # was no way to turn that into dollars from the logs at all.
+    #
+    # Both scopes, because they answer different questions and the per-date one
+    # alone cannot answer the second: the date says "how did Saturday go", the
+    # all-time says "is this working". Clicking through days and adding them up
+    # by eye is not the second answer, it is a chore that produces a guess.
+    try:
+        by_date = settlement_summary(normalized, orders=orders)
+        all_time = settlement_summary(None, orders=state.get("orders") or [])
+        for scope, summary in (("date=" + normalized, by_date), ("all_time", all_time)):
+            total = summary.get("total") or {}
+            # ROI stays ABSENT rather than 0.0 when nothing is settled -- a
+            # 0.0% return on zero bets and on fifty are the same string and
+            # opposite facts, which is why `settlement_summary` omits it.
+            roi = total.get("roi_pct")
+            win = total.get("win_pct")
+            print(
+                f"[paper_settlement] PNL {scope}"
+                f" settled={total.get('settled')} pending={total.get('pending')}"
+                f" won={total.get('won')} lost={total.get('lost')} push={total.get('push')}"
+                f" staked=${total.get('staked_dollars')} pnl=${total.get('pnl_dollars')}"
+                f" roi={'n/a' if roi is None else f'{roi}%'}"
+                f" win_rate={'n/a' if win is None else f'{win}%'}"
+                f" by_venue={[(b.get('venue'), b.get('settled'), b.get('pnl_dollars'), b.get('roi_pct')) for b in summary.get('by_venue') or []]}",
+                flush=True,
+            )
+    except Exception as exc:
+        # NEVER FATAL. Grading already happened and is persisted; a reporting
+        # failure must not undo it or stop the next date.
+        print(f"[paper_settlement] PNL_FAILED date={normalized} {type(exc).__name__}: {exc}", flush=True)
+
     return {
         "status": "ok",
         "date": normalized,

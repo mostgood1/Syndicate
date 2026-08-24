@@ -509,3 +509,75 @@ def test_a_player_prop_ignores_the_override_path(monkeypatch, tmp_path):
         resolver=lambda order: {"current_value": 7, "is_final": True, "started": True},
     )
     assert ledger.find_order(ledger.idempotency_key(request))["outcome"] == "won"
+
+
+def test_settling_reports_the_MONEY_not_only_the_counts(monkeypatch, tmp_path, capsys):
+    """`SETTLED` has always said how many bets graded and why the rest did not.
+    It never said what any of it won or lost -- that figure lived only on
+    `/portfolio/paper`, a web page, and the web service is unreachable from the
+    worker that computes settlement. So the question the whole layer exists to
+    answer could only be asked from a browser, one date at a time.
+
+    Both scopes, because they answer different questions: the date says how one
+    slate went, all-time says whether this is working at all."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared.paper_settlement import settle_orders
+
+    request = ledger.OrderRequest(
+        position_key="pnl-1", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e1", market="spreads", side="home", line=-1.5,
+        requested_price=-110.0, requested_stake_dollars=10.0,
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+    settle_orders(
+        "2026-08-22",
+        resolver=lambda order: {"current_value": 3, "side": "over", "line": 1.5,
+                                "is_final": True, "started": True},
+    )
+
+    out = capsys.readouterr().out
+    assert "[paper_settlement] PNL date=2026-08-22" in out
+    assert "[paper_settlement] PNL all_time" in out
+    assert "won=1" in out and "staked=$10.0" in out
+
+
+def test_the_pnl_line_says_n_a_rather_than_zero_when_nothing_settled(
+    monkeypatch, tmp_path, capsys
+):
+    """A 0.0% return on zero bets and on fifty are the same string and opposite
+    facts, which is why `settlement_summary` omits the percentage entirely."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared.paper_settlement import settle_orders
+
+    settle_orders("2026-08-22", resolver=lambda order: {})
+    out = capsys.readouterr().out
+    assert "roi=n/a" in out
+
+
+def test_a_reporting_failure_does_not_undo_the_grading(monkeypatch, tmp_path, capsys):
+    """Grading is already persisted by this point. A broken summary must not
+    take it back or stop the next date."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared import paper_settlement as mod
+
+    request = ledger.OrderRequest(
+        position_key="pnl-2", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e2", market="h2h", side="home",
+        requested_price=-110.0, requested_stake_dollars=10.0,
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+
+    def boom(*_a, **_k):
+        raise RuntimeError("summary exploded")
+
+    monkeypatch.setattr(mod, "settlement_summary", boom)
+    result = mod.settle_orders(
+        "2026-08-22",
+        resolver=lambda order: {"current_value": 3, "side": "over", "line": 0.0,
+                                "is_final": True, "started": True},
+    )
+    assert result["graded"] == 1
+    assert ledger.find_order(ledger.idempotency_key(request))["outcome"] == "won"
+    assert "PNL_FAILED" in capsys.readouterr().out
