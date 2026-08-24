@@ -95,6 +95,10 @@ REASON_NEEDS_EVENT_MAPPING = "needs_event_mapping"
 REASON_EVENT_UNMATCHED = "event_not_on_our_board"
 REASON_EVENT_AMBIGUOUS = "event_matches_two_games"
 REASON_GAME_LINES_DISABLED = "game_lines_disabled"
+# A team-named game line whose club we cannot place on either side of the
+# resolved game. Its own reason because it is the LAST guard before a bet
+# on the wrong team, and it must never be quietly folded into "no row".
+REASON_TEAM_SIDE_UNRESOLVED = "team_side_unresolved"
 # A market whose ticker carries no readable game date. Separated from every
 # other refusal because it is the ONLY one that would previously have been
 # silently mis-dated instead of refused.
@@ -144,6 +148,86 @@ def _resolve_event(
     result = match_event_blob(blob, list(seen.values()), sport=sport)
     result.setdefault("sport", sport)
     return result
+
+
+def _event_key(row: Mapping[str, Any]) -> tuple[str, str, float] | None:
+    """A game line's identity: (event, market, line). No player involved.
+
+    Canonicalised through `market_keys` like `_board_key`, so both indexes
+    speak one vocabulary -- a second spelling here is how the two would drift.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    event_id = str(row.get("event_id") or "").strip()
+    if not event_id:
+        return None
+    raw = str(row.get("market") or "").strip().lower()
+    market = canonical_market_key(row.get("sport"), raw) or raw
+    try:
+        line = float(row.get("line"))
+    except (TypeError, ValueError):
+        # A moneyline has no line. Keyed at 0.0 so it is reachable rather than
+        # dropped -- `h2h` rows genuinely carry no number.
+        line = 0.0
+    return (event_id, market, line)
+
+
+def _side_for_team(
+    team: Any, resolution: Mapping[str, Any], *, sport: Any = None
+) -> str | None:
+    """Is `team` the away or the home side of this resolved game? None if unsure.
+
+    Through `team_aliases`, because Kalshi writes "Texas" where the board
+    writes "TEX" -- and because a club resolver that disagrees with the one the
+    event matcher used would put the two halves of the same join on different
+    vocabularies.
+
+    None is the important return. A market naming a club we cannot place is
+    refused, never assigned positionally: guessing which side a name refers to
+    is a bet on the wrong team half the time, at a price that looks confident.
+    """
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:
+        return None
+
+    away = canonical_team(sport, resolution.get("away_team"))
+    home = canonical_team(sport, resolution.get("home_team"))
+    if not away or not home:
+        return None
+
+    named = canonical_team(sport, team)
+    if named:
+        if named == away and named != home:
+            return "away"
+        if named == home and named != away:
+            return "home"
+        return None
+
+    # KALSHI NAMES THE CITY. Titles say "Texas wins by over 3.5 runs", and the
+    # club map carries tri-codes and full names -- `canonical_team("mlb",
+    # "Texas")` is None, so an exact resolver refuses every team-named game
+    # line. Measured: `team_side_unresolved` on all of them.
+    #
+    # So a city or nickname is matched as a TOKEN SUBSET of the full club name
+    # ("texas" within "texas rangers"), and only against the two clubs already
+    # resolved for THIS game -- never against the league. That bound is what
+    # keeps it safe: the candidate set is two, and both are known to be playing
+    # each other.
+    #
+    # AMBIGUITY REFUSES. "Chicago" is inside both "chicago cubs" and "chicago
+    # white sox", so on a Cubs-White Sox game it names neither side. Returning
+    # a guess there is a bet on the wrong team half the time, at a price that
+    # looks confident.
+    wanted = set(str(team or "").strip().lower().split())
+    if not wanted:
+        return None
+    hits = [
+        side
+        for side, full in (("away", away), ("home", home))
+        if wanted and wanted.issubset(set(str(full).split()))
+    ]
+    return hits[0] if len(hits) == 1 else None
 
 
 def normalize_person(value: Any) -> str:
@@ -337,10 +421,17 @@ def join_kalshi_to_board(
     not know the slate date should get the old behaviour, not a silent filter.
     """
     by_key: dict[tuple[str, str, float], list[Mapping[str, Any]]] = {}
+    # A SECOND INDEX, keyed by GAME rather than by player. A game line has no
+    # player to key on, so `by_key`'s (market, player, line) cannot reach it --
+    # the player slot would be empty for every row and every market.
+    by_event: dict[tuple[str, str, float], list[Mapping[str, Any]]] = {}
     for row in board_rows:
         key = _board_key(row)
         if key is not None:
             by_key.setdefault(key, []).append(row)
+        event_key = _event_key(row)
+        if event_key is not None:
+            by_event.setdefault(event_key, []).append(row)
 
     matches: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
@@ -408,7 +499,99 @@ def join_kalshi_to_board(
                 # the answer is still free.
                 _refuse(REASON_GAME_LINES_DISABLED)
                 continue
-            _refuse(REASON_NEEDS_EVENT_MAPPING)
+
+            # THE PRICING PATH. Until now this fell through to
+            # `needs_event_mapping` even when the event HAD resolved, so 60
+            # game lines a build were identified and then dropped -- the flag
+            # bought measurement and nothing else.
+            if wanted_date:
+                game_date = game_date_from_ticker(market.get("ticker"))
+                if game_date is None:
+                    _refuse(REASON_UNDATABLE)
+                    continue
+                if game_date != wanted_date:
+                    _refuse(REASON_WRONG_DATE)
+                    continue
+
+            game_rows = by_event.get(
+                (str(resolution.get("event_id") or ""), verdict["market"], verdict["line"])
+            )
+            if not game_rows:
+                _refuse(REASON_NO_BOARD_ROW)
+                continue
+
+            yes_price = _as_float(market.get("yes_american"))
+            no_price = _as_float(market.get("no_american"))
+            if yes_price is None and no_price is None:
+                _refuse(REASON_NO_PRICE)
+                continue
+
+            # WHICH SIDE IS KALSHI'S `YES`? Two different questions depending
+            # on the grammar, and getting it wrong is a real bet on the
+            # opposite outcome at a confident price.
+            subject = verdict.get("subject")
+            for row in game_rows:
+                board_side = str(row.get("side") or "").strip().lower()
+                if subject:
+                    # A TEAM-NAMED market: "Texas wins by over 3.5 runs" is YES
+                    # on Texas. The board row's side is `away`/`home`, so the
+                    # named club has to be resolved against the event's own two
+                    # clubs -- never positionally, and never by assuming the
+                    # first team named is the away side.
+                    named = _side_for_team(
+                        subject,
+                        resolution,
+                        sport=verdict.get("sport") or resolution.get("sport"),
+                    )
+                    if named is None:
+                        # We cannot say which club this names. REFUSED: a coin
+                        # flip between two sides of a real game is a bet on the
+                        # wrong team half the time.
+                        _refuse(REASON_TEAM_SIDE_UNRESOLVED)
+                        continue
+                    if board_side not in {"away", "home"}:
+                        _refuse("unmapped_board_side")
+                        continue
+                    # YES pays when the NAMED club covers. So the board row for
+                    # that club takes the yes quote, and the other side takes no.
+                    kalshi_side = "yes" if board_side == named else "no"
+                else:
+                    # A TOTAL names no club, so the side is the direction the
+                    # title already gave us.
+                    if board_side in {"over", "o"}:
+                        kalshi_side = "yes" if verdict.get("side") == "over" else "no"
+                    elif board_side in {"under", "u"}:
+                        kalshi_side = "no" if verdict.get("side") == "over" else "yes"
+                    else:
+                        _refuse("unmapped_board_side")
+                        continue
+
+                kalshi_price = yes_price if kalshi_side == "yes" else no_price
+                if kalshi_price is None:
+                    _refuse(REASON_NO_PRICE)
+                    continue
+                matches.append(
+                    {
+                        "ticker": market.get("ticker"),
+                        "series": verdict.get("series"),
+                        "market": verdict["market"],
+                        "player_name": None,
+                        "team": subject,
+                        "line": verdict["line"],
+                        "board_side": board_side,
+                        "kalshi_side": kalshi_side,
+                        "kalshi_american": kalshi_price,
+                        "kalshi_probability": market.get(
+                            "yes_probability" if kalshi_side == "yes" else "no_probability"
+                        ),
+                        "board_price": row.get("quote", {}).get("price")
+                        if isinstance(row.get("quote"), Mapping)
+                        else None,
+                        "board_event_id": row.get("event_id"),
+                        "model_edge_pct": row.get("model_edge_pct"),
+                        "game_line": True,
+                    }
+                )
             continue
 
         series = verdict.get("series")

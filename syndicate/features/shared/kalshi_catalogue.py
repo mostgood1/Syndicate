@@ -787,6 +787,9 @@ def classify_market(market: Mapping[str, Any]) -> dict[str, Any]:
         # True means the title alone cannot say WHICH GAME this is. The join
         # must refuse these until an event mapping exists.
         "needs_event_identity": parsed["grammar"] in _NEEDS_EVENT_IDENTITY,
+        # The league whose club map resolves this market's team names. `WSH` is
+        # the Nationals in mlb and the Mystics in wnba.
+        "sport": sport,
     }
 
 

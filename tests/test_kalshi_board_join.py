@@ -510,3 +510,133 @@ def test_an_unresolvable_club_on_our_side_is_skipped_not_matched_loosely():
 
     ours = [{"event_id": "e1", "away_team": "ZZZ", "home_team": "QQQ"}]
     assert match_event_blob("TEXCWS", ours, sport="mlb")["status"] == "no_match"
+
+
+# --------------------------------------------------------------------------
+# Game-line PRICING: the side mapping is the last guard before a wrong bet
+# --------------------------------------------------------------------------
+
+
+def _priced(markets, rows, monkeypatch, date="2026-08-24"):
+    from syndicate.features.shared import kalshi_catalogue as cat
+
+    monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "1")
+    cat.SERIES_SPORT["KXMLBSPREAD"] = "mlb"
+    cat.SERIES_SPORT["KXMLBF5TOTAL"] = "mlb"
+    try:
+        return join_kalshi_to_board(markets, rows, selected_date=date)
+    finally:
+        cat.SERIES_SPORT.pop("KXMLBSPREAD", None)
+        cat.SERIES_SPORT.pop("KXMLBF5TOTAL", None)
+
+
+def _spread_market(**kw):
+    m = {
+        "ticker": "KXMLBSPREAD-26AUG241940TEXCWS-TEX4",
+        "series": "KXMLBSPREAD",
+        "title": "Texas wins by over 3.5 runs?",
+        "yes_american": 150,
+        "no_american": -170,
+    }
+    m.update(kw)
+    return m
+
+
+def _tex_cws_rows(market="spreads", line=3.5, sides=("away", "home")):
+    return [
+        {
+            "sport": "mlb",
+            "event_id": "e1",
+            "market": market,
+            "line": line,
+            "side": side,
+            "away_team": "TEX",
+            "home_team": "CHW",
+        }
+        for side in sides
+    ]
+
+
+def test_the_named_team_takes_the_yes_quote(monkeypatch):
+    """`TEXCWS` is Texas AWAY. "Texas wins by over 3.5" pays on Texas, so the
+    AWAY row takes yes (+150) and the home row takes no (-170).
+
+    This is the hop that can produce a real bet on the opposite outcome, so it
+    is asserted by side and by price rather than by a count."""
+    report = _priced([_spread_market()], _tex_cws_rows(), monkeypatch)
+    by_side = {m["board_side"]: m for m in report["matches"]}
+    assert by_side["away"]["kalshi_side"] == "yes"
+    assert by_side["away"]["kalshi_american"] == 150.0
+    assert by_side["home"]["kalshi_side"] == "no"
+    assert by_side["home"]["kalshi_american"] == -170.0
+
+
+def test_a_city_naming_both_clubs_is_refused(monkeypatch):
+    """"Chicago" is inside both "chicago cubs" and "chicago white sox". On a
+    Cubs-White Sox game it names NEITHER side, and a guess there is a bet on
+    the wrong team half the time at a price that looks confident."""
+    from syndicate.features.shared.kalshi_board_join import REASON_TEAM_SIDE_UNRESOLVED
+
+    market = _spread_market(
+        title="Chicago wins by over 3.5 runs?",
+        ticker="KXMLBSPREAD-26AUG241940CHCCWS-CHC4",
+    )
+    rows = [
+        {
+            "sport": "mlb",
+            "event_id": "e1",
+            "market": "spreads",
+            "line": 3.5,
+            "side": side,
+            "away_team": "CHC",
+            "home_team": "CHW",
+        }
+        for side in ("away", "home")
+    ]
+    report = _priced([market], rows, monkeypatch)
+    assert report["matched"] == 0
+    assert report["reasons"][REASON_TEAM_SIDE_UNRESOLVED] == 2
+
+
+def test_a_club_we_cannot_place_is_refused_never_assigned_positionally(monkeypatch):
+    """Assuming the first club named is the away side would "work" on most
+    games and be wrong on the rest, silently."""
+    from syndicate.features.shared.kalshi_board_join import REASON_TEAM_SIDE_UNRESOLVED
+
+    market = _spread_market(title="Nowhere City wins by over 3.5 runs?")
+    report = _priced([market], _tex_cws_rows(), monkeypatch)
+    assert report["matched"] == 0
+    assert report["reasons"][REASON_TEAM_SIDE_UNRESOLVED] == 2
+
+
+def test_a_total_takes_its_side_from_the_title(monkeypatch):
+    """A total names no club, so over/under comes from the title and the board
+    row's own direction — not from a team."""
+    market = {
+        "ticker": "KXMLBF5TOTAL-26AUG241940TEXCWS-7",
+        "series": "KXMLBF5TOTAL",
+        "title": "First 5 innings: Over 6.5 runs",
+        "yes_american": -105,
+        "no_american": -115,
+    }
+    rows = _tex_cws_rows(market="totals_1st_5_innings", line=6.5, sides=("Over", "Under"))
+    report = _priced([market], rows, monkeypatch)
+    by_side = {m["board_side"]: m for m in report["matches"]}
+    assert by_side["over"]["kalshi_side"] == "yes"
+    assert by_side["under"]["kalshi_side"] == "no"
+
+
+def test_a_period_market_is_not_priced_off_the_full_game_row(monkeypatch):
+    """`totals_1st_5_innings` and `totals` are different wagers. The event
+    index keys on the market, so a first-five total cannot reach a full-game
+    row even at the same line."""
+    market = {
+        "ticker": "KXMLBF5TOTAL-26AUG241940TEXCWS-7",
+        "series": "KXMLBF5TOTAL",
+        "title": "First 5 innings: Over 6.5 runs",
+        "yes_american": -105,
+        "no_american": -115,
+    }
+    rows = _tex_cws_rows(market="totals", line=6.5, sides=("Over",))
+    report = _priced([market], rows, monkeypatch)
+    assert report["matched"] == 0

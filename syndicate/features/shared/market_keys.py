@@ -329,6 +329,13 @@ def canonical_market_key(sport: Any, *values: Any) -> str | None:
         # would lose a key we already have.
         if underscored.startswith(("batter_", "pitcher_", "player_")):
             return underscored
+        # GAME-LINE SPELLINGS TOO. `totals_1st_5_innings` and
+        # `spreads_1st_5_innings` are the board's own keys, produced by
+        # `canonical_game_market`, and the prop-only passthrough refused them --
+        # so a period market the parser had just resolved correctly came back
+        # `stat_not_in_market_vocabulary` one step later.
+        if underscored.startswith(("totals", "spreads", "h2h", "team_totals")):
+            return underscored
         # #247: strip a leading ROLE word and retry. Our boards label props by
         # role ("Hitter Hits", "Pitcher Outs") while graders and the odds feed
         # use the bare stat ("hits", "outs") -- and the table already holds the
