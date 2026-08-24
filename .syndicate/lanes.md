@@ -1902,6 +1902,35 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   their now-stable range is the natural next step, not yet done). Probe
   flag turned back off, redeploy confirmed live 21:51:37Z, deploy claim
   (refresh-worker, token `5bde3ff6440857af`) released.
+- **POLYMARKET FETCH POINTED AT THE REAL OFFSET RANGE, 2026-08-24, user-
+  requested** ("point the arb scan's Polymarket fetch at the real offset
+  range" -- the "natural next step, not yet done" from the entry directly
+  above). `run_arb_scan()` switched from
+  `polymarket_us_markets.fetch_markets(open_only=True, drop_settled=True,
+  max_pages=1)` (one page at offset 0 -- structurally could only ever see
+  season-level futures/politics/culture, never a real game) to
+  `polymarket_us_markets.fetch_game_markets()` -- the other session's
+  boundary-locating (binary search, re-checked every call, never a
+  hardcoded offset since ids and the boundary both move daily) page-to-
+  exhaustion function. Full slate reachable in ~33 signed calls per the
+  same day's measurement (`games=7585 truncated=False`). Corrected two
+  now-stale claims in the module's own header while here: the "single page
+  at offset 0" description, and a "no spread/total exists on this venue"
+  claim that was actually a sampling artifact of only ever having read the
+  first 2,000 id-ordered (season-level) rows -- the venue carries all five
+  game types; this module still scopes to moneyline only because that is
+  what is built and tested, not because the data is missing. Tests updated
+  to monkeypatch `fetch_game_markets`; one new regression test asserts
+  `run_arb_scan` calls it (and fails loudly if it ever calls `fetch_markets`
+  directly again). 24/24 green (was 23). Files: `syndicate/features/shared/
+  kalshi_polymarket_arb.py`, `tests/test_kalshi_polymarket_arb.py`,
+  `scripts/probe_kalshi_polymarket_arb.py`. **Not yet run live** -- the
+  same-evening finding two entries up (`.syndicate/deploys.md`, 21:52Z/
+  21:54Z) is that the board is soccer-only today because the MLB sim is
+  starved by `intelligence_pipeline_busy` (soccer odds-history re-reads
+  eating the execution guard), which this fetch fix does not touch -- a
+  live re-run of this scan today would still show `matched_games=0` for
+  that unrelated, upstream reason, not because this fix failed.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
