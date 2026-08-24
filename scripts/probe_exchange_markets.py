@@ -53,6 +53,12 @@ _PROBES: tuple[tuple[str, str, str], ...] = (
     ("novig", "syndicate.features.shared.novig_client", "probe"),
     ("prophetx", "syndicate.features.shared.prophetx_client", "probe"),
     ("cryptocom_og", "syndicate.features.shared.cryptocom_client", "probe"),
+    # Polymarket US's dedicated Sports API -- a DIFFERENT venue/credential
+    # from the "polymarket" row above (see polymarket_us_sports_client.py's
+    # header). Reports credentials_absent by name if this service does not
+    # carry POLYMARKET_US_API_KEY_ID/PRIVATE_KEY -- that is an expected,
+    # informative outcome here, not a probe failure.
+    ("polymarket_us_sports", "syndicate.features.shared.polymarket_us_sports_client", "probe_all_leagues"),
 )
 
 
