@@ -25644,3 +25644,91 @@ finding out what changed.
 verify: **CLEAR** — the probe answered its question and the answer is "one
 date". A market result on one date is not a backtest and will not be reported
 as one.
+
+---
+
+### 2026-08-24 ~14:32Z–15:12Z — live-odds-worker — venue reconciliation, field names, fees
+
+**Lane:** `portfolio-decision-and-execution`. **Claim:** held on `live-odds-worker`
+(expired claim from `kalshi-live` replaced). **Preflight:** could NOT run —
+`RENDER_API_KEY` is not in this container. Substituted the same manual check
+prior sessions used: `list_deploys` via the Render MCP showed no deploy in
+flight and the live SHA behind the target, and every deployed SHA was on
+`origin/main` at trigger time. Recorded as a substitution, not a pass.
+
+**SHAs, in order:** `0e0017d7b` → `b93344e0a`/`e33d6df33` → `4f1afd1c6`.
+
+**verify: `[execution_ledger] RECONCILE venue=kalshi candidates=1
+venue_orders=27 changed=0 not_found=0 unknown=0` at 14:48:14Z**, and the
+ledger summary in the same tick reading `by_status {'filled': 10,
+'submitted': 1}` with `unreconciled: 1`.
+
+Two readings out of that one line:
+
+1. **The phantom fill is gone.** The live Kalshi order
+   (`KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-5`) was `filled fill_price=0.54`
+   in our ledger while Kalshi showed it resting with `Filled: 0`. It now reads
+   `submitted`, which is what Kalshi says. The user found the original
+   discrepancy by looking at the Kalshi UI; no log had said anything.
+2. **`venue_orders=27`** — `GET /portfolio/orders?limit=100` works, signed,
+   from this worker.
+
+**The keys log settled the field names** (14:37:16Z). Not one of the three
+count spellings guessed beforehand was right: the live shape is
+`fill_count_fp`, `initial_count_fp`, `remaining_count_fp`,
+`taker_fees_dollars`, `maker_fees_dollars`, `taker_fill_cost_dollars`,
+`maker_fill_cost_dollars`, `yes_price_dollars`, `no_price_dollars`.
+Corrected in `b93344e0a`, which also charges fees (Kalshi took $0.02 on a
+$1.08 fill, ~1.9%) through P&L, the daily budget and the live page.
+
+**REGRESSION FOUND AND FIXED IN THE SAME WINDOW.** At 15:04:08Z:
+
+    RECONCILE venue=kalshi candidates=1 venue_orders=27 changed=0 not_found=0
+    BLOCKED_ON_UNRECONCILED count=1 keys=['c3f45504fce2767694a0e73e']
+
+Same second, same order. The freshness stamp was persisted only when a row
+MOVED, so a resting order that agreed with the ledger was read successfully
+and never marked as read — and live execution stayed blocked. It passed every
+test because every test moved something. `4f1afd1c6` persists the stamp
+whenever the venue said something positive, and reports `stamped` separately
+from `changed`. **Not yet verified in production** — that needs a
+`RECONCILE ... changed=0 stamped=1` followed by an `EXECUTED` rather than a
+`BLOCKED_ON_UNRECONCILED`.
+
+**VERIFIED 15:16:55Z / 15:17:03Z.** The stamp fix works in production:
+
+    15:13:34Z  RECONCILE ... changed=0 (no stamped= field -- old build)
+    15:13:34Z  BLOCKED_ON_UNRECONCILED count=1 keys=['c3f45504fce2767694a0e73e']
+    15:16:55Z  RECONCILE ... changed=0 ... stamped=1
+    15:17:03Z  RECONCILE ... changed=0 ... stamped=1
+    15:17:03Z  EXECUTED date=2026-08-24 mode=live venue=kalshi armed=True
+               positions=0 placed=0 duplicates=0 retried=0 skipped=0 refused={}
+
+Same order, same resting state, eight minutes apart: blocked before, executed
+after. Live execution is no longer jammed by a known-resting order.
+
+**`_fp` IS ANSWERED, and it is the harmless reading.** Measured 15:13:15Z:
+
+    COUNT_FIELDS fill_count_fp='0.00' initial_count_fp='2.00'
+      remaining_count_fp='2.00' taker_fees_dollars='0.000000'
+      maker_fees_dollars='0.000000' taker_fill_cost_dollars='0.000000'
+      maker_fill_cost_dollars='0.000000' status='resting'
+      yes_price_dollars='0.4600' no_price_dollars='0.5400'
+
+Quoted decimal STRINGS holding plain counts -- the same convention as the
+`count: "2.00"` we send on create. Not a fixed-point scale, so a 2-contract
+order reads as 2. `int(float("2.00"))` already handled it. The
+`RECONCILE_COUNT_IMPLAUSIBLE` bound stays: it cost nothing, and it is the
+guard that made shipping the unknown safe in the first place.
+
+The prices confirm the order is what we meant: our ask sits at
+`yes_price_dollars='0.4600'`, i.e. buying NO at $0.54. Fees read
+`0.000000` because nothing has filled -- the fee wiring is untested against a
+nonzero charge and will stay so until a fill lands.
+
+**Still open:** the live plan is producing `positions=0`, so nothing is being
+placed. Reconciliation and the gate are no longer the constraint -- candidate
+generation is. And the 46c order still rests while the market moved to 44c;
+its ledger row is `submitted`, so the marketable-limit path treats a re-place
+as a duplicate. Cancelling it at the venue is the unblock, and that needs a
+decision rather than a guess.

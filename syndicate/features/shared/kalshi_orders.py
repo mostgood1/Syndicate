@@ -65,6 +65,7 @@ __all__ = [
     "fetch_order",
     "fetch_orders",
     "venue_order_view",
+    "cancel_order",
     "kalshi_submitter",
     "OrderBuildError",
 ]
@@ -628,6 +629,57 @@ def _sum_present(order: Mapping[str, Any], fields: tuple[str, ...]) -> float | N
     return round(total, 6) if seen else None
 
 
+def _order_cancel_url(order_id: str) -> str:
+    """DELETE hangs off the WRITE path, not the read path.
+
+        POST   /portfolio/events/orders          -- create
+        DELETE /portfolio/events/orders/{id}     -- cancel
+        GET    /portfolio/orders                 -- list
+        GET    /portfolio/orders/{id}            -- read one
+
+    The asymmetry is real and is the whole reason this is derived from
+    `_DEFAULT_ORDER_PATH` rather than from the read path: writes live under
+    `events/orders`, reads under `orders`. Guessing that DELETE followed the
+    reads would have produced the same class of failure as the create-route
+    410, and the shape of it -- a cancel that silently 404s while the order
+    keeps resting -- is worse, because nothing about the order changes to say
+    so.
+    """
+    path = (os.environ.get("KALSHI_ORDER_CANCEL_PATH") or _DEFAULT_ORDER_PATH).strip()
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{_read_base().rstrip('/')}{path}/{order_id}"
+
+
+def cancel_order(order_id: Any) -> dict[str, Any]:
+    """Pull one resting order off the book.
+
+        DELETE /trade-api/v2/portfolio/events/orders/{order_id}
+
+    Note the path: the WRITE route, alongside create -- not the `/portfolio/
+    orders` the reads use. The failure is still returned by NAME with the HTTP
+    code intact rather than raised, so one production line says if this moves
+    too. `KALSHI_ORDER_CANCEL_PATH` overrides it without a code change.
+
+    A CANCEL THAT FAILS MUST LEAVE THE ORDER ALONE. It is still resting, it can
+    still fill, and recording it as dead would free an idempotency key that the
+    venue still holds -- which is how one bet becomes two.
+    """
+    from syndicate.features.shared.kalshi_auth import signed_request
+
+    key = str(order_id or "").strip()
+    if not key:
+        return {"status": "error", "reason": "no_order_id"}
+    url = _order_cancel_url(key)
+    print(f"[kalshi_orders] CANCEL url={url}", flush=True)
+    try:
+        payload = signed_request("DELETE", url)
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+    order = _unwrap_order(payload)
+    return {"status": "ok", "order": order or {}}
+
+
 def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     """One Kalshi order, reduced to the facts the ledger needs.
 
@@ -710,6 +762,11 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         "fill_price": price,
         "fill_cost_dollars": fill_cost,
         "fees_dollars": fees,
+        # BOTH LEGS, carried rather than resolved. Which one we are paying
+        # depends on our side, which this function does not know -- and Kalshi
+        # hands over both, so guessing is unnecessary.
+        "yes_price": _price_or_none(order.get("yes_price_dollars")),
+        "no_price": _price_or_none(order.get("no_price_dollars")),
         "order_id": order.get("order_id") or order.get("id"),
         "client_order_id": order.get("client_order_id"),
         "ticker": order.get("ticker"),
