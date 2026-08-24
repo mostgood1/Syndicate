@@ -25826,3 +25826,52 @@ the intended behaviour, not a gap.
 **Owed:** the two Polymarket field-name fixes; a root-cause pass on the Novig
 CSV 403 (try a different path/header, or downgrade the scope doc's confidence
 on that tier if it turns out not to be public at all).
+
+---
+
+### 2026-08-24 17:39:07Z — GAME LINES GRADE. Coverage 71/171 → 150/171 on one slate.
+
+**verify: `[paper_settlement] SETTLED date=2026-08-23 orders=171 graded=77
+already_graded=73 outcomes={'lost': 49, 'won': 28}`**, refresh-worker instance
+`n7g4m`, first settlement tick to complete after the deploy.
+
+    this morning   graded=0  already_graded=71  ungraded={'unmapped_market': 80, ...}
+    16:36Z         graded=0  already_graded=73  ungraded={'side_not_a_team_in_this_game': 77, ...}
+    17:39Z         graded=77 already_graded=73  outcomes={'lost': 49, 'won': 28}
+
+`side_not_a_team_in_this_game` went 77 → **0**, and all 77 graded in one pass.
+41.5% of the slate was gradeable this morning; 87.7% is now.
+
+**SHAs.** `9862536b8` (the translation) and `01a984d3e` (positional
+`home`/`away` sides). live-odds-worker runs `01a984d3e`, live 17:17:49Z.
+refresh-worker runs it inside `efbfb7f41` — another session's PR #30, deployed
+over mine at 17:20:41Z while this lane held the claim. **Ancestry checked
+rather than assumed** (`git merge-base --is-ancestor`): `01a984d3e` IS
+contained, so that deploy composed rather than reverted. Had their branch been
+cut from an older `main` it would have silently undone the fix and the claim
+would not have stopped it — the exact case CLAUDE.md names when it says
+serialisation is not composition.
+
+**`home_away_disagree_between_sources` did not fire once.** That guard refuses
+a positional side when the odds provider and statsapi disagree about which team
+is home. Zero across 77 orders is the evidence that the two sources agree in
+practice, which had been an assumption until this line.
+
+**The 21 still ungraded, each with a different owner:** `game_not_in_live_box`
+11 (WNBA capture), `no_resolver_for_soccer` 5 (no resolver exists),
+`stat_not_in_feed` 2, `no_team_scores_in_player_box` 1 (WNBA game lines need
+team scores in the box — named honestly rather than made to look like the MLB
+fix), `order_not_filled` 2 (correct: nothing to grade).
+
+**Claims released with `--force`, and that is worth stating.** A container
+restart lost this session's claim tokens, so a clean `release` refused. The
+claims were this lane's own; forcing them is the documented escape hatch, but
+it means the token file is not durable across a restart of the session that
+holds it.
+
+**NOT ESTABLISHED, and the next thing to read:** 28 won against 49 lost is a
+36.4% strike rate on the newly-graded game lines. At typical spread pricing
+break-even is ~52%, so on its face this slate's game-line selections lost
+money — but no P&L figure has been read, n=77 is one slate, and the stake
+distribution is unknown. The count is a fact; the conclusion is not one yet.
+`settlement_summary` is where that number lives.
