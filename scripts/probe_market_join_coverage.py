@@ -66,6 +66,44 @@ from syndicate.features.shared.basketball_momentum_artifacts import (
     momentum_events_path,
 )
 from syndicate.features.shared.odds_book_quotes import resolve_book_quotes_path
+from syndicate.features.wnba.cards import _canonical_wnba_tri
+
+def _matchup(home: Any, away: Any) -> tuple[str, str] | None:
+    """The join key, canonicalised. `None` when either side cannot be mapped.
+
+    **THE TWO FAMILIES DO NOT SHARE AN ID SPACE, AND THE FIRST RUN OF THIS PROBE
+    READ THAT AS "NO GAMES IN COMMON".** `book_quotes.event_id` is OddsAPI's
+    `event_obj["id"]`; the state artifact is keyed on ESPN's numeric event id.
+    Joining them gave `event_overlap=0` on ALL FOURTEEN dates -- a number that
+    looks like a finding about the data and is a fact about the key.
+
+    The repo had already settled this. `period_lines_by_matchup`: *"Keyed on the
+    team names exactly as the quote rows carry them ... because the quote log is
+    the shared record and should not learn one sport's identifier scheme."* So
+    the key is the matchup, and `_canonical_wnba_tri` is reused rather than
+    respelt -- it already maps tricodes AND full names ("LASVEGASACES" -> "LVA")
+    onto one canonical form. That function is where the LA/LAS collision was
+    fixed once; a second copy here would be a second place for it to rot.
+    """
+    h = _canonical_wnba_tri(str(home or "").strip())
+    a = _canonical_wnba_tri(str(away or "").strip())
+    if not h or not a or h == a:
+        return None
+    # **AN UNRECOGNISED NAME COMES BACK UNCHANGED, NOT EMPTY.**
+    # `_canonical_wnba_tri` passes a value it does not know straight through, so
+    # "Toronto Tempo" becomes the key "TORONTO TEMPO" -- non-empty, distinct,
+    # and unable to match the state side's "TOR". That is a silent zero one
+    # level below the one this function was written to fix. A canonical WNBA
+    # tricode is two to four letters and nothing else, so anything wider is a
+    # name the map has never seen and must be reported rather than joined on.
+    if not (_looks_like_tricode(h) and _looks_like_tricode(a)):
+        return None
+    return (h, a)
+
+
+def _looks_like_tricode(value: str) -> bool:
+    return 2 <= len(value) <= 4 and value.isalpha()
+
 
 # The intervals a book actually prices, per `period_lines._PERIODS`.
 INTERVAL_SEGMENTS = ("q1", "q2", "q3", "q4", "h1", "h2")
@@ -109,9 +147,21 @@ def _state_coverage(root: Path, league: str, day: str) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {"games": 0, "events": set()}
     games = doc.get("games") or {}
-    usable = {str(k) for k, v in games.items()
-              if isinstance(v, dict) and v.get("pressure") and v.get("narrator")}
-    return {"games": len(usable), "events": usable}
+    usable = 0
+    keys: set[tuple[str, str]] = set()
+    unmapped: set[str] = set()
+    for value in games.values():
+        if not isinstance(value, dict):
+            continue
+        if not (value.get("pressure") and value.get("narrator")):
+            continue
+        usable += 1
+        key = _matchup(value.get("home_tri"), value.get("away_tri"))
+        if key:
+            keys.add(key)
+        else:
+            unmapped.add(f"{value.get('away_tri')}@{value.get('home_tri')}")
+    return {"games": usable, "events": keys, "unmapped": unmapped}
 
 
 def _bridge_coverage(root: Path, league: str, day: str) -> dict[str, Any]:
@@ -141,13 +191,14 @@ def _bridge_coverage(root: Path, league: str, day: str) -> dict[str, Any]:
 def _quote_coverage(day: str) -> dict[str, Any]:
     path = resolve_book_quotes_path("wnba", day)
     if not path or not Path(path).exists():
-        return {"rows": 0, "interval_rows": 0, "events": set(),
+        return {"rows": 0, "interval_rows": 0, "events": set(), "unmapped": set(),
                 "by_segment": {}, "instants_by_event": {}, "books": set()}
     rows = interval_rows = 0
     events: set[str] = set()
     by_segment: dict[str, int] = defaultdict(int)
-    instants_by_event: dict[str, set] = defaultdict(set)
+    instants_by_event: dict[tuple[str, str], set] = defaultdict(set)
     books: set[str] = set()
+    unmapped: set[str] = set()
     for row in _read_jsonl(Path(path)):
         rows += 1
         segment = str(row.get("segment") or "").strip().lower()
@@ -160,21 +211,26 @@ def _quote_coverage(day: str) -> dict[str, Any]:
             continue
         interval_rows += 1
         by_segment[segment] += 1
-        event_id = str(row.get("event_id") or "").strip()
-        if event_id:
-            events.add(event_id)
+        key = _matchup(row.get("home_team"), row.get("away_team"))
+        if key:
+            events.add(key)
             # `captured_at` is when OUR loop looked -- the instant a bettor
             # could have acted on. `book_updated_at` is the book's own clock and
             # is not always present.
             stamp = str(row.get("captured_at") or "").strip()
             if stamp:
-                instants_by_event[event_id].add(stamp)
+                instants_by_event[key].add(stamp)
+        else:
+            # **NAMED, NOT DROPPED.** An unmappable team is how a real overlap
+            # becomes a silent zero -- Toronto and Portland are 2026 expansion
+            # sides and are absent from the canonical map's full-name entries.
+            unmapped.add(f"{row.get('away_team')}@{row.get('home_team')}")
         book = str(row.get("bookmaker") or "").strip()
         if book:
             books.add(book)
     return {"rows": rows, "interval_rows": interval_rows, "events": events,
             "by_segment": dict(by_segment), "instants_by_event": dict(instants_by_event),
-            "books": books}
+            "books": books, "unmapped": unmapped}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -229,6 +285,10 @@ def main(argv: list[str] | None = None) -> int:
               f"event_overlap={len(overlap)} "
               f"instants_per_event={counts[:6]} "
               f"segments={dict(sorted(quotes['by_segment'].items()))}", flush=True)
+        stray = (state.get("unmapped") or set()) | (quotes.get("unmapped") or set())
+        if stray:
+            print(f"[join] UNMAPPED {day} {sorted(stray)[:8]} -- these cannot join "
+                  f"and are NOT counted as absent games", flush=True)
 
         # Joinable means ALL THREE, plus at least one event in common, plus a
         # quote stream that actually moves. Anything less is not a live line.

@@ -52,7 +52,11 @@ def _quote(day: str, event: str, captured_at: str, line: float,
            segment: str = "q3", market: str = "totals") -> dict:
     return {"captured_at": captured_at, "sport": "wnba", "date": day,
             "event_id": event, "bookmaker": "fanduel", "market": market,
-            "segment": segment, "selection": "Over", "line": line, "price": -110}
+            "segment": segment, "selection": "Over", "line": line, "price": -110,
+            # **THE JOIN KEY IS THE MATCHUP, NOT `event_id`.** The quote log
+            # carries OddsAPI's id and the state artifact carries ESPN's, so
+            # these fixtures must supply the teams or they test nothing real.
+            "home_team": "Indiana Fever", "away_team": "New York Liberty"}
 
 
 def _write_quotes(root: Path, rows: list[dict], day: str = DAY) -> None:
@@ -189,7 +193,8 @@ def test_an_event_present_in_only_one_family_does_not_count(tmp_path, capsys) ->
     on EVENT, not on date."""
     _write_state(tmp_path)
     _write_bridge(tmp_path)
-    _write_quotes(tmp_path, _moving_quotes(event="999999999"))
+    _write_quotes(tmp_path, [dict(q, home_team="Seattle Storm", away_team="Phoenix Mercury")
+                             for q in _moving_quotes()])
     code, out = _run(tmp_path, capsys)
     assert "event_overlap=0" in out, out
     assert code == 4, out
@@ -292,3 +297,66 @@ def test_joinable_DOES_seal_the_sentinel(tmp_path, monkeypatch, capsys) -> None:
     out = capsys.readouterr().out
     assert "exit=0" in out, out
     assert sentinel.exists(), out
+
+
+# --------------------------------------------------------------------------
+# The join key
+
+
+def test_it_joins_across_DIFFERENT_id_spaces(tmp_path, capsys) -> None:
+    """**THE REGRESSION FOR THE BUG THIS PROBE FOUND IN ITSELF.**
+    `book_quotes.event_id` is OddsAPI's hash; the state artifact is keyed on
+    ESPN's numeric id. The first production run joined on `event_id` and
+    reported `event_overlap=0` on all fourteen dates -- which reads as a finding
+    about the data and is a fact about the key.
+
+    Same game, two unrelated ids, and it must still join."""
+    _write_state(tmp_path)                       # ESPN-style id, IND vs NYL
+    _write_bridge(tmp_path)
+    _write_quotes(tmp_path, [dict(q, event_id="9f2c1ab4de7c4e0fb1a2c3d4e5f60718")
+                             for q in _moving_quotes()])
+    code, out = _run(tmp_path, capsys)
+    assert "event_overlap=1" in out, out
+    assert code == 0, out
+
+
+def test_it_joins_a_tricode_against_a_full_team_name(tmp_path, capsys) -> None:
+    """The state artifact carries tricodes and the quote log carries full names.
+    `_canonical_wnba_tri` already maps both onto one form -- reused rather than
+    respelt, since that function is where the LA/LAS collision was fixed once."""
+    _write_state(tmp_path)
+    _write_bridge(tmp_path)
+    _write_quotes(tmp_path, [dict(q, home_team="Indiana Fever",
+                                  away_team="New York Liberty")
+                             for q in _moving_quotes()])
+    _, out = _run(tmp_path, capsys)
+    assert "event_overlap=1" in out, out
+
+
+def test_home_and_away_are_not_interchangeable(tmp_path, capsys) -> None:
+    """A reversed matchup is a different key. Sorting the pair would make the
+    join succeed on a game whose sides we have backwards, and every projection
+    downstream is signed."""
+    _write_state(tmp_path)                       # home IND, away NYL
+    _write_bridge(tmp_path)
+    _write_quotes(tmp_path, [dict(q, home_team="New York Liberty",
+                                  away_team="Indiana Fever")
+                             for q in _moving_quotes()])
+    code, out = _run(tmp_path, capsys)
+    assert "event_overlap=0" in out, out
+    assert code == 4, out
+
+
+def test_an_unmappable_team_is_NAMED_not_silently_dropped(tmp_path, capsys) -> None:
+    """**A SILENT ZERO IS THE FAILURE MODE OF EVERY JOIN IN THIS LANE.** An
+    expansion side missing from the canonical map would drop out of the overlap
+    and read as "that game has no quotes". The exact strings must be printed so
+    the map can be fixed from production rather than from a guess."""
+    _write_state(tmp_path)
+    _write_bridge(tmp_path)
+    _write_quotes(tmp_path, [dict(q, home_team="Toronto Tempo",
+                                  away_team="Portland Fire")
+                             for q in _moving_quotes()])
+    _, out = _run(tmp_path, capsys)
+    assert "UNMAPPED" in out, out
+    assert "Portland Fire@Toronto Tempo" in out, out
