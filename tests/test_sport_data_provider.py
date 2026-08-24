@@ -83,7 +83,21 @@ class SoccerDataProviderTests(unittest.TestCase):
             return_value={"games": fake_games},
         ) as mocked:
             games = self.provider.games(context, is_active_today=True)
-        mocked.assert_called_once_with("mls", 17, 2026)
+        # `#545`: the CURRENT matchday and the NEXT. Asking for the current one
+        # alone was the defect -- `default_week` answers "which matchday are we
+        # in", which on a Monday is the one that just finished, while the board
+        # carries a seven-day FORWARD horizon. Measured in production
+        # 2026-08-24T20:36:39Z: 65 of 96 soccer chips described already-played
+        # fixtures and 72 of the 105 fixtures in the board's window had none.
+        self.assertEqual(
+            [call.args for call in mocked.call_args_list],
+            [("mls", 17, 2026), ("mls", 18, 2026)],
+        )
+        # ONE game, not two: this mock returns the same fixture for both weeks,
+        # and the de-duplication is load-bearing rather than tidy -- the
+        # browser's canonical chip index DISCARDS colliding keys, so a fixture
+        # emitted twice would lose its chip entirely and reproduce the very
+        # symptom the widening exists to fix.
         self.assertEqual(games, fake_games)
         self.assertEqual(games[0]["league"], "mls")
 
@@ -108,7 +122,11 @@ class SoccerDataProviderTests(unittest.TestCase):
             "syndicate.features.soccer.cards.build_cards_page_context", side_effect=fake_cards
         ) as mocked:
             games = self.provider.games(context, is_active_today=True)
-        called_leagues = sorted(call.args[0] for call in mocked.call_args_list)
+        # DISTINCT leagues: `#545` asks each for two matchdays, so the raw call
+        # list now holds each league twice. What this test is about is that
+        # every ACTIVE league reaches the board, not how many weeks each is
+        # asked for -- that is `test_soccer_chip_week_span.py`'s subject.
+        called_leagues = sorted({call.args[0] for call in mocked.call_args_list})
         self.assertEqual(called_leagues, ["epl", "mls"])
         self.assertEqual(sorted(game["league"] for game in games), ["epl", "mls"])
         # MLS keeps the context's own season/week; other leagues resolve

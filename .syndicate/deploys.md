@@ -26717,3 +26717,224 @@ this load rises through the week toward the matchday.
 pass at all. That is the actual question for whoever fixes it — the answer is
 probably a cache keyed on mtime, since the shards only change when a refresh
 unit writes one.
+
+
+---
+
+### 2026-08-24 — the odds-history caching fix: NOT taken, and my own cost claim was WRONG
+
+Checked `lanes.md` and then measured. Two independent reasons not to do it, and
+the second refutes something I said earlier in this session.
+
+**1. It is not free.** `syndicate/features/intelligence.py` and
+`odds_control_plane.py` are unclaimed, so the edit itself would be legal — but
+the OPEN lane `layer2-sim-view-and-live-projection` lists
+`pipeline/intelligence_state.py` and `scripts/refresh_odds_sources.py` in its
+`Files:`, and its own stated current question is **"the ODDS FETCH."** That is
+the same subsystem. Claims were retired in the 2026-08-18 orphan sweep so
+nothing would block me mechanically; the lane protocol still says surface it
+rather than edit across it.
+
+Also: `load_odds_history_payload_for_sport` ALREADY takes a `cache` parameter
+(`odds_control_plane.py:148`) and `intelligence.py:2998` simply does not pass
+one. So the "fix" looks like a one-liner — but the safe version is an
+intra-build cache, and there is no intra-build duplication to remove (each
+shard is read once per build). The version that would matter is a CROSS-build
+cache with mtime invalidation, in a loader whose own docstring documents a
+2026-08-04 incident where a stale copy shadowed a fresh one and every MLB
+candidate silently got `history_points=0`. That is the exact failure a
+careless mtime cache reintroduces.
+
+**2. IT WOULD NOT HELP, AND MY EARLIER CLAIM WAS WRONG.** I wrote that
+re-reading ~8.3MB every ~73s was "the cost" holding the guard. The trace
+timestamps are nanosecond-precision and say otherwise:
+
+```
+21:53:33.109754887  2026-08-26    120,337 B
+21:53:33.114291438  2026-08-27    194,665 B   +4.5 ms
+21:53:33.125552243  2026-08-28    742,052 B  +11.3 ms
+21:53:33.183592197  2026-08-29  4,797,451 B  +58.0 ms
+21:53:33.200727575  2026-08-30  1,466,836 B  +17.1 ms
+```
+
+**All five shards: 91 ms. The 4.8MB one: 58 ms. Against a 73,000 ms cycle —
+0.12%.** Reading and parsing 4.8MB of JSON is simply fast. Caching it would
+save 91ms out of 73 seconds and change nothing about the starvation.
+
+I inferred "big file, read often, therefore expensive" from size and cadence
+without timing it. The data to refute that was in the same log lines I had
+already quoted.
+
+**SO THE REAL QUESTION IS STILL OPEN:** what holds `_execution_guard` for the
+other ~99.9% of the cycle. That needs a profile of the board build, not another
+guess from artifact sizes. Nothing was changed.
+
+
+---
+
+### 2026-08-24 — ROOT CAUSE: the intelligence guard is held across the 60s inter-cycle sleep
+
+Profiled the board build. It is not slow. The guard is simply never released.
+
+**The structure** (`pipeline/intelligence_state.py`, indent in the margin):
+
+```
+5631   8 | while not self._stop.is_set():
+5803  12 |     try:
+5805  20 |         guard_acquired = self._execution_guard.acquire(blocking=False)
+      .. |         ... board build ... (odds_history reads measured at 91 ms)
+5991  20 |         self._condition.wait(timeout=self._interval_seconds)   <-- GUARD HELD
+5992  12 |     finally:
+5994  20 |         self._execution_guard.release()
+```
+
+`self._condition.wait(timeout=self._interval_seconds)` at line 5991 sits INSIDE
+the guarded region. The `finally` that releases is at indent 12, so the release
+happens only after that wait returns.
+
+**`SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS = "60"` on all three
+services** (render.yaml lines 154, 507, 886). So every iteration holds the lock
+for `build_time + 60s`, and the lock is free only in the microscopic window
+between `release()` at the end of one iteration and `acquire()` at the start of
+the next. Observed cycle ~73s = ~13s of build plus the 60s sleep.
+
+**That is ~100% duty cycle on a lock whose own docstring (line 306) says it
+means "True while the board build is actively computing in THIS process."** It
+does not mean that. It means "the loop is alive."
+
+**This explains the whole chain**, and it explains why every size-based theory
+failed: MLB sim starved (`mlbDailySim: intelligence_pipeline_busy` on nearly
+every tick, one win at 21:50:26 catching the release window) -> no
+recommendations -> `per_game_reco_rows=0` -> board rows soccer-only -> all four
+venue books `scoped=0` -> nothing to execute.
+
+**The fix is to release before sleeping and re-acquire after** — the wait
+belongs outside the guarded region. The two guards were designed for "strict
+alternation rather than overlap" (line 313); holding one through its own idle
+period is not alternation, it is permanent occupancy.
+
+**NOT DONE, DELIBERATELY.** `pipeline/intelligence_state.py` is claimed by the
+OPEN lane `layer2-sim-view-and-live-projection`, whose current question is the
+odds fetch in the same subsystem. Surfacing rather than editing across it, per
+the lane protocol. This is a small diff with a large blast radius — it changes
+how two background loops interleave on both workers — and it belongs to whoever
+holds that lane.
+
+**Method note, third correction this session:** I twice inferred the cost from
+artifact SIZE (`sporting=500`, the 4.8MB shard) and was wrong both times. The
+answer came from reading the control flow around the lock, not from measuring
+data volume. The reads were never the problem; the sleep was.
+
+
+---
+
+### 2026-08-24 21:57Z — "why is the pipeline empty": TWO separate problems, and more venue feeds fixes neither
+
+**The shortlist never considers MLB at all:**
+
+```
+[intelligence_state] LAYER2_SHORTLIST date=2026-08-24 rows=176 considered=9112
+  below_floor=16 admitted_by_blend=1 sports=['soccer']
+[layer2_shortlist] LAYER2_BOARD_HEALTH sport=soccer rows=176
+  pregame_proj=26 live_proj=0 no_proj=150 edged=26
+  age_p50s=50090 age_p90s=50117 age_maxs=50371
+```
+
+`sports=['soccer']`, `considered=9112` — every candidate is soccer. MLB is not
+rejected; it CONTRIBUTES NOTHING. Consistent with the starved sim.
+
+**PROBLEM 1 — no MLB rows. The binding constraint is the MODEL side, not the
+price side.** Soccer proves it: of 176 rows, `pregame_proj=26` and `no_proj=150`
+— and `edged=26`. EXACTLY the rows with a projection are the rows with an edge.
+A row with a price and no model view yields nothing.
+
+So MLB has prices (`has_markets_ml=True`, `has_markets_totals=True`) and no
+projection reaching Layer 2, because `mlbDailySim` is starved by the guard held
+across its own 60s sleep. **Adding Polymarket/Kalshi/Novig price feeds gives
+more prices for rows that still have no model view. It cannot create an edge,
+and it cannot create a single MLB row.**
+
+**PROBLEM 2 — and the user's staleness instinct IS onto something real, just
+not the emptiness.** Those `age_*s` fields are seconds:
+
+    age_p50s 50,090s = 13.9 h    age_maxs 50,371s = 14.0 h
+
+**Every soccer board row is priced on odds ~14 hours old.** There is no
+staleness guard REJECTING them — the opposite, 14-hour-old quotes are being
+admitted and edged. That is a genuine defect and it is where fresher venue
+feeds would help. It is NOT why the pipeline is empty.
+
+**SO THE VENUE WORK IS NECESSARY BUT NOT SUFFICIENT, AND IT IS MOSTLY DONE.**
+Kalshi's join exists; Polymarket's full slate (7,585 game markets) is reachable.
+Both are already correct. They are matching against a board with no US-sport
+rows, and no amount of additional venue plumbing changes that.
+
+**Order of operations that actually unblocks execution:**
+1. Release the guard before the sleep (`intelligence_state.py:5991`) — MLB sim
+   runs, MLB projections reach Layer 2, MLB rows appear. Owned by the OPEN lane
+   `layer2-sim-view-and-live-projection`.
+2. THEN the existing Kalshi/Polymarket joins have US-sport rows to price, and
+   `VENUE_SCOPE scoped=` becomes non-zero for the first time.
+3. Separately, chase the 14-hour odds age — that is where a direct venue feed
+   genuinely beats OddsAPI.
+
+
+---
+
+### 2026-08-24 22:09Z — THE BOARD IS SOCCER-ONLY BECAUSE OF A 6h vs 24h STALENESS CEILING. User's hypothesis CONFIRMED; my sim-starvation framing was at best second-order.
+
+**The rejection is explicit and I had already been shown it:**
+
+```
+[recommendation_engine] FILTER_CANDIDATES sport=all in=255 out=144
+  rejected={"edge_below_threshold": 36, "stale_beyond_sla": 75}
+[intelligence_state] CANDIDATE_SLATE_FILTER considered=144 kept=73
+  no_slate=0 not_today=65 no_match=6
+```
+
+**75 of 255 candidates rejected as `stale_beyond_sla`.**
+
+**THE CEILING IS PER-SPORT AND THE ASYMMETRY IS DECISIVE.**
+`_candidate_freshness_ceiling_seconds` = `_pregame_sweep_interval_seconds(sport) * 3`,
+and `_PREGAME_SWEEP_INTERVAL_DEFAULTS = {"soccer": 8*3600}` with
+`_PREGAME_SWEEP_INTERVAL_FALLBACK = 2*3600`:
+
+| sport | sweep | ceiling |
+|---|---|---|
+| mlb | 2 h | **6 h** |
+| wnba | 2 h | **6 h** |
+| soccer | 8 h | **24 h** |
+
+**Measured board-row odds age: `age_p50s=50090` = 13.9 hours.**
+
+At ~14h old: soccer (14 < 24) **survives**; MLB and WNBA (14 > 6) are
+**rejected**. That is not a coincidence — it exactly reproduces
+`sports=['soccer']`. The games ARE there (10 MLB, 2 WNBA on the board
+contract, `has_markets_ml=True`); their candidates are thrown out for age.
+
+**WHY THE ODDS ARE 14h OLD — two real, independent contributors, and I am
+NOT yet claiming which dominates:**
+
+1. **Nobody refreshes today's MLB odds.** The all-sports refresh runs
+   `--sports mlb,wnba,nfl,ncaaf,soccer --date 2026-08-25` — TOMORROW. The only
+   `--date 2026-08-24` refreshes are `--sports soccer`. Today's MLB/WNBA odds
+   were last written when 08-24 was still "tomorrow", i.e. ~14h ago.
+2. The starved `mlbDailySim` (guard held across its 60s sleep), which would
+   also leave candidate `last_updated` stale.
+
+Both are real. (1) alone is sufficient and is the simpler explanation.
+
+**WHERE I WAS WRONG.** I told the user the staleness instinct was "a second,
+separate problem" and "not why the pipeline is empty." It IS why. The
+`stale_beyond_sla: 75` counter was in a log line I had already pulled, and I
+read past it because I had already committed to the sim-starvation story.
+
+**Note the guard that makes this silent:** the rejection only fires when
+`pipeline_looks_healthy` (`manifest_age <= ceiling`). So the manifest is fresh
+while the candidates behind it are not — the pipeline reports healthy and drops
+75 candidates.
+
+**AND THIS CHANGES THE VENUE ANSWER.** Fresh direct feeds from
+Kalshi/Polymarket/Novig WOULD fix this, contrary to what I said: they replace
+14h-old OddsAPI quotes with live ones, putting MLB/WNBA candidates under the 6h
+ceiling. The user's proposed direction was right.

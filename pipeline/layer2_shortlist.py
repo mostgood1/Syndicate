@@ -721,13 +721,49 @@ def build_layer2_shortlist(
     # slow read has to leave the shortlist exactly as it found it.
     try:
         from syndicate.features.shared.chip_join_coverage import chip_join_coverage
-        from syndicate.features.shared.game_chip_scoreboard import build_game_chips
+        from syndicate.features.shared.game_chip_scoreboard import (
+            GAME_CHIP_DEFAULT_SPORTS,
+            build_game_chips,
+        )
 
         _cards = shortlist.get("cards") or []
-        _sports = sorted({str(c.get("sport") or c.get("sport_slug") or "").strip().lower()
-                          for c in _cards if isinstance(c, Mapping)} - {""})
-        if _cards and _sports:
+        # `#545`. BUILT FOR THE FULL DEFAULT SPORT LIST, not just the sports on
+        # today's board, because this build is now also what the WEB SERVES.
+        # Scoping it to the board's sports would mean a sport with no rows today
+        # loses its scoreboard strip entirely -- and a chip-less strip is
+        # indistinguishable from a sport with no games.
+        _sports = sorted(
+            set(GAME_CHIP_DEFAULT_SPORTS)
+            | ({str(c.get("sport") or c.get("sport_slug") or "").strip().lower()
+                for c in _cards if isinstance(c, Mapping)} - {""})
+        )
+        if _sports:
             _chips = build_game_chips(selected_date, _sports)
+            # PUBLISH BEFORE MEASURING. The artifact is what the board actually
+            # serves; the coverage line below is diagnostics. If the telemetry
+            # were to throw, the outer guard would swallow it and the web would
+            # be left reading yesterday's chips -- so the thing users see is
+            # written first and separately.
+            try:
+                from pipeline.intelligence_state import write_game_chips
+
+                _published = write_game_chips(selected_date, _chips)
+                print(
+                    f"[layer2_shortlist] GAME_CHIPS_PUBLISHED date={selected_date} "
+                    f"chips={len(_chips)} sports={len(_sports)} "
+                    f"ok={bool(_published)}",
+                    flush=True,
+                )
+            except Exception as _pub_exc:
+                # Named, not silent. The web falls back to its own build, so
+                # this degrades rather than breaks -- but a permanent failure
+                # here means the request-path fan-out never actually went away,
+                # which is the whole point of `#545`.
+                print(
+                    f"[layer2_shortlist] GAME_CHIPS_PUBLISH_FAILED date={selected_date} "
+                    f"error={type(_pub_exc).__name__}: {_pub_exc}",
+                    flush=True,
+                )
             # Per-sport, because one sport's healthy window says nothing about
             # another's -- MLB reads 400/400 in the same breath as soccer's 222
             # misses, and a single total would let one hide the other.
@@ -745,7 +781,7 @@ def build_layer2_shortlist(
                         _seen.append(_start)
             for _dates in _chip_dates.values():
                 _dates.sort()
-            _coverage = chip_join_coverage(_cards, _chips)
+            _coverage = chip_join_coverage(_cards, _chips) if _cards else {"by_sport": {}}
             shortlist["chip_join_coverage"] = _coverage
             for _sport, _b in sorted((_coverage.get("by_sport") or {}).items()):
                 print(

@@ -1,5 +1,86 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#545` — **The soccer chip build moves to the WORKER and widens to the board's horizon: 72 uncovered fixtures -> 0.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
+
+`#541`'s telemetry found it and `#541`'s diagnosis named it: the chip set was a
+full matchday per league, for the matchday that had ALREADY BEEN PLAYED.
+Production 2026-08-24T20:36:39Z: `chips=96`, `chip_dates` opening on 08-22/08-23,
+`no_chip_available=251` of 342 cards, only 64 resolving a chip at all.
+
+**TWO CHANGES, and they are separable on purpose.**
+
+**1. Cover the horizon, not the current matchday.** `_SoccerDataProvider.games`
+now builds `week` AND `week+1` per league. `default_week(reference_date=today)`
+answers "which matchday are we in"; the board asks "the next seven days", and on
+a Monday those differ. Measured locally against the real schedules: window
+fixtures with no chip **72 -> 0**, all ten leagues at zero, chips 98 -> 210 with
+in-window chips 33 -> 105.
+
+De-duplicated by fixture id across the two weeks, and that guard is
+load-bearing rather than tidy: the browser's canonical index DISCARDS colliding
+keys, so a fixture emitted twice would lose its chip entirely — the widening
+would have caused the exact symptom it exists to fix.
+
+**2. The build moves off the request path.** `/api/board/game-chips` called
+`build_game_chips` inline; widening made that twenty `build_cards_page_context`
+calls for soccer alone, inside a Flask handler. The worker now publishes
+`reports/intelligence/game_chips_<date>.json` through `write_json_file`
+(keyvalue-backed, same transport as the shortlist beside it, because Render
+gives each service its own disk) and the endpoint reads it. Measured: 210 chips
+= **89 KB** against the 8 MB ceiling, so no shedding guard is needed.
+
+**THE FALLBACK IS KEPT, AGAINST THE LETTER OF THE RULE, AND SAYS SO.** The
+worker-split rule says a request must not backfill missing data. The honest
+reading is that this is a cache miss on a DISPLAY artifact, not missing board
+data — and refusing to serve would blank every sport's scoreboard strip for the
+whole window between a deploy and the worker's next shortlist build. That is a
+visible regression bought for a purity the user never sees. So the fallback
+stays and **names itself in the response** (`source=fallback_inline_build`),
+because the failure mode that actually matters is it becoming the silent status
+quo — the request fan-out still running while everyone believes it was removed.
+
+**ONE SPORT LIST, SHARED.** `GAME_CHIP_DEFAULT_SPORTS` now lives in
+`game_chip_scoreboard.py` and the blueprint re-exports it. The worker builds for
+that full list rather than only the sports on today's board: scoping to the
+board would mean a sport with no rows loses its scoreboard entirely, and a
+chip-less strip is indistinguishable from a sport with no games.
+
+**Tests:** `tests/test_game_chips_worker_artifact.py` (7 — including that the
+endpoint does NOT recompute when the artifact exists, asserted by making
+`build_game_chips` raise), `tests/test_soccer_chip_week_span.py` (5 — the two
+weeks, the de-duplication, a missing next week not costing the current one).
+Updated two stale assertions in `test_sport_data_provider.py` that pinned the
+single-week behaviour this change deliberately replaces.
+
+**Pre-existing reds: FIVE, not the two I first reported.** My `-k` selector
+covered `chip|scoreboard|game_card|shortlist|soccer_card|sport_data_provider`
+and I reported "only the two known WNBA reds" off it — but I had edited
+`pipeline/intelligence_state.py` and `syndicate/blueprints/home.py`, whose tests
+that selector never ran. A wider background sweep surfaced three more:
+`test_daily_update_smoke::test_home_dashboard_payload_exposes_live_lens_link`
+and two in `test_intelligence_state`. **All three fail identically at the parent
+commit `133eb536`, checked in a detached worktree — none are mine.**
+
+The first attempt to check that proved NOTHING and nearly passed as evidence:
+`git stash` with an already-clean tree stashed nothing, so the "before" run was
+the same commit as the "after" run and produced an identical result that looked
+like confirmation. Caught by `git stash pop` reporting "No stash entries found".
+**A before/after comparison where both sides are the same tree always agrees.**
+
+`tests/test_polymarket_us_auth.py` fails COLLECTION in this environment
+(`ModuleNotFoundError: _cffi_backend`) — another session's file, an env issue,
+not a result.
+
+**THE SELECTOR LESSON, which has now cost twice:** `#539` shipped with a guard
+test that a `-k` filter had skipped, and this run reported a clean surface that
+excluded two files the change edited. Choose `-k` from the FILES TOUCHED, not
+from the topic being worked on.
+
+**NOT YET DEPLOYED.** Needs both services: worker to publish, web to read.
+**Verify after deploy:** `GAME_CHIPS_PUBLISHED date=... chips=` in the worker
+log, then `CHIP_JOIN_COVERAGE sport=soccer` with `no_chip_available` far below
+251, and `/api/board/game-chips` returning `source=worker_artifact`.
+
 ### `#542` — **We can now BET game lines that we cannot GRADE. 98 of 171 orders on one slate are permanently ungraded, and every performance number rests on the 73 that are left.** — lane `portfolio-decision-and-execution`, 2026-08-24
 
 MEASURED on refresh-worker, 15:43:19Z, the same line every cycle:

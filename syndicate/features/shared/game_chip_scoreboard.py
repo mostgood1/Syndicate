@@ -511,6 +511,22 @@ def _ensure_sport_data_providers() -> None:
         print(f"[game_chips] SPORT_PROVIDER_REGISTRATION_FAILED error={exc}", flush=True)
 
 
+# `#545`. ONE LIST, because the WORKER now builds the chips and the WEB reads
+# them, and the two must agree on which sports exist. If the worker publishes
+# seven sports and the endpoint defaults to eight, the eighth silently loses its
+# scoreboard -- a chip-less strip that looks exactly like a sport with no games.
+GAME_CHIP_DEFAULT_SPORTS: tuple[str, ...] = (
+    "mlb",
+    "nba",
+    "wnba",
+    "nhl",
+    "nfl",
+    "ncaaf",
+    "ncaab",
+    "soccer",
+)
+
+
 def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, Any]]:
     from syndicate.features.shared.sport_data_provider import get_sport_data_provider
 
