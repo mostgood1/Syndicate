@@ -26672,3 +26672,48 @@ gets no sim.
 cached or narrowed, and whether 2026-08-29's 2,107 entries (4.8MB, one day of
 soccer player props) is expected or itself a bug. Both are the next question,
 and both are in soccer's ingestion path, not the venue work.
+
+
+---
+
+### 2026-08-24 — the 4.8MB soccer shard is NOT anomalous. The re-read cadence is the cost.
+
+Asked whether `odds_history/soccer/2026-08-29.json` (2,107 entries, 4,797,451
+bytes) is a bug. **It is not.** Three independent checks:
+
+**1. Density is constant — no bloat.**
+
+| date | dow | entries | bytes | bytes/entry |
+|---|---|---|---|---|
+| 2026-08-26 | Wed | 38 | 120,337 | 3,167 |
+| 2026-08-27 | Thu | 72 | 194,665 | 2,704 |
+| 2026-08-28 | Fri | 314 | 742,052 | 2,363 |
+| 2026-08-29 | **Sat** | **2,107** | **4,797,451** | 2,277 |
+| 2026-08-30 | Sun | 641 | 1,466,836 | 2,288 |
+
+The three largest shards sit within 4% of each other per entry. The file is big
+because it has more rows, not because the rows are malformed.
+
+**2. The shape is a fixture calendar.** 2026-08-29 is a SATURDAY — the main
+European matchday — and the counts rise and fall exactly around it
+(Wed 38 < Thu 72 < Fri 314 < **Sat 2,107** > Sun 641). Player-prop markets
+(`player_goal_scorer_anytime`, `player_shots_on_target`) multiply that by book.
+
+**3. It is deliberately produced.** `refresh_odds_sources.py ... --soccer-leagues
+serie_a --soccer-date 2026-08-29 --phase live` — soccer refreshes work a queue
+of `(league, date)` units stalest-first over a horizon of upcoming matchdays
+(`run_refresh_worker.py:1120-1152`). 08-29 was simply the unit whose slot came up.
+
+**SO THE COST IS THE CADENCE, NOT THE FILE.** The intelligence pipeline re-reads
+ALL FIVE future shards — ~8.3MB — every ~73 seconds, resolving each against
+three candidate paths (15 stats per pass). No single shard needs shrinking;
+the read needs caching or date-narrowing.
+
+**AND IT GETS WORSE, NOT BETTER.** Saturday's shard grows as the date nears and
+more books quote more props into it. The guard is already almost never free;
+this load rises through the week toward the matchday.
+
+**NOT ESTABLISHED:** whether the pipeline needs all five future dates on every
+pass at all. That is the actual question for whoever fixes it — the answer is
+probably a cache keyed on mtime, since the shards only change when a refresh
+unit writes one.
