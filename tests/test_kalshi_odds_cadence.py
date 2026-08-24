@@ -277,3 +277,82 @@ def test_the_merged_artifact_reports_how_stale_its_oldest_price_is(monkeypatch):
     result = mod.run_kalshi_odds_refresh()
     # A merged artifact hides staleness by construction unless it is stated.
     assert set(result["staleness_seconds"]) == {"A", "B"}
+
+
+# --------------------------------------------------------------------------
+# Discovery must run in the process that PRICES, not in one worker's boot
+# --------------------------------------------------------------------------
+
+
+def test_discovery_runs_in_the_refresh_not_a_workers_boot(monkeypatch):
+    """MEASURED 2026-08-24T01:35:57Z, with real money armed and the game-line
+    flag ON:
+
+        BOARD_JOIN kalshi_markets=203 board_rows=513 matched=0
+          reasons={'market_is_for_another_date': 67, 'no_matching_board_row': 136}
+
+    203 markets from SEVEN hand-registered series, and no `game_lines_disabled`
+    in the refusals at all -- meaning not one game line even reached the
+    resolver. Discovery had found football, NBA and the game-line series... in
+    live-odds-worker, which does not do the join. `register_discovered` writes
+    a module-level dict, so it does not cross the process boundary, and the
+    join runs on refresh-worker where that dict was empty.
+    """
+    import pipeline.kalshi_odds_refresh as mod
+
+    monkeypatch.setattr(mod, "_DISCOVERY_DONE", False)
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_client.discover_series",
+        lambda: {
+            "status": "ok",
+            "count": 2,
+            "titles": {
+                "KXNFLPASSYDS": "Pro Football Player Passing Yards",
+                "KXWNBA1QTOTAL": "Women's Pro Basketball 1st Quarter Total",
+            },
+        },
+    )
+    result = mod.ensure_series_discovered(force=True)
+    assert result["status"] == "ok"
+    # BOTH kinds, from one call: a prop series and a game-line series.
+    assert result["prop_series"] == 1
+    assert result["game_series"] == 1
+
+    from syndicate.features.shared.kalshi_catalogue import all_series
+
+    registered = all_series()
+    assert registered.get("KXNFLPASSYDS") == "nfl"
+    assert registered.get("KXWNBA1QTOTAL") == "wnba"
+
+
+def test_a_failed_catalogue_is_retried_rather_than_latched(monkeypatch):
+    """Not marked done on failure. One 429 at startup would otherwise leave the
+    process pricing seven hand-registered series for its entire life -- the
+    same silent-degradation shape as the auth probe that never ran."""
+    import pipeline.kalshi_odds_refresh as mod
+
+    monkeypatch.setattr(mod, "_DISCOVERY_DONE", False)
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_client.discover_series",
+        lambda: {"status": "error", "errors": "429"},
+    )
+    assert mod.ensure_series_discovered(force=True)["status"] == "error"
+    assert mod._DISCOVERY_DONE is False
+
+
+def test_discovery_failure_never_takes_down_the_refresh(monkeypatch):
+    """The hand-registered series must still price when the catalogue is
+    unreachable. A discovery error is a smaller board, not an outage."""
+    import pipeline.kalshi_odds_refresh as mod
+
+    monkeypatch.setattr(mod, "_DISCOVERY_DONE", False)
+
+    def boom():
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_client.discover_series", boom
+    )
+    result = mod.ensure_series_discovered(force=True)
+    assert result["status"] == "error"
+    assert "network down" in result["reason"]

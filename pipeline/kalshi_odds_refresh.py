@@ -243,6 +243,73 @@ def _backing_off(entry: Mapping[str, Any], interval: int) -> bool:
     return since is not None and since < min(interval, FAILED_RETRY_SECONDS)
 
 
+# Discovery has run in THIS process. Module-level because `_DISCOVERED` is
+# module-level: registration does not cross the process boundary, and that is
+# exactly the bug this exists to fix.
+_DISCOVERY_DONE = False
+
+
+def ensure_series_discovered(*, force: bool = False) -> dict[str, Any]:
+    """Register every series Kalshi lists that we can price, IN THIS PROCESS.
+
+    THE BUG THIS FIXES, measured 2026-08-24T01:35:57Z:
+
+        BOARD_JOIN kalshi_markets=203 board_rows=513 matched=0
+          reasons={'market_is_for_another_date': 67, 'no_matching_board_row': 136}
+
+    203 markets from SEVEN hand-registered series, and not one game line among
+    them -- no `game_lines_disabled` in the refusals at all, on a build where
+    the flag was on. Discovery had run, found football and NBA and registered
+    thirteen series... on live-odds-worker, which does not do the join. The
+    join runs here, on refresh-worker, where `_DISCOVERED` was empty.
+
+    `register_discovered` writes to a module-level dict, so a boot-time call in
+    one worker is invisible to the other. Putting discovery in the REFRESH
+    rather than in a worker's boot means any process that prices Kalshi gets
+    the same series list, which is what `default_sports_series`'s docstring
+    already promised: "The fetch, the join and the venue scope all read this
+    one function, so none of them can drift."
+
+    Once per process. The catalogue is 13,389 series and changes on the order
+    of days, so re-reading it every two minutes would be a lot of bytes to
+    re-learn the same thing -- and a failure here must never take down a
+    refresh that can still run on the hand-registered series.
+    """
+    global _DISCOVERY_DONE
+    if _DISCOVERY_DONE and not force:
+        return {"status": "skipped", "reason": "already_discovered"}
+
+    try:
+        from syndicate.features.shared.kalshi_catalogue import (
+            auto_game_series_from_catalogue,
+            auto_series_from_catalogue,
+            register_discovered,
+        )
+        from syndicate.features.shared.kalshi_client import discover_series
+
+        report = discover_series()
+        if report.get("status") != "ok":
+            # NOT marked done: a failed catalogue read must be retried, or one
+            # 429 at boot leaves the process pricing seven series forever.
+            return {"status": "error", "reason": str(report.get("errors") or "catalogue_unavailable")}
+
+        titles = report.get("titles") or {}
+        props = auto_series_from_catalogue(titles)
+        games = auto_game_series_from_catalogue(titles)
+        added_props = register_discovered(props)
+        added_games = register_discovered(games)
+        _DISCOVERY_DONE = True
+        return {
+            "status": "ok",
+            "catalogue": int(report.get("count") or 0),
+            "prop_series": len(props),
+            "game_series": len(games),
+            "added": len(added_props.get("added") or {}) + len(added_games.get("added") or {}),
+        }
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+
+
 def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     """Refresh whichever series are due, merge, record, write.
 
@@ -256,6 +323,23 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     """
     if not (force or kalshi_odds_enabled()):
         return {"status": "skipped", "reason": "disabled"}
+
+    # BEFORE `sports_series()` is read, because it decides what that returns.
+    discovery = ensure_series_discovered()
+    if discovery.get("status") == "ok":
+        print(
+            f"[kalshi_odds] SERIES_DISCOVERY catalogue={discovery.get('catalogue')}"
+            f" prop_series={discovery.get('prop_series')}"
+            f" game_series={discovery.get('game_series')}"
+            f" added={discovery.get('added')}",
+            flush=True,
+        )
+    elif discovery.get("status") == "error":
+        # Named, and NOT fatal -- the hand-registered series still price.
+        print(
+            f"[kalshi_odds] SERIES_DISCOVERY_FAILED reason={discovery.get('reason')}",
+            flush=True,
+        )
 
     from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
 
