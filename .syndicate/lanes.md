@@ -1669,6 +1669,28 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   not exist yet** (`NOVIG_CLIENT_ID`/`NOVIG_CLIENT_SECRET`, founder-gated,
   no self-serve) and on the still-open legal/ToS review question from
   `todo.md #544`'s own NEXT section.
+- **FIRST LIVE PROBE RAN 2026-08-24T17:24:49Z** (PR #30 merged, flag set
+  one boot on refresh-worker, unset again) -- full readout
+  `.syndicate/deploys.md` same date. Polymarket 16/18 fields right, 2 fixed
+  (`minimum_tick_size`->`orderPriceMinTickSize`, `neg_risk`->`negRisk`, PR
+  #31, merged). Novig's "genuinely public" CSV tier actually 403'd --
+  corrected to UNVERIFIED, not yet root-caused. ProphetX/Novig OAuth tiers
+  correctly refused with no credential. Crypto.com OG confirmed still
+  "coming soon".
+- **PROPHETX ORDER-AUTOMATION SCOPED 2026-08-24, not started.**
+  `.syndicate/scope_2026-08-24_prophetx_order_automation.md` -- unlike
+  Novig, a real order-write endpoint WAS found and corroborated across
+  multiple sources: `POST cash.api.prophetx.co/trade/private/api/v2/wagers`,
+  payload `{lineID, odds, stake}`, same bearer token as the read side (one
+  credential, not two). A four-field status enum (`status`/`matching_status`/
+  `winning_status`/`update_status`) was also found, including `wiped` -- a
+  state with no Kalshi analogue (auto-cancelled on a game going live) that
+  needs its own handling rather than folding into `dead`. **The one
+  unresolved question: whether `cash.api.prophetx.co` is the same product as
+  the Affiliate API's sandbox host, or a legacy/different product
+  ("ProphetX Play", which reads like a separate embeddable widget) --
+  this has to be resolved in the partner conversation, not guessed.**
+  Same blockers as Novig otherwise: no credential, legal/ToS review open.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
