@@ -26310,3 +26310,45 @@ uses that convention), a `status` filter, or a `gameStartTime` bound. Until
 that is answered the catalogue is NOT usable for pricing, and `orderable=500`
 must not be read as "500 bets available".
 
+
+---
+
+### 2026-08-24 20:46:21Z — live-odds-worker `2874ad34d` — offset paging works; `status` corrects my price heuristic; today's slate still not reached
+
+**verify:**
+
+```
+POLYMARKET_US_CATALOGUE status=ok sporting=2000 settled=1998 live=2
+  rows=2000 pages=4 duplicate_ids=0 orderable=2000 truncated=True
+  window=2025-10-31T00:15:00Z..2026-01-13T01:15:00Z
+  live_window=2025-12-21T23:00:00Z..2026-01-09T01:00:00Z
+  types=['SPORTS_MARKET_TYPE_MONEYLINE'] statuses=['MARKET_STATUS_RESOLVED']
+```
+
+**1. `offset` paging WORKS.** `duplicate_ids=0` across 4 pages / 2,000 rows —
+the venue honours the `limit`/`offset` convention its Sports API documents.
+That was the guess `duplicate_ids` existed to falsify, and it held.
+
+**2. My price heuristic was wrong, and the probe caught it.** All 2,000 rows
+carry `MARKET_STATUS_RESOLVED` — including the 2 `is_settled_row` called live,
+which are priced `["0.5","0.5"]`. A resolved market that never traded sits at
+a coin flip forever and no price test can tell that from a genuine 50/50.
+0.1% error, and the failure mode is a real order on a finished game. `status`
+is now authoritative where present, price the fallback — the designed path,
+since `statuses` was reported precisely so this could switch on a real value
+rather than a guessed one. Fixed in `ab04f4a13`, NOT yet deployed.
+
+An unknown status is deliberately NOT read as settled: the directions are not
+symmetric. Treating unknown as settled silently discards tradeable markets,
+and a discarded market is invisible while a bad order is not.
+
+**3. STILL BLOCKED — today's slate is not reachable in four pages.** 2,000 rows
+deep the window is `2025-10-31..2026-01-13`, ascending, `truncated=True`.
+Today is 2026-08-24. At ~2.5 months per 2,000 rows, the current slate is
+roughly 6,000–8,000 rows in. Unanswered: whether `/v1/markets` takes a sort,
+a status filter, or a `gameStartTime` bound. Paging blindly to ~16 pages every
+boot is the brute-force fallback and should be the last resort.
+
+**Polymarket cannot price anything until (3) is answered.** `orderable=2000`
+is true and useless — every one of those games is over.
+
