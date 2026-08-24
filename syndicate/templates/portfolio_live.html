@@ -179,10 +179,22 @@
               </span>
             </td>
             <td>{{ o.get('venue') or '—' }}<span class="sub">{{ o.get('venue_ticker') or '' }}</span></td>
-            <td>{% if o.get('requested_price') is not none %}{{ "%+d"|format(o.get('requested_price')|int) }}{% else %}—{% endif %}
+            <td>
+              {% set rp = o.get('requested_price') %}
+              {% if rp is none %}—
+              {% elif rp > -1 and rp < 1 %}{{ "%.0f"|format(rp * 100) }}&cent;
+              {% else %}{{ "%+d"|format(rp|int) }}{% endif %}
               <span class="sub">${{ "%.2f"|format(o.get('requested_stake_dollars') or 0) }}</span></td>
             <td>
-              {% if o.get('fill_price') is not none %}{{ "%+d"|format(o.get('fill_price')|int) }}{% else %}—{% endif %}
+              {# KALSHI PRICES ARE DOLLARS, NOT AMERICAN ODDS. `int(0.54)` is 0,
+                 so `%+d` rendered every Kalshi fill as "+0" -- the column was
+                 destroying the number it existed to show, beside a REQUESTED
+                 column carrying American odds from the board. Two units, one
+                 table, and the reader has no way to tell. #}
+              {% set fp = o.get('fill_price') %}
+              {% if fp is none %}—
+              {% elif fp > -1 and fp < 1 %}{{ "%.0f"|format(fp * 100) }}&cent;
+              {% else %}{{ "%+d"|format(fp|int) }}{% endif %}
               {# The gap between requested and filled IS the slippage, and it is
                  the number a person checks first after a real submit. #}
               <span class="sub">${{ "%.2f"|format(o.get('fill_stake_dollars') or 0) }}</span>

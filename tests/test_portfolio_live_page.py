@@ -379,3 +379,25 @@ def test_a_stale_stamp_says_so(app_client, live_env, monkeypatch):
     )
     body = app_client.get("/portfolio/live").get_data(as_text=True)
     assert "may be stale" in body
+
+
+def test_a_kalshi_dollar_price_renders_as_cents_not_american_odds(app_client, live_env):
+    """MEASURED from the live page 2026-08-24: a Kalshi fill price of $0.54
+    rendered as "+0".
+
+    `"%+d"|format(0.54|int)` is `+0` — the column destroyed the number it
+    existed to show, beside a REQUESTED column carrying American odds from the
+    board. Two units in one table with nothing to tell them apart.
+    """
+    live_env["orders"] = [_order(fill_price=0.54, requested_price=0.46)]
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "54&cent;" in body or "54¢" in body
+    assert "+0" not in body
+
+
+def test_an_american_price_still_renders_as_american(app_client, live_env):
+    """The other venues quote American odds and must not become cents."""
+    live_env["orders"] = [_order(fill_price=-117.0, requested_price=163.0)]
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "-117" in body
+    assert "+163" in body
