@@ -151,20 +151,38 @@ def _distinct(rows: Iterable[Mapping[str, Any]], field: str) -> list[str]:
     return sorted(seen)[:20]
 
 
+# Observed 2026-08-24T20:46:21Z: every one of 2,000 rows carried
+# `MARKET_STATUS_RESOLVED`. That is the only value seen so far, so the test
+# below asks whether the status says RESOLVED rather than pattern-matching a
+# vocabulary nobody has seen the rest of -- an unknown status must not be read
+# as "settled", because that direction silently discards tradeable markets.
+_RESOLVED_STATUS_MARKERS = ("RESOLVED", "SETTLED", "CLOSED", "CANCELED", "CANCELLED")
+
+
 def is_settled_row(row: Mapping[str, Any]) -> bool:
-    """Is this market already resolved?
+    """Is this market already resolved? STATUS first, price only as a fallback.
 
     MEASURED 2026-08-24T20:28:07Z: the first 500 rows of
     `/v1/markets?active=true&limit=500` were ALL NFL games from `2025-11-02`
-    with `outcomePrices` of `["1","0"]` or `["0","1"]` -- settled games from
-    last season, priced at certainty, returned under `active=true`.
+    with `outcomePrices` of `["1","0"]` -- settled games from last season,
+    priced at certainty, returned under `active=true`. So `active` does not
+    mean unresolved on this venue.
 
-    So `active` does not mean unresolved on this venue, and a price at exactly
-    0 or 1 is the reliable tell: a live market cannot be certain. This is a
-    PRICE test rather than a `status` test because the `status` vocabulary has
-    not been observed -- `fetch_markets` reports it so the next run can use it
-    directly, but nothing depends on a guessed value in the meantime.
+    The first version of this inferred resolution from the PRICE, because the
+    `status` vocabulary had never been observed. MEASURED 2026-08-24T20:46:21Z,
+    it now has been: `statuses=['MARKET_STATUS_RESOLVED']` across 2,000 rows --
+    **including the 2 rows the price test called live**, which are priced
+    `["0.5","0.5"]`. A resolved market that never traded sits at 0.5 forever,
+    and no price test can tell that from a genuine coin-flip.
+
+    So status is authoritative where present and price is the fallback for a
+    row that omits it. Two false "live" rows out of 2,000 is a 0.1% error rate
+    that would have put real orders on games that finished months ago.
     """
+    status = str(row.get("status") or "").strip().upper()
+    if status:
+        return any(marker in status for marker in _RESOLVED_STATUS_MARKERS)
+
     prices = row.get("outcomePrices")
     if isinstance(prices, str):
         try:

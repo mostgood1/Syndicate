@@ -568,8 +568,16 @@ def test_the_v1_probe_names_absent_credentials(monkeypatch):
 
 
 def _settled_row(**kw):
-    row = _row(outcomePrices=["1", "0"], gameStartTime="2025-11-02T18:00:00Z")
+    row = _row(outcomePrices=["1", "0"], gameStartTime="2025-11-02T18:00:00Z",
+               status="MARKET_STATUS_RESOLVED")
     row.update(kw)
+    return row
+
+
+def _no_status(**kw):
+    """A row with no `status`, to exercise the PRICE fallback specifically."""
+    row = _row(**kw)
+    row.pop("status", None)
     return row
 
 
@@ -580,21 +588,21 @@ def test_a_market_priced_at_certainty_is_settled():
     `active` does not mean unresolved on this venue, and a price at exactly 0
     or 1 is the reliable tell: a live market cannot be certain."""
     assert mod.is_settled_row(_settled_row()) is True
-    assert mod.is_settled_row(_row(outcomePrices=["0", "1"])) is True
-    assert mod.is_settled_row(_row(outcomePrices=["0.55", "0.45"])) is False
+    assert mod.is_settled_row(_no_status(outcomePrices=["0", "1"])) is True
+    assert mod.is_settled_row(_no_status(outcomePrices=["0.55", "0.45"])) is False
 
 
 def test_prices_arrive_as_a_JSON_STRING_not_a_list():
     """The venue sends `outcomePrices` as `'["1","0"]'`. Treating that string as
     a list would make every row unparseable and therefore never settled --
     which fails toward "everything is live", the wrong direction."""
-    assert mod.is_settled_row(_row(outcomePrices='["1","0"]')) is True
-    assert mod.is_settled_row(_row(outcomePrices='["0.55","0.45"]')) is False
+    assert mod.is_settled_row(_no_status(outcomePrices='["1","0"]')) is True
+    assert mod.is_settled_row(_no_status(outcomePrices='["0.55","0.45"]')) is False
 
 
 def test_an_unparseable_price_is_not_claimed_to_be_settled():
     for prices in (None, "", "not-json", [], ["abc"]):
-        assert mod.is_settled_row(_row(outcomePrices=prices)) is False
+        assert mod.is_settled_row(_no_status(outcomePrices=prices)) is False
 
 
 def test_settled_and_live_are_reported_SEPARATELY_from_sporting(monkeypatch):
@@ -603,7 +611,8 @@ def test_settled_and_live_are_reported_SEPARATELY_from_sporting(monkeypatch):
     one number; `live` is the only usable one."""
     _stub(monkeypatch, {"markets": [
         _settled_row(id="s-1"), _settled_row(id="s-2"),
-        _row(id="l-1", outcomePrices=["0.55", "0.45"], gameStartTime="2026-08-24T23:05:00Z"),
+        _no_status(id="l-1", outcomePrices=["0.55", "0.45"],
+                   gameStartTime="2026-08-24T23:05:00Z"),
     ]})
     result = mod.fetch_markets()
     assert result["sporting"] == 3
@@ -615,7 +624,7 @@ def test_settled_rows_are_kept_by_default_and_dropped_only_on_request(monkeypatc
     """Off by default: a caller who has not thought about it should get the
     full picture rather than a silently narrowed one."""
     rows = [_settled_row(id="s-1"),
-            _row(id="l-1", outcomePrices=["0.55", "0.45"])]
+            _no_status(id="l-1", outcomePrices=["0.55", "0.45"])]
     _stub(monkeypatch, {"markets": rows})
     assert mod.fetch_markets()["count"] == 2
     _stub(monkeypatch, {"markets": rows})
@@ -627,7 +636,8 @@ def test_the_game_start_window_is_reported_so_stale_data_is_legible(monkeypatch)
     without needing a sample row."""
     _stub(monkeypatch, {"markets": [
         _settled_row(id="s-1", gameStartTime="2025-11-02T18:00:00Z"),
-        _row(id="l-1", outcomePrices=["0.5", "0.5"], gameStartTime="2026-08-24T23:05:00Z"),
+        _no_status(id="l-1", outcomePrices=["0.5", "0.5"],
+                   gameStartTime="2026-08-24T23:05:00Z"),
     ]})
     result = mod.fetch_markets()
     assert result["game_start_min"] == "2025-11-02T18:00:00Z"
@@ -710,3 +720,38 @@ def test_the_status_vocabulary_is_reported_since_it_has_never_been_observed(monk
     value before one is seen."""
     _stub(monkeypatch, {"markets": [_row(status="STATUS_OPEN"), _row(id="m-2", status="STATUS_RESOLVED")]})
     assert mod.fetch_markets()["statuses"] == ["STATUS_OPEN", "STATUS_RESOLVED"]
+
+
+def test_STATUS_beats_price_because_a_resolved_market_can_sit_at_a_coin_flip():
+    """MEASURED 2026-08-24T20:46:21Z: all 2,000 rows carried
+    MARKET_STATUS_RESOLVED -- INCLUDING the 2 the price test called live, which
+    are priced ["0.5","0.5"]. A resolved market that never traded sits at 0.5
+    forever, and no price test can tell that from a genuine coin-flip. Two
+    false live rows in 2,000 is a 0.1% error rate that would have put real
+    orders on games finished months ago."""
+    coin_flip_but_resolved = _row(
+        outcomePrices=["0.5", "0.5"], status="MARKET_STATUS_RESOLVED",
+        gameStartTime="2025-12-21T23:00:00Z",
+    )
+    assert mod.is_settled_row(coin_flip_but_resolved) is True
+
+
+def test_an_UNKNOWN_status_is_not_read_as_settled():
+    """Only one status value has ever been seen. An unknown one must fail
+    toward tradeable, because the other direction silently discards live
+    markets -- and a discarded market is invisible, while a bad order is not."""
+    assert mod.is_settled_row(_row(status="MARKET_STATUS_SOMETHING_NEW")) is False
+    assert mod.is_settled_row(_row(status="MARKET_STATUS_OPEN")) is False
+
+
+def test_the_price_fallback_still_applies_when_status_is_absent():
+    """Status is authoritative WHERE PRESENT. A row that omits it still gets
+    the price test rather than being assumed live."""
+    assert mod.is_settled_row(_no_status(outcomePrices=["1", "0"])) is True
+
+
+@pytest.mark.parametrize("status", [
+    "MARKET_STATUS_RESOLVED", "market_status_resolved", "SETTLED", "CLOSED", "CANCELED",
+])
+def test_the_resolved_markers_are_matched_case_insensitively(status):
+    assert mod.is_settled_row(_row(status=status)) is True
