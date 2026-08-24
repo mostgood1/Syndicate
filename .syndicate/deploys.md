@@ -25591,3 +25591,60 @@ say JOINABLE on more than that however the key behaves. What it CAN settle is
 whether those two dates join at all, and what the unmapped team names are. A
 market result resting on 2 dates is not a backtest and will not be reported as
 one.
+
+---
+
+### 2026-08-24 ~14:32Z–15:12Z — live-odds-worker — venue reconciliation, field names, fees
+
+**Lane:** `portfolio-decision-and-execution`. **Claim:** held on `live-odds-worker`
+(expired claim from `kalshi-live` replaced). **Preflight:** could NOT run —
+`RENDER_API_KEY` is not in this container. Substituted the same manual check
+prior sessions used: `list_deploys` via the Render MCP showed no deploy in
+flight and the live SHA behind the target, and every deployed SHA was on
+`origin/main` at trigger time. Recorded as a substitution, not a pass.
+
+**SHAs, in order:** `0e0017d7b` → `b93344e0a`/`e33d6df33` → `4f1afd1c6`.
+
+**verify: `[execution_ledger] RECONCILE venue=kalshi candidates=1
+venue_orders=27 changed=0 not_found=0 unknown=0` at 14:48:14Z**, and the
+ledger summary in the same tick reading `by_status {'filled': 10,
+'submitted': 1}` with `unreconciled: 1`.
+
+Two readings out of that one line:
+
+1. **The phantom fill is gone.** The live Kalshi order
+   (`KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-5`) was `filled fill_price=0.54`
+   in our ledger while Kalshi showed it resting with `Filled: 0`. It now reads
+   `submitted`, which is what Kalshi says. The user found the original
+   discrepancy by looking at the Kalshi UI; no log had said anything.
+2. **`venue_orders=27`** — `GET /portfolio/orders?limit=100` works, signed,
+   from this worker.
+
+**The keys log settled the field names** (14:37:16Z). Not one of the three
+count spellings guessed beforehand was right: the live shape is
+`fill_count_fp`, `initial_count_fp`, `remaining_count_fp`,
+`taker_fees_dollars`, `maker_fees_dollars`, `taker_fill_cost_dollars`,
+`maker_fill_cost_dollars`, `yes_price_dollars`, `no_price_dollars`.
+Corrected in `b93344e0a`, which also charges fees (Kalshi took $0.02 on a
+$1.08 fill, ~1.9%) through P&L, the daily budget and the live page.
+
+**REGRESSION FOUND AND FIXED IN THE SAME WINDOW.** At 15:04:08Z:
+
+    RECONCILE venue=kalshi candidates=1 venue_orders=27 changed=0 not_found=0
+    BLOCKED_ON_UNRECONCILED count=1 keys=['c3f45504fce2767694a0e73e']
+
+Same second, same order. The freshness stamp was persisted only when a row
+MOVED, so a resting order that agreed with the ledger was read successfully
+and never marked as read — and live execution stayed blocked. It passed every
+test because every test moved something. `4f1afd1c6` persists the stamp
+whenever the venue said something positive, and reports `stamped` separately
+from `changed`. **Not yet verified in production** — that needs a
+`RECONCILE ... changed=0 stamped=1` followed by an `EXECUTED` rather than a
+`BLOCKED_ON_UNRECONCILED`.
+
+**Still unverified:** what `_fp` means. Undocumented, and if it is a
+fixed-point scale rather than a plain count then a 2-contract fill arrives as
+a large number. Guarded two ways rather than guessed: `COUNT_FIELDS` logs the
+raw values on the next read, and reconciliation refuses to book more contracts
+than the order requested (`RECONCILE_COUNT_IMPLAUSIBLE`), an invariant that
+holds whatever the unit turns out to be.
