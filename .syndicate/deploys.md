@@ -25875,3 +25875,53 @@ break-even is ~52%, so on its face this slate's game-line selections lost
 money — but no P&L figure has been read, n=77 is one slate, and the stake
 distribution is unknown. The count is a fact; the conclusion is not one yet.
 `settlement_summary` is where that number lives.
+
+---
+
+### 2026-08-24 18:03:24Z — THE BOOK IS PROFITABLE, AND MY READ OF IT WAS WRONG
+
+**verify: `[paper_settlement] PNL date=2026-08-23 settled=150 pending=19
+won=66 lost=84 push=0 staked=$931.29 pnl=$17.34 roi=1.86% win_rate=44.0%`**
+and **`PNL all_time settled=169 ... staked=$1060.9 pnl=$21.43 roi=2.02%
+win_rate=43.79%`**, refresh-worker instance `n2z8x`, `3e5a56eb7`, live
+17:55:27Z. Both deploys reached `live`.
+
+**A 44% WIN RATE IS PROFITABLE HERE, AND I SAID IT WOULD NOT BE.** Reading
+`outcomes={'lost': 49, 'won': 28}` an hour earlier I wrote that break-even is
+~52% and the game lines had therefore probably lost money. That reasoning
+assumed -110 pricing on both sides of every bet. It is not that book: the
+model takes underdogs, so the average winner pays well over even money and
+44% clears it. The count was a fact and the inference from it was wrong —
+which is the whole reason the dollar figure was worth building rather than
+estimating.
+
+**By venue, and this is the interesting split:**
+
+    paper (unrestricted)   92 settled   -$25.45   -4.25%
+    paper:kalshi           30 settled   +$27.57  +16.19%
+    paper:novig            12 settled   +$20.48  +23.94%
+    paper:polymarket       14 settled   +$16.29  +21.41%
+    paper:prophetx         21 settled   -$17.46  -13.48%
+    kalshi (LIVE)           0 settled        —        —
+
+The venue-scoped books are mostly positive while the unrestricted one — which
+prices every position at whichever book is best — is the worst performer of
+the six. That is the opposite of what "best available price" is supposed to
+produce, and it is the finding worth chasing next.
+
+**WHAT THIS IS NOT EVIDENCE OF.** `all_time` is 169 settled and 150 of them
+are the 08-23 slate, so the two lines are very nearly the same measurement
+printed twice — the all-time figure is NOT independent corroboration of the
+daily one. The venue books are largely the SAME underlying picks priced
+differently, so their five ROIs are not five independent samples either. And
+n per venue is 12–92. Nothing here supports a claim about edge; it supports
+"the instrument now works and the first reading is positive".
+
+**`kalshi` live shows 0 settled** — the Alcantara contract is still pending,
+watch armed for 23:30Z. No live money has been graded yet by anything.
+
+**Claims force-released again.** A container restart lost the tokens a second
+time, so a clean `release` refused twice today. The claim file is not durable
+across a restart of the session holding it, which makes `--force` on one's own
+lane routine rather than exceptional — worth fixing or worth documenting, but
+not worth pretending is clean.

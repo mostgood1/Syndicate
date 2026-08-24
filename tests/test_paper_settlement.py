@@ -581,3 +581,79 @@ def test_a_reporting_failure_does_not_undo_the_grading(monkeypatch, tmp_path, ca
     assert result["graded"] == 1
     assert ledger.find_order(ledger.idempotency_key(request))["outcome"] == "won"
     assert "PNL_FAILED" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# The cuts that separate best-of-N EV inflation from market mix
+# --------------------------------------------------------------------------
+
+
+def _settled(**kw):
+    row = {"venue": "paper", "sport": "mlb", "market": "batter_hits",
+           "status": "filled", "outcome": "won", "fill_stake_dollars": 10.0,
+           "pnl_dollars": 9.09, "selected_date": "2026-08-23"}
+    row.update(kw)
+    return row
+
+
+def test_the_book_splits_by_market_family():
+    """MEASURED 2026-08-24: the unrestricted `paper` book returned -4.25% while
+    four of five venue-scoped books were positive. A venue label cannot say
+    whether that is best-of-N EV inflation admitting bad rows, or simply that
+    the unrestricted book is prop-heavy while the venue books are game-line
+    heavy. Those need opposite fixes, so the split is worth having."""
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    summary = settlement_summary(orders=[
+        _settled(market="batter_hits", pnl_dollars=9.09),
+        _settled(market="spreads", outcome="lost", pnl_dollars=-10.0),
+        _settled(market="h2h", outcome="lost", pnl_dollars=-10.0),
+        _settled(market="totals", pnl_dollars=9.09),
+    ])
+    families = {b["key"]: b for b in summary["by_market_family"]}
+    assert families["player_prop"]["settled"] == 1
+    assert families["game_line"]["settled"] == 2
+    assert families["game_line"]["pnl_dollars"] == -20.0
+    assert families["game_total"]["settled"] == 1
+    # A total is a scoreboard bet like a spread but is modelled completely
+    # differently, so it is its own bucket rather than folded into either.
+    assert families["game_total"]["key"] != families["game_line"]["key"]
+
+
+def test_the_book_splits_by_sport():
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    summary = settlement_summary(orders=[
+        _settled(sport="mlb"), _settled(sport="wnba", outcome="lost", pnl_dollars=-10.0),
+    ])
+    sports = {b["key"]: b for b in summary["by_sport"]}
+    assert sports["mlb"]["pnl_dollars"] == 9.09
+    assert sports["wnba"]["pnl_dollars"] == -10.0
+
+
+def test_the_cuts_agree_with_the_total():
+    """Three views of one book. If they disagree, one of them is wrong, and a
+    breakdown that does not reconcile is worse than no breakdown."""
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    orders = [
+        _settled(market="batter_hits", venue="paper"),
+        _settled(market="spreads", venue="paper:kalshi", outcome="lost", pnl_dollars=-10.0),
+        _settled(market="totals", venue="paper:novig", sport="wnba"),
+    ]
+    summary = settlement_summary(orders=orders)
+    total = summary["total"]["pnl_dollars"]
+    for cut in ("by_venue", "by_market_family", "by_sport"):
+        assert round(sum(b["pnl_dollars"] for b in summary[cut]), 2) == total, cut
+        assert sum(b["settled"] for b in summary[cut]) == summary["total"]["settled"], cut
+
+
+def test_an_unsettled_row_is_pending_in_every_cut_and_moves_no_money():
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    summary = settlement_summary(orders=[_settled(outcome=None, pnl_dollars=None)])
+    assert summary["total"]["settled"] == 0
+    for cut in ("by_market_family", "by_sport"):
+        assert summary[cut][0]["pending"] == 1
+        assert summary[cut][0]["pnl_dollars"] == 0.0
+        assert summary[cut][0]["roi_pct"] is None
