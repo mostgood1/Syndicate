@@ -324,15 +324,30 @@ def event_blob_from_ticker(ticker: Any) -> str | None:
     return rest or None
 
 
-def _blob_for(away: Any, home: Any) -> str:
-    def _clean(value: Any) -> str:
-        return "".join(ch for ch in str(value or "").upper() if ch.isalnum())
+def _clean_code(value: Any) -> str:
+    return "".join(ch for ch in str(value or "").upper() if ch.isalnum())
 
-    return f"{_clean(away)}{_clean(home)}"
+
+def _blob_for(away: Any, home: Any) -> str:
+    return f"{_clean_code(away)}{_clean_code(home)}"
+
+
+def _splits(blob: str) -> list[tuple[str, str]]:
+    """Every way `MINATH` could be two club codes.
+
+    Club codes run 2-4 characters, so the boundary is bounded rather than
+    guessed at -- and every candidate is CHECKED against our own schedule
+    below, so a wrong split cannot survive.
+    """
+    return [
+        (blob[:i], blob[i:])
+        for i in range(2, len(blob) - 1)
+        if 2 <= i <= 4 and 2 <= len(blob) - i <= 4
+    ]
 
 
 def match_event_blob(
-    blob: Any, games: Sequence[Mapping[str, Any]]
+    blob: Any, games: Sequence[Mapping[str, Any]], *, sport: Any = None
 ) -> dict[str, Any]:
     """Which of OUR games is `blob`? Returns the answer AND how sure it is.
 
@@ -357,11 +372,49 @@ def match_event_blob(
     if not wanted:
         return {"status": "no_match", "reason": "empty_blob"}
 
+    # EXACT STRING FIRST -- cheap, and it is what matches when both sides
+    # already spell a club the same way.
     hits = [
         game
         for game in (games or [])
         if _blob_for(game.get("away_team"), game.get("home_team")) == wanted
     ]
+
+    if not hits:
+        # THEN THROUGH THE CLUB RESOLVER. Kalshi says `ATH` where our board may
+        # say `OAK`, and `CWS` where it may say `CHW`; comparing the raw
+        # concatenation calls those different games and refuses a real match.
+        # Measured 2026-08-24: `event_not_on_our_board: 66`.
+        #
+        # `team_aliases.canonical_team` is the repo's existing resolver, built
+        # from the per-sport maps that already carry these spellings -- reused
+        # rather than reimplemented, because two normalisers that disagree
+        # about one club is a silent mismatch nobody sees (#218).
+        #
+        # The blob is SPLIT rather than the codes concatenated, because we do
+        # not hold Kalshi's code list and cannot generate its spelling from
+        # ours. Every candidate split is checked against a real game, so a
+        # wrong boundary matches nothing rather than inventing a pairing.
+        try:
+            from syndicate.features.shared.team_aliases import canonical_team
+        except Exception:
+            canonical_team = None
+
+        if canonical_team is not None:
+            for game in games or []:
+                ours_away = canonical_team(sport, game.get("away_team"))
+                ours_home = canonical_team(sport, game.get("home_team"))
+                if not ours_away or not ours_home:
+                    # A club OUR side cannot resolve. Skipped rather than
+                    # matched loosely -- an unresolvable name is not evidence.
+                    continue
+                for left, right in _splits(wanted):
+                    if (
+                        canonical_team(sport, left) == ours_away
+                        and canonical_team(sport, right) == ours_home
+                    ):
+                        hits.append(game)
+                        break
     if not hits:
         return {"status": "no_match", "blob": wanted}
     if len(hits) > 1:

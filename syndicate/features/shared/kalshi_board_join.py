@@ -120,11 +120,16 @@ def _resolve_event(
     from syndicate.features.shared.kalshi_catalogue import (
         event_blob_from_ticker,
         match_event_blob,
+        sport_for_series,
     )
 
     blob = event_blob_from_ticker(market.get("ticker"))
     if not blob:
         return {"status": "no_match", "reason": "no_blob"}
+    # The SPORT decides which club map resolves the codes -- `WSH` is the
+    # Nationals in mlb and the Mystics in wnba, and resolving against the wrong
+    # map is how a bet lands on the wrong league's game.
+    sport = sport_for_series(market.get("series"))
     # DISTINCT GAMES ONLY. The board carries one row per market per game, so
     # feeding every row in would make an ordinary slate look ambiguous.
     seen: dict[str, dict[str, Any]] = {}
@@ -136,7 +141,9 @@ def _resolve_event(
                 "home_team": row.get("home_team"),
                 "away_team": row.get("away_team"),
             }
-    return match_event_blob(blob, list(seen.values()))
+    result = match_event_blob(blob, list(seen.values()), sport=sport)
+    result.setdefault("sport", sport)
+    return result
 
 
 def normalize_person(value: Any) -> str:
@@ -337,6 +344,7 @@ def join_kalshi_to_board(
 
     matches: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
+    unmatched_samples: list[dict[str, Any]] = []
 
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
@@ -372,6 +380,21 @@ def join_kalshi_to_board(
             # never softened into a best guess.
             resolution = _resolve_event(market, board_rows)
             status = str(resolution.get("status") or "")
+            if status == "no_match" and len(unmatched_samples) < 8:
+                # THE ALIAS LIST, WRITTEN FROM DATA. `event_not_on_our_board`
+                # is a count; it cannot say WHICH code we failed to recognise,
+                # and guessing at club spellings is how a bet lands on the
+                # wrong game. This prints Kalshi's blob beside the blobs our
+                # own board offered for the same date, so the missing alias is
+                # readable rather than inferred. Bounded at 8 -- enough to name
+                # the pattern, not enough to flood the log money moves through.
+                unmatched_samples.append(
+                    {
+                        "kalshi": resolution.get("blob"),
+                        "ticker": market.get("ticker"),
+                        "sport": resolution.get("sport"),
+                    }
+                )
             if status != "ok":
                 _refuse(
                     REASON_EVENT_AMBIGUOUS
@@ -508,5 +531,16 @@ def join_kalshi_to_board(
         "board_market_vocabulary": dict(
             sorted(board_markets.items(), key=lambda kv: -kv[1])[:12]
         ),
+        # Kalshi blobs we could not pair, beside the blobs OUR board offered.
+        # The count alone cannot say which club spelling is missing, and a club
+        # alias guessed rather than read is how a bet reaches the wrong game.
+        "unmatched_events": unmatched_samples,
+        "board_event_sample": sorted(
+            {
+                f"{str(r.get('away_team') or '?')}{str(r.get('home_team') or '?')}"
+                for r in board_rows
+                if r.get("away_team") or r.get("home_team")
+            }
+        )[:12],
         "matches": matches,
     }

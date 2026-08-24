@@ -451,3 +451,62 @@ def test_only_distinct_games_are_considered(monkeypatch):
     from syndicate.features.shared.kalshi_board_join import REASON_EVENT_AMBIGUOUS
 
     assert report["reasons"].get(REASON_EVENT_AMBIGUOUS) is None
+
+
+# --------------------------------------------------------------------------
+# Club-code aliases: ATH vs OAK, CWS vs CHW
+# --------------------------------------------------------------------------
+
+
+def test_a_club_alias_still_matches_the_game(monkeypatch):
+    """MEASURED 2026-08-24: `event_not_on_our_board: 66`.
+
+    Kalshi writes `CWS` where our board may write `CHW`, and `ATH` where it may
+    write `OAK`. Comparing the raw concatenation calls those different games
+    and refuses a real match. Resolution goes through `team_aliases`, the
+    repo's EXISTING club resolver, rather than a second table -- two
+    normalisers that disagree about one club is a silent mismatch nobody sees.
+    """
+    from syndicate.features.shared.kalshi_catalogue import match_event_blob
+
+    ours = [{"event_id": "e1", "away_team": "TEX", "home_team": "CHW"}]
+    assert match_event_blob("TEXCWS", ours, sport="mlb")["status"] == "ok"
+
+
+def test_the_sport_decides_which_club_map_is_used():
+    """`WSH` is the Nationals in mlb and the Mystics in wnba. Resolving against
+    the wrong map is how a bet lands on the wrong league's game."""
+    from syndicate.features.shared.kalshi_catalogue import match_event_blob
+
+    ours = [{"event_id": "e1", "away_team": "TEX", "home_team": "CHW"}]
+    # The right map pairs it; a sport whose map has neither club must not.
+    assert match_event_blob("TEXCWS", ours, sport="mlb")["status"] == "ok"
+    assert match_event_blob("TEXCWS", ours, sport="wnba")["status"] == "no_match"
+
+
+def test_an_alias_match_still_refuses_the_wrong_game():
+    """Widening the matcher must not widen what it will PAIR."""
+    from syndicate.features.shared.kalshi_catalogue import match_event_blob
+
+    ours = [{"event_id": "e1", "away_team": "TEX", "home_team": "CHW"}]
+    assert match_event_blob("NYYBOS", ours, sport="mlb")["status"] == "no_match"
+
+
+def test_an_alias_match_still_refuses_a_doubleheader():
+    """Two real games behind one code pair stays a refusal, aliases or not."""
+    from syndicate.features.shared.kalshi_catalogue import match_event_blob
+
+    ours = [
+        {"event_id": "e1", "away_team": "TEX", "home_team": "CHW"},
+        {"event_id": "e2", "away_team": "TEX", "home_team": "CHW"},
+    ]
+    assert match_event_blob("TEXCWS", ours, sport="mlb")["status"] == "ambiguous"
+
+
+def test_an_unresolvable_club_on_our_side_is_skipped_not_matched_loosely():
+    """An unresolvable name is not evidence. Matching on it would pair a game
+    we cannot even identify."""
+    from syndicate.features.shared.kalshi_catalogue import match_event_blob
+
+    ours = [{"event_id": "e1", "away_team": "ZZZ", "home_team": "QQQ"}]
+    assert match_event_blob("TEXCWS", ours, sport="mlb")["status"] == "no_match"

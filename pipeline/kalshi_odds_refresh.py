@@ -629,4 +629,16 @@ def join_to_board(
             f" board_markets={report.get('board_market_vocabulary')}",
             flush=True,
         )
+        # The CLUB CODES, both sides. `event_not_on_our_board` is a count and
+        # cannot say which spelling is missing; printing Kalshi's blob beside
+        # our board's makes the alias readable instead of guessed at, and a
+        # club alias guessed rather than read is how a bet reaches the wrong
+        # game.
+        if report.get("unmatched_events"):
+            print(
+                "[kalshi_odds] JOIN_EVENTS"
+                f" unmatched={report.get('unmatched_events')}"
+                f" board={report.get('board_event_sample')}",
+                flush=True,
+            )
     return report
