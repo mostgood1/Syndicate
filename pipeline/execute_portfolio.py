@@ -20,6 +20,9 @@ from typing import Any, Mapping
 
 from syndicate.features.shared.execution_ledger import (
     LIVE,
+    STATUS_FAILED,
+    STATUS_FILLED,
+    STATUS_SUBMITTED,
     OrderRequest,
     execution_mode,
     ledger_summary,
@@ -300,6 +303,8 @@ def run_execution(
     )
 
     placed = 0
+    filled = 0
+    failed = 0
     duplicates = 0
     retried = 0
     skipped = 0
@@ -368,8 +373,30 @@ def run_execution(
                 f" error={record.get('error')!r}",
                 flush=True,
             )
-        if status in {"filled"}:
+        # PLACED MEANS THE VENUE TOOK IT. FILLED MEANS IT TRADED.
+        #
+        # These were one counter, and the phantom-fill fix silently broke it.
+        # Before that fix a submit response defaulted to `filled`, so counting
+        # fills happened to count placements too. Now a resting limit order
+        # correctly records `submitted` -- and MEASURED 2026-08-24T15:38:23Z,
+        # a real order went to Kalshi (Sandy Alcantara over 4.5 Ks, 3 contracts
+        # at $0.50) and the run reported `placed=0 duplicates=0 retried=0
+        # skipped=0 refused={}`. Every counter zero, an order at the venue.
+        #
+        # That is the exact reading `LIVE_ORDER` was added to prevent, arrived
+        # at from the other direction: making the STATUS honest made the COUNT
+        # dishonest, because the count was reading the status as a proxy for a
+        # different question. A correct fix that breaks its neighbour is still
+        # a break.
+        #
+        # So the two questions get two counters. A limit order that rests all
+        # afternoon is placed and not filled, and both of those are true.
+        if status in {STATUS_FILLED, STATUS_SUBMITTED}:
             placed += 1
+        if status == STATUS_FILLED:
+            filled += 1
+        if status == STATUS_FAILED:
+            failed += 1
         # Charged for anything that MAY have reached the venue, matching
         # `spent_today`'s rule. `rejected` is the one status set without a call.
         if status in {"filled", "submitted", "failed"}:
@@ -384,6 +411,7 @@ def run_execution(
     print(
         f"[execute_portfolio] EXECUTED date={normalized} mode={mode} venue={venue} "
         f"armed={live_execution_armed()} positions={len(positions)} placed={placed} "
+        f"filled={filled} failed={failed} "
         f"duplicates={duplicates} retried={retried} skipped={skipped} refused={refused} "
         f"spent={used} summary={summary}",
         flush=True,
@@ -395,6 +423,11 @@ def run_execution(
         "venue": venue,
         "positions": len(positions),
         "placed": placed,
+        # Reported apart from `placed` because a resting order is placed and
+        # not filled, and collapsing them makes a working limit book look like
+        # a run that did nothing.
+        "filled": filled,
+        "failed": failed,
         # A re-run places nothing new. This is the number that proves the
         # idempotency works in production rather than only in a test.
         "duplicates": duplicates,
