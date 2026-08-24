@@ -933,6 +933,35 @@ def _polymarket_us_slate_probe_at_boot() -> None:
                 flush=True,
             )
 
+        # THE JOINABLE SLATE. Boundary located rather than hardcoded: ids grow
+        # as the venue lists markets, so it moves daily.
+        slate = pm.fetch_game_markets(limit=500, max_pages=30)
+        print(
+            f"[live_odds_worker] POLYMARKET_US_GAMES status={slate.get('status')}"
+            f" start_offset={slate.get('start_offset')}"
+            f" boundary_probes={slate.get('boundary_probes')}"
+            f" monotonic={slate.get('boundary_monotonic')}"
+            f" games={slate.get('games')} futures={slate.get('futures')}"
+            f" rows={slate.get('total_rows')} pages={slate.get('pages')}"
+            f" duplicate_ids={slate.get('duplicate_ids')}"
+            f" truncated={slate.get('truncated')}"
+            f" orderable={slate.get('orderable')}"
+            f" game_types={slate.get('game_types')}"
+            f" window={slate.get('game_start_min')}..{slate.get('game_start_max')}"
+            f" reason={slate.get('reason')}",
+            flush=True,
+        )
+        for row in (slate.get("markets") or [])[:6]:
+            print(
+                f"[live_odds_worker] POLYMARKET_US_GAME slug={row.get('slug')!r}"
+                f" type={row.get('sportsMarketTypeV2')!r}"
+                f" start={row.get('gameStartTime')!r}"
+                f" outcomes={row.get('outcomes')!r} prices={row.get('outcomePrices')!r}"
+                f" tick={row.get('orderPriceMinTickSize')!r}"
+                f" question={str(row.get('question'))[:70]!r}",
+                flush=True,
+            )
+
         # WHERE do game markets live in the `closed=false` ordering?
         # games=0 across the first 2,000 rows, and moneylines are known to
         # exist here (the unfiltered query returns them). Deeper, or absent?
