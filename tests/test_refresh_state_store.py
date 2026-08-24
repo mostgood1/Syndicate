@@ -14,6 +14,24 @@ from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 
 
+def _without_explicit_roots() -> None:
+    """Remove the root overrides from an already-patched `os.environ`.
+
+    THESE TWO TESTS ARE ABOUT THE ABSENCE OF AN OVERRIDE, so the absence has to
+    be asserted rather than assumed. They passed for as long as nothing in the
+    suite happened to set `SYNDICATE_REPORTS_ROOT` -- which stopped being true
+    on 2026-08-24, when `conftest` began pointing the whole reports tree at a
+    scratch dir to stop the suite dirtying tracked artifacts. `patch.dict(...,
+    clear=False)` keeps whatever is already there, so `reports_root()` found an
+    override and returned it instead of raising.
+
+    Call this INSIDE the `patch.dict` context: it snapshots and restores the
+    entire mapping on exit, so the pops are undone with everything else.
+    """
+    for name in ("SYNDICATE_REPORTS_ROOT", "SYNDICATE_STATE_ROOT", "SYNDICATE_DATA_ROOT"):
+        os.environ.pop(name, None)
+
+
 class _FakeKeyValueClient:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
@@ -90,6 +108,7 @@ class RefreshStateStoreTests(unittest.TestCase):
             },
             clear=False,
         ):
+            _without_explicit_roots()
             with self.assertRaises(RuntimeError):
                 refresh_state_store.data_root()
             with self.assertRaises(RuntimeError):
@@ -184,6 +203,7 @@ class RefreshStateStoreTests(unittest.TestCase):
             },
             clear=False,
         ):
+            _without_explicit_roots()
             self.assertEqual(refresh_state_store.reports_root(), refresh_state_store.REPORTS_ROOT)
 
     def test_keyvalue_backend_round_trips_json_and_text_by_path(self) -> None:
