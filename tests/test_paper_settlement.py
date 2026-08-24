@@ -689,18 +689,16 @@ def test_the_grade_audit_prints_the_facts_and_writes_nothing(monkeypatch, tmp_pa
     key = ledger.idempotency_key(request)
     before = dict(ledger.find_order(key))
 
-    monkeypatch.setattr(
-        mod, "_default_resolver",
-        lambda date: (lambda o: {"current_value": 3, "side": "over", "line": 1.5,
-                                 "is_final": True, "started": True}),
-    )
     result = mod.audit_game_line_grades("2026-08-22")
     out = capsys.readouterr().out
 
     assert result["rows"] == 1
     assert "GRADE_AUDIT" in out
-    assert "margin_for_bet=3" in out
-    assert "graded_against=1.5" in out
+    # From the LEDGER, not a re-derivation. `settled_value` is the margin the
+    # grader actually used; recomputing could disagree with what was stored,
+    # and then the audit reports a third thing rather than auditing the second.
+    assert "margin_used=3" in out
+    assert "must_beat=1.5" in out
     assert "our_verdict=won" in out
     # The other reading, side by side. Not a judgement — the point is that a
     # person can see both without re-deriving one.
@@ -729,3 +727,35 @@ def test_the_grade_audit_ignores_props_and_totals(monkeypatch, tmp_path, capsys)
     )
     assert mod.audit_game_line_grades("2026-08-22")["rows"] == 0
     assert "rows=0" in capsys.readouterr().out
+
+
+def test_a_skipped_row_says_WHY(monkeypatch, tmp_path, capsys):
+    """MEASURED 2026-08-24T19:29Z: the first version printed `audited=0 of=79`
+    and no reason, because every row hit a bare `continue`. A diagnostic that
+    refuses silently, in a repo whose whole discipline is named refusals --
+    it made the audit itself unauditable."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared import paper_settlement as mod
+
+    request = ledger.OrderRequest(
+        position_key="skip-why", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e9", market="spreads", side="home", line=-1.5,
+        requested_price=-110.0, requested_stake_dollars=10.0,
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+    # Graded, but with no settled_value -- the shape the audit must explain
+    # rather than silently drop.
+    ledger.complete_order(ledger.idempotency_key(request), status=ledger.STATUS_FILLED,
+                          fill_price=-110.0, fill_stake_dollars=10.0)
+    state = ledger._load()
+    for row in state["orders"]:
+        if row.get("idempotency_key") == ledger.idempotency_key(request):
+            row["outcome"] = "won"
+            row["settled_value"] = None
+    ledger._persist(state)
+
+    result = mod.audit_game_line_grades("2026-08-22")
+    assert result["rows"] == 0
+    assert result["skipped"] == {"no_settled_value": 1}
+    assert "skipped={'no_settled_value': 1}" in capsys.readouterr().out

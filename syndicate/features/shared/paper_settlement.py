@@ -370,31 +370,33 @@ def settle_orders(
 
 
 def audit_game_line_grades(selected_date: str, *, limit: int = 25) -> dict[str, Any]:
-    """Print the RAW FACTS beside each game-line verdict, so a human can check one.
+    """Print the RAW FACTS behind each game-line verdict, from the LEDGER.
 
     MEASURED 2026-08-24T19:17Z: game lines graded -16.4% on 79 bets at a 35.44%
     win rate, while totals -- graded through the old, long-exercised path --
     returned +24.03%. Game lines began grading four hours earlier, through code
-    I wrote that day.
+    written that day.
 
-    A CONSISTENT SIGN INVERSION PRODUCES EXACTLY THAT PICTURE, and 1 - 0.3544
-    is roughly what an inverted-but-otherwise-fine model would look like. Both
-    existing guards pass under an inversion: the unit tests assert both
-    directions against my own convention, and
-    `home_away_disagree_between_sources` checks whether the two SOURCES agree
-    about which team is home, not whether the convention is right.
+    A CONSISTENT SIGN INVERSION PRODUCES EXACTLY THAT PICTURE, and nothing
+    already in place can detect one: the unit tests assert both directions
+    against my own convention, so an inverted convention passes them
+    symmetrically, and `home_away_disagree_between_sources` checks whether the
+    two SOURCES agree about which team is home, not whether the convention is
+    right. Both pass while every verdict is backwards.
 
-    So neither the tests nor the logs can settle it. Only ground truth can:
-    a real final score, a real quoted line, and a verdict a person can check by
-    eye in one row. That is all this prints.
+    READS THE STORED VERDICT, NOT A RE-DERIVATION. The first version called
+    `_default_resolver` to recompute the margin, and on 2026-08-24T19:29Z it
+    reported `audited=0 of=79` -- every row refused, because MLB feed payloads
+    live on refresh-worker's disk and this runs on live-odds-worker. Same class
+    of mistake as the Kalshi series discovery that ran in the wrong process.
 
-    "The model is bad at game lines" and "I grade them backwards" have opposite
-    responses -- stop betting them, or fix the grader and discard every
-    game-line number from today. Acting before checking is the expensive move.
+    Reading the ledger is better than fixing that, for a reason beyond
+    convenience: `settled_value` is the margin the grader ACTUALLY USED. A
+    re-derivation can disagree with what was stored, and then the audit is
+    reporting a third thing rather than auditing the second.
 
-    Read-only. It re-derives the score from the same resolver settlement uses
-    and CHANGES NOTHING -- an audit that writes is an audit that can create the
-    thing it was meant to detect.
+    Read-only. It changes nothing -- an audit that writes can create the thing
+    it was meant to detect.
     """
     from syndicate.features.shared.execution_ledger import _load
     from syndicate.features.shared.game_line_bet import is_game_line_market
@@ -409,43 +411,37 @@ def audit_game_line_grades(selected_date: str, *, limit: int = 25) -> dict[str, 
     ]
     if not orders:
         print(f"[paper_settlement] GRADE_AUDIT date={normalized} rows=0", flush=True)
-        return {"status": "ok", "rows": 0}
+        return {"status": "ok", "rows": 0, "candidates": 0}
 
-    resolver = _default_resolver(normalized)
     rows = 0
-    agree = 0
+    # WHY A ROW WAS SKIPPED, BY NAME. The first version had a bare `continue`
+    # and printed `audited=0 of=79` with no reason -- a diagnostic that refuses
+    # silently, in a repo whose whole discipline is named refusals. It made the
+    # audit itself unauditable.
+    skipped: dict[str, int] = {}
     for order in orders[:limit]:
-        try:
-            resolved = resolver(order) or {}
-        except Exception as exc:
-            print(
-                f"[paper_settlement] GRADE_AUDIT_UNRESOLVED key={order.get('idempotency_key')}"
-                f" {type(exc).__name__}: {exc}",
-                flush=True,
-            )
+        margin = order.get("settled_value")
+        line_used = order.get("line")
+        if margin is None:
+            skipped["no_settled_value"] = skipped.get("no_settled_value", 0) + 1
             continue
-        if resolved.get("unavailable_reason"):
+        if line_used is None and str(order.get("market") or "").lower().startswith("spread"):
+            skipped["no_line_on_spread"] = skipped.get("no_line_on_spread", 0) + 1
             continue
 
-        # The TRANSLATED view -- what the grader was actually handed. Printed
-        # beside the order's own side and line, because the whole question is
-        # whether that translation points the right way.
-        margin = resolved.get("current_value")
-        line_used = resolved.get("line")
         rows += 1
-        # What the verdict WOULD be if the convention were inverted. Not a
-        # judgement, just the other reading, so the two sit side by side.
+        # The other reading, side by side. Not a judgement -- the point is that
+        # both sit on one line so a person does not have to re-derive one.
         try:
-            inverted = "won" if float(margin) < float(line_used) else "lost"
+            threshold = -float(line_used) if line_used is not None else 0.0
+            inverted = "won" if float(margin) < threshold else "lost"
         except (TypeError, ValueError):
-            inverted = "?"
-        if str(order.get("outcome")) != inverted:
-            agree += 1
+            threshold, inverted = None, "?"
         print(
             f"[paper_settlement] GRADE_AUDIT market={order.get('market')}"
-            f" bet_side={order.get('side')!r} bet_line={order.get('line')}"
+            f" bet_side={order.get('side')!r} bet_line={line_used}"
             f" {order.get('away_team')}@{order.get('home_team')}"
-            f" margin_for_bet={margin} graded_against={line_used}"
+            f" margin_used={margin} must_beat={threshold}"
             f" our_verdict={order.get('outcome')} if_inverted={inverted}"
             f" pnl={order.get('pnl_dollars')}",
             flush=True,
@@ -453,12 +449,13 @@ def audit_game_line_grades(selected_date: str, *, limit: int = 25) -> dict[str, 
 
     print(
         f"[paper_settlement] GRADE_AUDIT_SUMMARY date={normalized} audited={rows}"
-        f" of={len(orders)} -- CHECK ONE ROW BY HAND against the real final score:"
-        " margin_for_bet must be the bet team's score minus its opponent's,"
-        " and graded_against must be the NEGATED quoted line",
+        f" of={len(orders)} skipped={skipped}"
+        " -- CHECK ONE ROW BY HAND: margin_used must be the BET TEAM's score"
+        " minus its opponent's, and our_verdict must be `won` exactly when"
+        " margin_used > must_beat",
         flush=True,
     )
-    return {"status": "ok", "rows": rows, "candidates": len(orders)}
+    return {"status": "ok", "rows": rows, "candidates": len(orders), "skipped": skipped}
 
 
 def _default_resolver(selected_date: str):
