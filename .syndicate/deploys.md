@@ -26938,3 +26938,48 @@ while the candidates behind it are not — the pipeline reports healthy and drop
 Kalshi/Polymarket/Novig WOULD fix this, contrary to what I said: they replace
 14h-old OddsAPI quotes with live ones, putting MLB/WNBA candidates under the 6h
 ceiling. The user's proposed direction was right.
+
+
+---
+
+### 2026-08-24 22:20Z — carve-out on `execute_portfolio.py` ACKNOWLEDGED, no conflict, and one fact the other lane needs
+
+The exchange-markets lane (session 71a74bb7) took a narrow additive carve-out on
+`pipeline/execute_portfolio.py::_venue_submitter` and, in a follow-up, correctly
+REVERTED its planned `portfolio_commit.py::_venue_price_resolver` change as
+bigger than asked.
+
+**No collision.** This lane's tree is clean, nothing was mid-edit in either
+file, and their commit is on their branch only (`origin/main` is at
+`5ac78bdae`, which does not contain it).
+
+**The dependency they are wiring exists and its contract is:**
+
+```python
+polymarket_us_submitter(resolve_market)
+# resolve_market(request) -> (slug, price, tick_size, min_qty)
+```
+
+**AND ALL FOUR MUST COME FROM THE VENUE'S OWN MARKET RESPONSE.** `order_body`
+takes `tick_size`/`minimum_trade_qty` as REQUIRED arguments deliberately — the
+docs say "Do not infer price tick size or minimum quantity from product type,
+symbol, or slug", and an optional parameter with a plausible default is an
+inference wearing a keyword. A resolver that hardcodes `0.01`/`1` will place
+real orders on an illegal price grid for any market with
+`orderPriceMinTickSize: 0.005` (a documented real value, and `0.001` was
+measured live on NFL spreads).
+
+**THEY NO LONGER HAVE TO FETCH IT.** As of `5ac78bdae` the slate persists to
+`reports/intelligence/polymarket_us_games.json` on a 900s cadence, and the
+stored row carries exactly `slug`, `orderPriceMinTickSize`, `minimumTradeQty`,
+`outcomes`, `outcomePrices`, `sportsMarketTypeV2`, `line`, `gameStartTime`,
+`orderable` — which is `_polymarket_resolve_market`'s whole input. Reading that
+artifact also keeps them out of the second-independent-caller incident class
+(`#139/#144`, `#148`).
+
+**STILL THIS LANE'S, and still open:** `portfolio_commit._venue_price_resolver`
+returns `(None, None)` for every venue but Kalshi (`portfolio_commit.py:170`),
+so the `paper:polymarket` book is priced from the AGGREGATOR, not from
+Polymarket. Their revert was right — that is a board-join resolver across every
+market type, not a single-market lookup — and it means the Polymarket PRICING
+gap is unowned by them and owned here.
