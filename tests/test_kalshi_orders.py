@@ -214,3 +214,56 @@ def test_the_side_still_decides_which_price_field_is_sent(monkeypatch):
     assert body["side"] == "no"
     assert body["no_price"] == 42
     assert "yes_price" not in body
+
+
+# --------------------------------------------------------------------------
+# The order ROUTE: v2-in-the-path is not the same as the v2 order contract
+# --------------------------------------------------------------------------
+
+
+def test_the_order_path_is_overridable_without_a_deploy(monkeypatch):
+    """MEASURED 2026-08-24, the first real response this endpoint ever gave:
+
+        http_410 .../trade-api/v2/portfolio/orders
+        {"error":{"code":"deprecated_v1_order_endpoint",
+                  "message":"Please switch to the V2 endpoints"}}
+
+    The path carries `v2` and Kalshi calls it the V1 ORDER endpoint — the API
+    surface and the order contract are versioned separately, and reading the
+    `v2` in the URL as proof the route was current was wrong.
+    """
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.delenv("KALSHI_ORDER_URL", raising=False)
+    monkeypatch.delenv("KALSHI_API_BASE", raising=False)
+    monkeypatch.setenv("KALSHI_ORDER_PATH", "/portfolio/orders/v2")
+    assert mod._orders_url().endswith("/trade-api/v2/portfolio/orders/v2")
+
+
+def test_a_leading_slash_is_not_required(monkeypatch):
+    """A path pasted out of a docs page rarely carries one."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.delenv("KALSHI_ORDER_URL", raising=False)
+    monkeypatch.setenv("KALSHI_ORDER_PATH", "orders")
+    assert mod._orders_url().endswith("/trade-api/v2/orders")
+
+
+def test_an_absolute_url_override_wins_outright(monkeypatch):
+    """For a route that does not hang off the same base at all."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.delenv("KALSHI_ORDER_PATH", raising=False)
+    monkeypatch.setenv("KALSHI_ORDER_URL", "https://api.elections.kalshi.com/trade-api/v2/orders")
+    assert mod._orders_url() == "https://api.elections.kalshi.com/trade-api/v2/orders"
+
+
+def test_the_default_is_unchanged(monkeypatch):
+    """Not silently repointed at a guessed route. The replacement is unknown
+    here — the docs host is blocked from this environment — and inventing one
+    would repeat exactly the mistake the 410 just exposed."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    for key in ("KALSHI_ORDER_URL", "KALSHI_ORDER_PATH", "KALSHI_API_BASE"):
+        monkeypatch.delenv(key, raising=False)
+    assert mod._orders_url().endswith("/trade-api/v2/portfolio/orders")

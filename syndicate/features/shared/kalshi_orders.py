@@ -178,11 +178,39 @@ def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str,
     return body
 
 
+# The order path, SEPARATE from the API base and overridable on its own.
+#
+# MEASURED 2026-08-24, the first real response this endpoint ever gave us:
+#
+#   http_410 https://external-api.kalshi.com/trade-api/v2/portfolio/orders
+#   {"error":{"code":"deprecated_v1_order_endpoint",
+#             "message":"Please switch to the V2 endpoints",
+#             "details":"https://docs.kalshi.com/api-reference/orders/create-order-v2"}}
+#
+# `/trade-api/v2/portfolio/orders` carries `v2` in the path and Kalshi calls it
+# the V1 ORDER endpoint. Those are two different versionings -- the API surface
+# and the order contract -- and reading the `v2` in the URL as proof the order
+# route was current was wrong.
+#
+# Kept overridable because the replacement path is not yet known here: the docs
+# host is blocked from this environment, and inventing a route would repeat the
+# mistake this comment records. One env var moves it, no deploy.
+_DEFAULT_ORDER_PATH = "/portfolio/orders"
+
+
 def _orders_url() -> str:
     from syndicate.features.shared.kalshi_client import _BASE_URLS
 
     base = (os.environ.get("KALSHI_API_BASE") or "").strip() or _BASE_URLS[0]
-    return f"{base}/portfolio/orders"
+    path = (os.environ.get("KALSHI_ORDER_PATH") or _DEFAULT_ORDER_PATH).strip()
+    if not path.startswith("/"):
+        path = f"/{path}"
+    # An absolute override wins outright, for a route that does not hang off
+    # the same base at all.
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    override = (os.environ.get("KALSHI_ORDER_URL") or "").strip()
+    return override or f"{base.rstrip('/')}{path}"
 
 
 def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
