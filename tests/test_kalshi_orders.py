@@ -571,3 +571,63 @@ def test_prices_are_read_as_dollars_whichever_unit_they_arrive_in():
                              "average_fill_price": 46})["fill_price"] == 0.46
     assert venue_order_view({"status": "executed", "filled_count": 1,
                              "average_fill_price": 0.46})["fill_price"] == 0.46
+
+
+# --------------------------------------------------------------------------
+# The field names, corrected from a live response 2026-08-24T14:37:16Z
+# --------------------------------------------------------------------------
+
+
+def test_the_real_kalshi_field_names_are_read():
+    """Not one of the three count spellings guessed beforehand was right. The
+    live keys are `fill_count_fp`, `initial_count_fp`, `remaining_count_fp`,
+    `taker_fees_dollars`, `taker_fill_cost_dollars`."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({
+        "status": "executed",
+        "fill_count_fp": 2,
+        "taker_fill_cost_dollars": 1.08,
+        "taker_fees_dollars": 0.02,
+        "maker_fees_dollars": 0.0,
+    })
+    assert seen["state"] == "filled"
+    assert seen["filled_count"] == 2
+    assert seen["fill_cost_dollars"] == 1.08
+    assert seen["fees_dollars"] == 0.02
+    # The price becomes a DIVISION of what Kalshi billed, rather than a guess
+    # about which of yes_price_dollars / no_price_dollars is our leg.
+    assert seen["fill_price"] == 0.54
+
+
+def test_the_fp_count_fields_drive_the_derived_count():
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "canceled", "initial_count_fp": 5,
+                             "remaining_count_fp": 4})
+    assert seen["filled_count"] == 1
+
+
+def test_no_fee_leg_at_all_is_unknown_not_zero():
+    """A sum of the PRESENT legs is the total -- an order filled entirely as a
+    taker carries a real 0.0 on the maker leg. But an order carrying neither
+    has told us nothing, and $0.00 of fees is a fee we would never charge."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    assert venue_order_view({"status": "resting"})["fees_dollars"] is None
+    assert venue_order_view(
+        {"status": "executed", "fill_count_fp": 1, "maker_fees_dollars": 0.0}
+    )["fees_dollars"] == 0.0
+
+
+def test_the_venue_fill_cost_outranks_our_reconstruction():
+    """`count * price` was arithmetic over two numbers we parsed. The fill cost
+    is the charge itself."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({
+        "status": "executed", "fill_count_fp": 3,
+        "taker_fill_cost_dollars": 1.50, "maker_fill_cost_dollars": 0.30,
+    })
+    assert seen["fill_cost_dollars"] == 1.80
+    assert seen["fill_price"] == 0.6

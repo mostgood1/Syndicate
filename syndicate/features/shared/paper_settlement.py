@@ -98,6 +98,39 @@ def american_profit(price: Any) -> float | None:
     return 100.0 / abs(value)
 
 
+def contract_profit(price: Any) -> float | None:
+    """Profit per $1 staked on a PROBABILITY-DOLLAR contract. 0.46 -> 1.174…
+
+    A Kalshi contract costs $p and settles at $1, so a winner returns
+    (1 - p) / p per dollar staked.
+    """
+    value = _as_float(price)
+    if value is None or not 0.0 < value < 1.0:
+        return None
+    return (1.0 - value) / value
+
+
+def profit_per_dollar(price: Any) -> float | None:
+    """The right arithmetic for whichever unit the fill price is in.
+
+    THE LEDGER HOLDS BOTH UNITS IN ONE COLUMN. A sportsbook fill records
+    American odds (-110); a Kalshi fill records probability dollars (0.46).
+    Grading 0.46 as American odds returns 0.0046 -- a winning contract booked
+    at a 0.46% profit instead of 117%, a number ~250x too small that reads as a
+    disappointing result rather than as an error. The same confusion rendered
+    every Kalshi price on the live page as `+0`.
+
+    The boundary is unambiguous: American odds are never strictly inside
+    (-1, 1), and a probability price is always strictly inside (0, 1).
+    """
+    value = _as_float(price)
+    if value is None:
+        return None
+    if 0.0 < value < 1.0:
+        return contract_profit(value)
+    return american_profit(value)
+
+
 def grade_order(order: Mapping[str, Any], status: Mapping[str, Any]) -> dict[str, Any]:
     """One order plus its resolved status -> outcome and P&L, or a named refusal.
 
@@ -115,21 +148,32 @@ def grade_order(order: Mapping[str, Any], status: Mapping[str, Any]) -> dict[str
         return {"graded": False, "reason": REASON_NOT_DECIDED}
 
     stake = _as_float(order.get("fill_stake_dollars"))
-    profit_multiple = american_profit(order.get("fill_price"))
+    profit_multiple = profit_per_dollar(order.get("fill_price"))
     if stake is None or profit_multiple is None:
         return {"graded": False, "reason": REASON_NO_PRICE}
 
+    # FEES ARE PAID ON EXECUTION, WHATEVER THE OUTCOME. Kalshi took $0.02 on a
+    # $1.08 fill -- ~1.9%, against edges this system will act on at 3%. Netted
+    # into every branch including the push, because the money left the account
+    # when the trade happened, not when it settled.
+    #
+    # Absent means UNKNOWN, and unknown is charged as zero here rather than
+    # refused: a bet whose fee we cannot read is still a bet with a real
+    # outcome, and refusing to grade it would lose the outcome to save the
+    # rounding. Every venue but Kalshi reports no fee at all today.
+    fees = _as_float(order.get("fees_dollars")) or 0.0
+
     raw = str(status.get("status") or "")
     if raw == STATUS_WON:
-        outcome, pnl = OUTCOME_WON, stake * profit_multiple
+        outcome, pnl = OUTCOME_WON, stake * profit_multiple - fees
     elif raw == STATUS_LOST:
-        outcome, pnl = OUTCOME_LOST, -stake
+        outcome, pnl = OUTCOME_LOST, -stake - fees
     else:
         # A DECIDED tie is a push: the stake comes back and the bet is neither
         # won nor lost. `resolve_bet_status` calls it `live_tied`, which reads
         # oddly for a finished game -- folding it into the losses would
         # understate every figure this module produces.
-        outcome, pnl = OUTCOME_PUSH, 0.0
+        outcome, pnl = OUTCOME_PUSH, -fees
 
     return {
         "graded": True,

@@ -344,3 +344,80 @@ def test_a_wnba_bet_now_grades_end_to_end(monkeypatch, tmp_path):
     # Points only rise, so the over is decided the moment it crosses — no
     # game-status field required.
     assert result["outcomes"] == {"won": 1}
+
+
+# --------------------------------------------------------------------------
+# Two price units in one column, and the fees that come out of both
+# --------------------------------------------------------------------------
+
+
+def test_a_kalshi_contract_is_not_graded_as_american_odds():
+    """THE LEDGER HOLDS BOTH UNITS IN ONE COLUMN. A sportsbook fill records
+    American odds (-110); a Kalshi fill records probability dollars (0.46).
+    `american_profit(0.46)` is 0.0046 -- a winning contract booked at 0.46%
+    profit instead of 117%, ~250x too small, and it reads as a disappointing
+    result rather than as an error. The same confusion rendered every Kalshi
+    price on the live page as `+0`."""
+    from syndicate.features.shared.paper_settlement import (
+        american_profit,
+        profit_per_dollar,
+    )
+
+    assert american_profit(0.46) == pytest.approx(0.0046)
+    assert profit_per_dollar(0.46) == pytest.approx(0.5400 / 0.46)
+    # American odds are untouched -- they are never strictly inside (-1, 1).
+    assert profit_per_dollar(-110) == pytest.approx(100.0 / 110.0)
+    assert profit_per_dollar(150) == pytest.approx(1.5)
+
+
+def test_fees_are_netted_out_of_a_winner():
+    from syndicate.features.shared.bet_status import STATUS_WON
+    from syndicate.features.shared.paper_settlement import grade_order
+
+    graded = grade_order(
+        {"status": "filled", "fill_price": 0.54, "fill_stake_dollars": 1.08,
+         "fees_dollars": 0.02},
+        {"decided": True, "status": STATUS_WON},
+    )
+    # 2 contracts at $0.54 settle at $1.00 -> $0.92 gross, $0.90 after the fee.
+    assert graded["pnl_dollars"] == pytest.approx(0.90, abs=1e-4)
+
+
+def test_fees_are_charged_on_a_loser_too():
+    from syndicate.features.shared.bet_status import STATUS_LOST
+    from syndicate.features.shared.paper_settlement import grade_order
+
+    graded = grade_order(
+        {"status": "filled", "fill_price": 0.54, "fill_stake_dollars": 1.08,
+         "fees_dollars": 0.02},
+        {"decided": True, "status": STATUS_LOST},
+    )
+    assert graded["pnl_dollars"] == pytest.approx(-1.10, abs=1e-4)
+
+
+def test_a_push_still_costs_the_fee():
+    """The money left the account when the trade happened, not when it
+    settled."""
+    from syndicate.features.shared.paper_settlement import grade_order
+
+    graded = grade_order(
+        {"status": "filled", "fill_price": -110, "fill_stake_dollars": 10.0,
+         "fees_dollars": 0.25},
+        {"decided": True, "status": "live_tied"},
+    )
+    assert graded["outcome"] == "push"
+    assert graded["pnl_dollars"] == pytest.approx(-0.25)
+
+
+def test_an_absent_fee_is_charged_as_zero_not_refused():
+    """A bet whose fee we cannot read is still a bet with a real outcome.
+    Refusing to grade it would lose the outcome to save the rounding."""
+    from syndicate.features.shared.bet_status import STATUS_WON
+    from syndicate.features.shared.paper_settlement import grade_order
+
+    graded = grade_order(
+        {"status": "filled", "fill_price": -110, "fill_stake_dollars": 10.0},
+        {"decided": True, "status": STATUS_WON},
+    )
+    assert graded["graded"] is True
+    assert graded["pnl_dollars"] == pytest.approx(100.0 / 11.0, abs=1e-3)

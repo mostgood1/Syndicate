@@ -197,7 +197,12 @@
               {% else %}{{ "%+d"|format(fp|int) }}{% endif %}
               {# The gap between requested and filled IS the slippage, and it is
                  the number a person checks first after a real submit. #}
-              <span class="sub">${{ "%.2f"|format(o.get('fill_stake_dollars') or 0) }}</span>
+              <span class="sub">${{ "%.2f"|format(o.get('fill_stake_dollars') or 0) }}{#
+                 THE FEE, WHERE THE VENUE REPORTED ONE. $0.02 on a $1.08 fill is
+                 ~1.9%, against edges this system will act on at 3% -- so it is
+                 shown beside the stake rather than folded into it. Absent means
+                 the venue reported none, which is not the same as zero and so
+                 renders as nothing at all. #}{% if o.get('fees_dollars') %} + ${{ "%.2f"|format(o.get('fees_dollars')) }} fee{% endif %}</span>
             </td>
             <td>{{ o.get('status') or '—' }}
               {% if o.get('error') %}<span class="sub warn">{{ o.get('error') }}</span>{% endif %}</td>

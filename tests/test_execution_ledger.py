@@ -779,3 +779,100 @@ def test_an_unreconciled_order_still_blocks(monkeypatch):
 
     key = _live_order(mod, monkeypatch, key="never-read", status=mod.STATUS_SUBMITTED)
     assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+
+# --------------------------------------------------------------------------
+# Fees, and the bound that makes an undocumented count unit safe
+# --------------------------------------------------------------------------
+
+
+def _kalshi_order(mod, monkeypatch, *, key: str, price: float, stake: float):
+    """A live order priced the way Kalshi prices -- probability dollars."""
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    request = _request(
+        position_key=key, venue="kalshi", venue_ticker="KX-TEST-1",
+        requested_price=price, requested_stake_dollars=stake,
+    )
+    record, _ = mod.record_order(request, mode=mod.LIVE)
+    return record["idempotency_key"]
+
+
+def test_fees_reach_the_ledger_from_the_venue(monkeypatch):
+    """Kalshi took $0.02 on a $1.08 fill -- ~1.9%, against edges this system
+    will act on at 3%. They arrive on every order read; the only reason they
+    were absent is that nothing carried them across."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _kalshi_order(mod, monkeypatch, key="fees", price=0.54, stake=1.58)
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-f", "client_order_id": key,
+                                "status": "executed", "fill_count_fp": 2,
+                                "taker_fill_cost_dollars": 1.08,
+                                "taker_fees_dollars": 0.02}]),
+    )
+
+    assert mod.reconcile_live_orders()["changed"] == 1
+    row = mod.find_order(key)
+    assert row["fees_dollars"] == 0.02
+    # The venue's own charge, not our count * price reconstruction.
+    assert row["fill_stake_dollars"] == 1.08
+
+
+def test_a_fill_larger_than_the_order_is_refused(monkeypatch):
+    """`fill_count_fp` carries an undocumented `_fp`. If it is a fixed-point
+    scale, a 2-contract fill arrives as some large number and booking it claims
+    a position orders of magnitude beyond what the stake could buy. No venue
+    can fill more than was asked, so this is a PARSE failure, never a trade."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _kalshi_order(mod, monkeypatch, key="scaled", price=0.54, stake=1.58)
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-s", "client_order_id": key,
+                                "status": "executed", "fill_count_fp": 2_000_000}]),
+    )
+
+    result = mod.reconcile_live_orders()
+    assert result["implausible"] == 1
+    assert result["changed"] == 0
+    # Left untouched -- not booked, and not silently zeroed either.
+    assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
+
+
+def test_a_fill_within_the_order_is_booked(monkeypatch):
+    """The bound must not refuse honest fills: $1.58 at $0.54 buys 2."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _kalshi_order(mod, monkeypatch, key="bounded", price=0.54, stake=1.58)
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-b", "client_order_id": key,
+                                "status": "executed", "fill_count_fp": 2,
+                                "taker_fill_cost_dollars": 1.08}]),
+    )
+
+    assert mod.reconcile_live_orders()["changed"] == 1
+    assert mod.find_order(key)["contracts"] == 2
+
+
+def test_fees_are_charged_against_the_daily_budget(monkeypatch):
+    """A cap that counts only stake is a cap the account can exceed."""
+    from syndicate.features.shared import execution_guard as guard
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _kalshi_order(mod, monkeypatch, key="budget", price=0.54, stake=1.58)
+    mod.complete_order(key, status=mod.STATUS_FILLED, fill_stake_dollars=1.08)
+    spent = guard.spent_today("2026-08-22", mode=mod.LIVE)
+    assert spent["dollars"] == 1.08
+
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-g", "client_order_id": key,
+                                "status": "executed", "fill_count_fp": 2,
+                                "taker_fill_cost_dollars": 1.08,
+                                "taker_fees_dollars": 0.02}]),
+    )
+    mod.reconcile_live_orders()
+    assert guard.spent_today("2026-08-22", mode=mod.LIVE)["dollars"] == 1.10
