@@ -45,6 +45,27 @@ def _row(**overrides):
     return row
 
 
+def _write_live_plan(monkeypatch, rows, venue="kalshi"):
+    """A venue-scoped plan, which is the only book live mode may place.
+
+    Added 2026-08-24: `run_execution` now refuses live mode without a venue
+    scope, after the worker spent a night pointed at the unrestricted plan and
+    tried to put a soccer total on Kalshi.
+
+    The venue plan is served from the committed one rather than priced through
+    `venue_scope`. These tests are about the ARM, the inline refusal and the
+    adapter lookup; making each of them depend on a venue actually quoting the
+    fixture row would couple three unrelated guards to a pricing path and give
+    all of them the same way to fail for the wrong reason.
+    """
+    plan = _write_plan(monkeypatch, rows)
+    monkeypatch.setattr(
+        "pipeline.portfolio_commit.read_portfolio_plan_for_venue",
+        lambda date, scope: plan,
+    )
+    return plan
+
+
 def _write_plan(monkeypatch, rows):
     monkeypatch.setenv("SYNDICATE_PORTFOLIO_COMMIT_ENABLED", "1")
     monkeypatch.setattr(
@@ -226,12 +247,12 @@ def test_paper_mode_is_not_blocked_by_a_stranded_order(monkeypatch):
 def test_force_does_not_bypass_the_live_arm(monkeypatch):
     """`force` skips the enablement flag only. A convenience flag that can reach
     real money is not a convenience."""
-    _write_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row()])
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
     from pipeline import execute_portfolio as runner
 
-    result = runner.run_execution("2026-08-22", force=True)
+    result = runner.run_execution("2026-08-22", force=True, venue_scope="kalshi")
     assert result["status"] == "ok"
     # Every order rejected for want of the arm; nothing filled.
     assert result["placed"] == 0
@@ -278,13 +299,13 @@ def test_inline_still_runs_paper(monkeypatch):
 def test_the_non_inline_path_is_unchanged(monkeypatch):
     """A standalone run (its own service, or the CLI) keeps full live capability
     -- the refusal must not leak into the path that is allowed to place."""
-    _write_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row()])
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
     from pipeline import execute_portfolio as runner
 
-    result = runner.run_execution("2026-08-22")
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
     assert result["status"] == "ok"
     assert result["mode"] == "live"
     # Rejected for want of the arm, NOT refused for being inline.
@@ -444,14 +465,14 @@ def test_the_commit_populates_live_bet_status(monkeypatch, capsys):
 
 
 def test_live_mode_against_a_venue_with_no_adapter_stops_with_a_reason(monkeypatch):
-    _write_plan(monkeypatch, [_row()])
+    _write_live_plan(monkeypatch, [_row()])
     monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
     monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
     monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "draftkings")
     from pipeline import execute_portfolio as runner
 
-    result = runner.run_execution("2026-08-22")
+    result = runner.run_execution("2026-08-22", venue_scope="draftkings")
     # Falling through to a paper fill wearing a live `mode` would put a record
     # in the ledger claiming money moved when none did.
     assert result["status"] == "skipped"
@@ -508,3 +529,228 @@ def test_a_position_with_no_contract_yields_an_order_the_adapter_refuses(monkeyp
     with pytest.raises(OrderBuildError) as excinfo:
         order_body(request, price_dollars=0.62)
     assert "no_venue_ticker" in str(excinfo.value)
+
+
+# --------------------------------------------------------------------------
+# Live must not place the UNRESTRICTED plan at one venue
+# --------------------------------------------------------------------------
+
+
+def test_live_without_a_venue_scope_is_refused(monkeypatch):
+    """MEASURED 2026-08-24T00:34Z, with real money armed.
+
+    The worker called `run_execution(date)` with no scope, so live mode read
+    the unrestricted plan and tried to place a SOCCER TOTAL and an MLB SPREAD
+    on Kalshi -- positions priced at other books, carrying no Kalshi ticker,
+    that the join had never paired. Both died at order build, so nothing
+    reached the venue; that was the last guard in the chain doing the work
+    rather than a design.
+    """
+    import pipeline.execute_portfolio as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+
+    result = mod.run_execution("2026-08-24")
+    assert result["status"] == "skipped"
+    assert result["reason"] == "live_mode_requires_venue_scope"
+
+
+def test_paper_without_a_scope_is_still_fine(monkeypatch):
+    """The refusal is LIVE-only. Paper's whole job is the unrestricted book,
+    and blocking it would turn a safety guard into an outage."""
+    import pipeline.execute_portfolio as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "paper")
+    monkeypatch.delenv("SYNDICATE_EXECUTION_LIVE_ARMED", raising=False)
+
+    result = mod.run_execution("2026-08-24")
+    # Whatever it does about the plan, it must not be refused for the scope.
+    assert result.get("reason") != "live_mode_requires_venue_scope"
+
+
+def test_a_retried_order_is_counted_and_LOGGED_not_swallowed(monkeypatch):
+    """MEASURED 2026-08-24T12:58Z. The retry unblock worked — a real order went
+    to Kalshi:
+
+        SUBMIT url=.../portfolio/events/orders
+          ticker=KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-5
+          side=ask count=2.00 price=0.4600
+
+    and this branch still counted it `duplicates=1` and `continue`d PAST the
+    LIVE_ORDER log. A real order moved and its outcome was recorded nowhere a
+    person could read. Invisible is the one thing an order that moves money
+    must never be.
+    """
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared.execution_ledger import (
+        LIVE, STATUS_REJECTED, complete_order, find_order, idempotency_key, place_order,
+    )
+
+    _write_live_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+
+    submitted = []
+
+    def submitter(request):
+        submitted.append(request)
+        return {"status": "filled", "fill_price": 0.46, "fill_stake_dollars": 0.92}
+
+    monkeypatch.setattr(runner, "_venue_submitter", lambda venue: submitter)
+
+    first = runner.run_execution("2026-08-22", venue_scope="kalshi")
+    assert first["placed"] == 1
+
+    # Force the pre-retry state: rejected, never reached the venue.
+    key = None
+    for order in first.get("summary", {}).get("by_status", {}) or {}:
+        pass
+    from syndicate.features.shared.execution_ledger import _load
+
+    for order in _load().get("orders") or []:
+        if order.get("venue", "").startswith("kalshi"):
+            key = order["idempotency_key"]
+    assert key
+    complete_order(key, status=STATUS_REJECTED, error="dead route")
+
+    submitted.clear()
+    second = runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    assert submitted, "a rejected order must actually reach the venue again"
+    # Counted as a PLACEMENT, not a duplicate — and surfaced separately so a
+    # retry storm is visible rather than looking like ordinary volume.
+    assert second["retried"] == 1
+    assert second["duplicates"] == 0
+    assert second["placed"] == 1
+
+
+def test_a_retry_is_charged_against_the_cap(monkeypatch):
+    """A retry spends, so it must be charged. Only a true duplicate — which
+    places nothing — may go uncharged."""
+    from pipeline import execute_portfolio as runner
+    from syndicate.features.shared.execution_ledger import (
+        LIVE, STATUS_REJECTED, complete_order, _load, complete_order,
+    )
+
+    _write_live_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+    monkeypatch.setattr(
+        runner, "_venue_submitter",
+        lambda venue: (lambda r: {"status": "filled", "fill_price": 0.46,
+                                  "fill_stake_dollars": 0.92}),
+    )
+    runner.run_execution("2026-08-22", venue_scope="kalshi")
+
+    key = None
+    for order in _load().get("orders") or []:
+        if str(order.get("venue", "")).startswith("kalshi"):
+            key = order["idempotency_key"]
+    complete_order(key, status=STATUS_REJECTED, error="dead route")
+
+    # A cap the retry cannot clear. Note it is a DOLLAR cap: `_int_env` treats
+    # a non-positive order count as a typo and falls back to the default, so
+    # `MAX_DAY_ORDERS=0` would silently not bind — a guard that reads zero as
+    # "no limit" is worth knowing about, and this test would have hidden it.
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "0.01")
+    result = runner.run_execution("2026-08-22", venue_scope="kalshi")
+    assert result["placed"] == 0
+    assert "over_max_order_dollars" in result["refused"]
+
+
+# --------------------------------------------------------------------------
+# Marketable limit: pay the LIVE ask, bounded by slippage
+# --------------------------------------------------------------------------
+
+
+def _price_env(monkeypatch, *, live=None, live_status="ok", artifact=None):
+    from syndicate.features.shared import kalshi_client
+    import pipeline.execute_portfolio as runner
+
+    def fetch_market(ticker):
+        if live_status != "ok":
+            return {"status": "error", "reason": live_status}
+        return {"status": "ok", "market": {"ticker": ticker, "no_ask_dollars": live}}
+
+    monkeypatch.setattr(kalshi_client, "fetch_market", fetch_market)
+    monkeypatch.setattr(runner, "_artifact_price", lambda t, k: artifact)
+
+
+class _Req:
+    venue_ticker = "KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-5"
+    side = "under"
+
+
+def test_the_live_ask_is_used_not_the_artifact(monkeypatch):
+    """MEASURED 2026-08-24. `_kalshi_price_for` read `kalshi_markets.json` and
+    called it "re-read at submit time" — but 155 series refresh 12 a tick, so
+    that ask can be ~26 minutes old. We sent $0.54 from the artifact while the
+    live ask was $0.56, and the order rested unfilled.
+    """
+    import pipeline.execute_portfolio as runner
+
+    _price_env(monkeypatch, live=0.56, artifact=0.54)
+    assert runner._kalshi_price_for(_Req()) == 0.56
+
+
+def test_a_price_that_moved_too_far_REFUSES(monkeypatch):
+    """A marketable limit without a bound is "pay anything". Beyond the
+    tolerance the edge is not the edge we sized, and refusing is honest."""
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
+    _price_env(monkeypatch, live=0.62, artifact=0.54)  # +0.08, past 0.03
+    with pytest.raises(Exception) as excinfo:
+        runner._kalshi_price_for(_Req())
+    assert "slippage" in str(excinfo.value)
+
+
+def test_a_price_that_moved_in_our_FAVOUR_is_taken(monkeypatch):
+    """Drift is directional. A cheaper ask is not slippage."""
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
+    _price_env(monkeypatch, live=0.40, artifact=0.54)
+    assert runner._kalshi_price_for(_Req()) == 0.40
+
+
+def test_a_slippage_refusal_never_reached_the_venue(monkeypatch):
+    """So it records as `rejected` — uncharged and retryable — rather than
+    `failed`, which would hold budget for an order that was never sent."""
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.01")
+    _price_env(monkeypatch, live=0.90, artifact=0.54)
+    try:
+        runner._kalshi_price_for(_Req())
+    except Exception as exc:
+        assert getattr(exc, "venue_contacted", True) is False
+
+
+def test_the_artifact_is_the_fallback_and_says_so(monkeypatch, capsys):
+    """A stale price beats no order — but the two must never be confused, so
+    the fallback announces itself in the log money moves through."""
+    import pipeline.execute_portfolio as runner
+
+    _price_env(monkeypatch, live_status="429 rate limited", artifact=0.54)
+    assert runner._kalshi_price_for(_Req()) == 0.54
+    out = capsys.readouterr().out
+    assert "PRICE_FROM_ARTIFACT" in out
+    assert "LIVE_PRICE_UNAVAILABLE" in out
+
+
+def test_no_price_anywhere_returns_none_so_the_order_refuses(monkeypatch):
+    """`kalshi_submitter` raises on None, so the order is recorded with a
+    reason rather than sent at a price nobody chose."""
+    import pipeline.execute_portfolio as runner
+
+    _price_env(monkeypatch, live_status="down", artifact=None)
+    assert runner._kalshi_price_for(_Req()) is None

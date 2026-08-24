@@ -89,6 +89,55 @@ def _side_name(game: dict[str, Any], side: str) -> str:
     return _text(container.get("name")) or _text(game.get(f"{side}_name"))
 
 
+def _side_key(sport: str, game: dict[str, Any], side: str) -> str | None:
+    """The club's CANONICAL name, for joining a chip to a board row.
+
+    THE BROWSER WAS APPROXIMATING A MAP THE SERVER ALREADY HAS. `#365` added a
+    normalised chip index because chip names come from the league's card
+    builder and a Layer 2 row's matchup comes from the odds feed, which spells
+    the same clubs differently. String normalisation closes most of that gap
+    (accents, punctuation, club-type affixes) and CANNOT close the rest,
+    because the remainder is not a spelling difference at all -- it is two
+    different names for one club:
+
+        odds feed "Athletic Bilbao"                vs chip "Athletic Club"
+        odds feed "Real Racing Club de Santander"  vs chip "Racing Santander"
+
+    Measured 2026-08-24 over the real chips for the La Liga week: 9 of 13
+    fixtures joined, 4 did not, and all 4 were those two clubs. The cards for
+    them printed the odds-feed spelling verbatim beside cards showing
+    tri-codes -- the reported "mismatched team names".
+
+    NO AMOUNT OF NORMALISATION FIXES THOSE and trying is actively dangerous:
+    matching "athletic bilbao" to "athletic club" means dropping a city
+    qualifier, which is exactly what collapses Manchester United into
+    Manchester City. `normalizeClubName`'s own comment pins those two clubs
+    for that reason.
+
+    `team_aliases.canonical_team` already resolves BOTH spellings of both
+    clubs to one name -- it is the map `_SOCCER_VENDOR_NAME_ALIASES` maintains,
+    every entry of it quoted from a production reading. Stamping its answer on
+    the chip lets the board row and the chip join on a value neither of them
+    had to spell the same way, and leaves the JS normalisation as the fallback
+    for clubs the map does not know rather than as the mechanism.
+
+    None when the sport has no alias map or the club is unresolvable; the
+    existing indexes still apply, so this only ever ADDS a join.
+    """
+    name = _side_name(game, side) or _side_label(game, side)
+    if not name:
+        return None
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+
+        return canonical_team(sport, name)
+    except Exception:
+        # A chip that cannot resolve an alias is still a usable chip. This is a
+        # display join, not a correctness gate -- raising here would take out
+        # the whole scoreboard strip for every sport.
+        return None
+
+
 def _side_score(game: dict[str, Any], side: str) -> str | None:
     container = game.get(side) if isinstance(game.get(side), dict) else {}
     status = game.get("status") if isinstance(game.get("status"), dict) else {}
@@ -400,8 +449,21 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         "league_display": _text(game.get("league_display")) or None,
         "game_key": _game_key(game),
         "matchup": _matchup_text(game),
-        "away": {"abbr": _side_label(game, "away"), "name": _side_name(game, "away"), "score": away_score},
-        "home": {"abbr": _side_label(game, "home"), "name": _side_name(game, "home"), "score": home_score},
+        # `key` is the CANONICAL club name from the server's own alias map, and
+        # it exists because the browser was approximating that map with string
+        # normalisation and could not close the last gap. See `_side_key`.
+        "away": {
+            "abbr": _side_label(game, "away"),
+            "name": _side_name(game, "away"),
+            "key": _side_key(sport_slug, game, "away"),
+            "score": away_score,
+        },
+        "home": {
+            "abbr": _side_label(game, "home"),
+            "name": _side_name(game, "home"),
+            "key": _side_key(sport_slug, game, "home"),
+            "score": home_score,
+        },
         "state": state,
         "status_token": status_token,
         "leader": leader,

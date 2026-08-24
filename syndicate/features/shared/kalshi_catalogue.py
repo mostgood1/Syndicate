@@ -41,12 +41,23 @@ like, so one daily discovery run is the whole discovery loop.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import Any
 
 __all__ = [
     "SERIES_SPORT",
+    "game_date_from_ticker",
+    "prop_candidates",
+    "event_blob_from_ticker",
+    "match_event_blob",
+    "game_market_from_title",
+    "auto_game_series_from_catalogue",
     "sport_for_series",
+    "sport_for_ticker",
+    "auto_series_from_catalogue",
+    "register_discovered",
+    "all_series",
     "classify_market",
     "unmapped_series",
     "GRAMMAR_PLAYER_THRESHOLD",
@@ -67,6 +78,32 @@ SERIES_SPORT: dict[str, str] = {
     "KXMLBOUTS": "mlb",
     # seen 2026-08-23, "Pete Crow-Armstrong: 2+ home runs?"
     "KXMLBHR": "mlb",
+    # seen 2026-08-23T23:28:49Z in the signed series catalogue, titled
+    # "Women's Pro Basketball Player Rebounds". The ONLY WNBA player-prop
+    # series in the 91 Kalshi lists -- every other one is a game line
+    # (quarter/half winners, spreads, totals) or a future (MVP, ROY, draft),
+    # and those need an event_ticker mapping that does not exist.
+    #
+    # `market_keys` resolves "rebounds" -> `player_rebounds` for wnba, and
+    # `bet_status_wnba` reads `reb` off the live box, so this one line makes the
+    # market priceable, joinable AND gradeable.
+    "KXWNBAREB": "wnba",
+    # The other three WNBA player props, seen in the same catalogue read:
+    # "Women's Pro Basketball Player Points" / "Player Assists" /
+    # "Player Threes". `market_keys` resolves all three for wnba and
+    # `bet_status_wnba` reads pts / ast / threes_made off the live box.
+    #
+    # HAND-REGISTERED even though `auto_series_from_catalogue` finds all four,
+    # and the duplication is deliberate. Discovery is PER-PROCESS state
+    # populated at boot: if the catalogue read fails once -- a 429, a restart
+    # mid-outage -- that process prices nothing but the hand-written entries for
+    # its whole life, silently. Naming the ones that matter tonight makes them
+    # independent of a network call succeeding at the right moment.
+    # `register_discovered` never overwrites these, so discovery finding them
+    # again is a no-op rather than a conflict.
+    "KXWNBAPTS": "wnba",
+    "KXWNBAAST": "wnba",
+    "KXWNBA3PT": "wnba",
 }
 
 # Series we have SEEN and deliberately do not cover. Kept explicit so they stop
@@ -115,10 +152,459 @@ _TEAM_SPREAD = re.compile(
 # "Mexico wins" / "Yadong Song wins"
 _MONEYLINE = re.compile(r"^\s*(?P<team>.+?)\s+wins\s*\??\s*$", re.IGNORECASE)
 
+# --------------------------------------------------------------------------
+# THE GAME-LINE GRAMMARS KALSHI ACTUALLY USES, read from production titles
+# 2026-08-24T02:12Z. The three above were written against a different wording
+# and matched NONE of them -- 302 markets came back `unreadable_title` on the
+# first build after game-line series were registered.
+#
+#   KXMLBSPREAD       'Texas wins by over 3.5 runs?'
+#   KXMLBF5SPREAD     'Texas wins first 5 innings by over 2.5 runs?'
+#   KXMLBF5TOTAL      'First 5 innings: Over 6.5 runs'
+#   KXMLBTEAMTOTAL    'Will Texas score over 7.5 runs?'
+#   KXMLBINNINGTOTAL  '9th inning: Over 1.5 runs'
+#   KXMLBF5           'first 5 innings tie'
+#
+# `_TEAM_SPREAD` above wants "Will the X win by ..."; these say "X wins by ...".
+# Close enough to look handled and different enough to match nothing, which is
+# why the count was 302 and not a partial number.
+# --------------------------------------------------------------------------
+
+# The period phrase MLB uses, and the board's own suffix for it. Only the
+# prefixes OddsAPI actually carries (`_1st_5_innings` and friends) are here --
+# a 9th-inning total has no board key, so it must refuse rather than acquire a
+# spelling that joins to nothing.
+_INNINGS_PERIOD = {
+    "1": "1st_1_innings",
+    "3": "1st_3_innings",
+    "5": "1st_5_innings",
+    "7": "1st_7_innings",
+}
+
+# "Texas wins by over 3.5 runs?" / "Texas wins first 5 innings by over 2.5 runs?"
+_TEAM_SPREAD_WINS_BY = re.compile(
+    r"^\s*(?P<team>.+?)\s+wins\s+(?:first\s+(?P<innings>\d+)\s+innings\s+)?"
+    r"by\s+(?P<direction>over|under)\s+(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# "First 5 innings: Over 6.5 runs"  (a TOTAL -- names no team)
+_PERIOD_TOTAL = re.compile(
+    r"^\s*first\s+(?P<innings>\d+)\s+innings\s*:\s*(?P<direction>over|under)\s+"
+    r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# "Will Texas score over 7.5 runs?"  (a TEAM total -- names the team)
+_TEAM_SCORES = re.compile(
+    r"^\s*will\s+(?:the\s+)?(?P<team>.+?)\s+score\s+(?P<direction>over|under)\s+"
+    r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# "first 5 innings tie" -- the DRAW leg of a three-way. Recognised so it stops
+# counting as unreadable, and refused below: a draw is a third outcome and the
+# board carries no MLB first-innings three-way market to join it to. Reading it
+# as either side of a two-way line would be a bet on a different thing.
+_INNINGS_TIE = re.compile(
+    r"^\s*first\s+(?P<innings>\d+)\s+innings\s+tie\s*\??\s*$", re.IGNORECASE
+)
+
+
+# Ticker token -> sport. ORDER MATTERS AND IS THE WHOLE TRAP: "KXWNBAREB"
+# contains "NBA", so a naive scan registers every WNBA series as NBA and prices
+# women's rebounds off a men's box score. Longest-first, and WNBA before NBA.
+_SPORT_TOKENS: tuple[tuple[str, str], ...] = (
+    ("NCAAF", "ncaaf"),
+    ("NCAAB", "ncaab"),
+    ("WNBA", "wnba"),
+    ("NBA", "nba"),
+    ("MLB", "mlb"),
+    ("NFL", "nfl"),
+    ("NHL", "nhl"),
+)
+
+# A title that names a PLAYER prop. Kalshi words them "…Player Rebounds",
+# "…Player Points". The word PLAYER is the discriminator: "Team Totals",
+# "1st Quarter Spread" and "Rookie of the Year" all lack it, and every one of
+# them is a market this system must not auto-register -- a game line has no
+# player to join on and needs an event mapping that does not exist.
+_PLAYER_PROP_TITLE = re.compile(r"\bplayer\s+(?P<stat>[A-Za-z0-9 +'-]+)$", re.IGNORECASE)
+
+
+# The game date, which lives in the EVENT segment of the ticker and nowhere
+# else. Two shapes are in production, both measured 2026-08-23T23:51Z:
+#
+#   KXWNBAPTS-26AUG23LVTOR-TORJALLEMAND22-15     event `26AUG23LVTOR`
+#   KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2     event `26AUG242140MINATH`
+#
+# MLB carries a start time after the date, WNBA does not, so only the leading
+# `YYMMMDD` is common to both -- and that is all a date comparison needs. The
+# time is deliberately NOT parsed: whether `2140` is Eastern or UTC is not
+# settled by any reading I have, and a date taken from Kalshi's own labelling
+# of the event does not depend on the answer.
+_EVENT_DATE = re.compile(r"^(?P<yy>\d{2})(?P<mon>[A-Z]{3})(?P<dd>\d{2})")
+_MONTHS = {
+    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+}
+
+
+def game_date_from_ticker(ticker: Any) -> str | None:
+    """The date the game is played, as `YYYY-MM-DD`, or None if unreadable.
+
+    NOT `close_time`, WHICH IS A SETTLEMENT DEADLINE. This is the correction to
+    a wrong assumption that cost a whole slate. `kalshi_board_join` compared
+    `close_time[:10]` against the board's date and refused everything that
+    disagreed; the comment there said the assumption was unverified. Measured:
+
+        ticker  KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2
+        open    2026-08-23T23:11:00Z
+        close   2026-08-28T01:40:00Z      <- FOUR DAYS after the game
+        expiration 2026-08-28T01:40:00Z
+
+    Kalshi closes a market days after the event so late settlement data can
+    land. So the date check refused 100% of markets, on every build for hours:
+    `matched=0 reasons={'market_closes_on_another_date': 190}`. Nothing was
+    wrong with the names, the prices or the parsing -- the join was comparing
+    a game date against a settlement date and they never agree.
+
+    Returns None rather than guessing. A caller must refuse an undatable market
+    with its own named reason: falling back to `close_time` would restore
+    exactly the bug this replaces.
+    """
+    text = str(ticker or "").strip().upper()
+    parts = text.split("-")
+    if len(parts) < 2:
+        return None
+    match = _EVENT_DATE.match(parts[1])
+    if not match:
+        return None
+    month = _MONTHS.get(match.group("mon"))
+    if month is None:
+        return None
+    try:
+        # `26` is 2026. Kalshi has no markets from 1926 and none listed beyond
+        # a few days out, so the century is not ambiguous in practice.
+        return date(2000 + int(match.group("yy")), month, int(match.group("dd"))).isoformat()
+    except ValueError:
+        # A real date shape that is not a real date (`26FEB30`). Unreadable is
+        # the honest answer; inventing March 2nd is not.
+        return None
+
+
+def event_blob_from_ticker(ticker: Any) -> str | None:
+    """The TEAM part of the event segment: `26AUG242140MINATH` -> `MINATH`.
+
+    The date, and MLB's optional four-digit start time, are stripped off the
+    front; whatever remains identifies the two clubs. Returns None when the
+    segment has no readable date, because without one the remainder is not
+    reliably the team blob.
+
+    DELIBERATELY NOT SPLIT INTO TWO TEAMS HERE. `MINATH` is MIN+ATH and `LVTOR`
+    is LV+TOR, but nothing in the string says where the boundary is, and club
+    codes vary in length. Splitting it needs a per-sport registry of Kalshi's
+    own codes, which we do not have and would be guessing at -- and a wrong
+    split pairs a bet with the wrong game, which is the one failure this whole
+    module is built to prevent. `match_event_blob` inverts the problem instead.
+    """
+    text = str(ticker or "").strip().upper()
+    parts = text.split("-")
+    if len(parts) < 2:
+        return None
+    segment = parts[1]
+    match = _EVENT_DATE.match(segment)
+    if not match:
+        return None
+    rest = segment[len(match.group(0)):]
+    # MLB carries HHMM after the date; WNBA does not. Strip exactly four
+    # leading digits when present -- a club code is never all digits.
+    if len(rest) >= 4 and rest[:4].isdigit():
+        rest = rest[4:]
+    return rest or None
+
+
+def _clean_code(value: Any) -> str:
+    return "".join(ch for ch in str(value or "").upper() if ch.isalnum())
+
+
+def _blob_for(away: Any, home: Any) -> str:
+    return f"{_clean_code(away)}{_clean_code(home)}"
+
+
+def _splits(blob: str) -> list[tuple[str, str]]:
+    """Every way `MINATH` could be two club codes.
+
+    Club codes run 2-4 characters, so the boundary is bounded rather than
+    guessed at -- and every candidate is CHECKED against our own schedule
+    below, so a wrong split cannot survive.
+    """
+    return [
+        (blob[:i], blob[i:])
+        for i in range(2, len(blob) - 1)
+        if 2 <= i <= 4 and 2 <= len(blob) - i <= 4
+    ]
+
+
+def match_event_blob(
+    blob: Any, games: Sequence[Mapping[str, Any]], *, sport: Any = None
+) -> dict[str, Any]:
+    """Which of OUR games is `blob`? Returns the answer AND how sure it is.
+
+    THE INVERSION. Rather than splitting Kalshi's concatenated codes -- which
+    needs a registry we do not have -- this builds `AWAY+HOME` from each game
+    WE already know about and looks for the blob among them. Our own schedule
+    supplies the boundary that the string omits, so no guess is required.
+
+    Every outcome is named, and only `ok` is usable:
+
+      ok         exactly one of our games produces this blob
+      no_match   none does. Usually our club codes differ from Kalshi's
+                 (`OAK` vs `ATH`), which is an ALIAS to add, not a bet to make
+      ambiguous  more than one does -- a doubleheader, or two clubs whose codes
+                 concatenate the same way. Refused: a coin flip between two
+                 real games is worse than no bet, because it looks like a bet
+
+    `no_match` being common is expected at first and is exactly the measurement
+    that says which aliases to add. It must never soften into a best guess.
+    """
+    wanted = "".join(ch for ch in str(blob or "").upper() if ch.isalnum())
+    if not wanted:
+        return {"status": "no_match", "reason": "empty_blob"}
+
+    # EXACT STRING FIRST -- cheap, and it is what matches when both sides
+    # already spell a club the same way.
+    hits = [
+        game
+        for game in (games or [])
+        if _blob_for(game.get("away_team"), game.get("home_team")) == wanted
+    ]
+
+    if not hits:
+        # THEN THROUGH THE CLUB RESOLVER. Kalshi says `ATH` where our board may
+        # say `OAK`, and `CWS` where it may say `CHW`; comparing the raw
+        # concatenation calls those different games and refuses a real match.
+        # Measured 2026-08-24: `event_not_on_our_board: 66`.
+        #
+        # `team_aliases.canonical_team` is the repo's existing resolver, built
+        # from the per-sport maps that already carry these spellings -- reused
+        # rather than reimplemented, because two normalisers that disagree
+        # about one club is a silent mismatch nobody sees (#218).
+        #
+        # The blob is SPLIT rather than the codes concatenated, because we do
+        # not hold Kalshi's code list and cannot generate its spelling from
+        # ours. Every candidate split is checked against a real game, so a
+        # wrong boundary matches nothing rather than inventing a pairing.
+        try:
+            from syndicate.features.shared.team_aliases import canonical_team
+        except Exception:
+            canonical_team = None
+
+        if canonical_team is not None:
+            for game in games or []:
+                ours_away = canonical_team(sport, game.get("away_team"))
+                ours_home = canonical_team(sport, game.get("home_team"))
+                if not ours_away or not ours_home:
+                    # A club OUR side cannot resolve. Skipped rather than
+                    # matched loosely -- an unresolvable name is not evidence.
+                    continue
+                for left, right in _splits(wanted):
+                    if (
+                        canonical_team(sport, left) == ours_away
+                        and canonical_team(sport, right) == ours_home
+                    ):
+                        hits.append(game)
+                        break
+    if not hits:
+        return {"status": "no_match", "blob": wanted}
+    if len(hits) > 1:
+        return {"status": "ambiguous", "blob": wanted, "count": len(hits)}
+    game = hits[0]
+    return {
+        "status": "ok",
+        "blob": wanted,
+        "event_id": game.get("event_id"),
+        "home_team": game.get("home_team"),
+        "away_team": game.get("away_team"),
+    }
+
+
+def sport_for_ticker(ticker: Any) -> str | None:
+    """The sport a series ticker names, or None. Longest token first."""
+    text = str(ticker or "").strip().upper()
+    for token, sport in _SPORT_TOKENS:
+        if token in text:
+            return sport
+    return None
+
+
+def auto_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]:
+    """Series Kalshi lists that are PLAYER PROPS we can already price.
+
+    THE ALTERNATIVE TO A HAND-MAINTAINED REGISTRY. Kalshi lists 13,389 series;
+    four were registered by hand, and every sport added that way is a sport
+    somebody has to remember. This reads the catalogue Kalshi gave us and keeps
+    the ones that satisfy BOTH conditions:
+
+      1. the TITLE says "Player <stat>" -- Kalshi's own word for a player prop,
+         and the discriminator that excludes team totals, quarter spreads and
+         every futures market, none of which have a player to join on; and
+      2. `market_keys` resolves that stat for that sport -- so a market we
+         cannot name is never registered, however player-shaped it looks.
+
+    Both, because either alone is a guess. A title with "Player" in it whose
+    stat we cannot resolve would price nothing; a stat we can resolve on a
+    series that is actually a game line would join to the wrong thing.
+
+    The SPORT comes from the ticker, never the title: "Women's Pro Basketball"
+    is not a token this repo uses anywhere.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    found: dict[str, str] = {}
+    for ticker, title in (titles or {}).items():
+        sport = sport_for_ticker(ticker)
+        if sport is None:
+            continue
+        match = _PLAYER_PROP_TITLE.search(str(title or "").strip())
+        if not match:
+            continue
+        if canonical_market_key(sport, match.group("stat").strip()) is None:
+            continue
+        found[str(ticker).strip().upper()] = sport
+    return found
+
+
+def prop_candidates(titles: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Every series whose TITLE looks like a player prop, mapped or not.
+
+    THE MEASUREMENT THAT PRECEDES A MAPPING. `auto_series_from_catalogue`
+    returns only what already resolves, so a sport we cannot price is invisible
+    in its output -- indistinguishable from a sport Kalshi does not list. That
+    is the absence/failure confusion again, and it hid 317 NFL series behind
+    `classified_n=0` for as long as football had no vocabulary.
+
+    This reports the candidates BEFORE either filter, with the reason each one
+    fails, so the gap is readable:
+
+      - `sport=None`  the ticker carries no token we recognise. This is how
+                      soccer surfaces at all: Kalshi names soccer series by
+                      COMPETITION (`KXEPL...`, `KXUCL...`), never by the word
+                      soccer, so there is no token to add until we have seen
+                      the real prefixes.
+      - `market=None` the sport is known and the STAT is not in `market_keys`.
+                      A spelling to add, and until it is added the series is
+                      refused rather than guessed at.
+
+    Bounded by the shape of the pattern: only titles ending "Player <stat>"
+    reach the list, which is a small subset of 13,389 series.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    found: list[dict[str, Any]] = []
+    for ticker, title in (titles or {}).items():
+        text = str(title or "").strip()
+        match = _PLAYER_PROP_TITLE.search(text)
+        if not match:
+            continue
+        stat = match.group("stat").strip()
+        sport = sport_for_ticker(ticker)
+        found.append(
+            {
+                "ticker": str(ticker).strip().upper(),
+                "title": text,
+                "stat": stat,
+                "sport": sport,
+                "market": canonical_market_key(sport, stat) if sport else None,
+            }
+        )
+    found.sort(key=lambda c: (c["sport"] or "~unmapped", c["ticker"]))
+    return found
+
+
+def game_market_from_title(title: Any) -> str | None:
+    """The game-line market a series title names, or None.
+
+    Kalshi prefixes every title with the competition -- "Women's Pro Basketball
+    1st Quarter Total" -- so the market is the TAIL, not the whole string. The
+    longest tail that resolves wins, because "Total" and "1st Quarter Total"
+    both resolve and only the longer one is right.
+
+    Bounded at four words: the longest real phrase is "1st Quarter Spread" at
+    three, and letting it run further would start swallowing competition names
+    that happen to end in a market word.
+    """
+    from syndicate.features.shared.market_keys import canonical_game_market
+
+    words = str(title or "").strip().split()
+    if not words:
+        return None
+    for size in range(min(4, len(words)), 0, -1):
+        resolved = canonical_game_market(" ".join(words[-size:]))
+        if resolved:
+            return resolved
+    return None
+
+
+def auto_game_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]:
+    """Game-line series Kalshi lists that we can name -- totals, spreads,
+    moneylines, and their quarter/half/period and alternate forms.
+
+    SEPARATE FROM THE PLAYER-PROP DISCOVERY because the two have different
+    identities and different risks. A prop names a human and a human plays one
+    game a day, so its title is a complete identity. A game line names no team
+    at all, so it can only be placed once the EVENT is resolved from the
+    ticker -- which is why `kalshi_board_join` keeps these behind
+    `SYNDICATE_KALSHI_GAME_LINES` and refuses an unresolved one by name.
+
+    Registering the series is therefore not the same as agreeing to bet it. It
+    only makes the market legible enough to be counted.
+    """
+    found: dict[str, str] = {}
+    for ticker, title in (titles or {}).items():
+        key = str(ticker).strip().upper()
+        if key in SERIES_OUT_OF_SCOPE:
+            continue
+        sport = sport_for_ticker(key)
+        if not sport:
+            continue
+        if game_market_from_title(title) is None:
+            continue
+        found[key] = sport
+    return found
+
 
 def sport_for_series(series: Any) -> str | None:
-    """The sport, or None. Explicit table, never a prefix rule."""
-    return SERIES_SPORT.get(str(series or "").strip().upper())
+    """The sport, or None. Hand registry first, then anything discovery added.
+
+    Discovery writes into `_DISCOVERED` rather than into `SERIES_SPORT`, so a
+    hand-written entry always wins and the two never become indistinguishable
+    -- "we chose this" and "a title matched" are different confidence levels.
+    """
+    key = str(series or "").strip().upper()
+    return SERIES_SPORT.get(key) or _DISCOVERED.get(key)
+
+
+_DISCOVERED: dict[str, str] = {}
+
+
+def register_discovered(found: Mapping[str, str]) -> dict[str, Any]:
+    """Add auto-discovered series. Reports what was ADDED, not what was seen.
+
+    Idempotent, and never overwrites a hand-written entry.
+    """
+    added = {
+        ticker: sport
+        for ticker, sport in (found or {}).items()
+        if ticker not in SERIES_SPORT and _DISCOVERED.get(ticker) != sport
+    }
+    _DISCOVERED.update(added)
+    return {"added": added, "total_discovered": len(_DISCOVERED)}
+
+
+def all_series() -> dict[str, str]:
+    """Every series we price: hand-registered plus discovered."""
+    return {**_DISCOVERED, **SERIES_SPORT}
 
 
 def threshold_to_line(threshold: Any) -> float | None:
@@ -152,6 +638,55 @@ def _parse_title(title: str) -> dict[str, Any] | None:
             "line": threshold_to_line(match.group("threshold")),
             "side": "over",
         }
+
+    # BEFORE `_TEAM_SPREAD` and `_MONEYLINE`. "Texas wins first 5 innings by
+    # over 2.5 runs?" contains "wins", and a looser pattern reading it as a
+    # moneyline would price the game winner as though it were a run line.
+    match = _TEAM_SPREAD_WINS_BY.match(title)
+    if match:
+        innings = match.group("innings")
+        period = _INNINGS_PERIOD.get(str(innings)) if innings else None
+        if innings and period is None:
+            # A period the board has no key for. Refused rather than flattened
+            # onto the full-game spread, which is a different wager.
+            return None
+        return {
+            "grammar": GRAMMAR_TEAM_SPREAD,
+            "subject": match.group("team").strip(),
+            "stat_text": f"spreads_{period}" if period else "spreads",
+            "line": float(match.group("line")),
+            "side": match.group("direction").strip().lower(),
+        }
+
+    match = _PERIOD_TOTAL.match(title)
+    if match:
+        period = _INNINGS_PERIOD.get(str(match.group("innings")))
+        if period is None:
+            return None
+        return {
+            "grammar": GRAMMAR_TEAM_TOTAL,
+            # Names no team -- the game comes from the ticker.
+            "subject": None,
+            "stat_text": f"totals_{period}",
+            "line": float(match.group("line")),
+            "side": match.group("direction").strip().lower(),
+        }
+
+    match = _TEAM_SCORES.match(title)
+    if match:
+        return {
+            "grammar": GRAMMAR_TEAM_SPREAD,
+            "subject": match.group("team").strip(),
+            # A TEAM total, not the game total -- a different market, and
+            # conflating them would price one side's runs as both sides'.
+            "stat_text": "team_totals",
+            "line": float(match.group("line")),
+            "side": match.group("direction").strip().lower(),
+        }
+
+    if _INNINGS_TIE.match(title):
+        # Readable and deliberately unpriceable -- see the pattern's comment.
+        return None
 
     match = _TEAM_SPREAD.match(title)
     if match:
@@ -252,6 +787,9 @@ def classify_market(market: Mapping[str, Any]) -> dict[str, Any]:
         # True means the title alone cannot say WHICH GAME this is. The join
         # must refuse these until an event mapping exists.
         "needs_event_identity": parsed["grammar"] in _NEEDS_EVENT_IDENTITY,
+        # The league whose club map resolves this market's team names. `WSH` is
+        # the Nationals in mlb and the Mystics in wnba.
+        "sport": sport,
     }
 
 

@@ -3256,6 +3256,8 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         read_portfolio_plan_for_venue,
     )
     from syndicate.features.shared.execution_ledger import (
+        LIVE,
+        PAPER,
         execution_mode,
         ledger_summary,
         _load,
@@ -3278,7 +3280,17 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # computed from this one -- reusing the filtered list would have
         # produced a figure labelled "all dates" that was the selected day's,
         # which is worse than not showing it at all.
-        all_orders = list(_load().get("orders") or [])
+        # PAPER ORDERS ONLY, and this filter is load-bearing rather than tidy.
+        # This page's banner says "Simulated fills only. No money moves, no book
+        # is contacted, nothing here is a real wager." A live order rendered
+        # under that sentence is a real position wearing a disclaimer that it is
+        # not one -- the single most dangerous thing this surface could show.
+        # Live orders have their own page: `/portfolio/live`.
+        all_orders = [
+            order
+            for order in (_load().get("orders") or [])
+            if str(order.get("mode") or PAPER) != LIVE
+        ]
         orders = [
             order
             for order in all_orders
@@ -3481,6 +3493,151 @@ def _paper_date_nav(selected_date: str) -> dict[str, Any]:
 def portfolio_paper_api():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     return _no_cache_response(jsonify({"ok": True, **_paper_portfolio_payload(selected_date)}))
+
+
+def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
+    """Real money only. The mirror image of `_paper_portfolio_payload`.
+
+    A SEPARATE PAGE RATHER THAN A FILTER ON THE PAPER ONE. The two answer the
+    same questions about different things, and the whole reason `/portfolio` and
+    `/portfolio/paper` are separate is that simulated positions shown beside
+    real ones get mistaken for bets somebody placed. Adding a toggle would
+    rebuild that confusion with better formatting.
+
+    Everything here is `mode=live`, across ALL dates rather than one: a real
+    position is not interesting only on the day it was opened, and a page that
+    hides yesterday's open bet behind a date picker is a page that will one day
+    let one expire unwatched.
+    """
+    from syndicate.features.shared.execution_ledger import (
+        LIVE,
+        STATUS_SUBMITTED,
+        execution_mode,
+        live_execution_armed,
+        read_execution_state,
+        _load,
+    )
+    from syndicate.features.shared.execution_guard import kill_switch_engaged, limits
+    from syndicate.features.shared.paper_settlement import settlement_summary
+    from pipeline.execute_portfolio import execution_enabled
+
+    orders: list = []
+    ledger_error = None
+    try:
+        orders = [
+            order
+            for order in (_load().get("orders") or [])
+            if str(order.get("mode") or "") == LIVE
+        ]
+        orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
+    except Exception as exc:
+        # An unreadable ledger must never render as "no live positions". That
+        # is the one absence this page cannot afford to get wrong.
+        ledger_error = f"{type(exc).__name__}: {exc}"
+        _LOGGER.exception("LIVE_LEDGER_READ_FAILURE")
+
+    settlement = None
+    settlement_error = None
+    try:
+        settlement = settlement_summary(None, orders=orders)
+    except Exception as exc:
+        settlement_error = f"{type(exc).__name__}: {exc}"
+        _LOGGER.exception("LIVE_SETTLEMENT_SUMMARY_FAILURE")
+
+    # SENT, OR POSSIBLY SENT, WITH AN UNKNOWN RESULT. A restart between submit
+    # and record produces exactly these, and they are the rows a person needs to
+    # see first -- they must be checked against the venue rather than retried.
+    unreconciled = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
+
+    # THE WORKER'S STATE, NOT THIS PROCESS'S. The switches and caps are env
+    # vars on live-odds-worker; the web service has none of them, so reading
+    # its own env reported `mode=paper armed=no job=off` and the DEFAULT caps
+    # ($25/$100) on a book that was live, armed and capped at $10/$40. That is
+    # the same defect the paper page had with "COMMIT JOB off", and the same
+    # fix: the worker stamps its state, and the page says which source it is
+    # showing rather than presenting web's environment as the truth.
+    stamped = None
+    try:
+        stamped = read_execution_state()
+    except Exception:
+        _LOGGER.exception("EXECUTION_STATE_READ_FAILURE")
+
+    if stamped:
+        switch = stamped.get("kill_switch") or {}
+        payload_state = {
+            "execution_mode": stamped.get("execution_mode"),
+            "live_armed": bool(stamped.get("live_armed")),
+            "execution_enabled": bool(stamped.get("execution_enabled")),
+            "kill_switch": switch,
+            "limits": stamped.get("limits") or {},
+            "state_source": "worker",
+            "state_recorded_by": stamped.get("recorded_by"),
+            "state_recorded_at": stamped.get("recorded_at"),
+            "state_age_seconds": _seconds_since(stamped.get("recorded_at")),
+        }
+    else:
+        # NEVER SILENTLY web's env. Absent a stamp we show this process's view
+        # and label it, because "the worker has not reported" and "execution is
+        # off" are different facts with opposite responses.
+        try:
+            switch = kill_switch_engaged()
+        except Exception as exc:
+            switch = {"engaged": True, "source": "read_failed", "detail": type(exc).__name__}
+        payload_state = {
+            "execution_mode": execution_mode(),
+            "live_armed": live_execution_armed(),
+            "execution_enabled": execution_enabled(),
+            "kill_switch": switch,
+            "limits": limits(LIVE),
+            "state_source": "web_env",
+            "state_recorded_by": None,
+            "state_recorded_at": None,
+            "state_age_seconds": None,
+        }
+
+    return {
+        "date": selected_date,
+        "orders": orders,
+        "ledger_error": ledger_error,
+        "settlement": settlement,
+        "settlement_error": settlement_error,
+        "unreconciled": unreconciled,
+        **payload_state,
+    }
+
+
+def _seconds_since(stamp: Any) -> int | None:
+    """Age of a UTC stamp in seconds, or None if unreadable.
+
+    The age is what turns a stamp into a heartbeat: state from forty minutes
+    ago is not current state, and a page that cannot tell the difference will
+    show a dead worker's last known settings as though they were now.
+    """
+    from datetime import datetime, timezone as _tz
+
+    text = str(stamp or "").strip()
+    if not text:
+        return None
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=_tz.utc)
+    return max(0, int((datetime.now(_tz.utc) - moment).total_seconds()))
+
+
+@intelligence_bp.get("/api/portfolio/live")
+def api_portfolio_live():
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    return _no_cache_response(jsonify(_live_portfolio_payload(selected_date)))
+
+
+@intelligence_bp.get("/portfolio/live")
+def portfolio_live_page():
+    """Real positions. Deliberately its own page, not a tab on the paper one."""
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    return render_template("portfolio_live.html", live=_live_portfolio_payload(selected_date))
 
 
 @intelligence_bp.get("/portfolio/paper")

@@ -25303,3 +25303,223 @@ part of the very data the probe is meant to measure.
 
 Queued for after the slate: `SYNDICATE_WNBA_MARKET_JOIN_PROBE=2026-08-11..
 2026-08-24` on `live-odds-worker`, once `live_events=0`.
+---
+
+## 2026-08-23 — refresh-worker `6bba203a7`: the modelled live edge fires on exactly its population, and reaches nothing
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da5nuu6417fc7383rn20`, live `23:20:44Z`. Commit `6bba203a7`, on
+`origin/main` and containing `b427a825` (`#539`) — checked with
+`git merge-base --is-ancestor`, then confirmed in the deployed tree itself
+(`git show 6bba203a:...` → 3 `edged_modelled` sites in the join, 1 in the log
+line) rather than trusting the ancestry alone. Trigger `api` (MCP), so the
+claim I held on `refresh-worker` was advisory: the deploy-guard hook matches
+`Bash|PowerShell` and does not see an MCP deploy. Preflight could not run at
+all — no `RENDER_API_KEY` in this shell.
+
+**verify (the half that passed):** first post-deploy board build, `23:27:49Z`:
+
+```
+[layer2_shortlist] LIVE_PROJECTION_JOIN sport=soccer
+  considered=343 projected=43 edged=0 edged_modelled=38 prob_withheld=0
+  lens_indexed=144 lens_live_games=1
+  edge_withheld=5 edge_why={'no_fair_value_devig_failed': 5}
+```
+
+`edged=0 edged_modelled=38` is the exact pairing `#539` was scoped to produce:
+the de-vig path stayed at zero, as it must when the market is one-sided, and
+the modelled path took 38 rows that had no number at all before. The
+`one_sided_quote` bucket, which was **110** on the 2026-08-22 reading, is now
+absent from `edge_why` entirely — those rows are priced, not withheld. The
+5 that remain are the residual `devig_failed` population `#530` left behind,
+untouched by this change on purpose.
+
+**verify (the half that FAILED, and it is the half that matters to a user):**
+
+```
+[layer2_shortlist] LAYER2_BOARD_HEALTH sport=soccer
+  rows=348 pregame_proj=172 live_proj=0 no_proj=176 live_rows=2 edged=171
+```
+
+I wrote the criterion as "then `LAYER2_BOARD_HEALTH sport=soccer` should show
+live rows carrying a number for the first time". It does not. `live_proj=0`.
+**38 modelled edges exist and zero of them reached the board.**
+
+**Root cause found, and it is not the 38.** `edge_vs_modelled_fair_pct`
+(`book_margin_model.EDGE_FIELD`) is WRITTEN by three producers —
+`soccer_projections`, `prop_projections`, and now `live_projection_join` — and
+READ BY NOTHING. `_model_edge_for` (`layer2_board.py:1018`) accepts
+`edge_vs_market_pct` and only that, by name, deliberately. A grep for the field
+across every `.js` and `.html` in `syndicate/` returns zero hits. So the number
+cannot rank and cannot display; it is a value in an artifact nobody consults.
+
+This is `#444`'s shape exactly — *a producer returning a new key does not make
+it visible* — and I quoted that lesson in the very commit that reproduced it. I
+reported the new counter and checked that the counter was wired, which is the
+easy half of `#444`; the field the counter counts is the half that had to reach
+a consumer, and I did not check it. **This has also been silently true of the
+PREGAME path since 2026-08-17**, so the mechanism the user was told "already
+exists and is approved for pregame" has never actually put a number on a board
+either.
+
+`live_rows=2` on 348 published soccer rows is a second, independent limit —
+`lens_live_games=1`, so there was one live match in the lens to draw from —
+but it is NOT the explanation, and I am not resting on it. Even a build with
+plenty of live soccer would publish `live_proj` rows whose modelled edge no
+ranking term and no template can see.
+
+**Open obligation.** Deploying is not the fix here; the consumer is. Filed as a
+follow-up on `#539` rather than closed. Nothing about the four refusals changes
+— the modelled number must stay distinguishable from a de-vig — so the consumer
+has to accept it as its OWN labelled term, not by widening
+`_model_edge_for`'s name check.
+
+## 2026-08-24T00:00Z — web `d44f62357` — live portfolio page
+
+**What:** `/portfolio/live` + `/api/portfolio/live`, and a `mode != live` filter
+on the paper payload (a live order would otherwise have rendered under
+"Simulated fills only… nothing here is a real wager").
+
+**Claim/preflight:** claim held by `kalshi-live`, released. `deploy_preflight.py`
+could NOT run — `RENDER_API_KEY` is not set in this container. Did the two
+checks it does by hand instead: `d44f62357` is on `origin/main`, and the
+live web commit at trigger time (`60ca2486b`) is an ancestor of it, so the
+deploy is cumulative rather than a revert of a peer's merge.
+
+**verify:** UNVERIFIED IN PRODUCTION, and named as such rather than assumed.
+Deploy reached `status=live` at 23:58:27Z, which proves it BUILT and nothing
+more. Both measurement channels are closed in this container right now:
+Render log reads are refused by the permission classifier, and HTTPS to
+`syndicate-an21.onrender.com` gets a 403 on CONNECT from the agent proxy
+(`recentRelayFailures`, 23:56–23:58Z). The reading that would close this is
+`GET /api/portfolio/live` returning `execution_mode` and an `orders` array —
+one request, whenever a channel reopens.
+
+**Local evidence, which is not production evidence:** 68 tests over the two
+portfolio pages, including that a live order does not appear on
+`/portfolio/paper` in the payload or the rendered HTML.
+## 2026-08-23 23:42-23:53Z — web `60ca2486` — PR #24, NFL fantasy Buzz dedupe — deployed, verified by content and by live status
+
+Lane `nfl-fantasy-endpoint-issue-37mqx4` (task session, no `.syndicate` lane
+opened — a scoped GitHub-issue fix, not a standing work lane). Claim
+`e40fa7a969f6db03` acquired on `web`, released clean after landing.
+
+**WHAT SHIPPED.** `recent_news_by_player()` (NFL fantasy `/nfl/fantasy` Buzz
+popup) attached one archive row PER DAY a story stayed on ESPN's feed instead
+of once per distinct story — `capture_news_snapshot` polls the same live feed
+every refresh-worker run, so a headline surviving a few days in the "recent"
+window was duplicated into a player's Buzz list that many times, crowding out
+real distinct coverage under the `[:6]` cap. Fixed to dedupe by the article's
+own `id` (headline fallback). Also fixed `recent_news_by_player`'s
+`date.today()` (timezone-ambiguous, flagged by `test_slate_date_timezone_discipline.py`
+`#518`) to `datetime.now(timezone.utc).date()`, matching the UTC stamp the
+archive files are actually named from. And fixed stale "Hover the badge" help
+text to "Click" — the badge has been a click-to-open dialog, not a tooltip,
+since a prior session's fix; the popup already renders each article's stored
+`description`, nothing there was reverted.
+
+**PREFLIGHT WAS NOT RUN AS THE SCRIPT — RENDER_API_KEY absent from this
+session's environment, no `.env` anywhere on disk.** `deploy_preflight.py`
+hard-requires it at the top of `main()` for every service, including `web`
+(used for `live_deploy`/`fleet_live_commits`, ahead of the service-specific
+process sample). Could not produce a literal CLEAR receipt. **Substituted a
+manual-equivalent check via the Render MCP connector** (a different,
+already-authenticated credential path): `get_service` showed `web` live and
+idle, last deploy (`84ea3b77`) finished ~6.5h earlier with nothing since;
+`list_deploys` showed no `build_in_progress`/`update_in_progress` entry;
+`list_logs` (app, last ~20 lines) showed only Render healthchecks and normal
+read-path artifact export/publish/stream traffic from the workers, nothing
+resembling a job in flight. Judged CLEAR on that basis, with the user's
+explicit sign-off (asked via AskUserQuestion after disclosing the gap) to
+proceed this way rather than wait on the credential. Target commit `60ca2486`
+confirmed on `origin/main` (merged via PR #24, squash) before triggering —
+the `OFF_MAIN` check the script would have run.
+
+**RISK WAS LOW BY ARCHITECTURE, not just by this reading.** `web` does no
+heavy computation (CLAUDE.md's own runtime-execution-model rule) —
+`recent_news_by_player` is explicitly a request-path-only reader per its own
+docstring, so this class of change carries none of the "deploy kills an
+in-flight sim" risk that motivates the process-liveness check for the
+workers.
+
+**verify, 23:53:42Z:** Render `get_deploy` on `dep-da5oe8e417fc73857jm0` —
+`status: live`, `commit.id: 60ca2486b84ac6658ff91d12398711358b5df6d4` (exact
+PR #24 merge commit). Content verify: the merge commit IS the diff reviewed
+in PR #24 (byte-identical to what was pushed and tested locally — 4 new
+tests in `tests/test_nfl_fantasy_news.py`, `pytest` clean on the touched
+files pre-merge). Not independently re-fetched from the live site post-deploy
+— the outbound proxy denies `CONNECT` to `syndicate-an21.onrender.com`
+(policy denial, confirmed via `/__agentproxy/status`, not retried per that
+tool's own instruction) — so "live" here means Render's own deploy record
+plus the pre-verified diff, not a fresh HTTP read of the rendered page.
+
+**CI note, unrelated to this fix, left as found:** `pytest-baseline` (the
+repo's "no NEW failures vs baseline" gate) was RED on this PR and is
+independently RED on `main` itself at the same timestamp (checked: `main`
+push `6cf93202`, same 3 "new" failures — `test_odds_refresh_memory_headroom_snapshot_...`,
+`test_memory_headroom_snapshot_...`, `test_the_live_refusal_is_not_bypassed`,
+none touching NFL/fantasy). Pre-existing baseline drift, not introduced or
+fixed here; not investigated further as out of this task's scope.
+
+**Owed, if anyone picks up preflight tooling:** `deploy_preflight.py` could
+read Render access via an alternate path (or accept a pre-authenticated
+client) the way this session's Render MCP connector does, so a missing raw
+`RENDER_API_KEY` doesn't force every future session into this same manual
+substitution.
+
+**CORRECTION, same session, caught when asked "what else rode along":** the
+paragraph above says "verified by content" and that claim is narrower than it
+reads — it verifies MY diff, not the deploy's composition. `web`'s previous
+live commit was `84ea3b77` (17:07:20Z); this deploy's `60ca2486` is **73
+commits later on `main`**, ~30 of them non-merge code changes from OTHER
+sessions landed in the hours between: WNBA prop-series registration and
+grading, soccer live-edge pricing against a modelled fair, Kalshi
+auth/signing moved onto the worker, basketball interval-projection and
+situational-grid work, live bet-status/placement wiring, among others. None
+of those were reviewed by this session — this deploy shipped the state of
+`main` at trigger time, not a scoped diff of PR #24. That is this repo's
+normal deploy model, not a mistake specific to this run (`deploy_claim`
+serialises WHEN a deploy happens; it does not and cannot audit WHAT is on
+main when it fires — CLAUDE.md's own words: "Serialisation is not
+composition"). Recorded because the ledger entry above reads more scoped
+than the deploy actually was, and a future reader comparing "what changed on
+`web`" against "what this entry says shipped" should not have to
+re-derive the gap.
+
+---
+
+## 2026-08-24 — live-odds-worker `0e0017d7b`: the ledger now asks Kalshi what it holds
+
+**Deployed:** `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`), deploy
+`dep-da65btjbc2fs73b039a0`, triggered `14:32:22Z`. Commit `0e0017d7b`, on
+`origin/main` (branch fast-forwarded main before triggering). Trigger `api`
+(MCP).
+
+**Claim:** `deploy_claim.py acquire --service live-odds-worker --holder
+portfolio-decision-and-execution`, token `3083438d58d0ff77` — it replaced an
+expired `kalshi-live` claim 789 min old.
+
+**Preflight: NOT RUN, and this is a substitution, not a pass.**
+`deploy_preflight.py` exits on `RENDER_API_KEY not set in the environment or
+.env`; this container reaches Render through the MCP connector instead, which
+the script cannot use. Substituted by hand: `list_deploys` showed
+`4a023f566` live with nothing in flight, and the target SHA is a descendant of
+it on `main`. That covers OFF_MAIN and in-flight; it does NOT cover the job
+liveness and blast-radius checks preflight also does. The gap is the same one
+already recorded in the 08-23 `web` entry, still owed.
+
+**A SECOND DEPLOY OF THE SAME COMMIT** appeared at `14:43:51Z`
+(`dep-da65h9u417fc739d6jo0`), which this session did not trigger. Recorded
+because an unexplained deploy is exactly the thing CLAUDE.md says is findable
+and should be looked up rather than assumed benign. Same SHA, so composition is
+unaffected either way.
+
+**verify:** _(open obligation)_ — the reading that will prove this worked is a
+`[execution_ledger] RECONCILE venue=kalshi candidates=N venue_orders=M ...`
+line on live-odds-worker, followed by a `RECONCILED key=... filled->submitted`
+for `KXMLBKS-26AUG242140MINATH-MINZMATTHEWS52-5`. That order is resting and
+unfilled at Kalshi while our ledger says `filled`; the correction of that one
+row is the measurement. A `RECONCILE_READ_FAILED` would mean the read route or
+the auth on it is wrong, which is the outcome this is most likely to have
+wrong -- `ORDERS_READ n=N keys=[...]` logs the response shape once per read for
+exactly that reason.

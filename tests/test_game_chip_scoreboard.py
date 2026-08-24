@@ -23,8 +23,20 @@ class GameChipBuilderTests(unittest.TestCase):
         # `name` is empty here because this fixture carries only labels; the
         # key is always present so consumers see one chip shape, and the board
         # join falls back to `abbr` exactly as it did before names existed.
-        self.assertEqual(chip["away"], {"abbr": "NYY", "name": "", "score": "4"})
-        self.assertEqual(chip["home"], {"abbr": "BOS", "name": "", "score": "2"})
+        #
+        # `key` is the CANONICAL club name (2026-08-24) -- and this fixture is
+        # the proof that it does not need a full name to work: `_side_key`
+        # falls back to the label, and `canonical_team` resolves a tri-code as
+        # readily as a name, so "NYY" answers "new york yankees". A chip whose
+        # club the alias map cannot place carries `None` here rather than a
+        # guess, because a WRONG key attaches one game's score to another
+        # game's card.
+        self.assertEqual(
+            chip["away"], {"abbr": "NYY", "name": "", "key": "new york yankees", "score": "4"}
+        )
+        self.assertEqual(
+            chip["home"], {"abbr": "BOS", "name": "", "key": "boston red sox", "score": "2"}
+        )
         self.assertEqual(chip["leader"], "away")
         self.assertEqual(chip["game_key"], "823759")
 

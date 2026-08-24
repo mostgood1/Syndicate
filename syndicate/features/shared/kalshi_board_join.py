@@ -64,13 +64,18 @@ _PROP_TITLE = re.compile(
 # disagreeing about what happened.
 from syndicate.features.shared.kalshi_catalogue import (  # noqa: E402
     REASON_COMBINATORIAL,
+    game_date_from_ticker,
     REASON_OUT_OF_SCOPE,
     REASON_UNMAPPED_SERIES,
     REASON_UNMAPPED_STAT,
     REASON_UNREADABLE_TITLE,
 )
 
-REASON_WRONG_DATE = "market_closes_on_another_date"
+# Renamed from `market_closes_on_another_date`, which named the field the
+# check USED rather than the fact it asserts -- and that field turned out to be
+# the wrong one. A reason string that describes a mechanism goes stale the
+# moment the mechanism is corrected; this one describes the finding.
+REASON_WRONG_DATE = "market_is_for_another_date"
 # Split out from the above: this one means the player, market and line all
 # matched a board row and ONLY the date disagreed. Same refusal, opposite
 # diagnosis -- one says Kalshi is quoting a slate we are not looking at, the
@@ -82,6 +87,147 @@ REASON_NO_PRICE = "no_kalshi_price"
 # refusal: these are markets we CAN read and CANNOT yet place, so the number is
 # the size of the game-lines gap rather than a defect.
 REASON_NEEDS_EVENT_MAPPING = "needs_event_mapping"
+# The game-line resolution outcomes, each counted by name. `unmatched` is the
+# one that says which club-code ALIASES to add; `ambiguous` means two of our
+# own games produce the same code pair (a doubleheader) and must never be
+# guessed between. `disabled` means it WOULD have resolved and the flag is off,
+# which is what makes the measurement readable before anything is priced.
+REASON_EVENT_UNMATCHED = "event_not_on_our_board"
+REASON_EVENT_AMBIGUOUS = "event_matches_two_games"
+REASON_GAME_LINES_DISABLED = "game_lines_disabled"
+# A team-named game line whose club we cannot place on either side of the
+# resolved game. Its own reason because it is the LAST guard before a bet
+# on the wrong team, and it must never be quietly folded into "no row".
+REASON_TEAM_SIDE_UNRESOLVED = "team_side_unresolved"
+# A market whose ticker carries no readable game date. Separated from every
+# other refusal because it is the ONLY one that would previously have been
+# silently mis-dated instead of refused.
+REASON_UNDATABLE = "no_game_date_in_ticker"
+
+
+def game_lines_enabled() -> bool:
+    """Are game lines allowed to be PRICED? Absent means no.
+
+    Off by default and read per call rather than at import, so the flag can be
+    turned on without a code deploy once the resolution numbers justify it.
+    """
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_KALSHI_GAME_LINES") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _resolve_event(
+    market: Mapping[str, Any], board_rows: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Which of our games this game-line market belongs to."""
+    from syndicate.features.shared.kalshi_catalogue import (
+        event_blob_from_ticker,
+        match_event_blob,
+        sport_for_series,
+    )
+
+    blob = event_blob_from_ticker(market.get("ticker"))
+    if not blob:
+        return {"status": "no_match", "reason": "no_blob"}
+    # The SPORT decides which club map resolves the codes -- `WSH` is the
+    # Nationals in mlb and the Mystics in wnba, and resolving against the wrong
+    # map is how a bet lands on the wrong league's game.
+    sport = sport_for_series(market.get("series"))
+    # DISTINCT GAMES ONLY. The board carries one row per market per game, so
+    # feeding every row in would make an ordinary slate look ambiguous.
+    seen: dict[str, dict[str, Any]] = {}
+    for row in board_rows:
+        event_id = str(row.get("event_id") or "")
+        if event_id and event_id not in seen:
+            seen[event_id] = {
+                "event_id": event_id,
+                "home_team": row.get("home_team"),
+                "away_team": row.get("away_team"),
+            }
+    result = match_event_blob(blob, list(seen.values()), sport=sport)
+    result.setdefault("sport", sport)
+    return result
+
+
+def _event_key(row: Mapping[str, Any]) -> tuple[str, str, float] | None:
+    """A game line's identity: (event, market, line). No player involved.
+
+    Canonicalised through `market_keys` like `_board_key`, so both indexes
+    speak one vocabulary -- a second spelling here is how the two would drift.
+    """
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    event_id = str(row.get("event_id") or "").strip()
+    if not event_id:
+        return None
+    raw = str(row.get("market") or "").strip().lower()
+    market = canonical_market_key(row.get("sport"), raw) or raw
+    try:
+        line = float(row.get("line"))
+    except (TypeError, ValueError):
+        # A moneyline has no line. Keyed at 0.0 so it is reachable rather than
+        # dropped -- `h2h` rows genuinely carry no number.
+        line = 0.0
+    return (event_id, market, line)
+
+
+def _side_for_team(
+    team: Any, resolution: Mapping[str, Any], *, sport: Any = None
+) -> str | None:
+    """Is `team` the away or the home side of this resolved game? None if unsure.
+
+    Through `team_aliases`, because Kalshi writes "Texas" where the board
+    writes "TEX" -- and because a club resolver that disagrees with the one the
+    event matcher used would put the two halves of the same join on different
+    vocabularies.
+
+    None is the important return. A market naming a club we cannot place is
+    refused, never assigned positionally: guessing which side a name refers to
+    is a bet on the wrong team half the time, at a price that looks confident.
+    """
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:
+        return None
+
+    away = canonical_team(sport, resolution.get("away_team"))
+    home = canonical_team(sport, resolution.get("home_team"))
+    if not away or not home:
+        return None
+
+    named = canonical_team(sport, team)
+    if named:
+        if named == away and named != home:
+            return "away"
+        if named == home and named != away:
+            return "home"
+        return None
+
+    # KALSHI NAMES THE CITY. Titles say "Texas wins by over 3.5 runs", and the
+    # club map carries tri-codes and full names -- `canonical_team("mlb",
+    # "Texas")` is None, so an exact resolver refuses every team-named game
+    # line. Measured: `team_side_unresolved` on all of them.
+    #
+    # So a city or nickname is matched as a TOKEN SUBSET of the full club name
+    # ("texas" within "texas rangers"), and only against the two clubs already
+    # resolved for THIS game -- never against the league. That bound is what
+    # keeps it safe: the candidate set is two, and both are known to be playing
+    # each other.
+    #
+    # AMBIGUITY REFUSES. "Chicago" is inside both "chicago cubs" and "chicago
+    # white sox", so on a Cubs-White Sox game it names neither side. Returning
+    # a guess there is a bet on the wrong team half the time, at a price that
+    # looks confident.
+    wanted = set(str(team or "").strip().lower().split())
+    if not wanted:
+        return None
+    hits = [
+        side
+        for side, full in (("away", away), ("home", home))
+        if wanted and wanted.issubset(set(str(full).split()))
+    ]
+    return hits[0] if len(hits) == 1 else None
 
 
 def normalize_person(value: Any) -> str:
@@ -275,13 +421,21 @@ def join_kalshi_to_board(
     not know the slate date should get the old behaviour, not a silent filter.
     """
     by_key: dict[tuple[str, str, float], list[Mapping[str, Any]]] = {}
+    # A SECOND INDEX, keyed by GAME rather than by player. A game line has no
+    # player to key on, so `by_key`'s (market, player, line) cannot reach it --
+    # the player slot would be empty for every row and every market.
+    by_event: dict[tuple[str, str, float], list[Mapping[str, Any]]] = {}
     for row in board_rows:
         key = _board_key(row)
         if key is not None:
             by_key.setdefault(key, []).append(row)
+        event_key = _event_key(row)
+        if event_key is not None:
+            by_event.setdefault(event_key, []).append(row)
 
     matches: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
+    unmatched_samples: list[dict[str, Any]] = []
 
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
@@ -299,11 +453,145 @@ def join_kalshi_to_board(
         if verdict.get("needs_event_identity"):
             # A player prop names a human, and a human plays one game a day, so
             # (player, market, line) is a complete identity. A total names
-            # neither team -- pairing it needs `event_ticker` mapped to our
-            # event id, which does not exist yet. REFUSED rather than attempted:
-            # a total joined to the wrong game is a confidently-priced bet on
-            # strangers.
-            _refuse(REASON_NEEDS_EVENT_MAPPING)
+            # NEITHER team, so pairing it needs the game -- and the game is in
+            # the ticker, which is where the game date turned out to be too:
+            # `KXMLBHR-26AUG242140MINATH-...` is MIN at ATH.
+            #
+            # GATED OFF BY DEFAULT. The identity is resolved by matching
+            # Kalshi's concatenated club codes against OUR schedule
+            # (`match_event_blob`), and how often our codes agree with Kalshi's
+            # is UNMEASURED -- `OAK` against `ATH` is a real possibility and
+            # every such gap is an alias nobody has written yet. So the resolver
+            # runs and REPORTS on every build, and the flag decides only whether
+            # a resolved game may be priced. That way the measurement arrives
+            # before the money does, which is the opposite of how tonight went.
+            #
+            # A total joined to the wrong game is a confidently-priced bet on
+            # strangers, so `ambiguous` and `no_match` are refused by name and
+            # never softened into a best guess.
+            resolution = _resolve_event(market, board_rows)
+            status = str(resolution.get("status") or "")
+            if status == "no_match" and len(unmatched_samples) < 8:
+                # THE ALIAS LIST, WRITTEN FROM DATA. `event_not_on_our_board`
+                # is a count; it cannot say WHICH code we failed to recognise,
+                # and guessing at club spellings is how a bet lands on the
+                # wrong game. This prints Kalshi's blob beside the blobs our
+                # own board offered for the same date, so the missing alias is
+                # readable rather than inferred. Bounded at 8 -- enough to name
+                # the pattern, not enough to flood the log money moves through.
+                unmatched_samples.append(
+                    {
+                        "kalshi": resolution.get("blob"),
+                        "ticker": market.get("ticker"),
+                        "sport": resolution.get("sport"),
+                    }
+                )
+            if status != "ok":
+                _refuse(
+                    REASON_EVENT_AMBIGUOUS
+                    if status == "ambiguous"
+                    else REASON_EVENT_UNMATCHED
+                )
+                continue
+            if not game_lines_enabled():
+                # RESOLVED, and still not priced. Counted separately from the
+                # unresolved ones so the log answers "would this work?" while
+                # the answer is still free.
+                _refuse(REASON_GAME_LINES_DISABLED)
+                continue
+
+            # THE PRICING PATH. Until now this fell through to
+            # `needs_event_mapping` even when the event HAD resolved, so 60
+            # game lines a build were identified and then dropped -- the flag
+            # bought measurement and nothing else.
+            if wanted_date:
+                game_date = game_date_from_ticker(market.get("ticker"))
+                if game_date is None:
+                    _refuse(REASON_UNDATABLE)
+                    continue
+                if game_date != wanted_date:
+                    _refuse(REASON_WRONG_DATE)
+                    continue
+
+            game_rows = by_event.get(
+                (str(resolution.get("event_id") or ""), verdict["market"], verdict["line"])
+            )
+            if not game_rows:
+                _refuse(REASON_NO_BOARD_ROW)
+                continue
+
+            yes_price = _as_float(market.get("yes_american"))
+            no_price = _as_float(market.get("no_american"))
+            if yes_price is None and no_price is None:
+                _refuse(REASON_NO_PRICE)
+                continue
+
+            # WHICH SIDE IS KALSHI'S `YES`? Two different questions depending
+            # on the grammar, and getting it wrong is a real bet on the
+            # opposite outcome at a confident price.
+            subject = verdict.get("subject")
+            for row in game_rows:
+                board_side = str(row.get("side") or "").strip().lower()
+                if subject:
+                    # A TEAM-NAMED market: "Texas wins by over 3.5 runs" is YES
+                    # on Texas. The board row's side is `away`/`home`, so the
+                    # named club has to be resolved against the event's own two
+                    # clubs -- never positionally, and never by assuming the
+                    # first team named is the away side.
+                    named = _side_for_team(
+                        subject,
+                        resolution,
+                        sport=verdict.get("sport") or resolution.get("sport"),
+                    )
+                    if named is None:
+                        # We cannot say which club this names. REFUSED: a coin
+                        # flip between two sides of a real game is a bet on the
+                        # wrong team half the time.
+                        _refuse(REASON_TEAM_SIDE_UNRESOLVED)
+                        continue
+                    if board_side not in {"away", "home"}:
+                        _refuse("unmapped_board_side")
+                        continue
+                    # YES pays when the NAMED club covers. So the board row for
+                    # that club takes the yes quote, and the other side takes no.
+                    kalshi_side = "yes" if board_side == named else "no"
+                else:
+                    # A TOTAL names no club, so the side is the direction the
+                    # title already gave us.
+                    if board_side in {"over", "o"}:
+                        kalshi_side = "yes" if verdict.get("side") == "over" else "no"
+                    elif board_side in {"under", "u"}:
+                        kalshi_side = "no" if verdict.get("side") == "over" else "yes"
+                    else:
+                        _refuse("unmapped_board_side")
+                        continue
+
+                kalshi_price = yes_price if kalshi_side == "yes" else no_price
+                if kalshi_price is None:
+                    _refuse(REASON_NO_PRICE)
+                    continue
+                matches.append(
+                    {
+                        "ticker": market.get("ticker"),
+                        "series": verdict.get("series"),
+                        "market": verdict["market"],
+                        "player_name": None,
+                        "team": subject,
+                        "line": verdict["line"],
+                        "board_side": board_side,
+                        "kalshi_side": kalshi_side,
+                        "kalshi_american": kalshi_price,
+                        "kalshi_probability": market.get(
+                            "yes_probability" if kalshi_side == "yes" else "no_probability"
+                        ),
+                        "board_price": row.get("quote", {}).get("price")
+                        if isinstance(row.get("quote"), Mapping)
+                        else None,
+                        "board_event_id": row.get("event_id"),
+                        "model_edge_pct": row.get("model_edge_pct"),
+                        "game_line": True,
+                    }
+                )
             continue
 
         series = verdict.get("series")
@@ -322,11 +610,23 @@ def join_kalshi_to_board(
         # is right and only the calendar disagrees, while `no_matching_board_row`
         # says the key is still wrong.
         if wanted_date:
-            # `close_time` compared on the DATE only -- a night game closes
-            # after midnight UTC (`#370`). Whether `close_time` is first pitch
-            # at all is UNVERIFIED; see `kalshi_odds_refresh`'s DATE_FIELDS.
-            close_date = str(market.get("close_time") or "")[:10]
-            if close_date and close_date != wanted_date:
+            # THE GAME DATE COMES FROM THE TICKER, NOT FROM `close_time`.
+            # `close_time` is a SETTLEMENT deadline days after the event --
+            # `KXMLBHR-26AUG242140MINATH-...` closes 2026-08-28 for a game on
+            # the 24th -- so comparing it to the board's slate date refused
+            # every market on every build: `matched=0 reasons={
+            # 'market_closes_on_another_date': 190}` for hours, straight
+            # through a live slate. The DATE_FIELDS probe was printing the
+            # disproof the whole time; nothing had read it.
+            game_date = game_date_from_ticker(market.get("ticker"))
+            if game_date is None:
+                # NO FALLBACK TO `close_time`. Falling back would reinstate the
+                # bug this replaces, and it would do it silently on exactly the
+                # markets whose identity we understand least. An undatable
+                # market gets its own reason so the count is visible.
+                _refuse(REASON_UNDATABLE)
+                continue
+            if game_date != wanted_date:
                 _refuse(REASON_WOULD_MATCH_WRONG_DATE if rows else REASON_WRONG_DATE)
                 continue
 
@@ -414,5 +714,16 @@ def join_kalshi_to_board(
         "board_market_vocabulary": dict(
             sorted(board_markets.items(), key=lambda kv: -kv[1])[:12]
         ),
+        # Kalshi blobs we could not pair, beside the blobs OUR board offered.
+        # The count alone cannot say which club spelling is missing, and a club
+        # alias guessed rather than read is how a bet reaches the wrong game.
+        "unmatched_events": unmatched_samples,
+        "board_event_sample": sorted(
+            {
+                f"{str(r.get('away_team') or '?')}{str(r.get('home_team') or '?')}"
+                for r in board_rows
+                if r.get("away_team") or r.get("home_team")
+            }
+        )[:12],
         "matches": matches,
     }

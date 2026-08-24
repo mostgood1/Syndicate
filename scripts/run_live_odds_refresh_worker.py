@@ -763,6 +763,11 @@ def _kalshi_series_catalogue_at_boot() -> None:
     try:
         from syndicate.features.shared.kalshi_client import discover_series, series_matching
 
+        # Imported HERE, not inside the auto-registration `try` below. A name
+        # bound inside a try is unbound on the except path, and that is exactly
+        # how `BET_STATUS_FAILED` shipped a block that had never once executed.
+        from syndicate.features.shared.kalshi_catalogue import sport_for_series
+
         report = discover_series()
         tickers = report.get("tickers") or []
         print(
@@ -783,15 +788,217 @@ def _kalshi_series_catalogue_at_boot() -> None:
                 flush=True,
             )
             return
-        for token in ("WNBA", "NBA", "MLB", "NFL", "NHL"):
+        # TITLES, not just tickers. `KXWNBATEAMTOTAL` is legible; most are not,
+        # and the question tonight is which of the 91 is a PLAYER PROP -- the
+        # only shape that can be joined on (player, market, line) and graded
+        # without an event mapping that does not exist. A ticker list cannot
+        # answer that and a title list can.
+        titled = report.get("titles") or {}
+        # AUTO-REGISTER the player-prop series Kalshi lists. Four were
+        # hand-written; the catalogue has 13,389, and every sport added by hand
+        # is a sport somebody has to remember. Registered only when the TITLE
+        # says "Player <stat>" AND `market_keys` resolves that stat for that
+        # sport -- either alone is a guess.
+        try:
+            from syndicate.features.shared.kalshi_catalogue import (
+                auto_series_from_catalogue,
+                register_discovered,
+            )
+
+            discovered = auto_series_from_catalogue(titled)
+            result = register_discovered(discovered)
+            print(
+                "[live_odds_worker] KALSHI_AUTO_SERIES"
+                f" added={result.get('added')}"
+                f" total_discovered={result.get('total_discovered')}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] KALSHI_AUTO_SERIES_ERROR {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+        # THE PROP CANDIDATES, MAPPED OR NOT. This is what tells us which
+        # series to add for a new sport, and it prints the ones we CANNOT price
+        # as well as the ones we can -- a list of only what already works
+        # cannot distinguish "Kalshi does not list it" from "we have no
+        # vocabulary for it", which is exactly how 317 NFL series sat behind
+        # `classified_n=0`. Soccer can only surface here: Kalshi names those
+        # series by COMPETITION, so there is no sport token to add until the
+        # real prefixes have been seen.
+        try:
+            from syndicate.features.shared.kalshi_catalogue import prop_candidates
+
+            candidates = prop_candidates(titled)
+            unmapped = [c for c in candidates if not c.get("market")]
+            print(
+                f"[live_odds_worker] KALSHI_PROP_CANDIDATES n={len(candidates)}"
+                f" mapped={len(candidates) - len(unmapped)} unmapped={len(unmapped)}",
+                flush=True,
+            )
+            for cand in unmapped[:60]:
+                print(
+                    f"[live_odds_worker] KALSHI_PROP_UNMAPPED sport={cand.get('sport')}"
+                    f" stat={cand.get('stat')!r} ticker={cand.get('ticker')}"
+                    f" title={cand.get('title')!r}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] KALSHI_PROP_CANDIDATES_ERROR {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+        # GAME-LINE SERIES, registered so they can be COUNTED. Registering is
+        # not agreeing to bet them: `kalshi_board_join` keeps game lines behind
+        # `SYNDICATE_KALSHI_GAME_LINES` and refuses an unresolved event by name.
+        # This only makes totals, spreads, moneylines and their quarter/half and
+        # alternate forms legible enough to measure.
+        try:
+            from syndicate.features.shared.kalshi_catalogue import (
+                auto_game_series_from_catalogue,
+                register_discovered,
+            )
+
+            game_found = auto_game_series_from_catalogue(titled)
+            game_result = register_discovered(game_found)
+            by_sport: dict[str, int] = {}
+            for sport in game_found.values():
+                by_sport[sport] = by_sport.get(sport, 0) + 1
+            print(
+                f"[live_odds_worker] KALSHI_GAME_SERIES found={len(game_found)}"
+                f" added={len(game_result.get('added') or {})} by_sport={by_sport}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] KALSHI_GAME_SERIES_ERROR {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+        for token in ("WNBA",):
             found = series_matching([token], tickers)
             print(
-                f"[live_odds_worker] KALSHI_SPORT {token} series={found[:12]} n={len(found)}",
+                f"[live_odds_worker] KALSHI_SPORT {token} n={len(found)}",
+                flush=True,
+            )
+            for ticker in found:
+                print(
+                    f"[live_odds_worker] KALSHI_SERIES {ticker} :: {str(titled.get(ticker) or '')[:70]}",
+                    flush=True,
+                )
+        for token in ("NBA", "MLB", "NFL", "NHL"):
+            # SUBSTRING MATCH, and the line says so. `KXWNBAPTS` contains
+            # "NBA", so it appears under NBA here -- which read, in a log, as
+            # the classifier having made exactly the mistake `_SPORT_TOKENS`
+            # exists to prevent, and cost a diagnostic detour to disprove. The
+            # classifier is `sport_for_series`; this is a catalogue census. A
+            # diagnostic that cannot be told apart from the bug it is near is
+            # worse than no diagnostic.
+            found = series_matching([token], tickers)
+            classified = [t for t in found if sport_for_series(t) == token.lower()]
+            print(
+                f"[live_odds_worker] KALSHI_SPORT {token}"
+                f" ticker_substring_n={len(found)}"
+                f" classified_n={len(classified)}"
+                f" classified={classified[:12]}",
                 flush=True,
             )
     except Exception as exc:
         print(
             f"[live_odds_worker] KALSHI_SERIES_CATALOGUE_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _live_ledger_at_boot() -> None:
+    """Print every LIVE order the ledger holds, with the venue's own error.
+
+    A BOOT DUMP RATHER THAN AN ENDPOINT, because the endpoint is not always
+    reachable and a real position is not something to be unable to look at.
+    Added 2026-08-24 after the first real order this system sent failed and the
+    reason -- written to the ledger by `place_order` -- had no reader anywhere
+    in the logs. Read-only, and bounded: live orders are capped per day by
+    `execution_guard`, so this cannot become the 4.9GB log the shadow ledger
+    once was.
+    """
+    try:
+        from syndicate.features.shared.execution_ledger import LIVE, _load
+
+        orders = [
+            o
+            for o in (_load().get("orders") or [])
+            if str(o.get("mode") or "") == LIVE
+        ]
+    except Exception as exc:
+        # An unreadable ledger is NOT "no live orders" and must never print as
+        # one -- that is the same absence/failure confusion the live page
+        # exists to keep apart.
+        print(
+            f"[live_odds_worker] LIVE_LEDGER_UNREADABLE {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return
+
+    # CORRECT BEFORE REPORTING. Rows written before adapters declared
+    # `venue_contacted` carry `failed` for orders that never left the process,
+    # and `failed` charges the daily budget and can block the next live run.
+    # Idempotent, so this is a no-op on every boot after the first.
+    try:
+        from syndicate.features.shared.execution_ledger import reclassify_presend_failures
+
+        fixed = reclassify_presend_failures()
+        if fixed.get("reclassified"):
+            print(
+                f"[live_odds_worker] LEDGER_RECLASSIFIED n={fixed.get('reclassified')}"
+                f" orders={fixed.get('orders')}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] LEDGER_RECLASSIFY_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+    # THEN ASK KALSHI WHAT IT ACTUALLY HOLDS. Reclassification above corrects
+    # rows from what we KNOW happened locally; this corrects them from what the
+    # VENUE says, which is the only account that can see a resting order fill
+    # after we stopped watching it. Runs on this worker because this is where
+    # the Kalshi credentials live and where the ledger is already being read.
+    try:
+        from syndicate.features.shared.execution_ledger import reconcile_live_orders
+
+        reconciled = reconcile_live_orders()
+        if reconciled.get("changed"):
+            # Re-read: the rows printed below are now stale by exactly the
+            # corrections we just made, and a report of the pre-correction
+            # state is worse than no report.
+            orders = [
+                o
+                for o in (_load().get("orders") or [])
+                if str(o.get("mode") or "") == LIVE
+            ]
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] LEDGER_RECONCILE_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+    print(f"[live_odds_worker] LIVE_LEDGER n={len(orders)}", flush=True)
+    for order in orders[-25:]:
+        print(
+            f"[live_odds_worker] LIVE_LEDGER_ROW date={order.get('selected_date')}"
+            f" status={order.get('status')} venue={order.get('venue')}"
+            f" ticker={order.get('venue_ticker')}"
+            f" sport={order.get('sport')} market={order.get('market')}"
+            f" player={order.get('player_name')!r}"
+            f" side={order.get('side')} line={order.get('line')}"
+            f" price={order.get('requested_price')}"
+            f" stake={order.get('requested_stake_dollars')}"
+            f" fill_price={order.get('fill_price')}"
+            f" outcome={order.get('outcome')}"
+            f" error={order.get('error')!r}",
             flush=True,
         )
 
@@ -853,7 +1060,28 @@ def _run_execution_tick() -> None:
         from pipeline.execute_portfolio import run_execution
         from syndicate.features.shared.timezone import central_today_iso
 
-        result = run_execution(central_today_iso())
+        # STAMP THE SWITCHES WHERE WEB CAN SEE THEM. They are env vars on THIS
+        # process; the web service has none of them and reading its own env
+        # reports `mode=paper armed=no` on a live, armed book. Written every
+        # tick so `recorded_at` doubles as a heartbeat.
+        try:
+            from syndicate.features.shared.execution_ledger import record_execution_state
+
+            record_execution_state(recorded_by="live-odds-worker")
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] EXECUTION_STATE_STAMP_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+        # THE VENUE-RESTRICTED PLAN, named explicitly. Without this the call
+        # read the unrestricted plan and tried to place a soccer total and an
+        # MLB spread on Kalshi (2026-08-24T00:34Z) -- positions priced at other
+        # books, carrying no Kalshi ticker, that only the order builder stopped.
+        # `run_execution` now refuses live mode without a scope, so this is the
+        # explicit half of a guard that fails closed on both sides.
+        venue = str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").strip().lower()
+        result = run_execution(central_today_iso(), venue_scope=venue or None)
         print(
             "[live_odds_worker] EXECUTION"
             f" status={result.get('status')}"
@@ -1000,6 +1228,10 @@ def main() -> int:
     try:
         _kalshi_auth_probe_at_boot()
         _kalshi_series_catalogue_at_boot()
+        # BEFORE the catalogue's early returns could ever swallow it -- placing
+        # a probe after another probe's `return` is how the auth check went
+        # three restarts without running.
+        _live_ledger_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)

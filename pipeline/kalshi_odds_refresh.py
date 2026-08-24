@@ -53,15 +53,15 @@ from collections.abc import Mapping
 from typing import Any
 
 def default_sports_series() -> tuple[str, ...]:
-    """Which series to price, from the CATALOGUE rather than a list here.
+    """Every series we price: hand-registered PLUS auto-discovered.
 
-    Adding a sport is then one registry line in one file, and the fetch, the
-    join and the venue scope all pick it up at once. A list maintained here as
-    well would be a second place to forget.
+    Adding a sport is one registry line, and discovery adds the rest from
+    Kalshi's own catalogue. The fetch, the join and the venue scope all read
+    this one function, so none of them can drift from the others.
     """
-    from syndicate.features.shared.kalshi_catalogue import SERIES_SPORT
+    from syndicate.features.shared.kalshi_catalogue import all_series
 
-    return tuple(sorted(SERIES_SPORT))
+    return tuple(sorted(all_series()))
 
 
 def sports_series() -> tuple[str, ...]:
@@ -90,7 +90,15 @@ def kalshi_odds_enabled() -> bool:
     return str(raw).strip().lower() not in {"0", "false", "no", "off"}
 
 
-DEFAULT_REFRESH_INTERVAL_SECONDS = 3600
+# TWO MINUTES, not an hour. The hourly default was written when the only
+# consumer was a next-day opening line, and it is the wrong number entirely for
+# acting on a live game: a rebounds line moves every possession, and a price
+# fetched an hour ago is a memory being sent as a limit order.
+#
+# Affordable now because reads are SIGNED -- the 429s that forced pacing were
+# on the anonymous quota. Per-series, so the cost is one call per series per
+# interval and the per-tick cap only smooths the burst.
+DEFAULT_REFRESH_INTERVAL_SECONDS = 120
 # A failed fetch retries sooner than a successful one -- but not immediately.
 FAILED_RETRY_SECONDS = 600
 
@@ -162,7 +170,7 @@ def fetch_series_markets(series: str) -> dict[str, Any]:
     }
 
 
-DEFAULT_SERIES_PER_TICK = 6
+DEFAULT_SERIES_PER_TICK = 12
 
 # Total markets kept in the artifact. The keyvalue store refuses at 8MB and
 # `layer2_shortlist` already sits at 5.7MB of that budget, so an unbounded
@@ -186,6 +194,73 @@ def series_per_tick() -> int:
     except (TypeError, ValueError):
         return DEFAULT_SERIES_PER_TICK
     return parsed if parsed > 0 else DEFAULT_SERIES_PER_TICK
+
+
+def hot_refresh_interval_seconds() -> int:
+    """How often a HOT series may be re-fetched. Much shorter than the rest.
+
+    A series carrying real money is not the same kind of thing as one of the
+    142 game-line series we have never priced, and giving them one clock is
+    what produced ~26-minute-old quotes on the only markets that mattered.
+    """
+    raw = (os.environ.get("SYNDICATE_KALSHI_HOT_REFRESH_SECONDS") or "").strip()
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        return 30
+    return parsed if parsed > 0 else 30
+
+
+def hot_series() -> set[str]:
+    """Series we have MONEY or a POSITION in, and must not price off a stale quote.
+
+    THE ECONOMY PROBLEM, measured 2026-08-24: 155 series against a cap of 12 a
+    tick means ~13 ticks to sweep, so any given quote can be ~26 minutes old.
+    That is harmless for a series nobody is trading and unacceptable for one
+    with a resting order against it -- and the old queue could not tell them
+    apart, because it ordered by AGE alone.
+
+    Derived from the LEDGER rather than configured, so it follows the money
+    automatically: a series stops being hot when its order stops being open,
+    with no list for anyone to update. `SYNDICATE_KALSHI_HOT_SERIES` adds to it
+    for a series we want watched before we have traded it.
+
+    Fails to the EMPTY SET, never to an exception: a hot list we cannot compute
+    must degrade to the ordinary schedule, not stop the refresh.
+    """
+    found: set[str] = set()
+
+    extra = (os.environ.get("SYNDICATE_KALSHI_HOT_SERIES") or "").strip()
+    for token in extra.replace(",", " ").split():
+        if token:
+            found.add(token.strip().upper())
+
+    try:
+        from syndicate.features.shared.execution_ledger import (
+            STATUS_FILLED,
+            STATUS_SUBMITTED,
+            _load,
+        )
+        from syndicate.features.shared.kalshi_client import series_from_ticker
+
+        for order in (_load().get("orders") or []):
+            # OPEN means the venue may still act on it, or we hold it and it is
+            # not yet graded. A rejected or failed order is not money at risk.
+            if str(order.get("status") or "") not in {STATUS_SUBMITTED, STATUS_FILLED}:
+                continue
+            if order.get("outcome"):
+                # Already graded -- the price no longer decides anything.
+                continue
+            series = series_from_ticker(order.get("venue_ticker"))
+            if series:
+                found.add(str(series).strip().upper())
+    except Exception as exc:
+        print(
+            f"[kalshi_odds] HOT_SERIES_UNAVAILABLE {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+    return found
 
 
 def _due_series(state: dict[str, Any], wanted: tuple[str, ...], interval: int) -> list[str]:
@@ -235,6 +310,73 @@ def _backing_off(entry: Mapping[str, Any], interval: int) -> bool:
     return since is not None and since < min(interval, FAILED_RETRY_SECONDS)
 
 
+# Discovery has run in THIS process. Module-level because `_DISCOVERED` is
+# module-level: registration does not cross the process boundary, and that is
+# exactly the bug this exists to fix.
+_DISCOVERY_DONE = False
+
+
+def ensure_series_discovered(*, force: bool = False) -> dict[str, Any]:
+    """Register every series Kalshi lists that we can price, IN THIS PROCESS.
+
+    THE BUG THIS FIXES, measured 2026-08-24T01:35:57Z:
+
+        BOARD_JOIN kalshi_markets=203 board_rows=513 matched=0
+          reasons={'market_is_for_another_date': 67, 'no_matching_board_row': 136}
+
+    203 markets from SEVEN hand-registered series, and not one game line among
+    them -- no `game_lines_disabled` in the refusals at all, on a build where
+    the flag was on. Discovery had run, found football and NBA and registered
+    thirteen series... on live-odds-worker, which does not do the join. The
+    join runs here, on refresh-worker, where `_DISCOVERED` was empty.
+
+    `register_discovered` writes to a module-level dict, so a boot-time call in
+    one worker is invisible to the other. Putting discovery in the REFRESH
+    rather than in a worker's boot means any process that prices Kalshi gets
+    the same series list, which is what `default_sports_series`'s docstring
+    already promised: "The fetch, the join and the venue scope all read this
+    one function, so none of them can drift."
+
+    Once per process. The catalogue is 13,389 series and changes on the order
+    of days, so re-reading it every two minutes would be a lot of bytes to
+    re-learn the same thing -- and a failure here must never take down a
+    refresh that can still run on the hand-registered series.
+    """
+    global _DISCOVERY_DONE
+    if _DISCOVERY_DONE and not force:
+        return {"status": "skipped", "reason": "already_discovered"}
+
+    try:
+        from syndicate.features.shared.kalshi_catalogue import (
+            auto_game_series_from_catalogue,
+            auto_series_from_catalogue,
+            register_discovered,
+        )
+        from syndicate.features.shared.kalshi_client import discover_series
+
+        report = discover_series()
+        if report.get("status") != "ok":
+            # NOT marked done: a failed catalogue read must be retried, or one
+            # 429 at boot leaves the process pricing seven series forever.
+            return {"status": "error", "reason": str(report.get("errors") or "catalogue_unavailable")}
+
+        titles = report.get("titles") or {}
+        props = auto_series_from_catalogue(titles)
+        games = auto_game_series_from_catalogue(titles)
+        added_props = register_discovered(props)
+        added_games = register_discovered(games)
+        _DISCOVERY_DONE = True
+        return {
+            "status": "ok",
+            "catalogue": int(report.get("count") or 0),
+            "prop_series": len(props),
+            "game_series": len(games),
+            "added": len(added_props.get("added") or {}) + len(added_games.get("added") or {}),
+        }
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+
+
 def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     """Refresh whichever series are due, merge, record, write.
 
@@ -249,6 +391,23 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     if not (force or kalshi_odds_enabled()):
         return {"status": "skipped", "reason": "disabled"}
 
+    # BEFORE `sports_series()` is read, because it decides what that returns.
+    discovery = ensure_series_discovered()
+    if discovery.get("status") == "ok":
+        print(
+            f"[kalshi_odds] SERIES_DISCOVERY catalogue={discovery.get('catalogue')}"
+            f" prop_series={discovery.get('prop_series')}"
+            f" game_series={discovery.get('game_series')}"
+            f" added={discovery.get('added')}",
+            flush=True,
+        )
+    elif discovery.get("status") == "error":
+        # Named, and NOT fatal -- the hand-registered series still price.
+        print(
+            f"[kalshi_odds] SERIES_DISCOVERY_FAILED reason={discovery.get('reason')}",
+            flush=True,
+        )
+
     from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
 
     path = markets_artifact_path()
@@ -260,6 +419,16 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
 
     wanted = sports_series()
     interval = refresh_interval_seconds()
+
+    # HOT FIRST, on their own shorter clock. Without this a series with a
+    # resting order waits behind up to 150 nobody is trading, because the queue
+    # ordered by age alone and could not tell the two apart.
+    hot = hot_series() & set(wanted)
+    hot_due = (
+        list(hot)
+        if force
+        else _due_series(state, tuple(sorted(hot)), hot_refresh_interval_seconds())
+    )
     due = wanted if force else _due_series(state, wanted, interval)
 
     # A failed series backs off on its OWN shorter clock. Without this a venue
@@ -269,7 +438,21 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         due = [s for s in due if not _backing_off(per_series.get(s) or {}, interval)]
 
     cap = series_per_tick()
-    fetching = due if force else due[:cap]
+    if force:
+        fetching = due
+    else:
+        # Hot series are fetched IN ADDITION to the cap, not out of it. They
+        # are few -- bounded by the per-day order cap -- and letting them
+        # consume the cold budget would starve discovery of exactly the markets
+        # we are not yet trading but might.
+        cold = [s for s in due if s not in set(hot_due)]
+        fetching = hot_due + cold[:cap]
+    if hot_due:
+        print(
+            f"[kalshi_odds] HOT_SERIES n={len(hot_due)} series={sorted(hot_due)[:8]}"
+            f" interval_s={hot_refresh_interval_seconds()}",
+            flush=True,
+        )
 
     fetched: dict[str, Any] = {}
     for series in fetching:
@@ -333,6 +516,24 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         return {"status": "empty", "markets": [], "per_series": fetched}
 
     if fetching:
+        # SAMPLE TITLES from what was just fetched, one per series. The title
+        # grammar is the last unverified assumption in the chain: `parse_prop_title`
+        # reads "Player: N+ stat?" and REFUSES anything else rather than
+        # guessing, so a series whose titles are worded differently prices
+        # nothing and says so only as a refusal count. One printed title turns
+        # that into a one-line fix.
+        _seen: set[str] = set()
+        for _market in all_markets:
+            _series = str(_market.get("series") or "")
+            if _series in _seen:
+                continue
+            _seen.add(_series)
+            print(
+                f"[kalshi_odds] TITLE {_series} :: {str(_market.get('title'))[:80]!r}"
+                f" ticker={_market.get('ticker')}",
+                flush=True,
+            )
+
         # Only record history when something was actually re-fetched. Recording
         # on every tick would append the same merged snapshot ~30 times an hour
         # and the "price moved" test would still be doing the real work -- but
@@ -519,4 +720,16 @@ def join_to_board(
             f" board_markets={report.get('board_market_vocabulary')}",
             flush=True,
         )
+        # The CLUB CODES, both sides. `event_not_on_our_board` is a count and
+        # cannot say which spelling is missing; printing Kalshi's blob beside
+        # our board's makes the alias readable instead of guessed at, and a
+        # club alias guessed rather than read is how a bet reaches the wrong
+        # game.
+        if report.get("unmatched_events"):
+            print(
+                "[kalshi_odds] JOIN_EVENTS"
+                f" unmatched={report.get('unmatched_events')}"
+                f" board={report.get('board_event_sample')}",
+                flush=True,
+            )
     return report

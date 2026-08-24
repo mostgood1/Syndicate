@@ -155,6 +155,29 @@ def run_execution(
             "date": normalized,
         }
 
+    # ASK THE VENUE FIRST. Everything below this line reasons about our own
+    # ledger -- the stranded-order gate, the daily budget, the duplicate check
+    # -- and all of it is only as true as the ledger is. A resting order that
+    # filled since the last run is a position we hold and do not know about; a
+    # phantom fill is a position we do not hold and do believe in. Both are
+    # corrected here, before any decision is made on top of them.
+    #
+    # Live only: paper orders have no venue to ask.
+    #
+    # NEVER FATAL. A venue that will not answer leaves the ledger untouched and
+    # the run continues under the conservative reading -- which is exactly what
+    # the gate below enforces, since an unreconciled order still blocks.
+    if mode == LIVE:
+        try:
+            from syndicate.features.shared.execution_ledger import reconcile_live_orders
+
+            reconcile_live_orders()
+        except Exception as exc:
+            print(
+                f"[execute_portfolio] RECONCILE_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
     # UNRECONCILED ORDERS BLOCK A NEW RUN, in live mode only. An order left in
     # the write-ahead state was sent, or may have been, with an unknown result.
     # Placing a fresh slate on top of that risks doubling it. Paper mode cannot
@@ -180,6 +203,34 @@ def run_execution(
 
     # Resolved before the plan read: it decides WHICH plan is read.
     scope = str(venue_scope or "").strip().lower()
+
+    # LIVE MUST READ THE VENUE-RESTRICTED PLAN. Measured 2026-08-24T00:34Z: the
+    # worker called `run_execution(date)` with no scope, so live mode read the
+    # UNRESTRICTED plan and tried to place a SOCCER TOTAL and an MLB SPREAD on
+    # Kalshi -- markets the join never paired, carrying no venue ticker and
+    # priced at some other book. Both failed at order build, so nothing reached
+    # the venue; that was the last guard in the chain doing the work, not a
+    # design.
+    #
+    # The unrestricted plan is a different book with a different meaning: its
+    # prices come from whichever bookmaker was best, and a position in it is
+    # not a claim that THIS venue quotes the market at all. Sending it to one
+    # venue is a category error, and the failure mode if a price ever did
+    # resolve is a real bet on a market nothing matched to the board row.
+    #
+    # Refused rather than defaulted, because guessing the scope here would make
+    # the wrong plan reachable again through a different door.
+    if mode == LIVE and not scope:
+        print(
+            "[execute_portfolio] LIVE_WITHOUT_VENUE_SCOPE date="
+            f"{normalized} -- refusing to place the unrestricted plan at one venue",
+            flush=True,
+        )
+        return {
+            "status": "skipped",
+            "reason": "live_mode_requires_venue_scope",
+            "date": normalized,
+        }
     if scope:
         from pipeline.portfolio_commit import read_portfolio_plan_for_venue
 
@@ -195,13 +246,21 @@ def run_execution(
         return {"status": "skipped", "reason": "plan_has_no_positions_key", "date": normalized}
 
     venue = PAPER_VENUE if mode != LIVE else str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").strip()
-    if scope:
+    if scope and mode != LIVE:
         # Suffixed rather than replaced: the record must still say PAPER at a
         # glance, and `mode` alone would not distinguish the two paper books.
+        #
+        # PAPER ONLY. In live mode the venue IS the scope -- suffixing produced
+        # `kalshi:kalshi`, which resolves to no adapter, so the first live run
+        # after the scope became mandatory would have refused every order with
+        # `no_adapter_for_venue:kalshi:kalshi`. Caught by the existing live
+        # tests the moment the scope was threaded through, which is the whole
+        # reason they name the adapter lookup explicitly.
         venue = f"{venue}:{scope}"
     if mode == LIVE and not venue:
         return {"status": "skipped", "reason": "live_mode_with_no_venue_configured", "date": normalized}
 
+    from syndicate.features.shared.execution_ledger import STATUS_REJECTED
     from syndicate.features.shared.execution_guard import (
         check_order,
         guarded_submit,
@@ -242,6 +301,7 @@ def run_execution(
 
     placed = 0
     duplicates = 0
+    retried = 0
     skipped = 0
     # Every refusal is COUNTED BY NAME. A single `skipped` number cannot tell a
     # plan that named nothing bettable from a cap that stopped a good slate, and
@@ -259,10 +319,19 @@ def run_execution(
             continue
 
         before = _status_of(request)
-        if before is None:
-            # Checked only for orders that would be NEWLY placed. A duplicate
-            # places nothing, so charging it against the cap would let a re-run
-            # exhaust a budget it never spent.
+        # A REJECTED order never reached the venue, so a fresh attempt is a
+        # PLACEMENT, not a duplicate. Measured 2026-08-24T12:58Z: the retry
+        # unblock worked and the order really was submitted -- and this branch
+        # still counted it `duplicates=1` and `continue`d PAST the LIVE_ORDER
+        # log, so a real order went to Kalshi and its outcome was never
+        # recorded anywhere a person could read. Invisible is the one thing an
+        # order that moves money must never be.
+        retryable = before is None or before == STATUS_REJECTED
+        if retryable:
+            # Checked for anything that would be NEWLY placed, retries
+            # included -- a retry spends, so it must be charged. A duplicate
+            # places nothing, and charging that would let a re-run exhaust a
+            # budget it never spent.
             verdict = check_order(request, mode=mode, already=used)
             if not verdict.get("allowed"):
                 reason = str(verdict.get("reason"))
@@ -271,10 +340,34 @@ def run_execution(
                 continue
 
         record = place_order(request, submit=submitter)
-        if before is not None:
+        if not retryable:
             duplicates += 1
             continue
+        if before == STATUS_REJECTED:
+            retried += 1
         status = str(record.get("status") or "")
+        if mode == LIVE:
+            # EVERY LIVE ORDER GETS A LINE, whatever happened to it. Measured
+            # 2026-08-24T00:23:47Z: the first real order this system ever sent
+            # FAILED, and the only trace was `placed=0 ... spent={'dollars':
+            # 4.39, 'orders': 1}` -- a pair of numbers that reads identically to
+            # "nothing was attempted", because `placed` counts fills and `spent`
+            # charges anything that may have reached the venue. Telling those
+            # apart took reading this function's source. The venue's own reason
+            # for refusing real money is the most valuable string in the system
+            # and it was being written to the ledger and never printed.
+            print(
+                f"[execute_portfolio] LIVE_ORDER status={status}"
+                f" venue={venue} ticker={record.get('venue_ticker')}"
+                f" sport={record.get('sport')} market={record.get('market')}"
+                f" player={record.get('player_name')!r}"
+                f" side={record.get('side')} line={record.get('line')}"
+                f" price={record.get('requested_price')}"
+                f" stake={record.get('requested_stake_dollars')}"
+                f" fill_price={record.get('fill_price')}"
+                f" error={record.get('error')!r}",
+                flush=True,
+            )
         if status in {"filled"}:
             placed += 1
         # Charged for anything that MAY have reached the venue, matching
@@ -291,7 +384,7 @@ def run_execution(
     print(
         f"[execute_portfolio] EXECUTED date={normalized} mode={mode} venue={venue} "
         f"armed={live_execution_armed()} positions={len(positions)} placed={placed} "
-        f"duplicates={duplicates} skipped={skipped} refused={refused} "
+        f"duplicates={duplicates} retried={retried} skipped={skipped} refused={refused} "
         f"spent={used} summary={summary}",
         flush=True,
     )
@@ -305,6 +398,10 @@ def run_execution(
         # A re-run places nothing new. This is the number that proves the
         # idempotency works in production rather than only in a test.
         "duplicates": duplicates,
+        # Orders that had been REJECTED and were attempted again. Counted apart
+        # from `placed` so a retry storm is visible rather than looking like
+        # ordinary volume.
+        "retried": retried,
         "skipped": skipped,
         "refused": refused,
         "spent": used,
@@ -332,31 +429,116 @@ def _venue_submitter(venue: str):
     return None
 
 
-def _kalshi_price_for(request) -> float | None:
-    """The CURRENT Kalshi ask for this contract, in dollars.
+def max_slippage_dollars() -> float:
+    """How far worse than the planned price we will still pay, in dollars.
 
-    Re-read at submit time rather than taken from the plan, and that is
-    deliberate even though the plan's price is what the EV was computed from:
-    the limit price we send has to be one Kalshi is actually showing, or the
-    order rests unfilled. The gap between the two IS the slippage, and
-    `execution_ledger` records both so it stays visible.
+    A MARKETABLE LIMIT WITHOUT THIS IS "PAY ANYTHING". Repricing to whatever
+    the venue currently shows is how the order fills; refusing to bound it is
+    how it fills at a price the edge was never computed against. Three cents
+    by default on a contract that settles at a dollar -- roughly a 3% band.
     """
-    from syndicate.features.shared.kalshi_client import dollars_to_probability
-    from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+    raw = (os.environ.get("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS") or "").strip()
+    try:
+        parsed = float(raw)
+    except (TypeError, ValueError):
+        return 0.03
+    return parsed if parsed > 0 else 0.03
+
+
+def _kalshi_price_for(request) -> float | None:
+    """The price to send: the venue's CURRENT ask, bounded by slippage.
+
+    A MARKETABLE LIMIT. This used to read `kalshi_markets.json` and call that
+    "re-read at submit time" -- but the artifact refreshes 12 series a tick
+    across 155, so its ask can be ~26 minutes old. Measured 2026-08-24: we sent
+    $0.54 because that was the artifact's ask; the live ask was $0.56, and the
+    order rested unfilled.
+
+    A resting order is worse than a missed one. It fills only if the market
+    comes back to our stale price -- which is the market moving AGAINST the
+    thesis -- so a standing limit at a price we no longer believe is a free
+    option written to everyone else.
+
+    So: read the live ask and pay it, unless it has moved further than
+    `max_slippage_dollars` from what the plan priced. Beyond that the edge is
+    not the edge we sized, and refusing is the honest answer.
+
+    Falls back to the artifact ONLY when the live read fails, and says so --
+    a stale price is better than no order, but the two must not be confused.
+    """
+    from syndicate.features.shared.kalshi_client import dollars_to_probability, fetch_market
 
     ticker = str(getattr(request, "venue_ticker", "") or "").strip()
     if not ticker:
         return None
+    side = str(getattr(request, "side", "") or "").strip().lower()
+    key = "no_ask_dollars" if side in {"under", "no"} else "yes_ask_dollars"
+
+    planned = _artifact_price(ticker, key)
+
+    live = None
+    try:
+        result = fetch_market(ticker)
+        if result.get("status") == "ok":
+            live = dollars_to_probability((result.get("market") or {}).get(key))
+        else:
+            print(
+                f"[execute_portfolio] LIVE_PRICE_UNAVAILABLE ticker={ticker}"
+                f" reason={result.get('reason')}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[execute_portfolio] LIVE_PRICE_ERROR ticker={ticker}"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+    if live is None:
+        # The artifact, explicitly labelled. Not silently -- an order priced off
+        # a 26-minute-old quote should be visible as such in the one log a
+        # person reads while money is moving.
+        print(
+            f"[execute_portfolio] PRICE_FROM_ARTIFACT ticker={ticker} price={planned}",
+            flush=True,
+        )
+        return planned
+
+    if planned is not None:
+        drift = round(live - planned, 4)
+        if drift > max_slippage_dollars():
+            # WORSE than planned by more than we allow. Refused by raising, so
+            # the order is recorded with a reason rather than silently skipped.
+            raise _SlippageExceeded(
+                f"slippage: planned={planned} live={live} drift={drift:+.4f}"
+                f" max={max_slippage_dollars()}"
+            )
+        print(
+            f"[execute_portfolio] LIVE_PRICE ticker={ticker} planned={planned}"
+            f" live={live} drift={drift:+.4f}",
+            flush=True,
+        )
+    return live
+
+
+class _SlippageExceeded(Exception):
+    """The live price moved past the tolerance. Never reached the venue."""
+
+    venue_contacted = False
+
+
+def _artifact_price(ticker: str, key: str) -> float | None:
+    """The last price the refresh recorded. The FALLBACK, not the source."""
+    from syndicate.features.shared.kalshi_client import dollars_to_probability
+    from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
     try:
         payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json") or {}
     except Exception:
         return None
     for market in payload.get("markets") or []:
-        if str(market.get("ticker") or "") != ticker:
-            continue
-        side = str(getattr(request, "side", "") or "").strip().lower()
-        key = "no_ask_dollars" if side in {"under", "no"} else "yes_ask_dollars"
-        return dollars_to_probability(market.get(key))
+        if str(market.get("ticker") or "") == ticker:
+            return dollars_to_probability(market.get(key))
     return None
 
 

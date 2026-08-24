@@ -117,14 +117,26 @@ def test_a_partial_fill_is_reported_as_partial(monkeypatch):
     assert result["fill_stake_dollars"] == 1.86
 
 
-def test_a_response_without_a_fill_count_falls_back_to_what_was_asked(monkeypatch):
+def test_a_resting_response_holds_NOTHING_yet(monkeypatch):
+    """This test used to assert `contracts == 8` on a RESTING order — that we
+    held the full requested size on something the venue had not executed. It
+    encoded the phantom fill rather than catching it, and it passed the whole
+    time the ledger was booking positions that did not exist.
+
+    A resting order is accepted and unfilled: nothing is held until it trades.
+    """
     monkeypatch.setattr(
         "syndicate.features.shared.kalshi_auth.signed_request",
         lambda *a, **k: {"order": {"order_id": "ord-2", "status": "resting"}},
     )
     result = orders.submit_order(_request(stake=5.0), price_dollars=0.62)
-    assert result["contracts"] == 8
-    assert result["status"] == "resting"
+    assert result["contracts"] == 0
+    assert result["status"] == "submitted"
+    assert result["fill_price"] is None
+    # What we ASKED for is still reported, so a later reconciliation can tell a
+    # resting order from one that was never sent.
+    assert result["requested_contracts"] == 8
+    assert result["venue_status"] == "resting"
 
 
 def test_an_unpriceable_contract_raises_so_the_order_is_recorded_as_failed():
@@ -141,3 +153,421 @@ def test_the_adapter_never_sends_when_the_body_cannot_be_built(monkeypatch):
     monkeypatch.setattr("syndicate.features.shared.kalshi_auth.signed_request", explode)
     with pytest.raises(orders.OrderBuildError):
         orders.submit_order(_request(ticker=None), price_dollars=0.62)
+
+
+# --------------------------------------------------------------------------
+# The price field: the one order-contract assumption nothing has tested
+# --------------------------------------------------------------------------
+
+
+def _req(**kw):
+    from syndicate.features.shared.execution_ledger import OrderRequest
+
+    base = dict(
+        position_key="p", selected_date="2026-08-24", venue="kalshi", sport="mlb",
+        event_id="e1", market="spreads", side="over", requested_price=150.0,
+        requested_stake_dollars=5.0, line=3.5,
+        venue_ticker="KXMLBSPREAD-26AUG241940TEXCWS-TEX4",
+    )
+    base.update(kw)
+    return OrderRequest(**base)
+
+
+def test_the_price_unit_is_switchable_without_a_deploy(monkeypatch):
+    """Kalshi's v2 order contract has long taken `yes_price` in INTEGER CENTS;
+    this module sends `yes_price_dollars`, a spelling inferred from the MARKET
+    READ fields. Nothing has confirmed the write side agrees — the endpoint has
+    never been reached, because both live attempts died at order build.
+
+    An inference from a neighbouring field, never checked against the thing it
+    describes, is exactly the game-date bug (`close_time` read as first pitch)
+    and the title-grammar bug. So it is switchable, and one real response
+    settles it.
+    """
+    from syndicate.features.shared.kalshi_orders import order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_PRICE_UNIT", raising=False)
+    assert order_body(_req(), price_dollars=0.42)["yes_price_dollars"] == 0.42
+
+    monkeypatch.setenv("KALSHI_ORDER_PRICE_UNIT", "cents")
+    body = order_body(_req(), price_dollars=0.42)
+    assert body["yes_price"] == 42
+    assert "yes_price_dollars" not in body
+
+
+def test_cents_are_an_integer_not_a_rounded_float(monkeypatch):
+    """`42.0` and `42` are different JSON. A float where an integer is expected
+    is a rejection whose message will not say so."""
+    from syndicate.features.shared.kalshi_orders import order_body
+
+    monkeypatch.setenv("KALSHI_ORDER_PRICE_UNIT", "cents")
+    value = order_body(_req(), price_dollars=0.42)["yes_price"]
+    assert isinstance(value, int) and not isinstance(value, bool)
+
+
+def test_a_price_outside_one_contract_refuses_in_cents_too(monkeypatch):
+    """A contract settles at $1, so a price outside 1-99c is not a price —
+    and the cents path must not lose that check."""
+    from syndicate.features.shared.kalshi_orders import OrderBuildError, order_body
+
+    monkeypatch.setenv("KALSHI_ORDER_PRICE_UNIT", "cents")
+    for bad in (0.0, 1.5):
+        with pytest.raises(OrderBuildError):
+            order_body(_req(), price_dollars=bad)
+
+
+def test_the_side_still_decides_which_price_field_is_sent(monkeypatch):
+    """An `under` is a NO buy, and the price belongs on the no field. Putting
+    it on the yes field prices the opposite outcome."""
+    from syndicate.features.shared.kalshi_orders import order_body
+
+    monkeypatch.setenv("KALSHI_ORDER_PRICE_UNIT", "cents")
+    body = order_body(_req(side="under"), price_dollars=0.42)
+    assert body["side"] == "no"
+    assert body["no_price"] == 42
+    assert "yes_price" not in body
+
+
+# --------------------------------------------------------------------------
+# The order ROUTE: v2-in-the-path is not the same as the v2 order contract
+# --------------------------------------------------------------------------
+
+
+def test_the_order_path_is_overridable_without_a_deploy(monkeypatch):
+    """MEASURED 2026-08-24, the first real response this endpoint ever gave:
+
+        http_410 .../trade-api/v2/portfolio/orders
+        {"error":{"code":"deprecated_v1_order_endpoint",
+                  "message":"Please switch to the V2 endpoints"}}
+
+    The path carries `v2` and Kalshi calls it the V1 ORDER endpoint — the API
+    surface and the order contract are versioned separately, and reading the
+    `v2` in the URL as proof the route was current was wrong.
+    """
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.delenv("KALSHI_ORDER_URL", raising=False)
+    monkeypatch.delenv("KALSHI_API_BASE", raising=False)
+    monkeypatch.setenv("KALSHI_ORDER_PATH", "/portfolio/orders/v2")
+    assert mod._orders_url().endswith("/trade-api/v2/portfolio/orders/v2")
+
+
+def test_a_leading_slash_is_not_required(monkeypatch):
+    """A path pasted out of a docs page rarely carries one."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.delenv("KALSHI_ORDER_URL", raising=False)
+    monkeypatch.setenv("KALSHI_ORDER_PATH", "orders")
+    assert mod._orders_url().endswith("/trade-api/v2/orders")
+
+
+def test_an_absolute_url_override_wins_outright(monkeypatch):
+    """For a route that does not hang off the same base at all."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.delenv("KALSHI_ORDER_PATH", raising=False)
+    monkeypatch.setenv("KALSHI_ORDER_URL", "https://api.elections.kalshi.com/trade-api/v2/orders")
+    assert mod._orders_url() == "https://api.elections.kalshi.com/trade-api/v2/orders"
+
+
+def test_the_default_route_is_the_supplied_one_not_a_guess(monkeypatch):
+    """Written when the replacement was unknown and the default had to stay on
+    the dead route rather than a guessed one. The owner then supplied the real
+    contract, so the default is now `/portfolio/events/orders` — read off a
+    sample, still not inferred."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    for key in ("KALSHI_ORDER_URL", "KALSHI_ORDER_PATH", "KALSHI_API_BASE"):
+        monkeypatch.delenv(key, raising=False)
+    assert mod._orders_url().endswith("/trade-api/v2/portfolio/events/orders")
+
+
+# --------------------------------------------------------------------------
+# The v2 order contract, from the sample the owner supplied 2026-08-24
+# --------------------------------------------------------------------------
+
+
+def test_the_v2_body_matches_the_supplied_contract(monkeypatch):
+    """Field-for-field against the sample, because every previous order-shape
+    belief in this module was inferred from a neighbouring endpoint and every
+    one of them was wrong."""
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    body = build_order_body(_req(), price_dollars=0.56)
+
+    assert body["side"] == "bid"  # `_req` is an over
+    # QUOTED DECIMALS. A JSON number where a string is expected is a rejection
+    # whose message will not say which field it meant.
+    assert body["price"] == "0.5600"
+    assert isinstance(body["count"], str) and body["count"].endswith(".00")
+    assert body["time_in_force"] == "good_till_canceled"
+    assert body["self_trade_prevention_type"] == "taker_at_cross"
+    assert body["post_only"] is False
+    assert body["reduce_only"] is False
+    assert body["subaccount"] == 0
+    assert body["exchange_index"] == 0
+    # The v1 fields are GONE, not merely unused — sending them alongside the
+    # new ones is how a request gets rejected for a reason nobody can read.
+    for dead in ("action", "type", "yes_price", "no_price", "yes_price_dollars"):
+        assert dead not in body
+
+
+def test_an_under_is_an_ask_at_the_complement(monkeypatch):
+    """Kalshi quotes this endpoint entirely from the YES leg:
+
+        "bid means buy YES, ask means sell YES. (Selling YES is economically
+         equivalent to buying NO at 1 - price...)"
+
+    So an under is not `side: no` — no such value exists — it is an ASK at the
+    complement. Asserted by side AND price, because a count alone cannot tell a
+    correct order from one on the opposite outcome.
+    """
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    over = build_order_body(_req(side="over"), price_dollars=0.40)
+    under = build_order_body(_req(side="under"), price_dollars=0.40)
+
+    assert over["side"] == "bid" and over["price"] == "0.4000"
+    assert under["side"] == "ask" and under["price"] == "0.6000"
+
+
+def test_the_count_does_NOT_invert_with_the_price(monkeypatch):
+    """THE EASY THING TO GET WRONG, and the reason it has its own test.
+
+    Buying NO at $0.40 is selling YES at $0.60, but the capital committed is
+    still $0.40 per contract. Sizing off the quoted 0.60 would buy ~33% fewer
+    contracts than the stake was sized for — silently, on every under, with
+    nothing in the response to reveal it.
+    """
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    over = build_order_body(_req(side="over"), price_dollars=0.40)
+    under = build_order_body(_req(side="under"), price_dollars=0.40)
+
+    # Same stake, same price paid per contract, so the same size both ways.
+    assert under["count"] == over["count"]
+    assert float(under["count"]) == float(_req().requested_stake_dollars) // 0.40
+
+
+def test_a_price_leaving_no_complement_refuses(monkeypatch):
+    """A NO price so close to $1 that the YES quote rounds to zero has no
+    order behind it. $0.9999 is NOT that case — its complement is $0.0001, a
+    dreadful bet but a structurally valid one, and the builder is not the place
+    to have opinions about value."""
+    from syndicate.features.shared.kalshi_orders import OrderBuildError, build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    assert build_order_body(_req(side="under"), price_dollars=0.9999)["price"] == "0.0001"
+
+    with pytest.raises(OrderBuildError):
+        build_order_body(_req(side="under"), price_dollars=0.999999)
+
+
+def test_v2_is_the_default_because_v1_is_confirmed_dead(monkeypatch):
+    """v1 returns http_410 `deprecated_v1_order_endpoint`. Defaulting to it
+    would be defaulting to a guaranteed failure."""
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    assert build_order_body(_req(), price_dollars=0.56)["side"] == "bid"
+
+
+def test_v1_remains_reachable_for_rollback(monkeypatch):
+    """Kept only so a rollback needs no deploy."""
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.setenv("KALSHI_ORDER_CONTRACT", "v1")
+    monkeypatch.delenv("KALSHI_ORDER_PRICE_UNIT", raising=False)
+    body = build_order_body(_req(), price_dollars=0.56)
+    assert body["side"] == "yes"
+    assert body["yes_price_dollars"] == 0.56
+
+
+def test_the_default_route_is_the_v2_one(monkeypatch):
+    from syndicate.features.shared import kalshi_orders as mod
+
+    for key in ("KALSHI_ORDER_URL", "KALSHI_ORDER_PATH", "KALSHI_API_BASE"):
+        monkeypatch.delenv(key, raising=False)
+    assert mod._orders_url().endswith("/trade-api/v2/portfolio/events/orders")
+
+
+# --------------------------------------------------------------------------
+# A resting order is NOT a fill — the phantom position of 2026-08-24T13:12Z
+# --------------------------------------------------------------------------
+
+
+def _submit_with(monkeypatch, response, price=0.54):
+    from syndicate.features.shared import kalshi_auth, kalshi_orders
+
+    monkeypatch.setattr(kalshi_auth, "signed_request", lambda *a, **k: response)
+    return kalshi_orders.submit_order(_req(side="under"), price_dollars=price)
+
+
+def test_a_resting_order_is_recorded_submitted_not_filled(monkeypatch):
+    """THE WORST BUG OF THE RUN. Our ledger read `status=filled fill_price=0.54`
+    for an order that was RESTING and unfilled on Kalshi — the owner saw it
+    pending in their account while we had booked the position.
+
+    The line was `str(order.get("status") or "filled")`. An accepted-but-
+    unexecuted order returns a status we did not map, and the default booked a
+    trade that never happened: settlement would grade it, P&L would count it,
+    and reconciliation becomes impossible when our record and the venue's book
+    disagree about whether a trade occurred.
+    """
+    out = _submit_with(monkeypatch, {"order": {"status": "resting", "order_id": "abc"}})
+    assert out["status"] == "submitted"
+    assert out["contracts"] == 0
+    # A fill price on an unfilled order is a number that will be believed.
+    assert out["fill_price"] is None
+    assert out["fill_stake_dollars"] == 0
+    # The venue's own word is kept, so reconciliation has something to match on.
+    assert out["venue_status"] == "resting"
+
+
+def test_an_unrecognised_status_is_not_a_fill(monkeypatch):
+    """Defaulting the UNKNOWN case to the most committal outcome is exactly
+    backwards. A status we have never seen is not evidence of a trade."""
+    for response in (
+        {"order": {"order_id": "abc"}},
+        {"order": {"status": "pending", "order_id": "abc"}},
+        {"order": {"status": "some_new_state", "order_id": "abc"}},
+    ):
+        out = _submit_with(monkeypatch, response)
+        assert out["status"] == "submitted", response
+        assert out["fill_price"] is None
+
+
+def test_an_executed_order_IS_a_fill(monkeypatch):
+    """The guard must not swing so far that a real fill is missed — an unbooked
+    position is its own kind of wrong."""
+    out = _submit_with(
+        monkeypatch,
+        {"order": {"status": "executed", "order_id": "abc", "filled_count": "2"}},
+    )
+    assert out["status"] == "filled"
+    assert out["contracts"] == 2
+    assert out["fill_price"] == 0.54
+    assert out["fill_stake_dollars"] == 1.08
+
+
+def test_a_partial_fill_counts_what_actually_filled(monkeypatch):
+    """Resting with a positive filled_count is a PARTIAL fill: we hold what
+    filled. Recording the requested size would be a position we believe and do
+    not hold."""
+    out = _submit_with(
+        monkeypatch,
+        {"order": {"status": "resting", "order_id": "abc", "filled_count": "1"}},
+    )
+    assert out["status"] == "filled"
+    assert out["contracts"] == 1
+    assert out["fill_stake_dollars"] == 0.54
+
+
+# --------------------------------------------------------------------------
+# Reading the venue back
+# --------------------------------------------------------------------------
+
+
+def test_the_read_routes_hang_off_the_same_base(monkeypatch):
+    """`GET /portfolio/orders` and `GET /portfolio/orders/{id}`. This shares a
+    prefix with the POST that returns 410 for creation -- reading is fine
+    there, only the create verb moved. Written down because guessing that
+    route is how the 410 happened."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.setenv("KALSHI_API_BASE", "https://example.test/trade-api/v2")
+    assert mod._orders_list_url(100) == (
+        "https://example.test/trade-api/v2/portfolio/orders?limit=100"
+    )
+    assert mod._order_read_url("abc") == (
+        "https://example.test/trade-api/v2/portfolio/orders/abc"
+    )
+
+
+def test_a_read_failure_is_named_not_raised(monkeypatch):
+    """Reconciliation runs over the whole open book; one unreadable response
+    must not stop the rest, and must never look like an empty book."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("connection reset")
+
+    monkeypatch.setattr("syndicate.features.shared.kalshi_auth.signed_request", boom)
+    result = mod.fetch_orders()
+    assert result["status"] == "error"
+    assert "RuntimeError" in result["reason"]
+    assert "orders" not in result
+
+
+def test_a_response_without_an_orders_array_is_an_error(monkeypatch):
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_auth.signed_request",
+        lambda *a, **k: {"cursor": "x"},
+    )
+    assert mod.fetch_orders()["reason"] == "no_orders_array"
+
+
+def test_a_resting_order_is_not_a_fill():
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "resting", "filled_count": 0, "order_id": "o1"})
+    assert seen["state"] == "resting"
+    assert not seen["filled_count"]
+
+
+def test_an_unmapped_status_stays_unknown():
+    """UNKNOWN IS A REAL ANSWER. Collapsing it into either 'it traded' or 'it
+    didn't' is the mistake that booked a position we never held."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    assert venue_order_view({"status": "who_knows"})["state"] == "unknown"
+
+
+def test_the_fill_count_is_derived_when_it_is_not_given():
+    """Three spellings, one fact. The response shape has never been seen live,
+    and `kalshi_client`'s first live run corrected ten field names."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    assert venue_order_view({"status": "executed", "filled_count": 3})["filled_count"] == 3
+    assert venue_order_view(
+        {"status": "executed", "taker_fill_count": 2, "maker_fill_count": 1}
+    )["filled_count"] == 3
+    assert venue_order_view(
+        {"status": "canceled", "initial_count": 5, "remaining_count": 4}
+    )["filled_count"] == 1
+
+
+def test_a_partial_fill_outranks_a_cancelled_status():
+    """The cancel describes the remainder; the contracts that traded are a
+    position we hold."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "canceled", "filled_count": 1})
+    assert seen["state"] == "filled"
+    assert seen["filled_count"] == 1
+
+
+def test_an_executed_order_with_no_readable_count_is_still_filled():
+    """Reported as filled with an unknown count rather than as zero contracts,
+    which would be a lie in the direction that loses a position."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "executed"})
+    assert seen["state"] == "filled"
+    assert seen["filled_count"] is None
+
+
+def test_prices_are_read_as_dollars_whichever_unit_they_arrive_in():
+    """A probability price cannot exceed $1, so the boundary is unambiguous --
+    and the 100x error is the one `kalshi_client` actually made."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    assert venue_order_view({"status": "executed", "filled_count": 1,
+                             "average_fill_price": 46})["fill_price"] == 0.46
+    assert venue_order_view({"status": "executed", "filled_count": 1,
+                             "average_fill_price": 0.46})["fill_price"] == 0.46

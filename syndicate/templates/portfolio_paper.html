@@ -337,6 +337,10 @@
     </span>
     <span class="paper-links">
       <a href="/portfolio">Your tracked bets</a> ·
+      {# The real book is a SEPARATE page, and it has to be reachable from here:
+         a live position nobody can navigate to is a live position nobody
+         watches. #}
+      <a href="/portfolio/live">Live book</a> ·
       <a href="/api/portfolio/paper?date={{ p.date }}">JSON</a>
     </span>
   </div>

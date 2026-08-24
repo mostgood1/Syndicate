@@ -1,0 +1,221 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Live Positions{% endblock %}
+
+{% block content %}
+<style>
+  .live-page { padding: 12px 14px 40px; max-width: 1180px; margin: 0 auto; }
+  .live-banner {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 8px 12px; border-radius: 8px; margin-bottom: 12px;
+    border: 1px solid var(--cards-border, #384152); background: var(--cards-surface, #11151d);
+  }
+  .live-badge { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; }
+  .live-badge--real { background: #7f1d1d; color: #fee2e2; }
+  .live-badge--dark { background: #1f2937; color: #9ca3af; }
+  .live-flag { font-size: 11px; display: inline-flex; gap: 4px; align-items: center; }
+  .live-flag__label { color: var(--cards-text-dim, #9099a8); }
+  .live-flag__value { font-weight: 600; }
+  .live-flag__value.on { color: #f87171; }
+  .live-flag__value.off { color: #6b7280; }
+  .live-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .live-tile { border: 1px solid var(--cards-border, #384152); border-radius: 8px; padding: 8px 10px; background: var(--cards-surface, #11151d); }
+  .live-tile__label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--cards-text-dim, #9099a8); }
+  .live-tile__value { font-size: 19px; font-weight: 700; margin-top: 2px; }
+  .live-tile__meta { font-size: 10px; color: var(--cards-text-dim, #9099a8); margin-top: 2px; }
+  .pos { color: #4ade80; } .neg { color: #f87171; } .warn { color: #fbbf24; }
+  .live-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .live-table th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--cards-text-dim, #9099a8); border-bottom: 1px solid var(--cards-border, #384152); padding: 5px 6px; }
+  .live-table td { padding: 6px; border-bottom: 1px solid rgba(56,65,82,.5); vertical-align: top; }
+  .live-table .primary { font-weight: 600; }
+  .sub { display: block; font-size: 10px; color: var(--cards-text-dim, #9099a8); }
+  .live-empty { border: 1px dashed var(--cards-border, #384152); border-radius: 8px; padding: 18px; text-align: center;
+    color: var(--cards-text-dim, #9099a8); font-size: 12px; }
+  .live-error { border: 1px solid #7f1d1d; background: rgba(127,29,29,.18); color: #fecaca;
+    border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
+  .live-links { font-size: 11px; margin-left: auto; }
+  .live-links a { color: var(--cards-accent, #60a5fa); text-decoration: none; }
+</style>
+
+{% set L = live or {} %}
+{% set st = (L.settlement or {}).get('total') or {} %}
+{% set caps = L.limits or {} %}
+{% set switch = L.kill_switch or {} %}
+{% set orders = L.orders or [] %}
+
+<main class="live-page">
+  <div class="live-banner">
+    {# The badge reads from whether anything CAN place, not from a label. Four
+       switches have to agree; any one of them off means nothing moves. #}
+    {% set armed = L.execution_enabled and L.execution_mode == 'live' and L.live_armed and not switch.get('engaged') %}
+    <span class="live-badge {{ 'live-badge--real' if armed else 'live-badge--dark' }}">
+      {{ 'LIVE — REAL MONEY' if armed else 'LIVE MODE OFF' }}
+    </span>
+    <span style="font-size:12px">
+      {% if armed %}
+        Orders on this page are real submissions to a real venue.
+      {% else %}
+        Nothing can be placed right now. Positions below, if any, were placed earlier.
+      {% endif %}
+    </span>
+    <span class="live-flag"><span class="live-flag__label">Job</span>
+      <span class="live-flag__value {{ 'on' if L.execution_enabled else 'off' }}">{{ 'on' if L.execution_enabled else 'off' }}</span></span>
+    <span class="live-flag"><span class="live-flag__label">Mode</span>
+      <span class="live-flag__value {{ 'on' if L.execution_mode == 'live' else 'off' }}">{{ L.execution_mode or '—' }}</span></span>
+    <span class="live-flag"><span class="live-flag__label">Armed</span>
+      <span class="live-flag__value {{ 'on' if L.live_armed else 'off' }}">{{ 'yes' if L.live_armed else 'no' }}</span></span>
+    <span class="live-flag"><span class="live-flag__label">Kill switch</span>
+      {# Engaged is the SAFE state, so it is not painted as an error. #}
+      <span class="live-flag__value {{ 'off' if switch.get('engaged') else 'on' }}">
+        {{ 'ENGAGED' if switch.get('engaged') else 'clear' }}</span></span>
+    {# WHERE THESE NUMBERS COME FROM. The switches live on the worker; this
+       page used to read the WEB process's env and print "LIVE MODE OFF" over a
+       live, armed book with the wrong caps. Naming the source is what stops a
+       reader trusting the wrong process's view. #}
+    <span class="live-flag"><span class="live-flag__label">Source</span>
+      {% if L.state_source == 'worker' %}
+        <span class="live-flag__value {{ 'off' if (L.state_age_seconds or 0) > 900 else 'on' }}">
+          {{ L.state_recorded_by or 'worker' }}{% if L.state_age_seconds is not none %} · {{ (L.state_age_seconds // 60) }}m ago{% endif %}</span>
+      {% else %}
+        <span class="live-flag__value off" title="The worker has not reported. These are the WEB service's own settings, which are not what places orders.">web env (worker silent)</span>
+      {% endif %}</span>
+    <span class="live-links"><a href="/portfolio/paper">Paper book</a> · <a href="/api/portfolio/live">JSON</a></span>
+  </div>
+
+  {% if L.state_source != 'worker' %}
+    <div class="live-error">
+      <strong>The worker has not reported its execution state.</strong>
+      The switches and caps below are this web service's own environment, which is
+      <strong>not</strong> what decides whether orders are placed — that is
+      live-odds-worker's. Treat them as unknown, not as off.
+    </div>
+  {% elif (L.state_age_seconds or 0) > 900 %}
+    <div class="live-error">
+      Worker last reported <strong>{{ (L.state_age_seconds // 60) }} minutes ago</strong>.
+      These settings may be stale — a stopped worker's last known state looks
+      identical to its current one.
+    </div>
+  {% endif %}
+
+  {% if L.ledger_error %}
+    <div class="live-error">
+      Ledger unreadable: <code>{{ L.ledger_error }}</code>.
+      This is <strong>not</strong> the same as having no live positions — it means we cannot see them.
+    </div>
+  {% endif %}
+
+  {% if L.unreconciled %}
+    <div class="live-error">
+      <strong>{{ L.unreconciled|length }} order(s) sent with an unknown result.</strong>
+      A restart between submit and record leaves exactly these. Check them against the venue
+      before placing anything else — do not re-submit.
+    </div>
+  {% endif %}
+
+  <div class="live-tiles">
+    <div class="live-tile">
+      <div class="live-tile__label">Positions</div>
+      <div class="live-tile__value">{{ orders|length }}</div>
+      <div class="live-tile__meta">all dates</div>
+    </div>
+    <div class="live-tile">
+      <div class="live-tile__label">Settled</div>
+      {% if st.get('settled') %}
+        <div class="live-tile__value">
+          <span class="pos">{{ st.get('won', 0) }}W</span> · <span class="neg">{{ st.get('lost', 0) }}L</span>{% if st.get('push') %} · {{ st.get('push') }}P{% endif %}
+        </div>
+        <div class="live-tile__meta">{{ st.get('pending', 0) }} still open</div>
+      {% else %}
+        <div class="live-tile__value">—</div>
+        <div class="live-tile__meta">{{ st.get('pending', 0) }} open, none decided</div>
+      {% endif %}
+    </div>
+    <div class="live-tile">
+      <div class="live-tile__label">Profit / loss</div>
+      {% if st.get('settled') %}
+        <div class="live-tile__value {{ 'pos' if (st.get('pnl_dollars') or 0) > 0 else ('neg' if (st.get('pnl_dollars') or 0) < 0 else '') }}">
+          {{ "%+.2f"|format(st.get('pnl_dollars') or 0) }}</div>
+        <div class="live-tile__meta">
+          {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% on {% endif %}${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled</div>
+      {% else %}
+        <div class="live-tile__value">—</div>
+        {# 0.00 on nothing settled and 0.00 on fifty are the same string. #}
+        <div class="live-tile__meta">nothing settled yet</div>
+      {% endif %}
+    </div>
+    <div class="live-tile">
+      <div class="live-tile__label">Caps in force</div>
+      <div class="live-tile__value">${{ "%.0f"|format(caps.get('max_order_dollars') or 0) }}</div>
+      <div class="live-tile__meta">
+        per order · ${{ "%.0f"|format(caps.get('max_day_dollars') or 0) }}/day · {{ caps.get('max_day_orders') }} orders
+      </div>
+    </div>
+  </div>
+
+  {% if not orders %}
+    <div class="live-empty">
+      {% if L.ledger_error %}
+        Cannot read the ledger — see above. This page is not claiming there are no positions.
+      {% else %}
+        No live positions have ever been placed.
+      {% endif %}
+    </div>
+  {% else %}
+    <table class="live-table">
+      <thead>
+        <tr><th>Date</th><th>Selection</th><th>Venue</th><th>Requested</th><th>Filled</th>
+            <th>Status</th><th>Outcome</th><th>P&amp;L</th></tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+          <tr>
+            <td>{{ o.get('selected_date') or '—' }}<span class="sub">{{ (o.get('submitted_at') or '')[11:19] }}</span></td>
+            <td class="primary">
+              {{ o.get('player_name') or o.get('side') or '—' }}
+              <span class="sub">
+                {{ o.get('market') or '—' }}{% if o.get('line') is not none %} {{ o.get('side') }} {{ o.get('line') }}{% endif %}
+                {% if o.get('away_team') or o.get('home_team') %}· {{ o.get('away_team') or '?' }} @ {{ o.get('home_team') or '?' }}{% endif %}
+              </span>
+            </td>
+            <td>{{ o.get('venue') or '—' }}<span class="sub">{{ o.get('venue_ticker') or '' }}</span></td>
+            <td>
+              {% set rp = o.get('requested_price') %}
+              {% if rp is none %}—
+              {% elif rp > -1 and rp < 1 %}{{ "%.0f"|format(rp * 100) }}&cent;
+              {% else %}{{ "%+d"|format(rp|int) }}{% endif %}
+              <span class="sub">${{ "%.2f"|format(o.get('requested_stake_dollars') or 0) }}</span></td>
+            <td>
+              {# KALSHI PRICES ARE DOLLARS, NOT AMERICAN ODDS. `int(0.54)` is 0,
+                 so `%+d` rendered every Kalshi fill as "+0" -- the column was
+                 destroying the number it existed to show, beside a REQUESTED
+                 column carrying American odds from the board. Two units, one
+                 table, and the reader has no way to tell. #}
+              {% set fp = o.get('fill_price') %}
+              {% if fp is none %}—
+              {% elif fp > -1 and fp < 1 %}{{ "%.0f"|format(fp * 100) }}&cent;
+              {% else %}{{ "%+d"|format(fp|int) }}{% endif %}
+              {# The gap between requested and filled IS the slippage, and it is
+                 the number a person checks first after a real submit. #}
+              <span class="sub">${{ "%.2f"|format(o.get('fill_stake_dollars') or 0) }}</span>
+            </td>
+            <td>{{ o.get('status') or '—' }}
+              {% if o.get('error') %}<span class="sub warn">{{ o.get('error') }}</span>{% endif %}</td>
+            <td>
+              {% set outcome = o.get('outcome') %}
+              {% if outcome == 'won' %}<span class="pos">WON</span>
+              {% elif outcome == 'lost' %}<span class="neg">LOST</span>
+              {% elif outcome == 'push' %}PUSH
+              {% else %}<span class="sub">open</span>{% endif %}
+              {% if o.get('settled_value') is not none %}<span class="sub">{{ o.get('settled_value') }} vs {{ o.get('line') }}</span>{% endif %}
+            </td>
+            <td class="{{ 'pos' if (o.get('pnl_dollars') or 0) > 0 else ('neg' if (o.get('pnl_dollars') or 0) < 0 else '') }}">
+              {% if o.get('pnl_dollars') is not none %}{{ "%+.2f"|format(o.get('pnl_dollars')) }}{% else %}—{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</main>
+{% endblock %}
