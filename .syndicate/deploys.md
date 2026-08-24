@@ -27038,3 +27038,62 @@ verify: `[kalshi_polymarket_arb] SCAN ... 'polymarket_moneylines_resolved':
 687 ...` in production logs at 22:33:36Z, up from `0` at every prior run
 today (21:26:00Z, 21:44:47Z, 22:04:10.986216985Z entries, all `polymarket_
 moneylines_resolved: 0`).
+
+---
+
+### 2026-08-24 22:48:14Z — refresh-worker/live-odds-worker `798e7126` — Polymarket price resolver LIVE. Venue side works; the board is empty.
+
+**verify:**
+
+```
+POLYMARKET_US_SLATE_WRITE status=ok written=True count=7940
+  bytes=2,353,625 headroom=6,034,983 truncated=False
+
+POLYMARKET_BOARD_JOIN markets=7940 indexed=2593 board_rows=0 matched=0
+  slate_age_s=857.5
+  refusals={'market_type_not_a_game_line': 4288,
+            'segment_market_not_full_game': 927,
+            'outcomes_unreadable': 132}
+```
+
+**THE ACCOUNTING IS COMPLETE**, which is the first thing to check on any join:
+
+    indexed                       2593   32.7%
+    market_type_not_a_game_line   4288   54.0%   props + DRAWABLE_OUTCOME
+    segment_market_not_full_game   927   11.7%   1q/2h/f5 markets
+    outcomes_unreadable            132    1.7%
+    SUM                           7940 = markets
+
+Every one of 7,940 markets is accounted for. No silent drops — which is the
+property `matched=0` alone can never tell you, and the reason each refusal got
+its own counter.
+
+**2,593 GAME-LINE MARKETS ARE INDEXED AND READY.** The venue side works end to
+end: slug parsing, market-type mapping, sign/line extraction, outcome parsing.
+That is the half this lane built, and it is proven against the real slate.
+
+**`matched=0` is the BOARD's doing, not the join's: `board_rows=0`.** Every
+venue reports `rows_in=0` on the same cycle — kalshi, novig, prophetx and
+polymarket alike. The shortlist is now empty entirely, where it held 235 soccer
+rows at 21:57 and (per the other lane) 742 an hour before that. 742 -> 235 -> 0.
+
+So the resolver cannot be exercised until the board carries rows again, and the
+board's emptiness is the staleness ceiling / starved-sim chain already recorded
+above — not anything about Polymarket.
+
+**Slate freshness is good:** `slate_age_s=857.5` against a 900s cadence, so the
+artifact is being rewritten as designed and the 14-hour problem does not exist
+on this feed.
+
+**ONE THING WORTH CHASING: `outcomes_unreadable: 132` (1.7%).** Those are
+markets whose `outcomes`/`outcomePrices` did not parse as equal-length JSON
+lists. Small, but it is a SHAPE I did not anticipate rather than a market I
+chose to refuse, and the other three refusals are all deliberate. Not chased
+tonight; recorded so it is not mistaken for an intentional exclusion.
+
+**Prediction stated before the run, for the record:** I told the user to expect
+`matched=0` dominated by `market_type_not_a_game_line`, and that the numbers
+indicating a real bug would be `slug_unparseable` or
+`side_not_an_outcome_of_this_market`. Both of those are **absent entirely** —
+zero slugs failed to parse across 7,940 markets.
+
