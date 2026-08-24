@@ -759,3 +759,70 @@ def test_a_skipped_row_says_WHY(monkeypatch, tmp_path, capsys):
     assert result["rows"] == 0
     assert result["skipped"] == {"no_settled_value": 1}
     assert "skipped={'no_settled_value': 1}" in capsys.readouterr().out
+
+
+def test_the_scoreboard_is_stored_and_printed_so_a_verdict_is_checkable(
+    monkeypatch, tmp_path, capsys
+):
+    """MEASURED 2026-08-24T19:36Z: the grade audit was internally correct on
+    all 25 rows and still could not answer whether the sign convention was
+    right — because `settled_value` is the MARGIN, and a margin is
+    self-consistent under an inversion. It can never falsify one.
+
+    Two raw scores can. Storing them turns the audit from a request that
+    someone go and look a game up into a line that is checkable on sight."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared import paper_settlement as mod
+
+    request = ledger.OrderRequest(
+        position_key="score-1", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e1", market="h2h", side="home",
+        requested_price=-110.0, requested_stake_dollars=10.0,
+        home_team="Kansas City Royals", away_team="Detroit Tigers",
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+    mod.settle_orders(
+        "2026-08-22",
+        resolver=lambda o: {
+            "current_value": 4, "side": "over", "line": 0.0,
+            "is_final": True, "started": True,
+            "home_score": 7, "away_score": 3,
+            "home_name": "Kansas City Royals", "away_name": "Detroit Tigers",
+        },
+    )
+
+    stored = ledger.find_order(ledger.idempotency_key(request))
+    assert stored["home_score"] == 7 and stored["away_score"] == 3
+    # The margin must agree with the scoreboard it came from: 7 - 3 = 4.
+    assert stored["settled_value"] == stored["home_score"] - stored["away_score"]
+
+    mod.audit_game_line_grades("2026-08-22")
+    out = capsys.readouterr().out
+    assert "score=Detroit Tigers 3 - 7 Kansas City Royals" in out
+    assert "margin_used=4" in out
+    assert "our_verdict=won" in out
+
+
+def test_a_row_with_no_recorded_score_says_so_rather_than_printing_blanks(
+    monkeypatch, tmp_path, capsys
+):
+    """Orders graded before the scoreboard was carried through have none.
+    `<not_recorded>` is a named absence; two empty numbers would read as 0-0."""
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared import paper_settlement as mod
+
+    request = ledger.OrderRequest(
+        position_key="score-2", selected_date="2026-08-22", venue="paper",
+        sport="mlb", event_id="e2", market="h2h", side="home",
+        requested_price=-110.0, requested_stake_dollars=10.0,
+    )
+    ledger.place_order(request, mode=ledger.PAPER)
+    mod.settle_orders(
+        "2026-08-22",
+        resolver=lambda o: {"current_value": 4, "side": "over", "line": 0.0,
+                            "is_final": True, "started": True},
+    )
+    mod.audit_game_line_grades("2026-08-22")
+    assert "score=<not_recorded>" in capsys.readouterr().out
