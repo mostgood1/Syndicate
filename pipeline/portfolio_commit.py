@@ -192,7 +192,10 @@ def _polymarket_price_resolver(selected_date: str | None):
         f"[portfolio_commit] POLYMARKET_BOARD_JOIN markets={joined.get('polymarket_markets')} "
         f"indexed={joined.get('indexed')} board_rows={joined.get('board_rows')} "
         f"matched={joined.get('matched')} slate_age_s={age} "
-        f"refusals={joined.get('refusals')}",
+        f"refusals={joined.get('refusals')} "
+        # The SHAPES behind the parse refusals, bounded to six. A count says
+        # how many; only this says what the venue actually sent.
+        f"shapes={joined.get('unreadable_shapes')}",
         flush=True,
     )
     matches = joined.get("matches") or []
