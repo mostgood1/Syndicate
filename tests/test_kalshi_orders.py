@@ -117,14 +117,26 @@ def test_a_partial_fill_is_reported_as_partial(monkeypatch):
     assert result["fill_stake_dollars"] == 1.86
 
 
-def test_a_response_without_a_fill_count_falls_back_to_what_was_asked(monkeypatch):
+def test_a_resting_response_holds_NOTHING_yet(monkeypatch):
+    """This test used to assert `contracts == 8` on a RESTING order — that we
+    held the full requested size on something the venue had not executed. It
+    encoded the phantom fill rather than catching it, and it passed the whole
+    time the ledger was booking positions that did not exist.
+
+    A resting order is accepted and unfilled: nothing is held until it trades.
+    """
     monkeypatch.setattr(
         "syndicate.features.shared.kalshi_auth.signed_request",
         lambda *a, **k: {"order": {"order_id": "ord-2", "status": "resting"}},
     )
     result = orders.submit_order(_request(stake=5.0), price_dollars=0.62)
-    assert result["contracts"] == 8
-    assert result["status"] == "resting"
+    assert result["contracts"] == 0
+    assert result["status"] == "submitted"
+    assert result["fill_price"] is None
+    # What we ASKED for is still reported, so a later reconciliation can tell a
+    # resting order from one that was never sent.
+    assert result["requested_contracts"] == 8
+    assert result["venue_status"] == "resting"
 
 
 def test_an_unpriceable_contract_raises_so_the_order_is_recorded_as_failed():
@@ -380,3 +392,75 @@ def test_the_default_route_is_the_v2_one(monkeypatch):
     for key in ("KALSHI_ORDER_URL", "KALSHI_ORDER_PATH", "KALSHI_API_BASE"):
         monkeypatch.delenv(key, raising=False)
     assert mod._orders_url().endswith("/trade-api/v2/portfolio/events/orders")
+
+
+# --------------------------------------------------------------------------
+# A resting order is NOT a fill — the phantom position of 2026-08-24T13:12Z
+# --------------------------------------------------------------------------
+
+
+def _submit_with(monkeypatch, response, price=0.54):
+    from syndicate.features.shared import kalshi_auth, kalshi_orders
+
+    monkeypatch.setattr(kalshi_auth, "signed_request", lambda *a, **k: response)
+    return kalshi_orders.submit_order(_req(side="under"), price_dollars=price)
+
+
+def test_a_resting_order_is_recorded_submitted_not_filled(monkeypatch):
+    """THE WORST BUG OF THE RUN. Our ledger read `status=filled fill_price=0.54`
+    for an order that was RESTING and unfilled on Kalshi — the owner saw it
+    pending in their account while we had booked the position.
+
+    The line was `str(order.get("status") or "filled")`. An accepted-but-
+    unexecuted order returns a status we did not map, and the default booked a
+    trade that never happened: settlement would grade it, P&L would count it,
+    and reconciliation becomes impossible when our record and the venue's book
+    disagree about whether a trade occurred.
+    """
+    out = _submit_with(monkeypatch, {"order": {"status": "resting", "order_id": "abc"}})
+    assert out["status"] == "submitted"
+    assert out["contracts"] == 0
+    # A fill price on an unfilled order is a number that will be believed.
+    assert out["fill_price"] is None
+    assert out["fill_stake_dollars"] == 0
+    # The venue's own word is kept, so reconciliation has something to match on.
+    assert out["venue_status"] == "resting"
+
+
+def test_an_unrecognised_status_is_not_a_fill(monkeypatch):
+    """Defaulting the UNKNOWN case to the most committal outcome is exactly
+    backwards. A status we have never seen is not evidence of a trade."""
+    for response in (
+        {"order": {"order_id": "abc"}},
+        {"order": {"status": "pending", "order_id": "abc"}},
+        {"order": {"status": "some_new_state", "order_id": "abc"}},
+    ):
+        out = _submit_with(monkeypatch, response)
+        assert out["status"] == "submitted", response
+        assert out["fill_price"] is None
+
+
+def test_an_executed_order_IS_a_fill(monkeypatch):
+    """The guard must not swing so far that a real fill is missed — an unbooked
+    position is its own kind of wrong."""
+    out = _submit_with(
+        monkeypatch,
+        {"order": {"status": "executed", "order_id": "abc", "filled_count": "2"}},
+    )
+    assert out["status"] == "filled"
+    assert out["contracts"] == 2
+    assert out["fill_price"] == 0.54
+    assert out["fill_stake_dollars"] == 1.08
+
+
+def test_a_partial_fill_counts_what_actually_filled(monkeypatch):
+    """Resting with a positive filled_count is a PARTIAL fill: we hold what
+    filled. Recording the requested size would be a position we believe and do
+    not hold."""
+    out = _submit_with(
+        monkeypatch,
+        {"order": {"status": "resting", "order_id": "abc", "filled_count": "1"}},
+    )
+    assert out["status"] == "filled"
+    assert out["contracts"] == 1
+    assert out["fill_stake_dollars"] == 0.54

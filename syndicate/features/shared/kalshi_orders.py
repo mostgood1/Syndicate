@@ -72,6 +72,11 @@ ORDER_PRICE_UNIT = "dollars"
 # bought, so this is arithmetic rather than policy.
 _MIN_CONTRACTS = 1
 
+# Venue statuses that mean the trade HAPPENED. Everything else -- `resting`,
+# `pending`, `canceled`, or anything unrecognised -- is not a fill, and is
+# recorded as `submitted` rather than guessed into one.
+_VENUE_FILLED_STATUSES = frozenset({"executed", "filled", "matched", "closed"})
+
 
 class OrderBuildError(ValueError):
     """The request cannot become a valid order. Raised BEFORE anything is sent.
@@ -344,12 +349,50 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
     # raises -- which would turn a successful submit into a `failed` record
     # after the money had already moved, the worst possible place to throw.
     requested = int(float(body["count"]))
-    filled = order.get("filled_count")
-    contracts = int(float(filled)) if filled is not None else requested
+
+    # WHAT THE VENUE ACTUALLY SAYS HAPPENED -- never a default of `filled`.
+    #
+    # MEASURED 2026-08-24T13:12Z, and this is the worst bug of the run: our
+    # ledger read `status=filled fill_price=0.54` for an order that was RESTING
+    # and unfilled on Kalshi. The line was `str(order.get("status") or
+    # "filled")` -- an accepted-but-unexecuted order returns a status we did not
+    # map, or none, and the default booked a position that does not exist.
+    #
+    # A created order and an executed order are different facts. Defaulting the
+    # UNKNOWN case to the most committal one is exactly backwards: settlement
+    # grades a bet that never happened, P&L books it, and reconciliation against
+    # the venue becomes impossible because our record and their book disagree
+    # about whether a trade occurred.
+    #
+    # So: filled ONLY on an explicit executed/filled status, or on a positive
+    # filled_count. Anything else is `submitted` -- the write-ahead state that
+    # means "the venue has it, the outcome is not known here" -- which is
+    # precisely true of a resting limit order.
+    raw_status = str(order.get("status") or "").strip().lower()
+    filled_raw = order.get("filled_count")
+    try:
+        filled_count = int(float(filled_raw)) if filled_raw is not None else None
+    except (TypeError, ValueError):
+        filled_count = None
+
+    executed = raw_status in _VENUE_FILLED_STATUSES or bool(filled_count)
+    if executed:
+        contracts = filled_count if filled_count is not None else requested
+        status = "filled"
+        fill_price = price_dollars
+    else:
+        # RESTING, PENDING, or a status we have never seen. None of them is a
+        # fill, and a fill_price on an unfilled order is a number that will be
+        # believed.
+        contracts = 0
+        status = "submitted"
+        fill_price = None
+
     return {
-        "status": str(order.get("status") or "filled"),
+        "status": status,
         "venue_order_id": order.get("order_id") or order.get("id"),
-        "fill_price": price_dollars,
+        "venue_status": raw_status or None,
+        "fill_price": fill_price,
         "fill_stake_dollars": round(contracts * float(price_dollars or 0.0), 2),
         "contracts": contracts,
         "requested_contracts": requested,
