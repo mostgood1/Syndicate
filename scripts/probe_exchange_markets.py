@@ -87,25 +87,6 @@ def run_all_probes_if_enabled() -> dict[str, Any] | None:
     return results
 
 
-def run_novig_csv_snapshot_probe_if_enabled(*, limit: int = 4000) -> dict[str, Any] | None:
-    """Verify the REAL, dated CSV structure (`/reporting/trade-data/...`,
-    real docs.novig.com content supplied 2026-08-24) against a live response
-    -- the flat-path guess this replaced (`diagnose_daily_csv_403`, since
-    deleted) never had a chance to succeed; this checks the fix, not a
-    hypothesis. Own flag so it never rides along on the routine six-venue
-    probe above.
-    """
-    if not _env_bool("SYNDICATE_NOVIG_CSV_SNAPSHOT_PROBE_ON_BOOT", default=False):
-        return None
-    from syndicate.features.shared.novig_client import fetch_latest_markets_snapshot
-
-    print("[novig_csv_snapshot] STARTING", flush=True)
-    result = fetch_latest_markets_snapshot()
-    print("[novig_csv_snapshot] RESULT " + json.dumps(result, default=str)[:limit], flush=True)
-    print("[novig_csv_snapshot] DONE", flush=True)
-    return result
-
-
 def main() -> int:
     run_all_probes()
     return 0
