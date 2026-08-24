@@ -30,7 +30,10 @@ from syndicate.features.intelligence_board import build_intelligence_board_contr
 from syndicate.features.shared.json_safety import json_safe_value
 from syndicate.features.intelligence_board import _recommendation_lane
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
-from syndicate.features.shared.game_chip_scoreboard import build_game_chips
+from syndicate.features.shared.game_chip_scoreboard import (
+    GAME_CHIP_DEFAULT_SPORTS,
+    build_game_chips,
+)
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -2174,7 +2177,9 @@ def intelligence_status_api():
     return _no_cache_response(jsonify(response_payload))
 
 
-_GAME_CHIP_DEFAULT_SPORTS = ["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"]
+# Re-exported from the shared module so the worker that BUILDS the chips and
+# the endpoint that SERVES them cannot drift apart on which sports exist.
+_GAME_CHIP_DEFAULT_SPORTS = list(GAME_CHIP_DEFAULT_SPORTS)
 
 
 @intelligence_bp.get("/api/board/game-chips")
@@ -2186,12 +2191,63 @@ def board_game_chips_api():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     sports_raw = str(request.args.get("sports") or "").strip()
     sports = [part.strip().lower() for part in sports_raw.split(",") if part.strip()] or list(_GAME_CHIP_DEFAULT_SPORTS)
+    # `#545`. READ THE WORKER'S ARTIFACT. This handler used to call
+    # `build_game_chips` inline, which fans out over every sport and -- for
+    # soccer -- over every league, two matchdays each. That is computation in a
+    # request handler, which the worker-split rule forbids outright, and the
+    # widening that fixed the coverage gap is what made it indefensible rather
+    # than merely against the rules.
+    #
+    # `source` is on the RESPONSE, not just in a log, because the two paths
+    # produce chips that look identical and are not: one is what the worker
+    # published, the other is this service recomputing. Without it, a permanent
+    # publish failure is invisible -- the board keeps working and the request
+    # fan-out `#545` set out to remove is quietly still running.
+    chips: list = []
+    source = "worker_artifact"
+    published = None
     try:
-        chips = build_game_chips(selected_date, sports)
+        from pipeline.intelligence_state import read_game_chips
+
+        published = read_game_chips(selected_date)
     except Exception:
-        _LOGGER.exception("BOARD_GAME_CHIPS_FAILURE")
-        chips = []
-    return _no_cache_response(jsonify({"ok": True, "date": selected_date, "chips": chips}))
+        _LOGGER.exception("BOARD_GAME_CHIPS_ARTIFACT_READ_FAILURE")
+    if isinstance(published, dict) and isinstance(published.get("chips"), list):
+        wanted = {str(slug).strip().lower() for slug in sports}
+        chips = [
+            chip
+            for chip in published["chips"]
+            if isinstance(chip, dict) and str(chip.get("sport") or "").strip().lower() in wanted
+        ]
+    else:
+        # FALLBACK, KEPT DELIBERATELY. The rule says a request must not backfill
+        # missing data -- and the honest reading is that this is a cache miss on
+        # a DISPLAY artifact, not missing data on the board itself. Removing it
+        # would blank every sport's scoreboard strip for the whole window
+        # between a deploy and the worker's next shortlist build, which is a
+        # visible regression traded for a purity that buys the user nothing.
+        # It is named `fallback_inline_build` in the response and logged, so it
+        # can never be the silent status quo.
+        source = "fallback_inline_build"
+        _LOGGER.warning(
+            "BOARD_GAME_CHIPS_ARTIFACT_MISSING date=%s -- building inline", selected_date
+        )
+        try:
+            chips = build_game_chips(selected_date, sports)
+        except Exception:
+            _LOGGER.exception("BOARD_GAME_CHIPS_FAILURE")
+            chips = []
+    return _no_cache_response(
+        jsonify(
+            {
+                "ok": True,
+                "date": selected_date,
+                "chips": chips,
+                "source": source,
+                "published_at": (published or {}).get("written_at") if isinstance(published, dict) else None,
+            }
+        )
+    )
 
 
 def _attach_book_grid_game_state(grid: list, *, sport: str, selected_date: str) -> dict:

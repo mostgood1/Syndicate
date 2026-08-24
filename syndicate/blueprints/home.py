@@ -6427,12 +6427,66 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
             # must not empty the whole sport -- each league is best-effort.
             try:
                 season, week = self._league_season_week(league, context, today)
-                payload = build_cards_page_context(league, week, season)
             except Exception as exc:
                 print(f"[home] SOCCER_LEAGUE_GAMES_FAILED league={league} error={exc}", flush=True)
                 continue
-            for game in payload.get("games") or []:
-                if isinstance(game, dict):
+            # `#545`. THE RESOLVED WEEK IS THE ONE CONTAINING *NOW*, WHICH ON A
+            # MONDAY IS THE MATCHDAY THAT JUST FINISHED.
+            #
+            # `default_week(reference_date=today)` answers "which matchday are
+            # we in", and the board asks a different question entirely -- it
+            # carries a SEVEN-DAY forward odds horizon. Those two disagree for
+            # most of every week.
+            #
+            # Measured in production 2026-08-24T20:36:39Z:
+            # `CHIP_JOIN_COVERAGE sport=soccer chips=96 ... cards=342
+            #  no_chip_available=251` -- and `chip_dates` opened on 08-22/08-23,
+            # already played. 65 of 96 chips described finished fixtures while
+            # 72 of the 105 fixtures in the board's window had no chip at all.
+            # `primeira_liga` was the control: its resolved week happened to
+            # align and it was the ONLY league with zero uncovered fixtures.
+            #
+            # Worse, it DECAYS: `by_matchup` fell 94 -> 7 between 15:34Z and
+            # 20:36Z the same day, as the board rolled forward past the fixtures
+            # the chips described. Coverage was thinnest exactly when the next
+            # slate is the one being bet.
+            #
+            # So the span covers the CURRENT week and the NEXT. Current is kept
+            # rather than dropped because a match in progress or just finished
+            # is precisely what a live scoreboard chip is for. Duplicates across
+            # the two weeks are dropped by fixture id -- a league whose week
+            # boundary does not move (or whose `default_week` clamps at the end
+            # of a season) would otherwise emit every fixture twice, and two
+            # chips for one fixture is a collision the browser's canonical index
+            # resolves by DISCARDING BOTH.
+            seen_ids: set[str] = set()
+            for week_offset in (0, 1):
+                target_week = int(week) + week_offset
+                try:
+                    payload = build_cards_page_context(league, target_week, season)
+                except Exception as exc:
+                    # A missing NEXT week is normal at a season boundary and
+                    # must not cost us the current one, so this is per-week.
+                    print(
+                        f"[home] SOCCER_LEAGUE_GAMES_FAILED league={league} "
+                        f"week={target_week} error={exc}",
+                        flush=True,
+                    )
+                    continue
+                for game in payload.get("games") or []:
+                    if not isinstance(game, dict):
+                        continue
+                    identity = str(
+                        game.get("event_id")
+                        or game.get("game_id")
+                        or game.get("match_id")
+                        or game.get("gamePk")
+                        or ""
+                    ).strip()
+                    if identity:
+                        if identity in seen_ids:
+                            continue
+                        seen_ids.add(identity)
                     game.setdefault("league", league)
                     games.append(game)
         return games

@@ -2120,6 +2120,53 @@ def read_layer2_shortlist(selected_date: str | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def _game_chips_path(selected_date: str) -> Path:
+    suffix = str(selected_date or "").strip().replace("-", "_") or _intelligence_state_daily_suffix()
+    return reports_root() / "intelligence" / f"game_chips_{suffix}.json"
+
+
+def write_game_chips(selected_date: str, chips: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Publish the live-scoreboard chips the WORKER built, for the WEB to read.
+
+    `#545`. THE CHIP BUILD IS NOT LIGHT AND IT WAS RUNNING IN A REQUEST.
+    `build_game_chips` fans out over every sport, and for soccer over every
+    league, calling `build_cards_page_context` per league -- and `#545` widened
+    that to two matchdays per league to cover the board's forward horizon, so it
+    is now twenty card-context builds for soccer alone. The architecture rule is
+    explicit that the web service reads precomputed artifacts and does not
+    compute; a per-request fan-out of that size is exactly what it forbids, and
+    the widening is what made it untenable rather than merely wrong.
+
+    Same transport as the shortlist beside it (`write_json_file`, keyvalue
+    backed) and for the same reason: refresh-worker writes, web reads, and
+    Render gives each service its own disk so a file cannot be shared.
+
+    Small enough not to need the shortlist's shedding guard -- 210 soccer chips
+    measured at ~90 KB against an 8 MB ceiling -- but the count is stamped so a
+    reader can tell a thin build from a stale one WITHOUT having to diff two
+    payloads.
+    """
+    normalized_date = str(selected_date or "").strip()
+    if not normalized_date:
+        return None
+    payload = {
+        "selected_date": normalized_date,
+        "written_at": _utc_now(),
+        "chips": list(chips or []),
+        "chip_count": len(chips or []),
+    }
+    write_json_file(_game_chips_path(normalized_date), payload)
+    return payload
+
+
+def read_game_chips(selected_date: str | None) -> dict[str, Any] | None:
+    normalized_date = str(selected_date or "").strip()
+    if not normalized_date:
+        return None
+    payload = read_json_file(_game_chips_path(normalized_date))
+    return payload if isinstance(payload, dict) else None
+
+
 def write_intelligence_board_state(state: dict[str, Any]) -> dict[str, Any] | None:
     normalized = dict(state or {})
     selected_date = str(normalized.get("selected_date") or "").strip()
