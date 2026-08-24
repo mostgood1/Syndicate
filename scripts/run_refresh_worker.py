@@ -4225,6 +4225,12 @@ def main() -> int:
         start_background_loop_if_enabled()
     except Exception as exc:
         print(f"[refresh_worker] NOVIG_ODDS_REFRESH_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # NOTE: Polymarket's odds refresh (pipeline/polymarket_odds_refresh.py)
+    # deliberately gets NO hook here -- another session already built and
+    # wired it into scripts/run_live_odds_refresh_worker.py's own boot
+    # sequence (that service, not this one). A duplicate hook here would run
+    # the same fetch from two processes against the same artifact path for no
+    # gain.
     # #285. Cap glibc arenas BEFORE the loops spawn threads -- `mallopt` only
     # governs arenas created after it returns, so this is worthless if it moves
     # later in main(). The trim proved allocator retention is real (1109.6MB
