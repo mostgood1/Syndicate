@@ -1578,6 +1578,43 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none for Phase A. Phase B is blocked on scope §7 decisions 1 and 2;
   Phase C is blocked on a live WNBA slate (NBA out of season until autumn 2026).
 
+### exchange-markets-api-integration — OPEN — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
+- Goal: read-only market/odds-pulling client modules for six prediction/event-market
+  venues -- coinbase, prophetx, novig, polymarket, robinhood, crypto.com ("OG") --
+  each following `kalshi_client.py`'s pattern (single-place schema assumption,
+  `probe()` reports the shape that actually came back rather than parsing blind,
+  named refusal never a silent empty list). A second session is doing the Kalshi
+  order-automation build end to end; this lane is deliberately the OTHER venues,
+  market-data pull only -- no order placement, no credentials that can write.
+- Files (all NEW, no existing file touched):
+  `syndicate/features/shared/coinbase_client.py`,
+  `syndicate/features/shared/prophetx_client.py`,
+  `syndicate/features/shared/novig_client.py`,
+  `syndicate/features/shared/polymarket_client.py`,
+  `syndicate/features/shared/robinhood_client.py`,
+  `syndicate/features/shared/cryptocom_client.py`,
+  `scripts/probe_coinbase.py`, `scripts/probe_prophetx.py`,
+  `scripts/probe_novig.py`, `scripts/probe_polymarket.py`,
+  `scripts/probe_robinhood.py`, `scripts/probe_cryptocom.py`,
+  `tests/test_coinbase_client.py`, `tests/test_prophetx_client.py`,
+  `tests/test_novig_client.py`, `tests/test_polymarket_client.py`,
+  `tests/test_robinhood_client.py`, `tests/test_cryptocom_client.py`,
+  `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md` (NEW)
+- Hypothesis: n/a -- this is construction against public API docs, not diagnosis.
+- Falsification test: n/a for the construction; the schema assumption in each
+  module is the thing a first live production run (refresh-worker, which has
+  outbound access this sandbox does not -- confirmed 2026-08-24, every venue host
+  403s CONNECT through the agent proxy, same as Kalshi) can falsify. `probe()`
+  in each module exists to make that falsification cheap and visible.
+- Verification: `python -m pytest tests/test_coinbase_client.py
+  tests/test_prophetx_client.py tests/test_novig_client.py
+  tests/test_polymarket_client.py tests/test_robinhood_client.py
+  tests/test_cryptocom_client.py` green locally (pure-function unit/odds-conversion
+  coverage only -- network calls cannot be exercised from this sandbox). Schema
+  correctness itself stays UNVERIFIED until a `probe_*` script runs from a host
+  with outbound access, same caveat `kalshi_client.py`'s header carries.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
