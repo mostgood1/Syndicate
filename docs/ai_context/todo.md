@@ -56,9 +56,46 @@ file rather than testing the helper it calls.
 including the collision path, which the first draft of that test silently
 missed because the exact-name index answered first).
 
-**Verify after deploy:** `CHIP_JOIN_COVERAGE sport=soccer` with
-`no_chip_available=0 unknown_no_key=0`. A non-zero `unknown_no_key` means cards
-are reaching the board from a path that does not stamp the keys.
+**DEPLOYED `ee9f8296`, first reading 2026-08-24T15:34:53Z — and it immediately
+found something far larger than the bug that prompted it.**
+
+```
+CHIP_JOIN_COVERAGE sport=mlb    cards=400 by_matchup=400 no_chip_available=0   unknown_no_key=0
+CHIP_JOIN_COVERAGE sport=wnba   cards=400 by_matchup=400 no_chip_available=0   unknown_no_key=0
+CHIP_JOIN_COVERAGE sport=soccer cards=400 by_matchup=94 by_canonical=78
+                                no_chip_available=222 unknown_no_key=6
+```
+
+**`#540` IS DOING REAL WORK: 78 soccer cards resolve ONLY via the canonical
+key** — a fifth of the board, invisible before today.
+
+**BUT 222 OF 400 SOCCER CARDS CAN REACH NO CHIP AT ALL** (55%). Those print
+their matchup verbatim. The reported La Liga complaint was 4 fixtures; this is
+the same symptom at fifty times the scale, and no count in the system had ever
+said so.
+
+**THE OBVIOUS EXPLANATION IS WRONG.** I assumed the board's 7-day horizon ran
+past a one-day chip window. Measured instead: `chip_dates` spans
+**2026-08-22 → 2026-08-30, nine dates**, covering the board's whole horizon.
+So these are genuine join failures, not fixtures too far out. The likelier
+cause is that `build_game_chips` returns only **98 chips for ten leagues over
+nine days** — La Liga alone had 13 — so the chip set is a thin slice of the
+board's fixtures. NOT YET DIAGNOSED; do not treat that as established.
+
+`unknown_no_key=6` names an alias gap directly: `ADO Den Haag @ Feyenoord` has
+`home_key=None` because `canonical_team` cannot resolve "Feyenoord" (the
+artifacts spell it "Feyenoord Rotterdam"). Exactly the class `#540` fixed, found
+by reading a log this time instead of by a user.
+
+**ADDED `chips=` AND `chip_dates=` AFTER THAT FIRST READING**, because the
+reading could not answer its own question: `no_chip_available=222` reads
+identically for "the horizon runs past the window" (cosmetic) and "the chip
+build returned almost nothing" (an outage). A number nobody can act on is not
+telemetry. Those two fields are what turned the hypothesis above from plausible
+to refuted, in one reading.
+
+**NEXT:** diagnose why `build_game_chips` yields 98 chips against 400 soccer
+cards. That is now a number on a line, not a thing someone has to notice.
 
 ### `#540` — **La Liga compact cards showed mismatched team names: two clubs the browser's normalisation can NEVER join, now joined on the server's own alias map.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 

@@ -728,11 +728,37 @@ def build_layer2_shortlist(
                           for c in _cards if isinstance(c, Mapping)} - {""})
         if _cards and _sports:
             _chips = build_game_chips(selected_date, _sports)
+            # Per-sport, because one sport's healthy window says nothing about
+            # another's -- MLB reads 400/400 in the same breath as soccer's 222
+            # misses, and a single total would let one hide the other.
+            _chip_counts: dict[str, int] = {}
+            _chip_dates: dict[str, list[str]] = {}
+            for _chip in _chips or ():
+                if not isinstance(_chip, Mapping):
+                    continue
+                _cs = str(_chip.get("sport") or "").strip().lower()
+                _chip_counts[_cs] = _chip_counts.get(_cs, 0) + 1
+                _start = str(_chip.get("start_time_utc") or "")[:10]
+                if _start:
+                    _seen = _chip_dates.setdefault(_cs, [])
+                    if _start not in _seen:
+                        _seen.append(_start)
+            for _dates in _chip_dates.values():
+                _dates.sort()
             _coverage = chip_join_coverage(_cards, _chips)
             shortlist["chip_join_coverage"] = _coverage
             for _sport, _b in sorted((_coverage.get("by_sport") or {}).items()):
                 print(
                     f"[layer2_shortlist] CHIP_JOIN_COVERAGE sport={_sport} "
+                    # HOW MANY CHIPS EXISTED AT ALL, and over WHAT DATES.
+                    # Without these, `no_chip_available=222` is uninterpretable:
+                    # it reads identically for "the board's horizon runs past
+                    # the chip window" (expected, cosmetic) and "the chip build
+                    # returned almost nothing" (an outage). The first reading
+                    # (2026-08-24 15:34:53Z) was exactly that ambiguous, which
+                    # is how this line earned the extra two fields.
+                    f"chips={_chip_counts.get(_sport, 0)} "
+                    f"chip_dates={_chip_dates.get(_sport) or None} "
                     f"cards={_b.get('cards')} by_id={_b.get('by_id')} "
                     f"by_matchup={_b.get('by_matchup')} by_canonical={_b.get('by_canonical')} "
                     # THE TWO THAT MATTER, and they have different owners:
