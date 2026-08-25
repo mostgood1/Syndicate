@@ -400,10 +400,15 @@ def apply_venue_quotes(
         # `venue_quote_key`, so requiring one would have matched nothing and
         # reported a confident `stamped=0` -- the "zero that looks like a
         # working feed" failure this module documents three times over.
-        key = row.get("venue_quote_key") or quote_key(
-            sport, row.get("market"), row.get("side"), _as_float_or_none(row.get("line"))
-        )
-        quote = (payload.get("quotes") or {}).get(str(key))
+        keys = _candidate_keys(row, sport)
+        quotes_for_sport = payload.get("quotes") or {}
+        quote = None
+        key = keys[0]
+        for candidate in keys:
+            found = quotes_for_sport.get(str(candidate))
+            if found is not None:
+                quote, key = found, candidate
+                break
         if quote is None:
             # WHAT THE UNMATCHED KEY ACTUALLY LOOKED LIKE, bounded to a handful.
             #
@@ -452,6 +457,53 @@ def apply_venue_quotes(
 
 _UNMATCHED_SAMPLE_LIMIT = 8
 _OFFERED_SAMPLE_LIMIT = 4
+
+
+def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
+    """Every key shape this row could legitimately be quoted under, in order.
+
+    ONE ROW, MORE THAN ONE VOCABULARY. The board keys a moneyline side by its
+    ROLE (`h2h|home`); Polymarket keys it by the CLUB (`h2h|chicago cubs`).
+    Both are correct descriptions of the same bet, and measured
+    2026-08-25T00:46Z they never met: polymarket_us offered 3,106 quotes and
+    won zero of 237 selections while every other counter looked healthy.
+
+    Rather than force one side to adopt the other's words -- which would break
+    whichever source already speaks the first -- a row offers both and the
+    first hit wins. Additive by construction: the role key is tried FIRST and
+    unchanged, so every match that worked before still works, and this can only
+    add matches.
+
+    The club key is derived with `canonical_team`, the SAME resolver the
+    adapter uses on the venue's outcome name. Two resolvers is how the halves
+    of a join end up on different vocabularies; one cannot disagree with
+    itself.
+    """
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    explicit = row.get("venue_quote_key")
+    if explicit:
+        return [str(explicit)]
+
+    market = str(row.get("market") or "").strip().lower()
+    side = str(row.get("side") or "").strip().lower()
+    line = _as_float_or_none(row.get("line"))
+    keys = [quote_key(sport, market, side, line)]
+
+    if market == "h2h" and side in {"home", "away"}:
+        team = row.get(f"{side}_team")
+        try:
+            from syndicate.features.shared.team_aliases import canonical_team
+
+            club = canonical_team(sport, team)
+        except Exception:
+            club = None
+        # No club, no second key -- never a bare team string as a fallback.
+        # An unresolved name would build a key that matches nothing and hides
+        # the fact that the row could not be placed.
+        if club:
+            keys.append(quote_key(sport, market, club, None))
+    return keys
 
 
 def _offered_sample(by_sport: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
