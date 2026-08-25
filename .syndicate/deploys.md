@@ -28938,3 +28938,60 @@ Third guard today that could not read its own input.
 
 **Kalshi remains unable to transact.** `no_venue_ticker` on every game line;
 `kalshi_ticker_resolver` is built from the join's matches and the join has 4.
+
+---
+
+## 2026-08-25 — the Kalshi artifact writes again: 8.7MB rejected -> 2.57MB written
+
+**verify:** `[refresh_state_store]` at `19:36:24Z`, refresh-worker instance
+`dkfk6` on `210844950` (which carries `4380738e6`):
+
+```
+KEYVALUE_WRITE_LARGE key=...kalshi_markets.json size_bytes=2568574 max_bytes=8388608
+```
+
+Against the failure it replaces, `18:53:11Z`:
+
+```
+KEYVALUE_WRITE_REJECTED size_bytes=8701075 max_bytes=8388608
+COMPOSITION series=9196911
+  KXNCAAFSPREAD=2306201 KXNFLSPREAD=903759 KXNCAAFWINS=645977 ...
+```
+
+**3.4x smaller, and written.** `fetched_at` can persist again, which is the
+thing that was actually broken: with every write refused, the rotation
+re-fetched the SAME 60 series every tick — 18:42:40 and 18:53:10 byte-identical
+— while `oldest_s` merely aged. A rotation that cannot record its own progress
+does not rotate, and Kalshi's join sat at `matched=4` while the data to fix it
+was fetched and discarded every ten minutes.
+
+**It took three attempts, and the first two are worth recording as the same
+mistake twice.** `6145522ee` removed the duplicated merged list — real, but the
+per-series markets were still unbounded and THAT dict is the payload.
+`4380738e6` bounded and shrank them. Between the two I also wrote a comment
+claiming `_record_daily_book` ran "ABOVE" when it ran below; the call was moved
+so the ordering is a fact rather than a claim.
+
+**A filter I tried and REVERTED, which is the more useful entry.** Dropping
+undated markets from the working set looked free — futures carry no game date
+and can never match a board row. But PLAYER PROPS SKIP THE JOIN'S DATE CHECK
+ENTIRELY (it lives inside the `needs_event_identity` branch), so a prop whose
+ticker shape did not parse would have been silently dropped from the venue we
+actually trade. Six existing tests caught it. **Size is a size problem; solve it
+by size.**
+
+**Where Kalshi now stands.** The chain was three deep and each layer hid the
+next: queue starvation (fixed), the game-lines flag off (now on), the artifact
+write failing (now fixed). The flag change is already proven —
+`matched` went 4 -> 33 and `event_not_on_our_board` REAPPEARED at 60, which
+means game lines are reaching the event resolver for the first time.
+
+**Still open:** `oldest_s=149885` has not yet fallen, because `19:36:24Z` was
+the first tick whose write survived. The next tick is the proof: `due` should
+drop below 193 and a DIFFERENT 60 series should be fetched. Not yet read.
+
+**Unrelated and pre-existing, flagged not fixed:** `novig_markets.json` fails
+the same 8MB ceiling at 12,219,331 bytes on every cycle. Novig is switched off
+(`VENUE_REPRICE ... novig: {'status': 'disabled'}`), so nothing depends on it,
+but it is the same defect in a third artifact and will need the same lean-row
+treatment.
