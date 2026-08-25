@@ -28663,3 +28663,56 @@ status the venue had never shown us would have read as confidently resting
 instead of reaching `unknown`. A loose match that produces a plausible answer is
 worse than no match, because `unknown` is the value the whole design depends on.
 Now the known prefix is stripped and the remainder matched whole.
+
+---
+
+## 2026-08-25 — refresh-worker `caa915cba`: `unreadable_title` is two different facts
+
+**Deployed:** `refresh-worker`, deploy `dep-da6sbl6k1f9s73eh9tsg`, live ~`16:53Z`
+on instance `wgnsm`. Commit `caa915cba`, on `origin/main`. Claim `kalshi-join`.
+
+**verify:** `[kalshi_odds] JOIN_TITLES` at `16:56:46Z`, the first per-series
+sample of the 216 refused titles:
+
+```
+KXMLBALCENT      'Will Minnesota be the 2026 AL Central Division Winner'  KXMLBALCENT-26-MIN
+KXMLBALEAST      'Will Toronto be the 2026 AL East Division Winner'
+KXMLBALWEST      'Will Texas be the 2026 AL West Division Winner'
+KXMLBNLCENT      'Will St. Louis be the 2026 NL Central Division Winner'
+KXMLBNLEAST      'Will Washington be the 2026 NL East Division Winner'
+KXMLBNLWEST      'Will San Francisco be the 2026 NL West Division Winner'
+KXMLBF3          'first 3 innings tie'      KXMLBF3-26AUG241940TEXCWS-TIE
+KXMLBF5          'first 5 innings tie'
+KXMLBF7          'first 7 innings tie'
+KXMLBINNINGTOTAL '9th inning: Over 1.5 runs'
+```
+
+**What it proves.** `unreadable_title: 216` is not one problem. **Six of ten
+samples are SEASON FUTURES** — division winners, markets this system would never
+bet — sitting in the same counter as markets we want and cannot parse. Those are
+different facts with opposite consequences, and this is the `#505` failure
+("Kalshi has nothing we bet" vs "our join is broken" sharing a number) appearing
+one layer below where it was last fixed. Note the tickers distinguish them
+cleanly without any title parsing: `KXMLBALCENT-26-MIN` carries no game date,
+where `KXMLBF5-26AUG241940TEXCWS-TIE` does.
+
+The tie legs and the 9th-inning total are a second, smaller finding: both
+already have handling described in `kalshi_catalogue` (`_INNINGS_TIE` matches
+`first N innings tie`; the 9th-inning total is documented as needing a named
+refusal because no board key exists for it) and both are nevertheless landing in
+`unreadable_title`. Why is not yet known and should be established before any
+new grammar is written.
+
+**What it does NOT prove, and this is the correction.** It was deployed to
+confirm that the missing `KXMLBGAME` grammar is the h2h blocker. **`KXMLBGAME`
+does not appear in the sample at all.** That is NOT evidence of absence: the
+sample is one title per series capped at 10, and clearly more than 10 series
+refuse here. "Absent from the 883" and "past the cap" are different facts —
+one means there is no grammar to write and the fetch/series filter is the
+question, the other means there is. Unresolved.
+
+Third hypothesis of the session to be disproven by its own diagnostic, all the
+same shape: a counter that named a problem while withholding the data needed to
+act on it. `600a8f9ae` adds the complete per-series count beside the bounded
+sample (deploy `dep-da6skvafngtc73c969ig`) — the sample teaches the grammar, the
+count answers "is this family here at all". Not yet read.
