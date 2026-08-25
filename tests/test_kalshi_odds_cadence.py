@@ -804,3 +804,37 @@ def test_an_undated_market_is_still_persisted(monkeypatch):
         "strategy": "series_filter"})
     result = mod.run_kalshi_odds_refresh()
     assert len(result["markets"]) == 1
+
+
+def test_the_unregistered_sport_series_are_named(monkeypatch):
+    """Registration is the FIRST gate, and a series that fails it is INVISIBLE:
+    never fetched, so it cannot appear in `unreadable_title`, in BOARD_JOIN
+    reasons, or in the daily book. The only symptom is a board row that never
+    gets a price -- which reads as "Kalshi does not offer this".
+
+    That is exactly how `KXMLBGAME` hid: title "Professional Baseball Game",
+    no `game` entry in the vocabulary, and the moneyline was unreachable on
+    every sport until a user found a live market on kalshi.com.
+    """
+    titles = {
+        "KXMLBGAME": "Professional Baseball Game",       # registers
+        "KXMLBTOTAL": "Professional Baseball Total Runs",  # does NOT
+        "KXNPBTOTAL": "Japanese Baseball Total",          # out of scope
+        "KXPOLITICS": "Some Election",                    # no sport token
+    }
+    props = {}
+    games = {"KXMLBGAME": "mlb"}
+    rows = mod._unregistered_sport_series(titles, props, games)
+    series = [r["series"] for r in rows]
+
+    assert series == ["KXMLBTOTAL"], rows
+    assert rows[0]["title"] == "Professional Baseball Total Runs"
+    assert rows[0]["sport"] == "mlb"
+
+
+def test_an_already_registered_series_is_not_reported_as_a_gap():
+    """A work list that fills with successes is noise."""
+    rows = mod._unregistered_sport_series(
+        {"KXMLBGAME": "Professional Baseball Game"}, {}, {"KXMLBGAME": "mlb"}
+    )
+    assert rows == []

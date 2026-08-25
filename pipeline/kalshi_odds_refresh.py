@@ -455,6 +455,36 @@ def _backing_off(entry: Mapping[str, Any], interval: int) -> bool:
 _DISCOVERY_DONE = False
 
 
+def _unregistered_sport_series(
+    titles: Mapping[str, Any],
+    props: Mapping[str, Any],
+    games: Mapping[str, Any],
+) -> list[dict[str, str]]:
+    """Series whose ticker names a sport we model but which nothing registered.
+
+    The work list for coverage we do not even ATTEMPT. Bounded and sorted so
+    the line stays readable; the count rides on the result so a truncated
+    sample cannot read as the whole gap.
+    """
+    from syndicate.features.shared.kalshi_catalogue import (
+        SERIES_OUT_OF_SCOPE,
+        sport_for_ticker,
+    )
+
+    registered = {str(k).upper() for k in props} | {str(k).upper() for k in games}
+    out: list[dict[str, str]] = []
+    for ticker, title in (titles or {}).items():
+        key = str(ticker or "").strip().upper()
+        if not key or key in registered or key in SERIES_OUT_OF_SCOPE:
+            continue
+        sport = sport_for_ticker(key)
+        if not sport:
+            continue
+        out.append({"series": key, "sport": sport, "title": str(title or "")[:60]})
+    out.sort(key=lambda row: (row["sport"], row["series"]))
+    return out
+
+
 def ensure_series_discovered(*, force: bool = False) -> dict[str, Any]:
     """Register every series Kalshi lists that we can price, IN THIS PROCESS.
 
@@ -505,12 +535,47 @@ def ensure_series_discovered(*, force: bool = False) -> dict[str, Any]:
         added_props = register_discovered(props)
         added_games = register_discovered(games)
         _DISCOVERY_DONE = True
+
+        # WHAT THE CATALOGUE LISTS AND WE NEVER FETCH.
+        #
+        # Registration is the FIRST gate: a series that does not register is
+        # never added to `sports_series()`, never fetched, and therefore
+        # invisible to every counter downstream -- it cannot appear in
+        # `unreadable_title`, in `BOARD_JOIN` reasons, or anywhere else. The
+        # only symptom is a board row that never gets a price, which reads as
+        # "Kalshi does not offer this".
+        #
+        # That is exactly how `KXMLBGAME` hid: its title is "Professional
+        # Baseball Game", `_GAME_CORE` had no entry for the bare word "game",
+        # and the moneyline -- the single most valuable market on the venue --
+        # was unreachable across every sport until a user found a live market
+        # the diagnostics said did not exist.
+        #
+        # MEASURED 2026-08-25: `KXMLBTOTAL` appears NOWHERE in the logs, while
+        # `KXWNBATOTAL` fetches 45 markets. A board row for `totals over 7.5`
+        # on an MLB game therefore has no Kalshi market to join to, and the
+        # order fails `no_live_price` -- which is what every Kalshi order today
+        # did.
+        #
+        # So: name the sport-token series the catalogue carries that we did NOT
+        # register, with their titles, so the next grammar is written from
+        # Kalshi's own words rather than from a guess about them.
+        unregistered = _unregistered_sport_series(titles, props, games)
+        if unregistered:
+            print(
+                "[kalshi_odds] SERIES_UNREGISTERED"
+                f" n={len(unregistered)}"
+                f" sample={unregistered[:14]}",
+                flush=True,
+            )
+
         return {
             "status": "ok",
             "catalogue": int(report.get("count") or 0),
             "prop_series": len(props),
             "game_series": len(games),
             "added": len(added_props.get("added") or {}) + len(added_games.get("added") or {}),
+            "unregistered": len(unregistered),
         }
     except Exception as exc:
         return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
