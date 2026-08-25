@@ -1189,3 +1189,55 @@ def test_an_unrecognised_polymarket_payload_is_named_not_empty(monkeypatch):
     result = fetch_orders()
     assert result["status"] == "error"
     assert result["reason"] == "no_orders_array"
+
+
+def test_the_state_field_is_what_carries_a_polymarket_order_status():
+    """MEASURED 2026-08-25T17:05:58Z on the first real per-order read: the
+    payload has no `status` key at all. It is `state`.
+
+      ORDERS_READ n=1 mode=per_order asked=1 statuses=['']
+        keys=[...,'cumQuantity','id','leavesQuantity','marketSlug',
+              'outcomeSide','price','quantity','side','state','tif','type']
+
+    Reading the wrong key gave `unknown`, which correctly changes nothing --
+    and so the order stayed blocking live execution on both venues.
+    """
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    assert venue_order_view({"state": "ORDER_STATE_CANCELED"})["state"] == "dead"
+    assert venue_order_view({"state": "ORDER_STATE_OPEN"})["state"] == "resting"
+    # `status` still works if the venue ever adds it -- kept, not replaced.
+    assert venue_order_view({"status": "ORDER_STATUS_CANCELED"})["state"] == "dead"
+
+
+def test_the_measured_polymarket_fill_fields_are_the_ones_read():
+    """`cumQuantity` is cumulative filled and `avgPx` the average price, both
+    from the measured key list. `leavesQuantity` is the UNFILLED remainder and
+    must never be read as a fill."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view({
+        "state": "ORDER_STATE_FILLED",
+        "cumQuantity": "2.86",
+        "leavesQuantity": "0",
+        "avgPx": "0.495",
+        "marketSlug": "aec-mlb-tex-cws-2026-08-25",
+        "id": "o-1",
+    })
+    assert view["filled_count"] == 2.86
+    assert view["fill_price"] == 0.495
+    assert view["ticker"] == "aec-mlb-tex-cws-2026-08-25"
+    assert view["order_id"] == "o-1"
+
+
+def test_leaves_quantity_alone_is_not_a_fill():
+    """A wholly unfilled resting order carries leavesQuantity == quantity. If
+    that were read as a fill we would book a position we do not hold -- the
+    2026-08-24 phantom fill, in a new place."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view({
+        "state": "ORDER_STATE_OPEN", "cumQuantity": "0", "leavesQuantity": "2.86",
+    })
+    assert view["state"] == "resting"
+    assert not view["filled_count"]

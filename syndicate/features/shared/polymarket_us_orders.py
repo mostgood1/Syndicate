@@ -604,7 +604,7 @@ def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) ->
             print(
                 f"[polymarket_us_orders] ORDERS_READ n={len(rows)} mode=per_order"
                 f" asked={len(wanted)} keys={sorted(rows[0].keys())}"
-                f" statuses={sorted({str(r.get('status') or '') for r in rows})}"
+                f" states={sorted({str(r.get('state') or '') for r in rows})}"
                 f" errors={errors[:2]}",
                 flush=True,
             )
@@ -666,7 +666,7 @@ def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) ->
         print(
             f"[polymarket_us_orders] ORDERS_READ n={len(orders)} container={container}"
             f" keys={sorted(orders[0].keys())}"
-            f" statuses={sorted({str(o.get('status') or '') for o in orders})}",
+            f" states={sorted({str(o.get('state') or o.get('status') or '') for o in orders})}",
             flush=True,
         )
     return {"status": "ok", "orders": orders, "count": len(orders)}
@@ -684,8 +684,23 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     the same reason: reading them the other way round reconciles a real
     position away to zero.
     """
-    raw_status = str(order.get("status") or "").strip().lower()
-    # The venue prefixes its enums (`ORDER_STATUS_CANCELED`), so the prefix is
+    # `state`, NOT `status`. MEASURED 2026-08-25T17:05:58Z on the first real
+    # per-order read, which is exactly what the shape report exists to catch:
+    #
+    #   ORDERS_READ n=1 mode=per_order asked=1 statuses=['']
+    #     keys=['action','avgPx','cashOrderQty',...,'cumQuantity','id',
+    #           'insertTime','leavesQuantity','marketSlug','outcomeSide',
+    #           'price','quantity','side','state','tif','type']
+    #
+    # There is no `status` key at all, so the view read None, mapped it to
+    # `unknown`, and left the row untouched -- correct behaviour on an unknown
+    # status, and the order stayed blocking. Same class as `kalshi_client`'s
+    # first live run correcting 10 of 17 field names.
+    #
+    # `status` is kept as a fallback rather than replaced: it costs nothing and
+    # a venue that adds the field later should not need another deploy.
+    raw_status = str(order.get("state") or order.get("status") or "").strip().lower()
+    # The venue prefixes its enums (`ORDER_STATE_CANCELED`), so the prefix is
     # STRIPPED and the remainder matched whole.
     #
     # NOT a split on the last underscore, which was the first attempt and is
@@ -694,13 +709,16 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     # resting. An unmapped status must reach `unknown` -- that is the value
     # that makes reconciliation leave the row alone.
     tail = raw_status
-    for prefix in ("order_status_", "status_"):
+    for prefix in ("order_state_", "order_status_", "state_", "status_"):
         if tail.startswith(prefix):
             tail = tail[len(prefix):]
             break
 
+    # `cumQuantity` is the venue's cumulative filled size, from the same
+    # measured key list. `leavesQuantity` is the unfilled remainder -- NOT read
+    # as a fill, and named here so a future reader does not mistake it for one.
     filled = None
-    for field in ("filledQuantity", "filled_quantity", "filledSize", "matchedQuantity"):
+    for field in ("cumQuantity", "filledQuantity", "filled_quantity", "filledSize", "matchedQuantity"):
         value = order.get(field)
         if value in (None, ""):
             continue
@@ -723,7 +741,8 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         state = "unknown"
 
     price = None
-    for field in ("averageFillPrice", "average_fill_price", "avgPrice", "fillPrice"):
+    # `avgPx` is the venue's own average fill price, from the measured keys.
+    for field in ("avgPx", "averageFillPrice", "average_fill_price", "avgPrice", "fillPrice"):
         raw_price = order.get(field)
         if isinstance(raw_price, Mapping):
             raw_price = raw_price.get("value")
