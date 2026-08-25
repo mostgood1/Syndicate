@@ -623,6 +623,7 @@ def _kalshi_price_for(request) -> float | None:
         )
         return planned
 
+    planned = planned_probability(planned)
     if planned is not None:
         drift = round(live - planned, 4)
         if drift > max_slippage_dollars():
@@ -665,6 +666,54 @@ def _artifact_price(ticker: str, key: str) -> float | None:
     for market in markets_from_state(payload):
         if str(market.get("ticker") or "") == ticker:
             return dollars_to_probability(market.get(key))
+    return None
+
+
+def planned_probability(value: Any) -> float | None:
+    """`requested_price` as a PROBABILITY, whatever unit it arrived in.
+
+    THE SLIPPAGE GUARD HAS NEVER WORKED, on either venue, because it compared
+    two different units. MEASURED 2026-08-25T17:59:06Z, the first totals order
+    to resolve a side:
+
+        _SlippageExceeded: polymarket_slippage: slug=tsc-mlb-tb-det-2026-08-25-7pt5
+            planned=-108.0 price=0.52 drift=+108.5200 max=0.03
+
+    `planned` is AMERICAN ODDS off our own board; `price` is a probability from
+    the venue. Subtracting them is meaningless, and the meaninglessness is
+    ASYMMETRIC, which is why it went unnoticed:
+
+      * negative American odds (-108) produce a huge POSITIVE drift and refuse
+        every order;
+      * positive American odds (+104) produce a huge NEGATIVE drift, which is
+        never `> max`, so the order sails through unchecked.
+
+    The one live order that reached a venue today was `planned=104.0` against
+    `price=0.495` -- drift -103.5, silently passed. The single guard standing
+    between us and a bad fill was decided by the SIGN of the odds.
+
+    Kalshi's copy at `_kalshi_price_for` had the identical defect and is fixed
+    through this same helper, so the two cannot drift apart again.
+
+    UNIT IS INFERRED FROM MAGNITUDE, because both forms genuinely occur: a
+    probability is strictly inside (0, 1), and American odds are conventionally
+    at least 100 away from zero. Anything between is AMBIGUOUS and returns None
+    rather than being guessed -- a guessed unit here is a guessed guard.
+    """
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    if 0.0 < parsed < 1.0:
+        return parsed
+    if abs(parsed) >= 100.0:
+        from syndicate.features.shared.prophetx_client import american_to_probability
+
+        return american_to_probability(parsed)
     return None
 
 
@@ -1014,12 +1063,21 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
         return None
 
     fetched_at = (payload or {}).get("fetched_at")
-    planned = getattr(request, "requested_price", None)
+    planned_raw = getattr(request, "requested_price", None)
+    planned = planned_probability(planned_raw)
+    if planned_raw is not None and planned is None:
+        # AMBIGUOUS UNIT -- named, never guessed, and never silently skipped.
+        print(
+            f"[execute_portfolio] SLIPPAGE_UNCHECKED slug={slug}"
+            f" planned={planned_raw!r} -- not readable as odds or a probability",
+            flush=True,
+        )
     if planned is not None:
-        drift = round(price - float(planned), 4)
+        drift = round(price - planned, 4)
         if drift > max_slippage_dollars():
             raise _SlippageExceeded(
-                f"polymarket_slippage: slug={slug} planned={planned} price={price}"
+                f"polymarket_slippage: slug={slug} planned={planned_raw}"
+                f" planned_prob={planned:.4f} price={price}"
                 f" drift={drift:+.4f} max={max_slippage_dollars()} fetched_at={fetched_at}"
             )
     # THE NAME WE RESOLVED, not just the number. A price alone cannot be

@@ -1140,3 +1140,79 @@ def test_a_moneyline_still_resolves_on_team_names(monkeypatch):
     resolved = runner._polymarket_resolve_market(_PolyReq())
     assert resolved is not None
     assert resolved[1] == 0.55
+
+
+# --------------------------------------------------------------------------
+# The slippage guard compared two different units, on both venues
+# --------------------------------------------------------------------------
+
+
+def test_american_odds_become_a_probability_before_the_slippage_compare():
+    """MEASURED 2026-08-25T17:59:06Z, the first totals order to resolve a side:
+
+      _SlippageExceeded: planned=-108.0 price=0.52 drift=+108.5200 max=0.03
+
+    `planned` is AMERICAN ODDS off our board; `price` is a probability from the
+    venue. Subtracting them is meaningless, and asymmetrically so -- which is
+    why it survived: negative odds refuse everything, positive odds produce a
+    huge NEGATIVE drift that is never `> max` and sail through unchecked.
+    """
+    import pipeline.execute_portfolio as runner
+
+    assert runner.planned_probability(-108.0) == pytest.approx(0.5192, abs=1e-4)
+    assert runner.planned_probability(104.0) == pytest.approx(0.4902, abs=1e-4)
+    # Already a probability -- passed through, because both forms occur.
+    assert runner.planned_probability(0.52) == 0.52
+
+
+def test_an_ambiguous_planned_price_is_refused_rather_than_guessed():
+    """A guessed unit here is a guessed guard. American odds are conventionally
+    at least 100 from zero and a probability is inside (0,1); anything between
+    is not readable as either."""
+    import pipeline.execute_portfolio as runner
+
+    for ambiguous in (5.0, -3.0, 99.0, 1.0, 0.0, None, "x"):
+        assert runner.planned_probability(ambiguous) is None, ambiguous
+
+
+def test_a_positive_odds_order_is_now_actually_CHECKED(monkeypatch):
+    """The order that reached a venue today was `planned=104.0` against
+    `price=0.495` -- drift -103.5, silently passed. In real units 104.0 is
+    0.4902, so a 0.495 fill is a 0.0048 drift: inside the cap, and now
+    genuinely measured rather than accidentally ignored."""
+    runner = _artifact_env(monkeypatch)
+    resolved = runner._polymarket_resolve_market(_PolyReq())
+    assert resolved is not None
+
+
+def test_a_real_adverse_move_on_positive_odds_is_now_REFUSED(monkeypatch):
+    """The half of the guard that never fired. Planned +104 (0.4902) against a
+    0.75 ask is a 0.26 drift -- far outside the cap, and previously passed
+    because -103.5 is not greater than 0.03."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(prices=("0.75", "0.25")),
+    ])
+
+    class _Moved(_PolyReq):
+        requested_price = 104.0
+
+    with pytest.raises(Exception) as excinfo:
+        runner._polymarket_resolve_market(_Moved())
+    assert "slippage" in str(excinfo.value)
+
+
+def test_a_polymarket_build_error_does_not_charge_the_daily_budget():
+    """MEASURED 2026-08-25T17:59:06Z:
+
+      LIVE_ORDER status=failed venue=polymarket market=spreads
+        error='OrderBuildError: market_unresolved_for_position'
+      EXECUTION placed=0 spent={'dollars': 2.39, 'orders': 1}
+
+    $2.39 and one order charged against a $40 daily cap for something that
+    never left the process. `execution_ledger` reads `venue_contacted`,
+    defaulting to True for unknown exceptions -- Kalshi's OrderBuildError
+    carries the attribute, Polymarket's did not.
+    """
+    from syndicate.features.shared.polymarket_us_orders import OrderBuildError
+
+    assert OrderBuildError.venue_contacted is False
