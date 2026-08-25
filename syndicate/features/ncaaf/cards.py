@@ -242,7 +242,7 @@ def _smartsim2_standalone_market_lines(
 ) -> dict[tuple[str, str], dict[str, float | None]]:
     """Market lines for one week, OddsAPI first and CFBD as the fallback.
 
-    `#546`. The CFBD path below is kept and still tried, but it has had NO
+    `#557`. The CFBD path below is kept and still tried, but it has had NO
     PRODUCER on any service since it was written -- `fetch_ncaaf_market_lines.py`
     and `fetch_cfbd_lines.py` have zero callers, and no `cfbd_lines_*.json`
     exists in git at any SHA -- which is why `markets` was null on 0-of-51 games
@@ -2269,7 +2269,7 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
         f"with a total of {total_points} and a home win probability of {win_probability}. "
         f"{LEGACY_ENGINE_SOURCE_LABEL} has no prediction for this game yet."
     )
-    # `#546`. THE MARKET GOES FIRST, and the ordering is the whole point.
+    # `#557`. THE MARKET GOES FIRST, and the ordering is the whole point.
     #
     # The compact card (`shared/_scoreboard_strip_generic.html`) renders
     # `metrics[:3]` and nothing else, so whatever sits in the first three slots
@@ -2378,7 +2378,7 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
             },
         ],
         "market_tiles": _smartsim2_standalone_market_tiles(row),
-        # `#546`. THE SHARED CONTRACT'S OWN BLOCK, and it is what was missing.
+        # `#557`. THE SHARED CONTRACT'S OWN BLOCK, and it is what was missing.
         #
         # `publication_adapter._shared_markets` builds the cross-sport
         # `markets` / `shared_markets` dict by looking for `home_ml` / `away_ml`

@@ -1,6 +1,6 @@
 """Capture NCAAF game lines (moneyline / spread / total) from The Odds API.
 
-`#546`. The NCAAF board had a projection on all 51 week-1 games and a price on
+`#557`. The NCAAF board had a projection on all 51 week-1 games and a price on
 none, because `syndicate/features/ncaaf/cards.py` read lines from
 `cfbd_lines_{season}_wk{week}.json` -- a path whose only two writers
 (`fetch_ncaaf_market_lines.py`, `fetch_cfbd_lines.py`) have ZERO callers on any

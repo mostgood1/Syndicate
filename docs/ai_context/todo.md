@@ -1,6 +1,79 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#546` — **NCAAF's board has a model on all 51 games and a price on none: `cfbd_lines_{season}_wk{week}.json` has NO PRODUCER on any service.** — lane `ncaaf-readiness-assessment`, 2026-08-25, measured
+### `#546` — **Kalshi listed six MLB prop series the board was asking for BY NAME, and we never asked for them. Plus: the totals grammar priced a corners market as a goals total.** — lane `kalshi-registry`, 2026-08-25, user request ("fix kalshi")
+
+**The shape of all four findings is the same and it is worth naming once:
+REGISTRATION IS UPSTREAM OF EVERYTHING, and an unregistered series is
+indistinguishable from a venue that lists nothing.** `classify_market` refuses
+at `unmapped_series` before it ever reads a title, `sports_series()` never puts
+the series in the fetch list, and the board row reports "Kalshi has no market".
+Every layer below agrees, and every one of them is wrong.
+
+**1. Six MLB prop series, four of them already on the board's want list.**
+Measured 2026-08-25T16:13:44Z, `VENUE_REPRICE_KEYS board_wanted`:
+
+    mlb|batter_rbis|over|0.5  (x3)  -> KXMLBRBI
+    mlb|batter_total_bases|over|1.5 -> KXMLBTB
+    mlb|earned_runs|under|1.5       -> KXMLBERA
+    mlb|hits_allowed|over|4.5       -> KXMLBHA
+
+The stat vocabulary resolved all six already. The registry line was the only
+missing piece. Confirmed against live market pages the user sent, and verified
+end to end: `"Agustin Ramirez: 1+ hits?"` -> `batter_hits over 0.5`.
+
+**2. Soccer could never be seen at all, and `prop_candidates` had said so in
+its own docstring since it was written:** Kalshi names soccer series by
+COMPETITION (`KXLALIGAGAME`, `KXUCL1HTOTAL`), never by the word soccer, so
+`sport_for_ticker` had no token to scan for. Adding ticker prefixes is the
+wrong fix twice over — one prefix per competition per week is the whack-a-mole
+the user asked us to end, and a short competition code as a SUBSTRING is
+dangerous in exactly the way that made `KXWNBAREB` read as NBA: **`UCL` sits
+inside `KXNUCLEARTEST`.** So the competition now comes from Kalshi's own title,
+matched as a PREFIX against the ten names `LEAGUE_DISPLAY_NAMES` already holds.
+Any of the ten registers the moment Kalshi lists it, with no deploy.
+
+**3. `_TEAM_TOTAL` parsed its stat and threw it away.** The pattern is
+`Over <line> <anything>?` and the market was then hardcoded to the string
+`"totals"`:
+
+    "Over 4.5 corners?"                 -> totals 4.5
+    "Over 77.5 1st half points scored?" -> totals 77.5
+    "Over 2.5 1H goals scored"          -> totals 2.5   (real, KXUCL1HTOTAL)
+
+**The first is a wrong BET, not a miscount.** Soccer boards carry a goals total
+at 4.5, the join matches on (market, line, side), and our goals model would
+have priced a corners market with nothing anywhere reading wrong. Found only
+because registering soccer brought corners titles into range for the first
+time — the bug was already there for every sport. `total_market_from_stat` now
+checks the tail against the sport's scoring unit and KEEPS the period, so a
+half line stays `totals_h1` and corners refuses by name into the work queue.
+
+**4. A comment claiming a property the code did not have, again.**
+`KXWNBA3PT`'s hand-registration comment says "`market_keys` resolves all three
+for wnba" — true of the SERIES title ("Player Threes") and false of the MARKET
+titles, which refused `stat_not_in_market_vocabulary` on every wording but the
+bare word. That is the fourth instance of this pattern this week.
+
+**Operational note, cost me a real debugging detour:** two `test_kalshi_board_join`
+helpers registered series into `SERIES_SPORT` and then popped them
+unconditionally in a `finally`. Once those keys became hand-registered, the pop
+DELETED production state for the rest of the pytest process — `KXMLBSPREAD`
+went missing that way and a registration test in a DIFFERENT FILE failed while
+passing in isolation. **Passing alone and failing in the suite is the
+signature.** Both helpers now restore prior state instead of popping.
+
+**Deployed** `461ee74be` to refresh-worker + live-odds-worker 2026-08-25T20:16Z.
+Verification readings are in `.syndicate/deploys.md` under that SHA — the one
+that matters is not the registration count, it is whether those four
+`board_wanted` keys now match a Kalshi price.
+
+### `#557` — **NCAAF's board has a model on all 51 games and a price on none: `cfbd_lines_{season}_wk{week}.json` has NO PRODUCER on any service.** — lane `ncaaf-readiness-assessment`, 2026-08-25, measured
+
+> **Renumbered from `#546` on 2026-08-25.** Two lanes took 546 the same day in
+> parallel branches; `kalshi-registry`'s reached `main` first and is cited from
+> `.syndicate/deploys.md` under `461ee74be`, so it kept the number. PR #61's body
+> and commit messages still say `#546`–`#554` for this block; read them as
+> `#557` + `#547`–`#554`.
 
 Full assessment: `docs/ai_context/ncaaf_readiness_assessment_2026_08_25.md`.
 State: `state.md` `[ncaaf-readiness-2026]`.
@@ -132,7 +205,7 @@ path cannot supply what is missing.)
 
 ### `#552` — **NCAAF game lines: OddsAPI capture built and proven off-line; `markets` 0 -> 51, Layer 1 grid rows 0 -> 32. NOT WIRED INTO THE SWEEP (cross-lane).** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, user request ("oddsAPI is back online - use this to build the odds out")
 
-Closes the `#546` blocker in code. **Nothing is deployed and no live fetch has
+Closes the `#557` blocker in code. **Nothing is deployed and no live fetch has
 run** -- this session had no egress to `api.the-odds-api.com` (proxy 403) and no
 `ODDS_API_KEY`, so every number below is from a replayed fixture built on the
 REAL 8-game 08-29/08-30 slate, not from OddsAPI.
