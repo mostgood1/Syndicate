@@ -899,7 +899,6 @@ def _live_lens_background_loop() -> None:
 			)
 		meta = _run_live_lens_tick()
 		if _live_lens_publish_enabled():
-			publish_started_epoch = time.time()
 			# #327. THE GAP THIS ITEM POINTED AT. The last per-sport sample
 			# (`live_lens_tick_after_<last sport>`) precedes TICK_COMPLETE by
 			# ~18s, and this sweep is what runs inside that window -- measured
@@ -967,6 +966,16 @@ def _live_lens_background_loop() -> None:
 				# a persisted watermark on any non-raising return would
 				# permanently skip a file that failed for a transient reason".
 				# That was still true here after the watermark fix above.
+				#
+				# CAPTURED HERE, not before `log_and_persist_process_memory`
+				# above. `#327`'s in-sweep sampler was inserted between the two
+				# and reads the clock itself, so a capture taken before it
+				# stamped the watermark one tick EARLIER than this sweep's true
+				# start -- harmless in production (a watermark that is early is
+				# still safe, never late), but it broke
+				# `test_the_watermark_is_stamped_at_the_publish_not_the_cycle_
+				# start`'s exact-equality invariant, measured 2026-08-25.
+				publish_started_epoch = time.time()
 				sweep = sweep_changed_hot_artifacts(last_publish_epoch)
 				sweep_published = int(sweep.published_count or 0)
 				sweep_failed = len(sweep.failed_paths or ())

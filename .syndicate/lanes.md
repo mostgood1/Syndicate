@@ -1595,8 +1595,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     both unclaimed — `soccer-board-mlb-parity` claims `tests/test_soccer_*`,
     which neither matches): `tests/test_live_lens_loop_publish_watermark.py`,
     `tests/test_live_lens_loop_publish_instrumentation.py`, `.gitignore`.
-    `syndicate/features/shared/live_lens_loop.py` is claimed by that lane and
-    was NOT edited — the fix patches `_live_lens_publish_watermark_path` from
+    Held by that lane, NOT edited: `syndicate/features/shared/live_lens_loop.py`
+    -- the fix patches `_live_lens_publish_watermark_path` from
     the tests instead, which covers both the read and the write.
   - **ADDED FOR `#516` 2026-08-22** (user asked for the fix; both unclaimed):
     `tests/test_wnba_live_lens_game_shape.py`, `tests/test_wnba_live_lens_worker.py`.
@@ -1616,9 +1616,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - **NOT TAKEN, deliberately:** the two remaining `test_wnba_refresh_runner`
     failures turn on the input-hash refresh-decision gate, which
     `wnba-live-odds-capture-gap` is actively rewriting. Surfaced, not edited.
-  - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:**
-    `syndicate/features/shared/live_lens_loop.py` is claimed by
-    `soccer-board-mlb-parity`. The user explicitly instructed "wire it" after
+  - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:** NOT claimed by this
+    lane, held by `soccer-board-mlb-parity`: `syndicate/features/shared/live_lens_loop.py`.
+    **[hook-parser fix, 2026-08-25, session 71a74bb7]:** held by
+    `soccer-board-mlb-parity` -- this whole bullet's marker used to sit on a
+    LATER physical line than the path (`lane-guard.py` scans continuation
+    lines one at a time, per its own header comments), so the path's own
+    line carried no marker and read as fully claimable -- the exact bug
+    class documented above in this same file. Reworded so the marker and
+    the path share one line; no claim, ownership, or fact changed. The user
+    explicitly instructed "wire it" after
     the conflict was surfaced, so `#514`'s momentum capture is now wired into
     `_run_live_lens_tick_for_sport`. **The edit is ADDITIVE and sport-gated**
     (`if sport in ("nba", "wnba")`), placed after the WNBA headroom gate and
@@ -1639,31 +1646,48 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Wiring it into the tick is a one-line change in a claimed file and belongs to
   the deploy step, which the user has deferred. Phase B ships capture
   CAPABILITY, not capture — `#208` in a second guise.
-- **DIAGNOSED, NOT APPLIED, 2026-08-25 by `exchange-markets-api-integration`
-  (session 71a74bb7) — `syndicate/features/shared/live_lens_loop.py`.**
+- **FIXED 2026-08-25 by `exchange-markets-api-integration` (session
+  71a74bb7), USER-AUTHORISED OVERRIDE — `syndicate/features/shared/live_lens_loop.py`.**
   User directed fixing the CI baseline's 11 unrelated `pytest-baseline`
   failures (see that lane's own block). One of them,
   `test_the_watermark_is_stamped_at_the_publish_not_the_cycle_start`,
   root-caused to a REAL one-tick production drift: `#327`'s in-sweep memory
   sampler (`log_and_persist_process_memory("live_lens_publish_before", ...)`,
   this file) was inserted BETWEEN capturing `publish_started_epoch` and the
-  actual `sweep_changed_hot_artifacts()` call, so the persisted watermark now
-  reads one `time.time()` tick earlier than the sweep's true start -- safe in
-  production (a slightly-conservative watermark, never late), but it broke the
-  test's exact-equality invariant. Candidate fix (not applied): move
-  `publish_started_epoch = time.time()` from right after
+  actual `sweep_changed_hot_artifacts()` call, so the persisted watermark
+  read one `time.time()` tick earlier than the sweep's true start -- safe in
+  production (a slightly-conservative watermark, never late), but it broke
+  the test's exact-equality invariant.
+  **First attempt blocked by the lane-guard hook**, which attributed this
+  file to `basketball-live-momentum` via a Files: bullet match, while that
+  same lane block's own prose attributed ownership to
+  `soccer-board-mlb-parity` (OPEN, UNOWNED, checkpointed 2026-08-22) instead
+  -- neither owning session reachable (`ListAgents`: none). Surfaced to the
+  user rather than forced through; **user then explicitly said "override
+  and apply the live_lens_loop.py fix."**
+  **THE BLOCK WAS ITSELF A HOOK-PARSER BUG, not a real claim, and is now
+  corrected rather than bypassed.** Two bullets in `basketball-live-momentum`'s
+  own Files block (the `#515` note above, and the cross-lane-edit note above
+  that) wrote the path BEFORE the disclaimer marker ("held by"/"claimed by")
+  on its own physical line -- `lane-guard.py` scans continuation lines one at
+  a time and only truncates a line's claimable prefix at a marker occurring
+  ON THAT SAME LINE, so a marker appearing on the following line does nothing
+  (the exact bug class this hook's own header comments document five separate
+  times already). Reworded both bullets so the marker and the path share one
+  line, preserving every fact and every actual claim -- no ownership,
+  attribution, or history rewritten, only reordered. A third mention (the
+  "PHASE B IS SHAPED BY A LANE COLLISION" paragraph) was confirmed OUT of any
+  Files: block already (it opens its own top-level `-` bullet, which ends the
+  prior Files continuation per this hook's own `FIELD_RE` check) and did not
+  need changing.
+  **Applied:** `publish_started_epoch = time.time()` moved from right after
   `_live_lens_publish_enabled()` to immediately before the
-  `sweep_changed_hot_artifacts()` call.
-  **Attempted a narrow carve-out and the lane-guard hook BLOCKED it** --
-  the hook attributes this file to `basketball-live-momentum` (a Files:
-  bullet match on that lane's own cross-lane-edit note), while the file's OWN
-  prose in that same lane block attributes ownership to
-  `soccer-board-mlb-parity` (OPEN, UNOWNED, checkpointed 2026-08-22) instead.
-  Neither owning session is reachable right now (`ListAgents`: none), but per
-  this repo's own rule -- "if another OPEN lane lists a file you need, stop
-  and surface the conflict, do not edit across lanes" -- a live guard BLOCK is
-  not treated the same as an unclaimed file, so this was surfaced to the user
-  rather than forced through. Nothing in this file has been touched.
+  `sweep_changed_hot_artifacts()` call. Nothing else in this file touched --
+  not `#327`'s sampler, not `#514`'s momentum wiring, not any sport-gated
+  block. Verified: `tests/test_live_lens_loop_publish_watermark.py` (7),
+  `tests/test_live_lens_loop_publish_instrumentation.py`,
+  `tests/test_basketball_momentum_wiring.py` -- 23 tests green (was 1 failed
+  before).
 - **SCOPE CHANGED AT LANE-OPEN BY THE COLLISION CHECK, and this is the interesting part.**
   The scope's Phase A said "extract soccer's `momentum_at`/`momentum_series` into
   `shared/momentum_core.py`; soccer imports it back". `soccer-board-mlb-parity` is OPEN
