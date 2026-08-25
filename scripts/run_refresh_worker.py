@@ -4727,7 +4727,14 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_nfl_pbp_fetch(
-            # SECOND, DIRECTLY BEHIND RECONCILIATION, and `#341` is why.
+            # AHEAD OF EVERY NFL JOB THAT CONSUMES IT, and `#341` is why.
+            #
+            # Stated as a RELATIONSHIP, not an ordinal. This read "SECOND,
+            # DIRECTLY BEHIND RECONCILIATION" and had been false since
+            # `_launch_autorun_evaluation_settlement` was inserted above it. An
+            # ordinal is wrong the moment anyone inserts higher, and FOUR
+            # comments in this chain had gone stale exactly that way -- two of
+            # them claiming the same slot as each other.
             #
             # It sat 6th of 8 and emitted NOTHING for the 10 minutes after its
             # first deploy. Not broken -- starved. `#341`'s comment above
@@ -4753,8 +4760,67 @@ def main() -> int:
         ):
             if args.run_once:
                 return 0
+        elif _launch_autorun_nfl_injuries_fetch(
+            # DIRECTLY BEHIND THE PBP FETCH, AND AHEAD OF THE FANTASY ARTIFACT
+            # THAT CONSUMES IT -- same `#341` starvation
+            # reasoning as that branch's comment above: injuries data is
+            # exactly as time-sensitive for the same sport, so it gets the
+            # same priority tier rather than being appended at the end where
+            # it can go mute for weeks while still enabled and correctly
+            # configured. Also DAILY-ish gated (default 21600s interval, not
+            # literally daily), so it wins at most a handful of ticks per day.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_roster_snapshot(
+            # DIRECTLY BEHIND THE INJURIES FETCH -- same `#341`
+            # starvation reasoning as the branches above: equally
+            # time-sensitive for the same sport, same priority tier.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_depth_chart_snapshot(
+            # DIRECTLY BEHIND THE ROSTER SNAPSHOT -- same reasoning.
+            # No producer/consumer ordering is actually required between
+            # these two (see the module comment above), but keeping them
+            # adjacent keeps this chain's NFL block easy to reason about.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_news_capture(
+            # AHEAD OF the fantasy artifact it feeds, and for the same reason the
+            # artifact sits high: `#341` starvation. This one is six-hourly
+            # rather than daily, so it wins at most four ticks a day, and it is
+            # one HTTP GET.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
         elif _launch_autorun_nfl_fantasy_artifact(
-            # THIRD, directly behind the pbp fetch, and `#341` is why it is not
+            # BEHIND EVERY INPUT IT READS. injuries, roster, depth and news all
+            # produce what this consumes, so all four sit above it.
+            #
+            # This claimed "THIRD, directly behind the pbp fetch" -- the same
+            # slot the INJURIES fetch claims in its own comment. Both could not
+            # be true, and this was the one that was not: measured 2026-08-25,
+            # this branch ran AHEAD of its own producers, so on a busy slate it
+            # built projections from yesterday's injuries and news.
+            #
+            # Moving it down does NOT reopen `#341`. That starvation came from
+            # sitting BELOW high-frequency branches; everything now above it here
+            # is daily or six-hourly gated, so the whole NFL block needs about six
+            # winning ticks a day out of ~2,880. `#341` is why it is not
             # lower. IT WAS TENTH ON ITS FIRST DEPLOY: the patch that added it
             # anchored on `season_projections` and inserted above THAT, which
             # put it below evaluation_settlement while the comment here still
@@ -4771,52 +4837,6 @@ def main() -> int:
             # rather than running inline, so the poll loop is free again
             # immediately. It sits behind the pbp fetch specifically because it
             # CONSUMES what that job produces.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_news_capture(
-            # Beside the fantasy artifact it feeds, and for the same reason the
-            # artifact sits high: `#341` starvation. This one is six-hourly
-            # rather than daily, so it wins at most four ticks a day, and it is
-            # one HTTP GET.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_injuries_fetch(
-            # THIRD, DIRECTLY BEHIND THE PBP FETCH -- same `#341` starvation
-            # reasoning as that branch's comment above: injuries data is
-            # exactly as time-sensitive for the same sport, so it gets the
-            # same priority tier rather than being appended at the end where
-            # it can go mute for weeks while still enabled and correctly
-            # configured. Also DAILY-ish gated (default 21600s interval, not
-            # literally daily), so it wins at most a handful of ticks per day.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_roster_snapshot(
-            # FOURTH, DIRECTLY BEHIND THE INJURIES FETCH -- same `#341`
-            # starvation reasoning as the branches above: equally
-            # time-sensitive for the same sport, same priority tier.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_depth_chart_snapshot(
-            # FIFTH, DIRECTLY BEHIND THE ROSTER SNAPSHOT -- same reasoning.
-            # No producer/consumer ordering is actually required between
-            # these two (see the module comment above), but keeping them
-            # adjacent keeps this chain's NFL block easy to reason about.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

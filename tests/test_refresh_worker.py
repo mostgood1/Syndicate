@@ -15,6 +15,38 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 
+
+def _assert_no_refresh_subprocess(test, mocked_popen) -> None:
+    """No REFRESH JOB was spawned as a raw subprocess.
+
+    Deliberately not `assert_not_called()`. That form asserts nothing in the
+    whole process touched `subprocess.Popen`, and on Linux it is false for a
+    reason that has nothing to do with this worker: `ctypes.util.find_library`
+    shells out to `/sbin/ldconfig -p` while a dependency loads, so the mock can
+    record two calls before `main()` decides anything. The Windows dev box these
+    tests were written on has no `ldconfig`, so the assertion passed there and
+    failed here -- green on one platform, red on another, the same "passes only
+    on one machine" shape as the hardcoded-repo-path graders filed in
+    learnings.md 2026-08-25.
+
+    Whether it bites also depends on TEST ORDER, because `find_library` caches:
+    only the first test to run in a fresh process saw the calls. Four of the
+    five sites this replaced were passing for that reason alone, not because
+    they were sound.
+
+    What the assertion MEANS is that the autorun hands off through
+    `launch_refresh_run` rather than spawning a job itself, so that is what is
+    checked: no Popen call whose command references the repo's own scripts.
+    """
+    spawned = []
+    for call in mocked_popen.call_args_list:
+        command = call.args[0] if call.args else call.kwargs.get("args") or []
+        parts = [str(part) for part in (command if isinstance(command, (list, tuple)) else [command])]
+        if any("scripts" in part or part.endswith(".py") for part in parts):
+            spawned.append(parts)
+    test.assertEqual(spawned, [], f"expected no refresh job spawned directly; got {spawned}")
+
+
 class RefreshWorkerTests(unittest.TestCase):
     @staticmethod
     def _load_module(repo_root: Path):
@@ -291,7 +323,7 @@ class RefreshWorkerTests(unittest.TestCase):
             self.assertEqual(called_kwargs["sports"], "mlb")
             self.assertEqual(called_kwargs["phase"], "live")
             self.assertEqual(called_kwargs["launch_mode"], "web_process")
-            mocked_popen.assert_not_called()
+            _assert_no_refresh_subprocess(self, mocked_popen)
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
             self.assertEqual(worker_status["state"], "launched")
             self.assertTrue(worker_status["ranJob"])
@@ -346,7 +378,7 @@ class RefreshWorkerTests(unittest.TestCase):
             self.assertEqual(called_kwargs["sports"], "nfl,ncaaf")
             self.assertEqual(called_kwargs["phase"], "live")
             self.assertEqual(called_kwargs["launch_mode"], "web_process")
-            mocked_popen.assert_not_called()
+            _assert_no_refresh_subprocess(self, mocked_popen)
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
             self.assertEqual(worker_status["state"], "launched")
             self.assertTrue(worker_status["ranJob"])
@@ -505,7 +537,7 @@ class RefreshWorkerTests(unittest.TestCase):
             # (run_live_odds_refresh_worker.py) now owns instead.
             self.assertEqual(called_kwargs["phase"], "live")
             self.assertEqual(called_kwargs["launch_mode"], "web_process")
-            mocked_popen.assert_not_called()
+            _assert_no_refresh_subprocess(self, mocked_popen)
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
             self.assertEqual(worker_status["state"], "launched")
             self.assertTrue(worker_status["ranJob"])
@@ -934,7 +966,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 0)
-            mocked_popen.assert_not_called()
+            _assert_no_refresh_subprocess(self, mocked_popen)
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
             self.assertEqual(worker_status["state"], "throttled")
             self.assertIn("configured limit", worker_status["detail"])
@@ -969,7 +1001,7 @@ class RefreshWorkerTests(unittest.TestCase):
                 exit_code = module.main()
 
             self.assertEqual(exit_code, 0)
-            mocked_popen.assert_not_called()
+            _assert_no_refresh_subprocess(self, mocked_popen)
             worker_status = json.loads(worker_status_path.read_text(encoding="utf-8"))
             self.assertNotEqual(worker_status["state"], "throttled")
             self.assertEqual(worker_status["state"], "idle")

@@ -209,7 +209,22 @@ class MainTests(unittest.TestCase):
             # patch both so the real production pbp_2025.csv is never
             # touched by this test (hermetic, same discipline as
             # test_generate_smartsim2_nfl_projections.py's own tests).
-            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)), patch.object(regular_gen, "DATA_ROOT", Path(tmp)), patch.object(
+            # `SYNDICATE_NFL_SOURCE_ROOT`, not just `DATA_ROOT`. `#441`
+            # deliberately moved `_pbp_path` OFF `DATA_ROOT` and onto a
+            # candidate-root resolver, because `default_nfl_source_root()`
+            # picks a root by probing for `upcoming_recs_*.csv` and so chose
+            # the ephemeral CHECKOUT on refresh-worker while the pbp lives
+            # only on the mounted disk -- measured: zero plays, the
+            # degenerate-run guard refused, artifact 2.36 days stale at ~107
+            # relaunches/day. Patching `DATA_ROOT` alone therefore stopped
+            # steering the pbp read, and this test silently reached for the
+            # REAL repo path instead of its own fixture.
+            #
+            # Setting the env var exercises the real resolver rather than
+            # stubbing it, and it lands on exactly the tmp tree the fixture
+            # above already writes.
+            # The "still hermetic" claim above was FALSE without this line.
+            with patch.dict(os.environ, {"SYNDICATE_NFL_SOURCE_ROOT": tmp}, clear=False), patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)), patch.object(regular_gen, "DATA_ROOT", Path(tmp)), patch.object(
                 sys, "argv", ["generate_smartsim2_nfl_preseason_projections.py", "--season", "2026", "--week", "1", "--seeds", "2"],
             ):
                 gen.main()

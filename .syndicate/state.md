@@ -4090,6 +4090,302 @@ the collector reads, keeping the volume low: `MLB_INPUT_CHECKLIST`,
 `mlb_sim_engine_reference.md` were corrected on 2026-08-19 to say so.
 
 
+## [ncaaf-readiness-2026] NCAAF SEASON READINESS — the model is ready, the MARKET is not connected to it `[measured 2026-08-25, four days before kickoff]`
+
+Full assessment with every reading:
+`docs/ai_context/ncaaf_readiness_assessment_2026_08_25.md`.
+
+**51 games render with a projection on every one, in production and locally.
+Every surface that needs a PRICE is at exactly zero.**
+
+    [prod 2026-08-25T14:21:27Z]
+    overview_counts        dashboard_games_count=51 data_health=partial
+    game_candidate_inputs  gameMarkets=0 game_market_recommendations=0 markets=5
+    GAME_CANDIDATES_EXIT   sport=ncaaf rows=0
+    candidate_generation   generated=0 markets={}
+    SPORT_PROPS_DONE       sport=ncaaf pregame=0 live=0
+    odds_history_input     entry_count=0 present=false shard_key=2026_wk1
+
+`markets: 5` is a KEY count, not a value count. Measured on the same board
+`[local]`: **markets non-null 0 of 51, predictions non-null 0 of 51,
+shared_game_state.startTime 0 of 51** — the last two while the NCAAF card's own
+`metrics`/`panels` carry the numbers and the kickoff correctly. A cross-sport
+consumer reading the shared contract sees a sport with no model and no clock.
+
+**THIS WEEKEND IS COVERED. 8 games 08-28..08-30, all FBS-vs-FBS, all 8 simmed.**
+But "Week 1" as the board serves it spans **08-29 → 09-07**: 8 games this
+weekend, **43 on 09-03..09-07**, all under one undated `WEEK 1` badge. And the
+FBS-only filter drops **48 of 99** week-1 games (every FBS-vs-FCS matchup) —
+free this weekend, half the slate from 09-05.
+
+### THE BLOCKER IS ONE ARTIFACT FAMILY WITH NO PRODUCER `[the part that does not self-clear]`
+
+`_smartsim2_standalone_market_lines` (cards.py:237) reads exactly
+`data/ncaaf_source/data/cfbd_lines_{season}_wk{week}.json`.
+
+- Written ONLY by `fetch_ncaaf_market_lines.py` / `fetch_cfbd_lines.py`.
+  **Both have ZERO callers** — not `refresh_odds_sources.py`, not either
+  worker, not any `.ps1`. Manual scripts.
+- **Zero `cfbd_lines_*.json` in git at any SHA**, none on this checkout.
+- **Not allowlisted** — `cfbd_lines_*` and `smartsim2_projections_*.csv` match
+  nothing in `HOT_ARTIFACT_PATTERNS`. **CORRECTED 2026-08-25 (same day):** the
+  earlier wording here, "0 NCAAF patterns of 155", was literally true and
+  materially misleading. The patterns are SPORT-AGNOSTIC GLOBS, and two of them
+  already match NCAAF — `*_source/tracking/book_quotes/*.jsonl` and
+  `*_source/data/book_grid/book_grid_*.json` (fnmatch, verified). So NCAAF is
+  covered for the shared quote/grid transport and is NOT covered for those two
+  named files. `#552` routes the new OddsAPI capture through the covered path
+  precisely so no allowlist edit is needed.
+
+What the sweep DOES run for NCAAF is `refresh_ncaaf_oddsapi.py`, writing
+`recommendations_summary/` off the legacy 2025 predicted-totals CSVs — which
+production already reports absent for 2026 (`artifact_status data_health=missing
+artifact_exists=false`).
+
+**PREDICTION, to be READ on 08-28/29 and not believed:** the sweep arms,
+`book_quotes`/`book_grid` fill, Layer 1 may populate — and the cards' `markets`
+block STAYS NULL, so Layer 2 candidates stay at 0. Tokens: `markets.total.line`
+on `/ncaaf/api/cards?week=1`, and `GAME_CANDIDATES_EXIT sport=ncaaf rows=`.
+
+### TODAY'S SWEEP EXCLUSION IS THE GATE WORKING, NOT A DEFECT — VERIFIED, NOT ASSUMED
+
+    [prod 2026-08-25T14:23:45Z] SWEEP_OWNERSHIP_EXCLUDED date=2026-08-25
+      kept=mlb,wnba,soccer dropped=nfl:… ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+
+`SYNDICATE_ACTIVE_SPORTS` is **not in `render.yaml`** (0 matches) — a service
+env var, so editing it would NOT fire `blueprint_sync`. But it should not need
+editing: `#520`'s weekly carve-out keeps nfl/ncaaf/ncaab on the fast tick on
+game days regardless of that var, at `horizon_days=1` (today+tomorrow). No
+NCAAF game within 08-25..08-26 → correctly dropped; 7 games on 08-29 → should
+claim on **08-28**.
+
+**Confirmed the carve-out actually fires in production**, same file, same live
+SHA (`620734fb`, byte-identical to this checkout), on NFL:
+
+    [prod 2026-08-24T03:55:01Z..04:56:14Z, repeating]
+    SWEEP_OWNERSHIP_WEEKLY_CLAIM sport=nfl kept=true
+      reason=claimed_by_fast_tick_despite_SYNDICATE_ACTIVE_SPORTS
+
+**Caveat: horizon 1 means no line history before Friday** — no opening-line
+capture, no CLV baseline across the week, on a market trading for months.
+
+### WEB SERVES AN 08-19 ARTIFACT AND THE WORKER'S DAILY REBUILD NEVER REACHES IT
+
+Live web `0e0017d7` carries `smartsim2_projections_2026_wk1.csv`, 51 rows,
+`generated_at 2026-08-19T22:11:51Z`, committed `46ca8445` on 08-24. The worker
+regenerates daily (`SEASON_PROJECTION_LAUNCHING sport=ncaaf … age_seconds=86552`,
+08-24T20:43:54Z) into a file web never reads. **That age sitting at one interval
+rather than growing is also the evidence the generator SUCCEEDS — `CFBD_API_KEY`
+is present on refresh-worker as a service env var (it is in no `render.yaml`),
+so `#458` looks resolved there.**
+
+**Only week 1 exists** anywhere. Week 2 needs a manual commit + web deploy.
+
+### THE BACKTESTS CANNOT BE REPRODUCED FROM THIS REPO, AND FAIL SILENTLY
+
+    scripts/grade_football_playability.py:42   REPO = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+    scripts/grade_football_model_weight.py:36  REPO = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+
+Run here with `PYTHONPATH` set: **`0 gradable games` for both sports, exit 0, no
+error.** Proximate cause is that the pick-ledger CSVs they grade
+(`{sport}_source/data/pick_ledger/pick_ledger_*.csv`) are **untracked and
+absent** — `git ls-files | grep pick_ledger` returns only the builder, the
+module and its test. The hardcoded path is a second, independent barrier.
+
+The conclusions are almost certainly right (stated with n and CIs). The problem
+is that **the entire evidence base for suppressing NCAAF picks lives on one
+laptop**, and re-running it anywhere else returns a clean, plausible zero rather
+than failing. That is `model_engine_standard.md`'s unfed-input signature applied
+to the EVIDENCE layer instead of the input layer.
+
+### UI — the compact card is inherited, not designed
+
+NCAAF falls to `_scoreboard_strip_generic.html`; only `mlb_main` and
+`soccer_main` have their own. Against MLB's strip, NCAAF's has **no kickoff
+time** (badge reads `WEEK 1`, identical on all 51), no score, **no logo `<img>`
+though `logo_url` IS in the payload**, no market chips, no odds-freshness stamp
+— and the `PROJECTED TOTAL` tile is **clipped at the card edge on every card**.
+Two of ~4 text blocks per card say a legacy engine has no prediction, the second
+repeating the first verbatim.
+
+**Two fields named for quantities they do not hold** (the 2026-08-21 rule,
+recurring): the header stat **`Candidates 51`** counts GAMES — production
+generated **0** candidates from this board; and the main card's **Section 2 is
+titled `Enhanced Totals Engine`** while holding SmartSim 2.0's numbers, beside a
+panel saying the Enhanced Totals Engine has no prediction.
+
+Props parity: MLB carries 10 props/ladder surfaces, NCAAF **zero**.
+
+### PROPS ARE UNWIRED BY DESIGN AND THE DESIGN'S OWN DEADLINE HAS PASSED
+
+`fetch_ncaaf_oddsapi_props_local.py`'s docstring says the join should be built
+"once real market coverage is confirmed closer to the season
+(**~2026-08-23 to 2026-08-30**)". That window opened two days ago; nobody built
+it. No caller anywhere, no `oddsapi_player_props_*.csv` on disk. And the planned
+rate basis — `player_stats.py` over the `player_game_stats` snapshot — has
+**never produced a file**, correctly, since no 2026 games have been played. So
+**week 1 has no rate basis for a props ladder regardless**; props are a week-3+
+surface, not an opening-weekend one.
+
+### SIM ENGINE — checklist FAILs, and that is a truth, not a work order
+
+`scripts/football_sim_input_checklist.py`: **FAIL, 9 alarms.** 9 blocks / 65
+keys consumed, **0 of 3 production entrypoints pass a payload**; every NCAAF
+game runs on four rating scalars plus a hardcoded `pace_seconds_per_play=24.0`.
+**Do NOT read this as "wire the payload"** — the domination result (b=+0.990,
+w=−0.028, 751 clean OOS games) says the payload path cannot supply what is
+missing, measured at 4.1% of margin SD against the ratings path's 17.2%.
+
+One loose end worth a look: the checklist's NCAAF arm reports
+**`UNMEASURED: loader returned 0 games`** from a checkout where the board
+builder returns **51**. Different loaders; the checklist is measuring something
+the board does not use.
+
+
+## [nfl-autorun-chain-order] THE NFL AUTORUN CHAIN RAN THE FANTASY ARTIFACT ABOVE ITS OWN INPUTS — FIXED IN CODE, NOT DEPLOYED `[measured 2026-08-25, lane ncaaf-oddsapi-game-lines]`
+
+Detail: `todo.md` `#554`. Two `learnings.md` rules filed the same day.
+
+**THE DEFECT.** `build_nfl_fantasy_projection_artifact.py` reads injury
+availability (`use_injury_availability`) and the news layer.
+`_launch_autorun_nfl_fantasy_artifact` sat ABOVE both
+`_launch_autorun_nfl_injuries_fetch` and `_launch_autorun_nfl_news_capture` in
+the autorun `elif` chain. **Only one branch fires per tick** (`#341`), so on a
+busy slate the artifact was built from yesterday's injuries and news. Order now:
+
+    reconciliation -> evaluation_settlement -> pbp -> injuries -> roster
+      -> depth -> news -> fantasy artifact -> mlb -> ...
+
+Starvation is NOT reopened: everything now above the artifact is daily or
+six-hourly gated, so the NFL block needs ~6 winning ticks/day out of ~2,880.
+`#341`'s starvation came from sitting below HIGH-FREQUENCY branches, still
+forbidden by the window assertion in `test_nfl_fantasy_artifact_autorun.py`.
+
+**FOUR POSITION COMMENTS WERE STALE AND TWO CLAIMED THE SAME SLOT** — the
+fantasy artifact and the injuries fetch both read "THIRD, directly behind the pbp
+fetch"; the pbp branch said "SECOND" while sitting third. All rewritten as
+RELATIONSHIPS. **Ordinals in an ordered chain are wrong the moment anyone inserts
+above them, and nothing reports it.**
+
+**THE TESTS WERE FIGHTING EACH OTHER, WHICH IS WHY THIS SURVIVED.**
+`test_nfl_injuries_fetch_autorun`'s `index <= 2` had been UNSATISFIABLE alongside
+the same file's `injuries == pbp + 1` ever since `evaluation_settlement` was
+inserted above the pbp fetch. Two assertions that cannot both pass are not an
+alarm; the pair read as pre-existing noise and the real inversion hid behind it.
+Absolute indices replaced with relative bounds throughout.
+
+**SEVEN TESTS WERE RED ON `origin/main`**, six reported plus one found while
+verifying. Three unrelated causes: this one, plus three tests still steering the
+pbp read with `DATA_ROOT` after `#441` deliberately moved `_pbp_path` off it, plus
+a platform-dependent `mocked_popen.assert_not_called()` (on Linux
+`ctypes.util.find_library` shells out to `/sbin/ldconfig -p`; green on the Windows
+dev box, red here — and `find_library` caches, so 4 of 5 identical sites were
+passing on test ORDER alone).
+
+**CROSS-LANE AND UNMEASURED.** `scripts/run_refresh_worker.py` is claimed by TWO
+OPEN lanes and was already this repo's one contested file. The edit reorders
+existing `elif` blocks and corrects comments — no branch logic, gating or body
+touched; reverting is re-ordering the same blocks back. The priority call
+(which NFL job wins a tick first) was made on PRODUCER-BEFORE-CONSUMER grounds,
+not measured, because the effect cannot be measured from a checkout. **The
+owners should confirm it.** Nothing is deployed; `autoDeploy` is off.
+
+## [ncaaf-oddsapi-lines] NCAAF GAME LINES — OddsAPI capture BUILT AND PROVEN OFF-LINE, NOT DEPLOYED AND NEVER RUN LIVE `[measured 2026-08-25, lane ncaaf-oddsapi-game-lines]`
+
+**Read `[ncaaf-readiness-2026]` first — this closes its stated blocker in CODE
+and changes nothing that is running.** Detail: `todo.md` `#552`, `#553`.
+
+**NO LIVE FETCH HAS HAPPENED.** This session had no egress to
+`api.the-odds-api.com` (agent proxy answers 403 to CONNECT) and no
+`ODDS_API_KEY`. Every number below comes from a REPLAYED FIXTURE built over the
+real 8-game 08-29/08-30 slate. The fetch itself is unproven and must be proven
+on the worker.
+
+    markets non-null           0 of 51  ->  51 of 51   (8 with a real book line)
+    Layer 1 market-board rows  0        ->  32         (ML/ML/spread/total x 8)
+    team-name join             94 of 94 on the real week-1 slate, both directions
+    tests                      354 ncaaf + 411 shared-contract green; CI archive 383 OK
+
+**THE DESIGN DECISION WORTH KEEPING.** Lines go into the SHARED QUOTE LOG, not a
+new file. `HOT_ARTIFACT_PATTERNS`' globs are sport-agnostic and already match
+`ncaaf_source/tracking/book_quotes/*.jsonl`, and `run_refresh_worker.py`'s
+book-grid pass already loops over `ncaaf` — so one capture feeds BOTH the cards
+board and Layer 1, crosses worker→web with **no allowlist edit**, and avoids the
+`artifact_publisher.py` collision with `basketball-live-momentum`. A bespoke
+`ncaaf_*_lines.json` would have needed a new allowlist entry and given the board
+a second line source free to disagree with Layer 1's.
+
+**TWO SILENT BUGS THE REACHABILITY TEST CAUGHT** — neither would have failed a
+correctness test that only checked "the number is right when present":
+1. The quote log normalises `selection` to `home`/`away`. Matching it against the
+   TEAM NAME dropped every spread and moneyline while TOTALS — whose outcome name
+   really is "Over" — kept working. That reads as thin book coverage, not a bug.
+2. With a correct index, `markets` STILL stayed null on all 51: the card never
+   emitted the `betting` block `publication_adapter._shared_markets` reads. The
+   line existed and the board could not see it.
+
+**AND ONE CAUGHT BY READING THE OUTPUT, NOT BY A TEST:** `p_home_cover` came out
+**0.97** for a game the model has the home side LOSING to the spread by 4.6
+points — the cover line was passed negated. Plausible-looking and exactly
+inverted, the same shape as the nflverse `spread_line` trap already in this file.
+Now pinned by a test asserting DIRECTION (`< 0.5` when the model trails the line)
+rather than a value.
+
+**TEAM NAMES ARE THE STANDING RISK.** OddsAPI sends "<School> <Mascot>"; the
+board joins on CFBD's canonical name; ~680 schools share mascots. The resolver is
+exact (school+mascot from the team registry, plus a validated supplement),
+REFUSES ambiguity rather than guessing, and never keys on a bare mascot.
+`fold()` transliterates diacritics before stripping punctuation — without that,
+CFBD "San José State" and OddsAPI "San Jose State" never meet, because the
+board's own `_normalize_text` DELETES non-ASCII instead of folding it.
+**OddsAPI's exact spellings remain unverified**; `--report` prints every
+unresolved name and `_ODDSAPI_NAME_SUPPLEMENT` is where they go.
+
+**WIRED INTO THE SWEEP 2026-08-25** — `ncaaf_game_lines_oddsapi`, first of the
+two NCAAF steps in `_build_ncaaf_steps`, phases `(pregame, live)`. A CROSS-LANE
+take of `scripts/refresh_odds_sources.py` (held by OPEN lane
+`layer2-sim-view-and-live-projection`) made under explicit user instruction,
+scoped to one appended `RefreshStep` and nothing else, recorded in `lanes.md`.
+
+**VERIFIED BY RUNNING THE SWEEP, not by reading the builder**: against a local
+fake OddsAPI, `refresh_odds_sources.py --date 2026-08-29 --phase pregame
+--sports ncaaf` wrote **192 quote rows** across the two kickoff shards and the
+board then read `priced=8 of 51`, `layer1_rows=32`. `return_code=0` was
+deliberately not taken as the acceptance reading — the step exits 0 whether or
+not it captured anything.
+
+**NO --season/--week, on purpose.** The capture shards each event by its OWN
+commence date, because NCAAF weeks are not calendar windows (2026 week 1 spans
+08-29→09-07) and the board reads quotes per kickoff date. Pinned by a test.
+
+**NOT separately season-gated, also on purpose.**
+`live_refresh_loop._weekly_sport_claimed_by_fast_tick` already decides whether
+NCAAF is on the sweep at all, and `#520` records that re-applying an upstream
+gate at the launch site is how NFL lost 24 hours of capture. Out of season the
+call costs one credit and appends nothing.
+
+**TWO STALE `test_ops.py` ASSERTIONS FIXED, one of them NOT MINE.** Both pinned a
+sport at exactly one refresh step and read it as `refresh_steps[0]`.
+`test_build_refresh_plan_uses_nfl_syndicate_runner_in_source_mode` had been **RED
+ON `origin/main`** (verified in a clean worktree) since `nfl_schedule_refresh`
+was added — that step is deliberate and load-bearing (`schedule_{season}.csv` is
+a MODEL INPUT, +1.18 ROI points paired on 16,906 held-out 2025 bets) so the TEST
+was stale, not the code. Both now assert the step NAMES IN ORDER and look each
+command up BY NAME, which is strictly stronger than the count they replaced and
+cannot be repointed by a third step appearing. `test_ops.py` is now **124 passed,
+0 failed** (baseline 1 failed / 123 passed).
+
+**A PRE-EXISTING NFL RED BAND EXISTS AND IS NOT MINE** `[surfaced 2026-08-25]`.
+Widening a `-k` filter to include `nfl` revealed **6 failures that reproduce
+identically on `origin/main`**: `test_generate_smartsim2_nfl_projections` (2),
+`test_generate_smartsim2_nfl_preseason_projections` (1),
+`test_nfl_injuries_fetch_autorun::DispatchOrder` (2),
+`test_nfl_roster_depth_autorun::DispatchOrder` (1). Untouched by this lane and
+left alone; recorded so the next session does not mistake them for new breakage.
+
+**STILL OWED: a LIVE run.** Nothing here has touched real OddsAPI.
+
+
 ## [ncaaf-margin-calibration] NCAAF MARGINS ARE CALIBRATED; TOTALS ARE NOT `[verified 2026-08-19]`
 
 **Margins fixed and measured** on the 2026 wk1 slate (51 games, 300 seeds):

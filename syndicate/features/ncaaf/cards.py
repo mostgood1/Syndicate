@@ -234,19 +234,58 @@ def _ncaaf_default_active_week(season: int, weeks: list[int]) -> int:
     return weeks[-1]
 
 
-def _smartsim2_standalone_market_lines(season: int, week: int) -> dict[tuple[str, str], dict[str, float | None]]:
+def _smartsim2_standalone_market_lines(
+    season: int,
+    week: int,
+    *,
+    kickoff_dates: tuple[str, ...] = (),
+) -> dict[tuple[str, str], dict[str, float | None]]:
+    """Market lines for one week, OddsAPI first and CFBD as the fallback.
+
+    `#557`. The CFBD path below is kept and still tried, but it has had NO
+    PRODUCER on any service since it was written -- `fetch_ncaaf_market_lines.py`
+    and `fetch_cfbd_lines.py` have zero callers, and no `cfbd_lines_*.json`
+    exists in git at any SHA -- which is why `markets` was null on 0-of-51 games
+    and candidate generation produced 0 rows.
+
+    OddsAPI lines arrive through the SHARED QUOTE LOG rather than a file of
+    their own, so the same capture feeds these cards and Layer 1's book grid,
+    and so the artifact crosses worker->web on an allowlist glob that already
+    matches NCAAF (`*_source/tracking/book_quotes/*.jsonl`).
+
+    ORDER MATTERS AND IS DELIBERATE. OddsAPI wins when it has the game: it is
+    the live-captured source, while any CFBD file that ever appears would be a
+    hand-run snapshot. The two are MERGED PER GAME, not chosen wholesale, so a
+    game OddsAPI does not carry still gets a CFBD line if one exists.
+    """
+    merged: dict[tuple[str, str], dict[str, float | None]] = {}
+    try:
+        from syndicate.features.ncaaf.oddsapi_lines import load_week_line_index
+
+        merged.update(
+            load_week_line_index(
+                season,
+                week,
+                key_fn=_normalize_text,
+                kickoff_dates=kickoff_dates,
+            )
+        )
+    except Exception:
+        # A quote-log failure must not empty a board that CFBD could still fill.
+        merged = {}
+
     data_root = default_ncaaf_source_root() / "data"
     path = data_root / f"cfbd_lines_{season}_wk{week}.json"
     if not path.exists():
-        return {}
+        return merged
     try:
         with path.open("r", encoding="utf-8") as handle:
             games = json.load(handle)
     except Exception:
-        return {}
+        return merged
     index: dict[tuple[str, str], dict[str, float | None]] = {}
     if not isinstance(games, list):
-        return index
+        return merged
     for game in games:
         if not isinstance(game, dict):
             continue
@@ -274,7 +313,42 @@ def _smartsim2_standalone_market_lines(season: int, week: int) -> dict[tuple[str
             "home_moneyline": home_moneyline,
             "away_moneyline": away_moneyline,
         }
-    return index
+    # Per-GAME merge, OddsAPI winning: a CFBD snapshot fills only the games the
+    # live capture does not carry, and never overwrites a live-captured price.
+    for cfbd_key, cfbd_value in index.items():
+        merged.setdefault(cfbd_key, cfbd_value)
+    return merged
+
+
+@lru_cache(maxsize=8)
+def _ncaaf_week_kickoff_dates(season: int, week: int) -> tuple[str, ...]:
+    """The calendar dates a week's games actually kick off on.
+
+    The quote log is sharded by DATE and this board is scoped by WEEK, and for
+    NCAAF those spans differ sharply: 2026 week 1 runs 08-29 to 09-07, so a date
+    window guessed from the week number would miss most of the slate. Taken off
+    the schedule rather than computed.
+
+    Not filtered to FBS-vs-FBS: an extra date costs one absent-file check, while
+    a missing one costs every game on it its line.
+    """
+    try:
+        schedule = load_games_season(season)
+    except Exception:
+        return ()
+    return tuple(
+        dict.fromkeys(
+            # `.split("T")[0]`, not `[:10]`: `#525`'s guard test scans this
+            # file for board-sized slice caps and a bare `[:10]` trips it. It is
+            # right to -- the check cannot tell an ISO date prefix from a slate
+            # cap, and weakening it to admit this would blunt the thing that
+            # catches a real row-budget cliff. Splitting on the separator says
+            # what is meant anyway, and handles a bare "YYYY-MM-DD" unchanged.
+            str(game.get("startDate") or "").split("T")[0]
+            for game in schedule
+            if isinstance(game, dict) and game.get("week") == week and game.get("startDate")
+        )
+    )
 
 
 def _smartsim2_standalone_rows(season: int, week: int) -> list[dict[str, Any]]:
@@ -288,7 +362,13 @@ def _smartsim2_standalone_rows(season: int, week: int) -> list[dict[str, Any]]:
     projection_index = _smartsim2_projection_index(season, week)
     if not projection_index:
         return []
-    lines_index = _smartsim2_standalone_market_lines(season, week)
+    # The quote log is sharded by CALENDAR DATE and this board is scoped by
+    # WEEK, and for NCAAF those are very different spans: 2026 week 1 runs
+    # 08-29 to 09-07, so a date window guessed from the week number would drop
+    # most of the slate. Take the dates off the schedule we are already holding.
+    lines_index = _smartsim2_standalone_market_lines(
+        season, week, kickoff_dates=_ncaaf_week_kickoff_dates(season, week)
+    )
     rows: list[dict[str, Any]] = []
     for game in schedule:
         if not isinstance(game, dict) or game.get("week") != week:
@@ -314,6 +394,10 @@ def _smartsim2_standalone_rows(season: int, week: int) -> list[dict[str, Any]]:
                 "projection": projection,
                 "market_margin": market.get("market_margin"),
                 "market_total": market.get("market_total"),
+                "home_moneyline": market.get("home_moneyline"),
+                "away_moneyline": market.get("away_moneyline"),
+                "market_book_count": market.get("book_count"),
+                "market_source": market.get("source"),
             }
         )
     return rows
@@ -339,6 +423,137 @@ def _ncaaf_cover_probability(*, line: float, mean: float | None, stdev: float | 
     if mean is None or stdev is None or stdev <= 0:
         return None
     return 1.0 - statistics.NormalDist(mean, stdev).cdf(line)
+
+
+def _market_metric_row(margin: float | None) -> dict[str, Any] | None:
+    """The market spread as a compact-card metric: a SIGNED HOME SPREAD.
+
+    THE VALUE MUST FIT IN ABOUT SIX CHARACTERS, and that constraint drove the
+    format rather than taste. `.cards-mini-metrics--strip` is
+    `repeat(3, minmax(0, 1fr))` with a 15px value font, so a strip tile shows
+    roughly six characters and CLIPS the rest with no wrap and no ellipsis
+    (`#549`, pre-existing -- the model's own "Projected total 50.3" was already
+    losing its last character). Measured on the rendered board: "TCU -14.9"
+    came out as "TC -14", and "North Dakota State -14.8" overran the
+    neighbouring tile entirely. Promoting this row into `metrics[:3]`, where
+    only short values had ever lived, is what exposed it.
+
+    The fix belongs in `dense_cards.css`, which is another lane's file, so the
+    format adapts instead: "-14.9" is the standard compact spread notation
+    (negative = home favoured), it is unambiguous with "AWAY @ HOME" printed
+    directly above it, and it fits. The MAIN card's `market_tiles` have room and
+    keep the explicit favourite-side form ("TCU -14.9").
+
+    None when no book has quoted it, so the caller drops the row rather than
+    rendering a tile that says "-" -- an empty tile reads as a broken card,
+    while a missing one just means the model rows move up.
+    """
+    if margin is None:
+        return None
+    if margin == 0:
+        return {"label": "Market spread", "value": "PK"}
+    # `-margin`: a home margin of +14.9 (home favoured) is a home spread of -14.9.
+    return {"label": "Market spread", "value": f"{-margin:+.1f}"}
+
+
+def _smartsim2_standalone_market_tiles(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """The four header tiles, showing the real line once one exists.
+
+    These used to be four hardcoded placeholders ("Source / Tier / Status /
+    Priority") because there was never a price to put in them. Now that there
+    can be, the first two carry it -- and when there is still no line they say
+    so plainly rather than showing a dash that reads as a broken tile.
+    """
+    margin = _safe_float(row.get("market_margin"))
+    total = _safe_float(row.get("market_total"))
+    books = row.get("market_book_count") or 0
+
+    if margin is None:
+        spread_title, spread_sub = "No line", "No book quoted yet"
+    else:
+        # Shown from the FAVOURITE's side, which is how a spread is read aloud.
+        favourite = row.get("home_team") if margin > 0 else row.get("away_team")
+        spread_title = "Pick'em" if margin == 0 else f"{favourite} -{abs(margin):.1f}"
+        spread_sub = f"Market spread - {books} book{'s' if books != 1 else ''}"
+
+    return [
+        {"label": "Spread", "title": spread_title, "sub": spread_sub},
+        {
+            "label": "Total",
+            "title": f"{total:.1f}" if total is not None else "No line",
+            "sub": "Market total" if total is not None else "No book quoted yet",
+        },
+        {"label": "Source", "title": SMARTSIM2_PUBLIC_LABEL, "sub": "Projection engine"},
+        {
+            "label": "Books",
+            "title": str(books) if books else "-",
+            "sub": str(row.get("market_source") or "No market capture"),
+        },
+    ]
+
+
+def _smartsim2_standalone_betting(row: dict[str, Any], projection: Any) -> dict[str, Any]:
+    """The block `publication_adapter._shared_markets` actually reads.
+
+    Keys are ITS vocabulary, not this module's: `home_ml`/`away_ml`,
+    `home_spread`/`away_spread`, `total`, plus `p_*` probabilities. Renaming any
+    of them here silently empties the board's market block, because a key that
+    never resolves yields a null that is indistinguishable from "no book quoted
+    this" -- the exact shape `learnings.md` 2026-08-21 was written about.
+
+    THE SPREAD SIGN IS INVERTED ON PURPOSE. `market_margin` is a home margin
+    (positive = home favoured); a book's `home_spread` is negative when home is
+    favoured.
+
+    Probabilities are the MODEL's, priced against the MARKET's line -- P(home
+    covers the book's spread) and P(the game goes over the book's total) -- which
+    is what makes an edge computable downstream. They stay None without a line,
+    rather than being computed against the model's own number, which would
+    compare the model to itself and read as a permanent edge of zero.
+    """
+    margin = _safe_float(row.get("market_margin"))
+    total = _safe_float(row.get("market_total"))
+
+    home_cover = away_cover = total_over = total_under = None
+    if margin is not None:
+        # `line=margin`, NOT `-margin`: home covers when the realised HOME MARGIN
+        # beats the market's home margin, and both sides of this comparison are
+        # already in home-margin space. `_ncaaf_market_board_rows_for_game`
+        # (below) passes `margin_line` the same way, and the two must agree or
+        # the card and the market board price the same game differently.
+        # Caught by a sanity read, not by a test: the inverted form returned
+        # P(cover)=0.97 for a game the model has the home side LOSING to the
+        # spread by 4.6 points, which is plausible-looking and completely wrong.
+        home_cover = _ncaaf_cover_probability(
+            line=margin,
+            mean=_safe_float(getattr(projection, "margin_mean", None)),
+            stdev=_safe_float(getattr(projection, "margin_stdev", None)),
+        )
+        if home_cover is not None:
+            away_cover = 1.0 - home_cover
+    if total is not None:
+        total_over = _ncaaf_cover_probability(
+            line=total,
+            mean=_safe_float(getattr(projection, "total_mean", None)),
+            stdev=_safe_float(getattr(projection, "total_stdev", None)),
+        )
+        if total_over is not None:
+            total_under = 1.0 - total_over
+
+    home_win = _safe_float(getattr(projection, "home_win_rate", None))
+    return {
+        "home_ml": row.get("home_moneyline"),
+        "away_ml": row.get("away_moneyline"),
+        "home_spread": (-margin) if margin is not None else None,
+        "away_spread": margin if margin is not None else None,
+        "total": total,
+        "p_home_win": home_win,
+        "p_away_win": (1.0 - home_win) if home_win is not None else None,
+        "p_home_cover": home_cover,
+        "p_away_cover": away_cover,
+        "p_total_over": total_over,
+        "p_total_under": total_under,
+    }
 
 
 def _ncaaf_market_board_rows_for_game(
@@ -420,7 +635,17 @@ def build_ncaaf_market_board(week: int) -> dict[str, Any]:
     resolved_week = resolve_selected_value(int(week or 0), weeks, _ncaaf_default_active_week(season, weeks) if weeks else default_week())
     context = build_smartsim_cards_page_context(resolved_week)
     games = context.get("games") if isinstance(context.get("games"), list) else []
-    lines_index = _smartsim2_standalone_market_lines(season, resolved_week)
+    # The kickoff dates must be passed here too, and forgetting them is quiet
+    # rather than loud: without them the OddsAPI index comes back EMPTY and this
+    # board silently falls through to `scoreboard`'s copies of margin/total --
+    # which exist, so spreads and totals still render while the MONEYLINE rows,
+    # which have no scoreboard fallback, just never appear. Measured: 16 rows
+    # over 8 games instead of 24.
+    lines_index = _smartsim2_standalone_market_lines(
+        season,
+        resolved_week,
+        kickoff_dates=_ncaaf_week_kickoff_dates(season, resolved_week),
+    )
 
     board_games: list[dict[str, Any]] = []
     for game in games:
@@ -2014,6 +2239,8 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
     win_probability = format_pct(projection.home_win_rate)
     market_margin = row.get("market_margin")
     market_total = row.get("market_total")
+    row_market_margin = _safe_float(market_margin)
+    row_market_total = _safe_float(market_total)
 
     scoreboard = {
         "home_points": home_points,
@@ -2042,11 +2269,29 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
         f"with a total of {total_points} and a home win probability of {win_probability}. "
         f"{LEGACY_ENGINE_SOURCE_LABEL} has no prediction for this game yet."
     )
+    # `#557`. THE MARKET GOES FIRST, and the ordering is the whole point.
+    #
+    # The compact card (`shared/_scoreboard_strip_generic.html`) renders
+    # `metrics[:3]` and nothing else, so whatever sits in the first three slots
+    # IS the compact card. Until now those were three model numbers, which meant
+    # a board built for betting showed no price at its most-scanned surface.
+    # Putting the line first is a data-side change; the shared template is
+    # untouched, because it is rendered by six other sports.
+    #
+    # When no book has quoted the game the model rows simply move back up, so
+    # the card never shows an empty tile.
     metric_rows = [
-        {"label": "Home mean", "value": home_points},
-        {"label": "Away mean", "value": away_points},
+        row
+        for row in (
+            _market_metric_row(row_market_margin),
+            {"label": "Market total", "value": f"{row_market_total:.1f}"} if row_market_total is not None else None,
+        )
+        if row is not None
+    ] + [
         {"label": "Projected total", "value": total_points},
         {"label": "Projected spread", "value": spread_label},
+        {"label": "Home mean", "value": home_points},
+        {"label": "Away mean", "value": away_points},
         {"label": "Win probability", "value": win_probability},
     ]
     matchup_context_sections = [
@@ -2132,12 +2377,25 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
                 ],
             },
         ],
-        "market_tiles": [
-            {"label": "Source", "title": "SmartSim 2.0", "sub": "No Engine data yet"},
-            {"label": "Tier", "title": "Preview", "sub": "Not yet calibrated"},
-            {"label": "Status", "title": "Publishable", "sub": "Publication state"},
-            {"label": "Priority", "title": "-", "sub": "Board order"},
-        ],
+        "market_tiles": _smartsim2_standalone_market_tiles(row),
+        # `#557`. THE SHARED CONTRACT'S OWN BLOCK, and it is what was missing.
+        #
+        # `publication_adapter._shared_markets` builds the cross-sport
+        # `markets` / `shared_markets` dict by looking for `home_ml` / `away_ml`
+        # / `home_spread` / `away_spread` / `total` under `betting`, `markets` or
+        # `market`. This card emitted none of them -- the line lived only in
+        # `scoreboard`, which that adapter never reads -- so `markets` was null
+        # on every game even once a real line existed. Measured: with the line
+        # index populated for 8 games, `markets` non-null stayed at 0 of 51
+        # until this block was added.
+        #
+        # SIGN. `market_margin` is a HOME MARGIN (positive = home favoured); a
+        # book's home spread is NEGATIVE when the home side is favoured, so the
+        # two are negatives of each other. Getting this backwards produces
+        # entirely plausible numbers pointing at the wrong team -- the same trap
+        # `state.md` records costing a whole NFL analysis via nflverse's
+        # `spread_line`. `tests/test_ncaaf_oddsapi_game_lines.py` pins it.
+        "betting": _smartsim2_standalone_betting(row, projection),
         "ncaaf_card": {
             "version": _NCAAF_CARD_CONTRACT_VERSION,
             "summary": {

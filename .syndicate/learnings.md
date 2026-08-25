@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 531 rules `[generated]`
+## Index — 555 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5826,6 +5826,198 @@ With the real gate dead, the by-hand substitute inherited a property the gate
 does not have — it can go stale silently — and nothing in the environment
 reports that. Three for three.
 
+### 2026-08-25 — FORBIDDEN: never accept a backtest's "0 rows graded" as a result. An analysis script that cannot find its inputs must EXIT NON-ZERO, not report a clean zero
+
+- What we believed: NCAAF's picks are suppressed on measured evidence — the
+  model loses to the closing line and to always-bet-the-underdog — and that
+  evidence is in the repo, in `scripts/grade_football_playability.py` and
+  `grade_football_model_weight.py`, which are unusually well built (52.4%
+  breakeven not 50%, every threshold printed so the multiplicity is visible,
+  Wilson intervals, underdog-share reported so an under-dispersed model cannot
+  read as skill).
+- What was actually true: **neither script can run anywhere but one laptop, and
+  neither says so.** Both hardcode `REPO = Path(r"C:\Users\tempadmin\OneDrive\
+  Coding\Syndicate")`, and the pick-ledger CSVs they grade
+  (`{sport}_source/data/pick_ledger/pick_ledger_*.csv`) are untracked and absent
+  from the repo entirely — `git ls-files | grep pick_ledger` returns the
+  builder, the module and its test, and no data. Run on a machine with
+  `PYTHONPATH` set so the import still resolves, the output is
+  `NCAAF ... 0 gradable games` / `NFL PRESEASON ... 0 gradable games`, followed
+  by the multiplicity warning, **exit 0**.
+- How we found out: ran them during an end-to-end NCAAF readiness assessment,
+  expecting to reproduce the numbers `state.md` cites. The report rendered
+  perfectly — headers, labels, the honest caveat block — around nothing. Nothing
+  in the output distinguished "graded 858 games and found no edge" from "found
+  no games". The tell was the number itself being 0 twice, not any error.
+- The rule going forward: **an analysis script must fail loudly when its input
+  set is empty.** Assert a minimum row count before reporting and exit non-zero
+  below it; name the resolved input path in the output so a wrong root is
+  visible in the report rather than in the code. And never hardcode an absolute
+  repo path — derive it from `__file__`, which is what makes the failure
+  portable instead of silent. Corollary for readers: **before citing a measured
+  result, re-run it and check the denominator.** A conclusion whose evidence
+  exists on exactly one machine is not in the ledger, whatever the ledger says.
+- Cost: none yet, and that is luck rather than design — the suppression the
+  evidence supports is almost certainly correct, and the numbers are stated with
+  n and CIs. What was lost is the ability to check: the entire evidence base for
+  withholding NCAAF picks is unreproducible, and any future session re-running
+  it gets a clean, plausible zero. This is `model_engine_standard.md`'s unfed-input
+  signature — a neutral default indistinguishable from a working feature — moved
+  from the INPUT layer to the EVIDENCE layer, where there is no checklist watching.
+
+### 2026-08-25 — METHOD: to prove a conditional gate still fires, find it firing for a SIBLING that meets the condition today — do not reason from the code
+
+- What we believed: NCAAF being dropped from the odds sweep four days before
+  kickoff (`SWEEP_OWNERSHIP_EXCLUDED ... dropped=ncaaf:not_in_SYNDICATE_ACTIVE_
+  SPORTS`) was the root cause of an entirely empty market pipeline.
+- What was actually true: it is the gate working. `#520`'s weekly carve-out keeps
+  nfl/ncaaf/ncaab on the fast tick on game days regardless of that env var, at
+  `horizon_days=1`; there is no NCAAF game within today+1, so dropping it is
+  correct, and it should self-arm the day before kickoff.
+- How we found out: running the predicate locally returned the OPPOSITE of
+  production for the same date — because `sport_has_games_within` needs ESPN and
+  the sandbox has no egress, so it fell through to its `unknown_means_yes: True`
+  fallback. A local re-run was not merely uninformative, it was **confidently
+  wrong in the reassuring direction**. What settled it was finding the carve-out
+  firing in production for **NFL** on 2026-08-24 — same file, same live SHA
+  (verified byte-identical), a sibling sport that had a game that day.
+- The rule going forward: **a conditional gate is proven by an observation of it
+  firing, not by reading its condition.** When the sport/date you care about does
+  not meet the condition yet, find a sibling that does today and confirm the log
+  token there, then check the live SHA carries the same code
+  (`git show <sha>:<file>` vs your checkout). Re-running a network-dependent
+  predicate in a sandbox proves nothing — and worse, a fallback default like
+  `unknown_means_yes` will hand you a confident answer that is backwards.
+- Cost: none — caught before it was written down. Had it not been, the ledger
+  would have carried "NCAAF is switched off in production" as a fact, and the
+  fix for it would have been an env-var change to a gate that was already correct.
+
+### 2026-08-25 — FORBIDDEN: never state an allowlist/config gap as "0 entries for X" when the entries are WILDCARDS. Count what MATCHES, not what mentions X
+
+- What we believed: NCAAF artifacts could not cross worker->web, because
+  `HOT_ARTIFACT_PATTERNS` contained **0 NCAAF patterns of 155** -- measured, true,
+  and written into `state.md` as a load-bearing blocker with a "fourth failed
+  handoff" note attached.
+- What was actually true: the patterns are SPORT-AGNOSTIC GLOBS. Two of them
+  already match NCAAF -- `*_source/tracking/book_quotes/*.jsonl` and
+  `*_source/data/book_grid/book_grid_*.json` -- so the shared quote and grid
+  transport was covered all along, and production was visibly already pulling
+  `ncaaf_source/tracking/book_quotes/<date>.jsonl`. What is genuinely
+  unallowlisted is two NAMED files, `cfbd_lines_*` and `smartsim2_projections_*`.
+  The original grep (`'ncaaf' in pattern`) could only ever return zero.
+- How we found out: the production log line that contradicted it was in hand the
+  whole time -- `STREAM_PULL_ABSENT path=ncaaf_source/tracking/book_quotes/...`
+  is the publisher *trying* to pull an NCAAF artifact, which a zero-coverage
+  allowlist would never do. It was read as "absent" and not as "reachable". The
+  actual test is one `fnmatch` call per candidate path.
+- The rule going forward: **for any allowlist, ignore-file, route table or
+  pattern-based config, test COVERAGE by running the real matcher over the real
+  candidate paths. Never by grepping the pattern list for a substring.** A
+  wildcard config cannot be audited by reading it. And when a measurement says a
+  subsystem is unreachable while a log shows the system reaching for it, the log
+  wins -- go and find why they disagree before writing the measurement down.
+- Cost: near-miss, and only because the design changed for an unrelated reason.
+  The wrong belief had already been published in an assessment and would have
+  sent the fix at `artifact_publisher.py` -- a file another OPEN lane holds, so
+  the "cheap" edit would have opened a lane conflict to solve a problem that did
+  not exist. Correcting it made the fix need no allowlist edit at all.
+
+### 2026-08-25 — FORBIDDEN: a reachability test must assert a COUNT over the whole surface, and be run BEFORE the correctness tests. Two silent breaks in one feature, neither visible to a value assertion
+
+- What we believed: wiring OddsAPI lines into the NCAAF board was one change --
+  give the reader a populated line index and the board would price. Correctness
+  tests on the aggregation (mean spread, negated sign, one book for moneylines)
+  looked like the work.
+- What was actually true: **two independent breaks sat between a correct line
+  index and a priced card**, and both produced output that looked like ordinary
+  missing data. (1) The shared quote log normalises `selection` to
+  `home`/`away`; matching it against the TEAM NAME silently dropped every spread
+  and moneyline, while TOTALS kept working because their outcome name really is
+  "Over" -- a half-priced board that reads as thin book coverage. (2) With the
+  index fully correct, `markets` stayed null on ALL 51 games, because the card
+  never emitted the `betting` block the shared publication adapter reads: the
+  line existed and the board could not see it.
+- How we found out: `off != on` as a COUNT -- `markets` non-null across all 51
+  served games, with the loader stubbed empty and then populated -- run before
+  any value was asserted. Break (1) showed as a partial count, which a
+  single-card assertion would have passed. Break (2) showed as 0 of 51 when the
+  index provably held 8 games, which no test of the index itself could reveal.
+  Separately, `p_home_cover` came back **0.97** for a game the model has losing
+  to the spread by 4.6 points; that one was caught by READING the number, and is
+  now pinned by a test asserting direction rather than a value.
+- The rule going forward: **the reachability assertion is a count over the whole
+  served surface, taken end to end through the real builder, and it is written
+  first.** "N of M priced" catches a partial wiring break that "this card is
+  right" cannot, and it catches a missing hop between two individually-correct
+  layers. Then, for any derived probability, assert its DIRECTION against a
+  hand-reasoned case (model trails the line -> P(cover) < 0.5); a sign error
+  produces a perfectly plausible number and no test of magnitude will find it.
+- Cost: none shipped -- all three were caught pre-commit. Roughly an hour, and
+  every minute of it was spent inside the gap that the counted reachability test
+  is designed to expose.
+
+### 2026-08-25 — FORBIDDEN: never pin a position in an ordered chain with an ABSOLUTE index, in a comment or an assertion. Both go stale silently, and two of them can become mutually unsatisfiable
+
+- What we believed: `run_refresh_worker.py`'s autorun `elif` chain was ordered as
+  documented. Four branches carried comments naming their slot ("SECOND, DIRECTLY
+  BEHIND RECONCILIATION", "THIRD, directly behind the pbp fetch"), and three
+  tests pinned absolute indices (`injuries <= 2`, `fantasy position <= 3`,
+  `roster <= 4`).
+- What was actually true: **every one of those ordinals was wrong, and two
+  different branches claimed the same slot.** `_launch_autorun_nfl_fantasy_artifact`
+  and `_launch_autorun_nfl_injuries_fetch` BOTH said "THIRD, directly behind the
+  pbp fetch"; the pbp branch itself said "SECOND" while sitting third. Worse than
+  cosmetic: the fantasy artifact CONSUMES injuries and news
+  (`use_injury_availability`), and both producers sat BELOW it, so on a busy
+  slate it built projections from yesterday's data. And because
+  `_launch_autorun_evaluation_settlement` had been inserted above the pbp fetch,
+  the injuries file's `index <= 2` directly contradicted its own
+  `injuries == pbp + 1` — two assertions in one file that could never both pass.
+- How we found out: a `-k` filter widened to include `nfl` surfaced six failures
+  that had been red on `origin/main`. Reading them as a set — rather than fixing
+  each — showed the ordinals were the common cause and that the tests were
+  fighting each other, not reporting a recent break.
+- The rule going forward: **in an ordered chain, pin RELATIONSHIPS, never
+  ordinals or indices.** In comments: "AHEAD OF EVERY JOB THAT CONSUMES IT", not
+  "SECOND". In tests: `x == producer_index + 1`, or "nothing that is not a
+  producer sits between X and Y", never `index <= 3`. A relative assertion
+  survives an insertion above it; an absolute one is wrong from that moment and
+  wrong silently. And when two assertions cannot both pass, that pair has
+  stopped being an alarm — say so and fix the conflict rather than muting either.
+  **Producer before consumer is the tiebreak** when two jobs want the same slot;
+  it is not a preference, it is the only ordering that does not feed one of them
+  stale input.
+- Cost: unknown but real and ongoing — the NFL fantasy artifact ran above its own
+  injury and news inputs for as long as those branches have existed, and three
+  tests that would have caught it were red for an unrelated, unsatisfiable reason
+  and were being read as pre-existing noise.
+
+### 2026-08-25 — FORBIDDEN: never assert `mock.assert_not_called()` on a shared primitive like `subprocess.Popen`. It asserts about the whole PROCESS, not your code, and the answer is platform- and order-dependent
+
+- What we believed: `test_refresh_worker.py`'s
+  `mocked_popen.assert_not_called()` checked that the soccer weekly autorun hands
+  off through `launch_refresh_run` instead of spawning a job itself.
+- What was actually true: it asserted that **nothing anywhere in the process
+  touched `subprocess.Popen`**, and on Linux that is false for a reason unrelated
+  to the worker — `ctypes.util.find_library` shells out to `/sbin/ldconfig -p`
+  while a dependency loads. Two calls, both `['/sbin/ldconfig', '-p']`, recorded
+  before `main()` decided anything. The Windows dev box these tests were written
+  on has no `ldconfig`, so it passed there and failed here. `find_library` also
+  caches, so only the FIRST such test in a fresh process saw it: four of the five
+  identical assertions were passing on test ORDER, not on soundness.
+- How we found out: instrumenting `Popen` to record its arguments rather than
+  trusting the count. The command list named the culprit immediately; the
+  assertion's own failure message ("Expected 'Popen' to not have been called")
+  could never have.
+- The rule going forward: **assert on the CALLS YOU MEAN, not on the absence of
+  all calls to a shared primitive.** Filter the recorded calls to the ones your
+  code would make -- here, any command referencing the repo's own scripts -- and
+  assert that list is empty. A global `assert_not_called` on `Popen`, `open`,
+  `requests.get` or similar is a test of the interpreter's whole process and will
+  eventually be decided by an import you did not write.
+- Cost: one test red on Linux for as long as this repo has been developed on
+  Windows, plus four more that were one test-ordering change away from the same
+  failure. It was being counted as pre-existing breakage rather than diagnosed.
 ## 2026-08-25 — GitHub Actions CI results are not this repo's source of truth
 
 **User, direct instruction: "ignore the CI results, just keep pushing

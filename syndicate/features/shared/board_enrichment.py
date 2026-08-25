@@ -1003,6 +1003,41 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=nfl date=%s", selected_date)
             return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
 
+    if sport == "ncaaf":
+        # `#555`. Layer 1 gained real NCAAF prices with `#552` and then reported
+        # `no_projection_source_for_sport`, so the Proj/Edge columns stayed dead
+        # -- prices with no model are an odds screen, not a betting board.
+        #
+        # NOT routed through the NFL module: it hardcodes `source:
+        # "nfl_smartsim2"`, and its caveat machinery is gated on
+        # `is_preseason_profile`, so an NCAAF profile would fall through it and
+        # arrive with NO caveat. That matters more here than for any other
+        # sport, because this model is MEASURED as losing to the closing line
+        # (margin MAE 15.775 vs 12.212, n=2233, t=+17.20) and its totals are
+        # 1.67x over-dispersed. Every projection it emits carries `model_skill`.
+        #
+        # Displaying is correct despite that: `football/pick_gate.py` suppresses
+        # PICKS and says in terms that it "does NOT stop projections being
+        # generated, published, or displayed", because a gate that blinds its
+        # own exit criterion never opens.
+        try:
+            from syndicate.features.ncaaf.game_projections import (
+                attach_ncaaf_game_projections,
+                load_ncaaf_game_projections,
+            )
+
+            index = load_ncaaf_game_projections(selected_date)
+            if not index.games:
+                return {
+                    "supported": True,
+                    "rows_with_projection": 0,
+                    "reason": "no NCAAF SmartSim2 projections for this date",
+                }
+            return attach_ncaaf_game_projections(grid, index)
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=ncaaf date=%s", selected_date)
+            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
     if sport != "mlb":
         return {"supported": False, "reason": f"no projection source wired for {sport}"}
     try:
