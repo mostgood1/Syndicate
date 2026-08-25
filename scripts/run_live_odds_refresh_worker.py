@@ -719,6 +719,52 @@ def _run_tick() -> dict[str, object] | None:
         return None
 
 
+def _ncaaf_oddsapi_report_at_boot() -> None:
+    """One-shot, OPT-IN: does the NCAAF team resolver survive contact with the
+    REAL OddsAPI event list?
+
+    `todo.md` `#558`. `scripts/fetch_ncaaf_oddsapi_game_lines.py` was built and
+    proven entirely against a captured fixture -- the sandbox it was written in
+    answers 403 to CONNECT for `api.the-odds-api.com`, so not one live call had
+    ever been made. This service does reach OddsAPI (it fetches MLB and soccer
+    lines every tick), which is why the check belongs here rather than in a
+    checkout, and it is the same role `probe_exchange_markets.py` plays for the
+    exchange clients.
+
+    `--report` FETCHES BUT DOES NOT WRITE. One credit, no quote rows, so this
+    can run before `SYNDICATE_ACTIVE_SPORTS` carries `ncaaf` and cannot leave a
+    half-populated quote log behind if the resolver is wrong.
+
+    THE READING IS `UNRESOLVED_TEAMS`, not the exit code. A school the resolver
+    cannot place is a game whose card shows an empty market block -- which is
+    indistinguishable on the board from "no book quoted it". This log line is
+    the only place that difference is visible, which is the entire reason to
+    spend a boot on it.
+
+    **OFF BY DEFAULT, and meant to be turned off again.** Set
+    `SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT=1`, deploy, read the
+    `[ncaaf_odds]` lines, then clear the flag. Nothing here raises past its own
+    try/except: a diagnostic must never be able to stop this worker booting.
+    """
+    raw = str(os.environ.get("SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT") or "").strip().lower()
+    if raw not in {"1", "true", "yes", "on"}:
+        # Says so out loud rather than returning in silence: when this runs the
+        # question being asked is "did the flag reach this service", and a
+        # silent no-op answers it identically to a probe that crashed.
+        print("[live_odds_worker] NCAAF_ODDSAPI_REPORT_SKIPPED flag=off", flush=True)
+        return
+    try:
+        from scripts.fetch_ncaaf_oddsapi_game_lines import main as _ncaaf_report_main
+
+        code = _ncaaf_report_main(["--report"])
+        print(f"[live_odds_worker] NCAAF_ODDSAPI_REPORT_DONE exit={code}", flush=True)
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] NCAAF_ODDSAPI_REPORT_ERROR {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _kalshi_auth_probe_at_boot() -> None:
     """Can THIS service sign? Asked here because the answer is per-service.
 
@@ -1816,6 +1862,10 @@ def main() -> int:
     recycled_for_uptime = False
 
     try:
+        # FIRST, deliberately. Every comment below this block is about a
+        # probe that never ran because something above it returned early;
+        # nothing can be above this one.
+        _ncaaf_oddsapi_report_at_boot()
         _kalshi_auth_probe_at_boot()
         _kalshi_series_catalogue_at_boot()
         # BEFORE the catalogue's early returns could ever swallow it -- placing
