@@ -155,3 +155,64 @@ def test_a_malformed_grid_row_does_not_raise():
         "mlb", "2026-08-24", collected=_collected(),
     )
     assert result["repriced"] == 0
+
+
+def test_the_reprice_runs_BEFORE_every_step_that_reads_a_price():
+    """The ordering, pinned against the source rather than believed.
+
+    `7799abf9c` moved the re-price ahead of `build_layer2_rows` and stopped
+    there. It was still AFTER `attach_projections` and `attach_live_gamelines`,
+    which is how a live price came to be scored against a pregame benchmark:
+    both of those compute a fair value, and both had already run.
+
+    The rule is positional and cheap to break by moving one tuple entry, so it
+    is asserted on the tuple's own order:
+
+        game_state, live_game_state   read NO price, and are what tell the
+                                      re-price a game is live
+        venue_reprice                 <- here
+        projections, margin_model,    every one of these reads a price
+        live_projections, live_gamelines
+
+    A source-order assertion rather than a behavioural one, deliberately: the
+    behaviour it protects only appears on a live board with venue coverage, and
+    a test that needs production to fail is not a test.
+    """
+    from pathlib import Path
+
+    source = Path("pipeline/layer2_shortlist.py").read_text(encoding="utf-8")
+    start = source.index("enrichment: dict[str, object] = {}")
+    end = source.index("if fn is None:", start)
+    block = source[start:end]
+
+    order = [
+        name
+        for name in (
+            "game_state",
+            "live_game_state",
+            "venue_reprice",
+            "projections",
+            "margin_model",
+            "live_projections",
+            "live_gamelines",
+        )
+        if f'"{name}",' in block or f'("{name}",' in block
+    ]
+    positions = {name: block.index(f'"{name}"') for name in order}
+
+    assert "venue_reprice" in positions, "the re-price is no longer an enrichment step"
+    # The two state joins must precede it: they carry no price, and `game.state`
+    # is the predicate the benchmark rewrite refuses on.
+    for earlier in ("game_state", "live_game_state"):
+        assert positions[earlier] < positions["venue_reprice"], (
+            f"{earlier} must run BEFORE venue_reprice -- the re-price refuses any "
+            "row it cannot see is live, so a state join after it silently disables "
+            "the whole benchmark rewrite"
+        )
+    # And every price reader must follow it.
+    for later in ("projections", "margin_model", "live_projections", "live_gamelines"):
+        assert positions["venue_reprice"] < positions[later], (
+            f"venue_reprice must run BEFORE {later} -- {later} de-vigs a fair value "
+            "out of the row, and a fair value computed before the re-price is the "
+            "pregame vintage the live edge is then subtracted from"
+        )
