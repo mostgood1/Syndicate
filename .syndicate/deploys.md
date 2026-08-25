@@ -29353,3 +29353,71 @@ are still dropped from the sweep (`SWEEP_OWNERSHIP_EXCLUDED`), so nothing is
 captured yet. The reading that authorises that flip now exists.
 `SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT=1` is still armed on live-odds-worker
 and spends one credit per boot — clear it when the flip lands.
+
+---
+
+## 2026-08-25T22:07Z — env only, no code — `SYNDICATE_ACTIVE_SPORTS` += `ncaaf,nfl`; probe flag cleared
+
+**What.** `#558`. Two `update_environment_variables` writes (merge, not replace),
+both landing on `e79841573` which contains the aliases (`6bb2d6ae`) and the
+registry fix (`e2b1f271`):
+
+- live-odds-worker `srv-d91dpertqb8s73co8lt0` (`dep-da714brbc2fs738b3t90`):
+  `SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer,ncaaf,nfl`,
+  `SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT=0`
+- refresh-worker `srv-d91dpertqb8s73co8ls0` (`dep-da714e15efls738ashcg`):
+  `SYNDICATE_ACTIVE_SPORTS` only
+
+**verify (what IS confirmed):**
+
+```
+22:11:28Z  live-odds-worker  NCAAF_ODDSAPI_REPORT_SKIPPED flag=off
+22:14:05Z  refresh-worker    STREAM_PULL_OK  ncaaf_source/tracking/book_quotes/2026-08-29.state.json bytes=53431
+22:14:06Z  refresh-worker    PUBLISH_OK      ncaaf_source/data/book_grid/book_grid_2026-08-29.json bytes=190954
+```
+
+The probe is disarmed (no more credit per boot) and NCAAF artifacts move
+between the services.
+
+**verify (what is NOT confirmed, and this is the point):** **no `[ncaaf_odds]
+EVENTS` or `QUOTES` line exists.** The OddsAPI fetch step has not run. The
+53KB quote-state and the 190KB grid are almost certainly the git-tracked
+mirror seeded onto web, not a live capture — a grid built from mirror data
+looks exactly like a grid built from a fetch, and calling this "working"
+would repeat the error the whole day was spent correcting.
+
+**A THIRD GATE, found by reading rather than by waiting.** `SWEEP_OWNERSHIP_EXCLUDED`
+prints only `if dropped:`, so its silence proves nothing — success and
+"has not ticked" are the same absence. Following the chain instead:
+
+1. `SYNDICATE_ACTIVE_SPORTS` — now carries ncaaf/nfl. **Cleared.**
+2. Fast-tick claim: `_weekly_sport_claimed_by_fast_tick` uses
+   `WEEKLY_SPORTS_GAME_HORIZON_DAYS`, default **1**. NCAAF's first games are
+   2026-08-29, four days out, so live-odds-worker does NOT claim it and it
+   falls to refresh-worker.
+3. `_launch_autorun_weekly_sports_refresh` is gated on
+   `WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN`, which is
+   `raw in {"1","true","yes","on"}` — **absent means OFF.** No evidence it is
+   set; seven days of logs carry no weekly-sports launch (though that function
+   emits an event, not a greppable token, so absence there is weak evidence).
+
+**Prediction, falsifiable and dated.** If (3) is unset, NCAAF captures nothing
+today and starts on its own around **2026-08-28**, when the 08-29 slate enters
+the 1-day horizon and the fast tick claims it on live-odds-worker — which is
+exactly the "self-clears 08-28" line in `#557` that I wrote during the original
+assessment and then half-dismissed.
+
+**NOT flipped:** `WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN` enables a whole
+class of weekly work for NFL as well as NCAAF, on the service that runs the
+MLB sims. Needs a decision, not an inference.
+
+**An inference sitting in production, recorded so it can be corrected.** There
+is NO read path for env vars — the Render MCP has `update_environment_variables`
+and nothing to list them, and this session has no egress to the services. The
+prior value of `SYNDICATE_ACTIVE_SPORTS` was reconstructed from two agreeing
+sources: today's `kept=mlb,wnba,soccer` with `nfl` explicitly dropped, and
+`live_lens_loop.py:743` recording it as `mlb,wnba,soccer,nfl`. Neither mentions
+nba/nhl/ncaab — but those are out of season in August and would not appear in
+either list even if present, **so if they were set, this write removed them.**
+No effect until October/November; one env write to restore. Settle it from the
+Render dashboard.
