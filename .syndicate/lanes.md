@@ -2065,7 +2065,21 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   slug's `<home>`, ~0.0 means `<away>`, **anything between FALSIFIES the
   symmetric-ladder finding and spreads must stay refused.**
 
-### kalshi-oddsapi-coverage-audit — OPEN — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+### kalshi-oddsapi-coverage-audit — CLOSED 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+- **Outcome: DELIVERED.** `docs/ai_context/kalshi_oddsapi_coverage_audit.md`
+  + `scripts/audit_kalshi_oddsapi_coverage.py`, commit `4152111e2` on
+  `origin/claude/kalshi-oddsapi-coverage-audit`. Verification RAN: every fact
+  row carries a production timestamp, three provenance tiers are marked, and
+  the SUSPECTED/UNCONFIRMED section is separated from the observed one.
+  Narrative in `.syndicate/log/2026-08-25.md`; verified facts in `state.md`
+  `[kalshi-coverage-vs-oddsapi]`. **Claims released** -- both files are NEW
+  and unclaimed by anyone; nothing existing was edited.
+- **The two things worth doing next, both one line, 180 live markets, measured
+  2026-08-25T20:33:06Z:** `market_keys._MLB` needs
+  `"hits + runs + rbis"` (`KXMLBHRR`, 136 markets, refusing since it was
+  registered 12 minutes earlier); `KXMLBSB` needs a registry line (44).
+  Then `_BY_SPORT` needs `nhl` and `ncaab` keys -- without them NO prop in
+  either sport can ever auto-register.
 - Goal: ONE document that answers, per sport and per market family, all four of
   "does Kalshi list it / do we register it / does the board carry the key /
   does OddsAPI supply it" -- from OBSERVED production evidence only -- plus a
