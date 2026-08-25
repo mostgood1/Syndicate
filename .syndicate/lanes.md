@@ -2142,6 +2142,76 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   separated from the observed one.
 - Blocked by: none.
 
+
+### kalshi-line-aware-rungs — OPEN — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+- Goal: **`[kalshi_odds] BOARD_JOIN matched` rises on an unchanged `board_rows`,
+  with no increase in `kalshi_markets`.** The working-set bound keeps the ladder
+  rungs NEAREST THE BOARD'S LINE instead of the first 400 in API order.
+- Files: `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_odds_cadence.py`,
+  `tests/test_kalshi_line_aware_rungs.py` (NEW).
+  Checked with `lane-guard`'s OWN `_claims()` over 153 claims from OPEN lanes:
+  all three UNCLAIMED.
+- **WHY, measured 2026-08-25** (audit `docs/ai_context/kalshi_oddsapi_coverage_audit.md`):
+  - `kalshi_board_join.py:772` keys the join on `(board_market, player_key,
+    LINE)` — an EXACT line match. Kalshi lists every strike as its own market;
+    the board carries one line per market. **So at most one rung of a ladder can
+    ever match.**
+  - `MAX_MARKETS_PER_SERIES = 400` keeps `markets[:400]` — **API order, not
+    proximity to the board's line.** `KXNCAAFSPREAD` has **1994** rungs, so the
+    board's line is more likely in the discarded 1594 than in the kept 400.
+    `KXNFLSPREAD` 795. Per-tick `trimmed=` ran 862–2983.
+  - Best reading (20:55:47Z): `matched=87` of `board_rows=1290`, with
+    `no_matching_board_row=1036` — **93% of everything that survived the date
+    check**. That is the bucket this lane attacks.
+- Hypothesis: **the wanted (market, line) set is reachable from inside
+  `kalshi_odds_refresh` without editing anything another lane holds.**
+  `pipeline.intelligence_state.read_layer2_shortlist(date)` is a public,
+  keyvalue-backed reader (`intelligence_state.py:2115`). IMPORTING that module
+  is not editing it — `pipeline/intelligence_state.py` is held by OPEN lane
+  `layer2-sim-view-and-live-projection` and **is deliberately NOT claimed
+  here**. If a parameter must instead be threaded through
+  `intelligence_state.py:5211`'s call site, this lane is BLOCKED on that lane
+  and must say so rather than edit across.
+- Falsification test (run FIRST, before any selection code):
+  1. `read_layer2_shortlist(today)` returns rows carrying a usable `market` and
+     `line` per row. **If it does not, the hypothesis is dead.**
+  2. Those rows cover the sports whose ladders are being truncated — NCAAF and
+     NFL. A wanted-line set that omits them cannot improve the number this lane
+     is judged on.
+- **KNOWN HAZARDS, to be measured not assumed:**
+  - `_shed_rows_to_fit_keyvalue` **sheds shortlist rows** to fit the 8MB
+    ceiling, and `venue_daily_odds.py:49` records the shortlist already
+    occupying 5.0MB of it. **The persisted row set may be a SUBSET of the
+    board.** A wanted-line set built from a shed artifact silently optimises
+    for the rows that survived shedding.
+  - Freshness: the in-memory shortlist exists before `run_kalshi_odds_refresh()`
+    at the call site, but whether `write_layer2_shortlist` has run by then
+    decides if the persisted read is same-tick or one tick stale. One tick is
+    almost certainly fine (lines move slowly) — **but it must be read, not
+    assumed.**
+  - **DO NOT touch `_record_daily_book(full_markets)`.** It runs BEFORE both
+    bounds and is what keeps whole ladders for CLV; `intelligence_state.py:5204`
+    states the lookahead prices it captures "become the OPENING prices a CLV
+    grade needs". That separation was broken once already and fixed in
+    `e4ae9ebec`. This lane changes only the WORKING SET.
+  - `learnings.md 2026-08-23 FORBIDDEN`: a module may not hold its own list of
+    market names. The selection must compare board keys produced by
+    `market_keys`, never a private spelling.
+  - Degrade safely: with **no** wanted lines (first tick of a boot, empty
+    shortlist, failed read) the selection must fall back to today's behaviour,
+    not keep nothing. A board-starved tick must not empty the working set.
+- Verification: **`matched` rises against a BASELINE BAND, not a single reading.**
+  `matched` swung **87 → 44** on an identical `board_rows=1290` between
+  consecutive builds 20:55:47Z → 21:09:46Z, because the working set is a
+  rotating window (60 of 193 series per tick, staleness-trimmed). **Collect the
+  band across >=6 builds before and after, or the rotation will read as the
+  result.** `kalshi_markets` must stay at 6000 — a rise there means more was
+  fetched and the comparison is void.
+- Blocked by: none. **Cheap precondition, not a blocker:** audit
+  recommendation #4 (make `no_matching_board_row` name the KEY it wanted) turns
+  this lane's target bucket from a number into a ranked list, and is one log
+  line. Worth doing first if anyone is in that file.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
