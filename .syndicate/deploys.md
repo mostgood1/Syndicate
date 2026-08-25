@@ -29304,3 +29304,52 @@ series are not in it yet. Expected to clear on its own; if it does not, that is
 a real finding rather than a guess. **Not yet read: whether a Kalshi position
 reaches the order path.** `ORDER_PATH` at 20:46:57Z still said `no_positions`,
 but that predates the 20:48:06Z reprice.
+
+---
+
+## 2026-08-25T21:53Z — `1f0825852` — live-odds-worker: NCAAF team resolution 0 -> 184 of 184
+
+**What.** `#558`, closing the arc that started at `resolved=0`. Three deploys,
+three distinct causes, each found by re-running the same one-shot probe rather
+than by reasoning about the code.
+
+**verify:**
+
+```
+21:53:53Z  instance -hzkgv
+[ncaaf_odds] TEAM_REGISTRY rows=684 teams=684
+[ncaaf_odds] EVENTS events=111 teams=184 resolved=184 unresolved=0
+[live_odds_worker] NCAAF_ODDSAPI_REPORT_DONE exit=0
+```
+
+**`TEAM_REGISTRY_MISSING` is ABSENT from this boot**, and that is the second
+reading rather than a detail: the registry persisted on the worker's disk from
+the 21:41 pull, so this run never needed to fetch it. The fix holds across
+restarts; it did not merely work once.
+
+**The whole arc, every number from the real 111-event slate:**
+
+| time | reading | cause |
+|---|---|---|
+| 21:03 | `resolved=0 unresolved=184`, exit 0 | registry not in `HOT_ARTIFACT_PATTERNS`; live-odds-worker never runs `bootstrap_data_root`, so it had no copy and `_csv_rows()` returned `[]` in silence |
+| 21:19 | `resolved=0`, **exit 3**, `PULL ok=False` | the refusal working as built — no credit spent. Pull 403'd: **web was still on `93de25cc`** with the old 155-pattern tuple, and `is_hot_artifact_relative_path` gates the SERVER side of `/api/ops/artifacts/stream` |
+| 21:41 | `resolved=176 unresolved=8` | both ends on the new allowlist; `PULL ok=True written=1` |
+| 21:53 | **`resolved=184 unresolved=0`** | the 8 measured aliases |
+
+**The lesson worth keeping is the 21:19 row.** The allowlist has to be live on
+BOTH ENDS — the worker asks, web decides — and I had deployed only the asker.
+A 403 rather than a 404 is what said so: the file was present and refused, not
+missing. Deploying one side of a permission check is not deploying the fix.
+
+**Deploys.** `dep-da70lv2fngtc73btsop0` (worker, `7abc3f15`, live 21:40:14Z),
+`dep-da70ii2fngtc73btjdug` (web, `7abc3f15`, live 21:32:58Z),
+`dep-da70s2gu01pc73dig0n0` (worker, `1f0825852`, live ~21:53Z). Also recorded:
+`dep-da70buajnfac73abhko0` at 21:15:38Z was a **ridealong** — a peer session
+deployed `e2b1f271` (my own PR #68 merge) and the armed probe re-ran for free.
+Three of the four worker restarts in this window were other sessions'.
+
+**Still open.** `SYNDICATE_ACTIVE_SPORTS` is `mlb,wnba,soccer`; NCAAF and NFL
+are still dropped from the sweep (`SWEEP_OWNERSHIP_EXCLUDED`), so nothing is
+captured yet. The reading that authorises that flip now exists.
+`SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT=1` is still armed on live-odds-worker
+and spends one credit per boot — clear it when the flip lands.
