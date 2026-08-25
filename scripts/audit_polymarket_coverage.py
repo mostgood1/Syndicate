@@ -443,6 +443,117 @@ def run_spread_audit_if_enabled() -> dict[str, Any] | None:
         return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
 
 
+def run_offset_probe_if_enabled() -> dict[str, Any] | None:
+    """Is `find_first_game_offset`'s boundary landing ABOVE part of the game block?
+
+    THE QUESTION, and why logs cannot answer it. Measured 2026-08-25:
+
+        19:28Z  start_offset=12142  games=13255  futures=1613  truncated=True
+        22:11Z  start_offset=20987  games=7936   futures=47    truncated=False
+
+    A scan that now claims completeness returns 5,319 FEWER game markets than
+    the truncated one did, after its start offset jumped +8,845. Over the same
+    window MLB full-game spreads went from present in the join's index
+    (`offered: ['chc-az@-2.5','-1.5','+1.5','+2.5']`, 20:16Z -- and that index
+    REFUSES segments, so those were full-game) to absent entirely
+    (`no_candidates|mlb|spreads: 51`, `offered: []`, 22:01Z).
+
+    The budget trim is EXONERATED as the cause: `dropped_for_size=0
+    dropped_by_date={}` on every cycle, with 5.99MB of headroom. So the loss is
+    upstream of it, and there are exactly two candidates with opposite fixes:
+    the venue stopped listing those markets, or **the boundary search stopped
+    seeing them**. `find_first_game_offset`'s own docstring names the second --
+    "past the first games (silently missing part of the slate)".
+
+    `monotonic` is supposed to catch that and reads True. It is weaker than it
+    looks: it only checks offsets the binary search HAPPENED to probe, so a
+    boundary sitting inside the block can still report True.
+
+    THE TEST. Probe a ladder BELOW the live boundary. **If any offset below it
+    returns game rows, the boundary is too high and part of the slate is
+    invisible to us.** If every one returns futures or empty, the boundary is
+    right and the missing markets are the venue's, not ours.
+
+    Derived from the CURRENT boundary, never hardcoded -- the value under test
+    moves every day, which is the whole reason that function exists.
+
+    COST: ~10 signed GETs of 5 rows. This DOES call the venue, deliberately --
+    no artifact can answer "what lives at offset 18000", which is the one
+    question here. It is opt-in, one-shot at boot, reads only, and places
+    nothing. Unset the flag once the answer is in.
+    """
+    if not _env_bool("SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT"):
+        return None
+
+    try:
+        from syndicate.features.shared.polymarket_us_markets import (
+            find_first_game_offset,
+            probe_offset_landscape,
+        )
+
+        located = find_first_game_offset()
+        boundary = located.get("first_game_offset")
+        if not isinstance(boundary, int) or boundary <= 0:
+            print(
+                "[audit_polymarket_coverage] OFFSET_BOUNDARY_PROBE status=refused"
+                f" reason=no_boundary located={located}",
+                flush=True,
+            )
+            return {"status": "refused", "reason": "no_boundary", "located": located}
+
+        # A ladder BELOW the boundary, plus the boundary and one page above it
+        # as controls: the boundary itself must show games, and a rung below it
+        # must not.
+        rungs = sorted({
+            max(0, int(boundary * f)) for f in (0.2, 0.4, 0.6, 0.8, 0.9, 0.95, 0.99)
+        } | {boundary, boundary + 2000})
+        result = probe_offset_landscape(offsets=tuple(rungs), limit=5)
+        samples = result.get("samples") or {}
+
+        below = {
+            off: s for off, s in samples.items()
+            if int(off) < boundary and isinstance(s, Mapping) and int(s.get("games") or 0) > 0
+        }
+        at_boundary_games = int(
+            (samples.get(str(boundary)) or {}).get("games") or 0
+        )
+        if below:
+            verdict = (
+                f"BOUNDARY TOO HIGH -- {len(below)} offset(s) below {boundary} carry game"
+                " rows, so part of the slate is invisible to us. NOT a venue absence."
+            )
+        elif at_boundary_games == 0:
+            verdict = (
+                f"INCONCLUSIVE -- the boundary {boundary} itself returned no game rows,"
+                " so the control failed and nothing here can be trusted."
+            )
+        else:
+            verdict = (
+                f"BOUNDARY SOUND -- every rung below {boundary} is futures or empty and"
+                " the boundary itself carries games. Missing markets are the VENUE's,"
+                " not our scan's."
+            )
+        print(
+            "[audit_polymarket_coverage] OFFSET_BOUNDARY_PROBE status=ok"
+            f" boundary={boundary} probes={located.get('probes')}"
+            f" monotonic={located.get('monotonic')}"
+            f" rungs={rungs}"
+            f" games_below_boundary={ {k: v.get('games') for k, v in below.items()} }"
+            f" at_boundary_games={at_boundary_games}"
+            f" verdict={verdict!r}"
+            f" samples={samples}",
+            flush=True,
+        )
+        return {"status": "ok", "boundary": boundary, "verdict": verdict, "samples": samples}
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[audit_polymarket_coverage] OFFSET_BOUNDARY_PROBE_FAILED"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--date", default="", help="board date for the spread test (default: skip it)")

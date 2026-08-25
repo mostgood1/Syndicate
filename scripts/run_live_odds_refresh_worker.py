@@ -1277,6 +1277,30 @@ def _polymarket_spread_sign_audit_at_boot() -> None:
         )
 
 
+def _polymarket_offset_boundary_probe_at_boot() -> None:
+    """Probe a ladder of offsets below the live game-block boundary. Opt-in.
+
+    Exists because two facts moved together on 2026-08-25 and only one of them
+    can be true: `start_offset` jumped 12,142 -> 20,987 while `games` fell
+    13,255 -> 7,936 on a scan reporting `truncated=False`, and MLB full-game
+    spreads left the join's index entirely over the same window. Either the
+    venue stopped listing them or our boundary search stopped seeing them --
+    opposite fixes, and no log line distinguishes them.
+
+    Wrapped whole: a diagnostic must not be able to stop the loop it diagnoses.
+    """
+    try:
+        from scripts.audit_polymarket_coverage import run_offset_probe_if_enabled
+
+        run_offset_probe_if_enabled()
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[live_odds_worker] POLYMARKET_OFFSET_BOUNDARY_PROBE_FAILED"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _game_line_grade_audit_at_boot() -> None:
     """Print the raw facts behind each game-line verdict, once, for eyeballing.
 
@@ -1930,6 +1954,13 @@ def main() -> int:
         # sibling worker. Full reasoning:
         # `docs/ai_context/polymarket_oddsapi_coverage_audit.md` SS5.4.
         _polymarket_spread_sign_audit_at_boot()
+        # Answers ONE question and then should be switched off again: is
+        # `find_first_game_offset`'s boundary landing above part of the game
+        # block? Inert unless SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT is set.
+        # Unlike the audit above this one DOES read the venue (~10 signed GETs
+        # of 5 rows) -- deliberately, because no artifact can say what lives at
+        # a given offset, which is the whole question. Reads only.
+        _polymarket_offset_boundary_probe_at_boot()
         _game_line_grade_audit_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
