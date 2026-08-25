@@ -16,6 +16,7 @@ problem.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Mapping
 
 from syndicate.features.shared.execution_ledger import (
@@ -626,6 +627,24 @@ def _decode_polymarket_list(value: Any) -> list[Any] | None:
 _HOME_LIKE_SIDES = {"yes", "over", "home"}
 
 
+def _polymarket_max_price_age_seconds() -> float:
+    """How old the persisted slate may be and still price a real order.
+
+    Default 1800s -- TWICE the writer's 900s cadence, so one missed write is
+    tolerated and a stopped writer is not. Tied to the cadence deliberately: a
+    ceiling unrelated to how often the artifact is refreshed either refuses
+    healthy slates or admits dead ones.
+    """
+    raw = os.environ.get("SYNDICATE_POLYMARKET_MAX_PRICE_AGE_SECONDS")
+    try:
+        parsed = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return 1800.0
+    # A non-positive ceiling is a typo, not an instruction to refuse everything
+    # forever -- same reading `execution_guard._float_env` gives a bad cap.
+    return parsed if parsed > 0 else 1800.0
+
+
 def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
     """`(slug, price, tick_size, min_qty)` for one Polymarket US position, or
     `None` to refuse cleanly -- which `polymarket_us_submitter` turns into an
@@ -721,6 +740,42 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
     rows = (payload or {}).get("markets")
     if not isinstance(rows, list):
         print(f"[execute_portfolio] POLYMARKET_ARTIFACT_EMPTY slug={slug}", flush=True)
+        return None
+
+    # BOUND THE AGE OF A PRICE THAT IS ABOUT TO BUY SOMETHING.
+    #
+    # This function's docstring said staleness here is "logged, never
+    # hard-refused" -- reasonable when the only alternative was becoming a
+    # second independent caller. It stopped being reasonable on 2026-08-25,
+    # when two facts met: Polymarket went live with real money, and the slate
+    # writer turned out to be BOOT-ONLY (called once before the loop, so the
+    # artifact aged with the worker's uptime -- 99 minutes between writes on a
+    # 900s cadence). The writer is fixed in the same change; this is the guard
+    # that means a writer which stops for any OTHER reason cannot quietly
+    # price an order off an hours-old book.
+    #
+    # Fails CLOSED and BY NAME. A missing timestamp refuses too: "we cannot
+    # tell how old this is" and "this is fresh" must never share an outcome,
+    # which is the same fail-closed reading `kill_switch_engaged` uses for an
+    # unreadable flag.
+    max_age = _polymarket_max_price_age_seconds()
+    fetched_at = (payload or {}).get("fetched_at")
+    try:
+        age = time.time() - float(fetched_at)
+    except (TypeError, ValueError):
+        print(
+            f"[execute_portfolio] POLYMARKET_ARTIFACT_NO_FETCHED_AT slug={slug}"
+            " -- refusing rather than pricing an order off a book of unknown age",
+            flush=True,
+        )
+        return None
+    if age > max_age:
+        print(
+            f"[execute_portfolio] POLYMARKET_ARTIFACT_STALE slug={slug}"
+            f" age_s={age:.0f} max_s={max_age:.0f}"
+            " -- refusing rather than buying at a price this old",
+            flush=True,
+        )
         return None
 
     row = next((m for m in rows if isinstance(m, Mapping) and str(m.get("slug") or "") == slug), None)

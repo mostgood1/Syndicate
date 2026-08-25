@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from syndicate.features.shared.execution_ledger import ledger_summary
@@ -802,7 +804,19 @@ class _PolyReq:
     requested_price = 0.55
 
 
-def _artifact_env(monkeypatch, *, markets=None, raises=None, fetched_at=1787600000.0):
+def _artifact_env(monkeypatch, *, markets=None, raises=None, fetched_at=None):
+    # FRESH BY DEFAULT, relative to now rather than a fixed epoch. These tests
+    # are about side resolution, slippage and not calling the venue directly;
+    # the artifact's AGE is incidental to every one of them. It stopped being
+    # incidental on 2026-08-25, when `_polymarket_resolve_market` gained a
+    # staleness ceiling -- the fixed 1787600000.0 was ~17,774s old, so every
+    # one of them began refusing before it reached the behaviour under test.
+    # A fixture whose default silently trips a real guard tests the guard, not
+    # its subject. The ceiling itself is covered in
+    # tests/test_polymarket_slate_freshness.py, including an explicitly stale
+    # artifact.
+    if fetched_at is None:
+        fetched_at = time.time()
     from syndicate.features.shared import refresh_state_store
     import pipeline.execute_portfolio as runner
 

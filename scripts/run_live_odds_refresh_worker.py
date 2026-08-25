@@ -1743,6 +1743,27 @@ def main() -> int:
                 run_disk_maintenance()
             except Exception as exc:
                 print(f"[live_odds_worker] DISK_MAINTENANCE_ERROR {type(exc).__name__}: {exc}", flush=True)
+            # THE SLATE WRITER BELONGS IN THE LOOP, and was called only at boot.
+            #
+            # MEASURED 2026-08-25: POLYMARKET_US_SLATE_WRITE at 22:33:57Z
+            # (instance c2727), then nothing until 00:13:15Z -- on a NEW
+            # instance. 99 minutes on a 900s cadence should be ~6 writes; it
+            # was one. Every write in the record is a fresh-boot write, because
+            # `_POLYMARKET_SLATE_LAST_RUN` is per-process and resets to 0.0.
+            #
+            # The interval gate inside the function was never wrong; it simply
+            # never got a second chance to run, so the artifact went as stale as
+            # the worker was long-lived. That reads as a cadence in the log
+            # (writes DO appear, with plausible gaps) which is why it survived.
+            #
+            # THIS IS NOW A MONEY PATH. `execute_portfolio._polymarket_resolve_
+            # market` prices real orders off this artifact and, by its own
+            # docstring, logs staleness rather than bounding it. A boot-only
+            # writer means an order priced off a slate of unbounded age.
+            #
+            # Called BEFORE the execution tick so an order placed this pass is
+            # priced from the freshest slate this pass can get.
+            _polymarket_us_slate_refresh_tick()
             _run_execution_tick()
             # Use the adaptive interval (900s idle/pregame, 60s once a game is
             # actually live -- see _live_refresh_loop_interval_for_meta) rather

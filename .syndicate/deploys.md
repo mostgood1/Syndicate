@@ -27186,8 +27186,15 @@ market was keyed `mlb|h2h|<team>` when collected for mlb. It never bit only
 because Kalshi was fresher and won every selection — a timing accident.
 
 `selected_by_source={'kalshi': 237}` still, at kalshi age 1017s vs polymarket
-5300s. **Polymarket's slate is 5300s old against a 900s cadence — the writer is
-not ticking at its configured rate.** Open, not chased.
+5300s. **Polymarket's slate is 5300s old against a 900s cadence.** CORRECTED
+2026-08-25: there was no 900s cadence. `_polymarket_us_slate_refresh_tick()`
+was called ONCE AT BOOT, before the worker's `while` loop, so its interval
+gate never got a second chance and the artifact aged with the worker's
+uptime. Writes at 22:33:57Z / 00:13:15Z / 00:21:05Z are on three DIFFERENT
+instances — every one a fresh-boot write. I described this as a cadence in
+this ledger and in the code's own docstring; both were wrong, and the
+plausible-looking gaps are why it read as one. Fixed: the tick now runs
+inside the loop, before the execution tick.
 
 ### 2. `df2047f5f` — `kalshi_discovery` called three names it never imported.
 
