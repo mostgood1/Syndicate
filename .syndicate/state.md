@@ -415,6 +415,27 @@ That story ended; do not re-open it from the archive.**
   already. `deploy_preflight.py` no longer depends on the log line for web
   (it reads `/api/ops/memory`), so nothing is blocked by this being off.
 
+- **2026-08-25 — REAL EXECUTION CAPS: bankroll $1000, Kalshi $50/day,
+  Polymarket $100/day, $10 max order, 10 orders/day per exchange, 15 combined.**
+  Asked directly, with the numbers. Bankroll was already `$1000`
+  (`portfolio_settings.DEFAULT_BANKROLL_UNITS`, a 2026-08-22 decision, no code
+  change needed). Everything else is now the code default in
+  `execution_guard.py` (PR #62, `210844950`) AND the live `live-odds-worker`
+  env vars (`SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI=50`, `_POLYMARKET=100`,
+  `_ALL_VENUES=150`) — **verified live in production 2026-08-25T19:35Z**, both
+  venues' `caps={...}` lines match exactly.
+  Consequence to hold onto: **the env vars had drifted from the stated policy
+  before this fix** — production was running a flat `$40`/day cap identical
+  for both venues (`$80` combined), the leftover of an earlier
+  "small numbers a first funded week should survive being wrong about" phase.
+  The user caught this by asking "are you sure this is set correctly now?"
+  rather than accepting an earlier report that the code change alone was done —
+  a code-default change is NOT sufficient to fix a service with an explicit,
+  contradicting env-var override; verify against live logs, not the diff.
+  The per-venue day-dollar cap is a **day-SPEND cap standing in for real
+  funded balance**, not a running capital-availability ledger — nothing here
+  subtracts an open position's stake from tomorrow's budget.
+
 Product decisions, not engineering ones. Do not re-take them.
 
 1. **The LLM is NOT meant to be on.** `ANTHROPIC_API_KEY` stays absent. The
