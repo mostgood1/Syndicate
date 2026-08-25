@@ -81,7 +81,29 @@ def _fetched_at(payload: Mapping[str, Any] | None, mtime: float | None) -> float
     touch files this way. Trusting mtime there would launder stale data as
     fresh, which is precisely the failure this module exists to catch.
     """
-    for key in ("fetched_at", "generated_at", "last_updated", "as_of"):
+    # `updated_at` IS THE KEY THE ODDS-HISTORY SHARDS ACTUALLY USE, and its
+    # absence from this list is why `oddsapi` contributed ZERO quotes to every
+    # reprice on 2026-08-24/25.
+    #
+    # MEASURED: mlb, wnba and soccer all reported
+    # `oddsapi: {'status': 'error', 'reason': 'shard_has_no_timestamp'}` on
+    # every VENUE_REPRICE for a full evening. That reason is only reachable
+    # AFTER the payload loads and after `markets` is confirmed non-empty -- so
+    # the shards were present and full the whole time. Inspecting one:
+    #
+    #   data/mlb_source/artifacts/mlb/odds_history.json
+    #     top-level: 'date', 'markets' (35), 'updated_at'
+    #
+    # `updated_at = '2026-07-12T02:47:30+00:00'`, and this loop never looked for
+    # it. The same holds for the wnba and nhl shards. One missing key name took
+    # an entire source offline while every counter said "error" rather than
+    # "misconfigured", which is the difference between a feed someone chases
+    # and a feed someone fixes.
+    #
+    # APPENDED, not inserted: the four names above keep their precedence, so a
+    # shard carrying both an explicit fetch stamp and an update stamp still
+    # prefers the fetch stamp. This can only ADD a resolvable timestamp.
+    for key in ("fetched_at", "generated_at", "last_updated", "as_of", "updated_at"):
         raw = (payload or {}).get(key) if isinstance(payload, Mapping) else None
         if isinstance(raw, (int, float)) and raw > 0:
             return float(raw)
