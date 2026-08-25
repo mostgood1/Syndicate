@@ -1749,520 +1749,43 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none for Phase A. Phase B is blocked on scope §7 decisions 1 and 2;
   Phase C is blocked on a live WNBA slate (NBA out of season until autumn 2026).
 
-### exchange-markets-api-integration — OPEN — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
-- Goal: read-only market/odds-pulling client modules for six prediction/event-market
-  venues -- coinbase, prophetx, novig, polymarket, robinhood, crypto.com ("OG") --
-  each following `kalshi_client.py`'s pattern (single-place schema assumption,
-  `probe()` reports the shape that actually came back rather than parsing blind,
-  named refusal never a silent empty list). A second session is doing the Kalshi
-  order-automation build end to end; this lane is deliberately the OTHER venues,
-  market-data pull only -- no order placement, no credentials that can write.
-- Files (all NEW, no existing file touched):
-  `syndicate/features/shared/coinbase_client.py`,
-  `syndicate/features/shared/prophetx_client.py`,
-  `syndicate/features/shared/novig_client.py`,
-  `syndicate/features/shared/polymarket_client.py`,
-  `syndicate/features/shared/robinhood_client.py`,
-  `syndicate/features/shared/cryptocom_client.py`,
-  `scripts/probe_coinbase.py`, `scripts/probe_prophetx.py`,
-  `scripts/probe_novig.py`, `scripts/probe_polymarket.py`,
-  `scripts/probe_robinhood.py`, `scripts/probe_cryptocom.py`,
-  `tests/test_coinbase_client.py`, `tests/test_prophetx_client.py`,
-  `tests/test_novig_client.py`, `tests/test_polymarket_client.py`,
-  `tests/test_robinhood_client.py`, `tests/test_cryptocom_client.py`,
-  `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md` (NEW),
-  `scripts/probe_exchange_markets.py` (NEW).
-  **NARROW claim added 2026-08-24:** `scripts/run_refresh_worker.py` -- ONE
-  small, additive, try/except-wrapped, opt-in-only diagnostic hook (calls
-  `probe_exchange_markets.run_all_probes_if_enabled()` near boot, no-op unless
-  `SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT=1`). Released from
-  `portfolio-ledger-service-split` (owning session `74a0966a` archived
-  2026-08-22) -- see that lane's block for the release note.
-- Hypothesis: n/a -- this is construction against public API docs, not diagnosis.
-- Falsification test: n/a for the construction; the schema assumption in each
-  module is the thing a first live production run (refresh-worker, which has
-  outbound access this sandbox does not -- confirmed 2026-08-24, every venue host
-  403s CONNECT through the agent proxy, same as Kalshi) can falsify. `probe()`
-  in each module exists to make that falsification cheap and visible.
-- Verification: `python -m pytest tests/test_coinbase_client.py
-  tests/test_prophetx_client.py tests/test_novig_client.py
-  tests/test_polymarket_client.py tests/test_robinhood_client.py
-  tests/test_cryptocom_client.py` green locally (pure-function unit/odds-conversion
-  coverage only -- network calls cannot be exercised from this sandbox). Schema
-  correctness itself stays UNVERIFIED until a `probe_*` script runs from a host
-  with outbound access, same caveat `kalshi_client.py`'s header carries.
-- Blocked by: none.
-- **SHIPPED 2026-08-24, VERIFIED LOCALLY, NOT YET LIVE.** All six modules built.
-  Research (parallel WebSearch/WebFetch passes, one per venue) changed the shape
-  of the work: only polymarket (public, documented, no-auth) and novig/prophetx
-  (real but PARTNER-GATED -- no self-serve credential) have anything resembling
-  their own API. **coinbase and robinhood have NO distinct API at all** -- both
-  are broker/reseller front ends over Kalshi (and, for Robinhood, also
-  ForecastEx/Rothera) -- so `coinbase_client.py` / `robinhood_client.py` report
-  that finding and delegate to the other session's `kalshi_client.py` read-only
-  surface rather than fabricating an endpoint, clearly labelled
-  (`coinbase_predict_via_kalshi`, `robinhood_..._via_kalshi_partial`) so neither
-  is ever mistaken for the venue's own confirmed catalogue. **crypto.com "OG"**
-  (a real platform, `OG.com`, launched 2026-02-03 via CDNA) has no public
-  REST/WebSocket yet -- `cryptocom_client.py` reports the finding and rejects
-  one uncorroborated third-party-advertised endpoint by name. 53 unit tests
-  green (`polymarket_client.probability_to_american` needed a range guard the
-  first test run caught -- it divided by zero on `probability=0/1`, since
-  unlike `kalshi_client`'s version this one is public/`__all__`-exported and
-  callable directly rather than always reached through a validating caller).
-  Probe scripts run and fail as designed (named refusal, non-zero exit,
-  no crash) against the same agent-proxy denial every venue host hits. Full
-  per-venue evidence: `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`,
-  `docs/ai_context/todo.md #544` (renumbered from #542 on merge -- another lane
-  took #542/#543 first on `main`; see `scripts/todo_id_alloc.py`, which exists
-  for exactly this race). **OWED:** a `probe_*` run from refresh-worker
-  (real outbound access) to confirm or correct every schema assumption, same as
-  Kalshi's own first live run corrected 10 of 17 field names.
-- **NOVIG ORDER-AUTOMATION SCOPED 2026-08-24, not started.**
-  `.syndicate/scope_2026-08-24_novig_order_automation.md` -- read against the
-  OTHER session's live Kalshi automation build (`kalshi_orders.py`,
-  `execution_guard.py`, `execution_ledger.py`), which turned out to be fully
-  venue-agnostic: Novig's entire surface is two new files
-  (`novig_auth.py`, `novig_orders.py`) plus one `elif` in
-  `pipeline/execute_portfolio.py::_venue_submitter` (claimed by
-  `portfolio-decision-and-execution`, not yet narrow-claimed -- premature
-  before there is a `novig_orders.py` to wire in). Price unit and order
-  identity (`outcomeId` + `index`, never array position) CONFIRMED against
-  real `docs.novig.com` pages this time, not just third-party write-ups. The
-  **order WRITE endpoint could not be found by any search** -- the single
-  most important unknown, Novig's equivalent of the sample payload Kalshi's
-  owner had to supply by hand. **Blocked on a partner credential that does
-  not exist yet** (`NOVIG_CLIENT_ID`/`NOVIG_CLIENT_SECRET`, founder-gated,
-  no self-serve) and on the still-open legal/ToS review question from
-  `todo.md #544`'s own NEXT section.
-- **FIRST LIVE PROBE RAN 2026-08-24T17:24:49Z** (PR #30 merged, flag set
-  one boot on refresh-worker, unset again) -- full readout
-  `.syndicate/deploys.md` same date. Polymarket 16/18 fields right, 2 fixed
-  (`minimum_tick_size`->`orderPriceMinTickSize`, `neg_risk`->`negRisk`, PR
-  #31, merged). Novig's "genuinely public" CSV tier actually 403'd --
-  corrected to UNVERIFIED, not yet root-caused. ProphetX/Novig OAuth tiers
-  correctly refused with no credential. Crypto.com OG confirmed still
-  "coming soon".
-- **PROPHETX ORDER-AUTOMATION SCOPED 2026-08-24, not started.**
-  `.syndicate/scope_2026-08-24_prophetx_order_automation.md` -- unlike
-  Novig, a real order-write endpoint WAS found and corroborated across
-  multiple sources: `POST cash.api.prophetx.co/trade/private/api/v2/wagers`,
-  payload `{lineID, odds, stake}`, same bearer token as the read side (one
-  credential, not two). A four-field status enum (`status`/`matching_status`/
-  `winning_status`/`update_status`) was also found, including `wiped` -- a
-  state with no Kalshi analogue (auto-cancelled on a game going live) that
-  needs its own handling rather than folding into `dead`. **The one
-  unresolved question: whether `cash.api.prophetx.co` is the same product as
-  the Affiliate API's sandbox host, or a legacy/different product
-  ("ProphetX Play", which reads like a separate embeddable widget) --
-  this has to be resolved in the partner conversation, not guessed.**
-  Same blockers as Novig otherwise: no credential, legal/ToS review open.
-- **NOVIG'S ORDER-WRITE ENDPOINT RESOLVED 2026-08-24 (same day) -- the user
-  supplied real `docs.novig.com` page content directly** (REST Endpoints/
-  Rate Limits/URLs, and Place Order), not another research pass. Scope doc
-  updated in place. `syndicate/features/shared/novig_orders.py` (NEW) now
-  has `order_body()` + `cash_units_for_stake()`, pure and unit-tested against
-  the exact documented contract (`POST /emm/orders/place`, body `{outcomeId,
-  price, qty, currency, tif, ttl?, flags?}`) -- 16 tests. `submit_order` (the
-  actual network call) deliberately NOT written -- the response shape of a
-  placed order was not supplied. `novig_client._MARKET_FIELDS` corrected
-  against the same real content (three invented names replaced); confirmed
-  `fetch_market(market_id)` added. **New open questions, both flagged rather
-  than guessed:** whether `qty` means risked or to-win, and the cancel
-  endpoint's HTTP method (path confirmed, verb assumed = DELETE). **A real
-  unit trap caught before it could bite:** `Retry-After`/`X-RateLimit-Reset`
-  on a Novig 429 are MILLISECONDS not seconds --
-  `novig_orders.backoff_seconds_from_headers` divides by 1000 in exactly one
-  tested place. Files: `syndicate/features/shared/novig_orders.py` (NEW),
-  `tests/test_novig_orders.py` (NEW), `syndicate/features/shared/novig_client.py`,
-  `tests/test_novig_client.py`, `.syndicate/scope_2026-08-24_novig_order_automation.md`.
-  Then `novig_orders.submit_order()` was BUILT (still same day): sends the
-  real POST, handles 429/HTTP/network/undecodable-response errors as a new
-  `NovigOrderError`, and -- because the docs' own words say a 201 means
-  "placed in the queue," not executed -- reports every accepted order as
-  `submitted`, **never `filled`**, returning the raw undecoded response
-  rather than parsing it. 30 tests total (was 16). PR #34, merged.
-- **SCOPE PIVOT 2026-08-24, same day, user decision: Novig buy-side
-  automation is OFF.** "We can't automate novig end to end for buying but we
-  should use public endpoint/data to populate our odds." `novig_orders.py`
-  (order_body/submit_order) stays as built -- verified, tested, not deployed
-  toward live orders -- but the active work becomes the PUBLIC CSV MIRROR as
-  an odds-population source, not order execution.
-- **THE CSV 403 IS RESOLVED, FOR REAL THIS DAY** -- the user supplied the
-  actual documented structure directly, which explains everything the
-  earlier flat-path guess (`{base}/markets.csv`) got wrong: files are DATED
-  and INDEXED under `data.novig.com/reporting/trade-data/`
-  (`/index.json` -> `dates`/`marketDates`; `/{date}/trades.csv`;
-  `/{date}/markets.csv`). The flat path 403'd because it was never going to
-  exist -- CDN default-deny on a missing key, not an auth or header problem.
-  `diagnose_daily_csv_403()` (the earlier candidate-URL diagnostic) is
-  DELETED, not merely superseded -- the real shape replaced the need to
-  guess. **A THIRD price convention found and kept separate**: the CSV's
-  OHLC fields are CENTS 0.0-100.0 (one decimal), NOT the REST tier's 0-1
-  decimal probability -- `cents_to_probability`/`cents_to_american` are new,
-  distinct functions from `probability_to_american`, with a test asserting
-  the two conventions are NOT interchangeable (same 0.62 read each way gives
-  different American odds). `cost`/`qty`/`openInterest`/`dailyVolume` parsed
-  via `Decimal(str(...))`, matching `novig_orders.cash_units_for_stake`'s
-  already-fixed float-precision lesson. **THIS IS END-OF-DAY DATA** --
-  published "shortly after midnight Eastern" for the PRIOR trading day, a
-  closing-line/historical feed, never a live price; `fetch_latest_markets_snapshot()`
-  (the odds-population entry point) returns `is_stale_by_days` explicitly so
-  a consuming board cannot mistake it for current. 29 new tests
-  (`tests/test_novig_csv_data.py`), pinned against the REAL example rows
-  supplied (STRAIGHT/COMBO trades, order-book/COMBO/no-trades-today markets).
-  Files: `syndicate/features/shared/novig_client.py`,
-  `tests/test_novig_csv_data.py` (NEW), `scripts/probe_novig.py`,
-  `scripts/probe_exchange_markets.py`, `scripts/run_refresh_worker.py`
-  (narrow claim, already held).
-- **THE ODDS-REFRESH PIPELINE ITSELF, same day.** User: "build the odds
-  refresh pipeline for novig." `pipeline/novig_odds_refresh.py` (NEW) --
-  read against `kalshi_odds_refresh.py`'s shape but deliberately SIMPLER:
-  Novig publishes once a day, not continuously, so this is one hourly
-  manifest-check clock rather than Kalshi's per-series due-queue/hot-series/
-  per-tick-cap machinery. The multi-thousand-row CSV is only re-fetched when
-  the manifest actually names a NEW date; `"cached"` on this pipeline can
-  mean "up to ~24h old, and that's the freshest Novig has" -- a materially
-  different meaning than Kalshi's `"cached"`, stated explicitly in the
-  module header so a future reader does not import Kalshi's assumption.
-  Recurring background thread (`start_background_loop_if_enabled`), NOT a
-  tick inside `run_refresh_worker.py`'s own main loop -- that loop is
-  Kalshi's real-money cadence and this lane holds only a narrow claim on
-  that file for small additive boot hooks, so a self-contained daemon
-  thread (same pattern `syndicate/app.py::_bootstrap_render_data` already
-  uses) gets real hourly recurrence without widening this lane's footprint
-  in a file another lane depends on for something with real money behind
-  it. **OFF BY DEFAULT** (`SYNDICATE_NOVIG_ODDS_REFRESH_ON_BOOT`) even
-  though the refresh function itself defaults enabled -- one deliberate
-  opt-in before a new recurring background job goes unconditional, per this
-  repo's own measure-first culture. The superseded one-shot boot probe
-  (`run_novig_csv_snapshot_probe_if_enabled`,
-  `SYNDICATE_NOVIG_CSV_SNAPSHOT_PROBE_ON_BOOT`) is DELETED, not kept
-  alongside -- the recurring pipeline's first cycle does strictly more than
-  that probe ever did. 10 new tests (`tests/test_novig_odds_cadence.py`):
-  cadence gating, unchanged-date short-circuit, failed-check backoff, a
-  last-good-snapshot survives one bad manifest read. `scripts/probe_novig.py
-  --refresh` is the manual trigger (force=True, no waiting for the clock).
-  Files: `pipeline/novig_odds_refresh.py` (NEW),
-  `tests/test_novig_odds_cadence.py` (NEW), `scripts/probe_novig.py`,
-  `scripts/probe_exchange_markets.py`, `scripts/run_refresh_worker.py`
-  (narrow claim, unchanged scope). **Not yet run in production** -- next
-  step is `SYNDICATE_NOVIG_ODDS_REFRESH_ON_BOOT=1` on refresh-worker and a
-  read of the first `[novig_odds] REFRESHED` line. **Still explicitly NOT
-  done: joining this artifact onto the actual board** -- that touches
-  heavily-claimed board files (`layer2_board.py` et al.) and needs a design
-  decision on how a closing-line (not live) price should be presented
-  alongside live odds; out of scope for what was asked this round.
-- **NOVIG'S ARTIFACT WRITE FIXED, TWO BUGS DEEP, 2026-08-24 19:38:48Z** (PRs
-  #37/#39; full readout `.syndicate/deploys.md` same timestamp). The pipeline
-  above ran in production for the first time and never actually persisted
-  `novig_markets.json` -- first `Object of type Decimal is not JSON
-  serializable` (Decimal fields from `normalize_market_row`, fixed with a
-  `_json_safe()` pass), then, the VERY NEXT cycle after that fix, `9128668
-  bytes exceeds 8388608` (`#60`'s keyvalue ceiling; fixed by trimming each
-  persisted row to 8 fields, dropping the per-row `date` and OHLC intraday
-  fields). Both confirmed fixed in the same post-redeploy cycle. **Structural
-  finding, not an engineering gap: Novig's public CSV is anonymized at the
-  game/player/team level** -- `reportTicker`/`contractSeries` name a category
-  only, `marketId`/`outcomeId` are opaque UUIDs, so this artifact CANNOT feed
-  a per-bet price resolver (`_venue_price_resolver()` in
-  `pipeline/portfolio_commit.py`, claimed by `portfolio-decision-and-
-  execution`) the way Kalshi's ticker or Polymarket's question text can. The
-  credentialed REST tier that could carry `description`/`league`/`eventId`
-  needs `NOVIG_CLIENT_ID`/`NOVIG_CLIENT_SECRET`, which this lane does not
-  have (see the NOVIG ORDER-AUTOMATION entry above).
-- **POLYMARKET US SPORTS API CLIENT BUILT 2026-08-24** (PR #41), from
-  Sports API/Sports (Legacy) API reference pages the user pasted verbatim --
-  `GET /v2/leagues/{slug}/events`, `GET /v2/sports/{slug}/events`, plus the
-  legacy `/v1/sports*` family. Built because the GLOBAL venue's catalogue
-  (`polymarket_client.py`, this lane's own file) came back `sporting=0` of
-  100 on its most recent live production pull -- the venue's general
-  `/markets` listing is not where its sports coverage lives, if it has any at
-  all; this is the endpoint family aimed specifically at that question.
-  `syndicate/features/shared/polymarket_us_sports_client.py` (NEW) reuses
-  `polymarket_us_auth.signed_request` (a file this lane does NOT own --
-  `polymarket_us_auth.py`/`polymarket_us_orders.py` belong to the concurrently
-  running Polymarket-order-automation session, branch `relaxed-knuth-38xts4`;
-  nothing there was edited, only imported read-only) and imports nothing from
-  `polymarket_us_orders.py` -- discovery must never gain order-placement
-  ability by accident of a shared import. `nfl`/`nba`/`mlb` league slugs are
-  the docs' own documented examples; `wnba`/`nhl`/`ncaaf`/`ncaab` are an
-  UNVERIFIED guess at the same pattern, marked as such in the mapping's own
-  comment; soccer deliberately absent (no documented slug, no single
-  Syndicate league key). `probe_league()`/`probe_all_leagues()` report the
-  SHAPE an event row actually has -- the endpoints are documented, the row
-  schema is not. Wired into `scripts/probe_exchange_markets.py`'s existing
-  boot-probe rotation (this lane's own file). 29 new tests.
-  **LIVE PROBE RUN, TWICE, RESOLVED 2026-08-24: BOTH DOCUMENTED SPORTS API
-  FAMILIES ARE DEAD ON THIS ACCOUNT.** First pass (`credentials_absent` --
-  `POLYMARKET_US_API_KEY_ID`/`PRIVATE_KEY` were not on refresh-worker) told
-  the user, who then set them. Second pass, all seven leagues: `http_404`
-  with an identical gRPC `{"code":5,...}` NOT_FOUND body -- a route absent
-  from this deployment, not a bad slug. The other session (Polymarket-order-
-  automation, `relaxed-knuth-38xts4`) independently hit the same wall on
-  `live-odds-worker` within the same minute and tested further
-  (`/v1/sports/teams/provider` also 404s; `/v1/markets` is the one route
-  that works and already carries every field a join needs). This lane
-  started building the identical next probe and found their more complete
-  commit first -- discarded the duplicate, kept only a docstring pointer to
-  their measurement in `polymarket_us_sports_client.py`'s header (PR #44).
-  Fourth reciprocal-deference trade with that session today. Probe flag
-  turned back off, deploy claim `b89496aa53797228` released, full readout
-  `.syndicate/deploys.md` 2026-08-24 20:17:59Z and 20:18:37Z entries.
-  **Consequence for the user's Kalshi-vs-Polymarket arb ask:** the dedicated
-  Sports API this module targets is not the path -- the other session's
-  `/v1/markets`-filtered approach is, and it is already building the join
-  needed for its own order automation. The arb comparison itself is not yet
-  built by anyone; it should be built once that join lands, not duplicated
-  from scratch here.
-- **KALSHI-VS-POLYMARKET ARB DETECTION BUILT 2026-08-24, user-authorized**
-  ("Yes, build the Kalshi-vs-Polymarket arb detection"). New module
-  `syndicate/features/shared/kalshi_polymarket_arb.py` (PR #47, extended PR
-  #50) -- detection only, cannot place an order on either venue. Scoped to
-  moneyline ONLY: `sportsMarketTypeV2` carried exactly one value across 2,000
-  real Polymarket rows (`SPORTS_MARKET_TYPE_MONEYLINE`), so spread/total is
-  currently unobservable on that venue, not merely unbuilt. Kalshi's own
-  event identity (`event_blob_from_ticker`/`match_event_blob` against
-  `read_layer2_shortlist` board rows) drives the join; the match itself
-  reuses `kalshi_board_join._side_for_team` -- **a real bug caught before
-  merge**: the first draft used `team_aliases.canonical_team` directly on
-  Polymarket's `outcomes`, which returns `None` for bare nicknames
-  ("Titans"), only resolving codes/full names. `_side_for_team`'s
-  token-subset fallback handles it; a test proves the join survives
-  Polymarket listing its two teams in the OPPOSITE order from Kalshi's
-  ticker blob. Every match reports `raw_edge` AND `edge_after_buffer` (after
-  `DEFAULT_FEE_BUFFER=0.04`, explicitly an unmeasured placeholder for BOTH
-  venues' combined costs, not either one's real schedule). 23 tests.
-  New files: `tests/test_kalshi_polymarket_arb.py` (NEW),
-  `scripts/probe_kalshi_polymarket_arb.py` (NEW). Narrow claim added:
-  `scripts/run_refresh_worker.py` -- one more small, additive, opt-in-only
-  boot hook (`SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT`).
-  **FIRST LIVE RUN found a real bug in THIS module, root-caused and fixed
-  same day (user: "look into the Kalshi discovery-timing question").**
-  `kalshi_moneylines_resolved=0` with `kalshi_refusals={}` -- not one Kalshi
-  market was even attempted, because `kalshi_catalogue.SERIES_SPORT` (the
-  hand registry `classify_market` checks first) has ZERO moneyline series;
-  the fallback `_DISCOVERED` dict is populated only by
-  `ensure_series_discovered()`/`run_kalshi_discovery()`, both normally
-  reached via `start_intelligence_state_background_loop()` -- which this
-  boot hook, in `run_refresh_worker.py`'s own linear `main()`, runs ~120
-  lines BEFORE. Fixed (PR #50): `run_arb_scan()` now calls
-  `ensure_series_discovered()` itself first (idempotent, never fatal),
-  surfacing `kalshi_discovery: ok/skipped/error` on the result so a future
-  zero-result run is diagnosable from the log line alone. **VERIFIED LIVE
-  2026-08-24T21:44:47Z**: `kalshi_discovery: 'ok'` now present where the
-  prior run had no such key at all -- direct before/after confirmation.
-  `kalshi_moneylines_resolved` is STILL 0, but now for a documented,
-  DIFFERENT reason (full readout `.syndicate/deploys.md` same timestamp):
-  the real, independent production Kalshi board-join
-  (`kalshi_odds_refresh.py`'s own `BOARD_JOIN`) is ALSO logging `matched=0`
-  on the same 831-market catalogue right now, `board_rows` having fallen
-  from 742 to 235 in under an hour -- current-state drift, not this
-  module's bug, and not chased further here (out of scope for what was
-  asked). `polymarket_moneylines_resolved=0` remains explained by the
-  earlier-known cause: this scan's Polymarket fetch is one page at offset
-  0, and the real game-market region starts far deeper in the id-ordered
-  catalogue (the other session's paging-strategy work, referenced above,
-  is what resolves this -- their latest commit reports the full 7,585-row
-  game slate reached with `truncated=False`; pointing this scan's fetch at
-  their now-stable range is the natural next step, not yet done). Probe
-  flag turned back off, redeploy confirmed live 21:51:37Z, deploy claim
-  (refresh-worker, token `5bde3ff6440857af`) released.
-- **POLYMARKET FETCH POINTED AT THE REAL OFFSET RANGE, 2026-08-24, user-
-  requested** ("point the arb scan's Polymarket fetch at the real offset
-  range" -- the "natural next step, not yet done" from the entry directly
-  above). `run_arb_scan()` switched from
-  `polymarket_us_markets.fetch_markets(open_only=True, drop_settled=True,
-  max_pages=1)` (one page at offset 0 -- structurally could only ever see
-  season-level futures/politics/culture, never a real game) to
-  `polymarket_us_markets.fetch_game_markets()` -- the other session's
-  boundary-locating (binary search, re-checked every call, never a
-  hardcoded offset since ids and the boundary both move daily) page-to-
-  exhaustion function. Full slate reachable in ~33 signed calls per the
-  same day's measurement (`games=7585 truncated=False`). Corrected two
-  now-stale claims in the module's own header while here: the "single page
-  at offset 0" description, and a "no spread/total exists on this venue"
-  claim that was actually a sampling artifact of only ever having read the
-  first 2,000 id-ordered (season-level) rows -- the venue carries all five
-  game types; this module still scopes to moneyline only because that is
-  what is built and tested, not because the data is missing. Tests updated
-  to monkeypatch `fetch_game_markets`; one new regression test asserts
-  `run_arb_scan` calls it (and fails loudly if it ever calls `fetch_markets`
-  directly again). 24/24 green (was 23). Files: `syndicate/features/shared/
-  kalshi_polymarket_arb.py`, `tests/test_kalshi_polymarket_arb.py`,
-  `scripts/probe_kalshi_polymarket_arb.py`.
-  **VERIFIED LIVE 2026-08-24T22:33:36Z, deploy `dep-da6cbd61egvs73b4bi50`:
-  `polymarket_moneylines_resolved` went 0 -> 687**, direct before/after
-  confirmation this fetch fix works in production (only 2 structural
-  refusals out of 689 rows seen). `matched_games` stayed 0 as predicted --
-  the board-starvation cause named below is unrelated to this fix and was
-  not touched by it. Probe flag off, redeploy confirmed live 22:38:02Z,
-  deploy claim (refresh-worker, token `ffcb3cbe7d79fad9`) released. Full
-  readout `.syndicate/deploys.md` same timestamp.
-- **THE END-TO-END GAP THIS SESSION FLAGGED CLOSED, SAME EVENING, BY THE
-  OWNING LANE -- not this session's work, recorded here because it directly
-  answers this lane's own "still missing" note above.**
-  `portfolio_commit.py::_venue_price_resolver` returning `(None, None)` for
-  every venue but Kalshi was named, in this session's `_polymarket_resolve_
-  market` docstring and PR #52, as the one piece needed before a Polymarket
-  order could reach the wired submitter end to end. Commit `04fd2c90`
-  ("Price the `paper:polymarket` book from Polymarket, not from the
-  aggregator") adds `_polymarket_price_resolver` and a new
-  `polymarket_board_join.py`, reading the SAME `polymarket_us_games.json`
-  artifact this lane's submitter reads; `polymarket_ticker_resolver`
-  returns the market's `slug` -- exactly what `venue_ticker` needs to be for
-  `_polymarket_resolve_market` to find it. Merged into this branch cleanly,
-  121 tests green. Not independently live-verified by this session -- that
-  lane's own claim and its own verification to run.
-- **KXMLBGAME ROOT CAUSE FOUND AND FIXED (PR #57), VERIFIED LIVE END TO END,
-  2026-08-25 -- SUPERSEDES this lane's own earlier "kalshi_moneylines_resolved=0
-  is correct, not a bug" conclusion, which was WRONG, disproven by the user
-  directly (a live kalshi.com screenshot of a real $6.7M-volume moneyline
-  market the scan said didn't exist).** Root cause: Kalshi's real series-level
-  title for `KXMLBGAME` is exactly `"Professional Baseball Game"` -- no
-  "moneyline"/"winner" word in it, so `market_keys._GAME_CORE` (missing an
-  entry for the bare word "game") never let `auto_game_series_from_catalogue()`
-  register the series at all. The market was never fetched into
-  `kalshi_markets.json`, not merely misclassified -- invisible upstream of
-  `classify_market` entirely. **Not MLB-specific**: the same live 13,445-series
-  catalogue read showed `"<Sport> Game"` is Kalshi's moneyline-series title
-  pattern for every sport this repo carries (NFL/NBA/NHL/NCAAF/MLS/NCAAB/...),
-  so the platform's single most valuable market type was silently unreachable
-  everywhere, not just baseball. Fix: one line, `"game": "h2h"` in
-  `syndicate/features/shared/market_keys.py`'s `_GAME_CORE`. New regression
-  test in `tests/test_kalshi_catalogue.py`. 269 targeted tests green.
-  **VERIFIED LIVE 2026-08-25T01:23:01Z**, deploy `dep-da6ek8gu01pc73fqf120`:
-  production's own `[kalshi_odds] TICK` fetched `KXMLBGAME` for the first time
-  ever (90 markets, sample title `'New York M wins'`), and `classify_market()`
-  confirmed locally now returns `grammar: 'moneyline'` for it where it refused
-  `unmapped_series` before the fix. Full chain fixed end to end: catalogue ->
-  discovery -> per-series fetch -> persisted artifact -> classify_market ->
-  moneyline grammar. Probe flag off, redeploy `dep-da6etfn10e5c73bfgu0g`
-  triggered 01:24:14Z, deploy claim (refresh-worker, token `bc8c0dd024576cec`)
-  to be released once confirmed live. Full readout `.syndicate/deploys.md`
-  same timestamp. **OWED**: a fresh arb-scan run's own
-  `kalshi_moneylines_resolved`/`matched_games` was not re-verified nonzero in
-  this session (the scan's last run predates the 01:23:01Z fetch tick) --
-  mechanism is proven at every hop, but the scan's own end-to-end number is
-  the next natural check for whoever picks this back up.
-- **POLYMARKET COVERAGE DEEP DIVE, 2026-08-25 -- NARROW CARVE-OUT TAKEN on
-  `polymarket_board_join.py` / `venue_quote_adapters.py` (owned in practice
-  by `portfolio-decision-and-execution`, session `9324a3e5` /
-  `session_01Sia2rPD72eFTriy28azzs2`, which authored every recent commit on
-  both files today but had not added them to its own Files: list).**
-  User asked for a deep dive into Polymarket US sports-odds coverage
-  including soccer. Findings, both from live production log evidence
-  (~14:00Z): (1) `market_type_not_a_game_line` refuses 5,810-6,612 of
-  ~12,200-12,900 markets every cycle, the largest refusal bucket by far --
-  `MARKET_TYPE_TO_BOARD` only maps MONEYLINE/SPREAD/TOTAL, so
-  `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` (a 3-way home/draw/away type --
-  soccer's moneyline shape, confirmed in `POLYMARKET_US_GAMES` catalogue
-  logs) is refused unconditionally, unlike PROP which is refused
-  deliberately/by design. (2) Both files key the league match on a literal
-  string compare (`sport.lower()` against the slug's own league token),
-  which works for mlb/nfl/nba/wnba by coincidence but not for soccer:
-  Syndicate stamps every soccer board row `sport="soccer"`
-  (`game_board_contract.py:1072`) while Polymarket lists soccer by
-  competition -- a production-refused sample carried league token `eflc`
-  (EFL Championship), and Syndicate's own soccer competition vocabulary
-  (epl/la_liga/bundesliga/serie_a/ligue_1/mls/eredivisie/primeira_liga/
-  championship/belgian_pro_league, `soccer/sources.py`) never equals the
-  literal string "soccer". Soccer is killed twice over, independent of the
-  separately-observed `board_rows=0` on every sampled `POLYMARKET_BOARD_JOIN`
-  line today (that one is the empty-board condition, not a coverage gap,
-  and stays with whoever owns that).
-  Attempted to message the owning session directly first
-  (`session_01Sia2rPD72eFTriy28azzs2`) -- not reachable as a live peer from
-  this session's tools at the time (`ListAgents` returned none), so the
-  proposal is recorded here per this file's own established fallback (see
-  the 2026-08-24 carve-out note above this one, same pattern: "that session
-  was messaged... offered no narrower mechanism than a whole-file release").
-  **Taken, scoped to exactly two changes, nothing else in either file
-  touched:** (a) map `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` -> `"h2h"` in
-  `MARKET_TYPE_TO_BOARD` and the matching dict in
-  `venue_quote_adapters._polymarket_sides`; (b) resolve soccer's join league
-  from Syndicate's `"soccer"` sport key to Polymarket's per-competition slug
-  tokens instead of a literal string match. None of today's join-date/
-  home-away/sport-filter logic touched. Reclaim by re-adding both paths to
-  that lane's Files: list whenever it wants them back, same as the prior
-  carve-out's own terms.
-- **CI PYTEST-BASELINE SCOPE, 2026-08-25.** User asked to fix all CI-baseline
-  failures and find a way to shorten the ~45-minute `pytest-baseline` job.
-  Fixed 6 real bugs (soccer date-scope x2, `live_lens_loop` watermark timing,
-  3 timezone-ambiguous `date.today()` sites -- all recorded above and in
-  their own commits). The remaining original 8 CI-flagged failures are
-  confirmed genuinely elusive: they do not reproduce standalone, in their own
-  file, or bundled with a dozen others -- only inside the full ~11,000-test
-  SERIAL run, meaning some earlier test pollutes shared state before they
-  run. Not chased further; would need a bisection across thousands of tests.
-  **Speedup measured and scoped, not applied:** `pytest-xdist -n auto
-  --dist=loadscope` cuts the suite from ~45min to ~12min (3.7x, same 4-core
-  sandbox GitHub's `ubuntu-latest` also provisions). An initial read that
-  parallelization surfaces ~15 NEW resource-contention failures was CHECKED
-  and found WRONG -- every one of those 15 reproduces standalone, serially,
-  with `-n auto` nowhere involved; 12 are already in `tests/pytest_baseline.json`
-  as pre-existing tracked debt. Full write-up, the corrected finding, and the
-  concrete adoption checklist (add `pytest-xdist`, wire `-n auto` into the
-  `pytest-baseline` job only, regenerate the baseline under the new
-  invocation, confirm on real CI):
-  `.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`. Nothing in
-  `.github/workflows/ci.yml` or `requirements-dev.txt` has been touched yet --
-  this is a proposal, not a shipped change.
-- **REAL-MONEY CAP UPDATE, 2026-08-25, user decision.** User set the actual
-  policy: bankroll $1000 (already `portfolio_settings.DEFAULT_BANKROLL_UNITS`,
-  a 2026-08-22 decision -- no code change needed there), Kalshi funded $50,
-  Polymarket funded $100, max order size $10 (was $25), 10 trades/day per
-  exchange (unchanged, already the default) or 15 combined across both (new --
-  no such cross-venue order-count cap existed before, only a dollar one).
-  **Narrow, undeclared touch to `execution_guard.py`** (not in this lane's own
-  Files: list above, nor itemized in `portfolio-decision-and-execution`'s
-  Files: bullets around line 1432 -- only named in that lane's prose grouped
-  with `kalshi_orders.py`/`execution_ledger.py`; `ListAgents` showed no
-  reachable session to hand this to). Changes: `max_order_dollars` default
-  $25→$10; new `_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE = {kalshi: 50, polymarket:
-  100}` (day-SPEND cap standing in for real funded balance -- this is NOT a
-  running capital-availability ledger, nothing here subtracts an open
-  position's stake from tomorrow's budget); new `max_day_orders_all_venues`
-  default 15 (mirrors the existing `max_day_dollars_all_venues` pattern,
-  deliberately less than 10+10=20 so a second venue can't silently double the
-  account's order budget); `max_day_dollars_all_venues`'s default now sums the
-  two per-venue numbers ($150) UNLESS the flat `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS`
-  env var is explicitly set, in which case that still wins (preserves
-  `test_execution_multi_venue.py`'s pre-existing "edit the flat cap, the
-  combined ceiling moves with it" invariant). `limits()` gained an optional
-  `venue` kwarg; `check_order()` and `pipeline/execute_portfolio.py`'s log
-  line both pass it through. Also touched: `tests/test_execution_guard.py`
-  (3 existing tests' hardcoded $25/$100 numbers fixed, 9 new tests added).
-  **427 passed** across `test_execution_guard.py`,
-  `test_execution_multi_venue.py`, `test_execution_ledger.py`,
-  `test_execute_portfolio.py`, `test_portfolio_live_page.py`,
-  `test_live_refresh_loop.py`. **NOT VERIFIED against production** -- no
-  Render env-var read tool exists and direct HTTP to the live web service is
-  blocked from this sandbox, so if production already has an env override set
-  for `SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS`/`_MAX_DAY_DOLLARS`/etc., that
-  override still wins over these new code defaults per existing precedence --
-  worth confirming/clearing on Render directly. `.py` only, no `render.yaml`
-  touched, so pushing this is free per `#284`.
-- **VERIFIED AGAINST PRODUCTION, same day.** Read `live-odds-worker`'s actual
-  logs (`mcp__Render__list_logs`, `[execute_portfolio] LIMITS`/`EXECUTION`
-  lines, as recent as 18:33:18Z) rather than guessing. Confirmed the above
-  concern was real: production had `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS=40`
-  (flat, identical for both venues) and `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES=80`
-  explicitly set -- the old "$40/day, survive-being-wrong" policy, not
-  $50/$100/$150. `max_order_dollars=10` and `max_day_orders=10` were already
-  correct. Opened PR #62 (`claude/exchange-market-apis-jr2lqy` -> `main`) for
-  the code side. Updated `live-odds-worker` env vars directly (merge, not
-  replace, so nothing else on the service was touched):
-  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI=50`,
-  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_POLYMARKET=100`,
-  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES=150` (was 80). Left the flat
-  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS=40` var in place deliberately -- the
-  per-venue override wins outright ahead of it in `limits()`'s own precedence,
-  so it is now inert for Kalshi/Polymarket specifically and touching it
-  further would be an unrequested, unverified extra write to a live
-  real-money service. Did not set `..._MAX_DAY_ORDERS_ALL_VENUES` -- no such
-  env var exists yet, so the code's new default of 15 applies once PR #62 is
-  merged and deployed with nothing to override it.
+### exchange-markets-api-integration — OPEN, GOAL COMPLETE, lane idle — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
+- Goal (DONE): read-only market/odds-pulling client modules for six
+  prediction/event-market venues (coinbase, prophetx, novig, polymarket,
+  robinhood, crypto.com "OG"). Full research findings, per-venue status, and
+  the Novig/ProphetX order-automation scoping work: `todo.md #544` (canonical)
+  and `lanes_history.md` (this lane's full narrative, moved 2026-08-25).
+- Files still claimed: `syndicate/features/shared/{coinbase,prophetx,novig,
+  polymarket,robinhood,cryptocom}_client.py`, matching `scripts/probe_*.py` and
+  `tests/test_*_client.py`, `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`,
+  `scripts/probe_exchange_markets.py`. **NARROW claim only** on
+  `scripts/run_refresh_worker.py` (one small, additive, opt-in-only boot-probe
+  hook).
+- **Status: nothing outstanding for this lane.** `#544`'s stated NEXT phase
+  (order automation for whichever of polymarket/novig/prophetx clears
+  legal/ToS review) is externally resolved: Polymarket order automation
+  shipped via a sibling session; Novig buy-side automation is OFF by explicit
+  user decision (2026-08-24); ProphetX is blocked on a partner credential with
+  no self-serve path. Checked against `todo.md` on 2026-08-25 — unchanged,
+  still the same answer.
+- **2026-08-25 follow-up work, same conversation, not this lane's original
+  scope:** real-money execution-cap change (bankroll $1000 unchanged, Kalshi
+  $50/day, Polymarket $100/day, $10 max order, 15 combined orders/day) — PR #62
+  merged, `live-odds-worker` + `web` redeployed, `live-odds-worker` env vars
+  fixed to match (was drifted to a flat $40/day for both venues), **verified
+  live in production 2026-08-25T19:35Z**. PR #63 (deploys.md record) merged.
+  Both feature branches (`claude/exchange-market-apis-jr2lqy`,
+  `claude/record-deploys-2026-08-25`) deleted post-merge — deletion itself had
+  to be done by the user; this session's git/API credentials are blocked from
+  ref-deletion (confirmed via both `git push --delete` and a direct GitHub API
+  `DELETE`, both 403). One confirming comment posted on PR #61 (a different
+  session's work) as one of two named owners of `run_refresh_worker.py`; the
+  other named owner's session (`portfolio-ledger-service-split`, `74a0966a`)
+  was archived before that PR opened and could not respond. User merged PR #61
+  directly. Full narrative, evidence, and what's believed-not-verified:
+  `.syndicate/log/2026-08-25.md`; deploy measurements: `.syndicate/deploys.md`.
+- Blocked by: none. All deploy claims released (`deploy_claim.py status`: all
+  four services free).
 
 ### ncaaf-oddsapi-game-lines — OPEN — opened 2026-08-25 — session 50ae96b2-cc59-54dc-83e9-1cac12d4c623
 - Goal: NCAAF game cards carry a real book line. `markets` non-null goes from
@@ -2377,6 +1900,170 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     `mocked_popen.assert_not_called()` sites that assert about the whole PROCESS
     (green on Windows, red on Linux via `ldconfig`).
 
+### polymarket-oddsapi-coverage-audit — OPEN — opened 2026-08-25 — session 0fd6da62-c2cc-543e-b5ea-47d428412dc0
+- Goal: a per-sport, per-market-family map of what Polymarket US LISTS versus
+  what Syndicate RESOLVES versus what the board CARRIES versus what OddsAPI
+  SUPPLIES, every row observed in a production log line with its timestamp, so
+  the user can hand back direct Polymarket links for the gaps instead of
+  closing coverage one market at a time.
+- Files: `docs/ai_context/polymarket_oddsapi_coverage_audit.md` (NEW),
+  `scripts/audit_polymarket_coverage.py` (NEW), this block.
+  **READ-ONLY AUDIT.** No execution, pricing or order-submission code touched;
+  no `render.yaml`; no deploy. The script is a read-only analyser over
+  artifacts already on the worker and is not wired into any loop.
+  **Added 2026-08-25 for the boot hook (PR after #65), user decision "hand off
+  to next deploy":** `scripts/run_live_odds_refresh_worker.py` and
+  `tests/test_polymarket_spread_audit_hook.py` (NEW).
+  Nothing else is claimed by this lane.
+- **NO CARVE-OUT WAS NEEDED and none was taken** -- checked, not assumed. The
+  live-odds worker entrypoint is held by NO open lane:
+  `wnba-live-odds-capture-gap` lists it explicitly as "Not claimed, read-only
+  reference". `ListAgents` also returned no reachable peer, the same condition
+  `exchange-markets-api-integration` recorded for its two carve-outs, but it
+  did not arise here.
+- **The REFRESH worker's entrypoint was deliberately NOT used**, even though it
+  is where the two `*_PROBE_ON_BOOT` hooks this one mirrors already live. It is
+  the repo's one contested file (held by `exchange-markets-api-integration` and
+  `portfolio-ledger-service-split` -- a pre-existing `check_lane_invariants.py`
+  FAIL, reproduced against `origin/main` with my change reverted, so it is not
+  mine), and adding a third toucher makes a known problem worse. **Its path is
+  deliberately not written in backticks anywhere in a `- Files:` block on this
+  lane:** the checker's own `[hint]` says a backticked path inside that block
+  becomes a CLAIM, and an earlier draft of this very sentence made this lane a
+  third holder of that contested file -- the note explaining the avoidance
+  caused the thing it described.
+- Collision check: `exchange-markets-api-integration` (session 71a74bb7) and
+  `portfolio-decision-and-execution` (session 9324a3e5) hold every Polymarket
+  `.py` module between them. Neither path above is claimed by any OPEN lane,
+  and this lane claims none of their files. The sibling Kalshi audit's
+  `docs/ai_context/kalshi_oddsapi_coverage_audit.md` is NOT claimed here and
+  was not touched.
+- Hypothesis (stated before testing): the four absences in `VENUE_REPRICE_KEYS`
+  have four DIFFERENT causes, not one — spreads are a refusal we chose, props
+  are a refusal we chose, soccer/ncaaf are a league-vocabulary miss, and
+  nhl/ncaab are an empty board rather than an empty venue.
+- Falsification test: any absence turning out to be "Polymarket does not list
+  it" would falsify the hypothesis for that row. Measured result: NONE of the
+  eight sports' absences is a venue absence — every one is ours. Recorded per
+  row in the doc.
+- Verification: every table cell carries a production log line and a UTC
+  timestamp, or it sits in the SUSPECTED, UNCONFIRMED section. Rows whose
+  evidence is code-read rather than production-read are labelled as such.
+- Blocked by: none.
+- **DELIVERED 2026-08-25 ~20:4xZ. `docs/ai_context/polymarket_oddsapi_coverage_audit.md`,
+  every cell carrying a production log line and a UTC timestamp. HYPOTHESIS HELD:
+  none of the eight sports' gaps is a venue absence. Headline findings:**
+  1. **THE CATALOGUE READ IS TRUNCATED AND WAS NOT BEFORE.** `POLYMARKET_US_GAMES
+     rows=15000 pages=30 truncated=True` (19:28:40Z) -- `rows` now EQUALS the
+     30x500 budget. `exchange_capture_deep_dive.md` §2.4's "the slate is not
+     being truncated" is SUPERSEDED. Consequence: every zero in this audit is an
+     upper bound, and NBA/NHL/NCAAB absences are NOT established -- the fetched
+     block spans game starts 2026-08-21..2026-09-20 and all three seasons start
+     outside it.
+  2. **57% OF THE BOOK IS DROPPED BEFORE CAPTURE.** `POLYMARKET_DAILY_BOOK
+     skipped=7545` of 13,233 (`5688 + 7545 = 13233`, reconciles exactly), at
+     `in_scope_sports()`. Of those 7,545, **1,038 are in leagues whose codes are
+     never printed** -- `record_venue_book` truncates `skipped_by_sport[:20]`
+     and the twenty printed sum to 6,507.
+  3. **SOCCER LEAGUE MAPPING READ FROM DATA, six of ten confirmed BY THE CLUBS IN
+     A VERBATIM SLUG, not by token resemblance:** `lal`->la_liga (960,
+     `astatc-lal-ala-vil-2026-08-28-btts`), `epl`->epl (790, `…-cry-mnc-…`),
+     `lg1`->ligue_1 (711, `…-lil-psg-…`), `sea`->serie_a (448, `…-mil-ven-…`),
+     `bun`->bundesliga (393, `…-fcb-stu-…`), `eflc`->championship (198,
+     `astatc-eflc-car-nor-2026-08-25-btts`). Out-of-ten tokens also confirmed:
+     `lgscup`, `uecl`, `ucl`, `arg2`, `uslc`. `mls`/`eredivisie`/`primeira_liga`/
+     `belgian_pro_league` are absent FROM THE READING, not from the venue -- they
+     sit in the 1,038 below the print cap. **The codes are supplied; the
+     `SYNDICATE_VENUE_ODDS_SPORTS` change is a production change and was NOT
+     taken.**
+  4. **NCAAF IS LISTED AS `cfb`, 246 markets on 2026-08-25, and is 100% lost by
+     name.** Same class as soccer, in a sport nobody had looked for it in --
+     and with no club-alias rescue, because `cfb` is not a soccer token.
+  5. **SPREADS: two of the three facts are now CONFIRMED, 5 rows of 5.** The
+     slug's `pos`/`neg` token labels `outcomes[0]` (`asc-eflc-car-nor-2026-08-25-`
+     `neg-2pt5` -> `["-2.50","+2.50"]`, `…-neg-1pt5`, `…-pos-1pt5`, `…-pos-2pt5`,
+     `asc-nfl-pit-buf-2026-08-27-1h-neg-4pt5`), and each fixture's ladder is
+     symmetric about zero (`chc-az @ ±1.5, ±2.5`), so the sign belongs to ONE
+     reference club per game. **Control in the same log line: the TOTALS rows for
+     that same fixture are `["Under","Over"]` at 1.5 and `["Over","Under"]` at
+     2.5/3.5 -- array position really is unstable while the sign token is not.**
+     STILL UNCONFIRMED and deliberately not guessed: whether the reference club
+     is the slug's `<home>` or `<away>`. **CONFLICT FLAGGED:** `venue_quote_
+     adapters`' docstring records "1 of 5 spread rows would have been priced on
+     the opposite handicap"; those five are not reproduced in any log line found
+     here and the two measurements must be reconciled before anything ships.
+     `scripts/audit_polymarket_coverage.py --spreads` implements the offline
+     test that settles it (Polymarket ladder sign vs the board's own signed home
+     spread, one vote per fixture, bimodal answer, refuses below n=30).
+  6. **A FIFTH BUG CLASS, found here: the join cannot resolve Polymarket's own
+     tri-codes.** Code-read at HEAD `a41f8e2d`: `teams_match("mlb","chc","Chicago
+     Cubs")`, `("mlb","az",...)`, `("mlb","stl",...)` and `("wnba","phx",...)` all
+     return **False** (17/20 MLB, 6/7 WNBA, **15/15 NFL** resolve). Production
+     offered `chc-az` as a spreads AND totals candidate at 20:16:08Z and the
+     board row still read `no_match`, **at the same tick the re-pricer offered
+     `mlb|h2h|chicago cubs` and `mlb|h2h|arizona diamondbacks`** -- because
+     `_polymarket_sides` resolves the OUTCOME NAME while `_teams_match` resolves
+     the SLUG CODE. The same club is resolvable and unresolvable at once. Same
+     shape as the `min`/`ath` collision already in `_effective_league`'s comment.
+     NOT FIXED -- `team_aliases.py` is another lane's file and was edited today.
+  7. **The `question` field is dropped by `_SLATE_STORAGE_FIELDS`**, so
+     `out_of_scope_samples` -- whose own comment says "the question is what names
+     the bet" -- is structurally blind: every sample observed today carries
+     `'question': ''`.
+  8. **The Polymarket daily book has recorded ZERO price points all day**
+     (`opened=0 appended=0` on six consecutive byte-identical cycles; Kalshi's
+     equivalent appended 663-1245 over the same window).
+  9. **Two live incidents recorded, neither chased (other lanes' files):**
+     `POLYMARKET_US_GAMES status=error reason=no_game_offset: ok` at 20:21:29Z
+     (whole-slate outage; `start_offset` had been climbing 11,554 -> 12,142 over
+     three hours), and `POLYMARKET_US_SLATE status=skipped
+     reason=sports_routes_404_on_this_host` -- `/v1/markets` is the only working
+     discovery path.
+  10. **REVERSE DIRECTION, stated with its limit.** At the RE-PRICE layer OddsAPI
+     contributed **0 quotes** for mlb (`no_side_in_key:3449`), wnba
+     (`no_side_in_key:99`, age 4.4h) and nfl (`no_odds_history_shard…`) while
+     Polymarket offered 194/112/1376 and won 786 of 892 selections. Soccer is the
+     only sport where OddsAPI is doing re-price work (44 quotes, and it is
+     genuinely fresher: 128s vs 1916s). **But OddsAPI is what CREATES board rows
+     and Polymarket resolves no player props at all**, so this supports cutting
+     OddsAPI GAME-LINE price pulls for mlb/wnba/nfl and nothing else -- and it is
+     one tick, not a day.
+  **Nothing deployed, no `render.yaml`, no execution/pricing/order code touched.**
+  Twelve gaps are tabulated with verbatim slugs; the browsable Polymarket US
+  market URL is UNOBSERVED and deliberately not constructed -- one link from the
+  user confirms it and unlocks the rest of the gap table.
+- **THE SPREAD TEST CANNOT BE RUN FROM A SESSION SANDBOX, established 2026-08-25
+  ~21:0xZ, and the hook that makes it runnable is now shipped OFF.** Four paths
+  were checked, not assumed: (a) the script is on a PR branch, workers run
+  `main` with `autoDeploy=no`; (b) nothing invoked it -- `grep` for
+  `audit_polymarket_coverage` outside its own file returned zero hits; (c) SSH
+  is unavailable -- no key on the account (only an empty
+  `commit_signing_key.pub`) and TCP 22 to `ssh.oregon.render.com` is blocked;
+  (d) the inputs cannot be pulled here either -- `/api/ops/artifacts/export`
+  403s at the agent proxy and `mcp__Render__get_key_value` returns instance
+  METADATA only, never contents. **A separate sidecar service was the best idea
+  and it also fails:** both inputs ARE in the shared keyvalue (that is the whole
+  point of `refresh_state_store`), but `SYNDICATE_REFRESH_STATE_URL` comes from
+  `fromService` -- blueprint-only -- and the instance has `ipAllowList: []`, so
+  giving a new service that URL means pushing `render.yaml`, which fires
+  `blueprint_sync` across all three live services (`#284`). **User decision
+  (asked, not assumed): hand off to the next deploy.** The hook is
+  `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT`, absent = OFF, additive,
+  try/except-wrapped, read-only, placed AFTER `_polymarket_us_slate_refresh_tick()`
+  so it reads the current cycle's book rather than the previous one. 12 new
+  tests assert BOTH directions (`off != on`), that it refuses BY NAME rather
+  than with a zero, that it cannot raise into the boot loop, that one fixture
+  casts one vote regardless of ladder depth, and that an `away` board row is
+  normalised before comparing. **205 tests green** across
+  `test_live_odds_refresh_worker.py`, `test_live_odds_worker_execution.py`,
+  `test_polymarket_{board_join,us_markets,side_vocabulary,slate_freshness,
+  join_date,resolver_wrong_game}.py` and the new file.
+  **STILL OWED, and doc SS5.3 stays UNCONFIRMED until it lands:** set
+  `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` on `live-odds-worker` at the
+  next deploy of that service, read one `SPREAD_SIGN_AUDIT` line, unset the
+  flag. The reading is bimodal -- `rate` ~1.0 means the reference club is the
+  slug's `<home>`, ~0.0 means `<away>`, **anything between FALSIFIES the
+  symmetric-ladder finding and spreads must stay refused.**
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

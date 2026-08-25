@@ -4258,8 +4258,14 @@ def main() -> int:
                 from syndicate.features.shared.kalshi_catalogue import unmapped_series
                 from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
 
+                from pipeline.kalshi_odds_refresh import markets_from_state
+
                 _kalshi_payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
-                _kalshi_markets_diag = (_kalshi_payload or {}).get("markets") or []
+                # Through the merge helper -- `markets` is no longer a persisted
+                # top-level key. A DIAGNOSTIC reading zero is worse than no
+                # diagnostic: it reports "Kalshi lists nothing we cannot map",
+                # which is the conclusion this line exists to test.
+                _kalshi_markets_diag = markets_from_state(_kalshi_payload)
                 _unmapped = unmapped_series(_kalshi_markets_diag)
                 print(
                     f"[kalshi_polymarket_arb] UNMAPPED_DIAG total_markets={len(_kalshi_markets_diag)}"

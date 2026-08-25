@@ -1178,9 +1178,37 @@ def verify_order_paths(
             market = str(getattr(request, "market", "") or "")
             try:
                 if venue == "polymarket":
+                    # NO TICKER AND UNRESOLVABLE ARE DIFFERENT FAILURES, and
+                    # folding them together cost a real order's diagnosis.
+                    #
+                    # Kalshi has had a distinct `no_venue_ticker` verdict all
+                    # along; Polymarket's was counted as `market_unresolved`,
+                    # which says "we found the market and could not price it"
+                    # about a position that never had a market identified at
+                    # all. Measured 2026-08-25 4:36:05 PM Central, an h2h on
+                    # Cleveland @ LA Angels rejected with
+                    # `market_unresolved_for_position` while the resolver's own
+                    # log line said `POLYMARKET_NO_SLUG ... (type=NoneType)`.
+                    # The two point at different fixes: one is the board join
+                    # not stamping a slug, the other is the slate or the price.
+                    #
+                    # AND IT CARRIED NO DETAIL. `note()` takes one and this
+                    # passed none, so `examples` held nothing for the single
+                    # most common Polymarket failure -- a counter naming a
+                    # problem while withholding its data, which is the shape
+                    # this verifier exists to eliminate.
+                    ticker = _venue_ticker_of(position)
+                    if not ticker:
+                        note(
+                            market,
+                            "no_venue_ticker",
+                            f"{position.get('event_id') or '?'}"
+                            f" {position.get('side') or '?'} {position.get('line')}",
+                        )
+                        continue
                     resolved = _polymarket_resolve_market(request)
                     if not resolved:
-                        note(market, "market_unresolved")
+                        note(market, "market_unresolved", str(ticker))
                         continue
                     slug, price, tick, min_qty, index = resolved
                     from syndicate.features.shared.polymarket_us_orders import order_body

@@ -6087,3 +6087,60 @@ above is about what to DO with the results it produces, not about deleting
 or reverting the mechanism. A PR's mergeability (conflicts, human review
 threads) is still worth watching; only the CI-check dimension of "drive to
 green" stops applying here.
+
+### 2026-08-25 — FORBIDDEN: report a real-money code-default change as "done" without reading the live service's actual env vars. A contradicting override wins silently
+
+- What we believed: changing `execution_guard.py`'s code defaults (bankroll,
+  per-venue day-dollar caps, max order size, order-count caps) to match the
+  user's stated real policy, plus 427 passing tests, was the fix. Reported it
+  as complete.
+- What was actually true: `live-odds-worker` already had explicit env-var
+  overrides (`SYNDICATE_EXECUTION_MAX_DAY_DOLLARS=40` flat for both venues,
+  `_ALL_VENUES=80`) that outrank ANY new code default under this file's own
+  env>default precedence. The service was still running the OLD "$40/day,
+  survive-being-wrong" policy after the code change merged — the new defaults
+  were completely inert for the two live venues.
+- How we found out: the user asked "these were set as environment variables —
+  are you sure this is set correctly now?" instead of accepting the report.
+  Read `live-odds-worker`'s actual production logs
+  (`[execute_portfolio] LIMITS ... caps={...}`) via the Render MCP server and
+  found the drift directly, before/after.
+- The rule going forward: **a code-default change to a file whose whole design
+  is "env var wins over default" is not verified by the diff or the test
+  suite — it is verified by reading the live service's actual resolved
+  values.** For Syndicate specifically: `mcp__Render__list_logs` on the
+  relevant service, filtered to the module's own log line, is the read; there
+  is no env-var-listing tool, so log lines that print the resolved config
+  (this file's `LIMITS`/`EXECUTION` lines) are the only way to see what a
+  service is actually running without one.
+- Cost: none — caught before any real order was placed under the wrong caps,
+  and only because the user asked rather than accepted the report.
+
+### 2026-08-25 — FORBIDDEN: rename a lane's header status away from the literal word "OPEN" without checking what that silently releases
+
+- What we believed: rewording a lane's header from `OPEN` to a descriptive
+  status like `GOAL COMPLETE, lane idle` was a harmless, purely cosmetic
+  checkpoint edit — the lane's Files: claims were untouched text, so surely
+  the claims themselves were untouched too.
+- What was actually true: `check_lane_invariants.py` (and, by the same
+  `OPEN_RE = re.compile(r"\bOPEN\b")` pattern, several sibling scripts —
+  `archive_released_lanes.py`, `audit_lane_unguarding.py`,
+  `hoist_open_lanes.py`) recognize a lane's claims as live ONLY if the literal
+  word `OPEN` appears in its header. Dropping that one word silently voided
+  EVERY claim the lane held — not just the one file being reconsidered, but
+  six unrelated, still-legitimately-owned modules in the same block.
+  `trim_lane_blocks.py` then read the now-claim-free block as eligible to
+  leave `lanes.md` entirely, compounding it.
+- How we found out: ran `check_lane_invariants.py` after the rewording as a
+  sanity check (not required, done out of caution) and saw the OPEN-lane
+  count drop by one and the claim count drop by dozens — traced to the
+  regex, not to any Files: line actually being edited.
+- The rule going forward: **a lane's header keeps the literal word `OPEN` for
+  as long as it holds ANY claim it intends to keep enforced**, however done
+  or idle the work described in the body is. To retire a specific claim while
+  the lane stays open, strike through that one file with an explicit release
+  note (the convention already used elsewhere in this file) — never rename
+  the whole lane out of `OPEN` as a shortcut. Only drop `OPEN` once every
+  claim is explicitly released one at a time.
+- Cost: none — caught by running the invariant checker before committing,
+  not after.

@@ -279,7 +279,26 @@ def _venue_price_resolver(venue: str, selected_date: str | None = None):
         return (None, None)
     try:
         payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
-        markets = (payload or {}).get("markets") or []
+        # THROUGH THE MERGE HELPER, never `payload["markets"]`. That key is no
+        # longer persisted -- the markets live under `series[<ticker>]["markets"]`
+        # since the artifact was split to fit the store's 8MB ceiling.
+        #
+        # THIS READER FAILED WORSE THAN THE OTHER TWO, because it did not
+        # error. `.get("markets") or []` became `[]`, which returns
+        # `(None, None)` -- the value that means "this venue has no direct
+        # feed", indistinguishable from Novig, which genuinely has none.
+        # Measured 2026-08-25 3:55:49 PM Central:
+        #
+        #   PAPER2_PLAN_WRITTEN venue=kalshi rows_in=86 positions=0
+        #     venue_priced=0 sim_view_on=84/86
+        #
+        # ...while the fan-in was simultaneously producing 2,344 Kalshi quotes
+        # and winning 1,852 selections. Kalshi silently priced from the
+        # aggregator instead of its own book, so no Kalshi position was ever
+        # committed and `ORDER_PATH venue=kalshi` read `no_positions`.
+        from pipeline.kalshi_odds_refresh import markets_from_state
+
+        markets = markets_from_state(payload)
         if not markets:
             return (None, None)
         return _resolvers_from_markets(markets)
