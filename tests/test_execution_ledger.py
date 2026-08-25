@@ -1345,3 +1345,51 @@ def test_a_whole_contract_kalshi_fill_is_unchanged(monkeypatch):
     )
     mod.reconcile_live_orders()
     assert mod.find_order(key)["fill_stake_dollars"] == pytest.approx(1.50, abs=0.01)
+
+
+def test_price_improvement_is_not_an_implausible_fill(monkeypatch, tmp_path):
+    """A BETTER FILL PRICE BUYS MORE CONTRACTS, and this refused it.
+
+    Measured 2026-08-25 6:50:34 PM Central, and it halted ALL trading on BOTH
+    venues:
+
+        RECONCILE_COUNT_IMPLAUSIBLE venue_count=5.82 requested=5.221
+        BLOCKED_ON_UNRECONCILED count=1
+        EXECUTION status=blocked reason=unreconciled_orders   (both venues)
+
+    `over 6.5 TB@DET`, +127, $2.30. +127 is 0.4405, so the stake sized 5.221
+    contracts; the venue filled at 0.395 and $2.30 / 0.395 = 5.82. Every number
+    was correct and the order was refused for being CHEAPER than planned --
+    then one unreconciled row blocked the whole placer.
+
+    The invariant is DOLLARS, not contracts: a fill cannot cost more than the
+    order was sized for.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    stake, fill_price, venue_count = 2.30, 0.395, 5.82
+    assert venue_count * fill_price <= stake * mod._FILL_DOLLAR_TOLERANCE
+    # ...and the contract bound, which is what refused it, does NOT hold.
+    assert venue_count > stake / (100.0 / (127.0 + 100.0))
+
+
+def test_a_fixed_point_scale_error_is_STILL_refused():
+    """The bound the guard exists for. `fill_count_fp` carries an undocumented
+    `_fp` suffix; if it is a fixed-point scale, a 5.82-contract fill arrives as
+    5820 and booking it claims a position three orders of magnitude past
+    anything the stake could buy. The dollar bound catches that by 800x, which
+    is the margin this guard actually needs -- not 5%."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    stake, fill_price = 2.30, 0.395
+    assert 5820 * fill_price > stake * mod._FILL_DOLLAR_TOLERANCE
+    assert 58200 * fill_price > stake * mod._FILL_DOLLAR_TOLERANCE
+
+
+def test_the_tolerance_is_wide_enough_for_fees_and_narrow_enough_to_bound():
+    """Fees and rounding ride along in the venue's own numbers, so a bound at
+    exactly the stake would refuse real fills; a bound at 100x would catch
+    nothing. 1.25 sits where neither is true."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    assert 1.05 < mod._FILL_DOLLAR_TOLERANCE < 2.0

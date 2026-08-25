@@ -726,6 +726,13 @@ def _venue_reader(venue: str):
     return None, None
 
 
+# How far past the requested stake a fill may land before it is refused as a
+# parse error. Generous on purpose: fees and rounding ride along in the venue's
+# numbers, and the failure this bound exists to catch is a fixed-point scale
+# error -- off by 100x or 1000x, never by 5%.
+_FILL_DOLLAR_TOLERANCE = 1.25
+
+
 def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[str, Any]:
     """Correct the live ledger from what the VENUE says, not from what we sent.
 
@@ -862,24 +869,59 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         if venue_state == "filled":
             contracts = seen.get("filled_count")
 
-            # A FILL CANNOT BE LARGER THAN THE ORDER. `fill_count_fp` carries
-            # an undocumented `_fp` suffix -- if it turns out to be a
-            # fixed-point scale rather than a plain count, a 2-contract fill
-            # arrives as some large number and booking it claims a position
-            # orders of magnitude beyond anything the stake could buy.
+            # A FILL CANNOT BE LARGER THAN THE ORDER -- IN DOLLARS. `fill_count_fp`
+            # carries an undocumented `_fp` suffix, and if that is a fixed-point
+            # scale rather than a plain count, a 2-contract fill arrives as some
+            # large number and booking it claims a position orders of magnitude
+            # beyond anything the stake could buy. The guard against that is
+            # worth keeping.
             #
-            # This invariant holds whatever `_fp` means, and is worth keeping
-            # once it is known: no venue can fill more than was asked for, so a
-            # count that exceeds the request is a PARSE failure, never a trade.
-            # Refused by name and left untouched, in the same spirit as
-            # `unknown` -- a number we cannot believe must not become a
-            # position, and must not silently become zero either.
+            # BUT IT WAS BOUNDED IN CONTRACTS, AND CONTRACTS ARE NOT THE
+            # INVARIANT. A better fill price buys MORE contracts for the same
+            # money, which is price improvement -- the good outcome -- and this
+            # read it as a parse failure. Measured 2026-08-25 6:50:34 PM
+            # Central, and it halted all trading on BOTH venues:
+            #
+            #   RECONCILE_COUNT_IMPLAUSIBLE venue_count=5.82 requested=5.221
+            #   BLOCKED_ON_UNRECONCILED count=1
+            #   EXECUTION status=blocked reason=unreconciled_orders  (x2 venues)
+            #
+            # `over 6.5 TB@DET`, +127, $2.30. +127 is 0.4405, so $2.30 sized
+            # 5.221 contracts. The venue filled at 0.395 -- $2.30 / 0.395 = 5.82.
+            # Every number is correct and the order was refused for being
+            # cheaper than planned.
+            #
+            # The DOLLAR bound catches the `_fp` scale error just as well (a
+            # fixed-point count times any sane price blows past the stake by
+            # orders of magnitude) without punishing a good fill. Tolerance is
+            # generous because fees and rounding ride along; the failure this
+            # guards against is 100x, not 2%.
             requested_contracts = _requested_contracts(order)
-            if (
-                contracts is not None
-                and requested_contracts is not None
-                and contracts > requested_contracts
-            ):
+            fill_price = _price_as_probability(seen.get("fill_price"))
+            filled_dollars = (
+                None if (contracts is None or fill_price is None)
+                else float(contracts) * float(fill_price)
+            )
+            stake_ceiling = None
+            try:
+                stake = float(order.get("requested_stake_dollars") or 0.0)
+                if stake > 0:
+                    stake_ceiling = stake * _FILL_DOLLAR_TOLERANCE
+            except (TypeError, ValueError):
+                stake_ceiling = None
+
+            if filled_dollars is not None and stake_ceiling is not None:
+                # The dollar bound, which is the real invariant.
+                implausible_count = filled_dollars > stake_ceiling
+            else:
+                # No readable fill price: fall back to the contract bound rather
+                # than to no bound at all.
+                implausible_count = (
+                    contracts is not None
+                    and requested_contracts is not None
+                    and contracts > requested_contracts
+                )
+            if implausible_count:
                 implausible += 1
                 print(
                     f"[execution_ledger] RECONCILE_COUNT_IMPLAUSIBLE key={key}"
