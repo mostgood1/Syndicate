@@ -644,6 +644,9 @@ def run_portfolio_commit(
                 selected_date=normalized,
                 settings=resolve_settings(),
                 settled_sample_size_by_sport=settled_sample_size_by_sport,
+                # A row this venue cannot PLACE must not hold one of its
+                # `max_positions` slots. See the cut in `commit_portfolio`.
+                prefer_placeable=True,
             )
             venue_plan["venue"] = venue
             venue_plan["venue_scope_refusals"] = scope_refusals
@@ -664,6 +667,14 @@ def run_portfolio_commit(
                 # aggregator -- the difference between a real coverage number
                 # and OddsAPI's view of one.
                 f"venue_priced={sum(1 for r in scoped if r.get('price_source') == 'venue_feed')} "
+                # HOW MANY PLACEABLE ROWS THE POSITION CAP COST, which is the
+                # number that says whether `max_positions` is the binding
+                # constraint on this venue actually trading. A cut that reports
+                # only a total cannot distinguish "we ran out of slots for bets
+                # we could make" from "we ran out of slots for bets we could
+                # not".
+                f"placeable_committed={sum(1 for p in (venue_plan.get('positions') or []) if p.get('price_source') == 'venue_feed')}"
+                f"/{venue_totals.get('positions')} "
                 # Side by side on ONE line, because the comparison IS the
                 # deliverable and reading it off two lines invites pairing the
                 # wrong two runs.
