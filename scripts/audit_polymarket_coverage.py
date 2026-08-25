@@ -178,6 +178,7 @@ def spread_sign_test(
     """
     from syndicate.features.shared.polymarket_board_join import (
         _effective_league,
+        _has_segment,
         _line_from_modifiers,
         parse_slug,
     )
@@ -235,6 +236,7 @@ def spread_sign_test(
 
     agree = disagree = 0
     unmatched_fixtures = 0
+    segment_slugs = 0
     seen_fixture: set[tuple] = set()
     disagreements: list[dict[str, Any]] = []
 
@@ -243,6 +245,31 @@ def spread_sign_test(
             continue
         parsed = parse_slug(row.get("slug"))
         if parsed is None:
+            continue
+        # A FIRST-FIVE-INNINGS SPREAD IS NOT A GAME SPREAD.
+        #
+        # MEASURED IN PRODUCTION 2026-08-25T22:01:52Z, the first run that
+        # produced any votes at all: `fixtures=7 agree_home=2 disagree=5
+        # rate=0.2857` -- and **all five disagreements carried `-f5-`**:
+        #
+        #   asc-mlb-cle-laa-2026-08-25-f5-neg-1pt5   board_home_line=+1.5
+        #   asc-mlb-chc-az-2026-08-25-f5-neg-1pt5    board_home_line=+1.5
+        #   asc-mlb-min-ath-2026-08-25-f5-neg-1pt5   board_home_line=+1.0
+        #   asc-mlb-phi-sea-2026-08-25-f5-neg-1pt5   board_home_line=+1.5
+        #   asc-mlb-cin-sf-2026-08-25-f5-neg-1pt5    board_home_line=+1.0
+        #
+        # The board's spread is the FULL GAME; `f5` is the first five innings.
+        # Their signs need not agree and comparing them measures nothing. Both
+        # `join_polymarket_to_board` and `venue_quote_adapters._polymarket_sides`
+        # already refuse segment rows for exactly this reason; this test did
+        # not, so a rate of 0.2857 looked like evidence against the
+        # symmetric-ladder finding when it was an artefact of the instrument.
+        #
+        # IT COMPOUNDED with the one-vote rule below: `seen_fixture` is set on
+        # the FIRST match, so an `f5` slug appearing earlier in the slate stole
+        # the fixture's only vote from the full-game slug behind it.
+        if _has_segment(parsed["modifiers"]):
+            segment_slugs += 1
             continue
         slug_line = _line_from_modifiers(parsed["modifiers"])
         if slug_line is None or slug_line == 0:
@@ -300,6 +327,9 @@ def spread_sign_test(
         "disagree": disagree,
         "agreement_rate": rate,
         "spread_slugs_with_no_board_fixture": unmatched_fixtures,
+        # Counted rather than silently dropped: a segment ladder is real
+        # coverage we refuse elsewhere, and its size is worth seeing.
+        "segment_slugs_skipped": segment_slugs,
         "sample_disagreements": disagreements,
         "verdict": verdict,
     }
@@ -397,6 +427,7 @@ def run_spread_audit_if_enabled() -> dict[str, Any] | None:
             f" disagree={result['disagree']}"
             f" rate={result['agreement_rate']}"
             f" no_board_fixture={result['spread_slugs_with_no_board_fixture']}"
+            f" segment_skipped={result['segment_slugs_skipped']}"
             f" verdict={result['verdict']!r}"
             f" disagreements={result['sample_disagreements']}",
             flush=True,

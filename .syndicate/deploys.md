@@ -29437,3 +29437,68 @@ guessing. Read that next.
 `no_venue_ticker` verdict its detail and left the Kalshi one, in the same
 function two lines below, still passing none. Fixing one branch of a paired
 defect is how the second branch survives review.
+## 2026-08-25 21:57–22:02Z — live-odds-worker `8397f9afb` — the test votes now, and the votes were contaminated
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `43fe90f1825b42bf`
+**user instruction:** "merge 71 and deploy again".
+
+**What shipped.** `8397f9afb` (main tip = PR #71's date fallback + four other
+sessions' commits, all ancestors of it). `.py`/docs only — no `render.yaml`.
+Deploy live **22:00:22Z**, not cancelled this time. Flag was already set, so the
+boot fired the hook with no further env change.
+
+**verify: the reading.**
+
+```
+[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date=2026-08-25
+  slate_markets=7888 board_rows=1290
+  board_spread_rows=55 board_fixtures_keyed=18 board_rows_unkeyable=0
+  fixtures=7 agree_home=2 disagree=5 rate=0.2857
+  no_board_fixture=1137 verdict='UNDECIDED: n=7 < min_sample=30'
+  disagreements=[
+    {'slug': 'asc-mlb-cle-laa-2026-08-25-f5-neg-1pt5', 'board_home_line': 1.5},
+    {'slug': 'asc-mlb-chc-az-2026-08-25-f5-neg-1pt5', 'board_home_line': 1.5},
+    {'slug': 'asc-mlb-min-ath-2026-08-25-f5-neg-1pt5','board_home_line': 1.0},
+    {'slug': 'asc-mlb-phi-sea-2026-08-25-f5-neg-1pt5','board_home_line': 1.5},
+    {'slug': 'asc-mlb-cin-sf-2026-08-25-f5-neg-1pt5', 'board_home_line': 1.0}]
+                                  -- live-odds-worker, 2026-08-25T22:01:52.354Z
+```
+
+**PR #71 worked: `board_rows_unkeyable=0`, and the test cast votes for the first
+time** (18 fixtures keyed from 55 board spread rows, 7 paired).
+
+**`rate=0.2857` IS NOT EVIDENCE ABOUT POLYMARKET. All five disagreements carry
+`-f5-`** — first five innings. The board's spread is the FULL GAME. Comparing
+them measures nothing, and `join_polymarket_to_board` and
+`venue_quote_adapters._polymarket_sides` both already refuse segment rows for
+this exact reason; the audit script did not. **It compounded with the
+one-vote-per-fixture rule**: `seen_fixture` is set on the FIRST match, so an
+`f5` slug earlier in the slate stole the fixture's only vote from the full-game
+slug behind it. Fix + 2 tests in **PR #72** (an `f5` slug placed first must not
+take the vote; a fixture listed only as `f5` must cast none at all).
+
+**The instrument found its own bug, and only because of PR #71.** Without the
+`disagreements` sample carrying slugs, `rate=0.2857` would have read as a
+genuine refutation of the symmetric-ladder finding and spreads would have
+stayed refused on false evidence. **Two instrument bugs in two runs, both in
+the direction of a confident wrong answer.** That is the third time in this
+lane that a number which looked like a finding was a property of the reader —
+same shape as `#502`'s `settled_count: 0` and the `no_side_in_key` zeros.
+
+**STILL UNANSWERED after two deploys: whether a Polymarket spread's sign
+belongs to the slug's `<home>` or `<away>`.** Nothing here licenses lifting
+`spread_side_needs_verified_team_mapping`.
+
+**A BOUND WORTH KNOWING BEFORE THE NEXT RUN.** `board_fixtures_keyed=18` on a
+one-sport slate, so **n can never reach `min_sample=30` today** — MLB is the
+only sport with spread rows on the board. Three honest options, none taken
+here: read across several days, widen to NFL/soccer once their spread rows
+exist, or decide that unanimity on ~15 is enough. **The bar was deliberately
+NOT lowered to manufacture a verdict**; `SYNDICATE_POLYMARKET_SPREAD_AUDIT_MIN_SAMPLE`
+exists if a human decides otherwise.
+
+**Flag `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` STILL SET.** PR #72 is
+blocked on a merge permission, so the next deploy carrying it will fire the
+hook automatically. **Unset once a clean reading exists.**
+
+**Claim released.**
