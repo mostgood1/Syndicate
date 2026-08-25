@@ -28000,3 +28000,89 @@ in one session before.
    itself worth an explanation.
 3. Only then decide whether the fix is chip freshness or a `final` cross-check
    in `opportunity_gate`.
+
+### 2026-08-25 04:43:49Z — `af4434877` — THE WNBA READING, AND TWO MORE OF MY CLAIMS FALLING
+
+**The instrument works, on both sports, first live reading.**
+
+    LIVE_GAMELINE_JOIN sport=mlb index=10 considered=5 projected=5 priceable=3
+      index_why={'games_in_snapshot': 10, 'indexed': 10,
+                 'skipped_no_team_names': 0, 'skipped_no_accepted_lane': 0,
+                 'sources_seen': {'live_mc': 20, 'segment_projection': 40},
+                 'accepted_sources': ['live_mc']}
+
+10 of 10 indexed, nothing skipped, and `sources_seen` shows the exact two-lane
+structure `live_gameline_from_lens`' docstring predicts — `live_mc` accepted,
+the 40 `segment_projection` lanes (first1/3/5) correctly ignored. That is the
+instrument agreeing with the code's own stated design on a sport that was
+already working, which is the check that matters before trusting it on one that
+was not.
+
+**WNBA — `index=1`, NOT 0, and the join WORKS:**
+
+    LIVE_GAMELINE_JOIN sport=wnba index=1 considered=184 projected=166 priceable=1
+      withheld=183
+      why={'analytic_probability_is_only_valid_at_its_own_line': 162,
+           'no_two_sided_market_price': 3, 'segment_is_not_full_game': 18}
+      index_why={'games_in_snapshot': 2, 'indexed': 1,
+                 'skipped_no_accepted_lane': 1,
+                 'sources_seen': {'pregame': 1, 'live_projection': 1},
+                 'accepted_sources': ['live_projection']}
+
+`sources_seen={'pregame': 1, 'live_projection': 1}` is the discriminator doing
+precisely the job it was added for, on its first live reading: one game stamped
+live, one stamped pregame, and the difference between "not wired" (`{}`) and
+"wired, this game is not live" now legible at a glance.
+
+**166 rows projected.** The dominant withhold,
+`analytic_probability_is_only_valid_at_its_own_line: 162`, is `#475`'s
+single-line analytic limitation refusing every other line rather than
+interpolating a shape nobody fitted. Correct behaviour, not a gap.
+
+**AND THE PROP HALF, which I had marked UNVERIFIED and was right to:**
+
+    LIVE_PROJECTION_JOIN sport=wnba considered=155 projected=5 edged=5
+      prob_withheld=0 lens_indexed=9 lens_live_games=1
+
+Earlier the same line read `reason=live-lens snapshot for wnba carries no
+liveProps (producer not wired)`. Nine lens rows, one live game, five edged.
+
+**SO BOTH HALVES OF "WNBA HAS NO LIVE MODEL" WERE FALSE.** The user said so
+before any of this was measured. The gameline half is wired and projecting 166;
+the prop half is wired and edging 5.
+
+### THE CORRECTION I ALSO OWE ON THE STATE-CONTRADICTION ENTRY
+
+The entry above it says the wnba chips froze at `live` while
+`basketball_momentum` read `post=2`, and frames the LENS as the component
+reading the slate correctly. **That framing is wrong and this reading is why.**
+
+At 04:43:49Z the lens itself carried `lens_live_games=1` and a
+`live_projection` stamp. `basketball_momentum`'s last reading before it
+(04:30:28Z) was `post=2 live_events=0`. So the lens is on the SAME side as the
+chips — the whole board-side view believed a game was live while the scoreboard
+said both were final. It is not "frozen chips vs. a correct lens"; it is
+board-side vs. scoreboard, with the lens on the board side.
+
+**What survives unchanged, because it is a fact about a set literal rather than
+an inference:** `_LIVE_GAME_STATE_SPORTS = frozenset({"mlb", "soccer"})`
+excludes wnba, so `attach_live_game_state_from_lens` has always returned
+`supported: False, reason: no live status source wired for wnba`. That is true
+regardless of who is right about the game state, and `620734fb3`'s
+`LIVE_GAME_STATE_JOIN` line will print it verbatim on the next build.
+
+**What is now UNRESOLVED and must not be written up as settled:** which of the
+scoreboard and the board-side view was actually right about those two games at
+04:21–04:43. I have asserted a cause for this zero twice and been wrong twice.
+
+### verify: OWED, and the window is TODAY
+
+`SCOREBOARD_STATES league=wnba date=2026-08-25 pre=3` at 13:51:47Z — three
+games scheduled, none live yet. On tip-off, read in this order:
+
+1. `LIVE_GAME_STATE_JOIN sport=wnba supported=` — expect `False` with the
+   stated reason, converting the set-literal inference into a measurement.
+2. `sources_seen` against `basketball_momentum`'s `SCOREBOARD_STATES` at the
+   SAME minute. That pairing, and only that pairing, settles who is right.
+3. Only then decide whether wnba belongs in `_LIVE_GAME_STATE_SPORTS`, and
+   whether its snapshot carries the `status.abstract` the corrector reads.
