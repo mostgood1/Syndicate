@@ -766,6 +766,11 @@ def _record_daily_book(markets: list[dict[str, Any]]) -> None:
         # Rows with no readable sport or game date -- futures land here, which
         # is correct: a season-long market has no game day to be filed under.
         f" undated={report.get('undated')}"
+        # Sports we do not model, counted by name. Polymarket's soccer league
+        # codes surface here -- real markets in a sport we DO model, under
+        # names we have not yet read.
+        f" skipped={report.get('skipped_total')}"
+        f" skipped_by_sport={report.get('skipped_by_sport')}"
         # THE COVERAGE GAP, BY FAMILY. Empty means every market Kalshi listed
         # for these sports was named, which has never yet been true.
         f" unparsed={report.get('unparsed_by_family')}"

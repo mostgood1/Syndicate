@@ -866,6 +866,11 @@ def _polymarket_daily_book() -> None:
         f" opened={report.get('opened')}"
         f" appended={report.get('appended')}"
         f" undated={report.get('undated')}"
+        # Sports we do not model, counted by name. Polymarket's soccer league
+        # codes surface here -- real markets in a sport we DO model, under
+        # names we have not yet read.
+        f" skipped={report.get('skipped_total')}"
+        f" skipped_by_sport={report.get('skipped_by_sport')}"
         # BY FAMILY -- this is the number that says what a parser is still
         # owed, and `SPORTS_MARKET_TYPE_PROP` is a mixed bucket, so the family
         # is the venue's own type rather than anything inferred from it.

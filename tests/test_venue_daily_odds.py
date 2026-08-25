@@ -208,3 +208,53 @@ def test_a_one_sided_polymarket_quote_is_recorded_not_discarded():
     }])
     assert rows[0]["yes"] == "0.495"
     assert rows[0]["no"] is None
+
+
+# --------------------------------------------------------------------------
+# Sports only, and only the ones Syndicate models
+# --------------------------------------------------------------------------
+
+
+def test_a_sport_syndicate_does_not_model_gets_no_file():
+    """MEASURED 2026-08-25T17:34:36Z, before this filter: files=211 --
+    Argentine second division, tennis, table tennis, esports -- written to the
+    keyvalue store every 180s for leagues no module models. Capture-first is
+    not capture-everything: a market with no sim, no board and no grader
+    cannot be priced, and storing it crowds out the sports that can."""
+    report = mod.record_venue_book("polymarket", [
+        _row("a", sport="mlb", game_date="2026-08-25"),
+        _row("b", sport="atp", game_date="2026-08-25"),
+        _row("c", sport="arg2", game_date="2026-08-25"),
+        _row("d", sport="arg2", game_date="2026-08-25"),
+    ])
+    assert report["files"] == 1
+    assert report["skipped_by_sport"] == {"arg2": 2, "atp": 1}
+    assert report["skipped_total"] == 3
+
+
+def test_an_out_of_scope_sport_is_COUNTED_never_silent():
+    """This is where Polymarket's soccer league codes will surface. Syndicate
+    models ten soccer leagues; Polymarket names leagues in its own vocabulary
+    and the mapping has never been read. Counting makes those codes addable
+    from data instead of guessed."""
+    report = mod.record_venue_book("polymarket", [
+        _row("a", sport="epl", game_date="2026-08-25"),
+    ])
+    assert report["files"] == 0
+    assert report["skipped_by_sport"]["epl"] == 1
+
+
+def test_the_scope_is_extendable_without_a_deploy(monkeypatch):
+    """A soccer code goes in the minute it is identified."""
+    monkeypatch.setenv("SYNDICATE_VENUE_ODDS_SPORTS", "mlb, arg2")
+    assert mod.in_scope_sports() == frozenset({"mlb", "arg2"})
+    report = mod.record_venue_book("polymarket", [
+        _row("a", sport="arg2", game_date="2026-08-25"),
+    ])
+    assert report["files"] == 1
+
+
+def test_the_default_scope_covers_the_sports_the_platform_models():
+    scope = mod.in_scope_sports()
+    for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
+        assert sport in scope, sport

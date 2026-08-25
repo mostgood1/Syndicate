@@ -82,6 +82,7 @@ __all__ = [
     "daily_odds_path",
     "record_daily_odds",
     "record_venue_book",
+    "in_scope_sports",
     "kalshi_daily_rows",
     "polymarket_daily_rows",
     "MAX_POINTS_PER_MARKET",
@@ -386,6 +387,44 @@ def _outcome_prices(row: Mapping[str, Any]) -> tuple[Any, Any]:
     return (first, second)
 
 
+def in_scope_sports() -> frozenset[str]:
+    """Which sports get a daily odds file. SPORTS SYNDICATE ACTUALLY MODELS.
+
+    MEASURED 2026-08-25T17:34:36Z, the first run without this filter:
+
+        POLYMARKET_DAILY_BOOK files=211 listed=12893
+          detail=[{'sport': 'alsv'...}, {'sport': 'arg2'...},
+                  {'sport': 'atbl'...}, {'sport': 'atp', 'markets': 940}]
+
+    211 files -- Argentine second division, tennis, table tennis, esports --
+    written to the keyvalue store every 180 seconds for leagues no Syndicate
+    module models. Capture-first does not mean capture-everything: a market we
+    have no sim, no board and no grader for cannot be priced, and paying
+    storage and write bandwidth for it crowds out the sports that can.
+
+    SOCCER IS THE OPEN EDGE, and it is left open deliberately. Syndicate models
+    ten soccer leagues (`epl`, `la_liga`, `bundesliga`, ...) but Polymarket
+    names leagues in its own vocabulary and the mapping between the two has
+    never been read. Guessing it would either drop every soccer market or
+    invent a league. So out-of-scope rows are COUNTED BY LEAGUE rather than
+    discarded silently, and the codes become addable from data -- which is the
+    same discipline that turned `unreadable_title` into a work list.
+
+    Extendable without a deploy: `SYNDICATE_VENUE_ODDS_SPORTS` replaces the
+    set, which is how a soccer code goes in the minute it is identified.
+    """
+    import os
+
+    from syndicate.features.shared.artifact_manifests import SUPPORTED_SPORT_SLUGS
+
+    raw = str(os.environ.get("SYNDICATE_VENUE_ODDS_SPORTS") or "").strip()
+    if raw:
+        chosen = {part.strip().lower() for part in raw.split(",") if part.strip()}
+        if chosen:
+            return frozenset(chosen)
+    return frozenset(set(SUPPORTED_SPORT_SLUGS) | {"soccer"})
+
+
 def record_venue_book(venue: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Group a venue's whole book by (sport, game date) and record each file.
 
@@ -403,11 +442,19 @@ def record_venue_book(venue: str, rows: Sequence[Mapping[str, Any]]) -> dict[str
     """
     grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
     undated = 0
+    wanted = in_scope_sports()
+    skipped_by_sport: dict[str, int] = {}
     for row in rows or []:
         sport = str((row or {}).get("sport") or "").strip().lower()
         game_date = str((row or {}).get("game_date") or "").strip()[:10]
         if not sport or not game_date:
             undated += 1
+            continue
+        if sport not in wanted:
+            # COUNTED, NEVER SILENT. This is where Polymarket's soccer league
+            # codes will surface -- they are real markets in a sport we model,
+            # under names we have not yet read.
+            skipped_by_sport[sport] = skipped_by_sport.get(sport, 0) + 1
             continue
         grouped.setdefault((sport, game_date), []).append(row)
 
@@ -444,6 +491,13 @@ def record_venue_book(venue: str, rows: Sequence[Mapping[str, Any]]) -> dict[str
         # A row we could not place in a day. Counted rather than filed under
         # today, and reported so it cannot become a silent gap.
         "undated": undated,
+        # Out of scope by SPORT, by name and count. The top entries here are
+        # the candidate soccer leagues; everything else is a sport Syndicate
+        # does not model and correctly does not store.
+        "skipped_by_sport": dict(
+            sorted(skipped_by_sport.items(), key=lambda kv: -kv[1])[:20]
+        ),
+        "skipped_total": sum(skipped_by_sport.values()),
         "unparsed_by_family": dict(
             sorted(unparsed_by_family.items(), key=lambda kv: -kv[1])
         ),
