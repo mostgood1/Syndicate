@@ -432,6 +432,17 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                 "[kalshi_orders] SUBMIT_FAILED_MARKET"
                 f" ticker={body.get('ticker')} side={body.get('side')}"
                 f" fetch_status={probe.get('status') if isinstance(probe, dict) else None}"
+                # THE EVENT THIS MARKET BELONGS TO, and on an endpoint called
+                # `/portfolio/events/orders` it is the first thing to check.
+                # The user's own market URL 2026-08-25 shows a KXMLBTOTAL
+                # market living under a KXMLBGAME event:
+                #
+                #   /markets/kxmlbgame/.../kxmlbgame-26aug251840tbdet
+                #     ?op_market_ticker=KXMLBTOTAL-26AUG251840TBDET-7
+                #
+                # So the event ticker is NOT the market ticker's own prefix,
+                # and our body sends no event field at all.
+                f" event_ticker={market.get('event_ticker')}"
                 f" market_type={market.get('market_type')}"
                 f" status={market.get('status')}"
                 f" mve_collection={market.get('mve_collection_ticker')}"
