@@ -2372,7 +2372,52 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `KXNCAAFAWARD` / `KXNBAWINS` at all. **`stamped` rising is the outcome;
   the band caveat above applies -- matched ran 44 -> 104 -> 0 across three
   consecutive builds.**
-- **REMAINING: step 3, line-aware rungs, scoped to NFL/MLB/WNBA.**
+- **STEP 3 RETESTED 2026-08-25 23:3xZ. THE NCAAF PREMISE IS DEAD AGAIN, for a
+  SECOND and deeper reason -- and the retest found the thing that actually
+  matters.**
+  - **Why it was retested:** `INTEL_TRACE by_sport` began carrying
+    `ncaaf: 204` candidates, where the first falsification test had found none.
+    Candidates are not the rows the join receives, so this was checked rather
+    than assumed.
+  - **NCAAF: STILL NO.** `[kalshi_odds] BY_GAME_DATE`, two independent readings
+    (`23:28:23Z`, `23:35:31Z`), each over a full 6,000-market working set: the
+    **earliest date carrying ANY NCAAF market is 2026-08-29**. The board's
+    `selected_date` is **2026-08-25** (confirmed on `CONTAINER_MEMORY` /
+    `PROCESS_TREE_MEMORY`, same instance). NCAAF has no game on the board's
+    date -- the season starts on the 29th. Line-aware selection of NCAAF rungs
+    would still be selecting against an empty wanted-set. Same for NFL, whose
+    earliest market is also 2026-08-29.
+  - **THE FINDING THAT OUTRANKS THE WHOLE LANE.** Neither reading contains a
+    single market for `2026-08-25`, or for `2026-08-26`. The earliest date in
+    both is `2026-08-27`. **The 6,000-market working set the join prices
+    against holds NOTHING for the date the board is built for.**
+    That is measured twice, seven minutes apart, on different series
+    compositions.
+  - **It explains the numbers this lane has been chasing.**
+    `market_is_for_another_date` is the largest refusal bucket (2,525-4,269 of
+    6,000) *because it is literally true of the whole set*, and `matched`
+    sticks at 61-94 because only player props survive -- props skip the join's
+    date check, which is the same asymmetry `kalshi_odds_refresh` already
+    records when it refuses to filter the working set by date.
+  - **SO STEP 3 IS THE WRONG SHAPE. The bound should be DATE-AWARE BEFORE it is
+    LINE-AWARE.** Keeping the rungs nearest the board's line cannot help when
+    no rung in the set is for the board's day. Same class of change -- which
+    markets survive `MAX_MARKETS_PER_SERIES` / `MAX_STORED_MARKETS` -- and a
+    strictly larger effect. **Line-aware selection becomes worth doing only
+    after the set contains the board's own date.**
+  - **CAUTION, and it needs its own check before anyone writes the date-aware
+    bound.** `game_date_from_ticker` reads the ticker's date token and its
+    docstring states the time is deliberately NOT parsed because the timezone
+    "is not settled by any reading I have". A 19:45 ET game on Aug 25 is
+    00:45 UTC on Aug 26, so a night slate can be labelled by Kalshi one day
+    ahead of the board's Central date. **That is a SUSPECTED systematic
+    off-by-one, not a measured one** -- and it must be settled first, because a
+    date-aware bound built on the wrong timezone would discard the very markets
+    it is meant to keep. What would settle it: one ticker whose game date is
+    known independently, compared against its token.
+- **REMAINING:** (a) settle the ticker timezone; (b) date-aware bound;
+  (c) line-aware rungs, LAST, and only once (a) and (b) show the board's date
+  present in the working set.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
