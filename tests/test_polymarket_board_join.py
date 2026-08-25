@@ -342,3 +342,78 @@ def test_the_sample_is_BOUNDED_so_the_log_line_stays_a_log_line():
     result = mod.join_polymarket_to_board(markets, [])
     assert result["refusals"]["outcomes_count_mismatch"] == 40
     assert len(result["unreadable_shapes"]) == 6
+
+
+# ==========================================================================
+# DRAWABLE_OUTCOME (soccer's 3-way h2h) and the soccer league key -- 2026-08-25
+# ==========================================================================
+
+
+def test_drawable_outcome_is_a_mapped_game_line_not_a_refusal():
+    """Was refused as `market_type_not_a_game_line` alongside PROP -- the
+    largest refusal bucket measured (5,810-6,612 of ~12,200-12,900 markets
+    every cycle). Confirmed live in `POLYMARKET_US_GAMES` catalogue logs as a
+    real game-market type. Slug is `<away>-<home>` -- `ars` away, `che` home."""
+    assert mod.MARKET_TYPE_TO_BOARD["SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME"] == "h2h"
+    result = mod.join_polymarket_to_board(
+        [_market(slug="aec-eflc-ars-che-2026-08-25",
+                 kind="SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME",
+                 outcomes=("Arsenal", "Chelsea"))],
+        [_board(side="Arsenal", home="Chelsea", away="Arsenal",
+                date="2026-08-25", sport="soccer")],
+    )
+    assert result["matched"] == 1
+
+
+def test_a_draw_outcome_with_no_board_side_is_dropped_not_an_error():
+    """A third "Draw" outcome resolves to no club and no board `h2h` side asks
+    for it today -- it must simply not match anything, not raise or refuse
+    the whole row."""
+    result = mod.join_polymarket_to_board(
+        [_market(slug="aec-eflc-ars-che-2026-08-25",
+                 kind="SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME",
+                 outcomes=("Arsenal", "Chelsea", "Draw"),
+                 prices=("0.45", "0.30", "0.25"))],
+        [_board(side="Arsenal", home="Chelsea", away="Arsenal",
+                date="2026-08-25", sport="soccer")],
+    )
+    assert result["matched"] == 1
+    assert result["matches"][0]["polymarket_probability"] == pytest.approx(0.45)
+
+
+def test_soccer_effective_league_overrides_a_non_soccer_literal_token():
+    """Polymarket lists soccer per COMPETITION (`eflc` observed live for EFL
+    Championship); Syndicate stamps every soccer board row `sport="soccer"`
+    uniformly. A literal `parsed["league"] == "soccer"` compare can never
+    match, so `_effective_league` recognises the row by its CLUBS instead."""
+    parsed = mod.parse_slug("aec-eflc-ars-che-2026-08-25")
+    assert parsed["league"] == "eflc"
+    assert mod._effective_league(parsed) == "soccer"
+
+
+def test_effective_league_leaves_non_soccer_leagues_untouched():
+    """mlb/nfl/nba/wnba already match on the literal token -- this must not
+    change behaviour for any of them."""
+    for slug in ("aec-mlb-pit-sd-2026-08-24", "aec-nfl-lac-ten-2025-11-02"):
+        parsed = mod.parse_slug(slug)
+        assert mod._effective_league(parsed) == parsed["league"]
+
+
+def test_effective_league_does_not_relabel_an_unresolvable_pair():
+    """Both clubs must resolve as soccer clubs before the row is relabelled --
+    an unknown pair keeps its literal (probably wrong, but not GUESSED)
+    league token."""
+    parsed = mod.parse_slug("aec-xyz-zzznotaclub-alsonotaclub-2026-08-25")
+    assert mod._effective_league(parsed) == "xyz"
+
+
+def test_a_soccer_row_matches_the_board_across_a_non_soccer_league_token():
+    """End to end: the board asks for `sport="soccer"`, the venue's slug
+    carries the competition token `eflc`, and the row still matches -- the
+    fix this test guards against regressing."""
+    result = mod.join_polymarket_to_board(
+        [_market(slug="aec-eflc-ars-che-2026-08-25", outcomes=("Arsenal", "Chelsea"))],
+        [_board(side="Arsenal", home="Chelsea", away="Arsenal",
+                date="2026-08-25", sport="soccer")],
+    )
+    assert result["matched"] == 1

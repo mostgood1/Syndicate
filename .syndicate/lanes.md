@@ -1461,6 +1461,23 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   change landed. Reclaim by re-adding both paths to the Files: list above
   whenever this lane wants them back; nothing here removes this lane's
   ownership going forward, only this one narrow slice tonight.
+- **SECOND NARROW CARVE-OUT taken 2026-08-25 by `exchange-markets-api-integration`
+  (session 71a74bb7) on `polymarket_board_join.py` / `venue_quote_adapters.py`**
+  -- both files this lane has been actively committing to today (`3e8856e81`,
+  `f32ec00ff`, `18569e814`, `053d336e8`) but had not added to its own Files:
+  list above. User asked for a Polymarket coverage deep dive; found
+  `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` (soccer's 3-way moneyline shape)
+  entirely unmapped in `MARKET_TYPE_TO_BOARD`/`_polymarket_sides`, and
+  soccer's league match keyed on a literal `sport.lower()` string compare
+  that can never equal Polymarket's per-competition slug token (`eflc`
+  observed live). Full finding in this lane's own block below. Attempted
+  direct message to `session_01Sia2rPD72eFTriy28azzs2` first -- not
+  reachable as a live peer from this session's tools, so recorded here per
+  this same fallback pattern. **Taken, scoped to exactly two changes**: (a)
+  map DRAWABLE_OUTCOME -> `"h2h"` in both files' type maps, (b) soccer
+  league resolution via competition tokens instead of literal string match.
+  Nothing else in either file touched. Reclaim by re-adding both paths to
+  this lane's own Files: list whenever wanted back.
   **`pipeline/portfolio_commit.py` stayed on this lane's list, untouched** --
   its `_venue_price_resolver` (Kalshi-only price/ticker resolver, built from
   the WHOLE board-join across every market type this lane resolves, not a
@@ -2029,6 +2046,47 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   this session (the scan's last run predates the 01:23:01Z fetch tick) --
   mechanism is proven at every hop, but the scan's own end-to-end number is
   the next natural check for whoever picks this back up.
+- **POLYMARKET COVERAGE DEEP DIVE, 2026-08-25 -- NARROW CARVE-OUT TAKEN on
+  `polymarket_board_join.py` / `venue_quote_adapters.py` (owned in practice
+  by `portfolio-decision-and-execution`, session `9324a3e5` /
+  `session_01Sia2rPD72eFTriy28azzs2`, which authored every recent commit on
+  both files today but had not added them to its own Files: list).**
+  User asked for a deep dive into Polymarket US sports-odds coverage
+  including soccer. Findings, both from live production log evidence
+  (~14:00Z): (1) `market_type_not_a_game_line` refuses 5,810-6,612 of
+  ~12,200-12,900 markets every cycle, the largest refusal bucket by far --
+  `MARKET_TYPE_TO_BOARD` only maps MONEYLINE/SPREAD/TOTAL, so
+  `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` (a 3-way home/draw/away type --
+  soccer's moneyline shape, confirmed in `POLYMARKET_US_GAMES` catalogue
+  logs) is refused unconditionally, unlike PROP which is refused
+  deliberately/by design. (2) Both files key the league match on a literal
+  string compare (`sport.lower()` against the slug's own league token),
+  which works for mlb/nfl/nba/wnba by coincidence but not for soccer:
+  Syndicate stamps every soccer board row `sport="soccer"`
+  (`game_board_contract.py:1072`) while Polymarket lists soccer by
+  competition -- a production-refused sample carried league token `eflc`
+  (EFL Championship), and Syndicate's own soccer competition vocabulary
+  (epl/la_liga/bundesliga/serie_a/ligue_1/mls/eredivisie/primeira_liga/
+  championship/belgian_pro_league, `soccer/sources.py`) never equals the
+  literal string "soccer". Soccer is killed twice over, independent of the
+  separately-observed `board_rows=0` on every sampled `POLYMARKET_BOARD_JOIN`
+  line today (that one is the empty-board condition, not a coverage gap,
+  and stays with whoever owns that).
+  Attempted to message the owning session directly first
+  (`session_01Sia2rPD72eFTriy28azzs2`) -- not reachable as a live peer from
+  this session's tools at the time (`ListAgents` returned none), so the
+  proposal is recorded here per this file's own established fallback (see
+  the 2026-08-24 carve-out note above this one, same pattern: "that session
+  was messaged... offered no narrower mechanism than a whole-file release").
+  **Taken, scoped to exactly two changes, nothing else in either file
+  touched:** (a) map `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` -> `"h2h"` in
+  `MARKET_TYPE_TO_BOARD` and the matching dict in
+  `venue_quote_adapters._polymarket_sides`; (b) resolve soccer's join league
+  from Syndicate's `"soccer"` sport key to Polymarket's per-competition slug
+  tokens instead of a literal string match. None of today's join-date/
+  home-away/sport-filter logic touched. Reclaim by re-adding both paths to
+  that lane's Files: list whenever it wants them back, same as the prior
+  carve-out's own terms.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
