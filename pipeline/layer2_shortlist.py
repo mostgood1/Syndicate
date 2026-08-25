@@ -650,6 +650,30 @@ def build_layer2_shortlist(
         # shape. Measured 2026-08-25T00:02Z, polymarket_us offered 3,106 quotes
         # and won none of 237 -- which freshness cannot explain, since Kalshi
         # quotes no game lines at all.
+        # WHICH SPORT PRODUCED WHAT, on the line that reports the board.
+        #
+        # MEASURED 2026-08-25: three consecutive builds logged
+        # `VENUE_REPRICE rows_in=4296 sports=['nfl','soccer']` -- byte-identical
+        # -- while MLB independently generated 411 candidates (44 game, 367
+        # prop) and logged `GAME_CANDIDATES_EXIT sport=mlb rows=68`. MLB is
+        # KEPT by the manifest gate and IS iterated here, so it was reaching
+        # this loop and yielding zero opportunities, and nothing said so.
+        #
+        # `per_sport_stats` has carried `candidates`/`scored`/`sides_priced`/
+        # `opportunities` per sport the entire time and was stored on the
+        # result where only an artifact reader could see it. This is the same
+        # computed-but-unprinted gap as the seven drop counters on
+        # LAYER2_SHORTLIST: the number that identifies the sport at fault
+        # existed and never reached a log line.
+        print(
+            "[layer2_shortlist] PER_SPORT_INGEST "
+            + " ".join(
+                f"{name}(cand={stat.get('candidates')},scored={stat.get('scored')},"
+                f"priced={stat.get('sides_priced')},opps={stat.get('opportunities')})"
+                for name, stat in sorted((per_sport_stats or {}).items())
+            ),
+            flush=True,
+        )
         print(
             "[layer2_shortlist] VENUE_REPRICE_KEYS "
             f"unmatched_by_sport={repriced.get('unmatched_by_sport')} "

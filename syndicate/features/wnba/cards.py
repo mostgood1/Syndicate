@@ -836,6 +836,39 @@ def _normalized_game_status(
         if start_dt is not None and start_dt <= datetime.now(timezone.utc) - timedelta(hours=3) and (has_score_evidence or _infer_period_clock_from_status_text(detail_raw or status_raw)[0] is not None):
             # Upstream feeds can lag terminal flags; settle stale past-start rows as final only when the row looks like real game state.
             is_final = True
+            # SAY SO. This converts a game to Final on a CLOCK, not on the
+            # feed, and until now it did it silently.
+            #
+            # MEASURED 2026-08-25: wnba board games decayed 2 -> 1 -> 0 while
+            # two games were genuinely in progress, ending at
+            # `game_count: 0` with `data_health: "healthy"`. WNBA tips run
+            # 23:00Z-00:30Z, so by 02:35Z both had crossed three hours and this
+            # branch is the only thing in the file that could have finalised
+            # them without a terminal flag.
+            #
+            # THE BRANCH ONLY RUNS WHEN `not live`, which is the part that
+            # matters and the part nobody can see: if the feed said live, this
+            # is unreachable. So the open question is whether the feed went
+            # STALE (and this rule is compensating correctly) or whether the
+            # feed is fine and something upstream failed to mark it live.
+            # Those need opposite fixes. Printing the raw status text and the
+            # elapsed hours is what tells them apart on the next cycle --
+            # widening the window without knowing would paper over a stale
+            # feed, and a WNBA game genuinely can run past three hours in
+            # overtime, which is exactly the case this rule gets wrong.
+            try:
+                print(
+                    "[wnba_cards] STALE_PAST_START_FORCED_FINAL"
+                    f" start_utc={start_time_utc!r}"
+                    f" hours_since_start={round((datetime.now(timezone.utc) - start_dt).total_seconds() / 3600.0, 2)}"
+                    f" status_raw={str(status_raw)[:40]!r}"
+                    f" detail_raw={str(detail_raw)[:40]!r}"
+                    f" has_score_evidence={bool(has_score_evidence)}",
+                    flush=True,
+                )
+            except Exception:
+                # A diagnostic must never cost the card it is describing.
+                pass
 
     if live:
         is_final = False
