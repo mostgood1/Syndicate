@@ -540,7 +540,10 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     of a join end up on different vocabularies; one cannot disagree with
     itself.
     """
-    from syndicate.features.shared.venue_quote_adapters import quote_key
+    from syndicate.features.shared.venue_quote_adapters import (
+        quote_key,
+        team_name_tokens,
+    )
 
     explicit = row.get("venue_quote_key")
     if explicit:
@@ -564,6 +567,32 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
         # the fact that the row could not be placed.
         if club:
             keys.append(quote_key(sport, market, club, None))
+
+        # A THIRD SHAPE: THE CITY OR NICKNAME ALONE.
+        #
+        # Kalshi names a moneyline by the team and nothing else -- "Texas
+        # wins", "Buffalo wins" -- so it publishes `h2h|texas` where the board
+        # carries "Texas Rangers". Neither of the two keys above can meet that:
+        # the role key says `home`, and the club key says `texas rangers`.
+        # Measured 2026-08-25T21:12:14Z, `sources_offered` had kalshi at
+        # `nfl|h2h|yes` against a board asking `soccer|h2h|real betis` --
+        # every Kalshi game line offered under a side the board never asks for.
+        #
+        # AMBIGUOUS TOKENS ARE DROPPED, and that is the whole safety property.
+        # "chicago" sits inside both "chicago cubs" and "chicago white sox", so
+        # on a Cubs/White Sox game it names NEITHER side. The candidate set here
+        # is exactly two clubs and both are known to be playing each other, so
+        # the opponent's tokens are available to subtract -- the same bound
+        # `kalshi_board_join._side_for_team` relies on, and the same refusal:
+        # guessing which side a shared name refers to is a bet on the wrong team
+        # half the time, at a price that looks confident.
+        opponent = "away_team" if side == "home" else "home_team"
+        mine = team_name_tokens(sport, team)
+        theirs = team_name_tokens(sport, row.get(opponent))
+        for token in sorted(mine - theirs):
+            candidate = quote_key(sport, market, token, None)
+            if candidate not in keys:
+                keys.append(candidate)
     return keys
 
 

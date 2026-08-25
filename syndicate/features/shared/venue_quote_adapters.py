@@ -41,6 +41,58 @@ def quote_key(sport: str, market: str, side: str, line: float | None) -> str:
     return f"{str(sport or '').lower()}|{str(market or '').lower()}|{str(side or '').lower()}{line_part}"
 
 
+def team_quote_token(sport: Any, name: Any) -> str | None:
+    """A team's identity for a quote key, or None.
+
+    ONE NORMALISER, IMPORTED BY BOTH SIDES. `venue_quote_fanin._candidate_keys`
+    calls this for the BOARD's team names and `kalshi_outcome` calls it for the
+    VENUE's, so the two halves of the join cannot end up on different
+    spellings. A private copy in either file is the drift this repo has already
+    paid for three times in one day (`learnings.md` 2026-08-23).
+
+    `canonical_team` FIRST, so a name the club map knows keeps the exact
+    spelling the existing `h2h|<club>` key already uses and nothing that
+    matches today stops matching. Only an unresolvable name falls through to a
+    normalised raw form -- which is the common case for Kalshi, whose titles
+    say "Texas" where the club map carries "texas rangers".
+    """
+    raw = " ".join(str(name or "").strip().lower().replace(".", " ").split())
+    if not raw:
+        return None
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+
+        resolved = canonical_team(sport, name)
+    except Exception:
+        resolved = None
+    return str(resolved).strip().lower() if resolved else raw
+
+
+def team_name_tokens(sport: Any, name: Any) -> set[str]:
+    """The distinguishing words of a club name, for matching a venue that names
+    a team by its CITY or nickname alone.
+
+    Kalshi writes "Texas wins by over 3.5 runs" while the board carries "Texas
+    Rangers", so an exact compare refuses every team-named game line --
+    `kalshi_board_join._side_for_team` records exactly that measurement
+    (`team_side_unresolved` on all of them) and solves it the same way: match a
+    token against the club name.
+
+    THE CALLER MUST BOUND THE CANDIDATE SET AND SUPPRESS SHARED TOKENS. That
+    bound is the whole safety property: "chicago" sits inside both "chicago
+    cubs" and "chicago white sox", so on a Cubs/White Sox game it names neither
+    side, and returning a guess there is a bet on the wrong team at a price
+    that looks confident. This function only reports the tokens; it is
+    `_candidate_keys` that drops the ones the opponent shares.
+    """
+    token = team_quote_token(sport, name)
+    if not token:
+        return set()
+    # The full form is a token too, so an exact name still matches through the
+    # same path rather than through a second one.
+    return {token} | {word for word in token.split() if len(word) > 2}
+
+
 def probability_to_american(probability: float | None) -> int | None:
     """Probability in (0,1) -> American odds. Declared once, used by every
     adapter whose venue quotes probability, so the conversion cannot drift
@@ -170,6 +222,13 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         return SourceOutcome(source="kalshi", status="error", reason="no_fetched_at_or_mtime")
 
     quotes: list[Quote] = []
+    # THE WORK QUEUE, not decoration -- same reasoning as `polymarket_us_outcome`'s
+    # `spread_rows`: a refusal nobody counts is indistinguishable from a venue
+    # that lists nothing, which is the confusion this whole module exists to
+    # prevent.
+    spread_rows = 0
+    h2h_unresolved = 0
+    h2h_keyed = 0
     try:
         from syndicate.features.shared.kalshi_catalogue import classify_market
     except Exception as exc:  # noqa: BLE001
@@ -190,12 +249,73 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         side = str(classified.get("side") or "")
         if not market or not side:
             continue
+
+        # THE SIDE VOCABULARY, AND WHY IT IS NOT ONE STRING FOR EVERY MARKET.
+        #
+        # `classify_market` reports the side the GRAMMAR read: a player prop and
+        # a game total both say over/under, and the board asks for over/under
+        # too, so those already meet and are passed through untouched. The two
+        # game-line families do NOT:
+        #
+        #   moneyline   Kalshi "Texas wins"                -> side "yes"
+        #   spread      Kalshi "Texas wins by over 3.5"     -> side "over"
+        #   board       mlb|h2h|home  ·  mlb|spreads|away|1
+        #
+        # Measured 2026-08-25T21:12:14Z, `[layer2_shortlist] VENUE_REPRICE_KEYS`
+        # with kalshi finally present in `sources_offered` for all four sports:
+        #
+        #   kalshi offered   nfl|h2h|yes      nfl|spreads|over|7.5
+        #   board wanted     mlb|spreads|away|1   soccer|h2h|real betis
+        #
+        # A moneyline quoted `yes` and a spread quoted `over` can never meet a
+        # board row keyed by ROLE, at any line -- so this sits UPSTREAM of every
+        # line- or freshness-related reason the fan-in reports. Nothing was
+        # broken; the two halves were never speaking the same words.
+        if market == "h2h":
+            # THE TEAM IS THE SIDE. `_MONEYLINE` already parsed it into
+            # `subject` and this adapter was discarding it.
+            # `venue_quote_fanin._candidate_keys` offers the matching shapes
+            # from the board's own row -- club name, and the city or nickname
+            # with any token the OPPONENT shares removed -- so the
+            # disambiguation happens where both clubs are known, which is the
+            # only place it is safe.
+            subject = team_quote_token(sport, classified.get("subject"))
+            if not subject:
+                # A moneyline naming nobody. Counted, never published under a
+                # positional guess.
+                h2h_unresolved += 1
+                continue
+            side = subject
+            line = None
+        elif market.startswith("spreads"):
+            # REFUSED BY NAME, PENDING THE SIGN CONVENTION -- exactly as
+            # `polymarket_us_outcome` refuses spreads "pending a measurement of
+            # which team a handicap belongs to".
+            #
+            # Kalshi says "Texas wins by over 3.5 runs", which is Texas -3.5,
+            # and the board carries a SIGNED line per role (`spreads|home|-1.5`,
+            # `spreads|away|1`). Publishing a club key here needs that sign to
+            # be read off the board's own producer rather than inferred from
+            # two samples, and `under` is not the mirror of `over` on this
+            # grammar at all: "wins by under 3.5" is "wins, by less than 3.5",
+            # which is not the other side of a handicap.
+            #
+            # Today these publish `spreads|over|<line>` and match nothing, so
+            # refusing costs no match that exists -- it converts a silent
+            # non-match into a counted one, which is the difference between
+            # "Kalshi lists no spreads" and "we cannot key them yet".
+            spread_rows += 1
+            continue
+
         probability = _as_float(row.get("yes_bid") or row.get("last_price"))
         if probability is not None and probability > 1.0:
             # Kalshi has quoted CENTS on some routes. 54 is not a probability;
             # converting it as one is the 100x error its first live run found.
             probability = probability / 100.0
-        line = _as_float(classified.get("line"))
+        if market == "h2h":
+            h2h_keyed += 1
+        else:
+            line = _as_float(classified.get("line"))
         quotes.append(
             Quote(
                 key=quote_key(sport, market, side, line),
@@ -213,10 +333,34 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
     return SourceOutcome(
         source="kalshi",
         status="ok" if quotes else "no_rows",
-        reason=None if quotes else "no_kalshi_market_classified_to_this_sport",
+        # Carried on a SUCCESSFUL outcome too, for the reason
+        # `_polymarket_ok_reason` already states: spreads refused while
+        # moneylines and props price is the normal state until the sign
+        # question is settled, and it must stay visible rather than vanish the
+        # moment anything else succeeds.
+        reason=_kalshi_ok_reason(spread_rows, h2h_keyed, h2h_unresolved)
+        or (None if quotes else "no_kalshi_market_classified_to_this_sport"),
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )
+
+
+def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int) -> str | None:
+    """What this adapter could not key, by name and count.
+
+    `h2h_keyed` is reported alongside the refusals rather than only on failure:
+    it is the number that says whether the moneyline re-key is reaching
+    anything at all, and a counter that appears only when it fires cannot
+    distinguish "ran and matched nothing" from "never ran".
+    """
+    parts = []
+    if spread_rows:
+        parts.append(f"spreads_refused:{spread_rows}")
+    if h2h_unresolved:
+        parts.append(f"h2h_team_unresolved:{h2h_unresolved}")
+    if h2h_keyed:
+        parts.append(f"h2h_keyed_by_team:{h2h_keyed}")
+    return " ".join(parts) if parts else None
 
 
 # --------------------------------------------------------------------------
