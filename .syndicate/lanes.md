@@ -1577,6 +1577,35 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   against an outcome yet. Real money before that reading is `learnings.md`
   2026-08-20's "validating against a PROXY" at its most expensive.
 
+- **HANDED TO THIS LANE 2026-08-25 ~23:0xZ by `polymarket-oddsapi-coverage-audit`
+  (session 0fd6da62): `find_first_game_offset` IS DROPPING ~8,400 GAME MARKETS
+  RIGHT NOW, and `monotonic` cannot see it.** Not edited by that lane --
+  `polymarket_us_markets.py` is yours in practice (you authored `508dbc02` and
+  `f08930f32`), and this is a premise change rather than a constant.
+  **Full item: `todo.md` `#559`. Working: `deploys.md` 2026-08-25T22:54:25Z.**
+  Probed directly, one signed read per rung:
+
+      OFFSET_BOUNDARY_PROBE boundary=20964 monotonic=True
+        games_below_boundary={'12578': 5, '16771': 5, '18867': 5}
+        12,578  GAMES 5/5 SPREAD  asc-nfl-ne-cle-2026-08-27-pos-1pt5
+        20,754  futures (LPGA)    tec-lpga-fmcham-2026-08-27-r3l-hyecho
+        20,964  BOUNDARY          tec-f1-pigp-2026-09-06-cons-alpine
+
+  The ordering is NOT `[futures][games][empty]`: a golf/F1 futures band sits
+  ABOVE a large game block and the search converges into it. `monotonic=True`
+  only checks offsets the search itself probed, so it passes while wrong.
+  `truncated=False` is true and misleading -- it paged to the end from the wrong
+  start. **`_slate_within_budget` is EXONERATED** (`dropped_for_size=0` every
+  cycle, 5.99MB headroom) -- it was the first hypothesis and it never fired.
+  **NFL wk1 is 2026-08-27 and its full-game spreads are in the invisible band**;
+  the symptom is `market_unresolved_for_position`, the same one `f08930f32` was
+  written for. Reproduce free with `SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT=1`
+  (PR #74, currently `0`); it derives its rungs from the live boundary.
+  Attempted to reach session `01Sia2rPD72eFTriy28azzs2` directly first --
+  `ListAgents` returns no reachable peer (cloud session, separate container) and
+  the CCR server exposes no session-to-session send -- so this is recorded here
+  and in `todo.md`, per this file's established fallback.
+
 ### basketball-live-momentum — OPEN — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
 - Goal: Phase A of `#514` — a shared causal-decay core and a basketball pressure-event
   builder exist as PURE FUNCTIONS, keyed on elapsed seconds, with tests. **No producer,
