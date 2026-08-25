@@ -27744,3 +27744,84 @@ the theory.**
   `_SLATE_STORAGE_FIELDS` does not persist.
 - `053d336e8` (OddsAPI shard-key parse) is committed and DEPLOYED but its
   `no_side_in_key:N` counter has not been read.
+
+---
+
+## 2026-08-25 04:14Z — `40d14abf2` — ONE ROW, TWO VINTAGES.
+
+**lane:** portfolio-decision-and-execution
+**services:** refresh-worker `dep-da6hbhu7bikc738jtneg` (live 04:14:23Z),
+live-odds-worker `dep-da6hbsm7bikc738jumqg`
+
+### WHAT THE REFUSAL ACTUALLY WAS
+
+    LAYER2_BOARD_HEALTH sport=mlb rows=14 pregame_proj=14 edged=10
+    PAPER2_PLAN_WRITTEN venue=polymarket rows_in=14 positions=0
+      venue_priced=12 refusals={'no_model_edge_pct': 14}
+
+Ten rows carried an edge and none survived `_MODEL_EDGE_MAX_POINTS = 15.0`.
+**The bound was working.** `todo.md` records it as KEEP-permanent ("a cheap
+assertion that a probability-space claim is actually in probability space") and
+it is untouched here.
+
+`7799abf9c` re-priced `best` from the venues before the lane gate and left every
+fair-value benchmark on the pregame OddsAPI capture:
+
+| field | vintage |
+|---|---|
+| `best.price` | LIVE — venue, seconds old |
+| `cells` / `consensus` | PREGAME — OddsAPI, before first pitch |
+
+Both readers of fair value read the second pair — `layer2_board._fair_by_side`
+de-vigs `cells`, `prop_projections._no_vig_over_probability` de-vigs `consensus`
+and that is `market_fair_prob_over`. `live_gameline_join.price_moneyline` then
+subtracts that pregame fair from the LIVE re-sim's win probability. A team three
+runs up in the 7th is ~0.90 to the live model and ~0.55 to the pregame
+consensus: a 35-point "edge" that is entirely the gap between two clocks.
+
+**The only number on the row that knew the game had started was the price.**
+
+### THE FIX
+
+1. `_reprice_live_benchmark` moves `cells` and `consensus` onto the venue that
+   priced the row. Four conditions, three of them refusals counted by name in
+   `benchmark_skipped`: LIVE ROWS ONLY (pregame keeps its multi-book median,
+   `#384`), EVERY SIDE OR NO SIDE, ONE VENUE PER ROW, STRICTLY FRESHER.
+2. The re-price runs as an enrichment STEP — after the two state joins (which
+   read no price and are what tell it a game is live) and before the four that
+   do. It had still been running after `attach_projections` and
+   `attach_live_gamelines`.
+
+**A test caught the half I would have shipped.** Merely ADDING the venue to
+`cells` leaves the median blending vintages: live -900 and pregame -120 de-vig
+to ~0.90 and ~0.50, median ~0.6999 — half the gap, the same defect at half the
+size. The test asserted 0.90 and read 0.6999. Superseded books now MOVE to
+`cells_superseded` (kept, not deleted); a book within
+`LIVE_MARKET_MAX_AGE_SECONDS` of the venue stays a peer; an unstamped age is
+unknown, not fresh.
+
+### TWO MORE COMPUTED-AND-NEVER-PRINTED NUMBERS
+
+`attach_live_gamelines` has been returning index size, rows
+projected/priceable/withheld and a per-reason split, all of it to the artifact
+and nowhere else — so "the live moneyline join produced nothing" and "it
+produced something the board dropped" were indistinguishable from the logs.
+`LIVE_GAMELINE_JOIN` prints it now. `GRID_REPRICE` gains `benchmark_rows`
+beside `repriced`: sides whose PRICE moved versus rows whose FAIR VALUE moved
+with it. **The two being different numbers is the whole finding**, and the
+second did not exist.
+
+That is now nine instruments in this thread that printed numbers the code was
+already computing. The pattern is not incidental.
+
+### verify: OWED
+
+`GRID_REPRICE ... benchmark_rows=N` non-zero on mlb/wnba, and
+`PAPER2_PLAN_WRITTEN` refusals no longer `no_model_edge_pct` on every row.
+**Neither read yet** — the worker booted at 04:14:23Z into an overview refresh
+and the shortlist build comes later in the cycle. Nothing about this change is
+verified until those two lines are read.
+
+Caveat on the window: 04:15Z is 23:15 Central on 08-24. If the slate finishes
+before a build lands, the measurement waits for the next live slate. Say that
+rather than reading a quiet board as a pass.
