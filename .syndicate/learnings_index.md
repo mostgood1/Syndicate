@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 531 rules `[generated]`
+## Index — 550 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,13 +8,18 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 90**
+**FORBIDDEN — 99**
 
+- [2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-…](#2026-08-22-forbidden-never-read-a-service_updated-deploy-as-shipping-code-an-env-var-change-restarts-the-service-on-the-commit-it-is-already-running)
+- [2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the sam…](#2026-08-22-forbidden-never-name-a-datastore-setting-and-a-service-env-var-by-the-same-store-without-saying-which-surface-a-4-minute-refresh-worker-outage-came-from-that-ambiguity)
 - [2026-08-21 — FORBIDDEN: never publish a field under a name that describes a DIFFERENT q…](#2026-08-21-forbidden-never-publish-a-field-under-a-name-that-describes-a-different-quantity-however-well-documented-the-real-one-is)
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, an…](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname)
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content)
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session)
+- [2026-08-23 — FORBIDDEN: claiming a feature works when no test runs the path that CALLS…](#2026-08-23-forbidden-claiming-a-feature-works-when-no-test-runs-the-path-that-calls-it)
+- [2026-08-23 — FORBIDDEN: a module may not hold its own list of market names. It WILL dri…](#2026-08-23-forbidden-a-module-may-not-hold-its-own-list-of-market-names-it-will-drift-from-market_keys-silently)
+- [2026-08-23 — FORBIDDEN: never read `settled_at` on an order as "the bet was decided"](#2026-08-23-forbidden-never-read-settled_at-on-an-order-as-the-bet-was-decided)
 - [2026-08-15 — FORBIDDEN: never treat equality of a LABEL as identity of a BET](#2026-08-15-forbidden-never-treat-equality-of-a-label-as-identity-of-a-bet)
 - [2026-08-16 — FORBIDDEN: never deploy on `check_deploy_safety.py` alone. It said CLEAR w…](#2026-08-16-forbidden-never-deploy-on-check_deploy_safetypy-alone-it-said-clear-while-three-jobs-were-running-on-the-service)
 - [2026-08-16 — FORBIDDEN: a wait loop must gate on an AFFIRMATIVE success token, never on…](#2026-08-16-forbidden-a-wait-loop-must-gate-on-an-affirmative-success-token-never-on-the-absence-of-a-failure-string)
@@ -70,6 +75,10 @@
 - [2026-08-22 — FORBIDDEN: never join on an id minted from a content hash of a payload tha…](#2026-08-22-forbidden-never-join-on-an-id-minted-from-a-content-hash-of-a-payload-that-carries-live-prices)
 - [2026-08-22 — FORBIDDEN: verifying a REORDERING by elapsed-time-since-boot](#2026-08-22-forbidden-verifying-a-reordering-by-elapsed-time-since-boot)
 - [2026-08-22 — FORBIDDEN: never allowlist an artifact without reading the CONSUMER that w…](#2026-08-22-forbidden-never-allowlist-an-artifact-without-reading-the-consumer-that-will-start-finding-it)
+- [08-22 FORBIDDEN: `git add -A` in this repo. THE TEST SUITE MUTATES TRACKED FILES](#08-22-forbidden-git-add--a-in-this-repo-the-test-suite-mutates-tracked-files)
+- [08-22 FORBIDDEN: calling a test failure "pre-existing on main" from a clean WORKTREE. A…](#08-22-forbidden-calling-a-test-failure-pre-existing-on-main-from-a-clean-worktree-a-worktree-shares-site-packages)
+- [08-22 FORBIDDEN: treating a todo id as RESERVED because you checked it was free. Checki…](#08-22-forbidden-treating-a-todo-id-as-reserved-because-you-checked-it-was-free-checking-is-not-reserving)
+- [2026-08-25 — FORBIDDEN: never accept a backtest's "0 rows graded" as a result. An analy…](#2026-08-25-forbidden-never-accept-a-backtests-0-rows-graded-as-a-result-an-analysis-script-that-cannot-find-its-inputs-must-exit-non-zero-not-report-a-clean-zero)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -109,7 +118,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 436**
+**Rules and corrections — 446**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -353,6 +362,16 @@
 - [2026-08-22 — An absent LOG LINE is not an absent EVENT, and a stale ledger figure will…](#2026-08-22-an-absent-log-line-is-not-an-absent-event-and-a-stale-ledger-figure-will-out-argue-a-fresh-measurement)
 - [2026-08-22 — the retraction was as wrong as the claim. "It ran once" is not "it runs"](#2026-08-22-the-retraction-was-as-wrong-as-the-claim-it-ran-once-is-not-it-runs)
 - [2026-08-22 — RULE: `| tail -N` on a backgrounded command truncates the OUTPUT FILE, not…](#2026-08-22-rule-tail--n-on-a-backgrounded-command-truncates-the-output-file-not-just-the-display)
+- [2026-08-22 (later) — A rule written from one sport's vocabulary is a rule about that sp…](#2026-08-22-later-a-rule-written-from-one-sports-vocabulary-is-a-rule-about-that-sport-and-a-safety-net-that-skips-the-biggest-cases-is-not-a-safety-net)
+- [2026-08-23 — a measurement that matches your CHANGE instead of the COMPLAINT is not ver…](#2026-08-23-a-measurement-that-matches-your-change-instead-of-the-complaint-is-not-verification-lane-layer2-sim-view-and-live-projection)
+- [2026-08-23 — a counter's POSITION relative to its gate decides which question it answers](#2026-08-23-a-counters-position-relative-to-its-gate-decides-which-question-it-answers)
+- [2026-08-23 — a guard firing 248 times looks exactly like a coverage regression](#2026-08-23-a-guard-firing-248-times-looks-exactly-like-a-coverage-regression)
+- [2026-08-23 — `trim_lane_blocks.py` is now exhausted, and `lanes.md` is over cap anyway](#2026-08-23-trim_lane_blockspy-is-now-exhausted-and-lanesmd-is-over-cap-anyway)
+- [2026-08-23 — READ THE RATE, NOT THE REASON STRING `[lane layer2-sim-view-and-live-proje…](#2026-08-23-read-the-rate-not-the-reason-string-lane-layer2-sim-view-and-live-projection)
+- [2026-08-23 — a counter whose inputs are absent reports CONSTANTS that look like findings](#2026-08-23-a-counter-whose-inputs-are-absent-reports-constants-that-look-like-findings)
+- [2026-08-23 — `git merge-base --is-ancestor` on an unfetched object exits 128, and `2>/d…](#2026-08-23-git-merge-base---is-ancestor-on-an-unfetched-object-exits-128-and-2devnull-turns-that-into-a-clean-no)
+- [2026-08-24 — A PRE-FLIGHT CHECK DOES NOT SURVIVE A TURN BOUNDARY. Three times in one se…](#2026-08-24-a-pre-flight-check-does-not-survive-a-turn-boundary-three-times-in-one-session)
+- [2026-08-25 — METHOD: to prove a conditional gate still fires, find it firing for a SIBL…](#2026-08-25-method-to-prove-a-conditional-gate-still-fires-find-it-firing-for-a-sibling-that-meets-the-condition-today-do-not-reason-from-the-code)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

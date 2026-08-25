@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 531 rules `[generated]`
+## Index — 550 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5790,3 +5790,69 @@ exactly this and has been unable to run all session (`RENDER_API_KEY not set`).
 With the real gate dead, the by-hand substitute inherited a property the gate
 does not have — it can go stale silently — and nothing in the environment
 reports that. Three for three.
+
+### 2026-08-25 — FORBIDDEN: never accept a backtest's "0 rows graded" as a result. An analysis script that cannot find its inputs must EXIT NON-ZERO, not report a clean zero
+
+- What we believed: NCAAF's picks are suppressed on measured evidence — the
+  model loses to the closing line and to always-bet-the-underdog — and that
+  evidence is in the repo, in `scripts/grade_football_playability.py` and
+  `grade_football_model_weight.py`, which are unusually well built (52.4%
+  breakeven not 50%, every threshold printed so the multiplicity is visible,
+  Wilson intervals, underdog-share reported so an under-dispersed model cannot
+  read as skill).
+- What was actually true: **neither script can run anywhere but one laptop, and
+  neither says so.** Both hardcode `REPO = Path(r"C:\Users\tempadmin\OneDrive\
+  Coding\Syndicate")`, and the pick-ledger CSVs they grade
+  (`{sport}_source/data/pick_ledger/pick_ledger_*.csv`) are untracked and absent
+  from the repo entirely — `git ls-files | grep pick_ledger` returns the
+  builder, the module and its test, and no data. Run on a machine with
+  `PYTHONPATH` set so the import still resolves, the output is
+  `NCAAF ... 0 gradable games` / `NFL PRESEASON ... 0 gradable games`, followed
+  by the multiplicity warning, **exit 0**.
+- How we found out: ran them during an end-to-end NCAAF readiness assessment,
+  expecting to reproduce the numbers `state.md` cites. The report rendered
+  perfectly — headers, labels, the honest caveat block — around nothing. Nothing
+  in the output distinguished "graded 858 games and found no edge" from "found
+  no games". The tell was the number itself being 0 twice, not any error.
+- The rule going forward: **an analysis script must fail loudly when its input
+  set is empty.** Assert a minimum row count before reporting and exit non-zero
+  below it; name the resolved input path in the output so a wrong root is
+  visible in the report rather than in the code. And never hardcode an absolute
+  repo path — derive it from `__file__`, which is what makes the failure
+  portable instead of silent. Corollary for readers: **before citing a measured
+  result, re-run it and check the denominator.** A conclusion whose evidence
+  exists on exactly one machine is not in the ledger, whatever the ledger says.
+- Cost: none yet, and that is luck rather than design — the suppression the
+  evidence supports is almost certainly correct, and the numbers are stated with
+  n and CIs. What was lost is the ability to check: the entire evidence base for
+  withholding NCAAF picks is unreproducible, and any future session re-running
+  it gets a clean, plausible zero. This is `model_engine_standard.md`'s unfed-input
+  signature — a neutral default indistinguishable from a working feature — moved
+  from the INPUT layer to the EVIDENCE layer, where there is no checklist watching.
+
+### 2026-08-25 — METHOD: to prove a conditional gate still fires, find it firing for a SIBLING that meets the condition today — do not reason from the code
+
+- What we believed: NCAAF being dropped from the odds sweep four days before
+  kickoff (`SWEEP_OWNERSHIP_EXCLUDED ... dropped=ncaaf:not_in_SYNDICATE_ACTIVE_
+  SPORTS`) was the root cause of an entirely empty market pipeline.
+- What was actually true: it is the gate working. `#520`'s weekly carve-out keeps
+  nfl/ncaaf/ncaab on the fast tick on game days regardless of that env var, at
+  `horizon_days=1`; there is no NCAAF game within today+1, so dropping it is
+  correct, and it should self-arm the day before kickoff.
+- How we found out: running the predicate locally returned the OPPOSITE of
+  production for the same date — because `sport_has_games_within` needs ESPN and
+  the sandbox has no egress, so it fell through to its `unknown_means_yes: True`
+  fallback. A local re-run was not merely uninformative, it was **confidently
+  wrong in the reassuring direction**. What settled it was finding the carve-out
+  firing in production for **NFL** on 2026-08-24 — same file, same live SHA
+  (verified byte-identical), a sibling sport that had a game that day.
+- The rule going forward: **a conditional gate is proven by an observation of it
+  firing, not by reading its condition.** When the sport/date you care about does
+  not meet the condition yet, find a sibling that does today and confirm the log
+  token there, then check the live SHA carries the same code
+  (`git show <sha>:<file>` vs your checkout). Re-running a network-dependent
+  predicate in a sandbox proves nothing — and worse, a fallback default like
+  `unknown_means_yes` will hand you a confident answer that is backwards.
+- Cost: none — caught before it was written down. Had it not been, the ledger
+  would have carried "NCAAF is switched off in production" as a fact, and the
+  fix for it would have been an env-var change to a gate that was already correct.
