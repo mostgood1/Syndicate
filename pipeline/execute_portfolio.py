@@ -688,23 +688,47 @@ def _decode_polymarket_list(value: Any) -> list[Any] | None:
 # side" means.
 _HOME_LIKE_SIDES = {"yes", "over", "home"}
 
+# Board market names whose OUTCOMES are Over/Under rather than team names.
+_TOTAL_MARKETS = {"totals", "total", "totals_alt", "alternate_totals"}
+# ...and whose outcomes are signed numbers, naming no team at all.
+_SPREAD_MARKETS = {"spreads", "spread", "spreads_alt", "alternate_spreads", "run_line", "puck_line"}
+
+
+# The ceiling is a MULTIPLE of the writer's cadence, and the multiple is named
+# once. Restating the product is what let the two drift apart.
+_SLATE_CEILING_MULTIPLE = 3
+
+
+def _slate_ceiling_default() -> float:
+    from syndicate.features.shared.polymarket_us_markets import SLATE_INTERVAL_SECONDS
+
+    return float(SLATE_INTERVAL_SECONDS * _SLATE_CEILING_MULTIPLE)
+
 
 def _polymarket_max_price_age_seconds() -> float:
     """How old the persisted slate may be and still price a real order.
 
-    Default 1800s -- TWICE the writer's 900s cadence, so one missed write is
-    tolerated and a stopped writer is not. Tied to the cadence deliberately: a
-    ceiling unrelated to how often the artifact is refreshed either refuses
+    Default is THREE TIMES the writer's cadence, DERIVED from
+    `polymarket_us_markets.SLATE_INTERVAL_SECONDS` rather than restated -- so a
+    couple of missed writes are tolerated and a stopped writer is not.
+
+    LOWERED WITH THE CADENCE, and that coupling is the point. This was 1800s
+    against a 900s writer. When the writer dropped to 180s the old ceiling
+    became TEN times the cadence, which would have let a writer that stopped
+    nine cycles ago still price a real order -- the guard would still have been
+    present, still logged, and no longer guarding anything. Tied to the
+    cadence deliberately: a ceiling unrelated to how often the artifact is
+    refreshed either refuses
     healthy slates or admits dead ones.
     """
     raw = os.environ.get("SYNDICATE_POLYMARKET_MAX_PRICE_AGE_SECONDS")
     try:
         parsed = float(str(raw).strip())
     except (TypeError, ValueError):
-        return 1800.0
+        return _slate_ceiling_default()
     # A non-positive ceiling is a typo, not an instruction to refuse everything
     # forever -- same reading `execution_guard._float_env` gives a bad cap.
-    return parsed if parsed > 0 else 1800.0
+    return parsed if parsed > 0 else _slate_ceiling_default()
 
 
 def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | None:
@@ -912,11 +936,34 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
     # `home`/`away`. The two disagreed, and on 2026-08-25T16:08:10Z that bought
     # TEXAS on a `side=home` row whose home team is the White Sox, at the price
     # resolved for the White Sox. One reading now feeds both.
+    market = str(getattr(request, "market", "") or "").strip().lower()
+    our_side = str(getattr(request, "side", "") or "").strip().lower()
+
+    # WHICH OUTCOME IS OURS DEPENDS ON WHAT KIND OF MARKET THIS IS.
+    #
+    # MEASURED 2026-08-25T17:45:13Z. The slug was RIGHT -- the right game and
+    # the right number -- and the order still failed:
+    #
+    #   totals over 7.5 Tampa Bay Rays @ Detroit Tigers
+    #   slug=tsc-mlb-tb-det-2026-08-25-7pt5
+    #   OrderBuildError: market_unresolved_for_position
+    #
+    # This loop matched every outcome with `_side_for_team`, which resolves
+    # TEAM NAMES. A totals market's outcomes are `["Over","Under"]` and a
+    # spread's are `["+2.50","-2.50"]` -- neither is a team, so both outcomes
+    # were skipped, the price stayed None, and every totals and spreads order
+    # on this venue has failed this way since the venue went live. Only
+    # moneylines ever resolved, because only moneyline outcomes are teams.
     price = None
     outcome_index = None
-    for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
-        side = _side_for_team(name, resolution, sport=sport)
-        if side is not None and (side == "home") == wants_home:
+    refusal = None
+
+    if market in _TOTAL_MARKETS:
+        # UNAMBIGUOUS. `Over` and `Under` name the side directly, and our own
+        # side is already `over`/`under`.
+        for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
+            if str(name or "").strip().lower() != our_side:
+                continue
             try:
                 price = float(raw_price)
             except (TypeError, ValueError):
@@ -924,10 +971,37 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
             else:
                 outcome_index = position
             break
+        if outcome_index is None:
+            refusal = "total_side_not_in_outcomes"
+    elif market in _SPREAD_MARKETS:
+        # REFUSED BY NAME, and this is a deliberate stop rather than an
+        # omission. A spread's outcomes are SIGNED NUMBERS -- `["+2.50",
+        # "-2.50"]` -- and nothing in them says which TEAM is getting the
+        # points. Our side is `home`/`away`, so pairing them means assuming an
+        # ordering, and an assumed ordering on this venue has already bought
+        # the wrong team once today at a real cost. The slug's `pos`/`neg`
+        # token is a candidate answer and it is UNVERIFIED against the
+        # outcomes array, so it stays a candidate.
+        refusal = "spread_side_needs_verified_team_mapping"
+    else:
+        for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
+            side = _side_for_team(name, resolution, sport=sport)
+            if side is not None and (side == "home") == wants_home:
+                try:
+                    price = float(raw_price)
+                except (TypeError, ValueError):
+                    price = None
+                else:
+                    outcome_index = position
+                break
+        if outcome_index is None:
+            refusal = "team_side_not_in_outcomes"
+
     if price is None or outcome_index is None:
         print(
-            f"[execute_portfolio] POLYMARKET_SIDE_UNRESOLVED slug={slug}"
-            f" side={getattr(request, 'side', None)}",
+            f"[execute_portfolio] POLYMARKET_SIDE_REFUSED slug={slug}"
+            f" market={market!r} side={our_side!r} reason={refusal}"
+            f" outcomes={outcomes!r}",
             flush=True,
         )
         return None

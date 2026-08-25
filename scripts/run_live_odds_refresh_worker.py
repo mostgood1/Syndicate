@@ -920,7 +920,9 @@ def _polymarket_us_slate_refresh_tick() -> None:
     # The floor drops to 60s so the override can go further when a slate is
     # worth watching closely; it stays a floor because the write is ~2.1MB and
     # an unbounded value here would put that on the keyvalue store in a loop.
-    interval = 180
+    from syndicate.features.shared.polymarket_us_markets import SLATE_INTERVAL_SECONDS
+
+    interval = SLATE_INTERVAL_SECONDS
     raw = str(os.environ.get("SYNDICATE_POLYMARKET_US_SLATE_INTERVAL_SECONDS") or "").strip()
     if raw:
         try:

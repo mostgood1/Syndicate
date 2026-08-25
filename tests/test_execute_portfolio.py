@@ -1045,3 +1045,98 @@ def test_a_failed_order_is_neither_placed_nor_invisible(monkeypatch):
     result = runner.run_execution("2026-08-22")
     assert result["placed"] == 0
     assert result["failed"] == 1
+
+
+# --------------------------------------------------------------------------
+# Polymarket side resolution depends on what KIND of market it is
+# --------------------------------------------------------------------------
+
+
+def _poly_market(slug, outcomes, prices, market_type="SPORTS_MARKET_TYPE_TOTAL"):
+    import json as _json
+    return {
+        "slug": slug, "sportsMarketTypeV2": market_type,
+        "outcomes": _json.dumps(outcomes), "outcomePrices": _json.dumps(prices),
+        "orderPriceMinTickSize": "0.005", "minimumTradeQty": "0.01",
+        "orderable": True,
+    }
+
+
+def test_a_TOTALS_market_resolves_on_over_under_not_on_team_names(monkeypatch):
+    """MEASURED 2026-08-25T17:45:13Z. The slug was RIGHT -- right game, right
+    number -- and the order still failed:
+
+      totals over 7.5 Tampa Bay Rays @ Detroit Tigers
+      slug=tsc-mlb-tb-det-2026-08-25-7pt5
+      OrderBuildError: market_unresolved_for_position
+
+    The resolver matched every outcome with `_side_for_team`, which resolves
+    TEAM names. A totals market's outcomes are `["Over","Under"]`, so both were
+    skipped and the price stayed None. Every totals order on this venue had
+    failed this way since it went live; only moneylines ever resolved.
+    """
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("tsc-mlb-tb-det-2026-08-25-7pt5", ["Over", "Under"], ["0.52", "0.50"]),
+    ])
+
+    class _TotalReq(_PolyReq):
+        market = "totals"
+        side = "over"
+        line = 7.5
+        venue_ticker = "tsc-mlb-tb-det-2026-08-25-7pt5"
+        home_team = "Detroit Tigers"
+        away_team = "Tampa Bay Rays"
+        requested_price = 0.52
+
+    resolved = runner._polymarket_resolve_market(_TotalReq())
+    assert resolved is not None, "a totals market still refuses"
+    assert resolved[1] == 0.52
+    # The INDEX is what `order_body` turns into `outcomeSide`, so it must be
+    # the Over slot, not merely "some priced slot".
+    assert resolved[4] == 0
+
+
+def test_the_under_side_takes_the_UNDER_price(monkeypatch):
+    """The control. Getting the price right for the wrong side is the failure
+    that bought the wrong team on 2026-08-25."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("tsc-mlb-tb-det-2026-08-25-7pt5", ["Over", "Under"], ["0.52", "0.50"]),
+    ])
+
+    class _UnderReq(_PolyReq):
+        market = "totals"
+        side = "under"
+        venue_ticker = "tsc-mlb-tb-det-2026-08-25-7pt5"
+        requested_price = 0.50
+
+    resolved = runner._polymarket_resolve_market(_UnderReq())
+    assert resolved[1] == 0.50
+    assert resolved[4] == 1
+
+
+def test_a_SPREAD_is_refused_by_name_rather_than_guessed(monkeypatch):
+    """A spread's outcomes are SIGNED NUMBERS -- `["+2.50","-2.50"]` -- and
+    nothing in them says which TEAM is getting the points. Our side is
+    home/away, so pairing them means assuming an ordering, and an assumed
+    ordering on this venue already bought the wrong team once today."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("asc-mlb-cle-laa-2026-08-25-pos-1pt5",
+                     ["+1.50", "-1.50"], ["0.55", "0.47"],
+                     market_type="SPORTS_MARKET_TYPE_SPREAD"),
+    ])
+
+    class _SpreadReq(_PolyReq):
+        market = "spreads"
+        side = "home"
+        line = 1.5
+        venue_ticker = "asc-mlb-cle-laa-2026-08-25-pos-1pt5"
+
+    assert runner._polymarket_resolve_market(_SpreadReq()) is None
+
+
+def test_a_moneyline_still_resolves_on_team_names(monkeypatch):
+    """The path that already worked must not regress."""
+    runner = _artifact_env(monkeypatch)
+    resolved = runner._polymarket_resolve_market(_PolyReq())
+    assert resolved is not None
+    assert resolved[1] == 0.55

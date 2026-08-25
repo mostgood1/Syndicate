@@ -1197,6 +1197,19 @@ def _normalise_team(value: Any) -> str:
 
 GAME_SLATE_ARTIFACT = ("intelligence", "polymarket_us_games.json")
 
+# How often the slate writer runs, in seconds.
+#
+# NAMED HERE SO THE FRESHNESS CEILING CAN BE DERIVED FROM IT rather than
+# restated. `execute_portfolio._polymarket_max_price_age_seconds` is documented
+# as a MULTIPLE of this cadence -- and it drifted: the ceiling stayed at 1800s
+# (twice a 900s writer) when the writer dropped to 180s, which quietly made it
+# ten times the cadence. A guard that tolerates nine missed writes is still
+# present, still logged, and no longer guarding anything.
+#
+# One constant, two readers, so the relationship the docstrings claim is the
+# one the code has.
+SLATE_INTERVAL_SECONDS = 180
+
 # `refresh_state_store`'s keyvalue backend refuses a write past this.
 _KEYVALUE_CEILING_BYTES = 8 * 1024 * 1024
 
