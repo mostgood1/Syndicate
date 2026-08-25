@@ -2065,6 +2065,35 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   slug's `<home>`, ~0.0 means `<away>`, **anything between FALSIFIES the
   symmetric-ladder finding and spreads must stay refused.**
 
+### kalshi-oddsapi-coverage-audit — OPEN — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+- Goal: ONE document that answers, per sport and per market family, all four of
+  "does Kalshi list it / do we register it / does the board carry the key /
+  does OddsAPI supply it" -- from OBSERVED production evidence only -- plus a
+  GAP TABLE of Kalshi market-page URL patterns the user can paste live links
+  back for. Ends the one-market-at-a-time loop.
+- Files (ALL NEW, no existing file touched -- this is a READ-ONLY AUDIT):
+  `docs/ai_context/kalshi_oddsapi_coverage_audit.md` (NEW),
+  `scripts/audit_kalshi_oddsapi_coverage.py` (NEW).
+  Collision-checked against every OPEN lane's `Files:` list: no lane claims
+  either path, and neither exists on `main`.
+- DELIBERATELY NOT TOUCHED, though the brief allowed it: the `GAP` 12-row cap
+  in `pipeline/kalshi_discovery.py`. Widening it is log-only but INERT without
+  a deploy, and deploying is out of scope for this lane; that file is also
+  being actively edited today by `exchange-market-apis`
+  (session `01Sia2rPD72eFTriy28azzs2`, commits `461ee74be`/`eb551697c`).
+  Recorded in the audit as a recommendation with its measured justification.
+- Hypothesis: n/a -- this is a census, not a diagnosis.
+- Falsification test: every table row cites a production log line WITH ITS
+  TIMESTAMP, or the entry belongs in the SUSPECTED/UNCONFIRMED section. Any
+  ticker that cannot be traced to a `KALSHI_SPORT` / `LISTED` / `SERIES` /
+  `GAP` / `TICK` line or a user-confirmed market page is a fabrication and
+  must move. `kalshi_catalogue.py`'s header states why: an invented plausible
+  ticker manufactures a false negative.
+- Verification: the doc exists on `claude/kalshi-oddsapi-coverage-audit`, every
+  FACT row carries an observation timestamp, and the SUSPECTED section is
+  separated from the observed one.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
