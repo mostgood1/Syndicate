@@ -2405,19 +2405,36 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     markets survive `MAX_MARKETS_PER_SERIES` / `MAX_STORED_MARKETS` -- and a
     strictly larger effect. **Line-aware selection becomes worth doing only
     after the set contains the board's own date.**
-  - **CAUTION, and it needs its own check before anyone writes the date-aware
-    bound.** `game_date_from_ticker` reads the ticker's date token and its
-    docstring states the time is deliberately NOT parsed because the timezone
-    "is not settled by any reading I have". A 19:45 ET game on Aug 25 is
-    00:45 UTC on Aug 26, so a night slate can be labelled by Kalshi one day
-    ahead of the board's Central date. **That is a SUSPECTED systematic
-    off-by-one, not a measured one** -- and it must be settled first, because a
-    date-aware bound built on the wrong timezone would discard the very markets
-    it is meant to keep. What would settle it: one ticker whose game date is
-    known independently, compared against its token.
-- **REMAINING:** (a) settle the ticker timezone; (b) date-aware bound;
-  (c) line-aware rungs, LAST, and only once (a) and (b) show the board's date
-  present in the working set.
+  - **THE TICKER TIMEZONE IS SETTLED: IT IS EASTERN. The suspected off-by-one
+    is REFUTED** `[2026-08-25]`. `game_date_from_ticker`'s docstring says the
+    time is deliberately not parsed because the zone "is not settled by any
+    reading I have" -- it is settled now, and the docstring should say so.
+    Six observed tickers against their home park's standard start; only ONE
+    hypothesis survives all six:
+
+        KXMLBGAME-26AUG26**1905**HOUNYY   19:05 ET  Yankee Stadium standard
+        KXMLBGAME-26AUG26**1915**LADATL   19:15 ET  Truist Park standard
+        KXMLBGAME-26AUG26**1945**BALSTL   19:45 ET = 18:45 CT  Busch standard
+        KXMLBGAME-26AUG26**1940**TEXCWS   19:40 ET = 18:40 CT  Rate Field standard
+        KXMLBGAME-26AUG26**1845**COLWSH   18:45 ET  Nationals standard
+        KXMLBGAME-26AUG26**2105**MINATH   21:05 ET = 18:05 PT  Athletics standard
+
+    UTC would put all six between 14:45 and 17:05 ET on a weeknight, which no
+    club starts. VENUE-LOCAL fails on TEXCWS (19:40 CT) and MINATH (21:05 PT),
+    neither a real start. **EASTERN is the only reading consistent with all
+    six.**
+  - **AND THEREFORE THE OFF-BY-ONE CANNOT HAPPEN.** ET and Central differ by
+    one hour, so the calendar date differs only for a start between 00:00 and
+    01:00 ET. The observed range is 18:45-21:05 ET. **No MLB slate can shift a
+    day between the ticker's zone and the board's.** The hazard I recorded was
+    real to check and is now closed as NOT a hazard.
+- **REMAINING, reordered by what the retraction changed:** (a) fix
+  `board_by_game_date` to group on the ticker's game date -- it is the reason
+  any date reasoning here is unsafe; (b) THEN re-establish what
+  `market_is_for_another_date` actually is, from a line that means what it
+  says; (c) line-aware rungs LAST, if the re-established numbers still support
+  them. **(b) is now genuinely open** -- this lane has had two hypotheses
+  killed and should not adopt a third without a measurement.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
