@@ -226,3 +226,52 @@ def test_a_zero_says_which_kind_of_zero_it_is():
     )
     assert no_venue["board_fixtures_keyed"] == 1
     assert no_venue["spread_slugs_with_no_board_fixture"] == 0
+
+
+def test_a_first_five_innings_spread_never_votes():
+    """MEASURED 2026-08-25T22:01:52Z: `fixtures=7 agree=2 disagree=5 rate=0.2857`,
+    and ALL FIVE disagreements carried `-f5-`.
+
+    The board's spread is the full game; `f5` is the first five innings. Their
+    signs need not agree, so comparing them measures the instrument, not the
+    venue -- and a rate of 0.2857 read as evidence against the symmetric-ladder
+    finding when it was an artefact.
+
+    It compounded with the one-vote rule: `seen_fixture` is set on the first
+    match, so an `f5` slug earlier in the slate stole the fixture's only vote.
+    This pins that a segment slug cannot vote even when it comes first.
+    """
+    board = [{
+        "market": "spreads", "side": "home", "line": -1.5, "sport": "mlb",
+        "selected_date": "2026-08-25",
+        "home_team": "Arizona Diamondbacks", "away_team": "Chicago Cubs",
+    }]
+    # The f5 slug is FIRST, exactly as production ordered it.
+    slate = [
+        {"slug": "asc-mlb-chc-az-2026-08-25-f5-neg-1pt5",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD"},
+        {"slug": "asc-mlb-chc-az-2026-08-25-neg-1pt5",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD"},
+    ]
+    result = spread_sign_test(slate, board, min_sample=1, selected_date="2026-08-25")
+    assert result["segment_slugs_skipped"] == 1
+    # One vote, and it is the FULL-GAME slug's.
+    assert result["fixtures_compared"] == 1
+    assert result["agree_with_home_sign"] == 1
+    assert result["disagree"] == 0
+
+
+def test_a_segment_only_fixture_casts_no_vote_at_all():
+    """Silence beats a wrong vote: if the venue lists only `f5` for a fixture,
+    that fixture must not appear in the denominator."""
+    board = [{
+        "market": "spreads", "side": "home", "line": -1.5, "sport": "mlb",
+        "selected_date": "2026-08-25",
+        "home_team": "Arizona Diamondbacks", "away_team": "Chicago Cubs",
+    }]
+    slate = [{"slug": "asc-mlb-chc-az-2026-08-25-f5-neg-1pt5",
+              "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD"}]
+    result = spread_sign_test(slate, board, min_sample=1, selected_date="2026-08-25")
+    assert result["segment_slugs_skipped"] == 1
+    assert result["fixtures_compared"] == 0
+    assert result["agreement_rate"] is None
