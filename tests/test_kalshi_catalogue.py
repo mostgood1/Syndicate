@@ -539,3 +539,323 @@ def test_a_real_full_game_total_ticker_classifies_end_to_end():
     assert verdict["side"] == "over"
     # A total names no team, so the game must come from the ticker.
     assert verdict["needs_event_identity"] is True
+
+
+def test_the_mlb_player_prop_series_the_board_was_already_asking_for():
+    """CONFIRMED BY THE USER 2026-08-25 from live Kalshi market pages -- six
+    series we never fetched, while the board was already asking for four of
+    them by name.
+
+    `VENUE_REPRICE_KEYS board_wanted`, measured 2026-08-25T16:13:44Z:
+
+        mlb|batter_rbis|over|0.5        (x3)   -> KXMLBRBI
+        mlb|batter_total_bases|over|1.5        -> KXMLBTB
+        mlb|earned_runs|under|1.5              -> KXMLBERA
+        mlb|hits_allowed|over|4.5              -> KXMLBHA
+
+    Every one of those rows found nothing and reported it as Kalshi having no
+    market, when Kalshi had the market and we were not asking for it.
+    """
+    from syndicate.features.shared.kalshi_catalogue import sport_for_series
+
+    for series in (
+        "KXMLBHIT", "KXMLBHRR", "KXMLBTB",
+        "KXMLBRBI", "KXMLBERA", "KXMLBWA", "KXMLBHA",
+    ):
+        assert sport_for_series(series) == "mlb", series
+
+
+def test_the_real_prop_tickers_classify_to_the_market_the_board_wants():
+    """Registration is necessary, not sufficient. Tickers are the user's,
+    verbatim; titles are Kalshi's own "N+ stat" wording."""
+    from syndicate.features.shared.kalshi_catalogue import classify_market
+
+    cases = (
+        ("KXMLBHIT", "KXMLBHIT-26AUG251840BOSMIA-MIAARAMREZ50-1",
+         "Agustin Ramirez: 1+ hits?", "batter_hits", 0.5),
+        ("KXMLBTB", "KXMLBTB-26AUG251840BOSMIA-MIAARAMREZ50-2",
+         "Agustin Ramirez: 2+ total bases?", "batter_total_bases", 1.5),
+        ("KXMLBRBI", "KXMLBRBI-26AUG251840BOSMIA-MIAARAMREZ50-1",
+         "Agustin Ramirez: 1+ RBIs?", "batter_rbis", 0.5),
+        ("KXMLBERA", "KXMLBERA-26AUG251840BOSMIA-BOSPTOLLE70-1",
+         "Payton Tolle: 1+ earned runs?", "earned_runs", 0.5),
+        ("KXMLBWA", "KXMLBWA-26AUG251840BOSMIA-MIATPHILLIPS30-2",
+         "Tyler Phillips: 2+ walks allowed?", "walks_allowed", 1.5),
+        ("KXMLBHA", "KXMLBHA-26AUG251840BOSMIA-BOSPTOLLE70-5",
+         "Payton Tolle: 5+ hits allowed?", "hits_allowed", 4.5),
+    )
+    for series, ticker, title, market, line in cases:
+        verdict = classify_market({
+            "ticker": ticker, "series": series, "title": title,
+            "yes_ask_dollars": 0.5, "no_ask_dollars": 0.5,
+        })
+        assert verdict["status"] == "ok", (series, verdict)
+        assert verdict["market"] == market, (series, verdict)
+        assert verdict["line"] == line, (series, verdict)
+        assert verdict["side"] == "over", (series, verdict)
+        # A prop names a human, so it needs neither an event resolution nor
+        # the game-lines flag.
+        assert not verdict.get("needs_event_identity"), (series, verdict)
+
+
+def test_soccer_registers_from_the_competition_in_kalshis_own_title():
+    """Soccer was the one sport `sport_for_ticker` could never see, because
+    Kalshi names soccer series by COMPETITION -- `KXLALIGAGAME`, `KXUCL1HTOTAL`
+    -- and there is no token to scan for. `prop_candidates` has said so in its
+    own docstring since it was written.
+
+    MEASURED 2026-08-25T19:12:01Z in `kalshi_discovery GAP`: KXLALIGASCORE,
+    KXLALIGA1HSCORE, KXUECLSCORE, KXUECLTEAMTOTAL, KXUELTEAMTOTAL,
+    KXUCL1HTOTAL, KXEFLCUPTOTAL -- all `reason=unmapped_series`.
+    """
+    from syndicate.features.shared.kalshi_catalogue import soccer_league_from_title
+
+    assert soccer_league_from_title("La Liga Game") == "la_liga"
+    assert soccer_league_from_title("EPL Total") == "epl"
+    assert soccer_league_from_title("MLS Spread") == "mls"
+    assert soccer_league_from_title("Championship Game") == "championship"
+
+
+def test_the_soccer_title_gate_is_a_prefix_and_not_a_substring():
+    """Two collisions this would otherwise cause, and both are the exact shape
+    of the `KXWNBAREB`-contains-`NBA` trap already documented above.
+
+    "Championship" is a substring of "UEFA Champions League"... it is not,
+    quite, but "Champion" is, and a looser match files a competition we do not
+    model under one we do. And a competition code as a TICKER substring is
+    worse still: `UCL` sits inside `KXNUCLEARTEST`.
+    """
+    from syndicate.features.shared.kalshi_catalogue import soccer_league_from_title
+
+    # Competitions Syndicate does not model stay unmapped -- and stay in the
+    # COVERAGE_GAPS work queue, which is the point.
+    for title in (
+        "UEFA Champions League 1st Half Total",
+        "UEFA Europa Conference League Final Score",
+        "EFL Cup Total",
+        "Nuclear test in 2026",
+        "MLSomething Total",
+    ):
+        assert soccer_league_from_title(title) is None, title
+
+
+def test_soccer_discovery_registers_game_lines_and_refuses_what_we_cannot_price():
+    """The whole gate, end to end. Correct-score and corners have no board row
+    and no `market_keys` entry, so they must be REFUSED rather than registered
+    -- a series we register but cannot name would be fetched forever for
+    nothing."""
+    from syndicate.features.shared.kalshi_catalogue import (
+        auto_game_series_from_catalogue,
+        auto_series_from_catalogue,
+    )
+
+    titles = {
+        "KXLALIGAGAME": "La Liga Game",
+        "KXLALIGATOTAL": "La Liga Total",
+        "KXLALIGASPREAD": "La Liga Spread",
+        "KXLALIGAGOAL": "La Liga Player Goals",
+        "KXLALIGASCORE": "La Liga Final Score",
+        "KXLALIGATCORNERS": "La Liga Team Corners",
+        "KXUCL1HTOTAL": "UEFA Champions League 1st Half Total",
+    }
+    games = auto_game_series_from_catalogue(titles)
+    assert games == {
+        "KXLALIGAGAME": "soccer",
+        "KXLALIGATOTAL": "soccer",
+        "KXLALIGASPREAD": "soccer",
+    }
+    assert auto_series_from_catalogue(titles) == {"KXLALIGAGOAL": "soccer"}
+
+
+def test_the_soccer_gate_does_not_disturb_the_sports_that_have_tickers():
+    """The title gate is a FALLBACK, consulted only when the ticker carries no
+    sport token. A soccer-shaped title on an MLB ticker must stay MLB."""
+    from syndicate.features.shared.kalshi_catalogue import (
+        auto_game_series_from_catalogue,
+    )
+
+    found = auto_game_series_from_catalogue({
+        "KXMLBGAME": "Professional Baseball Game",
+        "KXWNBATOTAL": "Women's Pro Basketball Total",
+    })
+    assert found == {"KXMLBGAME": "mlb", "KXWNBATOTAL": "wnba"}
+
+
+def test_the_real_wnba_tickers_from_a_live_game_all_classify():
+    """CONFIRMED BY THE USER 2026-08-25 from the live Chicago/Connecticut game
+    page. Seven tickers, every market family the venue offers on one game.
+
+    THE EVENT SEGMENT CARRIES NO TIME -- `26AUG25CHICONN`, where MLB's is
+    `26AUG251840BOSMIA`. Both shapes are in production and a parser that
+    assumed the longer one would drop every WNBA and soccer market on the
+    venue while reporting nothing.
+
+    `KXWNBA3PT` is the one that was failing: the series is hand-registered and
+    its comment claims `market_keys` resolves it, which was true of the SERIES
+    title ("Player Threes") and false of the MARKET titles. It refused
+    `stat_not_in_market_vocabulary` on every wording but the bare word.
+    """
+    from syndicate.features.shared.kalshi_catalogue import (
+        classify_market,
+        event_blob_from_ticker,
+        game_date_from_ticker,
+        sport_for_series,
+    )
+
+    cases = (
+        ("KXWNBAGAME", "KXWNBAGAME-26AUG25CHICONN-CHI",
+         "Chicago Sky wins", "h2h", None, True),
+        ("KXWNBATOTAL", "KXWNBATOTAL-26AUG25CHICONN-172",
+         "Over 171.5 points scored?", "totals", 171.5, True),
+        ("KXWNBASPREAD", "KXWNBASPREAD-26AUG25CHICONN-CHI7",
+         "Will the Chicago Sky win by over 6.5 points?", "spreads", 6.5, True),
+        ("KXWNBAPTS", "KXWNBAPTS-26AUG25CHICONN-CHIDCARRINGTON3-10",
+         "DiJonai Carrington: 10+ points?", "player_points", 9.5, False),
+        ("KXWNBAREB", "KXWNBAREB-26AUG25CHICONN-CHIDCARRINGTON3-2",
+         "DiJonai Carrington: 2+ rebounds?", "player_rebounds", 1.5, False),
+        ("KXWNBA3PT", "KXWNBA3PT-26AUG25CHICONN-CONNSRIVERS22-1",
+         "Saniya Rivers: 1+ three pointers made?", "player_threes", 0.5, False),
+    )
+    for series, ticker, title, market, line, needs_event in cases:
+        assert sport_for_series(series) == "wnba", series
+        assert game_date_from_ticker(ticker) == "2026-08-25", ticker
+        assert event_blob_from_ticker(ticker) == "CHICONN", ticker
+        verdict = classify_market({
+            "ticker": ticker, "series": series, "title": title,
+            "yes_ask_dollars": 0.5, "no_ask_dollars": 0.5,
+        })
+        assert verdict["status"] == "ok", (series, verdict)
+        assert verdict["market"] == market, (series, verdict)
+        assert verdict["line"] == line, (series, verdict)
+        assert bool(verdict.get("needs_event_identity")) is needs_event, (series, verdict)
+
+
+def test_a_made_three_resolves_however_the_market_title_spells_it():
+    """The failure was one spelling wide. Kalshi words a market title per
+    market, and only the bare word "threes" resolved -- so a registered series
+    refused every market on it, which reads exactly like a series Kalshi does
+    not list."""
+    from syndicate.features.shared.market_keys import canonical_market_key
+
+    for spelling in (
+        "threes", "threes made", "made threes",
+        "three pointers", "three pointers made",
+        "three-pointers", "three-pointers made",
+        "3 pointers made", "3-pointers made", "3PT made", "3pts",
+    ):
+        for sport in ("wnba", "nba"):
+            assert canonical_market_key(sport, spelling) == "player_threes", (sport, spelling)
+
+
+def test_the_wnba_half_total_the_user_confirmed_classifies_once_registered():
+    """`KXWNBA1HTOTAL-26AUG25CHICONN-78`, confirmed on the live game page and
+    present in production's `AUTO_SERIES game_sample` the same day -- so
+    discovery registers it and the static table deliberately does not.
+
+    Pinned anyway, because the REGISTRATION was never the fragile part. When
+    this test was first written it asserted only status/line/side and PASSED
+    while the market resolved to `totals` -- the full-game key -- because the
+    totals grammar threw its stat away. See
+    `test_a_game_total_is_refused_unless_it_counts_this_sports_scoring_unit`.
+    """
+    from syndicate.features.shared import kalshi_catalogue as cat
+
+    absent = object()
+    prior = cat.SERIES_SPORT.get("KXWNBA1HTOTAL", absent)
+    cat.SERIES_SPORT["KXWNBA1HTOTAL"] = "wnba"
+    try:
+        verdict = cat.classify_market({
+            "ticker": "KXWNBA1HTOTAL-26AUG25CHICONN-78",
+            "series": "KXWNBA1HTOTAL",
+            "title": "Over 77.5 1st half points scored?",
+            "yes_ask_dollars": 0.5, "no_ask_dollars": 0.5,
+        })
+    finally:
+        if prior is absent:
+            cat.SERIES_SPORT.pop("KXWNBA1HTOTAL", None)
+        else:
+            cat.SERIES_SPORT["KXWNBA1HTOTAL"] = prior
+
+    assert verdict["status"] == "ok", verdict
+    # `totals_h1`, NOT `totals`. This assertion is the whole test: the grammar
+    # matched `Over <line> <anything>?` and hardcoded `totals`, so a half line
+    # was indistinguishable from a full-game line and joined on (market, line).
+    assert verdict["market"] == "totals_h1", verdict
+    assert verdict["line"] == 77.5, verdict
+    assert verdict["side"] == "over", verdict
+
+
+def test_a_game_total_is_refused_unless_it_counts_this_sports_scoring_unit():
+    """THE CONFIDENT WRONG MATCH THIS FILE EXISTS TO PREVENT, found while
+    registering soccer 2026-08-25.
+
+    `_TEAM_TOTAL` matches `Over <line> <anything>?` and then set the market to
+    the literal string "totals", discarding the stat it had just parsed. So
+    every one of these became a full-game points/runs total:
+
+        "Over 4.5 corners?"                  -> totals 4.5
+        "Over 77.5 1st half points scored?"  -> totals 77.5
+        "Over 2.5 1H goals scored"           -> totals 2.5   (real, KXUCL1HTOTAL)
+
+    The first is a WRONG BET rather than a miscount. Soccer boards carry a
+    goals total at 4.5, the join matches on (market, line, side), and our goals
+    model would have priced a corners market with nothing anywhere reading
+    wrong.
+    """
+    from syndicate.features.shared import kalshi_catalogue as cat
+
+    absent = object()
+    added = {"KXLALIGATOTAL": "soccer", "KXLALIGATCORNERS": "soccer"}
+    before = {k: cat.SERIES_SPORT.get(k, absent) for k in added}
+    cat.SERIES_SPORT.update(added)
+    try:
+        goals = cat.classify_market({
+            "ticker": "KXLALIGATOTAL-26AUG25VCFRBB-2", "series": "KXLALIGATOTAL",
+            "title": "Over 2.5 goals scored?",
+            "yes_ask_dollars": 0.5, "no_ask_dollars": 0.5,
+        })
+        corners = cat.classify_market({
+            "ticker": "KXLALIGATCORNERS-26AUG25VCFRBB-VCF5", "series": "KXLALIGATCORNERS",
+            "title": "Over 4.5 corners?",
+            "yes_ask_dollars": 0.5, "no_ask_dollars": 0.5,
+        })
+    finally:
+        for key, prior in before.items():
+            if prior is absent:
+                cat.SERIES_SPORT.pop(key, None)
+            else:
+                cat.SERIES_SPORT[key] = prior
+
+    assert goals["status"] == "ok" and goals["market"] == "totals", goals
+    assert corners["status"] == "refused", corners
+    assert corners["reason"] == "stat_not_in_market_vocabulary", corners
+    # The stat VERBATIM, so the work queue names what to add rather than a
+    # count. A refusal that says "corners" is actionable; `totals 4.5` is a bet.
+    assert corners["detail"] == "corners", corners
+
+
+def test_the_scoring_unit_is_per_sport_and_the_period_survives_it():
+    """A goals line is not a runs line. Reading either as the other is the same
+    error as reading corners as goals, one sport over."""
+    from syndicate.features.shared.market_keys import total_market_from_stat
+
+    assert total_market_from_stat("mlb", "runs scored") == "totals"
+    assert total_market_from_stat("soccer", "goals scored") == "totals"
+    assert total_market_from_stat("nhl", "goals") == "totals"
+    assert total_market_from_stat("wnba", "points scored") == "totals"
+
+    # Right shape, wrong sport's unit.
+    assert total_market_from_stat("mlb", "goals scored") is None
+    assert total_market_from_stat("soccer", "runs scored") is None
+    assert total_market_from_stat("wnba", "goals") is None
+
+    # The period is carried through, never flattened onto the full game.
+    assert total_market_from_stat("wnba", "1st half points scored") == "totals_h1"
+    assert total_market_from_stat("nba", "1st quarter points scored") == "totals_q1"
+    assert total_market_from_stat("soccer", "1H goals scored") == "totals_h1"
+    assert total_market_from_stat("nhl", "1st period goals") == "totals_p1"
+
+    # A period with no unit after it is not a total.
+    assert total_market_from_stat("nba", "1st half") is None
+    assert total_market_from_stat("nba", "") is None
+    assert total_market_from_stat("chess", "points") is None

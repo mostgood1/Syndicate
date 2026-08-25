@@ -111,6 +111,34 @@ _BASKETBALL: dict[str, str] = {
     "triple double": "player_triple_double",
     "fg3m": "player_threes",
     "3s": "player_threes",
+    # EVERY WAY A MARKET TITLE SPELLS A MADE THREE. `KXWNBA3PT` is
+    # hand-registered in `kalshi_catalogue` and its comment says "market_keys
+    # resolves all three for wnba" -- true of the series title ("Player
+    # Threes") and NOT of the market titles, which are worded per market and
+    # were refusing `stat_not_in_market_vocabulary` on anything but the bare
+    # word. A registered series whose markets all refuse is indistinguishable
+    # from a series Kalshi does not list, which is the absence/failure
+    # confusion this integration keeps paying for.
+    #
+    # Widening a vocabulary that already resolves the stat cannot mismap
+    # anything: no other basketball market means "three pointer". The reverse
+    # -- guessing at Kalshi's exact wording and adding only that -- is what
+    # left this refusing in the first place.
+    "three pointers": "player_threes",
+    "three pointers made": "player_threes",
+    "three-pointers": "player_threes",
+    "three-pointers made": "player_threes",
+    "3 pointers": "player_threes",
+    "3 pointers made": "player_threes",
+    "3-pointers": "player_threes",
+    "3-pointers made": "player_threes",
+    "3pt": "player_threes",
+    "3pt made": "player_threes",
+    "3pts": "player_threes",
+    "threes made": "player_threes",
+    "made threes": "player_threes",
+    "three point field goals": "player_threes",
+    "three point field goals made": "player_threes",
 }
 
 # --------------------------------------------------------------------------
@@ -137,6 +165,78 @@ _PERIOD_SUFFIX: dict[str, str] = {
     "2nd period": "p2", "second period": "p2", "p2": "p2",
     "3rd period": "p3", "third period": "p3", "p3": "p3",
 }
+
+# What a GAME TOTAL counts, per sport. The unit and nothing else.
+#
+# THIS EXISTS BECAUSE THE TOTALS GRAMMAR THREW ITS STAT AWAY. Kalshi words a
+# game total "Over 7.5 runs scored?", and `kalshi_catalogue._TEAM_TOTAL`
+# matched `Over <line> <anything>?` and then hardcoded the market as `totals`
+# -- so the stat was parsed and discarded. Every one of these became a
+# full-game points/runs total:
+#
+#     "Over 4.5 corners?"                  -> totals 4.5
+#     "Over 77.5 1st half points scored?"  -> totals 77.5
+#     "Over 2.5 1H goals scored"           -> totals 2.5   (real, KXUCL1HTOTAL)
+#
+# The first is a WRONG BET, not a miscount: soccer boards carry a goals total
+# at 4.5, so our goals model would have priced a corners market and the join
+# would have looked clean. The second is the same shape one period over -- an
+# NBA 1st-half total at 110.5 against a full-game line at 110.5 matches on
+# (market, line) and is a bet on a different thing.
+#
+# A game total is the only market where the unit is implicit, which is why it
+# was easy to drop: nobody writes "goals" on a totals board row. So the unit is
+# checked HERE and the period is kept, rather than the tail being trusted.
+_TOTAL_UNIT: dict[str, frozenset[str]] = {
+    "mlb": frozenset({"run", "runs"}),
+    "nba": frozenset({"point", "points"}),
+    "wnba": frozenset({"point", "points"}),
+    "ncaab": frozenset({"point", "points"}),
+    "nfl": frozenset({"point", "points"}),
+    "ncaaf": frozenset({"point", "points"}),
+    "nhl": frozenset({"goal", "goals"}),
+    "soccer": frozenset({"goal", "goals"}),
+}
+
+# Words Kalshi appends that carry no meaning for the key. "scored" is the only
+# one seen so far and it is stripped rather than enumerated into every unit.
+_TOTAL_FILLER = ("scored", "in total", "total")
+
+
+def total_market_from_stat(sport: Any, stat_text: Any) -> str | None:
+    """"1st half points scored" -> `totals_h1`. A corners line -> None.
+
+    Returns None for ANY unit that is not this sport's scoring unit, and that
+    refusal is the point: `classify_market` turns it into
+    `stat_not_in_market_vocabulary` with the stat text verbatim, so a real
+    market we cannot yet price lands in the work queue by name instead of
+    being priced as something else.
+    """
+    units = _TOTAL_UNIT.get(str(sport or "").strip().lower())
+    if not units:
+        return None
+    token = " ".join(str(stat_text or "").strip().lower().split())
+    if not token:
+        return None
+
+    period = ""
+    for phrase, suffix in sorted(_PERIOD_SUFFIX.items(), key=lambda kv: -len(kv[0])):
+        if token == phrase:
+            return None
+        if token.startswith(phrase + " "):
+            period, token = suffix, token[len(phrase) :].strip()
+            break
+
+    for filler in _TOTAL_FILLER:
+        if token.endswith(" " + filler):
+            token = token[: -len(filler)].strip()
+        if token.startswith(filler + " "):
+            token = token[len(filler) :].strip()
+
+    if token not in units:
+        return None
+    return f"totals_{period}" if period else "totals"
+
 
 # The market word, once the period has been stripped off the front.
 _GAME_CORE: dict[str, str] = {
