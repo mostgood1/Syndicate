@@ -283,6 +283,57 @@ measured, because the effect cannot be measured from a checkout.
 
 Nothing is deployed. `autoDeploy` is off.
 
+### `#555` — **Layer 1 NCAAF now carries the model, WITH its measurement attached. `0 with a projection` -> 52.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, user decision
+
+`#552` gave Layer 1 real NCAAF prices; it then reported
+`no_projection_source_for_sport` because `_attach_projections_by_sport` had no
+`ncaaf` branch. Prices with no model are an odds screen, not a betting board.
+
+**PROVEN END TO END, not predicted.** `#552` claimed Layer 1 would clear on its
+own once quotes existed. That was an assertion from reading the code; it is now a
+measurement. Wrote quotes -> `build_book_grid_artifact('ncaaf', ...)` ->
+46 + 6 rows -> board renders 8 games / 52 markets, `no_precomputed_grid_artifact`
+gone. Then with projections wired: **52 with a projection**, 52 of 52 rows.
+
+**THE CAVEAT IS THE FEATURE.** `football/pick_gate.py` suppresses PICKS and says
+in terms that it "does NOT stop projections being generated, published, or
+displayed", because a gate that blinds its own exit criterion never opens. So
+displaying is correct — but this model is measured as losing to the closing line
+(margin MAE 15.775 vs 12.212, n=2233, t=+17.20) and its totals are 1.67x
+over-dispersed. User chose "wire it, with the skill caveat". Result:
+- h2h and spreads publish **no bare `projected`** — a number in a column headed
+  PROJECTED has nowhere to carry a caveat. Same resolution `#377` reached for NFL.
+- the h2h PROBABILITY survives: it has somewhere to carry the note, and the gate
+  needs the model visible for the measurement that would lift it.
+- totals keep the mean (not itself inflated) but publish **no percentage edge** —
+  pricing a line against a 1.67x over-dispersed distribution is what `state.md`
+  calls manufacturing an edge. `edge_vs_line` survives as a labelled diagnostic.
+
+**THE FIELD NAME WAS THE WHOLE FIX, AND THE FIRST ATTEMPT GOT IT WRONG.**
+`layer1_board.html` renders the EDGE cell with a hover title when
+`edge_unavailable_reason` is set. The PROJ cell (line ~1012) has NO tooltip
+channel, and `model_skill` is rendered nowhere. The caveat first went into
+`projection_unavailable_reason` — correct-looking, entirely invisible, the same
+shape as the frozen-chip corrector's "stated refusal nobody could read".
+Verified on the real DOM: **12 elements carry the tooltip**, text "margin model
+loses to the closing line by 3.563 points of MAE over 2233 games (t=17.2)".
+
+**NOT routed through `nfl_game_projections`**, and both reasons are rules:
+it hardcodes `source: "nfl_smartsim2"` in three places (stamping NFL provenance
+on NCAAF rows is the 2026-08-21 FORBIDDEN naming rule), and its caveat machinery
+is gated on `is_preseason_profile`, so an NCAAF profile falls straight through
+and would have arrived with NO caveat — the precise opposite of what was asked
+for. The genuinely generic part IS shared: `_no_vig_over_probability` is imported
+from `prop_projections`, exactly as the NFL module imports it.
+
+Files: `syndicate/features/ncaaf/game_projections.py` (NEW),
+`syndicate/features/shared/board_enrichment.py` (one `ncaaf` branch),
+`tests/test_ncaaf_game_projections.py` (NEW, 19 tests). 500 related tests pass.
+
+**Layer 2 is the next question, not answered here.** Candidate generation reads
+the cards board's market block, not Layer 1's grid; whether these projections
+reach it is unmeasured.
+
 ### `#545` — **The soccer chip build moves to the WORKER and widens to the board's horizon: 72 uncovered fixtures -> 0.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
 `#541`'s telemetry found it and `#541`'s diagnosis named it: the chip set was a
