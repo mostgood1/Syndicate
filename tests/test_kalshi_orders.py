@@ -726,3 +726,68 @@ def test_a_real_price_failure_still_names_the_TICKER_it_could_not_price():
     message = str(excinfo.value)
     assert message.startswith("no_live_price:"), message
     assert "None" not in message, message
+
+
+def test_a_submit_failure_asks_the_venue_what_the_market_IS(monkeypatch, capsys):
+    """`market_not_found` ON A MARKET THE GET FINDS.
+
+    Measured 2026-08-25 6:00 PM Central, three real submissions in one minute:
+
+        KXWNBAAST-...-4          side=bid  price=0.5000  -> FILLED
+        KXMLBTOTAL-...MINATH-10  side=ask  price=0.5500  -> market_not_found
+        KXMLBTOTAL-...CINSF-8    side=ask  price=0.5100  -> market_not_found
+
+    ...while `fetch_market` on that same MINATH ticker returned a live price
+    TWICE in the same minute (`LIVE_PRICE ... live=0.45 drift=+0.0100`). The
+    ticker is real and tradeable; the GET finds it and the POST does not.
+
+    Two candidates remain and the error text distinguishes neither: an `ask`
+    (sell YES) this endpoint refuses, or a market whose order shape differs
+    (`market_type`, or an MVE collection). A 1-vs-2 sample is not enough to
+    flip order semantics -- this file's own `_DEFAULT_ORDER_PATH` comment
+    records inventing a route once already and earning a 410 for it. So the
+    failure asks the venue what the market IS.
+    """
+    from syndicate.features.shared import kalshi_auth, kalshi_client
+
+    def _boom(*_a, **_k):
+        raise orders.OrderBuildError("http_404: market_not_found")
+
+    monkeypatch.setattr(kalshi_auth, "signed_request", _boom)
+    monkeypatch.setattr(
+        kalshi_client, "fetch_market",
+        lambda ticker: {"status": "ok", "market": {
+            "market_type": "binary", "status": "active",
+            "mve_collection_ticker": None, "strike_type": "greater",
+            "yes_ask_dollars": 0.55, "no_ask_dollars": 0.45,
+            "can_close_early": True,
+        }},
+    )
+
+    with pytest.raises(orders.OrderBuildError):
+        orders.submit_order(_request(), price_dollars=0.55)
+
+    printed = capsys.readouterr().out
+    assert "SUBMIT_FAILED_MARKET" in printed, printed
+    # The fields that tell the two hypotheses apart.
+    for field in ("market_type=", "mve_collection=", "yes_ask=", "no_ask="):
+        assert field in printed, (field, printed)
+
+
+def test_the_diagnostic_never_masks_the_real_error(monkeypatch):
+    """A probe that raised would replace the venue's own rejection with our
+    own -- losing the only message that says why the order failed."""
+    from syndicate.features.shared import kalshi_auth, kalshi_client
+
+    monkeypatch.setattr(
+        kalshi_auth, "signed_request",
+        lambda *_a, **_k: (_ for _ in ()).throw(orders.OrderBuildError("http_404: real_reason")),
+    )
+    monkeypatch.setattr(
+        kalshi_client, "fetch_market",
+        lambda ticker: (_ for _ in ()).throw(RuntimeError("probe exploded")),
+    )
+
+    with pytest.raises(orders.OrderBuildError) as excinfo:
+        orders.submit_order(_request(), price_dollars=0.55)
+    assert "real_reason" in str(excinfo.value), str(excinfo.value)

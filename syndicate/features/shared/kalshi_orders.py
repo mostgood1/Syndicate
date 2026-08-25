@@ -350,7 +350,55 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         f" tif={body.get('time_in_force')}",
         flush=True,
     )
-    response = signed_request("POST", url, body=body)
+    try:
+        response = signed_request("POST", url, body=body)
+    except Exception as exc:
+        # THE MARKET'S OWN FIELDS, ON THE FAILURE, and only on the failure.
+        #
+        # Measured 2026-08-25 6:00 PM Central, three real submissions to this
+        # endpoint in one minute:
+        #
+        #   KXWNBAAST-...-4         side=bid  price=0.5000  -> FILLED
+        #   KXMLBTOTAL-...MINATH-10 side=ask  price=0.5500  -> market_not_found
+        #   KXMLBTOTAL-...CINSF-8   side=ask  price=0.5100  -> market_not_found
+        #
+        # `market_not_found` while `fetch_market` on the SAME ticker returned a
+        # live price twice in the same minute (`LIVE_PRICE ... live=0.45`). So
+        # the ticker is real and tradeable: the GET finds it and the POST does
+        # not. That leaves two candidates and the error text distinguishes
+        # neither -- an `ask` (sell YES) this endpoint will not take, or a
+        # market whose order shape differs (`market_type`, or an MVE
+        # collection: `mve_collection_ticker` is in the probe's field list).
+        #
+        # GUESSING BETWEEN THEM IS HOW THIS FILE GOT A 410. Its own comment on
+        # `_DEFAULT_ORDER_PATH` records inventing a route once already. So this
+        # asks the venue what the market IS, rather than changing the order
+        # semantics on a 1-vs-2 sample.
+        try:
+            from syndicate.features.shared.kalshi_client import fetch_market
+
+            probe = fetch_market(str(body.get("ticker") or ""))
+            market = (probe.get("market") or {}) if isinstance(probe, dict) else {}
+            print(
+                "[kalshi_orders] SUBMIT_FAILED_MARKET"
+                f" ticker={body.get('ticker')} side={body.get('side')}"
+                f" fetch_status={probe.get('status') if isinstance(probe, dict) else None}"
+                f" market_type={market.get('market_type')}"
+                f" status={market.get('status')}"
+                f" mve_collection={market.get('mve_collection_ticker')}"
+                f" strike_type={market.get('strike_type')}"
+                f" yes_ask={market.get('yes_ask_dollars')}"
+                f" no_ask={market.get('no_ask_dollars')}"
+                f" can_close_early={market.get('can_close_early')}",
+                flush=True,
+            )
+        except Exception as probe_exc:  # noqa: BLE001 -- a diagnostic never masks the real error
+            print(
+                f"[kalshi_orders] SUBMIT_FAILED_MARKET_PROBE_ERROR"
+                f" {type(probe_exc).__name__}: {probe_exc}",
+                flush=True,
+            )
+        raise exc
     order = response.get("order") or response
 
     # `count` is what we ASKED for; the fill can be partial. Reported from the
