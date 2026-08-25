@@ -27248,3 +27248,78 @@ never been confirmed by a venue response. If it is inverted, the first order
 buys the opposite side at a price never quoted for it — and it will look
 entirely plausible in the log. The first `filled` Polymarket record must be
 read against the actual position before a second slate runs.
+
+### 4. `59708e6c3` — the venue-list regression, and the reading that closes it
+
+**verify:** `EXECUTION` on live-odds-worker, 2026-08-25T00:21:11Z / 00:21:12Z.
+
+`5ca8409f4` broke Kalshi. At 00:13:26Z, the first tick after the env var became
+a list, BOTH venues refused:
+
+    EXECUTION status=skipped reason=no_adapter_for_venue:kalshi,polymarket scope=kalshi
+    EXECUTION status=skipped reason=no_adapter_for_venue:kalshi,polymarket scope=polymarket
+
+The loop passed one scope per call correctly. `run_execution` then looked past
+its own argument and read the WHOLE env string back out, asking for an adapter
+named "kalshi,polymarket". **Kalshi, which had been placing live all evening,
+stopped placing.** It failed CLOSED — an unknown venue resolves to no adapter
+and `place_order` rejects rather than completing a paper fill wearing a live
+`mode` — so no order went to the wrong venue and nothing was recorded as moving
+money that did not move.
+
+After the fix:
+
+    EXECUTION status=ok mode=live venue=kalshi     scope=kalshi     placed=0 refused={} spent={'dollars': 2.99, 'orders': 2}
+    EXECUTION status=ok mode=live venue=polymarket scope=polymarket placed=0 refused={} spent={'dollars': 0.0,  'orders': 0}
+    limits={... 'max_day_dollars': 40.0, 'max_day_orders': 10, 'max_day_dollars_all_venues': 80.0}
+
+Three facts in those two lines:
+
+1. **`venue=kalshi` again** — the regression is closed, Kalshi resolves its own
+   adapter and its 2 earlier orders / $2.99 still stand.
+2. **`venue=polymarket` runs its own pass** — a second venue reaches live
+   execution for the first time. The capability the user asked for exists.
+3. **`max_day_dollars_all_venues: 80.0` is in force**, exactly as set.
+
+**`placed=0 refused={}` for polymarket means an EMPTY PLAN, not a refusal.** An
+empty `refused` dict is the tell: no position reached the guard at all. Had the
+caps, the kill switch or the order builder stopped anything, each would appear
+by name. Nothing was there to stop.
+
+**WHY THE PLAN IS EMPTY — measured, one hop upstream, 00:02:29Z:**
+
+    POLYMARKET_BOARD_JOIN markets=7940 indexed=2593 board_rows=10 matched=0
+      refusals={'market_type_not_a_game_line': 4288,
+                'segment_market_not_full_game': 927,
+                'outcomes_count_mismatch': 132,
+                'board_market_not_a_game_line': 10}
+
+`matched=0` on a new named refusal. All 10 surviving board rows are PLAYER
+PROPS, which follows from the `kalshi_discovery` NameError: Kalshi's registered
+series are player props only, Kalshi won all 237 reprices, so the only rows
+fresh enough to clear both gates are props. Polymarket's joined slate is
+full-game lines. **The two venues currently have zero overlap**, so Polymarket
+has nothing to place regardless of caps or arming.
+
+**SO POLYMARKET IS ARMED AND EXERCISED BUT UNPROVEN.** The `outcomeSide`
+YES/NO convention is still UNVERIFIED against a real venue response, because
+no order has yet had anything to be built from. That risk has not been retired
+— it has not yet been reached. The first `filled` Polymarket record still must
+be read against the actual position before a second slate runs.
+
+### 5. `477346830` — a diagnostic, because one zero is not yet explained
+
+polymarket_us offered 3,106 quotes across mlb/wnba/nfl and won ZERO of 237
+selections. Freshness explains losing SOME (5311s vs Kalshi's 1017s) but not
+ALL: Kalshi registers no game-line series, so on a game-line row Polymarket is
+the only bidder and should win by default.
+
+`stamped` cannot distinguish a key-space mismatch from a venue that lists
+nothing — the same confident zero that let the OddsAPI adapter sit on a
+different key space for an entire evening. `VENUE_REPRICE_KEYS` now logs what
+the BOARD asked for beside what each SOURCE offered, counts complete and key
+samples bounded. **Hypothesis, not a finding:** Polymarket keys a side by the
+venue's own outcome string (short team name, "Over", "+2.50") while the board
+asks by its own vocabulary, and `quote_key` compares exactly — the
+short-name-versus-full-name problem `team_aliases.teams_match` already solves
+in the board join. Two log lines will settle it.
