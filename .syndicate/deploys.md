@@ -29421,3 +29421,365 @@ nba/nhl/ncaab — but those are out of season in August and would not appear in
 either list even if present, **so if they were set, this write removed them.**
 No effect until October/November; one env write to restore. Settle it from the
 Render dashboard.
+## 2026-08-25 21:36–21:47Z — live-odds-worker `7abc3f150` — the spread-sign hook is REACHABLE; the spread question is NOT answered
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `8fb67f04032a0bb7`
+**user instruction:** "deploy live-odds-worker and set the flag".
+
+**What shipped.** `7abc3f150` (main's tip: PRs #65 audit + #67 hook). `.py` and
+docs only — **no `render.yaml`, so no `blueprint_sync`**.
+
+**verify: the reading, and it is not the one we wanted.**
+
+```
+[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date=2026-08-25
+  slate_markets=7730 board_rows=1290 slate_fetched_at=1787694438.98
+  fixtures=0 agree_home=0 disagree=0 rate=None
+  no_board_fixture=1167 verdict='UNDECIDED: n=0 < min_sample=30'
+                                  -- live-odds-worker, 2026-08-25T21:47:20.198Z
+```
+
+**What this DOES prove: the hook is reachable, `off != on`.** That line did not
+exist on any prior boot of this service. The flag was absent, the hook was
+inert, the flag was set, the hook ran. A diagnostic that has never once fired
+is indistinguishable from one wired up wrong, and this one has now fired.
+
+**What it does NOT prove, and the failure is MINE, not the venue's.** 1,167
+spread slugs, **not one paired to a board fixture**. The board index came out
+empty: shortlist rows carry neither `selected_date` nor `date`
+(`_board_rows_for_join` returns them verbatim from `read_layer2_shortlist` and
+nothing stamps one on), so the key was unbuildable for every row.
+`polymarket_board_join` **documents this exact trap and already solves it** with
+a caller-supplied fallback — I read that workaround while writing the audit and
+did not apply it one function over. Fix + 3 tests in **PR #71**, one of which
+reproduces this zero exactly when the fallback is withheld.
+
+**The worse half, and the reason this is worth a ledger entry at all.** That
+zero was indistinguishable from two others with opposite meanings — "the board
+carries no spread rows" and "the venue lists no spreads for a board we keyed
+fine". All three render as `fixtures=0`. **The instrument built to separate
+"we cannot see it" from "the venue does not list it" could not separate them
+about itself.** PR #71 adds `board_spread_rows`, `board_fixtures_keyed` and
+`board_rows_unkeyable` so the next zero says which one it is.
+
+**THE DEPLOY CLAIM DID NOT SERIALISE, AND I HAVE THE RECEIPT.** My trigger
+`dep-da70lnp5efls7389gdtg` (21:36:31Z) was **CANCELED at 21:37:01Z** by a
+concurrent `api` deploy `dep-da70lv2fngtc73btsop0` that started 29 seconds
+later — the exact CANCEL failure mode `deploy_claim.py`'s header was written
+for, reproduced against the claim I was holding. **Cause: `.syndicate/deploy_claims/`
+is gitignored, and in the cloud-session topology every session has its own
+container and its own clone.** The claim file's whole design rests on "a FILE in
+the shared worktree — visible to every session instantly", and there is no
+shared worktree any more. It is inert as a cross-session lock here. No harm
+this time — both deploys carried the SAME commit — but that was luck, not the
+mechanism. **Left as a finding, not fixed: it is the deploy protocol's file and
+not this lane's to change.**
+
+**No silent revert, checked before triggering** (`#284` / the 2026-08-15
+incident): every commit live on this service — `e2b1f2714`, `f08930f32`,
+`508dbc02e`, `407c602d1` — was verified an ancestor of `7abc3f150` with
+`git merge-base --is-ancestor`, so this deploy was cumulative by construction.
+
+**Preflight, run by hand.** `scripts/deploy_preflight.py` **cannot run from a
+session sandbox** — it needs `RENDER_API_KEY` and direct `api.render.com`, which
+403s at the agent proxy. Its substance was performed through the Render MCP
+instead: `ALL_PROCESS_MEMORY` at 21:28:21Z showed 3 processes (pid 1 bash, pid 39
+the worker, pid 138 a transient child with no cmdline) and **no named job**;
+`BLOCKED_ON_UNRECONCILED count=1 keys=['7219fdfe46ecbc8b658af248']` at 21:20:11Z
+showed the execution path already latched, so **no order could be in flight to
+interrupt**. That latch predates this deploy and is untouched by it.
+
+**Also newly measured, and it dates the audit's own numbers.**
+`slate_markets=7730`, against `markets=13233` at 20:34:22Z. The drop is another
+session's `_slate_within_budget` (`f08930f32`, "Bound the Polymarket slate by
+GAME DATE instead of by page offset"), which now trims the far dates to fit the
+keyvalue ceiling. **That commit and `508dbc02e` fix the two headline production
+findings in `docs/ai_context/polymarket_oddsapi_coverage_audit.md` §2.1 and
+§2.2** — the truncation and the `no_game_offset: ok` outage — both within an
+hour of the audit being written. The audit's §2 numbers are now historical.
+
+**Flag state: `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` is STILL SET** on
+live-odds-worker (set 21:42:58Z, merge not replace, nothing else touched).
+Deliberate: the reading has not been taken, and the repo's own probe-hook
+pattern says unset it *once it has*. The next deploy carrying PR #71 fires the
+hook with no further env change. **Unset it after that reading.**
+
+**Claim released.**
+
+---
+
+## 2026-08-25 4:47 PM Central — `1f0825852` — refresh-worker
+
+**VERIFIED. Kalshi `venue_priced` 0 -> 161, and the first Kalshi position ever
+committed.**
+
+**What it was.** `_match_key` indexes on `board_event_id` and returns None
+without one -- by design, because `("totals", "", 8.5, "over")` is otherwise
+one key for every 8.5 total on the slate. `_resolvers_from_markets` built its
+match dicts BY HAND from `classify_market` alone, and a Kalshi market does not
+know which board row it belongs to. Every key was None, the index was empty,
+and `resolve()` returned None for every row it was ever asked about.
+
+**Silent by construction.** `venue_scope` falls back to
+`quote.book_prices["kalshi"]`, so a price was always found and
+`venue_not_quoting` never fired. Kalshi took the AGGREGATOR's price on all 86
+rows with nothing anywhere saying so. **Any `paper:kalshi` result recorded
+before this is not a Kalshi result.**
+
+**verify: before and after.**
+
+    4:40:11 PM  venue=kalshi rows_in=86  positions=0 venue_priced=0
+    5:01:56 PM  venue=kalshi rows_in=233 positions=1 venue_priced=161 staked=$1.08
+                KALSHI_BOARD_JOIN markets=10683 board_rows=1290 matched=168
+
+`rows_in` nearly tripled because rows the venue actually quotes became
+scopable at all. `KALSHI_BOARD_JOIN` is a new line and cannot be silent again.
+
+**Also verified in the same deploy:** `AUTO_SERIES game_series` 173 -> **204**,
+`total_discovered` 186 -> **212**. That is the soccer title-gate from
+`461ee74be` firing -- Kalshi names soccer by COMPETITION and those series had
+never been registered under any sport. NOT yet confirmed WHICH series: the
+sample is 8 random of 204 and showed only US sports. Counting is not naming.
+
+**Still open at this SHA.** The one committed Kalshi position reached the
+order path as `{'totals_alt': {'no_venue_ticker': 1}}`. Both readings are
+live -- 72 of 233 rows were aggregator-priced, and such a row correctly has no
+contract id -- so `376def0d0` puts `price_source` on the verdict rather than
+guessing. Read that next.
+
+**A defect I introduced and then repeated.** `369e1d49c` gave the Polymarket
+`no_venue_ticker` verdict its detail and left the Kalshi one, in the same
+function two lines below, still passing none. Fixing one branch of a paired
+defect is how the second branch survives review.
+## 2026-08-25 21:57–22:02Z — live-odds-worker `8397f9afb` — the test votes now, and the votes were contaminated
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `43fe90f1825b42bf`
+**user instruction:** "merge 71 and deploy again".
+
+**What shipped.** `8397f9afb` (main tip = PR #71's date fallback + four other
+sessions' commits, all ancestors of it). `.py`/docs only — no `render.yaml`.
+Deploy live **22:00:22Z**, not cancelled this time. Flag was already set, so the
+boot fired the hook with no further env change.
+
+**verify: the reading.**
+
+```
+[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date=2026-08-25
+  slate_markets=7888 board_rows=1290
+  board_spread_rows=55 board_fixtures_keyed=18 board_rows_unkeyable=0
+  fixtures=7 agree_home=2 disagree=5 rate=0.2857
+  no_board_fixture=1137 verdict='UNDECIDED: n=7 < min_sample=30'
+  disagreements=[
+    {'slug': 'asc-mlb-cle-laa-2026-08-25-f5-neg-1pt5', 'board_home_line': 1.5},
+    {'slug': 'asc-mlb-chc-az-2026-08-25-f5-neg-1pt5', 'board_home_line': 1.5},
+    {'slug': 'asc-mlb-min-ath-2026-08-25-f5-neg-1pt5','board_home_line': 1.0},
+    {'slug': 'asc-mlb-phi-sea-2026-08-25-f5-neg-1pt5','board_home_line': 1.5},
+    {'slug': 'asc-mlb-cin-sf-2026-08-25-f5-neg-1pt5', 'board_home_line': 1.0}]
+                                  -- live-odds-worker, 2026-08-25T22:01:52.354Z
+```
+
+**PR #71 worked: `board_rows_unkeyable=0`, and the test cast votes for the first
+time** (18 fixtures keyed from 55 board spread rows, 7 paired).
+
+**`rate=0.2857` IS NOT EVIDENCE ABOUT POLYMARKET. All five disagreements carry
+`-f5-`** — first five innings. The board's spread is the FULL GAME. Comparing
+them measures nothing, and `join_polymarket_to_board` and
+`venue_quote_adapters._polymarket_sides` both already refuse segment rows for
+this exact reason; the audit script did not. **It compounded with the
+one-vote-per-fixture rule**: `seen_fixture` is set on the FIRST match, so an
+`f5` slug earlier in the slate stole the fixture's only vote from the full-game
+slug behind it. Fix + 2 tests in **PR #72** (an `f5` slug placed first must not
+take the vote; a fixture listed only as `f5` must cast none at all).
+
+**The instrument found its own bug, and only because of PR #71.** Without the
+`disagreements` sample carrying slugs, `rate=0.2857` would have read as a
+genuine refutation of the symmetric-ladder finding and spreads would have
+stayed refused on false evidence. **Two instrument bugs in two runs, both in
+the direction of a confident wrong answer.** That is the third time in this
+lane that a number which looked like a finding was a property of the reader —
+same shape as `#502`'s `settled_count: 0` and the `no_side_in_key` zeros.
+
+**STILL UNANSWERED after two deploys: whether a Polymarket spread's sign
+belongs to the slug's `<home>` or `<away>`.** Nothing here licenses lifting
+`spread_side_needs_verified_team_mapping`.
+
+**A BOUND WORTH KNOWING BEFORE THE NEXT RUN.** `board_fixtures_keyed=18` on a
+one-sport slate, so **n can never reach `min_sample=30` today** — MLB is the
+only sport with spread rows on the board. Three honest options, none taken
+here: read across several days, widen to NFL/soccer once their spread rows
+exist, or decide that unanimity on ~15 is enough. **The bar was deliberately
+NOT lowered to manufacture a verdict**; `SYNDICATE_POLYMARKET_SPREAD_AUDIT_MIN_SAMPLE`
+exists if a human decides otherwise.
+
+**Flag `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` STILL SET.** PR #72 is
+blocked on a merge permission, so the next deploy carrying it will fire the
+hook automatically. **Unset once a clean reading exists.**
+
+**Claim released.**
+
+---
+
+## 2026-08-25 22:13–22:18Z — live-odds-worker `7b8f67b04` — the instrument is CORRECT now, and the answer is that MLB cannot answer it
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `86f40ce4cf44d122`
+**user instruction:** "merge 72 and deploy again".
+
+**What shipped.** `7b8f67b04` (main tip = PR #72's segment filter + the sibling
+Kalshi audit #66 + others, all ancestors). No `render.yaml`. Live **22:16:xxZ**.
+
+**verify: the reading.**
+
+```
+[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date=2026-08-25
+  slate_markets=7936 board_rows=1290
+  board_spread_rows=55 board_fixtures_keyed=18 board_rows_unkeyable=0
+  fixtures=0 agree_home=0 disagree=0 rate=None
+  no_board_fixture=1052 segment_skipped=74
+  verdict='UNDECIDED: n=0 < min_sample=30'
+                                  -- live-odds-worker, 2026-08-25T22:17:48.985Z
+```
+
+**PR #72 worked, and it cost every vote there was.** 74 segment slugs skipped,
+and `fixtures` went **7 -> 0**. So all seven pairings in the previous run were
+`f5` first-five-innings markets, including the two that "agreed" — the
+`rate=0.2857` of 22:01:52Z was **100% artefact**, not 71% artefact.
+
+**WHY THE ZERO, and this one is NOT an instrument bug.** The obvious suspect
+was the tri-code alias gap this audit recorded as §5.5 (`chc`/`az`/`stl`/`phx`
+returning False from `teams_match`). **Checked against `7b8f67b04`: 10 of 10
+tri-codes for the five paired fixtures now resolve** — another session has
+fixed the alias map since `a41f8e2d`, which also closes §5.5. Aliases are why
+those f5 rows paired at all.
+
+**So the finding is: our copy of the slate carries FIRST-FIVE-INNINGS spreads
+for MLB and no FULL-GAME spreads for any of the 18 board fixtures.** With
+segments correctly excluded, there is nothing left to vote.
+
+**Say this the right way round.** *Our slate* has no full-game MLB spread —
+NOT *Polymarket does not list one*. Those are the two claims this whole audit
+exists to keep apart, and the slate is now **trimmed**: 13,233 markets at
+20:34Z, 7,936 now, because `_slate_within_budget` (`f08930f32`, another
+session) drops the far dates to fit the keyvalue ceiling. **Whether full-game
+MLB spreads are absent at the venue or dropped by our own budget rule is
+UNMEASURED**, and the two need opposite responses. An earlier reading points at
+the venue rather than the trim: `POLYMARKET_UNMATCHED` at 20:16:08Z offered
+`chc-az@-2.5, -1.5, +1.5, +2.5` from the join's index, which refuses segments —
+so full-game MLB spreads existed in our slate two hours ago. That is
+suggestive, not conclusive, and it is not resolved here.
+
+**STILL UNANSWERED after three deploys: whether a Polymarket spread's sign
+belongs to the slug's `<home>` or `<away>`.** `spread_side_needs_verified_team_mapping`
+stays. Three runs, three different reasons for no answer — a dateless board
+index, a segment contamination, and now an empty full-game population. **Each
+of the first two would have produced a CONFIDENT WRONG ANSWER if the counters
+added along the way had not existed.**
+
+**What would actually answer it**, in preference order: (1) an NFL or soccer
+slate — both carry full-game spreads and neither is `f5`-shaped, and NFL wk1 is
+2026-08-27; (2) several MLB days pooled; (3) determining whether the budget
+trim is eating full-game spreads, which is a different bug and belongs to
+whoever owns `_slate_within_budget`.
+
+**Flag `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` LEFT SET, deliberately.**
+The instrument is now correct and costs one artifact read plus one line per
+boot; the first slate that carries full-game spreads answers the question with
+no further deploy. **Unset it once a verdict other than UNDECIDED appears.**
+
+**Claim released.** Deploy discipline note: a sibling deploy (`e79841573`, the
+Kalshi audit #66) was **in flight** when this one was ready at 22:12Z. It was
+allowed to finish (live 22:10:36Z) before triggering, rather than cancelling it
+— the failure mode recorded two entries above, not repeated.
+
+---
+
+## 2026-08-25 — refresh-worker `e79841573` (PR #66): Kalshi registry, vocabulary, side re-key and futures eviction
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da714uqjnfac73adpu50`, live `22:11:36Z`. Trigger `api` (MCP).
+PR #66 merged to `main` as `e79841573` at `22:07:25Z`.
+
+**Claim:** held by `kalshi-line-aware-rungs`, token `8602300fd7507692`,
+acquired `~22:05Z`, ttl 2700s.
+
+**PREFLIGHT COULD NOT RUN, AND THAT IS STATED RATHER THAN GLOSSED.**
+`scripts/deploy_preflight.py` exits 1 with `RENDER_API_KEY not set in the
+environment or .env` -- this container has no such key and no `.env`. I ran the
+preflight's OWN substantive check by hand against the same evidence source it
+uses, the worker's `ALL_PROCESS_MEMORY` line:
+
+```
+22:07:57Z  process_count=3  container_memory_mb=2003.8 (48.9% of 4096)
+  python scripts/run_refresh_worker.py            pid 39   rss 950MB
+  bash /home/render/graceful-shell-command.sh     pid 1    rss 3MB
+  python (no cmdline)                             pid 369  ppid 39
+  stage=live_lens_tick_before_nfl
+```
+
+No `daily_update.py`, no `run_mlb_daily_sim_job.py`, no smartsim -- i.e. the
+CLEAR condition. **Confirmed correct after the fact:** the only
+`WORKER_SHUTDOWN_KILLED_BOARD_BUILD` in the 21:45-22:40 window is at
+`22:35:19Z`, on instance `f2lwf`, which is NOT this deploy (this one went live
+at 22:11:36Z). This deploy killed no board build and no sim.
+
+**The guard did not see this deploy at all**, for the reason the 2026-08-23
+entry in this file already records: `deploy-guard.py` matches `Bash|PowerShell`
+and an MCP `trigger_deploy` is neither. Same known gap, named again rather than
+relied on.
+
+**COMPOSITION VERIFIED BY CONTENT, twice, because tonight demanded it.** Four
+refresh-worker deploys landed in 25 minutes (22:08:59, 22:17:37, 22:29:43,
+22:33:36), three of them from `session_01Sia2rPD72eFTriy28azzs2`. My own
+trigger at 22:08:59 SUPERSEDED an in-flight deploy of `e79841573` itself
+(`dep-da714e15efls738ashcg`, canceled) -- the replacement is a strict superset,
+so nothing was lost. Checked at each step that the deploying SHA CONTAINS
+`e79841573` and that all five changes are present in the served files:
+
+```
+7b8f67b0 (22:11:36Z live)   contains e79841573  ✓
+a6a87742 (22:20:28Z live)   contains e79841573  ✓
+075dc3ae (22:36:13Z live)   contains e79841573  ✓
+  season_futures 32 · team_quote_token 3 · _HOCKEY 3
+  'hits + runs + rbis' 1 · KXMLBSB 2
+```
+
+This is the `#284` on-main rule working exactly as written: two sessions
+deploying nine minutes apart, and the second contains the first. Ancestry AND
+content were both checked -- `git merge-base --is-ancestor` answers a question
+about history, and deployment is a question about content
+(`learnings.md` 2026-08-16).
+
+**verify: NOT YET OBTAINED. THIS ROW IS AN OPEN OBLIGATION.**
+
+Not one `[kalshi_odds]` line has been emitted since 22:11:36Z -- no `TICK`, no
+`BOARD_JOIN`, no `AUTO_SERIES`. The cause is measured and is NOT this change:
+
+```
+22:35:19Z  WORKER_SHUTDOWN_KILLED_BOARD_BUILD frame=collect_candidates
+           uptime_s=145 -- this build's work is lost and will restart
+           from zero on the next boot
+```
+
+**refresh-worker is being redeployed faster than a board build completes.**
+The kalshi odds refresh runs from inside that build (`intelligence_state.py`),
+so every cycle is dying at `collect_candidates` before it reaches the tick.
+Instance churn since my deploy: `skpbf` (22:12) -> `j6zmj` (22:20) -> `f2lwf`
+(22:32, killed at 145s) -> next. That 22:35 shutdown also killed
+`tools/daily_update.py --workflow ui-daily --sim` and
+`run_mlb_daily_sim_job.py` -- the exact kill-risk `preflight` exists to
+prevent, on somebody else's deploy.
+
+**The four readings that will close this row**, none of which needs a band:
+
+1. `TICK series_wanted` **193 -> ~155** (futures eviction; a count of
+   registered series, immune to rotation)
+2. `JOIN_TITLES by_series` no longer naming `KXNCAAFWINS` / `KXNCAAFAWARD` /
+   `KXNBAWINS` at all
+3. `VENUE_REPRICE_KEYS sources_offered` kalshi reading `h2h|<team>` where it
+   read `h2h|yes`
+4. `by_source` carrying `spreads_refused:<n>` and `h2h_keyed_by_team:<n>`
+
+**The `matched`/`stamped` band is deliberately NOT attempted.** `matched` ran
+44 -> 104 -> 140 -> 0 across four builds on three different SHAs before this
+deploy, and four more deploys have landed since. Any before/after taken tonight
+would credit another session's work to this one. It needs a quiet window: no
+refresh-worker deploy for >=30 min and >=6 readings on one SHA.

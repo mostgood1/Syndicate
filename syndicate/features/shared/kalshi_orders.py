@@ -789,9 +789,30 @@ def kalshi_submitter(price_for):
     """
 
     def _submit(request):
+        # NO CONTRACT ID IS NOT NO PRICE, and calling it one sent three real
+        # orders to the ledger under the wrong cause on 2026-08-25.
+        #
+        # `_kalshi_price_for` returns None at its FIRST line when
+        # `venue_ticker` is empty -- before it ever asks Kalshi for a price --
+        # so an unstamped position arrived here indistinguishable from a market
+        # the venue would not quote. Every Kalshi row in the day's ledger read
+        # `OrderBuildError: no_live_price: None`, and the `None` on the end was
+        # the ticker saying so all along:
+        #
+        #   LIVE_ORDER status=rejected venue=kalshi ticker=None
+        #     market=totals_alt side=over line=5.5
+        #     error='OrderBuildError: no_live_price: None'
+        #
+        # `verify_order_paths` had the distinction right (`no_venue_ticker`)
+        # while the path with money on it did not. The two point at different
+        # fixes: a missing id is the board join or the position cap, a missing
+        # price is the venue or staleness.
+        ticker = str(getattr(request, "venue_ticker", "") or "").strip()
+        if not ticker:
+            raise OrderBuildError("no_venue_ticker")
         price = price_for(request)
         if price is None:
-            raise OrderBuildError(f"no_live_price: {getattr(request, 'venue_ticker', None)}")
+            raise OrderBuildError(f"no_live_price: {ticker}")
         return submit_order(request, price_dollars=float(price))
 
     return _submit

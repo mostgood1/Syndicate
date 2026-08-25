@@ -164,6 +164,7 @@ def spread_sign_test(
     board: list[Mapping[str, Any]],
     *,
     min_sample: int = 30,
+    selected_date: str = "",
 ) -> dict[str, Any]:
     """Does the slug's `pos`/`neg` sign follow the board's HOME spread?
 
@@ -177,16 +178,26 @@ def spread_sign_test(
     """
     from syndicate.features.shared.polymarket_board_join import (
         _effective_league,
+        _has_segment,
         _line_from_modifiers,
         parse_slug,
     )
     from syndicate.features.shared.team_aliases import teams_match as alias_match
 
     # The board's own signed HOME spread per fixture.
+    #
+    # COUNTED, because the first production run returned a zero this dict could
+    # not explain. "the board has no spread rows", "they carry no date" and
+    # "the venue lists no spreads" are three different facts that all render as
+    # `fixtures=0`, and a line that cannot tell them apart sends the reader to
+    # the wrong one -- which is the whole subject of the audit this serves.
     home_line: dict[tuple[str, str, str, str], float] = {}
+    board_spread_rows = 0
+    skipped_board_rows = 0
     for row in board:
         if str(row.get("market") or "").strip().lower() not in {"spreads", "spread"}:
             continue
+        board_spread_rows += 1
         side = str(row.get("side") or "").strip().lower()
         try:
             line = float(row.get("line"))
@@ -201,14 +212,31 @@ def spread_sign_test(
         elif side != "home":
             continue
         sport = str(row.get("sport") or "").strip().lower()
-        date = str(row.get("selected_date") or row.get("date") or "").strip()
+        # THE CALLER'S DATE IS THE FALLBACK, AND IN PRACTICE IT DOES THE WORK.
+        #
+        # MEASURED IN PRODUCTION 2026-08-25T21:47:20Z, the first run of this
+        # test: `fixtures=0 no_board_fixture=1167`. Every one of 1,167 spread
+        # slugs failed to pair, because this dict came out EMPTY -- shortlist
+        # rows carry neither `selected_date` nor `date` (`_board_rows_for_join`
+        # returns them verbatim from `read_layer2_shortlist` and nothing stamps
+        # one on), so `all(key)` was False for every row.
+        #
+        # `join_polymarket_to_board` already documents this exact trap and
+        # already solves it the same way. Row first, so a board that DOES carry
+        # its own date still wins and a multi-date board is not collapsed onto
+        # one caller's date.
+        date = str(
+            row.get("selected_date") or row.get("date") or selected_date or ""
+        ).strip()
         key = (sport, date, str(row.get("home_team") or ""), str(row.get("away_team") or ""))
         if not all(key):
+            skipped_board_rows += 1
             continue
         home_line.setdefault(key, line)
 
     agree = disagree = 0
     unmatched_fixtures = 0
+    segment_slugs = 0
     seen_fixture: set[tuple] = set()
     disagreements: list[dict[str, Any]] = []
 
@@ -217,6 +245,31 @@ def spread_sign_test(
             continue
         parsed = parse_slug(row.get("slug"))
         if parsed is None:
+            continue
+        # A FIRST-FIVE-INNINGS SPREAD IS NOT A GAME SPREAD.
+        #
+        # MEASURED IN PRODUCTION 2026-08-25T22:01:52Z, the first run that
+        # produced any votes at all: `fixtures=7 agree_home=2 disagree=5
+        # rate=0.2857` -- and **all five disagreements carried `-f5-`**:
+        #
+        #   asc-mlb-cle-laa-2026-08-25-f5-neg-1pt5   board_home_line=+1.5
+        #   asc-mlb-chc-az-2026-08-25-f5-neg-1pt5    board_home_line=+1.5
+        #   asc-mlb-min-ath-2026-08-25-f5-neg-1pt5   board_home_line=+1.0
+        #   asc-mlb-phi-sea-2026-08-25-f5-neg-1pt5   board_home_line=+1.5
+        #   asc-mlb-cin-sf-2026-08-25-f5-neg-1pt5    board_home_line=+1.0
+        #
+        # The board's spread is the FULL GAME; `f5` is the first five innings.
+        # Their signs need not agree and comparing them measures nothing. Both
+        # `join_polymarket_to_board` and `venue_quote_adapters._polymarket_sides`
+        # already refuse segment rows for exactly this reason; this test did
+        # not, so a rate of 0.2857 looked like evidence against the
+        # symmetric-ladder finding when it was an artefact of the instrument.
+        #
+        # IT COMPOUNDED with the one-vote rule below: `seen_fixture` is set on
+        # the FIRST match, so an `f5` slug appearing earlier in the slate stole
+        # the fixture's only vote from the full-game slug behind it.
+        if _has_segment(parsed["modifiers"]):
+            segment_slugs += 1
             continue
         slug_line = _line_from_modifiers(parsed["modifiers"])
         if slug_line is None or slug_line == 0:
@@ -265,11 +318,18 @@ def spread_sign_test(
             "refused; do not ship a mapping on this."
         )
     return {
+        # The three numbers that tell a real zero from a broken one.
+        "board_spread_rows": board_spread_rows,
+        "board_fixtures_keyed": len(home_line),
+        "board_rows_unkeyable": skipped_board_rows,
         "fixtures_compared": n,
         "agree_with_home_sign": agree,
         "disagree": disagree,
         "agreement_rate": rate,
         "spread_slugs_with_no_board_fixture": unmatched_fixtures,
+        # Counted rather than silently dropped: a segment ladder is real
+        # coverage we refuse elsewhere, and its size is worth seeing.
+        "segment_slugs_skipped": segment_slugs,
         "sample_disagreements": disagreements,
         "verdict": verdict,
     }
@@ -352,16 +412,22 @@ def run_spread_audit_if_enabled() -> dict[str, Any] | None:
             )
             return {"status": "refused", "reason": board_reason}
 
-        result = spread_sign_test(slate, board, min_sample=min_sample)
+        result = spread_sign_test(
+            slate, board, min_sample=min_sample, selected_date=selected_date
+        )
         print(
             f"[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date={selected_date}"
             f" slate_markets={len(slate)} board_rows={len(board)}"
             f" slate_fetched_at={fetched_at}"
+            f" board_spread_rows={result['board_spread_rows']}"
+            f" board_fixtures_keyed={result['board_fixtures_keyed']}"
+            f" board_rows_unkeyable={result['board_rows_unkeyable']}"
             f" fixtures={result['fixtures_compared']}"
             f" agree_home={result['agree_with_home_sign']}"
             f" disagree={result['disagree']}"
             f" rate={result['agreement_rate']}"
             f" no_board_fixture={result['spread_slugs_with_no_board_fixture']}"
+            f" segment_skipped={result['segment_slugs_skipped']}"
             f" verdict={result['verdict']!r}"
             f" disagreements={result['sample_disagreements']}",
             flush=True,
@@ -371,6 +437,117 @@ def run_spread_audit_if_enabled() -> dict[str, Any] | None:
         # A DIAGNOSTIC MUST NOT BE ABLE TO KILL THE WORKER IT RUNS IN.
         print(
             f"[audit_polymarket_coverage] SPREAD_SIGN_AUDIT_FAILED"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+
+
+def run_offset_probe_if_enabled() -> dict[str, Any] | None:
+    """Is `find_first_game_offset`'s boundary landing ABOVE part of the game block?
+
+    THE QUESTION, and why logs cannot answer it. Measured 2026-08-25:
+
+        19:28Z  start_offset=12142  games=13255  futures=1613  truncated=True
+        22:11Z  start_offset=20987  games=7936   futures=47    truncated=False
+
+    A scan that now claims completeness returns 5,319 FEWER game markets than
+    the truncated one did, after its start offset jumped +8,845. Over the same
+    window MLB full-game spreads went from present in the join's index
+    (`offered: ['chc-az@-2.5','-1.5','+1.5','+2.5']`, 20:16Z -- and that index
+    REFUSES segments, so those were full-game) to absent entirely
+    (`no_candidates|mlb|spreads: 51`, `offered: []`, 22:01Z).
+
+    The budget trim is EXONERATED as the cause: `dropped_for_size=0
+    dropped_by_date={}` on every cycle, with 5.99MB of headroom. So the loss is
+    upstream of it, and there are exactly two candidates with opposite fixes:
+    the venue stopped listing those markets, or **the boundary search stopped
+    seeing them**. `find_first_game_offset`'s own docstring names the second --
+    "past the first games (silently missing part of the slate)".
+
+    `monotonic` is supposed to catch that and reads True. It is weaker than it
+    looks: it only checks offsets the binary search HAPPENED to probe, so a
+    boundary sitting inside the block can still report True.
+
+    THE TEST. Probe a ladder BELOW the live boundary. **If any offset below it
+    returns game rows, the boundary is too high and part of the slate is
+    invisible to us.** If every one returns futures or empty, the boundary is
+    right and the missing markets are the venue's, not ours.
+
+    Derived from the CURRENT boundary, never hardcoded -- the value under test
+    moves every day, which is the whole reason that function exists.
+
+    COST: ~10 signed GETs of 5 rows. This DOES call the venue, deliberately --
+    no artifact can answer "what lives at offset 18000", which is the one
+    question here. It is opt-in, one-shot at boot, reads only, and places
+    nothing. Unset the flag once the answer is in.
+    """
+    if not _env_bool("SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT"):
+        return None
+
+    try:
+        from syndicate.features.shared.polymarket_us_markets import (
+            find_first_game_offset,
+            probe_offset_landscape,
+        )
+
+        located = find_first_game_offset()
+        boundary = located.get("first_game_offset")
+        if not isinstance(boundary, int) or boundary <= 0:
+            print(
+                "[audit_polymarket_coverage] OFFSET_BOUNDARY_PROBE status=refused"
+                f" reason=no_boundary located={located}",
+                flush=True,
+            )
+            return {"status": "refused", "reason": "no_boundary", "located": located}
+
+        # A ladder BELOW the boundary, plus the boundary and one page above it
+        # as controls: the boundary itself must show games, and a rung below it
+        # must not.
+        rungs = sorted({
+            max(0, int(boundary * f)) for f in (0.2, 0.4, 0.6, 0.8, 0.9, 0.95, 0.99)
+        } | {boundary, boundary + 2000})
+        result = probe_offset_landscape(offsets=tuple(rungs), limit=5)
+        samples = result.get("samples") or {}
+
+        below = {
+            off: s for off, s in samples.items()
+            if int(off) < boundary and isinstance(s, Mapping) and int(s.get("games") or 0) > 0
+        }
+        at_boundary_games = int(
+            (samples.get(str(boundary)) or {}).get("games") or 0
+        )
+        if below:
+            verdict = (
+                f"BOUNDARY TOO HIGH -- {len(below)} offset(s) below {boundary} carry game"
+                " rows, so part of the slate is invisible to us. NOT a venue absence."
+            )
+        elif at_boundary_games == 0:
+            verdict = (
+                f"INCONCLUSIVE -- the boundary {boundary} itself returned no game rows,"
+                " so the control failed and nothing here can be trusted."
+            )
+        else:
+            verdict = (
+                f"BOUNDARY SOUND -- every rung below {boundary} is futures or empty and"
+                " the boundary itself carries games. Missing markets are the VENUE's,"
+                " not our scan's."
+            )
+        print(
+            "[audit_polymarket_coverage] OFFSET_BOUNDARY_PROBE status=ok"
+            f" boundary={boundary} probes={located.get('probes')}"
+            f" monotonic={located.get('monotonic')}"
+            f" rungs={rungs}"
+            f" games_below_boundary={ {k: v.get('games') for k, v in below.items()} }"
+            f" at_boundary_games={at_boundary_games}"
+            f" verdict={verdict!r}"
+            f" samples={samples}",
+            flush=True,
+        )
+        return {"status": "ok", "boundary": boundary, "verdict": verdict, "samples": samples}
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[audit_polymarket_coverage] OFFSET_BOUNDARY_PROBE_FAILED"
             f" {type(exc).__name__}: {exc}",
             flush=True,
         )
@@ -400,7 +577,7 @@ def main() -> int:
         report["board_reason"] = board_reason
         if board:
             report["spread_sign_test"] = spread_sign_test(
-                slate, board, min_sample=args.min_sample
+                slate, board, min_sample=args.min_sample, selected_date=args.date
             )
 
     if args.json:

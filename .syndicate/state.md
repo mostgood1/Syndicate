@@ -69,6 +69,72 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
+## [kalshi-coverage-vs-oddsapi] KALSHI COVERAGE: capture is healthy, the JOIN is the bottleneck, and two prop vocabularies do not exist `[verified 2026-08-25, lane kalshi-oddsapi-coverage-audit]`
+
+Full audit: `docs/ai_context/kalshi_oddsapi_coverage_audit.md` (branch
+`claude/kalshi-oddsapi-coverage-audit`, `4152111e2`). Evidence is production
+log lines with timestamps; regenerate with
+`scripts/audit_kalshi_oddsapi_coverage.py`.
+
+**KALSHI LISTS 13,472 SERIES** `[KALSHI_SERIES_CATALOGUE status=ok, 20:21:24.977Z]`.
+By ticker token: MLB 174, NBA 351, WNBA 91, NHL 52, NFL 323, NCAAF 126,
+NCAAB 20. **NBA's 351 INCLUDES WNBA's 91** -- `series_matching` is a substring
+match and `NBA` sits inside `WNBA`. **Soccer has no line at all**, because
+`_KALSHI_SPORT_TOKENS` is the 7 sports and soccer is named by competition.
+That is "we cannot see it", NOT "Kalshi does not list it".
+
+**`[kalshi_discovery] LISTED` IS NOT THE CATALOGUE AND MUST NOT BE READ AS ONE.**
+`truncated=True` on 7 of 7 runs observed, `combinatorial` 39,350-39,976 of
+40,000. `singles` swung 24 -> 650 between consecutive runs on pagination luck.
+**Every per-series count derived from it is a floor.**
+
+**THE BOTTLENECK IS THE JOIN, NOT CAPTURE.** `BOARD_JOIN` 20:16:06Z:
+`kalshi_markets=6000 board_rows=1290 matched=54`, **`unreadable_title=3703`
+-- 62% of the working set**; 20:19:38Z: `board_rows=617 matched=0`.
+`VENUE_REPRICE_KEYS` on ten consecutive readings 19:35-20:18Z lists Kalshi in
+**NO `sources_offered` bucket** for any sport. **So no OddsAPI market may be
+cancelled in favour of Kalshi yet** -- that turns a metered market into a
+missing one. Order: fix the join, measure `matched` per family, then cancel.
+
+**NO NHL AND NO NCAAB PLAYER PROP COULD EVER AUTO-REGISTER -- FIXED
+`b8a958fe6`, NOT YET DEPLOYED, and unobservable until those seasons start.**
+`market_keys._BY_SPORT` had no `nhl` and no `ncaab` key, and
+`auto_series_from_catalogue` gates registration on `canonical_market_key`
+resolving. `_TOTAL_UNIT` *does* carry both, so game totals work and props
+cannot -- which is why it reads as coverage. `KXNHLSAVES`, `KXNHLANYGOAL`,
+`KXNHLPTS` are already listed. Identical to the defect `market_keys`' own
+header records for NFL (`ticker_substring_n=317 classified_n=0`).
+
+**LADDERS: THE RECORD IS WHOLE, THE JOIN'S INPUT IS NOT.**
+`MAX_MARKETS_PER_SERIES=400` against `KXNCAAFSPREAD`'s **1994** real markets is
+one rung in five; `KXNFLSPREAD` **795** is one in two. Per-tick `trimmed=`
+862-2983. Surviving rungs are `markets[:400]` in API order, not the ones near
+the line. `_record_daily_book(full_markets)` runs before both bounds
+(`e4ae9ebec`, live 18:56Z), so the dated capture files ARE whole.
+
+**SOCCER REGISTERS AS OF `461ee74be` (live 20:20:57Z).** `AUTO_SERIES`
+20:32:19Z read `game_series=204` where every prior run read **173**, with
+`('KXMLSTOTAL','soccer')` in the sample. **Any reading before 20:20:57Z
+describes a system that no longer exists.** What remains is scoped:
+(a) only the 10 competitions in `LEAGUE_DISPLAY_NAMES` can register -- UCL,
+UEL, UECL and EFL Cup are absent BY DESIGN, a product call, not a defect
+(`KXEFLCUPSPREAD` still `unmapped_series` 20:33:06Z); (b) soccer PROP series
+still cannot, because Kalshi titles them "La Liga Goal" with no word "Player"
+(`KXLALIGAGOAL` 5, `unmapped_series`, 20:33:06Z).
+
+**TWO ONE-LINE FIXES, MEASURED, NOT APPLIED** (20:33:06Z, 180 live markets):
+`KXMLBHRR` **136** refuses `stat_not_in_market_vocabulary
+detail="hits + runs + RBIs"` -- registered 12 minutes earlier by `461ee74be`
+and still refusing, the largest MLB prop family on the venue, one
+`market_keys._MLB` line. `KXMLBSB` **44** refuses `unmapped_series`
+("1+ stolen bases"), one registry line plus one vocabulary line.
+
+**`KXNBAPTS` IS A REAL, LISTED, AUTO-DISCOVERED SERIES.**
+`kalshi_catalogue.py`'s header uses it as its example of an invented ticker;
+it appears in `AUTO_SERIES sample` on six reads on 2026-08-25. The principle
+is right and should stand -- the EXAMPLE is falsified and misleads anyone who
+checks it.
+
 ## [portfolio-settlement] PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[verified 2026-08-22, lane portfolio-ledger-service-split]`
 
 **`/api/portfolio/summary` read `settled_count: 0, avg_clv: null` for weeks, and

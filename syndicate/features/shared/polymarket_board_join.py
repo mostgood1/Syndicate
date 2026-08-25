@@ -53,6 +53,7 @@ from typing import Any, Mapping, Sequence
 
 __all__ = [
     "parse_slug",
+    "market_web_url",
     "join_polymarket_to_board",
     "polymarket_price_resolver",
     "polymarket_ticker_resolver",
@@ -91,6 +92,53 @@ _SLUG_SHAPE = re.compile(
     r"^(?P<prefix>[a-z]+)-(?P<league>[a-z0-9]+)-(?P<away>[a-z0-9]+)-(?P<home>[a-z0-9]+)"
     r"-(?P<date>\d{4}-\d{2}-\d{2})(?:-(?P<rest>.+))?$"
 )
+
+
+def market_web_url(slug: Any) -> str | None:
+    """The browsable page for a slug's GAME, or None.
+
+    CONFIRMED BY THE USER 2026-08-25, one example, verbatim:
+
+        slug  tsc-mlb-cin-sf-2026-08-25-7pt5
+        url   https://polymarket.us/sports/mlb/mlb-cin-sf-2026-08-25
+
+    So the address is `<league>-<away>-<home>-<date>` under `/sports/<league>/`:
+    the slug's PREFIX and its MODIFIERS are both dropped.
+
+    IT ADDRESSES THE GAME, NOT THE MARKET. Every market on one game -- the
+    total at 7.5, the spread ladder, each prop -- collapses to this same URL,
+    because the modifiers that distinguish them are exactly what the web form
+    discards. Good enough to eyeball coverage, and not a per-market link; a
+    coverage report that implied otherwise would send someone looking for a
+    market the page does not single out.
+
+    THE LEAGUE TOKEN IS POLYMARKET'S OWN, and that is confirmed rather than
+    assumed. Both examples came from the user the same day:
+
+        aec/tsc-mlb-cin-sf-2026-08-25    -> /sports/mlb/mlb-cin-sf-2026-08-25
+        astatc-epl-cry-mnc-2026-08-28    -> /sports/epl/epl-cry-mnc-2026-08-28
+
+    The second is the one that mattered. Syndicate calls that sport `soccer`
+    and Polymarket calls the competition `epl`, so the open question was
+    whether the web form spoke our vocabulary or theirs -- and it is theirs,
+    unchanged from the slug. That makes every soccer row in the coverage gap
+    checkable with a link built from what we already store, including the
+    league codes (`lal`, `lg1`, `sea`, `bun`) we do not yet map.
+
+    This repo still never fetches a Polymarket web page -- it has no business
+    being that caller -- so a league neither example covers is a CANDIDATE
+    built by the same rule, not a verified address.
+    """
+    parsed = parse_slug(slug)
+    if not parsed:
+        return None
+    league = str(parsed.get("league") or "").strip()
+    away = str(parsed.get("away") or "").strip()
+    home = str(parsed.get("home") or "").strip()
+    date = str(parsed.get("date") or "").strip()
+    if not (league and away and home and date):
+        return None
+    return f"https://polymarket.us/sports/{league}/{league}-{away}-{home}-{date}"
 
 
 def parse_slug(slug: Any) -> dict[str, Any] | None:
@@ -411,6 +459,13 @@ def join_polymarket_to_board(
         out_of_scope_samples.append({
             "key": key,
             "slug": str(row.get("slug") or "")[:64],
+            # THE PAGE, so a coverage gap is CHECKABLE rather than just
+            # counted. Until the user supplied one confirmed URL on
+            # 2026-08-25, this repo had never seen a browsable Polymarket
+            # address and the coverage audit refused to construct one -- which
+            # left its whole gap table unactionable. It addresses the GAME, not
+            # the individual market; see `market_web_url`.
+            "url": market_web_url(row.get("slug")),
             # THE QUESTION IS THE PAYLOAD HERE. A slug says which game; only the
             # question says what the bet IS, and that is what decides whether a
             # parser can be written for the family.

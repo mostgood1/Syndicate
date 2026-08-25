@@ -909,7 +909,16 @@ def _polymarket_daily_book() -> None:
         if not isinstance(markets, list) or not markets:
             print("[live_odds_worker] POLYMARKET_DAILY_BOOK status=no_slate", flush=True)
             return
-        report = record_venue_book("polymarket", polymarket_daily_rows(markets))
+        # THE SLATE'S OWN STAMP, so a FROZEN FEED is distinguishable from a
+        # flat market. Six consecutive daily-book lines on 2026-08-25 were
+        # byte-identical while `persist_game_slate` was erroring every cycle --
+        # the book read as "nothing moved" for an hour and the truth was
+        # "nothing was fetched".
+        report = record_venue_book(
+            "polymarket",
+            polymarket_daily_rows(markets),
+            source_fetched_at=payload.get("fetched_at"),
+        )
     except Exception as exc:  # noqa: BLE001
         print(
             f"[live_odds_worker] POLYMARKET_DAILY_BOOK_FAILED {type(exc).__name__}: {exc}",
@@ -925,6 +934,16 @@ def _polymarket_daily_book() -> None:
         f" parsed={report.get('parsed')}"
         f" opened={report.get('opened')}"
         f" appended={report.get('appended')}"
+        # THE COUNTERS THAT MAKE `appended=0` READABLE. Three different
+        # problems with three different fixes -- no id, no price, nothing
+        # moved -- and this line printed none of them, so an empty daily book
+        # was unattributable for a whole day.
+        f" unchanged={report.get('unchanged')}"
+        f" unpriced={report.get('unpriced')}"
+        f" no_id={report.get('skipped_no_id')}"
+        # Non-zero means the FEED did not advance, so `unchanged` is not a
+        # statement about the market.
+        f" stale_source_files={report.get('stale_source_files')}"
         f" undated={report.get('undated')}"
         # Sports we do not model, counted by name. Polymarket's soccer league
         # codes surface here -- real markets in a sport we DO model, under
@@ -1286,6 +1305,30 @@ def _polymarket_spread_sign_audit_at_boot() -> None:
     except Exception as exc:  # noqa: BLE001
         print(
             f"[live_odds_worker] POLYMARKET_SPREAD_SIGN_AUDIT_FAILED"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _polymarket_offset_boundary_probe_at_boot() -> None:
+    """Probe a ladder of offsets below the live game-block boundary. Opt-in.
+
+    Exists because two facts moved together on 2026-08-25 and only one of them
+    can be true: `start_offset` jumped 12,142 -> 20,987 while `games` fell
+    13,255 -> 7,936 on a scan reporting `truncated=False`, and MLB full-game
+    spreads left the join's index entirely over the same window. Either the
+    venue stopped listing them or our boundary search stopped seeing them --
+    opposite fixes, and no log line distinguishes them.
+
+    Wrapped whole: a diagnostic must not be able to stop the loop it diagnoses.
+    """
+    try:
+        from scripts.audit_polymarket_coverage import run_offset_probe_if_enabled
+
+        run_offset_probe_if_enabled()
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[live_odds_worker] POLYMARKET_OFFSET_BOUNDARY_PROBE_FAILED"
             f" {type(exc).__name__}: {exc}",
             flush=True,
         )
@@ -1944,6 +1987,13 @@ def main() -> int:
         # sibling worker. Full reasoning:
         # `docs/ai_context/polymarket_oddsapi_coverage_audit.md` SS5.4.
         _polymarket_spread_sign_audit_at_boot()
+        # Answers ONE question and then should be switched off again: is
+        # `find_first_game_offset`'s boundary landing above part of the game
+        # block? Inert unless SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT is set.
+        # Unlike the audit above this one DOES read the venue (~10 signed GETs
+        # of 5 rows) -- deliberately, because no artifact can say what lives at
+        # a given offset, which is the whole question. Reads only.
+        _polymarket_offset_boundary_probe_at_boot()
         _game_line_grade_audit_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():

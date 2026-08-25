@@ -85,6 +85,8 @@ __all__ = [
     "in_scope_sports",
     "kalshi_daily_rows",
     "polymarket_daily_rows",
+    "POLYMARKET_LEAGUE_TO_SPORT",
+    "sport_for_polymarket_league",
     "MAX_POINTS_PER_MARKET",
     "MAX_MARKETS_PER_FILE",
 ]
@@ -168,6 +170,7 @@ def record_daily_odds(
     rows: Sequence[Mapping[str, Any]],
     *,
     now: str | None = None,
+    source_fetched_at: Any = None,
 ) -> dict[str, Any]:
     """Append today's price points for one venue and sport. Never raises.
 
@@ -265,6 +268,22 @@ def record_daily_odds(
         trimmed_markets = len(markets) - MAX_MARKETS_PER_FILE
         markets = dict(ordered[:MAX_MARKETS_PER_FILE])
 
+    # DID THE SOURCE ACTUALLY MOVE? "Prices did not change" and "we are
+    # looking at the same photograph again" produce the SAME `unchanged`
+    # count, and only one of them is a fact about the market.
+    #
+    # Measured 2026-08-25: six consecutive `POLYMARKET_DAILY_BOOK` lines were
+    # byte-identical (`listed=5688 parsed=2664 opened=0 appended=0`) while the
+    # slate artifact behind them had stopped being written at all
+    # (`POLYMARKET_US_SLATE_WRITE status=error reason=no_game_offset: ok`).
+    # The daily book read as a flat market for an hour; it was a frozen feed.
+    previous_source = state.get("source_fetched_at")
+    source_unchanged = (
+        source_fetched_at is not None and previous_source == source_fetched_at
+    )
+    if source_fetched_at is not None:
+        state["source_fetched_at"] = source_fetched_at
+
     state["markets"] = markets
     state["venue"] = venue
     state["sport"] = sport
@@ -297,6 +316,9 @@ def record_daily_odds(
         ),
         "trimmed_points": trimmed_points,
         "trimmed_markets": trimmed_markets,
+        # True means the FEED did not advance since the last write, so
+        # `unchanged` says nothing about the market.
+        "source_unchanged": bool(source_unchanged),
     }
 
 
@@ -344,6 +366,63 @@ def kalshi_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str, An
     return out
 
 
+# Polymarket's league TOKEN -> the sport Syndicate models it as.
+#
+# THE SCOPE CHECK WAS COMPARING TWO VOCABULARIES AND NOBODY NOTICED, because
+# five of them collide by coincidence. `in_scope_sports()` returns Syndicate's
+# names (`mlb`, `nfl`, `wnba`, `nba`, `nhl`, `ncaaf`, `ncaab`, `soccer`) and
+# the row carries POLYMARKET's token. The first five match by luck. `cfb` never
+# matches `ncaaf`, and no soccer competition token has ever matched `soccer`.
+#
+# So every one of those markets was counted `skipped_by_sport` -- filed under
+# "a sport Syndicate does not model" -- in sports we model completely.
+# Measured 2026-08-25 5:48 PM Central, one cycle:
+#
+#     'cfb': 555   'lal': 351   'lg1': 216   'epl': 80   'eflch': 36
+#
+# EVERY ENTRY IS CONFIRMED AGAINST A REAL GAME, never against the token
+# resembling a league name:
+#
+#   cfb  user-confirmed 2026-08-25, https://polymarket.us/sports/cfb/
+#        cfb-ncar-tcu-2026-08-29 -- North Carolina at TCU, college football.
+#        The coverage audit had this as an OPEN question (its §9-C): 246
+#        markets seen only as a counter, with no slug ever sampled.
+#   epl  user-confirmed the same day, /sports/epl/epl-cry-mnc-2026-08-28 --
+#        Crystal Palace v Manchester City.
+#   lal/lg1/sea/bun/eflc  confirmed BY THE CLUBS in verbatim slugs in
+#        `polymarket_oddsapi_coverage_audit.md` §6: Alaves v Villarreal,
+#        Lille v PSG, Milan v Venezia, Bayern v Stuttgart, Cardiff v Norwich.
+#
+# THE TOKENS DRIFT, so this is a floor and not a closed list: `eflc` in the
+# audit's own reading became `eflch` hours later, and `lig2`, `csl`, `tdp`,
+# `fibawcq` appeared in between. An unmapped token keeps its own name and
+# stays counted in `skipped_by_sport`, which is the surface the next mapping
+# gets read from -- and `SYNDICATE_VENUE_ODDS_SPORTS` still overrides all of
+# it without a deploy.
+POLYMARKET_LEAGUE_TO_SPORT: dict[str, str] = {
+    "cfb": "ncaaf",
+    "epl": "soccer",
+    "lal": "soccer",
+    "lg1": "soccer",
+    "sea": "soccer",
+    "bun": "soccer",
+    "eflc": "soccer",
+    "eflch": "soccer",
+}
+
+
+def sport_for_polymarket_league(league: Any) -> str | None:
+    """The Syndicate sport for a Polymarket league token, or the token itself.
+
+    Returns the TOKEN unchanged when unmapped, so an unknown competition is
+    still counted by its own name rather than disappearing into a default.
+    """
+    token = str(league or "").strip().lower()
+    if not token:
+        return None
+    return POLYMARKET_LEAGUE_TO_SPORT.get(token, token)
+
+
 def polymarket_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Polymarket markets -> the common row shape, WITHOUT dropping anything.
 
@@ -377,7 +456,15 @@ def polymarket_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str
             "event": None if parsed is None else f"{parsed['away']}-{parsed['home']}",
             "raw_title": row.get("question"),
             "game_date": None if parsed is None else parsed["date"],
-            "sport": None if parsed is None else parsed["league"],
+            # THE SYNDICATE SPORT, mapped from Polymarket's league token --
+            # see `POLYMARKET_LEAGUE_TO_SPORT`. Unmapped tokens pass through
+            # unchanged so they stay counted by name.
+            "sport": None if parsed is None else sport_for_polymarket_league(parsed["league"]),
+            # THE VENUE'S OWN TOKEN, kept beside it. Mapping soccer's six
+            # competitions onto one sport is right for the file split and
+            # wrong to do destructively: which competition a market belongs to
+            # is the thing the next mapping is read from.
+            "league": None if parsed is None else parsed["league"],
             "yes": prices[0],
             "no": prices[1],
         })
@@ -453,7 +540,12 @@ def in_scope_sports() -> frozenset[str]:
     return frozenset(set(SUPPORTED_SPORT_SLUGS) | {"soccer"})
 
 
-def record_venue_book(venue: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def record_venue_book(
+    venue: str,
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    source_fetched_at: Any = None,
+) -> dict[str, Any]:
     """Group a venue's whole book by (sport, game date) and record each file.
 
     THE CALLER STAYS THIN ON PURPOSE. Grouping is the only place the per-sport
@@ -489,9 +581,12 @@ def record_venue_book(venue: str, rows: Sequence[Mapping[str, Any]]) -> dict[str
     files: list[dict[str, Any]] = []
     errors = 0
     listed = parsed = opened = appended = 0
+    unchanged = unpriced = skipped_no_id = stale_source_files = 0
     unparsed_by_family: dict[str, int] = {}
     for (sport, game_date), group in sorted(grouped.items()):
-        result = record_daily_odds(venue, sport, game_date, group)
+        result = record_daily_odds(
+            venue, sport, game_date, group, source_fetched_at=source_fetched_at
+        )
         if result.get("status") != "ok":
             errors += 1
             files.append({"sport": sport, "date": game_date, "error": result.get("reason")})
@@ -500,6 +595,15 @@ def record_venue_book(venue: str, rows: Sequence[Mapping[str, Any]]) -> dict[str
         parsed += int(result.get("parsed") or 0)
         opened += int(result.get("opened") or 0)
         appended += int(result.get("appended") or 0)
+        # THE COUNTERS THAT MAKE `appended=0` READABLE. Without them a zero is
+        # unattributable: no id, no price, and nothing moved are three
+        # different problems with three different fixes, and the caller was
+        # printing none of them.
+        unchanged += int(result.get("unchanged") or 0)
+        unpriced += int(result.get("unpriced") or 0)
+        skipped_no_id += int(result.get("skipped_no_id") or 0)
+        if result.get("source_unchanged"):
+            stale_source_files += 1
         for family, count in (result.get("unparsed_by_family") or {}).items():
             unparsed_by_family[family] = unparsed_by_family.get(family, 0) + count
         files.append({
@@ -519,6 +623,12 @@ def record_venue_book(venue: str, rows: Sequence[Mapping[str, Any]]) -> dict[str
         # A row we could not place in a day. Counted rather than filed under
         # today, and reported so it cannot become a silent gap.
         "undated": undated,
+        "unchanged": unchanged,
+        "unpriced": unpriced,
+        "skipped_no_id": skipped_no_id,
+        # Files whose SOURCE stamp did not advance. Non-zero means the feed is
+        # frozen and `unchanged` is not a statement about the market.
+        "stale_source_files": stale_source_files,
         # Out of scope by SPORT, by name and count. The top entries here are
         # the candidate soccer leagues; everything else is a sport Syndicate
         # does not model and correctly does not store.

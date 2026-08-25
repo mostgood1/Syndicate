@@ -315,3 +315,173 @@ def test_the_opening_waits_for_a_real_price_rather_than_taking_zero():
 
     entry = read_json_file(mod.daily_odds_path("kalshi", "mlb", "2026-08-25"))["markets"]["m1"]
     assert entry["opening_yes"] == 0.93, "the empty book became the opening"
+
+
+# --------------------------------------------------------------------------
+# A frozen feed and a flat market must never share a number
+# --------------------------------------------------------------------------
+
+
+def _frozen_feed_row(**kw):
+    row = {
+        "id": "m1", "market": "totals", "line": 7.5, "side": None, "player": None,
+        "family": "TOTAL", "event": "cin-sf", "raw_title": "x",
+        "game_date": "2026-08-25", "sport": "mlb", "yes": "0.51", "no": "0.49",
+    }
+    row.update(kw)
+    return row
+
+
+def test_a_frozen_source_is_NAMED_not_read_as_a_flat_market(tmp_path, monkeypatch):
+    """THE DAY THE DAILY BOOK RECORDED NOTHING.
+
+    Measured 2026-08-25: six consecutive `POLYMARKET_DAILY_BOOK` lines were
+    BYTE-IDENTICAL (`listed=5688 parsed=2664 opened=0 appended=0`) while
+    `persist_game_slate` was erroring on every cycle
+    (`POLYMARKET_US_SLATE_WRITE status=error reason=no_game_offset: ok`). The
+    book read as an hour of flat prices; the truth was that nothing had been
+    fetched.
+
+    "Prices did not change" and "we are looking at the same photograph again"
+    produce the same `unchanged` count, and only one of them is a fact about
+    the market. The SOURCE's own stamp is what tells them apart.
+    """
+    from syndicate.features.shared import refresh_state_store
+    from syndicate.features.shared import venue_daily_odds as mod
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+
+    first = mod.record_venue_book("polymarket", [_frozen_feed_row()], source_fetched_at=1000.0)
+    assert (first["opened"], first["appended"], first["stale_source_files"]) == (1, 1, 0)
+
+    # SAME source stamp: the feed did not advance.
+    frozen = mod.record_venue_book("polymarket", [_frozen_feed_row()], source_fetched_at=1000.0)
+    assert frozen["appended"] == 0
+    assert frozen["unchanged"] == 1
+    assert frozen["stale_source_files"] == 1, "a frozen feed must be named"
+
+    # Fresh stamp AND a moved price: a real point.
+    moved = mod.record_venue_book(
+        "polymarket", [_frozen_feed_row(yes="0.55")], source_fetched_at=2000.0
+    )
+    assert moved["appended"] == 1
+    assert moved["stale_source_files"] == 0
+
+
+def test_a_genuinely_flat_market_on_a_FRESH_feed_is_not_flagged(tmp_path, monkeypatch):
+    """The other direction, which is what makes the flag mean anything. A feed
+    that advanced while the price held is a real observation, and it must not
+    be reported as staleness or the counter becomes noise."""
+    from syndicate.features.shared import refresh_state_store
+    from syndicate.features.shared import venue_daily_odds as mod
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+
+    mod.record_venue_book("polymarket", [_frozen_feed_row()], source_fetched_at=1000.0)
+    flat = mod.record_venue_book("polymarket", [_frozen_feed_row()], source_fetched_at=2000.0)
+
+    assert flat["appended"] == 0, "an unmoved price still appends no point"
+    assert flat["unchanged"] == 1
+    assert flat["stale_source_files"] == 0, "the FEED advanced -- that is not staleness"
+
+
+def test_appended_zero_is_always_attributable(tmp_path, monkeypatch):
+    """Three different problems with three different fixes, and the caller
+    printed none of them. `appended=0` must always be explainable from the
+    counters on the same line."""
+    from syndicate.features.shared import refresh_state_store
+    from syndicate.features.shared import venue_daily_odds as mod
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+
+    report = mod.record_venue_book(
+        "polymarket",
+        [
+            _frozen_feed_row(id="", market="totals"),                 # no id
+            _frozen_feed_row(id="m2", yes=None, no=None),             # listed, not quoted
+            _frozen_feed_row(id="m3"),                                # a real point
+        ],
+        source_fetched_at=1000.0,
+    )
+    assert report["skipped_no_id"] == 1
+    assert report["unpriced"] == 1
+    assert report["appended"] == 1
+    # Every row is accounted for by a named counter.
+    assert report["skipped_no_id"] + report["unpriced"] + report["appended"] == 3
+
+
+# --------------------------------------------------------------------------
+# The scope check was comparing two vocabularies
+# --------------------------------------------------------------------------
+
+
+def test_polymarkets_league_token_maps_to_the_sport_syndicate_models():
+    """FIVE TOKENS COLLIDE BY COINCIDENCE AND THAT HID THE BUG.
+
+    `in_scope_sports()` returns Syndicate's names (`mlb`, `nfl`, `wnba`, `nba`,
+    `nhl`, `ncaaf`, `ncaab`, `soccer`); the row carries POLYMARKET's league
+    token. The first five match by luck. `cfb` never matches `ncaaf`, and no
+    soccer competition token has ever matched `soccer` -- so those markets were
+    filed under "a sport Syndicate does not model", in sports we model
+    completely.
+
+    Measured 2026-08-25 5:48 PM Central, one cycle:
+
+        'cfb': 555   'lal': 351   'lg1': 216   'epl': 80   'eflch': 36
+
+    Every mapping is confirmed against a REAL GAME, never against the token
+    resembling a league name: `cfb-ncar-tcu-2026-08-29` (North Carolina at
+    TCU) and `epl-cry-mnc-2026-08-28` (Crystal Palace v Man City) are
+    user-confirmed URLs; the other soccer codes are confirmed by the CLUBS in
+    verbatim slugs in the coverage audit's §6.
+    """
+    from syndicate.features.shared.venue_daily_odds import (
+        in_scope_sports,
+        sport_for_polymarket_league,
+    )
+
+    wanted = in_scope_sports()
+    assert sport_for_polymarket_league("cfb") == "ncaaf"
+    assert sport_for_polymarket_league("cfb") in wanted, "555 markets/cycle"
+    for token in ("epl", "lal", "lg1", "sea", "bun", "eflc", "eflch"):
+        assert sport_for_polymarket_league(token) == "soccer", token
+        assert sport_for_polymarket_league(token) in wanted, token
+
+    # The five that already worked must keep working.
+    for token in ("mlb", "nfl", "wnba", "nba", "nhl"):
+        assert sport_for_polymarket_league(token) == token
+
+
+def test_an_unmapped_competition_keeps_its_own_name_and_stays_counted():
+    """THE TOKENS DRIFT, so the map is a floor and not a closed list: `eflc` in
+    the audit's own reading became `eflch` hours later, and `lig2`, `csl`,
+    `tdp` and `fibawcq` appeared in between.
+
+    An unmapped token must pass through UNCHANGED rather than fall to a
+    default. It then fails the scope check and lands in `skipped_by_sport` by
+    its own name -- which is the surface the next mapping gets read from. A
+    default would erase exactly that.
+    """
+    from syndicate.features.shared.venue_daily_odds import (
+        in_scope_sports,
+        sport_for_polymarket_league,
+    )
+
+    for token in ("lig2", "csl", "tdp", "fibawcq", "atp", "cs2"):
+        assert sport_for_polymarket_league(token) == token, token
+        assert sport_for_polymarket_league(token) not in in_scope_sports(), token
+
+
+def test_the_row_keeps_the_venues_league_beside_the_mapped_sport():
+    """Mapping six competitions onto one sport is right for the file split and
+    wrong to do destructively. Which competition a market belongs to is the
+    thing the next mapping -- and any per-league analysis -- is read from."""
+    from syndicate.features.shared.venue_daily_odds import polymarket_daily_rows
+
+    rows = polymarket_daily_rows([{
+        "slug": "astatc-lal-ala-vil-2026-08-28-btts",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+        "outcomePrices": '["0.6","0.4"]',
+    }])
+    assert rows[0]["sport"] == "soccer"
+    assert rows[0]["league"] == "lal"

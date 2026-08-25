@@ -1159,3 +1159,205 @@ def test_that_scan_actually_catches_a_reintroduced_reader(tmp_path):
         '    return markets_from_state(payload)\n'
     )
     assert not _kalshi_artifact_offenders(tmp_path)
+def test_kxmlbhrr_classifies_instead_of_refusing_the_stat():
+    """The 136-market refusal, end to end through `classify_market`.
+
+    MEASURED 2026-08-25T20:33:06Z, twelve minutes after the deploy that
+    registered `KXMLBHRR`: every one of its 136 markets came back
+    `stat_not_in_market_vocabulary detail='hits + runs + RBIs'`. Registering a
+    series and being able to READ its markets are two different gates, and
+    asserting only the registry is what let this ship.
+    """
+    from syndicate.features.shared.kalshi_catalogue import classify_market
+
+    verdict = classify_market({
+        "series": "KXMLBHRR",
+        "title": "William Contreras: 5+ hits + runs + RBIs?",
+        "ticker": "KXMLBHRR-26AUG251840MILCHC-MILWCONTRERAS5",
+    })
+
+    assert verdict["status"] == "ok", verdict
+    assert verdict["market"] == "batter_hits_runs_rbis", verdict
+    assert verdict["subject"] == "William Contreras", verdict
+    # "5+" is 4.5, never 5.0 and never 5.5. Matching 5+ against a line of 5.0
+    # finds nothing; matching it against 5.5 finds a DIFFERENT bet and prices
+    # it confidently.
+    assert verdict["line"] == 4.5, verdict
+    assert verdict["side"] == "over", verdict
+
+
+def test_kxmlbsb_registers_and_reads():
+    """`KXMLBSB` was refused at `unmapped_series` -- the FIRST gate, before any
+    title was read -- so its 44 markets were never fetched and the board row
+    reported Kalshi as having no market.
+
+    Asserted through `classify_market` rather than against `SERIES_SPORT`
+    directly, because a registry line whose stat does not resolve just moves
+    the refusal one gate later. That is precisely what `KXMLBHRR` did.
+    """
+    from syndicate.features.shared.kalshi_catalogue import classify_market
+
+    verdict = classify_market({
+        "series": "KXMLBSB",
+        "title": "William Contreras: 1+ stolen bases?",
+        "ticker": "KXMLBSB-26AUG251840MILCHC-MILWCONTRERAS1",
+    })
+
+    assert verdict["status"] == "ok", verdict
+    assert verdict["market"] == "batter_stolen_bases", verdict
+    assert verdict["subject"] == "William Contreras", verdict
+    assert verdict["line"] == 0.5, verdict
+    assert verdict["side"] == "over", verdict
+    # A prop names a human, so it needs no event resolution to be joinable.
+    assert verdict["needs_event_identity"] is False, verdict
+
+
+def test_neither_new_series_is_reported_as_a_coverage_gap_any_more():
+    """`unmapped_series` is the WORK QUEUE. A series that now classifies must
+    leave it, or the queue keeps naming work that is already done and stops
+    being read -- the same reason `SERIES_OUT_OF_SCOPE` exists."""
+    from syndicate.features.shared.kalshi_catalogue import unmapped_series
+
+    gaps = unmapped_series([
+        {"series": "KXMLBHRR", "title": "William Contreras: 5+ hits + runs + RBIs?"},
+        {"series": "KXMLBSB", "title": "William Contreras: 1+ stolen bases?"},
+    ])
+
+    assert gaps == {}, gaps
+
+
+def test_nhl_and_ncaab_prop_series_can_now_auto_register():
+    """The gate this actually opens, asserted through discovery rather than the
+    vocabulary table.
+
+    `auto_series_from_catalogue` refuses to register a prop series unless
+    `canonical_market_key(sport, stat)` resolves, so a sport absent from
+    `_BY_SPORT` was unreachable no matter how many series Kalshi listed --
+    the mechanism that held NFL at `classified_n=0` before `_FOOTBALL` existed.
+
+    The TITLE SHAPE here is Kalshi's observed pattern from other sports
+    ("Women's Pro Basketball Player Rebounds"), not an observed NHL title --
+    NHL is out of season (user-confirmed 2026-08-25). What this pins is the
+    MECHANISM: given a title of that shape, the sport now resolves where it
+    previously could not.
+    """
+    from syndicate.features.shared.kalshi_catalogue import auto_series_from_catalogue
+
+    found = auto_series_from_catalogue({
+        "KXNHLSAVES": "NHL Player Saves",
+        "KXNHLPTS": "NHL Player Points",
+        "KXNCAABPTS": "College Basketball Player Points",
+        "KXNCAABREB": "College Basketball Player Rebounds",
+    })
+
+    assert found == {
+        "KXNHLSAVES": "nhl",
+        "KXNHLPTS": "nhl",
+        "KXNCAABPTS": "ncaab",
+        "KXNCAABREB": "ncaab",
+    }, found
+
+
+def test_ncaa_baseball_is_still_refused_despite_matching_the_ncaab_token():
+    """`KXNCAABASEBALL` is NCAA BASEBALL and it contains the string `NCAAB`.
+
+    Observed in the live catalogue 2026-08-25T20:21:24Z. Aliasing `ncaab` to
+    the basketball vocabulary makes this series reach that map for the first
+    time, so the refusal has to be asserted rather than assumed -- registering
+    it would price a baseball prop off a basketball model, which is the same
+    class of error as `KXWNBAREB` reading as NBA.
+    """
+    from syndicate.features.shared.kalshi_catalogue import (
+        auto_series_from_catalogue,
+        sport_for_ticker,
+    )
+
+    # The ticker really does resolve to ncaab -- that is the hazard, not a bug.
+    assert sport_for_ticker("KXNCAABASEBALL") == "ncaab"
+
+    found = auto_series_from_catalogue({
+        "KXNCAABASEBALL": "College Baseball Player Home Runs",
+    })
+    assert found == {}, found
+
+
+def test_the_unread_anytime_goal_series_stays_in_the_work_queue():
+    """`KXNHLANYGOAL`: a ticker we have seen, a title we have not.
+
+    It must NOT register off a guessed key. Refusing is what puts it in the
+    COVERAGE_GAPS queue by name, carrying its real title -- which is how the
+    title gets read instead of invented.
+    """
+    from syndicate.features.shared.kalshi_catalogue import auto_series_from_catalogue
+
+    found = auto_series_from_catalogue({
+        "KXNHLANYGOAL": "NHL Player Anytime Goal Scorer",
+    })
+    assert found == {}, found
+
+
+def test_kalshi_words_one_spread_three_ways_and_all_three_read():
+    """413 SOCCER MARKETS AND 160 NFL QUARTER SPREADS, thrown away for a synonym.
+
+    Measured 2026-08-25 5:01:52 PM Central, `JOIN_TITLES ... by_series`, every
+    one of these `unreadable_title` on a series registered minutes earlier:
+
+        KXMLSTOTAL 90  KXSERIEATOTAL 60  KXMLSSPREAD 60  KXLALIGASPREAD 52
+        KXSERIEASPREAD 40  KXSERIEAGAME 39  KXLIGUE1TOTAL 39  KXLIGUE1GAME 33
+        KXNFL1QSPREAD 160
+
+    Registration is necessary and not sufficient, and the two fail
+    independently: the series has to be registered AND its titles read.
+    """
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    # Kalshi's soccer wording. Verbatim from KXLALIGASPREAD-26AUG31BARRVC-RVC3.
+    soccer = _parse_title("Vallecano wins by more than 2.5 goals?")
+    assert soccer["grammar"] == "team_spread"
+    assert soccer["subject"] == "Vallecano"
+    assert soccer["line"] == 2.5
+    assert soccer["side"] == "over", "more than IS over -- no other reading exists"
+
+    assert _parse_title("Buffalo wins by less than 3.5 points?")["side"] == "under"
+
+    # The wording that already worked must keep working.
+    mlb = _parse_title("Texas wins by over 3.5 runs?")
+    assert mlb["side"] == "over" and mlb["stat_text"] == "spreads"
+
+
+def test_a_quarter_spread_keeps_its_period_and_does_not_flatten():
+    """`KXNFL1QSPREAD` at 160 markets: "Tennessee wins 1Q by over 7.5 points?".
+
+    The period token is read into the BOARD's own suffix. Flattening it onto
+    the full-game spread would join a quarter line to a full-game row -- the
+    confident wrong match this file exists to prevent -- and baseball's innings
+    phrase keeps its own separate spelling because the board spells them
+    differently.
+    """
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    assert _parse_title("Tennessee wins 1Q by over 7.5 points?")["stat_text"] == "spreads_q1"
+    assert _parse_title("Buffalo wins 2H by less than 3.5 points?")["stat_text"] == "spreads_h2"
+    # Baseball's own period phrase is untouched and spelled the board's way.
+    assert (
+        _parse_title("Texas wins first 5 innings by over 2.5 runs?")["stat_text"]
+        == "spreads_1st_5_innings"
+    )
+
+
+def test_the_draw_leg_of_a_period_three_way_is_known_and_refused():
+    """"Will neither team win the 1st Quarter?" -- 144 markets across
+    KXNFL1Q/1H/2Q on 2026-08-25.
+
+    RECOGNISED AND REFUSED, which is not the same as unreadable. A draw is a
+    third outcome and the board carries no three-way quarter market to join it
+    to; reading it as either side of a two-way line would be a bet on a
+    different thing. The pattern exists so it stops appearing in the work queue
+    as a title nobody has looked at.
+    """
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    assert _parse_title("Chicago vs Tennessee: Will neither team win the 1st Quarter?") is None
+    assert _parse_title("Will neither team win the 2nd Half?") is None
+    # And it must not swallow a real moneyline.
+    assert _parse_title("Chicago Sky wins")["grammar"] == "moneyline"

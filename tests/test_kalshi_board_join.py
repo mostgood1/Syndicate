@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import contextlib
 
+from syndicate.features.shared import kalshi_board_join as mod_join
+
 import pytest
 
 from syndicate.features.shared.kalshi_board_join import (
@@ -866,10 +868,43 @@ def test_the_per_series_count_is_COMPLETE_where_the_sample_is_bounded():
         lambda: join_kalshi_to_board(markets, [_row()]),
     )
     assert report["reasons"][REASON_UNREADABLE_TITLE] == 13
-    # The SAMPLE is capped...
-    assert len(report["unreadable_titles"]) == 10
+    # ONE SAMPLE PER SERIES, not per market: 12 series, 13 refusals.
+    assert len(report["unreadable_titles"]) == 12
+    assert len({s["series"] for s in report["unreadable_titles"]}) == 12
     # ...the COUNT is not, so a series past the cap is still visible.
     assert len(report["unreadable_by_series"]) == 12
     assert report["unreadable_by_series"]["KXS0"] == 2
     # Sorted by count, so the family that dominates is readable at a glance.
     assert list(report["unreadable_by_series"])[0] == "KXS0"
+
+
+
+def test_the_unreadable_sample_is_bounded_and_the_count_still_is_not(monkeypatch):
+    """THE CAP, exercised where it actually binds.
+
+    The sibling test above has 12 series against a bound of 40, so it no longer
+    reaches the cap and cannot say whether one exists. That matters because the
+    bound was RAISED for a reason: at 10 the noisiest families reached it before
+    the quiet ones were named, and on 2026-08-25 eight soccer series were
+    reported `unreadable_title` (413 markets) while not one soccer TITLE
+    appeared in the sample. The gap could be counted and not read.
+
+    Both halves are the point: the sample is bounded so a log line stays
+    readable, and the per-series COUNT is not, so a series past the bound is
+    still visible by name.
+    """
+    from syndicate.features.shared.kalshi_board_join import REASON_UNREADABLE_TITLE
+
+    monkeypatch.setattr(mod_join, "MAX_UNREADABLE_SAMPLES", 3)
+    markets = [
+        _kalshi(title=f"unreadable {n}", series=f"KXQ{n}", ticker=f"KXQ{n}-26AUG22X-1")
+        for n in range(9)
+    ]
+    report = _with_series(
+        {f"KXQ{n}": "mlb" for n in range(9)},
+        lambda: join_kalshi_to_board(markets, [_row()]),
+    )
+
+    assert len(report["unreadable_titles"]) == 3, "the sample must stay bounded"
+    assert len(report["unreadable_by_series"]) == 9, "every series must still be NAMED"
+    assert report["reasons"][REASON_UNREADABLE_TITLE] == 9

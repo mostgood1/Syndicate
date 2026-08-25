@@ -551,3 +551,215 @@ def test_kalshi_and_the_other_venues_are_unchanged(monkeypatch):
 
     assert mod._venue_price_resolver("novig", "2026-08-24") == (None, None)
     assert mod._venue_price_resolver("prophetx", "2026-08-24") == (None, None)
+
+
+# --------------------------------------------------------------------------
+# The Kalshi resolver has to go through the board join, or it indexes nothing
+# --------------------------------------------------------------------------
+
+
+def _kalshi_prop_market(ticker="KXMLBHIT-26AUG251840BOSMIA-MIAARAMREZ50-1"):
+    return {
+        "ticker": ticker,
+        "series": "KXMLBHIT",
+        "title": "Agustin Ramirez: 1+ hits?",
+        "yes_american": -120,
+        "no_american": 105,
+        "yes_ask_dollars": 0.55,
+        "no_ask_dollars": 0.49,
+    }
+
+
+def _board_row(event_id="evt-1"):
+    return {
+        "event_id": event_id,
+        "sport": "mlb",
+        "market": "batter_hits",
+        "player_name": "Agustin Ramirez",
+        "line": 0.5,
+        "side": "over",
+        "home_team": "Miami Marlins",
+        "away_team": "Boston Red Sox",
+        "game_date": "2026-08-25",
+    }
+
+
+def test_a_match_with_no_board_event_id_can_never_be_indexed():
+    """THE WHOLE DEFECT, in one assertion.
+
+    `_match_key` indexes on `board_event_id` and returns None without one -- by
+    design, because `("totals", "", 8.5, "over")` is otherwise one key for every
+    8.5 total on the slate. `_resolvers_from_markets` built its match dicts by
+    hand from `classify_market` alone, and a Kalshi market does not know which
+    board row it belongs to. Every key was None; the index was empty; the
+    resolver returned None for every row it was ever asked about.
+    """
+    from syndicate.features.shared.kalshi_board_join import _match_key, _row_key
+
+    hand_built = {
+        "market": "batter_hits", "player_name": "Agustin Ramirez",
+        "line": 0.5, "board_side": "over", "kalshi_american": -120,
+    }
+    assert _match_key(hand_built) is None
+
+    # The join stamps the one fact the market cannot know, and then the two
+    # sides agree exactly.
+    joined_like = dict(hand_built, board_event_id="evt-1")
+    assert _match_key(joined_like) == _row_key(_board_row("evt-1"))
+
+
+def test_the_kalshi_resolver_prices_a_row_it_was_silently_missing(monkeypatch):
+    """END TO END, against the numbers this was found by.
+
+    Measured 2026-08-25 4:40:11 PM Central, three artifact-reader fixes later:
+
+        PAPER2_PLAN_WRITTEN venue=kalshi     rows_in=86 venue_priced=0
+        PAPER2_PLAN_WRITTEN venue=polymarket rows_in=89 venue_priced=30
+
+    ...while the fan-in priced 2,344 Kalshi quotes off the same artifact on the
+    same service. Two matchers, one venue. Kalshi took the AGGREGATOR's price
+    on all 86 rows and `venue_not_quoting` never fired, because a price was
+    always found -- just not Kalshi's.
+    """
+    from pipeline import portfolio_commit as mod
+
+    rows = [_board_row()]
+    monkeypatch.setattr(mod, "_board_rows_for_join", lambda _d: rows)
+    price_resolver, ticker_resolver = mod._resolvers_from_markets(
+        [_kalshi_prop_market()], "2026-08-25"
+    )
+
+    assert price_resolver is not None, "the resolver must exist"
+    assert price_resolver(rows[0]) is not None, (
+        "the resolver exists but indexes nothing -- the exact silent failure"
+    )
+    # Price and contract id come from ONE match list, which is what stops a
+    # bet being placed on a ticker at a price never quoted for it.
+    assert ticker_resolver(rows[0])
+
+
+def test_the_kalshi_resolver_reverts_to_the_aggregator_and_SAYS_SO(monkeypatch, capsys):
+    """`(None, None)` is the documented fallback and must stay. What it must
+    never do again is happen silently: the whole failure above was a venue
+    quietly pricing off someone else's book with nothing in any log to say
+    which."""
+    from pipeline import portfolio_commit as mod
+
+    monkeypatch.setattr(mod, "_board_rows_for_join", lambda _d: [])
+    price_resolver, ticker_resolver = mod._resolvers_from_markets(
+        [_kalshi_prop_market()], "2026-08-25"
+    )
+
+    assert (price_resolver, ticker_resolver) == (None, None)
+    printed = capsys.readouterr().out
+    assert "KALSHI_BOARD_JOIN" in printed, printed
+    assert "matched=0" in printed, printed
+
+
+# --------------------------------------------------------------------------
+# The position cap must not spend a venue's slots on bets it cannot place
+# --------------------------------------------------------------------------
+
+
+def _cuttable_row(key, score, price_source, ev_pct=8.0, model_edge_pct=6.0):
+    return {
+        "position_key": key,
+        "event_id": key,
+        "sport": "mlb",
+        "market": "totals",
+        "side": "over",
+        "line": 8.5,
+        "quote": {"price": -110},
+        "ev_pct": ev_pct,
+        "model_edge_pct": model_edge_pct,
+        "score": {"price_reliability": 0.8, "score": score},
+        "price_source": price_source,
+    }
+
+
+def test_the_position_cap_prefers_rows_the_venue_can_actually_place():
+    """AN UNPLACEABLE ROW MUST NOT HOLD A SLOT.
+
+    A venue-scoped row priced from the AGGREGATOR carries no venue contract id
+    and can never be bought at that venue. Ranking it against placeable rows
+    lets a bet we cannot make consume one of `max_positions` (12) slots.
+
+    Measured 2026-08-25 5:17:58 PM Central, the first Kalshi plan that ever
+    priced off Kalshi's own book: 161 of 233 rows venue-priced, 40 cut here,
+    and the ONE position that survived was `price_source=aggregator` --
+    unplaceable, holding the only slot that mattered. `ORDER_PATH venue=kalshi`
+    refused it `no_venue_ticker`.
+
+    Placeability is PRIMARY, not a tiebreak: an unplaceable row's score is a
+    statement about a bet we cannot hold, so ranking it above one we can
+    optimises a book nobody can own.
+    """
+    from syndicate.features.shared.portfolio_commit import commit_portfolio
+    from syndicate.features.shared.portfolio_settings import PortfolioSettings, resolve_settings
+
+    settings = resolve_settings()
+    settings = PortfolioSettings(**{**settings.__dict__, "max_positions": 2})
+
+    rows = [
+        _cuttable_row("agg-hi", 9.9, "aggregator"),
+        _cuttable_row("agg-hi2", 9.8, "aggregator"),
+        _cuttable_row("venue-lo", 1.0, "venue_feed"),
+    ]
+    plan = commit_portfolio(
+        rows, selected_date="2026-08-25", settings=settings, prefer_placeable=True
+    )
+    # Identified by `event_id`: `position_key` is REGENERATED by hashing the
+    # row's identity, not carried from the fixture.
+    kept = {p.get("event_id") for p in plan["positions"]}
+    assert "venue-lo" in kept, kept
+    assert len(plan["positions"]) == 2
+
+
+def test_the_main_plan_is_UNCHANGED_because_it_never_opts_in():
+    """`prefer_placeable` is off by default and the main plan's rows carry no
+    `price_source` at all.
+
+    Explicit rather than inferred from the field's presence: a guarantee that
+    depends on nobody ever setting a field is not a guarantee. With the flag
+    off the order is pure score, highest first, exactly as before.
+    """
+    from syndicate.features.shared.portfolio_commit import commit_portfolio
+    from syndicate.features.shared.portfolio_settings import PortfolioSettings, resolve_settings
+
+    settings = resolve_settings()
+    settings = PortfolioSettings(**{**settings.__dict__, "max_positions": 2})
+
+    rows = [
+        _cuttable_row("agg-hi", 9.9, "aggregator"),
+        _cuttable_row("agg-hi2", 9.8, "aggregator"),
+        _cuttable_row("venue-lo", 1.0, "venue_feed"),
+    ]
+    plan = commit_portfolio(rows, selected_date="2026-08-25", settings=settings)
+    kept = [p.get("event_id") for p in plan["positions"]]
+    assert kept == ["agg-hi", "agg-hi2"], kept
+
+
+def test_nothing_is_dropped_by_the_preference_only_reordered():
+    """The restricted-vs-unrestricted comparison keeps its full population.
+    Preference decides WHO gets cut when the cap binds; it never removes a row
+    from consideration, and every row is still accounted for by name."""
+    from syndicate.features.shared.portfolio_commit import commit_portfolio
+    from syndicate.features.shared.portfolio_settings import PortfolioSettings, resolve_settings
+
+    settings = resolve_settings()
+    settings = PortfolioSettings(**{**settings.__dict__, "max_positions": 2})
+
+    rows = [
+        _cuttable_row("agg-hi", 9.9, "aggregator"),
+        _cuttable_row("venue-a", 5.0, "venue_feed"),
+        _cuttable_row("venue-b", 4.0, "venue_feed"),
+    ]
+    plan = commit_portfolio(
+        rows, selected_date="2026-08-25", settings=settings, prefer_placeable=True
+    )
+    # `rows_in` is top-level, and the invariant the module's own docstring
+    # states: every row is accounted for by name.
+    assert plan["totals"]["positions"] + sum(plan["refusals"].values()) == plan["rows_in"]
+    assert plan["refusals"].get("beyond_max_positions") == 1
+    # The aggregator row was the one cut, and it is still COUNTED.
+    assert {p["event_id"] for p in plan["positions"]} == {"venue-a", "venue-b"}

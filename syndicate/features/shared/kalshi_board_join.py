@@ -104,6 +104,17 @@ REASON_TEAM_SIDE_UNRESOLVED = "team_side_unresolved"
 # silently mis-dated instead of refused.
 REASON_UNDATABLE = "no_game_date_in_ticker"
 
+# How many DISTINCT SERIES get a sample title. One per series, so the bound is
+# on series rather than on samples.
+#
+# It was 10, and the noisiest families reached it before the quiet ones were
+# named: on 2026-08-25 `by_series` reported eight soccer series as
+# `unreadable_title` (413 markets) while not one soccer TITLE appeared in the
+# sample. The grammar gap could be counted and not read, which cost a cycle.
+# Named rather than written twice: the old literal lived here and in a test,
+# and a bound nobody can find is a bound nobody revisits.
+MAX_UNREADABLE_SAMPLES = 40
+
 
 def game_lines_enabled() -> bool:
     """Are game lines allowed to be PRICED? Absent means no.
@@ -555,7 +566,15 @@ def join_kalshi_to_board(
                 # among them, which is not evidence either way while more than
                 # 10 series refuse. A count is small, complete, and settles it.
                 unreadable_by_series[series] = unreadable_by_series.get(series, 0) + 1
-                if series not in unreadable_series and len(unreadable_titles) < 10:
+                # ONE SAMPLE PER SERIES, and the bound is on SERIES rather
+                # than on samples. At `< 10` the cap was reached by the noisiest
+                # families and every quieter series went unnamed: on 2026-08-25
+                # `by_series` reported eight soccer series `unreadable_title`
+                # (413 markets) while not one soccer TITLE appeared in the
+                # sample, so the grammar gap could be counted and not read.
+                # De-duplicated by series already, so this is 40 short strings
+                # at worst -- the cost of the low cap was another cycle.
+                if series not in unreadable_series and len(unreadable_titles) < MAX_UNREADABLE_SAMPLES:
                     unreadable_series.add(series)
                     unreadable_titles.append(
                         {

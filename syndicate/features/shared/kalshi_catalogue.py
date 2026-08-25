@@ -178,6 +178,18 @@ SERIES_SPORT: dict[str, str] = {
     # Seen in a production `KALSHI_SPORT MLB` catalogue read rather than on a
     # market page, so it is evidence of the same kind: the venue lists it.
     "KXMLBHA": "mlb",
+    # seen 2026-08-25T20:33:06Z, `[kalshi_discovery] GAP series=KXMLBSB
+    # count=44 reason=unmapped_series sample='William Contreras: 1+ stolen
+    # bases?'` -- 44 markets refused at the FIRST gate, before any title was
+    # read. `market_keys` gained `stolen bases -> batter_stolen_bases` in the
+    # same change; registering a series whose stat does not resolve just moves
+    # the refusal one gate later, which is what `KXMLBHRR` did.
+    #
+    # WORTH MORE THAN THE COUNT SUGGESTS: `tests/test_mlb_ladders_build.py`
+    # keeps `batter_stolen_bases` in `known_unfed` -- the MLB sim already
+    # models this market and no feed prices it. This is the first price source
+    # it has had.
+    "KXMLBSB": "mlb",
     "KXMLBTOTAL": "mlb",
     "KXNBATOTAL": "nba",
     "KXNFLTOTAL": "nfl",
@@ -210,6 +222,87 @@ SERIES_OUT_OF_SCOPE: dict[str, str] = {
     "KXKBORFI": "kbo",
     "KXUFCFIGHT": "ufc",
     "KXSOWBBALLGAME": "softball",
+    # ------------------------------------------------------------------
+    # SEASON AND SLATE FUTURES, evicted 2026-08-25. Real markets, in sports
+    # we model, that NO board row can ever match -- the board is built per
+    # GAME DATE and these have no game.
+    #
+    # HOW THEY GOT IN: `auto_game_series_from_catalogue` registers any
+    # sport-token series whose title TAIL resolves via `canonical_game_market`,
+    # and Kalshi titles a division future "... Division Winner". "Winner" is a
+    # game-market word, so the gate that exists to find moneylines let the
+    # futures through with them.
+    #
+    # WHAT IT COST, measured 2026-08-25 on `[kalshi_odds] TICK this_tick` and
+    # `[kalshi_odds] JOIN_TITLES by_series` (21:13:07Z / 21:15:49Z): roughly
+    # 1,660 markets of the 6,000-market working set and ~34 of the 193 slots in
+    # a 60-per-tick fetch rotation -- so a live ladder waited ~8 extra minutes
+    # behind markets that cannot be bet. `KXNCAAFWINS` and `KXNCAAFAWARD` were
+    # each capped at EXACTLY 400 by `MAX_MARKETS_PER_SERIES`, i.e. consuming
+    # the whole per-series bound, and every one of those 800 came back
+    # `unreadable_title`.
+    #
+    # WHY THE REGISTRY AND NOT A DATE FILTER. Dropping undated markets from the
+    # working set is the obvious fix and `kalshi_odds_refresh` records that it
+    # "was tried and reverted": player props skip the join's date check, so a
+    # prop whose ticker shape does not parse was silently dropped from the
+    # venue we actually trade, and six tests caught it. Evicting the SERIES is
+    # both safer and strictly better -- it stops the FETCH, which a
+    # market-level filter cannot.
+    #
+    # EVERY ENTRY BELOW WAS SEEN IN PRODUCTION, with the count beside it. This
+    # list is deliberately not a title-pattern rule: the series-level titles
+    # these register on have not been read, and inventing a pattern from market
+    # titles is the guess this file exists to refuse.
+    # ------------------------------------------------------------------
+    # Division / conference winners. Sample title, KXNFLAFCEAST 21:13:07Z:
+    # 'Will New York J win the Pro Football AFC East Division?'; KXNBACENTRAL
+    # 21:15:49Z: 'Will Milwaukee be the Central Division winner in the 2026-27
+    # season?'; KXMLBNLCENT 21:15:49Z: 'Will St. Louis be the 2026 NL Central
+    # Division Winner'.
+    "KXMLBALEAST": "season_futures",     # 5 markets
+    "KXMLBALCENT": "season_futures",     # 5
+    "KXMLBALWEST": "season_futures",     # 5
+    "KXMLBNLEAST": "season_futures",     # 5
+    "KXMLBNLCENT": "season_futures",     # 5
+    "KXMLBNLWEST": "season_futures",     # 5
+    "KXNBAATLANTIC": "season_futures",   # 5
+    "KXNBACENTRAL": "season_futures",    # 5
+    "KXNBANORTHWEST": "season_futures",  # 5
+    "KXNBAPACIFIC": "season_futures",    # 5
+    "KXNBASOUTHEAST": "season_futures",  # 5
+    "KXNBASOUTHWEST": "season_futures",  # 5
+    "KXNFLAFCEAST": "season_futures",    # 4
+    "KXNFLAFCNORTH": "season_futures",   # 4
+    "KXNFLAFCSOUTH": "season_futures",   # 4
+    "KXNFLAFCWEST": "season_futures",    # 4
+    "KXNFLNFCEAST": "season_futures",    # 4
+    "KXNFLNFCNORTH": "season_futures",   # 4
+    "KXNFLNFCSOUTH": "season_futures",   # 4
+    "KXNFLNFCWEST": "season_futures",    # 4
+    "KXNHLATLANTIC": "season_futures",   # 8
+    "KXNHLCENTRAL": "season_futures",    # 8
+    "KXNHLMETROPOLITAN": "season_futures",  # 8
+    "KXNHLPACIFIC": "season_futures",    # 8
+    # Season win totals, awards and season-long player races. The two largest
+    # single wasters on the venue.
+    "KXNCAAFWINS": "season_futures",     # 618 listed, 400 kept, 400 unreadable
+    "KXNCAAFAWARD": "season_futures",    # 509 listed, 400 kept, 400 unreadable
+    "KXNBAWINS": "season_futures",       # 312, all unreadable
+    "KXNFLH2HWINS": "season_futures",    # 22
+    "KXWNBAWINS": "season_futures",      # 19
+    "KXNHLSEASONPTS": "season_futures",  # seen in AUTO_SERIES game_sample 19:11:24Z
+    "KXNFLPLAYOFFHOST": "season_futures",  # 32
+    "KXNBAMOSTWINS": "season_futures",   # 4
+    # Slate-level and exhibition markets: real, and not a game line on any
+    # board row. KXNFLCOMPETE 21:13:07Z: 'Jake Paul to compete in a Pro
+    # Football game in the 2026-27 season?'.
+    "KXNFLHIGHSCORE": "slate_futures",   # 9
+    "KXNCAAFHIGHSCORE": "slate_futures", # 10
+    "KXNBAPTSALLGAMES": "slate_futures", # AUTO_SERIES game_sample 19:35:08Z
+    "KXNFLCOMPETE": "not_a_game_line",   # 2
+    "KXNFLCELEBRITYGAME": "not_a_game_line",  # AUTO_SERIES game_sample 16:55:55Z
+    "KXNBASLAMDUNK": "not_a_game_line",  # AUTO_SERIES game_sample 17:41:52Z
 }
 
 GRAMMAR_PLAYER_THRESHOLD = "player_threshold"
@@ -271,10 +364,43 @@ _INNINGS_PERIOD = {
 }
 
 # "Texas wins by over 3.5 runs?" / "Texas wins first 5 innings by over 2.5 runs?"
+# / "Vallecano wins by more than 2.5 goals?" / "Tennessee wins 1Q by over 7.5 points?"
+#
+# THREE WORDINGS FOR ONE WAGER, and only the first was read. Measured
+# 2026-08-25 5:01:52 PM Central, `JOIN_TITLES ... by_series`, every one of
+# these `unreadable_title` on a series we had just registered:
+#
+#   KXMLSTOTAL 90  KXSERIEATOTAL 60  KXMLSSPREAD 60  KXLALIGASPREAD 52
+#   KXSERIEASPREAD 40  KXSERIEAGAME 39  KXLIGUE1TOTAL 39  KXLIGUE1GAME 33
+#   KXNFL1QSPREAD 160
+#
+# 413 soccer markets and 160 NFL quarter spreads, fetched and thrown away for
+# a synonym. Registration was necessary and is not sufficient: the series has
+# to be registered AND its titles read, and those fail independently.
+#
+# `more than`/`less than` are Kalshi's soccer wording and mean exactly
+# over/under -- no other reading is available for "wins by more than 2.5
+# goals". The PERIOD token is separate from MLB's innings phrase because the
+# board spells them differently (`spreads_q1` vs `spreads_1st_5_innings`) and
+# collapsing them would join a quarter line to a full-game row.
 _TEAM_SPREAD_WINS_BY = re.compile(
-    r"^\s*(?P<team>.+?)\s+wins\s+(?:first\s+(?P<innings>\d+)\s+innings\s+)?"
-    r"by\s+(?P<direction>over|under)\s+(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    r"^\s*(?P<team>.+?)\s+wins\s+"
+    r"(?:first\s+(?P<innings>\d+)\s+innings\s+)?"
+    r"(?:(?P<period>[1-4](?:Q|H)|OT)\s+)?"
+    r"by\s+(?P<direction>over|under|more\s+than|less\s+than)\s+"
+    r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
     re.IGNORECASE,
+)
+
+# "Chicago vs Tennessee: Will neither team win the 1st Quarter?"
+#
+# THE DRAW LEG OF A THREE-WAY, recognised so it stops counting as unreadable
+# and REFUSED for the same reason `_INNINGS_TIE` is: a draw is a third outcome
+# and the board carries no three-way quarter market to join it to. Reading it
+# as either side of a two-way line would be a bet on a different thing.
+# 144 markets across KXNFL1Q/1H/2Q on 2026-08-25.
+_NEITHER_TEAM_WINS = re.compile(
+    r"^\s*(?:.+?:\s*)?will\s+neither\s+team\s+win\b.*$", re.IGNORECASE
 )
 
 # "First 5 innings: Over 6.5 runs"  (a TOTAL -- names no team)
@@ -801,6 +927,31 @@ def threshold_to_line(threshold: Any) -> float | None:
     return float(value) - 0.5
 
 
+# Kalshi's quarter/half token -> the board's suffix. Kept separate from
+# `_INNINGS_PERIOD` because the board spells baseball and football periods
+# differently (`spreads_1st_5_innings` vs `spreads_q1`) and one table would
+# invite joining a quarter line to a full-game row.
+_PERIOD_TOKEN = {
+    "1q": "q1", "2q": "q2", "3q": "q3", "4q": "q4",
+    "1h": "h1", "2h": "h2",
+}
+
+
+def _direction(word: Any) -> str:
+    """`more than` -> `over`, `less than` -> `under`, otherwise verbatim.
+
+    Kalshi words the same wager three ways and only one was read. There is no
+    other reading available for "wins by more than 2.5 goals", so this is a
+    synonym table rather than an interpretation.
+    """
+    token = " ".join(str(word or "").strip().lower().split())
+    if token == "more than":
+        return "over"
+    if token == "less than":
+        return "under"
+    return token
+
+
 def _parse_title(title: str) -> dict[str, Any] | None:
     """Which grammar reads this title, and what it says. None if none does.
 
@@ -822,6 +973,13 @@ def _parse_title(title: str) -> dict[str, Any] | None:
     # BEFORE `_TEAM_SPREAD` and `_MONEYLINE`. "Texas wins first 5 innings by
     # over 2.5 runs?" contains "wins", and a looser pattern reading it as a
     # moneyline would price the game winner as though it were a run line.
+    if _NEITHER_TEAM_WINS.match(title):
+        # Readable and deliberately unpriceable -- the draw leg of a three-way,
+        # same reasoning as `_INNINGS_TIE`. Returning None keeps it refused;
+        # the pattern exists so it is refused as a KNOWN shape rather than
+        # counted as a title nobody has looked at.
+        return None
+
     match = _TEAM_SPREAD_WINS_BY.match(title)
     if match:
         innings = match.group("innings")
@@ -830,12 +988,19 @@ def _parse_title(title: str) -> dict[str, Any] | None:
             # A period the board has no key for. Refused rather than flattened
             # onto the full-game spread, which is a different wager.
             return None
+        if period is None and match.group("period"):
+            # A quarter/half token ("1Q", "2H"). The board's own suffix, via
+            # the shared table -- a spelling only Kalshi's side understands
+            # would join to nothing.
+            period = _PERIOD_TOKEN.get(match.group("period").strip().lower())
+            if period is None:
+                return None
         return {
             "grammar": GRAMMAR_TEAM_SPREAD,
             "subject": match.group("team").strip(),
             "stat_text": f"spreads_{period}" if period else "spreads",
             "line": float(match.group("line")),
-            "side": match.group("direction").strip().lower(),
+            "side": _direction(match.group("direction")),
         }
 
     match = _PERIOD_TOTAL.match(title)

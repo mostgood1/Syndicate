@@ -686,3 +686,43 @@ def test_both_price_legs_are_carried_through():
                              "no_price_dollars": "0.5400"})
     assert seen["yes_price"] == 0.46
     assert seen["no_price"] == 0.54
+
+
+def test_a_position_with_no_ticker_says_SO_instead_of_blaming_the_price():
+    """THREE REAL ORDERS WENT TO THE LEDGER UNDER THE WRONG CAUSE.
+
+    `_kalshi_price_for` returns None at its FIRST line when `venue_ticker` is
+    empty -- before it ever asks Kalshi for a price -- so an unstamped position
+    arrived here indistinguishable from a market the venue would not quote.
+    Every Kalshi row in the 2026-08-25 ledger read:
+
+        OrderBuildError: no_live_price: None
+
+    and the trailing `None` was the ticker saying so all along:
+
+        LIVE_ORDER status=rejected venue=kalshi ticker=None
+          market=totals_alt side=over line=5.5
+
+    `verify_order_paths` had the distinction right (`no_venue_ticker`) while
+    the path with money on it did not. They point at different fixes: a missing
+    id is the board join or the position cap; a missing price is the venue or
+    staleness.
+    """
+    import dataclasses
+
+    submit = orders.kalshi_submitter(lambda request: 0.55)
+    unstamped = dataclasses.replace(_request(), venue_ticker="")
+    with pytest.raises(orders.OrderBuildError) as excinfo:
+        submit(unstamped)
+    assert str(excinfo.value) == "no_venue_ticker", str(excinfo.value)
+
+
+def test_a_real_price_failure_still_names_the_TICKER_it_could_not_price():
+    """The other half stays reachable, and now carries the contract id instead
+    of the `None` that made the two look alike."""
+    submit = orders.kalshi_submitter(lambda request: None)
+    with pytest.raises(orders.OrderBuildError) as excinfo:
+        submit(_request())
+    message = str(excinfo.value)
+    assert message.startswith("no_live_price:"), message
+    assert "None" not in message, message
