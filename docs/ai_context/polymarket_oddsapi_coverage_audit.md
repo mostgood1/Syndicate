@@ -61,6 +61,43 @@ this page an upper bound rather than a fact.
 `5,688 + 7,545 = 13,233` exactly, and the refusal counters reconcile to the
 unit (§3.1), so these are complete counts, not samples.
 
+### 2.0 SUPERSEDED, AND REPLACED BY A WORSE BUG — READ THIS BEFORE §2.1
+
+**§2.1 below is HISTORICAL.** The page-ceiling truncation it reports was real at
+19:28:40Z and was fixed the same evening by `f08930f32`. It has been replaced by
+a different and larger defect, settled by direct probe on 2026-08-25T22:54:25Z:
+
+```
+OFFSET_BOUNDARY_PROBE boundary=20964 monotonic=True
+  games_below_boundary={'12578': 5, '16771': 5, '18867': 5}
+  verdict='BOUNDARY TOO HIGH -- 3 offset(s) below 20964 carry game rows,
+           so part of the slate is invisible to us. NOT a venue absence.'
+```
+
+`find_first_game_offset` assumes the `closed=false` ordering is
+`[futures][games][empty]`. **It is not.** A band of golf/F1 futures sits ABOVE a
+large block of game markets, and the binary search converges into that band:
+
+```
+ 12,578  GAMES 5/5 SPREAD  asc-nfl-ne-cle-2026-08-27-pos-1pt5   <-- NFL FULL-GAME SPREAD
+ 18,867  GAMES 5/5 TOTAL   tsc-nfl-cin-phi-2026-08-28-4q-17pt5
+ 20,754  futures (LPGA)    tec-lpga-fmcham-2026-08-27-r3l-hyecho
+ 20,964  BOUNDARY          tec-f1-pigp-2026-09-06-cons-alpine
+```
+
+**~8,400 rows below the boundary are never fetched**, and `truncated=False` is
+technically true while being materially misleading — the scan paged to the end
+from the wrong start. `monotonic=True` passed because it only checks offsets the
+search itself probed.
+
+**Consequences for this document:** the funnel in §2 undercounts the venue by
+roughly 40%; every "not observed" on this page is bounded by this blind spot as
+well as by §2.1's; and §5.3's spread question **was not answerable on 2026-08-25
+at all**, because the full-game spreads it needs sit in the invisible band. The
+budget trim was the first hypothesis and is **fully exonerated**
+(`dropped_for_size=0` every cycle). Owned by the lane that shipped `508dbc02`;
+diagnosed here, not fixed. Full working: `.syndicate/deploys.md`, 22:54:25Z.
+
 ### 2.1 THE READ IS TRUNCATED, AND THAT CHANGES HOW EVERY ZERO READS
 
 ```
