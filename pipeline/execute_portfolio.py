@@ -688,7 +688,7 @@ def _polymarket_max_price_age_seconds() -> float:
     return parsed if parsed > 0 else 1800.0
 
 
-def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
+def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | None:
     """`(slug, price, tick_size, min_qty)` for one Polymarket US position, or
     `None` to refuse cleanly -- which `polymarket_us_submitter` turns into an
     `OrderBuildError` (recorded as failed, never sent at a price nobody chose,
@@ -754,13 +754,21 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
     via `kalshi_board_join._side_for_team`, the SAME resolver
     `kalshi_polymarket_arb.py` already uses and tests for the identical
     problem (Polymarket's `outcomes` carry bare team names, never "yes"/"no",
-    and never a guaranteed array order). Whether that team is
-    `OUTCOME_SIDE_YES` or `_NO` on Polymarket's own books is decided by
-    `polymarket_us_orders._side_to_outcome` from `request.side` directly, not
-    here -- and that YES/NO convention is itself UNVERIFIED against a real
-    venue response (no live order has ever been placed on this venue). Getting
-    the PRICE right for the wrong `outcomeSide` would still buy the wrong side
-    at a price never quoted for it, so this is named rather than assumed away.
+    and never a guaranteed array order).
+
+    IT ALSO SELECTS THE SIDE, and that is a correction. This docstring used to
+    end by naming the risk and leaving it: the `outcomeSide` was decided
+    separately by `_side_to_outcome` from `request.side`, the YES/NO convention
+    was "UNVERIFIED against a real venue response", and getting the price right
+    for the wrong side "would still buy the wrong side at a price never quoted
+    for it". A live order then did precisely that -- `side=home` on Texas @
+    Chicago White Sox bought TEXAS at the White Sox's price, and did not fill,
+    because the limit was priced for the outcome it was not buying.
+
+    A named risk is not a mitigation. The index this function resolves is now
+    returned and carried into `order_body`, so the price and the side are two
+    readings of one match instead of two independent guesses that happened to
+    be compared by nobody.
     """
     from syndicate.features.shared.kalshi_board_join import _side_for_team
     from syndicate.features.shared.polymarket_us_markets import GAME_SLATE_ARTIFACT
@@ -879,16 +887,25 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
     sport = getattr(request, "sport", None)
     wants_home = str(getattr(request, "side", "") or "").strip().lower() in _HOME_LIKE_SIDES
 
+    # KEEP THE INDEX. This loop already establishes exactly which entry of
+    # `outcomes` is our team -- and it used to throw that away and return only
+    # the price, leaving `order_body` to pick the side positionally from
+    # `home`/`away`. The two disagreed, and on 2026-08-25T16:08:10Z that bought
+    # TEXAS on a `side=home` row whose home team is the White Sox, at the price
+    # resolved for the White Sox. One reading now feeds both.
     price = None
-    for name, raw_price in zip(outcomes, prices):
+    outcome_index = None
+    for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
         side = _side_for_team(name, resolution, sport=sport)
         if side is not None and (side == "home") == wants_home:
             try:
                 price = float(raw_price)
             except (TypeError, ValueError):
                 price = None
+            else:
+                outcome_index = position
             break
-    if price is None:
+    if price is None or outcome_index is None:
         print(
             f"[execute_portfolio] POLYMARKET_SIDE_UNRESOLVED slug={slug}"
             f" side={getattr(request, 'side', None)}",
@@ -905,9 +922,15 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
                 f"polymarket_slippage: slug={slug} planned={planned} price={price}"
                 f" drift={drift:+.4f} max={max_slippage_dollars()} fetched_at={fetched_at}"
             )
+    # THE NAME WE RESOLVED, not just the number. A price alone cannot be
+    # checked against the venue's own order screen; the outcome name can, and
+    # that screen is what caught the inverted order.
     print(
         f"[execute_portfolio] POLYMARKET_ARTIFACT_PRICE slug={slug} price={price}"
-        f" planned={planned} fetched_at={fetched_at}",
+        f" planned={planned} fetched_at={fetched_at}"
+        f" our_side={getattr(request, 'side', None)}"
+        f" outcome_index={outcome_index} outcome={outcomes[outcome_index]!r}"
+        f" outcomes={outcomes!r}",
         flush=True,
     )
 
@@ -924,6 +947,7 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
         price,
         tick if tick is not None else ticker_tick,
         min_qty if min_qty is not None else ticker_min_qty,
+        outcome_index,
     )
 
 

@@ -833,8 +833,10 @@ def _artifact_env(monkeypatch, *, markets=None, raises=None, fetched_at=None):
 def test_resolves_the_artifact_price_for_our_named_team(monkeypatch):
     runner = _artifact_env(monkeypatch)
     resolved = runner._polymarket_resolve_market(_PolyReq())
-    # CHW (home, requested) is "White Sox" in outcomes[0] at 0.55.
-    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1")
+    # CHW (home, requested) is "White Sox" in outcomes[0] at 0.55. The INDEX
+    # comes back too: it is what `order_body` uses to pick `outcomeSide`, so
+    # the side cannot disagree with the price it was resolved beside.
+    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1", 0)
 
 
 def test_the_away_side_gets_the_away_price_not_positional(monkeypatch):
@@ -849,7 +851,10 @@ def test_the_away_side_gets_the_away_price_not_positional(monkeypatch):
         side = "away"
 
     resolved = runner._polymarket_resolve_market(_AwayReq())
-    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.42, "0.001", "1")
+    # Rangers (away, requested) sit at outcomes[0] here, so the index is 0 for
+    # an AWAY side -- which is exactly the point: the index tracks our team,
+    # never the home/away role.
+    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.42, "0.001", "1", 0)
 
 
 def test_no_venue_ticker_refuses_without_reading_the_artifact(monkeypatch):
@@ -880,7 +885,7 @@ def test_never_calls_the_venue_directly(monkeypatch):
     monkeypatch.setattr(polymarket_us_markets, "fetch_markets", explode)
     runner = _artifact_env(monkeypatch)
     assert runner._polymarket_resolve_market(_PolyReq()) == (
-        "aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1"
+        "aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1", 0
     )
 
 
@@ -969,6 +974,10 @@ def test_venue_submitter_polymarket_end_to_end(monkeypatch):
         "market_slug": "aec-mlb-tex-chw-2026-08-24",
         "tick_size": "0.001",
         "minimum_trade_qty": "1",
+        # THE INDEX REACHES `submit_order`. Without it the side is picked
+        # positionally and can contradict the price -- the 2026-08-25 inverted
+        # order. This seam is where that thread would silently break again.
+        "outcome_index": 0,
     }]
 
 

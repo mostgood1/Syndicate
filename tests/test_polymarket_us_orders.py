@@ -259,3 +259,91 @@ def test_the_order_route_can_be_overridden_without_a_deploy(monkeypatch):
     assert mod._orders_url() == "https://api.polymarket.us/v1/orders"
     monkeypatch.setenv("POLYMARKET_US_ORDER_PATH", "/v2/orders")
     assert mod._orders_url() == "https://api.polymarket.us/v2/orders"
+
+
+# --------------------------------------------------------------------------
+# The inverted order of 2026-08-25: side must follow the outcomes array
+# --------------------------------------------------------------------------
+
+
+def test_a_team_side_REFUSES_to_be_mapped_positionally():
+    """`home`/`away` carry no information about a market's outcome ORDER.
+
+    They used to map straight to YES/NO. Measured 2026-08-25T16:08:10Z, on the
+    first Polymarket order ever placed: a `side=home` row for Texas Rangers @
+    Chicago White Sox (home = White Sox) was sent as OUTCOME_SIDE_YES and the
+    venue booked "Buy TEX" -- the away team, at the price resolved for the
+    home one. Refusing is what keeps that path from being reachable by a
+    caller that forgets to pass an index.
+    """
+    from syndicate.features.shared.polymarket_us_orders import (
+        OrderBuildError,
+        _side_to_outcome,
+    )
+
+    for side in ("home", "away"):
+        with pytest.raises(OrderBuildError) as excinfo:
+            _side_to_outcome(side)
+        assert "side_needs_outcome_index" in str(excinfo.value)
+
+
+def test_the_outcome_index_decides_the_side_not_the_home_away_role():
+    """Our team's POSITION in `outcomes` is the only thing that names a side.
+
+    Both cases below are `side=home`; they differ only in where the home team
+    sits in the array. A positional rule gives them the same answer, which is
+    how one of them became a bet on the other team.
+    """
+    from syndicate.features.shared.polymarket_us_orders import outcome_side_for_index
+
+    assert outcome_side_for_index(0) == "OUTCOME_SIDE_YES"
+    assert outcome_side_for_index(1) == "OUTCOME_SIDE_NO"
+
+
+def test_the_yes_index_is_correctable_without_a_deploy(monkeypatch):
+    """The YES-to-index convention is the one thing here the venue alone can
+    settle, and it was wrong once at the cost of a real order. An env override
+    turns a second correction into minutes rather than a build."""
+    from syndicate.features.shared import polymarket_us_orders as mod
+
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_YES_OUTCOME_INDEX", "1")
+    assert mod.outcome_side_for_index(1) == "OUTCOME_SIDE_YES"
+    assert mod.outcome_side_for_index(0) == "OUTCOME_SIDE_NO"
+
+
+def test_an_unusable_outcome_index_refuses_rather_than_defaulting():
+    from syndicate.features.shared.polymarket_us_orders import (
+        OrderBuildError,
+        outcome_side_for_index,
+    )
+
+    for bad in (2, -1, "x", None):
+        with pytest.raises(OrderBuildError):
+            outcome_side_for_index(bad)
+
+
+def test_order_body_uses_the_index_over_the_side_name():
+    """The end the money comes out of. A `side=home` body must be able to send
+    OUTCOME_SIDE_NO -- which the old code could not express at all."""
+    from syndicate.features.shared.polymarket_us_orders import order_body
+
+    request = _Request(side="home")
+    body = order_body(
+        request,
+        market_slug="aec-mlb-tex-cws-2026-08-25",
+        price_dollars=0.495,
+        tick_size=0.005,
+        minimum_trade_qty=0.01,
+        outcome_index=1,
+    )
+    assert body["outcomeSide"] == "OUTCOME_SIDE_NO"
+
+    flipped = order_body(
+        request,
+        market_slug="aec-mlb-tex-cws-2026-08-25",
+        price_dollars=0.495,
+        tick_size=0.005,
+        minimum_trade_qty=0.01,
+        outcome_index=0,
+    )
+    assert flipped["outcomeSide"] == "OUTCOME_SIDE_YES"

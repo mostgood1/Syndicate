@@ -104,17 +104,84 @@ _VENUE_FILLED_STATUSES = frozenset({"filled", "executed", "matched", "closed", "
 _ORDERS_PATH = "/v1/orders"
 
 
+# Which entry of a market's `outcomes` array the YES side buys.
+#
+# Overridable WITHOUT A DEPLOY, deliberately. This convention was wrong once
+# already at the cost of a real inverted order (below), and the venue is the
+# only place the answer lives; an env override is how it gets corrected in
+# minutes rather than in a build. Same reasoning as `POLYMARKET_US_ORDER_PATH`.
+_YES_OUTCOME_INDEX_DEFAULT = 0
+
+
+def yes_outcome_index() -> int:
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_POLYMARKET_YES_OUTCOME_INDEX") or "").strip()
+    return 1 if raw == "1" else _YES_OUTCOME_INDEX_DEFAULT
+
+
+def outcome_side_for_index(index: Any) -> str:
+    """Which `outcomeSide` buys `outcomes[index]`.
+
+    THE ONLY SOUND WAY TO PICK A SIDE ON THIS VENUE. Polymarket's `outcomes`
+    carry bare names -- two teams, or Over/Under -- never "yes"/"no". So the
+    side we want is identified by MATCHING OUR TEAM AGAINST THAT ARRAY and
+    using where it landed. Anything else is a positional guess about an array
+    whose order is not guaranteed.
+
+    Measured, and this is why the guarantee cannot be assumed: slug
+    `aec-atp-domstr-markru` carries `outcomes: ["Martin Krumich", "Dominic
+    Stephan Stricker"]` -- REVERSED relative to its own slug. So slug order is
+    not outcomes order, and a rule derived from the slug is wrong for some
+    unknown fraction of the book.
+    """
+    try:
+        position = int(index)
+    except (TypeError, ValueError):
+        raise OrderBuildError(f"outcome_index_unreadable: {index!r}") from None
+    if position not in (0, 1):
+        raise OrderBuildError(f"outcome_index_out_of_range: {index!r}")
+    return _SIDE_YES if position == yes_outcome_index() else _SIDE_NO
+
+
 def _side_to_outcome(side: Any) -> str:
     """Our `over`/`under`/`yes`/`no` -> the venue's outcome side.
 
     REFUSES an unmapped side. Defaulting to YES would turn an unrecognised side
     into a real bet on the opposite outcome, which is the most expensive silent
     default available in this file.
+
+    `home` AND `away` ARE REFUSED HERE, and their removal is the fix for a
+    measured real-money error rather than a tidy-up. They used to map
+    positionally -- `home` to YES, `away` to NO -- which is a claim about the
+    ORDER of a market's `outcomes` array, not about our side. Measured
+    2026-08-25T16:08:10Z on the first Polymarket order ever placed:
+
+        ledger   side=home   Texas Rangers @ Chicago White Sox
+                 slug=aec-mlb-tex-cws-2026-08-25   price=0.495   $1.42
+        venue    "Buy TEX"   2.86 shares @ 49.5c   Pending
+
+    Home is the WHITE SOX. The order bought TEXAS -- the other team -- at the
+    price that had been resolved for the White Sox. Both halves of that are one
+    bug: `_polymarket_resolve_market` picked the PRICE by matching our team
+    against `outcomes`, then threw the index away, and this function picked the
+    SIDE by position. Nothing made the two agree, so the order bought one team
+    at the other team's price -- which is also why it did not fill, the limit
+    being priced for a different outcome than the one it was buying.
+
+    A game-line side must come from `outcome_side_for_index` instead, so the
+    price and the side are two readings of ONE resolution. Refusing here keeps
+    the positional path from being reachable again by a caller that forgets.
     """
     raw = str(side or "").strip().lower()
-    if raw in {"yes", "over", "home"}:
+    if raw in {"home", "away"}:
+        raise OrderBuildError(
+            f"side_needs_outcome_index: {side!r} -- a team side must be resolved"
+            " against the market's outcomes array, not by position"
+        )
+    if raw in {"yes", "over"}:
         return _SIDE_YES
-    if raw in {"no", "under", "away"}:
+    if raw in {"no", "under"}:
         return _SIDE_NO
     raise OrderBuildError(f"unmappable_side: {side!r}")
 
@@ -176,6 +243,7 @@ def order_body(
     price_dollars: float,
     tick_size: Any,
     minimum_trade_qty: Any,
+    outcome_index: Any = None,
 ) -> dict[str, Any]:
     """The JSON body for one order. PURE -- no clock, no network, no env.
 
@@ -217,7 +285,18 @@ def order_body(
         # THE NO SIDE IS REAL. See the module docstring: an under is a BUY of
         # NO, not a SELL of YES at the complement. Kalshi's inversion does not
         # belong here and its absence is deliberate.
-        "outcomeSide": _side_to_outcome(getattr(request, "side", None)),
+        #
+        # THE INDEX WINS WHEN THE RESOLVER FOUND ONE. It is the position our
+        # own team occupies in this market's `outcomes` array -- the same
+        # reading that selected the price -- so price and side describe one
+        # outcome by construction. Falling back to the side name is for the
+        # `yes`/`no`/`over`/`under` markets that name no team; `home`/`away`
+        # refuse there rather than guessing positionally again.
+        "outcomeSide": (
+            outcome_side_for_index(outcome_index)
+            if outcome_index is not None
+            else _side_to_outcome(getattr(request, "side", None))
+        ),
         "action": _ACTION_BUY,
         "manualOrderIndicator": _MANUAL_INDICATOR,
         # The ledger's key, sent so the venue can reject a duplicate we cannot
@@ -248,6 +327,7 @@ def submit_order(
     market_slug: str,
     tick_size: Any,
     minimum_trade_qty: Any,
+    outcome_index: Any = None,
 ) -> dict[str, Any]:
     """Send one order. Returns the shape `place_order` expects from an adapter.
 
@@ -263,6 +343,7 @@ def submit_order(
         price_dollars=price_dollars,
         tick_size=tick_size,
         minimum_trade_qty=minimum_trade_qty,
+        outcome_index=outcome_index,
     )
     url = _orders_url()
     # THE REQUEST, BEFORE THE RESPONSE. If the venue rejects the body, the
@@ -272,7 +353,13 @@ def submit_order(
         f"[polymarket_us_orders] SUBMIT url={url} slug={body.get('marketSlug')}"
         f" side={body.get('outcomeSide')} action={body.get('action')}"
         f" qty={body.get('quantity')} price={body.get('price')}"
-        f" tif={body.get('tif')}",
+        f" tif={body.get('tif')}"
+        # OUR side beside the venue's, and the index that connects them. The
+        # inverted order of 2026-08-25 was invisible in this line: it read
+        # `side=OUTCOME_SIDE_YES` and said nothing about WHICH TEAM that buys,
+        # so the log agreed with itself while the venue bought the other team.
+        f" our_side={getattr(request, 'side', None)} outcome_index={outcome_index}"
+        f" yes_index={yes_outcome_index()}",
         flush=True,
     )
     response = signed_request("POST", url, body=body)
@@ -302,22 +389,36 @@ def polymarket_us_submitter(resolve_market):
     """An adapter bound to a market resolver, for `place_order(submit=...)`.
 
     `resolve_market(request)` must return `(slug, price, tick_size, min_qty)`
-    -- all four from the venue's own market response. It is injected rather
-    than imported so this module stays free of the board join, and so the
-    "never infer tick size" rule has one owner rather than one per caller.
+    or, preferably, `(slug, price, tick_size, min_qty, outcome_index)` -- all
+    from the venue's own market response. It is injected rather than imported
+    so this module stays free of the board join, and so the "never infer tick
+    size" rule has one owner rather than one per caller.
+
+    `outcome_index` is where OUR side landed in the market's `outcomes` array.
+    A resolver that has matched our team against that array already knows it,
+    and passing it is what keeps the price and the side describing the same
+    outcome. The four-value form stays accepted so an older resolver still
+    works -- but a team side then refuses in `_side_to_outcome` rather than
+    being placed positionally, which is the failure that made this argument
+    necessary.
     """
 
     def submit(request: Any) -> dict[str, Any]:
         resolved = resolve_market(request)
         if not resolved:
             raise OrderBuildError("market_unresolved_for_position")
-        slug, price, tick, min_qty = resolved
+        outcome_index = None
+        if len(resolved) == 5:
+            slug, price, tick, min_qty, outcome_index = resolved
+        else:
+            slug, price, tick, min_qty = resolved
         return submit_order(
             request,
             price_dollars=price,
             market_slug=slug,
             tick_size=tick,
             minimum_trade_qty=min_qty,
+            outcome_index=outcome_index,
         )
 
     return submit
