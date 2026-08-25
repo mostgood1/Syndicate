@@ -29049,3 +29049,38 @@ the same 8MB ceiling at 12,219,331 bytes on every cycle. Novig is switched off
 (`VENUE_REPRICE ... novig: {'status': 'disabled'}`), so nothing depends on it,
 but it is the same defect in a third artifact and will need the same lean-row
 treatment.
+
+---
+
+## 2026-08-25T20:16Z — `461ee74be` — refresh-worker + live-odds-worker
+
+**What.** Series registration and the totals grammar. Carries `d6cff4557`
+(`KXMLBTOTAL`) which had been committed and never deployed.
+
+- Six MLB prop series the board was already asking for by name
+  (`KXMLBHIT/HRR/TB/RBI/ERA/WA` + `KXMLBHA`).
+- `KXMLBTOTAL` and the moneyline/spread pair, hand-registered so a Kalshi
+  title reword cannot un-register them.
+- Soccer registers from the COMPETITION in Kalshi's own title, matched as a
+  prefix against `LEAGUE_DISPLAY_NAMES`. No ticker tokens: `UCL` is a
+  substring of `KXNUCLEARTEST`.
+- `_TEAM_TOTAL` no longer discards the stat it parses.
+- `player_threes` resolves however the market title spells it.
+
+**verify:** three readings, in this order.
+
+1. `[kalshi_discovery] AUTO_SERIES ... game_series=` should EXCEED 173 (the
+   value on every read 2026-08-25T17:41–19:35Z), with soccer tickers in
+   `game_sample`. That is the soccer gate firing.
+2. `[kalshi_discovery] GAP series=KXLALIGASCORE` should keep its
+   `reason=unmapped_series` while `KXLALIGATOTAL`/`KXLALIGAGAME` DISAPPEAR
+   from the gap list — registered, not merely counted. A corners or
+   correct-score series that flips to `reason=stat_not_in_market_vocabulary`
+   is also correct: refused BY NAME rather than priced as a goals total.
+3. `VENUE_REPRICE_KEYS`: the four `board_wanted` keys that were finding
+   nothing (`mlb|batter_rbis|over|0.5`, `mlb|batter_total_bases|over|1.5`,
+   `mlb|earned_runs|under|1.5`, `mlb|hits_allowed|over|4.5`) should match a
+   Kalshi price. That is the reading that says Kalshi can transact — not the
+   registration count.
+
+**Not yet read.** Deploy triggered 20:16:09Z / 20:16:16Z.
