@@ -5826,6 +5826,44 @@ With the real gate dead, the by-hand substitute inherited a property the gate
 does not have — it can go stale silently — and nothing in the environment
 reports that. Three for three.
 
+### 2026-08-25 — FORBIDDEN: never accept "the artifact I WRITE is allowlisted" as evidence the feature works. Check what it READS, and check it on the service that will run it
+
+- What we believed: `#557`/`#552`'s OddsAPI capture needed no
+  `HOT_ARTIFACT_PATTERNS` edit, because `*_source/tracking/book_quotes/*.jsonl`
+  already matches NCAAF. I verified that twice, wrote it into the PR body as a
+  design advantage, and it is TRUE.
+- What was actually true: the resolver's INPUT — the CFBD team registry at
+  `ncaaf_source/source_artifacts/data/processed/team_registry/ncaaf_team_registry_snapshot.csv`
+  — matches **none of the 155 patterns**, and `live-odds-worker` has never run
+  `bootstrap_data_root` (zero log lines in seven days), so its data root holds
+  only what the artifact sync delivers. First live run:
+  **`resolved=0 unresolved=184`**. Every team. `_csv_rows()` returns `[]` for a
+  missing file, so nothing anywhere said the registry was absent.
+- How we found out: a one-shot boot probe running the fetcher's own `--report`
+  on the real service, because the user asked for the report BEFORE the sport
+  was switched on. Every local test passed throughout — the fixture resolved
+  94/94 — because a checkout HAS the registry. **The fixture was the thing that
+  lied: it carried a file the worker does not have.**
+- The rule going forward: for any feature, enumerate the artifacts it READS,
+  not just the ones it writes, and run the allowlist check against each — in
+  code, `fnmatch` against the real tuple, never by eye. Then ask which SERVICE
+  will execute it and whether that service seeds from the checkout at all; web
+  and the workers do not have the same disk and do not fill it the same way.
+  A git-tracked input is present on web and absent on both workers, and that
+  asymmetry is invisible from a checkout.
+- Second, separable defect found by the same reading: `_alias_map()` validates
+  `_ODDSAPI_NAME_SUPPLEMENT` against the registry and RAISES on an unknown
+  canonical name — but the check sits inside `if known:`, so an EMPTY map skips
+  it. **The one assertion that would have caught this is disabled by exactly
+  the condition that breaks it.** Guard clauses that no-op on empty input are
+  not guards; assert the input is non-empty FIRST.
+- Cost: none in production, and that is the process working rather than luck.
+  The report ran before `SYNDICATE_ACTIVE_SPORTS` was flipped, so nothing was
+  written. Had the order been reversed, the sweep would have produced a quote
+  log keyed to nothing and 51 cards showing an empty market block —
+  indistinguishable on the board from "no book quoted it". One credit and one
+  restart bought that.
+
 ### 2026-08-25 — FORBIDDEN: never accept a backtest's "0 rows graded" as a result. An analysis script that cannot find its inputs must EXIT NON-ZERO, not report a clean zero
 
 - What we believed: NCAAF's picks are suppressed on measured evidence — the
