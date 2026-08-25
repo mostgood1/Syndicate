@@ -27417,3 +27417,66 @@ carries real moneyline markets, and the local `classify_market` replay, are
 the evidence in hand; a live arb-scan re-run confirming a nonzero count end to
 end is the next natural check, not required before closing this investigation
 given the mechanism is now fully traced and proven at every hop.
+
+### 6. `3e8856e81` — Polymarket side vocabulary. VERIFIED, and it named its own next gap.
+
+**verify:** `VENUE_REPRICE` / `VENUE_REPRICE_KEYS` on refresh-worker,
+2026-08-25T01:22:04Z, against the 00:46/00:57 baseline.
+
+    selected_by_source   {'kalshi': 210}  ->  {'polymarket_us': 28, 'kalshi': 73}
+    unmatched mlb        617              ->  76      (-88%)
+    unmatched nfl        124              ->  104
+    unmatched wnba       614              ->  610
+    unmatched soccer     4184             ->  4184    (predicted: DRAWABLE_OUTCOME unmapped)
+
+**28 is the number that mattered.** Polymarket had offered 3,106 quotes and won
+ZERO for as long as this has been instrumented. The two key spaces now meet.
+
+The offered keys are in the board's vocabulary on both sides:
+
+    mlb  polymarket_us  mlb|h2h|chicago cubs, arizona diamondbacks, houston astros
+    wnba polymarket_us  wnba|h2h|chicago sky, connecticut sun, dallas wings
+    nfl  polymarket_us  nfl|totals|over|24.5, nfl|totals|under|24.5
+
+wnba was `sky`/`sun`/`portland`/`wings` an hour ago and nfl was
+`nfl|spreads|-21.50` with no line at all.
+
+**A SECOND, INDEPENDENT CONFIRMATION OF THE DIAGNOSIS, recorded because it
+rules out the rival explanation.** At 00:57Z Polymarket's mlb quotes were 207s
+old against Kalshi's 608s -- Polymarket was the FRESHER source and still won
+zero of 210. Freshness-first selection means a fresher source that shares a key
+space wins. It won nothing. That is not a source losing on age; that is two
+sources that never met.
+
+**THE DIAGNOSTIC NAMED ITS OWN NEXT FIX, which is the whole point of building
+it:**
+
+    wnba polymarket_us reason="spreads_refused:40 clubs_unresolved:2:['Portland', 'Toronto']"
+
+Two real missing `team_aliases` entries, by name. Both are 2026 WNBA expansion
+clubs. This is exactly the counter added so an alias gap on OUR side could not
+read as an absent league on the venue's -- and it fired on its first live run.
+It also explains why wnba barely moved (614 -> 610): those two clubs are a
+large share of its h2h rows.
+
+**The spread work queue is now sized:** `spreads_refused:191` mlb,
+`:40` wnba, `:864` nfl. 1,095 markets waiting on one measurement -- which team
+a Polymarket handicap belongs to. Refused, not guessed.
+
+**WHAT THE REMAINING mlb 76 ARE**, read off `board_wanted`: spreads
+(`mlb|spreads|home|-1.5`) and player props (`mlb|strikeouts|under|5.5`,
+`mlb|batter_total_bases|under|1.5`). Both are known named refusals -- spreads by
+choice, props because Polymarket's `SPORTS_MARKET_TYPE_PROP` has no market
+mapping measured yet.
+
+**ONE NUMBER I HAVE NOT EXPLAINED AND AM NOT CLAIMING.** `stamped` fell 210 ->
+101, with Kalshi's own share falling 210 -> 73 on an unchanged 573/86 quote
+count. `rows_in` also fell 5749 -> 5075 as the slate finished out, which would
+reduce matches on its own. My change CANNOT be the cause by construction -- the
+role key is tried first and unchanged, so any row that matched before still
+matches on the first candidate -- but that is an argument, not a measurement.
+Left open rather than asserted.
+
+**Board still rows=10** (`beyond_quote_age=4870` of 5075 considered). The
+reprice is reaching more rows; the freshness ceiling is still what empties the
+board.
