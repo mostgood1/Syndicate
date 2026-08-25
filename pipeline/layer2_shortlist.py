@@ -34,6 +34,27 @@ from typing import Any, Iterable, Mapping
 _UNSET = object()
 
 
+def _reprice_grid_from_venues(grid: Any, sport: Any, selected_date: Any) -> dict:
+    """Move a sport's grid onto the live venues, and never take the board down.
+
+    Extracted from the enrichment tuple only so the import stays local: a
+    `venue_quote_fanin` that is a deploy behind must cost this sport's re-price
+    and nothing else. The caller's own try/except would catch the raise, but it
+    would record `{"error": "ImportError"}` with no name in it, and "the module
+    is missing" and "the venue refused" need different fixes.
+    """
+    try:
+        from syndicate.features.shared.venue_quote_fanin import (
+            apply_venue_quotes_to_grid,
+        )
+    except ImportError as exc:  # pragma: no cover - deploy-skew guard
+        return {"supported": False, "error": f"ImportError: {exc}"}
+    try:
+        return apply_venue_quotes_to_grid(grid, sport, str(selected_date or ""))
+    except Exception as exc:  # noqa: BLE001 - a venue failure is not a board failure
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def build_layer2_shortlist(
     selected_date: str,
     sport_slugs: Iterable[str],
@@ -338,6 +359,37 @@ def build_layer2_shortlist(
                         else None
                     ),
                 ),
+                # PRICE BEFORE ANYTHING THAT READS PRICE.
+                #
+                # `7799abf9c` moved this ahead of `build_layer2_rows` so a row
+                # the lane gate had already killed could still be rescued by a
+                # venue quote. It was still too late for the four steps below,
+                # and that left ONE ROW CARRYING TWO VINTAGES:
+                #
+                #   `best.price`            LIVE   (Polymarket / Kalshi)
+                #   `cells` / `consensus`   PREGAME (OddsAPI, before first pitch)
+                #
+                # Every fair value on the row is de-vigged from the second pair
+                # -- `_fair_by_side` from `cells`, `market_fair_prob_over` from
+                # `consensus` -- and `live_gameline_join` then subtracts that
+                # pregame fair from the LIVE re-sim's win probability. On a game
+                # three runs in, that difference is mostly the gap between two
+                # clocks, and `_MODEL_EDGE_MAX_POINTS` drops it. Measured
+                # 2026-08-25 03:5xZ, and this is the guard working correctly:
+                #
+                #     LAYER2_BOARD_HEALTH sport=mlb rows=14 edged=10
+                #     PAPER2_PLAN_WRITTEN venue=polymarket rows_in=14
+                #       positions=0 venue_priced=12
+                #       refusals={'no_model_edge_pct': 14}
+                #
+                # Ten rows carried an edge and none survived the bound. So the
+                # re-price runs HERE: after the two state joins, which read no
+                # price and are what tell it a game is live, and before every
+                # step that reads one.
+                (
+                    "venue_reprice",
+                    lambda: _reprice_grid_from_venues(grid, sport, selected_date),
+                ),
                 ("projections", lambda: attach_projections(grid, sport=sport, selected_date=selected_date)),
                 ("margin_model", lambda: attach_margin_model(grid)),
                 # Same functions the serve-time endpoint calls
@@ -495,44 +547,58 @@ def build_layer2_shortlist(
             except Exception:
                 pass
 
-            # RE-PRICE THE GRID BEFORE THE GATE SEES IT.
+            # THE RE-PRICE'S OWN NUMBERS. It runs as an enrichment step above
+            # (see the comment there for why its position moved twice); this is
+            # the instrument, printed here beside the other join diagnostics.
             #
-            # `build_layer2_rows` runs `opportunity_gate` and returns only the
-            # SURVIVORS. The reprice below (line ~634) then ran on that survivor
-            # list, so a row the gate had already killed could never be rescued
-            # by a venue price -- the lane was decided before the venue quote
-            # was ever stamped.
-            #
-            # MEASURED 2026-08-25, five consecutive builds:
-            #   VENUE_REPRICE sports=['nfl','soccer']  rows_in=4296 (unmoving)
-            #   mlb  ... opps=0 lanes={'dead': 1302}
-            #   wnba ... opps=0 lanes={'dead': 1225}
-            # The only rows reaching the reprice were the pregame sports that
-            # survived; the live ones were already gone.
-            #
-            # Never fatal: a venue failure costs this sport's reprice, not its
-            # board.
+            # `benchmark_*` is the second half `#546` added: `repriced` counts
+            # sides whose PRICE moved to a venue, `benchmark_rows` counts rows
+            # whose FAIR VALUE moved with it. The two being different numbers is
+            # the whole finding -- the first was non-zero and the second did not
+            # exist, which is how a live price came to be scored against a
+            # pregame benchmark.
             try:
-                from syndicate.features.shared.venue_quote_fanin import (
-                    apply_venue_quotes_to_grid,
-                )
+                grid_reprice = enrichment.get("venue_reprice")
+                if isinstance(grid_reprice, Mapping):
+                    print(
+                        f"[layer2_shortlist] GRID_REPRICE sport={sport}"
+                        f" sides_seen={grid_reprice.get('sides_seen')}"
+                        f" repriced={grid_reprice.get('repriced')}"
+                        f" by_source={grid_reprice.get('by_source')}"
+                        f" benchmark_rows={grid_reprice.get('benchmark_rows')}"
+                        f" benchmark_skipped={grid_reprice.get('benchmark_skipped')}"
+                        f" error={grid_reprice.get('error')}",
+                        flush=True,
+                    )
+            except Exception:
+                pass
 
-                grid_reprice = apply_venue_quotes_to_grid(
-                    grid, sport, str(selected_date or "")
-                )
-                print(
-                    f"[layer2_shortlist] GRID_REPRICE sport={sport}"
-                    f" sides_seen={grid_reprice.get('sides_seen')}"
-                    f" repriced={grid_reprice.get('repriced')}"
-                    f" by_source={grid_reprice.get('by_source')}",
-                    flush=True,
-                )
-            except Exception as exc:  # noqa: BLE001
-                print(
-                    f"[layer2_shortlist] GRID_REPRICE_FAILED sport={sport}"
-                    f" {type(exc).__name__}: {exc}",
-                    flush=True,
-                )
+            # AND THE LIVE GAME-LINE JOIN, which has never printed anything.
+            #
+            # `attach_live_gamelines` returns a full coverage payload -- index
+            # size, rows projected, priceable, and the per-reason withhold split
+            # -- and every field of it went into the shortlist artifact and
+            # nowhere else. That is the same computed-but-unprinted gap as the
+            # seven drop counters and the three joins above it, and it is why
+            # "the live moneyline join produced nothing" and "it produced
+            # something the board then dropped" looked identical from the logs.
+            try:
+                gl_stats = enrichment.get("live_gamelines")
+                if isinstance(gl_stats, Mapping) and gl_stats.get("supported") is not False:
+                    print(
+                        f"[layer2_shortlist] LIVE_GAMELINE_JOIN sport={sport} "
+                        f"index={gl_stats.get('index_size')} "
+                        f"considered={gl_stats.get('rows_live_gameline_considered')} "
+                        f"projected={gl_stats.get('rows_live_gameline_projected')} "
+                        f"priceable={gl_stats.get('rows_live_gameline_priceable')} "
+                        f"withheld={gl_stats.get('rows_live_gameline_withheld')} "
+                        f"why={gl_stats.get('withheld_by_reason')} "
+                        f"reason={gl_stats.get('reason')} "
+                        f"error={gl_stats.get('error')}",
+                        flush=True,
+                    )
+            except Exception:
+                pass
 
             result = build_layer2_rows(grid, openings=openings_index)
             sport_opportunities = list(result.get("opportunities") or [])

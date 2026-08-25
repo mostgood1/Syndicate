@@ -692,6 +692,9 @@ def apply_venue_quotes_to_grid(
     sides_seen = 0
     by_source: dict[str, int] = {}
 
+    benchmark_rows = 0
+    benchmark_skipped: dict[str, int] = {}
+
     for row in grid or []:
         if not isinstance(row, Mapping):
             continue
@@ -700,18 +703,28 @@ def apply_venue_quotes_to_grid(
             continue
         market = row.get("market")
         line = _as_float_or_none(row.get("line"))
-        for side in list(row.get("sides") or []):
-            side_key = str(side)
-            side_best = best.get(side_key)
-            if not isinstance(side_best, dict):
-                continue
-            sides_seen += 1
+        side_names = [str(side) for side in (row.get("sides") or [])]
+        # Resolved for every side BEFORE anything is written, because the
+        # benchmark rewrite below is all-or-nothing per row and cannot be
+        # decided one side at a time.
+        venue_quotes: dict[str, Any] = {}
+        for side_key in side_names:
             quote = quotes.get(str(quote_key(sport_slug, market, side_key, line)))
             if quote is None or quote.source not in _LIVE_QUOTING_VENUES:
                 continue
             if quote.american is None:
                 # No price is not a reprice. Refreshing the clock here would be
                 # the age-only laundering this function refuses.
+                continue
+            venue_quotes[side_key] = quote
+
+        for side_key in side_names:
+            side_best = best.get(side_key)
+            if not isinstance(side_best, dict):
+                continue
+            sides_seen += 1
+            quote = venue_quotes.get(side_key)
+            if quote is None:
                 continue
             venue_age = quote.age_seconds(now=now)
             existing_age = _as_float_or_none(side_best.get("age_seconds"))
@@ -728,10 +741,207 @@ def apply_venue_quotes_to_grid(
             repriced += 1
             by_source[quote.source] = by_source.get(quote.source, 0) + 1
 
+        outcome = _reprice_live_benchmark(
+            row, side_names, venue_quotes, now=now
+        )
+        if outcome == "repriced":
+            benchmark_rows += 1
+        elif outcome:
+            benchmark_skipped[outcome] = benchmark_skipped.get(outcome, 0) + 1
+
     return {
         "sport": sport_slug,
         "sides_seen": sides_seen,
         "repriced": repriced,
         "by_source": by_source,
+        "benchmark_rows": benchmark_rows,
+        "benchmark_skipped": benchmark_skipped,
         "source_status": (payload or {}).get("by_source"),
     }
+
+
+# The states in which a PREGAME book price stops being a description of the
+# market. Same vocabulary `opportunity_gate` and `live_gameline_join` use.
+_LIVE_STATES = frozenset({"live", "in_progress"})
+
+# How far behind the live venue a book may lag and still count as a peer in the
+# fair-value median. `opportunity_gate.LIVE_MARKET_MAX_AGE_SECONDS` is the same
+# 900s ceiling the gate applies to a live row's own price -- read from there so
+# the staleness the board ENFORCES and the staleness it BENCHMARKS AGAINST
+# cannot drift apart.
+try:  # pragma: no cover - import-order guard, not a behaviour branch
+    from syndicate.features.shared.opportunity_gate import (
+        LIVE_MARKET_MAX_AGE_SECONDS as _BENCHMARK_SUPERSEDE_LAG_SECONDS,
+    )
+except ImportError:  # pragma: no cover
+    _BENCHMARK_SUPERSEDE_LAG_SECONDS = 900.0
+
+
+def _reprice_live_benchmark(
+    row: Mapping[str, Any],
+    side_names: list[str],
+    venue_quotes: Mapping[str, Any],
+    *,
+    now: float | None,
+) -> str:
+    """Move a LIVE row's fair-value benchmark onto the venue that priced it.
+
+    --------------------------------------------------------------------------
+    THE DEFECT THIS FIXES: ONE ROW, TWO VINTAGES
+    --------------------------------------------------------------------------
+
+    Re-pricing `best` alone put a LIVE price on the row and left every
+    fair-value benchmark pregame. The board then compared them:
+
+      * `layer2_board._fair_by_side` de-vigs `row["cells"]` -- the per-book
+        prices, all OddsAPI, captured before first pitch.
+      * `prop_projections._no_vig_over_probability` de-vigs `row["consensus"]`,
+        the same pregame capture, and that is `market_fair_prob_over`.
+      * `live_gameline_join.price_moneyline` subtracts that pregame fair from
+        the LIVE re-sim's win probability.
+
+    A team three runs up in the 7th is ~0.90 to the live model and ~0.55 to the
+    pregame consensus. The subtraction reports a 35-point edge that is entirely
+    the gap between two clocks, and `layer2_board._MODEL_EDGE_MAX_POINTS` then
+    drops it -- correctly, since a 35-point edge is exactly the units/vintage
+    mismatch that bound exists to catch (`todo.md`: "should be permanent").
+
+    So the observed `refusals={'no_model_edge_pct': 14}` is the guard working.
+    **The bound is not the bug and is not touched here.** The bug is that the
+    only number on the row that knew the game had started was the price.
+
+    --------------------------------------------------------------------------
+    FOUR CONDITIONS, EACH LOAD-BEARING
+    --------------------------------------------------------------------------
+
+    1. **LIVE ROWS ONLY.** On a pregame game the multi-book consensus is a real
+       consensus of the current market and is left completely alone -- replacing
+       five books with one venue there would throw away the median that stops a
+       single fat-fingered book moving the benchmark (`#384`).
+
+    2. **EVERY SIDE, OR NO SIDE.** A de-vig mixing a live venue price for home
+       with a pregame consensus for away spans two vintages and is worse than
+       the stale pair it replaces. All sides come from the same venue or nothing
+       is written.
+
+    3. **ONE VENUE PER ROW.** Both sides must come from the SAME source, for the
+       reason `_fair_by_side` already documents at length: the best over at one
+       book and the best under at another sum to less than a market, and
+       normalising that to 1.0 launders a line-shopping edge into the fair
+       price.
+
+    4. **STRICTLY FRESHER.** Same rule as the price reprice above -- this can
+       never age a benchmark up.
+
+    Writes `cells` AND `consensus` because they feed two different readers:
+    `_fair_by_side` reads `cells` (and needs the venue present as a book quoting
+    every leg, which is exactly what condition 2 guarantees), while
+    `market_fair_prob_over` reads `consensus`. Updating one and not the other is
+    how the board's EV and the live edge would come to disagree.
+
+    Returns "repriced", or the name of the condition that refused, so a zero is
+    attributable rather than bare.
+    """
+    if not isinstance(row, dict):
+        return "row_not_mutable"
+    if len(side_names) < 2:
+        return "not_two_sided"
+    game = row.get("game")
+    state = str((game or {}).get("state") or "").strip().lower() if isinstance(game, Mapping) else ""
+    if state not in _LIVE_STATES:
+        return "not_live"
+    if len(venue_quotes) != len(side_names):
+        return "venue_did_not_price_every_side"
+    sources = {quote.source for quote in venue_quotes.values()}
+    if len(sources) != 1:
+        return "sides_from_different_venues"
+
+    source = next(iter(sources))
+    book = _VENUE_BOOK_NAME.get(source, source)
+    ages = [quote.age_seconds(now=now) for quote in venue_quotes.values()]
+    venue_age = max(ages) if ages else None
+    if venue_age is None:
+        return "venue_quote_has_no_age"
+    existing_age = _as_float_or_none(row.get("age_seconds"))
+    if existing_age is not None and existing_age <= venue_age:
+        return "existing_benchmark_is_fresher"
+
+    cells = row.get("cells")
+    if not isinstance(cells, dict):
+        cells = {}
+        row["cells"] = cells
+    venue_cells = cells.get(book)
+    if not isinstance(venue_cells, dict):
+        venue_cells = {}
+        cells[book] = venue_cells
+
+    consensus = row.get("consensus")
+    if not isinstance(consensus, dict):
+        consensus = {}
+        row["consensus"] = consensus
+
+    for side_key in side_names:
+        quote = venue_quotes[side_key]
+        price = int(quote.american)
+        age = quote.age_seconds(now=now)
+        venue_cells[side_key] = {
+            "price": price,
+            "bookmaker": book,
+            "age_seconds": age,
+            "seen_age_seconds": age,
+            # Never stale by construction -- it just cleared the strictly-fresher
+            # check above -- and `book_grid`'s consensus builder drops stale
+            # cells, so an unset flag here would read as unknown.
+            "stale": False,
+            "price_source": source,
+        }
+        # A plain american price, which is the shape `book_grid` writes and
+        # `_no_vig_over_probability` reads via `_implied`.
+        consensus[side_key] = price
+
+    # SET THE SUPERSEDED BOOKS ASIDE, or the median puts them back.
+    #
+    # `_fair_by_side` de-vigs EVERY book in `cells` and takes the MEDIAN across
+    # them (`#384`, so one fat-fingered book cannot move the benchmark). With
+    # the venue merely ADDED, a live -900 and a pregame -120 de-vig to ~0.90 and
+    # ~0.50 and the median of the two is ~0.70 -- half the vintage gap, which is
+    # the same defect at half the size. Caught by
+    # `test_the_devig_the_board_will_run_is_now_live_on_both_legs`, which asserted
+    # ~0.90 and read 0.6999.
+    #
+    # A book that is itself quoting the live market STAYS a peer -- the rule is
+    # about vintage, not about preferring the venue. Only books lagging the
+    # venue by more than the live-market ceiling move.
+    #
+    # MOVED, NOT DELETED. `cells_superseded` keeps the pregame observation on
+    # the row: it is a real record of an earlier market and the ledger reads it.
+    superseded = row.get("cells_superseded")
+    if not isinstance(superseded, dict):
+        superseded = {}
+    for other in [key for key in cells if key != book]:
+        other_cells = cells.get(other)
+        if not isinstance(other_cells, Mapping):
+            continue
+        other_ages = [
+            _as_float_or_none(cell.get("age_seconds"))
+            for cell in other_cells.values()
+            if isinstance(cell, Mapping)
+        ]
+        present = [age for age in other_ages if age is not None]
+        # An age nobody stamped is unknown, not fresh: a book with no clock
+        # cannot be shown to be quoting the live market, and this is the
+        # direction that fails safe.
+        if present and len(present) == len(other_ages):
+            if min(present) - venue_age <= _BENCHMARK_SUPERSEDE_LAG_SECONDS:
+                continue
+        superseded[other] = cells.pop(other)
+    if superseded:
+        row["cells_superseded"] = superseded
+
+    books = row.get("books")
+    if isinstance(books, list):
+        row["books"] = [name for name in books if name not in superseded]
+        if book not in row["books"]:
+            row["books"].append(book)
+        row["books_quoting"] = len(row["books"])
+    return "repriced"
