@@ -2143,7 +2143,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
-### kalshi-line-aware-rungs — OPEN — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+### kalshi-line-aware-rungs — OPEN — RE-SCOPED after its own falsification test — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+- **RE-SCOPED 2026-08-25, on the user's instruction "fix the side vocabulary
+  first".** The test below voided this lane's original headline example, and
+  surfaced two things that outrank it. Order is now: **(1) side vocabulary
+  [DONE], (2) evict the futures that can never join, (3) line-aware rungs,
+  scoped to NFL/MLB/WNBA.** The slug is kept because lane identity is stable.
+- **Files ADDED for step 1** (checked UNCLAIMED against `lane-guard`'s own
+  `_claims()` over all OPEN lanes before editing):
+  `syndicate/features/shared/venue_quote_adapters.py`,
+  `syndicate/features/shared/venue_quote_fanin.py`,
+  `tests/test_kalshi_side_vocabulary.py` (NEW).
 - Goal: **`[kalshi_odds] BOARD_JOIN matched` rises on an unchanged `board_rows`,
   with no increase in `kalshi_markets`.** The working-set bound keeps the ladder
   rungs NEAREST THE BOARD'S LINE instead of the first 400 in API order.
@@ -2265,6 +2275,46 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **RECOMMENDED RE-SCOPE (not taken unilaterally -- this lane's own rule is to
   surface, not to widen):** do the side-vocabulary fix first, the futures
   eviction second, and line-aware rungs THIRD and scoped to NFL/MLB/WNBA.
+- **STEP 1 DONE 2026-08-25 — SIDE VOCABULARY. Not deployed.** 655 tests green
+  across the venue/quote surface and its downstream consumers.
+  - **Moneylines are now keyed by the TEAM, not by `yes`.** `_MONEYLINE` had
+    already parsed the club into `subject` and `kalshi_outcome` was discarding
+    it. Verified end to end: Kalshi `'Texas wins'` publishes `mlb|h2h|texas`
+    where it published `mlb|h2h|yes`, and a board row
+    `h2h|home` on Texas Rangers now offers `mlb|h2h|texas` among its candidates.
+  - **The disambiguation happens where BOTH clubs are known**, which is the
+    only place it is safe. `_candidate_keys` builds the city/nickname keys from
+    the board row and **drops any token the OPPONENT shares** -- `chicago` is
+    offered to NEITHER side of Cubs/White Sox, pinned by a test on both rows.
+    Same bound and same refusal as `kalshi_board_join._side_for_team`.
+  - **ONE NORMALISER, imported by both halves** (`team_quote_token` /
+    `team_name_tokens` in `venue_quote_adapters`, imported by the fan-in), per
+    `learnings.md` 2026-08-23 -- a private copy in either file is the drift this
+    repo paid for three times in one day.
+  - **TOTALS AND PROPS DELIBERATELY UNTOUCHED, and this is the load-bearing
+    part.** They also say over/under and the board asks over/under, so they were
+    the only families already meeting. A blanket side rewrite would have broken
+    exactly what worked. A regression test pins that a `totals` row still
+    produces `['mlb|totals|over|8.5']` and gains no team keys.
+  - **SPREADS REFUSED BY NAME, pending the sign convention** -- the precedent is
+    `polymarket_us_outcome`, which refuses spreads "pending a measurement of
+    which team a handicap belongs to". Kalshi's `'Texas wins by over 3.5 runs'`
+    is Texas -3.5 while the board carries a signed line per role; and `under` is
+    **not** the mirror of `over` on this grammar ("wins by under 3.5" is "wins,
+    by less than 3.5", which is not the other side of a handicap). These
+    published `spreads|over|<line>` and matched nothing, so refusing costs no
+    existing match -- it converts a SILENT non-match into a counted one.
+  - **KNOWN RESIDUAL, measured not hidden: Kalshi TRUNCATES team names.**
+    `'New York M'` (Mets) tokenises to `new york m`, which no board candidate
+    carries, so those still will not match. Fixing it needs Kalshi's truncation
+    RULE read off real titles rather than inferred from one sample. The new
+    `h2h_keyed_by_team` / `h2h_team_unresolved` counters on the adapter's
+    `reason` are what will size this in production.
+- **NEXT ACTION:** read `[layer2_shortlist] VENUE_REPRICE_KEYS` after a deploy.
+  `sources_offered` for kalshi must show `h2h|<team>` where it showed
+  `h2h|yes`, and `by_source` must carry `spreads_refused:<n>` and
+  `h2h_keyed_by_team:<n>`. **`stamped` rising is the outcome; the band caveat
+  above applies -- matched ran 44 -> 104 -> 0 across three consecutive builds.**
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
