@@ -819,6 +819,38 @@ def build_layer2_shortlist(
                     f" reason={step.get('reason')} error={step.get('error')}",
                     flush=True,
                 )
+            # THE STEP THAT CORRECTS A FROZEN CHIP, AND THE ONLY ONE THAT NEVER
+            # PRINTED. `#413` records the mechanism: the chip reader uses
+            # PRESENCE where freshness was meant, so whenever a game's feed was
+            # first captured becomes its state for the rest of the day -- MIL@SD
+            # read `live / TOP 9` off a FIVE-MINUTE-OLD artifact while the lens
+            # read `Final`. `attach_live_game_state_from_lens` is the overlay
+            # that fixes it, and its coverage payload went to the artifact and
+            # nowhere else.
+            #
+            # MEASURED 2026-08-25 04:21:24Z, which is why this is here:
+            # `basketball_momentum` reported wnba `post=2 live_events=0` on every
+            # tick from 04:18:50Z, and the same build counted 184 wnba rows past
+            # `attach_live_gamelines`' live-state check. Both games final, 184
+            # rows live. `game.state` gates BOTH live guards --
+            # `opportunity_gate`'s 900s clock and `live_edge_policy`'s refusal of
+            # a settled market -- so a chip frozen at `live` means that refusal
+            # never fires.
+            #
+            # `supported` is the field that matters: `_LIVE_GAME_STATE_SPORTS` is
+            # `{mlb, soccer}`, so this returns `supported: False` for wnba and
+            # always has. That is a stated refusal nobody could read.
+            live_step = ((stat or {}).get("enrichment") or {}).get("live_game_state")
+            if isinstance(live_step, dict):
+                print(
+                    f"[layer2_shortlist] LIVE_GAME_STATE_JOIN sport={name}"
+                    f" supported={live_step.get('supported')}"
+                    f" corrected={live_step.get('rows_corrected')}"
+                    f" transitions={live_step.get('transitions')}"
+                    f" snapshot_age_s={live_step.get('snapshot_age_seconds')}"
+                    f" reason={live_step.get('reason')} error={live_step.get('error')}",
+                    flush=True,
+                )
         print(
             "[layer2_shortlist] VENUE_REPRICE_KEYS "
             f"unmatched_by_sport={repriced.get('unmatched_by_sport')} "
