@@ -1639,6 +1639,31 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Wiring it into the tick is a one-line change in a claimed file and belongs to
   the deploy step, which the user has deferred. Phase B ships capture
   CAPABILITY, not capture — `#208` in a second guise.
+- **DIAGNOSED, NOT APPLIED, 2026-08-25 by `exchange-markets-api-integration`
+  (session 71a74bb7) — `syndicate/features/shared/live_lens_loop.py`.**
+  User directed fixing the CI baseline's 11 unrelated `pytest-baseline`
+  failures (see that lane's own block). One of them,
+  `test_the_watermark_is_stamped_at_the_publish_not_the_cycle_start`,
+  root-caused to a REAL one-tick production drift: `#327`'s in-sweep memory
+  sampler (`log_and_persist_process_memory("live_lens_publish_before", ...)`,
+  this file) was inserted BETWEEN capturing `publish_started_epoch` and the
+  actual `sweep_changed_hot_artifacts()` call, so the persisted watermark now
+  reads one `time.time()` tick earlier than the sweep's true start -- safe in
+  production (a slightly-conservative watermark, never late), but it broke the
+  test's exact-equality invariant. Candidate fix (not applied): move
+  `publish_started_epoch = time.time()` from right after
+  `_live_lens_publish_enabled()` to immediately before the
+  `sweep_changed_hot_artifacts()` call.
+  **Attempted a narrow carve-out and the lane-guard hook BLOCKED it** --
+  the hook attributes this file to `basketball-live-momentum` (a Files:
+  bullet match on that lane's own cross-lane-edit note), while the file's OWN
+  prose in that same lane block attributes ownership to
+  `soccer-board-mlb-parity` (OPEN, UNOWNED, checkpointed 2026-08-22) instead.
+  Neither owning session is reachable right now (`ListAgents`: none), but per
+  this repo's own rule -- "if another OPEN lane lists a file you need, stop
+  and surface the conflict, do not edit across lanes" -- a live guard BLOCK is
+  not treated the same as an unclaimed file, so this was surfaced to the user
+  rather than forced through. Nothing in this file has been touched.
 - **SCOPE CHANGED AT LANE-OPEN BY THE COLLISION CHECK, and this is the interesting part.**
   The scope's Phase A said "extract soccer's `momentum_at`/`momentum_series` into
   `shared/momentum_core.py`; soccer imports it back". `soccer-board-mlb-parity` is OPEN
