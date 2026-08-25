@@ -462,13 +462,52 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         entry["attempted_at"] = _now_stamp()
         entry["strategy"] = result.get("strategy")
         entry["reason"] = result.get("reason")
+        # AN EMPTY SERIES IS A SUCCESSFUL READ OF AN EMPTY BOOK, and telling
+        # that apart from a FAILED read is what keeps this queue moving.
+        #
+        # `fetched_at` used to move only when markets came back. The intent was
+        # right -- a failure that stamped it would blank the series for an
+        # interval AND start its clock. But a series that genuinely has no open
+        # markets never got stamped either, so `_due_series` saw `age=None`,
+        # sorted it at `inf` ahead of everything, and it returned to the front
+        # of the queue on EVERY tick, forever. Backoff cannot absorb that: it
+        # lasts `min(interval, FAILED_RETRY_SECONDS)` and ticks are ~15 minutes
+        # apart, so it has always expired.
+        #
+        # MEASURED 2026-08-25T16:41:09Z and again at 16:56:45Z, identical:
+        #
+        #   TICK series_wanted=191 due=191 fetched=12 cap=12 markets=883
+        #     this_tick={'KXATTENDMLB': (0,'series_filter'),
+        #                'KXMLBASGAME': (0,'series_filter'),
+        #                'KXMVENBASINGLEGAME': (0,'series_filter'),
+        #                'KXNBA1HSPREAD': (0,'series_filter'), ...}  ALL ZERO
+        #     oldest_s=142655
+        #
+        # Twelve of twelve slots spent on attendance markets, the All-Star
+        # game, parlay series and NBA quarter lines in AUGUST -- while the
+        # oldest live series sat 39.6 HOURS stale. The whole per-tick budget,
+        # every tick, on series that can never return anything this month.
+        #
+        # It also inverts the economy of auto-discovery: every newly registered
+        # out-of-season series joins the permanent front of the queue, so
+        # REGISTERING MORE SERIES MAKES COVERAGE WORSE. That is the mechanism
+        # behind "whack-a-mole" -- not a missing grammar, a starved queue.
+        #
+        # So the stamp follows the READ, not the payload: a strategy that ran
+        # and returned an empty list is fetched. `filter_ignored` and `failed`
+        # still leave the stamps disagreeing, which is what `_backing_off`
+        # reads, so a real failure behaves exactly as before.
+        read_succeeded = result.get("strategy") == "series_filter"
         if markets:
             entry["markets"] = markets
             entry["count"] = len(markets)
-            # `fetched_at` moves ONLY on a fetch that returned something. A
-            # failure that stamped it would blank this series for an interval
-            # AND start its clock, so the next hour would serve zero markets
-            # from an artifact that looks fresh.
+        elif read_succeeded:
+            # Keep the last known markets rather than blanking: an empty read
+            # is "nothing open right now", not "the previous prices were
+            # wrong". `_seconds_since(fetched_at)` still ages them, and the
+            # merge reports `oldest_s`, so staleness stays visible.
+            entry["count"] = 0
+        if markets or read_succeeded:
             entry["fetched_at"] = entry["attempted_at"]
         per_series[series] = entry
         fetched[series] = {"count": len(markets), "strategy": result.get("strategy")}
@@ -720,16 +759,65 @@ def join_to_board(
             f" board_markets={report.get('board_market_vocabulary')}",
             flush=True,
         )
-        # The CLUB CODES, both sides. `event_not_on_our_board` is a count and
-        # cannot say which spelling is missing; printing Kalshi's blob beside
-        # our board's makes the alias readable instead of guessed at, and a
-        # club alias guessed rather than read is how a bet reaches the wrong
-        # game.
-        if report.get("unmatched_events"):
-            print(
-                "[kalshi_odds] JOIN_EVENTS"
-                f" unmatched={report.get('unmatched_events')}"
-                f" board={report.get('board_event_sample')}",
-                flush=True,
-            )
+    # THE CLUB CODES, WHENEVER THERE ARE ANY -- NOT ONLY ON A ZERO-MATCH JOIN.
+    #
+    # This sat inside the `if not matched` block above, and that is precisely
+    # why the Kalshi game-line gap stayed invisible. MEASURED 2026-08-25
+    # 15:56:35Z:
+    #
+    #   BOARD_JOIN kalshi_markets=883 board_rows=1290 matched=5
+    #     reasons={'event_not_on_our_board': 20, ...}
+    #
+    # Five player props matched, so `matched` was truthy and the samples never
+    # printed -- while all 20 GAME LINES failed event resolution and nothing
+    # said which club codes they were. A partial match is the normal state and
+    # it was the one state that suppressed the diagnostic.
+    #
+    # `game_lines_disabled` is ABSENT from those reasons, which is the reading
+    # that matters: that counter fires only for a game line whose event
+    # RESOLVED, so its absence means zero resolved. Turning
+    # `SYNDICATE_KALSHI_GAME_LINES` on would price nothing.
+    #
+    # WHAT THIS LINE THEN MEASURED, 2026-08-25T16:14:40Z -- and it was NOT the
+    # club-code alias gap predicted here:
+    #
+    #   JOIN_EVENTS unmatched=[{'kalshi': 'ATLMIL',
+    #       'ticker': 'KXMLBSPREAD-26AUG231910ATLMIL-MIL4', 'sport': 'mlb'}, ...]
+    #
+    # Every sample was `ATLMIL` on `26AUG23` -- Atlanta at Milwaukee, two days
+    # stale, and a blob the resolver reads correctly. The refusals were dated,
+    # not misspelled. Two separate defects made that look like an alias gap,
+    # both since fixed in `kalshi_board_join.py`: the date check sat BELOW the
+    # resolver, so a stale game could only fail as `event_not_on_our_board`;
+    # and the sample was bounded on markets rather than on distinct blobs, so
+    # one game consumed all eight slots.
+    #
+    # The prediction may still be right for the remaining refusals -- it is
+    # simply not yet evidence. With the date checked first, whatever
+    # `event_not_on_our_board` still counts is an alias gap, and THAT is when
+    # this line becomes the work list it was built to be.
+    # THE GRAMMAR WORK LIST. `unreadable_title` is the single largest refusal
+    # on an MLB slate (216 of 883, 2026-08-25T16:14:40Z) and the one that hides
+    # the h2h path: `KXMLBGAME` -- the moneyline series, and the market the
+    # rejected live Kalshi order wanted -- has no title grammar at all, so
+    # every one of its markets refuses here and no game line ever reaches the
+    # resolver. One title per series, so a new market family is visible rather
+    # than buried under whichever series is largest.
+    if report.get("unreadable_titles"):
+        print(
+            "[kalshi_odds] JOIN_TITLES"
+            f" unreadable={report.get('unreadable_titles')}"
+            # The COMPLETE per-series count, which the bounded sample cannot
+            # give: it answers "is this market family refusing here at all",
+            # where the sample can only answer "what does one of them say".
+            f" by_series={report.get('unreadable_by_series')}",
+            flush=True,
+        )
+    if report.get("unmatched_events"):
+        print(
+            "[kalshi_odds] JOIN_EVENTS"
+            f" unmatched={report.get('unmatched_events')}"
+            f" board={report.get('board_event_sample')}",
+            flush=True,
+        )
     return report

@@ -144,12 +144,15 @@ def test_a_fresh_slate_still_RESOLVES(_artifact, monkeypatch):
     resolved = execute_portfolio._polymarket_resolve_market(_Request())
 
     assert resolved is not None, "a 60s-old slate was refused"
-    slug, price, tick, min_qty = resolved
+    slug, price, tick, min_qty, outcome_index = resolved
     assert slug == _Request.venue_ticker
     assert price == pytest.approx(0.55)
     # Tick size and minimum quantity come FROM THE MARKET, never inferred.
     assert tick == 0.01
     assert min_qty == 1
+    # The index that names WHICH outcome the price belongs to, carried through
+    # to `order_body` so the side cannot contradict it.
+    assert outcome_index == 0
 
 
 # ---------------------------------------------------------------------------

@@ -278,18 +278,86 @@ def _as_float(value: Any) -> float | None:
     return None if parsed != parsed else parsed
 
 
-def _match_key(match: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
+def _key_line(value: Any) -> tuple[bool, float | None]:
+    """A line for the resolver key: `(ok, line)`.
+
+    **A MONEYLINE HAS NO LINE, AND REFUSING IT MADE KALSHI h2h UNPLACEABLE.**
+
+    MEASURED 2026-08-25 14:57:34Z, on a live Kalshi order:
+
+        h2h · Texas Rangers @ Chicago White Sox  +108
+        OrderBuildError: no_live_price: None
+
+    The trailing `None` is `request.venue_ticker`. Both key functions did
+    `float(match.get("line"))` inside a `try` and returned None on TypeError, so
+    an h2h -- whose line legitimately IS None -- was never indexed, no ticker was
+    ever stamped, and `_kalshi_price_for` refused for want of one. Not a data
+    gap: the market was matched and priced, and only the key could not hold it.
+
+    None is now a VALUE in the key rather than a refusal, which is safe here for
+    a reason that was not true before `#547`: the tuple leads with `event_id`, so
+    `(evt, "h2h", "", None, "home")` names exactly one bet. Without the game it
+    would have been the collision that stamped a BAL@STL slug on a CIN@SF row.
+
+    An UNPARSEABLE line is still a refusal, and that distinction is the point: a
+    market that has no line and a market whose line we could not read are
+    different facts, and only the first is safe to key.
+
+    Returns `(ok, line)`. `ok=False` means the caller must refuse -- NOT a NaN
+    sentinel, which was the first attempt here and is wrong: a module-level
+    `float("nan")` is ONE object, and a dict lookup compares by identity before
+    equality, so two rows with unreadable lines would have matched each other.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return (True, None)
+    try:
+        return (True, float(value))
+    except (TypeError, ValueError):
+        return (False, None)
+
+
+def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
     """The identity the join matched on. Shared by both resolvers ON PURPOSE.
 
     Two resolvers keyed by two slightly different tuples would pair a row with
     one venue's price and another venue's contract -- a bet placed at a price
     that was never quoted for it.
+
+    **THE GAME IS IN THE KEY.** It was not, and Polymarket -- which had copied
+    this module's shape -- stamped a BAL@STL slug onto a CIN@SF position and a
+    PIT@SD slug onto a TEX@CWS one (measured 2026-08-25 14:57:34Z). Without
+    `board_event_id`, `("totals", "", 8.5, "over")` is one key for every 8.5
+    total on the slate and the index keeps whichever game was written last.
+
+    Kalshi has not yet produced that failure for two reasons, NEITHER of which
+    is a guard: its board join currently supplies only player props, whose
+    `player_name` happens to identify a game; and the `float(line)` below
+    returns None for an h2h with no line, so moneylines are not indexed at all.
+    The 171 game series registered on 2026-08-25 would have removed both
+    accidents at once.
+
+    A record with no event id returns None and is never indexed -- an empty
+    string would rebuild the same collision under a different spelling, and not
+    indexed means no order, which is the direction that fails safe.
+
+    **THE MARKET NAME IS TAKEN VERBATIM HERE AND CANONICALISED IN `_row_key`.**
+    That asymmetry is deliberate and load-bearing: a match's `market` is
+    `verdict["market"]`, which the join has already canonicalised, while a board
+    row carries whatever the board spells it (`pitcher_strikeouts` where the
+    canonical key is `strikeouts`). Canonicalising twice would be harmless;
+    canonicalising NEITHER side would pair `pitcher_strikeouts` with nothing.
+    Stated because a fixture built with a board-shaped market name resolves to
+    None here and looks like a key bug rather than a fixture that does not
+    match what the join emits.
     """
-    try:
-        line = float(match.get("line"))
-    except (TypeError, ValueError):
+    event_id = str(match.get("board_event_id") or "").strip()
+    if not event_id:
+        return None
+    ok, line = _key_line(match.get("line"))
+    if not ok:
         return None
     return (
+        event_id,
         str(match.get("market") or "").strip().lower(),
         normalize_person(match.get("player_name")),
         line,
@@ -297,15 +365,23 @@ def _match_key(match: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
     )
 
 
-def _row_key(row: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
+def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
+    """The board row's side of `_match_key`. The two must stay one shape.
+
+    A board row's game is `event_id`; a match carries the same value under
+    `board_event_id` because that is what the join copied off the row.
+    """
     from syndicate.features.shared.market_keys import canonical_market_key
 
-    try:
-        line = float(row.get("line"))
-    except (TypeError, ValueError):
+    event_id = str(row.get("event_id") or "").strip()
+    if not event_id:
+        return None
+    ok, line = _key_line(row.get("line"))
+    if not ok:
         return None
     raw = str(row.get("market") or "").strip().lower()
     return (
+        event_id,
         canonical_market_key(row.get("sport"), raw) or raw,
         normalize_person(row.get("player_name")),
         line,
@@ -349,41 +425,31 @@ def kalshi_price_resolver(matches: Sequence[Mapping[str, Any]]):
     and the reason every coverage figure in this thread was about the aggregator
     rather than the venue. This prices from what Kalshi is actually quoting.
 
-    Keyed on (market, player, line, side): the same identity the join matched
-    on, so a resolver cannot pair a row with a price for a different bet. A
-    lookup that is looser than the join would silently reintroduce exactly the
-    mismatches the join refuses.
+    KEYED BY `_match_key` / `_row_key`, THE SHARED FUNCTIONS -- not by a copy.
+
+    This built its key INLINE while the ticker resolver called `_match_key`,
+    and the docstring here claimed they were "the same identity the join
+    matched on". They were the same tuple only for as long as nobody edited one
+    of them. Adding the game to `_match_key` moved the ticker resolver and left
+    this behind, and a test asking both for the same row got a CIN@SF contract
+    priced at BAL@STL's number -- which is precisely the failure `_match_key`'s
+    own docstring says the sharing exists to prevent, produced by the sharing
+    not actually being shared.
+
+    One function, two callers. The `canonical_market_key` normalisation on the
+    row side comes along with it, which this copy also lacked.
     """
-    index: dict[tuple[str, str, float, str], float] = {}
+    index: dict[tuple[str, str, str, float, str], float] = {}
     for match in matches:
-        try:
-            line = float(match.get("line"))
-        except (TypeError, ValueError):
-            continue
+        key = _match_key(match)
         price = match.get("kalshi_american")
-        if price is None:
+        if key is None or price is None:
             continue
-        key = (
-            str(match.get("market") or "").strip().lower(),
-            normalize_person(match.get("player_name")),
-            line,
-            str(match.get("board_side") or "").strip().lower(),
-        )
         index[key] = float(price)
 
     def resolve(row: Mapping[str, Any]) -> float | None:
-        try:
-            line = float(row.get("line"))
-        except (TypeError, ValueError):
-            return None
-        return index.get(
-            (
-                str(row.get("market") or "").strip().lower(),
-                normalize_person(row.get("player_name")),
-                line,
-                str(row.get("side") or "").strip().lower(),
-            )
-        )
+        key = _row_key(row)
+        return index.get(key) if key else None
 
     resolve.market_count = len(index)  # type: ignore[attr-defined]
     return resolve
@@ -436,6 +502,15 @@ def join_kalshi_to_board(
     matches: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
     unmatched_samples: list[dict[str, Any]] = []
+    # Blobs already sampled, so the bounded sample spends its slots on distinct
+    # club codes rather than on repeat markets from one game.
+    unmatched_blobs: set[str] = set()
+    # Titles the catalogue could not read, one per series -- the grammar work
+    # list. Series already sampled, for the same reason blobs are deduplicated.
+    unreadable_titles: list[dict[str, Any]] = []
+    unreadable_series: set[str] = set()
+    # Complete, not sampled: which series refuse and how many each.
+    unreadable_by_series: dict[str, int] = {}
 
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
@@ -447,7 +522,49 @@ def join_kalshi_to_board(
         # which is a mapping that works for two series and stops at three.
         verdict = _classify(market)
         if verdict.get("status") != "ok":
-            _refuse(str(verdict.get("reason")))
+            reason = str(verdict.get("reason"))
+            if reason == REASON_UNREADABLE_TITLE:
+                # THE GRAMMAR WORK LIST, WRITTEN FROM DATA -- same argument as
+                # the alias sample below, and now the LARGEST remaining refusal
+                # on an MLB slate rather than a secondary one. `unreadable_title` names the problem
+                # and then withholds the one thing needed to fix it: the title.
+                # 216 markets a build refused with the string never printed.
+                #
+                # Guessing at Kalshi's wording is specifically what failed here
+                # before: three grammars written against an imagined phrasing
+                # matched NONE of production and 302 markets came back
+                # unreadable on the first build (see the grammar block in
+                # `kalshi_catalogue.py`). The titles are readable from the same
+                # payload the join already holds, so there is no reason to
+                # guess.
+                #
+                # ONE ROW PER SERIES. A series shares a title grammar, so a
+                # second title from the same series teaches nothing while a
+                # first title from a new series is a whole market family. That
+                # is also what keeps `KXMLBGAME` -- the moneyline, and the
+                # market the rejected live order wanted -- from being buried
+                # under whichever series happens to be largest.
+                series = str(market.get("series") or "").strip()
+                # THE COMPLETE PER-SERIES COUNT, beside the bounded sample.
+                #
+                # The sample is one title per series capped at 10, which names
+                # the GRAMMAR but cannot answer "is series X in here at all" --
+                # and that is the question that matters when a specific market
+                # family is missing. Measured 2026-08-25T16:56:46Z, the sample
+                # returned 10 series and `KXMLBGAME` (the moneyline) was not
+                # among them, which is not evidence either way while more than
+                # 10 series refuse. A count is small, complete, and settles it.
+                unreadable_by_series[series] = unreadable_by_series.get(series, 0) + 1
+                if series not in unreadable_series and len(unreadable_titles) < 10:
+                    unreadable_series.add(series)
+                    unreadable_titles.append(
+                        {
+                            "series": series,
+                            "title": str(market.get("title") or ""),
+                            "ticker": str(market.get("ticker") or ""),
+                        }
+                    )
+            _refuse(reason)
             continue
 
         if verdict.get("needs_event_identity"):
@@ -459,19 +576,67 @@ def join_kalshi_to_board(
             #
             # GATED OFF BY DEFAULT. The identity is resolved by matching
             # Kalshi's concatenated club codes against OUR schedule
-            # (`match_event_blob`), and how often our codes agree with Kalshi's
-            # is UNMEASURED -- `OAK` against `ATH` is a real possibility and
-            # every such gap is an alias nobody has written yet. So the resolver
-            # runs and REPORTS on every build, and the flag decides only whether
-            # a resolved game may be priced. That way the measurement arrives
-            # before the money does, which is the opposite of how tonight went.
+            # (`match_event_blob`), and the flag decides only whether a resolved
+            # game may be priced. The resolver runs and REPORTS on every build,
+            # so the measurement arrives before the money does.
+            #
+            # THAT MEASUREMENT HAS NOW ARRIVED, and it retired the worry this
+            # comment used to carry. It read: "how often our codes agree with
+            # Kalshi's is UNMEASURED -- `OAK` against `ATH` is a real
+            # possibility and every such gap is an alias nobody has written
+            # yet." Measured across two consecutive builds, once the date was
+            # checked before the resolver rather than after it:
+            #
+            #   16:14:40Z  matched=5  {'event_not_on_our_board': 20,
+            #                          'market_is_for_another_date': 512, ...}
+            #   16:41:09Z  matched=4  {'market_is_for_another_date': 532, ...}
+            #
+            # `event_not_on_our_board` went 20 -> 0 and the date counter took
+            # exactly those 20. Every one was a stale game, not a club code we
+            # could not read; there is no alias gap on this slate. The club map
+            # is not the game-line blocker and adding spellings to it would
+            # have changed nothing.
             #
             # A total joined to the wrong game is a confidently-priced bet on
             # strangers, so `ambiguous` and `no_match` are refused by name and
             # never softened into a best guess.
+            # DATE FIRST, BEFORE THE CLUB CODES. This check used to sit
+            # below the resolver, and being second made it unreachable for the
+            # markets it describes: `_resolve_event` matches the blob against
+            # TODAY'S board, so a game line from another date cannot resolve
+            # and died as `event_not_on_our_board` -- a club code we failed to
+            # recognise -- without the date ever being read.
+            #
+            # MEASURED 2026-08-25T16:14:40Z. All 8 sampled "unrecognised" MLB
+            # events were `ATLMIL` on `26AUG23`, two days stale:
+            #
+            #   JOIN_EVENTS unmatched=[{'kalshi': 'ATLMIL',
+            #       'ticker': 'KXMLBSPREAD-26AUG231910ATLMIL-MIL4', ...}, ...]
+            #
+            # `ATLMIL` is a blob the resolver handles fine. Nothing was wrong
+            # with our club map; the game was simply over. That is exactly the
+            # `#505` failure the counters above are named to prevent -- "Kalshi
+            # has nothing we bet" and "our join is broken" sharing one number
+            # -- reappearing one layer down, where the reason names were right
+            # but their ORDER made one impersonate the other.
+            #
+            # The date is in the ticker (`game_date_from_ticker`), so it is
+            # answerable without the board. Asking it first keeps
+            # `event_not_on_our_board` a true alias-gap count and keeps the
+            # JOIN_EVENTS sample an alias work list rather than a list of
+            # yesterday's games.
+            if wanted_date:
+                game_date = game_date_from_ticker(market.get("ticker"))
+                if game_date is None:
+                    _refuse(REASON_UNDATABLE)
+                    continue
+                if game_date != wanted_date:
+                    _refuse(REASON_WRONG_DATE)
+                    continue
+
             resolution = _resolve_event(market, board_rows)
             status = str(resolution.get("status") or "")
-            if status == "no_match" and len(unmatched_samples) < 8:
+            if status == "no_match":
                 # THE ALIAS LIST, WRITTEN FROM DATA. `event_not_on_our_board`
                 # is a count; it cannot say WHICH code we failed to recognise,
                 # and guessing at club spellings is how a bet lands on the
@@ -479,13 +644,27 @@ def join_kalshi_to_board(
                 # own board offered for the same date, so the missing alias is
                 # readable rather than inferred. Bounded at 8 -- enough to name
                 # the pattern, not enough to flood the log money moves through.
-                unmatched_samples.append(
-                    {
-                        "kalshi": resolution.get("blob"),
-                        "ticker": market.get("ticker"),
-                        "sport": resolution.get("sport"),
-                    }
-                )
+                #
+                # ONE ROW PER BLOB, and the budget is spent on DISTINCT codes.
+                # The bound used to be `len(unmatched_samples) < 8`, which
+                # takes the first eight markets rather than the first eight
+                # codes -- and one game offers far more than eight. Measured
+                # 2026-08-25T16:14:40Z, all 8 slots went to `ATLMIL`: six
+                # spreads and two team totals off a single event, so a sample
+                # built to enumerate missing aliases named exactly one thing
+                # and said nothing about the other 19 refusals. A blob is what
+                # an alias is written against, so a blob is the unit to
+                # deduplicate on.
+                blob = str(resolution.get("blob") or "")
+                if blob not in unmatched_blobs and len(unmatched_samples) < 8:
+                    unmatched_blobs.add(blob)
+                    unmatched_samples.append(
+                        {
+                            "kalshi": resolution.get("blob"),
+                            "ticker": market.get("ticker"),
+                            "sport": resolution.get("sport"),
+                        }
+                    )
             if status != "ok":
                 _refuse(
                     REASON_EVENT_AMBIGUOUS
@@ -504,15 +683,6 @@ def join_kalshi_to_board(
             # `needs_event_mapping` even when the event HAD resolved, so 60
             # game lines a build were identified and then dropped -- the flag
             # bought measurement and nothing else.
-            if wanted_date:
-                game_date = game_date_from_ticker(market.get("ticker"))
-                if game_date is None:
-                    _refuse(REASON_UNDATABLE)
-                    continue
-                if game_date != wanted_date:
-                    _refuse(REASON_WRONG_DATE)
-                    continue
-
             game_rows = by_event.get(
                 (str(resolution.get("event_id") or ""), verdict["market"], verdict["line"])
             )
@@ -710,6 +880,13 @@ def join_kalshi_to_board(
         "matched": len(matches),
         "reasons": dict(sorted(reasons.items())),
         "kalshi_key_sample": kalshi_keys,
+        # One refused title per series: what grammar is missing, not how many.
+        "unreadable_titles": unreadable_titles,
+        # ...and how many per series, complete, so a family that is ABSENT can
+        # be distinguished from one the bounded sample simply did not reach.
+        "unreadable_by_series": dict(
+            sorted(unreadable_by_series.items(), key=lambda kv: -kv[1])
+        ),
         "board_key_sample": board_keys,
         "board_market_vocabulary": dict(
             sorted(board_markets.items(), key=lambda kv: -kv[1])[:12]

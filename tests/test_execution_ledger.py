@@ -539,7 +539,11 @@ def _reader(orders, *, ok: bool = True):
     """Stand in for the Kalshi read side, in the shape `_venue_reader` returns."""
     from syndicate.features.shared.kalshi_orders import venue_order_view
 
-    def fetch(*, limit=100):
+    def fetch(*, limit=100, order_ids=None):
+        # `order_ids` is part of the reader contract: Kalshi lists the whole
+        # book and ignores it, Polymarket has no list of settled orders and
+        # reads one at a time by id. Accepted here so this stand-in matches the
+        # real signature rather than the one it wishes existed.
         if not ok:
             return {"status": "error", "reason": "KalshiAuthError: http_503"}
         return {"status": "ok", "orders": list(orders)}
@@ -1076,3 +1080,164 @@ def test_the_ledger_is_not_written_by_the_cancel(monkeypatch):
 
     mod.cancel_stale_resting_orders([_resting_row(idempotency_key=key, order_id="ord-c")])
     assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
+
+
+# --------------------------------------------------------------------------
+# The reconciliation latch: a venue with no reader can never be cleared
+# --------------------------------------------------------------------------
+
+
+def test_polymarket_has_a_venue_reader():
+    """A venue that can PLACE but cannot be READ is a latch, not a gap.
+
+    `_venue_reader` said "Only Kalshi has one", so a Polymarket order recorded
+    `submitted` could never be corrected -- and an unreconciled order blocks
+    live mode on EVERY venue. Measured 2026-08-25T16:40:00Z, from one resting
+    Polymarket order:
+
+        BLOCKED_ON_UNRECONCILED count=1 keys=['1984a57ed28e1cd5ccad8b16']
+        EXECUTION status=blocked reason=unreconciled_orders scope=kalshi
+        EXECUTION status=blocked reason=unreconciled_orders scope=polymarket
+
+    Nothing in the system could lift that, because the only thing that lifts it
+    is the read that did not exist.
+    """
+    import syndicate.features.shared.execution_ledger as mod
+
+    # LIVE venues only -- paper orders never reconcile (the candidate filter
+    # requires mode == LIVE), so a paper book needs no reader.
+    for venue in ("polymarket", "kalshi"):
+        fetch, view = mod._venue_reader(venue)
+        assert fetch is not None, f"{venue} can be placed on but never reconciled"
+        assert view is not None
+
+
+def test_every_venue_we_can_place_on_can_also_be_read():
+    """The invariant behind the test above, stated once so a THIRD venue cannot
+    reintroduce the latch by being added to the submit side alone."""
+    import pipeline.execute_portfolio as runner
+    import syndicate.features.shared.execution_ledger as mod
+
+    for venue in ("kalshi", "polymarket"):
+        if runner._venue_submitter(venue) is None:
+            continue
+        fetch, _ = mod._venue_reader(venue)
+        assert fetch is not None, f"{venue} has a submitter but no reader"
+
+
+def test_a_cancelled_polymarket_order_reads_as_dead_not_unknown():
+    """The user cancels at the venue; the ledger must be able to see it.
+
+    Polymarket prefixes its enums (`ORDER_STATUS_CANCELED`), so a bare-string
+    match falls through to `unknown` -- and `unknown` deliberately changes
+    nothing, which would leave the order blocking live mode forever.
+    """
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    for status in ("CANCELED", "ORDER_STATUS_CANCELED", "cancelled", "ORDER_STATUS_REJECTED"):
+        assert venue_order_view({"status": status})["state"] == "dead", status
+
+
+def test_a_partially_filled_then_cancelled_order_is_a_FILL():
+    """The cancelled status describes the remainder; the contracts that traded
+    are a position we hold. Size outranks status, or a real position gets
+    reconciled away to zero."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view({"status": "ORDER_STATUS_CANCELED", "filledQuantity": "1.5"})
+    assert view["state"] == "filled"
+    assert view["filled_count"] == 1.5
+
+
+def test_a_resting_polymarket_order_is_resting_not_dead():
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    for status in ("ORDER_STATUS_OPEN", "pending", "ORDER_STATUS_LIVE"):
+        assert venue_order_view({"status": status})["state"] == "resting", status
+
+
+def test_an_unmapped_polymarket_status_is_unknown_not_guessed():
+    """`unknown` is a real answer. A status we have never seen must leave the
+    row untouched rather than be collapsed into traded or not-traded."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    assert venue_order_view({"status": "ORDER_STATUS_SOMETHING_NEW"})["state"] == "unknown"
+
+
+def test_a_failed_polymarket_read_is_an_error_never_an_empty_book(monkeypatch):
+    """An empty `orders` on a FAILED read says "the venue holds nothing", and
+    reconciliation would take that as licence to write off a live position."""
+    from syndicate.features.shared import polymarket_us_auth
+    from syndicate.features.shared.polymarket_us_orders import fetch_orders
+
+    def boom(*a, **kw):
+        raise RuntimeError("venue unreachable")
+
+    monkeypatch.setattr(polymarket_us_auth, "signed_request", boom)
+    result = fetch_orders()
+    assert result["status"] == "error"
+    assert "orders" not in result
+
+
+def test_an_unrecognised_polymarket_payload_is_named_not_empty(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth
+    from syndicate.features.shared.polymarket_us_orders import fetch_orders
+
+    monkeypatch.setattr(
+        polymarket_us_auth, "signed_request", lambda *a, **kw: {"unexpected": []}
+    )
+    result = fetch_orders()
+    assert result["status"] == "error"
+    assert result["reason"] == "no_orders_array"
+
+
+def test_the_state_field_is_what_carries_a_polymarket_order_status():
+    """MEASURED 2026-08-25T17:05:58Z on the first real per-order read: the
+    payload has no `status` key at all. It is `state`.
+
+      ORDERS_READ n=1 mode=per_order asked=1 statuses=['']
+        keys=[...,'cumQuantity','id','leavesQuantity','marketSlug',
+              'outcomeSide','price','quantity','side','state','tif','type']
+
+    Reading the wrong key gave `unknown`, which correctly changes nothing --
+    and so the order stayed blocking live execution on both venues.
+    """
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    assert venue_order_view({"state": "ORDER_STATE_CANCELED"})["state"] == "dead"
+    assert venue_order_view({"state": "ORDER_STATE_OPEN"})["state"] == "resting"
+    # `status` still works if the venue ever adds it -- kept, not replaced.
+    assert venue_order_view({"status": "ORDER_STATUS_CANCELED"})["state"] == "dead"
+
+
+def test_the_measured_polymarket_fill_fields_are_the_ones_read():
+    """`cumQuantity` is cumulative filled and `avgPx` the average price, both
+    from the measured key list. `leavesQuantity` is the UNFILLED remainder and
+    must never be read as a fill."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view({
+        "state": "ORDER_STATE_FILLED",
+        "cumQuantity": "2.86",
+        "leavesQuantity": "0",
+        "avgPx": "0.495",
+        "marketSlug": "aec-mlb-tex-cws-2026-08-25",
+        "id": "o-1",
+    })
+    assert view["filled_count"] == 2.86
+    assert view["fill_price"] == 0.495
+    assert view["ticker"] == "aec-mlb-tex-cws-2026-08-25"
+    assert view["order_id"] == "o-1"
+
+
+def test_leaves_quantity_alone_is_not_a_fill():
+    """A wholly unfilled resting order carries leavesQuantity == quantity. If
+    that were read as a fill we would book a position we do not hold -- the
+    2026-08-24 phantom fill, in a new place."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view({
+        "state": "ORDER_STATE_OPEN", "cumQuantity": "0", "leavesQuantity": "2.86",
+    })
+    assert view["state"] == "resting"
+    assert not view["filled_count"]

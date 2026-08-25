@@ -105,6 +105,41 @@ BEFORE any state is touched, which converted a silent multi-day corruption into
 a loud four-minute outage. **A permissive parse plus a strict startup assert is
 the pattern**: the assert is doing the work the `.get(key, default)` cannot.
 
+### 2026-08-25 — FORBIDDEN: never ship a venue's submit side without its read side
+- What we believed: the Polymarket integration was incomplete but safe — it
+  could place orders, and the read side was a later nicety. `_venue_reader`
+  said so in its own docstring: *"The read side of a venue adapter. Only Kalshi
+  has one."* A missing reader reads as a gap in coverage.
+- What was actually true: it is a LATCH ON THE WHOLE LIVE PATH. The first
+  Polymarket order was placed at `16:08:10Z` and rested unfilled. From that
+  moment every live pass on EVERY venue returned
+  `status=blocked reason=unreconciled_orders` — Kalshi included — and no order
+  could be placed again by anything. The unreconciled gate is global by design
+  (a stranded order might have doubled), and the only thing that lifts it is a
+  venue read. Two independent causes, each sufficient: there was no Polymarket
+  reader at all, and `execute_portfolio` called `reconcile_live_orders()` bare,
+  whose `venue` defaults to `"kalshi"`.
+- How we found out: a USER CANCELLED the order at the venue and said so. That
+  prompted the question "will the ledger see it?" — and the answer was no,
+  nothing could. The block itself had been printing for 32 minutes
+  (`BLOCKED_ON_UNRECONCILED count=1` at `16:40:00Z`, both scopes) and had not
+  been looked at, because the absence of LIVE_ORDER lines looks identical to a
+  quiet slate.
+- The rule going forward: **a venue's submit side and read side are not
+  independently shippable — shipping one without the other arms a latch that
+  the first resting order closes.** Two tripwires: (1) an invariant test that
+  every venue with a submitter has a reader, so a third venue cannot
+  reintroduce this by being added to one side alone
+  (`tests/test_execution_ledger.py`); (2) when a gate is GLOBAL, the thing that
+  lifts it must be attempted for every venue, not just the one in hand —
+  reconciling only "our" venue leaves us blocked by a row we declined to ask
+  about. And more generally: **an operator action at the venue cannot fix a
+  state the system has no way to observe.** Cancelling was necessary and could
+  never have been sufficient.
+- Cost: 40 minutes of no live execution on both venues, self-sustaining and
+  unrecoverable without a code change. No money lost — the one order that did
+  go out was on the wrong team for an unrelated reason, and did not fill.
+
 ### 2026-08-21 — FORBIDDEN: never publish a field under a name that describes a DIFFERENT quantity, however well-documented the real one is
 - What we believed: the Layer 2 board's `Win%` column showed a win probability,
   and `model_probability` was the model's number for the row being recommended.

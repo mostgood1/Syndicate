@@ -37,11 +37,16 @@ def _market(ticker, yes, series="KXMLBKS"):
     }
 
 
-def _stub(monkeypatch, calls, *, fails=()):
+def _stub(monkeypatch, calls, *, fails=(), empty=()):
+    """`fails` is a venue that would not answer. `empty` is a venue that
+    answered with an empty book -- an out-of-season series. The two must not
+    behave alike, which is what the starvation test below pins."""
     def fake(series):
         calls.append(series)
         if series in fails:
             return {"markets": [], "strategy": "failed", "reason": "http_429"}
+        if series in empty:
+            return {"markets": [], "strategy": "series_filter"}
         return {"markets": [_market(f"{series}-1", 0.4, series=series)], "strategy": "series_filter"}
 
     monkeypatch.setattr(mod, "fetch_series_markets", fake)
@@ -446,3 +451,82 @@ def test_a_bad_hot_interval_falls_back_rather_than_disabling(monkeypatch):
     for bad in ("0", "-5", "soon", ""):
         monkeypatch.setenv("SYNDICATE_KALSHI_HOT_REFRESH_SECONDS", bad)
         assert mod.hot_refresh_interval_seconds() == 30
+
+
+# --------------------------------------------------------------------------
+# An out-of-season series must not monopolise the queue forever
+# --------------------------------------------------------------------------
+
+
+def test_an_empty_series_does_not_starve_every_other_series(monkeypatch):
+    """THE WHACK-A-MOLE MECHANISM, and it is a starved queue rather than a
+    missing grammar.
+
+    `fetched_at` used to move only when markets came back. A series that
+    genuinely has none -- NBA quarter lines in August, the All-Star game,
+    parlays -- therefore never got stamped, `_due_series` saw `age=None` and
+    sorted it at `inf` ahead of everything, and it returned to the front of the
+    queue on every tick forever. With a per-tick cap of 12 and more than twelve
+    such series, the entire budget went to markets that cannot exist this month.
+
+    MEASURED 2026-08-25T16:41:09Z, twice, identical:
+
+        TICK series_wanted=191 due=191 fetched=12 cap=12 markets=883
+          this_tick={'KXATTENDMLB': (0,'series_filter'),
+                     'KXMLBASGAME': (0,'series_filter'),
+                     'KXMVENBASINGLEGAME': (0,'series_filter'), ...} ALL ZERO
+          oldest_s=142655        <- 39.6 hours
+
+    It also inverts auto-discovery: each newly registered out-of-season series
+    joins the permanent front of the queue, so registering MORE series makes
+    coverage WORSE.
+    """
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "EMPTY1,EMPTY2,LIVE1,LIVE2")
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES_PER_TICK", "2")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    calls = []
+    _stub(monkeypatch, calls, empty=("EMPTY1", "EMPTY2"))
+
+    mod.run_kalshi_odds_refresh()   # tick 1 -- the two empties sort first
+    first = list(calls)
+    calls.clear()
+    mod.run_kalshi_odds_refresh()   # tick 2 -- must move on
+    second = list(calls)
+
+    assert set(first) == {"EMPTY1", "EMPTY2"}, first
+    # THE ASSERTION THAT MATTERS: the live series get their turn.
+    assert set(second) == {"LIVE1", "LIVE2"}, (
+        f"empty series monopolised the queue: tick2 fetched {second}"
+    )
+
+
+def test_a_FAILED_series_still_backs_off_rather_than_being_stamped(monkeypatch):
+    """The control. The stamp follows a successful READ, not a non-empty
+    payload -- so a venue that would not answer must still look unfetched, or
+    the backoff that stopped the 2026-08-23 http_429s is gone."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "BROKEN")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    calls = []
+    _stub(monkeypatch, calls, fails=("BROKEN",))
+
+    mod.run_kalshi_odds_refresh()
+    state = mod._load_state() if hasattr(mod, "_load_state") else None
+    if state is not None:
+        entry = (state.get("series") or {}).get("BROKEN") or {}
+        assert entry.get("fetched_at") != entry.get("attempted_at")
+
+
+def test_an_empty_read_keeps_the_last_known_markets(monkeypatch):
+    """"Nothing open right now" is not "the previous prices were wrong".
+    Blanking on an empty read would delete a live series' prices the moment its
+    last market settled."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "A")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    calls = []
+    _stub(monkeypatch, calls)
+    first = mod.run_kalshi_odds_refresh()
+    assert len(first["markets"]) == 1
+
+    _stub(monkeypatch, calls, empty=("A",))
+    second = mod.run_kalshi_odds_refresh()
+    assert len(second["markets"]) == 1, "an empty read blanked the stored prices"
