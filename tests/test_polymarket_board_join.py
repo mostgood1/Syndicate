@@ -510,3 +510,141 @@ def test_segment_markets_are_sampled_separately_from_type_refusals():
     }]
     report = mod.join_polymarket_to_board(markets, [], selected_date="2026-08-28")
     assert "SPORTS_MARKET_TYPE_TOTAL|SEGMENT|nfl" in report["out_of_scope_counts"]
+
+
+# --------------------------------------------------------------------------
+# A board row the venue could not be paired with: both sides, not a count
+# --------------------------------------------------------------------------
+
+
+def _total_market(slug, line_prices=("0.5", "0.5")):
+    import json as _json
+    return {
+        "slug": slug, "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "outcomes": _json.dumps(["Over", "Under"]),
+        "outcomePrices": _json.dumps(list(line_prices)),
+        "orderPriceMinTickSize": "0.01", "minimumTradeQty": "1",
+    }
+
+
+def test_a_game_the_venue_never_listed_reports_an_EMPTY_offered_list():
+    """"The venue does not list this game" and "it lists it under a name we do
+    not recognise" need opposite responses, and shared a counter
+    (`no_matching_polymarket_market: 54`). An empty `offered` is the first."""
+    report = mod.join_polymarket_to_board(
+        [],
+        [{"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+          "away_team": "Minnesota Twins", "home_team": "Athletics",
+          "date": "2026-08-25", "event_id": "e1"}],
+        selected_date="2026-08-25",
+    )
+    sample = report["unmatched_samples"][0]
+    assert sample["kind"] == "no_candidates"
+    assert sample["offered"] == []
+    assert "Athletics" in sample["board"]
+
+
+def test_a_game_the_venue_DID_list_shows_what_it_offered():
+    """The other half. A populated `offered` beside a failed match means the
+    game IS there and the PAIRING failed -- a club-code or line question, not
+    a coverage one.
+
+    `Athletics` is the live example: the club moved, so `ath` / `oak` / `sac`
+    are all plausible venue spellings and our club map carries only `ATH`.
+    """
+    report = mod.join_polymarket_to_board(
+        [_total_market("tsc-mlb-min-sac-2026-08-25-10pt5")],
+        [{"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+          "away_team": "Minnesota Twins", "home_team": "Athletics",
+          "date": "2026-08-25", "event_id": "e1"}],
+        selected_date="2026-08-25",
+    )
+    sample = report["unmatched_samples"][0]
+    assert sample["kind"] == "no_match"
+    assert sample["offered"] == ["min-sac@10.5"], sample
+    assert sample["want"] == "totals|under|10.5"
+
+
+def test_the_unmatched_count_is_complete_while_the_sample_is_bounded():
+    """Same shape as every other work list added today: the sample teaches the
+    pattern, the count says how much of the board it costs."""
+    rows = [
+        {"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+         "away_team": f"Team {n}", "home_team": "Athletics",
+         "date": "2026-08-25", "event_id": f"e{n}"}
+        for n in range(7)
+    ]
+    report = mod.join_polymarket_to_board([], rows, selected_date="2026-08-25")
+    assert report["unmatched_counts"]["no_candidates|mlb|totals"] == 7
+    assert len(report["unmatched_samples"]) == 1
+
+
+def test_a_matched_row_is_not_sampled_as_unmatched():
+    """The control -- a work list that fills with successes is noise."""
+    report = mod.join_polymarket_to_board(
+        [_total_market("tsc-mlb-min-ath-2026-08-25-10pt5")],
+        [{"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+          "away_team": "Minnesota Twins", "home_team": "Athletics",
+          "date": "2026-08-25", "event_id": "e1"}],
+        selected_date="2026-08-25",
+    )
+    assert report["matched"] == 1
+    assert report["unmatched_samples"] == []
+
+
+# --------------------------------------------------------------------------
+# A club-code coincidence must not reclassify a sport out of itself
+# --------------------------------------------------------------------------
+
+
+def test_an_mlb_slug_is_not_reclassified_as_soccer_by_colliding_tri_codes():
+    """MEASURED 2026-08-25T18:49:14Z, in production, as a LOST POSITION.
+
+    `_effective_league` asked only whether BOTH clubs resolve as soccer clubs.
+    MLB tri-codes collide with soccer clubs:
+
+        min -> Minnesota United FC (MLS)   | Minnesota Twins
+        ath -> Athletic Club (Bilbao)      | Athletics
+        sd  -> San Diego FC                | San Diego Padres
+
+    So `tsc-mlb-min-ath-...` was indexed under league `soccer` while its MLB
+    board row looked up `mlb`, and the two could never meet. A `totals under
+    10.5` on Minnesota Twins @ Athletics reached the placer with
+    `venue_ticker=None`.
+
+    Tampa Bay @ Detroit filled minutes earlier from the same code path, because
+    `tb` and `det` happen not to collide -- which is why this read as
+    intermittent coverage rather than as a rule.
+    """
+    assert mod._effective_league(mod.parse_slug("tsc-mlb-min-ath-2026-08-25-10pt5")) == "mlb"
+    assert mod._effective_league(mod.parse_slug("aec-mlb-sd-pit-2026-08-25")) == "mlb"
+
+
+def test_the_colliding_game_now_joins_end_to_end():
+    """The failure the user reported, as a join test."""
+    report = mod.join_polymarket_to_board(
+        [_total_market("tsc-mlb-min-ath-2026-08-25-10pt5")],
+        [{"sport": "mlb", "market": "totals", "side": "under", "line": 10.5,
+          "away_team": "Minnesota Twins", "home_team": "Athletics",
+          "date": "2026-08-25", "event_id": "e1"}],
+        selected_date="2026-08-25",
+    )
+    assert report["matched"] == 1, report["refusals"]
+
+
+def test_a_real_soccer_competition_token_still_resolves_to_soccer():
+    """The behaviour `e27812117` added is preserved and is the reason for an
+    ALLOWLIST rather than a soccer denylist: Polymarket names soccer per
+    COMPETITION (`eflc`), Syndicate stamps every soccer row `sport="soccer"`,
+    and a competition token we have never seen must still be able to reach the
+    soccer test."""
+    parsed = mod.parse_slug("tsc-eflc-lee-bur-2026-08-25-2pt5")
+    assert mod._effective_league(parsed) == "soccer"
+
+
+def test_every_sport_syndicate_models_is_protected():
+    """A club-code coincidence in ANY modelled sport must not move it. NBA and
+    WNBA share tri-codes with each other and with soccer clubs."""
+    for token in ("mlb", "nba", "wnba", "nfl", "nhl", "ncaaf", "ncaab"):
+        parsed = mod.parse_slug(f"tsc-{token}-min-ath-2026-08-25-10pt5")
+        assert mod._effective_league(parsed) == token, token

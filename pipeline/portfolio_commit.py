@@ -205,6 +205,20 @@ def _polymarket_price_resolver(selected_date: str | None):
     # QUESTION, which is the only field that says what the bet actually is --
     # `SPORTS_MARKET_TYPE_PROP` turned out to include League of Legends map
     # winners, so the family cannot be named from its type alone.
+    # BOARD ROWS THE VENUE COULD NOT BE PAIRED WITH. A `totals under 10.5` on
+    # Minnesota Twins @ Athletics reached the placer with `venue_ticker=None`
+    # on 2026-08-25T18:49:14Z because nothing was stamped here -- and the join
+    # reported it only as `no_matching_polymarket_market: 54`. This prints what
+    # the BOARD wanted beside what the VENUE offered for the same league, date
+    # and market, so "not listed" and "listed under a name we do not know" stop
+    # sharing a number.
+    if joined.get("unmatched_counts"):
+        print(
+            "[portfolio_commit] POLYMARKET_UNMATCHED"
+            f" counts={joined.get('unmatched_counts')}"
+            f" samples={joined.get('unmatched_samples')}",
+            flush=True,
+        )
     if joined.get("out_of_scope_counts"):
         print(
             "[portfolio_commit] POLYMARKET_OUT_OF_SCOPE"

@@ -155,6 +155,14 @@ def _line_from_modifiers(modifiers: Sequence[str]) -> float | None:
     return None
 
 
+# League tokens that are definitively NOT soccer, so a club-code coincidence
+# cannot reclassify them. These are the sports Syndicate models with their own
+# board rows; anything else still reaches the soccer test below.
+_NON_SOCCER_LEAGUE_TOKENS = frozenset({
+    "mlb", "nba", "wnba", "nfl", "nhl", "ncaaf", "ncaab", "ncaabb",
+})
+
+
 def _effective_league(parsed: Mapping[str, Any]) -> str:
     """The slug's own league token, UNLESS both clubs resolve as soccer clubs.
 
@@ -183,6 +191,37 @@ def _effective_league(parsed: Mapping[str, Any]) -> str:
     league = str(parsed.get("league") or "")
     if league == "soccer":
         return league
+
+    # A LEAGUE TOKEN WE ALREADY KNOW IS NOT SOCCER ENDS THE QUESTION HERE.
+    #
+    # This function's own docstring promised exactly that -- "so mlb/nfl/nba/
+    # wnba/nhl are not touched by this at all" -- and the code never checked
+    # the token. It asked only whether BOTH clubs resolve as soccer clubs, and
+    # MLB tri-codes collide with soccer clubs:
+    #
+    #     min -> Minnesota United FC (MLS)      | Minnesota Twins
+    #     ath -> Athletic Club (Bilbao)         | Athletics
+    #     sd  -> San Diego FC                   | San Diego Padres
+    #
+    # So `tsc-mlb-min-ath-2026-08-25-10pt5` was indexed under league `soccer`
+    # while its MLB board row looked up `mlb`, and the two could never meet.
+    #
+    # MEASURED 2026-08-25T18:49:14Z, in production, as a lost position: a
+    # `totals under 10.5` on Minnesota Twins @ Athletics reached the placer
+    # with `venue_ticker=None` because the join never paired it --
+    # `POLYMARKET_NO_SLUG ... (type=NoneType)`. Tampa Bay @ Detroit filled
+    # minutes earlier from the same code path, because `tb` and `det` happen
+    # not to collide. The bug was invisible for exactly that reason: it hits
+    # only the games whose codes overlap, so it reads as intermittent coverage
+    # rather than as a rule.
+    #
+    # An explicit allowlist rather than a soccer denylist: a new Polymarket
+    # competition token we have never seen should still be ABLE to reach the
+    # soccer test, while a sport we model can never be reclassified out of
+    # itself by a club-code coincidence.
+    if league in _NON_SOCCER_LEAGUE_TOKENS:
+        return league
+
     try:
         from syndicate.features.shared.team_aliases import canonical_team
     except Exception:
@@ -312,6 +351,57 @@ def join_polymarket_to_board(
     out_of_scope_samples: list[dict[str, Any]] = []
     out_of_scope_seen: set[str] = set()
 
+    # A BOARD ROW THE VENUE COULD NOT BE PAIRED WITH -- BOTH SIDES, NOT A COUNT.
+    #
+    # MEASURED 2026-08-25T18:49:14Z: a `totals under 10.5` position on Minnesota
+    # Twins @ Athletics reached the placer with `venue_ticker=None`, because
+    # nothing was ever stamped at commit time:
+    #
+    #   POLYMARKET_NO_SLUG -- venue_ticker unset (type=NoneType)
+    #   LIVE_ORDER rejected market=totals side=under line=10.5
+    #
+    # The order path was right to refuse; the gap is the JOIN. And the join
+    # reported it as `no_matching_polymarket_market: 54` -- a number with no
+    # way to tell "the venue does not list this game" from "the venue lists it
+    # under a name we do not recognise". Those need opposite responses, and
+    # guessing between them is what has cost this session repeatedly.
+    #
+    # `Athletics` is a live example of why the distinction matters: the club
+    # moved, so `ATH` / `OAK` / `SAC` are all plausible venue spellings and our
+    # club map carries only `ATH`. This prints what the BOARD wanted beside the
+    # blobs the VENUE offered for the same league, date and market, so the
+    # answer is read rather than inferred.
+    unmatched_counts: dict[str, int] = {}
+    unmatched_samples: list[dict[str, Any]] = []
+    unmatched_seen: set[str] = set()
+
+    def _note_unmatched(
+        kind: str,
+        board_row: Mapping[str, Any],
+        board_market: str,
+        league: str,
+        date: str,
+        candidates: Sequence[Mapping[str, Any]],
+    ) -> None:
+        key = f"{kind}|{league}|{board_market}"
+        unmatched_counts[key] = unmatched_counts.get(key, 0) + 1
+        if key in unmatched_seen or len(unmatched_samples) >= 10:
+            return
+        unmatched_seen.add(key)
+        unmatched_samples.append({
+            "kind": kind,
+            "board": f"{board_row.get('away_team')} @ {board_row.get('home_team')}"[:52],
+            "want": f"{board_market}|{board_row.get('side')}|{board_row.get('line')}",
+            "date": date,
+            # WHAT THE VENUE HAD for the same league/date/market. Empty means it
+            # listed nothing; a populated list beside a failed match means the
+            # game is there and the PAIRING is what failed.
+            "offered": [
+                f"{c['parsed']['away']}-{c['parsed']['home']}@{c.get('line')}"
+                for c in list(candidates)[:5]
+            ],
+        })
+
     def _note_out_of_scope(venue_type: str, parsed: Mapping[str, Any], row: Mapping[str, Any]) -> None:
         key = f"{venue_type}|{parsed.get('league')}"
         out_of_scope_counts[key] = out_of_scope_counts.get(key, 0) + 1
@@ -419,6 +509,7 @@ def join_polymarket_to_board(
         ).strip()
         candidates = index.get((league, date, board_market)) or []
         if not candidates:
+            _note_unmatched("no_candidates", board_row, board_market, league, date, [])
             refuse("no_polymarket_market_for_league_date_market")
             continue
 
@@ -443,6 +534,9 @@ def join_polymarket_to_board(
             picked = candidate
         if picked is None:
             if "ambiguous_polymarket_match" not in refusals or refusals.get("ambiguous_polymarket_match", 0) == 0:
+                _note_unmatched(
+                    "no_match", board_row, board_market, league, date, candidates
+                )
                 refuse("no_matching_polymarket_market")
             continue
 
@@ -492,6 +586,11 @@ def join_polymarket_to_board(
             sorted(out_of_scope_counts.items(), key=lambda kv: -kv[1])
         ),
         "out_of_scope_samples": out_of_scope_samples,
+        # Board rows the venue could not be paired with, both sides shown.
+        "unmatched_counts": dict(
+            sorted(unmatched_counts.items(), key=lambda kv: -kv[1])
+        ),
+        "unmatched_samples": unmatched_samples,
     }
 
 
