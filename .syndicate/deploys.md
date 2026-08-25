@@ -28941,6 +28941,60 @@ Third guard today that could not read its own input.
 
 ---
 
+## 2026-08-25 — `live-odds-worker` + `web` `2108449508`: real execution caps ($10/$50/$100/$150/15), by explicit user decision
+
+**Deployed:** PR #62 (`claude/exchange-market-apis-jr2lqy` → `main`, squash-merged
+`21084495085a5cb7e52f3d7422955a970defd931`).
+- `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`): deploy `dep-da6un8vavr4c739nkvm0`,
+  live. Claim held/released by `exchange-markets-api-integration`.
+- `web` (`srv-d88ahvrbc2fs73eodu30`): deploy `dep-da6usprncjis73a84ee0`, triggered
+  (build in progress at time of this entry; low-risk, request-serving only, no
+  background jobs to interrupt). Claim held/released.
+- `refresh-worker` deliberately NOT redeployed — it never calls
+  `execute_portfolio`/`execution_guard`, so this change is inert there; no reason
+  to touch a service with unrelated live jobs.
+
+**Preflight, without `RENDER_API_KEY`:** `scripts/deploy_preflight.py` needs
+`RENDER_API_KEY`, unavailable in this sandbox. Substituted a manual equivalent via
+the Render MCP's own log/service reads before triggering: `live-odds-worker` was
+mid a routine soccer live-lens tick only (65% memory, no kill-risk job); a
+`refresh-worker` `MLB_DAILY_SIM_ORPHANED` line was from a restart that had ALREADY
+happened at 18:57:23Z, before this deploy — not something this deploy caused, and
+refresh-worker wasn't touched anyway. `web`'s only prior sample was 4 days stale;
+accepted because web has no background jobs to interrupt (architecture doc: "the
+web service does no heavy computation").
+
+**Env vars updated on `live-odds-worker`** (merge, not replace — nothing else on
+the service touched): `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI=50`,
+`SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_POLYMARKET=100`,
+`SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES=150` (was `80`). The pre-existing
+flat `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS=40` was left in place deliberately — the
+per-venue override wins ahead of it in `limits()`'s own precedence, so it is now
+inert for Kalshi/Polymarket specifically; touching it further would have been an
+unrequested extra write with no effect.
+
+**verify:** `[execute_portfolio] LIMITS`/`[live_odds_worker] EXECUTION` lines,
+19:35:27–19:35:28Z (after both the deploy and the env-var update landed):
+
+```
+venue=kalshi     caps={max_order_dollars: 10.0, max_day_dollars: 50.0,  max_day_orders: 10, max_day_dollars_all_venues: 150.0, max_day_orders_all_venues: 15}
+venue=polymarket caps={max_order_dollars: 10.0, max_day_dollars: 100.0, max_day_orders: 10, max_day_dollars_all_venues: 150.0, max_day_orders_all_venues: 15}
+```
+
+Matches the stated policy exactly. **Before this deploy** (measured
+17:59–18:33Z, same day, pre-existing production config): `max_day_dollars: 40.0`
+identical for both venues, `max_day_dollars_all_venues: 80.0`, no
+`max_day_orders_all_venues` key at all — confirming the user's env vars had
+drifted from the stated real policy (flat $40/day survive-being-wrong config, not
+$50/$100 real funded amounts) until this fix.
+
+**Not yet independently reverified:** `web`'s deploy was still `build_in_progress`
+when this entry was written; the code is identical to what's already confirmed
+live on `live-odds-worker`; no reason to expect a different result but the read
+wasn't done.
+
+---
+
 ## 2026-08-25 — the Kalshi artifact writes again: 8.7MB rejected -> 2.57MB written
 
 **verify:** `[refresh_state_store]` at `19:36:24Z`, refresh-worker instance
