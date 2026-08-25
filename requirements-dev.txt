@@ -5,6 +5,17 @@
 # whose `<testcase classname= name=>` shape has been stable across 7.x and 8.x.
 pytest>=7.4,<10.0
 
+# Parallel worker processes for the `pytest-baseline` CI job.
+# `.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`: measured 3.7x
+# (45min -> 12min) on the same 4 cores GitHub's `ubuntu-latest` provisions,
+# with `--dist=loadscope` (keeps one test FILE's cases in one worker, rather
+# than interleaving across files the way the default `--dist=load` would --
+# safer against this suite's existing module-level-state test-order
+# sensitivity, not a fix for it). Installed via its OWN targeted grep in
+# `ci.yml`, same pattern as the bare `pytest` line above, so psutil/playwright
+# below still never reach that job.
+pytest-xdist>=3.6,<4.0
+
 playwright>=1.45,<2.0
 
 # Process enumeration for LOCAL diagnostics on Windows.
