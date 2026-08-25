@@ -1991,6 +1991,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `_polymarket_resolve_market` to find it. Merged into this branch cleanly,
   121 tests green. Not independently live-verified by this session -- that
   lane's own claim and its own verification to run.
+- **KXMLBGAME ROOT CAUSE FOUND AND FIXED (PR #57), VERIFIED LIVE END TO END,
+  2026-08-25 -- SUPERSEDES this lane's own earlier "kalshi_moneylines_resolved=0
+  is correct, not a bug" conclusion, which was WRONG, disproven by the user
+  directly (a live kalshi.com screenshot of a real $6.7M-volume moneyline
+  market the scan said didn't exist).** Root cause: Kalshi's real series-level
+  title for `KXMLBGAME` is exactly `"Professional Baseball Game"` -- no
+  "moneyline"/"winner" word in it, so `market_keys._GAME_CORE` (missing an
+  entry for the bare word "game") never let `auto_game_series_from_catalogue()`
+  register the series at all. The market was never fetched into
+  `kalshi_markets.json`, not merely misclassified -- invisible upstream of
+  `classify_market` entirely. **Not MLB-specific**: the same live 13,445-series
+  catalogue read showed `"<Sport> Game"` is Kalshi's moneyline-series title
+  pattern for every sport this repo carries (NFL/NBA/NHL/NCAAF/MLS/NCAAB/...),
+  so the platform's single most valuable market type was silently unreachable
+  everywhere, not just baseball. Fix: one line, `"game": "h2h"` in
+  `syndicate/features/shared/market_keys.py`'s `_GAME_CORE`. New regression
+  test in `tests/test_kalshi_catalogue.py`. 269 targeted tests green.
+  **VERIFIED LIVE 2026-08-25T01:23:01Z**, deploy `dep-da6ek8gu01pc73fqf120`:
+  production's own `[kalshi_odds] TICK` fetched `KXMLBGAME` for the first time
+  ever (90 markets, sample title `'New York M wins'`), and `classify_market()`
+  confirmed locally now returns `grammar: 'moneyline'` for it where it refused
+  `unmapped_series` before the fix. Full chain fixed end to end: catalogue ->
+  discovery -> per-series fetch -> persisted artifact -> classify_market ->
+  moneyline grammar. Probe flag off, redeploy `dep-da6etfn10e5c73bfgu0g`
+  triggered 01:24:14Z, deploy claim (refresh-worker, token `bc8c0dd024576cec`)
+  to be released once confirmed live. Full readout `.syndicate/deploys.md`
+  same timestamp. **OWED**: a fresh arb-scan run's own
+  `kalshi_moneylines_resolved`/`matched_games` was not re-verified nonzero in
+  this session (the scan's last run predates the 01:23:01Z fetch tick) --
+  mechanism is proven at every hop, but the scan's own end-to-end number is
+  the next natural check for whoever picks this back up.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
