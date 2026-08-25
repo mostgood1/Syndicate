@@ -122,19 +122,45 @@ def contracts_for_stake(stake_dollars: float, price_dollars: float) -> int:
     return int(count)
 
 
-def _side_to_kalshi(side: Any) -> str:
-    """Our `over`/`under`/`yes`/`no` -> Kalshi's `yes`/`no`.
+# Board markets whose SIDE names a TEAM rather than a direction. On these the
+# contract is chosen by WHICH TICKER, not by yes/no -- see `_side_to_kalshi`.
+_TEAM_SIDED_MARKETS = frozenset({"h2h", "h2h_h1", "h2h_h2", "h2h_q1", "h2h_q2",
+                                 "h2h_q3", "h2h_q4", "h2h_p1", "h2h_p2", "h2h_p3"})
+
+
+def _side_to_kalshi(side: Any, market: Any = None) -> str:
+    """Our `over`/`under`/`yes`/`no`/`home`/`away` -> Kalshi's `yes`/`no`.
 
     Explicit, and it REFUSES an unmapped side. Defaulting to `yes` would turn an
     unrecognised side into a real bet on the opposite outcome -- the single most
     expensive silent default available in this file.
+
+    A MONEYLINE SIDE NAMES A TEAM, AND THE TEAM IS ALREADY IN THE TICKER.
+    Confirmed by the user 2026-08-25 from Kalshi's own order URLs -- one market
+    PER TEAM, each offering a BUY on both legs:
+
+        KXMLBGAME-26AUG251840BOSMIA-BOS   op_order_side=yes  op_side=BUY
+        KXMLBGAME-26AUG251840BOSMIA-MIA   op_order_side=yes  op_side=BUY
+
+    So backing Miami is `BUY YES` on the `-MIA` contract, not a NO or an ask on
+    the `-BOS` one. `kalshi_board_join` already keys a match on `board_side` and
+    stamps the ticker of the team that side names, so by the time an order is
+    built the contract IS our team and the leg is always YES.
+
+    THIS IS SAFE ONLY BECAUSE THE TICKER IS PER-TEAM, which is why it is
+    restricted to the moneyline family. Reading `home` as `yes` on a market
+    whose ticker did NOT encode our team would buy the opponent -- so a totals
+    or spread row still refuses, and `home`/`away` on anything outside
+    `_TEAM_SIDED_MARKETS` raises exactly as before.
     """
     raw = str(side or "").strip().lower()
     if raw in {"yes", "over"}:
         return "yes"
     if raw in {"no", "under"}:
         return "no"
-    raise OrderBuildError(f"unmappable_side: {side!r}")
+    if raw in {"home", "away"} and str(market or "").strip().lower() in _TEAM_SIDED_MARKETS:
+        return "yes"
+    raise OrderBuildError(f"unmappable_side: {side!r} market={market!r}")
 
 
 def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
@@ -150,7 +176,7 @@ def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str,
         # means deriving it from a catalogue that may have moved since we priced.
         raise OrderBuildError("no_venue_ticker")
 
-    side = _side_to_kalshi(getattr(request, "side", None))
+    side = _side_to_kalshi(getattr(request, "side", None), getattr(request, "market", None))
     price = price_dollars
     if price is None:
         raise OrderBuildError("no_price_dollars")
@@ -283,7 +309,9 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
     #   "bid means buy YES, ask means sell YES. (Selling YES is economically
     #    equivalent to buying NO at 1 - price, but this endpoint quotes
     #    everything from the YES side.)"
-    contract_side = _side_to_kalshi(getattr(request, "side", None))
+    contract_side = _side_to_kalshi(
+        getattr(request, "side", None), getattr(request, "market", None)
+    )
     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
 
     if contract_side == "yes":

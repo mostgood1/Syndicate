@@ -791,3 +791,70 @@ def test_the_diagnostic_never_masks_the_real_error(monkeypatch):
     with pytest.raises(orders.OrderBuildError) as excinfo:
         orders.submit_order(_request(), price_dollars=0.55)
     assert "real_reason" in str(excinfo.value), str(excinfo.value)
+
+
+def test_a_moneyline_side_buys_YES_on_our_own_teams_contract():
+    """CONFIRMED BY THE USER 2026-08-25 from Kalshi's own order URLs. One market
+    PER TEAM, each offering a BUY on both legs:
+
+        KXMLBGAME-26AUG251840BOSMIA-BOS   op_order_side=yes  op_side=BUY
+        KXMLBGAME-26AUG251840BOSMIA-MIA   op_order_side=yes  op_side=BUY
+
+    So backing Miami is BUY YES on `-MIA`, not a NO or an ask on `-BOS`. The
+    join already keys a match on `board_side` and stamps the ticker of the team
+    that side names, so by order-build time the contract IS our team and the
+    leg is always YES.
+
+    Before this, `home`/`away` raised `unmappable_side` and no moneyline could
+    build an order at all -- untested because every h2h had already failed
+    upstream on a missing ticker.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    assert _side_to_kalshi("home", "h2h") == "yes"
+    assert _side_to_kalshi("away", "h2h") == "yes"
+    # The period moneylines are the same shape.
+    assert _side_to_kalshi("home", "h2h_h1") == "yes"
+
+
+def test_a_team_side_on_a_NON_team_ticker_still_refuses():
+    """THE GUARD THAT MAKES THE ABOVE SAFE, and the reason it is restricted to
+    the moneyline family.
+
+    A totals ticker encodes a STRIKE (`KXMLBTOTAL-...-10`), not a team. Reading
+    `home` as `yes` there would buy a market that has nothing to do with our
+    side -- so it must keep raising. `home` on a total is a defect upstream,
+    and a defect that refuses is worth far more than one that guesses.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    for market in ("totals", "totals_alt", "spreads", "batter_hits", None, ""):
+        with pytest.raises(orders.OrderBuildError, match="unmappable_side"):
+            _side_to_kalshi("home", market)
+
+
+def test_the_direction_sides_are_untouched_by_the_moneyline_path():
+    """over/under must keep mapping exactly as before -- the moneyline rule is
+    additive, not a rewrite of the leg selection every other market uses."""
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    assert _side_to_kalshi("over", "totals") == "yes"
+    assert _side_to_kalshi("under", "totals") == "no"
+    assert _side_to_kalshi("over", "h2h") == "yes"
+    assert _side_to_kalshi("yes", None) == "yes"
+    assert _side_to_kalshi("no", None) == "no"
+
+
+def test_a_moneyline_order_body_is_a_BID_not_an_ask():
+    """END TO END: the whole point of the workaround. An `ask` is what every
+    failed Kalshi order today was (`market_not_found`, twice); a moneyline must
+    never take that path."""
+    import dataclasses
+
+    request = dataclasses.replace(
+        _request(), market="h2h", side="home", line=None,
+        venue_ticker="KXMLBGAME-26AUG251840BOSMIA-MIA",
+    )
+    body = orders.order_body_v2(request, price_dollars=0.55)
+    assert body["side"] == "bid", body
+    assert body["ticker"] == "KXMLBGAME-26AUG251840BOSMIA-MIA"
