@@ -1534,23 +1534,52 @@ def _run_execution_tick() -> None:
         # books, carrying no Kalshi ticker, that only the order builder stopped.
         # `run_execution` now refuses live mode without a scope, so this is the
         # explicit half of a guard that fails closed on both sides.
-        venue = str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").strip().lower()
-        result = run_execution(central_today_iso(), venue_scope=venue or None)
-        print(
-            "[live_odds_worker] EXECUTION"
-            f" status={result.get('status')}"
-            f" reason={result.get('reason')}"
-            f" mode={result.get('mode')}"
-            f" venue={result.get('venue')}"
-            f" placed={result.get('placed')}"
-            f" duplicates={result.get('duplicates')}"
-            # Named refusals, so a cap that stopped a good slate and a plan with
-            # nothing bettable never share a number.
-            f" refused={result.get('refused')}"
-            f" spent={result.get('spent')}"
-            f" limits={result.get('limits')}",
-            flush=True,
-        )
+        #
+        # A LIST, NOT ONE VENUE. This was read as a single string, so exactly
+        # one venue could ever place -- Kalshi held the slot, and Polymarket US
+        # could not transact no matter how complete its order path was. Comma
+        # separated now, and one venue is still a list of one, so nothing
+        # already configured changes meaning.
+        #
+        # RUN IN TURN, NOT POOLED. Each venue reads its OWN venue-restricted
+        # plan (`read_portfolio_plan_for_venue`), because a position in
+        # kalshi's plan is a claim that KALSHI quotes that market -- exactly
+        # the category error `LIVE_WITHOUT_VENUE_SCOPE` refuses. One call per
+        # venue is the only shape that keeps that true.
+        #
+        # ORDER IS THE CONFIGURED ORDER, and it is load-bearing whenever the
+        # account-wide cap binds: the first venue listed gets first call on the
+        # shared daily budget. Stated because it is a real allocation decision
+        # hiding inside a string.
+        venues = [
+            part.strip().lower()
+            for part in str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").split(",")
+            if part.strip()
+        ]
+        # `[None]` preserves the previous unscoped call exactly: live mode
+        # refuses without a scope, and paper mode wants the unrestricted plan.
+        for venue in venues or [None]:
+            result = run_execution(central_today_iso(), venue_scope=venue)
+            print(
+                "[live_odds_worker] EXECUTION"
+                f" status={result.get('status')}"
+                f" reason={result.get('reason')}"
+                f" mode={result.get('mode')}"
+                f" venue={result.get('venue')}"
+                # The venue ASKED FOR, beside the venue the ledger recorded.
+                # They differ when a venue has no plan, and "placed nothing
+                # because there was no plan" must not read the same as "placed
+                # nothing because the caps said no".
+                f" scope={venue}"
+                f" placed={result.get('placed')}"
+                f" duplicates={result.get('duplicates')}"
+                # Named refusals, so a cap that stopped a good slate and a plan
+                # with nothing bettable never share a number.
+                f" refused={result.get('refused')}"
+                f" spent={result.get('spent')}"
+                f" limits={result.get('limits')}",
+                flush=True,
+            )
     except Exception as exc:
         # A placer that raises must not take down the odds refresh this worker
         # exists for. Named, because a silent absence and a crashed placer are

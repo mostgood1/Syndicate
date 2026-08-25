@@ -126,6 +126,28 @@ def limits(mode: str | None = None) -> dict[str, Any]:
             "SYNDICATE_EXECUTION_MAX_DAY_ORDERS",
             _DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS,
         ),
+        # THE ACCOUNT-WIDE CEILING, ACROSS EVERY VENUE AT ONCE.
+        #
+        # `max_day_dollars` is enforced PER VENUE -- `spent_today` filters on
+        # `order.venue`, deliberately, so one venue's budget is not consumed by
+        # another's. That is right for comparing books and WRONG as a statement
+        # about the account: with a $40 day cap, one live venue risks $40 and
+        # two risk $80, and the number nobody edited is the one that moved.
+        #
+        # Adding a venue must not raise total exposure by default. So this
+        # DEFAULTS TO `max_day_dollars` -- the same figure, now meaning what a
+        # reader already assumed it meant -- and only an explicit
+        # SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES raises it. Turning on a
+        # second venue then splits one budget instead of duplicating it, which
+        # is a decision someone can make on purpose rather than one that
+        # happens to them.
+        "max_day_dollars_all_venues": _float_env(
+            "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES",
+            _float_env(
+                "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS",
+                _DEFAULT_PAPER_MAX_DAY_DOLLARS if paper else _DEFAULT_MAX_DAY_DOLLARS,
+            ),
+        ),
     }
 
 
@@ -272,6 +294,24 @@ def check_order(
             "limits": caps,
         }
 
+    # ACROSS EVERY VENUE. Read separately and NEVER from `already`, which the
+    # caller computes per venue -- passing it here would make the account-wide
+    # cap read one venue's spend and agree with itself.
+    #
+    # A distinct reason string, because "this venue is done for the day" and
+    # "the account is done for the day" call for different responses and a
+    # shared name would hide which one stopped the slate.
+    all_venues = spent_today(selected_date, venue=None, mode=resolved_mode)
+    if float(all_venues.get("dollars") or 0.0) + stake > caps["max_day_dollars_all_venues"]:
+        return {
+            "allowed": False,
+            "reason": "over_max_day_dollars_all_venues",
+            "stake": stake,
+            "already": used,
+            "already_all_venues": all_venues,
+            "limits": caps,
+        }
+
     if resolved_mode == LIVE:
         # Checked LAST among the live-only gates but before anything is placed,
         # and checked again immediately before submit by `guarded_submit`.
@@ -279,7 +319,13 @@ def check_order(
         if switch.get("engaged"):
             return {"allowed": False, "reason": "kill_switch", "switch": switch, "limits": caps}
 
-    return {"allowed": True, "reason": None, "limits": caps, "already": used}
+    return {
+        "allowed": True,
+        "reason": None,
+        "limits": caps,
+        "already": used,
+        "already_all_venues": all_venues,
+    }
 
 
 class KillSwitchEngaged(RuntimeError):
