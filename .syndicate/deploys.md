@@ -27825,3 +27825,87 @@ verified until those two lines are read.
 Caveat on the window: 04:15Z is 23:15 Central on 08-24. If the slate finishes
 before a build lands, the measurement waits for the next live slate. Say that
 rather than reading a quiet board as a pass.
+
+### verify: MEASURED 2026-08-25 04:21-04:22Z, refresh-worker `40d14abf2`
+
+**The benchmark rewrite fires, and the pregame control is clean.**
+
+    GRID_REPRICE mlb    sides_seen=1390  repriced=28  benchmark_rows=3
+      skipped={'not_live': 420, 'venue_did_not_price_every_side': 151, 'not_two_sided': 242}
+    GRID_REPRICE wnba   sides_seen=1247  repriced=10  benchmark_rows=3
+    GRID_REPRICE nfl    sides_seen=2710  repriced=442 benchmark_rows=0
+      skipped={'not_live': 1352}
+    GRID_REPRICE soccer sides_seen=10523 repriced=0   benchmark_rows=0
+
+Counters reconcile exactly: mlb 420+151+242+3 = 816 = `PREGAME_PROJECTION_JOIN
+considered`. **NFL is the control and it behaves**: 442 sides re-priced, ZERO
+benchmarks touched, every row refused `not_live`. A pregame board keeps its
+multi-book median, which is the first condition and the one most likely to have
+been wrong.
+
+**The refusal moved, on MLB rows specifically.**
+
+| | before (03:5xZ) | after (04:22Z) |
+|---|---|---|
+| polymarket plan `rows_in` | 14 (all mlb) | 5 (all mlb) |
+| ...of which `no_model_edge_pct` | **14 — 100%** | **3 — 60%** |
+| ...reaching an EV test | 0 | 2 |
+| master `PLAN_WRITTEN sized=` | 0 | **1** |
+| mlb board `age_p50s` | hours | **298s** |
+
+**Two live MLB rows now carry a usable model edge where zero did.** Small, and
+attributable: `benchmark_rows=3` on mlb, 2 of 5 board rows past the bound. The
+same scale, which is what a real fix looks like rather than a threshold moving.
+
+**STATED SO IT IS NOT OVER-READ.** The master plan's `no_model_edge_pct` fell
+4/14 from 14/14, but the board's COMPOSITION also changed — 14 mlb rows became
+5 mlb + 9 soccer as games ended. Soccer is pregame and all 9 carry an edge, so
+most of that headline improvement is composition, not this change. The
+venue-scoped polymarket plan (mlb only, 5 rows) is the honest comparison and it
+is the 100% -> 60% above.
+
+**`positions=0`, and the reasons are now ORDINARY ones.**
+
+    PLAN_WRITTEN rows_in=14 sized=1 positions=0 bankroll=$250.0
+      refusals={'below_min_ev_pct': 8, 'below_min_stake': 1,
+                'no_model_edge_pct': 4, 'zero_kelly_stake': 1}
+
+`below_min_ev_pct` is the largest bucket now. That is a board saying *there is
+no bet here*, which is the answer a live-vs-live comparison SHOULD give: the
+35-point edges were the vintage gap, and removing it removes them. A market
+whose model and price are both current does not offer 35 points.
+
+Window caveat: 04:22Z is 23:22 Central. `POLYMARKET_BOARD_JOIN` shapes read
+`prices: ["0.005"]` and `["0.01"]` on MLB moneylines — near-settled markets on a
+slate that is ending. Zero positions tonight is expected regardless of this
+change, and must NOT be read as either a pass or a failure of it.
+
+### THREE THINGS THE NEW INSTRUMENTS SURFACED IMMEDIATELY
+
+1. **`053d336e8`'s counter is finally READ, and it is total.**
+   `oddsapi mlb {'status': 'no_rows', 'reason': 'no_side_in_key:1201'}` — ALL
+   1,201 MLB shard entries carry no side in the key, so OddsAPI contributes
+   zero MLB quotes. Soccer works on the same code (290 quotes, 42s,
+   `no_side_in_key:8`). MLB's shard shape is the gap, not the parser.
+
+2. **WNBA has NO live model at all** — a producer gap, newly named:
+   `LIVE_GAMELINE_JOIN sport=wnba index=0 considered=184 projected=0
+   withheld=184 why={'no_live_gameline_projection': 166}`, and
+   `LIVE_PROJECTION_JOIN sport=wnba reason=live-lens snapshot for wnba carries
+   no liveProps (producer not wired)`. Index size ZERO with 184 rows asking is
+   exactly the distinction this line was added to make, and it took one build.
+
+3. **NFL has a real team-alias gap.** `GAME_STATE_JOIN sport=nfl chips=29
+   rows_matched=141 unmatched=['Seattle Seahawks', 'Tennessee Titans', 'Los
+   Angeles Rams', 'Cincinnati Bengals', ...]` — full team names unmatched, on
+   the sport with 416 opportunities.
+
+### STILL OPEN AFTER THIS
+
+- `venue_did_not_price_every_side: 151` (mlb) / `317` (wnba) is now the
+  DOMINANT refusal on live rows. Polymarket priced one leg and not the other,
+  so 10 of MLB's 13 priceable game lines still carry a pregame benchmark. That
+  is the next lever and it is a COVERAGE question, not a mechanism one.
+- Polymarket spreads still refuse: `spreads_refused:237` (mlb), `992` (nfl),
+  `32` (wnba); `outcomes_count_mismatch: 80` in the board join. Needs
+  `marketSides`, which the venue returns and `_SLATE_STORAGE_FIELDS` drops.
