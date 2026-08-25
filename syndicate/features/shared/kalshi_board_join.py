@@ -509,6 +509,8 @@ def join_kalshi_to_board(
     # list. Series already sampled, for the same reason blobs are deduplicated.
     unreadable_titles: list[dict[str, Any]] = []
     unreadable_series: set[str] = set()
+    # Complete, not sampled: which series refuse and how many each.
+    unreadable_by_series: dict[str, int] = {}
 
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
@@ -543,6 +545,16 @@ def join_kalshi_to_board(
                 # market the rejected live order wanted -- from being buried
                 # under whichever series happens to be largest.
                 series = str(market.get("series") or "").strip()
+                # THE COMPLETE PER-SERIES COUNT, beside the bounded sample.
+                #
+                # The sample is one title per series capped at 10, which names
+                # the GRAMMAR but cannot answer "is series X in here at all" --
+                # and that is the question that matters when a specific market
+                # family is missing. Measured 2026-08-25T16:56:46Z, the sample
+                # returned 10 series and `KXMLBGAME` (the moneyline) was not
+                # among them, which is not evidence either way while more than
+                # 10 series refuse. A count is small, complete, and settles it.
+                unreadable_by_series[series] = unreadable_by_series.get(series, 0) + 1
                 if series not in unreadable_series and len(unreadable_titles) < 10:
                     unreadable_series.add(series)
                     unreadable_titles.append(
@@ -870,6 +882,11 @@ def join_kalshi_to_board(
         "kalshi_key_sample": kalshi_keys,
         # One refused title per series: what grammar is missing, not how many.
         "unreadable_titles": unreadable_titles,
+        # ...and how many per series, complete, so a family that is ABSENT can
+        # be distinguished from one the bounded sample simply did not reach.
+        "unreadable_by_series": dict(
+            sorted(unreadable_by_series.items(), key=lambda kv: -kv[1])
+        ),
         "board_key_sample": board_keys,
         "board_market_vocabulary": dict(
             sorted(board_markets.items(), key=lambda kv: -kv[1])[:12]

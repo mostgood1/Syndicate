@@ -767,7 +767,11 @@ def join_to_board(
     if report.get("unreadable_titles"):
         print(
             "[kalshi_odds] JOIN_TITLES"
-            f" unreadable={report.get('unreadable_titles')}",
+            f" unreadable={report.get('unreadable_titles')}"
+            # The COMPLETE per-series count, which the bounded sample cannot
+            # give: it answers "is this market family refusing here at all",
+            # where the sample can only answer "what does one of them say".
+            f" by_series={report.get('unreadable_by_series')}",
             flush=True,
         )
     if report.get("unmatched_events"):

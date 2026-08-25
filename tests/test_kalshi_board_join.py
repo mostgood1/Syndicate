@@ -818,3 +818,36 @@ def test_a_title_the_catalogue_CAN_read_is_not_sampled():
     report = join_kalshi_to_board([_kalshi()], [_row(side="Over")])
     assert report["matched"] == 1
     assert report["unreadable_titles"] == []
+
+
+def test_the_per_series_count_is_COMPLETE_where_the_sample_is_bounded():
+    """The sample names the grammar; the count answers "is this family here".
+
+    Measured 2026-08-25T16:56:46Z, JOIN_TITLES returned 10 series and
+    `KXMLBGAME` -- the moneyline, the market a rejected live order wanted --
+    was not among them. With more than 10 series refusing, that is not evidence
+    either way, and the difference between "absent" and "past the cap" decides
+    whether there is a grammar to write at all.
+    """
+    from syndicate.features.shared.kalshi_board_join import REASON_UNREADABLE_TITLE
+
+    markets = []
+    for n in range(12):
+        markets.append(
+            _kalshi(title=f"unreadable {n}", series=f"KXS{n}", ticker=f"KXS{n}-26AUG22X-1")
+        )
+    # ...and a second refusal for one of them, so the count is not just a set.
+    markets.append(_kalshi(title="also unreadable", series="KXS0", ticker="KXS0-26AUG22X-2"))
+
+    report = _with_series(
+        {f"KXS{n}": "mlb" for n in range(12)},
+        lambda: join_kalshi_to_board(markets, [_row()]),
+    )
+    assert report["reasons"][REASON_UNREADABLE_TITLE] == 13
+    # The SAMPLE is capped...
+    assert len(report["unreadable_titles"]) == 10
+    # ...the COUNT is not, so a series past the cap is still visible.
+    assert len(report["unreadable_by_series"]) == 12
+    assert report["unreadable_by_series"]["KXS0"] == 2
+    # Sorted by count, so the family that dominates is readable at a glance.
+    assert list(report["unreadable_by_series"])[0] == "KXS0"
