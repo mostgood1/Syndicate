@@ -277,3 +277,68 @@ def test_the_venue_ABBREVIATION_matches_the_boards_full_club_name():
         [_board(side="Padres", home="San Diego Padres", away="Pittsburgh Pirates")],
     )
     assert result["matched"] == 1
+
+
+# ==========================================================================
+# The 132: four different things wearing one counter
+# ==========================================================================
+
+
+def test_a_ONE_SIDED_quote_is_its_own_reason_not_generic_unreadable():
+    """MEASURED 2026-08-24: `outcomes_unreadable: 132` (1.7% of 7,940). A
+    market quoted on ONE SIDE ONLY is a real tradeable market being discarded,
+    not a broken row -- opposite responses, so they cannot share a counter. A
+    logged row carried outcomes=["Yes","No"] against prices=["0.0010"], and a
+    parallel lane measured 88% of soccer live prop quotes as one-sided."""
+    result = mod.join_polymarket_to_board(
+        [_market(outcomes=("Yes", "No"), prices=("0.0010",))], [],
+    )
+    assert result["refusals"]["outcomes_count_mismatch"] == 1
+    assert "outcomes_unreadable" not in result["refusals"]
+
+
+def test_a_one_sided_quote_is_still_REFUSED_for_now():
+    """Deliberately. Pairing positionally assumes prices[0] belongs to
+    names[0] -- plausible, unverified, and on a two-outcome market a wrong
+    assumption is a real order on the opposite team."""
+    result = mod.join_polymarket_to_board(
+        [_market(outcomes=("Padres", "Pirates"), prices=("0.55",))],
+        [_board(side="Padres")],
+    )
+    assert result["matched"] == 0
+
+
+@pytest.mark.parametrize("row,expected", [
+    ({"outcomes": None, "outcomePrices": '["0.5"]'}, "outcomes_field_missing"),
+    ({"outcomes": "not json", "outcomePrices": '["0.5"]'}, "outcomes_not_a_json_list"),
+    ({"outcomes": "[]", "outcomePrices": "[]"}, "outcomes_empty"),
+    ({"outcomes": '["A","B"]', "outcomePrices": '["0.5","x"]'}, "price_not_numeric"),
+])
+def test_each_parse_failure_gets_its_own_name(row, expected):
+    market = _market()
+    market.update(row)
+    result = mod.join_polymarket_to_board([market], [])
+    assert result["refusals"][expected] == 1
+
+
+def test_the_SHAPE_is_sampled_so_a_count_can_be_explained():
+    """A count says how many; only a sample says WHAT. Every unexplained
+    refusal this week needed the sample to resolve."""
+    result = mod.join_polymarket_to_board(
+        [_market(slug="asc-mlb-pit-sd-2026-08-24-pos-1pt5",
+                 kind="SPORTS_MARKET_TYPE_SPREAD",
+                 outcomes=("Yes", "No"), prices=("0.0010",))], [],
+    )
+    shape = result["unreadable_shapes"][0]
+    assert shape["reason"] == "outcomes_count_mismatch"
+    assert shape["type"] == "SPORTS_MARKET_TYPE_SPREAD"
+    assert '"Yes"' in shape["outcomes"]
+    assert "0.0010" in shape["prices"]
+
+
+def test_the_sample_is_BOUNDED_so_the_log_line_stays_a_log_line():
+    markets = [_market(slug=f"aec-mlb-pit-sd-2026-08-2{i%9}", outcomes=("Y", "N"), prices=("0.5",))
+               for i in range(40)]
+    result = mod.join_polymarket_to_board(markets, [])
+    assert result["refusals"]["outcomes_count_mismatch"] == 40
+    assert len(result["unreadable_shapes"]) == 6

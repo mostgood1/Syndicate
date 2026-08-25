@@ -190,3 +190,214 @@ def test_stamping_does_not_mutate_the_input():
     original = {"last_updated": "2026-08-23T08:00:00Z"}
     stamp_candidate_freshness(original, _q("kalshi"))
     assert original["last_updated"] == "2026-08-23T08:00:00Z"
+
+
+# ==========================================================================
+# TWO GATES, TWO FIELDS. Missing the second emptied the board.
+# ==========================================================================
+
+
+def test_stamping_sets_the_SHORTLIST_gate_field_too():
+    """MEASURED 2026-08-24 23:23Z: beyond_quote_age=6184 of considered=8600 --
+    71.9% of the board died on `layer2_board._row_quote_age_seconds`, which
+    reads row["quote"]["quote_seen_age_seconds"]. Stamping only `last_updated`
+    would have fixed the gate that was already recovering and left the one
+    actually emptying the board."""
+    now = time.time()
+    stamped = stamp_candidate_freshness({"quote": {"book_age_seconds": 50000.0}},
+                                        _q("kalshi", age=12.0, now=now))
+    assert stamped["quote"]["quote_seen_age_seconds"] == pytest.approx(12.0, abs=1.0)
+    assert stamped["quote"]["quote_source"] == "kalshi"
+
+
+def test_book_age_seconds_is_DELIBERATELY_left_alone():
+    """It answers "has the market moved", not "how old is our observation", and
+    opportunity_gate's live/pregame checks read it for that. Overwriting it
+    would make a motionless market look like a moving one."""
+    stamped = stamp_candidate_freshness({"quote": {"book_age_seconds": 50000.0}},
+                                        _q("kalshi", age=5.0))
+    assert stamped["quote"]["book_age_seconds"] == 50000.0
+
+
+def test_the_nested_quote_block_is_COPIED_not_mutated():
+    """These rows are shared across the build. Mutating a nested dict would
+    age-stamp rows this quote was never applied to."""
+    original = {"quote": {"book_age_seconds": 50000.0}}
+    stamp_candidate_freshness(original, _q("kalshi", age=5.0))
+    assert "quote_seen_age_seconds" not in original["quote"]
+
+
+def test_a_row_with_no_quote_block_still_gets_one():
+    stamped = stamp_candidate_freshness({}, _q("polymarket_us", age=3.0))
+    assert stamped["quote"]["quote_seen_age_seconds"] == pytest.approx(3.0, abs=1.0)
+
+
+# --------------------------------------------------------------------------
+# Applying to a row set
+# --------------------------------------------------------------------------
+
+
+def test_only_rows_we_actually_priced_are_stamped():
+    """A row with no venue quote stays as stale as it really is. Blanket
+    -refreshing timestamps would launder staleness through a gate designed to
+    catch it -- worse than the empty board this exists to fix."""
+    now = time.time()
+    # Keys are DERIVED from the row the same way the adapters build them, so
+    # the fixture uses real board-row fields rather than a pre-set key.
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    home_key = quote_key("mlb", "h2h", "home", None)
+    collected = {"quotes": {home_key: _q("kalshi", key=home_key, age=10, now=now)}}
+    result = mod.apply_venue_quotes(
+        [{"sport": "mlb", "market": "h2h", "side": "home", "quote": {"book_age_seconds": 50000.0}},
+         {"sport": "mlb", "market": "h2h", "side": "away", "quote": {"book_age_seconds": 50000.0}}],
+        "2026-08-24", collected_by_sport={"mlb": collected}, now=now,
+    )
+    assert result["stamped"] == 1
+    assert result["unstamped"] == 1
+    priced, unpriced = result["rows"]
+    assert priced["quote"]["quote_seen_age_seconds"] == pytest.approx(10.0, abs=1.0)
+    # Untouched, and still carrying its real 50,000s age.
+    assert "quote_seen_age_seconds" not in unpriced["quote"]
+
+
+def test_the_applier_reports_what_would_still_be_gated():
+    now = time.time()
+    collected = {"quotes": {}, "ceiling_seconds": 6 * 3600, "by_source": {}, "selected_by_source": {}}
+    result = mod.apply_venue_quotes(
+        [{"key": "a"}, {"key": "b"}], "2026-08-24", collected_by_sport={"mlb": collected}, now=now,
+    )
+    assert result["rows_in"] == 2
+    assert result["stamped"] == 0
+    assert result["unstamped"] == 2
+
+
+def test_every_source_uses_ONE_key_space():
+    """Two sources on different keys do not contend -- they never meet, and the
+    freshest-wins rule this module is built on is silently inert. The OddsAPI
+    adapter first used the shard's own market key
+    (`event_id=...|market=h2h|side=Draw|book=draftkings`), which shares no key
+    space with the venue adapters."""
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    expected = quote_key("mlb", "h2h", "home", None)
+    assert expected == "mlb|h2h|home"
+    # A line is part of the identity: a -1.5 and a -2.5 spread are different
+    # bets, and collapsing them prices one at the other's number.
+    assert quote_key("mlb", "spreads", "home", -1.5) != quote_key("mlb", "spreads", "home", -2.5)
+
+
+def test_a_row_whose_key_matches_a_quote_is_repriced_across_sources():
+    """The point of one key space: a Kalshi quote and an OddsAPI quote for the
+    same bet contend, and the fresher wins."""
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    now = time.time()
+    key = quote_key("mlb", "h2h", "home", None)
+    result = mod.apply_venue_quotes(
+        [{"sport": "mlb", "market": "h2h", "side": "home"}],
+        "2026-08-24", now=now,
+        collected_by_sport={"mlb": {"quotes": {key: _q("polymarket_us", key=key, age=4.0, now=now)}}},
+    )
+    assert result["stamped"] == 1
+    assert result["rows"][0]["price_source"] == "polymarket_us"
+
+
+def test_quotes_are_collected_PER_SPORT_not_once_for_the_board():
+    """The row set spans every active sport, while every ceiling, artifact and
+    adapter is per-sport. One collect_quotes call for the whole board would
+    price MLB rows against whichever sport was passed in -- a WRONG price
+    rather than a missing one."""
+    asked: list[str] = []
+
+    def fake_collect(sport, _date, now=None):
+        asked.append(sport)
+        return {"quotes": {}, "ceiling_seconds": 6 * 3600, "by_source": {}}
+
+    import syndicate.features.shared.venue_quote_fanin as fanin
+
+    original = fanin.collect_quotes
+    try:
+        fanin.collect_quotes = fake_collect
+        result = fanin.apply_venue_quotes(
+            [{"sport": "mlb", "market": "h2h", "side": "home"},
+             {"sport": "wnba", "market": "h2h", "side": "home"},
+             {"sport": "mlb", "market": "totals", "side": "over", "line": 8.5}],
+            "2026-08-24",
+        )
+    finally:
+        fanin.collect_quotes = original
+    # Once per DISTINCT sport, not once per row.
+    assert sorted(asked) == ["mlb", "wnba"]
+    assert result["sports"] == ["mlb", "wnba"]
+
+
+def test_one_sports_venue_failure_does_not_cost_the_others(monkeypatch):
+    import syndicate.features.shared.venue_quote_fanin as fanin
+
+    now = time.time()
+    key = "wnba|h2h|home"
+
+    def flaky(sport, _date, now=None):
+        if sport == "mlb":
+            raise RuntimeError("kalshi unreachable")
+        return {"quotes": {key: _q("kalshi", key=key, age=5.0, now=now)}, "ceiling_seconds": 21600}
+
+    monkeypatch.setattr(fanin, "collect_quotes", flaky)
+    result = fanin.apply_venue_quotes(
+        [{"sport": "mlb", "market": "h2h", "side": "home"},
+         {"sport": "wnba", "market": "h2h", "side": "home"}],
+        "2026-08-24", now=now,
+    )
+    assert result["stamped"] == 1
+    assert result["rows"][1]["price_source"] == "kalshi"
+
+
+def test_a_row_with_no_sport_is_left_alone():
+    result = mod.apply_venue_quotes([{"market": "h2h", "side": "home"}], "2026-08-24",
+                                    collected_by_sport={})
+    assert result["stamped"] == 0
+    assert result["rows"][0] == {"market": "h2h", "side": "home"}
+
+
+# ==========================================================================
+# The Polymarket adapter must SELECT by sport, not just key by it
+# ==========================================================================
+
+
+def test_the_polymarket_adapter_filters_the_slate_BY_SPORT(monkeypatch):
+    """MEASURED 2026-08-24 23:45Z: polymarket_us reported quotes=7040 for mlb,
+    wnba, nfl AND soccer -- the same 7,040 every time, because `sport` was used
+    only to BUILD THE KEY and never to select rows. An NFL market keyed
+    `mlb|h2h|Chargers` is a WRONG price, not a missing one."""
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    slate = {
+        "fetched_at": time.time(),
+        "markets": [
+            {"slug": "aec-mlb-pit-sd-2026-08-24", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+             "outcomes": '["Pirates","Padres"]', "outcomePrices": '["0.45","0.55"]'},
+            {"slug": "aec-nfl-lac-ten-2026-08-28", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+             "outcomes": '["Chargers","Titans"]', "outcomePrices": '["0.5","0.5"]'},
+        ],
+    }
+    monkeypatch.setattr(adapters, "_artifact", lambda _p: (slate, time.time()))
+
+    mlb = adapters.polymarket_us_outcome("mlb", "2026-08-24")
+    nfl = adapters.polymarket_us_outcome("nfl", "2026-08-28")
+    assert len(mlb.quotes) == 2 and all(q.key.startswith("mlb|") for q in mlb.quotes)
+    assert len(nfl.quotes) == 2 and all(q.key.startswith("nfl|") for q in nfl.quotes)
+    # And no cross-contamination: the NFL teams never appear under mlb.
+    assert not any("chargers" in q.key or "titans" in q.key for q in mlb.quotes)
+
+
+def test_a_sport_the_venue_does_not_quote_reports_no_rows_by_name(monkeypatch):
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    slate = {"fetched_at": time.time(), "markets": [
+        {"slug": "aec-mlb-pit-sd-2026-08-24", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+         "outcomes": '["Pirates","Padres"]', "outcomePrices": '["0.45","0.55"]'}]}
+    monkeypatch.setattr(adapters, "_artifact", lambda _p: (slate, time.time()))
+    outcome = adapters.polymarket_us_outcome("nhl", "2026-08-24")
+    assert outcome.status == "no_rows"
+    assert "nhl" in outcome.reason

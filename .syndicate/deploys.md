@@ -27038,3 +27038,213 @@ verify: `[kalshi_polymarket_arb] SCAN ... 'polymarket_moneylines_resolved':
 687 ...` in production logs at 22:33:36Z, up from `0` at every prior run
 today (21:26:00Z, 21:44:47Z, 22:04:10.986216985Z entries, all `polymarket_
 moneylines_resolved: 0`).
+
+---
+
+### 2026-08-24 22:48:14Z — refresh-worker/live-odds-worker `798e7126` — Polymarket price resolver LIVE. Venue side works; the board is empty.
+
+**verify:**
+
+```
+POLYMARKET_US_SLATE_WRITE status=ok written=True count=7940
+  bytes=2,353,625 headroom=6,034,983 truncated=False
+
+POLYMARKET_BOARD_JOIN markets=7940 indexed=2593 board_rows=0 matched=0
+  slate_age_s=857.5
+  refusals={'market_type_not_a_game_line': 4288,
+            'segment_market_not_full_game': 927,
+            'outcomes_unreadable': 132}
+```
+
+**THE ACCOUNTING IS COMPLETE**, which is the first thing to check on any join:
+
+    indexed                       2593   32.7%
+    market_type_not_a_game_line   4288   54.0%   props + DRAWABLE_OUTCOME
+    segment_market_not_full_game   927   11.7%   1q/2h/f5 markets
+    outcomes_unreadable            132    1.7%
+    SUM                           7940 = markets
+
+Every one of 7,940 markets is accounted for. No silent drops — which is the
+property `matched=0` alone can never tell you, and the reason each refusal got
+its own counter.
+
+**2,593 GAME-LINE MARKETS ARE INDEXED AND READY.** The venue side works end to
+end: slug parsing, market-type mapping, sign/line extraction, outcome parsing.
+That is the half this lane built, and it is proven against the real slate.
+
+**`matched=0` is the BOARD's doing, not the join's: `board_rows=0`.** Every
+venue reports `rows_in=0` on the same cycle — kalshi, novig, prophetx and
+polymarket alike. The shortlist is now empty entirely, where it held 235 soccer
+rows at 21:57 and (per the other lane) 742 an hour before that. 742 -> 235 -> 0.
+
+So the resolver cannot be exercised until the board carries rows again, and the
+board's emptiness is the staleness ceiling / starved-sim chain already recorded
+above — not anything about Polymarket.
+
+**Slate freshness is good:** `slate_age_s=857.5` against a 900s cadence, so the
+artifact is being rewritten as designed and the 14-hour problem does not exist
+on this feed.
+
+**ONE THING WORTH CHASING: `outcomes_unreadable: 132` (1.7%).** Those are
+markets whose `outcomes`/`outcomePrices` did not parse as equal-length JSON
+lists. Small, but it is a SHAPE I did not anticipate rather than a market I
+chose to refuse, and the other three refusals are all deliberate. Not chased
+tonight; recorded so it is not mistaken for an intentional exclusion.
+
+**Prediction stated before the run, for the record:** I told the user to expect
+`matched=0` dominated by `market_type_not_a_game_line`, and that the numbers
+indicating a real bug would be `slug_unparseable` or
+`side_not_an_outcome_of_this_market`. Both of those are **absent entirely** —
+zero slugs failed to parse across 7,940 markets.
+
+
+---
+
+### 2026-08-24 23:02:42Z — the 132 `outcomes_unreadable` are ONE MARKET PER SIDE, all WTA tennis. The refusal was right.
+
+**verify:**
+
+```
+POLYMARKET_BOARD_JOIN markets=7940 indexed=2593 board_rows=0 matched=0
+  refusals={'market_type_not_a_game_line': 4288,
+            'segment_market_not_full_game': 927,
+            'outcomes_count_mismatch': 132}
+  shapes=[{'slug':'asc-wta-alypar-petmar-2026-08-24-gs-neg-2pt5','type':'SPREAD',
+           'outcomes':'["+2.50","-2.50"]','prices':'["0.5100"]'}, ...]
+```
+
+**ALL 132 are `outcomes_count_mismatch`.** Zero `outcomes_field_missing`, zero
+`outcomes_not_a_json_list`, zero `outcomes_empty`, zero `price_not_numeric`.
+Nothing is malformed — the split resolved it in one run.
+
+**THE CAUSE IS THE VENUE'S DATA MODEL, not a bad quote.** Polymarket US lists
+EACH SIDE OF A SPREAD AS ITS OWN MARKET, quoting only that side:
+
+    asc-wta-...-gs-neg-2pt5   outcomes ["+2.50","-2.50"]   prices ["0.5100"]
+    asc-wta-...-gs-pos-2pt5   outcomes ["+2.50","-2.50"]   prices ["0.6"]
+
+Same pair of outcomes, two slugs, two different single prices. `outcomes` lists
+both handicaps for CONTEXT; `outcomePrices` carries the one price for the side
+the SLUG names. Note also the outcomes are the LINE ITSELF (`+2.50`/`-2.50`),
+not team names, which is a second shape this join has never seen.
+
+**AND POSITIONAL PAIRING WOULD HAVE BEEN WRONG.** Checked against the sample:
+
+    ...gs-neg-2pt5   slug=neg   outcomes[0]=+2.50   -> WRONG SIDE
+    ...gs-neg-5pt5   slug=neg   outcomes[0]=-5.50   -> ok
+    ...gs-pos-5pt5   slug=pos   outcomes[0]=+5.50   -> ok
+    ...gs-neg-2pt5   slug=neg   outcomes[0]=-2.50   -> ok
+    ...gs-pos-2pt5   slug=pos   outcomes[0]=+2.50   -> ok
+
+**The array order does NOT reliably match the slug's side — 1 of 5 sampled rows
+would have been priced on the opposite side of the spread.** That is exactly
+the failure the refusal was holding the line against, and it is now measured
+rather than argued. Had I paired `prices[0]` to `outcomes[0]`, roughly a fifth
+of these would be real orders on the wrong handicap at a confident price.
+
+**IMPACT ON COVERAGE: NONE.** Every sampled row is **WTA tennis** —
+`asc-wta-alypar-petmar`, `asc-wta-clatau-renzar`. Tennis is not one of
+Syndicate's sports (mlb, nba, wnba, nhl, nfl, ncaaf, ncaab, soccer), so these
+132 are markets for a sport the board never asks about. 1.7% of the catalogue,
+0% of anything we would price.
+
+**BOUND ON THAT CLAIM:** the sample is 6 of 132. All six are WTA; I have not
+established that the other 126 are. If a covered sport ever appears in this
+counter, the per-side model above is what would have to be built — and the
+correct build reads the side from the SLUG, never from array position.
+
+**Still `board_rows=0`**, so the resolver remains unexercised. That is the
+staleness chain, not this.
+
+
+---
+
+## 2026-08-25T00:07Z — Polymarket US goes live as a second placing venue
+
+**lane:** portfolio-decision-and-execution
+**services:** refresh-worker `dep-da6dm3ajnfac73e46i7g` (df2047f5f),
+live-odds-worker `dep-da6dpjpsrm7s73cs9en0` (5ca8409f4 + env)
+
+Three changes, deployed in order. Each has its own reading.
+
+### 1. `f32ec00ff` — the Polymarket adapter now filters BY SPORT. VERIFIED.
+
+**verify:** `VENUE_REPRICE` on refresh-worker, 2026-08-25T00:02:18Z.
+
+Before (23:45Z): `polymarket_us quotes=7040` for mlb, wnba, nfl AND soccer —
+the same number four times, because `sport` was used to BUILD THE KEY and never
+to SELECT rows. After:
+
+    mlb    polymarket_us quotes=526
+    wnba   polymarket_us quotes=178
+    nfl    polymarket_us quotes=2402
+    soccer polymarket_us no_rows  reason=no_polymarket_row_for_league_soccer
+
+Four distinct numbers and one NAMED refusal where the venue lists nothing for
+that league. This was a wrong-price path, not a missing-price path: an NFL
+market was keyed `mlb|h2h|<team>` when collected for mlb. It never bit only
+because Kalshi was fresher and won every selection — a timing accident.
+
+`selected_by_source={'kalshi': 237}` still, at kalshi age 1017s vs polymarket
+5300s. **Polymarket's slate is 5300s old against a 900s cadence — the writer is
+not ticking at its configured rate.** Open, not chased.
+
+### 2. `df2047f5f` — `kalshi_discovery` called three names it never imported.
+
+**verify:** the absence of `[kalshi_discovery] PROBE_ERROR NameError` after
+00:00Z, against nine consecutive occurrences 21:32Z–23:45Z (one per deploy).
+
+`probe`, `discover`, `KalshiError` — all used at top level, imported nowhere.
+The probe sits inside `try/except Exception` written to survive a venue that
+will not answer, so **a bug in our own code was logged as the venue not
+answering** and the function RETURNED. Everything downstream never ran once:
+AUTO_SERIES registration, LISTED, COVERAGE_GAPS, per-series true counts.
+`kalshi_polymarket_arb` reported `kalshi_moneylines_resolved: 0` on every scan
+all evening for this reason and no other.
+
+This module's own docstring exists to stop "lists nothing" being confused with
+"did not answer". It was defeated from the inside.
+
+Also now registers GAME series on the board-building process — discovery is
+per-process, so `kalshi_odds_refresh` doing it elsewhere helped nothing here.
+
+### 3. `5ca8409f4` + env — two venues can place. **REAL MONEY, USER DECISION.**
+
+`SYNDICATE_EXECUTION_VENUE` was read as ONE STRING, so exactly one venue could
+ever transact. Kalshi held the slot (`EXECUTION mode=live venue=kalshi
+spent={'dollars': 2.99, 'orders': 2}`, 23:49Z). Polymarket's path was already
+complete — auth verified live at 20:18Z (`POLYMARKET_US_AUTH ok=True`, signed
+read, 28 real row keys), submitter, resolver and ticker stamp all wired. The
+only thing in the way was a `.split(",")`.
+
+**The cap is why this needed more than an edit.** `spent_today` filters on
+`order.venue` deliberately, so `max_day_dollars` is PER VENUE: one live venue
+risks $40, two risk $80, and nobody edited a cap. The per-venue check cannot
+catch it — the new venue has spent $0 of its own $40 and is correctly allowed.
+`max_day_dollars_all_venues` now defaults to `max_day_dollars` so adding a
+venue SPLITS one budget rather than duplicating it.
+
+**Env set on live-odds-worker (dashboard, not `render.yaml` — no
+`SYNDICATE_EXECUTION*` key is declared there, so no `blueprint_sync` exposure):**
+
+    SYNDICATE_EXECUTION_VENUE                      kalshi  ->  kalshi,polymarket
+    SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES  (unset) ->  80
+
+**USER DECISION, 2026-08-25.** Offered a $2 first-order step because no live
+order has ever reached Polymarket and its YES/NO `outcomeSide` convention is
+UNVERIFIED against a real response. User chose **full live at the existing
+$10/order cap**, and $80/day across both venues — the money is held as $50 in
+each, separate balances, so a per-venue budget is the honest model.
+
+**verify: NOT YET READ.** The line that proves it is
+`[live_odds_worker] EXECUTION ... scope=polymarket` with a non-null
+`placed`/`refused`. Until that appears, Polymarket transacting is a
+CONFIGURATION, not a measurement.
+
+**THE RISK THAT IS STILL OPEN, stated because the first fill is the only thing
+that closes it:** `polymarket_us_orders._side_to_outcome` maps our side to
+`OUTCOME_SIDE_YES`/`_NO` from this venue's own vocabulary, and that mapping has
+never been confirmed by a venue response. If it is inverted, the first order
+buys the opposite side at a price never quoted for it — and it will look
+entirely plausible in the log. The first `filled` Polymarket record must be
+read against the actual position before a second slate runs.

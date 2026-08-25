@@ -78,6 +78,7 @@ __all__ = [
     "collect_quotes",
     "select_quote",
     "stamp_candidate_freshness",
+    "apply_venue_quotes",
     "source_enabled",
     "freshness_ceiling_seconds",
 ]
@@ -294,18 +295,38 @@ def _count_by_source(quotes) -> dict[str, int]:
 
 
 def stamp_candidate_freshness(candidate: dict[str, Any], quote: Quote | None) -> dict[str, Any]:
-    """THE SEAM. Put the quote's age behind the field the gate reads.
+    """THE SEAM. Put the quote's age behind the fields the gates read.
 
-    `recommendation_engine._candidate_age_seconds` reads `last_updated` first
-    and falls back to `updated_epoch`. A candidate priced from a live venue
-    quote but still carrying last night's `last_updated` is rejected as stale
-    while holding a price seconds old -- which is the failure this whole module
-    is here to prevent, in its most galling form.
+    THERE ARE TWO GATES AND THEY READ DIFFERENT FIELDS. Missing the second is
+    why a venue-priced row could still age out:
 
-    Returns the candidate unchanged when there is no quote. A missing price
-    must not refresh a timestamp: that would hide staleness rather than fix it,
-    and an unpriced-but-fresh-looking candidate is worse than an honest stale
-    one.
+      1. `recommendation_engine._candidate_age_seconds` reads `last_updated`,
+         falling back to `updated_epoch`. Rejects as `stale_beyond_sla`
+         (6h mlb/wnba, 24h soccer).
+
+      2. `layer2_board._row_quote_age_seconds` reads
+         `row["quote"]["quote_seen_age_seconds"]`, falling back to
+         `quote["book_age_seconds"]`. Rejects as `beyond_quote_age`
+         (SHORTLIST_MAX_QUOTE_AGE_SECONDS, 14h).
+
+    MEASURED 2026-08-24 23:23Z, which is why this stamps both:
+
+        LAYER2_SHORTLIST rows=0 considered=8600
+          beyond_quote_age=6184  beyond_horizon=2416
+
+    **71.9% of the board died on gate 2**, the one nobody was looking at, while
+    gate 1 was improving. Stamping only `last_updated` would have fixed the gate
+    that was already recovering and left the one actually emptying the board.
+
+    `book_age_seconds` is DELIBERATELY NOT TOUCHED. It answers a different
+    question -- "has the market moved" rather than "how old is our observation"
+    -- and `opportunity_gate`'s live/pregame checks read it for that. Its own
+    docstring says so, and overwriting it would make a motionless market look
+    like a moving one.
+
+    Returns the candidate unchanged when there is no quote. A missing price must
+    not refresh a timestamp: that laundering is worse than an honest stale row,
+    because it defeats the gate rather than passing it.
     """
     if quote is None:
         return candidate
@@ -313,9 +334,102 @@ def stamp_candidate_freshness(candidate: dict[str, Any], quote: Quote | None) ->
     stamped["last_updated"] = _iso(quote.fetched_at)
     stamped["updated_epoch"] = float(quote.fetched_at)
     stamped["price_source"] = quote.source
+
+    # Gate 2. The nested `quote` block is copied rather than mutated in place:
+    # these rows are shared across the build, and mutating a nested dict would
+    # age-stamp rows this quote was never applied to.
+    existing = candidate.get("quote")
+    quote_block = dict(existing) if isinstance(existing, Mapping) else {}
+    quote_block["quote_seen_age_seconds"] = quote.age_seconds()
+    quote_block["quote_source"] = quote.source
+    stamped["quote"] = quote_block
+
     if quote.venue_ref:
         stamped["venue_ref"] = quote.venue_ref
     return stamped
+
+
+def apply_venue_quotes(
+    rows: Sequence[Mapping[str, Any]],
+    selected_date: str,
+    *,
+    collected_by_sport: Mapping[str, Mapping[str, Any]] | None = None,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Re-price rows from the freshest venue quote available, and report it.
+
+    GROUPS BY SPORT AND COLLECTS ONCE PER SPORT. The row set spans every active
+    sport, while every ceiling, artifact and adapter is per-sport -- a single
+    `collect_quotes` call for the whole board would price MLB rows against
+    whichever sport happened to be passed in, which is a wrong price rather
+    than a missing one.
+
+    ONLY ROWS WE ACTUALLY PRICED ARE STAMPED. A row with no venue quote is
+    returned untouched and stays as stale as it really is. Blanket-refreshing
+    timestamps would launder staleness through a gate designed to catch it,
+    which is the one outcome worse than the empty board this exists to fix.
+    """
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    by_sport: dict[str, Mapping[str, Any]] = dict(collected_by_sport or {})
+    out: list[Mapping[str, Any]] = []
+    stamped = 0
+    per_source: dict[str, int] = {}
+    ceilings: dict[str, int] = {}
+    source_status: dict[str, Any] = {}
+
+    for row in rows:
+        sport = str(row.get("sport") or "").strip().lower()
+        if not sport:
+            out.append(row)
+            continue
+        if sport not in by_sport:
+            try:
+                by_sport[sport] = collect_quotes(sport, selected_date, now=now)
+            except Exception:
+                # One sport's venue failure must not cost the others' rows.
+                by_sport[sport] = {"quotes": {}}
+        payload = by_sport[sport]
+        ceilings.setdefault(sport, payload.get("ceiling_seconds"))
+        if sport not in source_status and payload.get("by_source"):
+            source_status[sport] = payload.get("by_source")
+
+        # DERIVED from the row, not read off it. A board row carries no
+        # `venue_quote_key`, so requiring one would have matched nothing and
+        # reported a confident `stamped=0` -- the "zero that looks like a
+        # working feed" failure this module documents three times over.
+        key = row.get("venue_quote_key") or quote_key(
+            sport, row.get("market"), row.get("side"), _as_float_or_none(row.get("line"))
+        )
+        quote = (payload.get("quotes") or {}).get(str(key))
+        if quote is None:
+            out.append(row)
+            continue
+        out.append(stamp_candidate_freshness(dict(row), quote))
+        stamped += 1
+        per_source[quote.source] = per_source.get(quote.source, 0) + 1
+
+    return {
+        "rows": out,
+        "rows_in": len(rows),
+        "stamped": stamped,
+        # The number that predicts whether this actually helped. Rows left
+        # unstamped keep whatever age they had and will be gated on it.
+        "unstamped": len(rows) - stamped,
+        "sports": sorted(by_sport.keys()),
+        "ceiling_seconds_by_sport": ceilings,
+        "selected_by_source": per_source,
+        "by_source": source_status,
+    }
+
+
+def _as_float_or_none(value: Any) -> float | None:
+    try:
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _iso(epoch: float) -> str:

@@ -179,8 +179,20 @@ def load_polymarket_markets() -> tuple[list[Mapping[str, Any]], float | None]:
     )
 
 
-def _outcome_probabilities(row: Mapping[str, Any]) -> list[tuple[str, float]] | None:
-    """`[(outcome_name, probability)]`. Both fields arrive as JSON STRINGS."""
+def _outcome_probabilities(row: Mapping[str, Any]) -> tuple[list[tuple[str, float]] | None, str]:
+    """`([(outcome_name, probability)], reason)`. `reason` is "" on success.
+
+    WHY THIS RETURNS A REASON RATHER THAN JUST None. Measured 2026-08-24, the
+    first live run: `outcomes_unreadable: 132` (1.7% of 7,940). That single
+    counter lumps four different things together, and they call for opposite
+    responses — a market with a missing field is broken, while a market quoted
+    on ONE SIDE ONLY is a real, tradeable market this join was silently
+    discarding. Naming them is how we find out which.
+
+    A one-sided quote is known to exist on this venue: a logged row carried
+    `outcomes=["Yes","No"]` against `outcomePrices=["0.0010"]`, and a parallel
+    lane measured 88% of soccer live prop quotes as one-sided.
+    """
     import json
 
     def _list(value: Any) -> list[Any] | None:
@@ -194,18 +206,30 @@ def _outcome_probabilities(row: Mapping[str, Any]) -> list[tuple[str, float]] | 
             return parsed if isinstance(parsed, list) else None
         return None
 
-    names = _list(row.get("outcomes"))
-    prices = _list(row.get("outcomePrices"))
-    if not names or not prices or len(names) != len(prices):
-        return None
+    raw_names, raw_prices = row.get("outcomes"), row.get("outcomePrices")
+    if raw_names in (None, "") or raw_prices in (None, ""):
+        return None, "outcomes_field_missing"
+
+    names, prices = _list(raw_names), _list(raw_prices)
+    if names is None or prices is None:
+        return None, "outcomes_not_a_json_list"
+    if not names or not prices:
+        return None, "outcomes_empty"
+    if len(names) != len(prices):
+        # THE ONE-SIDED CASE, and deliberately still a refusal for now.
+        # Pairing positionally would assume `prices[0]` belongs to
+        # `names[0]` -- plausible, unverified, and wrong half the time if it
+        # is not. On a two-outcome market that is a real order on the opposite
+        # team. Counted separately so the decision can be made on data.
+        return None, "outcomes_count_mismatch"
+
     out: list[tuple[str, float]] = []
     for name, price in zip(names, prices):
         try:
-            probability = float(price)
+            out.append((str(name), float(price)))
         except (TypeError, ValueError):
-            return None
-        out.append((str(name), probability))
-    return out
+            return None, "price_not_numeric"
+    return out, ""
 
 
 def join_polymarket_to_board(
@@ -221,6 +245,9 @@ def join_polymarket_to_board(
     to parse, the date was wrong, or the venue simply does not quote the sport.
     """
     refusals: dict[str, int] = {}
+    # Shapes behind the parse refusals. A count says how many; only a sample
+    # says WHAT, and every unexplained refusal this week needed the sample.
+    shapes: list[dict[str, Any]] = []
 
     def refuse(reason: str) -> None:
         refusals[reason] = refusals.get(reason, 0) + 1
@@ -241,9 +268,19 @@ def join_polymarket_to_board(
         if _has_segment(parsed["modifiers"]):
             refuse("segment_market_not_full_game")
             continue
-        outcomes = _outcome_probabilities(row)
+        outcomes, outcome_reason = _outcome_probabilities(row)
         if not outcomes:
-            refuse("outcomes_unreadable")
+            refuse(outcome_reason or "outcomes_unreadable")
+            # A SAMPLE OF THE SHAPE, not the values -- enough to see what the
+            # venue actually sent without turning the log line into the payload.
+            if len(shapes) < 6:
+                shapes.append({
+                    "slug": str(row.get("slug") or "")[:60],
+                    "type": str(row.get("sportsMarketTypeV2") or ""),
+                    "reason": outcome_reason,
+                    "outcomes": str(row.get("outcomes"))[:80],
+                    "prices": str(row.get("outcomePrices"))[:80],
+                })
             continue
         key = (parsed["league"], parsed["date"], board_market)
         index.setdefault(key, []).append(
@@ -316,6 +353,7 @@ def join_polymarket_to_board(
         "polymarket_markets": len(markets),
         "indexed": sum(len(v) for v in index.values()),
         "refusals": refusals,
+        "unreadable_shapes": shapes,
     }
 
 

@@ -248,7 +248,26 @@ def run_execution(
     if not isinstance(positions, list):
         return {"status": "skipped", "reason": "plan_has_no_positions_key", "date": normalized}
 
-    venue = PAPER_VENUE if mode != LIVE else str(os.environ.get("SYNDICATE_EXECUTION_VENUE") or "").strip()
+    # LIVE VENUE COMES FROM THE SCOPE, NEVER FROM THE ENV VAR.
+    #
+    # This read `os.environ["SYNDICATE_EXECUTION_VENUE"]` directly. That was
+    # already redundant -- the comment six lines down says "in live mode the
+    # venue IS the scope" -- and it was correct only for as long as the env var
+    # held exactly one venue equal to the scope it was called with.
+    #
+    # MEASURED 2026-08-25T00:13:26Z, the first tick after the var became a
+    # list: both venues refused with
+    # `no_adapter_for_venue:kalshi,polymarket`. The loop passed `scope=kalshi`
+    # and `scope=polymarket` correctly; this line then looked past the argument
+    # and read the WHOLE STRING back out of the environment, so
+    # `_venue_submitter` was asked for an adapter named "kalshi,polymarket" and
+    # there is none. Kalshi, which had been placing, stopped placing.
+    #
+    # It fails CLOSED, which is the only reason this was cheap: an unknown
+    # venue name resolves to no adapter and `place_order` rejects rather than
+    # falling through to a paper fill wearing a live mode. Still a regression,
+    # and the fix is to trust the argument that was passed in.
+    venue = PAPER_VENUE if mode != LIVE else scope
     if scope and mode != LIVE:
         # Suffixed rather than replaced: the record must still say PAPER at a
         # glance, and `mode` alone would not distinguish the two paper books.
