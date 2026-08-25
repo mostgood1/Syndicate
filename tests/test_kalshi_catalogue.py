@@ -961,3 +961,201 @@ def test_the_legacy_top_level_markets_payload_still_reads():
         monkeypatch.undo()
 
     assert verdict.reason != "markets_key_absent", verdict
+
+
+def test_every_reader_of_the_kalshi_artifact_goes_through_the_merge_helper():
+    """THE SAME BUG THREE TIMES, found one at a time over three hours.
+
+    `kalshi_markets.json` stopped persisting a top-level `markets` key when the
+    artifact was split to fit the store's 8MB ceiling. `markets_from_state`
+    became the accessor. Readers that were missed, in the order they were
+    found:
+
+      venue_quote_adapters.kalshi_outcome      -> markets_key_absent, 0 quotes
+      kalshi_polymarket_arb.run_arb_scan       -> no_kalshi_markets
+      portfolio_commit._venue_price_resolver   -> (None, None), venue_priced=0
+
+    The third was the worst and the last found, because it did not error:
+    `.get("markets") or []` became `[]`, which returns the value meaning "this
+    venue has no direct feed" -- indistinguishable from Novig, which genuinely
+    has none. Kalshi silently priced off the aggregator while the fan-in was
+    producing 2,344 of its own quotes.
+
+    IT WAS HIDDEN BY A `| head -20` ON THE GREP THAT WENT LOOKING FOR IT, so
+    this walks the repo rather than trusting anyone to grep exhaustively.
+
+    AND THE FIRST VERSION OF THIS TEST WAS VACUOUS. It scanned a 12-line window
+    below each mention of the filename, and the offending line sat 20 lines
+    below its own explanatory comment -- so reintroducing the bug still passed.
+    A scan is worth exactly what it can be shown to CATCH, which is why the
+    partner test reintroduces the defect and asserts this fails.
+
+    Scoped by FUNCTION via the AST rather than by line distance: a module may
+    legitimately read some other payload's `markets` key (Polymarket's slate,
+    OddsAPI's shard), and flagging those would make this noisy and therefore
+    ignored.
+    """
+    import ast
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    offenders = _kalshi_artifact_offenders(root)
+    assert not offenders, (
+        "these read the Kalshi artifact's top-level `markets` key, which is no "
+        "longer persisted; use markets_from_state:\n  " + "\n  ".join(offenders)
+    )
+
+
+def _kalshi_artifact_offenders(root) -> list[str]:
+    """Functions that bind `markets` straight off the ARTIFACT PAYLOAD.
+
+    THREE THINGS HAD TO BE RIGHT and the first two versions each got one
+    wrong, which is worth stating because a scan is worth exactly what it can
+    be shown to catch:
+
+    1. SCOPED TO THE PAYLOAD VARIABLE. `run_arb_scan` legitimately reads
+       `kalshi_resolved["markets"]` -- the return value of a resolver, a
+       different object that happens to share a key name. Flagging by key name
+       alone produced five false positives in one function and would have made
+       this noisy enough to ignore.
+    2. BINDING, NOT CHECKING. `isinstance(payload.get("markets"), list)` is a
+       presence check and must stay: it is how a document carrying neither
+       shape is told from one holding no markets. Only an ASSIGNMENT or a
+       RETURN turns that value into the markets list.
+    3. NO WHOLE-FUNCTION EXEMPTION. An earlier version excused any function
+       mentioning `markets_from_state` anywhere, so a function that imported
+       the helper and then still read the key directly passed clean -- exactly
+       the regression it existed to catch.
+    """
+    import ast
+
+    artifact = "kalshi_markets.json"
+    exempt = {"pipeline/kalshi_odds_refresh.py"}  # defines the fallback itself
+    offenders: list[str] = []
+
+    for path in sorted(root.rglob("*.py")):
+        relative = path.relative_to(root).as_posix()
+        if relative.startswith(("tests/", ".venv/", "vendor/")) or relative in exempt:
+            continue
+        text = path.read_text(errors="ignore")
+        if artifact not in text:
+            continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if artifact not in (ast.get_source_segment(text, node) or ""):
+                continue
+
+            # Which local names hold the artifact PAYLOAD.
+            #
+            # Propagated across ONE hop and no further, because the read is
+            # usually two statements -- the path is built, then handed to
+            # `read_json_file` -- and matching only the statement containing the
+            # filename misses the payload itself. The meta-test below is written
+            # that way and caught that gap.
+            #
+            # ONLY THROUGH A READER CALL. Propagating through any call whose
+            # argument was tainted marked `kalshi_resolved =
+            # resolve_kalshi_moneylines(kalshi_markets, ...)` as a payload, so
+            # its perfectly correct `kalshi_resolved["markets"]` was flagged. A
+            # resolver returns a NEW object that merely shares a key name.
+            readers = {"read_json_file", "_artifact", "read_json"}
+
+            def _called(value) -> str:
+                if not isinstance(value, ast.Call):
+                    return ""
+                func = value.func
+                if isinstance(func, ast.Attribute):
+                    return func.attr
+                if isinstance(func, ast.Name):
+                    return func.id
+                return ""
+
+            assigns = [
+                statement
+                for statement in ast.walk(node)
+                if isinstance(statement, ast.Assign) and statement.value is not None
+            ]
+            payloads: set[str] = set()
+            for _ in range(len(assigns) + 1):
+                grew = False
+                for statement in assigns:
+                    value = statement.value
+                    source = ast.get_source_segment(text, value) or ""
+                    referenced = {n.id for n in ast.walk(value) if isinstance(n, ast.Name)}
+                    seeded = artifact in source
+                    carried = bool(referenced & payloads) and _called(value) in readers
+                    if not (seeded or carried):
+                        continue
+                    for target in statement.targets:
+                        for name in ast.walk(target):
+                            if isinstance(name, ast.Name) and name.id not in payloads:
+                                payloads.add(name.id)
+                                grew = True
+                if not grew:
+                    break
+            if not payloads:
+                continue
+
+            for statement in ast.walk(node):
+                if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                    value = statement.value
+                elif isinstance(statement, ast.Return):
+                    value = statement.value
+                else:
+                    continue
+                if value is None:
+                    continue
+                source = ast.get_source_segment(text, value) or ""
+                if "markets_from_state" in source:
+                    continue
+                for inner in ast.walk(value):
+                    base = literal = None
+                    if (
+                        isinstance(inner, ast.Call)
+                        and isinstance(inner.func, ast.Attribute)
+                        and inner.func.attr == "get"
+                        and inner.args
+                        and isinstance(inner.args[0], ast.Constant)
+                    ):
+                        base, literal = inner.func.value, inner.args[0].value
+                    elif isinstance(inner, ast.Subscript) and isinstance(
+                        inner.slice, ast.Constant
+                    ):
+                        base, literal = inner.value, inner.slice.value
+                    if literal != "markets" or base is None:
+                        continue
+                    names = {n.id for n in ast.walk(base) if isinstance(n, ast.Name)}
+                    if names & payloads:
+                        offenders.append(
+                            f"{relative}:{getattr(inner, 'lineno', '?')}: in {node.name}()"
+                        )
+    return offenders
+
+
+def test_that_scan_actually_catches_a_reintroduced_reader(tmp_path):
+    """The partner test. A source scan that cannot be shown to FAIL is
+    decoration -- and the first version of the scan above was exactly that."""
+    module = tmp_path / "pipeline"
+    module.mkdir()
+    (module / "regressed.py").write_text(
+        'def read_it(payload):\n'
+        '    path = reports_root() / "intelligence" / "kalshi_markets.json"\n'
+        '    payload = read_json_file(path)\n'
+        '    return (payload or {}).get("markets") or []\n'
+    )
+    assert _kalshi_artifact_offenders(tmp_path), "the scan must catch this"
+
+    (module / "regressed.py").write_text(
+        'def read_it(payload):\n'
+        '    path = reports_root() / "intelligence" / "kalshi_markets.json"\n'
+        '    payload = read_json_file(path)\n'
+        '    from pipeline.kalshi_odds_refresh import markets_from_state\n'
+        '    return markets_from_state(payload)\n'
+    )
+    assert not _kalshi_artifact_offenders(tmp_path)
