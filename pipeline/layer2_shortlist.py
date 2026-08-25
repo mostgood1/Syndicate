@@ -669,11 +669,46 @@ def build_layer2_shortlist(
             "[layer2_shortlist] PER_SPORT_INGEST "
             + " ".join(
                 f"{name}(cand={stat.get('candidates')},scored={stat.get('scored')},"
-                f"priced={stat.get('sides_priced')},opps={stat.get('opportunities')})"
+                f"priced={stat.get('sides_priced')},opps={stat.get('opportunities')},"
+                f"lanes={stat.get('by_lane')})"
                 for name, stat in sorted((per_sport_stats or {}).items())
             ),
             flush=True,
         )
+        # THE ENRICHMENT STEP THAT DECIDES THE LANE.
+        #
+        # MEASURED 2026-08-25T02:59:03Z:
+        #   mlb  cand=1302 scored=1300 priced=1390 opps=0
+        #   wnba cand=1225 scored=1225 priced=1247 opps=0
+        #   nfl  cand=2642 ... opps=112     soccer cand=9041 ... opps=4184
+        #
+        # Everything prices and scores, then MLB and WNBA emit nothing. The
+        # filter is `board_lane == LANE_OPPORTUNITY`, and `opportunity_gate`
+        # demotes to LANE_WATCHLIST when demotion is enabled AND the row has no
+        # game state AND kickoff has passed. Only the two LIVE sports meet all
+        # three -- nfl (08-28) and soccer have not kicked off, which is exactly
+        # why they are unaffected.
+        #
+        # So the question is why `attach_game_state` matches zero MLB/WNBA rows
+        # (`game_candidate_inputs` shows game_state="" is_live=false). That
+        # join already RETURNS `chips`/`rows_matched`/`unmatched_teams` for this
+        # purpose -- the 2026-08-06 soccer gap sat at 0 matched through nine
+        # hypotheses for want of exactly this sample -- and it was being stored
+        # where only an artifact reader could see it.
+        #
+        # The demotion itself is CORRECT and is not being touched: a started
+        # game with unknown state may already be settled, and Polymarket is
+        # armed with real money. The fix belongs upstream, in the join.
+        for name, stat in sorted((per_sport_stats or {}).items()):
+            step = ((stat or {}).get("enrichment") or {}).get("game_state")
+            if isinstance(step, dict):
+                print(
+                    f"[layer2_shortlist] GAME_STATE_JOIN sport={name}"
+                    f" chips={step.get('chips')} rows_matched={step.get('rows_matched')}"
+                    f" unmatched={str(step.get('unmatched_teams'))[:200]}"
+                    f" reason={step.get('reason')} error={step.get('error')}",
+                    flush=True,
+                )
         print(
             "[layer2_shortlist] VENUE_REPRICE_KEYS "
             f"unmatched_by_sport={repriced.get('unmatched_by_sport')} "
