@@ -28597,3 +28597,69 @@ series IS registered by AUTO_SERIES discovery (`game_added=171`) and its markets
 do reach the title parser and refuse there. `08d50a344` adds a per-series title
 sample (`JOIN_TITLES`) to read that grammar from data; deploy
 `dep-da6sbl6k1f9s73eh9tsg` carries it. Not yet read.
+
+---
+
+## 2026-08-25 — live-odds-worker `7e9c3a49a`: the live path was latched shut
+
+**Deployed:** `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`), deploy
+`dep-da6segk9v7es738aatq0`, triggered `16:48:02Z`. Commit `7e9c3a49a`, on
+`origin/main`. Claim `polymarket-side`.
+
+**The measurement:**
+
+```
+16:40:00.017Z [execute_portfolio] BLOCKED_ON_UNRECONCILED count=1
+                                  keys=['1984a57ed28e1cd5ccad8b16']
+16:40:00.028Z [live_odds_worker]  EXECUTION status=blocked
+                                  reason=unreconciled_orders scope=kalshi
+16:40:00.033Z [execute_portfolio] BLOCKED_ON_UNRECONCILED count=1
+                                  keys=['1984a57ed28e1cd5ccad8b16']
+16:40:00.033Z [live_odds_worker]  EXECUTION status=blocked
+                                  reason=unreconciled_orders scope=polymarket
+```
+
+**LIVE EXECUTION WAS DOWN ON BOTH VENUES** from `16:08:10Z` — the moment the
+first Polymarket order was placed — and no LIVE_ORDER line appears after it.
+One resting order did that, and the state was self-sustaining.
+
+**Two independent causes, each sufficient.** `_venue_reader` said *"Only Kalshi
+has one"*, so a Polymarket order recorded `submitted` had nothing that could
+correct it. And `execute_portfolio` called `reconcile_live_orders()` bare, whose
+`venue` defaults to `"kalshi"` — so even given a reader, Polymarket was never
+asked. The unreconciled gate is GLOBAL: any live order in that state blocks
+every venue.
+
+**The general lesson, and it is worth stating beyond this venue.** A venue we
+can PLACE on but cannot READ is not a half-built integration; it is a latch on
+the whole live path. The submit side and the read side are not independently
+shippable, and the asymmetry is invisible until the first order rests. The
+invariant is now a test: every venue with a submitter must have a reader, so a
+third venue cannot reintroduce this by being added to one side alone.
+
+**The operator action could not have been sufficient.** The user cancelled the
+inverted order at the venue at ~`16:45Z`. That is real and correct, and the
+ledger still could not see it — the only thing that reads a cancellation is the
+venue read that did not exist. Cancelling was necessary; it was never enough.
+
+**verify:** NOT YET READ. The next live pass should print
+`[polymarket_us_orders] ORDERS_READ n=... container=... keys=[...]
+statuses=[...]` and then place rather than block. Two things could still fail
+and both are named rather than silent:
+
+- **The list route is unverified.** `POST /v1/orders` creates; the GET default
+  is the same path, overridable via `POLYMARKET_US_ORDERS_LIST_PATH` with no
+  build — the same escape hatch the create path carries after Kalshi's create
+  route turned out to have MOVED (`http_410`). A wrong route fails as a named
+  error, never as an empty book.
+- **The status vocabulary has never been observed.** `ORDERS_READ` prints it.
+  An unmapped status reaches `unknown`, which changes nothing — so a bad
+  mapping leaves the order blocking rather than mis-booking it.
+
+**A parsing error caught before it shipped, recorded because the class recurs.**
+The first status parser split on the last underscore to strip the venue's enum
+prefix. `ORDER_STATUS_SOMETHING_NEW` tails to `new` — a RESTING status — so a
+status the venue had never shown us would have read as confidently resting
+instead of reaching `unknown`. A loose match that produces a plausible answer is
+worse than no match, because `unknown` is the value the whole design depends on.
+Now the known prefix is stripped and the remainder matched whole.
