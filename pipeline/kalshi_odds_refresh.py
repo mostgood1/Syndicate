@@ -720,16 +720,32 @@ def join_to_board(
             f" board_markets={report.get('board_market_vocabulary')}",
             flush=True,
         )
-        # The CLUB CODES, both sides. `event_not_on_our_board` is a count and
-        # cannot say which spelling is missing; printing Kalshi's blob beside
-        # our board's makes the alias readable instead of guessed at, and a
-        # club alias guessed rather than read is how a bet reaches the wrong
-        # game.
-        if report.get("unmatched_events"):
-            print(
-                "[kalshi_odds] JOIN_EVENTS"
-                f" unmatched={report.get('unmatched_events')}"
-                f" board={report.get('board_event_sample')}",
-                flush=True,
-            )
+    # THE CLUB CODES, WHENEVER THERE ARE ANY -- NOT ONLY ON A ZERO-MATCH JOIN.
+    #
+    # This sat inside the `if not matched` block above, and that is precisely
+    # why the Kalshi game-line gap stayed invisible. MEASURED 2026-08-25
+    # 15:56:35Z:
+    #
+    #   BOARD_JOIN kalshi_markets=883 board_rows=1290 matched=5
+    #     reasons={'event_not_on_our_board': 20, ...}
+    #
+    # Five player props matched, so `matched` was truthy and the samples never
+    # printed -- while all 20 GAME LINES failed event resolution and nothing
+    # said which club codes they were. A partial match is the normal state and
+    # it was the one state that suppressed the diagnostic.
+    #
+    # `game_lines_disabled` is ABSENT from those reasons, which is the reading
+    # that matters: that counter fires only for a game line whose event
+    # RESOLVED, so its absence means zero resolved. Turning
+    # `SYNDICATE_KALSHI_GAME_LINES` on would price nothing. The blocker is the
+    # club-code alias, exactly as `kalshi_board_join.py:528` predicted
+    # ("`OAK` against `ATH` is a real possibility and every such gap is an alias
+    # nobody has written yet"), and this line is the work list for it.
+    if report.get("unmatched_events"):
+        print(
+            "[kalshi_odds] JOIN_EVENTS"
+            f" unmatched={report.get('unmatched_events')}"
+            f" board={report.get('board_event_sample')}",
+            flush=True,
+        )
     return report
