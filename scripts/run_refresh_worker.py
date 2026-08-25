@@ -4266,6 +4266,39 @@ def main() -> int:
                     f" unmapped={_unmapped}",
                     flush=True,
                 )
+
+                # SECOND DIAGNOSTIC: `unmapped_series` only reports NON-ok
+                # verdicts, so a market that classify_market marks `status=ok`
+                # but with the WRONG grammar (e.g. team_spread instead of
+                # moneyline) is invisible to it -- a live, real, two-team
+                # win-probability market was confirmed on kalshi.com directly
+                # (Red Sox @ Marlins, YES 72c/NO 29c, $6.7M volume) at the
+                # exact moment the first diagnostic reported zero moneylines,
+                # so this classifies EVERY market and tallies by (series,
+                # grammar-or-refusal-reason) to find where it actually landed.
+                from syndicate.features.shared.kalshi_catalogue import classify_market
+
+                _tally: dict[str, dict[str, int]] = {}
+                _samples: dict[str, str] = {}
+                for _m in _kalshi_markets_diag:
+                    _verdict = classify_market(_m)
+                    _series = str(_m.get("series") or "").strip().upper()
+                    _bucket = _verdict.get("grammar") if _verdict.get("status") == "ok" else f"REFUSED:{_verdict.get('reason')}"
+                    _tally.setdefault(_series, {}).setdefault(str(_bucket), 0)
+                    _tally[_series][str(_bucket)] += 1
+                    _samples.setdefault(_series, str(_m.get("title") or "")[:80])
+                print(f"[kalshi_polymarket_arb] CLASSIFY_TALLY {_tally}", flush=True)
+                print(f"[kalshi_polymarket_arb] CLASSIFY_SAMPLES {_samples}", flush=True)
+
+                # Direct search for the confirmed live market by team name, in
+                # case its series/ticker does not match anything expected.
+                _needles = ("boston", "miami", "red sox", "marlins")
+                _hits = [
+                    {"series": m.get("series"), "ticker": m.get("ticker"), "title": m.get("title")}
+                    for m in _kalshi_markets_diag
+                    if any(n in str(m.get("title") or "").lower() for n in _needles)
+                ][:20]
+                print(f"[kalshi_polymarket_arb] BOS_MIA_SEARCH hits={len(_hits)} sample={_hits}", flush=True)
             except Exception as exc:
                 print(f"[kalshi_polymarket_arb] UNMAPPED_DIAG_FAILED {type(exc).__name__}: {exc}", flush=True)
     except Exception as exc:
