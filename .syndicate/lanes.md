@@ -2388,6 +2388,27 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   **READ-ONLY AUDIT.** No execution, pricing or order-submission code touched;
   no `render.yaml`; no deploy. The script is a read-only analyser over
   artifacts already on the worker and is not wired into any loop.
+  **Added 2026-08-25 for the boot hook (PR after #65), user decision "hand off
+  to next deploy":** `scripts/run_live_odds_refresh_worker.py` and
+  `tests/test_polymarket_spread_audit_hook.py` (NEW).
+  Nothing else is claimed by this lane.
+- **NO CARVE-OUT WAS NEEDED and none was taken** -- checked, not assumed. The
+  live-odds worker entrypoint is held by NO open lane:
+  `wnba-live-odds-capture-gap` lists it explicitly as "Not claimed, read-only
+  reference". `ListAgents` also returned no reachable peer, the same condition
+  `exchange-markets-api-integration` recorded for its two carve-outs, but it
+  did not arise here.
+- **The REFRESH worker's entrypoint was deliberately NOT used**, even though it
+  is where the two `*_PROBE_ON_BOOT` hooks this one mirrors already live. It is
+  the repo's one contested file (held by `exchange-markets-api-integration` and
+  `portfolio-ledger-service-split` -- a pre-existing `check_lane_invariants.py`
+  FAIL, reproduced against `origin/main` with my change reverted, so it is not
+  mine), and adding a third toucher makes a known problem worse. **Its path is
+  deliberately not written in backticks anywhere in a `- Files:` block on this
+  lane:** the checker's own `[hint]` says a backticked path inside that block
+  becomes a CLAIM, and an earlier draft of this very sentence made this lane a
+  third holder of that contested file -- the note explaining the avoidance
+  caused the thing it described.
 - Collision check: `exchange-markets-api-integration` (session 71a74bb7) and
   `portfolio-decision-and-execution` (session 9324a3e5) hold every Polymarket
   `.py` module between them. Neither path above is claimed by any OPEN lane,
@@ -2488,6 +2509,38 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Twelve gaps are tabulated with verbatim slugs; the browsable Polymarket US
   market URL is UNOBSERVED and deliberately not constructed -- one link from the
   user confirms it and unlocks the rest of the gap table.
+- **THE SPREAD TEST CANNOT BE RUN FROM A SESSION SANDBOX, established 2026-08-25
+  ~21:0xZ, and the hook that makes it runnable is now shipped OFF.** Four paths
+  were checked, not assumed: (a) the script is on a PR branch, workers run
+  `main` with `autoDeploy=no`; (b) nothing invoked it -- `grep` for
+  `audit_polymarket_coverage` outside its own file returned zero hits; (c) SSH
+  is unavailable -- no key on the account (only an empty
+  `commit_signing_key.pub`) and TCP 22 to `ssh.oregon.render.com` is blocked;
+  (d) the inputs cannot be pulled here either -- `/api/ops/artifacts/export`
+  403s at the agent proxy and `mcp__Render__get_key_value` returns instance
+  METADATA only, never contents. **A separate sidecar service was the best idea
+  and it also fails:** both inputs ARE in the shared keyvalue (that is the whole
+  point of `refresh_state_store`), but `SYNDICATE_REFRESH_STATE_URL` comes from
+  `fromService` -- blueprint-only -- and the instance has `ipAllowList: []`, so
+  giving a new service that URL means pushing `render.yaml`, which fires
+  `blueprint_sync` across all three live services (`#284`). **User decision
+  (asked, not assumed): hand off to the next deploy.** The hook is
+  `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT`, absent = OFF, additive,
+  try/except-wrapped, read-only, placed AFTER `_polymarket_us_slate_refresh_tick()`
+  so it reads the current cycle's book rather than the previous one. 12 new
+  tests assert BOTH directions (`off != on`), that it refuses BY NAME rather
+  than with a zero, that it cannot raise into the boot loop, that one fixture
+  casts one vote regardless of ladder depth, and that an `away` board row is
+  normalised before comparing. **205 tests green** across
+  `test_live_odds_refresh_worker.py`, `test_live_odds_worker_execution.py`,
+  `test_polymarket_{board_join,us_markets,side_vocabulary,slate_freshness,
+  join_date,resolver_wrong_game}.py` and the new file.
+  **STILL OWED, and doc SS5.3 stays UNCONFIRMED until it lands:** set
+  `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` on `live-odds-worker` at the
+  next deploy of that service, read one `SPREAD_SIGN_AUDIT` line, unset the
+  flag. The reading is bimodal -- `rate` ~1.0 means the reference club is the
+  slug's `<home>`, ~0.0 means `<away>`, **anything between FALSIFIES the
+  symmetric-ladder finding and spreads must stay refused.**
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

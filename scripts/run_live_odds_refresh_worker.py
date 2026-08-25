@@ -1238,6 +1238,35 @@ def _polymarket_us_slate_probe_at_boot() -> None:
         )
 
 
+def _polymarket_spread_sign_audit_at_boot() -> None:
+    """Which team does a Polymarket spread's sign belong to? Read-only, opt-in.
+
+    Spreads are refused on every sport by name -- `execute_portfolio`'s
+    `spread_side_needs_verified_team_mapping` and `venue_quote_adapters`'
+    matching refusal -- because a spread's outcomes are signed numbers
+    (`["-1.50","+1.50"]`) and name no team. That cost 1,519 quotes per cycle on
+    2026-08-25.
+
+    Two of the three facts needed to lift it are confirmed from production
+    (the slug's `pos`/`neg` token labels `outcomes[0]`, 5 rows of 5; each
+    fixture's ladder is symmetric about zero). The third -- home or away -- is
+    not readable from any log line this worker emits, which is why this exists.
+
+    Wrapped whole: a diagnostic that can stop the loop it is diagnosing is
+    worse than no diagnostic.
+    """
+    try:
+        from scripts.audit_polymarket_coverage import run_spread_audit_if_enabled
+
+        run_spread_audit_if_enabled()
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[live_odds_worker] POLYMARKET_SPREAD_SIGN_AUDIT_FAILED"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _game_line_grade_audit_at_boot() -> None:
     """Print the raw facts behind each game-line verdict, once, for eyeballing.
 
@@ -1882,6 +1911,15 @@ def main() -> int:
         # The WRITER, not the probe: the probe reports shape once at boot, this
         # keeps the artifact fresh for the fan-in to read.
         _polymarket_us_slate_refresh_tick()
+        # AFTER the writer, deliberately: the audit reads the slate artifact,
+        # so running it before the refresh tick would measure the previous
+        # cycle's book. Inert unless SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT
+        # is set -- absent means off -- and it only reads, so a boot with the
+        # flag on costs one artifact read and one printed line. Unset the flag
+        # again once the reading is taken, same as the two probe hooks on the
+        # sibling worker. Full reasoning:
+        # `docs/ai_context/polymarket_oddsapi_coverage_audit.md` SS5.4.
+        _polymarket_spread_sign_audit_at_boot()
         _game_line_grade_audit_at_boot()
         _log_worker_memory("loop_start", interval_seconds=interval_seconds, max_uptime_seconds=max_uptime_seconds)
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
