@@ -4299,6 +4299,29 @@ def main() -> int:
                     if any(n in str(m.get("title") or "").lower() for n in _needles)
                 ][:20]
                 print(f"[kalshi_polymarket_arb] BOS_MIA_SEARCH hits={len(_hits)} sample={_hits}", flush=True)
+
+                # THIRD DIAGNOSTIC: is KXMLBGAME even a series Kalshi's own
+                # catalogue lists, and what does IT call it? BOS_MIA_SEARCH
+                # only sees markets already fetched into kalshi_markets.json --
+                # if the moneyline series is never discovered/registered, it
+                # is never fetched, and would be invisible to that search even
+                # though the market is real and live on the site. This asks
+                # Kalshi's /series catalogue directly, which is upstream of
+                # both discovery-registration and the per-series fetch.
+                try:
+                    from syndicate.features.shared.kalshi_client import discover_series
+
+                    _series_report = discover_series()
+                    _titles = (_series_report or {}).get("titles") or {}
+                    _game_titles = {t: v for t, v in _titles.items() if "GAME" in str(t).upper()}
+                    print(
+                        f"[kalshi_polymarket_arb] SERIES_CATALOGUE_DIAG status={_series_report.get('status')}"
+                        f" count={_series_report.get('count')} kxmlbgame_title={_titles.get('KXMLBGAME')!r}"
+                        f" game_series={_game_titles}",
+                        flush=True,
+                    )
+                except Exception as exc:
+                    print(f"[kalshi_polymarket_arb] SERIES_CATALOGUE_DIAG_FAILED {type(exc).__name__}: {exc}", flush=True)
             except Exception as exc:
                 print(f"[kalshi_polymarket_arb] UNMAPPED_DIAG_FAILED {type(exc).__name__}: {exc}", flush=True)
     except Exception as exc:
