@@ -1,5 +1,69 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#559` — **`find_first_game_offset` lands ABOVE ~8,400 rows of real game markets. Its partition premise is false and `monotonic` cannot detect it.** — lane `portfolio-decision-and-execution` (session `9324a3e5`, authored `508dbc02`/`f08930f32` and owns `polymarket_us_markets.py` in practice), raised by lane `polymarket-oddsapi-coverage-audit`, 2026-08-25, measured — **NOT MINE TO FIX; HANDED OVER**
+
+Deploy + full working: `deploys.md` 2026-08-25T22:54:25Z. Audit: `polymarket_oddsapi_coverage_audit.md` §2.0.
+
+Probed directly on live-odds-worker, 22:54:25Z, one signed read per rung:
+
+```
+OFFSET_BOUNDARY_PROBE boundary=20964 probes=17 monotonic=True
+  games_below_boundary={'12578': 5, '16771': 5, '18867': 5} at_boundary_games=1
+  verdict='BOUNDARY TOO HIGH -- 3 offset(s) below 20964 carry game rows, so part
+           of the slate is invisible to us. NOT a venue absence.'
+```
+
+**The `closed=false` ordering is not `[futures][games][empty]`.** Verbatim per offset:
+
+```
+  4,192   futures  culture/science   dccc-measles-us-2026-12-31-gt4500
+  8,385   futures  politics          ushrewc-ushr-tx-09-2026-11-03-rep
+ 12,578   GAMES 5/5  SPREAD  sports  asc-nfl-ne-cle-2026-08-27-pos-1pt5   <-- NFL FULL-GAME SPREAD
+ 16,771   GAMES 5/5  TOTAL   sports  tsc-nfl-pit-buf-2026-08-27-1q-5pt5
+ 18,867   GAMES 5/5  TOTAL   sports  tsc-nfl-cin-phi-2026-08-28-4q-17pt5
+ 19,915   futures  sports (golf)     tec-dpwt-britmast-2026-08-27-r1l-jorlof
+ 20,754   futures  sports (LPGA)     tec-lpga-fmcham-2026-08-27-r3l-hyecho
+ 20,964   1/5 games, FUTURE+MONEYLINE tec-f1-pigp-2026-09-06-cons-alpine  <-- THE BOUNDARY
+ 22,964   GAMES 5/5  PROP            astatc-mlb-lad-atl-2026-08-25-xi
+```
+
+A band of golf/F1 futures sits ABOVE a large block of game markets and the binary
+search converges into it. Everything below 20,964 is never fetched.
+
+**Why nothing caught it.** `monotonic=True` passed while being wrong: it only
+checks offsets the search itself probed, so a boundary inside a futures band
+above the block satisfies it. It is the sole check on the premise the function
+rests on, and its true value carries no information. `truncated=False` is
+technically true and materially misleading -- the scan paged to the end, from
+the wrong start.
+
+**What it explains.** `games` 13,255 -> 7,936 on a scan reporting completeness;
+MLB full-game spreads leaving the join's index between 20:16Z and 22:01Z
+(`offered: ['chc-az@-2.5', ...]` -> `no_candidates|mlb|spreads: 51`); and
+`SPREAD_SIGN_AUDIT fixtures=0` -- the spread team/sign question was never
+answerable on 2026-08-25 because the markets it needs are below the boundary.
+
+**What it is NOT.** `_slate_within_budget` was the first hypothesis and is fully
+exonerated: `dropped_for_size=0 dropped_by_date={}` every cycle, 5.99MB
+headroom, `fetched == count`. It has never fired. And it is not a venue
+absence -- the probe reads those markets directly.
+
+**Money impact.** Every market below the boundary is unresolvable at order time
+and surfaces as `OrderBuildError: market_unresolved_for_position` -- the same
+symptom that prompted `f08930f32`. **NFL wk1 is 2026-08-27 and its full-game
+spreads are in the invisible band.**
+
+**Why this is not a constant to nudge.** The partition premise is false, so a
+search assuming contiguity cannot be made correct by moving its bounds. Options
+for the owning lane: a multi-band scan, a linear sweep of the sports category,
+or a `monotonic` that samples the whole range rather than the search path --
+the last is the cheapest and would at least make the failure loud.
+
+**Reproduce for free:** `SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT=1` on
+live-odds-worker (`scripts/audit_polymarket_coverage.py::run_offset_probe_if_enabled`,
+merged in PR #74). Currently set to `0`. It derives its rungs from the live
+boundary, so it stays valid as ids grow.
+
 ### `#558` — **PR #61 is deployed and captures nothing: NCAAF is excluded from the sweep by `SYNDICATE_ACTIVE_SPORTS`, an env var, not by the season calendar.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, measured — **NEEDS A USER DECISION**
 
 State: `state.md` `[ncaaf-sweep-env-gate]`. Deploy: `deploys.md` 2026-08-25T20:31Z.
