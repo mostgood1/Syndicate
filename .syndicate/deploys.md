@@ -28284,3 +28284,79 @@ which is the direction that fails safe.
   key; a belt-and-braces check at `submit_order` (slug's parsed teams vs the
   position's) would have caught this class at the last moment and does not
   exist. Worth adding.
+
+### 2026-08-25 15:50:40Z — `0531f8819` — TWO FIXES VERIFIED, ONE INERT
+
+#### verify: THE WRONG-GAME KEY IS FIXED, on live data
+
+Same row, same market, before and after `aa5c43ee8`:
+
+    14:57:34Z  TEX @ CWS h2h home  ->  aec-mlb-pit-sd-2026-08-25    WRONG GAME
+    15:50:40Z  TEX @ CWS h2h home  ->  aec-mlb-tex-cws-2026-08-25   correct
+
+The slug now names the teams on the row. That is `#547` confirmed against
+production rather than against its own tests.
+
+#### verify: THE AGGREGATOR CONFLICT WAS REAL
+
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=180 books=['kalshi','polymarket']
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=273 books=['kalshi','polymarket']
+
+**OddsAPI was supplying 180-273 duplicate kalshi/polymarket quotes PER BUILD**
+into the same `cells` the direct feed writes to -- the dict `_fair_by_side`
+de-vigs and `book_prices` is built from. Two different numbers for one venue
+under one name.
+
+Whether this was happening at all was an OPEN QUESTION when the filter was
+written, which is exactly why it was built with a counter instead of a silent
+`continue`. One build answered it. **A guard that cannot report what it caught
+is a guess with a `continue` in it.**
+
+#### THE LESSON: A FIX AT THE WRONG LAYER IS BYTE-IDENTICAL TO NO FIX
+
+`0531f8819` taught `_polymarket_resolve_market` to read a dict `venue_ticker`.
+It changed nothing:
+
+    POLYMARKET_MARKET_NOT_FOUND
+      slug={'slug': 'aec-mlb-tex-cws-2026-08-25', 'tick_size': 0.005, ...}
+
+`execute_portfolio.py:99` had already run `str(position.get("venue_ticker"))`
+when the `OrderRequest` was built, so `isinstance(raw, Mapping)` tested a STRING
+that merely looked like a dict. The refusal, the counter and the failure mode
+were unchanged from before the fix.
+
+**Nothing but the log line would have caught this.** The tests passed -- they
+called the resolver directly with a real dict, which is a shape the production
+path never delivers. The unit test proved the function worked; it could not
+prove the function was reached with that input.
+
+Rule earned: **when a fix targets a value's SHAPE, fix it where the shape is
+DECIDED, and pin the boundary rather than the consumer.** `4aea9fe2e` normalises
+at `_venue_ticker_of`, where `position` becomes `OrderRequest`, so
+`OrderRequest.venue_ticker` finally holds what its annotation says.
+
+That is the second time today a passing test described a stronger property than
+it tested (the first: two resolver tests named for tight keying that never
+varied the game).
+
+#### STILL OPEN: KALSHI h2h
+
+    LIVE_ORDER status=rejected venue=kalshi ticker=None market=h2h
+      error='OrderBuildError: no_live_price: None'
+
+Unchanged. `#547`'s key fix made a moneyline KEYABLE -- `(evt, "h2h", "", None,
+"home")` is now a valid key on both sides -- but no ticker is stamped, so the
+board join is not producing an h2h MATCH to key. Consistent with what the
+reprice reports Kalshi offering:
+
+    kalshi: ['mlb|spreads_1st_5_innings|over|2.5',
+             'mlb|totals_1st_5_innings|over|6.5', ...]
+
+Segment markets and player props; no full-game moneyline. That is a join or
+coverage question and is NOT diagnosed. Do not assume the key fix addressed it.
+
+#### NOT DEPLOYED
+
+`4aea9fe2e` is pushed and unshipped. With it, the next Polymarket execution tick
+can place a REAL order for the first time -- caps $10/order, $40/day, $80 across
+venues.
