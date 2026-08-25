@@ -222,6 +222,87 @@ SERIES_OUT_OF_SCOPE: dict[str, str] = {
     "KXKBORFI": "kbo",
     "KXUFCFIGHT": "ufc",
     "KXSOWBBALLGAME": "softball",
+    # ------------------------------------------------------------------
+    # SEASON AND SLATE FUTURES, evicted 2026-08-25. Real markets, in sports
+    # we model, that NO board row can ever match -- the board is built per
+    # GAME DATE and these have no game.
+    #
+    # HOW THEY GOT IN: `auto_game_series_from_catalogue` registers any
+    # sport-token series whose title TAIL resolves via `canonical_game_market`,
+    # and Kalshi titles a division future "... Division Winner". "Winner" is a
+    # game-market word, so the gate that exists to find moneylines let the
+    # futures through with them.
+    #
+    # WHAT IT COST, measured 2026-08-25 on `[kalshi_odds] TICK this_tick` and
+    # `[kalshi_odds] JOIN_TITLES by_series` (21:13:07Z / 21:15:49Z): roughly
+    # 1,660 markets of the 6,000-market working set and ~34 of the 193 slots in
+    # a 60-per-tick fetch rotation -- so a live ladder waited ~8 extra minutes
+    # behind markets that cannot be bet. `KXNCAAFWINS` and `KXNCAAFAWARD` were
+    # each capped at EXACTLY 400 by `MAX_MARKETS_PER_SERIES`, i.e. consuming
+    # the whole per-series bound, and every one of those 800 came back
+    # `unreadable_title`.
+    #
+    # WHY THE REGISTRY AND NOT A DATE FILTER. Dropping undated markets from the
+    # working set is the obvious fix and `kalshi_odds_refresh` records that it
+    # "was tried and reverted": player props skip the join's date check, so a
+    # prop whose ticker shape does not parse was silently dropped from the
+    # venue we actually trade, and six tests caught it. Evicting the SERIES is
+    # both safer and strictly better -- it stops the FETCH, which a
+    # market-level filter cannot.
+    #
+    # EVERY ENTRY BELOW WAS SEEN IN PRODUCTION, with the count beside it. This
+    # list is deliberately not a title-pattern rule: the series-level titles
+    # these register on have not been read, and inventing a pattern from market
+    # titles is the guess this file exists to refuse.
+    # ------------------------------------------------------------------
+    # Division / conference winners. Sample title, KXNFLAFCEAST 21:13:07Z:
+    # 'Will New York J win the Pro Football AFC East Division?'; KXNBACENTRAL
+    # 21:15:49Z: 'Will Milwaukee be the Central Division winner in the 2026-27
+    # season?'; KXMLBNLCENT 21:15:49Z: 'Will St. Louis be the 2026 NL Central
+    # Division Winner'.
+    "KXMLBALEAST": "season_futures",     # 5 markets
+    "KXMLBALCENT": "season_futures",     # 5
+    "KXMLBALWEST": "season_futures",     # 5
+    "KXMLBNLEAST": "season_futures",     # 5
+    "KXMLBNLCENT": "season_futures",     # 5
+    "KXMLBNLWEST": "season_futures",     # 5
+    "KXNBAATLANTIC": "season_futures",   # 5
+    "KXNBACENTRAL": "season_futures",    # 5
+    "KXNBANORTHWEST": "season_futures",  # 5
+    "KXNBAPACIFIC": "season_futures",    # 5
+    "KXNBASOUTHEAST": "season_futures",  # 5
+    "KXNBASOUTHWEST": "season_futures",  # 5
+    "KXNFLAFCEAST": "season_futures",    # 4
+    "KXNFLAFCNORTH": "season_futures",   # 4
+    "KXNFLAFCSOUTH": "season_futures",   # 4
+    "KXNFLAFCWEST": "season_futures",    # 4
+    "KXNFLNFCEAST": "season_futures",    # 4
+    "KXNFLNFCNORTH": "season_futures",   # 4
+    "KXNFLNFCSOUTH": "season_futures",   # 4
+    "KXNFLNFCWEST": "season_futures",    # 4
+    "KXNHLATLANTIC": "season_futures",   # 8
+    "KXNHLCENTRAL": "season_futures",    # 8
+    "KXNHLMETROPOLITAN": "season_futures",  # 8
+    "KXNHLPACIFIC": "season_futures",    # 8
+    # Season win totals, awards and season-long player races. The two largest
+    # single wasters on the venue.
+    "KXNCAAFWINS": "season_futures",     # 618 listed, 400 kept, 400 unreadable
+    "KXNCAAFAWARD": "season_futures",    # 509 listed, 400 kept, 400 unreadable
+    "KXNBAWINS": "season_futures",       # 312, all unreadable
+    "KXNFLH2HWINS": "season_futures",    # 22
+    "KXWNBAWINS": "season_futures",      # 19
+    "KXNHLSEASONPTS": "season_futures",  # seen in AUTO_SERIES game_sample 19:11:24Z
+    "KXNFLPLAYOFFHOST": "season_futures",  # 32
+    "KXNBAMOSTWINS": "season_futures",   # 4
+    # Slate-level and exhibition markets: real, and not a game line on any
+    # board row. KXNFLCOMPETE 21:13:07Z: 'Jake Paul to compete in a Pro
+    # Football game in the 2026-27 season?'.
+    "KXNFLHIGHSCORE": "slate_futures",   # 9
+    "KXNCAAFHIGHSCORE": "slate_futures", # 10
+    "KXNBAPTSALLGAMES": "slate_futures", # AUTO_SERIES game_sample 19:35:08Z
+    "KXNFLCOMPETE": "not_a_game_line",   # 2
+    "KXNFLCELEBRITYGAME": "not_a_game_line",  # AUTO_SERIES game_sample 16:55:55Z
+    "KXNBASLAMDUNK": "not_a_game_line",  # AUTO_SERIES game_sample 17:41:52Z
 }
 
 GRAMMAR_PLAYER_THRESHOLD = "player_threshold"

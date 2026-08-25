@@ -544,7 +544,7 @@ than every registry gap in this document combined.
 
 ---
 
-## 6. Over-registration — the mirror image, and it is not harmless
+## 6. Over-registration — the mirror image ✅ **FIXED, not yet deployed**
 
 `auto_game_series_from_catalogue` registers any sport-token series whose title
 *tail* resolves via `canonical_game_market`. **Season-long futures pass that
@@ -575,10 +575,13 @@ real markets need.
   20:11:06Z: a season future has no game day to be filed under, which is
   correct behaviour, but it means the write cost buys nothing.
 
-**Cheapest correct fix:** these are `SERIES_OUT_OF_SCOPE` candidates —
+**FIXED 2026-08-25 (§11c).** 38 series moved to `SERIES_OUT_OF_SCOPE` —
 "we do not model this" is a *different state* from "we have not looked at this
-yet", and `SERIES_OUT_OF_SCOPE`'s own comment says the queue is only useful if
-it means the second.
+yet", and that dict's own comment says the queue is only useful if it means the
+second. **Measured effect: 1,661 markets freed from a 6,000 working set and 38
+of 193 fetch slots — 20% of the rotation.** The eviction bites at
+REGISTRATION, so these are never fetched at all; refusing them later would
+still have spent the request.
 
 ---
 
@@ -698,8 +701,8 @@ deploy, and `pipeline/kalshi_discovery.py` is being edited today by
    against 68 gap series (19:12:01Z) it under-reports by ~5×, and it is the
    line the user has been working from all week. **Note it is inert without a
    deploy**, which is why it was not applied here.
-6. **Move the futures series to `SERIES_OUT_OF_SCOPE`** (§6) — recovers ~13% of
-   the working set and ~24 slots of a 60-wide fetch window.
+6. ✅ **APPLIED (§11c).** Moved 38 futures series to `SERIES_OUT_OF_SCOPE`
+   (§6) — 1,661 markets and 20% of the fetch rotation.
 7. **Then, and only then, revisit `unreadable_title` at 62% of 6000.** It is
    worth more than everything above put together, and it is the reason the
    "stop paying OddsAPI" table in §5 cannot yet be acted on.
@@ -877,3 +880,45 @@ should appear in `TICK this_tick`. If instead they appear in `GAP` with
 `reason=stat_not_in_market_vocabulary`, the map is right and the *wording* is
 wrong — and the `detail=` field will carry Kalshi's actual stat text verbatim,
 which is the whole point of that refusal being named.
+
+### 11c. Futures eviction — 38 series, 1,661 markets, 20% of the fetch rotation
+
+Season and slate futures were being fetched, stored and joined against. They are
+real markets in sports we model, and **no board row can ever match one** — the
+board is built per game date and a season future has no game.
+
+**How they got in.** `auto_game_series_from_catalogue` registers any sport-token
+series whose title *tail* resolves via `canonical_game_market`, and Kalshi titles
+a division future *"… Division Winner"*. `winner` is a game-market word, so the
+gate that exists to find moneylines admitted the futures alongside them.
+
+| what | measured |
+|---|---|
+| series evicted | **38** of 193 — **20% of a 60-per-tick rotation** |
+| markets freed | **1,661** of a 6,000 working set |
+| `unreadable_title` removed | **1,112** (`KXNCAAFWINS` 400 + `KXNCAAFAWARD` 400 + `KXNBAWINS` 312, 21:13:07Z) |
+| worst offenders | `KXNCAAFWINS` 618 listed and `KXNCAAFAWARD` 509, **each capped at exactly 400** — consuming the entire per-series bound, all 800 unreadable |
+
+**Why the registry and not a date filter.** Dropping undated markets from the
+working set is the obvious fix, and `kalshi_odds_refresh.py` records that it
+**"was tried and reverted"**: player props skip the join's date check, so a prop
+whose ticker shape does not parse was silently dropped from the venue we
+actually trade — *"Six tests caught it."* Evicting the **series** is both safer
+and strictly better: it stops the **fetch**, which a market-level filter cannot.
+
+**The guard is the point.** Evicting by ticker is only safe if no series carrying
+real game markets went with them — and the names are adjacent by construction
+(`KXNBAWINS` beside `KXNBAGAME`, `KXNHLCENTRAL` beside the NHL game lines). A
+test asserts that all 15 real game-line series still register, that none is
+out-of-scope, and that `SERIES_SPORT` and `SERIES_OUT_OF_SCOPE` never share a
+ticker.
+
+**Deliberately not a title-pattern rule.** The series-level titles these register
+on have not been read; inventing a pattern from market titles is exactly the
+guess this integration exists to refuse. Every one of the 38 was observed in
+production with its count beside it.
+
+**Verification after deploy:** `TICK series_wanted` **193 → ~155**, `markets`
+below 6,000 or the same 6,000 composed of joinable markets, and
+`JOIN_TITLES by_series` no longer naming `KXNCAAFWINS` / `KXNCAAFAWARD` /
+`KXNBAWINS` at all.

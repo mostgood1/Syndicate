@@ -2310,11 +2310,40 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     RULE read off real titles rather than inferred from one sample. The new
     `h2h_keyed_by_team` / `h2h_team_unresolved` counters on the adapter's
     `reason` are what will size this in production.
+- **STEP 2 DONE 2026-08-25 — FUTURES EVICTED. Not deployed.** 497 tests green.
+  38 series to `SERIES_OUT_OF_SCOPE`: **1,661 markets** freed from a 6,000
+  working set and **38 of 193 fetch slots -- 20% of the rotation**, so a live
+  ladder stops waiting ~8 minutes behind markets that cannot be bet.
+  `KXNCAAFWINS` (618 listed) and `KXNCAAFAWARD` (509) were each capped at
+  EXACTLY 400, consuming the whole per-series bound, and all 800 were
+  `unreadable_title`.
+  - **The eviction bites at REGISTRATION**, which is what keeps them out of
+    `sports_series()` and therefore out of the fetch. Refusing later would
+    still spend the request.
+  - **A DATE FILTER WAS THE OBVIOUS FIX AND IS FORBIDDEN BY PRIOR ART IN THIS
+    FILE.** `kalshi_odds_refresh.py` records that dropping undated markets
+    "was tried and reverted" -- player props skip the join's date check, so a
+    prop whose ticker shape does not parse was silently dropped from the venue
+    we actually trade, and six tests caught it. Read before writing; the
+    series-level eviction is both safer and strictly better.
+  - **GUARDED.** Evicting by ticker is only safe if checked: `KXNBAWINS` sits
+    beside `KXNBAGAME`, `KXNHLCENTRAL` beside the NHL game lines. A test pins
+    that all 15 real game-line series still register, that none is
+    out-of-scope, and that `SERIES_SPORT` and `SERIES_OUT_OF_SCOPE` never
+    share a ticker.
+  - **Deliberately NOT a title-pattern rule** -- the series-level titles these
+    register on have not been read, and inventing a pattern from market titles
+    is the guess this integration exists to refuse. All 38 observed, counts
+    recorded beside each.
 - **NEXT ACTION:** read `[layer2_shortlist] VENUE_REPRICE_KEYS` after a deploy.
   `sources_offered` for kalshi must show `h2h|<team>` where it showed
   `h2h|yes`, and `by_source` must carry `spreads_refused:<n>` and
-  `h2h_keyed_by_team:<n>`. **`stamped` rising is the outcome; the band caveat
-  above applies -- matched ran 44 -> 104 -> 0 across three consecutive builds.**
+  `h2h_keyed_by_team:<n>`. For step 2: `TICK series_wanted` **193 -> ~155**
+  and `JOIN_TITLES by_series` no longer naming `KXNCAAFWINS` /
+  `KXNCAAFAWARD` / `KXNBAWINS` at all. **`stamped` rising is the outcome;
+  the band caveat above applies -- matched ran 44 -> 104 -> 0 across three
+  consecutive builds.**
+- **REMAINING: step 3, line-aware rungs, scoped to NFL/MLB/WNBA.**
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
