@@ -145,6 +145,19 @@ _GAME_CORE: dict[str, str] = {
     "money line": "h2h",
     "ml": "h2h",
     "h2h": "h2h",
+    # "Game" is Kalshi's OWN word for the straight moneyline series, not a
+    # synonym anyone here invented. Measured 2026-08-24: KXMLBGAME's real
+    # series-level title is exactly "Professional Baseball Game" (confirmed
+    # against a live $6.7M-volume market the user found on kalshi.com that
+    # this vocabulary gap was silently dropping) -- no "moneyline"/"winner"
+    # word at all, so `canonical_game_market` returned None and the series
+    # was never registered, never fetched, never priced. The same "<Sport>
+    # Game" pattern is Kalshi's title for the moneyline series on EVERY
+    # sport carried here (KXNFLGAME "Professional Football Game", KXNBAGAME
+    # "Pro Basketball Game", KXNHLGAME "NHL Game", KXNCAAFGAME "College
+    # Football Game", KXMLSGAME "Major League Soccer Game", ...) -- this was
+    # not an MLB-only gap.
+    "game": "h2h",
     "spread": "spreads",
     "spreads": "spreads",
     "ats": "spreads",

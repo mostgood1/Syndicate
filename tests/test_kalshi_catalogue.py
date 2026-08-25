@@ -328,6 +328,37 @@ def test_a_football_series_now_auto_discovers():
     assert "KXNFLGAMETOTAL" not in found
 
 
+def test_a_bare_game_title_registers_as_the_moneyline():
+    """Measured 2026-08-24: KXMLBGAME's real series-level title on Kalshi is
+    exactly "Professional Baseball Game" -- confirmed against a live,
+    $6.7M-volume moneyline market a user found on kalshi.com that this
+    vocabulary gap was silently dropping from discovery entirely (not
+    misclassified -- never fetched into the artifact at all, because
+    `auto_game_series_from_catalogue` never registered the series in the
+    first place). No "moneyline"/"winner" word appears anywhere in the
+    title, only the bare word "game" -- which is Kalshi's OWN wording for
+    the straight moneyline series, not a synonym invented here. The same
+    "<Sport> Game" pattern is Kalshi's title for the moneyline series on
+    every other sport carried in this repo (KXNFLGAME "Professional
+    Football Game", KXNBAGAME "Pro Basketball Game", KXNHLGAME "NHL Game"),
+    so this was never an MLB-only gap.
+    """
+    from syndicate.features.shared.kalshi_catalogue import auto_game_series_from_catalogue
+
+    found = auto_game_series_from_catalogue(
+        {
+            "KXMLBGAME": "Professional Baseball Game",
+            "KXNFLGAME": "Professional Football Game",
+            "KXNBAGAME": "Pro Basketball Game",
+            "KXNHLGAME": "NHL Game",
+        }
+    )
+    assert found.get("KXMLBGAME") == "mlb"
+    assert found.get("KXNFLGAME") == "nfl"
+    assert found.get("KXNBAGAME") == "nba"
+    assert found.get("KXNHLGAME") == "nhl"
+
+
 def test_prop_candidates_reports_what_it_CANNOT_price():
     """A list of only what already works cannot tell "Kalshi does not list it"
     from "we have no vocabulary for it" -- the confusion that hid 317 NFL
