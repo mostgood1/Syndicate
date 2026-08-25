@@ -1353,3 +1353,47 @@ def test_verify_order_paths_separates_no_ticker_from_unresolvable(monkeypatch, t
     # counter this verifier exists to replace.
     assert detail["examples"].get("h2h|no_venue_ticker"), detail
     assert detail["examples"].get("h2h|market_unresolved"), detail
+
+
+def test_a_kalshi_row_with_no_ticker_says_WHICH_book_priced_it(monkeypatch):
+    """IDENTICAL OUTCOMES, OPPOSITE FIXES, and the verdict has to separate them.
+
+    A row priced from the AGGREGATOR has no Kalshi match by definition, so it
+    has no contract id and is correctly unplaceable -- the paper book still
+    records what the strategy would have done. A row priced from the VENUE and
+    still missing a ticker is a real defect: we matched it, priced it, and lost
+    the id between the join and the plan.
+
+    Measured 2026-08-25 5:01:58 PM Central, the first Kalshi position ever
+    committed:
+
+        ORDER_PATH venue=kalshi status=ok positions=1
+          markets={'totals_alt': {'no_venue_ticker': 1}} examples={}
+
+    Nothing on that line says which of the two it was -- and in the same cycle
+    only 161 of 233 rows were venue-priced, so both readings were live.
+    """
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    def _position(key, source):
+        return {
+            "position_key": key, "event_id": "e-9", "market": "totals_alt",
+            "side": "over", "sport": "mlb", "price": 0.5, "stake_dollars": 1.0,
+            "line": 8.5, "price_source": source,
+        }
+
+    monkeypatch.setattr(
+        portfolio_commit, "read_portfolio_plan_for_venue",
+        lambda _d, venue: {"positions": [_position("p-agg", "aggregator"),
+                                         _position("p-venue", "venue_feed")]}
+        if venue == "kalshi" else {"positions": []},
+    )
+
+    result = runner.verify_order_paths("2026-08-25", venues=("kalshi",))
+    detail = result["venues"]["kalshi"]
+
+    assert detail["markets"]["totals_alt"] == {"no_venue_ticker": 2}, detail
+    example = detail["examples"].get("totals_alt|no_venue_ticker")
+    assert example, detail
+    assert "price_source=" in example, example

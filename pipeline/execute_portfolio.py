@@ -1221,7 +1221,29 @@ def verify_order_paths(
                 else:
                     ticker = _venue_ticker_of(position)
                     if not ticker:
-                        note(market, "no_venue_ticker")
+                        # `price_source` IS THE WHOLE VERDICT HERE, and without
+                        # it this line cannot be acted on.
+                        #
+                        # A row priced from the AGGREGATOR has no Kalshi match
+                        # by definition, so it has no contract id and is
+                        # correctly unplaceable -- the paper book still records
+                        # what the strategy would have done. A row priced from
+                        # the VENUE and still missing a ticker is a real defect:
+                        # we matched it, priced it, and lost the id.
+                        #
+                        # Identical outcomes, opposite fixes. Measured
+                        # 2026-08-25 5:01:58 PM Central, the first Kalshi
+                        # position ever committed reached here as
+                        # `{'totals_alt': {'no_venue_ticker': 1}} examples={}`
+                        # and nothing on the line said which of the two it was.
+                        note(
+                            market,
+                            "no_venue_ticker",
+                            f"price_source={position.get('price_source') or '?'}"
+                            f" event={position.get('event_id') or '?'}"
+                            f" side={position.get('side') or '?'}"
+                            f" line={position.get('line')}",
+                        )
                         continue
                     price = _kalshi_price_for(request)
                     if price is None:
