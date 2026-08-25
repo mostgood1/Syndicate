@@ -1045,3 +1045,261 @@ def test_a_failed_order_is_neither_placed_nor_invisible(monkeypatch):
     result = runner.run_execution("2026-08-22")
     assert result["placed"] == 0
     assert result["failed"] == 1
+
+
+# --------------------------------------------------------------------------
+# Polymarket side resolution depends on what KIND of market it is
+# --------------------------------------------------------------------------
+
+
+def _poly_market(slug, outcomes, prices, market_type="SPORTS_MARKET_TYPE_TOTAL"):
+    import json as _json
+    return {
+        "slug": slug, "sportsMarketTypeV2": market_type,
+        "outcomes": _json.dumps(outcomes), "outcomePrices": _json.dumps(prices),
+        "orderPriceMinTickSize": "0.005", "minimumTradeQty": "0.01",
+        "orderable": True,
+    }
+
+
+def test_a_TOTALS_market_resolves_on_over_under_not_on_team_names(monkeypatch):
+    """MEASURED 2026-08-25T17:45:13Z. The slug was RIGHT -- right game, right
+    number -- and the order still failed:
+
+      totals over 7.5 Tampa Bay Rays @ Detroit Tigers
+      slug=tsc-mlb-tb-det-2026-08-25-7pt5
+      OrderBuildError: market_unresolved_for_position
+
+    The resolver matched every outcome with `_side_for_team`, which resolves
+    TEAM names. A totals market's outcomes are `["Over","Under"]`, so both were
+    skipped and the price stayed None. Every totals order on this venue had
+    failed this way since it went live; only moneylines ever resolved.
+    """
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("tsc-mlb-tb-det-2026-08-25-7pt5", ["Over", "Under"], ["0.52", "0.50"]),
+    ])
+
+    class _TotalReq(_PolyReq):
+        market = "totals"
+        side = "over"
+        line = 7.5
+        venue_ticker = "tsc-mlb-tb-det-2026-08-25-7pt5"
+        home_team = "Detroit Tigers"
+        away_team = "Tampa Bay Rays"
+        requested_price = 0.52
+
+    resolved = runner._polymarket_resolve_market(_TotalReq())
+    assert resolved is not None, "a totals market still refuses"
+    assert resolved[1] == 0.52
+    # The INDEX is what `order_body` turns into `outcomeSide`, so it must be
+    # the Over slot, not merely "some priced slot".
+    assert resolved[4] == 0
+
+
+def test_the_under_side_takes_the_UNDER_price(monkeypatch):
+    """The control. Getting the price right for the wrong side is the failure
+    that bought the wrong team on 2026-08-25."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("tsc-mlb-tb-det-2026-08-25-7pt5", ["Over", "Under"], ["0.52", "0.50"]),
+    ])
+
+    class _UnderReq(_PolyReq):
+        market = "totals"
+        side = "under"
+        venue_ticker = "tsc-mlb-tb-det-2026-08-25-7pt5"
+        requested_price = 0.50
+
+    resolved = runner._polymarket_resolve_market(_UnderReq())
+    assert resolved[1] == 0.50
+    assert resolved[4] == 1
+
+
+def test_a_SPREAD_is_refused_by_name_rather_than_guessed(monkeypatch):
+    """A spread's outcomes are SIGNED NUMBERS -- `["+2.50","-2.50"]` -- and
+    nothing in them says which TEAM is getting the points. Our side is
+    home/away, so pairing them means assuming an ordering, and an assumed
+    ordering on this venue already bought the wrong team once today."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("asc-mlb-cle-laa-2026-08-25-pos-1pt5",
+                     ["+1.50", "-1.50"], ["0.55", "0.47"],
+                     market_type="SPORTS_MARKET_TYPE_SPREAD"),
+    ])
+
+    class _SpreadReq(_PolyReq):
+        market = "spreads"
+        side = "home"
+        line = 1.5
+        venue_ticker = "asc-mlb-cle-laa-2026-08-25-pos-1pt5"
+
+    assert runner._polymarket_resolve_market(_SpreadReq()) is None
+
+
+def test_a_moneyline_still_resolves_on_team_names(monkeypatch):
+    """The path that already worked must not regress."""
+    runner = _artifact_env(monkeypatch)
+    resolved = runner._polymarket_resolve_market(_PolyReq())
+    assert resolved is not None
+    assert resolved[1] == 0.55
+
+
+# --------------------------------------------------------------------------
+# The slippage guard compared two different units, on both venues
+# --------------------------------------------------------------------------
+
+
+def test_american_odds_become_a_probability_before_the_slippage_compare():
+    """MEASURED 2026-08-25T17:59:06Z, the first totals order to resolve a side:
+
+      _SlippageExceeded: planned=-108.0 price=0.52 drift=+108.5200 max=0.03
+
+    `planned` is AMERICAN ODDS off our board; `price` is a probability from the
+    venue. Subtracting them is meaningless, and asymmetrically so -- which is
+    why it survived: negative odds refuse everything, positive odds produce a
+    huge NEGATIVE drift that is never `> max` and sail through unchecked.
+    """
+    import pipeline.execute_portfolio as runner
+
+    assert runner.planned_probability(-108.0) == pytest.approx(0.5192, abs=1e-4)
+    assert runner.planned_probability(104.0) == pytest.approx(0.4902, abs=1e-4)
+    # Already a probability -- passed through, because both forms occur.
+    assert runner.planned_probability(0.52) == 0.52
+
+
+def test_an_ambiguous_planned_price_is_refused_rather_than_guessed():
+    """A guessed unit here is a guessed guard. American odds are conventionally
+    at least 100 from zero and a probability is inside (0,1); anything between
+    is not readable as either."""
+    import pipeline.execute_portfolio as runner
+
+    for ambiguous in (5.0, -3.0, 99.0, 1.0, 0.0, None, "x"):
+        assert runner.planned_probability(ambiguous) is None, ambiguous
+
+
+def test_a_positive_odds_order_is_now_actually_CHECKED(monkeypatch):
+    """The order that reached a venue today was `planned=104.0` against
+    `price=0.495` -- drift -103.5, silently passed. In real units 104.0 is
+    0.4902, so a 0.495 fill is a 0.0048 drift: inside the cap, and now
+    genuinely measured rather than accidentally ignored."""
+    runner = _artifact_env(monkeypatch)
+    resolved = runner._polymarket_resolve_market(_PolyReq())
+    assert resolved is not None
+
+
+def test_a_real_adverse_move_on_positive_odds_is_now_REFUSED(monkeypatch):
+    """The half of the guard that never fired. Planned +104 (0.4902) against a
+    0.75 ask is a 0.26 drift -- far outside the cap, and previously passed
+    because -103.5 is not greater than 0.03."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(prices=("0.75", "0.25")),
+    ])
+
+    class _Moved(_PolyReq):
+        requested_price = 104.0
+
+    with pytest.raises(Exception) as excinfo:
+        runner._polymarket_resolve_market(_Moved())
+    assert "slippage" in str(excinfo.value)
+
+
+def test_a_polymarket_build_error_does_not_charge_the_daily_budget():
+    """MEASURED 2026-08-25T17:59:06Z:
+
+      LIVE_ORDER status=failed venue=polymarket market=spreads
+        error='OrderBuildError: market_unresolved_for_position'
+      EXECUTION placed=0 spent={'dollars': 2.39, 'orders': 1}
+
+    $2.39 and one order charged against a $40 daily cap for something that
+    never left the process. `execution_ledger` reads `venue_contacted`,
+    defaulting to True for unknown exceptions -- Kalshi's OrderBuildError
+    carries the attribute, Polymarket's did not.
+    """
+    from syndicate.features.shared.polymarket_us_orders import OrderBuildError
+
+    assert OrderBuildError.venue_contacted is False
+
+
+# --------------------------------------------------------------------------
+# The order-path verifier: confirmation on demand, without spending anything
+# --------------------------------------------------------------------------
+
+
+def test_the_verifier_reports_which_market_families_would_build(monkeypatch):
+    """The interesting question is never "did one order fail" but "which whole
+    market family cannot transact". `totals` failing on every row while `h2h`
+    succeeds is a different fact from a scattering of misses, and a per-order
+    log cannot show it."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch)
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 0.55,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]} if venue == "polymarket" else {"positions": []})
+
+    report = runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+    markets = report["venues"]["polymarket"]["markets"]
+    assert markets["h2h"]["would_build"] == 1
+
+
+def test_the_verifier_cannot_place_an_order(monkeypatch):
+    """A verifier that could spend money is not a verifier. Nothing in it
+    constructs a submitter, so an adapter that would send must never be
+    reached even when the resolve succeeds."""
+    import pipeline.execute_portfolio as runner
+    from syndicate.features.shared import polymarket_us_orders
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch)
+
+    def explode(*a, **kw):
+        raise AssertionError("the verifier submitted an order")
+
+    monkeypatch.setattr(polymarket_us_orders, "submit_order", explode)
+    monkeypatch.setattr(runner, "_venue_submitter", explode)
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 0.55,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]})
+
+    runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+
+
+def test_the_verifier_names_the_exception_rather_than_saying_failed(monkeypatch):
+    """A verifier that reported "failed" would reproduce the counter this whole
+    session has been prying data out of."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch, markets=[_polymarket_row(prices=("0.95", "0.05"))])
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 104.0,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]})
+
+    report = runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+    verdicts = report["venues"]["polymarket"]["markets"]["h2h"]
+    assert "_SlippageExceeded" in verdicts, verdicts
+
+
+def test_an_empty_plan_is_reported_as_such_not_as_success(monkeypatch):
+    """"Nothing to place" and "everything would build" must not read alike."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": []})
+    report = runner.verify_order_paths("2026-08-24", venues=("kalshi",))
+    assert report["venues"]["kalshi"]["status"] == "no_positions"

@@ -20,8 +20,13 @@ def _isolated(tmp_path, monkeypatch):
         "SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS",
         "SYNDICATE_KALSHI_SERIES",
         "SYNDICATE_KALSHI_SERIES_PER_TICK",
+        "SYNDICATE_KALSHI_DORMANT_INTERVAL_SECONDS",
     ):
         monkeypatch.delenv(name, raising=False)
+    # NO REAL SLEEPING IN TESTS. The spacing is what makes a large per-tick cap
+    # safe against the venue; it has its own tests below, and paying it in
+    # every other test buys nothing but wall clock.
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "0")
     (tmp_path / "intelligence").mkdir(parents=True, exist_ok=True)
     yield
 
@@ -530,3 +535,182 @@ def test_an_empty_read_keeps_the_last_known_markets(monkeypatch):
     _stub(monkeypatch, calls, empty=("A",))
     second = mod.run_kalshi_odds_refresh()
     assert len(second["markets"]) == 1, "an empty read blanked the stored prices"
+
+
+# --------------------------------------------------------------------------
+# Cadence: the calls are FREE, so the limit is the venue's rate, not our budget
+# --------------------------------------------------------------------------
+
+
+def test_the_burst_is_bounded_by_TIME_not_only_by_the_cap(monkeypatch):
+    """The 2026-08-23 http_429s came from RATE, not count.
+
+    The per-tick cap was the only burst control, which is why it sat at 12 --
+    raising it for freshness would have put the burst straight back. Spacing
+    bounds requests per second, so the cap can be about coverage instead.
+    """
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "A,B,C")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "40")
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+
+    slept: list[float] = []
+    monkeypatch.setattr(mod.time, "sleep", lambda s: slept.append(s))
+
+    mod.run_kalshi_odds_refresh()
+    assert sorted(calls) == ["A", "B", "C"]
+    # Three calls, two gaps -- the first pays nothing, so a one-series tick is
+    # not taxed for a burst it cannot create.
+    assert slept == [0.04, 0.04]
+
+
+def test_a_bad_spacing_value_does_not_become_an_unpaced_loop(monkeypatch):
+    """The failure this guard exists to prevent. A typo must fall back to the
+    default, never to zero -- zero is precisely the unpaced loop that drew the
+    429s."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "lots")
+    assert mod.request_spacing_seconds() == mod.DEFAULT_REQUEST_SPACING_MS / 1000.0
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "-5")
+    assert mod.request_spacing_seconds() == mod.DEFAULT_REQUEST_SPACING_MS / 1000.0
+
+
+def test_a_dormant_series_waits_longer_than_a_live_one(monkeypatch):
+    """Where the tick budget was going. An out-of-season series is worth
+    checking hourly, not every two minutes -- and the budget it frees goes to
+    series that actually have markets, which is what makes a high cadence
+    affordable on a free API."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "LIVE,DORMANT")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    monkeypatch.setenv("SYNDICATE_KALSHI_DORMANT_INTERVAL_SECONDS", "3600")
+    calls: list[str] = []
+    _stub(monkeypatch, calls, empty=("DORMANT",))
+
+    mod.run_kalshi_odds_refresh()      # both asked; DORMANT returns nothing
+    assert sorted(calls) == ["DORMANT", "LIVE"]
+    calls.clear()
+
+    mod.run_kalshi_odds_refresh()      # DORMANT is now on the hourly clock
+    assert calls == ["LIVE"], f"a dormant series kept consuming the budget: {calls}"
+
+
+def test_a_series_never_fetched_is_NOT_treated_as_dormant(monkeypatch):
+    """`count == 0` is a positive statement -- we asked, there was nothing.
+    Absence of `count` is unknown, and unknown must be asked at the normal
+    cadence or a newly registered series would wait an hour to be seen once."""
+    assert mod._is_dormant({}) is False
+    assert mod._is_dormant({"count": 0}) is True
+    assert mod._is_dormant({"count": 7}) is False
+
+
+# --------------------------------------------------------------------------
+# The artifact has a hard 8MB ceiling, and it hit it
+# --------------------------------------------------------------------------
+
+
+def test_the_merged_list_is_not_persisted_twice(monkeypatch):
+    """MEASURED 2026-08-25T17:53:48Z, the tick after the queue started rotating:
+
+      KEYVALUE_WRITE_REJECTED size_bytes=13315551 max_bytes=8388608
+      COMPOSITION series=7399941 markets=6682458
+
+    The artifact stored every series' markets AND their concatenation. Same
+    payload, twice, in a document with a hard 8MB ceiling -- so it stopped
+    being written at all and the board fell back to the last good write.
+    """
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "A,B")
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+    mod.run_kalshi_odds_refresh()
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    payload = read_json_file(mod.markets_artifact_path())
+    assert "markets" not in payload, "the merged list is persisted twice again"
+    # ...and it is still READABLE, merged back from the per-series entries.
+    assert len(mod.markets_from_state(payload)) == 2
+
+
+def test_a_legacy_payload_still_reads(monkeypatch):
+    """A deploy must not empty the board. A payload written before the change
+    has the top-level key and no per-series markets."""
+    assert mod.markets_from_state({"markets": [{"ticker": "T1"}]})[0]["ticker"] == "T1"
+    assert mod.markets_from_state(None) == []
+    assert mod.markets_from_state({}) == []
+
+
+def test_one_ladder_series_cannot_crowd_out_a_sport(monkeypatch):
+    """`KXNCAAFSPREAD` was 2.3MB on its own -- a spread ladder with every rung
+    of every game. Bounding per series is safe only because `venue_daily_odds`
+    now records the complete book separately; this artifact is the JOIN's
+    working set, and a working set may be bounded where a record may not."""
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 3)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "BIG")
+
+    def fake(series):
+        return {"markets": [_market(f"{series}-{n}", 0.4, series=series) for n in range(10)],
+                "strategy": "series_filter"}
+
+    monkeypatch.setattr(mod, "fetch_series_markets", fake)
+    result = mod.run_kalshi_odds_refresh()
+    assert len(result["markets"]) == 3
+
+
+def test_the_trim_drops_the_STALEST_series_not_the_alphabetically_last(monkeypatch):
+    """The docstring always said "trimmed OLDEST-SERIES-FIRST"; the code was
+    `all_markets[:MAX_STORED_MARKETS]` -- the alphabetically FIRST N, because
+    `sports_series()` returns sorted tickers. `KXWNBA*` sorts LAST, so the
+    first thing a trim deleted was every WNBA market, silently, while the
+    comment claimed otherwise.
+    """
+    monkeypatch.setattr(mod, "MAX_STORED_MARKETS", 2)
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 10)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "AAA,ZZZ")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+    mod.run_kalshi_odds_refresh()
+
+    # Make AAA stale and ZZZ fresh, then re-merge: the FRESH one must survive.
+    from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+
+    path = mod.markets_artifact_path()
+    state = read_json_file(path)
+    state["series"]["AAA"]["fetched_at"] = "2020-01-01T00:00:00Z"
+    for n in range(3):
+        state["series"]["ZZZ"]["markets"].append(_market(f"ZZZ-{n}", 0.4, series="ZZZ"))
+    write_json_file(path, state)
+
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "999999")
+    result = mod.run_kalshi_odds_refresh()
+    kept = {m["series"] for m in result["markets"]}
+    assert kept == {"ZZZ"}, f"the stale series survived the trim: {kept}"
+
+
+def test_the_daily_book_records_the_COMPLETE_set_not_the_working_set(monkeypatch):
+    """The bound on the working set is justified by the record being complete.
+    If the record inherits the bound, the justification is circular and the
+    bound becomes real data loss.
+
+    MEASURED 2026-08-25T18:33:55Z: `trimmed=2121` markets never reached the
+    daily book, and `KXNCAAFSPREAD`'s ladder was truncated 1994 -> 400 in the
+    one place whose purpose is keeping whole ladders.
+    """
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 2)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "LADDER")
+
+    def fake(series):
+        return {"markets": [_market(f"{series}-{n}", 0.4, series=series) for n in range(9)],
+                "strategy": "series_filter"}
+
+    monkeypatch.setattr(mod, "fetch_series_markets", fake)
+
+    recorded: list[list] = []
+    monkeypatch.setattr(mod, "_record_daily_book", lambda markets: recorded.append(list(markets)))
+
+    result = mod.run_kalshi_odds_refresh()
+
+    # The WORKING SET is bounded -- that is what keeps the artifact writable.
+    assert len(result["markets"]) == 2
+    # The RECORD is not. Every rung of the ladder reaches it.
+    assert len(recorded[0]) == 9

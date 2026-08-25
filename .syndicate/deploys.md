@@ -28716,3 +28716,225 @@ same shape: a counter that named a problem while withholding the data needed to
 act on it. `600a8f9ae` adds the complete per-series count beside the bounded
 sample (deploy `dep-da6skvafngtc73c969ig`) — the sample teaches the grammar, the
 count answers "is this family here at all". Not yet read.
+
+---
+
+## 2026-08-25 — the capture layer's first readings, and four disproven hypotheses
+
+**Deployed:** both workers through `d58cb0b8c` → `5d3a21e4e` → `9ee23abcf` →
+`8ebf397b1` → `441ec9e2f`, all on `origin/main`.
+
+### verify 1 — the Kalshi queue starvation fix WORKED
+
+```
+17:43:04Z  TICK series_wanted=193 due=193 fetched=60 cap=60 markets=1211
+             KXNBAGAME: (6, 'series_filter')
+             KXNBAWINS: (312, 'series_filter')
+           BOARD_JOIN kalshi_markets=1211 board_rows=1290 matched=4
+```
+
+Markets **883 → 1,211 (+37%) in one tick**. `KXNBAGAME` returned markets for
+the first time, and `KXNBAWINS` alone contributed 312 from a series the queue
+had never reached. `oldest_s=145434` is still 40h and is EXPECTED on the first
+tick after the fix — series not yet reached still carry old stamps. Watch it
+fall; if it does not, the rotation is still wrong.
+
+`unreadable_title` rose 216 → 538. That is coverage, not regression: we now
+fetch series we never reached, and ~380 of the 538 are futures.
+
+### verify 2 — the daily odds layer works on both venues
+
+```
+POLYMARKET_DAILY_BOOK files=211 listed=12893 parsed=5938 opened=12893 undated=0
+  unparsed={'SPORTS_MARKET_TYPE_PROP': 5815,
+            'SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME': 1140}
+KALSHI DAILY_BOOK files=7 listed=835 parsed=673 undated=376
+  unparsed={'unreadable_title': 162}
+```
+
+12,893 Polymarket markets now recorded with movement where **73** previously
+reached anything durable. The coverage gap is a number instead of a silence.
+**`DRAWABLE_OUTCOME: 1,140`** is almost certainly the soccer three-way draw leg
+— a market the board already carries.
+
+Kalshi's `undated=376` is the futures separating themselves with no title
+parsing at all: `KXMLBALCENT-26-MIN` carries no game date where
+`KXMLBKS-26AUG24…` does.
+
+**Corrected in `9ee23abcf`:** `files=211` was over-capture — Argentine second
+division, tennis, table tennis, esports — 211 keyvalue writes every 180s for
+leagues no module models. Scoped to `SUPPORTED_SPORT_SLUGS` + soccer, with
+out-of-scope rows COUNTED BY LEAGUE so Polymarket's soccer codes become
+addable from data rather than guessed.
+
+### verify 3 — a fabricated opening, caught by its own log line
+
+```
+MOVER KXMLBKS-26AUG251907KCTOR-TORMSCHERZER31-2 open=0.0 now=0.93 move_pts=93.0
+```
+
+`yes_ask_dollars = 0.0` is NO ASK, not a price. Recorded as an opening it
+manufactures a 93-point move that never happened — and CLV is measured against
+the opening, so every bet on that market would score a beat it never got. A
+price is now strictly inside (0, 1); a one-sided book still records, because
+half a quote is a price the venue showed. Fixed in `8ebf397b1`.
+
+### verify 4 — the reconciliation latch cleared
+
+The 16:08 Polymarket order moved from `submitted` to `rejected
+venue_order_state_canceled`, and execution resumed at 17:45. The per-order read
+plus the `state` field mapping did what the latch entry predicted.
+
+### FOUR HYPOTHESES OF MINE, DISPROVEN BY THEIR OWN DIAGNOSTICS
+
+Recorded together because the pattern matters more than any one of them. Every
+one was a counter that named a problem while withholding its data, and in every
+case the fix that worked was the log line that made guessing unnecessary.
+
+1. **Kalshi club-code alias gaps.** `event_not_on_our_board` 20 → 0 when the
+   date was checked first. There is no alias gap on this slate.
+2. **`JOIN_EVENTS` would produce an alias work list.** All 8 sample slots went
+   to one game.
+3. **A missing `KXMLBGAME` grammar blocks h2h.** The complete per-series count
+   settles it: `by_series={'KXNBAWINS': 312, 'KXMLBINNINGTOTAL': 72, 'KXMLBF3':
+   30, ...}` — `KXMLBGAME` is NOT among the unreadable, and `KXNBAGAME` returns
+   markets fine. The h2h gap is elsewhere and is still unlocated.
+4. **6,838 Polymarket "player props".** `SPORTS_MARKET_TYPE_PROP` includes
+   League of Legends map winners. It is a mixed bucket and the number was an
+   inference from a type name.
+
+### verify 5 — OPEN. Polymarket totals and spreads
+
+```
+17:45:13Z  totals over 7.5  Tampa Bay Rays @ Detroit Tigers
+           slug=tsc-mlb-tb-det-2026-08-25-7pt5   (right game, right number)
+           OrderBuildError: market_unresolved_for_position
+```
+
+`_side_for_team` resolves TEAM names; a totals market's outcomes are
+`["Over","Under"]`. Every totals and spreads order on this venue has failed
+this way since it went live — only moneylines ever resolved. `441ec9e2f` fixes
+totals and REFUSES spreads by name, because a spread's outcomes are signed
+numbers that name no team and an assumed ordering already bought the wrong team
+once today. Not yet read.
+
+Also in `441ec9e2f`: the slate freshness ceiling had stopped guarding. 1800s
+documented as "twice the writer's 900s cadence" became TEN times it when the
+writer dropped to 180s — present, logged, tolerating nine missed writes. The
+cadence is now a named constant with the ceiling derived from it.
+
+---
+
+## 2026-08-25 — CONFIG: `SYNDICATE_KALSHI_GAME_LINES=1` on both workers
+
+**Changed:** env var set on `refresh-worker` (`srv-d91dpertqb8s73co8ls0`) and
+`live-odds-worker` (`srv-d91dpertqb8s73co8lt0`) at `18:18Z`, triggering deploys
+`dep-da6tp0vqj5pc73bcavkg` and `dep-da6tp3u7bikc739ak9v0` on `5a8064772`.
+User decision, this session.
+
+**HOW, and it is the point of this entry.** Set through the service env-var API
+with `replace: false`, which MERGES — one key added, nothing else touched.
+Deliberately NOT via `render.yaml`: that fires `blueprint_sync`, which rewrites
+the WHOLE env block on all three services including drift nobody has read
+(`#284`). A one-key change is not worth that blast radius, and the API route
+has none of it.
+
+**Why it was needed — the answer to "why did Kalshi work yesterday".** Asked by
+the user, and the answer is the market TYPE, not a regression.
+
+Every Kalshi order that ever filled was `KXMLBKS` — a player strikeout prop.
+Every Kalshi failure today was a GAME LINE. They take different paths:
+
+- **Player props**: the title names a human, so `(player, market, line)` is a
+  complete identity. Joins on the player index, needs no event resolution, and
+  NEVER touches this flag.
+- **Game lines** (`_NEEDS_EVENT_IDENTITY = {TEAM_TOTAL, TEAM_SPREAD, MONEYLINE}`):
+  the title names no team, so the game must be recovered from the ticker's club
+  blob. Three gates props do not have — the date check, event resolution, and
+  this flag.
+
+**Kalshi game lines have never worked.** Nothing regressed. `game_lines_disabled`
+has NEVER appeared in the logs — checked across 30 hours — because nothing has
+ever survived the date gate to reach the flag at all.
+
+**Why flag-before-data turned out to be safe**, against my own earlier advice.
+I had wanted the data fixed first, on the reasoning that turning this on with
+40-hour-stale quotes would price game lines off yesterday's slate. That concern
+is void now: the date check was hoisted ABOVE `_resolve_event` in `7f4b8808a`,
+so a stale-dated game line is refused as `market_is_for_another_date` before it
+can reach the flag. The flag cannot price an old slate; it only decides what
+happens when a fresh one arrives.
+
+**verify:** NOT YET READ. Three things should become visible, and each
+distinguishes a different failure:
+
+- `game_lines_disabled` appearing at all would mean the flag did NOT take —
+  it is the counter that fires only for a game line whose event RESOLVED.
+- `matched` climbing above 4 on `BOARD_JOIN` means game lines are joining.
+- `ORDER_PATH venue=kalshi` moving `h2h`/`totals` from `no_venue_ticker` to
+  `would_build` — which is the whole point of the verifier: that reading costs
+  nothing and needs no slate.
+
+Still true and unchanged: Kalshi cannot transact on anything the join does not
+match, because `kalshi_ticker_resolver` is built from `matches`.
+
+---
+
+## 2026-08-25 — FIRST FILLED POSITION, and the YES convention verified
+
+**verify:** `[execute_portfolio]` / `[polymarket_us_orders]` / `[execution_ledger]`,
+`18:14:43Z` → `18:21:25Z`, live-odds-worker on `5a8064772`:
+
+```
+SUBMIT url=https://api.polymarket.us/v1/orders slug=tsc-mlb-tb-det-2026-08-25-7pt5
+  side=OUTCOME_SIDE_YES action=ORDER_ACTION_BUY qty=2.65
+  price={'value': '0.52'} tif=GOOD_TILL_CANCEL
+  our_side=over outcome_index=0 yes_index=0
+LIVE_ORDER status=submitted venue=polymarket market=totals side=over line=7.5
+EXECUTION venue=polymarket placed=1 spent={'dollars': 1.38, 'orders': 1}
+ORDERS_READ n=1 mode=per_order states=['ORDER_STATE_FILLED']
+RECONCILED submitted->filled contracts=2.65 fill_price=0.52
+RECONCILE candidates=1 venue_orders=1 changed=1 unknown=0 stamped=1
+```
+
+**A real filled position: 2.65 contracts @ $0.52 = $1.38, MLB Tampa Bay @
+Detroit, totals Over 7.5.** The first this system has ever held on Polymarket.
+
+**THE YES CONVENTION IS VERIFIED.** The user checked the venue's own position
+screen: it reads **Over 7.5**. So `OUTCOME_SIDE_YES` buys `outcomes[0]`, the
+default index of 0 is right, and `SYNDICATE_POLYMARKET_YES_OUTCOME_INDEX` does
+not need setting. That closes the convention that was wrong this morning and
+bought TEX instead of the White Sox — and it was checkable in seconds only
+because the SUBMIT line now carries `our_side` / `outcome_index` / `yes_index`.
+Keep those fields.
+
+**Four fixes proven in one cycle:** totals side resolution (`our_side=over`,
+impossible via `_side_for_team`); the slippage guard (this exact order was
+`drift=+108.52` at 17:59); `venue_contacted=False` (the spreads row is
+`rejected`, and charged nothing where it charged $2.39 an hour before); and the
+spreads refusal itself holding rather than guessing.
+
+**The verifier works and earned its keep immediately:**
+
+```
+ORDER_PATH venue=polymarket positions=2
+  markets={'totals': {'would_build': 1}, 'spreads': {'market_unresolved': 1}}
+  examples={'totals|would_build': 'tsc-mlb-tb-det-2026-08-25-7pt5 @ 0.52'}
+ORDER_PATH venue=kalshi positions=1 markets={'totals': {'no_venue_ticker': 1}}
+```
+
+Kalshi's blocker named exactly, with no slate spent to learn it.
+
+**AND IT EXPOSED A NEW DEFECT IN ITS OWN SUCCESS.** `spent={'dollars': 1.04}`
+against a `2.65 x 0.52 = $1.38` fill: the reconciler computed
+`int(contracts) * price`, so `int(2.65) * 0.52`. A 25% UNDER-count of real money
+against a daily cap on every fractional fill — harmless while Kalshi (whole
+contracts) was the only venue, wrong the moment a second arrived. Under-counting
+is the dangerous direction: a cap fed less than reality lets the account exceed
+it. Fixed in `0a504ab74`, which also un-inerted `_requested_contracts` — the
+"a fill cannot be larger than the order" bound required `0 < price < 1` and so
+returned None for EVERY Polymarket order, since they all carry American odds.
+Third guard today that could not read its own input.
+
+**Kalshi remains unable to transact.** `no_venue_ticker` on every game line;
+`kalshi_ticker_resolver` is built from the join's matches and the join has 4.

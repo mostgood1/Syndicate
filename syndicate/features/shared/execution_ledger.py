@@ -628,29 +628,70 @@ def reclassify_presend_failures() -> dict[str, Any]:
     return {"status": "ok", "reclassified": len(changed), "orders": changed}
 
 
-def _requested_contracts(order: Mapping[str, Any]) -> int | None:
+def _requested_contracts(order: Mapping[str, Any]) -> float | None:
     """How many contracts the stake could have bought, at the price we asked.
 
     The upper bound on any honest fill. Derived rather than stored because the
     ledger records dollars and a price, not a count -- `contracts_for_stake`
     does this same floor at order-build time, and this must agree with it.
     """
-    from syndicate.features.shared.kalshi_orders import contracts_for_stake
-
     try:
         stake = float(order.get("requested_stake_dollars") or 0.0)
-        price = float(order.get("requested_price") or 0.0)
     except (TypeError, ValueError):
         return None
-    if stake <= 0 or not 0.0 < price < 1.0:
-        # An American-odds price (or none at all) means this is not a Kalshi
-        # order priced in probability dollars, and the bound cannot be
-        # computed. No bound is better than a wrong one.
+    if stake <= 0:
+        return None
+
+    # THE PRICE MAY BE AMERICAN ODDS, AND USUALLY IS.
+    #
+    # This required `0 < price < 1` and returned None otherwise, with the
+    # comment "no bound is better than a wrong one". That reasoning is right
+    # and its effect was that the bound was NEVER COMPUTED for Polymarket --
+    # every order there carries American odds (`requested_price=-108.0`), so
+    # the guard returned None on the venue we actually trade. "A fill cannot be
+    # larger than the order" was present, documented, and inert.
+    #
+    # Same shape as the slippage guard, which compared American odds against
+    # probabilities and so refused on negative odds and passed silently on
+    # positive ones. A guard that cannot read its input is not a guard.
+    price = _price_as_probability(order.get("requested_price"))
+    if price is None:
+        return None
+
+    # UNFLOORED, and deliberately not `contracts_for_stake`. That helper floors
+    # to WHOLE contracts, which is right for Kalshi and wrong here: a real
+    # 2.65-contract Polymarket fill against a floor of 2 would be refused as
+    # `implausible` and left unbooked -- turning a guard against phantom
+    # positions into a cause of missing real ones. `stake / price` is the true
+    # upper bound at either venue, since a whole-contract fill is never more
+    # than the fractional one.
+    return stake / price
+
+
+def _price_as_probability(value: Any) -> float | None:
+    """A price as a probability, whether it arrived as odds or a probability.
+
+    Both forms genuinely occur: the board stores American odds, the venues
+    quote probability dollars. Magnitude decides -- a probability is strictly
+    inside (0, 1) and American odds are conventionally at least 100 from zero.
+    Anything between is AMBIGUOUS and returns None rather than being guessed,
+    because a guessed unit here is a guessed bound.
+    """
+    if value is None:
         return None
     try:
-        return contracts_for_stake(stake, price)
-    except Exception:
+        parsed = float(value)
+    except (TypeError, ValueError):
         return None
+    if parsed != parsed:
+        return None
+    if 0.0 < parsed < 1.0:
+        return parsed
+    if abs(parsed) >= 100.0:
+        from syndicate.features.shared.prophetx_client import american_to_probability
+
+        return american_to_probability(parsed)
+    return None
 
 
 def _venue_reader(venue: str):
@@ -865,7 +906,22 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
             stake = seen.get("fill_cost_dollars")
             if stake is None and contracts is not None and price is not None:
                 try:
-                    stake = round(int(contracts) * float(price), 2)
+                    # FLOAT, NOT INT. Kalshi sells WHOLE contracts, so `int()`
+                    # was harmless there and wrong the moment a second venue
+                    # arrived: Polymarket sells fractional ones
+                    # (`minimumTradeQty: 0.01`).
+                    #
+                    # MEASURED 2026-08-25T18:21:25Z, the first real Polymarket
+                    # fill: 2.65 contracts at $0.52 is $1.38, and the run
+                    # reported `spent={'dollars': 1.04}` -- because
+                    # `int(2.65) * 0.52` is `2 * 0.52`. A 25% under-count of
+                    # real money against a daily cap, silently, on every
+                    # fractional fill.
+                    #
+                    # Under-counting spend is the dangerous direction: the cap
+                    # exists to bound what the account can lose, and a cap fed
+                    # a number smaller than reality lets the account exceed it.
+                    stake = round(float(contracts) * float(price), 2)
                 except (TypeError, ValueError):
                     stake = None
             new_fields = {

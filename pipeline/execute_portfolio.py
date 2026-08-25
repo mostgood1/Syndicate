@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Sequence
 from typing import Any, Mapping
 
 from syndicate.features.shared.execution_ledger import (
@@ -623,6 +624,7 @@ def _kalshi_price_for(request) -> float | None:
         )
         return planned
 
+    planned = planned_probability(planned)
     if planned is not None:
         drift = round(live - planned, 4)
         if drift > max_slippage_dollars():
@@ -655,9 +657,64 @@ def _artifact_price(ticker: str, key: str) -> float | None:
         payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json") or {}
     except Exception:
         return None
-    for market in payload.get("markets") or []:
+    # THROUGH THE MERGE HELPER, not `payload["markets"]`. That key is no longer
+    # persisted: storing the merged list beside the per-series entries wrote the
+    # same payload twice and pushed the document past the store's 8MB ceiling,
+    # at which point it stopped being written at all. The helper reads the
+    # per-series entries and still falls back to the legacy key.
+    from pipeline.kalshi_odds_refresh import markets_from_state
+
+    for market in markets_from_state(payload):
         if str(market.get("ticker") or "") == ticker:
             return dollars_to_probability(market.get(key))
+    return None
+
+
+def planned_probability(value: Any) -> float | None:
+    """`requested_price` as a PROBABILITY, whatever unit it arrived in.
+
+    THE SLIPPAGE GUARD HAS NEVER WORKED, on either venue, because it compared
+    two different units. MEASURED 2026-08-25T17:59:06Z, the first totals order
+    to resolve a side:
+
+        _SlippageExceeded: polymarket_slippage: slug=tsc-mlb-tb-det-2026-08-25-7pt5
+            planned=-108.0 price=0.52 drift=+108.5200 max=0.03
+
+    `planned` is AMERICAN ODDS off our own board; `price` is a probability from
+    the venue. Subtracting them is meaningless, and the meaninglessness is
+    ASYMMETRIC, which is why it went unnoticed:
+
+      * negative American odds (-108) produce a huge POSITIVE drift and refuse
+        every order;
+      * positive American odds (+104) produce a huge NEGATIVE drift, which is
+        never `> max`, so the order sails through unchecked.
+
+    The one live order that reached a venue today was `planned=104.0` against
+    `price=0.495` -- drift -103.5, silently passed. The single guard standing
+    between us and a bad fill was decided by the SIGN of the odds.
+
+    Kalshi's copy at `_kalshi_price_for` had the identical defect and is fixed
+    through this same helper, so the two cannot drift apart again.
+
+    UNIT IS INFERRED FROM MAGNITUDE, because both forms genuinely occur: a
+    probability is strictly inside (0, 1), and American odds are conventionally
+    at least 100 away from zero. Anything between is AMBIGUOUS and returns None
+    rather than being guessed -- a guessed unit here is a guessed guard.
+    """
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    if 0.0 < parsed < 1.0:
+        return parsed
+    if abs(parsed) >= 100.0:
+        from syndicate.features.shared.prophetx_client import american_to_probability
+
+        return american_to_probability(parsed)
     return None
 
 
@@ -688,23 +745,47 @@ def _decode_polymarket_list(value: Any) -> list[Any] | None:
 # side" means.
 _HOME_LIKE_SIDES = {"yes", "over", "home"}
 
+# Board market names whose OUTCOMES are Over/Under rather than team names.
+_TOTAL_MARKETS = {"totals", "total", "totals_alt", "alternate_totals"}
+# ...and whose outcomes are signed numbers, naming no team at all.
+_SPREAD_MARKETS = {"spreads", "spread", "spreads_alt", "alternate_spreads", "run_line", "puck_line"}
+
+
+# The ceiling is a MULTIPLE of the writer's cadence, and the multiple is named
+# once. Restating the product is what let the two drift apart.
+_SLATE_CEILING_MULTIPLE = 3
+
+
+def _slate_ceiling_default() -> float:
+    from syndicate.features.shared.polymarket_us_markets import SLATE_INTERVAL_SECONDS
+
+    return float(SLATE_INTERVAL_SECONDS * _SLATE_CEILING_MULTIPLE)
+
 
 def _polymarket_max_price_age_seconds() -> float:
     """How old the persisted slate may be and still price a real order.
 
-    Default 1800s -- TWICE the writer's 900s cadence, so one missed write is
-    tolerated and a stopped writer is not. Tied to the cadence deliberately: a
-    ceiling unrelated to how often the artifact is refreshed either refuses
+    Default is THREE TIMES the writer's cadence, DERIVED from
+    `polymarket_us_markets.SLATE_INTERVAL_SECONDS` rather than restated -- so a
+    couple of missed writes are tolerated and a stopped writer is not.
+
+    LOWERED WITH THE CADENCE, and that coupling is the point. This was 1800s
+    against a 900s writer. When the writer dropped to 180s the old ceiling
+    became TEN times the cadence, which would have let a writer that stopped
+    nine cycles ago still price a real order -- the guard would still have been
+    present, still logged, and no longer guarding anything. Tied to the
+    cadence deliberately: a ceiling unrelated to how often the artifact is
+    refreshed either refuses
     healthy slates or admits dead ones.
     """
     raw = os.environ.get("SYNDICATE_POLYMARKET_MAX_PRICE_AGE_SECONDS")
     try:
         parsed = float(str(raw).strip())
     except (TypeError, ValueError):
-        return 1800.0
+        return _slate_ceiling_default()
     # A non-positive ceiling is a typo, not an instruction to refuse everything
     # forever -- same reading `execution_guard._float_env` gives a bad cap.
-    return parsed if parsed > 0 else 1800.0
+    return parsed if parsed > 0 else _slate_ceiling_default()
 
 
 def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | None:
@@ -912,11 +993,34 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
     # `home`/`away`. The two disagreed, and on 2026-08-25T16:08:10Z that bought
     # TEXAS on a `side=home` row whose home team is the White Sox, at the price
     # resolved for the White Sox. One reading now feeds both.
+    market = str(getattr(request, "market", "") or "").strip().lower()
+    our_side = str(getattr(request, "side", "") or "").strip().lower()
+
+    # WHICH OUTCOME IS OURS DEPENDS ON WHAT KIND OF MARKET THIS IS.
+    #
+    # MEASURED 2026-08-25T17:45:13Z. The slug was RIGHT -- the right game and
+    # the right number -- and the order still failed:
+    #
+    #   totals over 7.5 Tampa Bay Rays @ Detroit Tigers
+    #   slug=tsc-mlb-tb-det-2026-08-25-7pt5
+    #   OrderBuildError: market_unresolved_for_position
+    #
+    # This loop matched every outcome with `_side_for_team`, which resolves
+    # TEAM NAMES. A totals market's outcomes are `["Over","Under"]` and a
+    # spread's are `["+2.50","-2.50"]` -- neither is a team, so both outcomes
+    # were skipped, the price stayed None, and every totals and spreads order
+    # on this venue has failed this way since the venue went live. Only
+    # moneylines ever resolved, because only moneyline outcomes are teams.
     price = None
     outcome_index = None
-    for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
-        side = _side_for_team(name, resolution, sport=sport)
-        if side is not None and (side == "home") == wants_home:
+    refusal = None
+
+    if market in _TOTAL_MARKETS:
+        # UNAMBIGUOUS. `Over` and `Under` name the side directly, and our own
+        # side is already `over`/`under`.
+        for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
+            if str(name or "").strip().lower() != our_side:
+                continue
             try:
                 price = float(raw_price)
             except (TypeError, ValueError):
@@ -924,21 +1028,57 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
             else:
                 outcome_index = position
             break
+        if outcome_index is None:
+            refusal = "total_side_not_in_outcomes"
+    elif market in _SPREAD_MARKETS:
+        # REFUSED BY NAME, and this is a deliberate stop rather than an
+        # omission. A spread's outcomes are SIGNED NUMBERS -- `["+2.50",
+        # "-2.50"]` -- and nothing in them says which TEAM is getting the
+        # points. Our side is `home`/`away`, so pairing them means assuming an
+        # ordering, and an assumed ordering on this venue has already bought
+        # the wrong team once today at a real cost. The slug's `pos`/`neg`
+        # token is a candidate answer and it is UNVERIFIED against the
+        # outcomes array, so it stays a candidate.
+        refusal = "spread_side_needs_verified_team_mapping"
+    else:
+        for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
+            side = _side_for_team(name, resolution, sport=sport)
+            if side is not None and (side == "home") == wants_home:
+                try:
+                    price = float(raw_price)
+                except (TypeError, ValueError):
+                    price = None
+                else:
+                    outcome_index = position
+                break
+        if outcome_index is None:
+            refusal = "team_side_not_in_outcomes"
+
     if price is None or outcome_index is None:
         print(
-            f"[execute_portfolio] POLYMARKET_SIDE_UNRESOLVED slug={slug}"
-            f" side={getattr(request, 'side', None)}",
+            f"[execute_portfolio] POLYMARKET_SIDE_REFUSED slug={slug}"
+            f" market={market!r} side={our_side!r} reason={refusal}"
+            f" outcomes={outcomes!r}",
             flush=True,
         )
         return None
 
     fetched_at = (payload or {}).get("fetched_at")
-    planned = getattr(request, "requested_price", None)
+    planned_raw = getattr(request, "requested_price", None)
+    planned = planned_probability(planned_raw)
+    if planned_raw is not None and planned is None:
+        # AMBIGUOUS UNIT -- named, never guessed, and never silently skipped.
+        print(
+            f"[execute_portfolio] SLIPPAGE_UNCHECKED slug={slug}"
+            f" planned={planned_raw!r} -- not readable as odds or a probability",
+            flush=True,
+        )
     if planned is not None:
-        drift = round(price - float(planned), 4)
+        drift = round(price - planned, 4)
         if drift > max_slippage_dollars():
             raise _SlippageExceeded(
-                f"polymarket_slippage: slug={slug} planned={planned} price={price}"
+                f"polymarket_slippage: slug={slug} planned={planned_raw}"
+                f" planned_prob={planned:.4f} price={price}"
                 f" drift={drift:+.4f} max={max_slippage_dollars()} fetched_at={fetched_at}"
             )
     # THE NAME WE RESOLVED, not just the number. A price alone cannot be
@@ -968,6 +1108,114 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
         min_qty if min_qty is not None else ticker_min_qty,
         outcome_index,
     )
+
+
+def verify_order_paths(
+    selected_date: str, *, venues: Sequence[str] = ("kalshi", "polymarket")
+) -> dict[str, Any]:
+    """Would today's plan actually BUILD an order at each venue? Never submits.
+
+    WHY THIS EXISTS. Until now the only way to learn whether the order chain
+    works was to wait for the portfolio to produce a position, let it reach a
+    real venue, and read the failure. That is how every defect on
+    2026-08-25 was found -- wrong game, dict-as-slug, wrong side, unreadable
+    venue, totals unresolvable, an inert slippage guard -- each one hidden
+    behind the one before it, each costing a slate to discover, and every one
+    of those positions was a bet we intended to hold and did not.
+
+    A chain of six sequential single-shot discoveries is not a testing
+    strategy. This runs the SAME resolve and body-build path the placer uses,
+    against the SAME production artifacts, for every position in the plan, and
+    reports what would happen -- so the next defect is found in one reading
+    rather than one slate.
+
+    IT CANNOT PLACE AN ORDER. There is no submit function anywhere in this
+    function and no adapter is constructed; the venue is contacted only by the
+    reads the resolvers already do. That is what makes it safe to run on every
+    cycle rather than only when someone is watching.
+
+    Grouped by (venue, market, verdict) because the interesting question is
+    never "did one order fail" but "which whole market family cannot transact".
+    `totals` failing on every row and `h2h` succeeding on every row is a
+    different fact from a scattering of misses, and a per-order log cannot show
+    it.
+    """
+    from pipeline.portfolio_commit import read_portfolio_plan
+
+    from pipeline import portfolio_commit
+
+    normalized = str(selected_date or "").strip()[:10]
+    out: dict[str, Any] = {"date": normalized, "venues": {}}
+
+    for venue in venues:
+        summary: dict[str, dict[str, int]] = {}
+        examples: dict[str, str] = {}
+
+        def note(market: str, verdict: str, detail: str = "") -> None:
+            bucket = summary.setdefault(market or "unknown", {})
+            bucket[verdict] = bucket.get(verdict, 0) + 1
+            if detail and verdict not in examples:
+                examples[f"{market}|{verdict}"] = detail[:160]
+
+        try:
+            plan = portfolio_commit.read_portfolio_plan_for_venue(normalized, venue) or {}
+        except Exception as exc:
+            out["venues"][venue] = {"status": "plan_unreadable", "reason": f"{type(exc).__name__}: {exc}"}
+            continue
+
+        positions = plan.get("positions")
+        if not isinstance(positions, list) or not positions:
+            out["venues"][venue] = {"status": "no_positions", "markets": {}}
+            continue
+
+        for position in positions:
+            if not isinstance(position, Mapping):
+                continue
+            request = _order_from_position(position, normalized, venue)
+            if request is None:
+                note(str(position.get("market") or ""), "incomplete_position")
+                continue
+            market = str(getattr(request, "market", "") or "")
+            try:
+                if venue == "polymarket":
+                    resolved = _polymarket_resolve_market(request)
+                    if not resolved:
+                        note(market, "market_unresolved")
+                        continue
+                    slug, price, tick, min_qty, index = resolved
+                    from syndicate.features.shared.polymarket_us_orders import order_body
+
+                    order_body(
+                        request, market_slug=slug, price_dollars=price,
+                        tick_size=tick, minimum_trade_qty=min_qty, outcome_index=index,
+                    )
+                    note(market, "would_build", f"{slug} @ {price}")
+                else:
+                    ticker = _venue_ticker_of(position)
+                    if not ticker:
+                        note(market, "no_venue_ticker")
+                        continue
+                    price = _kalshi_price_for(request)
+                    if price is None:
+                        note(market, "no_live_price", str(ticker))
+                        continue
+                    from syndicate.features.shared.kalshi_orders import order_body
+
+                    order_body(request, price_dollars=price)
+                    note(market, "would_build", f"{ticker} @ {price}")
+            except Exception as exc:
+                # The venue's own reason, by TYPE and message. A verifier that
+                # reported "failed" would reproduce the counter this whole
+                # session has been prying data out of.
+                note(market, f"{type(exc).__name__}", str(exc))
+
+        out["venues"][venue] = {
+            "status": "ok",
+            "positions": len(positions),
+            "markets": summary,
+            "examples": examples,
+        }
+    return out
 
 
 def _status_of(request: OrderRequest) -> str | None:

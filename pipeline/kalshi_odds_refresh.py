@@ -48,6 +48,7 @@ out of every hour would be a strictly worse board in exchange for nothing.
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
 from collections.abc import Mapping
 from typing import Any
@@ -118,6 +119,31 @@ def refresh_interval_seconds() -> int:
     return parsed if parsed >= 0 else DEFAULT_REFRESH_INTERVAL_SECONDS
 
 
+def markets_from_state(payload: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Every stored market, merged from the per-series entries.
+
+    The artifact stores markets ONCE, under `series[<ticker>]["markets"]`.
+    It used to also store the concatenation under `markets`, which doubled a
+    document that has a hard 8MB ceiling and took it to 13.3MB -- at which
+    point the store refused and the artifact stopped being written entirely.
+
+    Falls back to a legacy top-level `markets` key so a payload written before
+    this change still reads, rather than a deploy silently emptying the board.
+    """
+    if not payload:
+        return []
+    series = payload.get("series")
+    if isinstance(series, Mapping):
+        out: list[dict[str, Any]] = []
+        for entry in series.values():
+            if isinstance(entry, Mapping):
+                out.extend(entry.get("markets") or [])
+        if out:
+            return out
+    legacy = payload.get("markets")
+    return list(legacy) if isinstance(legacy, list) else []
+
+
 def markets_artifact_path():
     from syndicate.features.shared.refresh_state_store import reports_root
 
@@ -170,13 +196,99 @@ def fetch_series_markets(series: str) -> dict[str, Any]:
     }
 
 
-DEFAULT_SERIES_PER_TICK = 12
+# RAISED FROM 12, because the cap was doing a job that now has its own tool.
+#
+# 12 was never a rate limit -- it was the ONLY burst control, chosen so thirty
+# HTTP calls could not leave in one second (the 2026-08-23 http_429s). With
+# explicit spacing below, the burst is bounded by time rather than by count,
+# so the cap can be what it should always have been: how much of the book we
+# refresh per tick.
+#
+# THESE CALLS ARE FREE. Kalshi and Polymarket are direct APIs, unlike OddsAPI
+# whose per-call cost is what paces the rest of the board build. So the right
+# cadence here is "as often as the venue tolerates", and fresher exchange
+# prices are also what lets us lean less on the metered feed over time.
+#
+# 60 x 150ms = 9 seconds of wall clock per tick, which a worker can absorb.
+DEFAULT_SERIES_PER_TICK = 60
+
+# Minimum gap between two series fetches, in milliseconds.
+#
+# THE THING THE CAP WAS STANDING IN FOR. `#` 2026-08-23: an unpaced loop put
+# thirty requests out in about a second and Kalshi answered http_429. A cap
+# fixes that only by accident -- it bounds the COUNT, not the RATE, so raising
+# it for freshness would have reintroduced the burst exactly.
+#
+# 150ms is ~6.7 requests/second sustained, an order of magnitude below the
+# burst that drew the 429 and slow enough that a much larger cap stays safe.
+DEFAULT_REQUEST_SPACING_MS = 150
+
+# How often a DORMANT series may be re-fetched -- one whose last successful
+# read returned zero markets.
+#
+# THIS IS WHERE THE BUDGET WAS GOING. Measured 2026-08-25T16:41:09Z, all twelve
+# slots in a tick went to `KXATTENDMLB`, `KXMLBASGAME`, `KXMVENBASINGLEGAME`,
+# `KXNBA1HSPREAD` and friends -- attendance markets, the All-Star game, parlays
+# and NBA quarter lines in AUGUST, every one returning zero -- while live
+# series sat 39.6 hours stale.
+#
+# `d58cb0b8c` stopped them monopolising the queue. This stops them CONSUMING it
+# at all on most ticks: an out-of-season series is worth checking hourly, not
+# every two minutes, and the budget it frees goes to series that have markets.
+# The effective per-tick load becomes "the series that are actually live",
+# which is what makes a high cadence affordable.
+DEFAULT_DORMANT_INTERVAL_SECONDS = 3600
 
 # Total markets kept in the artifact. The keyvalue store refuses at 8MB and
 # `layer2_shortlist` already sits at 5.7MB of that budget, so an unbounded
 # multi-sport catalogue is a write that starts failing silently one sport from
 # now. Trimmed OLDEST-SERIES-FIRST and reported, never silently.
 MAX_STORED_MARKETS = 6000
+
+# Markets kept per series in the JOIN'S WORKING SET.
+#
+# MEASURED 2026-08-25T17:53:48Z, the tick after the queue started rotating:
+#
+#   KEYVALUE_WRITE_REJECTED size_bytes=13315551 max_bytes=8388608
+#   WRITE_FAILED ... Shrink the payload rather than raising the ceiling
+#   COMPOSITION under=series KXNCAAFSPREAD=2306569 KXNCAAFWINS=645981
+#                            KXNCAAFGAME=635691 KXNCAAFAWARD=506778
+#
+# The artifact stopped being written AT ALL, so the board fell back to the
+# last good write. One series -- `KXNCAAFSPREAD`, a spread ladder with every
+# rung of every game -- was 2.3MB on its own.
+#
+# THIS BOUND IS SAFE ONLY BECAUSE CAPTURE MOVED. `venue_daily_odds` records
+# every market the venue lists, dated and split per sport, and wrote fine on
+# the same tick (`files=23`). So this artifact no longer has to be the record
+# of what Kalshi offers -- it is the working set the JOIN prices against, and a
+# working set may be bounded where a record may not. That separation is what
+# the capture-first layer bought.
+MAX_MARKETS_PER_SERIES = 400
+
+
+def request_spacing_seconds() -> float:
+    """Seconds to wait between two series fetches. Never negative."""
+    raw = os.environ.get("SYNDICATE_KALSHI_REQUEST_SPACING_MS")
+    try:
+        parsed = float(str(raw).strip())
+    except (TypeError, ValueError):
+        parsed = float(DEFAULT_REQUEST_SPACING_MS)
+    if parsed != parsed or parsed < 0:
+        # A bad value must not become an UNPACED loop -- that is the failure
+        # this exists to prevent, so it falls back rather than to zero.
+        parsed = float(DEFAULT_REQUEST_SPACING_MS)
+    return parsed / 1000.0
+
+
+def dormant_interval_seconds() -> int:
+    """How often a series whose last read returned nothing may be re-checked."""
+    raw = os.environ.get("SYNDICATE_KALSHI_DORMANT_INTERVAL_SECONDS")
+    try:
+        parsed = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return DEFAULT_DORMANT_INTERVAL_SECONDS
+    return parsed if parsed >= 0 else DEFAULT_DORMANT_INTERVAL_SECONDS
 
 
 def series_per_tick() -> int:
@@ -263,7 +375,26 @@ def hot_series() -> set[str]:
     return found
 
 
-def _due_series(state: dict[str, Any], wanted: tuple[str, ...], interval: int) -> list[str]:
+def _is_dormant(entry: Mapping[str, Any]) -> bool:
+    """Did this series' last successful read return nothing?
+
+    `count` is stamped on every successful read, including an empty one, so
+    `count == 0` is a POSITIVE statement ("we asked and there was nothing")
+    rather than an absence. A series never fetched has no `count` and is NOT
+    dormant -- it is unknown, and unknown must be asked at the normal cadence
+    or a new series would wait an hour to be seen for the first time.
+    """
+    count = entry.get("count")
+    return isinstance(count, int) and count == 0
+
+
+def _due_series(
+    state: dict[str, Any],
+    wanted: tuple[str, ...],
+    interval: int,
+    *,
+    dormant_interval: int | None = None,
+) -> list[str]:
     """Which series have not been fetched within `interval`, oldest first.
 
     PER SERIES, which is the whole economy of this design. A single whole-fetch
@@ -280,11 +411,19 @@ def _due_series(state: dict[str, Any], wanted: tuple[str, ...], interval: int) -
     for series in wanted:
         entry = per_series.get(series) or {}
         age = _seconds_since(entry.get("fetched_at"))
+        # A DORMANT SERIES WAITS LONGER. Its last successful read returned
+        # nothing, so re-asking every two minutes spends the tick budget to
+        # confirm that August still has no NBA quarter lines. Hourly is enough,
+        # and the budget it frees goes to series that have markets -- which is
+        # what makes a high cadence affordable on a free API.
+        due_after = interval
+        if dormant_interval is not None and _is_dormant(entry):
+            due_after = max(interval, dormant_interval)
         if age is None:
             # Never fetched. Sorts ahead of everything -- a series with no
             # prices at all is worth more than a refresh of one that has them.
             due.append((float("inf"), series))
-        elif age >= interval:
+        elif age >= due_after:
             due.append((age, series))
     due.sort(key=lambda item: -item[0])
     return [series for _age, series in due]
@@ -429,7 +568,11 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         if force
         else _due_series(state, tuple(sorted(hot)), hot_refresh_interval_seconds())
     )
-    due = wanted if force else _due_series(state, wanted, interval)
+    due = (
+        wanted
+        if force
+        else _due_series(state, wanted, interval, dormant_interval=dormant_interval_seconds())
+    )
 
     # A failed series backs off on its OWN shorter clock. Without this a venue
     # that is 403ing or rate-limiting us is retried every board build -- every
@@ -455,7 +598,13 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         )
 
     fetched: dict[str, Any] = {}
-    for series in fetching:
+    spacing = request_spacing_seconds()
+    for index, series in enumerate(fetching):
+        # SPACING, NOT A SMALLER CAP. The cap bounds how many; only this bounds
+        # how FAST, and the 2026-08-23 http_429s came from rate, not count.
+        # Skipped before the first call so a one-series tick pays nothing.
+        if index and spacing:
+            time.sleep(spacing)
         result = fetch_series_markets(series)
         markets = result.get("markets") or []
         entry = dict(per_series.get(series) or {})
@@ -513,19 +662,64 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         fetched[series] = {"count": len(markets), "strategy": result.get("strategy")}
 
     # MERGE. Every series' last good markets, whether or not it was fetched now.
-    all_markets: list[dict[str, Any]] = []
+    #
+    # PER-SERIES BOUND FIRST, so one ladder cannot crowd out a whole sport.
     staleness: dict[str, int] = {}
+    per_series_markets: list[tuple[float, str, list[dict[str, Any]]]] = []
+    # EVERY MARKET, BEFORE ANY BOUND. This is what the daily book records, and
+    # keeping it separate is the whole justification for bounding the working
+    # set at all -- see `_record_daily_book`.
+    full_markets: list[dict[str, Any]] = []
+    trimmed = 0
     for series in wanted:
         entry = per_series.get(series) or {}
-        all_markets.extend(entry.get("markets") or [])
+        markets = list(entry.get("markets") or [])
+        full_markets.extend(markets)
+        if len(markets) > MAX_MARKETS_PER_SERIES:
+            trimmed += len(markets) - MAX_MARKETS_PER_SERIES
+            markets = markets[:MAX_MARKETS_PER_SERIES]
         age = _seconds_since(entry.get("fetched_at"))
         if age is not None:
             staleness[series] = int(age)
+        per_series_markets.append((age if age is not None else float("inf"), series, markets))
 
-    trimmed = 0
-    if len(all_markets) > MAX_STORED_MARKETS:
-        trimmed = len(all_markets) - MAX_STORED_MARKETS
-        all_markets = all_markets[:MAX_STORED_MARKETS]
+    # THE TRIM IS BY STALENESS, WHICH IS WHAT THIS ALWAYS CLAIMED TO DO.
+    #
+    # It said "Trimmed OLDEST-SERIES-FIRST and reported, never silently" and
+    # the code was `all_markets[:MAX_STORED_MARKETS]` -- the alphabetically
+    # FIRST N, because `sports_series()` returns `sorted(...)`. `KXWNBA*` sorts
+    # last, so the first thing a trim deleted was every WNBA market, silently,
+    # while the comment said otherwise. Measured 2026-08-25T17:53:47Z:
+    # `markets=6000 trimmed=605` with NCAAF alone contributing thousands.
+    #
+    # Freshest series are kept: a stale series' prices are the least useful
+    # thing in the working set, which is the claim the docstring was making.
+    ordered = sorted(per_series_markets, key=lambda item: item[0])
+    all_markets: list[dict[str, Any]] = []
+    for _age, _series, markets in ordered:
+        if len(all_markets) >= MAX_STORED_MARKETS:
+            trimmed += len(markets)
+            continue
+        room = MAX_STORED_MARKETS - len(all_markets)
+        if len(markets) > room:
+            trimmed += len(markets) - room
+            markets = markets[:room]
+        all_markets.extend(markets)
+
+    # THE COMPLETE SET, NOT THE WORKING SET.
+    #
+    # This was called with `all_markets` -- AFTER the per-series cap and the
+    # staleness trim -- which quietly voided the argument that justified those
+    # bounds. `6145522ee` said the 400-per-series cap "is safe ONLY because
+    # capture moved: `venue_daily_odds` records every market the venue lists".
+    # It did not: measured 2026-08-25T18:33:55Z, `trimmed=2121` markets never
+    # reached the record, and `KXNCAAFSPREAD`'s ladder was truncated 1994 -> 400
+    # in the one place that is supposed to keep whole ladders.
+    #
+    # A record that inherits the working set's bounds is not a record, and the
+    # bound it was used to justify becomes real data loss. The two must read
+    # from different lists, which is now what they do.
+    _record_daily_book(full_markets)
 
     print(
         "[kalshi_odds] TICK"
@@ -581,7 +775,12 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         report_catalogue_gaps(all_markets)
 
     state["series"] = per_series
-    state["markets"] = all_markets
+    # THE MERGED LIST IS NOT PERSISTED. It is `per_series`' markets
+    # concatenated, so storing both wrote the same payload twice -- measured
+    # `series=7399941` plus `markets=6682458`, which is how a 13.3MB document
+    # exceeded an 8MB ceiling and stopped being written at all. Readers get it
+    # from `markets_from_state`.
+    state.pop("markets", None)
     state["count"] = len(all_markets)
     state["fetched_at"] = _now_stamp()
     state["staleness_seconds"] = staleness
@@ -624,6 +823,54 @@ def report_catalogue_gaps(markets: list[dict[str, Any]]) -> dict[str, Any]:
             flush=True,
         )
     return gaps
+
+
+def _record_daily_book(markets: list[dict[str, Any]]) -> None:
+    """Write the venue-native daily odds files. Never fatal.
+
+    CAPTURE-FIRST, and that is the whole point: this records EVERY market the
+    fetch returned, including the ones the board join refuses. Today an
+    unparsed family is invisible -- not refused, not counted, not stored -- so
+    the only way to find it is for a human to notice it on the venue's site.
+    Here it becomes a counted row carrying its raw title.
+
+    Non-fatal by construction. A history write failing must not cost the board
+    the prices it just fetched, and it is REPORTED rather than swallowed: a
+    silent failure here looks exactly like a venue that lists nothing.
+    """
+    try:
+        from syndicate.features.shared.venue_daily_odds import (
+            kalshi_daily_rows,
+            record_venue_book,
+        )
+
+        report = record_venue_book("kalshi", kalshi_daily_rows(markets))
+    except Exception as exc:
+        print(f"[kalshi_odds] DAILY_BOOK_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    print(
+        "[kalshi_odds] DAILY_BOOK"
+        f" status={report.get('status')}"
+        f" files={report.get('files')}"
+        f" errors={report.get('file_errors')}"
+        f" listed={report.get('listed')}"
+        f" parsed={report.get('parsed')}"
+        f" opened={report.get('opened')}"
+        f" appended={report.get('appended')}"
+        # Rows with no readable sport or game date -- futures land here, which
+        # is correct: a season-long market has no game day to be filed under.
+        f" undated={report.get('undated')}"
+        # Sports we do not model, counted by name. Polymarket's soccer league
+        # codes surface here -- real markets in a sport we DO model, under
+        # names we have not yet read.
+        f" skipped={report.get('skipped_total')}"
+        f" skipped_by_sport={report.get('skipped_by_sport')}"
+        # THE COVERAGE GAP, BY FAMILY. Empty means every market Kalshi listed
+        # for these sports was named, which has never yet been true.
+        f" unparsed={report.get('unparsed_by_family')}"
+        f" detail={report.get('detail')}",
+        flush=True,
+    )
 
 
 def _now_stamp() -> str:

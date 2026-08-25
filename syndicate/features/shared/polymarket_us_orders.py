@@ -82,7 +82,27 @@ __all__ = [
 
 
 class OrderBuildError(ValueError):
-    """Refused before anything was sent. Never means the venue saw it."""
+    """Refused before anything was sent. Never means the venue saw it.
+
+    `venue_contacted = False` is the MACHINE-READABLE half of that sentence,
+    and its absence here was costing real budget. `execution_ledger` reads
+    `getattr(exc, "venue_contacted", True)` -- defaulting to True, because an
+    unknown exception may well have reached the venue -- so every Polymarket
+    build refusal was booked as a FAILED order that had been sent.
+
+    MEASURED 2026-08-25T17:59:06Z. A spreads position refused locally, before
+    any request was built:
+
+        LIVE_ORDER status=failed venue=polymarket market=spreads
+            error='OrderBuildError: market_unresolved_for_position'
+        EXECUTION placed=0 spent={'dollars': 2.39, 'orders': 1}
+
+    $2.39 and one order charged against a $40 daily cap for something that
+    never left the process. Kalshi's copy has carried this attribute since its
+    own version of the same incident; this one did not.
+    """
+
+    venue_contacted = False
 
 
 # The enum values, verbatim from the documented request schema. In one place so
