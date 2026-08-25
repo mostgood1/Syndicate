@@ -720,6 +720,7 @@ def build_live_gameline_index(
     sources: tuple[str, ...] | None = None,
     analytic_std_err: float | None = None,
     sport: Any = None,
+    diagnostics: dict[str, Any] | None = None,
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """(away_team, home_team) -> the live moneyline projection.
 
@@ -731,13 +732,56 @@ def build_live_gameline_index(
     reproducing that machinery here would import its failure mode for no gain.
     If this join ever starts missing, the counter says so by name rather than
     silently returning zero coverage.
+
+    `diagnostics`, WHEN PASSED, IS FILLED WITH WHY THE INDEX IS THE SIZE IT IS.
+    A bare `index=0` cannot distinguish an absent snapshot from a present one
+    whose lanes are all stamped for a state this sport does not accept, and
+    those have completely different owners. Measured 2026-08-25 04:21Z: WNBA
+    read `index=0 considered=184` -- 184 board rows in a live game state asking
+    a snapshot that yielded nothing -- and it was read as "no live model wired
+    for WNBA", which is FALSE. `live_lens_loop` builds the WNBA lens every 60s
+    (`TICK_COMPLETE results={'wnba': True}` on live-odds-worker at 04:24:08Z).
+
+    What is conditional is the STAMP. `wnba/cards.py:1381`:
+
+        source = "live_projection" if (is_live and live_margin is not None
+                                       and elapsed_min is not None) else "pregame"
+
+    Three preconditions, and `live_gameline_from_lens` accepts only
+    `live_projection` for WNBA -- so any one of them failing produces a
+    published, healthy, correctly-refused snapshot that looks identical to an
+    absent one. The third is a KNOWN hole this repo already documents at
+    `wnba/cards.py:1345`: the clock blanks between periods, so `elapsed_min`
+    goes None and the lane reverts to `pregame` for the whole break (observed
+    2026-08-21 IND@DAL, a ~20-minute gap).
+
+    So the stamps actually SEEN are recorded, not just the ones accepted. That
+    is the difference between "the producer is not wired" and "the producer is
+    wired and the game is at halftime".
     """
+    diag = diagnostics if isinstance(diagnostics, dict) else None
+    if diag is not None:
+        diag.update({
+            "games_in_snapshot": 0,
+            "indexed": 0,
+            "skipped_no_team_names": 0,
+            "skipped_no_accepted_lane": 0,
+            "sources_seen": {},
+            "accepted_sources": list(sources or _DEFAULT_LENS_SOURCES),
+        })
+
     index: dict[tuple[str, str], dict[str, Any]] = {}
     if not isinstance(snapshot, Mapping):
+        if diag is not None:
+            diag["reason"] = "snapshot_is_not_a_mapping"
         return index
     games = snapshot.get("games")
     if not isinstance(games, list):
+        if diag is not None:
+            diag["reason"] = "snapshot_carries_no_games_list"
         return index
+    if diag is not None:
+        diag["games_in_snapshot"] = len(games)
     for game in games:
         if not isinstance(game, Mapping):
             continue
@@ -765,9 +809,24 @@ def build_live_gameline_index(
                 key = candidate
                 break
         if key is None:
+            if diag is not None:
+                diag["skipped_no_team_names"] = int(diag["skipped_no_team_names"]) + 1
             continue
+        if diag is not None:
+            # EVERY stamp on the lens, accepted or not. The rejected ones are
+            # the answer -- a snapshot full of `pregame` lanes is a live
+            # producer in a state it declines to call live, not a missing one.
+            lanes = game.get("gameLens")
+            for lens in lanes if isinstance(lanes, list) else ():
+                if not isinstance(lens, Mapping):
+                    continue
+                stamp = str(lens.get("source") or "none").strip().lower()
+                seen = diag["sources_seen"]
+                seen[stamp] = int(seen.get(stamp, 0)) + 1
         projection = live_gameline_from_lens(game.get("gameLens"), sources=sources)
         if projection is None:
+            if diag is not None:
+                diag["skipped_no_accepted_lane"] = int(diag["skipped_no_accepted_lane"]) + 1
             continue
         projection = dict(projection)
         projection["game_pk"] = game.get("gamePk")
@@ -779,6 +838,8 @@ def build_live_gameline_index(
         if sport is not None:
             projection["sport"] = str(sport).strip().lower()
         index[key] = projection
+        if diag is not None:
+            diag["indexed"] = int(diag["indexed"]) + 1
     return index
 
 

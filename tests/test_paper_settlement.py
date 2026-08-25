@@ -299,9 +299,28 @@ def test_each_sport_gets_its_own_resolver(monkeypatch):
 
 
 def test_a_sport_with_no_resolver_is_named_not_silent():
-    verdict = settle._default_resolver(DATE)({"sport": "soccer"})
+    """NFL, not soccer.
+
+    This test used soccer as its example until `#547` gave soccer a resolver --
+    and soccer being the stand-in for "unresolvable" is exactly why it stayed
+    that way: `no_resolver_for_soccer` read as a correctly-reported gap in a
+    passing test, while all-time settled soccer bets sat at 0 against a board
+    that was ~97% soccer by row count.
+
+    Kept pointed at a sport that genuinely has none, so the reason string stays
+    pinned; the day NFL gains one, this should move again rather than be
+    deleted.
+    """
+    verdict = settle._default_resolver(DATE)({"sport": "nfl"})
     # The ungraded counts stay a work list rather than a mystery.
-    assert verdict["unavailable_reason"] == "no_resolver_for_soccer"
+    assert verdict["unavailable_reason"] == "no_resolver_for_nfl"
+
+
+def test_soccer_now_dispatches_to_its_own_resolver():
+    """The complement, so the pair cannot both drift into vacuous truth."""
+    verdict = settle._default_resolver(DATE)({"sport": "soccer", "market": "h2h"})
+    # Whatever it says, it must NOT be "nobody handles soccer".
+    assert verdict.get("unavailable_reason") != "no_resolver_for_soccer"
 
 
 def test_one_sports_broken_resolver_does_not_stop_another(monkeypatch):
@@ -631,9 +650,23 @@ def test_the_book_splits_by_sport():
     assert sports["wnba"]["pnl_dollars"] == -10.0
 
 
-def test_the_cuts_agree_with_the_total():
-    """Three views of one book. If they disagree, one of them is wrong, and a
-    breakdown that does not reconcile is worse than no breakdown."""
+def test_the_cuts_agree_with_the_book_they_describe():
+    """Every cut must reconcile -- against the BOOK it covers, not one total.
+
+    This test used to assert all four cuts summed to `total`, and that was the
+    bug written down as an invariant: `total` spanned `paper` AND its
+    `paper:<venue>` shadow copies, so it counted one decision up to five times.
+    `by_venue` reconciled against it precisely because both were pooled.
+
+    Now `total` is the portfolio book alone. The cuts split into two families:
+
+      venue IS in the key   -> spans both books, reconciles against the SUM
+      venue is NOT in the key -> portfolio rows only, reconciles against `total`
+
+    A breakdown that does not reconcile is worse than no breakdown; a
+    breakdown that reconciles against the WRONG book is worse than both,
+    because it looks right.
+    """
     from syndicate.features.shared.paper_settlement import settlement_summary
 
     orders = [
@@ -642,10 +675,70 @@ def test_the_cuts_agree_with_the_total():
         _settled(market="totals", venue="paper:novig", sport="wnba"),
     ]
     summary = settlement_summary(orders=orders)
-    total = summary["total"]["pnl_dollars"]
-    for cut in ("by_venue", "by_market_family", "by_sport", "by_venue_family"):
-        assert round(sum(b["pnl_dollars"] for b in summary[cut]), 2) == total, cut
-        assert sum(b["settled"] for b in summary[cut]) == summary["total"]["settled"], cut
+    portfolio = summary["total"]
+    comparison = summary["comparison_total"]
+
+    # The portfolio is the ONE unrestricted order, not all three.
+    assert portfolio["settled"] == 1
+    assert portfolio["pnl_dollars"] == 9.09
+    assert comparison["settled"] == 2
+    assert comparison["pnl_dollars"] == -0.91
+
+    both = round(portfolio["pnl_dollars"] + comparison["pnl_dollars"], 2)
+    for cut in ("by_venue", "by_venue_family"):
+        assert round(sum(b["pnl_dollars"] for b in summary[cut]), 2) == both, cut
+        assert sum(b["settled"] for b in summary[cut]) == (
+            portfolio["settled"] + comparison["settled"]
+        ), cut
+    for cut in ("by_market_family", "by_sport"):
+        assert round(sum(b["pnl_dollars"] for b in summary[cut]), 2) == portfolio["pnl_dollars"], cut
+        assert sum(b["settled"] for b in summary[cut]) == portfolio["settled"], cut
+
+
+def test_the_two_totals_are_NEVER_summed_into_a_headline():
+    """The defect, stated as a property.
+
+    MEASURED in production 2026-08-25 14:09:04Z: `settled=181 staked=$1078.52
+    pnl=$16.7 roi=1.55%` over `paper` (95 settled) plus four `paper:<venue>`
+    books (84 settled) built from `scope_rows_to_venue(rows, venue)` -- subsets
+    of the very rows the unrestricted plan was built from. No book anyone could
+    have held had 181 bets or $1,078 at risk.
+    """
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    orders = [
+        _settled(venue="paper", pnl_dollars=9.09),
+        _settled(venue="paper:kalshi", pnl_dollars=9.09),
+        _settled(venue="paper:polymarket", pnl_dollars=9.09),
+    ]
+    summary = settlement_summary(orders=orders)
+
+    # Three orders, ONE decision. The portfolio reports the one.
+    assert summary["total"]["settled"] == 1
+    assert summary["total"]["pnl_dollars"] == 9.09
+    # The shadow books are still reported -- the comparison is the point of
+    # paper2 -- they are simply not added to it.
+    assert summary["comparison_total"]["settled"] == 2
+    assert summary["books"]["portfolio"]["venues"] == ["paper"]
+    assert summary["books"]["venue_comparison"]["venues"] == ["paper:kalshi", "paper:polymarket"]
+
+
+def test_real_money_is_in_the_portfolio_book_not_the_comparison():
+    """A bare venue name is LIVE money (`execute_portfolio`: `venue = scope` in
+    live mode, `paper:<scope>` only in paper mode). It belongs to the book a
+    person actually holds, and classifying it by prefix rather than by a venue
+    list is what makes a newly-added venue land correctly on day one."""
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    summary = settlement_summary(orders=[
+        _settled(venue="paper", pnl_dollars=9.09),
+        _settled(venue="kalshi", pnl_dollars=1.0),
+        _settled(venue="paper:kalshi", pnl_dollars=-10.0),
+    ])
+    assert summary["books"]["portfolio"]["venues"] == ["kalshi", "paper"]
+    assert summary["total"]["settled"] == 2
+    assert summary["total"]["pnl_dollars"] == 10.09
+    assert summary["comparison_total"]["settled"] == 1
 
 
 def test_the_cross_holds_the_family_fixed_and_varies_the_venue():

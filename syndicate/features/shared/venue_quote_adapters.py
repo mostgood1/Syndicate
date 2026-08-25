@@ -81,7 +81,29 @@ def _fetched_at(payload: Mapping[str, Any] | None, mtime: float | None) -> float
     touch files this way. Trusting mtime there would launder stale data as
     fresh, which is precisely the failure this module exists to catch.
     """
-    for key in ("fetched_at", "generated_at", "last_updated", "as_of"):
+    # `updated_at` IS THE KEY THE ODDS-HISTORY SHARDS ACTUALLY USE, and its
+    # absence from this list is why `oddsapi` contributed ZERO quotes to every
+    # reprice on 2026-08-24/25.
+    #
+    # MEASURED: mlb, wnba and soccer all reported
+    # `oddsapi: {'status': 'error', 'reason': 'shard_has_no_timestamp'}` on
+    # every VENUE_REPRICE for a full evening. That reason is only reachable
+    # AFTER the payload loads and after `markets` is confirmed non-empty -- so
+    # the shards were present and full the whole time. Inspecting one:
+    #
+    #   data/mlb_source/artifacts/mlb/odds_history.json
+    #     top-level: 'date', 'markets' (35), 'updated_at'
+    #
+    # `updated_at = '2026-07-12T02:47:30+00:00'`, and this loop never looked for
+    # it. The same holds for the wnba and nhl shards. One missing key name took
+    # an entire source offline while every counter said "error" rather than
+    # "misconfigured", which is the difference between a feed someone chases
+    # and a feed someone fixes.
+    #
+    # APPENDED, not inserted: the four names above keep their precedence, so a
+    # shard carrying both an explicit fetch stamp and an update stamp still
+    # prefers the fetch stamp. This can only ADD a resolvable timestamp.
+    for key in ("fetched_at", "generated_at", "last_updated", "as_of", "updated_at"):
         raw = (payload or {}).get(key) if isinstance(payload, Mapping) else None
         if isinstance(raw, (int, float)) and raw > 0:
             return float(raw)
@@ -539,10 +561,32 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         return SourceOutcome(source="oddsapi", status="error", reason="shard_has_no_timestamp")
 
     quotes: list[Quote] = []
+    no_side = 0
+    no_price = 0
     for market_key, entry in markets.items():
         if not isinstance(entry, Mapping):
             continue
-        american = _as_float(entry.get("american") or entry.get("price"))
+        # THE MARKET, SIDE AND LINE ARE IN THE KEY, NOT THE VALUE.
+        #
+        # MEASURED 2026-08-25 against a real shard entry:
+        #
+        #   KEY   event_id=..|home_team=..|away_team=..|market=h2h|bookmaker=fanduel
+        #   VALUE delta, delta_line, history, last_line, last_odds,
+        #         last_snapshot_ts, last_source_path, last_updated, movement,
+        #         percent_change, previous_line
+        #
+        # `entry.get("market")`, `("side")`, `("line")`, `("american")`,
+        # `("price")` and `("probability")` are ALL None. So every quote was
+        # built as `quote_key(sport, None, None, None)` -- one identical,
+        # useless key for the whole shard, carrying no price at all. That is
+        # why oddsapi reported `quotes: 298` and won ZERO selections: it was
+        # emitting 298 copies of `soccer||` with `american=None`.
+        #
+        # A count that looks like coverage while carrying nothing is the exact
+        # failure this module's header is about, and it survived because
+        # `quotes` was non-empty so `status` read `ok`.
+        parsed_key = _parse_odds_history_key(market_key)
+        american = _as_float(entry.get("last_odds"))
         # THE SAME KEY SHAPE AS EVERY OTHER SOURCE. The first cut used the
         # shard's own market key -- `event_id=...|home_team=...|market=h2h|
         # side=Draw|book=draftkings` -- which shares no key space with the
@@ -550,27 +594,71 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         # OddsAPI quote against a Kalshi one. Two sources on different keys do
         # not contend; they just never meet, and the freshest-wins rule this
         # module is built on would have been silently inert.
+        market = parsed_key.get("market")
+        side = parsed_key.get("side")
+        # NO SIDE, NO QUOTE. MLB keys carry `market=h2h|bookmaker=fanduel` with
+        # no side at all -- one entry per event+market+book -- so there is
+        # nothing that says which team `last_odds` belongs to. Emitting it
+        # against a guessed side is a price for the wrong team; counted by name
+        # instead, because "this shard cannot express a side" and "this sport
+        # is absent" are different facts.
+        if not market or not side:
+            no_side += 1
+            continue
+        if american is None:
+            no_price += 1
+            continue
         quotes.append(
             Quote(
-                key=quote_key(sport, entry.get("market"), entry.get("side"),
-                              _as_float(entry.get("line"))),
+                key=quote_key(sport, market, side, parsed_key.get("line")),
                 source="oddsapi",
                 sport=str(sport or ""),
-                market=str(entry.get("market") or ""),
-                side=str(entry.get("side") or ""),
-                probability=_as_float(entry.get("probability")),
-                american=int(american) if american is not None else None,
-                line=_as_float(entry.get("line")),
+                market=str(market),
+                side=str(side),
+                probability=None,
+                american=int(american),
+                line=parsed_key.get("line"),
                 fetched_at=fetched_at,
             )
         )
+    dropped = []
+    if no_side:
+        dropped.append(f"no_side_in_key:{no_side}")
+    if no_price:
+        dropped.append(f"no_last_odds:{no_price}")
+    detail = " ".join(dropped)
     return SourceOutcome(
         source="oddsapi",
         status="ok" if quotes else "no_rows",
-        reason=None if quotes else "shard_parsed_to_zero_quotes",
+        # The drop counts ride on SUCCESS too. A shard that yields 12 usable
+        # quotes out of 300 is not the same as one that yields 12 out of 12,
+        # and only this says which.
+        reason=(detail or None) if quotes else (detail or "shard_parsed_to_zero_quotes"),
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )
+
+
+def _parse_odds_history_key(market_key: Any) -> dict[str, Any]:
+    """`event_id=..|home_team=..|market=h2h|side=Draw|book=draftkings` -> a dict.
+
+    The shard's key is a pipe-delimited `k=v` string and it is the ONLY place
+    the market and side appear -- the entry value holds movement fields
+    (`delta`, `history`, `previous_line`) and no identity at all.
+
+    Shapes differ BY SPORT, which is why this parses rather than assumes: the
+    soccer keys carry `side=` and `book=`, the MLB keys carry `bookmaker=` and
+    NO side. A parser that required one shape would silently drop the other.
+    """
+    out: dict[str, Any] = {}
+    for part in str(market_key or "").split("|"):
+        name, sep, value = part.partition("=")
+        if not sep:
+            continue
+        out[name.strip().lower()] = value.strip()
+    line = out.get("line")
+    out["line"] = _as_float(line) if line is not None else None
+    return out
 
 
 def _as_float(value: Any) -> float | None:

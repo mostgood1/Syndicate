@@ -210,13 +210,40 @@ def test_stamping_sets_the_SHORTLIST_gate_field_too():
     assert stamped["quote"]["quote_source"] == "kalshi"
 
 
-def test_book_age_seconds_is_DELIBERATELY_left_alone():
-    """It answers "has the market moved", not "how old is our observation", and
-    opportunity_gate's live/pregame checks read it for that. Overwriting it
-    would make a motionless market look like a moving one."""
+def test_book_age_seconds_is_left_alone_for_an_AGGREGATOR():
+    """NARROWED 2026-08-25, and the half this test was really protecting is kept.
+
+    It previously asserted `book_age_seconds` is never touched by ANY source,
+    on the reasoning that it answers "has the market moved" rather than "how
+    old is our observation" -- opportunity_gate's live/pregame checks read it
+    for that, and overwriting it would make a motionless market look like a
+    moving one. That reasoning is right, and it is why the field is still
+    untouchable by OddsAPI: an aggregator shard is a periodic CAPTURE, not an
+    observation of the market moving.
+
+    What the original rule did not anticipate is `opportunity_gate`'s LIVE
+    branch. Once a game starts, the ceiling on this field collapses from 86,400s
+    to 900s. Measured 2026-08-25T03:13:38Z, that put 100% of MLB and WNBA rows
+    in `dead` (1302/1302 and 1225/1225) while the pregame sports were untouched
+    -- a venue-priced row seconds old was being judged on an OddsAPI book clock
+    measured in hours.
+
+    So the reset is now allowed for venues that quote a LIVE market
+    continuously, where `fetched_at` genuinely IS the last observation of the
+    market moving. See `test_live_book_age_stamp.py` for the full property set,
+    including that it can only ever make a row YOUNGER.
+    """
+    stamped = stamp_candidate_freshness({"quote": {"book_age_seconds": 50000.0}},
+                                        _q("oddsapi", age=5.0))
+    assert stamped["quote"]["book_age_seconds"] == 50000.0
+
+
+def test_a_live_quoting_venue_MAY_reset_the_book_clock():
+    """The narrowing, stated as its own case so the boundary is explicit."""
     stamped = stamp_candidate_freshness({"quote": {"book_age_seconds": 50000.0}},
                                         _q("kalshi", age=5.0))
-    assert stamped["quote"]["book_age_seconds"] == 50000.0
+    assert stamped["quote"]["book_age_seconds"] == pytest.approx(5.0, abs=2.0)
+    assert stamped["quote"]["book_age_source"] == "kalshi"
 
 
 def test_the_nested_quote_block_is_COPIED_not_mutated():

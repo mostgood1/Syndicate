@@ -34,6 +34,27 @@ from typing import Any, Iterable, Mapping
 _UNSET = object()
 
 
+def _reprice_grid_from_venues(grid: Any, sport: Any, selected_date: Any) -> dict:
+    """Move a sport's grid onto the live venues, and never take the board down.
+
+    Extracted from the enrichment tuple only so the import stays local: a
+    `venue_quote_fanin` that is a deploy behind must cost this sport's re-price
+    and nothing else. The caller's own try/except would catch the raise, but it
+    would record `{"error": "ImportError"}` with no name in it, and "the module
+    is missing" and "the venue refused" need different fixes.
+    """
+    try:
+        from syndicate.features.shared.venue_quote_fanin import (
+            apply_venue_quotes_to_grid,
+        )
+    except ImportError as exc:  # pragma: no cover - deploy-skew guard
+        return {"supported": False, "error": f"ImportError: {exc}"}
+    try:
+        return apply_venue_quotes_to_grid(grid, sport, str(selected_date or ""))
+    except Exception as exc:  # noqa: BLE001 - a venue failure is not a board failure
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def build_layer2_shortlist(
     selected_date: str,
     sport_slugs: Iterable[str],
@@ -338,6 +359,37 @@ def build_layer2_shortlist(
                         else None
                     ),
                 ),
+                # PRICE BEFORE ANYTHING THAT READS PRICE.
+                #
+                # `7799abf9c` moved this ahead of `build_layer2_rows` so a row
+                # the lane gate had already killed could still be rescued by a
+                # venue quote. It was still too late for the four steps below,
+                # and that left ONE ROW CARRYING TWO VINTAGES:
+                #
+                #   `best.price`            LIVE   (Polymarket / Kalshi)
+                #   `cells` / `consensus`   PREGAME (OddsAPI, before first pitch)
+                #
+                # Every fair value on the row is de-vigged from the second pair
+                # -- `_fair_by_side` from `cells`, `market_fair_prob_over` from
+                # `consensus` -- and `live_gameline_join` then subtracts that
+                # pregame fair from the LIVE re-sim's win probability. On a game
+                # three runs in, that difference is mostly the gap between two
+                # clocks, and `_MODEL_EDGE_MAX_POINTS` drops it. Measured
+                # 2026-08-25 03:5xZ, and this is the guard working correctly:
+                #
+                #     LAYER2_BOARD_HEALTH sport=mlb rows=14 edged=10
+                #     PAPER2_PLAN_WRITTEN venue=polymarket rows_in=14
+                #       positions=0 venue_priced=12
+                #       refusals={'no_model_edge_pct': 14}
+                #
+                # Ten rows carried an edge and none survived the bound. So the
+                # re-price runs HERE: after the two state joins, which read no
+                # price and are what tell it a game is live, and before every
+                # step that reads one.
+                (
+                    "venue_reprice",
+                    lambda: _reprice_grid_from_venues(grid, sport, selected_date),
+                ),
                 ("projections", lambda: attach_projections(grid, sport=sport, selected_date=selected_date)),
                 ("margin_model", lambda: attach_margin_model(grid)),
                 # Same functions the serve-time endpoint calls
@@ -490,6 +542,64 @@ def build_layer2_shortlist(
                         f"unmatched_fixtures={proj_stats.get('unmatched_fixtures_count')} "
                         f"board_names={proj_stats.get('unmatched_fixture_sample')} "
                         f"sim_names={proj_stats.get('indexed_fixture_sample')}",
+                        flush=True,
+                    )
+            except Exception:
+                pass
+
+            # THE RE-PRICE'S OWN NUMBERS. It runs as an enrichment step above
+            # (see the comment there for why its position moved twice); this is
+            # the instrument, printed here beside the other join diagnostics.
+            #
+            # `benchmark_*` is the second half `#546` added: `repriced` counts
+            # sides whose PRICE moved to a venue, `benchmark_rows` counts rows
+            # whose FAIR VALUE moved with it. The two being different numbers is
+            # the whole finding -- the first was non-zero and the second did not
+            # exist, which is how a live price came to be scored against a
+            # pregame benchmark.
+            try:
+                grid_reprice = enrichment.get("venue_reprice")
+                if isinstance(grid_reprice, Mapping):
+                    print(
+                        f"[layer2_shortlist] GRID_REPRICE sport={sport}"
+                        f" sides_seen={grid_reprice.get('sides_seen')}"
+                        f" repriced={grid_reprice.get('repriced')}"
+                        f" by_source={grid_reprice.get('by_source')}"
+                        f" benchmark_rows={grid_reprice.get('benchmark_rows')}"
+                        f" benchmark_skipped={grid_reprice.get('benchmark_skipped')}"
+                        f" error={grid_reprice.get('error')}",
+                        flush=True,
+                    )
+            except Exception:
+                pass
+
+            # AND THE LIVE GAME-LINE JOIN, which has never printed anything.
+            #
+            # `attach_live_gamelines` returns a full coverage payload -- index
+            # size, rows projected, priceable, and the per-reason withhold split
+            # -- and every field of it went into the shortlist artifact and
+            # nowhere else. That is the same computed-but-unprinted gap as the
+            # seven drop counters and the three joins above it, and it is why
+            # "the live moneyline join produced nothing" and "it produced
+            # something the board then dropped" looked identical from the logs.
+            try:
+                gl_stats = enrichment.get("live_gamelines")
+                if isinstance(gl_stats, Mapping) and gl_stats.get("supported") is not False:
+                    print(
+                        f"[layer2_shortlist] LIVE_GAMELINE_JOIN sport={sport} "
+                        f"index={gl_stats.get('index_size')} "
+                        f"considered={gl_stats.get('rows_live_gameline_considered')} "
+                        f"projected={gl_stats.get('rows_live_gameline_projected')} "
+                        f"priceable={gl_stats.get('rows_live_gameline_priceable')} "
+                        f"withheld={gl_stats.get('rows_live_gameline_withheld')} "
+                        f"why={gl_stats.get('withheld_by_reason')} "                        # WHY AN EMPTY INDEX IS EMPTY. `index=0` reads as "no
+                        # producer wired" and that reading was WRONG for WNBA on
+                        # 2026-08-25: the lens builds every 60s and its lane was
+                        # stamped `pregame`, which this join correctly refuses.
+                        # `sources_seen` is the discriminator.
+                        f"index_why={gl_stats.get('index_diagnostics')} "
+                        f"reason={gl_stats.get('reason')} "
+                        f"error={gl_stats.get('error')}",
                         flush=True,
                     )
             except Exception:
@@ -650,6 +760,97 @@ def build_layer2_shortlist(
         # shape. Measured 2026-08-25T00:02Z, polymarket_us offered 3,106 quotes
         # and won none of 237 -- which freshness cannot explain, since Kalshi
         # quotes no game lines at all.
+        # WHICH SPORT PRODUCED WHAT, on the line that reports the board.
+        #
+        # MEASURED 2026-08-25: three consecutive builds logged
+        # `VENUE_REPRICE rows_in=4296 sports=['nfl','soccer']` -- byte-identical
+        # -- while MLB independently generated 411 candidates (44 game, 367
+        # prop) and logged `GAME_CANDIDATES_EXIT sport=mlb rows=68`. MLB is
+        # KEPT by the manifest gate and IS iterated here, so it was reaching
+        # this loop and yielding zero opportunities, and nothing said so.
+        #
+        # `per_sport_stats` has carried `candidates`/`scored`/`sides_priced`/
+        # `opportunities` per sport the entire time and was stored on the
+        # result where only an artifact reader could see it. This is the same
+        # computed-but-unprinted gap as the seven drop counters on
+        # LAYER2_SHORTLIST: the number that identifies the sport at fault
+        # existed and never reached a log line.
+        print(
+            "[layer2_shortlist] PER_SPORT_INGEST "
+            + " ".join(
+                f"{name}(cand={stat.get('candidates')},scored={stat.get('scored')},"
+                f"priced={stat.get('sides_priced')},opps={stat.get('opportunities')},"
+                f"lanes={stat.get('by_lane')})"
+                for name, stat in sorted((per_sport_stats or {}).items())
+            ),
+            flush=True,
+        )
+        # THE ENRICHMENT STEP THAT DECIDES THE LANE.
+        #
+        # MEASURED 2026-08-25T02:59:03Z:
+        #   mlb  cand=1302 scored=1300 priced=1390 opps=0
+        #   wnba cand=1225 scored=1225 priced=1247 opps=0
+        #   nfl  cand=2642 ... opps=112     soccer cand=9041 ... opps=4184
+        #
+        # Everything prices and scores, then MLB and WNBA emit nothing. The
+        # filter is `board_lane == LANE_OPPORTUNITY`, and `opportunity_gate`
+        # demotes to LANE_WATCHLIST when demotion is enabled AND the row has no
+        # game state AND kickoff has passed. Only the two LIVE sports meet all
+        # three -- nfl (08-28) and soccer have not kicked off, which is exactly
+        # why they are unaffected.
+        #
+        # So the question is why `attach_game_state` matches zero MLB/WNBA rows
+        # (`game_candidate_inputs` shows game_state="" is_live=false). That
+        # join already RETURNS `chips`/`rows_matched`/`unmatched_teams` for this
+        # purpose -- the 2026-08-06 soccer gap sat at 0 matched through nine
+        # hypotheses for want of exactly this sample -- and it was being stored
+        # where only an artifact reader could see it.
+        #
+        # The demotion itself is CORRECT and is not being touched: a started
+        # game with unknown state may already be settled, and Polymarket is
+        # armed with real money. The fix belongs upstream, in the join.
+        for name, stat in sorted((per_sport_stats or {}).items()):
+            step = ((stat or {}).get("enrichment") or {}).get("game_state")
+            if isinstance(step, dict):
+                print(
+                    f"[layer2_shortlist] GAME_STATE_JOIN sport={name}"
+                    f" chips={step.get('chips')} rows_matched={step.get('rows_matched')}"
+                    f" unmatched={str(step.get('unmatched_teams'))[:200]}"
+                    f" reason={step.get('reason')} error={step.get('error')}",
+                    flush=True,
+                )
+            # THE STEP THAT CORRECTS A FROZEN CHIP, AND THE ONLY ONE THAT NEVER
+            # PRINTED. `#413` records the mechanism: the chip reader uses
+            # PRESENCE where freshness was meant, so whenever a game's feed was
+            # first captured becomes its state for the rest of the day -- MIL@SD
+            # read `live / TOP 9` off a FIVE-MINUTE-OLD artifact while the lens
+            # read `Final`. `attach_live_game_state_from_lens` is the overlay
+            # that fixes it, and its coverage payload went to the artifact and
+            # nowhere else.
+            #
+            # MEASURED 2026-08-25 04:21:24Z, which is why this is here:
+            # `basketball_momentum` reported wnba `post=2 live_events=0` on every
+            # tick from 04:18:50Z, and the same build counted 184 wnba rows past
+            # `attach_live_gamelines`' live-state check. Both games final, 184
+            # rows live. `game.state` gates BOTH live guards --
+            # `opportunity_gate`'s 900s clock and `live_edge_policy`'s refusal of
+            # a settled market -- so a chip frozen at `live` means that refusal
+            # never fires.
+            #
+            # `supported` is the field that matters: `_LIVE_GAME_STATE_SPORTS` is
+            # `{mlb, soccer}`, so this returns `supported: False` for wnba and
+            # always has. That is a stated refusal nobody could read.
+            live_step = ((stat or {}).get("enrichment") or {}).get("live_game_state")
+            if isinstance(live_step, dict):
+                print(
+                    f"[layer2_shortlist] LIVE_GAME_STATE_JOIN sport={name}"
+                    f" supported={live_step.get('supported')}"
+                    f" corrected={live_step.get('rows_corrected')}"
+                    f" transitions={live_step.get('transitions')}"
+                    f" snapshot_age_s={live_step.get('snapshot_age_seconds')}"
+                    f" reason={live_step.get('reason')} error={live_step.get('error')}",
+                    flush=True,
+                )
         print(
             "[layer2_shortlist] VENUE_REPRICE_KEYS "
             f"unmatched_by_sport={repriced.get('unmatched_by_sport')} "

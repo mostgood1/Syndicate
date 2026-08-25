@@ -27556,3 +27556,631 @@ are service-level so the flag-off change carried through regardless of which
 commit won the race) -- confirmed via absence of any further
 `[kalshi_polymarket_arb]` boot-probe log line on that boot. Deploy claim
 (refresh-worker, token `be62d278e004443f`) released.
+
+### 7. `4ab3b2fee` — `updated_at`. VERIFIED, and it was a NAME not a feed.
+
+**verify:** `VENUE_REPRICE` 2026-08-25T02:28:05Z.
+
+    soccer oddsapi  BEFORE  {'status': 'error', 'reason': 'shard_has_no_timestamp', 'quotes': 0}
+                    AFTER   {'status': 'ok', 'reason': None, 'quotes': 298, 'age_seconds': 30.0}
+
+The shards were present and full the whole time. `shard_has_no_timestamp` is
+reachable only AFTER the payload loads and AFTER `markets` is confirmed
+non-empty -- I carried it as "open, unmeasured" for hours while reading it as a
+missing feed. `_fetched_at` simply never looked for `updated_at`.
+
+### 8. `053d336e8` — OddsAPI was reporting 298 quotes it never had. NOT DEPLOYED.
+
+Immediately after #7 made oddsapi readable, it won ZERO selections with 298
+quotes at 30s age. The entry VALUE holds movement fields (`delta`, `history`,
+`previous_line`) and none of `market`/`side`/`line`/`american`/`probability` --
+all None. Every quote was `quote_key(sport, None, None, None)`: 298 copies of
+`soccer||` carrying no price. `status` read `ok` purely because the list was
+non-empty.
+
+Identity lives in the KEY, and the shapes differ BY SPORT -- soccer keys carry
+`side=`/`book=`, MLB keys carry `bookmaker=` and NO side at all. Parsed now,
+with `no_side_in_key:N` / `no_last_odds:N` counted on a SUCCESSFUL read.
+Committed, tested, **held undeployed at the user's direction**.
+
+### 9. MLB'S DISAPPEARANCE — SOLVED, AND IT WAS NEVER WHAT I SAID.
+
+**verify:** `post_state_filter_pruned`, 02:22:32Z and 02:30:15Z.
+
+    {"mlb": {"Prop already hit -- outcome decided, no longer a live opportunity.": 42,
+             "Prop already missed -- outcome decided, no longer a live opportunity.": 16,
+             "Inactive player state excluded.": 3}}
+
+MLB is KEPT by the manifest gate (`kept=mlb,wnba,nfl,ncaaf,soccer`), holds
+**1,201** odds-history entries for 2026-08-24, and its board contract processes
+10-15 games. Its candidates are pruned because the games are LIVE and the props
+have RESOLVED. That is correct behaviour, and it explains the whole arc: rows
+present at 01:22 pregame, drained by 01:54 as each prop decided.
+
+**THREE THINGS I ASSERTED THAT WERE WRONG, recorded because each cost a
+detour:**
+
+1. **"The 8-24 games are over."** Said twice, from two different weak signals:
+   Polymarket `prices: ["0.0050"]` (actually a one-sided quote,
+   `outcomes_count_mismatch`, not a settled market) and then the declining
+   `mlb:g=` count (actually the build window, not games ending). The user
+   corrected it twice. 6 MLB + 2 WNBA were live throughout.
+2. **"MLB candidate generation is starved."** The zero-candidate trace carried
+   NO sport label; I noted that and then reasoned as though it were
+   established. MLB's shard is full.
+3. **"The BOS@MIA live box is frozen."** Contradicted by this same evidence --
+   the state filter is reading DECIDED outcomes out of that box right now.
+
+**The stale-shared-copy theory was also checked and is dead**: the three shard
+copies do differ (control-plane 152 min older, 863KB smaller), matching the
+2026-08-04 incident, but the loader was already fixed to pick newest-mtime.
+
+### 10. THE REAL OPEN BUG: two components disagree about the same live box.
+
+`post_state_filter` sees 42 MLB props HIT and 16 MISSED. `paper_settlement`
+reports the same slate `not_decided_yet: 12`. **Kalshi has settled the
+Alcantara market**, which agrees with the state filter. One of these reads the
+box correctly and the other does not; the settler is the one out of step, and
+it is the one that grades money.
+
+Not chased -- awaiting direction.
+
+### 11. `beyond_quote_age` IS COVERAGE, NOT MECHANISM.
+
+    LAYER2_SHORTLIST rows=0 considered=4296 beyond_horizon=112
+      beyond_quote_age=4184 sports=[]
+
+4,184 of 4,296 are soccer, and neither venue lists it
+(`no_kalshi_market_classified_to_this_sport`,
+`no_polymarket_row_for_league_soccer`). Nothing can refresh those rows.
+`stamp_candidate_freshness` works where coverage exists -- MLB unmatched fell
+617 -> 76 and Polymarket went 0 -> 28 selections once the key spaces met. The
+lever is venue coverage for soccer, or a third source that can price soccer
+per-side; it is not the ceiling and not the stamping code.
+
+---
+
+## 2026-08-25 ~03:51Z — the live board, end to end. SIX fixes, one chain.
+
+**lane:** portfolio-decision-and-execution
+**final SHA:** `7799abf9c` on BOTH workers (refresh `dep-da6gsi942hec73d2hpo0`,
+live-odds `dep-da6gt4ou01pc7382jmsg`)
+
+### THE RESULT, measured
+
+| | before | after |
+|---|---|---|
+| Polymarket selections | 0 of 237 | 28 |
+| MLB unmatched keys | 617 | 76 |
+| MLB lanes | `{'dead': 1302}` | `{'opportunity': 14}` |
+| WNBA lanes | `{'dead': 1225}` | `{'opportunity': 8}` |
+| Shortlist | `rows=0 sports=[]` | `rows=23 ['mlb','soccer','wnba']` |
+| Polymarket join | `matched=0` | `matched=12` |
+| Kalshi game series | 0 | 171 |
+| OddsAPI | `error: shard_has_no_timestamp` | `ok`, 30s quotes |
+
+### THE ROOT CAUSE, and why it took all night
+
+**The venue reprice ran AFTER the lane gate.** `build_layer2_rows` (line 498)
+applies `opportunity_gate` and returns only SURVIVORS; `apply_venue_quotes`
+(line 634) then repriced that survivor list. A row the gate killed could never
+be rescued. The lane was decided before the venue quote was ever stamped.
+
+Compounded by a gate nobody had counted: `opportunity_gate` reads
+`book_age_seconds`, whose ceiling collapses 96x at first pitch
+(86,400s -> 900s). So every LIVE row was judged on an OddsAPI book clock in
+hours. MLB and WNBA -- the only live sports -- went 100% dead. NFL and soccer
+were untouched, which was the cleanest control available and the thing that
+finally localised it.
+
+`apply_venue_quotes_to_grid` now runs inside the per-sport loop, before the
+gate, on the grid. **Price and age move together or neither moves** -- an
+age-only refresh would be a stale price wearing a fresh timestamp, defeating
+the live-market check rather than passing it, with real money armed.
+
+### THE OTHER FIVE
+
+1. `f32ec00ff` Polymarket adapter filtered by sport (was keying NFL markets as
+   `mlb|h2h|<team>` -- a WRONG price path, latent only because Kalshi was
+   fresher).
+2. `df2047f5f` `kalshi_discovery` called `probe`/`discover`/`KalshiError` and
+   imported none. Nine boots of `NameError` reported as a venue failure.
+3. `3e8856e81` Polymarket side vocabulary: board keys a side by ROLE
+   (`h2h|home`), the venue by CLUB (`h2h|chicago cubs`). Now one resolver
+   decides both halves. Spreads refuse BY NAME pending a measurement of which
+   team a handicap belongs to.
+4. `4ab3b2fee` `_fetched_at` never looked for `updated_at`, the key the shards
+   actually stamp. One missing name took OddsAPI offline for three sports while
+   reporting `error` -- which reads as a feed to chase, not a key to add.
+5. `18569e814` join date fallback + `home`/`away` -> the row's own club.
+
+### WHERE IT STOPS NOW
+
+    PAPER2_PLAN_WRITTEN venue=polymarket rows_in=14 positions=0
+      venue_priced=12  refusals={'no_model_edge_pct': 14}
+
+**The join works and the prices are on the plan.** All 14 rows then refuse for
+want of `model_edge_pct`. Same refusal on novig and prophetx, so it is not
+Polymarket-specific: these are LIVE rows and nothing supplies a live model
+projection for them. That is a different subsystem from anything fixed tonight.
+
+### WHAT I GOT WRONG, and what each cost
+
+Recorded because the pattern is the lesson, not the individual errors.
+
+1. **"The 8-24 games are over."** Said TWICE, from two different weak signals
+   -- Polymarket `prices: ["0.0050"]` (actually a one-sided quote) and a
+   declining `mlb:g=` count (actually the build window). User corrected both.
+2. **"MLB candidate generation is starved."** The zero-candidate trace carried
+   no sport label; I noted that and reasoned as though it were established.
+   MLB had 411 candidates and a 1,201-entry shard.
+3. **"The BOS@MIA live box is frozen."** Contradicted by the state filter
+   reading DECIDED outcomes out of that same box.
+4. **"`attach_game_state` has an alias gap."** It was healthy -- 816 MLB and
+   643 WNBA rows matched, zero unmatched. Its HEALTH was what routed those
+   sports into the live branch.
+5. **"The rows are in `watchlist`."** They were 100% `dead`, a different gate
+   entirely.
+
+Every one was an assertion ahead of a measurement, and every one cost a deploy
+cycle on a live slate. The three diagnostics that ended the search
+(`PER_SPORT_INGEST`, `GAME_STATE_JOIN`, `GRID_REPRICE`) all printed numbers the
+code had been computing and discarding -- the same computed-but-unprinted gap
+as the seven drop counters. **The fastest path was always the log line, never
+the theory.**
+
+### STILL OPEN
+
+- `no_model_edge_pct` on live rows -- the last blocker to an order.
+- `paper_settlement` says `not_decided_yet` while `post_state_filter` reads 42
+  MLB props HIT and 16 MISSED from the same live box, and Kalshi has SETTLED
+  the Alcantara market. Two components, one box, opposite answers; the settler
+  is the one out of step and it is the one that grades money.
+- Kalshi supplies ONLY player props to the grid; its 171 newly-registered game
+  series were registered at 03:34, after the odds artifact that feeds the
+  reprice was written. Expect game lines on a later cycle -- unverified.
+- Polymarket spreads refuse (`outcomes_count_mismatch`), one price for two
+  outcomes. Needs `marketSides`, which the venue returns and
+  `_SLATE_STORAGE_FIELDS` does not persist.
+- `053d336e8` (OddsAPI shard-key parse) is committed and DEPLOYED but its
+  `no_side_in_key:N` counter has not been read.
+
+---
+
+## 2026-08-25 04:14Z — `40d14abf2` — ONE ROW, TWO VINTAGES.
+
+**lane:** portfolio-decision-and-execution
+**services:** refresh-worker `dep-da6hbhu7bikc738jtneg` (live 04:14:23Z),
+live-odds-worker `dep-da6hbsm7bikc738jumqg`
+
+### WHAT THE REFUSAL ACTUALLY WAS
+
+    LAYER2_BOARD_HEALTH sport=mlb rows=14 pregame_proj=14 edged=10
+    PAPER2_PLAN_WRITTEN venue=polymarket rows_in=14 positions=0
+      venue_priced=12 refusals={'no_model_edge_pct': 14}
+
+Ten rows carried an edge and none survived `_MODEL_EDGE_MAX_POINTS = 15.0`.
+**The bound was working.** `todo.md` records it as KEEP-permanent ("a cheap
+assertion that a probability-space claim is actually in probability space") and
+it is untouched here.
+
+`7799abf9c` re-priced `best` from the venues before the lane gate and left every
+fair-value benchmark on the pregame OddsAPI capture:
+
+| field | vintage |
+|---|---|
+| `best.price` | LIVE — venue, seconds old |
+| `cells` / `consensus` | PREGAME — OddsAPI, before first pitch |
+
+Both readers of fair value read the second pair — `layer2_board._fair_by_side`
+de-vigs `cells`, `prop_projections._no_vig_over_probability` de-vigs `consensus`
+and that is `market_fair_prob_over`. `live_gameline_join.price_moneyline` then
+subtracts that pregame fair from the LIVE re-sim's win probability. A team three
+runs up in the 7th is ~0.90 to the live model and ~0.55 to the pregame
+consensus: a 35-point "edge" that is entirely the gap between two clocks.
+
+**The only number on the row that knew the game had started was the price.**
+
+### THE FIX
+
+1. `_reprice_live_benchmark` moves `cells` and `consensus` onto the venue that
+   priced the row. Four conditions, three of them refusals counted by name in
+   `benchmark_skipped`: LIVE ROWS ONLY (pregame keeps its multi-book median,
+   `#384`), EVERY SIDE OR NO SIDE, ONE VENUE PER ROW, STRICTLY FRESHER.
+2. The re-price runs as an enrichment STEP — after the two state joins (which
+   read no price and are what tell it a game is live) and before the four that
+   do. It had still been running after `attach_projections` and
+   `attach_live_gamelines`.
+
+**A test caught the half I would have shipped.** Merely ADDING the venue to
+`cells` leaves the median blending vintages: live -900 and pregame -120 de-vig
+to ~0.90 and ~0.50, median ~0.6999 — half the gap, the same defect at half the
+size. The test asserted 0.90 and read 0.6999. Superseded books now MOVE to
+`cells_superseded` (kept, not deleted); a book within
+`LIVE_MARKET_MAX_AGE_SECONDS` of the venue stays a peer; an unstamped age is
+unknown, not fresh.
+
+### TWO MORE COMPUTED-AND-NEVER-PRINTED NUMBERS
+
+`attach_live_gamelines` has been returning index size, rows
+projected/priceable/withheld and a per-reason split, all of it to the artifact
+and nowhere else — so "the live moneyline join produced nothing" and "it
+produced something the board dropped" were indistinguishable from the logs.
+`LIVE_GAMELINE_JOIN` prints it now. `GRID_REPRICE` gains `benchmark_rows`
+beside `repriced`: sides whose PRICE moved versus rows whose FAIR VALUE moved
+with it. **The two being different numbers is the whole finding**, and the
+second did not exist.
+
+That is now nine instruments in this thread that printed numbers the code was
+already computing. The pattern is not incidental.
+
+### verify: OWED
+
+`GRID_REPRICE ... benchmark_rows=N` non-zero on mlb/wnba, and
+`PAPER2_PLAN_WRITTEN` refusals no longer `no_model_edge_pct` on every row.
+**Neither read yet** — the worker booted at 04:14:23Z into an overview refresh
+and the shortlist build comes later in the cycle. Nothing about this change is
+verified until those two lines are read.
+
+Caveat on the window: 04:15Z is 23:15 Central on 08-24. If the slate finishes
+before a build lands, the measurement waits for the next live slate. Say that
+rather than reading a quiet board as a pass.
+
+### verify: MEASURED 2026-08-25 04:21-04:22Z, refresh-worker `40d14abf2`
+
+**The benchmark rewrite fires, and the pregame control is clean.**
+
+    GRID_REPRICE mlb    sides_seen=1390  repriced=28  benchmark_rows=3
+      skipped={'not_live': 420, 'venue_did_not_price_every_side': 151, 'not_two_sided': 242}
+    GRID_REPRICE wnba   sides_seen=1247  repriced=10  benchmark_rows=3
+    GRID_REPRICE nfl    sides_seen=2710  repriced=442 benchmark_rows=0
+      skipped={'not_live': 1352}
+    GRID_REPRICE soccer sides_seen=10523 repriced=0   benchmark_rows=0
+
+Counters reconcile exactly: mlb 420+151+242+3 = 816 = `PREGAME_PROJECTION_JOIN
+considered`. **NFL is the control and it behaves**: 442 sides re-priced, ZERO
+benchmarks touched, every row refused `not_live`. A pregame board keeps its
+multi-book median, which is the first condition and the one most likely to have
+been wrong.
+
+**The refusal moved, on MLB rows specifically.**
+
+| | before (03:5xZ) | after (04:22Z) |
+|---|---|---|
+| polymarket plan `rows_in` | 14 (all mlb) | 5 (all mlb) |
+| ...of which `no_model_edge_pct` | **14 — 100%** | **3 — 60%** |
+| ...reaching an EV test | 0 | 2 |
+| master `PLAN_WRITTEN sized=` | 0 | **1** |
+| mlb board `age_p50s` | hours | **298s** |
+
+**Two live MLB rows now carry a usable model edge where zero did.** Small, and
+attributable: `benchmark_rows=3` on mlb, 2 of 5 board rows past the bound. The
+same scale, which is what a real fix looks like rather than a threshold moving.
+
+**STATED SO IT IS NOT OVER-READ.** The master plan's `no_model_edge_pct` fell
+4/14 from 14/14, but the board's COMPOSITION also changed — 14 mlb rows became
+5 mlb + 9 soccer as games ended. Soccer is pregame and all 9 carry an edge, so
+most of that headline improvement is composition, not this change. The
+venue-scoped polymarket plan (mlb only, 5 rows) is the honest comparison and it
+is the 100% -> 60% above.
+
+**`positions=0`, and the reasons are now ORDINARY ones.**
+
+    PLAN_WRITTEN rows_in=14 sized=1 positions=0 bankroll=$250.0
+      refusals={'below_min_ev_pct': 8, 'below_min_stake': 1,
+                'no_model_edge_pct': 4, 'zero_kelly_stake': 1}
+
+`below_min_ev_pct` is the largest bucket now. That is a board saying *there is
+no bet here*, which is the answer a live-vs-live comparison SHOULD give: the
+35-point edges were the vintage gap, and removing it removes them. A market
+whose model and price are both current does not offer 35 points.
+
+Window caveat: 04:22Z is 23:22 Central. `POLYMARKET_BOARD_JOIN` shapes read
+`prices: ["0.005"]` and `["0.01"]` on MLB moneylines — near-settled markets on a
+slate that is ending. Zero positions tonight is expected regardless of this
+change, and must NOT be read as either a pass or a failure of it.
+
+### THREE THINGS THE NEW INSTRUMENTS SURFACED IMMEDIATELY
+
+1. **`053d336e8`'s counter is finally READ, and it is total.**
+   `oddsapi mlb {'status': 'no_rows', 'reason': 'no_side_in_key:1201'}` — ALL
+   1,201 MLB shard entries carry no side in the key, so OddsAPI contributes
+   zero MLB quotes. Soccer works on the same code (290 quotes, 42s,
+   `no_side_in_key:8`). MLB's shard shape is the gap, not the parser.
+
+2. ~~**WNBA has NO live model at all**~~ **— WRONG, CORRECTED SAME NIGHT.**
+
+   I wrote that off `LIVE_GAMELINE_JOIN sport=wnba index=0 considered=184`.
+   **WNBA HAS a live lens and it was building the whole time**: live-odds-worker
+   logged `[live_lens_loop] TICK_COMPLETE results={'mlb': True, 'wnba': True,
+   'soccer': True}` at 04:24:08Z — three minutes after the reading, same slate.
+   The user said so and the log agrees.
+
+   What is conditional is the STAMP (`wnba/cards.py:1381`):
+
+       source = "live_projection" if (is_live and live_margin is not None
+                                      and elapsed_min is not None) else "pregame"
+
+   `live_gameline_from_lens` accepts only `live_projection` for WNBA, so any ONE
+   of those three failing publishes a healthy snapshot that this join correctly
+   refuses — and it looked identical to no producer at all. The third is a hole
+   this repo already documents at `wnba/cards.py:1345`: the clock BLANKS between
+   periods, `elapsed_min` goes None, and the lane reverts to `pregame` for the
+   entire break (observed 2026-08-21 IND@DAL, ~20 minutes). Two WNBA games at
+   04:21Z, plausibly mid-break — **unconfirmed, which is exactly the point.**
+
+   **This is the sixth time tonight I read an unattributed zero as a missing
+   component.** The zero was real; the cause was invented. The instrument I had
+   just added was not fine-grained enough to stop me — it printed the zero and
+   not its reason, which is the same gap one level down.
+
+   `index_why=` now carries `games_in_snapshot`, `indexed`,
+   `skipped_no_team_names`, `skipped_no_accepted_lane`, and the discriminator:
+   `sources_seen`, every stamp OBSERVED rather than only the accepted ones. A
+   producer that is not wired shows `{}`. One that is wired and between periods
+   shows `{'pregame': N}`. Those were the same number and are now different
+   sentences.
+
+   The PROP half is a separate and still-open gap: `LIVE_PROJECTION_JOIN
+   sport=wnba reason=live-lens snapshot for wnba carries no liveProps (producer
+   not wired)`. That names `liveProps`, a different key from `gameLens`, and is
+   not contradicted by any of the above — but after tonight it is carried as
+   UNVERIFIED, not as fact.
+
+3. **NFL has a real team-alias gap.** `GAME_STATE_JOIN sport=nfl chips=29
+   rows_matched=141 unmatched=['Seattle Seahawks', 'Tennessee Titans', 'Los
+   Angeles Rams', 'Cincinnati Bengals', ...]` — full team names unmatched, on
+   the sport with 416 opportunities.
+
+### STILL OPEN AFTER THIS
+
+- `venue_did_not_price_every_side: 151` (mlb) / `317` (wnba) is now the
+  DOMINANT refusal on live rows. Polymarket priced one leg and not the other,
+  so 10 of MLB's 13 priceable game lines still carry a pregame benchmark. That
+  is the next lever and it is a COVERAGE question, not a mechanism one.
+- Polymarket spreads still refuse: `spreads_refused:237` (mlb), `992` (nfl),
+  `32` (wnba); `outcomes_count_mismatch: 80` in the board join. Needs
+  `marketSides`, which the venue returns and `_SLATE_STORAGE_FIELDS` drops.
+
+### 2026-08-25 04:31Z — TWO COMPONENTS, ONE SLATE, OPPOSITE ANSWERS (wnba game state)
+
+**This is the finding, and it outranks the diagnostic that surfaced it.**
+
+`basketball_momentum` on live-odds-worker, EVERY tick from 04:18:50Z through
+04:30:28Z inclusive:
+
+    SCOREBOARD_STATES league=wnba date=2026-08-24 post=2
+    league=wnba date=2026-08-24 live_events=0
+
+Both 08-24 WNBA games FINAL, continuously, for the whole window.
+
+`layer2_shortlist` on refresh-worker at **04:21:24Z**, inside that window:
+
+    LIVE_GAMELINE_JOIN sport=wnba index=0 considered=184
+
+`considered` increments ONLY in `record()`, which is reached only after
+`attach_live_gamelines` passes `game.state in {live, in_progress}`
+(`live_gameline_join.py:807`) — every earlier branch `continue`s uncounted. So
+**184 grid rows carried a LIVE game state while the scoreboard said both games
+were final.**
+
+**WHY THIS IS LOAD-BEARING, not cosmetic.** `game.state` is the predicate for
+both live guards:
+
+- `opportunity_gate` applies `LIVE_MARKET_MAX_AGE_SECONDS` (900s) on it.
+- `live_edge_policy` REFUSES a final game — "the market is settled, so there is
+  no price to beat". **If the state says live when the game is final, that
+  refusal never fires** and a settled market remains eligible to rank. That is
+  the same failure the `over_already_decided` branch exists to prevent on the
+  prop side, reached through the game-state door instead.
+
+**AND IT REFRAMES TONIGHT'S WNBA WORK.** I called `index=0` a missing producer
+(wrong), then a between-periods clock hole (also wrong — the games were over,
+not at halftime). The lens was stamping `pregame` because `is_live` was False
+because **the games were genuinely final**. `live_gameline_from_lens` was the
+only component in the chain reading the slate CORRECTLY, and I misdiagnosed it
+twice on the way to finding the component that was actually wrong.
+
+**Same family as the OPEN Alcantara item**: `paper_settlement` says
+`not_decided_yet` while `post_state_filter` reads 42 HIT / 16 MISSED from the
+same box. Two readers, one source of truth, disagreeing — and in both cases the
+one that grades or gates money is the one out of step.
+
+**NOT CHASED TONIGHT, and say why:** it is 04:31Z, the slate is dead, and any
+fix would be unverifiable until the next live window. Chasing it now would
+produce a change nobody could measure, which is how four inert features shipped
+in one session before.
+
+**Next live window, in order:**
+1. Read `index_why=` (deployed `af4434877`) — expect `sources_seen={'pregame':N}`
+   on a final slate, confirming the instrument discriminates.
+2. Find what feeds `attach_game_state`'s WNBA chips and why it lags
+   `basketball_momentum`'s scoreboard by >12 minutes. `GAME_STATE_JOIN
+   sport=wnba chips=5 rows_matched=643` — 5 chips against a 2-game slate is
+   itself worth an explanation.
+3. Only then decide whether the fix is chip freshness or a `final` cross-check
+   in `opportunity_gate`.
+
+### 2026-08-25 04:43:49Z — `af4434877` — THE WNBA READING, AND TWO MORE OF MY CLAIMS FALLING
+
+**The instrument works, on both sports, first live reading.**
+
+    LIVE_GAMELINE_JOIN sport=mlb index=10 considered=5 projected=5 priceable=3
+      index_why={'games_in_snapshot': 10, 'indexed': 10,
+                 'skipped_no_team_names': 0, 'skipped_no_accepted_lane': 0,
+                 'sources_seen': {'live_mc': 20, 'segment_projection': 40},
+                 'accepted_sources': ['live_mc']}
+
+10 of 10 indexed, nothing skipped, and `sources_seen` shows the exact two-lane
+structure `live_gameline_from_lens`' docstring predicts — `live_mc` accepted,
+the 40 `segment_projection` lanes (first1/3/5) correctly ignored. That is the
+instrument agreeing with the code's own stated design on a sport that was
+already working, which is the check that matters before trusting it on one that
+was not.
+
+**WNBA — `index=1`, NOT 0, and the join WORKS:**
+
+    LIVE_GAMELINE_JOIN sport=wnba index=1 considered=184 projected=166 priceable=1
+      withheld=183
+      why={'analytic_probability_is_only_valid_at_its_own_line': 162,
+           'no_two_sided_market_price': 3, 'segment_is_not_full_game': 18}
+      index_why={'games_in_snapshot': 2, 'indexed': 1,
+                 'skipped_no_accepted_lane': 1,
+                 'sources_seen': {'pregame': 1, 'live_projection': 1},
+                 'accepted_sources': ['live_projection']}
+
+`sources_seen={'pregame': 1, 'live_projection': 1}` is the discriminator doing
+precisely the job it was added for, on its first live reading: one game stamped
+live, one stamped pregame, and the difference between "not wired" (`{}`) and
+"wired, this game is not live" now legible at a glance.
+
+**166 rows projected.** The dominant withhold,
+`analytic_probability_is_only_valid_at_its_own_line: 162`, is `#475`'s
+single-line analytic limitation refusing every other line rather than
+interpolating a shape nobody fitted. Correct behaviour, not a gap.
+
+**AND THE PROP HALF, which I had marked UNVERIFIED and was right to:**
+
+    LIVE_PROJECTION_JOIN sport=wnba considered=155 projected=5 edged=5
+      prob_withheld=0 lens_indexed=9 lens_live_games=1
+
+Earlier the same line read `reason=live-lens snapshot for wnba carries no
+liveProps (producer not wired)`. Nine lens rows, one live game, five edged.
+
+**SO BOTH HALVES OF "WNBA HAS NO LIVE MODEL" WERE FALSE.** The user said so
+before any of this was measured. The gameline half is wired and projecting 166;
+the prop half is wired and edging 5.
+
+### THE CORRECTION I ALSO OWE ON THE STATE-CONTRADICTION ENTRY
+
+The entry above it says the wnba chips froze at `live` while
+`basketball_momentum` read `post=2`, and frames the LENS as the component
+reading the slate correctly. **That framing is wrong and this reading is why.**
+
+At 04:43:49Z the lens itself carried `lens_live_games=1` and a
+`live_projection` stamp. `basketball_momentum`'s last reading before it
+(04:30:28Z) was `post=2 live_events=0`. So the lens is on the SAME side as the
+chips — the whole board-side view believed a game was live while the scoreboard
+said both were final. It is not "frozen chips vs. a correct lens"; it is
+board-side vs. scoreboard, with the lens on the board side.
+
+**What survives unchanged, because it is a fact about a set literal rather than
+an inference:** `_LIVE_GAME_STATE_SPORTS = frozenset({"mlb", "soccer"})`
+excludes wnba, so `attach_live_game_state_from_lens` has always returned
+`supported: False, reason: no live status source wired for wnba`. That is true
+regardless of who is right about the game state, and `620734fb3`'s
+`LIVE_GAME_STATE_JOIN` line will print it verbatim on the next build.
+
+**What is now UNRESOLVED and must not be written up as settled:** which of the
+scoreboard and the board-side view was actually right about those two games at
+04:21–04:43. I have asserted a cause for this zero twice and been wrong twice.
+
+### verify: OWED, and the window is TODAY
+
+`SCOREBOARD_STATES league=wnba date=2026-08-25 pre=3` at 13:51:47Z — three
+games scheduled, none live yet. On tip-off, read in this order:
+
+1. `LIVE_GAME_STATE_JOIN sport=wnba supported=` — expect `False` with the
+   stated reason, converting the set-literal inference into a measurement.
+2. `sources_seen` against `basketball_momentum`'s `SCOREBOARD_STATES` at the
+   SAME minute. That pairing, and only that pairing, settles who is right.
+3. Only then decide whether wnba belongs in `_LIVE_GAME_STATE_SPORTS`, and
+   whether its snapshot carries the `status.abstract` the corrector reads.
+
+### 2026-08-25 14:47:23Z — `c1f2aeaf3` — THE PORTFOLIO IS LOSING, AND THE POOLED NUMBER HID IT
+
+**services:** refresh-worker `dep-da6qgm2jnfac73bhsl30` (live 14:39:37Z),
+live-odds-worker `dep-da6qgoon74is73fv2a8g`
+
+#### verify 1: the double-count is split, and it RECONCILES EXACTLY
+
+    PNL all_time book=portfolio        settled=97 pending=65 won=41 lost=56
+      staked=$606.69 pnl=$-26.3  roi=-4.33% win_rate=42.27% venues=['kalshi','paper']
+    PNL all_time book=venue_comparison settled=84 pending=4  won=37 lost=47
+      staked=$471.83 pnl=$43.0   roi=9.11%  win_rate=44.05%
+      note=overlaps_portfolio_do_not_sum
+
+| | portfolio | comparison | sum | old pooled |
+|---|---|---|---|---|
+| settled | 97 | 84 | **181** | 181 |
+| staked | $606.69 | $471.83 | **$1,078.52** | $1,078.52 |
+| pnl | -$26.30 | +$43.00 | **+$16.70** | +$16.70 |
+
+Nothing lost, nothing invented: the same orders, arithmetic'd correctly.
+
+#### THE FINDING, and it is not cosmetic
+
+**The portfolio's real all-time return is -4.33%, not +1.55%.** The headline was
+the SHADOW books' +9.11% pulling the real book's -4.33% upward -- and the shadow
+books are the same decisions re-priced at venues we did not bet, so they
+contributed a return nobody earned. Every previous reading of "is this working"
+was taken off that blend.
+
+The market cut moved with it, `by_market_family` now being portfolio-only:
+
+| | pooled (before) | portfolio (now) |
+|---|---|---|
+| game_line | 79, -16.40% | **35, -12.08%** |
+| game_total | 78, +22.85% | **46, +11.17%** |
+| player_prop | 24, **-7.18%** | **16, -43.67%** |
+
+**`player_prop` is the one that changes the story.** The pooled -7.18% was
+`paper:kalshi/player_prop` (+74.7% on 8 shadow bets) cancelling the portfolio's
+own props. The book actually bet -43.67% on 16 prop bets, 31.25% win rate. That
+is the worst family by a wide margin and it read as the mildest.
+
+**Still nothing significant.** Portfolio z ~ -0.43; the three families are
+-0.80, +0.77, -1.18. Ninety-seven bets cannot separate a losing strategy from a
+break-even one. The value of this change is that the number is now ABOUT
+something -- a book that could have been held -- not that it is yet conclusive.
+
+#### verify 2: soccer dispatches, and the refusal is named
+
+    SETTLED date=2026-08-25 orders=9 graded=0
+      ungraded={'unmapped_market': 1, 'no_soccer_live_state_for_date': 1, 'no_live_feed': 7}
+    SETTLED date=2026-08-24 orders=15 graded=0 already_graded=12
+      ungraded={'unmapped_market': 1, 'no_soccer_live_state_for_date': 1, 'order_not_filled': 1}
+    UNMAPPED_MARKETS date=2026-08-25 {'totals': 1}
+
+**`no_resolver_for_soccer` is gone from both dates.** It was
+`{'no_resolver_for_soccer': 2}` on each; the same two orders now split 1/1, so
+the before/after pair identifies them: **of the 4 pending soccer orders, 2 are
+`totals` and 2 are game lines.**
+
+#### A GAP THE FIRST READING NAMED, and it is mine
+
+**Soccer TOTALS do not grade.** `game_line_view` covers moneylines and spreads
+only, so `is_game_line_market` is False for `totals` and the resolver refuses as
+`unmapped_market`. A total is gradeable from the same two scores this resolver
+already has (`home + away` against the line) -- MLB grades 46 of them. This is a
+missing branch, not a data gap, and `UNMAPPED_MARKETS {'totals': 1}` is the line
+that says so.
+
+#### verify 3: THE `finals` PATH IS STILL UNVERIFIED. Say so.
+
+Both dates refuse `no_soccer_live_state_for_date`, which is `_load_matches`
+returning None because `saw_source` never went True: no live matches, no finals,
+no per-league files on refresh-worker. At 14:44:48Z the poller wrote all ten
+leagues as `(0 live games, 0 box scores)`, ~380 bytes each -- correct for 09:45
+Central, before any European kickoff.
+
+**So the cross-service `finals` publish -- the half without which this whole
+change is inert -- has not yet been exercised on real data.** The unit test has
+the `off != on` control; production has not run it. First European finals land
+~16:00-17:00Z today and that is the reading that closes this.
+
+Do NOT read `no_soccer_live_state_for_date` as either success or failure of the
+finals path. It is the correct answer to "is there any soccer state on this
+service" on a morning with no football played.
+
+#### ALSO NOTED
+
+- `soccer_source/*/api/live_state/live_state_*.json` IS in
+  `artifact_publisher`'s allowlist (`:566`), which sits oddly beside
+  `board_enrichment`'s 2026-08-21 measurement that a per-league read from the
+  board build saw nothing. One of those is stale. Unresolved, and it decides
+  whether a soccer bet can be graded on a LATER date -- the aggregate is
+  single-and-current-dated, so today a soccer bet is gradeable while its date is
+  today and not after.
+- `pending=65` on the portfolio book against 97 settled. Still a large ungraded
+  tail, now attributable by name rather than pooled.
