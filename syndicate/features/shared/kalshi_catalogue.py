@@ -364,10 +364,43 @@ _INNINGS_PERIOD = {
 }
 
 # "Texas wins by over 3.5 runs?" / "Texas wins first 5 innings by over 2.5 runs?"
+# / "Vallecano wins by more than 2.5 goals?" / "Tennessee wins 1Q by over 7.5 points?"
+#
+# THREE WORDINGS FOR ONE WAGER, and only the first was read. Measured
+# 2026-08-25 5:01:52 PM Central, `JOIN_TITLES ... by_series`, every one of
+# these `unreadable_title` on a series we had just registered:
+#
+#   KXMLSTOTAL 90  KXSERIEATOTAL 60  KXMLSSPREAD 60  KXLALIGASPREAD 52
+#   KXSERIEASPREAD 40  KXSERIEAGAME 39  KXLIGUE1TOTAL 39  KXLIGUE1GAME 33
+#   KXNFL1QSPREAD 160
+#
+# 413 soccer markets and 160 NFL quarter spreads, fetched and thrown away for
+# a synonym. Registration was necessary and is not sufficient: the series has
+# to be registered AND its titles read, and those fail independently.
+#
+# `more than`/`less than` are Kalshi's soccer wording and mean exactly
+# over/under -- no other reading is available for "wins by more than 2.5
+# goals". The PERIOD token is separate from MLB's innings phrase because the
+# board spells them differently (`spreads_q1` vs `spreads_1st_5_innings`) and
+# collapsing them would join a quarter line to a full-game row.
 _TEAM_SPREAD_WINS_BY = re.compile(
-    r"^\s*(?P<team>.+?)\s+wins\s+(?:first\s+(?P<innings>\d+)\s+innings\s+)?"
-    r"by\s+(?P<direction>over|under)\s+(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    r"^\s*(?P<team>.+?)\s+wins\s+"
+    r"(?:first\s+(?P<innings>\d+)\s+innings\s+)?"
+    r"(?:(?P<period>[1-4](?:Q|H)|OT)\s+)?"
+    r"by\s+(?P<direction>over|under|more\s+than|less\s+than)\s+"
+    r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
     re.IGNORECASE,
+)
+
+# "Chicago vs Tennessee: Will neither team win the 1st Quarter?"
+#
+# THE DRAW LEG OF A THREE-WAY, recognised so it stops counting as unreadable
+# and REFUSED for the same reason `_INNINGS_TIE` is: a draw is a third outcome
+# and the board carries no three-way quarter market to join it to. Reading it
+# as either side of a two-way line would be a bet on a different thing.
+# 144 markets across KXNFL1Q/1H/2Q on 2026-08-25.
+_NEITHER_TEAM_WINS = re.compile(
+    r"^\s*(?:.+?:\s*)?will\s+neither\s+team\s+win\b.*$", re.IGNORECASE
 )
 
 # "First 5 innings: Over 6.5 runs"  (a TOTAL -- names no team)
@@ -894,6 +927,31 @@ def threshold_to_line(threshold: Any) -> float | None:
     return float(value) - 0.5
 
 
+# Kalshi's quarter/half token -> the board's suffix. Kept separate from
+# `_INNINGS_PERIOD` because the board spells baseball and football periods
+# differently (`spreads_1st_5_innings` vs `spreads_q1`) and one table would
+# invite joining a quarter line to a full-game row.
+_PERIOD_TOKEN = {
+    "1q": "q1", "2q": "q2", "3q": "q3", "4q": "q4",
+    "1h": "h1", "2h": "h2",
+}
+
+
+def _direction(word: Any) -> str:
+    """`more than` -> `over`, `less than` -> `under`, otherwise verbatim.
+
+    Kalshi words the same wager three ways and only one was read. There is no
+    other reading available for "wins by more than 2.5 goals", so this is a
+    synonym table rather than an interpretation.
+    """
+    token = " ".join(str(word or "").strip().lower().split())
+    if token == "more than":
+        return "over"
+    if token == "less than":
+        return "under"
+    return token
+
+
 def _parse_title(title: str) -> dict[str, Any] | None:
     """Which grammar reads this title, and what it says. None if none does.
 
@@ -915,6 +973,13 @@ def _parse_title(title: str) -> dict[str, Any] | None:
     # BEFORE `_TEAM_SPREAD` and `_MONEYLINE`. "Texas wins first 5 innings by
     # over 2.5 runs?" contains "wins", and a looser pattern reading it as a
     # moneyline would price the game winner as though it were a run line.
+    if _NEITHER_TEAM_WINS.match(title):
+        # Readable and deliberately unpriceable -- the draw leg of a three-way,
+        # same reasoning as `_INNINGS_TIE`. Returning None keeps it refused;
+        # the pattern exists so it is refused as a KNOWN shape rather than
+        # counted as a title nobody has looked at.
+        return None
+
     match = _TEAM_SPREAD_WINS_BY.match(title)
     if match:
         innings = match.group("innings")
@@ -923,12 +988,19 @@ def _parse_title(title: str) -> dict[str, Any] | None:
             # A period the board has no key for. Refused rather than flattened
             # onto the full-game spread, which is a different wager.
             return None
+        if period is None and match.group("period"):
+            # A quarter/half token ("1Q", "2H"). The board's own suffix, via
+            # the shared table -- a spelling only Kalshi's side understands
+            # would join to nothing.
+            period = _PERIOD_TOKEN.get(match.group("period").strip().lower())
+            if period is None:
+                return None
         return {
             "grammar": GRAMMAR_TEAM_SPREAD,
             "subject": match.group("team").strip(),
             "stat_text": f"spreads_{period}" if period else "spreads",
             "line": float(match.group("line")),
-            "side": match.group("direction").strip().lower(),
+            "side": _direction(match.group("direction")),
         }
 
     match = _PERIOD_TOTAL.match(title)

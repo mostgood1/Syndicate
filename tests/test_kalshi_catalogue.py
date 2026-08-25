@@ -1294,3 +1294,70 @@ def test_the_unread_anytime_goal_series_stays_in_the_work_queue():
         "KXNHLANYGOAL": "NHL Player Anytime Goal Scorer",
     })
     assert found == {}, found
+
+
+def test_kalshi_words_one_spread_three_ways_and_all_three_read():
+    """413 SOCCER MARKETS AND 160 NFL QUARTER SPREADS, thrown away for a synonym.
+
+    Measured 2026-08-25 5:01:52 PM Central, `JOIN_TITLES ... by_series`, every
+    one of these `unreadable_title` on a series registered minutes earlier:
+
+        KXMLSTOTAL 90  KXSERIEATOTAL 60  KXMLSSPREAD 60  KXLALIGASPREAD 52
+        KXSERIEASPREAD 40  KXSERIEAGAME 39  KXLIGUE1TOTAL 39  KXLIGUE1GAME 33
+        KXNFL1QSPREAD 160
+
+    Registration is necessary and not sufficient, and the two fail
+    independently: the series has to be registered AND its titles read.
+    """
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    # Kalshi's soccer wording. Verbatim from KXLALIGASPREAD-26AUG31BARRVC-RVC3.
+    soccer = _parse_title("Vallecano wins by more than 2.5 goals?")
+    assert soccer["grammar"] == "team_spread"
+    assert soccer["subject"] == "Vallecano"
+    assert soccer["line"] == 2.5
+    assert soccer["side"] == "over", "more than IS over -- no other reading exists"
+
+    assert _parse_title("Buffalo wins by less than 3.5 points?")["side"] == "under"
+
+    # The wording that already worked must keep working.
+    mlb = _parse_title("Texas wins by over 3.5 runs?")
+    assert mlb["side"] == "over" and mlb["stat_text"] == "spreads"
+
+
+def test_a_quarter_spread_keeps_its_period_and_does_not_flatten():
+    """`KXNFL1QSPREAD` at 160 markets: "Tennessee wins 1Q by over 7.5 points?".
+
+    The period token is read into the BOARD's own suffix. Flattening it onto
+    the full-game spread would join a quarter line to a full-game row -- the
+    confident wrong match this file exists to prevent -- and baseball's innings
+    phrase keeps its own separate spelling because the board spells them
+    differently.
+    """
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    assert _parse_title("Tennessee wins 1Q by over 7.5 points?")["stat_text"] == "spreads_q1"
+    assert _parse_title("Buffalo wins 2H by less than 3.5 points?")["stat_text"] == "spreads_h2"
+    # Baseball's own period phrase is untouched and spelled the board's way.
+    assert (
+        _parse_title("Texas wins first 5 innings by over 2.5 runs?")["stat_text"]
+        == "spreads_1st_5_innings"
+    )
+
+
+def test_the_draw_leg_of_a_period_three_way_is_known_and_refused():
+    """"Will neither team win the 1st Quarter?" -- 144 markets across
+    KXNFL1Q/1H/2Q on 2026-08-25.
+
+    RECOGNISED AND REFUSED, which is not the same as unreadable. A draw is a
+    third outcome and the board carries no three-way quarter market to join it
+    to; reading it as either side of a two-way line would be a bet on a
+    different thing. The pattern exists so it stops appearing in the work queue
+    as a title nobody has looked at.
+    """
+    from syndicate.features.shared.kalshi_catalogue import _parse_title
+
+    assert _parse_title("Chicago vs Tennessee: Will neither team win the 1st Quarter?") is None
+    assert _parse_title("Will neither team win the 2nd Half?") is None
+    # And it must not swallow a real moneyline.
+    assert _parse_title("Chicago Sky wins")["grammar"] == "moneyline"
