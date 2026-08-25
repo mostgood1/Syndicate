@@ -115,9 +115,46 @@ def _basketball_alias_to_name(league: str) -> dict[str, str]:
         import syndicate.features.shared.basketball_props_smart_sim as smart_sim
 
         mapping = getattr(smart_sim, attr, None) or {}
-        return {normalize(alias): normalize(name) for alias, name in mapping.items() if name}
+        resolved = {normalize(alias): normalize(name) for alias, name in mapping.items() if name}
+        if league == "wnba":
+            resolved.update(
+                {normalize(alias): normalize(name) for alias, name in _WNBA_EXTRA_ALIASES.items()}
+            )
+        return resolved
     except Exception:
         return {}
+
+
+# WNBA-ONLY, AND DELIBERATELY NOT IN `basketball_props_smart_sim`.
+#
+# MEASURED 2026-08-25T01:22:04Z, on the first live run of the unresolved-club
+# counter:
+#
+#   wnba polymarket_us reason="spreads_refused:40
+#                              clubs_unresolved:2:['Portland', 'Toronto']"
+#
+# Polymarket names these two clubs by CITY. `_WNBA_TEAM_ALIASES_LOCAL` carries
+# both franchises by NICKNAME only -- `fire` -> Portland Fire, `tempo` ->
+# Toronto Tempo -- while every other club in that map also carries its city
+# (`atlanta`/`dream`, `dallas`/`wings`, `seattle`/`storm`). The two newest
+# franchises went in nickname-only and nothing noticed, because nothing asked
+# by city until this venue did.
+#
+# THEY LIVE HERE RATHER THAN IN THAT MAP, and that is the whole point. That
+# module also exposes `_TEAM_ALIASES_LOCAL = {**_NBA..., **_WNBA...}`, where
+# WNBA WINS, and NBA already holds `por` -> Portland Trail Blazers and `tor` ->
+# Toronto Raptors. Adding these there would silently reassign both NBA clubs in
+# the merged map that `basketball_props_smart_sim` itself reads -- precisely the
+# collision `_basketball_alias_to_name`'s docstring documents, where a merged
+# map turned ("wnba", "min") against "Minnesota Lynx" into a WRONG answer,
+# arrived at from the other direction. An overlay applied only on the wnba
+# branch cannot reach the merged map at all.
+_WNBA_EXTRA_ALIASES: dict[str, str] = {
+    "portland": "Portland Fire",
+    "por": "Portland Fire",
+    "toronto": "Toronto Tempo",
+    "tor": "Toronto Tempo",
+}
 
 
 # NFL, static. The 32 franchises are stable, and unlike MLB/NBA there is no

@@ -186,7 +186,7 @@ def _polymarket_price_resolver(selected_date: str | None):
         print(f"[portfolio_commit] POLYMARKET_RESOLVER_BOARD_FAILED {type(exc).__name__}: {exc}", flush=True)
         return (None, None)
 
-    joined = join_polymarket_to_board(markets, board_rows)
+    joined = join_polymarket_to_board(markets, board_rows, selected_date=str(selected_date or ""))
     age = None if fetched_at is None else round(time.time() - float(fetched_at), 1)
     print(
         f"[portfolio_commit] POLYMARKET_BOARD_JOIN markets={joined.get('polymarket_markets')} "
