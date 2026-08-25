@@ -747,7 +747,20 @@ def _ncaaf_oddsapi_report_at_boot() -> None:
     try/except: a diagnostic must never be able to stop this worker booting.
     """
     raw = str(os.environ.get("SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT") or "").strip().lower()
-    if raw not in {"1", "true", "yes", "on"}:
+    # THREE STATES, and the write one is spelled out rather than implied by a
+    # truthy value. `#558`: the pregame sweep that would capture NCAAF runs on a
+    # much slower cadence than the ~90s live loop, and this service was
+    # restarted six times in one hour by other sessions -- each restart resetting
+    # that slower timer before it came round. `write` runs the fetcher for real
+    # so a capture can be OBSERVED rather than waited for; it is not a
+    # replacement for the sweep, which remains the thing that keeps quotes fresh.
+    if raw == "write":
+        argv: list[str] = []
+        mode = "write"
+    elif raw in {"1", "true", "yes", "on"}:
+        argv = ["--report"]
+        mode = "report"
+    else:
         # Says so out loud rather than returning in silence: when this runs the
         # question being asked is "did the flag reach this service", and a
         # silent no-op answers it identically to a probe that crashed.
@@ -756,8 +769,9 @@ def _ncaaf_oddsapi_report_at_boot() -> None:
     try:
         from scripts.fetch_ncaaf_oddsapi_game_lines import main as _ncaaf_report_main
 
-        code = _ncaaf_report_main(["--report"])
-        print(f"[live_odds_worker] NCAAF_ODDSAPI_REPORT_DONE exit={code}", flush=True)
+        print(f"[live_odds_worker] NCAAF_ODDSAPI_REPORT_START mode={mode}", flush=True)
+        code = _ncaaf_report_main(argv)
+        print(f"[live_odds_worker] NCAAF_ODDSAPI_REPORT_DONE mode={mode} exit={code}", flush=True)
     except Exception as exc:
         print(
             f"[live_odds_worker] NCAAF_ODDSAPI_REPORT_ERROR {type(exc).__name__}: {exc}",
