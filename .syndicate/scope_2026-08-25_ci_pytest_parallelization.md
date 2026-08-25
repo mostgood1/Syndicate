@@ -1,5 +1,16 @@
 # SCOPE — parallelize CI's `pytest-baseline` job
 
+**IMPLEMENTED 2026-08-25, same session, same day.** §5's checklist items
+1-3 are shipped (commits `b8a2dfb27`, `081ceb44b` on
+`claude/exchange-market-apis-jr2lqy` / PR #60): `pytest-xdist` added,
+`-n auto --dist=loadscope` wired into the `pytest-baseline` job only, and
+`tests/pytest_baseline.json` regenerated under a real local run of the new
+invocation (772s, 23 known failures, different set than the old serial
+baseline -- expected, see that commit's own message). Item 4 (confirm on
+real CI) is outstanding -- watch PR #60's next `pytest-baseline` run for
+the actual wall-clock and that no failure appears beyond the regenerated
+23.
+
 Drafted 2026-08-25 by `exchange-markets-api-integration` (session 71a74bb7), in
 response to: "we need to fix all the failures and find a way to shorten the
 test." This is the "shorten the test" half, split out on the user's own
