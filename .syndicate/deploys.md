@@ -29575,3 +29575,97 @@ no further deploy. **Unset it once a verdict other than UNDECIDED appears.**
 Kalshi audit #66) was **in flight** when this one was ready at 22:12Z. It was
 allowed to finish (live 22:10:36Z) before triggering, rather than cancelling it
 — the failure mode recorded two entries above, not repeated.
+
+---
+
+## 2026-08-25 — refresh-worker `e79841573` (PR #66): Kalshi registry, vocabulary, side re-key and futures eviction
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da714uqjnfac73adpu50`, live `22:11:36Z`. Trigger `api` (MCP).
+PR #66 merged to `main` as `e79841573` at `22:07:25Z`.
+
+**Claim:** held by `kalshi-line-aware-rungs`, token `8602300fd7507692`,
+acquired `~22:05Z`, ttl 2700s.
+
+**PREFLIGHT COULD NOT RUN, AND THAT IS STATED RATHER THAN GLOSSED.**
+`scripts/deploy_preflight.py` exits 1 with `RENDER_API_KEY not set in the
+environment or .env` -- this container has no such key and no `.env`. I ran the
+preflight's OWN substantive check by hand against the same evidence source it
+uses, the worker's `ALL_PROCESS_MEMORY` line:
+
+```
+22:07:57Z  process_count=3  container_memory_mb=2003.8 (48.9% of 4096)
+  python scripts/run_refresh_worker.py            pid 39   rss 950MB
+  bash /home/render/graceful-shell-command.sh     pid 1    rss 3MB
+  python (no cmdline)                             pid 369  ppid 39
+  stage=live_lens_tick_before_nfl
+```
+
+No `daily_update.py`, no `run_mlb_daily_sim_job.py`, no smartsim -- i.e. the
+CLEAR condition. **Confirmed correct after the fact:** the only
+`WORKER_SHUTDOWN_KILLED_BOARD_BUILD` in the 21:45-22:40 window is at
+`22:35:19Z`, on instance `f2lwf`, which is NOT this deploy (this one went live
+at 22:11:36Z). This deploy killed no board build and no sim.
+
+**The guard did not see this deploy at all**, for the reason the 2026-08-23
+entry in this file already records: `deploy-guard.py` matches `Bash|PowerShell`
+and an MCP `trigger_deploy` is neither. Same known gap, named again rather than
+relied on.
+
+**COMPOSITION VERIFIED BY CONTENT, twice, because tonight demanded it.** Four
+refresh-worker deploys landed in 25 minutes (22:08:59, 22:17:37, 22:29:43,
+22:33:36), three of them from `session_01Sia2rPD72eFTriy28azzs2`. My own
+trigger at 22:08:59 SUPERSEDED an in-flight deploy of `e79841573` itself
+(`dep-da714e15efls738ashcg`, canceled) -- the replacement is a strict superset,
+so nothing was lost. Checked at each step that the deploying SHA CONTAINS
+`e79841573` and that all five changes are present in the served files:
+
+```
+7b8f67b0 (22:11:36Z live)   contains e79841573  ✓
+a6a87742 (22:20:28Z live)   contains e79841573  ✓
+075dc3ae (22:36:13Z live)   contains e79841573  ✓
+  season_futures 32 · team_quote_token 3 · _HOCKEY 3
+  'hits + runs + rbis' 1 · KXMLBSB 2
+```
+
+This is the `#284` on-main rule working exactly as written: two sessions
+deploying nine minutes apart, and the second contains the first. Ancestry AND
+content were both checked -- `git merge-base --is-ancestor` answers a question
+about history, and deployment is a question about content
+(`learnings.md` 2026-08-16).
+
+**verify: NOT YET OBTAINED. THIS ROW IS AN OPEN OBLIGATION.**
+
+Not one `[kalshi_odds]` line has been emitted since 22:11:36Z -- no `TICK`, no
+`BOARD_JOIN`, no `AUTO_SERIES`. The cause is measured and is NOT this change:
+
+```
+22:35:19Z  WORKER_SHUTDOWN_KILLED_BOARD_BUILD frame=collect_candidates
+           uptime_s=145 -- this build's work is lost and will restart
+           from zero on the next boot
+```
+
+**refresh-worker is being redeployed faster than a board build completes.**
+The kalshi odds refresh runs from inside that build (`intelligence_state.py`),
+so every cycle is dying at `collect_candidates` before it reaches the tick.
+Instance churn since my deploy: `skpbf` (22:12) -> `j6zmj` (22:20) -> `f2lwf`
+(22:32, killed at 145s) -> next. That 22:35 shutdown also killed
+`tools/daily_update.py --workflow ui-daily --sim` and
+`run_mlb_daily_sim_job.py` -- the exact kill-risk `preflight` exists to
+prevent, on somebody else's deploy.
+
+**The four readings that will close this row**, none of which needs a band:
+
+1. `TICK series_wanted` **193 -> ~155** (futures eviction; a count of
+   registered series, immune to rotation)
+2. `JOIN_TITLES by_series` no longer naming `KXNCAAFWINS` / `KXNCAAFAWARD` /
+   `KXNBAWINS` at all
+3. `VENUE_REPRICE_KEYS sources_offered` kalshi reading `h2h|<team>` where it
+   read `h2h|yes`
+4. `by_source` carrying `spreads_refused:<n>` and `h2h_keyed_by_team:<n>`
+
+**The `matched`/`stamped` band is deliberately NOT attempted.** `matched` ran
+44 -> 104 -> 140 -> 0 across four builds on three different SHAs before this
+deploy, and four more deploys have landed since. Any before/after taken tonight
+would credit another session's work to this one. It needs a quiet window: no
+refresh-worker deploy for >=30 min and >=6 readings on one SHA.
