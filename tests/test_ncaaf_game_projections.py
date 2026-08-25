@@ -206,3 +206,95 @@ def test_board_enrichment_routes_ncaaf_here_rather_than_reporting_no_source():
     )
     assert coverage.get("supported") is True
     assert coverage.get("reason") != "no projection source wired for ncaaf"
+
+
+# --------------------------------------------------------------------------
+# Layer 2 -- does the priced board actually generate candidates?
+# --------------------------------------------------------------------------
+
+def _priced_card():
+    """The shape `_game_bet_candidates_from_game` reads, as the NCAAF card now
+    emits it."""
+    return {
+        "gamePk": "1_North_Carolina_TCU",
+        "summary": "TCU vs North Carolina",
+        "home": {"name": "TCU", "abbr": "TCU"},
+        "away": {"name": "North Carolina", "abbr": "NC"},
+        "betting": {
+            "home_ml": -320,
+            "away_ml": 260,
+            "home_spread": -14.875,
+            "away_spread": 14.875,
+            "total": 43.75,
+            "p_home_win": 0.80,
+            "p_away_win": 0.20,
+            "p_home_cover": 0.364,
+            "p_away_cover": 0.636,
+            "p_total_over": 0.713,
+            "p_total_under": 0.287,
+        },
+    }
+
+
+def test_the_betting_block_generates_layer2_candidates():
+    """REACHABILITY, and the reason this block exists at all.
+
+    Production measured `GAME_CANDIDATES_EXIT sport=ncaaf rows=0` with
+    `game_candidate_inputs blocks={betting: 0, ...}` -- the card emitted no
+    `betting` block, so the moneyline and total branches of
+    `_game_bet_candidates_from_game` had nothing to read and Layer 2 produced
+    nothing for NCAAF at all.
+    """
+    from syndicate.blueprints.home import _game_bet_candidates_from_game
+
+    sport = {"slug": "ncaaf", "name": "NCAAF"}
+    rows = _game_bet_candidates_from_game(sport, _priced_card(), fallback_epoch=0.0)
+    markets = sorted({r.get("market") for r in rows})
+    assert "Moneyline" in markets
+    assert "Total" in markets
+    assert len(rows) >= 4, rows
+
+    # OFF: strip the block and the same card yields nothing.
+    bare = _priced_card()
+    bare.pop("betting")
+    assert _game_bet_candidates_from_game(sport, bare, fallback_epoch=0.0) == []
+
+
+def test_no_ev_is_fabricated_from_a_model_that_loses_to_the_close():
+    """`_append_game_bet_candidate` takes `edge=betting.get("*_ev")`. Those
+    fields are deliberately NOT emitted.
+
+    An EV computed from a model measured at 15.775 MAE against the market's
+    12.212 would be a manufactured number, and Layer 2 ranks on edge. The model
+    PROBABILITY is carried instead, which is the same treatment Layer 1 gives it
+    -- visible, with its measurement, and not presented as a tradeable edge.
+    `pipeline/layer2_shortlist.py` refuses such rows downstream with
+    `no_model_edge_pct`, so they show on the board and cannot be traded.
+    """
+    card = _priced_card()
+    for key in card["betting"]:
+        assert not key.endswith("_ev"), key
+
+
+def test_spread_candidates_need_a_key_this_card_deliberately_does_not_set():
+    """A FINDING PINNED AS A TEST, not a fix.
+
+    `_game_bet_candidates_from_game` gates its Spread branch on
+    `betting["home_puck_line"]`/`["away_puck_line"]` -- the MARKET line -- while
+    reading `betting["home_spread"]` as the model's PROJECTED spread. But
+    `publication_adapter._shared_markets` reads that same `home_spread` as the
+    MARKET spread, and that is what makes the cards board's market block
+    correct.
+
+    One key, two meanings, two consumers. Setting `*_puck_line` here would
+    generate Spread rows whose `projected` was the market line wearing the
+    model's label. Resolving that collision is a shared-contract change across
+    every sport, so this asserts the current, honest state instead: no Spread
+    candidate rather than a mislabelled one.
+    """
+    from syndicate.blueprints.home import _game_bet_candidates_from_game
+
+    card = _priced_card()
+    assert "home_puck_line" not in card["betting"]
+    rows = _game_bet_candidates_from_game({"slug": "ncaaf"}, card, fallback_epoch=0.0)
+    assert "Spread" not in {r.get("market") for r in rows}

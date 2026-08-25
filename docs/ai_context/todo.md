@@ -334,6 +334,45 @@ Files: `syndicate/features/ncaaf/game_projections.py` (NEW),
 the cards board's market block, not Layer 1's grid; whether these projections
 reach it is unmeasured.
 
+### `#556` — **Layer 2 NCAAF candidate generation is ALIVE: `rows=0` -> 32. Spread rows blocked by a shared-contract key collision, NOT fixed.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, measured
+
+Production measured `GAME_CANDIDATES_EXIT sport=ncaaf rows=0` with
+`game_candidate_inputs blocks={betting:0, gameMarkets:0,
+game_market_recommendations:0, ...}`. The `betting` block `#552` added is one of
+the four sources `_game_bet_candidates_from_game` reads, and it was the missing
+one.
+
+**Measured on the priced board: 32 candidates from 8 priced games** (Home ML,
+Away ML, Over, Under), where the same cards with the `betting` block removed
+yield **zero** — asserted both ways.
+
+**NO `*_ev` EDGE IS EMITTED, DELIBERATELY.** The builder takes
+`edge=betting.get("away_ml_ev")` etc. Computing an EV from a model measured at
+15.775 MAE against the market's 12.212 would be a manufactured number, and
+Layer 2 ranks on edge. The model PROBABILITY is carried instead — the same
+treatment `#555` gives it on Layer 1. `layer2_shortlist.py` refuses such rows
+downstream with `no_model_edge_pct` (`LAYER2_BOARD_HEALTH rows=14 edged=10` on
+MLB shows edge-less rows DO reach the board), so these appear and cannot be
+traded. That is the correct end state while picks are suppressed.
+
+**THE SPREAD GAP IS A KEY COLLISION AND IS NOT MINE TO RESOLVE.**
+`_game_bet_candidates_from_game` gates its Spread branch on
+`betting["home_puck_line"]`/`["away_puck_line"]` — the MARKET line — while
+reading `betting["home_spread"]` as the model's PROJECTED spread
+(`home_spread_projected = _numeric_value(betting.get("home_spread"))`,
+`home.py:2671`). But `publication_adapter._shared_markets` reads that SAME
+`home_spread` as the MARKET spread, and that is what makes the cards board's
+market block correct (verified: `markets.spread.home = -14.875`).
+
+One key, two meanings, two consumers. Setting `*_puck_line` would produce Spread
+rows whose `projected` is the market line wearing the model's label — the
+2026-08-21 FORBIDDEN naming rule. Resolving it properly means splitting the
+contract across every sport that emits `betting`, so the honest state is pinned
+by test instead: no Spread candidate rather than a mislabelled one.
+
+(`puck_line` is hockey vocabulary doing duty as the generic market-line key,
+which is likely how the two meanings drifted together in the first place.)
+
 ### `#545` — **The soccer chip build moves to the WORKER and widens to the board's horizon: 72 uncovered fixtures -> 0.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
 `#541`'s telemetry found it and `#541`'s diagnosis named it: the chip set was a
