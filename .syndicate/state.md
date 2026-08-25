@@ -4293,9 +4293,30 @@ board's own `_normalize_text` DELETES non-ASCII instead of folding it.
 **OddsAPI's exact spellings remain unverified**; `--report` prints every
 unresolved name and `_ODDSAPI_NAME_SUPPLEMENT` is where they go.
 
-**OWED:** `scripts/refresh_odds_sources.py` is claimed by OPEN lane
-`layer2-sim-view-and-live-projection`, so the sweep wiring — one additive NCAAF
-step builder — was NOT taken. Until it lands this runs by hand only.
+**WIRED INTO THE SWEEP 2026-08-25** — `ncaaf_game_lines_oddsapi`, first of the
+two NCAAF steps in `_build_ncaaf_steps`, phases `(pregame, live)`. A CROSS-LANE
+take of `scripts/refresh_odds_sources.py` (held by OPEN lane
+`layer2-sim-view-and-live-projection`) made under explicit user instruction,
+scoped to one appended `RefreshStep` and nothing else, recorded in `lanes.md`.
+
+**VERIFIED BY RUNNING THE SWEEP, not by reading the builder**: against a local
+fake OddsAPI, `refresh_odds_sources.py --date 2026-08-29 --phase pregame
+--sports ncaaf` wrote **192 quote rows** across the two kickoff shards and the
+board then read `priced=8 of 51`, `layer1_rows=32`. `return_code=0` was
+deliberately not taken as the acceptance reading — the step exits 0 whether or
+not it captured anything.
+
+**NO --season/--week, on purpose.** The capture shards each event by its OWN
+commence date, because NCAAF weeks are not calendar windows (2026 week 1 spans
+08-29→09-07) and the board reads quotes per kickoff date. Pinned by a test.
+
+**NOT separately season-gated, also on purpose.**
+`live_refresh_loop._weekly_sport_claimed_by_fast_tick` already decides whether
+NCAAF is on the sweep at all, and `#520` records that re-applying an upstream
+gate at the launch site is how NFL lost 24 hours of capture. Out of season the
+call costs one credit and appends nothing.
+
+**STILL OWED: a LIVE run.** Nothing here has touched real OddsAPI.
 
 
 ## [ncaaf-margin-calibration] NCAAF MARGINS ARE CALIBRATED; TOTALS ARE NOT `[verified 2026-08-19]`

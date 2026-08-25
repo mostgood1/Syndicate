@@ -2092,12 +2092,32 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     `syndicate/features/ncaaf/oddsapi_lines.py`,
     `scripts/fetch_ncaaf_oddsapi_game_lines.py`,
     `tests/test_ncaaf_oddsapi_game_lines.py`.
-  - Cross-lane items surfaced, NOT edited: `scripts/refresh_odds_sources.py`
-    (sweep wiring, `#552`) and `syndicate/static/shared/dense_cards.css`
-    (`#553`, the strip tile clips every value by ~1 char on all sports — cause
-    located at `dense_cards.css:347`).
-  - STAYS OPEN until the sweep wiring lands or is reassigned; the capture runs
-    by hand only until then.
+  - Cross-lane item still surfaced and NOT edited:
+    `syndicate/static/shared/dense_cards.css` (`#553`, the strip tile clips
+    every value by ~1 char on ALL sports — cause located at
+    `dense_cards.css:347`). Left to its owner; the value format was adapted
+    around it and the character budget pinned by a test.
+- **CROSS-LANE TAKE 2026-08-25, NARROW, UNDER EXPLICIT USER INSTRUCTION —
+  `scripts/refresh_odds_sources.py`, held by OPEN lane
+  `layer2-sim-view-and-live-projection`.** Surfaced here rather than hidden,
+  same convention that lane itself used when it took this file and
+  `live_refresh_loop.py` from `refresh-worker-oom-recurrence` on 2026-08-22.
+  - User asked for the sweep wiring in as many words ("yes, wire it into the
+    sweep") after being told the file was claimed and being offered the choice
+    of handing it to the owner instead.
+  - **Scope: ONE step appended inside `_build_ncaaf_steps` and nothing else.**
+    No shared helper, no dispatch table, no other sport's builder touched. The
+    existing `ncaaf_lines_snapshot` step is unchanged and still second.
+  - Owner can revert it by deleting the single `RefreshStep(...)` block named
+    `ncaaf_game_lines_oddsapi`; nothing else in the file was modified.
+  - VERIFIED BY RUNNING THE REAL SWEEP, not by reading the builder:
+    `refresh_odds_sources.py --date 2026-08-29 --phase pregame --sports ncaaf`
+    against a local fake OddsAPI wrote **192 quote rows** across the two kickoff
+    shards, and the board then read `priced=8 of 51`, `layer1_rows=32`.
+    `return_code=0` was deliberately NOT taken as the acceptance reading.
+  - STAYS OPEN until a LIVE run against real OddsAPI confirms the team-name
+    join (`--report`, `UNRESOLVED_TEAMS`) and the capture is seen on the
+    worker.
 
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

@@ -1153,8 +1153,23 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle")
         self.assertTrue((result.get("generation") or {}).get("hosted_safe"))
         refresh_steps = result.get("refresh_steps") or []
-        self.assertEqual(len(refresh_steps), 1)
-        step = refresh_steps[0]
+        # `#552`: the OddsAPI capture step now precedes the legacy bundle
+        # runner. Looked up BY NAME, not by index, so a future third step
+        # cannot silently repoint this at the wrong command.
+        self.assertEqual(
+            [s.get("name") for s in refresh_steps],
+            ["ncaaf_game_lines_oddsapi", "ncaaf_lines_snapshot"],
+        )
+        capture = next(
+            s for s in refresh_steps if s.get("name") == "ncaaf_game_lines_oddsapi"
+        )
+        self.assertIn(
+            "scripts/fetch_ncaaf_oddsapi_game_lines.py",
+            " ".join(str(part) for part in (capture.get("command") or [])),
+        )
+        step = next(
+            s for s in refresh_steps if s.get("name") == "ncaaf_lines_snapshot"
+        )
         command = step.get("command") or []
         self.assertIn("scripts/refresh_ncaaf_oddsapi.py", " ".join(str(part) for part in command))
         self.assertNotIn("fetch_2025_lines.py --week", " ".join(str(part) for part in command))
@@ -1181,8 +1196,16 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual((result.get("generation") or {}).get("kind"), "local_artifact_bundle")
         self.assertEqual(result["source_repo"], str(missing_root))
         refresh_steps = result.get("refresh_steps") or []
-        self.assertEqual(len(refresh_steps), 1)
-        command = refresh_steps[0].get("command") or []
+        # `#552`: the OddsAPI capture step now precedes the legacy bundle
+        # runner. Looked up BY NAME, not by index, so a future third step
+        # cannot silently repoint this at the wrong command.
+        self.assertEqual(
+            [s.get("name") for s in refresh_steps],
+            ["ncaaf_game_lines_oddsapi", "ncaaf_lines_snapshot"],
+        )
+        command = next(
+            s for s in refresh_steps if s.get("name") == "ncaaf_lines_snapshot"
+        ).get("command") or []
         self.assertNotIn("--source-root", command)
 
     def test_build_refresh_plan_uses_ncaaf_existing_mirror_command_in_mirror_only_mode(self) -> None:

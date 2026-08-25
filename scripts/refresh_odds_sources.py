@@ -1037,13 +1037,53 @@ def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
     if args.week is not None:
         command.extend(["--week", str(args.week)])
     return [
+        # `#552`. THE MARKET CAPTURE GOES FIRST, and it is the step that gives
+        # the NCAAF board a price at all.
+        #
+        # Until this existed the board had a projection on all 51 week-1 games
+        # and a line on none: `ncaaf/cards.py` read its lines from
+        # `cfbd_lines_{season}_wk{week}.json`, whose only two writers
+        # (`fetch_ncaaf_market_lines.py`, `fetch_cfbd_lines.py`) have ZERO
+        # callers on any service and which exists in git at no SHA. The step
+        # below refreshes the LEGACY recommendation bundle and never wrote a
+        # book line.
+        #
+        # NO --season/--week ON PURPOSE. The fetch takes whatever OddsAPI is
+        # quoting and shards each event by its OWN commence date, because NCAAF
+        # weeks are not calendar windows -- 2026 week 1 spans 08-29 to 09-07, so
+        # a week-keyed capture would file ten days of games under one key and
+        # the board (which reads per kickoff date) would find none of them.
+        #
+        # ORDER MATTERS ONLY ONE WAY: if the legacy bundle step below fails, the
+        # book lines are already captured. The reverse is not true, and the
+        # lines are the load-bearing half.
+        #
+        # RUNNING THIS OUT OF SEASON IS SAFE AND NOT SEPARATELY GATED. An empty
+        # OddsAPI response costs one credit and appends nothing. A second gate
+        # here would double-gate the sport against
+        # `live_refresh_loop._weekly_sport_claimed_by_fast_tick`, which already
+        # decides whether NCAAF belongs on this sweep at all -- and `#520`
+        # records that re-applying an upstream gate at the launch site is
+        # exactly how NFL lost 24 hours of capture.
+        #
+        # The fetcher prints its team-name resolution report on every run, so
+        # `UNRESOLVED_TEAMS` lands in the sweep log without a separate pass.
+        # That matters: an unresolved school is a game that silently shows no
+        # line, and the board cannot tell that apart from "no book quoted it".
+        RefreshStep(
+            name="ncaaf_game_lines_oddsapi",
+            phases=("pregame", "live"),
+            cwd=REPO_ROOT,
+            command=(python_exe, "scripts/fetch_ncaaf_oddsapi_game_lines.py"),
+            description="Capture NCAAF moneyline/spread/total from OddsAPI into the shared book-quote log.",
+        ),
         RefreshStep(
             name="ncaaf_lines_snapshot",
             phases=("pregame", "live"),
             cwd=REPO_ROOT,
             command=tuple(command),
             description="Refresh NCAAF lines and bundle source recommendation artifacts through a Syndicate-owned runner.",
-        )
+        ),
     ]
 
 

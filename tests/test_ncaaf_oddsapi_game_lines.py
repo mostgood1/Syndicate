@@ -395,3 +395,47 @@ def test_the_compact_card_leads_with_the_market_when_there_is_one(monkeypatch):
     labels_unpriced = [row["label"] for row in by_key[keys[1]]["metrics"][:3]]
     assert "Market spread" not in labels_unpriced
     assert len(labels_unpriced) == 3
+
+
+# --------------------------------------------------------------------------
+# the odds sweep
+# --------------------------------------------------------------------------
+
+def test_the_sweep_runs_the_game_lines_capture_before_the_legacy_bundle():
+    """`#552`. Without this step the fetcher had no automated caller at all and
+    the board could never carry a price.
+
+    Order is asserted, not just membership: if the legacy bundle step fails, the
+    book lines are already captured, and the reverse is not true.
+    """
+    import argparse
+
+    from scripts import refresh_odds_sources
+
+    steps = refresh_odds_sources._build_ncaaf_steps(
+        argparse.Namespace(week=None, season=None, date="2026-08-29")
+    )
+    names = [step.name for step in steps]
+    assert names == ["ncaaf_game_lines_oddsapi", "ncaaf_lines_snapshot"]
+
+    capture = steps[0]
+    assert capture.phases == ("pregame", "live")
+    assert any(str(part).endswith("fetch_ncaaf_oddsapi_game_lines.py") for part in capture.command)
+
+
+def test_the_capture_step_is_not_week_scoped():
+    """NCAAF weeks are not calendar windows -- 2026 week 1 spans 08-29 to 09-07 --
+    and the board reads quotes per KICKOFF DATE. A week-keyed capture would file
+    ten days of games under one key and the board would find none of them, so
+    passing `--week`/`--season` here would be a silent regression.
+    """
+    import argparse
+
+    from scripts import refresh_odds_sources
+
+    steps = refresh_odds_sources._build_ncaaf_steps(
+        argparse.Namespace(week=3, season=2026, date="2026-09-19")
+    )
+    capture = steps[0]
+    assert "--week" not in [str(part) for part in capture.command]
+    assert "--season" not in [str(part) for part in capture.command]

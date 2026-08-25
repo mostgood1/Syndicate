@@ -176,14 +176,26 @@ Also caught by reading output, not by a test: `p_home_cover` came out **0.97**
 for a game the model has the home side losing to the spread by 4.6 -- the cover
 line was passed negated. Now pinned by a test asserting direction, not value.
 
-**OWED, and deliberately not taken:**
-- **`scripts/refresh_odds_sources.py` is claimed by OPEN lane
-  `layer2-sim-view-and-live-projection`.** It is the one place the fetcher gets
-  wired into the sweep, so until an NCAAF step is added there this runs only by
-  hand. One additive step builder; everything it would call is built and tested.
-- **A live run must confirm the team join.** OddsAPI's exact NCAAF spellings are
-  unverifiable from here. `--report` prints every unresolved name;
-  `_ODDSAPI_NAME_SUPPLEMENT` is where they go.
+**WIRED INTO THE SWEEP 2026-08-25**, on user instruction:
+`ncaaf_game_lines_oddsapi` is now the first of two steps in
+`_build_ncaaf_steps`, phases `(pregame, live)`. Cross-lane take of
+`scripts/refresh_odds_sources.py` (held by `layer2-sim-view-and-live-projection`),
+scoped to one appended `RefreshStep`, recorded in `lanes.md`; revert = delete
+that one block.
+
+Verified by RUNNING the sweep against a local fake OddsAPI, not by reading the
+builder: **192 quote rows** written across the two kickoff shards, board then
+`priced=8 of 51`, `layer1_rows=32`. `return_code=0` was not treated as the
+acceptance reading.
+
+**STILL OWED — a LIVE run, and it is the only thing left:**
+- Nothing in this item has touched real OddsAPI. Egress was 403'd and no
+  `ODDS_API_KEY` was present.
+- **Run `--report` first on the worker.** OddsAPI's exact NCAAF spellings are
+  unverifiable from here; `UNRESOLVED_TEAMS` names every school that will
+  silently show no line, and `_ODDSAPI_NAME_SUPPLEMENT` is where they go.
+- Nothing is deployed. `autoDeploy` is off, so this ships only when someone
+  deploys live-odds-worker.
 
 ### `#553` — **The compact-card metric tile clips EVERY value by ~1 character, all sports on the generic strip. Exact cause found.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, measured — **CROSS-LANE, NOT FIXED**
 
