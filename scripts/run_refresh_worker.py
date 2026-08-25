@@ -4247,6 +4247,27 @@ def main() -> int:
             ).date().isoformat()
             _arb_result = run_arb_scan(selected_date=_arb_date)
             print(f"[kalshi_polymarket_arb] SCAN date={_arb_date} result={_arb_result}", flush=True)
+
+            # ONE-SHOT DIAGNOSTIC, same flag: kalshi_moneylines_resolved has
+            # been 0 with EMPTY refusals every run tonight, which the arb
+            # module's own silent-skip-on-non-moneyline design cannot explain
+            # by itself -- `unmapped_series` is the function built for exactly
+            # this ("what Kalshi lists that we cannot yet price, by series,
+            # with an example"), just never wired to this probe.
+            try:
+                from syndicate.features.shared.kalshi_catalogue import unmapped_series
+                from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
+                _kalshi_payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
+                _kalshi_markets_diag = (_kalshi_payload or {}).get("markets") or []
+                _unmapped = unmapped_series(_kalshi_markets_diag)
+                print(
+                    f"[kalshi_polymarket_arb] UNMAPPED_DIAG total_markets={len(_kalshi_markets_diag)}"
+                    f" unmapped={_unmapped}",
+                    flush=True,
+                )
+            except Exception as exc:
+                print(f"[kalshi_polymarket_arb] UNMAPPED_DIAG_FAILED {type(exc).__name__}: {exc}", flush=True)
     except Exception as exc:
         print(f"[refresh_worker] KALSHI_POLYMARKET_ARB_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
     # NOTE: Polymarket's odds refresh (pipeline/polymarket_odds_refresh.py)
