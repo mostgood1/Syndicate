@@ -401,3 +401,82 @@ def test_an_american_price_still_renders_as_american(app_client, live_env):
     body = app_client.get("/portfolio/live").get_data(as_text=True)
     assert "-117" in body
     assert "+163" in body
+
+
+def _live_order(status, error="", key="k1"):
+    return {
+        "mode": "live", "selected_date": "2026-08-25", "venue": "kalshi",
+        "status": status, "error": error, "position_key": key,
+        "submitted_at": "2026-08-25T23:00:00Z", "requested_stake_dollars": 1.0,
+    }
+
+
+def test_orders_that_never_opened_a_position_are_hidden_by_default(monkeypatch):
+    """[USER DECISION 2026-08-25] Default to hiding them, with a toggle.
+
+    HIDDEN, NOT DROPPED, and counted either way: a page that silently omitted
+    them would make "we placed nothing" and "we tried and were refused" look
+    identical, which is the distinction this whole system keeps paying to
+    preserve. They are also the rows that say WHY a bet did not happen.
+    """
+    from syndicate.blueprints import intelligence as mod
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    orders = [
+        _live_order("filled", key="a"),
+        _live_order("rejected", "OrderBuildError: no_venue_ticker", key="b"),
+        _live_order("failed", "KalshiAuthError: http_404: market_not_found", key="c"),
+    ]
+    monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": orders})
+
+    default = mod._live_portfolio_payload("2026-08-25")
+    assert [o["position_key"] for o in default["orders"]] == ["a"]
+    assert default["hidden_count"] == 2
+    assert default["show_all"] is False
+
+    shown = mod._live_portfolio_payload("2026-08-25", show_all=True)
+    assert len(shown["orders"]) == 3
+    assert shown["hidden_count"] == 2
+    assert shown["show_all"] is True
+
+
+def test_a_failed_order_of_UNKNOWN_outcome_stays_visible(monkeypatch):
+    """The row a person must see FIRST.
+
+    A submit that timed out may well have landed -- that gap is why the
+    write-ahead record exists. Hiding it would bury the one order that needs
+    checking against the venue before anything else is placed, which is what
+    the page's own banner says. Only a failure the venue ANSWERED (a 4xx) is
+    certainly not a position.
+    """
+    from syndicate.blueprints import intelligence as mod
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    orders = [
+        _live_order("failed", "ReadTimeout", key="unknown"),
+        _live_order("failed", "http_500: internal", key="broke"),
+        _live_order("failed", "http_404: market_not_found", key="refused"),
+    ]
+    monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": orders})
+
+    payload = mod._live_portfolio_payload("2026-08-25")
+    visible = {o["position_key"] for o in payload["orders"]}
+    assert visible == {"unknown", "broke"}, visible
+    assert payload["hidden_count"] == 1
+
+
+def test_the_page_and_the_cap_agree_on_what_is_not_a_position(monkeypatch):
+    """One rule, two readers. The page's filter and the day-budget's spend
+    accounting both come from `_is_venue_refusal`, so a row that is hidden is
+    exactly a row that did not consume an order slot -- rather than two
+    functions that agree today and drift apart later."""
+    from syndicate.blueprints.intelligence import _is_non_position
+    from syndicate.features.shared.execution_guard import _is_venue_refusal
+
+    refused = _live_order("failed", "http_404: market_not_found")
+    assert _is_non_position(refused) is True
+    assert _is_venue_refusal(refused) is True
+
+    timed_out = _live_order("failed", "ReadTimeout")
+    assert _is_non_position(timed_out) is False
+    assert _is_venue_refusal(timed_out) is False

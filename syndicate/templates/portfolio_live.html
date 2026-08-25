@@ -30,6 +30,8 @@
   .live-table td { padding: 6px; border-bottom: 1px solid rgba(56,65,82,.5); vertical-align: top; }
   .live-table .primary { font-weight: 600; }
   .sub { display: block; font-size: 10px; color: var(--cards-text-dim, #9099a8); }
+  .live-toggle { margin: 0 0 10px; font-size: 13px; opacity: 0.75; }
+  .live-toggle a { color: #4ecdc4; }
   .live-empty { border: 1px dashed var(--cards-border, #384152); border-radius: 8px; padding: 18px; text-align: center;
     color: var(--cards-text-dim, #9099a8); font-size: 12px; }
   .live-error { border: 1px solid #7f1d1d; background: rgba(127,29,29,.18); color: #fecaca;
@@ -148,7 +150,15 @@
       <div class="live-tile__label">Caps in force</div>
       <div class="live-tile__value">${{ "%.0f"|format(caps.get('max_order_dollars') or 0) }}</div>
       <div class="live-tile__meta">
-        per order · ${{ "%.0f"|format(caps.get('max_day_dollars') or 0) }}/day · {{ caps.get('max_day_orders') }} orders
+        {# THE PER-VENUE CAPS, because one number cannot describe two books.
+           `max_day_dollars` here is whatever the worker resolved for its LAST
+           call, so a single figure reads as the account's limit while Kalshi
+           and Polymarket are funded differently. #}
+        per order · {{ caps.get('max_day_orders') }}/book · {{ caps.get('max_day_orders_all_venues') }} total
+      </div>
+      <div class="live-tile__meta">
+        kalshi ${{ "%.0f"|format(caps.get('max_day_dollars_kalshi') or 50) }}/day ·
+        polymarket ${{ "%.0f"|format(caps.get('max_day_dollars_polymarket') or 100) }}/day
       </div>
     </div>
   </div>
@@ -162,6 +172,20 @@
       {% endif %}
     </div>
   {% else %}
+    {# HIDDEN, NOT DROPPED. A page that silently omitted refused orders would
+       make "we placed nothing" and "we tried and were refused" identical. #}
+    {% if L.hidden_count %}
+      <div class="live-toggle">
+        {% if L.show_all %}
+          Showing all {{ L.hidden_count }} order(s) that never opened a position.
+          <a href="?date={{ L.selected_date }}">Hide them</a>
+        {% else %}
+          {{ L.hidden_count }} order(s) never opened a position and are hidden.
+          They do not count against the daily order cap.
+          <a href="?date={{ L.selected_date }}&amp;show=all">Show them</a>
+        {% endif %}
+      </div>
+    {% endif %}
     <table class="live-table">
       <thead>
         <tr><th>Date</th><th>Selection</th><th>Venue</th><th>Requested</th><th>Filled</th>

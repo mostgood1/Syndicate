@@ -204,6 +204,14 @@ def limits(mode: str | None = None, venue: str | None = None) -> dict[str, Any]:
             _DEFAULT_PAPER_MAX_ORDER_DOLLARS if paper else _DEFAULT_MAX_ORDER_DOLLARS,
         ),
         "max_day_dollars": max_day_dollars,
+        # THE PER-VENUE CAPS, ALWAYS BOTH, whatever venue this call asked
+        # about. `max_day_dollars` above is whichever ONE venue was resolved,
+        # and a page rendering that single figure as "the" daily cap reads as
+        # an account limit while the two books are funded differently -- the
+        # live portfolio banner showed exactly one number for months.
+        "max_day_dollars_by_venue": dict(_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE),
+        "max_day_dollars_kalshi": _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE["kalshi"],
+        "max_day_dollars_polymarket": _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE["polymarket"],
         "max_day_orders": _int_env(
             "SYNDICATE_EXECUTION_MAX_DAY_ORDERS",
             _DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS,
