@@ -502,6 +502,9 @@ def join_kalshi_to_board(
     matches: list[dict[str, Any]] = []
     reasons: dict[str, int] = {}
     unmatched_samples: list[dict[str, Any]] = []
+    # Blobs already sampled, so the bounded sample spends its slots on distinct
+    # club codes rather than on repeat markets from one game.
+    unmatched_blobs: set[str] = set()
 
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
@@ -535,9 +538,43 @@ def join_kalshi_to_board(
             # A total joined to the wrong game is a confidently-priced bet on
             # strangers, so `ambiguous` and `no_match` are refused by name and
             # never softened into a best guess.
+            # DATE FIRST, BEFORE THE CLUB CODES. This check used to sit
+            # below the resolver, and being second made it unreachable for the
+            # markets it describes: `_resolve_event` matches the blob against
+            # TODAY'S board, so a game line from another date cannot resolve
+            # and died as `event_not_on_our_board` -- a club code we failed to
+            # recognise -- without the date ever being read.
+            #
+            # MEASURED 2026-08-25T16:14:40Z. All 8 sampled "unrecognised" MLB
+            # events were `ATLMIL` on `26AUG23`, two days stale:
+            #
+            #   JOIN_EVENTS unmatched=[{'kalshi': 'ATLMIL',
+            #       'ticker': 'KXMLBSPREAD-26AUG231910ATLMIL-MIL4', ...}, ...]
+            #
+            # `ATLMIL` is a blob the resolver handles fine. Nothing was wrong
+            # with our club map; the game was simply over. That is exactly the
+            # `#505` failure the counters above are named to prevent -- "Kalshi
+            # has nothing we bet" and "our join is broken" sharing one number
+            # -- reappearing one layer down, where the reason names were right
+            # but their ORDER made one impersonate the other.
+            #
+            # The date is in the ticker (`game_date_from_ticker`), so it is
+            # answerable without the board. Asking it first keeps
+            # `event_not_on_our_board` a true alias-gap count and keeps the
+            # JOIN_EVENTS sample an alias work list rather than a list of
+            # yesterday's games.
+            if wanted_date:
+                game_date = game_date_from_ticker(market.get("ticker"))
+                if game_date is None:
+                    _refuse(REASON_UNDATABLE)
+                    continue
+                if game_date != wanted_date:
+                    _refuse(REASON_WRONG_DATE)
+                    continue
+
             resolution = _resolve_event(market, board_rows)
             status = str(resolution.get("status") or "")
-            if status == "no_match" and len(unmatched_samples) < 8:
+            if status == "no_match":
                 # THE ALIAS LIST, WRITTEN FROM DATA. `event_not_on_our_board`
                 # is a count; it cannot say WHICH code we failed to recognise,
                 # and guessing at club spellings is how a bet lands on the
@@ -545,13 +582,27 @@ def join_kalshi_to_board(
                 # own board offered for the same date, so the missing alias is
                 # readable rather than inferred. Bounded at 8 -- enough to name
                 # the pattern, not enough to flood the log money moves through.
-                unmatched_samples.append(
-                    {
-                        "kalshi": resolution.get("blob"),
-                        "ticker": market.get("ticker"),
-                        "sport": resolution.get("sport"),
-                    }
-                )
+                #
+                # ONE ROW PER BLOB, and the budget is spent on DISTINCT codes.
+                # The bound used to be `len(unmatched_samples) < 8`, which
+                # takes the first eight markets rather than the first eight
+                # codes -- and one game offers far more than eight. Measured
+                # 2026-08-25T16:14:40Z, all 8 slots went to `ATLMIL`: six
+                # spreads and two team totals off a single event, so a sample
+                # built to enumerate missing aliases named exactly one thing
+                # and said nothing about the other 19 refusals. A blob is what
+                # an alias is written against, so a blob is the unit to
+                # deduplicate on.
+                blob = str(resolution.get("blob") or "")
+                if blob not in unmatched_blobs and len(unmatched_samples) < 8:
+                    unmatched_blobs.add(blob)
+                    unmatched_samples.append(
+                        {
+                            "kalshi": resolution.get("blob"),
+                            "ticker": market.get("ticker"),
+                            "sport": resolution.get("sport"),
+                        }
+                    )
             if status != "ok":
                 _refuse(
                     REASON_EVENT_AMBIGUOUS
@@ -570,15 +621,6 @@ def join_kalshi_to_board(
             # `needs_event_mapping` even when the event HAD resolved, so 60
             # game lines a build were identified and then dropped -- the flag
             # bought measurement and nothing else.
-            if wanted_date:
-                game_date = game_date_from_ticker(market.get("ticker"))
-                if game_date is None:
-                    _refuse(REASON_UNDATABLE)
-                    continue
-                if game_date != wanted_date:
-                    _refuse(REASON_WRONG_DATE)
-                    continue
-
             game_rows = by_event.get(
                 (str(resolution.get("event_id") or ""), verdict["market"], verdict["line"])
             )

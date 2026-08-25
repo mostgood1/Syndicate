@@ -654,3 +654,89 @@ def test_a_period_market_is_not_priced_off_the_full_game_row(monkeypatch):
     rows = _tex_cws_rows(market="totals", line=6.5, sides=("Over",))
     report = _priced([market], rows, monkeypatch)
     assert report["matched"] == 0
+
+
+# --------------------------------------------------------------------------
+# A stale game line is refused BY DATE, not as an unrecognised club code
+# --------------------------------------------------------------------------
+
+
+def test_a_stale_game_line_is_refused_by_DATE_not_as_a_bad_club_code():
+    """The two failures must not share a counter.
+
+    `_resolve_event` matches Kalshi's club blob against TODAY'S board, so a
+    game line from another date cannot resolve no matter how well we read its
+    codes. While the date check sat below the resolver, that made every stale
+    game line indistinguishable from an alias we had never written.
+
+    Measured 2026-08-25T16:14:40Z: all 8 sampled "unrecognised" MLB events were
+    `ATLMIL` on `26AUG23`, a blob the resolver handles correctly -- the game
+    was simply two days over. This asserts the reason is the DATE, and the
+    control below proves a genuine alias gap still reports as one.
+    """
+    from syndicate.features.shared.kalshi_board_join import (
+        REASON_EVENT_UNMATCHED,
+        REASON_WRONG_DATE,
+    )
+
+    # ATLMIL is on the board -- but for a different day than the ticker.
+    report = _with_total_series(
+        lambda: join_kalshi_to_board(
+            [_total(ticker="KXTESTTOTAL-26AUG231910ATLMIL-8")],
+            [_game_row(away_team="ATL", home_team="MIL")],
+            selected_date="2026-08-25",
+        )
+    )
+    assert report["matched"] == 0
+    assert report["reasons"].get(REASON_WRONG_DATE) == 1
+    # The whole point: it is NOT counted as a club code we failed to read...
+    assert REASON_EVENT_UNMATCHED not in report["reasons"]
+    # ...and it does not consume a slot in the alias work list.
+    assert report["unmatched_events"] == []
+
+
+def test_an_alias_gap_ON_TODAYS_DATE_still_reports_as_an_alias_gap():
+    """The control for the test above. Refusing stale markets earlier must not
+    silence the counter it was crowding out -- an unreadable club code on the
+    RIGHT date is still `event_not_on_our_board`, and still samples."""
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_UNMATCHED
+
+    report = _with_total_series(
+        lambda: join_kalshi_to_board(
+            [_total(ticker="KXTESTTOTAL-26AUG242140ZZZYYY-8")],
+            [_game_row()],
+            selected_date="2026-08-24",
+        )
+    )
+    assert report["matched"] == 0
+    assert report["reasons"].get(REASON_EVENT_UNMATCHED) == 1
+    assert [s["kalshi"] for s in report["unmatched_events"]] == ["ZZZYYY"]
+
+
+def test_the_event_sample_spends_its_budget_on_DISTINCT_club_codes():
+    """One game must not consume the whole alias work list.
+
+    The bound was `len(unmatched_samples) < 8`, which counts MARKETS. A single
+    event offers far more than eight (six spreads and two team totals of
+    `ATLMIL` took every slot in the 2026-08-25 reading), so a sample built to
+    enumerate missing aliases named exactly one code. An alias is written
+    against a blob, so the blob is the unit that gets deduplicated.
+    """
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_UNMATCHED
+
+    # Twelve markets: ten off ONE unreadable event, then two others. Under the
+    # old market-counted bound the two distinct codes fall off the end.
+    markets = [
+        _total(ticker=f"KXTESTTOTAL-26AUG242140ZZZYYY-{n}") for n in range(10)
+    ]
+    markets.append(_total(ticker="KXTESTTOTAL-26AUG242140QQQWWW-8"))
+    markets.append(_total(ticker="KXTESTTOTAL-26AUG242140RRRVVV-8"))
+
+    report = _with_total_series(
+        lambda: join_kalshi_to_board(markets, [_game_row()], selected_date="2026-08-24")
+    )
+    # Every market is still COUNTED -- deduplication is of the sample only.
+    assert report["reasons"].get(REASON_EVENT_UNMATCHED) == 12
+    blobs = [s["kalshi"] for s in report["unmatched_events"]]
+    assert blobs == ["ZZZYYY", "QQQWWW", "RRRVVV"]
+    assert len(blobs) == len(set(blobs))

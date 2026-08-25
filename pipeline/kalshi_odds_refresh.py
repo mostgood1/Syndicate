@@ -737,10 +737,26 @@ def join_to_board(
     # `game_lines_disabled` is ABSENT from those reasons, which is the reading
     # that matters: that counter fires only for a game line whose event
     # RESOLVED, so its absence means zero resolved. Turning
-    # `SYNDICATE_KALSHI_GAME_LINES` on would price nothing. The blocker is the
-    # club-code alias, exactly as `kalshi_board_join.py:528` predicted
-    # ("`OAK` against `ATH` is a real possibility and every such gap is an alias
-    # nobody has written yet"), and this line is the work list for it.
+    # `SYNDICATE_KALSHI_GAME_LINES` on would price nothing.
+    #
+    # WHAT THIS LINE THEN MEASURED, 2026-08-25T16:14:40Z -- and it was NOT the
+    # club-code alias gap predicted here:
+    #
+    #   JOIN_EVENTS unmatched=[{'kalshi': 'ATLMIL',
+    #       'ticker': 'KXMLBSPREAD-26AUG231910ATLMIL-MIL4', 'sport': 'mlb'}, ...]
+    #
+    # Every sample was `ATLMIL` on `26AUG23` -- Atlanta at Milwaukee, two days
+    # stale, and a blob the resolver reads correctly. The refusals were dated,
+    # not misspelled. Two separate defects made that look like an alias gap,
+    # both since fixed in `kalshi_board_join.py`: the date check sat BELOW the
+    # resolver, so a stale game could only fail as `event_not_on_our_board`;
+    # and the sample was bounded on markets rather than on distinct blobs, so
+    # one game consumed all eight slots.
+    #
+    # The prediction may still be right for the remaining refusals -- it is
+    # simply not yet evidence. With the date checked first, whatever
+    # `event_not_on_our_board` still counts is an alias gap, and THAT is when
+    # this line becomes the work list it was built to be.
     if report.get("unmatched_events"):
         print(
             "[kalshi_odds] JOIN_EVENTS"
