@@ -372,7 +372,7 @@ def run_execution(
             }
         submitter = guarded_submit(submitter)
 
-    caps = limits(mode)
+    caps = limits(mode, venue=venue)
     # Seeded ONCE from the ledger and then incremented per placement. Seeded
     # rather than started at zero, because a restart mid-slate must not hand the
     # day its budget back; incremented rather than re-read, because a re-read

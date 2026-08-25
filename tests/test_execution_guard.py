@@ -41,9 +41,11 @@ def _request(stake=10.0, date="2026-08-24"):
 def test_absent_config_gives_the_restrictive_defaults_in_live_mode():
     caps = guard.limits("live")
     # #284's lesson applied to money: absent is not off.
-    assert caps["max_order_dollars"] == 25.0
+    assert caps["max_order_dollars"] == 10.0
     assert caps["max_day_dollars"] == 100.0
     assert caps["max_day_orders"] == 10
+    assert caps["max_day_dollars_all_venues"] == 150.0
+    assert caps["max_day_orders_all_venues"] == 15
 
 
 def test_paper_defaults_are_inert_so_the_ledger_records_the_strategy():
@@ -64,7 +66,7 @@ def test_the_same_env_vars_bind_both_modes(monkeypatch):
 
 def test_an_unparseable_cap_falls_back_to_the_default(monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "twenty-five")
-    assert guard.limits("live")["max_order_dollars"] == 25.0
+    assert guard.limits("live")["max_order_dollars"] == 10.0
 
 
 def test_a_non_positive_cap_is_a_typo_not_a_policy(monkeypatch):
@@ -83,8 +85,10 @@ def test_an_oversized_order_is_refused_by_name():
 
 
 def test_the_day_dollar_cap_counts_what_is_already_spent():
+    # stake stays under the $10 per-order cap; it's the ALREADY-SPENT total
+    # (kalshi's own $50 day cap) that this order pushes over.
     result = guard.check_order(
-        _request(stake=20.0), mode="live", already={"dollars": 95.0, "orders": 2}
+        _request(stake=10.0), mode="live", already={"dollars": 45.0, "orders": 2}
     )
     assert result["reason"] == "over_max_day_dollars"
 
@@ -103,7 +107,114 @@ def test_a_within_limits_order_is_allowed_and_says_what_the_limits_were():
         _request(stake=10.0), mode="live", already={"dollars": 0, "orders": 0}
     )
     assert result["allowed"] is True
-    assert result["limits"]["max_day_dollars"] == 100.0
+    # _request()'s default venue is "kalshi" -- its own per-venue cap, not the
+    # flat fallback.
+    assert result["limits"]["max_day_dollars"] == 50.0
+
+
+def test_kalshi_and_polymarket_get_their_own_day_dollar_cap():
+    """Real funded accounts, not one shared number: Kalshi $50, Polymarket $100."""
+    assert guard.limits("live", venue="kalshi")["max_day_dollars"] == 50.0
+    assert guard.limits("live", venue="polymarket")["max_day_dollars"] == 100.0
+
+
+def test_an_unknown_venue_falls_back_to_the_flat_default():
+    assert guard.limits("live", venue="prophetx")["max_day_dollars"] == 100.0
+    assert guard.limits("live", venue=None)["max_day_dollars"] == 100.0
+
+
+def test_a_per_venue_override_wins_over_the_flat_one(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS", "5")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI", "50")
+    # The specific knob wins over the flat one for Kalshi...
+    assert guard.limits("live", venue="kalshi")["max_day_dollars"] == 50.0
+    # ...and the flat one still governs a venue with no specific override.
+    assert guard.limits("live", venue="polymarket")["max_day_dollars"] == 5.0
+
+
+def test_paper_mode_ignores_the_per_venue_dollar_defaults():
+    """The MECHANISM (venue resolution) still runs in paper; the NUMBERS stay
+    inert, same reasoning as every other paper default in this file."""
+    assert guard.limits("paper", venue="kalshi")["max_day_dollars"] >= 1_000_000.0
+
+
+def test_kalshis_own_cap_refuses_an_order_the_flat_hundred_would_allow():
+    """The regression this whole change guards: before per-venue caps, $45
+    already spent plus a new $10 Kalshi order would have passed the flat $100
+    cap. Kalshi is only funded for $50."""
+    result = guard.check_order(
+        _request(stake=10.0), mode="live", already={"dollars": 45.0, "orders": 0}
+    )
+    assert result["allowed"] is False
+    assert result["reason"] == "over_max_day_dollars"
+    assert result["limits"]["max_day_dollars"] == 50.0
+
+
+def test_the_all_venues_dollar_cap_defaults_to_the_sum_of_the_per_venue_ones():
+    assert guard.limits("live")["max_day_dollars_all_venues"] == 150.0
+
+
+def test_an_order_within_its_own_venues_cap_can_still_be_refused_account_wide(monkeypatch):
+    """Both venues are individually well under their own cap; the ACCOUNT is
+    what stops the third order. The combined default equals the sum of the
+    two per-venue defaults by construction (see the module comment), so this
+    needs its own explicit override to demonstrate -- under plain defaults the
+    combined cap can never bind before one venue's own cap already would."""
+    from dataclasses import replace
+
+    from syndicate.features.shared import execution_ledger
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES", "95")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    execution_ledger.place_order(
+        replace(_request(stake=45.0, date="2026-08-24"), venue="kalshi"),
+        submit=lambda r: {"status": "filled", "fill_stake_dollars": 45.0},
+    )
+    execution_ledger.place_order(
+        replace(_request(stake=45.0, date="2026-08-24"), venue="polymarket", position_key="p2"),
+        submit=lambda r: {"status": "filled", "fill_stake_dollars": 45.0},
+    )
+    # A third order, $10 on Polymarket (own cap $100, well within it at
+    # 45+10=55, and under the $10 per-order cap) -- only the $95 account-wide
+    # override (90 already spent + 10 = 100) refuses it.
+    result = guard.check_order(
+        replace(_request(stake=10.0, date="2026-08-24"), venue="polymarket", position_key="p3"),
+        mode="live",
+    )
+    assert result["allowed"] is False
+    assert result["reason"] == "over_max_day_dollars_all_venues"
+
+
+def test_the_all_venues_order_count_cap_is_tighter_than_ten_plus_ten():
+    assert guard.limits("live")["max_day_orders_all_venues"] == 15
+
+
+def test_fifteen_orders_across_both_venues_refuses_the_sixteenth(monkeypatch):
+    from dataclasses import replace
+
+    from syndicate.features.shared import execution_ledger
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    for n in range(15):
+        venue = "kalshi" if n % 2 == 0 else "polymarket"
+        # A unique position_key per order -- the ledger's idempotency key
+        # includes position_key+date+venue, so fifteen identical requests on
+        # the same venue would collapse to one write instead of recording all
+        # of them.
+        execution_ledger.place_order(
+            replace(_request(stake=1.0, date="2026-08-24"), venue=venue, position_key=f"p{n}"),
+            submit=lambda r: {"status": "filled", "fill_stake_dollars": 1.0},
+        )
+
+    result = guard.check_order(
+        replace(_request(stake=1.0, date="2026-08-24"), position_key="p15"), mode="live"
+    )
+    assert result["allowed"] is False
+    assert result["reason"] == "over_max_day_orders_all_venues"
 
 
 def test_the_cap_MECHANISM_runs_in_paper_mode_too(monkeypatch):

@@ -2208,6 +2208,61 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`. Nothing in
   `.github/workflows/ci.yml` or `requirements-dev.txt` has been touched yet --
   this is a proposal, not a shipped change.
+- **REAL-MONEY CAP UPDATE, 2026-08-25, user decision.** User set the actual
+  policy: bankroll $1000 (already `portfolio_settings.DEFAULT_BANKROLL_UNITS`,
+  a 2026-08-22 decision -- no code change needed there), Kalshi funded $50,
+  Polymarket funded $100, max order size $10 (was $25), 10 trades/day per
+  exchange (unchanged, already the default) or 15 combined across both (new --
+  no such cross-venue order-count cap existed before, only a dollar one).
+  **Narrow, undeclared touch to `execution_guard.py`** (not in this lane's own
+  Files: list above, nor itemized in `portfolio-decision-and-execution`'s
+  Files: bullets around line 1432 -- only named in that lane's prose grouped
+  with `kalshi_orders.py`/`execution_ledger.py`; `ListAgents` showed no
+  reachable session to hand this to). Changes: `max_order_dollars` default
+  $25→$10; new `_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE = {kalshi: 50, polymarket:
+  100}` (day-SPEND cap standing in for real funded balance -- this is NOT a
+  running capital-availability ledger, nothing here subtracts an open
+  position's stake from tomorrow's budget); new `max_day_orders_all_venues`
+  default 15 (mirrors the existing `max_day_dollars_all_venues` pattern,
+  deliberately less than 10+10=20 so a second venue can't silently double the
+  account's order budget); `max_day_dollars_all_venues`'s default now sums the
+  two per-venue numbers ($150) UNLESS the flat `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS`
+  env var is explicitly set, in which case that still wins (preserves
+  `test_execution_multi_venue.py`'s pre-existing "edit the flat cap, the
+  combined ceiling moves with it" invariant). `limits()` gained an optional
+  `venue` kwarg; `check_order()` and `pipeline/execute_portfolio.py`'s log
+  line both pass it through. Also touched: `tests/test_execution_guard.py`
+  (3 existing tests' hardcoded $25/$100 numbers fixed, 9 new tests added).
+  **427 passed** across `test_execution_guard.py`,
+  `test_execution_multi_venue.py`, `test_execution_ledger.py`,
+  `test_execute_portfolio.py`, `test_portfolio_live_page.py`,
+  `test_live_refresh_loop.py`. **NOT VERIFIED against production** -- no
+  Render env-var read tool exists and direct HTTP to the live web service is
+  blocked from this sandbox, so if production already has an env override set
+  for `SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS`/`_MAX_DAY_DOLLARS`/etc., that
+  override still wins over these new code defaults per existing precedence --
+  worth confirming/clearing on Render directly. `.py` only, no `render.yaml`
+  touched, so pushing this is free per `#284`.
+- **VERIFIED AGAINST PRODUCTION, same day.** Read `live-odds-worker`'s actual
+  logs (`mcp__Render__list_logs`, `[execute_portfolio] LIMITS`/`EXECUTION`
+  lines, as recent as 18:33:18Z) rather than guessing. Confirmed the above
+  concern was real: production had `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS=40`
+  (flat, identical for both venues) and `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES=80`
+  explicitly set -- the old "$40/day, survive-being-wrong" policy, not
+  $50/$100/$150. `max_order_dollars=10` and `max_day_orders=10` were already
+  correct. Opened PR #62 (`claude/exchange-market-apis-jr2lqy` -> `main`) for
+  the code side. Updated `live-odds-worker` env vars directly (merge, not
+  replace, so nothing else on the service was touched):
+  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI=50`,
+  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_POLYMARKET=100`,
+  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES=150` (was 80). Left the flat
+  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS=40` var in place deliberately -- the
+  per-venue override wins outright ahead of it in `limits()`'s own precedence,
+  so it is now inert for Kalshi/Polymarket specifically and touching it
+  further would be an unrequested, unverified extra write to a live
+  real-money service. Did not set `..._MAX_DAY_ORDERS_ALL_VENUES` -- no such
+  env var exists yet, so the code's new default of 15 applies once PR #62 is
+  merged and deployed with nothing to override it.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
