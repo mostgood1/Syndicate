@@ -29168,3 +29168,65 @@ ever been made from this work. `python scripts/fetch_ncaaf_oddsapi_game_lines.py
 on live-odds-worker (one credit, no writes) is still owed, and `UNRESOLVED_TEAMS`
 in its output is the one failure mode this design cannot tell apart from "no
 book quoted it".
+
+---
+
+## 2026-08-25T20:34Z — `7ae8a1fed` — refresh-worker + live-odds-worker
+
+**VERIFIED. `selected_by_source` went `{}` -> `{'kalshi': 1852}`.**
+
+**What it was.** Not a coverage gap — a regression from my own 8MB size fix
+earlier today. `kalshi_markets.json` stopped persisting a top-level `markets`
+key (the merged list beside the per-series entries wrote the payload twice and
+pushed the document past the store's ceiling). `markets_from_state` was added
+as the accessor and `execute_portfolio` was updated. **Two other readers were
+not**: `venue_quote_adapters.kalshi_outcome` and
+`kalshi_polymarket_arb.run_arb_scan`.
+
+**verify: the reading, before and after.**
+
+`VENUE_REPRICE`, 2026-08-25T20:15:10Z, every sport, every cycle:
+
+    'kalshi': {'status': 'error', 'reason': 'markets_key_absent',
+               'quotes': 0, 'age_seconds': None}
+    selected_by_source={'polymarket_us': 788, 'oddsapi': 106}
+
+Same line, 2026-08-25T20:48:06Z, first cycle on instance `t6mqn`:
+
+    mlb    'kalshi': {'status': 'ok', 'quotes': 2219, 'age_seconds': 825.4}
+    wnba   'kalshi': {'status': 'ok', 'quotes':  125, 'age_seconds': 827.1}
+    selected_by_source={'kalshi': 1852, 'polymarket_us': 769, 'oddsapi': 106}
+
+`stamped` 894 -> 2,727 in the same line. **Kalshi is now the dominant price
+source on the board.**
+
+**Why every layer agreed and none was lying.** Zero quotes -> zero of 894
+selections -> zero Kalshi positions in the plan -> `ORDER_PATH venue=kalshi
+status=no_positions` (20:27:47Z). Each layer reported its own state
+accurately. Read from the bottom it says "Kalshi has no markets for us"; it
+was one dictionary key.
+
+**The lesson that generalises, and it is NOT "update all the readers".** A
+unit test of either broken reader PASSED throughout, because its fixture was
+written in the old shape and agreed with the old reader. **A fixture is a
+claim about the writer, and nothing was checking that claim.** The new tests
+are written in the shape the writer actually persists, and the per-series case
+reproduces `markets_key_absent` exactly when the old reader is restored —
+verified by reverting the reader in-memory and watching it fail.
+
+**A behaviour change caught by existing tests, worth recording.** My first fix
+refused on an EMPTY markets list. Three arb fixtures using `{"markets": []}`
+failed. An artifact holding zero markets is a quiet slate; a document carrying
+neither shape is a broken read. Presence is the test now, not emptiness, and
+`markets_key_absent` stays reachable — a helper that turned every unreadable
+payload into an empty list would replace a named error with a silent zero,
+which is the same confusion one layer down.
+
+**Still open at this SHA.** `nfl` and `soccer` read
+`kalshi: no_rows / no_kalshi_market_classified_to_this_sport` — moved from an
+ERROR to a NAMED REFUSAL. Soccer registration shipped in `461ee74be` but the
+fetch queue rotates 60 series/tick and the artifact was 828s old, so the soccer
+series are not in it yet. Expected to clear on its own; if it does not, that is
+a real finding rather than a guess. **Not yet read: whether a Kalshi position
+reaches the order path.** `ORDER_PATH` at 20:46:57Z still said `no_positions`,
+but that predates the 20:48:06Z reprice.
