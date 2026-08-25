@@ -859,3 +859,105 @@ def test_the_scoring_unit_is_per_sport_and_the_period_survives_it():
     assert total_market_from_stat("nba", "1st half") is None
     assert total_market_from_stat("nba", "") is None
     assert total_market_from_stat("chess", "points") is None
+
+
+def test_the_kalshi_adapter_reads_the_per_series_artifact_shape(monkeypatch):
+    """THE REGRESSION THAT COST AN EVENING, pinned behaviourally.
+
+    `kalshi_markets.json` stopped persisting a top-level `markets` key on
+    2026-08-25: storing the merged list beside `series[<ticker>]["markets"]`
+    wrote the payload twice and pushed the document past the keyvalue store's
+    8MB ceiling, at which point it stopped being written at all.
+
+    The writer changed and TWO READERS DID NOT. Measured 2026-08-25T20:15:10Z,
+    every sport, every cycle:
+
+        'kalshi': {'status': 'error', 'reason': 'markets_key_absent',
+                   'quotes': 0, 'age_seconds': None}
+
+    Kalshi offered zero quotes, so it won zero selections, so the plan held
+    zero Kalshi positions, so `ORDER_PATH venue=kalshi` read
+    `status=no_positions` -- which reads exactly like "Kalshi has no markets
+    for us" and was one dictionary key.
+
+    THE FIXTURE IS THE POINT. A unit test of this reader would have passed
+    throughout, because its fixture was written in the old shape and agreed
+    with the old reader. This one is written in the shape the WRITER actually
+    persists.
+    """
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    payload = {
+        "fetched_at": "2026-08-25T20:15:00Z",
+        "series": {
+            "KXMLBTOTAL": {
+                "markets": [{
+                    "ticker": "KXMLBTOTAL-26AUG251840BOSMIA-7",
+                    "series": "KXMLBTOTAL",
+                    "title": "Over 7.5 runs scored?",
+                    "yes_ask_dollars": 0.54,
+                    "no_ask_dollars": 0.48,
+                }]
+            }
+        },
+    }
+    import time
+
+    monkeypatch.setattr(adapters, "_artifact", lambda parts: (payload, time.time()))
+    outcome = adapters.kalshi_outcome("mlb", "2026-08-25")
+
+    assert outcome.reason != "markets_key_absent", outcome
+    assert outcome.status != "error", outcome
+
+
+def test_the_kalshi_adapter_still_names_a_document_with_neither_shape():
+    """`markets_key_absent` must stay REACHABLE. A helper that turns every
+    unreadable document into an empty market list would replace a named error
+    with a silent zero -- the same absence/failure confusion one layer down."""
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    outcome = adapters.kalshi_outcome.__wrapped__ if hasattr(
+        adapters.kalshi_outcome, "__wrapped__"
+    ) else adapters.kalshi_outcome
+
+    import time
+    import pytest as _pytest
+
+    monkeypatch = _pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(
+            adapters, "_artifact", lambda parts: ({"fetched_at": "x"}, time.time())
+        )
+        verdict = outcome("mlb", "2026-08-25")
+    finally:
+        monkeypatch.undo()
+
+    assert verdict.status == "error", verdict
+    assert verdict.reason == "markets_key_absent", verdict
+
+
+def test_the_legacy_top_level_markets_payload_still_reads():
+    """An artifact written before the split must not go dark on deploy."""
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    import time
+    import pytest as _pytest
+
+    payload = {
+        "fetched_at": "2026-08-25T20:15:00Z",
+        "markets": [{
+            "ticker": "KXMLBTOTAL-26AUG251840BOSMIA-7",
+            "series": "KXMLBTOTAL",
+            "title": "Over 7.5 runs scored?",
+            "yes_ask_dollars": 0.54,
+            "no_ask_dollars": 0.48,
+        }],
+    }
+    monkeypatch = _pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(adapters, "_artifact", lambda parts: (payload, time.time()))
+        verdict = adapters.kalshi_outcome("mlb", "2026-08-25")
+    finally:
+        monkeypatch.undo()
+
+    assert verdict.reason != "markets_key_absent", verdict
