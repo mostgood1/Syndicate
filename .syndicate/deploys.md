@@ -29304,3 +29304,90 @@ series are not in it yet. Expected to clear on its own; if it does not, that is
 a real finding rather than a guess. **Not yet read: whether a Kalshi position
 reaches the order path.** `ORDER_PATH` at 20:46:57Z still said `no_positions`,
 but that predates the 20:48:06Z reprice.
+
+---
+
+## 2026-08-25 21:36–21:47Z — live-odds-worker `7abc3f150` — the spread-sign hook is REACHABLE; the spread question is NOT answered
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `8fb67f04032a0bb7`
+**user instruction:** "deploy live-odds-worker and set the flag".
+
+**What shipped.** `7abc3f150` (main's tip: PRs #65 audit + #67 hook). `.py` and
+docs only — **no `render.yaml`, so no `blueprint_sync`**.
+
+**verify: the reading, and it is not the one we wanted.**
+
+```
+[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date=2026-08-25
+  slate_markets=7730 board_rows=1290 slate_fetched_at=1787694438.98
+  fixtures=0 agree_home=0 disagree=0 rate=None
+  no_board_fixture=1167 verdict='UNDECIDED: n=0 < min_sample=30'
+                                  -- live-odds-worker, 2026-08-25T21:47:20.198Z
+```
+
+**What this DOES prove: the hook is reachable, `off != on`.** That line did not
+exist on any prior boot of this service. The flag was absent, the hook was
+inert, the flag was set, the hook ran. A diagnostic that has never once fired
+is indistinguishable from one wired up wrong, and this one has now fired.
+
+**What it does NOT prove, and the failure is MINE, not the venue's.** 1,167
+spread slugs, **not one paired to a board fixture**. The board index came out
+empty: shortlist rows carry neither `selected_date` nor `date`
+(`_board_rows_for_join` returns them verbatim from `read_layer2_shortlist` and
+nothing stamps one on), so the key was unbuildable for every row.
+`polymarket_board_join` **documents this exact trap and already solves it** with
+a caller-supplied fallback — I read that workaround while writing the audit and
+did not apply it one function over. Fix + 3 tests in **PR #71**, one of which
+reproduces this zero exactly when the fallback is withheld.
+
+**The worse half, and the reason this is worth a ledger entry at all.** That
+zero was indistinguishable from two others with opposite meanings — "the board
+carries no spread rows" and "the venue lists no spreads for a board we keyed
+fine". All three render as `fixtures=0`. **The instrument built to separate
+"we cannot see it" from "the venue does not list it" could not separate them
+about itself.** PR #71 adds `board_spread_rows`, `board_fixtures_keyed` and
+`board_rows_unkeyable` so the next zero says which one it is.
+
+**THE DEPLOY CLAIM DID NOT SERIALISE, AND I HAVE THE RECEIPT.** My trigger
+`dep-da70lnp5efls7389gdtg` (21:36:31Z) was **CANCELED at 21:37:01Z** by a
+concurrent `api` deploy `dep-da70lv2fngtc73btsop0` that started 29 seconds
+later — the exact CANCEL failure mode `deploy_claim.py`'s header was written
+for, reproduced against the claim I was holding. **Cause: `.syndicate/deploy_claims/`
+is gitignored, and in the cloud-session topology every session has its own
+container and its own clone.** The claim file's whole design rests on "a FILE in
+the shared worktree — visible to every session instantly", and there is no
+shared worktree any more. It is inert as a cross-session lock here. No harm
+this time — both deploys carried the SAME commit — but that was luck, not the
+mechanism. **Left as a finding, not fixed: it is the deploy protocol's file and
+not this lane's to change.**
+
+**No silent revert, checked before triggering** (`#284` / the 2026-08-15
+incident): every commit live on this service — `e2b1f2714`, `f08930f32`,
+`508dbc02e`, `407c602d1` — was verified an ancestor of `7abc3f150` with
+`git merge-base --is-ancestor`, so this deploy was cumulative by construction.
+
+**Preflight, run by hand.** `scripts/deploy_preflight.py` **cannot run from a
+session sandbox** — it needs `RENDER_API_KEY` and direct `api.render.com`, which
+403s at the agent proxy. Its substance was performed through the Render MCP
+instead: `ALL_PROCESS_MEMORY` at 21:28:21Z showed 3 processes (pid 1 bash, pid 39
+the worker, pid 138 a transient child with no cmdline) and **no named job**;
+`BLOCKED_ON_UNRECONCILED count=1 keys=['7219fdfe46ecbc8b658af248']` at 21:20:11Z
+showed the execution path already latched, so **no order could be in flight to
+interrupt**. That latch predates this deploy and is untouched by it.
+
+**Also newly measured, and it dates the audit's own numbers.**
+`slate_markets=7730`, against `markets=13233` at 20:34:22Z. The drop is another
+session's `_slate_within_budget` (`f08930f32`, "Bound the Polymarket slate by
+GAME DATE instead of by page offset"), which now trims the far dates to fit the
+keyvalue ceiling. **That commit and `508dbc02e` fix the two headline production
+findings in `docs/ai_context/polymarket_oddsapi_coverage_audit.md` §2.1 and
+§2.2** — the truncation and the `no_game_offset: ok` outage — both within an
+hour of the audit being written. The audit's §2 numbers are now historical.
+
+**Flag state: `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` is STILL SET** on
+live-odds-worker (set 21:42:58Z, merge not replace, nothing else touched).
+Deliberate: the reading has not been taken, and the repo's own probe-hook
+pattern says unset it *once it has*. The next deploy carrying PR #71 fires the
+hook with no further env change. **Unset it after that reading.**
+
+**Claim released.**
