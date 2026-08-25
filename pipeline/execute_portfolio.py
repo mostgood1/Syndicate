@@ -218,7 +218,26 @@ def run_execution(
         try:
             from syndicate.features.shared.execution_ledger import reconcile_live_orders
 
-            reconcile_live_orders()
+            # THE VENUE WE ARE ABOUT TO PLACE ON, not the default. This called
+            # `reconcile_live_orders()` bare, and its `venue` defaults to
+            # `"kalshi"` -- so a Polymarket order was never asked about and its
+            # `submitted` row could not clear. Measured 2026-08-25T16:40:00Z:
+            # one resting Polymarket order blocked BOTH scopes, and the block
+            # was self-sustaining because the read that lifts it never ran.
+            #
+            # Both venues every pass, not just `venue`: the gate below is
+            # global -- ANY unreconciled live order blocks this run whatever
+            # venue it belongs to -- so reconciling only our own would leave us
+            # blocked by a row we deliberately declined to ask about.
+            for reconcile_venue in ("kalshi", "polymarket"):
+                outcome = reconcile_live_orders(venue=reconcile_venue)
+                if str(outcome.get("status") or "") != "ok":
+                    print(
+                        f"[execute_portfolio] RECONCILE venue={reconcile_venue}"
+                        f" status={outcome.get('status')}"
+                        f" reason={outcome.get('reason')}",
+                        flush=True,
+                    )
         except Exception as exc:
             print(
                 f"[execute_portfolio] RECONCILE_FAILED {type(exc).__name__}: {exc}",

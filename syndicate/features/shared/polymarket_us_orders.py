@@ -422,3 +422,174 @@ def polymarket_us_submitter(resolve_market):
         )
 
     return submit
+
+
+# --------------------------------------------------------------------------
+# THE READ SIDE. Without it a submitted order can never be reconciled, and an
+# unreconciled order blocks EVERY live run on EVERY venue.
+# --------------------------------------------------------------------------
+
+_VENUE_RESTING_STATUSES = frozenset(
+    {"resting", "pending", "open", "queued", "accepted", "active", "live", "new"}
+)
+_VENUE_DEAD_STATUSES = frozenset(
+    {"canceled", "cancelled", "expired", "rejected", "failed", "voided"}
+)
+
+_ORDERS_LIST_PATH = "/v1/orders"
+
+
+def _orders_list_url(limit: int) -> str:
+    from syndicate.features.shared.polymarket_us_auth import BASE_URL
+
+    base = (os.environ.get("POLYMARKET_US_API_BASE") or "").strip() or BASE_URL
+    path = (os.environ.get("POLYMARKET_US_ORDERS_LIST_PATH") or _ORDERS_LIST_PATH).strip()
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{base.rstrip('/')}{path}?limit={int(limit)}"
+
+
+def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
+    """Every recent order, one call. Same contract as `kalshi_orders.fetch_orders`.
+
+    WHY THIS HAD TO EXIST. `execution_ledger._venue_reader` said "Only Kalshi
+    has one", and `reconcile_live_orders` defaults to `venue="kalshi"` while
+    `execute_portfolio` called it with no arguments. So a Polymarket order
+    recorded `submitted` could never be corrected by anything -- and an
+    unreconciled order blocks live mode. MEASURED 2026-08-25T16:40:00Z, from a
+    single resting Polymarket order:
+
+        BLOCKED_ON_UNRECONCILED count=1 keys=['1984a57ed28e1cd5ccad8b16']
+        EXECUTION status=blocked reason=unreconciled_orders scope=kalshi
+        EXECUTION status=blocked reason=unreconciled_orders scope=polymarket
+
+    Both venues, not just the one that placed it. The live path was fully down
+    and could not recover on its own, because the only thing that clears that
+    state is a venue read that did not exist.
+
+    THE ROUTE IS NOT VERIFIED. `POST /v1/orders` creates; a GET on the same
+    path is the conventional list and is the default here, overridable with
+    `POLYMARKET_US_ORDERS_LIST_PATH` without a deploy -- the same escape hatch
+    the create path carries, and for the same reason: Kalshi's create route had
+    MOVED and cost an `http_410` to discover. The payload shape is REPORTED on
+    the first read rather than assumed, which is what corrected ten wrong field
+    names on `kalshi_client`'s first live run.
+
+    A FAILED READ IS AN ERROR, NEVER AN EMPTY LIST. An empty `orders` on a
+    failed read would say "the venue holds nothing", and `reconcile_live_orders`
+    would take that as licence to write off a live position.
+    """
+    from syndicate.features.shared.polymarket_us_auth import signed_request
+
+    try:
+        payload = signed_request("GET", _orders_list_url(limit))
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+    if not isinstance(payload, Mapping):
+        return {"status": "error", "reason": f"unexpected_shape:{type(payload).__name__}"}
+
+    raw = None
+    container = None
+    for key in ("orders", "data", "results", "items"):
+        if isinstance(payload.get(key), list):
+            raw = payload[key]
+            container = key
+            break
+    if raw is None:
+        # NAMED, and the keys reported. "No array we recognise" is a different
+        # fact from "no orders", and only one of them is a bug in this file.
+        print(
+            f"[polymarket_us_orders] ORDERS_READ_NO_ARRAY keys={sorted(payload.keys())}",
+            flush=True,
+        )
+        return {"status": "error", "reason": "no_orders_array"}
+
+    orders = [dict(o) for o in raw if isinstance(o, Mapping)]
+    if orders:
+        # KEYS AND STATUSES ONLY. An order carries no credential, but it does
+        # carry our own positions, so the log gets the shape and the status
+        # vocabulary -- the two things needed to map this venue -- not values.
+        print(
+            f"[polymarket_us_orders] ORDERS_READ n={len(orders)} container={container}"
+            f" keys={sorted(orders[0].keys())}"
+            f" statuses={sorted({str(o.get('status') or '') for o in orders})}",
+            flush=True,
+        )
+    return {"status": "ok", "orders": orders, "count": len(orders)}
+
+
+def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
+    """One Polymarket order, reduced to the facts the ledger needs.
+
+    `state` is our vocabulary: `filled`, `resting`, `dead`, `unknown`. UNKNOWN
+    IS A REAL ANSWER -- a status this venue has never shown us must leave the
+    row untouched rather than being collapsed into "traded" or "didn't".
+
+    A PARTIAL FILL THAT WAS THEN CANCELLED IS A FILL, so the filled size is
+    read FIRST and outranks the status. Same rule as `kalshi_orders`, and for
+    the same reason: reading them the other way round reconciles a real
+    position away to zero.
+    """
+    raw_status = str(order.get("status") or "").strip().lower()
+    # The venue prefixes its enums (`ORDER_STATUS_CANCELED`), so the prefix is
+    # STRIPPED and the remainder matched whole.
+    #
+    # NOT a split on the last underscore, which was the first attempt and is
+    # too loose: `ORDER_STATUS_SOMETHING_NEW` tails to `new`, a resting status,
+    # so a status this venue has never shown us would be confidently read as
+    # resting. An unmapped status must reach `unknown` -- that is the value
+    # that makes reconciliation leave the row alone.
+    tail = raw_status
+    for prefix in ("order_status_", "status_"):
+        if tail.startswith(prefix):
+            tail = tail[len(prefix):]
+            break
+
+    filled = None
+    for field in ("filledQuantity", "filled_quantity", "filledSize", "matchedQuantity"):
+        value = order.get(field)
+        if value in (None, ""):
+            continue
+        try:
+            filled = float(value)
+        except (TypeError, ValueError):
+            filled = None
+        else:
+            break
+
+    if filled:
+        state = "filled"
+    elif raw_status in _VENUE_FILLED_STATUSES or tail in _VENUE_FILLED_STATUSES:
+        state = "filled"
+    elif raw_status in _VENUE_RESTING_STATUSES or tail in _VENUE_RESTING_STATUSES:
+        state = "resting"
+    elif raw_status in _VENUE_DEAD_STATUSES or tail in _VENUE_DEAD_STATUSES:
+        state = "dead"
+    else:
+        state = "unknown"
+
+    price = None
+    for field in ("averageFillPrice", "average_fill_price", "avgPrice", "fillPrice"):
+        raw_price = order.get(field)
+        if isinstance(raw_price, Mapping):
+            raw_price = raw_price.get("value")
+        if raw_price in (None, ""):
+            continue
+        try:
+            price = round(float(raw_price), 4)
+        except (TypeError, ValueError):
+            price = None
+        else:
+            break
+
+    return {
+        "state": state,
+        "venue_status": raw_status or None,
+        "filled_count": filled,
+        "fill_price": price,
+        "fill_cost_dollars": None,
+        "fees_dollars": None,
+        "order_id": order.get("id") or order.get("orderId"),
+        "client_order_id": order.get("clientOrderId") or order.get("client_order_id"),
+        "ticker": order.get("marketSlug") or order.get("market_slug"),
+    }

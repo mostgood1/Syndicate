@@ -654,9 +654,32 @@ def _requested_contracts(order: Mapping[str, Any]) -> int | None:
 
 
 def _venue_reader(venue: str):
-    """The read side of a venue adapter. Only Kalshi has one."""
-    if str(venue or "").strip().lower().startswith("kalshi"):
+    """The read side of a venue adapter.
+
+    POLYMARKET WAS MISSING AND THAT TOOK THE LIVE PATH DOWN. This said "Only
+    Kalshi has one", so a Polymarket order recorded `submitted` could never be
+    corrected -- and an unreconciled order blocks live mode on EVERY venue, not
+    only its own. Measured 2026-08-25T16:40:00Z, from one resting Polymarket
+    order:
+
+        BLOCKED_ON_UNRECONCILED count=1 keys=['1984a57ed28e1cd5ccad8b16']
+        EXECUTION status=blocked reason=unreconciled_orders scope=kalshi
+        EXECUTION status=blocked reason=unreconciled_orders scope=polymarket
+
+    A gap in the read side is not a missing feature; it is a latch. Nothing in
+    the system could clear that state, because the only thing that clears it is
+    a venue read that did not exist.
+    """
+    name = str(venue or "").strip().lower()
+    if name.startswith("kalshi"):
         from syndicate.features.shared.kalshi_orders import fetch_orders, venue_order_view
+
+        return fetch_orders, venue_order_view
+    if name.startswith("polymarket"):
+        from syndicate.features.shared.polymarket_us_orders import (
+            fetch_orders,
+            venue_order_view,
+        )
 
         return fetch_orders, venue_order_view
     return None, None
