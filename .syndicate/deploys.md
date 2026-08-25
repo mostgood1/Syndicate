@@ -29865,3 +29865,93 @@ full-game spreads are in the invisible band.
 and its question is still open.
 
 **Claim released.**
+
+### 2026-08-25 23:30Z — the obligation above is CLOSED. Quiet window found, band collected.
+
+**Quiet window:** no refresh-worker deploy from `22:36:13Z` to `23:30Z` — **54
+minutes**, all readings on one SHA (`075dc3ae4`), one instance (`8c5vj`).
+
+**THREE OF THE FOUR DISCRETE CHECKS PASS. The fourth was the wrong check and
+is superseded.**
+
+**1. Side vocabulary — PASS.** `VENUE_REPRICE_KEYS sources_offered`,
+`23:08:08Z`, against `nfl|h2h|yes` before:
+
+```
+nfl     kalshi: ['nfl|h2h|new york g', 'nfl|h2h|los angeles r',
+                 'nfl|h2h|kansas city', 'nfl|h2h|indianapolis']
+soccer  kalshi: ['soccer|h2h|zulte waregem', 'soccer|h2h|kvc westerlo',
+                 'soccer|h2h|union gilloise', 'soccer|h2h|anderlecht']
+```
+
+`h2h|yes` is gone from every sport. No `spreads|over|` from kalshi anywhere —
+the spread refusal is holding. **AND THE PREDICTED RESIDUAL IS VISIBLE:**
+`new york g` and `los angeles r` are Kalshi's TRUNCATED names, which no board
+candidate carries; `kansas city` and `indianapolis` are full and will match.
+That is the limit this change was documented as having, showing up in
+production exactly as written rather than as a surprise.
+
+**2. Futures eviction — PASS, by named absence.** `JOIN_TITLES by_series`
+`23:09:27Z` no longer contains `KXNCAAFWINS`, `KXNCAAFAWARD` or `KXNBAWINS` —
+which were its top three entries at 400/400/312 — nor any division future,
+`KXNFLPLAYOFFHOST`, `KXNFLH2HWINS`, `KXNFLHIGHSCORE`, `KXNFLCOMPETE`. No
+`KXNHL*` appears in the fetch list at all.
+
+**3. `KXMLBSB` is live and fetching — PASS.** `TICK` `22:56:10Z`:
+`'KXMLBSB': (182, 'series_filter')`. Registered by this deploy, **182 markets**
+where the audit measured 44. The other registered MLB props are all fetching
+too: `KXMLBHIT` 739, `KXMLBHR` 424, `KXMLBTOTAL` 275, `KXMLBHA` 140,
+`KXMLBERA` 130.
+
+**4. `series_wanted` 193 -> ~155 — THIS PREDICTION WAS WRONG, and the reason
+is knowable rather than mysterious.** It reads **199**. The eviction did remove
+38, but the parallel session's soccer title-gate registered ~40 new soccer
+series in the same window — `KXBUNDESLIGAGAME/TOTAL/SPREAD`, `KXEREDIVISIE*`,
+`KXLALIGA*`, `KXLIGUE1*`, `KXBELGIANPLGAME`, `KXSERIEA*`, `KXEPL1H*` — all
+visible in the same `TICK`. **A net count cannot verify a change when a second
+change moves the same counter.** Check 2's named absence is the sound version
+and it passes; this row is the reminder that I picked a confounded metric.
+
+**THE BAND, board_rows=1291 only** — the 617-row builds are a different board
+population and mixing them is what made the earlier readings meaningless:
+
+```
+                    BEFORE (3 readings, 3 SHAs)   AFTER (4 readings, 1 SHA)
+matched             44 / 104 / 140                94 / 89 / 61 / 62
+                    min 44  max 140  med 104      min 61  max 94  med 89
+unreadable_title    2273 / 3379 / 3605            1563 / 1584 / 1958 / 2105
+                    min 2273 max 3605 med 3379    min 1563 max 2105 med 1958
+```
+
+**`matched` DID NOT MOVE.** The bands overlap and the after-band sits inside
+the before-band. **That is the predicted result, not a disappointment:** none
+of these three changes touches the join, and this was written down before the
+deploy rather than after it. Anyone reading `matched` up or down across this
+deploy would be reading rotation noise.
+
+**`unreadable_title` DID move, and it is the one number that separates.** Every
+after-reading sits BELOW the before-band's floor (max 2105 < min 2273); the
+median fell **3379 -> 1958, a drop of 1421**.
+
+**ATTRIBUTION, and it is only partial.** Two changes landed in this window:
+this deploy's futures eviction and `a6a877421`'s spread-synonym grammar fix.
+The eviction's share is separable because it is verified by NAMED ABSENCE
+rather than by the aggregate: `KXNCAAFWINS` 400 + `KXNCAAFAWARD` 400 +
+`KXNBAWINS` 312 = **1,112 of the ~1,421 drop**. The remaining ~309 is the
+grammar fix. Neither number is inferred from the total alone.
+
+**A NEW GAP IS NOW READABLE, which is what evicting the noise was for.**
+`JOIN_TITLES by_series` is now led by `KXNFLTOTAL: 400` on a wording nobody
+had seen while the futures were drowning the list:
+
+```
+KXNFLTOTAL   'Full Game: over 58.5 points scored?'
+KXWNBATOTAL  'Full Game: over 166.5 points?'
+KXWNBASPREAD 'Golden State wins the game by over 7.5 points'
+KXWNBA*Q*    "Washington vs Phoenix women's Pro Basketball game: Over 48.5 1Q points?"
+```
+
+`Full Game:` and the `<A> vs <B> <sport> game:` prefix are two more wordings,
+and the WNBA quarter ladder (21 markets x 12 series) is the largest block left.
+That is the next grammar increment, and it is legible only because the 1,112
+futures stopped filling the list.
