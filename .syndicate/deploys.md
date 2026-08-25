@@ -29391,3 +29391,49 @@ pattern says unset it *once it has*. The next deploy carrying PR #71 fires the
 hook with no further env change. **Unset it after that reading.**
 
 **Claim released.**
+
+---
+
+## 2026-08-25 4:47 PM Central — `1f0825852` — refresh-worker
+
+**VERIFIED. Kalshi `venue_priced` 0 -> 161, and the first Kalshi position ever
+committed.**
+
+**What it was.** `_match_key` indexes on `board_event_id` and returns None
+without one -- by design, because `("totals", "", 8.5, "over")` is otherwise
+one key for every 8.5 total on the slate. `_resolvers_from_markets` built its
+match dicts BY HAND from `classify_market` alone, and a Kalshi market does not
+know which board row it belongs to. Every key was None, the index was empty,
+and `resolve()` returned None for every row it was ever asked about.
+
+**Silent by construction.** `venue_scope` falls back to
+`quote.book_prices["kalshi"]`, so a price was always found and
+`venue_not_quoting` never fired. Kalshi took the AGGREGATOR's price on all 86
+rows with nothing anywhere saying so. **Any `paper:kalshi` result recorded
+before this is not a Kalshi result.**
+
+**verify: before and after.**
+
+    4:40:11 PM  venue=kalshi rows_in=86  positions=0 venue_priced=0
+    5:01:56 PM  venue=kalshi rows_in=233 positions=1 venue_priced=161 staked=$1.08
+                KALSHI_BOARD_JOIN markets=10683 board_rows=1290 matched=168
+
+`rows_in` nearly tripled because rows the venue actually quotes became
+scopable at all. `KALSHI_BOARD_JOIN` is a new line and cannot be silent again.
+
+**Also verified in the same deploy:** `AUTO_SERIES game_series` 173 -> **204**,
+`total_discovered` 186 -> **212**. That is the soccer title-gate from
+`461ee74be` firing -- Kalshi names soccer by COMPETITION and those series had
+never been registered under any sport. NOT yet confirmed WHICH series: the
+sample is 8 random of 204 and showed only US sports. Counting is not naming.
+
+**Still open at this SHA.** The one committed Kalshi position reached the
+order path as `{'totals_alt': {'no_venue_ticker': 1}}`. Both readings are
+live -- 72 of 233 rows were aggregator-priced, and such a row correctly has no
+contract id -- so `376def0d0` puts `price_source` on the verdict rather than
+guessing. Read that next.
+
+**A defect I introduced and then repeated.** `369e1d49c` gave the Polymarket
+`no_venue_ticker` verdict its detail and left the Kalshi one, in the same
+function two lines below, still passing none. Fixing one branch of a paired
+defect is how the second branch survives review.
