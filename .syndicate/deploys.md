@@ -28086,3 +28086,101 @@ games scheduled, none live yet. On tip-off, read in this order:
    SAME minute. That pairing, and only that pairing, settles who is right.
 3. Only then decide whether wnba belongs in `_LIVE_GAME_STATE_SPORTS`, and
    whether its snapshot carries the `status.abstract` the corrector reads.
+
+### 2026-08-25 14:47:23Z — `c1f2aeaf3` — THE PORTFOLIO IS LOSING, AND THE POOLED NUMBER HID IT
+
+**services:** refresh-worker `dep-da6qgm2jnfac73bhsl30` (live 14:39:37Z),
+live-odds-worker `dep-da6qgoon74is73fv2a8g`
+
+#### verify 1: the double-count is split, and it RECONCILES EXACTLY
+
+    PNL all_time book=portfolio        settled=97 pending=65 won=41 lost=56
+      staked=$606.69 pnl=$-26.3  roi=-4.33% win_rate=42.27% venues=['kalshi','paper']
+    PNL all_time book=venue_comparison settled=84 pending=4  won=37 lost=47
+      staked=$471.83 pnl=$43.0   roi=9.11%  win_rate=44.05%
+      note=overlaps_portfolio_do_not_sum
+
+| | portfolio | comparison | sum | old pooled |
+|---|---|---|---|---|
+| settled | 97 | 84 | **181** | 181 |
+| staked | $606.69 | $471.83 | **$1,078.52** | $1,078.52 |
+| pnl | -$26.30 | +$43.00 | **+$16.70** | +$16.70 |
+
+Nothing lost, nothing invented: the same orders, arithmetic'd correctly.
+
+#### THE FINDING, and it is not cosmetic
+
+**The portfolio's real all-time return is -4.33%, not +1.55%.** The headline was
+the SHADOW books' +9.11% pulling the real book's -4.33% upward -- and the shadow
+books are the same decisions re-priced at venues we did not bet, so they
+contributed a return nobody earned. Every previous reading of "is this working"
+was taken off that blend.
+
+The market cut moved with it, `by_market_family` now being portfolio-only:
+
+| | pooled (before) | portfolio (now) |
+|---|---|---|
+| game_line | 79, -16.40% | **35, -12.08%** |
+| game_total | 78, +22.85% | **46, +11.17%** |
+| player_prop | 24, **-7.18%** | **16, -43.67%** |
+
+**`player_prop` is the one that changes the story.** The pooled -7.18% was
+`paper:kalshi/player_prop` (+74.7% on 8 shadow bets) cancelling the portfolio's
+own props. The book actually bet -43.67% on 16 prop bets, 31.25% win rate. That
+is the worst family by a wide margin and it read as the mildest.
+
+**Still nothing significant.** Portfolio z ~ -0.43; the three families are
+-0.80, +0.77, -1.18. Ninety-seven bets cannot separate a losing strategy from a
+break-even one. The value of this change is that the number is now ABOUT
+something -- a book that could have been held -- not that it is yet conclusive.
+
+#### verify 2: soccer dispatches, and the refusal is named
+
+    SETTLED date=2026-08-25 orders=9 graded=0
+      ungraded={'unmapped_market': 1, 'no_soccer_live_state_for_date': 1, 'no_live_feed': 7}
+    SETTLED date=2026-08-24 orders=15 graded=0 already_graded=12
+      ungraded={'unmapped_market': 1, 'no_soccer_live_state_for_date': 1, 'order_not_filled': 1}
+    UNMAPPED_MARKETS date=2026-08-25 {'totals': 1}
+
+**`no_resolver_for_soccer` is gone from both dates.** It was
+`{'no_resolver_for_soccer': 2}` on each; the same two orders now split 1/1, so
+the before/after pair identifies them: **of the 4 pending soccer orders, 2 are
+`totals` and 2 are game lines.**
+
+#### A GAP THE FIRST READING NAMED, and it is mine
+
+**Soccer TOTALS do not grade.** `game_line_view` covers moneylines and spreads
+only, so `is_game_line_market` is False for `totals` and the resolver refuses as
+`unmapped_market`. A total is gradeable from the same two scores this resolver
+already has (`home + away` against the line) -- MLB grades 46 of them. This is a
+missing branch, not a data gap, and `UNMAPPED_MARKETS {'totals': 1}` is the line
+that says so.
+
+#### verify 3: THE `finals` PATH IS STILL UNVERIFIED. Say so.
+
+Both dates refuse `no_soccer_live_state_for_date`, which is `_load_matches`
+returning None because `saw_source` never went True: no live matches, no finals,
+no per-league files on refresh-worker. At 14:44:48Z the poller wrote all ten
+leagues as `(0 live games, 0 box scores)`, ~380 bytes each -- correct for 09:45
+Central, before any European kickoff.
+
+**So the cross-service `finals` publish -- the half without which this whole
+change is inert -- has not yet been exercised on real data.** The unit test has
+the `off != on` control; production has not run it. First European finals land
+~16:00-17:00Z today and that is the reading that closes this.
+
+Do NOT read `no_soccer_live_state_for_date` as either success or failure of the
+finals path. It is the correct answer to "is there any soccer state on this
+service" on a morning with no football played.
+
+#### ALSO NOTED
+
+- `soccer_source/*/api/live_state/live_state_*.json` IS in
+  `artifact_publisher`'s allowlist (`:566`), which sits oddly beside
+  `board_enrichment`'s 2026-08-21 measurement that a per-league read from the
+  board build saw nothing. One of those is stale. Unresolved, and it decides
+  whether a soccer bet can be graded on a LATER date -- the aggregate is
+  single-and-current-dated, so today a soccer bet is gradeable while its date is
+  today and not after.
+- `pending=65` on the portfolio book against 97 settled. Still a large ungraded
+  tail, now attributable by name rather than pooled.
