@@ -275,3 +275,91 @@ def test_a_segment_only_fixture_casts_no_vote_at_all():
     assert result["segment_slugs_skipped"] == 1
     assert result["fixtures_compared"] == 0
     assert result["agreement_rate"] is None
+
+
+# --------------------------------------------------------------------------
+# THE OFFSET BOUNDARY PROBE
+# --------------------------------------------------------------------------
+
+from scripts.audit_polymarket_coverage import run_offset_probe_if_enabled  # noqa: E402
+
+_PROBE = "SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT"
+
+
+@pytest.fixture(autouse=True)
+def _clear_probe_flag(monkeypatch):
+    monkeypatch.delenv(_PROBE, raising=False)
+
+
+def _patch(monkeypatch, *, boundary, samples):
+    monkeypatch.setattr(
+        "syndicate.features.shared.polymarket_us_markets.find_first_game_offset",
+        lambda: {"status": "ok", "first_game_offset": boundary, "probes": 16, "monotonic": True},
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.polymarket_us_markets.probe_offset_landscape",
+        lambda **kw: {"status": "ok", "samples": samples},
+    )
+
+
+def test_probe_is_off_unless_switched_on():
+    assert run_offset_probe_if_enabled() is None
+
+
+def test_a_game_row_below_the_boundary_convicts_the_scan(monkeypatch, capsys):
+    """The whole point: games below the boundary mean WE cannot see part of the
+    slate, which is the opposite conclusion from 'the venue delisted them'."""
+    monkeypatch.setenv(_PROBE, "1")
+    _patch(monkeypatch, boundary=20987, samples={
+        "4197": {"status": "ok", "games": 0, "types": ["SPORTS_MARKET_TYPE_FUTURE"]},
+        "18888": {"status": "ok", "games": 3, "types": ["SPORTS_MARKET_TYPE_SPREAD"]},
+        "20987": {"status": "ok", "games": 5, "types": ["SPORTS_MARKET_TYPE_TOTAL"]},
+    })
+    result = run_offset_probe_if_enabled()
+    assert result["status"] == "ok"
+    assert "BOUNDARY TOO HIGH" in result["verdict"]
+    assert "18888" in capsys.readouterr().out
+
+
+def test_all_futures_below_exonerates_the_scan(monkeypatch):
+    monkeypatch.setenv(_PROBE, "1")
+    _patch(monkeypatch, boundary=20987, samples={
+        "4197": {"status": "ok", "games": 0, "types": ["SPORTS_MARKET_TYPE_FUTURE"]},
+        "18888": {"status": "ok", "games": 0, "types": ["SPORTS_MARKET_TYPE_FUTURE"]},
+        "20987": {"status": "ok", "games": 5, "types": ["SPORTS_MARKET_TYPE_SPREAD"]},
+    })
+    assert "BOUNDARY SOUND" in run_offset_probe_if_enabled()["verdict"]
+
+
+def test_a_failed_control_is_inconclusive_not_sound(monkeypatch):
+    """If the boundary itself shows no games the probe proved nothing, and
+    saying 'sound' there would be the permissive-default failure this repo
+    keeps paying for."""
+    monkeypatch.setenv(_PROBE, "1")
+    _patch(monkeypatch, boundary=20987, samples={
+        "18888": {"status": "ok", "games": 0, "types": ["SPORTS_MARKET_TYPE_FUTURE"]},
+        "20987": {"status": "empty", "note": "past_end_of_collection"},
+    })
+    assert "INCONCLUSIVE" in run_offset_probe_if_enabled()["verdict"]
+
+
+def test_no_boundary_refuses_by_name(monkeypatch):
+    monkeypatch.setenv(_PROBE, "1")
+    monkeypatch.setattr(
+        "syndicate.features.shared.polymarket_us_markets.find_first_game_offset",
+        lambda: {"status": "error", "first_game_offset": None},
+    )
+    assert run_offset_probe_if_enabled()["reason"] == "no_boundary"
+
+
+def test_the_probe_cannot_raise_into_the_boot_loop(monkeypatch, capsys):
+    monkeypatch.setenv(_PROBE, "1")
+
+    def _boom():
+        raise RuntimeError("venue unreachable")
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.polymarket_us_markets.find_first_game_offset", _boom
+    )
+    assert run_offset_probe_if_enabled()["status"] == "error"
+    assert "OFFSET_BOUNDARY_PROBE_FAILED RuntimeError" in capsys.readouterr().out
