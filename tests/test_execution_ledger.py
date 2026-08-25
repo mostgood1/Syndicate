@@ -1241,3 +1241,107 @@ def test_leaves_quantity_alone_is_not_a_fill():
     })
     assert view["state"] == "resting"
     assert not view["filled_count"]
+
+
+# --------------------------------------------------------------------------
+# Fractional contracts: Kalshi sells whole ones, Polymarket does not
+# --------------------------------------------------------------------------
+
+
+def test_a_fractional_fill_books_its_real_dollar_value(monkeypatch):
+    """MEASURED 2026-08-25T18:21:25Z, the first real Polymarket fill:
+
+      RECONCILED ... submitted->filled contracts=2.65 fill_price=0.52
+      EXECUTED ... spent={'dollars': 1.04}
+
+    2.65 x 0.52 is $1.38. The reconciler computed `int(contracts) * price`,
+    so `int(2.65) * 0.52` = `2 * 0.52` = 1.04 -- a 25% UNDER-count of real
+    money against a daily cap, silently, on every fractional fill.
+
+    Under-counting is the dangerous direction: the cap exists to bound what
+    the account can lose, and a cap fed a number smaller than reality lets the
+    account exceed it.
+    """
+    import syndicate.features.shared.execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    request = _request(position_key="frac", venue="polymarket",
+                       requested_price=-108.0, requested_stake_dollars=1.38)
+    record, _ = mod.record_order(request, mode=mod.LIVE)
+    key = record["idempotency_key"]
+    mod.complete_order(key, status=mod.STATUS_SUBMITTED, venue_order_id="o-frac")
+
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    def fetch(*, limit=100, order_ids=None):
+        return {"status": "ok", "orders": [{
+            "id": "o-frac", "state": "ORDER_STATE_FILLED",
+            "cumQuantity": "2.65", "avgPx": "0.52",
+            "marketSlug": "tsc-mlb-tb-det-2026-08-25-7pt5",
+        }]}
+
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: (fetch, venue_order_view))
+    mod.reconcile_live_orders(venue="polymarket")
+
+    order = mod.find_order(key)
+    assert order["contracts"] == 2.65
+    assert order["fill_stake_dollars"] == pytest.approx(1.38, abs=0.01)
+
+
+def test_the_fill_size_bound_is_computed_for_AMERICAN_odds_too():
+    """"A fill cannot be larger than the order" required `0 < price < 1` and
+    returned None otherwise. Every Polymarket order carries American odds, so
+    the guard was never computed on the venue we actually trade -- present,
+    documented, and inert. Same shape as the slippage guard."""
+    import syndicate.features.shared.execution_ledger as mod
+
+    bound = mod._requested_contracts(
+        {"requested_stake_dollars": 1.38, "requested_price": -108.0}
+    )
+    assert bound is not None, "the bound is still inert on American odds"
+    # -108 is a 0.5192 probability, so $1.38 buys at most ~2.66 contracts --
+    # which must ADMIT the real 2.65 fill rather than refuse it.
+    assert bound == pytest.approx(2.66, abs=0.02)
+    assert bound >= 2.65
+
+
+def test_the_bound_is_unfloored_so_a_real_fractional_fill_is_not_refused():
+    """`contracts_for_stake` floors to WHOLE contracts -- right for Kalshi,
+    wrong here. A real 2.65 fill against a floor of 2 would be refused as
+    `implausible` and left unbooked, turning a guard against phantom positions
+    into a cause of missing real ones."""
+    import syndicate.features.shared.execution_ledger as mod
+
+    bound = mod._requested_contracts(
+        {"requested_stake_dollars": 1.38, "requested_price": 0.52}
+    )
+    assert bound > 2.65
+
+
+def test_an_unreadable_price_still_yields_no_bound():
+    """No bound is better than a wrong one -- that reasoning was always right,
+    it was the input reading that was too narrow."""
+    import syndicate.features.shared.execution_ledger as mod
+
+    for bad in (None, "", 5.0, -3.0, 0.0):
+        assert mod._requested_contracts(
+            {"requested_stake_dollars": 1.38, "requested_price": bad}
+        ) is None, bad
+
+
+def test_a_whole_contract_kalshi_fill_is_unchanged(monkeypatch):
+    """The control. Kalshi sells whole contracts, so float and int agree and
+    nothing about its accounting moves."""
+    import syndicate.features.shared.execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="whole", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="o-whole")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "o-whole", "client_order_id": key,
+                                "status": "executed", "filled_count": 3,
+                                "average_fill_price": 0.50}]),
+    )
+    mod.reconcile_live_orders()
+    assert mod.find_order(key)["fill_stake_dollars"] == pytest.approx(1.50, abs=0.01)

@@ -160,17 +160,32 @@ def test_a_fresh_slate_still_RESOLVES(_artifact, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_the_default_ceiling_is_TWICE_the_writer_cadence(monkeypatch):
-    """Tolerates one missed write; does not tolerate a stopped writer."""
+def test_the_default_ceiling_is_a_MULTIPLE_of_the_writer_cadence(monkeypatch):
+    """Tolerates a couple of missed writes; does not tolerate a stopped writer.
+
+    ASSERTED AS A RELATIONSHIP, not as a number, because the number drifted.
+    The ceiling stayed at 1800s -- twice a 900s writer -- when the writer
+    dropped to 180s, quietly becoming TEN times the cadence. A guard that
+    tolerates nine missed writes is still present, still logged, and no longer
+    guarding anything. Pinning the product would have passed throughout.
+    """
+    from syndicate.features.shared.polymarket_us_markets import SLATE_INTERVAL_SECONDS
+
     monkeypatch.delenv("SYNDICATE_POLYMARKET_MAX_PRICE_AGE_SECONDS", raising=False)
-    assert execute_portfolio._polymarket_max_price_age_seconds() == 1800.0
+    ceiling = execute_portfolio._polymarket_max_price_age_seconds()
+    assert ceiling == SLATE_INTERVAL_SECONDS * execute_portfolio._SLATE_CEILING_MULTIPLE
+    # And the relationship is the one the docstrings claim: a few missed
+    # writes, not an era.
+    assert 2 <= ceiling / SLATE_INTERVAL_SECONDS <= 4
 
 
 @pytest.mark.parametrize("raw", ["0", "-1", "", "not-a-number"])
 def test_a_nonsense_ceiling_falls_back_rather_than_refusing_forever(monkeypatch, raw):
     """A non-positive cap is a typo, not an instruction to trade nothing."""
     monkeypatch.setenv("SYNDICATE_POLYMARKET_MAX_PRICE_AGE_SECONDS", raw)
-    assert execute_portfolio._polymarket_max_price_age_seconds() == 1800.0
+    assert execute_portfolio._polymarket_max_price_age_seconds() == (
+        execute_portfolio._slate_ceiling_default()
+    )
 
 
 def test_the_ceiling_is_configurable(monkeypatch):

@@ -51,6 +51,23 @@ def _record_calls(monkeypatch):
     return calls
 
 
+def _current_week_per_league(calls):
+    """The CURRENT week's call per league, dropping the `#545` next-week one.
+
+    `games()` now fans out TWO calls per league (`week`, `week + 1` -- a
+    seven-day forward odds horizon, see that function's own docstring). A
+    dict comprehension over the raw call list keeps whichever occurrence
+    comes LAST, which is the next-week call (`week_offset` runs `(0, 1)` in
+    that order) -- so every league silently read one week high. First
+    occurrence wins here instead, recovering the property these tests are
+    actually about: the CURRENT week resolved per league.
+    """
+    current: dict[str, int] = {}
+    for league, week, _season in calls:
+        current.setdefault(league, week)
+    return current
+
+
 def test_the_fan_out_uses_the_context_date_not_today(monkeypatch):
     """The regression in one assertion.
 
@@ -64,11 +81,11 @@ def test_the_fan_out_uses_the_context_date_not_today(monkeypatch):
 
     calls_early = _record_calls(monkeypatch)
     provider.games(provider.resolve_context(requested_date="2026-08-16"), is_active_today=True)
-    early = dict((lg, wk) for lg, wk, _ in calls_early)
+    early = _current_week_per_league(calls_early)
 
     calls_late = _record_calls(monkeypatch)
     provider.games(provider.resolve_context(requested_date="2026-08-22"), is_active_today=True)
-    late = dict((lg, wk) for lg, wk, _ in calls_late)
+    late = _current_week_per_league(calls_late)
 
     assert early and late, "the fan-out requested no leagues at all"
 
@@ -100,10 +117,12 @@ def test_each_league_gets_its_own_week_not_the_primary_leagues(monkeypatch):
     provider = _provider()
     calls = _record_calls(monkeypatch)
     provider.games(provider.resolve_context(requested_date="2026-08-22"), is_active_today=True)
+    current = _current_week_per_league(calls)
+    seasons = {league: season for league, _wk, season in calls}
 
-    assert len({wk for _, wk, _ in calls}) >= 1
-    for league, week, season in calls:
-        assert week == default_week(league, season, reference_date="2026-08-22"), (
+    assert len({wk for wk in current.values()}) >= 1
+    for league, week in current.items():
+        assert week == default_week(league, seasons[league], reference_date="2026-08-22"), (
             f"{league} did not get its OWN week for the requested date"
         )
 

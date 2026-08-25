@@ -600,3 +600,241 @@ def test_a_series_never_fetched_is_NOT_treated_as_dormant(monkeypatch):
     assert mod._is_dormant({}) is False
     assert mod._is_dormant({"count": 0}) is True
     assert mod._is_dormant({"count": 7}) is False
+
+
+# --------------------------------------------------------------------------
+# The artifact has a hard 8MB ceiling, and it hit it
+# --------------------------------------------------------------------------
+
+
+def test_the_merged_list_is_not_persisted_twice(monkeypatch):
+    """MEASURED 2026-08-25T17:53:48Z, the tick after the queue started rotating:
+
+      KEYVALUE_WRITE_REJECTED size_bytes=13315551 max_bytes=8388608
+      COMPOSITION series=7399941 markets=6682458
+
+    The artifact stored every series' markets AND their concatenation. Same
+    payload, twice, in a document with a hard 8MB ceiling -- so it stopped
+    being written at all and the board fell back to the last good write.
+    """
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "A,B")
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+    mod.run_kalshi_odds_refresh()
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    payload = read_json_file(mod.markets_artifact_path())
+    assert "markets" not in payload, "the merged list is persisted twice again"
+    # ...and it is still READABLE, merged back from the per-series entries.
+    assert len(mod.markets_from_state(payload)) == 2
+
+
+def test_a_legacy_payload_still_reads(monkeypatch):
+    """A deploy must not empty the board. A payload written before the change
+    has the top-level key and no per-series markets."""
+    assert mod.markets_from_state({"markets": [{"ticker": "T1"}]})[0]["ticker"] == "T1"
+    assert mod.markets_from_state(None) == []
+    assert mod.markets_from_state({}) == []
+
+
+def test_one_ladder_series_cannot_crowd_out_a_sport(monkeypatch):
+    """`KXNCAAFSPREAD` was 2.3MB on its own -- a spread ladder with every rung
+    of every game. Bounding per series is safe only because `venue_daily_odds`
+    now records the complete book separately; this artifact is the JOIN's
+    working set, and a working set may be bounded where a record may not."""
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 3)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "BIG")
+
+    def fake(series):
+        return {"markets": [_market(f"{series}-{n}", 0.4, series=series) for n in range(10)],
+                "strategy": "series_filter"}
+
+    monkeypatch.setattr(mod, "fetch_series_markets", fake)
+    result = mod.run_kalshi_odds_refresh()
+    assert len(result["markets"]) == 3
+
+
+def test_the_trim_drops_the_STALEST_series_not_the_alphabetically_last(monkeypatch):
+    """The docstring always said "trimmed OLDEST-SERIES-FIRST"; the code was
+    `all_markets[:MAX_STORED_MARKETS]` -- the alphabetically FIRST N, because
+    `sports_series()` returns sorted tickers. `KXWNBA*` sorts LAST, so the
+    first thing a trim deleted was every WNBA market, silently, while the
+    comment claimed otherwise.
+    """
+    monkeypatch.setattr(mod, "MAX_STORED_MARKETS", 2)
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 10)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "AAA,ZZZ")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+    mod.run_kalshi_odds_refresh()
+
+    # Make AAA stale and ZZZ fresh, then re-merge: the FRESH one must survive.
+    from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+
+    path = mod.markets_artifact_path()
+    state = read_json_file(path)
+    state["series"]["AAA"]["fetched_at"] = "2020-01-01T00:00:00Z"
+    for n in range(3):
+        state["series"]["ZZZ"]["markets"].append(_market(f"ZZZ-{n}", 0.4, series="ZZZ"))
+    write_json_file(path, state)
+
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "999999")
+    result = mod.run_kalshi_odds_refresh()
+    kept = {m["series"] for m in result["markets"]}
+    assert kept == {"ZZZ"}, f"the stale series survived the trim: {kept}"
+
+
+def test_the_daily_book_records_the_COMPLETE_set_not_the_working_set(monkeypatch):
+    """The bound on the working set is justified by the record being complete.
+    If the record inherits the bound, the justification is circular and the
+    bound becomes real data loss.
+
+    MEASURED 2026-08-25T18:33:55Z: `trimmed=2121` markets never reached the
+    daily book, and `KXNCAAFSPREAD`'s ladder was truncated 1994 -> 400 in the
+    one place whose purpose is keeping whole ladders.
+    """
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 2)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "LADDER")
+
+    def fake(series):
+        return {"markets": [_market(f"{series}-{n}", 0.4, series=series) for n in range(9)],
+                "strategy": "series_filter"}
+
+    monkeypatch.setattr(mod, "fetch_series_markets", fake)
+
+    recorded: list[list] = []
+    monkeypatch.setattr(mod, "_record_daily_book", lambda markets: recorded.append(list(markets)))
+
+    result = mod.run_kalshi_odds_refresh()
+
+    # The WORKING SET is bounded -- that is what keeps the artifact writable.
+    assert len(result["markets"]) == 2
+    # The RECORD is not. Every rung of the ladder reaches it.
+    assert len(recorded[0]) == 9
+
+
+def test_the_PERSISTED_markets_are_bounded_too(monkeypatch):
+    """The 400-per-series cap was applied only when BUILDING the working set;
+    `per_series[<ticker>]["markets"]` still held every market, and that dict is
+    what gets written.
+
+    MEASURED 2026-08-25T18:53:11Z:
+
+      KEYVALUE_WRITE_REJECTED size_bytes=8701075 max_bytes=8388608
+      COMPOSITION series=9196911  KXNCAAFSPREAD=2306201 KXNFLSPREAD=903759 ...
+
+    So the artifact could not be written, `fetched_at` never persisted, and the
+    queue re-fetched the SAME 60 series every tick while `oldest_s` merely
+    aged. A rotation that cannot record its own progress does not rotate.
+    """
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 3)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "BIG")
+
+    def fake(series):
+        return {"markets": [
+            {"ticker": f"BIG-26AUG24{n:04d}MINATH-X", "series": series,
+             "title": f"Player P{n}: 7+ strikeouts?",
+             "yes_ask_dollars": 0.4, "no_ask_dollars": 0.6,
+             "close_time": "2026-08-24T23:10:00Z"}
+            for n in range(9)
+        ], "strategy": "series_filter"}
+
+    monkeypatch.setattr(mod, "fetch_series_markets", fake)
+    mod.run_kalshi_odds_refresh()
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    stored = read_json_file(mod.markets_artifact_path())["series"]["BIG"]["markets"]
+    assert len(stored) == 3, f"persisted {len(stored)} markets, unbounded"
+
+
+def test_the_persisted_row_is_LEAN(monkeypatch):
+    """"Shrink the payload rather than raising the ceiling" is what the store's
+    own refusal says. `normalize_market` keeps ~29 fields for diagnosis --
+    bids, volumes, open interest, liquidity, strike type -- and nothing
+    downstream of the artifact reads them. The full row survives in the daily
+    book, which is the record."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "LEAN")
+
+    fat = {
+        "ticker": "LEAN-26AUG242145CINSF-X", "series": "LEAN",
+        "title": "Player A: 7+ strikeouts?", "close_time": "2026-08-24T23:10:00Z",
+        "yes_ask_dollars": 0.4, "no_ask_dollars": 0.6,
+        "yes_american": 150, "no_american": -150,
+        # Diagnosis-only weight that must not persist.
+        "volume_fp": 12345, "open_interest_fp": 999, "liquidity_dollars": 4242,
+        "yes_bid_dollars": 0.39, "strike_type": "greater", "missing_fields": [],
+    }
+    monkeypatch.setattr(mod, "fetch_series_markets",
+                        lambda series: {"markets": [dict(fat)], "strategy": "series_filter"})
+
+    recorded: list[list] = []
+    monkeypatch.setattr(mod, "_record_daily_book", lambda markets: recorded.append(list(markets)))
+    mod.run_kalshi_odds_refresh()
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    stored = read_json_file(mod.markets_artifact_path())["series"]["LEAN"]["markets"][0]
+    for gone in ("volume_fp", "open_interest_fp", "liquidity_dollars",
+                 "yes_bid_dollars", "strike_type", "missing_fields"):
+        assert gone not in stored, gone
+    # ...and everything the join, the price lookup and the snapshot read stays.
+    for kept in ("ticker", "series", "title", "yes_ask_dollars", "no_ask_dollars",
+                 "yes_american", "no_american", "close_time"):
+        assert kept in stored, kept
+
+    # THE RECORD IS UNTOUCHED -- it saw the full row.
+    assert recorded[0][0]["volume_fp"] == 12345
+
+
+def test_an_undated_market_is_still_persisted(monkeypatch):
+    """A date filter on the working set was tried and REVERTED. Futures can
+    never match a board row, so dropping them looked free -- but PLAYER PROPS
+    SKIP THE JOIN'S DATE CHECK ENTIRELY (it lives inside the
+    `needs_event_identity` branch), so a prop whose ticker shape does not parse
+    would have been silently dropped from the venue we actually trade."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "UNDATED")
+    monkeypatch.setattr(mod, "fetch_series_markets", lambda series: {
+        "markets": [{"ticker": "UNDATED-1", "series": series,
+                     "title": "Player A: 7+ strikeouts?",
+                     "yes_ask_dollars": 0.4, "no_ask_dollars": 0.6}],
+        "strategy": "series_filter"})
+    result = mod.run_kalshi_odds_refresh()
+    assert len(result["markets"]) == 1
+
+
+def test_the_unregistered_sport_series_are_named(monkeypatch):
+    """Registration is the FIRST gate, and a series that fails it is INVISIBLE:
+    never fetched, so it cannot appear in `unreadable_title`, in BOARD_JOIN
+    reasons, or in the daily book. The only symptom is a board row that never
+    gets a price -- which reads as "Kalshi does not offer this".
+
+    That is exactly how `KXMLBGAME` hid: title "Professional Baseball Game",
+    no `game` entry in the vocabulary, and the moneyline was unreachable on
+    every sport until a user found a live market on kalshi.com.
+    """
+    titles = {
+        "KXMLBGAME": "Professional Baseball Game",       # registers
+        "KXMLBTOTAL": "Professional Baseball Total Runs",  # does NOT
+        "KXNPBTOTAL": "Japanese Baseball Total",          # out of scope
+        "KXPOLITICS": "Some Election",                    # no sport token
+    }
+    props = {}
+    games = {"KXMLBGAME": "mlb"}
+    rows = mod._unregistered_sport_series(titles, props, games)
+    series = [r["series"] for r in rows]
+
+    assert series == ["KXMLBTOTAL"], rows
+    assert rows[0]["title"] == "Professional Baseball Total Runs"
+    assert rows[0]["sport"] == "mlb"
+
+
+def test_an_already_registered_series_is_not_reported_as_a_gap():
+    """A work list that fills with successes is noise."""
+    rows = mod._unregistered_sport_series(
+        {"KXMLBGAME": "Professional Baseball Game"}, {}, {"KXMLBGAME": "mlb"}
+    )
+    assert rows == []

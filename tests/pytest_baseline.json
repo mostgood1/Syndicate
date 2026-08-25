@@ -1,15 +1,17 @@
 {
   "schema": "pytest_baseline_v1",
   "pytest_args": [
-    "tests/"
+    "tests/",
+    "-n",
+    "auto",
+    "--dist=loadscope"
   ],
-  "total_testcases": 9637,
+  "total_testcases": 11173,
   "failing_count": 15,
   "failing": [
+    "tests.test_daily_update_smoke.DailyUpdateSmokeTests::test_home_dashboard_payload_exposes_live_lens_link",
+    "tests.test_game_candidate_segment_profile.SegmentAccounting::test_rows_plus_tail_equals_total",
     "tests.test_intelligence_state.IntelligenceStateTests::test_compute_response_recomputes_when_cached_snapshot_is_stale",
-    "tests.test_layer2_imminence_floor::test_floor_is_a_floor_not_a_takeover",
-    "tests.test_layer2_imminence_floor::test_unused_floor_is_not_wasted",
-    "tests.test_layer2_imminence_floor::test_without_the_floor_today_is_crowded_out",
     "tests.test_layer2_movement_live_segment::test_steam_requires_a_sharp_move_in_a_short_window",
     "tests.test_memory_observability::test_malloc_arena_snapshot_degrades_quietly_off_glibc",
     "tests.test_memory_watchdog::test_untracked_census_deduplicates_shared_strings",
@@ -17,8 +19,9 @@
     "tests.test_nba_refresh_runner.NbaRefreshRunnerTests::test_main_materializes_core_artifacts_into_bundle_root",
     "tests.test_odds_control_plane.OddsControlPlaneTests::test_odds_history_prefers_artifact_history_over_tracking",
     "tests.test_probability_differential::test_every_converter_is_registered_or_excused",
-    "tests.test_slate_date_timezone_discipline.SlateDateTimezoneDisciplineTests::test_no_new_timezone_ambiguous_date_calls",
+    "tests.test_refresh_worker::test_311_cap_blocks_the_reclaim_when_a_job_process_is_already_running",
     "tests.test_soccer_board_mlb_parity.StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match",
+    "tests.test_wnba_grader_root_per_file.WnbaProcessedRootsTests::test_processed_roots_returns_every_candidate_in_preference_order",
     "tests.test_wnba_refresh_runner.WnbaRefreshRunnerTests::test_main_prefers_existing_refresh_outputs_before_source_job",
     "tests.test_wnba_refresh_runner.WnbaRefreshRunnerTests::test_main_refreshes_live_snapshots_even_when_reusing_existing_outputs"
   ]

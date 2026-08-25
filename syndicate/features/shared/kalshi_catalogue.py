@@ -56,6 +56,7 @@ __all__ = [
     "sport_for_series",
     "sport_for_ticker",
     "auto_series_from_catalogue",
+    "soccer_league_from_title",
     "register_discovered",
     "all_series",
     "classify_market",
@@ -104,6 +105,94 @@ SERIES_SPORT: dict[str, str] = {
     "KXWNBAPTS": "wnba",
     "KXWNBAAST": "wnba",
     "KXWNBA3PT": "wnba",
+    # ------------------------------------------------------------------
+    # FULL-GAME TOTALS, hand-registered because the TITLE GATE misses them.
+    # ------------------------------------------------------------------
+    #
+    # `auto_game_series_from_catalogue` registers a series only if
+    # `game_market_from_title` can name its market from Kalshi's own series
+    # title. That gate is why `KXMLBGAME` was invisible for weeks (its title is
+    # "Professional Baseball Game"; the vocabulary had no "game"), and it is
+    # still failing one market family over.
+    #
+    # CONFIRMED BY THE USER 2026-08-25 against a live market page:
+    #
+    #     KXMLBTOTAL-26AUG251840BOSMIA-7
+    #
+    # A full-game total on today's Boston/Miami game, strike 7. It exists, it
+    # is tradeable, and `KXMLBTOTAL` appears NOWHERE in our logs -- never
+    # registered, never fetched, so an MLB `totals` board row had nothing to
+    # join to and every Kalshi order refused `no_live_price`.
+    #
+    # We DO fetch `KXMLBF5TOTAL` (first five), `KXMLBINNINGTOTAL` (one inning)
+    # and `KXMLBTEAMTOTAL` (one team). None of those is the full-game total,
+    # and the near-miss is what made the gap read as coverage rather than as an
+    # absence.
+    #
+    # WHY THE GATE MISSES IT while `KXWNBATOTAL` and `KXNHLTOTAL` register
+    # fine: the vocabulary resolves a title ending "... Total", and
+    # 'Professional Baseball Total Runs' / 'Professional Baseball Runs' both
+    # return None. The sports whose totals are named for their scoring unit
+    # fall through; the ones named "Total" do not.
+    #
+    # Hand-registered rather than patched into the vocabulary because the
+    # registry needs no title at all -- `sport_for_series` checks it FIRST and
+    # `register_discovered` never overwrites it, so these keep working through
+    # a failed catalogue read, and a later vocabulary fix is a no-op here
+    # rather than a conflict. Same reasoning the WNBA props above already
+    # state: "naming the ones that matter makes them independent of a network
+    # call succeeding at the right moment."
+    # ------------------------------------------------------------------
+    # MLB PLAYER PROPS. Six confirmed by the user from live market pages
+    # 2026-08-25, plus one seen in a production catalogue read.
+    # ------------------------------------------------------------------
+    #
+    # Only KXMLBKS / KXMLBOUTS / KXMLBHR were registered, so these were never
+    # fetched -- and the board is ALREADY ASKING FOR THEM. Measured
+    # 2026-08-25T16:13:44Z, `VENUE_REPRICE_KEYS board_wanted`:
+    #
+    #   mlb|batter_rbis|over|0.5        (x3)   -> KXMLBRBI
+    #   mlb|batter_total_bases|over|1.5        -> KXMLBTB
+    #   mlb|earned_runs|under|1.5              -> KXMLBERA
+    #   mlb|hits_allowed|over|4.5              -> KXMLBHA
+    #
+    # Every one of those rows found nothing and reported it as Kalshi having
+    # no market, when Kalshi had the market and we were not asking for it.
+    #
+    # The stat vocabulary already resolves all of them -- `canonical_market_key`
+    # maps hits/total bases/RBIs/earned runs/walks allowed/hits allowed -- so
+    # the ONLY thing missing was the series registration. Verified end to end
+    # against the real tickers: classification returns the right market, line
+    # and side (`1+ hits` -> `batter_hits over 0.5`).
+    #
+    # PROPS NEED NO GAME-LINE FLAG. A prop names a human and joins on
+    # (player, market, line), so these are priceable and gradeable the moment
+    # they are fetched -- unlike the game lines, which also wait on
+    # `SYNDICATE_KALSHI_GAME_LINES` and an event resolution.
+    "KXMLBHIT": "mlb",
+    "KXMLBHRR": "mlb",
+    "KXMLBTB": "mlb",
+    "KXMLBRBI": "mlb",
+    "KXMLBERA": "mlb",
+    "KXMLBWA": "mlb",
+    # Seen in a production `KALSHI_SPORT MLB` catalogue read rather than on a
+    # market page, so it is evidence of the same kind: the venue lists it.
+    "KXMLBHA": "mlb",
+    "KXMLBTOTAL": "mlb",
+    "KXNBATOTAL": "nba",
+    "KXNFLTOTAL": "nfl",
+    "KXNCAAFTOTAL": "ncaaf",
+    "KXNCAABTOTAL": "ncaab",
+    # ...and the moneyline/spread pair for the same sports, for the same
+    # reason. `KXMLBGAME` and `KXMLBSPREAD` currently register only because a
+    # vocabulary entry happens to match their titles; a title Kalshi rewords
+    # would silently un-register the most valuable market on the venue again.
+    # A registry entry cannot be reworded out from under us.
+    "KXMLBGAME": "mlb",
+    "KXMLBSPREAD": "mlb",
+    "KXWNBAGAME": "wnba",
+    "KXWNBASPREAD": "wnba",
+    "KXWNBATOTAL": "wnba",
 }
 
 # Series we have SEEN and deliberately do not cover. Kept explicit so they stop
@@ -223,6 +312,29 @@ _SPORT_TOKENS: tuple[tuple[str, str], ...] = (
     ("NFL", "nfl"),
     ("NHL", "nhl"),
 )
+
+# Soccer competition display name -> Syndicate league slug, LONGEST FIRST.
+# Built from `LEAGUE_DISPLAY_NAMES` rather than restated, so a league added to
+# the soccer module is covered here without anybody remembering to. See
+# `soccer_league_from_title` for why this is a title prefix and not a ticker
+# token.
+def _soccer_league_prefixes() -> tuple[tuple[str, str], ...]:
+    try:
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+    except Exception:
+        # A soccer module that cannot import is a real failure, and returning
+        # an empty table says "no soccer competition matched" -- which is
+        # exactly the absence/failure confusion this file keeps refusing to
+        # make. It is nonetheless the safe direction: soccer stays UNMAPPED and
+        # keeps appearing in the COVERAGE_GAPS work queue, rather than being
+        # registered against a guess.
+        return ()
+    pairs = [(slug, str(name).strip().lower()) for slug, name in LEAGUE_DISPLAY_NAMES.items()]
+    pairs.sort(key=lambda pair: len(pair[1]), reverse=True)
+    return tuple(pairs)
+
+
+_SOCCER_LEAGUE_PREFIXES: tuple[tuple[str, str], ...] = _soccer_league_prefixes()
 
 # A title that names a PLAYER prop. Kalshi words them "…Player Rebounds",
 # "…Player Points". The word PLAYER is the discriminator: "Team Totals",
@@ -438,6 +550,67 @@ def sport_for_ticker(ticker: Any) -> str | None:
     return None
 
 
+def soccer_league_from_title(title: Any) -> str | None:
+    """The Syndicate soccer league a Kalshi series title names, or None.
+
+    THE ONE SPORT WITH NO TICKER TOKEN, and the gap `prop_candidates` has been
+    naming in its own docstring since it was written: "Kalshi names soccer
+    series by COMPETITION (`KXEPL...`, `KXUCL...`), never by the word soccer,
+    so there is no token to add until we have seen the real prefixes."
+
+    We have now seen them. MEASURED 2026-08-25T19:12:01Z, `kalshi_discovery
+    GAP`, every one of these reported `reason=unmapped_series`:
+
+        KXLALIGASCORE     31  'Final score FC Barcelona wins 7-1?'
+        KXLALIGA1HSCORE   13  'Will the 1st half score be FC Barcelona wins 3-2?'
+        KXUECLSCORE      120  'Reg Time: Final score FK Partizan Belgrade wins 5-2?'
+        KXUECLTEAMTOTAL   42  'Will Partizan Belgrade score over 2.5 goals?'
+        KXUELTEAMTOTAL    12  'Will Anderlecht score over 2.5 goals?'
+        KXUCL1HTOTAL      12  'Over 2.5 1H goals scored'
+        KXEFLCUPTOTAL      3  'Will over 6.5 goals be scored?'
+
+    ...and the user confirmed five more off live La Liga market pages the same
+    day: KXLALIGAGAME, KXLALIGATOTAL, KXLALIGAGOAL, KXLALIGATCORNERS,
+    KXLALIGA1HBTTS.
+
+    ADDING TICKER PREFIXES WOULD BE THE WRONG FIX, for two reasons that both
+    bit us this week. Kalshi runs dozens of competitions and we would be back
+    to hand-adding one prefix per competition per week -- the whack-a-mole the
+    user named. And a short competition code as a SUBSTRING is dangerous in a
+    way the sport tokens are not: `UCL` sits inside `KXNUCLEARTEST`, so the
+    same scan that made `KXWNBAREB` read as NBA would make a nuclear-test
+    market read as soccer.
+
+    So the COMPETITION comes from the title, which Kalshi writes in the same
+    English this repo already stores in `LEAGUE_DISPLAY_NAMES` -- "La Liga
+    Game", "EPL Total". Ten leagues, matched as a title PREFIX, and any of
+    them registers the moment Kalshi lists it with no deploy on our side.
+
+    A PREFIX, not a substring, and that is load-bearing: "Championship" would
+    otherwise match "UEFA Champions League" and file a competition we do not
+    model under one we do. Longest display name first, for the same reason
+    `game_market_from_title` prefers the longest tail: "Belgian Pro League"
+    and "Championship" must not race.
+
+    Returns the LEAGUE, not the sport, because the caller needs both -- the
+    sport for the registry and the league for the log line that says which
+    competition just became legible.
+    """
+    text = str(title or "").strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    for league, display in _SOCCER_LEAGUE_PREFIXES:
+        if lowered.startswith(display):
+            # A word boundary, so "MLS" does not match "MLSomething". Kalshi
+            # separates the competition from the market with a space in every
+            # title we have read.
+            rest = lowered[len(display) :]
+            if not rest or rest[0].isspace():
+                return league
+    return None
+
+
 def auto_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]:
     """Series Kalshi lists that are PLAYER PROPS we can already price.
 
@@ -463,7 +636,12 @@ def auto_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]:
 
     found: dict[str, str] = {}
     for ticker, title in (titles or {}).items():
+        # SOCCER COMES FROM THE TITLE, every other sport from the ticker. See
+        # `soccer_league_from_title`: Kalshi names soccer series by competition
+        # and there is no token to scan for.
         sport = sport_for_ticker(ticker)
+        if sport is None and soccer_league_from_title(title) is not None:
+            sport = "soccer"
         if sport is None:
             continue
         match = _PLAYER_PROP_TITLE.search(str(title or "").strip())
@@ -566,6 +744,8 @@ def auto_game_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]
         if key in SERIES_OUT_OF_SCOPE:
             continue
         sport = sport_for_ticker(key)
+        if not sport and soccer_league_from_title(title) is not None:
+            sport = "soccer"
         if not sport:
             continue
         if game_market_from_title(title) is None:
@@ -706,7 +886,14 @@ def _parse_title(title: str) -> dict[str, Any] | None:
             # this grammar cannot be joined by title alone -- see the note on
             # `needs_event_identity` below.
             "subject": None,
-            "stat_text": "totals",
+            # THE STAT, VERBATIM, and this used to be the string "totals".
+            #
+            # The pattern is `Over <line> <anything>?`, so hardcoding the market
+            # meant "Over 4.5 corners?" and "Over 77.5 1st half points scored?"
+            # both became FULL-GAME point/run totals. `total_market_from_stat`
+            # resolves it against the sport's scoring unit in `classify_market`,
+            # which is the only place the sport is known.
+            "stat_text": match.group("stat").strip(),
             "line": float(match.group("line")),
             "side": match.group("direction").strip().lower(),
         }
@@ -740,7 +927,10 @@ def classify_market(market: Mapping[str, Any]) -> dict[str, Any]:
     says add a `market_keys` entry, and those are different jobs.
     """
     from syndicate.features.shared.kalshi_client import is_combinatorial_series
-    from syndicate.features.shared.market_keys import canonical_market_key
+    from syndicate.features.shared.market_keys import (
+        canonical_market_key,
+        total_market_from_stat,
+    )
 
     series = str(market.get("series") or "").strip().upper()
     if is_combinatorial_series(series):
@@ -761,7 +951,17 @@ def classify_market(market: Mapping[str, Any]) -> dict[str, Any]:
     if parsed is None:
         return {"status": "refused", "reason": REASON_UNREADABLE_TITLE, "series": series}
 
-    market_key = canonical_market_key(sport, parsed["stat_text"])
+    # A GAME TOTAL IS RESOLVED BY ITS UNIT, not by the general vocabulary. The
+    # `_TEAM_TOTAL` grammar matches `Over <line> <anything>?`, so its tail has
+    # to be checked against what this sport's total actually counts -- runs,
+    # points, goals -- or a corners line prices as a goals line. The other
+    # totals grammar (`_PERIOD_TOTAL`, "First 5 innings: ...") has already
+    # produced a `totals_*` key and is passed through untouched.
+    stat_text = str(parsed["stat_text"])
+    if parsed["grammar"] == GRAMMAR_TEAM_TOTAL and not stat_text.startswith("totals"):
+        market_key = total_market_from_stat(sport, stat_text)
+    else:
+        market_key = canonical_market_key(sport, stat_text)
     if market_key is None:
         return {
             "status": "refused",

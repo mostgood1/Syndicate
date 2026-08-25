@@ -30,6 +30,8 @@ from typing import Any, NamedTuple
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
+from syndicate.features.shared.timezone import central_today
+
 logger = logging.getLogger("artifact_publisher")
 
 HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
@@ -1359,7 +1361,7 @@ def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepR
     root = _data_root()
     published = 0
     failed: list[Path] = []
-    today = date.today()
+    today = central_today()
     skipped: dict[str, int] = {}
     # `#402`: WHICH files, not just how many. The counter below has always said
     # a class was skipped and never which artifact, and that gap cost real time:

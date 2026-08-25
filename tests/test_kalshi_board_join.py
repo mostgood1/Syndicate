@@ -8,6 +8,8 @@ rather than an obvious failure.
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
 
 from syndicate.features.shared.kalshi_board_join import (
@@ -531,17 +533,43 @@ def test_an_unresolvable_club_on_our_side_is_skipped_not_matched_loosely():
 # --------------------------------------------------------------------------
 
 
+@contextlib.contextmanager
+def _series_registered(mapping):
+    """Add series to `SERIES_SPORT` for one test, then put the table BACK.
+
+    The distinction that matters is between a key the test INVENTED and a key
+    the test merely re-asserted. Popping both treats them alike and silently
+    unregisters the second: `KXMLBSPREAD` is hand-registered in production
+    code, and a helper that popped it left the rest of the pytest process
+    running against a table missing the most valuable market on the venue.
+    Passing in isolation and failing in the suite is the signature.
+    """
+    from syndicate.features.shared import kalshi_catalogue as cat
+
+    absent = object()
+    before = {key: cat.SERIES_SPORT.get(key, absent) for key in mapping}
+    cat.SERIES_SPORT.update(mapping)
+    try:
+        yield
+    finally:
+        for key, prior in before.items():
+            if prior is absent:
+                cat.SERIES_SPORT.pop(key, None)
+            else:
+                cat.SERIES_SPORT[key] = prior
+
+
 def _priced(markets, rows, monkeypatch, date="2026-08-24"):
     from syndicate.features.shared import kalshi_catalogue as cat
 
     monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "1")
-    cat.SERIES_SPORT["KXMLBSPREAD"] = "mlb"
-    cat.SERIES_SPORT["KXMLBF5TOTAL"] = "mlb"
-    try:
+    # RESTORE, never pop. Both of these are now hand-registered in
+    # `SERIES_SPORT`, so an unconditional pop DELETES production state for the
+    # rest of the pytest process -- which is exactly what happened: this helper
+    # ran, popped `KXMLBSPREAD`, and a registration test 200 lines away in
+    # another file failed while passing in isolation.
+    with _series_registered({"KXMLBSPREAD": "mlb", "KXMLBF5TOTAL": "mlb"}):
         return join_kalshi_to_board(markets, rows, selected_date=date)
-    finally:
-        cat.SERIES_SPORT.pop("KXMLBSPREAD", None)
-        cat.SERIES_SPORT.pop("KXMLBF5TOTAL", None)
 
 
 def _spread_market(**kw):
@@ -745,19 +773,13 @@ def test_the_event_sample_spends_its_budget_on_DISTINCT_club_codes():
 def _with_series(mapping, fn):
     """Register series the way production's AUTO_SERIES discovery does.
 
-    `KXMLBGAME` and `KXMLBSPREAD` are absent from the static table and added at
-    runtime (`game_added=171`, 2026-08-25). A test that omits them measures
-    `unmapped_series` -- a refusal production does not have -- instead of the
-    title grammar it means to test.
+    Some of these are added at runtime by discovery rather than written into
+    the static table (`game_added=171`, 2026-08-25). A test that omits them
+    measures `unmapped_series` -- a refusal production does not have -- instead
+    of the title grammar it means to test.
     """
-    from syndicate.features.shared import kalshi_catalogue as cat
-
-    cat.SERIES_SPORT.update(mapping)
-    try:
+    with _series_registered(mapping):
         return fn()
-    finally:
-        for key in mapping:
-            cat.SERIES_SPORT.pop(key, None)
 
 
 
