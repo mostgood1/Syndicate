@@ -210,7 +210,22 @@ def fetch_series_markets(series: str) -> dict[str, Any]:
 # prices are also what lets us lean less on the metered feed over time.
 #
 # 60 x 150ms = 9 seconds of wall clock per tick, which a worker can absorb.
-DEFAULT_SERIES_PER_TICK = 60
+#
+# RAISED TO 150 on 2026-08-25, because the registry grew and the cap became the
+# binding constraint on freshness rather than the rate limit. Measured that
+# evening: `AUTO_SERIES game_series=204 total_discovered=212` after the soccer
+# competitions registered, against 60 slots per 120s tick -- a full sweep took
+# roughly SEVEN MINUTES, so a live line could be seven minutes old before it
+# was even looked at.
+#
+# The bound that matters is the RATE, not the count: 150 x 150ms = 22.5s of
+# wall clock per tick inside a 120s cadence, still ~6.7 requests/second
+# sustained, an order of magnitude under the burst that drew the 429. Dormant
+# series cost nothing here -- they are backed off to hourly by
+# `DEFAULT_DORMANT_INTERVAL_SECONDS` -- so in practice this is "every live
+# series, every tick", which is what the user asked for and what free calls
+# make affordable.
+DEFAULT_SERIES_PER_TICK = 150
 
 # Minimum gap between two series fetches, in milliseconds.
 #
@@ -979,7 +994,15 @@ def _record_daily_book(markets: list[dict[str, Any]]) -> None:
             record_venue_book,
         )
 
-        report = record_venue_book("kalshi", kalshi_daily_rows(markets))
+        # Kalshi's markets come straight from the tick that just fetched them,
+        # so the source stamp is now. Passed anyway rather than omitted: the
+        # field exists to say whether the feed advanced, and a recorder that
+        # only sometimes receives it cannot answer that for every venue.
+        from syndicate.features.shared.venue_daily_odds import _utc_now
+
+        report = record_venue_book(
+            "kalshi", kalshi_daily_rows(markets), source_fetched_at=_utc_now()
+        )
     except Exception as exc:
         print(f"[kalshi_odds] DAILY_BOOK_FAILED {type(exc).__name__}: {exc}", flush=True)
         return
@@ -992,6 +1015,13 @@ def _record_daily_book(markets: list[dict[str, Any]]) -> None:
         f" parsed={report.get('parsed')}"
         f" opened={report.get('opened')}"
         f" appended={report.get('appended')}"
+        # The counters that make `appended=0` readable -- no id, no price, and
+        # nothing moved are three different problems with three different
+        # fixes. Polymarket's book read `appended=0` for a whole day and this
+        # line could not have said which.
+        f" unchanged={report.get('unchanged')}"
+        f" unpriced={report.get('unpriced')}"
+        f" no_id={report.get('skipped_no_id')}"
         # Rows with no readable sport or game date -- futures land here, which
         # is correct: a season-long market has no game day to be filed under.
         f" undated={report.get('undated')}"

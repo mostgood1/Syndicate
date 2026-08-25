@@ -895,7 +895,16 @@ def _polymarket_daily_book() -> None:
         if not isinstance(markets, list) or not markets:
             print("[live_odds_worker] POLYMARKET_DAILY_BOOK status=no_slate", flush=True)
             return
-        report = record_venue_book("polymarket", polymarket_daily_rows(markets))
+        # THE SLATE'S OWN STAMP, so a FROZEN FEED is distinguishable from a
+        # flat market. Six consecutive daily-book lines on 2026-08-25 were
+        # byte-identical while `persist_game_slate` was erroring every cycle --
+        # the book read as "nothing moved" for an hour and the truth was
+        # "nothing was fetched".
+        report = record_venue_book(
+            "polymarket",
+            polymarket_daily_rows(markets),
+            source_fetched_at=payload.get("fetched_at"),
+        )
     except Exception as exc:  # noqa: BLE001
         print(
             f"[live_odds_worker] POLYMARKET_DAILY_BOOK_FAILED {type(exc).__name__}: {exc}",
@@ -911,6 +920,16 @@ def _polymarket_daily_book() -> None:
         f" parsed={report.get('parsed')}"
         f" opened={report.get('opened')}"
         f" appended={report.get('appended')}"
+        # THE COUNTERS THAT MAKE `appended=0` READABLE. Three different
+        # problems with three different fixes -- no id, no price, nothing
+        # moved -- and this line printed none of them, so an empty daily book
+        # was unattributable for a whole day.
+        f" unchanged={report.get('unchanged')}"
+        f" unpriced={report.get('unpriced')}"
+        f" no_id={report.get('skipped_no_id')}"
+        # Non-zero means the FEED did not advance, so `unchanged` is not a
+        # statement about the market.
+        f" stale_source_files={report.get('stale_source_files')}"
         f" undated={report.get('undated')}"
         # Sports we do not model, counted by name. Polymarket's soccer league
         # codes surface here -- real markets in a sport we DO model, under

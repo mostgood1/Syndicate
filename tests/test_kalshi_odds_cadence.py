@@ -838,3 +838,46 @@ def test_an_already_registered_series_is_not_reported_as_a_gap():
         {"KXMLBGAME": "Professional Baseball Game"}, {}, {"KXMLBGAME": "mlb"}
     )
     assert rows == []
+
+
+def test_the_per_tick_cap_can_sweep_the_whole_registry_inside_one_interval():
+    """THE CAP BECAME THE BINDING CONSTRAINT ON FRESHNESS.
+
+    Measured 2026-08-25, after the soccer competitions registered:
+
+        [kalshi_discovery] AUTO_SERIES game_series=204 total_discovered=212
+
+    ...against 60 slots per 120s tick. A full sweep took roughly SEVEN MINUTES,
+    so a live line could be seven minutes old before anything looked at it --
+    on a venue whose calls are FREE, where the only real bound is the request
+    RATE.
+
+    The rate is what stays fixed: `DEFAULT_REQUEST_SPACING_MS` at 150ms is
+    ~6.7 requests/second, an order of magnitude below the burst that drew the
+    429 on 2026-08-23. This asserts the two move together -- a cap raised past
+    what the spacing can deliver inside one interval would be a promise the
+    loop cannot keep.
+    """
+    per_tick = mod.DEFAULT_SERIES_PER_TICK
+    spacing_ms = mod.DEFAULT_REQUEST_SPACING_MS
+    interval_s = mod.DEFAULT_REFRESH_INTERVAL_SECONDS
+
+    wall_clock_s = per_tick * spacing_ms / 1000.0
+    assert wall_clock_s < interval_s, (
+        f"{per_tick} series at {spacing_ms}ms is {wall_clock_s}s of a "
+        f"{interval_s}s tick -- the loop cannot keep up"
+    )
+    # And the sustained rate stays where the 429 investigation left it.
+    assert 1000.0 / spacing_ms <= 10.0, "faster than the rate that drew a 429"
+
+
+def test_a_dormant_series_does_not_consume_the_raised_budget():
+    """What makes the higher cap affordable. An out-of-season series returning
+    zero markets is backed off to hourly, so the per-tick budget goes to series
+    that actually have markets -- measured 2026-08-25T16:41:09Z, all twelve
+    slots in one tick had gone to attendance markets, the All-Star game and NBA
+    quarter lines in August while live series sat 39.6 hours stale."""
+    assert mod.DEFAULT_DORMANT_INTERVAL_SECONDS >= 3600
+    # `count == 0` is a POSITIVE observation of dormancy; absence is unknown.
+    assert mod._is_dormant({"count": 0, "fetched_at": "2026-08-25T00:00:00Z"}) is True
+    assert mod._is_dormant({"fetched_at": "2026-08-25T00:00:00Z"}) is False

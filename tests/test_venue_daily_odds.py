@@ -315,3 +315,96 @@ def test_the_opening_waits_for_a_real_price_rather_than_taking_zero():
 
     entry = read_json_file(mod.daily_odds_path("kalshi", "mlb", "2026-08-25"))["markets"]["m1"]
     assert entry["opening_yes"] == 0.93, "the empty book became the opening"
+
+
+# --------------------------------------------------------------------------
+# A frozen feed and a flat market must never share a number
+# --------------------------------------------------------------------------
+
+
+def _frozen_feed_row(**kw):
+    row = {
+        "id": "m1", "market": "totals", "line": 7.5, "side": None, "player": None,
+        "family": "TOTAL", "event": "cin-sf", "raw_title": "x",
+        "game_date": "2026-08-25", "sport": "mlb", "yes": "0.51", "no": "0.49",
+    }
+    row.update(kw)
+    return row
+
+
+def test_a_frozen_source_is_NAMED_not_read_as_a_flat_market(tmp_path, monkeypatch):
+    """THE DAY THE DAILY BOOK RECORDED NOTHING.
+
+    Measured 2026-08-25: six consecutive `POLYMARKET_DAILY_BOOK` lines were
+    BYTE-IDENTICAL (`listed=5688 parsed=2664 opened=0 appended=0`) while
+    `persist_game_slate` was erroring on every cycle
+    (`POLYMARKET_US_SLATE_WRITE status=error reason=no_game_offset: ok`). The
+    book read as an hour of flat prices; the truth was that nothing had been
+    fetched.
+
+    "Prices did not change" and "we are looking at the same photograph again"
+    produce the same `unchanged` count, and only one of them is a fact about
+    the market. The SOURCE's own stamp is what tells them apart.
+    """
+    from syndicate.features.shared import refresh_state_store
+    from syndicate.features.shared import venue_daily_odds as mod
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+
+    first = mod.record_venue_book("polymarket", [_frozen_feed_row()], source_fetched_at=1000.0)
+    assert (first["opened"], first["appended"], first["stale_source_files"]) == (1, 1, 0)
+
+    # SAME source stamp: the feed did not advance.
+    frozen = mod.record_venue_book("polymarket", [_frozen_feed_row()], source_fetched_at=1000.0)
+    assert frozen["appended"] == 0
+    assert frozen["unchanged"] == 1
+    assert frozen["stale_source_files"] == 1, "a frozen feed must be named"
+
+    # Fresh stamp AND a moved price: a real point.
+    moved = mod.record_venue_book(
+        "polymarket", [_frozen_feed_row(yes="0.55")], source_fetched_at=2000.0
+    )
+    assert moved["appended"] == 1
+    assert moved["stale_source_files"] == 0
+
+
+def test_a_genuinely_flat_market_on_a_FRESH_feed_is_not_flagged(tmp_path, monkeypatch):
+    """The other direction, which is what makes the flag mean anything. A feed
+    that advanced while the price held is a real observation, and it must not
+    be reported as staleness or the counter becomes noise."""
+    from syndicate.features.shared import refresh_state_store
+    from syndicate.features.shared import venue_daily_odds as mod
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+
+    mod.record_venue_book("polymarket", [_frozen_feed_row()], source_fetched_at=1000.0)
+    flat = mod.record_venue_book("polymarket", [_frozen_feed_row()], source_fetched_at=2000.0)
+
+    assert flat["appended"] == 0, "an unmoved price still appends no point"
+    assert flat["unchanged"] == 1
+    assert flat["stale_source_files"] == 0, "the FEED advanced -- that is not staleness"
+
+
+def test_appended_zero_is_always_attributable(tmp_path, monkeypatch):
+    """Three different problems with three different fixes, and the caller
+    printed none of them. `appended=0` must always be explainable from the
+    counters on the same line."""
+    from syndicate.features.shared import refresh_state_store
+    from syndicate.features.shared import venue_daily_odds as mod
+
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+
+    report = mod.record_venue_book(
+        "polymarket",
+        [
+            _frozen_feed_row(id="", market="totals"),                 # no id
+            _frozen_feed_row(id="m2", yes=None, no=None),             # listed, not quoted
+            _frozen_feed_row(id="m3"),                                # a real point
+        ],
+        source_fetched_at=1000.0,
+    )
+    assert report["skipped_no_id"] == 1
+    assert report["unpriced"] == 1
+    assert report["appended"] == 1
+    # Every row is accounted for by a named counter.
+    assert report["skipped_no_id"] + report["unpriced"] + report["appended"] == 3
