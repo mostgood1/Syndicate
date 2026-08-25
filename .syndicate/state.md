@@ -96,8 +96,9 @@ That is "we cannot see it", NOT "Kalshi does not list it".
 cancelled in favour of Kalshi yet** -- that turns a metered market into a
 missing one. Order: fix the join, measure `matched` per family, then cancel.
 
-**NO NHL AND NO NCAAB PLAYER PROP CAN EVER AUTO-REGISTER.**
-`market_keys._BY_SPORT` has no `nhl` and no `ncaab` key, and
+**NO NHL AND NO NCAAB PLAYER PROP COULD EVER AUTO-REGISTER -- FIXED
+`b8a958fe6`, NOT YET DEPLOYED, and unobservable until those seasons start.**
+`market_keys._BY_SPORT` had no `nhl` and no `ncaab` key, and
 `auto_series_from_catalogue` gates registration on `canonical_market_key`
 resolving. `_TOTAL_UNIT` *does* carry both, so game totals work and props
 cannot -- which is why it reads as coverage. `KXNHLSAVES`, `KXNHLANYGOAL`,

@@ -2067,8 +2067,11 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 ### kalshi-oddsapi-coverage-audit — CLOSED 2026-08-25 — audit delivered, both fixes applied, PR #66 open — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
 - **Outcome: DELIVERED.** Audit `docs/ai_context/kalshi_oddsapi_coverage_audit.md`
-  + `scripts/audit_kalshi_oddsapi_coverage.py`; the two fixes it found applied in
-  `bc887e2ad`. **PR #66**, branch `claude/kalshi-oddsapi-coverage-audit`.
+  + `scripts/audit_kalshi_oddsapi_coverage.py`; **FOUR** fixes applied --
+  the two live-market ones in `bc887e2ad` (KXMLBHRR 136 + KXMLBSB 44), and the
+  two structural prop-vocabulary maps in `b8a958fe6` (`nhl`, `ncaab` -- without
+  which NO prop in either sport could ever auto-register).
+  **PR #66**, branch `claude/kalshi-oddsapi-coverage-audit`.
   Shareable page: https://claude.ai/code/artifact/5b9b46fb-6263-48e6-8ab4-1ba4e7b3e3f1
 - **NOT DEPLOYED.** `.py` only, no `render.yaml` (`#284`). **The verification is a
   PRODUCTION READING, not the test suite** -- audit §11 and
