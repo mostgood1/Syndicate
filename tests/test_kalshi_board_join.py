@@ -740,3 +740,81 @@ def test_the_event_sample_spends_its_budget_on_DISTINCT_club_codes():
     blobs = [s["kalshi"] for s in report["unmatched_events"]]
     assert blobs == ["ZZZYYY", "QQQWWW", "RRRVVV"]
     assert len(blobs) == len(set(blobs))
+
+
+def _with_series(mapping, fn):
+    """Register series the way production's AUTO_SERIES discovery does.
+
+    `KXMLBGAME` and `KXMLBSPREAD` are absent from the static table and added at
+    runtime (`game_added=171`, 2026-08-25). A test that omits them measures
+    `unmapped_series` -- a refusal production does not have -- instead of the
+    title grammar it means to test.
+    """
+    from syndicate.features.shared import kalshi_catalogue as cat
+
+    cat.SERIES_SPORT.update(mapping)
+    try:
+        return fn()
+    finally:
+        for key in mapping:
+            cat.SERIES_SPORT.pop(key, None)
+
+
+
+# --------------------------------------------------------------------------
+# The grammar work list: which title we could not read, not how many
+# --------------------------------------------------------------------------
+
+
+def test_an_unreadable_title_is_SAMPLED_not_merely_counted():
+    """`unreadable_title` names the problem and withholds the fix.
+
+    216 of 883 markets refused this way on 2026-08-25 with the string never
+    printed. Guessing at Kalshi's wording is precisely what failed before --
+    three grammars written against imagined phrasing matched none of production
+    and 302 markets came back unreadable on the first build. The title is in
+    the payload the join already holds.
+    """
+    market = _kalshi(title="Who knows what this says", series="KXMLBGAME")
+    report = _with_series(
+        {"KXMLBGAME": "mlb"}, lambda: join_kalshi_to_board([market], [_row()])
+    )
+    assert report["matched"] == 0
+    assert report["unreadable_titles"] == [
+        {
+            "series": "KXMLBGAME",
+            "title": "Who knows what this says",
+            "ticker": market["ticker"],
+        }
+    ]
+
+
+def test_the_title_sample_is_ONE_PER_SERIES():
+    """A series shares a grammar, so a second title from it teaches nothing --
+    while a first title from a new series is a whole market family. Without
+    this, the largest series buries every other, which is how `KXMLBGAME` (the
+    moneyline, and the market the rejected live order wanted) stays invisible.
+    """
+    markets = [
+        _kalshi(title=f"unreadable {n}", series="KXMLBSPREAD", ticker=f"KXMLBSPREAD-{n}")
+        for n in range(6)
+    ]
+    markets.append(_kalshi(title="Boston Red Sox?", series="KXMLBGAME"))
+
+    report = _with_series(
+        {"KXMLBGAME": "mlb", "KXMLBSPREAD": "mlb"},
+        lambda: join_kalshi_to_board(markets, [_row()]),
+    )
+    # Every market is still counted -- the deduplication is of the sample only.
+    assert report["reasons"]["unreadable_title"] == 7
+    series = [t["series"] for t in report["unreadable_titles"]]
+    assert series == ["KXMLBSPREAD", "KXMLBGAME"]
+    # And the moneyline title survived rather than being crowded out.
+    assert report["unreadable_titles"][1]["title"] == "Boston Red Sox?"
+
+
+def test_a_title_the_catalogue_CAN_read_is_not_sampled():
+    """The control. A sample that fills up on readable titles is noise."""
+    report = join_kalshi_to_board([_kalshi()], [_row(side="Over")])
+    assert report["matched"] == 1
+    assert report["unreadable_titles"] == []

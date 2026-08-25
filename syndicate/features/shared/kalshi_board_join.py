@@ -505,6 +505,10 @@ def join_kalshi_to_board(
     # Blobs already sampled, so the bounded sample spends its slots on distinct
     # club codes rather than on repeat markets from one game.
     unmatched_blobs: set[str] = set()
+    # Titles the catalogue could not read, one per series -- the grammar work
+    # list. Series already sampled, for the same reason blobs are deduplicated.
+    unreadable_titles: list[dict[str, Any]] = []
+    unreadable_series: set[str] = set()
 
     def _refuse(reason: str) -> None:
         reasons[reason] = reasons.get(reason, 0) + 1
@@ -516,7 +520,38 @@ def join_kalshi_to_board(
         # which is a mapping that works for two series and stops at three.
         verdict = _classify(market)
         if verdict.get("status") != "ok":
-            _refuse(str(verdict.get("reason")))
+            reason = str(verdict.get("reason"))
+            if reason == REASON_UNREADABLE_TITLE:
+                # THE GRAMMAR WORK LIST, WRITTEN FROM DATA -- same argument as
+                # the alias sample below. `unreadable_title` names the problem
+                # and then withholds the one thing needed to fix it: the title.
+                # 216 markets a build refused with the string never printed.
+                #
+                # Guessing at Kalshi's wording is specifically what failed here
+                # before: three grammars written against an imagined phrasing
+                # matched NONE of production and 302 markets came back
+                # unreadable on the first build (see the grammar block in
+                # `kalshi_catalogue.py`). The titles are readable from the same
+                # payload the join already holds, so there is no reason to
+                # guess.
+                #
+                # ONE ROW PER SERIES. A series shares a title grammar, so a
+                # second title from the same series teaches nothing while a
+                # first title from a new series is a whole market family. That
+                # is also what keeps `KXMLBGAME` -- the moneyline, and the
+                # market the rejected live order wanted -- from being buried
+                # under whichever series happens to be largest.
+                series = str(market.get("series") or "").strip()
+                if series not in unreadable_series and len(unreadable_titles) < 10:
+                    unreadable_series.add(series)
+                    unreadable_titles.append(
+                        {
+                            "series": series,
+                            "title": str(market.get("title") or ""),
+                            "ticker": str(market.get("ticker") or ""),
+                        }
+                    )
+            _refuse(reason)
             continue
 
         if verdict.get("needs_event_identity"):
@@ -818,6 +853,8 @@ def join_kalshi_to_board(
         "matched": len(matches),
         "reasons": dict(sorted(reasons.items())),
         "kalshi_key_sample": kalshi_keys,
+        # One refused title per series: what grammar is missing, not how many.
+        "unreadable_titles": unreadable_titles,
         "board_key_sample": board_keys,
         "board_market_vocabulary": dict(
             sorted(board_markets.items(), key=lambda kv: -kv[1])[:12]

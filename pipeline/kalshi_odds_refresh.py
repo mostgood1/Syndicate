@@ -757,6 +757,19 @@ def join_to_board(
     # simply not yet evidence. With the date checked first, whatever
     # `event_not_on_our_board` still counts is an alias gap, and THAT is when
     # this line becomes the work list it was built to be.
+    # THE GRAMMAR WORK LIST. `unreadable_title` is the single largest refusal
+    # on an MLB slate (216 of 883, 2026-08-25T16:14:40Z) and the one that hides
+    # the h2h path: `KXMLBGAME` -- the moneyline series, and the market the
+    # rejected live Kalshi order wanted -- has no title grammar at all, so
+    # every one of its markets refuses here and no game line ever reaches the
+    # resolver. One title per series, so a new market family is visible rather
+    # than buried under whichever series is largest.
+    if report.get("unreadable_titles"):
+        print(
+            "[kalshi_odds] JOIN_TITLES"
+            f" unreadable={report.get('unreadable_titles')}",
+            flush=True,
+        )
     if report.get("unmatched_events"):
         print(
             "[kalshi_odds] JOIN_EVENTS"
