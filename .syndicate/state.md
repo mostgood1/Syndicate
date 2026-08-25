@@ -4127,10 +4127,15 @@ free this weekend, half the slate from 09-05.
   **Both have ZERO callers** — not `refresh_odds_sources.py`, not either
   worker, not any `.ps1`. Manual scripts.
 - **Zero `cfbd_lines_*.json` in git at any SHA**, none on this checkout.
-- **Not allowlisted.** `HOT_ARTIFACT_PATTERNS` holds **0 NCAAF patterns of
-  155** (fnmatch, both directions) — `cfbd_lines_*` AND
-  `smartsim2_projections_*.csv`. That is the FOURTH failed handoff of the
-  allowlist entry, now load-bearing rather than tidy.
+- **Not allowlisted** — `cfbd_lines_*` and `smartsim2_projections_*.csv` match
+  nothing in `HOT_ARTIFACT_PATTERNS`. **CORRECTED 2026-08-25 (same day):** the
+  earlier wording here, "0 NCAAF patterns of 155", was literally true and
+  materially misleading. The patterns are SPORT-AGNOSTIC GLOBS, and two of them
+  already match NCAAF — `*_source/tracking/book_quotes/*.jsonl` and
+  `*_source/data/book_grid/book_grid_*.json` (fnmatch, verified). So NCAAF is
+  covered for the shared quote/grid transport and is NOT covered for those two
+  named files. `#552` routes the new OddsAPI capture through the covered path
+  precisely so no allowlist edit is needed.
 
 What the sweep DOES run for NCAAF is `refresh_ncaaf_oddsapi.py`, writing
 `recommendations_summary/` off the legacy 2025 predicted-totals CSVs — which
@@ -4235,6 +4240,62 @@ One loose end worth a look: the checklist's NCAAF arm reports
 **`UNMEASURED: loader returned 0 games`** from a checkout where the board
 builder returns **51**. Different loaders; the checklist is measuring something
 the board does not use.
+
+
+## [ncaaf-oddsapi-lines] NCAAF GAME LINES — OddsAPI capture BUILT AND PROVEN OFF-LINE, NOT DEPLOYED AND NEVER RUN LIVE `[measured 2026-08-25, lane ncaaf-oddsapi-game-lines]`
+
+**Read `[ncaaf-readiness-2026]` first — this closes its stated blocker in CODE
+and changes nothing that is running.** Detail: `todo.md` `#552`, `#553`.
+
+**NO LIVE FETCH HAS HAPPENED.** This session had no egress to
+`api.the-odds-api.com` (agent proxy answers 403 to CONNECT) and no
+`ODDS_API_KEY`. Every number below comes from a REPLAYED FIXTURE built over the
+real 8-game 08-29/08-30 slate. The fetch itself is unproven and must be proven
+on the worker.
+
+    markets non-null           0 of 51  ->  51 of 51   (8 with a real book line)
+    Layer 1 market-board rows  0        ->  32         (ML/ML/spread/total x 8)
+    team-name join             94 of 94 on the real week-1 slate, both directions
+    tests                      354 ncaaf + 411 shared-contract green; CI archive 383 OK
+
+**THE DESIGN DECISION WORTH KEEPING.** Lines go into the SHARED QUOTE LOG, not a
+new file. `HOT_ARTIFACT_PATTERNS`' globs are sport-agnostic and already match
+`ncaaf_source/tracking/book_quotes/*.jsonl`, and `run_refresh_worker.py`'s
+book-grid pass already loops over `ncaaf` — so one capture feeds BOTH the cards
+board and Layer 1, crosses worker→web with **no allowlist edit**, and avoids the
+`artifact_publisher.py` collision with `basketball-live-momentum`. A bespoke
+`ncaaf_*_lines.json` would have needed a new allowlist entry and given the board
+a second line source free to disagree with Layer 1's.
+
+**TWO SILENT BUGS THE REACHABILITY TEST CAUGHT** — neither would have failed a
+correctness test that only checked "the number is right when present":
+1. The quote log normalises `selection` to `home`/`away`. Matching it against the
+   TEAM NAME dropped every spread and moneyline while TOTALS — whose outcome name
+   really is "Over" — kept working. That reads as thin book coverage, not a bug.
+2. With a correct index, `markets` STILL stayed null on all 51: the card never
+   emitted the `betting` block `publication_adapter._shared_markets` reads. The
+   line existed and the board could not see it.
+
+**AND ONE CAUGHT BY READING THE OUTPUT, NOT BY A TEST:** `p_home_cover` came out
+**0.97** for a game the model has the home side LOSING to the spread by 4.6
+points — the cover line was passed negated. Plausible-looking and exactly
+inverted, the same shape as the nflverse `spread_line` trap already in this file.
+Now pinned by a test asserting DIRECTION (`< 0.5` when the model trails the line)
+rather than a value.
+
+**TEAM NAMES ARE THE STANDING RISK.** OddsAPI sends "<School> <Mascot>"; the
+board joins on CFBD's canonical name; ~680 schools share mascots. The resolver is
+exact (school+mascot from the team registry, plus a validated supplement),
+REFUSES ambiguity rather than guessing, and never keys on a bare mascot.
+`fold()` transliterates diacritics before stripping punctuation — without that,
+CFBD "San José State" and OddsAPI "San Jose State" never meet, because the
+board's own `_normalize_text` DELETES non-ASCII instead of folding it.
+**OddsAPI's exact spellings remain unverified**; `--report` prints every
+unresolved name and `_ODDSAPI_NAME_SUPPLEMENT` is where they go.
+
+**OWED:** `scripts/refresh_odds_sources.py` is claimed by OPEN lane
+`layer2-sim-view-and-live-projection`, so the sweep wiring — one additive NCAAF
+step builder — was NOT taken. Until it lands this runs by hand only.
 
 
 ## [ncaaf-margin-calibration] NCAAF MARGINS ARE CALIBRATED; TOTALS ARE NOT `[verified 2026-08-19]`

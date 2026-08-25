@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 550 rules `[generated]`
+## Index — 552 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5856,3 +5856,67 @@ reports that. Three for three.
 - Cost: none — caught before it was written down. Had it not been, the ledger
   would have carried "NCAAF is switched off in production" as a fact, and the
   fix for it would have been an env-var change to a gate that was already correct.
+
+### 2026-08-25 — FORBIDDEN: never state an allowlist/config gap as "0 entries for X" when the entries are WILDCARDS. Count what MATCHES, not what mentions X
+
+- What we believed: NCAAF artifacts could not cross worker->web, because
+  `HOT_ARTIFACT_PATTERNS` contained **0 NCAAF patterns of 155** -- measured, true,
+  and written into `state.md` as a load-bearing blocker with a "fourth failed
+  handoff" note attached.
+- What was actually true: the patterns are SPORT-AGNOSTIC GLOBS. Two of them
+  already match NCAAF -- `*_source/tracking/book_quotes/*.jsonl` and
+  `*_source/data/book_grid/book_grid_*.json` -- so the shared quote and grid
+  transport was covered all along, and production was visibly already pulling
+  `ncaaf_source/tracking/book_quotes/<date>.jsonl`. What is genuinely
+  unallowlisted is two NAMED files, `cfbd_lines_*` and `smartsim2_projections_*`.
+  The original grep (`'ncaaf' in pattern`) could only ever return zero.
+- How we found out: the production log line that contradicted it was in hand the
+  whole time -- `STREAM_PULL_ABSENT path=ncaaf_source/tracking/book_quotes/...`
+  is the publisher *trying* to pull an NCAAF artifact, which a zero-coverage
+  allowlist would never do. It was read as "absent" and not as "reachable". The
+  actual test is one `fnmatch` call per candidate path.
+- The rule going forward: **for any allowlist, ignore-file, route table or
+  pattern-based config, test COVERAGE by running the real matcher over the real
+  candidate paths. Never by grepping the pattern list for a substring.** A
+  wildcard config cannot be audited by reading it. And when a measurement says a
+  subsystem is unreachable while a log shows the system reaching for it, the log
+  wins -- go and find why they disagree before writing the measurement down.
+- Cost: near-miss, and only because the design changed for an unrelated reason.
+  The wrong belief had already been published in an assessment and would have
+  sent the fix at `artifact_publisher.py` -- a file another OPEN lane holds, so
+  the "cheap" edit would have opened a lane conflict to solve a problem that did
+  not exist. Correcting it made the fix need no allowlist edit at all.
+
+### 2026-08-25 — FORBIDDEN: a reachability test must assert a COUNT over the whole surface, and be run BEFORE the correctness tests. Two silent breaks in one feature, neither visible to a value assertion
+
+- What we believed: wiring OddsAPI lines into the NCAAF board was one change --
+  give the reader a populated line index and the board would price. Correctness
+  tests on the aggregation (mean spread, negated sign, one book for moneylines)
+  looked like the work.
+- What was actually true: **two independent breaks sat between a correct line
+  index and a priced card**, and both produced output that looked like ordinary
+  missing data. (1) The shared quote log normalises `selection` to
+  `home`/`away`; matching it against the TEAM NAME silently dropped every spread
+  and moneyline, while TOTALS kept working because their outcome name really is
+  "Over" -- a half-priced board that reads as thin book coverage. (2) With the
+  index fully correct, `markets` stayed null on ALL 51 games, because the card
+  never emitted the `betting` block the shared publication adapter reads: the
+  line existed and the board could not see it.
+- How we found out: `off != on` as a COUNT -- `markets` non-null across all 51
+  served games, with the loader stubbed empty and then populated -- run before
+  any value was asserted. Break (1) showed as a partial count, which a
+  single-card assertion would have passed. Break (2) showed as 0 of 51 when the
+  index provably held 8 games, which no test of the index itself could reveal.
+  Separately, `p_home_cover` came back **0.97** for a game the model has losing
+  to the spread by 4.6 points; that one was caught by READING the number, and is
+  now pinned by a test asserting direction rather than a value.
+- The rule going forward: **the reachability assertion is a count over the whole
+  served surface, taken end to end through the real builder, and it is written
+  first.** "N of M priced" catches a partial wiring break that "this card is
+  right" cannot, and it catches a missing hop between two individually-correct
+  layers. Then, for any derived probability, assert its DIRECTION against a
+  hand-reasoned case (model trails the line -> P(cover) < 0.5); a sign error
+  produces a perfectly plausible number and no test of magnitude will find it.
+- Cost: none shipped -- all three were caught pre-commit. Roughly an hour, and
+  every minute of it was spent inside the gap that the counted reachability test
+  is designed to expose.

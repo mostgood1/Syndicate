@@ -2030,6 +2030,76 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   mechanism is proven at every hop, but the scan's own end-to-end number is
   the next natural check for whoever picks this back up.
 
+### ncaaf-oddsapi-game-lines — OPEN — opened 2026-08-25 — session 50ae96b2-cc59-54dc-83e9-1cac12d4c623
+- Goal: NCAAF game cards carry a real book line. `markets` non-null goes from
+  **0 of 51** to populated on the served board, which unblocks Layer 2
+  candidate generation (`generated=0` today). User instruction: "oddsAPI is
+  back online - use this to build the odds out".
+- Files:
+  - `scripts/fetch_ncaaf_oddsapi_game_lines.py` (NEW)
+  - `syndicate/features/ncaaf/cards.py`
+  - `syndicate/features/ncaaf/sources.py`
+  - `tests/test_ncaaf_oddsapi_game_lines.py` (NEW)
+  - Read-only reference, NOT claimed: `scripts/fetch_nfl_team_odds_local.py`,
+    `syndicate/features/shared/odds_book_quotes.py`
+- **CROSS-LANE, NOT EDITED, SURFACED:** `scripts/refresh_odds_sources.py` is
+  claimed by OPEN lane `layer2-sim-view-and-live-projection`. That is the one
+  place the fetcher would be wired into the sweep. Left unedited pending an
+  explicit decision; everything else is built and tested so the wiring is one
+  additive step builder.
+- **`artifact_publisher.py` deliberately NOT needed**, and this corrects a claim
+  in my own assessment earlier today. "0 NCAAF patterns of 155" was literally
+  true and materially misleading: the patterns are sport-agnostic globs, and
+  `*_source/tracking/book_quotes/*.jsonl` + `*_source/data/book_grid/book_grid_*.json`
+  ALREADY match `ncaaf_source/...`. Verified with fnmatch. Routing the lines
+  through the shared book-quote path therefore needs no allowlist edit, avoids
+  the collision on that file, and reuses transport that is demonstrably running
+  (the publisher pulls `ncaaf_source/tracking/book_quotes/<date>.jsonl` today).
+  What is genuinely unallowlisted is `cfbd_lines_*` and `smartsim2_projections_*`.
+- Hypothesis: the NCAAF board's market block is empty ONLY because
+  `_smartsim2_standalone_market_lines` reads `cfbd_lines_{season}_wk{week}.json`,
+  a path with no producer on any service. Feeding an equivalent line index from
+  OddsAPI populates every downstream priced surface with no other change.
+- Falsification test: build the line index from a fixture and rebuild the board.
+  If `markets` non-null stays at 0 of 51, the reader is not the only blocker and
+  the diagnosis is wrong. **Reachability before correctness: assert off != on**
+  (0 with no lines file, >0 with one) before asserting any specific price.
+- Verification: (1) reachability test above, green; (2) team-name join measured
+  as a COUNT of matched games against the real 51-game week-1 slate, not
+  spot-checked -- the ~680-school mascot collision makes fuzzy matching unsafe,
+  so the join is exact on school+mascot from the team registry; (3) full
+  `tests/test_ncaaf*` suite green. Live OddsAPI verification is NOT possible from
+  this session -- egress to `api.the-odds-api.com` is 403'd by the sandbox proxy
+  and no `ODDS_API_KEY` is present -- so the fetch itself must be proven on the
+  worker, and that is stated rather than implied.
+- Blocked by: none for the build; sweep wiring blocked on the cross-lane
+  decision above.
+- **RESULT 2026-08-25 — BUILD DONE AND VERIFIED OFF-LINE. Nothing deployed, no
+  live fetch ever ran** (no egress to `api.the-odds-api.com`, no `ODDS_API_KEY`;
+  all figures are from a fixture replayed over the real 8-game 08-29/08-30
+  slate).
+  - Falsification test PASSED, and it FAILED FIRST TWICE, which is the value:
+    `markets` non-null `0 of 51 -> 51 of 51` (8 carrying a real book line),
+    Layer 1 market-board rows `0 -> 32`, team join `94 of 94` both directions.
+  - Two silent breaks it caught: the quote log normalises `selection` to
+    `home`/`away` (matching the TEAM NAME dropped every spread and moneyline
+    while totals kept working), and the card never emitted the `betting` block
+    the shared publication adapter reads (`markets` null on all 51 with a
+    provably correct index). A third, `p_home_cover` inverted to 0.97, was
+    caught by reading the number.
+  - Suites: 354 ncaaf + 411 shared-contract green; CI archive suite 383 OK.
+  - Files added since opening (all unclaimed at add time):
+    `syndicate/features/ncaaf/oddsapi_lines.py`,
+    `scripts/fetch_ncaaf_oddsapi_game_lines.py`,
+    `tests/test_ncaaf_oddsapi_game_lines.py`.
+  - Cross-lane items surfaced, NOT edited: `scripts/refresh_odds_sources.py`
+    (sweep wiring, `#552`) and `syndicate/static/shared/dense_cards.css`
+    (`#553`, the strip tile clips every value by ~1 char on all sports — cause
+    located at `dense_cards.css:347`).
+  - STAYS OPEN until the sweep wiring lands or is reassigned; the capture runs
+    by hand only until then.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

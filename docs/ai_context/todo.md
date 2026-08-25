@@ -130,6 +130,89 @@ and "UNMEASURED" is one careless reading away from being taken as "unfed".
 domination result, b=+0.990 / w=−0.028 on 751 clean OOS games, says the payload
 path cannot supply what is missing.)
 
+### `#552` — **NCAAF game lines: OddsAPI capture built and proven off-line; `markets` 0 -> 51, Layer 1 grid rows 0 -> 32. NOT WIRED INTO THE SWEEP (cross-lane).** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, user request ("oddsAPI is back online - use this to build the odds out")
+
+Closes the `#546` blocker in code. **Nothing is deployed and no live fetch has
+run** -- this session had no egress to `api.the-odds-api.com` (proxy 403) and no
+`ODDS_API_KEY`, so every number below is from a replayed fixture built on the
+REAL 8-game 08-29/08-30 slate, not from OddsAPI.
+
+**What was built**
+- `scripts/fetch_ncaaf_oddsapi_game_lines.py` -- h2h/spreads/totals for
+  `americanfootball_ncaaf`, every book kept, appended to the SHARED quote log.
+  `--report` prints team-name resolution without writing; `--events-json`
+  replays a captured response with no credits spent.
+- `syndicate/features/ncaaf/oddsapi_lines.py` -- team resolver + line index.
+- `syndicate/features/ncaaf/cards.py` -- reads the index (CFBD kept as a
+  per-game fallback), emits the `betting` block the shared publication adapter
+  actually reads, and leads the compact card with the market.
+
+**Why the quote log and not a new file.** `HOT_ARTIFACT_PATTERNS` is written in
+sport-agnostic globs and two ALREADY match NCAAF --
+`*_source/tracking/book_quotes/*.jsonl` and
+`*_source/data/book_grid/book_grid_*.json`. So the capture crosses
+worker->web with **no allowlist edit** (which also avoids the `artifact_publisher.py`
+collision with `basketball-live-momentum`), and `run_refresh_worker.py`'s
+book-grid pass already loops over `ncaaf`, so Layer 1's
+`no_precomputed_grid_artifact` should clear on its own. **This corrects `#547`:
+"0 NCAAF patterns of 155" was true and materially misleading.** What is genuinely
+unallowlisted is `cfbd_lines_*` and `smartsim2_projections_*`.
+
+**Measured on the fixture**
+    markets non-null          0 of 51  ->  51 of 51   (8 carrying a real book line)
+    Layer 1 market-board rows 0        ->  32         (ML/ML/spread/total x 8)
+    team-name join            94 of 94 on the real week-1 slate, both directions
+    tests                     354 ncaaf + 411 shared-contract, all green
+
+**TWO BUGS THE REACHABILITY TEST CAUGHT, both silent:**
+1. The quote log normalises `selection` to `home`/`away`; the first version
+   matched it against the TEAM NAME, so every spread and moneyline vanished
+   while totals (outcome name literally "Over") kept working. Reads as thin book
+   coverage, not a bug.
+2. Even with a correct index, `markets` stayed null on all 51 because the card
+   never emitted the `betting` block `publication_adapter._shared_markets` reads.
+   The line existed and the board could not see it.
+Also caught by reading output, not by a test: `p_home_cover` came out **0.97**
+for a game the model has the home side losing to the spread by 4.6 -- the cover
+line was passed negated. Now pinned by a test asserting direction, not value.
+
+**OWED, and deliberately not taken:**
+- **`scripts/refresh_odds_sources.py` is claimed by OPEN lane
+  `layer2-sim-view-and-live-projection`.** It is the one place the fetcher gets
+  wired into the sweep, so until an NCAAF step is added there this runs only by
+  hand. One additive step builder; everything it would call is built and tested.
+- **A live run must confirm the team join.** OddsAPI's exact NCAAF spellings are
+  unverifiable from here. `--report` prints every unresolved name;
+  `_ODDSAPI_NAME_SUPPLEMENT` is where they go.
+
+### `#553` — **The compact-card metric tile clips EVERY value by ~1 character, all sports on the generic strip. Exact cause found.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, measured — **CROSS-LANE, NOT FIXED**
+
+`syndicate/static/shared/dense_cards.css:347`
+
+    .cards-mini-metrics--strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+Three equal columns of the strip card's width, `minmax(0, 1fr)` so a column may
+shrink below its content, a 15px value font, and **no `text-overflow`, no wrap**.
+About four characters survive. Rendered proof, all from the same board:
+`50.3` -> `50`, `43.8` -> `43.`, `-14.9` -> `-14.`.
+
+**PRE-EXISTING AND NOT NCAAF-ONLY** -- `_scoreboard_strip_generic.html` is the
+strip for nfl, nhl, ncaab and soccer too, and the model's own "Projected total"
+was already losing a character before this lane touched anything. It became
+visible here because `#552` promoted the market into `metrics[:3]`, where a
+clipped digit changes a PRICE rather than a projection.
+
+`dense_cards.css` is claimed by OPEN lane `layer2-sim-view-and-live-projection`,
+so this was NOT edited. The value format was adapted instead (a signed home
+spread, `-14.9`, the shortest correct notation) and
+`test_compact_metric_values_fit_the_strip_tile` pins the character budget so the
+next person cannot widen it back without noticing.
+
+Likely fix for whoever owns it: `min-width: 0` is already there, so this wants
+`overflow: hidden; text-overflow: ellipsis; white-space: nowrap` on the value, a
+smaller `font-size` at strip scale, or `auto-fit`/`minmax(72px, 1fr)` so tiles
+may wrap to a second row instead of truncating.
+
 ### `#545` — **The soccer chip build moves to the WORKER and widens to the board's horizon: 72 uncovered fixtures -> 0.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
 `#541`'s telemetry found it and `#541`'s diagnosis named it: the chip set was a
