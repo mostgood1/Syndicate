@@ -539,7 +539,11 @@ def _reader(orders, *, ok: bool = True):
     """Stand in for the Kalshi read side, in the shape `_venue_reader` returns."""
     from syndicate.features.shared.kalshi_orders import venue_order_view
 
-    def fetch(*, limit=100):
+    def fetch(*, limit=100, order_ids=None):
+        # `order_ids` is part of the reader contract: Kalshi lists the whole
+        # book and ignores it, Polymarket has no list of settled orders and
+        # reads one at a time by id. Accepted here so this stand-in matches the
+        # real signature rather than the one it wishes existed.
         if not ok:
             return {"status": "error", "reason": "KalshiAuthError: http_503"}
         return {"status": "ok", "orders": list(orders)}

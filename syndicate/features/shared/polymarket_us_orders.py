@@ -67,7 +67,8 @@ from __future__ import annotations
 
 import math
 import os
-from collections.abc import Mapping
+import urllib.parse
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 __all__ = [
@@ -436,7 +437,40 @@ _VENUE_DEAD_STATUSES = frozenset(
     {"canceled", "cancelled", "expired", "rejected", "failed", "voided"}
 )
 
-_ORDERS_LIST_PATH = "/v1/orders"
+# THE DOCUMENTED LIST ROUTE -- and it lists OPEN orders only.
+#
+# That word is load-bearing and is why this is the FALLBACK rather than the
+# primary read. A cancelled or filled order is simply absent from it, and
+# absence is ambiguous: cancelled, filled, or merely not returned. Reconciliation
+# already treats "not in the read" as `not_found` and changes nothing, which is
+# correct and safe -- but it means this route ALONE can never clear a cancelled
+# order, and a cancelled order left uncleared blocks live execution on every
+# venue.
+#
+# `GET /v1/order/{orderId}` is the read that can say "dead", so it is the one
+# used whenever the caller knows which orders it cares about (it always does --
+# reconciliation starts from our own candidate list).
+_ORDERS_LIST_PATH = "/v1/orders/open"
+
+
+_ORDER_GET_PATH = "/v1/order"
+
+
+def _order_url(order_id: str) -> str:
+    """`GET /v1/order/{orderId}` -- the DOCUMENTED read, singular.
+
+    Note the path is `order`, not `orders`: the create route is
+    `POST /v1/orders` and the read is `GET /v1/order/{id}`. Sibling spellings
+    that differ by one character and one verb, which is exactly why the list
+    guess returned `code: 12` UNIMPLEMENTED rather than a 404.
+    """
+    from syndicate.features.shared.polymarket_us_auth import BASE_URL
+
+    base = (os.environ.get("POLYMARKET_US_API_BASE") or "").strip() or BASE_URL
+    path = (os.environ.get("POLYMARKET_US_ORDER_GET_PATH") or _ORDER_GET_PATH).strip()
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{base.rstrip('/')}{path.rstrip('/')}/{urllib.parse.quote(str(order_id), safe='')}"
 
 
 def _orders_list_url(limit: int) -> str:
@@ -504,7 +538,7 @@ def probe_order_list_routes(*, limit: int = 1) -> dict[str, Any]:
     return {"status": "ok", "routes": out}
 
 
-def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
+def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) -> dict[str, Any]:
     """Every recent order, one call. Same contract as `kalshi_orders.fetch_orders`.
 
     WHY THIS HAD TO EXIST. `execution_ledger._venue_reader` said "Only Kalshi
@@ -535,6 +569,46 @@ def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
     would take that as licence to write off a live position.
     """
     from syndicate.features.shared.polymarket_us_auth import signed_request
+
+    # PER-ORDER IS THE DOCUMENTED READ, and it is tried first when the caller
+    # knows which orders it cares about. `GET /v1/order/{orderId}` is what this
+    # venue publishes; there is no documented list route, which is what the
+    # `code: 12` UNIMPLEMENTED on `GET /v1/orders` was telling us.
+    if order_ids:
+        wanted = [str(i).strip() for i in order_ids if str(i or "").strip()]
+        rows: list[dict[str, Any]] = []
+        errors: list[str] = []
+        for order_id in wanted:
+            try:
+                payload = signed_request("GET", _order_url(order_id))
+            except Exception as exc:
+                errors.append(f"{order_id}: {type(exc).__name__}: {exc}"[:200])
+                continue
+            if not isinstance(payload, Mapping):
+                errors.append(f"{order_id}: unexpected_shape:{type(payload).__name__}")
+                continue
+            row = payload.get("order") if isinstance(payload.get("order"), Mapping) else payload
+            rows.append(dict(row))
+        # EVERY ID FAILING IS A READ FAILURE, not an empty book. One id failing
+        # is that order not being found, which reconciliation already treats as
+        # "change nothing". Collapsing the first case into the second is how a
+        # live position gets written off on a bad credential.
+        if wanted and not rows:
+            print(
+                f"[polymarket_us_orders] ORDERS_READ_ALL_FAILED n={len(wanted)}"
+                f" errors={errors[:3]}",
+                flush=True,
+            )
+            return {"status": "error", "reason": f"all_order_reads_failed: {errors[:2]}"}
+        if rows:
+            print(
+                f"[polymarket_us_orders] ORDERS_READ n={len(rows)} mode=per_order"
+                f" asked={len(wanted)} keys={sorted(rows[0].keys())}"
+                f" statuses={sorted({str(r.get('status') or '') for r in rows})}"
+                f" errors={errors[:2]}",
+                flush=True,
+            )
+        return {"status": "ok", "orders": rows, "count": len(rows), "errors": errors}
 
     try:
         payload = signed_request("GET", _orders_list_url(limit))

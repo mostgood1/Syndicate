@@ -742,7 +742,26 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     if not candidates:
         return {"status": "ok", "candidates": 0, "changed": 0, "orders": []}
 
-    read = fetch(limit=limit)
+    # THE IDS WE HOLD, handed to the reader. Kalshi lists the whole book in one
+    # call and ignores these; Polymarket publishes no list route at all --
+    # `GET /v1/orders` answers `code: 12` UNIMPLEMENTED -- and reads one order
+    # at a time via `GET /v1/order/{orderId}`. A reader that cannot be told
+    # WHICH orders matter can only be a list reader, so the contract carries
+    # them and each venue uses what it needs.
+    #
+    # A CANDIDATE WITH NO VENUE ID IS STILL A CANDIDATE. The submit response
+    # can be lost -- that is the case the write-ahead record exists for -- and
+    # such an order has no id to fetch by. It is simply absent from a per-order
+    # read and counts `not_found`, which changes nothing. That is the correct
+    # outcome and not a silent one: `not_found` is reported.
+    read = fetch(
+        limit=limit,
+        order_ids=[
+            str(o.get("venue_order_id") or "").strip()
+            for o in candidates
+            if str(o.get("venue_order_id") or "").strip()
+        ],
+    )
     if read.get("status") != "ok":
         # Reported, not raised, and NOTHING WRITTEN. The caller is a periodic
         # loop; a venue that is briefly unreachable must leave the ledger
