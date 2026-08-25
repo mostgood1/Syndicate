@@ -81,6 +81,42 @@ def test_it_always_passes_report_and_never_writes(monkeypatch):
     assert seen[0] == ["--report"]
 
 
+@pytest.mark.parametrize("raw", ["write", "WRITE", " Write "])
+def test_write_mode_runs_the_fetcher_for_real(monkeypatch, raw):
+    """`#558`. THE ARGV IS THE DIFFERENCE. `--report` returns before
+    `append_quotes`; an empty argv writes. The pregame sweep that would
+    otherwise capture NCAAF runs on a far slower cadence than the ~90s live
+    loop, and peer restarts kept resetting it -- this makes a capture
+    observable instead of waited for."""
+    monkeypatch.setenv("SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT", raw)
+    seen = _calls(monkeypatch)
+    worker._ncaaf_oddsapi_report_at_boot()
+    assert seen == [[]], raw
+
+
+def test_write_is_the_only_spelling_that_writes(monkeypatch):
+    """A truthy value must NOT write. `1`/`true`/`on` mean "report", and
+    silently upgrading them to a write would spend credits and mutate the
+    shared quote log on every boot of every service that had the old flag."""
+    for raw in ("1", "true", "yes", "on"):
+        monkeypatch.setenv("SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT", raw)
+        seen = _calls(monkeypatch)
+        worker._ncaaf_oddsapi_report_at_boot()
+        assert seen == [["--report"]], raw
+
+
+def test_both_modes_announce_themselves(monkeypatch, capsys):
+    """A boot that captured and a boot that only reported must not read the
+    same in the log -- one spent a credit and appended rows, the other did not."""
+    for raw, mode in (("1", "report"), ("write", "write")):
+        monkeypatch.setenv("SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT", raw)
+        _calls(monkeypatch)
+        worker._ncaaf_oddsapi_report_at_boot()
+        out = capsys.readouterr().out
+        assert f"NCAAF_ODDSAPI_REPORT_START mode={mode}" in out, raw
+        assert f"NCAAF_ODDSAPI_REPORT_DONE mode={mode}" in out, raw
+
+
 def test_a_failing_probe_cannot_stop_the_worker_booting(monkeypatch, capsys):
     monkeypatch.setenv("SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT", "1")
 
