@@ -175,3 +175,149 @@ def test_the_artifact_is_read_ONCE_for_a_whole_slate(monkeypatch):
     for _ in range(5):
         resolve(_order())
     assert calls["n"] == 1
+
+
+# --- game totals -----------------------------------------------------------
+#
+# MEASURED 2026-08-25 14:47:23Z, the first production reading of this resolver:
+#
+#   SETTLED date=2026-08-25 ungraded={'unmapped_market': 1, ...}
+#   UNMAPPED_MARKETS date=2026-08-25 {'totals': 1}
+#
+# Two of the four pending soccer orders were totals, refused by a resolver that
+# already held both scores. `is_game_line_market` is the SPREAD and MONEYLINE
+# test and is False for `totals` by design.
+
+
+def test_a_total_grades_off_the_COMBINED_score(monkeypatch):
+    """No `game_line_view` translation: a total already speaks the grader's
+    over/under vocabulary, so it needs the combined goals and nothing else --
+    the same shape `bet_status_mlb._combined_score` returns for its 46 settled
+    totals."""
+    _patch_matches(monkeypatch, [
+        {"home_team": "Chelsea", "away_team": "Fulham",
+         "home_score": 2, "away_score": 1, "final": True},
+    ])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="totals", side="over", line=2.5)
+    )
+    assert verdict.get("unavailable_reason") is None
+    assert verdict["current_value"] == 3
+    assert verdict["is_final"] is True
+    # Deliberately NOT rewritten: the order's own side and line are what the
+    # grader compares against, and overwriting them here would be the second
+    # copy of a decision this module keeps in one place.
+    assert "side" not in verdict
+    assert "line" not in verdict
+
+
+def test_the_ALT_total_families_grade_too(monkeypatch):
+    """`totals_alt` is the same market at another line, and a final score
+    prices any line. Leaving them out repeated the gap `live_gameline_join`
+    records: 53 of 107 live game-line rows unprojected, every one `spreads_alt`
+    or `totals_alt`."""
+    _patch_matches(monkeypatch, [
+        {"home_team": "Chelsea", "away_team": "Fulham",
+         "home_score": 0, "away_score": 0, "final": True},
+    ])
+    resolve = soccer.soccer_status_resolver("2026-08-25")
+    for market in ("totals", "total", "totals_alt", "alternate_totals"):
+        verdict = resolve(_order(market=market, side="under", line=1.5))
+        assert verdict.get("unavailable_reason") is None, market
+        assert verdict["current_value"] == 0, market
+
+
+def test_a_TEAM_total_is_refused_by_name_not_graded_off_the_scoreline(monkeypatch):
+    """The wrong answer this prevents: one team's goals graded against the
+    combined score roughly doubles the value and settles overs that lost.
+    Nothing here reads which team the side token names, so it refuses."""
+    _patch_matches(monkeypatch, [
+        {"home_team": "Chelsea", "away_team": "Fulham",
+         "home_score": 3, "away_score": 0, "final": True},
+    ])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="team_totals", side="over", line=1.5)
+    )
+    assert verdict["unavailable_reason"] == soccer.REASON_TEAM_TOTAL
+    # And specifically NOT the combined 3, which would have won this bet.
+    assert "current_value" not in verdict
+
+
+def test_an_integral_total_line_pushes_rather_than_needing_a_half_point(monkeypatch):
+    """The OPPOSITE of the three-way moneyline case. `game_line_view` shifts a
+    moneyline off the integer grid because a draw must not push; a total landing
+    exactly on an Asian 3.0 line SHOULD return the stake, so equality is left
+    alone and `resolve_bet_status` settles it as a push."""
+    from syndicate.features.shared.bet_status import resolve_bet_status
+    from syndicate.features.shared.paper_settlement import grade_order
+
+    _patch_matches(monkeypatch, [
+        {"home_team": "Chelsea", "away_team": "Fulham",
+         "home_score": 2, "away_score": 1, "final": True},
+    ])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="totals", side="over", line=3.0)
+    )
+    status = resolve_bet_status(
+        side="over", line=3.0, market="totals",
+        current_value=verdict["current_value"], is_final=verdict["is_final"],
+        started=verdict["started"],
+    )
+    # Asserted through to the MONEY, not on the status string: `live_tied` reads
+    # oddly for a finished match and only `grade_order` decides what it pays.
+    graded = grade_order(
+        {"status": "filled", "fill_price": -110.0, "fill_stake_dollars": 10.0,
+         "side": "over", "line": 3.0, "market": "totals"},
+        status,
+    )
+    assert graded["outcome"] == "push"
+    assert graded["pnl_dollars"] == 0.0
+
+    # And the control, so the push is not a comparator that never fires: one
+    # more goal wins the same bet.
+    for goals, expected in ((4.0, "won"), (2.0, "lost")):
+        moved = resolve_bet_status(
+            side="over", line=3.0, market="totals",
+            current_value=goals, is_final=True, started=True,
+        )
+        assert grade_order(
+            {"status": "filled", "fill_price": -110.0, "fill_stake_dollars": 10.0,
+             "side": "over", "line": 3.0, "market": "totals"},
+            moved,
+        )["outcome"] == expected
+
+
+def test_a_total_on_an_UNFINISHED_match_reports_its_value_and_waits(monkeypatch):
+    _patch_matches(monkeypatch, [
+        {"home_team": "Chelsea", "away_team": "Fulham",
+         "home_score": 1, "away_score": 1, "final": False},
+    ])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="totals", side="under", line=2.5)
+    )
+    assert verdict["current_value"] == 2
+    assert verdict["is_final"] is False
+
+
+def test_a_half_known_score_refuses_rather_than_reading_as_a_clean_sheet(monkeypatch):
+    _patch_matches(monkeypatch, [
+        {"home_team": "Chelsea", "away_team": "Fulham",
+         "home_score": 2, "away_score": None, "final": True},
+    ])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="totals", side="over", line=1.5)
+    )
+    assert verdict["unavailable_reason"] == soccer.REASON_NO_SCORES
+
+
+def test_string_scores_are_coerced_because_ESPN_ships_them(monkeypatch):
+    """`board_enrichment` records this for the same field: ESPN sends "1", and a
+    string compares wrong downstream without ever raising."""
+    _patch_matches(monkeypatch, [
+        {"home_team": "Chelsea", "away_team": "Fulham",
+         "home_score": "2", "away_score": "1", "final": True},
+    ])
+    verdict = soccer.soccer_status_resolver("2026-08-25")(
+        _order(market="totals", side="over", line=2.5)
+    )
+    assert verdict["current_value"] == 3.0
