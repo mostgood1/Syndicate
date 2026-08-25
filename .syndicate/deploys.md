@@ -27941,3 +27941,62 @@ change, and must NOT be read as either a pass or a failure of it.
 - Polymarket spreads still refuse: `spreads_refused:237` (mlb), `992` (nfl),
   `32` (wnba); `outcomes_count_mismatch: 80` in the board join. Needs
   `marketSides`, which the venue returns and `_SLATE_STORAGE_FIELDS` drops.
+
+### 2026-08-25 04:31Z — TWO COMPONENTS, ONE SLATE, OPPOSITE ANSWERS (wnba game state)
+
+**This is the finding, and it outranks the diagnostic that surfaced it.**
+
+`basketball_momentum` on live-odds-worker, EVERY tick from 04:18:50Z through
+04:30:28Z inclusive:
+
+    SCOREBOARD_STATES league=wnba date=2026-08-24 post=2
+    league=wnba date=2026-08-24 live_events=0
+
+Both 08-24 WNBA games FINAL, continuously, for the whole window.
+
+`layer2_shortlist` on refresh-worker at **04:21:24Z**, inside that window:
+
+    LIVE_GAMELINE_JOIN sport=wnba index=0 considered=184
+
+`considered` increments ONLY in `record()`, which is reached only after
+`attach_live_gamelines` passes `game.state in {live, in_progress}`
+(`live_gameline_join.py:807`) — every earlier branch `continue`s uncounted. So
+**184 grid rows carried a LIVE game state while the scoreboard said both games
+were final.**
+
+**WHY THIS IS LOAD-BEARING, not cosmetic.** `game.state` is the predicate for
+both live guards:
+
+- `opportunity_gate` applies `LIVE_MARKET_MAX_AGE_SECONDS` (900s) on it.
+- `live_edge_policy` REFUSES a final game — "the market is settled, so there is
+  no price to beat". **If the state says live when the game is final, that
+  refusal never fires** and a settled market remains eligible to rank. That is
+  the same failure the `over_already_decided` branch exists to prevent on the
+  prop side, reached through the game-state door instead.
+
+**AND IT REFRAMES TONIGHT'S WNBA WORK.** I called `index=0` a missing producer
+(wrong), then a between-periods clock hole (also wrong — the games were over,
+not at halftime). The lens was stamping `pregame` because `is_live` was False
+because **the games were genuinely final**. `live_gameline_from_lens` was the
+only component in the chain reading the slate CORRECTLY, and I misdiagnosed it
+twice on the way to finding the component that was actually wrong.
+
+**Same family as the OPEN Alcantara item**: `paper_settlement` says
+`not_decided_yet` while `post_state_filter` reads 42 HIT / 16 MISSED from the
+same box. Two readers, one source of truth, disagreeing — and in both cases the
+one that grades or gates money is the one out of step.
+
+**NOT CHASED TONIGHT, and say why:** it is 04:31Z, the slate is dead, and any
+fix would be unverifiable until the next live window. Chasing it now would
+produce a change nobody could measure, which is how four inert features shipped
+in one session before.
+
+**Next live window, in order:**
+1. Read `index_why=` (deployed `af4434877`) — expect `sources_seen={'pregame':N}`
+   on a final slate, confirming the instrument discriminates.
+2. Find what feeds `attach_game_state`'s WNBA chips and why it lags
+   `basketball_momentum`'s scoreboard by >12 minutes. `GAME_STATE_JOIN
+   sport=wnba chips=5 rows_matched=643` — 5 chips against a 2-game slate is
+   itself worth an explanation.
+3. Only then decide whether the fix is chip freshness or a `final` cross-check
+   in `opportunity_gate`.
