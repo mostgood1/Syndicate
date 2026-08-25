@@ -258,3 +258,60 @@ def test_the_default_scope_covers_the_sports_the_platform_models():
     scope = mod.in_scope_sports()
     for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
         assert sport in scope, sport
+
+
+# --------------------------------------------------------------------------
+# Zero is not a price -- it is an empty side of the book
+# --------------------------------------------------------------------------
+
+
+def test_a_zero_price_is_not_recorded_as_an_opening():
+    """MEASURED 2026-08-25T17:43:05Z:
+
+        MOVER KXMLBKS-26AUG251907KCTOR-TORMSCHERZER31-2
+              open=0.0 now=0.93 move_pts=93.0 n=4
+
+    `yes_ask_dollars = 0.0` means there is NO ASK. Recorded as an opening it
+    manufactures a 93-point move that never happened -- and CLV is measured
+    against the opening, so every bet on that market would score a beat it
+    never got. A missing opening is a known unknown; a fabricated one is a
+    wrong number that looks like a signal.
+    """
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25",
+                                   [_row(yes=0.0, no=0.0)])
+    assert report["unpriced"] == 1
+    assert report["markets"] == 0
+
+
+def test_a_one_price_is_also_refused():
+    """1.0 is a settled market, or the empty side of the other leg."""
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25",
+                                   [_row(yes=1.0, no=1.0)])
+    assert report["unpriced"] == 1
+
+
+def test_one_live_side_is_still_recorded_when_the_other_is_empty():
+    """A one-sided book is real. Half a quote is still a price the venue
+    showed -- refusing the row entirely would discard a live market."""
+    report = mod.record_daily_odds("kalshi", "mlb", "2026-08-25",
+                                   [_row(yes=0.93, no=0.0)])
+    assert report["unpriced"] == 0
+    assert report["opened"] == 1
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    entry = read_json_file(mod.daily_odds_path("kalshi", "mlb", "2026-08-25"))["markets"]["m1"]
+    assert entry["opening_yes"] == 0.93
+    assert entry["opening_no"] is None
+
+
+def test_the_opening_waits_for_a_real_price_rather_than_taking_zero():
+    """The whole point: a market first seen unquoted must open at its first
+    REAL price, not at the emptiness."""
+    mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row(yes=0.0, no=0.0)])
+    mod.record_daily_odds("kalshi", "mlb", "2026-08-25", [_row(yes=0.93, no=0.08)])
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    entry = read_json_file(mod.daily_odds_path("kalshi", "mlb", "2026-08-25"))["markets"]["m1"]
+    assert entry["opening_yes"] == 0.93, "the empty book became the opening"

@@ -105,13 +105,41 @@ def _utc_now() -> str:
 
 
 def _as_float(value: Any) -> float | None:
+    """A tradeable probability price, or None.
+
+    ZERO AND ONE ARE NOT PRICES. `yes_ask_dollars = 0.0` means there is NO ASK
+    -- an empty side of the book -- and 1.0 is a settled market or the same
+    emptiness on the other leg. Recording either as a price manufactures
+    movement that never happened.
+
+    MEASURED 2026-08-25T17:43:05Z, and it is exactly the failure this guard
+    prevents:
+
+        MOVER KXMLBKS-26AUG251907KCTOR-TORMSCHERZER31-2
+              open=0.0 now=0.93 move_pts=93.0 n=4
+
+    A 93-point "move" from a market that simply had no offer when we first
+    looked. As an OPENING that is worse than useless: CLV is measured against
+    it, so every bet on that market would score a 93-point beat it never got.
+    A missing opening is a known unknown; a fabricated one is a wrong number
+    that looks like a signal.
+
+    Returned as None so the row counts `unpriced` -- "nobody is making a price
+    right now" -- which is a real and separate fact from "the venue does not
+    offer this".
+    """
     if value is None or value == "":
         return None
     try:
         parsed = float(value)
     except (TypeError, ValueError):
         return None
-    return None if parsed != parsed else parsed
+    if parsed != parsed:
+        return None
+    # Strictly inside (0, 1). A probability price at either bound is not one.
+    if parsed <= 0.0 or parsed >= 1.0:
+        return None
+    return parsed
 
 
 def daily_odds_path(venue: str, sport: str, game_date: str):
