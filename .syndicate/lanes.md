@@ -2211,6 +2211,60 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   recommendation #4 (make `no_matching_board_row` name the KEY it wanted) turns
   this lane's target bucket from a number into a ranked list, and is one log
   line. Worth doing first if anyone is in that file.
+- **FALSIFICATION TEST RUN 2026-08-25 ~21:1xZ. RESULT: part 1 PASSES, part 2
+  FAILS FOR NCAAF. The lane's headline example is VOID and the lane needs
+  re-scoping before any code is written.**
+  - **Part 1 PASS.** `_board_key` and `_event_key`
+    (`kalshi_board_join.py`) both read `row["line"]` and canonicalise
+    `row["market"]` through `market_keys`. Board rows carry a usable
+    (market, line). A row whose line will not `float()` is dropped from the
+    index, so the wanted-line set is well defined.
+  - **Part 2 FAILS FOR NCAAF, passes for NFL.** `VENUE_REPRICE_KEYS
+    unmatched_by_sport={'mlb': 2589, 'wnba': 1458, 'nfl': 2572, 'soccer': 9414}`
+    (21:12:14Z) has **NO `ncaaf` key at all**, and `JOIN_EVENTS board=[...]`
+    (21:09:46Z) lists NFL and soccer clubs and **no college teams**.
+    **The board carries no NCAAF rows**, so `KXNCAAFSPREAD`'s 1994 rungs have
+    no board line to be near. Selecting them line-aware would optimise against
+    an EMPTY wanted-set. NCAAF is out of scope for this lane until the board
+    carries it.
+- **WHAT THE TEST SURFACED INSTEAD — two findings that outrank this lane's
+  premise. `[kalshi_odds] JOIN_TITLES by_series` ALREADY EXISTS
+  (`kalshi_odds_refresh.py:1195`), so audit rec #4 is half-built and the
+  breakdown was free:**
+  1. **THE SIDE VOCABULARY DISAGREES, on every game line, in every sport.**
+     `sources_offered` 21:12:14Z now carries `kalshi` for all four sports (it
+     carried none during the audit), and what it offers is
+     `nfl|h2h|**yes**` and `nfl|spreads|**over**|7.5` while the board asks for
+     `mlb|spreads|**away**|1` / `mlb|spreads|**home**|-1.5` and
+     `soccer|h2h|**real betis**`. Confirmed in code, not inferred:
+     `_TEAM_SPREAD_WINS_BY` sets `side` to over/under and `_MONEYLINE` sets it
+     to `"yes"` (`kalshi_catalogue.py`). A spread quoted `over` can never meet a
+     board row keyed `home`, at ANY line. `venue_quote_fanin._candidate_keys`
+     already exists for exactly this ("the board keys a moneyline side by its
+     ROLE; Polymarket keys it by the CLUB") -- Kalshi's vocabulary is simply
+     not among its candidates. **Cheaper than this lane and it affects h2h +
+     spreads across every sport.**
+  2. **71% of `unreadable_title` can never join at all.** Complete breakdown
+     21:13:07Z, `unreadable_title=3379`: `KXNCAAFWINS 400` + `KXNCAAFAWARD 400`
+     + `KXNBAWINS 312` = **1,112 season futures** (audit §6 over-registration,
+     each capped at EXACTLY 400 -- they are consuming the per-series bound),
+     plus **1,280 NFL quarter markets** (8 series x 160) the board has no key
+     for. **2,392 of 3,379.** Reclaiming those slots is free and needs no
+     grammar.
+     Genuinely worth reading: `KXNFLTOTAL 400` unreadable on the
+     "Will there be over N points scored?" wording, and soccer now in the set
+     and failing on the wordings already identified (`KXMLSTOTAL 90`,
+     `KXMLSSPREAD 60`, `KXSERIEATOTAL 60`, `KXSERIEASPREAD 40`,
+     `KXSERIEAGAME 39`).
+- **ROTATION VARIANCE CONFIRMED, and it is larger than first thought.** Three
+  consecutive builds: `matched=44` (21:09:46Z), `104` (21:13:07Z), `0`
+  (21:15:49Z) -- the last on `board_rows=617` rather than 1290. The
+  `by_series` sets differ almost completely between builds. **No single
+  reading can measure any change here.** The band requirement in the
+  Verification line above is now measured, not assumed.
+- **RECOMMENDED RE-SCOPE (not taken unilaterally -- this lane's own rule is to
+  surface, not to widen):** do the side-vocabulary fix first, the futures
+  eviction second, and line-aware rungs THIRD and scoped to NFL/MLB/WNBA.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
