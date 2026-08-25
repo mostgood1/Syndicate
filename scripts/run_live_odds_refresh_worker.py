@@ -829,6 +829,52 @@ def _print_param_probe(pm) -> None:
             )
 
 
+def _polymarket_daily_book() -> None:
+    """Write Polymarket's venue-native daily odds files. Never fatal.
+
+    Reads the slate artifact that `persist_game_slate` just wrote, so this adds
+    no venue traffic at all -- it is a second CONSUMER of one fetch, never a
+    second caller.
+    """
+    try:
+        from syndicate.features.shared.polymarket_us_markets import GAME_SLATE_ARTIFACT
+        from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+        from syndicate.features.shared.venue_daily_odds import (
+            polymarket_daily_rows,
+            record_venue_book,
+        )
+
+        payload = read_json_file(reports_root().joinpath(*GAME_SLATE_ARTIFACT)) or {}
+        markets = payload.get("markets")
+        if not isinstance(markets, list) or not markets:
+            print("[live_odds_worker] POLYMARKET_DAILY_BOOK status=no_slate", flush=True)
+            return
+        report = record_venue_book("polymarket", polymarket_daily_rows(markets))
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[live_odds_worker] POLYMARKET_DAILY_BOOK_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return
+    print(
+        "[live_odds_worker] POLYMARKET_DAILY_BOOK"
+        f" status={report.get('status')}"
+        f" files={report.get('files')}"
+        f" errors={report.get('file_errors')}"
+        f" listed={report.get('listed')}"
+        f" parsed={report.get('parsed')}"
+        f" opened={report.get('opened')}"
+        f" appended={report.get('appended')}"
+        f" undated={report.get('undated')}"
+        # BY FAMILY -- this is the number that says what a parser is still
+        # owed, and `SPORTS_MARKET_TYPE_PROP` is a mixed bucket, so the family
+        # is the venue's own type rather than anything inferred from it.
+        f" unparsed={report.get('unparsed_by_family')}"
+        f" detail={report.get('detail')}",
+        flush=True,
+    )
+
+
 def _polymarket_us_slate_refresh_tick() -> None:
     """Persist the Polymarket US game slate on a cadence, like Kalshi's.
 
@@ -853,11 +899,27 @@ def _polymarket_us_slate_refresh_tick() -> None:
 
     if (os.environ.get("SYNDICATE_POLYMARKET_US_SLATE_REFRESH_ENABLED") or "1").strip().lower() in {"0", "false", "no", "off"}:
         return
-    interval = 900
+    # LOWERED FROM 900s. THESE CALLS ARE FREE.
+    #
+    # Polymarket US is a direct API; unlike OddsAPI there is no per-call cost
+    # to ration, so a 15-minute cadence was rationing a resource that is not
+    # scarce. Exchange prices are also the freshest thing on the board -- they
+    # move in-game, which is exactly when a 15-minute-old quote is worth least
+    # and most likely to size a bet against a price nobody is showing.
+    #
+    # One cycle is ~37 requests (6-7 offset probes plus up to 30 pages), so
+    # 180s is ~12 requests/minute sustained. That is comfortably inside what
+    # this venue has tolerated and an order of magnitude below the burst that
+    # drew Kalshi's http_429s.
+    #
+    # The floor drops to 60s so the override can go further when a slate is
+    # worth watching closely; it stays a floor because the write is ~2.1MB and
+    # an unbounded value here would put that on the keyvalue store in a loop.
+    interval = 180
     raw = str(os.environ.get("SYNDICATE_POLYMARKET_US_SLATE_INTERVAL_SECONDS") or "").strip()
     if raw:
         try:
-            interval = max(120, int(raw))
+            interval = max(60, int(raw))
         except ValueError:
             pass
 
@@ -884,6 +946,17 @@ def _polymarket_us_slate_refresh_tick() -> None:
             f" reason={result.get('reason')}",
             flush=True,
         )
+        # THE DAILY BOOK, from the SAME fetch. Capture-first: this records
+        # every market the venue listed, including the 6,838
+        # `market_type_not_a_game_line` and 1,064 segment rows the board join
+        # refuses. They are already fetched and paid for; today they are
+        # discarded without record, so an unparsed family is invisible rather
+        # than counted.
+        #
+        # Reads the persisted slate rather than re-fetching -- becoming a
+        # second independent caller of this venue is a documented incident
+        # class in `venue_quote_adapters.py`.
+        _polymarket_daily_book()
     except Exception as exc:  # noqa: BLE001 -- never fatal to the loop
         print(
             f"[live_odds_worker] POLYMARKET_US_SLATE_WRITE_FAILED {type(exc).__name__}: {exc}",

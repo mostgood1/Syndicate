@@ -20,8 +20,13 @@ def _isolated(tmp_path, monkeypatch):
         "SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS",
         "SYNDICATE_KALSHI_SERIES",
         "SYNDICATE_KALSHI_SERIES_PER_TICK",
+        "SYNDICATE_KALSHI_DORMANT_INTERVAL_SECONDS",
     ):
         monkeypatch.delenv(name, raising=False)
+    # NO REAL SLEEPING IN TESTS. The spacing is what makes a large per-tick cap
+    # safe against the venue; it has its own tests below, and paying it in
+    # every other test buys nothing but wall clock.
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "0")
     (tmp_path / "intelligence").mkdir(parents=True, exist_ok=True)
     yield
 
@@ -530,3 +535,68 @@ def test_an_empty_read_keeps_the_last_known_markets(monkeypatch):
     _stub(monkeypatch, calls, empty=("A",))
     second = mod.run_kalshi_odds_refresh()
     assert len(second["markets"]) == 1, "an empty read blanked the stored prices"
+
+
+# --------------------------------------------------------------------------
+# Cadence: the calls are FREE, so the limit is the venue's rate, not our budget
+# --------------------------------------------------------------------------
+
+
+def test_the_burst_is_bounded_by_TIME_not_only_by_the_cap(monkeypatch):
+    """The 2026-08-23 http_429s came from RATE, not count.
+
+    The per-tick cap was the only burst control, which is why it sat at 12 --
+    raising it for freshness would have put the burst straight back. Spacing
+    bounds requests per second, so the cap can be about coverage instead.
+    """
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "A,B,C")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "40")
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+
+    slept: list[float] = []
+    monkeypatch.setattr(mod.time, "sleep", lambda s: slept.append(s))
+
+    mod.run_kalshi_odds_refresh()
+    assert sorted(calls) == ["A", "B", "C"]
+    # Three calls, two gaps -- the first pays nothing, so a one-series tick is
+    # not taxed for a burst it cannot create.
+    assert slept == [0.04, 0.04]
+
+
+def test_a_bad_spacing_value_does_not_become_an_unpaced_loop(monkeypatch):
+    """The failure this guard exists to prevent. A typo must fall back to the
+    default, never to zero -- zero is precisely the unpaced loop that drew the
+    429s."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "lots")
+    assert mod.request_spacing_seconds() == mod.DEFAULT_REQUEST_SPACING_MS / 1000.0
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "-5")
+    assert mod.request_spacing_seconds() == mod.DEFAULT_REQUEST_SPACING_MS / 1000.0
+
+
+def test_a_dormant_series_waits_longer_than_a_live_one(monkeypatch):
+    """Where the tick budget was going. An out-of-season series is worth
+    checking hourly, not every two minutes -- and the budget it frees goes to
+    series that actually have markets, which is what makes a high cadence
+    affordable on a free API."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "LIVE,DORMANT")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    monkeypatch.setenv("SYNDICATE_KALSHI_DORMANT_INTERVAL_SECONDS", "3600")
+    calls: list[str] = []
+    _stub(monkeypatch, calls, empty=("DORMANT",))
+
+    mod.run_kalshi_odds_refresh()      # both asked; DORMANT returns nothing
+    assert sorted(calls) == ["DORMANT", "LIVE"]
+    calls.clear()
+
+    mod.run_kalshi_odds_refresh()      # DORMANT is now on the hourly clock
+    assert calls == ["LIVE"], f"a dormant series kept consuming the budget: {calls}"
+
+
+def test_a_series_never_fetched_is_NOT_treated_as_dormant(monkeypatch):
+    """`count == 0` is a positive statement -- we asked, there was nothing.
+    Absence of `count` is unknown, and unknown must be asked at the normal
+    cadence or a newly registered series would wait an hour to be seen once."""
+    assert mod._is_dormant({}) is False
+    assert mod._is_dormant({"count": 0}) is True
+    assert mod._is_dormant({"count": 7}) is False
