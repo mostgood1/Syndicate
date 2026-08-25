@@ -347,3 +347,82 @@ def test_order_body_uses_the_index_over_the_side_name():
         outcome_index=0,
     )
     assert flipped["outcomeSide"] == "OUTCOME_SIDE_YES"
+
+
+# --------------------------------------------------------------------------
+# The order-list route: unimplemented means ASK, not guess
+# --------------------------------------------------------------------------
+
+
+def test_the_route_probe_is_READ_ONLY():
+    """A safety property, not a style choice. This probe runs against a live
+    money account, so a blind POST to an unknown path could CREATE something.
+    Every candidate must be a GET."""
+    from syndicate.features.shared import polymarket_us_auth as auth
+    from syndicate.features.shared import polymarket_us_orders as mod
+
+    methods = []
+    monkey = lambda method, url, **kw: (methods.append(method), {"orders": []})[1]
+    real_present, real_request = auth.credentials_present, auth.signed_request
+    auth.credentials_present = lambda: True
+    auth.signed_request = monkey
+    try:
+        mod.probe_order_list_routes()
+    finally:
+        auth.credentials_present, auth.signed_request = real_present, real_request
+
+    assert methods, "the probe asked nothing"
+    assert set(methods) == {"GET"}, f"non-GET verb in a probe: {set(methods)}"
+
+
+def test_an_unimplemented_list_route_triggers_the_probe(monkeypatch, capsys):
+    """MEASURED 2026-08-25T16:53:54Z: GET /v1/orders returned http_501 with
+    gRPC code 12 (UNIMPLEMENTED) -- POST to that same path creates orders, so
+    the path is real and has no GET handler. Choosing a second route by
+    reasoning about what it ought to be called is the same mistake as the
+    first, so the alternatives get asked about and logged."""
+    from syndicate.features.shared import polymarket_us_auth
+    from syndicate.features.shared import polymarket_us_orders as mod
+
+    def boom(method, url, **kw):
+        raise RuntimeError("http_501: unimplemented")
+
+    monkeypatch.setattr(polymarket_us_auth, "signed_request", boom)
+    monkeypatch.setattr(polymarket_us_auth, "credentials_present", lambda: True)
+
+    result = mod.fetch_orders()
+    assert result["status"] == "error"
+    assert "ORDER_LIST_ROUTE_PROBE" in capsys.readouterr().out
+
+
+def test_a_probe_failure_never_breaks_the_reader(monkeypatch):
+    """The probe is a diagnostic. If it raises, the reader must still return
+    its named error -- a diagnostic that converts an error into a crash is
+    worse than no diagnostic."""
+    from syndicate.features.shared import polymarket_us_auth
+    from syndicate.features.shared import polymarket_us_orders as mod
+
+    monkeypatch.setattr(
+        polymarket_us_auth,
+        "signed_request",
+        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("http_501: nope")),
+    )
+    monkeypatch.setattr(
+        mod, "probe_order_list_routes", lambda **kw: (_ for _ in ()).throw(ValueError("boom"))
+    )
+    assert mod.fetch_orders()["status"] == "error"
+
+
+def test_a_non_route_error_does_not_probe(monkeypatch, capsys):
+    """A 401 or a timeout says nothing about the route. Probing six paths on
+    every transient failure is noise on the path money moves through."""
+    from syndicate.features.shared import polymarket_us_auth
+    from syndicate.features.shared import polymarket_us_orders as mod
+
+    monkeypatch.setattr(
+        polymarket_us_auth,
+        "signed_request",
+        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("http_401: clock skew")),
+    )
+    mod.fetch_orders()
+    assert "ORDER_LIST_ROUTE_PROBE" not in capsys.readouterr().out

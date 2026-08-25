@@ -449,6 +449,61 @@ def _orders_list_url(limit: int) -> str:
     return f"{base.rstrip('/')}{path}?limit={int(limit)}"
 
 
+# Candidate list routes, in the order they are tried. GET ONLY -- a blind POST
+# to an unknown path on a venue that holds real money could CREATE something,
+# so the probe never uses a writing verb.
+#
+# The shapes are the ones a gRPC-gateway API takes, which is what this venue
+# is: the 501 body was `{"code":12,...}` and its enums are prefixed
+# (`ORDER_STATUS_CANCELED`). Code 12 is UNIMPLEMENTED -- the path exists for
+# POST and simply has no GET handler, which is different from 404 and is why
+# the sibling spellings below are worth asking about rather than concluding
+# "this venue has no order list".
+_ORDER_LIST_CANDIDATES = (
+    "/v1/orders/list",
+    "/v1/orders:list",
+    "/v1/portfolio/orders",
+    "/v1/user/orders",
+    "/v1/orders/history",
+    "/v1/order",
+)
+
+
+def probe_order_list_routes(*, limit: int = 1) -> dict[str, Any]:
+    """Ask which order-list route this venue actually implements.
+
+    READ-ONLY, and that is a safety property rather than a style choice: this
+    runs against a live money account, so every candidate is a GET.
+
+    Exists because guessing the second route after the first one 501s is the
+    same mistake as guessing the first. `kalshi_client.probe` settled ten wrong
+    field names this way, and `polymarket_us_markets.probe_v1_sports_routes`
+    settled which `/v1` sports paths exist -- both by asking and reporting
+    rather than by reasoning about what a route ought to be called.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    if not auth.credentials_present():
+        return {"status": "skipped", "reason": "credentials_absent"}
+
+    base = (os.environ.get("POLYMARKET_US_API_BASE") or "").strip() or auth.BASE_URL
+    out: dict[str, Any] = {}
+    for path in _ORDER_LIST_CANDIDATES:
+        url = f"{base.rstrip('/')}{path}?limit={int(limit)}"
+        try:
+            payload = auth.signed_request("GET", url)
+        except Exception as exc:
+            out[path] = str(exc)[:200]
+            continue
+        arrays = [k for k, v in payload.items() if isinstance(v, list)]
+        out[path] = {
+            "ok": True,
+            "payload_keys": sorted(payload.keys()),
+            "arrays": arrays,
+        }
+    return {"status": "ok", "routes": out}
+
+
 def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
     """Every recent order, one call. Same contract as `kalshi_orders.fetch_orders`.
 
@@ -484,7 +539,32 @@ def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
     try:
         payload = signed_request("GET", _orders_list_url(limit))
     except Exception as exc:
-        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+        reason = f"{type(exc).__name__}: {exc}"
+        # UNIMPLEMENTED MEANS ASK, NOT GUESS. MEASURED 2026-08-25T16:53:54Z:
+        #
+        #   http_501 https://api.polymarket.us/v1/orders?limit=100
+        #   {"code":12,"message":"The server was unable to process your request."}
+        #
+        # gRPC code 12 is UNIMPLEMENTED -- POST to that exact path creates an
+        # order, so the path is real and simply has no GET handler. Not a 401,
+        # which also clears the query-string question `signed_path` predicted
+        # ("a 401 on every GET that carries a filter"): the signing is fine.
+        #
+        # Picking a second route by reasoning about what it ought to be called
+        # is the same mistake as picking the first. So on an unimplemented
+        # route the candidates are PROBED, read-only, and the answer is logged
+        # -- the route can then be set via POLYMARKET_US_ORDERS_LIST_PATH with
+        # no build, which is why that override exists.
+        if "http_501" in reason or "http_404" in reason or "http_405" in reason:
+            try:
+                probed = probe_order_list_routes()
+            except Exception as probe_exc:  # never let a probe break a reader
+                probed = {"status": "error", "reason": f"{type(probe_exc).__name__}"}
+            print(
+                f"[polymarket_us_orders] ORDER_LIST_ROUTE_PROBE {probed}",
+                flush=True,
+            )
+        return {"status": "error", "reason": reason}
     if not isinstance(payload, Mapping):
         return {"status": "error", "reason": f"unexpected_shape:{type(payload).__name__}"}
 
