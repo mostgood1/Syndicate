@@ -714,3 +714,93 @@ def test_the_daily_book_records_the_COMPLETE_set_not_the_working_set(monkeypatch
     assert len(result["markets"]) == 2
     # The RECORD is not. Every rung of the ladder reaches it.
     assert len(recorded[0]) == 9
+
+
+def test_the_PERSISTED_markets_are_bounded_too(monkeypatch):
+    """The 400-per-series cap was applied only when BUILDING the working set;
+    `per_series[<ticker>]["markets"]` still held every market, and that dict is
+    what gets written.
+
+    MEASURED 2026-08-25T18:53:11Z:
+
+      KEYVALUE_WRITE_REJECTED size_bytes=8701075 max_bytes=8388608
+      COMPOSITION series=9196911  KXNCAAFSPREAD=2306201 KXNFLSPREAD=903759 ...
+
+    So the artifact could not be written, `fetched_at` never persisted, and the
+    queue re-fetched the SAME 60 series every tick while `oldest_s` merely
+    aged. A rotation that cannot record its own progress does not rotate.
+    """
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 3)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "BIG")
+
+    def fake(series):
+        return {"markets": [
+            {"ticker": f"BIG-26AUG24{n:04d}MINATH-X", "series": series,
+             "title": f"Player P{n}: 7+ strikeouts?",
+             "yes_ask_dollars": 0.4, "no_ask_dollars": 0.6,
+             "close_time": "2026-08-24T23:10:00Z"}
+            for n in range(9)
+        ], "strategy": "series_filter"}
+
+    monkeypatch.setattr(mod, "fetch_series_markets", fake)
+    mod.run_kalshi_odds_refresh()
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    stored = read_json_file(mod.markets_artifact_path())["series"]["BIG"]["markets"]
+    assert len(stored) == 3, f"persisted {len(stored)} markets, unbounded"
+
+
+def test_the_persisted_row_is_LEAN(monkeypatch):
+    """"Shrink the payload rather than raising the ceiling" is what the store's
+    own refusal says. `normalize_market` keeps ~29 fields for diagnosis --
+    bids, volumes, open interest, liquidity, strike type -- and nothing
+    downstream of the artifact reads them. The full row survives in the daily
+    book, which is the record."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "LEAN")
+
+    fat = {
+        "ticker": "LEAN-26AUG242145CINSF-X", "series": "LEAN",
+        "title": "Player A: 7+ strikeouts?", "close_time": "2026-08-24T23:10:00Z",
+        "yes_ask_dollars": 0.4, "no_ask_dollars": 0.6,
+        "yes_american": 150, "no_american": -150,
+        # Diagnosis-only weight that must not persist.
+        "volume_fp": 12345, "open_interest_fp": 999, "liquidity_dollars": 4242,
+        "yes_bid_dollars": 0.39, "strike_type": "greater", "missing_fields": [],
+    }
+    monkeypatch.setattr(mod, "fetch_series_markets",
+                        lambda series: {"markets": [dict(fat)], "strategy": "series_filter"})
+
+    recorded: list[list] = []
+    monkeypatch.setattr(mod, "_record_daily_book", lambda markets: recorded.append(list(markets)))
+    mod.run_kalshi_odds_refresh()
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    stored = read_json_file(mod.markets_artifact_path())["series"]["LEAN"]["markets"][0]
+    for gone in ("volume_fp", "open_interest_fp", "liquidity_dollars",
+                 "yes_bid_dollars", "strike_type", "missing_fields"):
+        assert gone not in stored, gone
+    # ...and everything the join, the price lookup and the snapshot read stays.
+    for kept in ("ticker", "series", "title", "yes_ask_dollars", "no_ask_dollars",
+                 "yes_american", "no_american", "close_time"):
+        assert kept in stored, kept
+
+    # THE RECORD IS UNTOUCHED -- it saw the full row.
+    assert recorded[0][0]["volume_fp"] == 12345
+
+
+def test_an_undated_market_is_still_persisted(monkeypatch):
+    """A date filter on the working set was tried and REVERTED. Futures can
+    never match a board row, so dropping them looked free -- but PLAYER PROPS
+    SKIP THE JOIN'S DATE CHECK ENTIRELY (it lives inside the
+    `needs_event_identity` branch), so a prop whose ticker shape does not parse
+    would have been silently dropped from the venue we actually trade."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "UNDATED")
+    monkeypatch.setattr(mod, "fetch_series_markets", lambda series: {
+        "markets": [{"ticker": "UNDATED-1", "series": series,
+                     "title": "Player A: 7+ strikeouts?",
+                     "yes_ask_dollars": 0.4, "no_ask_dollars": 0.6}],
+        "strategy": "series_filter"})
+    result = mod.run_kalshi_odds_refresh()
+    assert len(result["markets"]) == 1

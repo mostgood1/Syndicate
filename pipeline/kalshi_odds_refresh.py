@@ -717,9 +717,52 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     # in the one place that is supposed to keep whole ladders.
     #
     # A record that inherits the working set's bounds is not a record, and the
-    # bound it was used to justify becomes real data loss. The two must read
-    # from different lists, which is now what they do.
+    # bound it was used to justify becomes real data loss. The two read from
+    # different lists, and this call is placed BEFORE the persistence bound
+    # below so that ordering is a fact rather than a comment.
     _record_daily_book(full_markets)
+
+    # NOW SHRINK WHAT IS PERSISTED, having already recorded the whole book.
+    #
+    # The 400-per-series cap was applied only when BUILDING the working set;
+    # `per_series[<ticker>]["markets"]` still held every market with every
+    # field, and that dict is what gets written. MEASURED 2026-08-25T18:53:11Z:
+    #
+    #   KEYVALUE_WRITE_REJECTED size_bytes=8701075 max_bytes=8388608
+    #   COMPOSITION series=9196911
+    #     KXNCAAFSPREAD=2306201 KXNFLSPREAD=903759 KXNCAAFWINS=645977 ...
+    #
+    # So the artifact could not be written, `fetched_at` never persisted, and
+    # the queue re-fetched the SAME 60 series every tick -- 18:42:40 and
+    # 18:53:10 fetched byte-identical lists while `oldest_s` merely aged
+    # (146660 -> 147291). A rotation that cannot record its own progress does
+    # not rotate.
+    #
+    # A LEAN ROW, WHICH IS WHAT THE REFUSAL ITSELF PRESCRIBES: "Shrink the
+    # payload rather than raising the ceiling". `normalize_market` keeps ~29
+    # fields for diagnosis -- bids, volumes, open interest, liquidity, strike
+    # type, `missing_fields` -- and the join reads `yes_american`/`no_american`,
+    # the classifier reads ticker/series/title, the price lookup reads the ask
+    # dollars, and the snapshot reads `close_time`. Nothing downstream of here
+    # reads the rest, and the full row survives in the daily book.
+    #
+    # NOT FILTERED BY GAME DATE, and that was tried and reverted. Dropping
+    # undated markets looked attractive -- futures can never match a board row
+    # -- but PLAYER PROPS SKIP THE JOIN'S DATE CHECK ENTIRELY (it lives inside
+    # the `needs_event_identity` branch), so a prop whose ticker shape does not
+    # parse would have been silently dropped from the venue we actually trade.
+    # Six tests caught it. Size is a size problem; solve it by size.
+    #
+    # Safe only because `_record_daily_book(full_markets)` runs ABOVE, on the
+    # unbounded, unshrunk set.
+    for series in list(per_series):
+        entry = per_series.get(series) or {}
+        markets = entry.get("markets") or []
+        if not markets:
+            continue
+        if len(markets) > MAX_MARKETS_PER_SERIES:
+            markets = markets[:MAX_MARKETS_PER_SERIES]
+        entry["markets"] = [_lean_market(m) for m in markets]
 
     print(
         "[kalshi_odds] TICK"
@@ -823,6 +866,33 @@ def report_catalogue_gaps(markets: list[dict[str, Any]]) -> dict[str, Any]:
             flush=True,
         )
     return gaps
+
+
+# The fields anything downstream of the artifact actually reads. Everything
+# else `normalize_market` carries exists for DIAGNOSIS at fetch time and is
+# already in the daily book, which is the record.
+_LEAN_MARKET_FIELDS = (
+    "ticker",
+    "event_ticker",
+    "series",
+    "title",
+    "yes_sub_title",
+    "no_sub_title",
+    "status",
+    "yes_ask_dollars",
+    "no_ask_dollars",
+    "yes_american",
+    "no_american",
+    "yes_probability",
+    "no_probability",
+    "close_time",
+)
+
+
+def _lean_market(market: Mapping[str, Any]) -> dict[str, Any]:
+    """One market, reduced to what the join, the price lookup and the snapshot
+    read. See the size note at the persistence bound."""
+    return {field: market.get(field) for field in _LEAN_MARKET_FIELDS}
 
 
 def _record_daily_book(markets: list[dict[str, Any]]) -> None:
