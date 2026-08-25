@@ -48,6 +48,8 @@ status the ledger sets without ever calling the venue.
 
 from __future__ import annotations
 
+import re
+
 import os
 from collections.abc import Mapping
 from typing import Any
@@ -73,12 +75,14 @@ KILL_SWITCH_PATH_NAME = "execution_kill_switch.json"
 # actually assumes).
 _DEFAULT_MAX_ORDER_DOLLARS = 10.0
 _DEFAULT_MAX_DAY_DOLLARS = 100.0
-_DEFAULT_MAX_DAY_ORDERS = 10
+# 15 PER BOOK [USER DECISION 2026-08-25], raised from 10.
+_DEFAULT_MAX_DAY_ORDERS = 15
 # THE ACCOUNT-WIDE ORDER-COUNT CEILING, the count equivalent of
-# `max_day_dollars_all_venues` below -- 15 across both venues, deliberately
-# LESS than 10+10=20, so simply enabling a second venue cannot silently double
-# the account's daily order budget the way it could not for dollars either.
-_DEFAULT_MAX_DAY_ORDERS_ALL_VENUES = 15
+# `max_day_dollars_all_venues` below -- 25 across both venues [USER DECISION
+# 2026-08-25], deliberately LESS than 15+15=30, so simply enabling a second
+# venue cannot silently double the account's daily order budget the way it
+# could not for dollars either.
+_DEFAULT_MAX_DAY_ORDERS_ALL_VENUES = 25
 
 # PER-VENUE DOLLAR CAPS. `max_day_dollars` above is the FALLBACK for a venue
 # with no entry here (a future venue, or a test that does not pass one) --
@@ -105,7 +109,32 @@ _DEFAULT_PAPER_MAX_DAY_DOLLARS = 1_000_000.0
 _DEFAULT_PAPER_MAX_DAY_ORDERS = 10_000
 
 # Statuses that mean the venue may have seen this order. See the module note.
+#
+# `rejected` is absent because those never reached the venue at all
+# (`OrderBuildError.venue_contacted = False`). `failed` IS here because the
+# general case is genuinely unknown -- a submit that timed out may have landed,
+# and the write-ahead record exists precisely for that gap.
 _SPENT_STATUSES = {"submitted", "filled", "failed"}
+
+# ...but a 4xx IS AN ANSWER. The venue replied and refused; no contract exists,
+# no money moved, and nothing is pending reconciliation.
+#
+# Measured 2026-08-25: three Kalshi orders failed `http_404 market_not_found`
+# and charged $5.01 and three orders against a $50 / 15-order budget for
+# positions that were never opened. A cap that counts refusals is a cap that
+# shrinks every time the venue says no.
+#
+# 5xx and timeouts deliberately still count: "the venue broke" and "the venue
+# refused" are opposite facts about whether a position might exist, and only
+# one of them is safe to treat as free.
+_VENUE_REFUSED_ERROR = re.compile(r"http_4\d\d", re.IGNORECASE)
+
+
+def _is_venue_refusal(order: Mapping[str, Any]) -> bool:
+    """A `failed` order the venue ANSWERED and refused -- so not spend."""
+    if str(order.get("status") or "") != "failed":
+        return False
+    return bool(_VENUE_REFUSED_ERROR.search(str(order.get("error") or "")))
 
 
 def _float_env(name: str, default: float) -> float:
@@ -286,6 +315,10 @@ def spent_today(
         if venue is not None and str(order.get("venue") or "") != venue:
             continue
         if str(order.get("status") or "") not in _SPENT_STATUSES:
+            continue
+        if _is_venue_refusal(order):
+            # The venue answered and refused. No contract, no money, nothing
+            # to reconcile -- see `_VENUE_REFUSED_ERROR`.
             continue
         try:
             dollars += float(
