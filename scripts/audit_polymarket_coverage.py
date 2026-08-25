@@ -56,8 +56,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -271,6 +273,108 @@ def spread_sign_test(
         "sample_disagreements": disagreements,
         "verdict": verdict,
     }
+
+
+# --------------------------------------------------------------------------
+# THE BOOT HOOK -- opt-in, off unless explicitly switched on
+# --------------------------------------------------------------------------
+
+
+def _env_bool(name: str, *, default: bool = False) -> bool:
+    """ABSENT MEANS OFF, and that is stated rather than implied.
+
+    `CLAUDE.md`: "Absent != off. Check the code's default for any key you add."
+    This one defaults FALSE, so the hook is inert on every boot until someone
+    sets the flag, and unsetting it restores the inert state exactly.
+    """
+    raw = str(os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
+def run_spread_audit_if_enabled() -> dict[str, Any] | None:
+    """Run the spread sign test once at boot, if the flag is set. Never raises.
+
+    WHY A BOOT HOOK AND NOT A CRON OR AN ENDPOINT. The two inputs live in the
+    shared keyvalue store and nothing outside Render's private network can
+    reach it (`ipAllowList: []`, and `SYNDICATE_REFRESH_STATE_URL` is supplied
+    by `fromService`, a blueprint-only mechanism). So the test has to run from
+    inside a service that already holds the connection. This is the same
+    pattern `SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT` and
+    `SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT` already use on the sibling
+    worker, deliberately, so there is one shape for "diagnostic that runs once
+    on request" rather than two.
+
+    IT READS. It does not fetch from the venue, write a file, place an order,
+    or touch pricing -- see this module's header. The worst case for a boot
+    with the flag set is one extra artifact read and one printed line.
+
+    RETURNS the report (or None when the flag is off) so a test can assert BOTH
+    directions. A hook that has never been shown to do anything when switched
+    on is indistinguishable from one that is wired up wrong, which is the
+    failure `learnings.md` records as "a guard that has never once PASSED is
+    not a guard".
+    """
+    if not _env_bool("SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT"):
+        return None
+
+    try:
+        # THE GAME DATE, in UTC and explicitly. Three timezone-ambiguous
+        # `date.today()` sites were fixed in this repo on 2026-08-25; this is
+        # not going to be the fourth.
+        selected_date = str(
+            os.environ.get("SYNDICATE_POLYMARKET_SPREAD_AUDIT_DATE") or ""
+        ).strip() or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        try:
+            min_sample = int(os.environ.get("SYNDICATE_POLYMARKET_SPREAD_AUDIT_MIN_SAMPLE") or 30)
+        except (TypeError, ValueError):
+            min_sample = 30
+
+        slate, fetched_at, reason = _load_slate()
+        if reason:
+            # A NAMED REFUSAL, never a zero. "no slate on disk" and "the venue
+            # lists no spreads" are opposite facts and must not share a line.
+            print(
+                f"[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=refused reason={reason}"
+                f" date={selected_date}",
+                flush=True,
+            )
+            return {"status": "refused", "reason": reason}
+
+        board, board_reason = _load_board(selected_date)
+        if board_reason:
+            print(
+                f"[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=refused"
+                f" reason={board_reason} date={selected_date}"
+                f" slate_markets={len(slate)}",
+                flush=True,
+            )
+            return {"status": "refused", "reason": board_reason}
+
+        result = spread_sign_test(slate, board, min_sample=min_sample)
+        print(
+            f"[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date={selected_date}"
+            f" slate_markets={len(slate)} board_rows={len(board)}"
+            f" slate_fetched_at={fetched_at}"
+            f" fixtures={result['fixtures_compared']}"
+            f" agree_home={result['agree_with_home_sign']}"
+            f" disagree={result['disagree']}"
+            f" rate={result['agreement_rate']}"
+            f" no_board_fixture={result['spread_slugs_with_no_board_fixture']}"
+            f" verdict={result['verdict']!r}"
+            f" disagreements={result['sample_disagreements']}",
+            flush=True,
+        )
+        return {"status": "ok", **result}
+    except Exception as exc:  # noqa: BLE001
+        # A DIAGNOSTIC MUST NOT BE ABLE TO KILL THE WORKER IT RUNS IN.
+        print(
+            f"[audit_polymarket_coverage] SPREAD_SIGN_AUDIT_FAILED"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
 
 
 def main() -> int:
