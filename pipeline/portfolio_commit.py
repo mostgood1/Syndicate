@@ -301,7 +301,7 @@ def _venue_price_resolver(venue: str, selected_date: str | None = None):
         markets = markets_from_state(payload)
         if not markets:
             return (None, None)
-        return _resolvers_from_markets(markets)
+        return _resolvers_from_markets(markets, selected_date)
     except Exception as exc:
         # Named, and returns None so the venue silently reverts to the
         # aggregator rather than losing its book entirely.
@@ -309,44 +309,72 @@ def _venue_price_resolver(venue: str, selected_date: str | None = None):
         return (None, None)
 
 
-def _resolvers_from_markets(markets):
+def _resolvers_from_markets(markets, selected_date: str | None = None):
     """Fetched Kalshi markets -> `(price_resolver, ticker_resolver)`.
 
-    Classified by the CATALOGUE, so every sport it knows is priced here without
-    this function naming any of them. One match list feeds both resolvers.
+    THROUGH THE BOARD JOIN, which this used to skip -- and skipping it made
+    every resolver it returned inert.
+
+    `_match_key` indexes on `board_event_id` and returns None without one, so a
+    match carrying no board event is NEVER INDEXED. This function built its
+    match dicts by hand from `classify_market` alone -- market, player, line,
+    side, price, ticker -- and a Kalshi market does not know which board row it
+    belongs to. So every key was None, the index was empty, and `resolve()`
+    returned None for every row it was ever asked about.
+
+    Measured 2026-08-25 4:40:11 PM Central, after three separate artifact-reader
+    fixes had already landed:
+
+        PAPER2_PLAN_WRITTEN venue=kalshi     rows_in=86  venue_priced=0
+        PAPER2_PLAN_WRITTEN venue=polymarket rows_in=89  venue_priced=30
+
+    ...while the fan-in was pricing 2,344 Kalshi quotes off the same artifact
+    on the same service. Two matchers, one venue, and only one of them said
+    anything. Kalshi silently took the AGGREGATOR's price on all 86 rows --
+    `venue_not_quoting` never fired, because a price was always found.
+
+    `_match_key`'s own docstring names this: "Adding the game to `_match_key`
+    moved the ticker resolver and left this behind." It also predicted the
+    silence -- "its board join currently supplies only player props, whose
+    `player_name` happens to identify a game" -- describing the join's matches,
+    not these hand-built ones, which never had an event id under any market.
+
+    `join_kalshi_to_board` stamps `board_event_id` off the row it paired with,
+    which is the only place that fact exists. So this now mirrors
+    `_polymarket_price_resolver` exactly: read the board being committed, join,
+    and build both resolvers from ONE match list -- which is also what keeps a
+    price and a contract id from coming out of two different pairings.
     """
     from syndicate.features.shared.kalshi_board_join import (
+        join_kalshi_to_board,
         kalshi_price_resolver,
         kalshi_ticker_resolver,
     )
-    from syndicate.features.shared.kalshi_catalogue import classify_market
 
-    matches = []
-    for market in markets:
-        verdict = classify_market(market)
-        # Unmapped series, unreadable titles and game lines with no event
-        # mapping are all skipped here rather than guessed -- the catalogue
-        # already refuses each of them by its own name, and `report_catalogue_gaps`
-        # is where those numbers are meant to be read.
-        if verdict.get("status") != "ok" or verdict.get("needs_event_identity"):
-            continue
-        # Each side takes its OWN quote: yes and no are separately priced and
-        # the gap between them is the spread.
-        for side, price_key in (("over", "yes_american"), ("under", "no_american")):
-            price = market.get(price_key)
-            if price is None:
-                continue
-            matches.append(
-                {
-                    "market": verdict["market"],
-                    "player_name": verdict["subject"],
-                    "line": verdict["line"],
-                    "board_side": side,
-                    "kalshi_american": price,
-                    # Carried so the ticker resolver keys off the SAME match.
-                    "ticker": verdict.get("ticker"),
-                }
-            )
+    try:
+        board_rows = _board_rows_for_join(selected_date)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[portfolio_commit] KALSHI_RESOLVER_BOARD_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return (None, None)
+
+    joined = join_kalshi_to_board(
+        markets, board_rows, selected_date=str(selected_date or "")
+    )
+    matches = joined.get("matches") or []
+    print(
+        f"[portfolio_commit] KALSHI_BOARD_JOIN markets={joined.get('kalshi_markets')}"
+        f" board_rows={len(board_rows)} matched={len(matches)}"
+        f" refusals={joined.get('refusals')}",
+        flush=True,
+    )
+    if not matches:
+        # Named, and `(None, None)` so the venue reverts to the aggregator
+        # rather than losing its book -- but the line above says it happened,
+        # which is what this whole failure lacked.
+        return (None, None)
     return kalshi_price_resolver(matches), kalshi_ticker_resolver(matches)
 
 
