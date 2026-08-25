@@ -28544,3 +28544,56 @@ with itself while the venue bought the other team. It now carries `our_side`,
 **Operator action outstanding:** the inverted TEX order is still RESTING
 (Pending, GTC, $1.42). It is on the wrong team and cannot be fixed by a redeploy
 — it needs cancelling at the venue.
+
+---
+
+## 2026-08-25 — refresh-worker `7f4b8808a`: there is no Kalshi alias gap
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da6s4pm417fc73ejdmq0`, live ~`16:40Z` on instance `v8kxq`. Commit
+`7f4b8808a`, on `origin/main`. Claim `kalshi-join`.
+
+**verify:** two consecutive `[kalshi_odds] BOARD_JOIN` lines, same slate, same
+883 markets, across the change:
+
+```
+16:14:40Z  b51a34323  matched=5  reasons={'event_not_on_our_board': 20,
+                                          'market_is_for_another_date': 512,
+                                          'no_matching_board_row': 120,
+                                          'unreadable_title': 216,
+                                          'would_match_but_wrong_date': 10}
+16:41:09Z  7f4b8808a  matched=4  reasons={'market_is_for_another_date': 532,
+                                          'no_matching_board_row': 121,
+                                          'unreadable_title': 216,
+                                          'would_match_but_wrong_date': 10}
+```
+
+**What this proves.** `event_not_on_our_board` went **20 → 0** and
+`market_is_for_another_date` went **512 → 532**. The same twenty refusals, moved
+from the alias counter to the date counter — which is the whole claim, and it is
+arithmetic rather than inference. `JOIN_EVENTS` correctly stopped printing:
+there are no unmatched events left to sample.
+
+**It retires a hypothesis that had been carried as fact for days.**
+`kalshi_board_join.py` had said the club map was the game-line blocker — "`OAK`
+against `ATH` is a real possibility and every such gap is an alias nobody has
+written yet" — and the previous entry shipped `JOIN_EVENTS` specifically to
+produce that alias work list. **There is no alias gap on this slate.** Every one
+of the twenty was a stale game whose blob the resolver reads correctly, and
+adding club spellings would have changed nothing. The comment is corrected in
+place rather than left to mislead the next reader.
+
+**`matched` 5 → 4 is not this change.** The hoisted date check runs only inside
+the game-line branch (`needs_event_identity`), and those matches are player
+props; `no_matching_board_row` moved 120 → 121 in the same step, which is board
+churn between two cycles 27 minutes apart.
+
+**What is now the sole h2h blocker, and it is unambiguous:**
+`unreadable_title: 216`, unchanged across both builds. The registered grammars
+cover SPREAD, F5SPREAD, F5TOTAL, TEAMTOTAL, INNINGTOTAL and F5 — there is **no
+grammar for `KXMLBGAME`**, the moneyline series, which is the market the
+rejected live order wanted. `unmapped_series` is absent from the reasons, so the
+series IS registered by AUTO_SERIES discovery (`game_added=171`) and its markets
+do reach the title parser and refuse there. `08d50a344` adds a per-series title
+sample (`JOIN_TITLES`) to read that grammar from data; deploy
+`dep-da6sbl6k1f9s73eh9tsg` carries it. Not yet read.

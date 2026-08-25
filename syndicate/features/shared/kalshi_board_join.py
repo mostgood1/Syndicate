@@ -523,7 +523,8 @@ def join_kalshi_to_board(
             reason = str(verdict.get("reason"))
             if reason == REASON_UNREADABLE_TITLE:
                 # THE GRAMMAR WORK LIST, WRITTEN FROM DATA -- same argument as
-                # the alias sample below. `unreadable_title` names the problem
+                # the alias sample below, and now the LARGEST remaining refusal
+                # on an MLB slate rather than a secondary one. `unreadable_title` names the problem
                 # and then withholds the one thing needed to fix it: the title.
                 # 216 markets a build refused with the string never printed.
                 #
@@ -563,12 +564,26 @@ def join_kalshi_to_board(
             #
             # GATED OFF BY DEFAULT. The identity is resolved by matching
             # Kalshi's concatenated club codes against OUR schedule
-            # (`match_event_blob`), and how often our codes agree with Kalshi's
-            # is UNMEASURED -- `OAK` against `ATH` is a real possibility and
-            # every such gap is an alias nobody has written yet. So the resolver
-            # runs and REPORTS on every build, and the flag decides only whether
-            # a resolved game may be priced. That way the measurement arrives
-            # before the money does, which is the opposite of how tonight went.
+            # (`match_event_blob`), and the flag decides only whether a resolved
+            # game may be priced. The resolver runs and REPORTS on every build,
+            # so the measurement arrives before the money does.
+            #
+            # THAT MEASUREMENT HAS NOW ARRIVED, and it retired the worry this
+            # comment used to carry. It read: "how often our codes agree with
+            # Kalshi's is UNMEASURED -- `OAK` against `ATH` is a real
+            # possibility and every such gap is an alias nobody has written
+            # yet." Measured across two consecutive builds, once the date was
+            # checked before the resolver rather than after it:
+            #
+            #   16:14:40Z  matched=5  {'event_not_on_our_board': 20,
+            #                          'market_is_for_another_date': 512, ...}
+            #   16:41:09Z  matched=4  {'market_is_for_another_date': 532, ...}
+            #
+            # `event_not_on_our_board` went 20 -> 0 and the date counter took
+            # exactly those 20. Every one was a stale game, not a club code we
+            # could not read; there is no alias gap on this slate. The club map
+            # is not the game-line blocker and adding spellings to it would
+            # have changed nothing.
             #
             # A total joined to the wrong game is a confidently-priced bet on
             # strangers, so `ambiguous` and `no_match` are refused by name and
