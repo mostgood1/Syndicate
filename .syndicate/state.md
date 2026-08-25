@@ -4316,6 +4316,25 @@ NCAAF is on the sweep at all, and `#520` records that re-applying an upstream
 gate at the launch site is how NFL lost 24 hours of capture. Out of season the
 call costs one credit and appends nothing.
 
+**TWO STALE `test_ops.py` ASSERTIONS FIXED, one of them NOT MINE.** Both pinned a
+sport at exactly one refresh step and read it as `refresh_steps[0]`.
+`test_build_refresh_plan_uses_nfl_syndicate_runner_in_source_mode` had been **RED
+ON `origin/main`** (verified in a clean worktree) since `nfl_schedule_refresh`
+was added — that step is deliberate and load-bearing (`schedule_{season}.csv` is
+a MODEL INPUT, +1.18 ROI points paired on 16,906 held-out 2025 bets) so the TEST
+was stale, not the code. Both now assert the step NAMES IN ORDER and look each
+command up BY NAME, which is strictly stronger than the count they replaced and
+cannot be repointed by a third step appearing. `test_ops.py` is now **124 passed,
+0 failed** (baseline 1 failed / 123 passed).
+
+**A PRE-EXISTING NFL RED BAND EXISTS AND IS NOT MINE** `[surfaced 2026-08-25]`.
+Widening a `-k` filter to include `nfl` revealed **6 failures that reproduce
+identically on `origin/main`**: `test_generate_smartsim2_nfl_projections` (2),
+`test_generate_smartsim2_nfl_preseason_projections` (1),
+`test_nfl_injuries_fetch_autorun::DispatchOrder` (2),
+`test_nfl_roster_depth_autorun::DispatchOrder` (1). Untouched by this lane and
+left alone; recorded so the next session does not mistake them for new breakage.
+
 **STILL OWED: a LIVE run.** Nothing here has touched real OddsAPI.
 
 

@@ -1127,8 +1127,34 @@ class OpsRefreshApiTests(unittest.TestCase):
         result = plan["results"][0]
         self.assertEqual((result.get("ingestion") or {}).get("source_dependency"), "local_artifact_bundle")
         refresh_steps = result.get("refresh_steps") or []
-        self.assertEqual(len(refresh_steps), 1)
-        step = refresh_steps[0]
+        # NFL builds TWO steps at this date, and the schedule refresh is the
+        # deliberate one: `schedule_{season}.csv` became a MODEL INPUT rather
+        # than a calendar (`game_context.py` reads its spread_line/total_line
+        # for the prop model's implied team total, +1.18 ROI points measured
+        # paired on 16,906 held-out 2025 bets) and it previously had no
+        # automated caller at all. This assertion predated that step and had
+        # been RED ON MAIN since -- it pinned `len == 1` and read the oddsapi
+        # runner as `refresh_steps[0]`, which is now the schedule fetch.
+        #
+        # A third step, `nfl_preseason_oddsapi_refresh`, appears only inside
+        # the Jul-Sep calendar window; this test's date is 2026-10-01, so it
+        # is correctly absent here. Looked up BY NAME rather than by index so
+        # that step appearing cannot silently repoint these assertions at the
+        # wrong command -- which is exactly how this test went stale.
+        self.assertEqual(
+            [s.get("name") for s in refresh_steps],
+            ["nfl_schedule_refresh", "nfl_oddsapi_refresh"],
+        )
+        schedule_step = next(
+            s for s in refresh_steps if s.get("name") == "nfl_schedule_refresh"
+        )
+        self.assertIn(
+            "scripts/fetch_nfl_schedule.py",
+            " ".join(str(part) for part in (schedule_step.get("command") or [])),
+        )
+        step = next(
+            s for s in refresh_steps if s.get("name") == "nfl_oddsapi_refresh"
+        )
         command = step.get("command") or []
         self.assertIn("scripts/refresh_nfl_oddsapi.py", " ".join(str(part) for part in command))
         self.assertNotIn("fetch_oddsapi_props.py --out", " ".join(str(part) for part in command))
