@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 554 rules `[generated]`
+## Index — 555 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,10 +8,11 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 103**
+**FORBIDDEN — 104**
 
 - [2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-…](#2026-08-22-forbidden-never-read-a-service_updated-deploy-as-shipping-code-an-env-var-change-restarts-the-service-on-the-commit-it-is-already-running)
 - [2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the sam…](#2026-08-22-forbidden-never-name-a-datastore-setting-and-a-service-env-var-by-the-same-store-without-saying-which-surface-a-4-minute-refresh-worker-outage-came-from-that-ambiguity)
+- [2026-08-25 — FORBIDDEN: never ship a venue's submit side without its read side](#2026-08-25-forbidden-never-ship-a-venues-submit-side-without-its-read-side)
 - [2026-08-21 — FORBIDDEN: never publish a field under a name that describes a DIFFERENT q…](#2026-08-21-forbidden-never-publish-a-field-under-a-name-that-describes-a-different-quantity-however-well-documented-the-real-one-is)
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, an…](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname)
