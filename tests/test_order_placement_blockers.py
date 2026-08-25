@@ -196,3 +196,45 @@ def test_a_blank_bookmaker_is_kept_because_it_can_still_anchor_a_line():
 
     kept = freshest_rows_for_grid([{"bookmaker": "", "selection": "home", "price": -110}])
     assert len(kept) == 1
+
+
+# --- 1b. the layer the first fix MISSED ------------------------------------
+
+
+def test_the_dict_is_normalised_where_the_ORDER_REQUEST_is_built():
+    """`execute_portfolio.py:99` did `str(position.get("venue_ticker"))`, so a
+    Polymarket dict became the string "{'slug': ..., 'tick_size': ...}" BEFORE
+    any resolver saw it.
+
+    The first fix read the dict inside `_polymarket_resolve_market` -- one layer
+    too late, because `str()` had already run and `isinstance(raw, Mapping)` was
+    False on a string that merely looked like a dict. MEASURED 2026-08-25
+    15:50:40Z, on the deploy that was supposed to have fixed it:
+
+        POLYMARKET_MARKET_NOT_FOUND
+          slug={'slug': 'aec-mlb-tex-cws-2026-08-25', 'tick_size': 0.005, ...}
+
+    This pins the boundary, which is where the shape is actually decided.
+    """
+    from pipeline.execute_portfolio import _venue_ticker_of
+
+    slug = "aec-mlb-tex-cws-2026-08-25"
+    assert _venue_ticker_of(
+        {"venue_ticker": {"slug": slug, "tick_size": 0.005, "minimum_trade_qty": 0.01}}
+    ) == slug
+    # Kalshi's string ticker is untouched.
+    assert _venue_ticker_of({"venue_ticker": "KXMLBGAME-TEXCWS-TEX"}) == "KXMLBGAME-TEXCWS-TEX"
+    assert _venue_ticker_of({}) is None
+    # A dict with no slug is not a contract id. Returning "{}" would be the same
+    # truthy-garbage bug in a smaller costume.
+    assert _venue_ticker_of({"venue_ticker": {"tick_size": 0.005}}) is None
+
+
+def test_the_normalised_ticker_is_a_STRING_as_its_type_claims():
+    """`OrderRequest.venue_ticker` is `str | None`. Storing a dict there worked
+    only because Python does not enforce it, and every reader downstream assumed
+    the annotation."""
+    from pipeline.execute_portfolio import _venue_ticker_of
+
+    got = _venue_ticker_of({"venue_ticker": {"slug": "aec-mlb-tex-cws-2026-08-25"}})
+    assert isinstance(got, str)

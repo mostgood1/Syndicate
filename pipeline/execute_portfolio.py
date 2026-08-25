@@ -42,6 +42,51 @@ def execution_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _venue_ticker_of(position: Mapping[str, Any]) -> str | None:
+    """The venue's contract id as a STRING, whatever shape the plan stored.
+
+    --------------------------------------------------------------------------
+    THE DICT IS STRINGIFIED HERE, AND THAT IS WHERE IT WENT WRONG
+    --------------------------------------------------------------------------
+
+    This was `str(position.get("venue_ticker")).strip()`. `venue_scope.py:190`
+    stamps `ticker_resolver(row)` verbatim, and the two venues return different
+    shapes: Kalshi a string ticker, Polymarket a dict
+    `{slug, tick_size, minimum_trade_qty}` -- because `order_body` REFUSES to
+    infer the last two and the resolver is the only thing holding them.
+
+    So a Polymarket position arrived here as a dict and left as the string
+    `"{'slug': 'aec-mlb-tex-cws-2026-08-25', 'tick_size': 0.005, ...}"`, which
+    is TRUTHY, sails past every `if not slug` guard, and is then looked up in
+    the slate as a slug. MEASURED 2026-08-25 15:50:40Z, after the deploy that
+    was supposed to fix this:
+
+        POLYMARKET_MARKET_NOT_FOUND
+          slug={'slug': 'aec-mlb-tex-cws-2026-08-25', 'tick_size': 0.005, ...}
+
+    **The first fix read the dict inside `_polymarket_resolve_market`, which is
+    one layer too late** -- by then `str()` had already run here, and
+    `isinstance(raw_ticker, Mapping)` was False on a string that merely looked
+    like a dict. The log line said so plainly and is the only reason this was
+    caught on the same slate rather than assumed fixed.
+
+    Normalised at the BOUNDARY instead, so `OrderRequest.venue_ticker` holds
+    what its type says: a string. `tick_size` and `minimum_trade_qty` are not
+    carried on the request -- `_polymarket_resolve_market` reads both from the
+    slate row, which is the venue's own current answer and outranks a value
+    captured a refresh earlier.
+    """
+    raw = position.get("venue_ticker")
+    if isinstance(raw, Mapping):
+        # Polymarket. An entry with no slug is not a contract id, and returning
+        # `"{}"` would be the same truthy-garbage bug in a smaller costume.
+        return str(raw.get("slug") or "").strip() or None
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
+
+
 def _order_from_position(position: Mapping[str, Any], selected_date: str, venue: str) -> OrderRequest | None:
     """One committed position -> one order request, or None with nothing placed.
 
@@ -96,9 +141,7 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         # there is no single contract when the price came from an aggregator's
         # best-of-many, which is exactly why the Kalshi adapter refuses without
         # one rather than picking a plausible ticker at submit time.
-        venue_ticker=(str(position.get("venue_ticker")).strip() or None)
-        if position.get("venue_ticker")
-        else None,
+        venue_ticker=_venue_ticker_of(position),
     )
 
 
