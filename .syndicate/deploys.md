@@ -28184,3 +28184,103 @@ service" on a morning with no football played.
   today and not after.
 - `pending=65` on the portfolio book against 97 settled. Still a large ungraded
   tail, now attributable by name rather than pooled.
+
+### 2026-08-25 14:57:34Z — NEAR MISS: THREE ORDERS, TWO FOR THE WRONG GAME
+
+**lane:** portfolio-decision-and-execution
+**fix:** `aa5c43ee8` (deployed `dep-da6r42f10e5c73cij2hg` / `dep-da6r469srm7s73b15fl0`)
+**severity:** would have bought a contract on a DIFFERENT GAME with real money.
+
+#### WHAT THE LEDGER SHOWED
+
+    board row                                        stamped slug
+    totals under 8.5 · Cincinnati Reds @ SF Giants   tsc-mlb-bal-stl-2026-08-25-8pt5
+    h2h home · Texas Rangers @ Chicago White Sox     aec-mlb-pit-sd-2026-08-25
+    h2h home · Texas Rangers @ Chicago White Sox     (kalshi) no_live_price: None
+
+BAL@STL stamped on a CIN@SF row. PIT@SD on a TEX@CWS row.
+
+#### THE CAUSE, and it is one missing field
+
+Both Polymarket resolvers keyed on `(market, player_name, line, side)`.
+**A GAME LINE HAS NO PLAYER.** So every MLB h2h home row on the slate hashed to
+`("h2h", "", None, "home")` and the dict kept whichever game was written last.
+Same for `("totals", "", 8.5, "under")`.
+
+**The JOIN was never wrong.** `join_polymarket_to_board` matches each row through
+`_teams_match` and refuses ambiguity by name. The defect was entirely in
+FLATTENING that per-row result into a key that no longer said which row produced
+it. A correct join followed by a lossy index is indistinguishable, from the
+outside, from a broken join.
+
+#### WHY IT DID NOT SPEND MONEY, STATED HONESTLY
+
+`polymarket_us_orders` raised `market_unresolved_for_position` because the
+SUBMIT-time resolver had been rebuilt from a slate holding fewer matches and had
+no entry for that key. **That is luck, not a guard.** Had it held one, the order
+goes to the venue: right size, right price format, wrong game.
+
+There is no check anywhere between the resolver and the venue that the slug's
+teams match the position's teams. There still isn't — the fix is upstream, in
+the key.
+
+#### THE SAME KEY WAS IN KALSHI, WHICH HAS REAL MONEY ARMED
+
+`kalshi_board_join._match_key` was `(market, player, line, side)` too. It had not
+produced the failure for two reasons, **neither of which is a guard**:
+
+1. its board join currently supplies only PLAYER PROPS, and a player name
+   happens to identify a game;
+2. `float(line)` returns None for an h2h, so moneylines are not indexed at all
+   — which is exactly the third row's `no_live_price: None`.
+
+The **171 Kalshi game series registered the same day** would have removed both
+accidents at once. Fixed rather than left standing.
+
+#### AND A SECOND DEFECT THE FIX SURFACED
+
+`kalshi_price_resolver` built its key INLINE while `kalshi_ticker_resolver`
+called `_match_key` — with a docstring asserting they were the same identity.
+Adding the game moved one and left the other, and a test asking both for the
+same row got a **CIN@SF contract priced at BAL@STL's number**. That is precisely
+the failure `_match_key`'s docstring says the sharing exists to prevent,
+produced by the sharing not actually being shared. Collapsed onto one function.
+
+#### WHY THE TESTS PASSED — THE LESSON
+
+Two tests were NAMED for this property:
+
+    test_the_resolver_is_not_LOOSER_than_the_join
+    test_the_price_resolver_is_keyed_as_tightly_as_the_join
+
+Both varied LINE and SIDE **within a single game** — dimensions already in the
+key. Neither varied the game. And both fixtures carried no `event_id`, so every
+fixture row was the same nameless game and a key that omitted the game LOOKED
+like an identity.
+
+**A test named for an invariant is not a test of that invariant.** These are the
+second and third tests this session whose name asserted more than their body
+(`test_a_sport_with_no_resolver_is_named_not_silent` used soccer as its
+stand-in for "unresolvable" and kept that gap alive for as long as it passed).
+The check that works: *what does this test vary, and is the field I care about
+one of them?*
+
+#### THE RULE
+
+**A venue resolver key must contain the GAME.** `event_id`, exact, on every
+published board row (`layer2_board.py:1825`). Not team names — that needs the
+alias machinery `build_live_gameline_index` refuses for this same reason.
+
+**A record with no `event_id` is NEVER INDEXED.** An empty string rebuilds the
+collision under another spelling. Not indexed means not resolved means no order,
+which is the direction that fails safe.
+
+#### STILL OPEN
+
+- **Kalshi h2h cannot be priced at all** (`float(line)` on a None line). A
+  refusal, not a wrong purchase, so it is safe — but it is why the third order
+  died and it is unfixed.
+- **No teams-match assertion between resolver and venue.** The fix is in the
+  key; a belt-and-braces check at `submit_order` (slug's parsed teams vs the
+  position's) would have caught this class at the last moment and does not
+  exist. Worth adding.
