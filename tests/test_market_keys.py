@@ -50,6 +50,46 @@ class MarketKeyTests(unittest.TestCase):
         self.assertEqual(k("mlb", "outs_recorded"), k("mlb", "Outs Recorded"))
         self.assertEqual(k("mlb", "home runs"), k("mlb", "home_runs"))
 
+    def test_kalshis_own_hits_runs_rbis_wording_resolves(self) -> None:
+        """The exact string production reported refusing, verbatim.
+
+        MEASURED 2026-08-25T20:33:06Z: `GAP series=KXMLBHRR count=136
+        reason=stat_not_in_market_vocabulary detail='hits + runs + RBIs'`. The
+        underscored spellings were already here and did not cover it, so the
+        largest MLB prop family on Kalshi refused every market while the series
+        sat registered -- indistinguishable from a series Kalshi does not list.
+        """
+        self.assertEqual(k("mlb", "hits + runs + RBIs"), "batter_hits_runs_rbis")
+
+    def test_the_near_spellings_of_hits_runs_rbis_resolve_too(self) -> None:
+        """Widening cannot mismap -- no other baseball market means this -- and
+        adding only the one wording we happened to see is what left
+        `player_threes` refusing."""
+        for spelling in (
+            "hits + runs + rbi",
+            "hits+runs+rbis",
+            "hits runs rbis",
+            "H+R+RBI",
+            "HRR",
+            "hits_runs_rbis",
+        ):
+            with self.subTest(spelling=spelling):
+                self.assertEqual(k("mlb", spelling), "batter_hits_runs_rbis")
+
+    def test_stolen_bases_resolves_to_the_key_this_repo_already_uses(self) -> None:
+        """`batter_stolen_bases` is not invented here: `test_mlb_ladders_build`
+        keeps it in `known_unfed`, i.e. the sim models it and nothing prices
+        it. `KXMLBSB` is that price source."""
+        self.assertEqual(k("mlb", "stolen bases"), "batter_stolen_bases")
+        self.assertEqual(k("mlb", "Stolen Bases"), "batter_stolen_bases")
+        self.assertEqual(k("mlb", "stolen_bases"), "batter_stolen_bases")
+
+    def test_the_new_entries_did_not_leak_into_another_sport(self) -> None:
+        """`_MLB` is per-sport and must stay that way -- a basketball board
+        asking for stolen bases must still get None, not a baseball key."""
+        self.assertIsNone(k("nba", "stolen bases"))
+        self.assertIsNone(k("wnba", "hits + runs + RBIs"))
+
 
 if __name__ == "__main__":
     unittest.main()

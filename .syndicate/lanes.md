@@ -2065,7 +2065,25 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   slug's `<home>`, ~0.0 means `<away>`, **anything between FALSIFIES the
   symmetric-ladder finding and spreads must stay refused.**
 
-### kalshi-oddsapi-coverage-audit — CLOSED 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+### kalshi-oddsapi-coverage-audit — REOPENED 2026-08-25 for the two fixes it found — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+- **REOPENED, same block (one lane, one block).** The audit closed DELIVERED;
+  the user then asked for the two one-line fixes it named to be applied and a
+  PR opened. Scope is exactly those two and their tests -- nothing else in
+  either file.
+- **Files ADDED to this lane for the fix** (checked against `lane-guard`'s OWN
+  `_claims()` over all 144 claims from OPEN lanes, 2026-08-25: all four
+  **UNCLAIMED**, and neither source file changed on `main` since this branch
+  point):
+  `syndicate/features/shared/market_keys.py`,
+  `syndicate/features/shared/kalshi_catalogue.py`,
+  `tests/test_market_keys.py`, `tests/test_kalshi_catalogue.py`.
+  Both source files were last touched by `exchange-market-apis`
+  (session `01Sia2rPD72eFTriy28azzs2`, commit `461ee74be`) which does not list
+  them in its `Files:` block. Changes are strictly additive dictionary entries;
+  reclaim by adding the paths to that lane's `Files:` list at any time.
+- **NOT deployed.** `.py` only, no `render.yaml`, so pushing is free per `#284`.
+  Verification is a production log reading, named below, that whoever deploys
+  should take.
 - **Outcome: DELIVERED.** `docs/ai_context/kalshi_oddsapi_coverage_audit.md`
   + `scripts/audit_kalshi_oddsapi_coverage.py`, commit `4152111e2` on
   `origin/claude/kalshi-oddsapi-coverage-audit`. Verification RAN: every fact

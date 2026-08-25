@@ -1159,3 +1159,68 @@ def test_that_scan_actually_catches_a_reintroduced_reader(tmp_path):
         '    return markets_from_state(payload)\n'
     )
     assert not _kalshi_artifact_offenders(tmp_path)
+def test_kxmlbhrr_classifies_instead_of_refusing_the_stat():
+    """The 136-market refusal, end to end through `classify_market`.
+
+    MEASURED 2026-08-25T20:33:06Z, twelve minutes after the deploy that
+    registered `KXMLBHRR`: every one of its 136 markets came back
+    `stat_not_in_market_vocabulary detail='hits + runs + RBIs'`. Registering a
+    series and being able to READ its markets are two different gates, and
+    asserting only the registry is what let this ship.
+    """
+    from syndicate.features.shared.kalshi_catalogue import classify_market
+
+    verdict = classify_market({
+        "series": "KXMLBHRR",
+        "title": "William Contreras: 5+ hits + runs + RBIs?",
+        "ticker": "KXMLBHRR-26AUG251840MILCHC-MILWCONTRERAS5",
+    })
+
+    assert verdict["status"] == "ok", verdict
+    assert verdict["market"] == "batter_hits_runs_rbis", verdict
+    assert verdict["subject"] == "William Contreras", verdict
+    # "5+" is 4.5, never 5.0 and never 5.5. Matching 5+ against a line of 5.0
+    # finds nothing; matching it against 5.5 finds a DIFFERENT bet and prices
+    # it confidently.
+    assert verdict["line"] == 4.5, verdict
+    assert verdict["side"] == "over", verdict
+
+
+def test_kxmlbsb_registers_and_reads():
+    """`KXMLBSB` was refused at `unmapped_series` -- the FIRST gate, before any
+    title was read -- so its 44 markets were never fetched and the board row
+    reported Kalshi as having no market.
+
+    Asserted through `classify_market` rather than against `SERIES_SPORT`
+    directly, because a registry line whose stat does not resolve just moves
+    the refusal one gate later. That is precisely what `KXMLBHRR` did.
+    """
+    from syndicate.features.shared.kalshi_catalogue import classify_market
+
+    verdict = classify_market({
+        "series": "KXMLBSB",
+        "title": "William Contreras: 1+ stolen bases?",
+        "ticker": "KXMLBSB-26AUG251840MILCHC-MILWCONTRERAS1",
+    })
+
+    assert verdict["status"] == "ok", verdict
+    assert verdict["market"] == "batter_stolen_bases", verdict
+    assert verdict["subject"] == "William Contreras", verdict
+    assert verdict["line"] == 0.5, verdict
+    assert verdict["side"] == "over", verdict
+    # A prop names a human, so it needs no event resolution to be joinable.
+    assert verdict["needs_event_identity"] is False, verdict
+
+
+def test_neither_new_series_is_reported_as_a_coverage_gap_any_more():
+    """`unmapped_series` is the WORK QUEUE. A series that now classifies must
+    leave it, or the queue keeps naming work that is already done and stops
+    being read -- the same reason `SERIES_OUT_OF_SCOPE` exists."""
+    from syndicate.features.shared.kalshi_catalogue import unmapped_series
+
+    gaps = unmapped_series([
+        {"series": "KXMLBHRR", "title": "William Contreras: 5+ hits + runs + RBIs?"},
+        {"series": "KXMLBSB", "title": "William Contreras: 1+ stolen bases?"},
+    ])
+
+    assert gaps == {}, gaps

@@ -54,6 +54,56 @@ _MLB: dict[str, str] = {
     "batter_runs_scored": "batter_runs_scored",
     "hits_runs_rbis": "batter_hits_runs_rbis",
     "batter_hits_runs_rbis": "batter_hits_runs_rbis",
+    # HOW KALSHI ACTUALLY WRITES IT, and the two underscored forms above did
+    # not cover it. MEASURED 2026-08-25T20:33:06Z, on the deploy that had
+    # registered `KXMLBHRR` twelve minutes earlier:
+    #
+    #   GAP series=KXMLBHRR count=136 reason=stat_not_in_market_vocabulary
+    #       detail='hits + runs + RBIs'
+    #       sample='William Contreras: 5+ hits + runs + RBIs?'
+    #
+    # 136 markets -- the LARGEST single MLB prop family on the venue -- and
+    # every one of them refused. This is exactly the failure the `player_threes`
+    # block below already documents: the series title ("Player Hits + Runs +
+    # RBIs") is not what the MARKET titles say, so a registered series whose
+    # markets all refuse is indistinguishable from a series Kalshi does not
+    # list. Registering a series and reading its markets are two different
+    # gates and this one has now cost us twice.
+    #
+    # `_normalize` lowercases and collapses whitespace but does NOT strip `+`,
+    # so the spaced and unspaced forms are different keys and both are listed.
+    # WIDENING CANNOT MISMAP: no other baseball market means hits+runs+RBIs.
+    # Guessing at Kalshi's exact wording and adding only that is what left
+    # `player_threes` refusing, so the near spellings go in together.
+    "hits + runs + rbis": "batter_hits_runs_rbis",
+    "hits + runs + rbi": "batter_hits_runs_rbis",
+    "hits+runs+rbis": "batter_hits_runs_rbis",
+    "hits+runs+rbi": "batter_hits_runs_rbis",
+    "hits runs rbis": "batter_hits_runs_rbis",
+    "hits runs and rbis": "batter_hits_runs_rbis",
+    "hits, runs and rbis": "batter_hits_runs_rbis",
+    "hits, runs + rbis": "batter_hits_runs_rbis",
+    "h+r+rbi": "batter_hits_runs_rbis",
+    "hrr": "batter_hits_runs_rbis",
+    # ------------------------------------------------------------------
+    # STOLEN BASES. `KXMLBSB` is registered in `kalshi_catalogue` alongside
+    # this entry; without the entry the series would register and then refuse
+    # every market, which is the KXMLBHRR failure directly above.
+    #
+    #   GAP series=KXMLBSB count=44 reason=unmapped_series
+    #       sample='William Contreras: 1+ stolen bases?'
+    #                                   [2026-08-25T20:33:06Z]
+    #
+    # `batter_stolen_bases` is NOT invented here -- it is the key this repo
+    # already uses (`tests/test_bet_status_mlb_gamepk.py` resolves an order on
+    # it). `tests/test_mlb_ladders_build.py` lists it in `known_unfed`: the MLB
+    # sim carries the market and nothing feeds it a price. This gives it one.
+    # ------------------------------------------------------------------
+    "stolen_bases": "batter_stolen_bases",
+    "stolen bases": "batter_stolen_bases",
+    "stolen base": "batter_stolen_bases",
+    "sb": "batter_stolen_bases",
+    "batter_stolen_bases": "batter_stolen_bases",
     "strikeouts": "strikeouts",
     "pitcher_strikeouts": "strikeouts",
     "outs": "outs",

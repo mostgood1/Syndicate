@@ -1,8 +1,11 @@
 # Kalshi vs. OddsAPI — coverage audit
 
 > **Lane:** `kalshi-oddsapi-coverage-audit` · **Branch:** `claude/kalshi-oddsapi-coverage-audit`
-> **Read-only audit.** Nothing was deployed, no `render.yaml` was touched, no
-> execution or pricing code was changed.
+> **Audit first, then two fixes it found.** Nothing was deployed and no
+> `render.yaml` was touched. The census (§1–§10) was taken read-only; §11
+> records the two additive vocabulary/registry entries applied afterwards **at
+> the user's request**, which change what a market is CALLED and nothing about
+> how it is priced or executed.
 >
 > **Every FACT row below was OBSERVED in a production log line, and the line's
 > timestamp is beside it.** Anything not observed is in
@@ -595,8 +598,8 @@ carries the slug, so that is what is given.
 
 | # | series | markets | gate | what it costs to fix | URL |
 |---|---|---|---|---|---|
-| 1 | `KXMLBHRR` | **136** | 4 `stat_not_in_market_vocabulary` — `detail="hits + runs + RBIs"` | **one `market_keys._MLB` line** | https://kalshi.com/markets/kxmlbhrr |
-| 2 | `KXMLBSB` | **44** | 1 `unmapped_series` | one `SERIES_SPORT` line + `"stolen bases": "batter_stolen_bases"` | https://kalshi.com/markets/kxmlbsb |
+| 1 | `KXMLBHRR` | **136** | 4 `stat_not_in_market_vocabulary` — `detail="hits + runs + RBIs"` | ✅ **FIXED, not yet deployed** — `market_keys._MLB` | https://kalshi.com/markets/kxmlbhrr |
+| 2 | `KXMLBSB` | **44** | 1 `unmapped_series` | ✅ **FIXED, not yet deployed** — `SERIES_SPORT` + `"stolen bases"` | https://kalshi.com/markets/kxmlbsb |
 | 3 | `KXNCAAFSPREAD` | **1994 listed, 400 seen** | 2c working-set cap | raise `MAX_MARKETS_PER_SERIES`, or select rungs near the line instead of `[:400]` | https://kalshi.com/markets/kxncaafspread |
 | 4 | `KXNFLSPREAD` | **795 listed, 400 seen** | 2c | same | https://kalshi.com/markets/kxnflspread |
 | 5 | `KXMLBINNINGTOTAL` | **306** | 3 `unreadable_title` | a grammar for `"<N>th inning: Over <L> runs"` **and** a board key for a single-inning total (none exists today) | https://kalshi.com/markets/kxmlbinningtotal |
@@ -624,10 +627,21 @@ carries the slug, so that is what is given.
 | 27 | `KXWNBAH2HPRA` | catalogue-only | 1 `unmapped_series` | a head-to-head-player grammar | https://kalshi.com/markets/kxwnbah2hpra |
 | 28 | `KXNCAAFTEAMTOTAL` `KXNCAAF4QBTTS` | catalogue-only | 1/3 | registry + BTTS grammar | https://kalshi.com/markets/kxncaafteamtotal |
 
-**The two rows worth doing tonight are #1 and #2** — together **180 live
-markets**, both one-line changes, both in files that already hold the right
-shape, and #1 is a series we registered *today* whose every market still
-refuses.
+**Rows #1 and #2 are DONE IN CODE** — together **180 live markets**, both
+strictly additive dictionary entries, with regression tests that assert through
+`classify_market` end to end rather than against the registry (a registry line
+whose stat does not resolve just moves the refusal one gate later, which is
+exactly what `KXMLBHRR` did). Verified locally:
+
+```
+KXMLBHRR  'William Contreras: 5+ hits + runs + RBIs?'
+          -> ok  batter_hits_runs_rbis  line 4.5  side over
+KXMLBSB   'William Contreras: 1+ stolen bases?'
+          -> ok  batter_stolen_bases    line 0.5  side over
+```
+
+**NOT YET DEPLOYED**, and that distinction is the whole point of this document
+— see §11 for the reading that will confirm it in production.
 
 ---
 
@@ -639,8 +653,8 @@ exercise. Each says exactly what would confirm it.
 
 | suspicion | why it is plausible | what would confirm it |
 |---|---|---|
-| **NHL game lines exist** (`KXNHLGAME`, `KXNHLTOTAL`, `KXNHLSPREAD`) | `market_keys._GAME_CORE`'s comment records `KXNHLGAME` "NHL Game" from a live catalogue read 2026-08-24, but **this audit did not observe any of the three**. NHL is out of season. | a kalshi.com page once the season starts, or a `KALSHI_SPORT NHL` line naming them |
-| **NCAAB game lines are seasonal, not absent** | `KXNCAABGAME`/`KXNCAABBGAME`/`KXNCAABBSPREAD` are in the fetch list at **0 markets** — registered and empty, which is exactly what off-season looks like | non-zero counts in `TICK this_tick` in November |
+| **NHL game lines exist** (`KXNHLGAME`, `KXNHLTOTAL`, `KXNHLSPREAD`) | `market_keys._GAME_CORE`'s comment records `KXNHLGAME` "NHL Game" from a live catalogue read 2026-08-24, but **this audit did not observe any of the three**. NHL is out of season (**user-confirmed 2026-08-25**). | a kalshi.com page once the season starts, or a `KALSHI_SPORT NHL` line naming them |
+| **NCAAB game lines are seasonal, not absent** | `KXNCAABGAME`/`KXNCAABBGAME`/`KXNCAABBSPREAD` are in the fetch list at **0 markets** — registered and empty, which is exactly what off-season looks like; NCAAB is out of season (**user-confirmed 2026-08-25**) | non-zero counts in `TICK this_tick` in November |
 | **NCAAF player props** | OddsAPI carries the full 9-market football set for NCAAF; Kalshi carries NFL props (`KXNFLPASSTDS`, `KXNFLREC`) | any `KXNCAAF*` series with a *"Player <stat>"* title, in `SERIES_UNREGISTERED` or on a market page |
 | **MLB props beyond the 9 registered** — runs scored, batter strikeouts, doubles | OddsAPI requests `batter_runs_scored` and `batter_strikeouts`; `market_keys._MLB` already resolves `runs_scored` | a `GAP` row naming e.g. `KXMLBRUNS`. **Do not add a registry line from this guess** — that is the invented-ticker trap |
 | **Soccer beyond La Liga/MLS/EPL** on the modelled 10 (Bundesliga, Serie A, Ligue 1, Eredivisie, Primeira Liga, Belgian Pro League) | La Liga, EPL and MLS series are all confirmed listed; Kalshi runs dozens of competitions | a `GAP`/`SERIES` line, or a market page. The title-prefix fix means **any of these registers with no deploy the moment Kalshi lists it** |
@@ -655,16 +669,18 @@ off-season sport that is the expected reading.
 
 ## 9. Recommendations, cheapest first
 
-Every one is **log-only or one line**. None was applied — this lane is
-read-only, and `pipeline/kalshi_discovery.py` is being actively edited today by
+Every one is **log-only or one line**. **#1 and #3 are applied** (§11); the
+rest are not. #5 in particular is deliberately left: it is inert without a
+deploy, and `pipeline/kalshi_discovery.py` is being edited today by
 `exchange-market-apis` (session `01Sia2rPD72eFTriy28azzs2`).
 
-1. **`market_keys._MLB` += `"hits + runs + rbis": "batter_hits_runs_rbis"`.**
-   136 live markets, measured 20:33:06Z. One line.
+1. ✅ **APPLIED (§11).** `market_keys._MLB` += the `hits + runs + RBIs`
+   spellings. 136 live markets, measured 20:33:06Z.
 2. **`market_keys._BY_SPORT` += `"ncaab": _BASKETBALL`** and an `"nhl"` map.
    Without them, no NCAAB or NHL prop series can *ever* auto-register — the
    identical defect this file's own header documents for NFL.
-3. **Register `KXMLBSB`** + `"stolen bases": "batter_stolen_bases"`. 44 markets.
+3. ✅ **APPLIED (§11).** Registered `KXMLBSB` + `"stolen bases":
+   "batter_stolen_bases"`. 44 markets.
 4. **Make `unparsed_by_family` name the SERIES.** In `venue_daily_odds`
    (line 336) an unparsed row's `family` is the refusal REASON, so
    `DAILY_BOOK` reads `unparsed={'unreadable_title': 2476}` — the gate without
@@ -695,7 +711,18 @@ read-only, and `pipeline/kalshi_discovery.py` is being actively edited today by
   counts *series*, not markets, and cannot see soccer.
 - **Two SHAs.** Readings before 20:20:57Z describe the pre-fix system.
 - **Off-season sports are not measurable today** — NHL, NCAAB, NBA and (mostly)
-  NFL. Their "❌"s are *"we did not observe it"*.
+  NFL. Their "❌"s are *"we did not observe it"*. **The user confirmed on
+  2026-08-25 that NBA, NHL and NCAAB are all out of season**, which upgrades
+  this from an inference off the market counts to a stated fact — and it is the
+  right reading of `KXNBAGAME`=6, `KXNCAABGAME`=0 and NHL's game-line series
+  being absent from the fetch list entirely. **None of those is evidence about
+  Kalshi's coverage.** Re-run this audit in-season before drawing any
+  conclusion about the three.
+- **One gap the off-season does NOT explain, and this is the important one:**
+  the NHL and NCAAB prop-vocabulary absence (§3.4, §3.7) is a property of
+  `market_keys._BY_SPORT`, not of the calendar. It will still be there on
+  opening night, and it will present as *"Kalshi lists no NHL props"* — which
+  will be false.
 - **No claim here is that a market family is absent from Kalshi.**
 
 ### To regenerate
@@ -705,3 +732,70 @@ that produced every table, so a later reader re-derives rather than trusts
 this snapshot. It makes **no** network call of its own — direct HTTP to Kalshi
 and to the live service is blocked from these sandboxes, which is why the
 Render MCP log reads are the method.
+
+---
+
+## 11. The two fixes: what shipped, and the reading that confirms them
+
+**Applied 2026-08-25 on `claude/kalshi-oddsapi-coverage-audit`. `.py` only — no
+`render.yaml` — so pushing is free per `#284`. NOT DEPLOYED.**
+
+| file | change |
+|---|---|
+| `market_keys.py` | `_MLB` += ten `hits + runs + RBIs` spellings and five `stolen bases` spellings |
+| `kalshi_catalogue.py` | `SERIES_SPORT` += `"KXMLBSB": "mlb"` |
+| `tests/test_market_keys.py` | +4 tests, incl. one that the new entries did **not** leak into another sport |
+| `tests/test_kalshi_catalogue.py` | +3 tests, asserting through `classify_market` and `unmapped_series` |
+
+**Both are strictly additive dictionary entries.** Nothing was removed or
+re-pointed, so no existing join can change meaning.
+
+**Why the near spellings went in together rather than only the one string
+production reported.** `market_keys`' own `player_threes` block says it: adding
+only the wording we happened to see is what left `KXWNBA3PT` refusing every
+market while its series sat registered. Widening a vocabulary that already
+resolves the stat cannot mismap anything — **no other baseball market means
+hits+runs+RBIs, and none means stolen bases** — while guessing narrowly has now
+cost this integration twice. A test pins that the widening stayed inside `_MLB`
+(`k("nba", "stolen bases")` must still be `None`).
+
+**Tests: 66 passed** across the two suites, and **315 passed** across the wider
+Kalshi/venue surface (`kalshi_catalogue`, `market_keys`, `kalshi_board_join`,
+`kalshi_client`, `kalshi_board`, `kalshi_discovery_names`, `kalshi_odds_cadence`,
+`kalshi_orders`, `kalshi_polymarket_arb`, `venue_daily_odds`,
+`venue_quote_adapters`).
+
+`tests/test_kalshi_auth.py` fails in this container (6 failed, 7 errors) on
+`ModuleNotFoundError: No module named '_cffi_backend'` — a missing
+`cryptography` binary dependency. **Verified pre-existing**: the identical
+failure set reproduces with these changes stashed. It is unrelated to this
+change and is not claimed as passing.
+
+### THE VERIFICATION THAT ACTUALLY COUNTS — for whoever deploys
+
+Not the test suite. **The refusal must move or disappear in production**, and
+these are the exact readings:
+
+1. **`KXMLBHRR` leaves the gap queue.** `[kalshi_discovery] GAP
+   series=KXMLBHRR` must **stop appearing**. Today it reads
+   `count=136 reason=stat_not_in_market_vocabulary detail='hits + runs + RBIs'`.
+   A count that merely drops is a slate change, not a fix — the line must go.
+2. **`KXMLBSB` enters the fetch list.** `[kalshi_odds] TICK` `this_tick` must
+   carry a `'KXMLBSB': (<n>, 'series_filter')` entry, and `series_wanted` must
+   rise **193 → 194**. This is the gate-1 → gate-2 transition and it is
+   the half that cannot be seen any other way.
+3. **Both reach the board.** `[kalshi_odds] DAILY_BOOK` `parsed` should rise by
+   roughly 180 against an unchanged `listed`, since these markets were already
+   being captured and merely could not be named.
+
+**What would falsify the fix rather than confirm it:** `KXMLBSB` appearing in
+`GAP` with `reason=stat_not_in_market_vocabulary` instead of
+`unmapped_series`. That means the registry line landed and the vocabulary line
+did not — the refusal moved one gate later and nothing is priceable. It is
+precisely what `KXMLBHRR` did, which is why both halves shipped together and
+why the tests assert through `classify_market` rather than against
+`SERIES_SPORT`.
+
+**Neither fix touches the join**, so `matched` is not expected to move on its
+own. `unreadable_title` at 62% of the working set (§5) is untouched and remains
+the largest single lever in the system.

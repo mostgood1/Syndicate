@@ -178,6 +178,18 @@ SERIES_SPORT: dict[str, str] = {
     # Seen in a production `KALSHI_SPORT MLB` catalogue read rather than on a
     # market page, so it is evidence of the same kind: the venue lists it.
     "KXMLBHA": "mlb",
+    # seen 2026-08-25T20:33:06Z, `[kalshi_discovery] GAP series=KXMLBSB
+    # count=44 reason=unmapped_series sample='William Contreras: 1+ stolen
+    # bases?'` -- 44 markets refused at the FIRST gate, before any title was
+    # read. `market_keys` gained `stolen bases -> batter_stolen_bases` in the
+    # same change; registering a series whose stat does not resolve just moves
+    # the refusal one gate later, which is what `KXMLBHRR` did.
+    #
+    # WORTH MORE THAN THE COUNT SUGGESTS: `tests/test_mlb_ladders_build.py`
+    # keeps `batter_stolen_bases` in `known_unfed` -- the MLB sim already
+    # models this market and no feed prices it. This is the first price source
+    # it has had.
+    "KXMLBSB": "mlb",
     "KXMLBTOTAL": "mlb",
     "KXNBATOTAL": "nba",
     "KXNFLTOTAL": "nfl",
