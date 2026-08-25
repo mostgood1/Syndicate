@@ -262,7 +262,10 @@ that it is a guess, and it is carried in
 
 **But there is a real, structural gap independent of the season:**
 
-> `market_keys._BY_SPORT` has **no `nhl` entry.** It maps
+> ✅ **FIXED in §11b (not yet deployed).** Kept in full below because the
+> mechanism is the reusable lesson, not the line.
+>
+> `market_keys._BY_SPORT` **had no `nhl` entry.** It mapped
 > `mlb / nba / wnba / nfl / ncaaf / soccer` and nothing else. So
 > `canonical_market_key("nhl", <any stat>)` can only ever return a `_GAME`
 > word or a passthrough — and `auto_series_from_catalogue` **requires** that
@@ -337,16 +340,18 @@ off-season (season starts November).
 | regular season | `KXNCAABBREG` 0 | ✅ discovered | — | ❌ |
 | conference / tourney futures | `KXNCAABBIGTEN` `KXNCAABBIG10` `KXNCAABACC` `KXNCAABBCONF` `KXNCAABBFINAL` `KXNCAABBPLAYOFFS` `KXTEAMSINNCAABBWS` `KXNCAABMENTION` `KXNCAABASEBALL` | mostly ❌ gate 1 | — | ❌ |
 
-**Structural gap, same class as NHL:** `market_keys._BY_SPORT` has **no
-`ncaab` entry** either. `_TOTAL_UNIT` *does* carry `ncaab` (so game totals
-resolve), but `canonical_market_key("ncaab", "points")` returns `None`, so
-**no NCAAB player-prop series can auto-register** when the season starts.
-One line — `"ncaab": _BASKETBALL` — would close it, exactly as `ncaaf` already
-reuses `_FOOTBALL`.
+**Structural gap, same class as NHL — ✅ FIXED in §11b (not yet deployed).**
+`market_keys._BY_SPORT` **had no `ncaab` entry** either. `_TOTAL_UNIT` *does*
+carry `ncaab` (so game totals resolved), but `canonical_market_key("ncaab",
+"points")` returned `None`, so **no NCAAB player-prop series could
+auto-register** when the season starts. One line — `"ncaab": _BASKETBALL` —
+closed it, exactly as `ncaaf` already reuses `_FOOTBALL`.
 
 ⚠️ **`KXNCAABASEBALL` is NCAA *baseball*, not basketball** — it matches the
-`NCAAB` token by coincidence. Registering it under `ncaab` would price
-baseball off a basketball model. It is currently refused, which is correct.
+`NCAAB` token by coincidence. Registering it under `ncaab` would price baseball
+off a basketball model. It is refused, which is correct — **and the `ncaab`
+alias in §11b makes this series reach the basketball map for the first time**,
+so the refusal is now pinned by a test rather than holding by accident.
 
 ### 3.8 Soccer — an entire namespace, and it moved during this audit
 
@@ -622,8 +627,9 @@ carries the slug, so that is what is given.
 | 22 | `KXSVKCUPSPREAD` / `KXSVKCUPTOTAL` | 2 each | 1 — competition not modelled | same as #6 | https://kalshi.com/markets/kxsvkcupspread |
 | 23 | `KXSAUDIPLTOTAL` | 1 | 1 — competition not modelled | same as #6 | https://kalshi.com/markets/kxsaudipltotal |
 | 24 | `KXNFLFFH2HSEASON` | 2 | 1 `unmapped_series` | fantasy-points H2H has no board shape | https://kalshi.com/markets/kxnflffh2hseason |
-| 25 | **`KXNHLSAVES` `KXNHLANYGOAL` `KXNHLPTS`** | catalogue-only (off-season) | 1 — **`_BY_SPORT` has no `nhl` key**, so no NHL prop can EVER register | `"nhl": {...}` in `market_keys._BY_SPORT` | https://kalshi.com/markets/kxnhlsaves |
-| 26 | **all NCAAB player props** | none listed yet (off-season) | 1 — **`_BY_SPORT` has no `ncaab` key** | one line: `"ncaab": _BASKETBALL` | — |
+| 25 | **`KXNHLSAVES` `KXNHLPTS`** | catalogue-only (off-season) | 1 — `_BY_SPORT` had no `nhl` key | ✅ **FIXED, not yet deployed** — new `_HOCKEY` map | https://kalshi.com/markets/kxnhlsaves |
+| 25b | **`KXNHLANYGOAL`** | catalogue-only | 1 — **title never observed** | ⚠️ **deliberately still refused** — see §11 | https://kalshi.com/markets/kxnhlanygoal |
+| 26 | **all NCAAB player props** | none listed yet (off-season) | 1 — `_BY_SPORT` had no `ncaab` key | ✅ **FIXED, not yet deployed** — `"ncaab": _BASKETBALL` | — |
 | 27 | `KXWNBAH2HPRA` | catalogue-only | 1 `unmapped_series` | a head-to-head-player grammar | https://kalshi.com/markets/kxwnbah2hpra |
 | 28 | `KXNCAAFTEAMTOTAL` `KXNCAAF4QBTTS` | catalogue-only | 1/3 | registry + BTTS grammar | https://kalshi.com/markets/kxncaafteamtotal |
 
@@ -676,9 +682,10 @@ deploy, and `pipeline/kalshi_discovery.py` is being edited today by
 
 1. ✅ **APPLIED (§11).** `market_keys._MLB` += the `hits + runs + RBIs`
    spellings. 136 live markets, measured 20:33:06Z.
-2. **`market_keys._BY_SPORT` += `"ncaab": _BASKETBALL`** and an `"nhl"` map.
-   Without them, no NCAAB or NHL prop series can *ever* auto-register — the
-   identical defect this file's own header documents for NFL.
+2. ✅ **APPLIED (§11).** `market_keys._BY_SPORT` += `"ncaab": _BASKETBALL`
+   and a new `_HOCKEY` map. Without them, no NCAAB or NHL prop series could
+   *ever* auto-register — the identical defect this file's own header
+   documents for NFL.
 3. ✅ **APPLIED (§11).** Registered `KXMLBSB` + `"stolen bases":
    "batter_stolen_bases"`. 44 markets.
 4. **Make `unparsed_by_family` name the SERIES.** In `venue_daily_odds`
@@ -735,17 +742,22 @@ Render MCP log reads are the method.
 
 ---
 
-## 11. The two fixes: what shipped, and the reading that confirms them
+## 11. What shipped, and the reading that confirms it
 
-**Applied 2026-08-25 on `claude/kalshi-oddsapi-coverage-audit`. `.py` only — no
-`render.yaml` — so pushing is free per `#284`. NOT DEPLOYED.**
+**Applied 2026-08-25 on `claude/kalshi-oddsapi-coverage-audit` (PR #66). `.py`
+only — no `render.yaml` — so pushing is free per `#284`. NOT DEPLOYED.**
+
+Two live-market fixes (§11a) and two structural ones (§11b).
 
 | file | change |
 |---|---|
 | `market_keys.py` | `_MLB` += ten `hits + runs + RBIs` spellings and five `stolen bases` spellings |
+| `market_keys.py` | new `_HOCKEY` map; `_BY_SPORT` += `"nhl": _HOCKEY` and `"ncaab": _BASKETBALL` |
 | `kalshi_catalogue.py` | `SERIES_SPORT` += `"KXMLBSB": "mlb"` |
-| `tests/test_market_keys.py` | +4 tests, incl. one that the new entries did **not** leak into another sport |
-| `tests/test_kalshi_catalogue.py` | +3 tests, asserting through `classify_market` and `unmapped_series` |
+| `tests/test_market_keys.py` | +9 tests |
+| `tests/test_kalshi_catalogue.py` | +6 tests, asserting through `classify_market`, `unmapped_series` and `auto_series_from_catalogue` |
+
+### 11a. The two live-market fixes — 180 markets
 
 **Both are strictly additive dictionary entries.** Nothing was removed or
 re-pointed, so no existing join can change meaning.
@@ -759,17 +771,75 @@ hits+runs+RBIs, and none means stolen bases** — while guessing narrowly has no
 cost this integration twice. A test pins that the widening stayed inside `_MLB`
 (`k("nba", "stolen bases")` must still be `None`).
 
-**Tests: 66 passed** across the two suites, and **315 passed** across the wider
-Kalshi/venue surface (`kalshi_catalogue`, `market_keys`, `kalshi_board_join`,
-`kalshi_client`, `kalshi_board`, `kalshi_discovery_names`, `kalshi_odds_cadence`,
-`kalshi_orders`, `kalshi_polymarket_arb`, `venue_daily_odds`,
-`venue_quote_adapters`).
+**Tests: 74 passed** across the two suites, **328 passed** across the wider
+Kalshi/venue surface, and **176 passed** across every other consumer of
+`canonical_market_key` (`evaluation_settlement`, `game_line_bet`, `bet_status*`,
+`live_projection_market_key`, `opportunity_*`) — that last sweep matters because
+adding `nhl` and `ncaab` **changes what those sports resolve to**, from `None`
+to a real key, and a behaviour change is not proved safe by the suite that
+tests it.
 
 `tests/test_kalshi_auth.py` fails in this container (6 failed, 7 errors) on
 `ModuleNotFoundError: No module named '_cffi_backend'` — a missing
 `cryptography` binary dependency. **Verified pre-existing**: the identical
 failure set reproduces with these changes stashed. It is unrelated to this
 change and is not claimed as passing.
+
+### 11b. The two structural fixes — NHL and NCAAB prop vocabulary
+
+`_BY_SPORT` mapped `mlb / nba / wnba / nfl / ncaaf / soccer` and nothing else,
+and `auto_series_from_catalogue` refuses to register a prop series unless
+`canonical_market_key(sport, stat)` resolves first. **So no NHL and no NCAAB
+player prop could ever auto-register** — the identical mechanism that held
+football at `KALSHI_SPORT NFL ticker_substring_n=317 classified_n=0` until
+`_FOOTBALL` was written.
+
+`_TOTAL_UNIT` already carried both, so a **game total resolved while every
+player prop refused**. That asymmetry is what made it read as coverage rather
+than as an absence, and it is why the gap survived until this audit.
+
+**NCAAB is one line**, `"ncaab": _BASKETBALL`, exactly as `ncaaf` already reuses
+`_FOOTBALL` — the stats are identical and only the rosters differ.
+
+**NHL needed a real map, and its values are not invented here.** They are the
+keys this repo's own vendored module already requests and parses
+(`vendor/nhl_betting_repo/nhl_betting/data/player_props.py`), whose comment
+calls them *"confirmed by provider docs and our live probes"* and warns that an
+unsupported key 422s the request: `player_points`, `player_assists`,
+`player_goals`, `player_shots_on_goal`, plus `player_saves` and
+`player_blocked_shots` from the map it parses arrivals with.
+
+**Verified through discovery, not the table:**
+
+```
+KXNHLSAVES  'NHL Player Saves'                    -> registers nhl
+KXNHLPTS    'NHL Player Points'                   -> registers nhl
+KXNCAABPTS  'College Basketball Player Points'    -> registers ncaab
+KXNCAABREB  'College Basketball Player Rebounds'  -> registers ncaab
+```
+
+**Two things are deliberately still refused, and each has a test:**
+
+- **`KXNCAABASEBALL` — NCAA *baseball*, and it contains the string `NCAAB`.**
+  Observed in the catalogue 20:21:24Z. Aliasing `ncaab` makes this series reach
+  the basketball map **for the first time**, so the refusal is asserted rather
+  than assumed: baseball stats appear nowhere in `_BASKETBALL`, so it still
+  refuses instead of pricing a baseball prop off a basketball model. Same class
+  of error as `KXWNBAREB` reading as NBA.
+- **`KXNHLANYGOAL` — a ticker we have seen and a title we have not.** Whether
+  it is a player prop or a team market (*"will any goal be scored"*) is
+  unknown, and this repo carries **two different spellings** of that key —
+  `player_goal_scorer_anytime` in `_SOCCER`, `player_anytime_goal_scorer` in
+  `test_layer2_excluded_markets`. Guessing between them on an unread title is
+  how a bet gets priced as a different bet. Refusing sends the series to the
+  `COVERAGE_GAPS` queue **by name with its real title**, which is how the title
+  gets read instead of invented.
+
+**These two cannot be confirmed against a live market until the seasons start**
+— NBA, NHL and NCAAB are all out of season (user-confirmed 2026-08-25).
+Registering the vocabulary now is still right: without it those series cannot
+even reach the work queue by name on opening night. They would present as
+*"Kalshi lists no NHL props"*, which is false.
 
 ### THE VERIFICATION THAT ACTUALLY COUNTS — for whoever deploys
 
@@ -796,6 +866,14 @@ precisely what `KXMLBHRR` did, which is why both halves shipped together and
 why the tests assert through `classify_market` rather than against
 `SERIES_SPORT`.
 
-**Neither fix touches the join**, so `matched` is not expected to move on its
+**No fix here touches the join**, so `matched` is not expected to move on its
 own. `unreadable_title` at 62% of the working set (§5) is untouched and remains
 the largest single lever in the system.
+
+**The NHL/NCAAB fixes have no observable effect until those seasons start**, by
+construction. Their verification is deferred, not skipped: on opening night,
+`AUTO_SERIES` `prop_series` should rise above 17 and `KXNHLSAVES`/`KXNHLPTS`
+should appear in `TICK this_tick`. If instead they appear in `GAP` with
+`reason=stat_not_in_market_vocabulary`, the map is right and the *wording* is
+wrong — and the `detail=` field will carry Kalshi's actual stat text verbatim,
+which is the whole point of that refusal being named.

@@ -84,6 +84,69 @@ class MarketKeyTests(unittest.TestCase):
         self.assertEqual(k("mlb", "Stolen Bases"), "batter_stolen_bases")
         self.assertEqual(k("mlb", "stolen_bases"), "batter_stolen_bases")
 
+    def test_hockey_resolves_the_stats_kalshi_lists_series_for(self) -> None:
+        """`_BY_SPORT` had no `nhl` key, and `auto_series_from_catalogue`
+        requires this call to resolve before it will register a prop series --
+        so NO NHL prop could ever auto-register, in season or out.
+
+        The values are this repo's own: `vendor/nhl_betting_repo/.../
+        player_props.py` requests player_points/assists/goals/shots_on_goal
+        and its comment calls them "confirmed by provider docs and our live
+        probes".
+        """
+        self.assertEqual(k("nhl", "saves"), "player_saves")
+        self.assertEqual(k("nhl", "points"), "player_points")
+        self.assertEqual(k("nhl", "goals"), "player_goals")
+        self.assertEqual(k("nhl", "assists"), "player_assists")
+        self.assertEqual(k("nhl", "shots on goal"), "player_shots_on_goal")
+        self.assertEqual(k("nhl", "SOG"), "player_shots_on_goal")
+        self.assertEqual(k("nhl", "blocked shots"), "player_blocked_shots")
+
+    def test_hockey_refuses_a_stat_from_another_sport(self) -> None:
+        """None is a real answer. A hockey board asking for hits or rebounds
+        must not acquire a baseball or basketball key."""
+        self.assertIsNone(k("nhl", "rebounds"))
+        self.assertIsNone(k("nhl", "home runs"))
+        self.assertIsNone(k("nhl", "receptions"))
+
+    def test_the_anytime_goal_scorer_market_is_deliberately_not_mapped(self) -> None:
+        """`KXNHLANYGOAL` is a ticker we have SEEN and a title we have NOT.
+
+        Whether it is a player prop or a team market is unknown, and this repo
+        carries two different spellings of that key
+        (`player_goal_scorer_anytime` in `_SOCCER`, `player_anytime_goal_scorer`
+        in `test_layer2_excluded_markets`). Guessing between them on an unread
+        title is how a bet gets priced as a different bet. Refusing sends the
+        series to the COVERAGE_GAPS queue by name, carrying its real title.
+
+        Delete this test the day that title is read -- not before.
+        """
+        self.assertIsNone(k("nhl", "anytime goal scorer"))
+        self.assertIsNone(k("nhl", "goalscorer"))
+
+    def test_ncaab_shares_the_basketball_vocabulary(self) -> None:
+        """Exactly as `ncaaf` shares football's. `_TOTAL_UNIT` already carried
+        `ncaab`, so a college GAME TOTAL resolved while every college PLAYER
+        PROP refused -- which is what made the gap read as coverage."""
+        self.assertEqual(k("ncaab", "points"), "player_points")
+        self.assertEqual(k("ncaab", "rebounds"), "player_rebounds")
+        self.assertEqual(k("ncaab", "assists"), "player_assists")
+        self.assertEqual(k("ncaab", "three pointers made"), "player_threes")
+        self.assertEqual(k("ncaab", "points"), k("nba", "points"))
+
+    def test_ncaab_does_not_price_ncaa_BASEBALL_off_a_basketball_map(self) -> None:
+        """THE ONE REAL COLLISION IN THIS TABLE, and the reason `ncaab` was not
+        simply aliased without checking.
+
+        `sport_for_ticker` matches `NCAAB` as a SUBSTRING, and
+        `KXNCAABASEBALL` -- NCAA *baseball*, observed in the live catalogue
+        2026-08-25T20:21:24Z -- contains it. So a baseball series resolves to
+        sport `ncaab` and reaches the basketball map. It must still refuse.
+        """
+        for baseball_stat in ("home runs", "hits", "RBIs", "strikeouts", "total bases"):
+            with self.subTest(stat=baseball_stat):
+                self.assertIsNone(k("ncaab", baseball_stat))
+
     def test_the_new_entries_did_not_leak_into_another_sport(self) -> None:
         """`_MLB` is per-sport and must stay that way -- a basketball board
         asking for stolen bases must still get None, not a baseball key."""

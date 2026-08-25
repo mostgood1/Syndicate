@@ -451,6 +451,76 @@ _SOCCER: dict[str, str] = {
     "shots on goal": "player_shots_on_goal",
 }
 
+# --------------------------------------------------------------------------
+# HOCKEY, added 2026-08-25.
+#
+# WHY THIS FILE HAD NO `nhl` KEY AND WHY THAT WAS NOT COSMETIC.
+# `auto_series_from_catalogue` registers a prop series only if
+# `canonical_market_key(sport, stat)` resolves first, so a sport ABSENT from
+# `_BY_SPORT` can never discover a player prop however many the venue lists --
+# it is the exact mechanism that held football at `KALSHI_SPORT NFL
+# ticker_substring_n=317 classified_n=0` until `_FOOTBALL` was written.
+#
+# `_TOTAL_UNIT` already carried `nhl`, so GAME TOTALS resolved while every prop
+# refused. That asymmetry is what made it read as coverage rather than as an
+# absence, and it is why the gap survived a whole audit pass.
+#
+# Kalshi lists these today -- observed in the signed catalogue
+# 2026-08-25T20:21:24Z, `[refresh_worker] KALSHI_SPORT NHL n=52`:
+#
+#     KXNHLSAVES   KXNHLPTS   KXNHLANYGOAL   KXNHLPLAYOFFGOALS
+#
+# The NHL season had not started on that date, so this map cannot be verified
+# end to end against a live market until it does. Registering the vocabulary
+# now is still right: without it those series cannot even reach the work queue
+# by name on opening night -- they would present as "Kalshi lists no NHL
+# props", which is false.
+#
+# THE VALUES ARE NOT INVENTED HERE. They are the keys this repo's own vendored
+# NHL module already requests and recognises
+# (`vendor/nhl_betting_repo/nhl_betting/data/player_props.py`), whose comment
+# says they are "confirmed by provider docs and our live probes" and warns that
+# an unsupported key 422s the request. `player_points` / `player_assists` /
+# `player_goals` / `player_shots_on_goal` are the four it requests;
+# `player_saves` and `player_blocked_shots` are in the map it parses arrivals
+# with.
+#
+# DELIBERATELY ABSENT: the anytime-goal-scorer market, which `KXNHLANYGOAL`
+# may or may not be. Its SERIES TITLE has never been observed -- only the
+# ticker -- so whether it is a player prop or a team market ("will any goal be
+# scored") is unknown, and this repo already carries TWO different spellings of
+# that key (`player_goal_scorer_anytime` in `_SOCCER` below,
+# `player_anytime_goal_scorer` in `tests/test_layer2_excluded_markets.py`).
+# Guessing between them on an unread title is how a bet gets priced as a
+# different bet. Left out so the series surfaces in the COVERAGE_GAPS queue BY
+# NAME with its real title, which is the answer this file wants anyway.
+_HOCKEY: dict[str, str] = {
+    "points": "player_points",
+    "pts": "player_points",
+    "player_points": "player_points",
+    "assists": "player_assists",
+    "ast": "player_assists",
+    "player_assists": "player_assists",
+    "goals": "player_goals",
+    "goal": "player_goals",
+    "player_goals": "player_goals",
+    # SOG is the box-score abbreviation and the vendored module's own canonical
+    # name for this market, so both spellings resolve.
+    "shots on goal": "player_shots_on_goal",
+    "shots_on_goal": "player_shots_on_goal",
+    "sog": "player_shots_on_goal",
+    "shots": "player_shots_on_goal",
+    "player_shots_on_goal": "player_shots_on_goal",
+    "saves": "player_saves",
+    "save": "player_saves",
+    "goalie saves": "player_saves",
+    "player_saves": "player_saves",
+    "blocked shots": "player_blocked_shots",
+    "blocks": "player_blocked_shots",
+    "blk": "player_blocked_shots",
+    "player_blocked_shots": "player_blocked_shots",
+}
+
 _BY_SPORT: dict[str, dict[str, str]] = {
     "mlb": _MLB,
     "nba": _BASKETBALL,
@@ -459,6 +529,21 @@ _BY_SPORT: dict[str, dict[str, str]] = {
     # rosters differ, and rosters are not this table's concern.
     "nfl": _FOOTBALL,
     "ncaaf": _FOOTBALL,
+    # NCAAB shares the basketball vocabulary for exactly the reason NCAAF
+    # shares football's, and its absence had exactly the consequence described
+    # on `_HOCKEY` above: `_TOTAL_UNIT` carries `ncaab`, so a college game
+    # total resolved while every college player prop refused.
+    #
+    # SAFE AGAINST THE ONE REAL COLLISION IN THIS TABLE. `sport_for_ticker`
+    # matches `NCAAB` as a SUBSTRING, and `KXNCAABASEBALL` -- NCAA *baseball*,
+    # observed in the catalogue 2026-08-25T20:21:24Z -- contains it. That
+    # series now resolves to sport `ncaab` and reaches this map, where baseball
+    # stats (hits, home runs, RBIs, strikeouts) appear nowhere, so it still
+    # refuses rather than pricing a baseball prop off a basketball model. A
+    # test pins that, because it is the kind of thing that only stays true
+    # while somebody is watching.
+    "ncaab": _BASKETBALL,
+    "nhl": _HOCKEY,
     "soccer": _SOCCER,
 }
 

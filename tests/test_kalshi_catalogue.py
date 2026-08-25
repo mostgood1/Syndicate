@@ -1224,3 +1224,73 @@ def test_neither_new_series_is_reported_as_a_coverage_gap_any_more():
     ])
 
     assert gaps == {}, gaps
+
+
+def test_nhl_and_ncaab_prop_series_can_now_auto_register():
+    """The gate this actually opens, asserted through discovery rather than the
+    vocabulary table.
+
+    `auto_series_from_catalogue` refuses to register a prop series unless
+    `canonical_market_key(sport, stat)` resolves, so a sport absent from
+    `_BY_SPORT` was unreachable no matter how many series Kalshi listed --
+    the mechanism that held NFL at `classified_n=0` before `_FOOTBALL` existed.
+
+    The TITLE SHAPE here is Kalshi's observed pattern from other sports
+    ("Women's Pro Basketball Player Rebounds"), not an observed NHL title --
+    NHL is out of season (user-confirmed 2026-08-25). What this pins is the
+    MECHANISM: given a title of that shape, the sport now resolves where it
+    previously could not.
+    """
+    from syndicate.features.shared.kalshi_catalogue import auto_series_from_catalogue
+
+    found = auto_series_from_catalogue({
+        "KXNHLSAVES": "NHL Player Saves",
+        "KXNHLPTS": "NHL Player Points",
+        "KXNCAABPTS": "College Basketball Player Points",
+        "KXNCAABREB": "College Basketball Player Rebounds",
+    })
+
+    assert found == {
+        "KXNHLSAVES": "nhl",
+        "KXNHLPTS": "nhl",
+        "KXNCAABPTS": "ncaab",
+        "KXNCAABREB": "ncaab",
+    }, found
+
+
+def test_ncaa_baseball_is_still_refused_despite_matching_the_ncaab_token():
+    """`KXNCAABASEBALL` is NCAA BASEBALL and it contains the string `NCAAB`.
+
+    Observed in the live catalogue 2026-08-25T20:21:24Z. Aliasing `ncaab` to
+    the basketball vocabulary makes this series reach that map for the first
+    time, so the refusal has to be asserted rather than assumed -- registering
+    it would price a baseball prop off a basketball model, which is the same
+    class of error as `KXWNBAREB` reading as NBA.
+    """
+    from syndicate.features.shared.kalshi_catalogue import (
+        auto_series_from_catalogue,
+        sport_for_ticker,
+    )
+
+    # The ticker really does resolve to ncaab -- that is the hazard, not a bug.
+    assert sport_for_ticker("KXNCAABASEBALL") == "ncaab"
+
+    found = auto_series_from_catalogue({
+        "KXNCAABASEBALL": "College Baseball Player Home Runs",
+    })
+    assert found == {}, found
+
+
+def test_the_unread_anytime_goal_series_stays_in_the_work_queue():
+    """`KXNHLANYGOAL`: a ticker we have seen, a title we have not.
+
+    It must NOT register off a guessed key. Refusing is what puts it in the
+    COVERAGE_GAPS queue by name, carrying its real title -- which is how the
+    title gets read instead of invented.
+    """
+    from syndicate.features.shared.kalshi_catalogue import auto_series_from_catalogue
+
+    found = auto_series_from_catalogue({
+        "KXNHLANYGOAL": "NHL Player Anytime Goal Scorer",
+    })
+    assert found == {}, found
