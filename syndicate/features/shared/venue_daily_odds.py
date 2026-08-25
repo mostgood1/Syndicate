@@ -85,6 +85,8 @@ __all__ = [
     "in_scope_sports",
     "kalshi_daily_rows",
     "polymarket_daily_rows",
+    "POLYMARKET_LEAGUE_TO_SPORT",
+    "sport_for_polymarket_league",
     "MAX_POINTS_PER_MARKET",
     "MAX_MARKETS_PER_FILE",
 ]
@@ -364,6 +366,63 @@ def kalshi_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str, An
     return out
 
 
+# Polymarket's league TOKEN -> the sport Syndicate models it as.
+#
+# THE SCOPE CHECK WAS COMPARING TWO VOCABULARIES AND NOBODY NOTICED, because
+# five of them collide by coincidence. `in_scope_sports()` returns Syndicate's
+# names (`mlb`, `nfl`, `wnba`, `nba`, `nhl`, `ncaaf`, `ncaab`, `soccer`) and
+# the row carries POLYMARKET's token. The first five match by luck. `cfb` never
+# matches `ncaaf`, and no soccer competition token has ever matched `soccer`.
+#
+# So every one of those markets was counted `skipped_by_sport` -- filed under
+# "a sport Syndicate does not model" -- in sports we model completely.
+# Measured 2026-08-25 5:48 PM Central, one cycle:
+#
+#     'cfb': 555   'lal': 351   'lg1': 216   'epl': 80   'eflch': 36
+#
+# EVERY ENTRY IS CONFIRMED AGAINST A REAL GAME, never against the token
+# resembling a league name:
+#
+#   cfb  user-confirmed 2026-08-25, https://polymarket.us/sports/cfb/
+#        cfb-ncar-tcu-2026-08-29 -- North Carolina at TCU, college football.
+#        The coverage audit had this as an OPEN question (its §9-C): 246
+#        markets seen only as a counter, with no slug ever sampled.
+#   epl  user-confirmed the same day, /sports/epl/epl-cry-mnc-2026-08-28 --
+#        Crystal Palace v Manchester City.
+#   lal/lg1/sea/bun/eflc  confirmed BY THE CLUBS in verbatim slugs in
+#        `polymarket_oddsapi_coverage_audit.md` §6: Alaves v Villarreal,
+#        Lille v PSG, Milan v Venezia, Bayern v Stuttgart, Cardiff v Norwich.
+#
+# THE TOKENS DRIFT, so this is a floor and not a closed list: `eflc` in the
+# audit's own reading became `eflch` hours later, and `lig2`, `csl`, `tdp`,
+# `fibawcq` appeared in between. An unmapped token keeps its own name and
+# stays counted in `skipped_by_sport`, which is the surface the next mapping
+# gets read from -- and `SYNDICATE_VENUE_ODDS_SPORTS` still overrides all of
+# it without a deploy.
+POLYMARKET_LEAGUE_TO_SPORT: dict[str, str] = {
+    "cfb": "ncaaf",
+    "epl": "soccer",
+    "lal": "soccer",
+    "lg1": "soccer",
+    "sea": "soccer",
+    "bun": "soccer",
+    "eflc": "soccer",
+    "eflch": "soccer",
+}
+
+
+def sport_for_polymarket_league(league: Any) -> str | None:
+    """The Syndicate sport for a Polymarket league token, or the token itself.
+
+    Returns the TOKEN unchanged when unmapped, so an unknown competition is
+    still counted by its own name rather than disappearing into a default.
+    """
+    token = str(league or "").strip().lower()
+    if not token:
+        return None
+    return POLYMARKET_LEAGUE_TO_SPORT.get(token, token)
+
+
 def polymarket_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Polymarket markets -> the common row shape, WITHOUT dropping anything.
 
@@ -397,7 +456,15 @@ def polymarket_daily_rows(markets: Sequence[Mapping[str, Any]]) -> list[dict[str
             "event": None if parsed is None else f"{parsed['away']}-{parsed['home']}",
             "raw_title": row.get("question"),
             "game_date": None if parsed is None else parsed["date"],
-            "sport": None if parsed is None else parsed["league"],
+            # THE SYNDICATE SPORT, mapped from Polymarket's league token --
+            # see `POLYMARKET_LEAGUE_TO_SPORT`. Unmapped tokens pass through
+            # unchanged so they stay counted by name.
+            "sport": None if parsed is None else sport_for_polymarket_league(parsed["league"]),
+            # THE VENUE'S OWN TOKEN, kept beside it. Mapping soccer's six
+            # competitions onto one sport is right for the file split and
+            # wrong to do destructively: which competition a market belongs to
+            # is the thing the next mapping is read from.
+            "league": None if parsed is None else parsed["league"],
             "yes": prices[0],
             "no": prices[1],
         })

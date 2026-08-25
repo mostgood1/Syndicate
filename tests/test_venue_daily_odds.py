@@ -408,3 +408,80 @@ def test_appended_zero_is_always_attributable(tmp_path, monkeypatch):
     assert report["appended"] == 1
     # Every row is accounted for by a named counter.
     assert report["skipped_no_id"] + report["unpriced"] + report["appended"] == 3
+
+
+# --------------------------------------------------------------------------
+# The scope check was comparing two vocabularies
+# --------------------------------------------------------------------------
+
+
+def test_polymarkets_league_token_maps_to_the_sport_syndicate_models():
+    """FIVE TOKENS COLLIDE BY COINCIDENCE AND THAT HID THE BUG.
+
+    `in_scope_sports()` returns Syndicate's names (`mlb`, `nfl`, `wnba`, `nba`,
+    `nhl`, `ncaaf`, `ncaab`, `soccer`); the row carries POLYMARKET's league
+    token. The first five match by luck. `cfb` never matches `ncaaf`, and no
+    soccer competition token has ever matched `soccer` -- so those markets were
+    filed under "a sport Syndicate does not model", in sports we model
+    completely.
+
+    Measured 2026-08-25 5:48 PM Central, one cycle:
+
+        'cfb': 555   'lal': 351   'lg1': 216   'epl': 80   'eflch': 36
+
+    Every mapping is confirmed against a REAL GAME, never against the token
+    resembling a league name: `cfb-ncar-tcu-2026-08-29` (North Carolina at
+    TCU) and `epl-cry-mnc-2026-08-28` (Crystal Palace v Man City) are
+    user-confirmed URLs; the other soccer codes are confirmed by the CLUBS in
+    verbatim slugs in the coverage audit's §6.
+    """
+    from syndicate.features.shared.venue_daily_odds import (
+        in_scope_sports,
+        sport_for_polymarket_league,
+    )
+
+    wanted = in_scope_sports()
+    assert sport_for_polymarket_league("cfb") == "ncaaf"
+    assert sport_for_polymarket_league("cfb") in wanted, "555 markets/cycle"
+    for token in ("epl", "lal", "lg1", "sea", "bun", "eflc", "eflch"):
+        assert sport_for_polymarket_league(token) == "soccer", token
+        assert sport_for_polymarket_league(token) in wanted, token
+
+    # The five that already worked must keep working.
+    for token in ("mlb", "nfl", "wnba", "nba", "nhl"):
+        assert sport_for_polymarket_league(token) == token
+
+
+def test_an_unmapped_competition_keeps_its_own_name_and_stays_counted():
+    """THE TOKENS DRIFT, so the map is a floor and not a closed list: `eflc` in
+    the audit's own reading became `eflch` hours later, and `lig2`, `csl`,
+    `tdp` and `fibawcq` appeared in between.
+
+    An unmapped token must pass through UNCHANGED rather than fall to a
+    default. It then fails the scope check and lands in `skipped_by_sport` by
+    its own name -- which is the surface the next mapping gets read from. A
+    default would erase exactly that.
+    """
+    from syndicate.features.shared.venue_daily_odds import (
+        in_scope_sports,
+        sport_for_polymarket_league,
+    )
+
+    for token in ("lig2", "csl", "tdp", "fibawcq", "atp", "cs2"):
+        assert sport_for_polymarket_league(token) == token, token
+        assert sport_for_polymarket_league(token) not in in_scope_sports(), token
+
+
+def test_the_row_keeps_the_venues_league_beside_the_mapped_sport():
+    """Mapping six competitions onto one sport is right for the file split and
+    wrong to do destructively. Which competition a market belongs to is the
+    thing the next mapping -- and any per-league analysis -- is read from."""
+    from syndicate.features.shared.venue_daily_odds import polymarket_daily_rows
+
+    rows = polymarket_daily_rows([{
+        "slug": "astatc-lal-ala-vil-2026-08-28-btts",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+        "outcomePrices": '["0.6","0.4"]',
+    }])
+    assert rows[0]["sport"] == "soccer"
+    assert rows[0]["league"] == "lal"
