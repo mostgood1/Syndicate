@@ -294,6 +294,15 @@ def _count_by_source(quotes) -> dict[str, int]:
     return counts
 
 
+# The venues that quote a LIVE market continuously, and therefore the only
+# sources whose `fetched_at` may stand in for `book_age_seconds` (see gate 3 in
+# `stamp_candidate_freshness`). Named explicitly rather than "anything not
+# oddsapi": an aggregator shard is a periodic capture, not an observation of the
+# market moving, and treating its age as a book clock is precisely the
+# laundering `opportunity_gate` exists to prevent.
+_LIVE_QUOTING_VENUES = frozenset({"kalshi", "polymarket_us"})
+
+
 def stamp_candidate_freshness(candidate: dict[str, Any], quote: Quote | None) -> dict[str, Any]:
     """THE SEAM. Put the quote's age behind the fields the gates read.
 
@@ -342,6 +351,58 @@ def stamp_candidate_freshness(candidate: dict[str, Any], quote: Quote | None) ->
     quote_block = dict(existing) if isinstance(existing, Mapping) else {}
     quote_block["quote_seen_age_seconds"] = quote.age_seconds()
     quote_block["quote_source"] = quote.source
+
+    # GATE 3, AND IT IS THE ONE THAT EMPTIED THE LIVE BOARD.
+    #
+    # `opportunity_gate` reads `book_age_seconds` for a check neither gate above
+    # covers, and its ceiling collapses 96x the moment a game starts:
+    #
+    #     LIVE_MARKET_MAX_AGE_SECONDS    =    900   (15 min, once live)
+    #     PREGAME_MARKET_MAX_AGE_SECONDS = 86,400   (24 hr, before)
+    #
+    # MEASURED 2026-08-25T03:13:38Z, with every other explanation ruled out:
+    #
+    #     mlb  cand=1302 scored=1300 priced=1390 opps=0 lanes={'dead': 1302}
+    #     wnba cand=1225 scored=1225 priced=1247 opps=0 lanes={'dead': 1225}
+    #     nfl  ... lanes={'opportunity': 112, 'watchlist': 226, 'dead': 2304}
+    #
+    #     GAME_STATE_JOIN sport=mlb  chips=25 rows_matched=816 unmatched=None
+    #     GAME_STATE_JOIN sport=wnba chips=5  rows_matched=643 unmatched=None
+    #
+    # The join is HEALTHY -- which is exactly why MLB and WNBA take the
+    # `state == "live"` branch that NFL and soccer never reach, and then fail
+    # its 15-minute clock on an OddsAPI `book_age` measured in hours. 100% of
+    # both sports went dead; the two pregame sports were untouched.
+    #
+    # ONLY FOR A GENUINELY VENUE-PRICED ROW, and that restriction is the whole
+    # safety argument. This function's own docstring says `book_age_seconds` is
+    # deliberately not touched because it answers "has the market MOVED", not
+    # "how old is our observation" -- and blanket-stamping it would defeat the
+    # one check standing between us and a stale price on a live game, which is
+    # the most dangerous row on the board with real money armed.
+    #
+    # What makes it defensible here: this row was just repriced from Kalshi or
+    # Polymarket, venues that quote the live market continuously. For such a row
+    # the venue's own `fetched_at` IS when the market was last observed moving,
+    # so `book_age` and `quote_seen_age` describe the same event and agreeing is
+    # correct rather than laundering.
+    #
+    # NEVER WIDENS. `min()` against any existing value means a book that really
+    # is fresher keeps its number, and a row can only ever get YOUNGER by the
+    # amount the venue actually just observed -- never older, never invented.
+    if quote.source in _LIVE_QUOTING_VENUES:
+        venue_age = quote.age_seconds()
+        existing_age = quote_block.get("book_age_seconds")
+        try:
+            existing_age = float(existing_age) if existing_age is not None else None
+        except (TypeError, ValueError):
+            existing_age = None
+        quote_block["book_age_seconds"] = (
+            venue_age if existing_age is None else min(existing_age, venue_age)
+        )
+        # Named so a reader can tell a venue-refreshed clock from a book's own.
+        quote_block["book_age_source"] = quote.source
+
     stamped["quote"] = quote_block
 
     if quote.venue_ref:
