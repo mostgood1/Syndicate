@@ -27556,3 +27556,191 @@ are service-level so the flag-off change carried through regardless of which
 commit won the race) -- confirmed via absence of any further
 `[kalshi_polymarket_arb]` boot-probe log line on that boot. Deploy claim
 (refresh-worker, token `be62d278e004443f`) released.
+
+### 7. `4ab3b2fee` — `updated_at`. VERIFIED, and it was a NAME not a feed.
+
+**verify:** `VENUE_REPRICE` 2026-08-25T02:28:05Z.
+
+    soccer oddsapi  BEFORE  {'status': 'error', 'reason': 'shard_has_no_timestamp', 'quotes': 0}
+                    AFTER   {'status': 'ok', 'reason': None, 'quotes': 298, 'age_seconds': 30.0}
+
+The shards were present and full the whole time. `shard_has_no_timestamp` is
+reachable only AFTER the payload loads and AFTER `markets` is confirmed
+non-empty -- I carried it as "open, unmeasured" for hours while reading it as a
+missing feed. `_fetched_at` simply never looked for `updated_at`.
+
+### 8. `053d336e8` — OddsAPI was reporting 298 quotes it never had. NOT DEPLOYED.
+
+Immediately after #7 made oddsapi readable, it won ZERO selections with 298
+quotes at 30s age. The entry VALUE holds movement fields (`delta`, `history`,
+`previous_line`) and none of `market`/`side`/`line`/`american`/`probability` --
+all None. Every quote was `quote_key(sport, None, None, None)`: 298 copies of
+`soccer||` carrying no price. `status` read `ok` purely because the list was
+non-empty.
+
+Identity lives in the KEY, and the shapes differ BY SPORT -- soccer keys carry
+`side=`/`book=`, MLB keys carry `bookmaker=` and NO side at all. Parsed now,
+with `no_side_in_key:N` / `no_last_odds:N` counted on a SUCCESSFUL read.
+Committed, tested, **held undeployed at the user's direction**.
+
+### 9. MLB'S DISAPPEARANCE — SOLVED, AND IT WAS NEVER WHAT I SAID.
+
+**verify:** `post_state_filter_pruned`, 02:22:32Z and 02:30:15Z.
+
+    {"mlb": {"Prop already hit -- outcome decided, no longer a live opportunity.": 42,
+             "Prop already missed -- outcome decided, no longer a live opportunity.": 16,
+             "Inactive player state excluded.": 3}}
+
+MLB is KEPT by the manifest gate (`kept=mlb,wnba,nfl,ncaaf,soccer`), holds
+**1,201** odds-history entries for 2026-08-24, and its board contract processes
+10-15 games. Its candidates are pruned because the games are LIVE and the props
+have RESOLVED. That is correct behaviour, and it explains the whole arc: rows
+present at 01:22 pregame, drained by 01:54 as each prop decided.
+
+**THREE THINGS I ASSERTED THAT WERE WRONG, recorded because each cost a
+detour:**
+
+1. **"The 8-24 games are over."** Said twice, from two different weak signals:
+   Polymarket `prices: ["0.0050"]` (actually a one-sided quote,
+   `outcomes_count_mismatch`, not a settled market) and then the declining
+   `mlb:g=` count (actually the build window, not games ending). The user
+   corrected it twice. 6 MLB + 2 WNBA were live throughout.
+2. **"MLB candidate generation is starved."** The zero-candidate trace carried
+   NO sport label; I noted that and then reasoned as though it were
+   established. MLB's shard is full.
+3. **"The BOS@MIA live box is frozen."** Contradicted by this same evidence --
+   the state filter is reading DECIDED outcomes out of that box right now.
+
+**The stale-shared-copy theory was also checked and is dead**: the three shard
+copies do differ (control-plane 152 min older, 863KB smaller), matching the
+2026-08-04 incident, but the loader was already fixed to pick newest-mtime.
+
+### 10. THE REAL OPEN BUG: two components disagree about the same live box.
+
+`post_state_filter` sees 42 MLB props HIT and 16 MISSED. `paper_settlement`
+reports the same slate `not_decided_yet: 12`. **Kalshi has settled the
+Alcantara market**, which agrees with the state filter. One of these reads the
+box correctly and the other does not; the settler is the one out of step, and
+it is the one that grades money.
+
+Not chased -- awaiting direction.
+
+### 11. `beyond_quote_age` IS COVERAGE, NOT MECHANISM.
+
+    LAYER2_SHORTLIST rows=0 considered=4296 beyond_horizon=112
+      beyond_quote_age=4184 sports=[]
+
+4,184 of 4,296 are soccer, and neither venue lists it
+(`no_kalshi_market_classified_to_this_sport`,
+`no_polymarket_row_for_league_soccer`). Nothing can refresh those rows.
+`stamp_candidate_freshness` works where coverage exists -- MLB unmatched fell
+617 -> 76 and Polymarket went 0 -> 28 selections once the key spaces met. The
+lever is venue coverage for soccer, or a third source that can price soccer
+per-side; it is not the ceiling and not the stamping code.
+
+---
+
+## 2026-08-25 ~03:51Z — the live board, end to end. SIX fixes, one chain.
+
+**lane:** portfolio-decision-and-execution
+**final SHA:** `7799abf9c` on BOTH workers (refresh `dep-da6gsi942hec73d2hpo0`,
+live-odds `dep-da6gt4ou01pc7382jmsg`)
+
+### THE RESULT, measured
+
+| | before | after |
+|---|---|---|
+| Polymarket selections | 0 of 237 | 28 |
+| MLB unmatched keys | 617 | 76 |
+| MLB lanes | `{'dead': 1302}` | `{'opportunity': 14}` |
+| WNBA lanes | `{'dead': 1225}` | `{'opportunity': 8}` |
+| Shortlist | `rows=0 sports=[]` | `rows=23 ['mlb','soccer','wnba']` |
+| Polymarket join | `matched=0` | `matched=12` |
+| Kalshi game series | 0 | 171 |
+| OddsAPI | `error: shard_has_no_timestamp` | `ok`, 30s quotes |
+
+### THE ROOT CAUSE, and why it took all night
+
+**The venue reprice ran AFTER the lane gate.** `build_layer2_rows` (line 498)
+applies `opportunity_gate` and returns only SURVIVORS; `apply_venue_quotes`
+(line 634) then repriced that survivor list. A row the gate killed could never
+be rescued. The lane was decided before the venue quote was ever stamped.
+
+Compounded by a gate nobody had counted: `opportunity_gate` reads
+`book_age_seconds`, whose ceiling collapses 96x at first pitch
+(86,400s -> 900s). So every LIVE row was judged on an OddsAPI book clock in
+hours. MLB and WNBA -- the only live sports -- went 100% dead. NFL and soccer
+were untouched, which was the cleanest control available and the thing that
+finally localised it.
+
+`apply_venue_quotes_to_grid` now runs inside the per-sport loop, before the
+gate, on the grid. **Price and age move together or neither moves** -- an
+age-only refresh would be a stale price wearing a fresh timestamp, defeating
+the live-market check rather than passing it, with real money armed.
+
+### THE OTHER FIVE
+
+1. `f32ec00ff` Polymarket adapter filtered by sport (was keying NFL markets as
+   `mlb|h2h|<team>` -- a WRONG price path, latent only because Kalshi was
+   fresher).
+2. `df2047f5f` `kalshi_discovery` called `probe`/`discover`/`KalshiError` and
+   imported none. Nine boots of `NameError` reported as a venue failure.
+3. `3e8856e81` Polymarket side vocabulary: board keys a side by ROLE
+   (`h2h|home`), the venue by CLUB (`h2h|chicago cubs`). Now one resolver
+   decides both halves. Spreads refuse BY NAME pending a measurement of which
+   team a handicap belongs to.
+4. `4ab3b2fee` `_fetched_at` never looked for `updated_at`, the key the shards
+   actually stamp. One missing name took OddsAPI offline for three sports while
+   reporting `error` -- which reads as a feed to chase, not a key to add.
+5. `18569e814` join date fallback + `home`/`away` -> the row's own club.
+
+### WHERE IT STOPS NOW
+
+    PAPER2_PLAN_WRITTEN venue=polymarket rows_in=14 positions=0
+      venue_priced=12  refusals={'no_model_edge_pct': 14}
+
+**The join works and the prices are on the plan.** All 14 rows then refuse for
+want of `model_edge_pct`. Same refusal on novig and prophetx, so it is not
+Polymarket-specific: these are LIVE rows and nothing supplies a live model
+projection for them. That is a different subsystem from anything fixed tonight.
+
+### WHAT I GOT WRONG, and what each cost
+
+Recorded because the pattern is the lesson, not the individual errors.
+
+1. **"The 8-24 games are over."** Said TWICE, from two different weak signals
+   -- Polymarket `prices: ["0.0050"]` (actually a one-sided quote) and a
+   declining `mlb:g=` count (actually the build window). User corrected both.
+2. **"MLB candidate generation is starved."** The zero-candidate trace carried
+   no sport label; I noted that and reasoned as though it were established.
+   MLB had 411 candidates and a 1,201-entry shard.
+3. **"The BOS@MIA live box is frozen."** Contradicted by the state filter
+   reading DECIDED outcomes out of that same box.
+4. **"`attach_game_state` has an alias gap."** It was healthy -- 816 MLB and
+   643 WNBA rows matched, zero unmatched. Its HEALTH was what routed those
+   sports into the live branch.
+5. **"The rows are in `watchlist`."** They were 100% `dead`, a different gate
+   entirely.
+
+Every one was an assertion ahead of a measurement, and every one cost a deploy
+cycle on a live slate. The three diagnostics that ended the search
+(`PER_SPORT_INGEST`, `GAME_STATE_JOIN`, `GRID_REPRICE`) all printed numbers the
+code had been computing and discarding -- the same computed-but-unprinted gap
+as the seven drop counters. **The fastest path was always the log line, never
+the theory.**
+
+### STILL OPEN
+
+- `no_model_edge_pct` on live rows -- the last blocker to an order.
+- `paper_settlement` says `not_decided_yet` while `post_state_filter` reads 42
+  MLB props HIT and 16 MISSED from the same live box, and Kalshi has SETTLED
+  the Alcantara market. Two components, one box, opposite answers; the settler
+  is the one out of step and it is the one that grades money.
+- Kalshi supplies ONLY player props to the grid; its 171 newly-registered game
+  series were registered at 03:34, after the odds artifact that feeds the
+  reprice was written. Expect game lines on a later cycle -- unverified.
+- Polymarket spreads refuse (`outcomes_count_mismatch`), one price for two
+  outcomes. Needs `marketSides`, which the venue returns and
+  `_SLATE_STORAGE_FIELDS` does not persist.
+- `053d336e8` (OddsAPI shard-key parse) is committed and DEPLOYED but its
+  `no_side_in_key:N` counter has not been read.
