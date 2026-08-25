@@ -237,6 +237,7 @@ def join_polymarket_to_board(
     board_rows: Sequence[Mapping[str, Any]],
     *,
     sport: str | None = None,
+    selected_date: str | None = None,
 ) -> dict[str, Any]:
     """Pair each board row with the Polymarket market quoting the same bet.
 
@@ -295,7 +296,30 @@ def join_polymarket_to_board(
             refuse("board_market_not_a_game_line")
             continue
         league = _norm(board_row.get("sport") or sport)
-        date = str(board_row.get("selected_date") or board_row.get("date") or "").strip()
+        # THE CALLER'S DATE IS THE FALLBACK, and in practice it is the value
+        # that does the work. MEASURED 2026-08-25T01:23:04Z, the first build
+        # where game-line rows reached this loop at all:
+        #
+        #   board_rows=10 matched=0
+        #     board_market_not_a_game_line=6
+        #     no_polymarket_market_for_league_date_market=4
+        #
+        # All four game-line rows refused for want of a candidate. Shortlist
+        # rows carry neither `selected_date` nor `date` -- `_board_rows_for_join`
+        # returns them verbatim from `read_layer2_shortlist` and nothing stamps
+        # one on -- so this read produced "" and the index key could never match
+        # a slug's real date. The same shape as `apply_venue_quotes` reading a
+        # key board rows do not carry, which reported a confident stamped=0
+        # earlier the same evening.
+        #
+        # Row first, so a row that DOES carry its own date still wins; a
+        # multi-date board must not be collapsed onto one caller's date.
+        date = str(
+            board_row.get("selected_date")
+            or board_row.get("date")
+            or selected_date
+            or ""
+        ).strip()
         candidates = index.get((league, date, board_market)) or []
         if not candidates:
             refuse("no_polymarket_market_for_league_date_market")
@@ -325,7 +349,7 @@ def join_polymarket_to_board(
                 refuse("no_matching_polymarket_market")
             continue
 
-        probability = _probability_for_side(side, picked, board_row.get("sport") or sport)
+        probability = _probability_for_side(side, picked, board_row.get("sport") or sport, board_row)
         if probability is None:
             # The measured failure of the game-line join, kept as its own
             # counter: the market matched but we cannot place the SIDE.
@@ -388,7 +412,12 @@ def _teams_match(board_row: Mapping[str, Any], parsed: Mapping[str, Any], sport:
     )
 
 
-def _probability_for_side(side: str, candidate: Mapping[str, Any], sport: Any) -> float | None:
+def _probability_for_side(
+    side: str,
+    candidate: Mapping[str, Any],
+    sport: Any,
+    board_row: Mapping[str, Any] | None = None,
+) -> float | None:
     """Which outcome is this board side? None if we cannot tell.
 
     None is the important return, for the same reason `_side_for_team`'s is:
@@ -402,6 +431,28 @@ def _probability_for_side(side: str, candidate: Mapping[str, Any], sport: Any) -
     wanted = str(side or "").strip()
     if not wanted:
         return None
+
+    # A ROLE IS NOT AN OUTCOME NAME. The board keys a moneyline side as
+    # `home`/`away`; this venue names the CLUB. Neither the literal compare nor
+    # `teams_match` below can bridge that -- "home" is not a club and resolves
+    # to nothing -- so every game-line row refused `side_not_an_outcome_of_this
+    # _market` once the date fix let them reach this function at all
+    # (measured 2026-08-25, the refusal that replaced
+    # `no_polymarket_market_for_league_date_market`).
+    #
+    # Translate the role into the row's OWN team first, then fall through to
+    # the existing name matching. Same fix as `venue_quote_adapters`
+    # `_polymarket_sides` -- the board and this venue describe a side two
+    # different ways and exactly one place should reconcile them per consumer.
+    #
+    # Refuses rather than guessing when the row does not name that team: an
+    # unresolvable role must not fall through to a positional pick.
+    if wanted.lower() in {"home", "away"}:
+        team = (board_row or {}).get(f"{wanted.lower()}_team")
+        if not str(team or "").strip():
+            return None
+        wanted = str(team).strip()
+
     outcomes = candidate.get("outcomes") or []
 
     for name, probability in outcomes:
