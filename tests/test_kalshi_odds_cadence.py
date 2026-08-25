@@ -685,3 +685,32 @@ def test_the_trim_drops_the_STALEST_series_not_the_alphabetically_last(monkeypat
     result = mod.run_kalshi_odds_refresh()
     kept = {m["series"] for m in result["markets"]}
     assert kept == {"ZZZ"}, f"the stale series survived the trim: {kept}"
+
+
+def test_the_daily_book_records_the_COMPLETE_set_not_the_working_set(monkeypatch):
+    """The bound on the working set is justified by the record being complete.
+    If the record inherits the bound, the justification is circular and the
+    bound becomes real data loss.
+
+    MEASURED 2026-08-25T18:33:55Z: `trimmed=2121` markets never reached the
+    daily book, and `KXNCAAFSPREAD`'s ladder was truncated 1994 -> 400 in the
+    one place whose purpose is keeping whole ladders.
+    """
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 2)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "LADDER")
+
+    def fake(series):
+        return {"markets": [_market(f"{series}-{n}", 0.4, series=series) for n in range(9)],
+                "strategy": "series_filter"}
+
+    monkeypatch.setattr(mod, "fetch_series_markets", fake)
+
+    recorded: list[list] = []
+    monkeypatch.setattr(mod, "_record_daily_book", lambda markets: recorded.append(list(markets)))
+
+    result = mod.run_kalshi_odds_refresh()
+
+    # The WORKING SET is bounded -- that is what keeps the artifact writable.
+    assert len(result["markets"]) == 2
+    # The RECORD is not. Every rung of the ladder reaches it.
+    assert len(recorded[0]) == 9

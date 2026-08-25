@@ -666,10 +666,15 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     # PER-SERIES BOUND FIRST, so one ladder cannot crowd out a whole sport.
     staleness: dict[str, int] = {}
     per_series_markets: list[tuple[float, str, list[dict[str, Any]]]] = []
+    # EVERY MARKET, BEFORE ANY BOUND. This is what the daily book records, and
+    # keeping it separate is the whole justification for bounding the working
+    # set at all -- see `_record_daily_book`.
+    full_markets: list[dict[str, Any]] = []
     trimmed = 0
     for series in wanted:
         entry = per_series.get(series) or {}
         markets = list(entry.get("markets") or [])
+        full_markets.extend(markets)
         if len(markets) > MAX_MARKETS_PER_SERIES:
             trimmed += len(markets) - MAX_MARKETS_PER_SERIES
             markets = markets[:MAX_MARKETS_PER_SERIES]
@@ -701,7 +706,20 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
             markets = markets[:room]
         all_markets.extend(markets)
 
-    _record_daily_book(all_markets)
+    # THE COMPLETE SET, NOT THE WORKING SET.
+    #
+    # This was called with `all_markets` -- AFTER the per-series cap and the
+    # staleness trim -- which quietly voided the argument that justified those
+    # bounds. `6145522ee` said the 400-per-series cap "is safe ONLY because
+    # capture moved: `venue_daily_odds` records every market the venue lists".
+    # It did not: measured 2026-08-25T18:33:55Z, `trimmed=2121` markets never
+    # reached the record, and `KXNCAAFSPREAD`'s ladder was truncated 1994 -> 400
+    # in the one place that is supposed to keep whole ladders.
+    #
+    # A record that inherits the working set's bounds is not a record, and the
+    # bound it was used to justify becomes real data loss. The two must read
+    # from different lists, which is now what they do.
+    _record_daily_book(full_markets)
 
     print(
         "[kalshi_odds] TICK"
