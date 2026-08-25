@@ -254,14 +254,35 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
     if price <= 0 or price >= 1:
         raise OrderBuildError(f"price_out_of_range: {price}")
 
-    # EVERYTHING IS QUOTED FROM THE YES SIDE. Kalshi's contract:
+    # THIS CLAIM IS CONTRADICTED BY THE VENUE'S OWN UI AND IS UNDER REVIEW.
+    #
+    # The paragraph below said an UNDER "is not `side: no` -- there is no such
+    # value", and that everything is quoted from the YES leg so an under must
+    # be an ASK at the complement. The user supplied two Kalshi order URLs for
+    # one market on 2026-08-25, and BOTH ARE BUYS:
+    #
+    #   ...KXMLBGAME-26AUG251840BOSMIA-BOS&op_order_side=yes&op_side=BUY
+    #   ...KXMLBGAME-26AUG251840BOSMIA-BOS&op_order_side=no &op_side=BUY
+    #
+    # So buying NO is a first-class operation on this venue, not a synonym for
+    # selling YES. And the order results line up with that exactly: every
+    # Kalshi order that FAILED on 2026-08-25 was an under sent as `ask`
+    # (`market_not_found`, twice), while the one that FILLED was an over sent
+    # as `bid`.
+    #
+    # NOT CHANGED YET, DELIBERATELY. Those URLs carry the UI's parameters
+    # (`op_order_side`, `op_side`), not the API body's field names, and the
+    # only body contract this repo has ever been given is the `"side": "bid"`
+    # sample from 2026-08-24. Renaming a field from a URL query string is the
+    # same guess that earned `_DEFAULT_ORDER_PATH` an http_410. What closes it
+    # is one NO-side body sample; `SUBMIT_FAILED_MARKET` collects the market's
+    # own shape in the meantime.
+    #
+    # The original claim, kept verbatim so the correction is legible:
     #
     #   "bid means buy YES, ask means sell YES. (Selling YES is economically
     #    equivalent to buying NO at 1 - price, but this endpoint quotes
     #    everything from the YES side.)"
-    #
-    # So an UNDER is not "side: no" -- there is no such value. It is an ASK at
-    # the complement of the price we want to pay for NO.
     contract_side = _side_to_kalshi(getattr(request, "side", None))
     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
 
