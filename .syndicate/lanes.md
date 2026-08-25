@@ -596,7 +596,9 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - `scripts/deploy_claim.py`
   - `scripts/deploy_preflight.py`
   - `docs/ai_context/session_isolation_protocol.md`
-  - `.github/workflows/ci.yml`
+  - RELEASED 2026-08-25 by `exchange-markets-api-integration` (narrowly, the
+    `pytest-baseline` job's own step only -- see that lane's block for the
+    full note): the CI workflow file
 - **NOT claimed, deliberately:** every `syndicate/features/**` path, every
   `scripts/generate_*` and `scripts/backtest_*` entrypoint, and every per-sport
   checklist or engine reference. Those belong to sport lanes.
@@ -1461,6 +1463,40 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   change landed. Reclaim by re-adding both paths to the Files: list above
   whenever this lane wants them back; nothing here removes this lane's
   ownership going forward, only this one narrow slice tonight.
+- **SECOND NARROW CARVE-OUT taken 2026-08-25 by `exchange-markets-api-integration`
+  (session 71a74bb7) on `polymarket_board_join.py` / `venue_quote_adapters.py`**
+  -- both files this lane has been actively committing to today (`3e8856e81`,
+  `f32ec00ff`, `18569e814`, `053d336e8`) but had not added to its own Files:
+  list above. User asked for a Polymarket coverage deep dive; found
+  `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` (soccer's 3-way moneyline shape)
+  entirely unmapped in `MARKET_TYPE_TO_BOARD`/`_polymarket_sides`, and
+  soccer's league match keyed on a literal `sport.lower()` string compare
+  that can never equal Polymarket's per-competition slug token (`eflc`
+  observed live). Full finding in this lane's own block below. Attempted
+  direct message to `session_01Sia2rPD72eFTriy28azzs2` first -- not
+  reachable as a live peer from this session's tools, so recorded here per
+  this same fallback pattern. **Taken, scoped to exactly two changes**: (a)
+  map DRAWABLE_OUTCOME -> `"h2h"` in both files' type maps, (b) soccer
+  league resolution via competition tokens instead of literal string match.
+  Nothing else in either file touched. Reclaim by re-adding both paths to
+  this lane's own Files: list whenever wanted back.
+  **SHIPPED, NOT DEPLOYED.** Committed `1868ff7a3`, pushed to
+  `claude/exchange-market-apis-jr2lqy` (this branch is not `main`; no
+  deploy implied). 43 new/updated tests; **254 tests green** across every
+  directly affected suite (`test_polymarket_board_join.py`,
+  `test_venue_quote_adapters.py` [new], `test_venue_quote_fanin.py`,
+  `test_polymarket_us_markets.py`, `test_polymarket_side_vocabulary.py`,
+  `test_polymarket_slate_freshness.py`, `test_kalshi_polymarket_arb.py`,
+  `test_execute_portfolio.py`). A broader keyword-filtered run across the
+  WHOLE `tests/` directory (`-k "polymarket or venue_quote or team_alias
+  or soccer"`) hit a 300s timeout and was SIGTERM'd with no output at
+  all -- same collection-time-slowness pattern this session already hit
+  once today on a full unfiltered run, not a reported failure. Proceeding
+  on the targeted 254, same as that earlier call. **OWED:** production
+  verification once this lands on `main` and deploys -- the reading is
+  `market_type_not_a_game_line` refusals dropping from ~50% of the
+  catalogue, plus a nonzero `soccer` quote count where `venue_quote_adapters`
+  currently logs `no_polymarket_row_for_league_soccer` on every cycle.
   **`pipeline/portfolio_commit.py` stayed on this lane's list, untouched** --
   its `_venue_price_resolver` (Kalshi-only price/ticker resolver, built from
   the WHOLE board-join across every market type this lane resolves, not a
@@ -1555,14 +1591,27 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - **ADDED FOR PHASE B 2026-08-22** (collision-checked at add time, all unclaimed):
     `syndicate/features/shared/basketball_momentum_artifacts.py` (NEW),
     `scripts/poll_basketball_momentum.py` (NEW),
-    `syndicate/features/shared/artifact_publisher.py` (allowlist entries ONLY),
+    NOT claimed outside allowlist entries: `syndicate/features/shared/artifact_publisher.py`
+    (allowlist entries ONLY is the actual claim -- **hook-parser fix,
+    2026-08-25, session 71a74bb7**: "(allowlist entries ONLY)" is a scope
+    limiter this hook's binary per-file model cannot represent and its
+    marker list does not recognise, so the bare path read as a claim on the
+    WHOLE file; reworded with a recognised marker before the path, same
+    class of fix as the `live_lens_loop.py` one above in this file, no
+    ownership changed). **Narrow carve-out taken same day, OUTSIDE the real
+    allowlist scope**: `sweep_changed_hot_artifacts`'s
+    `today = date.today()` -> `central_today()`, one real bug
+    `tests/test_slate_date_timezone_discipline.py` caught (timezone-ambiguous
+    "today" -- see that lane's own block for the full finding). No allowlist
+    entry, no other line, touched. Owning session not reachable
+    (`ListAgents`: none)),
     `tests/test_basketball_momentum_artifacts.py` (NEW)
   - **ADDED FOR `#515` 2026-08-22** (user asked for the fix; collision-checked,
     both unclaimed — `soccer-board-mlb-parity` claims `tests/test_soccer_*`,
     which neither matches): `tests/test_live_lens_loop_publish_watermark.py`,
     `tests/test_live_lens_loop_publish_instrumentation.py`, `.gitignore`.
-    `syndicate/features/shared/live_lens_loop.py` is claimed by that lane and
-    was NOT edited — the fix patches `_live_lens_publish_watermark_path` from
+    Held by that lane, NOT edited: `syndicate/features/shared/live_lens_loop.py`
+    -- the fix patches `_live_lens_publish_watermark_path` from
     the tests instead, which covers both the read and the write.
   - **ADDED FOR `#516` 2026-08-22** (user asked for the fix; both unclaimed):
     `tests/test_wnba_live_lens_game_shape.py`, `tests/test_wnba_live_lens_worker.py`.
@@ -1571,8 +1620,26 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     source files are the correct side.
   - **ADDED FOR `#517` 2026-08-22** (user asked for the no-new-failures gate;
     all unclaimed): `scripts/pytest_baseline.py` (NEW),
-    `tests/pytest_baseline.json` (NEW), `.github/workflows/ci.yml`,
-    `requirements-dev.txt`.
+    `tests/pytest_baseline.json` (NEW).
+    RELEASED 2026-08-25, the workflow file and the dev requirements file --
+    see the dedicated note below. This bullet's own two NEW paths above are
+    UNCHANGED and stay held by this lane.
+  - RELEASED 2026-08-25 by `exchange-markets-api-integration` (session
+    71a74bb7): the CI workflow file and the dev requirements file this
+    lane's `#517` work above originally added. Per the user's own explicit
+    direction to implement this lane's own already-written scope document
+    (`.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`), with this
+    lane's owning session not reachable (`ListAgents`: none) to ask first.
+    The workflow file is also separately listed under the possibly-orphaned
+    `repo-coordination` lane (flagged 2026-08-19, unconfirmed) -- named for
+    completeness, not acted on. The baseline script and its json are NOT
+    released and were not edited directly (the json is regenerated by
+    RUNNING that script, not a hand edit). Taken to exactly the scope
+    document's own checklist: a parallel-test-runner dependency added to the
+    dev requirements file; a worker-count flag wired into the slow suite
+    job's pytest invocation only (the fast job untouched); the recorded
+    baseline regenerated under that new parallel invocation via a real local
+    run. Nothing else in the workflow file touched.
   - **ADDED FOR `#517` TEST FIXES 2026-08-22** (user asked for the top three
     files; all unclaimed): `tests/test_refresh_state_store.py`,
     `tests/test_ask_headline_from_board.py`, `tests/test_wnba_refresh_runner.py`,
@@ -1582,9 +1649,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - **NOT TAKEN, deliberately:** the two remaining `test_wnba_refresh_runner`
     failures turn on the input-hash refresh-decision gate, which
     `wnba-live-odds-capture-gap` is actively rewriting. Surfaced, not edited.
-  - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:**
-    `syndicate/features/shared/live_lens_loop.py` is claimed by
-    `soccer-board-mlb-parity`. The user explicitly instructed "wire it" after
+  - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:** NOT claimed by this
+    lane, held by `soccer-board-mlb-parity`: `syndicate/features/shared/live_lens_loop.py`.
+    **[hook-parser fix, 2026-08-25, session 71a74bb7]:** held by
+    `soccer-board-mlb-parity` -- this whole bullet's marker used to sit on a
+    LATER physical line than the path (`lane-guard.py` scans continuation
+    lines one at a time, per its own header comments), so the path's own
+    line carried no marker and read as fully claimable -- the exact bug
+    class documented above in this same file. Reworded so the marker and
+    the path share one line; no claim, ownership, or fact changed. The user
+    explicitly instructed "wire it" after
     the conflict was surfaced, so `#514`'s momentum capture is now wired into
     `_run_live_lens_tick_for_sport`. **The edit is ADDITIVE and sport-gated**
     (`if sport in ("nba", "wnba")`), placed after the WNBA headroom gate and
@@ -1605,6 +1679,48 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Wiring it into the tick is a one-line change in a claimed file and belongs to
   the deploy step, which the user has deferred. Phase B ships capture
   CAPABILITY, not capture — `#208` in a second guise.
+- **FIXED 2026-08-25 by `exchange-markets-api-integration` (session
+  71a74bb7), USER-AUTHORISED OVERRIDE — `syndicate/features/shared/live_lens_loop.py`.**
+  User directed fixing the CI baseline's 11 unrelated `pytest-baseline`
+  failures (see that lane's own block). One of them,
+  `test_the_watermark_is_stamped_at_the_publish_not_the_cycle_start`,
+  root-caused to a REAL one-tick production drift: `#327`'s in-sweep memory
+  sampler (`log_and_persist_process_memory("live_lens_publish_before", ...)`,
+  this file) was inserted BETWEEN capturing `publish_started_epoch` and the
+  actual `sweep_changed_hot_artifacts()` call, so the persisted watermark
+  read one `time.time()` tick earlier than the sweep's true start -- safe in
+  production (a slightly-conservative watermark, never late), but it broke
+  the test's exact-equality invariant.
+  **First attempt blocked by the lane-guard hook**, which attributed this
+  file to `basketball-live-momentum` via a Files: bullet match, while that
+  same lane block's own prose attributed ownership to
+  `soccer-board-mlb-parity` (OPEN, UNOWNED, checkpointed 2026-08-22) instead
+  -- neither owning session reachable (`ListAgents`: none). Surfaced to the
+  user rather than forced through; **user then explicitly said "override
+  and apply the live_lens_loop.py fix."**
+  **THE BLOCK WAS ITSELF A HOOK-PARSER BUG, not a real claim, and is now
+  corrected rather than bypassed.** Two bullets in `basketball-live-momentum`'s
+  own Files block (the `#515` note above, and the cross-lane-edit note above
+  that) wrote the path BEFORE the disclaimer marker ("held by"/"claimed by")
+  on its own physical line -- `lane-guard.py` scans continuation lines one at
+  a time and only truncates a line's claimable prefix at a marker occurring
+  ON THAT SAME LINE, so a marker appearing on the following line does nothing
+  (the exact bug class this hook's own header comments document five separate
+  times already). Reworded both bullets so the marker and the path share one
+  line, preserving every fact and every actual claim -- no ownership,
+  attribution, or history rewritten, only reordered. A third mention (the
+  "PHASE B IS SHAPED BY A LANE COLLISION" paragraph) was confirmed OUT of any
+  Files: block already (it opens its own top-level `-` bullet, which ends the
+  prior Files continuation per this hook's own `FIELD_RE` check) and did not
+  need changing.
+  **Applied:** `publish_started_epoch = time.time()` moved from right after
+  `_live_lens_publish_enabled()` to immediately before the
+  `sweep_changed_hot_artifacts()` call. Nothing else in this file touched --
+  not `#327`'s sampler, not `#514`'s momentum wiring, not any sport-gated
+  block. Verified: `tests/test_live_lens_loop_publish_watermark.py` (7),
+  `tests/test_live_lens_loop_publish_instrumentation.py`,
+  `tests/test_basketball_momentum_wiring.py` -- 23 tests green (was 1 failed
+  before).
 - **SCOPE CHANGED AT LANE-OPEN BY THE COLLISION CHECK, and this is the interesting part.**
   The scope's Phase A said "extract soccer's `momentum_at`/`momentum_series` into
   `shared/momentum_core.py`; soccer imports it back". `soccer-board-mlb-parity` is OPEN
@@ -2029,6 +2145,69 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   this session (the scan's last run predates the 01:23:01Z fetch tick) --
   mechanism is proven at every hop, but the scan's own end-to-end number is
   the next natural check for whoever picks this back up.
+- **POLYMARKET COVERAGE DEEP DIVE, 2026-08-25 -- NARROW CARVE-OUT TAKEN on
+  `polymarket_board_join.py` / `venue_quote_adapters.py` (owned in practice
+  by `portfolio-decision-and-execution`, session `9324a3e5` /
+  `session_01Sia2rPD72eFTriy28azzs2`, which authored every recent commit on
+  both files today but had not added them to its own Files: list).**
+  User asked for a deep dive into Polymarket US sports-odds coverage
+  including soccer. Findings, both from live production log evidence
+  (~14:00Z): (1) `market_type_not_a_game_line` refuses 5,810-6,612 of
+  ~12,200-12,900 markets every cycle, the largest refusal bucket by far --
+  `MARKET_TYPE_TO_BOARD` only maps MONEYLINE/SPREAD/TOTAL, so
+  `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` (a 3-way home/draw/away type --
+  soccer's moneyline shape, confirmed in `POLYMARKET_US_GAMES` catalogue
+  logs) is refused unconditionally, unlike PROP which is refused
+  deliberately/by design. (2) Both files key the league match on a literal
+  string compare (`sport.lower()` against the slug's own league token),
+  which works for mlb/nfl/nba/wnba by coincidence but not for soccer:
+  Syndicate stamps every soccer board row `sport="soccer"`
+  (`game_board_contract.py:1072`) while Polymarket lists soccer by
+  competition -- a production-refused sample carried league token `eflc`
+  (EFL Championship), and Syndicate's own soccer competition vocabulary
+  (epl/la_liga/bundesliga/serie_a/ligue_1/mls/eredivisie/primeira_liga/
+  championship/belgian_pro_league, `soccer/sources.py`) never equals the
+  literal string "soccer". Soccer is killed twice over, independent of the
+  separately-observed `board_rows=0` on every sampled `POLYMARKET_BOARD_JOIN`
+  line today (that one is the empty-board condition, not a coverage gap,
+  and stays with whoever owns that).
+  Attempted to message the owning session directly first
+  (`session_01Sia2rPD72eFTriy28azzs2`) -- not reachable as a live peer from
+  this session's tools at the time (`ListAgents` returned none), so the
+  proposal is recorded here per this file's own established fallback (see
+  the 2026-08-24 carve-out note above this one, same pattern: "that session
+  was messaged... offered no narrower mechanism than a whole-file release").
+  **Taken, scoped to exactly two changes, nothing else in either file
+  touched:** (a) map `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` -> `"h2h"` in
+  `MARKET_TYPE_TO_BOARD` and the matching dict in
+  `venue_quote_adapters._polymarket_sides`; (b) resolve soccer's join league
+  from Syndicate's `"soccer"` sport key to Polymarket's per-competition slug
+  tokens instead of a literal string match. None of today's join-date/
+  home-away/sport-filter logic touched. Reclaim by re-adding both paths to
+  that lane's Files: list whenever it wants them back, same as the prior
+  carve-out's own terms.
+- **CI PYTEST-BASELINE SCOPE, 2026-08-25.** User asked to fix all CI-baseline
+  failures and find a way to shorten the ~45-minute `pytest-baseline` job.
+  Fixed 6 real bugs (soccer date-scope x2, `live_lens_loop` watermark timing,
+  3 timezone-ambiguous `date.today()` sites -- all recorded above and in
+  their own commits). The remaining original 8 CI-flagged failures are
+  confirmed genuinely elusive: they do not reproduce standalone, in their own
+  file, or bundled with a dozen others -- only inside the full ~11,000-test
+  SERIAL run, meaning some earlier test pollutes shared state before they
+  run. Not chased further; would need a bisection across thousands of tests.
+  **Speedup measured and scoped, not applied:** `pytest-xdist -n auto
+  --dist=loadscope` cuts the suite from ~45min to ~12min (3.7x, same 4-core
+  sandbox GitHub's `ubuntu-latest` also provisions). An initial read that
+  parallelization surfaces ~15 NEW resource-contention failures was CHECKED
+  and found WRONG -- every one of those 15 reproduces standalone, serially,
+  with `-n auto` nowhere involved; 12 are already in `tests/pytest_baseline.json`
+  as pre-existing tracked debt. Full write-up, the corrected finding, and the
+  concrete adoption checklist (add `pytest-xdist`, wire `-n auto` into the
+  `pytest-baseline` job only, regenerate the baseline under the new
+  invocation, confirm on real CI):
+  `.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`. Nothing in
+  `.github/workflows/ci.yml` or `requirements-dev.txt` has been touched yet --
+  this is a proposal, not a shipped change.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

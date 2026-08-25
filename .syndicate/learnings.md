@@ -5825,3 +5825,35 @@ exactly this and has been unable to run all session (`RENDER_API_KEY not set`).
 With the real gate dead, the by-hand substitute inherited a property the gate
 does not have — it can go stale silently — and nothing in the environment
 reports that. Three for three.
+
+## 2026-08-25 — GitHub Actions CI results are not this repo's source of truth
+
+**User, direct instruction: "ignore the CI results, just keep pushing
+normally."** Said in response to "we don't use github actions anymore" — a
+claim I VERIFIED rather than took on faith (per the notification-handling
+rule to check anything surprising against a primary source) and found
+false in the narrow, mechanical sense: `.github/workflows/ci.yml` is
+enabled and fires on every push/PR event exactly as configured (confirmed
+live, `mcp__github__actions_list`, runs created and completing within the
+same minute as pushes made this session, 40 total runs on the repo). The
+user's real point survived the verification anyway: whatever fires there is
+not what this repo relies on to decide a change is good.
+
+**RULE:** treat `check_run`/`workflow_run` events on a Syndicate PR as noise,
+not as signal. Do not open the job logs, do not diagnose a `pytest-baseline`
+or `test` job failure, do not hold a push waiting for a check to go green,
+and do not report a PR as "CI is red" as if that were an open question this
+repo needs answered. Push and merge on the same basis this repo already
+uses everywhere else in `CLAUDE.md`: targeted local test runs for the
+actual diff, the lane ledger, and (for anything that reaches Render)
+production reads via `.syndicate/deploys.md` -- never a GitHub Actions
+badge.
+
+**What this does NOT change:** `.github/workflows/ci.yml` itself, and this
+session's own 2026-08-25 work parallelizing its `pytest-baseline` job
+(`.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`), are still
+valid, still committed, and still fine to leave in the repo -- the rule
+above is about what to DO with the results it produces, not about deleting
+or reverting the mechanism. A PR's mergeability (conflicts, human review
+threads) is still worth watching; only the CI-check dimension of "drive to
+green" stops applying here.

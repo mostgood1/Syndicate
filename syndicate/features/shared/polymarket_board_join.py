@@ -62,10 +62,25 @@ __all__ = [
 
 # The venue's type vocabulary -> the board's market names. Observed values only;
 # an unseen type is refused rather than mapped to a plausible neighbour.
+#
+# DRAWABLE_OUTCOME -> h2h, added 2026-08-25: confirmed live in
+# `POLYMARKET_US_GAMES` catalogue logs as a real game-market type (a 3-way
+# home/draw/away shape -- soccer's moneyline). It was previously absent from
+# this map entirely, which put it in `market_type_not_a_game_line` alongside
+# PROP -- 5,810-6,612 of ~12,200-12,900 markets refused that way every cycle,
+# the largest refusal bucket measured. Routed to the SAME generic path
+# MONEYLINE already uses (`_outcome_probabilities` parses outcomes/prices
+# generically; each outcome name is resolved independently via
+# `team_aliases.canonical_team` downstream in `venue_quote_adapters`), so no
+# type-specific parsing is added on an unconfirmed row shape -- an outcome
+# that resolves to a club prices normally, and a "Draw" outcome (which no
+# board `h2h` side asks for today) simply never matches anything and is
+# dropped, the same way an unresolved club already is.
 MARKET_TYPE_TO_BOARD: dict[str, str] = {
     "SPORTS_MARKET_TYPE_MONEYLINE": "h2h",
     "SPORTS_MARKET_TYPE_SPREAD": "spreads",
     "SPORTS_MARKET_TYPE_TOTAL": "totals",
+    "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME": "h2h",
 }
 
 # `14pt5` -> 14.5. The venue writes decimals this way in slugs; reading it as an
@@ -138,6 +153,43 @@ def _line_from_modifiers(modifiers: Sequence[str]) -> float | None:
             return abs(value)
         return value
     return None
+
+
+def _effective_league(parsed: Mapping[str, Any]) -> str:
+    """The slug's own league token, UNLESS both clubs resolve as soccer clubs.
+
+    Measured 2026-08-25: Polymarket lists soccer per COMPETITION (a refused
+    production row carried league token `eflc`, EFL Championship) while
+    Syndicate stamps every soccer board row `sport="soccer"` uniformly --
+    one umbrella sport, ten competitions (`soccer/sources.py`
+    `LEAGUE_DISPLAY_NAMES`: epl/la_liga/bundesliga/serie_a/ligue_1/mls/
+    eredivisie/primeira_liga/championship/belgian_pro_league), none of which
+    is the literal string "soccer". A plain `parsed["league"] == sport`
+    compare therefore can never match a soccer row -- the same class of bug
+    the KXMLBGAME fix corrected one level down (there, a market key; here, a
+    league key) -- and this lane has confirmed only ONE of Polymarket's
+    competition tokens, not enough to build a translation table without
+    guessing the rest.
+
+    So this asks a question the rest of this module already trusts an answer
+    for instead: do both clubs resolve as known soccer clubs via
+    `team_aliases.canonical_team`? If so, the row is treated as league
+    `"soccer"` regardless of its own token; if either club is unresolved (a
+    real, counted gap -- ambiguous cross-league tri-codes are deliberately
+    dropped by `_soccer_alias_to_name`) or the sport is not soccer at all,
+    the literal token is returned unchanged, so mlb/nfl/nba/wnba/nhl are not
+    touched by this at all.
+    """
+    league = str(parsed.get("league") or "")
+    if league == "soccer":
+        return league
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:
+        return league
+    if canonical_team("soccer", parsed.get("home")) and canonical_team("soccer", parsed.get("away")):
+        return "soccer"
+    return league
 
 
 def _has_segment(modifiers: Sequence[str]) -> bool:
@@ -286,10 +338,13 @@ def join_polymarket_to_board(
         venue_type = str(row.get("sportsMarketTypeV2") or "").upper()
         board_market = MARKET_TYPE_TO_BOARD.get(venue_type)
         if board_market is None:
-            # PROP and DRAWABLE_OUTCOME land here. Real markets, currently out
-            # of scope -- but 6,838 of them are fetched every cycle and thrown
-            # away, so "out of scope" needs to be a MEASURED decision rather
-            # than a standing one.
+            # PROP lands here -- a real market, deliberately out of scope (see
+            # the module header). DRAWABLE_OUTCOME no longer does; it is in
+            # `MARKET_TYPE_TO_BOARD` as of 2026-08-25, so this branch is
+            # unreachable for it now -- the note below predates that fix.
+            #
+            # PROP is fetched every cycle and thrown away, so "out of scope"
+            # needs to be a MEASURED decision rather than a standing one.
             #
             # WHAT `PROP` ACTUALLY CONTAINS IS NOT OBVIOUS, and assuming it was
             # already produced one wrong claim. Measured 2026-08-25T17:05:02Z:
@@ -325,7 +380,7 @@ def join_polymarket_to_board(
                     "prices": str(row.get("outcomePrices"))[:80],
                 })
             continue
-        key = (parsed["league"], parsed["date"], board_market)
+        key = (_effective_league(parsed), parsed["date"], board_market)
         index.setdefault(key, []).append(
             {"parsed": parsed, "row": row, "outcomes": outcomes,
              "line": _line_from_modifiers(parsed["modifiers"])}

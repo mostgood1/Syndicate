@@ -235,7 +235,7 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
     #
     # The league is in the slug -- `aec-mlb-pit-sd-2026-08-24` -- which is the
     # same structured key the board join reads, so the two cannot disagree.
-    from syndicate.features.shared.polymarket_board_join import parse_slug
+    from syndicate.features.shared.polymarket_board_join import _effective_league, parse_slug
 
     wanted_league = str(sport or "").strip().lower()
 
@@ -250,7 +250,14 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
         if not isinstance(row, Mapping):
             continue
         parsed_slug = parse_slug(row.get("slug"))
-        if parsed_slug is None or str(parsed_slug.get("league") or "").lower() != wanted_league:
+        # `_effective_league`, not the literal slug token: Polymarket lists
+        # soccer per COMPETITION while every Syndicate soccer board row is
+        # stamped `sport="soccer"` uniformly, so a literal compare can never
+        # match soccer at all -- see that function's docstring for the
+        # measurement. Same resolver `polymarket_board_join` uses, so the two
+        # consumers of this venue cannot disagree about which league a row
+        # belongs to.
+        if parsed_slug is None or _effective_league(parsed_slug) != wanted_league:
             continue
         if str(row.get("sportsMarketTypeV2") or "").upper() == "SPORTS_MARKET_TYPE_SPREAD":
             spread_rows += 1
@@ -392,11 +399,22 @@ def _polymarket_sides(
         "SPORTS_MARKET_TYPE_MONEYLINE": "h2h",
         "SPORTS_MARKET_TYPE_SPREAD": "spreads",
         "SPORTS_MARKET_TYPE_TOTAL": "totals",
+        # DRAWABLE_OUTCOME -> h2h, added 2026-08-25: soccer's 3-way
+        # home/draw/away shape, confirmed live in catalogue logs. Falls
+        # through to the SAME generic moneyline resolution below (each
+        # outcome name resolved independently via `canonical_team`), so an
+        # unconfirmed "Draw" outcome shape costs nothing -- it simply never
+        # resolves to a club and is dropped like any other unresolved name,
+        # counted in `unresolved_clubs`. See `polymarket_board_join`'s
+        # `MARKET_TYPE_TO_BOARD` for the matching change and its full note.
+        "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME": "h2h",
     }.get(market_type)
     if market is None:
-        # PROP and DRAWABLE_OUTCOME are real and joinable, but they need a
-        # market mapping this module has not measured. Refusing one row is
-        # cheaper than inventing a market name that silently never matches.
+        # PROP is real and joinable, but needs a market mapping this module
+        # has not measured (player-name resolution, a different problem with
+        # its own failure modes -- see `polymarket_board_join`'s header).
+        # Refusing one row is cheaper than inventing a market name that
+        # silently never matches.
         return None
 
     from syndicate.features.shared.polymarket_board_join import (

@@ -141,7 +141,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install "$(grep -E '^pytest' requirements-dev.txt)"
+          pip install "$(grep -E '^pytest>' requirements-dev.txt)"
+          pip install "$(grep -E '^pytest-xdist' requirements-dev.txt)"
 
+      # `.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`. Measured
+      # 3.7x (45min -> 12min) on this same 4-core runner, `--dist=loadscope`
+      # rather than the default `--dist=load` so one test FILE's cases stay
+      # in one worker instead of interleaving with another file's -- safer
+      # against this suite's existing module-level-state test-order
+      # sensitivity, not a fix for it (see that document's own investigation:
+      # every failure newly surfaced by `-n auto` in that pass turned out to
+      # reproduce standalone too, unrelated to parallelization).
       - name: Full pytest suite (enforced -- no NEW failures vs the baseline)
-        run: python scripts/pytest_baseline.py --runnable
+        run: python scripts/pytest_baseline.py --runnable -- tests/ -n auto --dist=loadscope
