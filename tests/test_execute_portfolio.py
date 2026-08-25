@@ -1303,3 +1303,53 @@ def test_an_empty_plan_is_reported_as_such_not_as_success(monkeypatch):
                         lambda date, venue: {"positions": []})
     report = runner.verify_order_paths("2026-08-24", venues=("kalshi",))
     assert report["venues"]["kalshi"]["status"] == "no_positions"
+
+
+def test_verify_order_paths_separates_no_ticker_from_unresolvable(monkeypatch, tmp_path):
+    """TWO FAILURES THAT NEED OPPOSITE FIXES, counted as one until now.
+
+    Kalshi has had a distinct `no_venue_ticker` verdict since this verifier was
+    written. Polymarket's was folded into `market_unresolved`, which asserts
+    "we found the market and could not price it" about a position that never
+    had a market identified at all.
+
+    Measured 2026-08-25 4:36:05 PM Central: an h2h on Cleveland Guardians @ LA
+    Angels rejected with `OrderBuildError: market_unresolved_for_position`, and
+    `ORDER_PATH` had reported `{'h2h': {'market_unresolved': 1}}` one second
+    earlier with an EMPTY example map -- while the resolver's own log line said
+    `POLYMARKET_NO_SLUG -- venue_ticker unset or carries no slug
+    (type=NoneType)`. The board join had not stamped a slug; the slate and the
+    price were never reached. Those are different fixes and the verdict has to
+    say which.
+    """
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    def _position(key, ticker):
+        row = {
+            "position_key": key, "event_id": "e-1", "market": "h2h",
+            "side": "home", "sport": "mlb", "price": 0.5, "stake_dollars": 1.0,
+            "home_team": "Los Angeles Angels", "away_team": "Cleveland Guardians",
+        }
+        if ticker is not None:
+            row["venue_ticker"] = ticker
+        return row
+
+    monkeypatch.setattr(
+        portfolio_commit, "read_portfolio_plan_for_venue",
+        lambda _d, venue: {"positions": [_position("p-none", None),
+                                         _position("p-slug", "aec-mlb-cle-laa-2026-08-25")]}
+        if venue == "polymarket" else {"positions": []},
+    )
+    # The slug-carrying one still fails to resolve (no slate here), which is
+    # exactly the other verdict.
+    monkeypatch.setattr(runner, "_polymarket_resolve_market", lambda _r: None)
+
+    result = runner.verify_order_paths("2026-08-25", venues=("polymarket",))
+    detail = result["venues"]["polymarket"]
+
+    assert detail["markets"]["h2h"] == {"no_venue_ticker": 1, "market_unresolved": 1}, detail
+    # AND EACH CARRIES ITS DATA. A verdict with an empty example map is the
+    # counter this verifier exists to replace.
+    assert detail["examples"].get("h2h|no_venue_ticker"), detail
+    assert detail["examples"].get("h2h|market_unresolved"), detail
