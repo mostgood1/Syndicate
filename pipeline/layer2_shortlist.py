@@ -644,6 +644,19 @@ def build_layer2_shortlist(
             f"selected_by_source={repriced.get('selected_by_source')}",
             flush=True,
         )
+        # SEPARATE LINE, because it answers a different question and is the one
+        # worth reading when `stamped` is low. `selected_by_source` says who
+        # WON; this says whether the two sides of the join are even the same
+        # shape. Measured 2026-08-25T00:02Z, polymarket_us offered 3,106 quotes
+        # and won none of 237 -- which freshness cannot explain, since Kalshi
+        # quotes no game lines at all.
+        print(
+            "[layer2_shortlist] VENUE_REPRICE_KEYS "
+            f"unmatched_by_sport={repriced.get('unmatched_by_sport')} "
+            f"board_wanted={repriced.get('unmatched_sample')} "
+            f"sources_offered={repriced.get('offered_sample')}",
+            flush=True,
+        )
     except Exception as exc:  # noqa: BLE001 -- never fatal to the build
         # A venue feed being unreachable must cost the reprice, not the board.
         print(f"[layer2_shortlist] VENUE_REPRICE_FAILED {type(exc).__name__}: {exc}", flush=True)
