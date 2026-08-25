@@ -28476,3 +28476,71 @@ turning it on would price nothing.
 **Also measured on the same instance:** `AGGREGATOR_DUPLICATE_DROPPED rows=180`
 then `rows=273 books=['kalshi', 'polymarket']` — the OddsAPI duplicate drop for
 the two direct-feed books is live and load-bearing.
+
+---
+
+## 2026-08-25 — live-odds-worker `13a22d668`: the first order bought the WRONG TEAM
+
+**Deployed:** `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`), deploy
+`dep-da6sa12d0e5s73d7k440`, triggered `16:38:28Z`. Commit `13a22d668`, on
+`origin/main`. Claim `polymarket-side`.
+
+**The measurement that forced it** — the venue's own order screen, against our
+ledger row, both for `16:08:10Z`:
+
+```
+ledger   side=home   h2h   Texas Rangers @ Chicago White Sox
+         venue=polymarket  slug=aec-mlb-tex-cws-2026-08-25
+         requested +104   $1.42   status=submitted
+venue    "Buy TEX"   Texas Rangers vs. Chicago White Sox
+         2.86 shares   limit 49.5c   $1.42   Pending
+```
+
+**Home is the White Sox. We bought Texas.** At 0.495 — the price that had been
+resolved for the White Sox. This is the failure the entry above recorded as an
+open obligation ("the YES/NO convention is UNVERIFIED against a real venue
+response"), arriving one cycle later as an actual inverted bet.
+
+**Root cause, and it is one bug not two.** `_polymarket_resolve_market` picked
+the PRICE by matching our team against the market's `outcomes` array — correctly
+— and then discarded the matched index. `order_body` picked the SIDE separately,
+mapping `home`→YES and `away`→NO, which is a claim about the ORDER of that array
+rather than about our side. Nothing reconciled the two, so the order named one
+outcome and paid the other's price. That is also why it never filled: a limit
+priced for the White Sox sitting on the Texas book is not a marketable order.
+**Wrong side and no fill have the same cause.**
+
+The slug cannot substitute for the array, and this is measured, not assumed:
+`aec-atp-domstr-markru` carries `outcomes: ["Martin Krumich", "Dominic Stephan
+Stricker"]` — reversed relative to its own slug (seen in `POLYMARKET_BOARD_JOIN`
+shapes, `16:14:41Z`). No positional rule derived from a slug is safe.
+
+**The fix.** The index is kept and returned, threaded through the submitter into
+`order_body`, and `outcomeSide` derives from it — so price and side are two
+readings of one match, consistent by construction. `home`/`away` now RAISE in
+`_side_to_outcome` rather than falling back positionally, so the old path cannot
+be reached again by a caller that forgets.
+
+**verify:** NOT YET READ. Open obligation, and the specific unknown is named:
+**which index the YES side buys.** Only the venue settles it. Two facts are in
+hand and they do not yet combine — `OUTCOME_SIDE_YES` bought TEX on that slug
+(venue screen), but the outcomes ARRAY for it was never logged, so TEX's index
+is unknown. The next `POLYMARKET_ARTIFACT_PRICE` prints `outcomes`,
+`outcome_index` and the resolved outcome NAME, which closes it:
+
+- if it reports `outcome='Chicago White Sox' outcome_index=1` → YES is index 0,
+  the default is right, and the order goes out as `OUTCOME_SIDE_NO`;
+- if it reports `outcome_index=0` for the White Sox → YES is index 1, and
+  `SYNDICATE_POLYMARKET_YES_OUTCOME_INDEX=1` corrects it without a build.
+
+The env override exists precisely because this convention was wrong once at the
+cost of a real order, and a build is the wrong unit of latency for that.
+
+**The previous SUBMIT line could not have caught this.** It logged
+`side=OUTCOME_SIDE_YES` and never said which team that buys, so the log agreed
+with itself while the venue bought the other team. It now carries `our_side`,
+`outcome_index`, `yes_index` and the outcome name.
+
+**Operator action outstanding:** the inverted TEX order is still RESTING
+(Pending, GTC, $1.42). It is on the wrong team and cannot be fixed by a redeploy
+— it needs cancelling at the venue.
