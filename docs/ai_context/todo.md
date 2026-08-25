@@ -1,5 +1,50 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#558` — **PR #61 is deployed and captures nothing: NCAAF is excluded from the sweep by `SYNDICATE_ACTIVE_SPORTS`, an env var, not by the season calendar.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, measured — **NEEDS A USER DECISION**
+
+State: `state.md` `[ncaaf-sweep-env-gate]`. Deploy: `deploys.md` 2026-08-25T20:31Z.
+
+Measured in production `2026-08-25T20:36:57Z`, both workers, every cycle:
+
+```
+[live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED date=2026-08-25
+  kept=mlb,wnba,soccer
+  dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+```
+
+`#557`'s blocker is fixed in code and the code is LIVE on all three services.
+`ncaaf_game_lines_oddsapi` will still never execute, because the sweep drops
+NCAAF before it builds any steps.
+
+**The trap, and I walked into it before the log corrected me.**
+`ops_refresh._active_sports_for_date` (`syndicate/features/shared/ops_refresh.py:1150`)
+is a CALENDAR window: `(month == 8 and day >= 15) or (9 <= month <= 12) or month == 1`.
+Read on its own it says NCAAF has been active for ten days. The env var is
+consulted first and overrides it. **A season window in code is not evidence a
+sport is being swept.** Same shape as `#547`: a value that is literally true
+about the code and false about production.
+
+**The change, if approved.** `SYNDICATE_ACTIVE_SPORTS` is NOT in `render.yaml`
+(grep returns nothing), so this is `update_environment_variables` per service,
+NOT a blueprint push — `#284`'s whole-env-block blast radius does not apply.
+
+    refresh-worker    srv-d91dpertqb8s73co8ls0
+    live-odds-worker  srv-d91dpertqb8s73co8lt0
+      SYNDICATE_ACTIVE_SPORTS: mlb,wnba,soccer -> mlb,wnba,soccer,ncaaf
+
+Note it restarts each service it is set on, which is a deploy-equivalent
+interruption — see `#324`, and see this same day's ledger for two MLB sims
+killed by exactly that.
+
+**Why it is not done here.** Turning it on starts spending OddsAPI credits on
+a sport that has never been fetched even once, and the first fetch is also the
+first live test of the team resolver — `UNRESOLVED_TEAMS` is the failure mode
+the design cannot distinguish from "no book quoted it". The right order is the
+`--report` run (one credit, no writes) BEFORE the env flip, not after.
+
+**NFL is dropped by the same gate**, four days from its own opener. Whoever
+decides NCAAF should decide NFL in the same breath.
+
 ### `#546` — **Kalshi listed six MLB prop series the board was asking for BY NAME, and we never asked for them. Plus: the totals grammar priced a corners market as a goals total.** — lane `kalshi-registry`, 2026-08-25, user request ("fix kalshi")
 
 **The shape of all four findings is the same and it is worth naming once:

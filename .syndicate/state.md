@@ -4290,6 +4290,35 @@ touched; reverting is re-ordering the same blocks back. The priority call
 not measured, because the effect cannot be measured from a checkout. **The
 owners should confirm it.** Nothing is deployed; `autoDeploy` is off.
 
+## [ncaaf-sweep-env-gate] NCAAF IS SWITCHED OFF AT `SYNDICATE_ACTIVE_SPORTS`, NOT AT THE CALENDAR — the deployed capture cannot run `[measured 2026-08-25T20:36:57Z, lane ncaaf-oddsapi-game-lines]`
+
+PR #61 is DEPLOYED and live on all three services (`.syndicate/deploys.md`,
+2026-08-25T20:31Z). It still captures nothing, and this is why:
+
+```
+[live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED date=2026-08-25
+  kept=mlb,wnba,soccer
+  dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+```
+
+**Two gates, and reading the wrong one gives the wrong answer with total
+confidence.** `ops_refresh._active_sports_for_date` (line 1150) is a CALENDAR
+window and has NCAAF active since **Aug 15** — I read it first and would have
+concluded the sweep covers NCAAF today. It does not. The live services carry
+`SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer`, which is checked FIRST, so
+`ncaaf_game_lines_oddsapi` is unreachable in production no matter what SHA is
+deployed. NFL is excluded the same way, four days from its own season.
+
+`SYNDICATE_ACTIVE_SPORTS` is **not in `render.yaml`** — grep returns nothing —
+so it is set per-service in the Render dashboard/API. That means changing it
+does NOT need a `render.yaml` push and does NOT fire `blueprint_sync`; it is
+`update_environment_variables` on each worker. Cheaper and far narrower than
+`#284`'s blast radius, but still a production change: adding `ncaaf` starts
+spending OddsAPI credits on a sport that has never been fetched.
+
+**NOT DONE — needs a user decision.** Detail and the exact change: `todo.md`
+`#558`.
+
 ## [ncaaf-oddsapi-lines] NCAAF GAME LINES — OddsAPI capture BUILT AND PROVEN OFF-LINE, NOT DEPLOYED AND NEVER RUN LIVE `[measured 2026-08-25, lane ncaaf-oddsapi-game-lines]`
 
 **Read `[ncaaf-readiness-2026]` first — this closes its stated blocker in CODE
