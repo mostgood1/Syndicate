@@ -1021,9 +1021,31 @@ def find_first_game_offset(
         return {"status": "skipped", "reason": "credentials_absent"}
 
     probes = 0
-    seen: dict[int, bool] = {}
+    seen: dict[int, str] = {}
 
-    def _has_games(offset: int) -> bool | None:
+    # THREE PAGE STATES, NOT TWO, and conflating them is what broke this.
+    #
+    # The layout is [futures][games][empty]. The old probe returned a BOOL, so
+    # a futures page and a past-the-end empty page were both `False` -- and
+    # `False` sends the search UP (`low = mid + 1`). Its own comment claimed
+    # "the search should move DOWN, which False achieves correctly", which is
+    # the opposite of what the line below it did.
+    #
+    # Consequences, measured 2026-08-25 from 3:32 PM Central onward, on every
+    # cycle and across two instances:
+    #
+    #     POLYMARKET_US_SLATE_WRITE status=error reason=no_game_offset: ok
+    #
+    # -- a reason string that contradicts itself, because `status` was "ok"
+    # while `first_game_offset` was None. The slate artifact stopped
+    # refreshing (2,903s stale in the 3:48 PM reprice) and Polymarket could
+    # place nothing.
+    #
+    # An EMPTY page means the block is BELOW us; a FUTURES page means it is
+    # ABOVE us. Told apart, the search is correct wherever the block sits.
+    _GAMES, _FUTURES, _EMPTY = "games", "futures", "empty"
+
+    def _page(offset: int) -> str | None:
         nonlocal probes
         if offset in seen:
             return seen[offset]
@@ -1037,32 +1059,85 @@ def find_first_game_offset(
         except Exception:
             return None
         rows = [r for r in (payload.get("markets") or []) if isinstance(r, Mapping)]
-        # An empty page is past the end: no games there, and the search should
-        # move DOWN, which `False` achieves correctly.
-        found = any(is_game_market_row(r) for r in rows)
-        seen[offset] = found
-        return found
+        if not rows:
+            state = _EMPTY
+        elif any(is_game_market_row(r) for r in rows):
+            state = _GAMES
+        else:
+            state = _FUTURES
+        seen[offset] = state
+        return state
 
-    low, high = 0, int(ceiling)
+    # THE CEILING IS DERIVED, NOT TRUSTED. This function's own docstring says
+    # hardcoding 16000 "would break quietly" because ids grow as the venue
+    # lists markets -- and then hardcoded 40000 one line down. A ceiling that
+    # still shows FUTURES is a ceiling below the block, so it doubles until it
+    # reaches empty-or-games. Bounded by `max_probes` like every other probe.
+    top = int(ceiling)
+    for _ in range(6):
+        state = _page(top)
+        if state is None:
+            return {
+                "status": "error",
+                "reason": f"probe_failed_at_ceiling_{top}",
+                "probes": probes,
+                "sampled": dict(sorted(seen.items())),
+            }
+        if state != _FUTURES:
+            break
+        top *= 2
+    else:
+        # Still futures after six doublings: the partition assumption does not
+        # hold, or the catalogue is far larger than this search is shaped for.
+        # NAMED, never returned as a quiet None.
+        return {
+            "status": "error",
+            "reason": f"ceiling_below_game_block: futures at offset {top}",
+            "probes": probes,
+            "ceiling": top,
+            "sampled": dict(sorted(seen.items())),
+        }
+
+    low, high = 0, top
     while low < high:
         mid = (low + high) // 2
-        found = _has_games(mid)
-        if found is None:
-            return {"status": "error", "reason": f"probe_failed_at_offset_{mid}", "probes": probes}
-        if found:
-            high = mid
+        state = _page(mid)
+        if state is None:
+            return {
+                "status": "error",
+                "reason": f"probe_failed_at_offset_{mid}",
+                "probes": probes,
+                "sampled": dict(sorted(seen.items())),
+            }
+        if state == _FUTURES:
+            low = mid + 1          # the block is above us
         else:
-            low = mid + 1
+            high = mid             # games here, or past the end -- look lower
 
-    boundary = low if seen.get(low) or _has_games(low) else None
+    boundary = low if _page(low) == _GAMES else None
+    if boundary is None:
+        # THE FAILURE IS AN ERROR, NOT AN "ok" WITH A NULL. A status that says
+        # fine beside a result that says nothing is what produced
+        # `no_game_offset: ok` and told nobody anything. The sampled map goes
+        # with it so the next reading says WHICH shape was seen where.
+        return {
+            "status": "error",
+            "reason": "no_game_page_found",
+            "probes": probes,
+            "ceiling": top,
+            "sampled": dict(sorted(seen.items())),
+        }
     # THE ASSUMPTION, CHECKED. If any offset BELOW the boundary had games, the
     # collection is not partitioned and this answer is not trustworthy.
-    monotonic = not any(found for off, found in seen.items() if boundary is not None and off < boundary)
+    monotonic = not any(
+        state == _GAMES for off, state in seen.items() if off < boundary
+    )
     return {
         "status": "ok",
         "first_game_offset": boundary,
         "probes": probes,
         "monotonic": monotonic,
+        "ceiling": top,
         "sampled": dict(sorted(seen.items())),
     }
 
@@ -1081,7 +1156,14 @@ def fetch_game_markets(
         if located.get("status") != "ok" or located.get("first_game_offset") is None:
             return {
                 "status": "error",
-                "reason": f"no_game_offset: {located.get('reason') or located.get('status')}",
+                # The SAMPLED MAP, not just a status word. `no_game_offset: ok`
+                # was the old rendering and it is self-contradictory: it named
+                # the failure and then quoted a status that says fine. What
+                # anyone debugging needs is which offsets showed what.
+                "reason": (
+                    f"no_game_offset: {located.get('reason') or located.get('status')}"
+                    f" sampled={located.get('sampled')} probes={located.get('probes')}"
+                ),
                 "markets": [],
             }
         start_offset = int(located["first_game_offset"])

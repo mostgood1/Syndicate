@@ -1154,13 +1154,105 @@ def test_the_partition_assumption_is_CHECKED_not_trusted(monkeypatch):
     assert result["monotonic"] is True
 
 
-def test_a_collection_with_no_games_reports_no_offset(monkeypatch):
+def test_a_collection_with_no_games_reports_an_ERROR_not_an_ok_with_a_null(monkeypatch):
+    """`status: "ok"` beside `first_game_offset: None` is what broke Polymarket.
+
+    The caller rendered it as `no_game_offset: ok` -- a reason string that
+    names a failure and then quotes a status saying fine. Measured on every
+    cycle from 2026-08-25 3:32 PM Central across two instances; the slate
+    artifact went 2,903s stale and Polymarket could place nothing.
+
+    THE FIXTURE IS REALISTIC NOW, and that is part of the fix. It used to
+    return futures at EVERY offset -- a catalogue with no end, which no venue
+    has. A real games-less catalogue is futures, then empty.
+    """
     from syndicate.features.shared import polymarket_us_auth as auth
 
     monkeypatch.setattr(auth, "credentials_present", lambda: True)
-    monkeypatch.setattr(auth, "signed_request", lambda *_a, **_k: {"markets": [
-        _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")]})
-    assert mod.find_first_game_offset()["first_game_offset"] is None
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        if offset >= 12000:
+            return {"markets": []}
+        return {"markets": [
+            _row(id=f"f-{offset}", category="sports",
+                 sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.find_first_game_offset()
+
+    assert result["status"] == "error", result
+    assert result["reason"] == "no_game_page_found", result
+    assert result.get("first_game_offset") is None
+    # The sampled map rides along, so the next reading says WHICH shape was
+    # seen WHERE rather than only that nothing was found.
+    assert result["sampled"], result
+
+
+def test_the_ceiling_is_derived_when_the_block_sits_above_it(monkeypatch):
+    """THE PRODUCTION FAILURE. `find_first_game_offset`'s own docstring says
+    hardcoding 16000 "would break quietly" because ids grow as the venue lists
+    markets -- and then hardcoded `ceiling=40000` one line down. Once the game
+    block moved above 40000 every probe below it was futures, the search
+    climbed to the ceiling, and the answer was None.
+
+    A ceiling that still shows FUTURES is a ceiling below the block, so it
+    doubles until it reaches empty-or-games.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    boundary, end = 62000, 71000
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        if offset >= end:
+            return {"markets": []}
+        kind = ("SPORTS_MARKET_TYPE_SPREAD" if offset >= boundary
+                else "SPORTS_MARKET_TYPE_FUTURE")
+        return {"markets": [_row(id=f"m-{offset}", category="sports",
+                                 sportsMarketTypeV2=kind,
+                                 gameStartTime="2026-08-28T23:30:00Z")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.find_first_game_offset()
+
+    assert result["status"] == "ok", result
+    assert result["first_game_offset"] == boundary, result
+    assert result["ceiling"] > 40000, result
+
+
+def test_an_empty_page_sends_the_search_DOWN_not_up(monkeypatch):
+    """The single line that caused it. `_has_games` returned a BOOL, so a
+    futures page and a past-the-end empty page were both False -- and False ran
+    `low = mid + 1`, which moves UP. The comment above it claimed "the search
+    should move DOWN, which False achieves correctly", asserting the opposite
+    of the line beneath it.
+
+    A block that ENDS well below the ceiling is the case that exposes it: every
+    probe above the end is empty, and treating those as "go higher" walks the
+    search off the top of the collection.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        if offset >= 9000:            # the block ends early; everything above is empty
+            return {"markets": []}
+        kind = ("SPORTS_MARKET_TYPE_MONEYLINE" if offset >= 8000
+                else "SPORTS_MARKET_TYPE_FUTURE")
+        return {"markets": [_row(id=f"m-{offset}", category="sports",
+                                 sportsMarketTypeV2=kind,
+                                 gameStartTime="2026-08-28T23:30:00Z")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.find_first_game_offset()
+
+    assert result["status"] == "ok", result
+    assert result["first_game_offset"] == 8000, result
 
 
 def test_fetch_game_markets_starts_at_the_located_boundary(monkeypatch):
