@@ -29786,6 +29786,59 @@ refresh-worker deploy for >=30 min and >=6 readings on one SHA.
 
 ---
 
+## 2026-08-25T23:07:25Z — `b55eb971e` — live-odds-worker: **NCAAF IS CAPTURING.** First real write, 432 rows on the 08-29 slate
+
+**What.** `#558` closed. `SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT=write` on
+live-odds-worker (`dep-da71uj8u01pc73dm89ng`, commit `b55eb971e` — my own PR #76
+merge, so the write mode was certainly present).
+
+**verify — the whole chain, in one boot:**
+
+```
+23:07:25.301Z  NCAAF_ODDSAPI_REPORT_START mode=write
+23:07:25.712Z  [ncaaf_odds] EVENTS events=111 teams=184 resolved=184 unresolved=0
+23:07:25.817Z  [ncaaf_odds] QUOTES date=2026-08-29 events=7  rows=432  appended=18
+               [ncaaf_odds] QUOTES date=2026-09-05 events=60 rows=2050 appended=56
+               ... 14 date shards, 2026-08-29 through 2026-11-28 ...
+               [ncaaf_odds] DONE events=111 dates=14 rows_appended=74
+23:07:25.818Z  NCAAF_ODDSAPI_REPORT_DONE mode=write exit=0
+```
+
+**432 quote rows across the 7 games of the 08-29 slate** — the weekend the
+readiness assessment opened on, and the slate that had a model on all 51 games
+and a price on none. 184/184 resolution held on the WRITE path, not only the
+report path. Date-sharding works as designed: 14 shards keyed on each event's
+OWN kickoff, because OddsAPI returns the whole forward board rather than one
+week.
+
+**`appended` IS THE READING, NOT `rows`.** 432 rows, 18 appended: most were
+already in the log, so dedup is doing its job and this run added only what was
+new. It also confirms the earlier suspicion — NCAAF quote data was already
+present from the git-tracked mirror, which is exactly why the 190KB
+`book_grid_2026-08-29.json` at 22:14 was NOT accepted as proof of a capture.
+`rows` alone reads as success whether or not anything happened; `appended` is
+the column that says something did.
+
+**Why a boot hook and not the sweep.** live-odds-worker's tick is a
+`--phase live` loop firing every ~90s, and NCAAF has no games today, so its
+absence there is CORRECT, not a gate. The 08-29 capture comes from a
+`--phase pregame` sweep on a much slower cadence — and this service was
+restarted **six times in one hour** by peer sessions, each restart resetting
+that slower timer before it came round. The hook makes the first capture
+observable; the sweep still owns freshness.
+
+**The four gates, all now measured rather than reasoned about:**
+
+| gate | resolution |
+|---|---|
+| `cfbd_lines_*.json` had no producer (`#557`) | replaced by the OddsAPI capture |
+| team registry not in `HOT_ARTIFACT_PATTERNS` | allowlisted **on both ends** — the 403 was web refusing to serve, not a missing file |
+| `SYNDICATE_ACTIVE_SPORTS` excluded ncaaf/nfl | flipped; confirmed live by `live_lens_tick_after_nfl` appearing |
+| 8 unresolved schools | measured, looked up, aliased; 176 → 184 |
+
+**Cleanup owed and DONE in the next entry:** `...REPORT_ON_BOOT` must go back to
+`0`. In `write` it performs a real fetch AND append on **every** boot, and peers
+restart this service constantly.
 ## 2026-08-25 22:54:25Z — SETTLED: `find_first_game_offset`'s partition assumption is FALSE, and ~8,400 rows of game markets are invisible
 
 **lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `f43863ed7611dd7f`

@@ -5826,6 +5826,52 @@ With the real gate dead, the by-hand substitute inherited a property the gate
 does not have — it can go stale silently — and nothing in the environment
 reports that. Three for three.
 
+### 2026-08-25 — FORBIDDEN: never deploy one side of a permission check and call the fix shipped. A 403 is not a 404, and the difference names which end is wrong
+
+- What we believed: allowlisting the NCAAF team registry in
+  `HOT_ARTIFACT_PATTERNS` and deploying the WORKER that pulls it was the fix.
+  The worker had the new 156-pattern tuple and called `pull_streamed_artifact`
+  correctly.
+- What was actually true: `is_hot_artifact_relative_path` gates the **server**
+  side of `/api/ops/artifacts/stream` as well. Web was still on `93de25cc` with
+  the old 155-pattern tuple, so it REFUSED to serve a file it had.
+  `TEAM_REGISTRY_PULL ok=False written=0`, and `resolved=0 unresolved=184`
+  again. **The allowlist is a shared contract and must be live on BOTH ENDS.**
+- How we found out: web's own access log — `GET /api/ops/artifacts/stream?path=
+  …team_registry… → **403**`. Not 404. The file was present and refused; a
+  missing file would have been 404. One status code separated "web does not have
+  it" from "web will not serve it", and they have completely different fixes.
+- The rule going forward: for any change to a shared allowlist, gate, or
+  vocabulary, enumerate every SERVICE that evaluates it and deploy them all
+  before reading the result. And when a fetch fails, **read the status code
+  before theorising** — 403 vs 404 vs 304 each name a different end of the wire.
+- Cost: one deploy cycle and one wrong diagnosis. Cheap only because
+  `pull_streamed_artifact` never raises and the fetcher refused rather than
+  writing — the run that hit this returned exit 3 having spent no credit and
+  written nothing.
+
+### 2026-08-25 — METHOD: a log line that prints only on the bad path cannot verify the good path. Silence is not a reading
+
+- What we believed: `SWEEP_OWNERSHIP_EXCLUDED` disappearing after the
+  `SYNDICATE_ACTIVE_SPORTS` flip meant NCAAF was now kept by the sweep.
+- What was actually true: that line is inside `if dropped:`. It prints ONLY when
+  something is excluded, so its absence is equally consistent with "nothing was
+  dropped", "no tick ran", and "the service restarted before the tick". Several
+  polling rounds were spent on it before reading the code.
+- The rule going forward: before treating an absent log line as evidence, open
+  the emitter and check whether it can print on the path you are claiming. Prefer
+  a POSITIVE signal that only the good path produces — here
+  `live_lens_tick_after_nfl` (a sport being processed) and `FIXTURE_CADENCE
+  sport=ncaaf` (a sport being scheduled), both of which are impossible unless
+  the flip worked.
+- Corollary, same session: absence of a `--phase pregame` sweep was read as a
+  gate twice. It was not. A `--phase live` sweep correctly excludes a sport with
+  no games today, and Layer 2's absence is `_SLATE_WINDOW_DAYS["ncaaf"] = 3`
+  working as designed against a slate 4 days out. **Check whether the system is
+  supposed to do the thing before hunting for what is stopping it** — a fourth
+  env var was nearly changed on that reading.
+- Cost: turns, and one near-miss on an unnecessary production env change.
+
 ### 2026-08-25 — FORBIDDEN: never accept "the artifact I WRITE is allowlisted" as evidence the feature works. Check what it READS, and check it on the service that will run it
 
 - What we believed: `#557`/`#552`'s OddsAPI capture needed no

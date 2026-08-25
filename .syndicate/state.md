@@ -4377,7 +4377,38 @@ touched; reverting is re-ordering the same blocks back. The priority call
 not measured, because the effect cannot be measured from a checkout. **The
 owners should confirm it.** Nothing is deployed; `autoDeploy` is off.
 
-## [ncaaf-sweep-env-gate] NCAAF IS SWITCHED OFF AT `SYNDICATE_ACTIVE_SPORTS`, NOT AT THE CALENDAR — the deployed capture cannot run `[measured 2026-08-25T20:36:57Z, lane ncaaf-oddsapi-game-lines]`
+## [ncaaf-capture-live] NCAAF captures from real OddsAPI: 184/184 teams, 432 rows on the 08-29 slate `[measured 2026-08-25T23:07:25Z, lane ncaaf-oddsapi-game-lines]`
+
+**Only VERIFIED facts here.** Narrative in `log/2026-08-25.md`; deploy readings in
+`deploys.md`.
+
+```
+live-odds-worker 23:07:25Z
+  EVENTS events=111 teams=184 resolved=184 unresolved=0
+  QUOTES date=2026-08-29 events=7 rows=432 appended=18
+  DONE   events=111 dates=14 rows_appended=74
+```
+
+- **`appended` is the reading, never `rows`.** 432/18 — the mirror already held NCAAF
+  quotes, so a row count reads as success whether or not anything was captured. The
+  190KB `book_grid` at 22:14 was refused as evidence for exactly this reason.
+- Grid moved after the capture: `book_grid_2026-08-29.json` 190,954 → **198,278 B**,
+  checksum changed; new `book_grid_2026-08-30.json` (28,892 B).
+- **`HOT_ARTIFACT_PATTERNS` gates BOTH ENDS.** The registry pull failed with **403, not
+  404** — the file was on web and web refused it, because web ran an older SHA with the
+  old 155-pattern tuple. Deploying only the puller is not deploying the fix.
+- **live-odds-worker never runs `bootstrap_data_root`** (zero lines in 7 days), so a
+  git-tracked file is present on web and absent on that worker. That asymmetry is
+  invisible from a checkout and is why every local test passed at `resolved=0`.
+- `FIXTURE_CADENCE sport=ncaaf interval=86400 reason=far:88h_out` — in the loop, on a
+  DISTANCE-based cadence that tightens as kickoff nears. Being claimed by the fast tick
+  does not mean a fast cadence.
+- **Layer 2 does not cover NCAAF until 2026-08-26**, and that is correct:
+  `_SLATE_WINDOW_DAYS["ncaaf"] = 3` and the slate is 4 days out.
+- `SWEEP_OWNERSHIP_EXCLUDED` prints only `if dropped:` — **its silence is not evidence
+  of success.**
+
+## [ncaaf-sweep-env-gate] RESOLVED — `SYNDICATE_ACTIVE_SPORTS` now carries `ncaaf,nfl`; the capture runs `[measured 2026-08-25T23:07:25Z, lane ncaaf-oddsapi-game-lines]`
 
 PR #61 is DEPLOYED and live on all three services (`.syndicate/deploys.md`,
 2026-08-25T20:31Z). It still captures nothing, and this is why:
@@ -4406,7 +4437,7 @@ spending OddsAPI credits on a sport that has never been fetched.
 **NOT DONE — needs a user decision.** Detail and the exact change: `todo.md`
 `#558`.
 
-## [ncaaf-oddsapi-lines] NCAAF GAME LINES — OddsAPI capture BUILT AND PROVEN OFF-LINE, NOT DEPLOYED AND NEVER RUN LIVE `[measured 2026-08-25, lane ncaaf-oddsapi-game-lines]`
+## [ncaaf-oddsapi-lines] NCAAF GAME LINES — LIVE IN PRODUCTION, 432 rows captured on the 08-29 slate `[measured 2026-08-25T23:07:25Z, lane ncaaf-oddsapi-game-lines]`
 
 **Read `[ncaaf-readiness-2026]` first — this closes its stated blocker in CODE
 and changes nothing that is running.** Detail: `todo.md` `#552`, `#553`.
