@@ -28877,3 +28877,64 @@ distinguishes a different failure:
 
 Still true and unchanged: Kalshi cannot transact on anything the join does not
 match, because `kalshi_ticker_resolver` is built from `matches`.
+
+---
+
+## 2026-08-25 — FIRST FILLED POSITION, and the YES convention verified
+
+**verify:** `[execute_portfolio]` / `[polymarket_us_orders]` / `[execution_ledger]`,
+`18:14:43Z` → `18:21:25Z`, live-odds-worker on `5a8064772`:
+
+```
+SUBMIT url=https://api.polymarket.us/v1/orders slug=tsc-mlb-tb-det-2026-08-25-7pt5
+  side=OUTCOME_SIDE_YES action=ORDER_ACTION_BUY qty=2.65
+  price={'value': '0.52'} tif=GOOD_TILL_CANCEL
+  our_side=over outcome_index=0 yes_index=0
+LIVE_ORDER status=submitted venue=polymarket market=totals side=over line=7.5
+EXECUTION venue=polymarket placed=1 spent={'dollars': 1.38, 'orders': 1}
+ORDERS_READ n=1 mode=per_order states=['ORDER_STATE_FILLED']
+RECONCILED submitted->filled contracts=2.65 fill_price=0.52
+RECONCILE candidates=1 venue_orders=1 changed=1 unknown=0 stamped=1
+```
+
+**A real filled position: 2.65 contracts @ $0.52 = $1.38, MLB Tampa Bay @
+Detroit, totals Over 7.5.** The first this system has ever held on Polymarket.
+
+**THE YES CONVENTION IS VERIFIED.** The user checked the venue's own position
+screen: it reads **Over 7.5**. So `OUTCOME_SIDE_YES` buys `outcomes[0]`, the
+default index of 0 is right, and `SYNDICATE_POLYMARKET_YES_OUTCOME_INDEX` does
+not need setting. That closes the convention that was wrong this morning and
+bought TEX instead of the White Sox — and it was checkable in seconds only
+because the SUBMIT line now carries `our_side` / `outcome_index` / `yes_index`.
+Keep those fields.
+
+**Four fixes proven in one cycle:** totals side resolution (`our_side=over`,
+impossible via `_side_for_team`); the slippage guard (this exact order was
+`drift=+108.52` at 17:59); `venue_contacted=False` (the spreads row is
+`rejected`, and charged nothing where it charged $2.39 an hour before); and the
+spreads refusal itself holding rather than guessing.
+
+**The verifier works and earned its keep immediately:**
+
+```
+ORDER_PATH venue=polymarket positions=2
+  markets={'totals': {'would_build': 1}, 'spreads': {'market_unresolved': 1}}
+  examples={'totals|would_build': 'tsc-mlb-tb-det-2026-08-25-7pt5 @ 0.52'}
+ORDER_PATH venue=kalshi positions=1 markets={'totals': {'no_venue_ticker': 1}}
+```
+
+Kalshi's blocker named exactly, with no slate spent to learn it.
+
+**AND IT EXPOSED A NEW DEFECT IN ITS OWN SUCCESS.** `spent={'dollars': 1.04}`
+against a `2.65 x 0.52 = $1.38` fill: the reconciler computed
+`int(contracts) * price`, so `int(2.65) * 0.52`. A 25% UNDER-count of real money
+against a daily cap on every fractional fill — harmless while Kalshi (whole
+contracts) was the only venue, wrong the moment a second arrived. Under-counting
+is the dangerous direction: a cap fed less than reality lets the account exceed
+it. Fixed in `0a504ab74`, which also un-inerted `_requested_contracts` — the
+"a fill cannot be larger than the order" bound required `0 < price < 1` and so
+returned None for EVERY Polymarket order, since they all carry American odds.
+Third guard today that could not read its own input.
+
+**Kalshi remains unable to transact.** `no_venue_ticker` on every game line;
+`kalshi_ticker_resolver` is built from the join's matches and the join has 4.
