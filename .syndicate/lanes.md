@@ -2377,6 +2377,117 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     `mocked_popen.assert_not_called()` sites that assert about the whole PROCESS
     (green on Windows, red on Linux via `ldconfig`).
 
+### polymarket-oddsapi-coverage-audit — OPEN — opened 2026-08-25 — session 0fd6da62-c2cc-543e-b5ea-47d428412dc0
+- Goal: a per-sport, per-market-family map of what Polymarket US LISTS versus
+  what Syndicate RESOLVES versus what the board CARRIES versus what OddsAPI
+  SUPPLIES, every row observed in a production log line with its timestamp, so
+  the user can hand back direct Polymarket links for the gaps instead of
+  closing coverage one market at a time.
+- Files: `docs/ai_context/polymarket_oddsapi_coverage_audit.md` (NEW),
+  `scripts/audit_polymarket_coverage.py` (NEW), this block.
+  **READ-ONLY AUDIT.** No execution, pricing or order-submission code touched;
+  no `render.yaml`; no deploy. The script is a read-only analyser over
+  artifacts already on the worker and is not wired into any loop.
+- Collision check: `exchange-markets-api-integration` (session 71a74bb7) and
+  `portfolio-decision-and-execution` (session 9324a3e5) hold every Polymarket
+  `.py` module between them. Neither path above is claimed by any OPEN lane,
+  and this lane claims none of their files. The sibling Kalshi audit's
+  `docs/ai_context/kalshi_oddsapi_coverage_audit.md` is NOT claimed here and
+  was not touched.
+- Hypothesis (stated before testing): the four absences in `VENUE_REPRICE_KEYS`
+  have four DIFFERENT causes, not one — spreads are a refusal we chose, props
+  are a refusal we chose, soccer/ncaaf are a league-vocabulary miss, and
+  nhl/ncaab are an empty board rather than an empty venue.
+- Falsification test: any absence turning out to be "Polymarket does not list
+  it" would falsify the hypothesis for that row. Measured result: NONE of the
+  eight sports' absences is a venue absence — every one is ours. Recorded per
+  row in the doc.
+- Verification: every table cell carries a production log line and a UTC
+  timestamp, or it sits in the SUSPECTED, UNCONFIRMED section. Rows whose
+  evidence is code-read rather than production-read are labelled as such.
+- Blocked by: none.
+- **DELIVERED 2026-08-25 ~20:4xZ. `docs/ai_context/polymarket_oddsapi_coverage_audit.md`,
+  every cell carrying a production log line and a UTC timestamp. HYPOTHESIS HELD:
+  none of the eight sports' gaps is a venue absence. Headline findings:**
+  1. **THE CATALOGUE READ IS TRUNCATED AND WAS NOT BEFORE.** `POLYMARKET_US_GAMES
+     rows=15000 pages=30 truncated=True` (19:28:40Z) -- `rows` now EQUALS the
+     30x500 budget. `exchange_capture_deep_dive.md` §2.4's "the slate is not
+     being truncated" is SUPERSEDED. Consequence: every zero in this audit is an
+     upper bound, and NBA/NHL/NCAAB absences are NOT established -- the fetched
+     block spans game starts 2026-08-21..2026-09-20 and all three seasons start
+     outside it.
+  2. **57% OF THE BOOK IS DROPPED BEFORE CAPTURE.** `POLYMARKET_DAILY_BOOK
+     skipped=7545` of 13,233 (`5688 + 7545 = 13233`, reconciles exactly), at
+     `in_scope_sports()`. Of those 7,545, **1,038 are in leagues whose codes are
+     never printed** -- `record_venue_book` truncates `skipped_by_sport[:20]`
+     and the twenty printed sum to 6,507.
+  3. **SOCCER LEAGUE MAPPING READ FROM DATA, six of ten confirmed BY THE CLUBS IN
+     A VERBATIM SLUG, not by token resemblance:** `lal`->la_liga (960,
+     `astatc-lal-ala-vil-2026-08-28-btts`), `epl`->epl (790, `…-cry-mnc-…`),
+     `lg1`->ligue_1 (711, `…-lil-psg-…`), `sea`->serie_a (448, `…-mil-ven-…`),
+     `bun`->bundesliga (393, `…-fcb-stu-…`), `eflc`->championship (198,
+     `astatc-eflc-car-nor-2026-08-25-btts`). Out-of-ten tokens also confirmed:
+     `lgscup`, `uecl`, `ucl`, `arg2`, `uslc`. `mls`/`eredivisie`/`primeira_liga`/
+     `belgian_pro_league` are absent FROM THE READING, not from the venue -- they
+     sit in the 1,038 below the print cap. **The codes are supplied; the
+     `SYNDICATE_VENUE_ODDS_SPORTS` change is a production change and was NOT
+     taken.**
+  4. **NCAAF IS LISTED AS `cfb`, 246 markets on 2026-08-25, and is 100% lost by
+     name.** Same class as soccer, in a sport nobody had looked for it in --
+     and with no club-alias rescue, because `cfb` is not a soccer token.
+  5. **SPREADS: two of the three facts are now CONFIRMED, 5 rows of 5.** The
+     slug's `pos`/`neg` token labels `outcomes[0]` (`asc-eflc-car-nor-2026-08-25-`
+     `neg-2pt5` -> `["-2.50","+2.50"]`, `…-neg-1pt5`, `…-pos-1pt5`, `…-pos-2pt5`,
+     `asc-nfl-pit-buf-2026-08-27-1h-neg-4pt5`), and each fixture's ladder is
+     symmetric about zero (`chc-az @ ±1.5, ±2.5`), so the sign belongs to ONE
+     reference club per game. **Control in the same log line: the TOTALS rows for
+     that same fixture are `["Under","Over"]` at 1.5 and `["Over","Under"]` at
+     2.5/3.5 -- array position really is unstable while the sign token is not.**
+     STILL UNCONFIRMED and deliberately not guessed: whether the reference club
+     is the slug's `<home>` or `<away>`. **CONFLICT FLAGGED:** `venue_quote_
+     adapters`' docstring records "1 of 5 spread rows would have been priced on
+     the opposite handicap"; those five are not reproduced in any log line found
+     here and the two measurements must be reconciled before anything ships.
+     `scripts/audit_polymarket_coverage.py --spreads` implements the offline
+     test that settles it (Polymarket ladder sign vs the board's own signed home
+     spread, one vote per fixture, bimodal answer, refuses below n=30).
+  6. **A FIFTH BUG CLASS, found here: the join cannot resolve Polymarket's own
+     tri-codes.** Code-read at HEAD `a41f8e2d`: `teams_match("mlb","chc","Chicago
+     Cubs")`, `("mlb","az",...)`, `("mlb","stl",...)` and `("wnba","phx",...)` all
+     return **False** (17/20 MLB, 6/7 WNBA, **15/15 NFL** resolve). Production
+     offered `chc-az` as a spreads AND totals candidate at 20:16:08Z and the
+     board row still read `no_match`, **at the same tick the re-pricer offered
+     `mlb|h2h|chicago cubs` and `mlb|h2h|arizona diamondbacks`** -- because
+     `_polymarket_sides` resolves the OUTCOME NAME while `_teams_match` resolves
+     the SLUG CODE. The same club is resolvable and unresolvable at once. Same
+     shape as the `min`/`ath` collision already in `_effective_league`'s comment.
+     NOT FIXED -- `team_aliases.py` is another lane's file and was edited today.
+  7. **The `question` field is dropped by `_SLATE_STORAGE_FIELDS`**, so
+     `out_of_scope_samples` -- whose own comment says "the question is what names
+     the bet" -- is structurally blind: every sample observed today carries
+     `'question': ''`.
+  8. **The Polymarket daily book has recorded ZERO price points all day**
+     (`opened=0 appended=0` on six consecutive byte-identical cycles; Kalshi's
+     equivalent appended 663-1245 over the same window).
+  9. **Two live incidents recorded, neither chased (other lanes' files):**
+     `POLYMARKET_US_GAMES status=error reason=no_game_offset: ok` at 20:21:29Z
+     (whole-slate outage; `start_offset` had been climbing 11,554 -> 12,142 over
+     three hours), and `POLYMARKET_US_SLATE status=skipped
+     reason=sports_routes_404_on_this_host` -- `/v1/markets` is the only working
+     discovery path.
+  10. **REVERSE DIRECTION, stated with its limit.** At the RE-PRICE layer OddsAPI
+     contributed **0 quotes** for mlb (`no_side_in_key:3449`), wnba
+     (`no_side_in_key:99`, age 4.4h) and nfl (`no_odds_history_shard…`) while
+     Polymarket offered 194/112/1376 and won 786 of 892 selections. Soccer is the
+     only sport where OddsAPI is doing re-price work (44 quotes, and it is
+     genuinely fresher: 128s vs 1916s). **But OddsAPI is what CREATES board rows
+     and Polymarket resolves no player props at all**, so this supports cutting
+     OddsAPI GAME-LINE price pulls for mlb/wnba/nfl and nothing else -- and it is
+     one tick, not a day.
+  **Nothing deployed, no `render.yaml`, no execution/pricing/order code touched.**
+  Twelve gaps are tabulated with verbatim slugs; the browsable Polymarket US
+  market URL is UNOBSERVED and deliberately not constructed -- one link from the
+  user confirms it and unlocks the rest of the gap table.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
