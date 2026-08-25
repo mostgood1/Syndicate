@@ -28360,3 +28360,119 @@ coverage question and is NOT diagnosed. Do not assume the key fix addressed it.
 `4aea9fe2e` is pushed and unshipped. With it, the next Polymarket execution tick
 can place a REAL order for the first time -- caps $10/order, $40/day, $80 across
 venues.
+
+---
+
+## 2026-08-25 — live-odds-worker `b51a34323`: the first real Polymarket order, on the right game
+
+**Deployed:** `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`), deploy
+`dep-da6roiqfngtc73c63l6g`, live `16:05:07Z`. Commit `b51a34323`, on
+`origin/main`. Trigger `api` (MCP), so the claim was advisory — same guard gap
+recorded on 2026-08-23.
+
+**verify:** `[execute_portfolio]` and `[polymarket_us_orders]` at `16:08:10Z`:
+
+```
+POLYMARKET_ARTIFACT_PRICE slug=aec-mlb-tex-cws-2026-08-25 price=0.495 planned=104.0
+SUBMIT url=https://api.polymarket.us/v1/orders slug=aec-mlb-tex-cws-2026-08-25
+       side=OUTCOME_SIDE_YES action=ORDER_ACTION_BUY qty=2.86
+       price={'value': '0.495', 'currency': 'USD'} tif=GOOD_TILL_CANCEL
+LIVE_ORDER status=submitted venue=polymarket ticker=aec-mlb-tex-cws-2026-08-25
+       sport=mlb market=h2h side=home price=104.0 stake=1.42
+EXECUTED placed=1 filled=0 failed=0 refused={} spent={'dollars': 1.42, 'orders': 1}
+```
+
+**What this proves.** Two separate fixes, both confirmed live and each of which
+alone would still have blocked the order.
+
+The SLUG NAMES THE RIGHT GAME. The same Texas @ Chicago White Sox row carried
+`aec-mlb-pit-sd-2026-08-25` before — Pittsburgh at San Diego, a bet on
+strangers. The resolver keyed on `(market, player, line, side)` with no event in
+it, so any row of that shape collected whatever game the index happened to hold.
+It now keys on `event_id` through a `_resolver_key` shared by the price and
+ticker resolvers, and the slug reads `tex-cws`.
+
+The TICKER REACHED THE VENUE AS A STRING. `venue_ticker` is a Mapping
+(`{'slug': ..., 'tick_size': ..., 'minimum_trade_qty': ...}`), and
+`execute_portfolio.py:99` had already flattened it with `str()` when building
+the OrderRequest — so the earlier fix teaching `_polymarket_resolve_market` to
+read a dict tested a string and was INERT. Its production line was
+byte-identical before and after. `_venue_ticker_of` now unwraps at that
+boundary.
+
+**What this does NOT prove.** `filled=0`. The order is a GTC limit at 0.495
+resting on the book, not a fill — so this proves the ORDER PATH, not an
+execution. `reconcile_live_orders()` asks the venue before the stranded-order
+gate on the next live run, and `unreconciled_orders` deliberately distinguishes
+"we do not know" from "we know it rests unfilled", so a resting order should not
+jam the next slate. That distinction has not been observed holding on a real
+resting order. Open obligation.
+
+**Kalshi is unchanged and still blocked:** `LIVE_ORDER status=rejected
+venue=kalshi ticker=None ... error='OrderBuildError: no_live_price: None'` at
+`16:08:09Z`. Different cause, tracked below.
+
+---
+
+## 2026-08-25 — refresh-worker `b51a34323` → `7f4b8808a`: the alias hypothesis was wrong
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da6rogu417fc73ei53jg`, live `16:05:07Z` (`b51a34323`); then
+`dep-da6s4pm417fc73ejdmq0` at `16:27:18Z` (`7f4b8808a`). Both on `origin/main`.
+
+**verify:** `[kalshi_odds]` at `16:14:40Z`, first Kalshi cycle on the new
+instance (`92hw7`):
+
+```
+BOARD_JOIN kalshi_markets=883 board_rows=1290 matched=5
+  reasons={'event_not_on_our_board': 20, 'market_is_for_another_date': 512,
+           'no_matching_board_row': 120, 'unreadable_title': 216,
+           'would_match_but_wrong_date': 10}
+JOIN_EVENTS unmatched=[{'kalshi': 'ATLMIL',
+  'ticker': 'KXMLBSPREAD-26AUG231910ATLMIL-MIL4', 'sport': 'mlb'}, ...x8]
+```
+
+`b51a34323` moved the `JOIN_EVENTS` print out of the `if not matched` block so
+it would show on a partial join. That worked — the line printed for the first
+time, on a join with `matched=5`.
+
+**What it proves, and it is the opposite of what was expected.** The line was
+shipped to produce the club-code alias work list for the 20
+`event_not_on_our_board` refusals. It produced no such list. All 8 samples are
+`ATLMIL` on `26AUG23` — Atlanta at Milwaukee, two days stale — and `ATLMIL` is
+a blob the resolver reads correctly. **The refusals were dated, not
+misspelled.** The alias hypothesis carried in `kalshi_board_join.py:528`
+("`OAK` against `ATH` is a real possibility") is not supported by this reading;
+the comment asserting it as fact is corrected in `7f4b8808a`.
+
+Two defects made a date failure impersonate an alias failure:
+
+- **The date was checked SECOND.** `_resolve_event` matches the blob against
+  TODAY'S board, so a game line from another date cannot resolve however well
+  its codes are read — and the date check sat below the resolver, so a stale
+  market died as `event_not_on_our_board` with its date never consulted. This is
+  the `#505` failure the reason names exist to prevent, reappearing one layer
+  down: the names were right, their ORDER let one impersonate the other.
+- **The sample was bounded on MARKETS, not codes.** `len(unmatched_samples) < 8`
+  takes the first eight markets; one event offers far more, and six spreads plus
+  two team totals of `ATLMIL` took every slot.
+
+`7f4b8808a` checks `game_date_from_ticker` before `_resolve_event` and
+deduplicates the sample by blob. Both fix-tests fail against `b51a34323`; the
+dedupe test reproduces the production symptom exactly, filling all 8 slots with
+one blob.
+
+**What this does NOT prove — the open obligation.** It does not say how many of
+the 20 are real alias gaps. It makes the NEXT reading able to answer that:
+whatever `event_not_on_our_board` still counts after the date is checked first
+is an alias gap, and the sample is then the work list it was built to be. Not
+yet read.
+
+**Unchanged and still true:** `game_lines_disabled` is ABSENT from the reasons.
+That counter fires only for a game line whose event RESOLVED, so its absence
+means zero resolved and `SYNDICATE_KALSHI_GAME_LINES` is NOT the blocker —
+turning it on would price nothing.
+
+**Also measured on the same instance:** `AGGREGATOR_DUPLICATE_DROPPED rows=180`
+then `rows=273 books=['kalshi', 'polymarket']` — the OddsAPI duplicate drop for
+the two direct-feed books is live and load-bearing.
