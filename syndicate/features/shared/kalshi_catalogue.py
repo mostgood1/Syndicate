@@ -104,6 +104,58 @@ SERIES_SPORT: dict[str, str] = {
     "KXWNBAPTS": "wnba",
     "KXWNBAAST": "wnba",
     "KXWNBA3PT": "wnba",
+    # ------------------------------------------------------------------
+    # FULL-GAME TOTALS, hand-registered because the TITLE GATE misses them.
+    # ------------------------------------------------------------------
+    #
+    # `auto_game_series_from_catalogue` registers a series only if
+    # `game_market_from_title` can name its market from Kalshi's own series
+    # title. That gate is why `KXMLBGAME` was invisible for weeks (its title is
+    # "Professional Baseball Game"; the vocabulary had no "game"), and it is
+    # still failing one market family over.
+    #
+    # CONFIRMED BY THE USER 2026-08-25 against a live market page:
+    #
+    #     KXMLBTOTAL-26AUG251840BOSMIA-7
+    #
+    # A full-game total on today's Boston/Miami game, strike 7. It exists, it
+    # is tradeable, and `KXMLBTOTAL` appears NOWHERE in our logs -- never
+    # registered, never fetched, so an MLB `totals` board row had nothing to
+    # join to and every Kalshi order refused `no_live_price`.
+    #
+    # We DO fetch `KXMLBF5TOTAL` (first five), `KXMLBINNINGTOTAL` (one inning)
+    # and `KXMLBTEAMTOTAL` (one team). None of those is the full-game total,
+    # and the near-miss is what made the gap read as coverage rather than as an
+    # absence.
+    #
+    # WHY THE GATE MISSES IT while `KXWNBATOTAL` and `KXNHLTOTAL` register
+    # fine: the vocabulary resolves a title ending "... Total", and
+    # 'Professional Baseball Total Runs' / 'Professional Baseball Runs' both
+    # return None. The sports whose totals are named for their scoring unit
+    # fall through; the ones named "Total" do not.
+    #
+    # Hand-registered rather than patched into the vocabulary because the
+    # registry needs no title at all -- `sport_for_series` checks it FIRST and
+    # `register_discovered` never overwrites it, so these keep working through
+    # a failed catalogue read, and a later vocabulary fix is a no-op here
+    # rather than a conflict. Same reasoning the WNBA props above already
+    # state: "naming the ones that matter makes them independent of a network
+    # call succeeding at the right moment."
+    "KXMLBTOTAL": "mlb",
+    "KXNBATOTAL": "nba",
+    "KXNFLTOTAL": "nfl",
+    "KXNCAAFTOTAL": "ncaaf",
+    "KXNCAABTOTAL": "ncaab",
+    # ...and the moneyline/spread pair for the same sports, for the same
+    # reason. `KXMLBGAME` and `KXMLBSPREAD` currently register only because a
+    # vocabulary entry happens to match their titles; a title Kalshi rewords
+    # would silently un-register the most valuable market on the venue again.
+    # A registry entry cannot be reworded out from under us.
+    "KXMLBGAME": "mlb",
+    "KXMLBSPREAD": "mlb",
+    "KXWNBAGAME": "wnba",
+    "KXWNBASPREAD": "wnba",
+    "KXWNBATOTAL": "wnba",
 }
 
 # Series we have SEEN and deliberately do not cover. Kept explicit so they stop

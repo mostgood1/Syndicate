@@ -471,3 +471,71 @@ def test_a_futures_market_still_refuses():
     assert _parse_title("Will Texas be the 2026 AL West Division Winner") is None
     # And the ticker cannot be dated either -- two independent refusals.
     assert game_date_from_ticker("KXMLBALWEST-26-TEX") is None
+
+
+# --------------------------------------------------------------------------
+# The full-game total: registered by hand, because the title gate misses it
+# --------------------------------------------------------------------------
+
+
+def test_the_full_game_totals_series_are_registered():
+    """CONFIRMED BY THE USER 2026-08-25 against a live Kalshi market page:
+
+        KXMLBTOTAL-26AUG251840BOSMIA-7
+
+    A full-game total on today's Boston/Miami game. It exists and is
+    tradeable, and `KXMLBTOTAL` appeared NOWHERE in our logs -- never
+    registered, never fetched -- so every MLB `totals` board row had nothing to
+    join to and every Kalshi order refused `no_live_price`.
+
+    We DO fetch `KXMLBF5TOTAL` (first five), `KXMLBINNINGTOTAL` (one inning)
+    and `KXMLBTEAMTOTAL` (one team). None is the full-game total, and that
+    near-miss is what made the gap read as coverage rather than absence.
+    """
+    from syndicate.features.shared.kalshi_catalogue import sport_for_series
+
+    assert sport_for_series("KXMLBTOTAL") == "mlb"
+    for series, sport in (
+        ("KXNBATOTAL", "nba"), ("KXNFLTOTAL", "nfl"),
+        ("KXNCAAFTOTAL", "ncaaf"), ("KXNCAABTOTAL", "ncaab"),
+        ("KXWNBATOTAL", "wnba"),
+    ):
+        assert sport_for_series(series) == sport, series
+
+
+def test_the_moneyline_and_spread_survive_a_title_rewording():
+    """`KXMLBGAME` registered only because a vocabulary entry happens to match
+    "Professional Baseball Game". A title Kalshi rewords would silently
+    un-register the most valuable market on the venue -- again. A registry
+    entry cannot be reworded out from under us."""
+    from syndicate.features.shared.kalshi_catalogue import SERIES_SPORT
+
+    for series in ("KXMLBGAME", "KXMLBSPREAD", "KXWNBAGAME", "KXWNBASPREAD"):
+        assert SERIES_SPORT.get(series), series
+
+
+def test_a_real_full_game_total_ticker_classifies_end_to_end():
+    """Registration is necessary, not sufficient -- the market's own title must
+    still classify. Ticker and title shape are the ones measured in
+    production, not invented."""
+    from syndicate.features.shared.kalshi_catalogue import (
+        classify_market,
+        event_blob_from_ticker,
+        game_date_from_ticker,
+    )
+
+    ticker = "KXMLBTOTAL-26AUG251840BOSMIA-7"
+    assert game_date_from_ticker(ticker) == "2026-08-25"
+    assert event_blob_from_ticker(ticker) == "BOSMIA"
+
+    verdict = classify_market({
+        "ticker": ticker, "series": "KXMLBTOTAL",
+        "title": "Over 7.5 runs scored?",
+        "yes_ask_dollars": 0.5, "no_ask_dollars": 0.5,
+    })
+    assert verdict["status"] == "ok"
+    assert verdict["market"] == "totals"
+    assert verdict["line"] == 7.5
+    assert verdict["side"] == "over"
+    # A total names no team, so the game must come from the ticker.
+    assert verdict["needs_event_identity"] is True
