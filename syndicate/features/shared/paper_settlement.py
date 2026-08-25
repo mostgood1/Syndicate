@@ -342,13 +342,38 @@ def settle_orders(
             roi = total.get("roi_pct")
             win = total.get("win_pct")
             print(
-                f"[paper_settlement] PNL {scope}"
+                # `book=portfolio` on the line, because this number USED to span
+                # both books and a reader comparing it against an older log
+                # otherwise has no way to know the definition changed under them.
+                f"[paper_settlement] PNL {scope} book=portfolio"
                 f" settled={total.get('settled')} pending={total.get('pending')}"
                 f" won={total.get('won')} lost={total.get('lost')} push={total.get('push')}"
                 f" staked=${total.get('staked_dollars')} pnl=${total.get('pnl_dollars')}"
                 f" roi={'n/a' if roi is None else f'{roi}%'}"
                 f" win_rate={'n/a' if win is None else f'{win}%'}"
+                f" venues={(summary.get('books') or {}).get('portfolio', {}).get('venues')}"
                 f" by_venue={[(b.get('venue'), b.get('settled'), b.get('pnl_dollars'), b.get('roi_pct')) for b in summary.get('by_venue') or []]}",
+                flush=True,
+            )
+            # THE SHADOW BOOKS, ON THEIR OWN LINE AND NEVER ADDED TO THE ABOVE.
+            #
+            # These are `paper:<venue>` -- the same board rows re-priced and
+            # re-sized per venue, so their orders overlap the portfolio's one for
+            # one. Printed because the comparison is what paper2 exists to
+            # produce; separated because summing it was the defect.
+            comparison = summary.get("comparison_total") or {}
+            c_roi, c_win = comparison.get("roi_pct"), comparison.get("win_pct")
+            print(
+                f"[paper_settlement] PNL {scope} book=venue_comparison"
+                f" settled={comparison.get('settled')} pending={comparison.get('pending')}"
+                f" won={comparison.get('won')} lost={comparison.get('lost')}"
+                f" staked=${comparison.get('staked_dollars')} pnl=${comparison.get('pnl_dollars')}"
+                f" roi={'n/a' if c_roi is None else f'{c_roi}%'}"
+                f" win_rate={'n/a' if c_win is None else f'{c_win}%'}"
+                f" venues={(summary.get('books') or {}).get('venue_comparison', {}).get('venues')}"
+                # SAID OUT LOUD ON THE LINE. Anyone reading two totals will try
+                # to add them; this is the sentence that stops them.
+                f" note=overlaps_portfolio_do_not_sum",
                 flush=True,
             )
             # The two cuts that separate best-of-N EV inflation from market-mix.
@@ -505,6 +530,12 @@ def _default_resolver(selected_date: str):
     builders = {
         "mlb": lambda: _build("syndicate.features.shared.bet_status_mlb", "mlb_status_resolver", selected_date),
         "wnba": lambda: _build("syndicate.features.shared.bet_status_wnba", "wnba_status_resolver", selected_date),
+        # `#547`. Soccer orders returned `no_resolver_for_soccer` FOREVER --
+        # 0 settled all-time on 2026-08-25 while the board was ~97% soccer by
+        # row count. Game lines only; the resolver's docstring states why props
+        # refuse (the live-state capture is capped at 12 players per match, so
+        # an absent player is not a zero).
+        "soccer": lambda: _build("syndicate.features.shared.bet_status_soccer", "soccer_status_resolver", selected_date),
     }
     cache: dict[str, Any] = {}
 
@@ -531,6 +562,87 @@ def _build(module_name: str, factory_name: str, selected_date: str):
         return getattr(importlib.import_module(module_name), factory_name)(selected_date)
     except Exception:
         return None
+
+
+# THE TWO BOOKS IN THE LEDGER, AND WHY A TOTAL MAY NOT SPAN THEM.
+#
+# `paper2` writes its venue-restricted orders into the SAME ledger as the
+# unrestricted portfolio, distinguished only by `venue`:
+#
+#   paper            the unrestricted portfolio -- THE book
+#   paper:<venue>    the same rows scoped to one venue, RE-PRICED and RE-SIZED
+#   <venue>          real money, no prefix (`execute_portfolio.PAPER_VENUE`)
+#
+# `portfolio_commit` builds each venue book as
+# `commit_portfolio(scope_rows_to_venue(rows, venue))` -- a SUBSET of the very
+# rows the unrestricted plan was built from. So one decision on one game can
+# appear as up to five orders, and summing them counts the same judgement five
+# times.
+#
+# MEASURED 2026-08-25 14:09:04Z, which is what this fixes:
+#
+#   PNL all_time settled=181 staked=$1078.52 pnl=$16.7 roi=1.55%
+#     by_venue=[('kalshi', 2, 0.01), ('paper', 95, -26.31),
+#               ('paper:kalshi', 33, 25.96), ('paper:novig', 13, 19.07),
+#               ('paper:polymarket', 15, 14.88), ('paper:prophetx', 23, -16.91)]
+#
+# 95 unrestricted orders and 84 venue-scoped ones over the same board, summed
+# into "181 settled" and "$1,078.52 staked". Neither number describes any book
+# anyone could have held.
+#
+# `portfolio_plan_path_for_venue`'s own docstring already names this hazard as
+# the reason the PLANS are separate files -- "Stage C's per-market aggregates
+# would silently mix a best-book book with a Kalshi-only one" -- and then the
+# summary re-merged them. `order_clv` reached the same conclusion from the CLV
+# side and states the rule this now follows: "a number that does not know which
+# book it is about is not a measurement."
+#
+# So `total` describes the PORTFOLIO book only, `comparison_total` the
+# venue-scoped shadow books, and they are never added. The comparison is the
+# whole point of paper2 and it survives -- it just stops being laundered into
+# one headline.
+BOOK_PORTFOLIO = "portfolio"
+BOOK_VENUE_COMPARISON = "venue_comparison"
+
+
+def book_of(order: Mapping[str, Any]) -> str:
+    """Which book an order belongs to, from its venue name.
+
+    The `paper:` prefix is `execute_portfolio`'s own marker for a scoped shadow
+    book (`venue = f"{venue}:{scope}"`, paper mode only -- live mode uses the
+    bare venue). Keyed on that prefix rather than on a list of venue names so a
+    venue added to `paper2_venues()` is classified correctly the day it appears,
+    with no second place to update.
+    """
+    venue = str(order.get("venue") or "")
+    return BOOK_VENUE_COMPARISON if venue.startswith("paper:") else BOOK_PORTFOLIO
+
+
+def _aggregate(buckets: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Sum a set of per-venue buckets into one book's numbers.
+
+    Extracted so the portfolio total and the comparison total cannot drift into
+    two slightly different definitions of ROI -- which is how the pooled number
+    survived review in the first place.
+    """
+    out = {
+        "orders": sum(int(b.get("orders") or 0) for b in buckets),
+        "settled": sum(int(b.get("settled") or 0) for b in buckets),
+        "pending": sum(int(b.get("pending") or 0) for b in buckets),
+        "won": sum(int(b.get("won") or 0) for b in buckets),
+        "lost": sum(int(b.get("lost") or 0) for b in buckets),
+        "push": sum(int(b.get("push") or 0) for b in buckets),
+        "staked_dollars": round(sum(float(b.get("staked_dollars") or 0.0) for b in buckets), 2),
+        "pnl_dollars": round(sum(float(b.get("pnl_dollars") or 0.0) for b in buckets), 2),
+    }
+    out["roi_pct"] = (
+        round(100.0 * out["pnl_dollars"] / out["staked_dollars"], 2)
+        if out["staked_dollars"] > 0
+        else None
+    )
+    decided = out["won"] + out["lost"]
+    out["win_pct"] = round(100.0 * out["won"] / decided, 2) if decided else None
+    return out
 
 
 def settlement_summary(
@@ -580,27 +692,36 @@ def settlement_summary(
         decided = bucket["won"] + bucket["lost"]
         bucket["win_pct"] = round(100.0 * bucket["won"] / decided, 2) if decided else None
 
-    total = {
-        "orders": sum(b["orders"] for b in by_venue.values()),
-        "settled": sum(b["settled"] for b in by_venue.values()),
-        "pending": sum(b["pending"] for b in by_venue.values()),
-        "won": sum(b["won"] for b in by_venue.values()),
-        "lost": sum(b["lost"] for b in by_venue.values()),
-        "push": sum(b["push"] for b in by_venue.values()),
-        "staked_dollars": round(sum(b["staked_dollars"] for b in by_venue.values()), 2),
-        "pnl_dollars": round(sum(b["pnl_dollars"] for b in by_venue.values()), 2),
-    }
-    total["roi_pct"] = (
-        round(100.0 * total["pnl_dollars"] / total["staked_dollars"], 2)
-        if total["staked_dollars"] > 0
-        else None
+    # ONE BOOK PER TOTAL. See `book_of` above for the measurement that forced
+    # this: summing `paper` with `paper:kalshi` and friends counted the same
+    # decision up to five times and reported it as one portfolio.
+    portfolio_rows = [o for o in rows if book_of(o) == BOOK_PORTFOLIO]
+    comparison_rows = [o for o in rows if book_of(o) == BOOK_VENUE_COMPARISON]
+    portfolio_venues = {str(o.get("venue") or "unknown") for o in portfolio_rows}
+    total = _aggregate([b for v, b in by_venue.items() if v in portfolio_venues])
+    comparison_total = _aggregate(
+        [b for v, b in by_venue.items() if v not in portfolio_venues]
     )
-    decided = total["won"] + total["lost"]
-    total["win_pct"] = round(100.0 * total["won"] / decided, 2) if decided else None
 
     return {
         "selected_date": selected_date,
+        # THE PORTFOLIO BOOK, and nothing else. `paper` plus any real-money
+        # venue -- the bets a person could actually have held.
         "total": total,
+        # The venue-scoped shadow books, reported BESIDE the portfolio and never
+        # added to it. This is paper2's comparison and it is still here; it just
+        # no longer contributes to a headline that would double-count it.
+        "comparison_total": comparison_total,
+        # Named counts, so a reader can see the overlap that used to be summed
+        # rather than having to derive it from two totals.
+        "books": {
+            BOOK_PORTFOLIO: {"orders": len(portfolio_rows),
+                             "venues": sorted(portfolio_venues)},
+            BOOK_VENUE_COMPARISON: {"orders": len(comparison_rows),
+                                    "venues": sorted(
+                                        {str(o.get("venue") or "unknown") for o in comparison_rows}
+                                    )},
+        },
         "by_venue": [by_venue[k] for k in sorted(by_venue)],
         # TWO MORE CUTS, because `by_venue` alone cannot answer the question it
         # raises. MEASURED 2026-08-24: the unrestricted `paper` book returned
@@ -630,8 +751,14 @@ def settlement_summary(
         # is PAID at the best-book price it was sized against, and a better
         # price cannot lose money on a wager it wins. Whatever is happening is
         # about WHICH bets are taken, not what they were booked at.
-        "by_market_family": _grouped(rows, _market_family),
-        "by_sport": _grouped(rows, lambda o: str(o.get("sport") or "unknown")),
+        # PORTFOLIO ROWS ONLY. These two cuts key on market and sport with no
+        # venue in the key, so over the full ledger they pooled the unrestricted
+        # book with its own venue-scoped copies -- the same double-count as the
+        # old `total`, one level down and harder to see. `by_venue_family` below
+        # carries the venue IN its key and is therefore safe over everything,
+        # which is exactly why it stays unscoped and these two do not.
+        "by_market_family": _grouped(portfolio_rows, _market_family),
+        "by_sport": _grouped(portfolio_rows, lambda o: str(o.get("sport") or "unknown")),
         # THE CROSS, which is the cut that actually decides between A and B.
         # `by_market_family` alone cannot: if the unrestricted book is
         # prop-heavy and the venue books are game-line-heavy, then a bad
