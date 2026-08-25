@@ -28822,3 +28822,58 @@ Also in `441ec9e2f`: the slate freshness ceiling had stopped guarding. 1800s
 documented as "twice the writer's 900s cadence" became TEN times it when the
 writer dropped to 180s — present, logged, tolerating nine missed writes. The
 cadence is now a named constant with the ceiling derived from it.
+
+---
+
+## 2026-08-25 — CONFIG: `SYNDICATE_KALSHI_GAME_LINES=1` on both workers
+
+**Changed:** env var set on `refresh-worker` (`srv-d91dpertqb8s73co8ls0`) and
+`live-odds-worker` (`srv-d91dpertqb8s73co8lt0`) at `18:18Z`, triggering deploys
+`dep-da6tp0vqj5pc73bcavkg` and `dep-da6tp3u7bikc739ak9v0` on `5a8064772`.
+User decision, this session.
+
+**HOW, and it is the point of this entry.** Set through the service env-var API
+with `replace: false`, which MERGES — one key added, nothing else touched.
+Deliberately NOT via `render.yaml`: that fires `blueprint_sync`, which rewrites
+the WHOLE env block on all three services including drift nobody has read
+(`#284`). A one-key change is not worth that blast radius, and the API route
+has none of it.
+
+**Why it was needed — the answer to "why did Kalshi work yesterday".** Asked by
+the user, and the answer is the market TYPE, not a regression.
+
+Every Kalshi order that ever filled was `KXMLBKS` — a player strikeout prop.
+Every Kalshi failure today was a GAME LINE. They take different paths:
+
+- **Player props**: the title names a human, so `(player, market, line)` is a
+  complete identity. Joins on the player index, needs no event resolution, and
+  NEVER touches this flag.
+- **Game lines** (`_NEEDS_EVENT_IDENTITY = {TEAM_TOTAL, TEAM_SPREAD, MONEYLINE}`):
+  the title names no team, so the game must be recovered from the ticker's club
+  blob. Three gates props do not have — the date check, event resolution, and
+  this flag.
+
+**Kalshi game lines have never worked.** Nothing regressed. `game_lines_disabled`
+has NEVER appeared in the logs — checked across 30 hours — because nothing has
+ever survived the date gate to reach the flag at all.
+
+**Why flag-before-data turned out to be safe**, against my own earlier advice.
+I had wanted the data fixed first, on the reasoning that turning this on with
+40-hour-stale quotes would price game lines off yesterday's slate. That concern
+is void now: the date check was hoisted ABOVE `_resolve_event` in `7f4b8808a`,
+so a stale-dated game line is refused as `market_is_for_another_date` before it
+can reach the flag. The flag cannot price an old slate; it only decides what
+happens when a fresh one arrives.
+
+**verify:** NOT YET READ. Three things should become visible, and each
+distinguishes a different failure:
+
+- `game_lines_disabled` appearing at all would mean the flag did NOT take —
+  it is the counter that fires only for a game line whose event RESOLVED.
+- `matched` climbing above 4 on `BOARD_JOIN` means game lines are joining.
+- `ORDER_PATH venue=kalshi` moving `h2h`/`totals` from `no_venue_ticker` to
+  `would_build` — which is the whole point of the verifier: that reading costs
+  nothing and needs no slate.
+
+Still true and unchanged: Kalshi cannot transact on anything the join does not
+match, because `kalshi_ticker_resolver` is built from `matches`.
