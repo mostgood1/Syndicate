@@ -1204,10 +1204,15 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     "reason": "no published live-lens snapshot",
                     "rows_live_gameline_edged": 0,
                 }
+            # Filled by the index builder; folded into coverage so the shortlist
+            # can PRINT why an empty index is empty. `index=0` alone reads as
+            # "no producer" and on 2026-08-25 that reading was wrong for WNBA.
+            index_diag: dict = {}
             coverage = attach_live_gamelines(
                 grid,
                 build_live_gameline_index(
                     snapshot,
+                    diagnostics=index_diag,
                     sources=lens_sources_for_sport(sport),
                     # None for MLB, so its sims-derived interval stays in charge and
                     # its behaviour is unchanged. Set only for a sport whose live
@@ -1222,6 +1227,8 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 ),
             )
         coverage["supported"] = True
+        if sport != "soccer":
+            coverage["index_diagnostics"] = index_diag
         return coverage
     except Exception:
         _LOGGER.exception("BOOK_GRID_LIVE_GAMELINE_FAILURE sport=%s date=%s", sport, selected_date)

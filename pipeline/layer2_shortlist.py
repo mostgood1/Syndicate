@@ -592,7 +592,12 @@ def build_layer2_shortlist(
                         f"projected={gl_stats.get('rows_live_gameline_projected')} "
                         f"priceable={gl_stats.get('rows_live_gameline_priceable')} "
                         f"withheld={gl_stats.get('rows_live_gameline_withheld')} "
-                        f"why={gl_stats.get('withheld_by_reason')} "
+                        f"why={gl_stats.get('withheld_by_reason')} "                        # WHY AN EMPTY INDEX IS EMPTY. `index=0` reads as "no
+                        # producer wired" and that reading was WRONG for WNBA on
+                        # 2026-08-25: the lens builds every 60s and its lane was
+                        # stamped `pregame`, which this join correctly refuses.
+                        # `sources_seen` is the discriminator.
+                        f"index_why={gl_stats.get('index_diagnostics')} "
                         f"reason={gl_stats.get('reason')} "
                         f"error={gl_stats.get('error')}",
                         flush=True,
