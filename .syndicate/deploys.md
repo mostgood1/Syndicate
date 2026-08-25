@@ -29669,3 +29669,85 @@ prevent, on somebody else's deploy.
 deploy, and four more deploys have landed since. Any before/after taken tonight
 would credit another session's work to this one. It needs a quiet window: no
 refresh-worker deploy for >=30 min and >=6 readings on one SHA.
+
+---
+
+## 2026-08-25 22:54:25Z — SETTLED: `find_first_game_offset`'s partition assumption is FALSE, and ~8,400 rows of game markets are invisible
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `f43863ed7611dd7f`
+**user instruction:** "check whether the trim is eating full-game spreads" → "probe the offsets and settle it".
+
+**verify: the probe, run on live-odds-worker at `15f14984a`.**
+
+```
+[audit_polymarket_coverage] OFFSET_BOUNDARY_PROBE status=ok boundary=20964 probes=17
+  monotonic=True rungs=[4192, 8385, 12578, 16771, 18867, 19915, 20754, 20964, 22964]
+  games_below_boundary={'12578': 5, '16771': 5, '18867': 5} at_boundary_games=1
+  verdict='BOUNDARY TOO HIGH -- 3 offset(s) below 20964 carry game rows, so part
+           of the slate is invisible to us. NOT a venue absence.'
+```
+
+**THE ORDERING IS NOT `[futures][games][empty]`. It is interleaved.** Per-offset,
+verbatim:
+
+```
+  4,192   futures  culture/science   dccc-measles-us-2026-12-31-gt4500
+  8,385   futures  politics          ushrewc-ushr-tx-09-2026-11-03-rep
+ 12,578   GAMES 5/5  SPREAD  sports  asc-nfl-ne-cle-2026-08-27-pos-1pt5   <-- NFL FULL-GAME SPREAD
+ 16,771   GAMES 5/5  TOTAL   sports  tsc-nfl-pit-buf-2026-08-27-1q-5pt5
+ 18,867   GAMES 5/5  TOTAL   sports  tsc-nfl-cin-phi-2026-08-28-4q-17pt5
+ 19,915   futures  sports (golf)     tec-dpwt-britmast-2026-08-27-r1l-jorlof
+ 20,754   futures  sports (LPGA)     tec-lpga-fmcham-2026-08-27-r3l-hyecho
+ 20,964   1/5 games, FUTURE+MONEYLINE tec-f1-pigp-2026-09-06-cons-alpine  <-- THE BOUNDARY
+ 22,964   GAMES 5/5  PROP            astatc-mlb-lad-atl-2026-08-25-xi
+```
+
+**A band of golf/F1/tennis futures sits ABOVE a large block of real game
+markets, and the binary search converged into that band.** Everything below
+20,964 is never fetched: roughly 8,400 rows, including NFL full-game spreads
+(`asc-nfl-ne-cle-2026-08-27-pos-1pt5`) and NFL segment totals.
+
+**`monotonic=True` PASSED WHILE BEING WRONG, exactly as predicted.** It only
+checks offsets the binary search happened to probe; a boundary inside a futures
+band that sits above the block still satisfies it. **A guard whose true value
+carries no information is not a guard** — and this one is the sole check on the
+assumption the whole function rests on.
+
+**This explains three separate readings that had three separate explanations:**
+
+* `games` 13,255 → 7,936 with `truncated=False` — the scan starts above a large
+  block. `truncated=False` is *technically true and materially misleading*: it
+  paged to the end, from the wrong start.
+* MLB full-game spreads leaving the join's index between 20:16Z and 22:01Z
+  (`offered: ['chc-az@-2.5', ...]` → `no_candidates|mlb|spreads: 51`).
+* `SPREAD_SIGN_AUDIT fixtures=0` at 22:17Z. **The spread question was never
+  answerable today** — the full-game spreads it needs are below the boundary.
+
+**THE BUDGET TRIM IS FULLY EXONERATED**, and was the first hypothesis:
+`dropped_for_size=0 dropped_by_date={}` on every cycle, 5.99MB headroom,
+`fetched == count`. It has never once fired.
+
+**Supersedes the audit's §2.1.** That section blamed the page ceiling
+(`rows=15000 truncated=True`, measured 19:28Z). That WAS true then and was
+fixed by `f08930f32`; the current loss is a different bug in `508dbc02`, and
+the two must not be conflated.
+
+**OWNERSHIP: NOT THIS LANE'S TO FIX.** `find_first_game_offset` belongs to the
+session that shipped `508dbc02` (`session_01Sia2rPD72eFTriy28azzs2`).
+**Diagnosed, not touched.** The fix is not a nudged constant — the partition
+premise itself is false, so a search that assumes contiguity cannot be made
+correct by moving its bounds. A linear or multi-band scan is needed, or a
+`monotonic` check that samples the whole range rather than the search path.
+
+**Money impact, stated because it is real:** every market below the boundary is
+unresolvable at order time, which surfaces as
+`OrderBuildError: market_unresolved_for_position` — the exact symptom that
+prompted `f08930f32` in the first place. NFL wk1 is 2026-08-27 and its
+full-game spreads are in the invisible band.
+
+**Probe flag `SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT` set to `0` at 22:58Z**
+— the answer is in and this hook, unlike the spread audit, calls the venue.
+`SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT` stays `1`: it reads artifacts only
+and its question is still open.
+
+**Claim released.**
