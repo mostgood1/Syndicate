@@ -156,6 +156,26 @@ def _alias_map() -> dict[str, str]:
             offer(f"{school} {mascot}", canonical)
         offer(canonical, canonical)
         offer(school, canonical)
+
+        # "Boise St." as well as "Boise State". Measured 2026-08-25 across all
+        # 138 FBS teams: the full spellings resolve 138/138, but if the feed
+        # abbreviates, **30 of 138 silently lose their line** -- and a team with
+        # no line is indistinguishable on the board from a team no book quoted.
+        # Cheap to cover, and covering it costs nothing if the feed never
+        # abbreviates.
+        #
+        # ADDS AN ALIAS, never rewrites the lookup string, and that distinction
+        # is load-bearing: the registry holds 11 schools whose name genuinely
+        # STARTS with "St."/"Saint" (St. Anselm, Saint John's (MN), ...). A
+        # transform mapping the token "st" -> "state" on input would mangle
+        # every one of them. Generating "Boise St." as an extra key for a team
+        # already named "Boise State" cannot touch them, and any key two
+        # canonical teams both claim is dropped by the collision pass above.
+        if " State" in school:
+            abbreviated = school.replace(" State", " St.")
+            offer(abbreviated, canonical)
+            if mascot:
+                offer(f"{abbreviated} {mascot}", canonical)
         offer(row.get("display_name"), canonical)
         # `aliases` is pipe-separated and INCLUDES the bare mascot, which is why
         # every alias goes through the collision check rather than being trusted.

@@ -439,3 +439,72 @@ def test_the_capture_step_is_not_week_scoped():
     capture = steps[0]
     assert "--week" not in [str(part) for part in capture.command]
     assert "--season" not in [str(part) for part in capture.command]
+
+
+# --------------------------------------------------------------------------
+# spelling coverage across the whole FBS, not just one week's slate
+# --------------------------------------------------------------------------
+
+def _fbs_rows():
+    import csv
+
+    from syndicate.features.ncaaf.sources import team_registry_snapshot_path
+
+    with open(team_registry_snapshot_path(), encoding="utf-8-sig") as handle:
+        return [r for r in csv.DictReader(handle) if (r.get("subdivision") or "").lower() == "fbs"]
+
+
+def test_every_fbs_team_resolves_from_the_spellings_a_feed_might_send():
+    """A COUNT over all 138 FBS teams, not a spot check.
+
+    The live `--report` cannot be run from a sandbox (no `ODDS_API_KEY`, and
+    egress to api.the-odds-api.com is refused by org policy), so this is the
+    substitute: exercise every realistic way a feed can render a school and
+    assert the whole division resolves. An unresolved team is a game whose card
+    shows no line, and on the board that is indistinguishable from "no book
+    quoted it" -- so a silent miss here has no other alarm.
+    """
+    import unicodedata
+
+    def deaccent(value):
+        return "".join(c for c in unicodedata.normalize("NFKD", value) if not unicodedata.combining(c))
+
+    rows = _fbs_rows()
+    assert len(rows) > 100, f"registry looks wrong: only {len(rows)} FBS rows"
+
+    spellings = {
+        "school+mascot": lambda s, m: f"{s} {m}",
+        "de-accented": lambda s, m: deaccent(f"{s} {m}").replace("'", ""),
+        "school only": lambda s, m: s,
+        "St. for State": lambda s, m: f"{s} {m}".replace(" State", " St."),
+    }
+    for label, render in spellings.items():
+        missed = []
+        for row in rows:
+            canonical = row["canonical_team_name"]
+            school = row.get("school_name") or ""
+            mascot = row.get("mascot_name") or ""
+            if not school:
+                continue
+            if resolve := ol.resolve_team(render(school, mascot)):
+                if resolve != canonical:
+                    missed.append((canonical, render(school, mascot), resolve))
+            else:
+                missed.append((canonical, render(school, mascot), None))
+        assert missed == [], f"{label}: {len(missed)} of {len(rows)} unresolved, e.g. {missed[:5]}"
+
+
+def test_the_state_abbreviation_alias_does_not_capture_real_saint_schools():
+    """The `State` -> `St.` coverage ADDS aliases; it must never rewrite input.
+
+    The registry holds 11 schools whose name genuinely begins "St."/"Saint". A
+    transform mapping the token `st` to `state` on the way in would mangle every
+    one of them, which is why the alias is generated per registered team
+    instead.
+    """
+    for name in ("St. Anselm", "Saint John's (MN)", "St. Francis (PA)", "Saint Vincent"):
+        assert ol.resolve_team(name) == name, name
+    assert ol.resolve_team("St. Lawrence Saints") == "St. Lawrence"
+    # And the abbreviation still reaches the State schools it was added for.
+    assert ol.resolve_team("Boise St. Broncos") == "Boise State"
+    assert ol.resolve_team("Arizona St. Sun Devils") == "Arizona State"
