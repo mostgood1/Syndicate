@@ -1478,6 +1478,23 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   league resolution via competition tokens instead of literal string match.
   Nothing else in either file touched. Reclaim by re-adding both paths to
   this lane's own Files: list whenever wanted back.
+  **SHIPPED, NOT DEPLOYED.** Committed `1868ff7a3`, pushed to
+  `claude/exchange-market-apis-jr2lqy` (this branch is not `main`; no
+  deploy implied). 43 new/updated tests; **254 tests green** across every
+  directly affected suite (`test_polymarket_board_join.py`,
+  `test_venue_quote_adapters.py` [new], `test_venue_quote_fanin.py`,
+  `test_polymarket_us_markets.py`, `test_polymarket_side_vocabulary.py`,
+  `test_polymarket_slate_freshness.py`, `test_kalshi_polymarket_arb.py`,
+  `test_execute_portfolio.py`). A broader keyword-filtered run across the
+  WHOLE `tests/` directory (`-k "polymarket or venue_quote or team_alias
+  or soccer"`) hit a 300s timeout and was SIGTERM'd with no output at
+  all -- same collection-time-slowness pattern this session already hit
+  once today on a full unfiltered run, not a reported failure. Proceeding
+  on the targeted 254, same as that earlier call. **OWED:** production
+  verification once this lands on `main` and deploys -- the reading is
+  `market_type_not_a_game_line` refusals dropping from ~50% of the
+  catalogue, plus a nonzero `soccer` quote count where `venue_quote_adapters`
+  currently logs `no_polymarket_row_for_league_soccer` on every cycle.
   **`pipeline/portfolio_commit.py` stayed on this lane's list, untouched** --
   its `_venue_price_resolver` (Kalshi-only price/ticker resolver, built from
   the WHOLE board-join across every market type this lane resolves, not a
