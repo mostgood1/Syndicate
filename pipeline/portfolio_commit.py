@@ -198,6 +198,20 @@ def _polymarket_price_resolver(selected_date: str | None):
         f"shapes={joined.get('unreadable_shapes')}",
         flush=True,
     )
+    # WHAT WE FETCH AND THROW AWAY, on its own line because it is the largest
+    # single number in the refusals and has never been characterised. 6,838
+    # `market_type_not_a_game_line` plus 1,064 segment markets are paid for on
+    # every cycle and discarded. Counts are complete; the samples carry the
+    # QUESTION, which is the only field that says what the bet actually is --
+    # `SPORTS_MARKET_TYPE_PROP` turned out to include League of Legends map
+    # winners, so the family cannot be named from its type alone.
+    if joined.get("out_of_scope_counts"):
+        print(
+            "[portfolio_commit] POLYMARKET_OUT_OF_SCOPE"
+            f" counts={joined.get('out_of_scope_counts')}"
+            f" samples={joined.get('out_of_scope_samples')}",
+            flush=True,
+        )
     matches = joined.get("matches") or []
     if not matches:
         return (None, None)

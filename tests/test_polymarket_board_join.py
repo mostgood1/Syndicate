@@ -360,3 +360,78 @@ def test_the_sample_is_BOUNDED_so_the_log_line_stays_a_log_line():
     result = mod.join_polymarket_to_board(markets, [])
     assert result["refusals"]["outcomes_count_mismatch"] == 40
     assert len(result["unreadable_shapes"]) == 6
+
+
+# --------------------------------------------------------------------------
+# What we fetch and discard, characterised rather than assumed
+# --------------------------------------------------------------------------
+
+
+def _prop_row(slug, question, market_type="SPORTS_MARKET_TYPE_PROP"):
+    return {
+        "slug": slug,
+        "sportsMarketTypeV2": market_type,
+        "question": question,
+        "outcomes": '["Yes","No"]',
+        "outcomePrices": '["0.5","0.5"]',
+        "orderPriceMinTickSize": "0.01",
+        "minimumTradeQty": "1",
+    }
+
+
+def test_out_of_scope_markets_are_counted_by_type_and_league():
+    """6,838 `market_type_not_a_game_line` are fetched and discarded every
+    cycle and had never been characterised. A count keyed by (type, league)
+    turns "out of scope" from a standing assumption into a revisitable one."""
+    markets = [
+        _prop_row("astatc-lol-bam-gng-2026-08-20-game1", "Will Baam win Game 1?"),
+        _prop_row("astatc-lol-doc-fsk-2026-08-20-game1", "Will Doc win Game 1?"),
+        _prop_row("astatc-nfl-lar-lac-2026-08-27-x", "Will someone score a TD?"),
+    ]
+    report = mod.join_polymarket_to_board(markets, [], selected_date="2026-08-20")
+    counts = report["out_of_scope_counts"]
+    assert counts["SPORTS_MARKET_TYPE_PROP|lol"] == 2
+    assert counts["SPORTS_MARKET_TYPE_PROP|nfl"] == 1
+
+
+def test_the_out_of_scope_sample_carries_the_QUESTION():
+    """The slug says which game; only the question says what the bet IS.
+
+    Measured 2026-08-25T17:05:02Z: `astatc-lol-bam-gng-2026-08-20-game1` with
+    type `SPORTS_MARKET_TYPE_PROP` is a League of Legends MAP WINNER, not a
+    player prop. The type alone cannot name the family, so a parser written
+    from the type would be written for the wrong thing.
+    """
+    markets = [_prop_row("astatc-lol-bam-gng-2026-08-20-game1",
+                         "Will Baam Esports win Game 1 vs GnG Amazigh?")]
+    report = mod.join_polymarket_to_board(markets, [], selected_date="2026-08-20")
+    sample = report["out_of_scope_samples"][0]
+    assert sample["question"] == "Will Baam Esports win Game 1 vs GnG Amazigh?"
+    assert sample["key"] == "SPORTS_MARKET_TYPE_PROP|lol"
+
+
+def test_the_sample_is_one_per_type_and_league_but_the_count_is_complete():
+    """Same argument as the Kalshi title sample: the sample teaches the
+    grammar, the count answers "is this family here at all"."""
+    markets = [
+        _prop_row(f"astatc-lol-t{n}-o{n}-2026-08-20-game1", f"Q{n}") for n in range(9)
+    ]
+    report = mod.join_polymarket_to_board(markets, [], selected_date="2026-08-20")
+    assert report["out_of_scope_counts"]["SPORTS_MARKET_TYPE_PROP|lol"] == 9
+    assert len(report["out_of_scope_samples"]) == 1
+
+
+def test_segment_markets_are_sampled_separately_from_type_refusals():
+    """A quarter total is a market we CAN parse and choose not to join; a prop
+    is one we cannot yet name. Sharing a sample key would hide both."""
+    markets = [{
+        "slug": "tsc-nfl-tb-jax-2026-08-28-1q-17pt5",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "question": "1Q total over 17.5?",
+        "outcomes": '["Over","Under"]',
+        "outcomePrices": '["0.5","0.5"]',
+        "orderPriceMinTickSize": "0.01",
+        "minimumTradeQty": "1",
+    }]
+    report = mod.join_polymarket_to_board(markets, [], selected_date="2026-08-28")
+    assert "SPORTS_MARKET_TYPE_TOTAL|SEGMENT|nfl" in report["out_of_scope_counts"]

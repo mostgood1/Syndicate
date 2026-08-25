@@ -253,6 +253,29 @@ def join_polymarket_to_board(
     def refuse(reason: str) -> None:
         refusals[reason] = refusals.get(reason, 0) + 1
 
+    # THE OUT-OF-SCOPE WORK LIST. Complete counts keyed by (venue type, league)
+    # plus one sampled row each -- the same shape that turned Kalshi's
+    # `unreadable_title` from a number into an actionable list.
+    out_of_scope_counts: dict[str, int] = {}
+    out_of_scope_samples: list[dict[str, Any]] = []
+    out_of_scope_seen: set[str] = set()
+
+    def _note_out_of_scope(venue_type: str, parsed: Mapping[str, Any], row: Mapping[str, Any]) -> None:
+        key = f"{venue_type}|{parsed.get('league')}"
+        out_of_scope_counts[key] = out_of_scope_counts.get(key, 0) + 1
+        if key in out_of_scope_seen or len(out_of_scope_samples) >= 14:
+            return
+        out_of_scope_seen.add(key)
+        out_of_scope_samples.append({
+            "key": key,
+            "slug": str(row.get("slug") or "")[:64],
+            # THE QUESTION IS THE PAYLOAD HERE. A slug says which game; only the
+            # question says what the bet IS, and that is what decides whether a
+            # parser can be written for the family.
+            "question": str(row.get("question") or "")[:90],
+            "outcomes": str(row.get("outcomes") or "")[:60],
+        })
+
     # Index the venue side once, keyed on what a board row can be asked for.
     index: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for row in markets:
@@ -260,13 +283,32 @@ def join_polymarket_to_board(
         if parsed is None:
             refuse("slug_unparseable")
             continue
-        board_market = MARKET_TYPE_TO_BOARD.get(str(row.get("sportsMarketTypeV2") or "").upper())
+        venue_type = str(row.get("sportsMarketTypeV2") or "").upper()
+        board_market = MARKET_TYPE_TO_BOARD.get(venue_type)
         if board_market is None:
-            # PROP and DRAWABLE_OUTCOME land here. Real markets, deliberately
-            # out of scope -- see the module header.
+            # PROP and DRAWABLE_OUTCOME land here. Real markets, currently out
+            # of scope -- but 6,838 of them are fetched every cycle and thrown
+            # away, so "out of scope" needs to be a MEASURED decision rather
+            # than a standing one.
+            #
+            # WHAT `PROP` ACTUALLY CONTAINS IS NOT OBVIOUS, and assuming it was
+            # already produced one wrong claim. Measured 2026-08-25T17:05:02Z:
+            #
+            #   slug='astatc-lol-bam-gng-2026-08-20-game1'
+            #   type='SPORTS_MARKET_TYPE_PROP'
+            #   question='Will Baam Esports win Game 1 vs GnG Amazigh?'
+            #
+            # That is a League of Legends MAP WINNER, not a player prop. So
+            # `PROP` is a mixed bucket and the 6,838 cannot be characterised
+            # without looking. This samples one row per (type, league) with the
+            # slug and the QUESTION -- the question is what names the bet, the
+            # slug alone does not -- and counts every one completely, so a
+            # family that is absent is distinguishable from one past the cap.
+            _note_out_of_scope(venue_type, parsed, row)
             refuse("market_type_not_a_game_line")
             continue
         if _has_segment(parsed["modifiers"]):
+            _note_out_of_scope(f"{venue_type}|SEGMENT", parsed, row)
             refuse("segment_market_not_full_game")
             continue
         outcomes, outcome_reason = _outcome_probabilities(row)
@@ -388,6 +430,13 @@ def join_polymarket_to_board(
         "indexed": sum(len(v) for v in index.values()),
         "refusals": refusals,
         "unreadable_shapes": shapes,
+        # What we FETCH and discard, by (venue type, league). Complete counts
+        # plus one sampled row each, so "out of scope" is a decision that can
+        # be revisited from data rather than a standing assumption.
+        "out_of_scope_counts": dict(
+            sorted(out_of_scope_counts.items(), key=lambda kv: -kv[1])
+        ),
+        "out_of_scope_samples": out_of_scope_samples,
     }
 
 
