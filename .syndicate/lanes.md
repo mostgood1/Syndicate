@@ -2065,7 +2065,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   slug's `<home>`, ~0.0 means `<away>`, **anything between FALSIFIES the
   symmetric-ladder finding and spreads must stay refused.**
 
-### kalshi-oddsapi-coverage-audit — REOPENED 2026-08-25 for the two fixes it found — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+### kalshi-oddsapi-coverage-audit — CLOSED 2026-08-25 — audit delivered, both fixes applied, PR #66 open — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+- **Outcome: DELIVERED.** Audit `docs/ai_context/kalshi_oddsapi_coverage_audit.md`
+  + `scripts/audit_kalshi_oddsapi_coverage.py`; the two fixes it found applied in
+  `bc887e2ad`. **PR #66**, branch `claude/kalshi-oddsapi-coverage-audit`.
+  Shareable page: https://claude.ai/code/artifact/5b9b46fb-6263-48e6-8ab4-1ba4e7b3e3f1
+- **NOT DEPLOYED.** `.py` only, no `render.yaml` (`#284`). **The verification is a
+  PRODUCTION READING, not the test suite** -- audit §11 and
+  `.syndicate/log/2026-08-25.md` name all three, plus the falsifier.
+  Headline: `GAP series=KXMLBHRR` must DISAPPEAR, and `TICK series_wanted` must
+  go 193 -> 194 carrying `KXMLBSB`.
+- **Claims released.** `market_keys.py` / `kalshi_catalogue.py` and their tests
+  were checked UNCLAIMED against `lane-guard`'s own `_claims()` before editing
+  and are released now; changes are strictly additive dictionary entries.
+  `exchange-market-apis` may reclaim either at any time.
 - **REOPENED, same block (one lane, one block).** The audit closed DELIVERED;
   the user then asked for the two one-line fixes it named to be applied and a
   PR opened. Scope is exactly those two and their tests -- nothing else in
