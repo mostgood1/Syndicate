@@ -611,3 +611,127 @@ def _default_adapters() -> dict[str, Callable[[str, str], SourceOutcome]]:
         "novig": adapters.novig_outcome,
         "oddsapi": adapters.oddsapi_outcome,
     }
+
+
+# The board's book name for each live-quoting venue. `book_shortlist`
+# DEFAULT_BOOKS carries "polymarket", the adapter's source is "polymarket_us",
+# and a row whose bookmaker is not in that list is DROPPED as
+# `no_bettable_book`. Mapped explicitly so a venue-priced row survives the
+# bettable-book filter it is genuinely bettable at.
+_VENUE_BOOK_NAME: dict[str, str] = {
+    "kalshi": "kalshi",
+    "polymarket_us": "polymarket",
+}
+
+
+def apply_venue_quotes_to_grid(
+    grid: Sequence[Mapping[str, Any]],
+    sport: str,
+    selected_date: str,
+    *,
+    collected: Mapping[str, Any] | None = None,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Re-price a sport's GRID from the venues, BEFORE the lane gate runs.
+
+    --------------------------------------------------------------------------
+    WHY THIS EXISTS RATHER THAN `apply_venue_quotes` ALONE
+    --------------------------------------------------------------------------
+
+    The ordering was backwards, and no amount of stamping downstream could fix
+    it (measured 2026-08-25):
+
+        line 498   result = build_layer2_rows(grid, ...)   <- opportunity_gate
+        line 634   apply_venue_quotes(opportunities, ...)  <- venue reprice
+
+    `build_layer2_rows` applies the gate and returns only the SURVIVORS as
+    `opportunities`. The reprice then ran on that survivor list, so a row the
+    gate had already killed could never be rescued by a venue price. The lane
+    was decided before the venue quote was ever stamped.
+
+    That is why `VENUE_REPRICE sports=['nfl','soccer']` never listed mlb or
+    wnba, and why `rows_in=4296` did not move across five consecutive builds:
+    the only rows reaching the reprice were the pregame sports that survived.
+
+        03:13:38  mlb(...priced=1390, opps=0, lanes={'dead': 1302})
+        03:34:16  mlb(...priced=1390, opps=0, lanes={'dead': 1302})
+
+    Byte-identical across the book-clock fix, because the rows it fixed no
+    longer existed by the time it ran.
+
+    --------------------------------------------------------------------------
+    PRICE AND AGE MOVE TOGETHER, OR NEITHER MOVES
+    --------------------------------------------------------------------------
+
+    This replaces the side's PRICE, BOOKMAKER and AGE from the same quote. It
+    deliberately does NOT refresh the age alone: a stale price wearing a fresh
+    timestamp is exactly the laundering `opportunity_gate`'s live-market clock
+    exists to catch, and it would be worse than the empty board -- it defeats
+    the check instead of passing it.
+
+    Because price and book move together, the row becomes genuinely
+    venue-priced: `kalshi` and `polymarket` are both in
+    `book_shortlist.DEFAULT_BOOKS`, so it stays bettable, EV is computed on the
+    number we would actually take, and settlement grades against that same
+    number.
+
+    ONLY LIVE-QUOTING VENUES. OddsAPI is excluded for the reason stated on
+    `_LIVE_QUOTING_VENUES`: an aggregator shard is a periodic capture, not an
+    observation of the market moving.
+
+    ONLY WHEN THE VENUE IS FRESHER. `min()` on the age and a strict improvement
+    check mean this can never age a side UP or replace a genuinely fresher book
+    price with an older venue one.
+    """
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    sport_slug = str(sport or "").strip().lower()
+    payload = collected if collected is not None else collect_quotes(sport_slug, selected_date, now=now)
+    quotes = (payload or {}).get("quotes") or {}
+    repriced = 0
+    sides_seen = 0
+    by_source: dict[str, int] = {}
+
+    for row in grid or []:
+        if not isinstance(row, Mapping):
+            continue
+        best = row.get("best")
+        if not isinstance(best, dict):
+            continue
+        market = row.get("market")
+        line = _as_float_or_none(row.get("line"))
+        for side in list(row.get("sides") or []):
+            side_key = str(side)
+            side_best = best.get(side_key)
+            if not isinstance(side_best, dict):
+                continue
+            sides_seen += 1
+            quote = quotes.get(str(quote_key(sport_slug, market, side_key, line)))
+            if quote is None or quote.source not in _LIVE_QUOTING_VENUES:
+                continue
+            if quote.american is None:
+                # No price is not a reprice. Refreshing the clock here would be
+                # the age-only laundering this function refuses.
+                continue
+            venue_age = quote.age_seconds(now=now)
+            existing_age = _as_float_or_none(side_best.get("age_seconds"))
+            if existing_age is not None and existing_age <= venue_age:
+                # The book really is fresher. Leave it entirely alone.
+                continue
+            side_best["price"] = int(quote.american)
+            side_best["bookmaker"] = _VENUE_BOOK_NAME.get(quote.source, quote.source)
+            side_best["age_seconds"] = venue_age
+            side_best["seen_age_seconds"] = venue_age
+            side_best["price_source"] = quote.source
+            if quote.venue_ref:
+                side_best["venue_ref"] = quote.venue_ref
+            repriced += 1
+            by_source[quote.source] = by_source.get(quote.source, 0) + 1
+
+    return {
+        "sport": sport_slug,
+        "sides_seen": sides_seen,
+        "repriced": repriced,
+        "by_source": by_source,
+        "source_status": (payload or {}).get("by_source"),
+    }

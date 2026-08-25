@@ -495,6 +495,45 @@ def build_layer2_shortlist(
             except Exception:
                 pass
 
+            # RE-PRICE THE GRID BEFORE THE GATE SEES IT.
+            #
+            # `build_layer2_rows` runs `opportunity_gate` and returns only the
+            # SURVIVORS. The reprice below (line ~634) then ran on that survivor
+            # list, so a row the gate had already killed could never be rescued
+            # by a venue price -- the lane was decided before the venue quote
+            # was ever stamped.
+            #
+            # MEASURED 2026-08-25, five consecutive builds:
+            #   VENUE_REPRICE sports=['nfl','soccer']  rows_in=4296 (unmoving)
+            #   mlb  ... opps=0 lanes={'dead': 1302}
+            #   wnba ... opps=0 lanes={'dead': 1225}
+            # The only rows reaching the reprice were the pregame sports that
+            # survived; the live ones were already gone.
+            #
+            # Never fatal: a venue failure costs this sport's reprice, not its
+            # board.
+            try:
+                from syndicate.features.shared.venue_quote_fanin import (
+                    apply_venue_quotes_to_grid,
+                )
+
+                grid_reprice = apply_venue_quotes_to_grid(
+                    grid, sport, str(selected_date or "")
+                )
+                print(
+                    f"[layer2_shortlist] GRID_REPRICE sport={sport}"
+                    f" sides_seen={grid_reprice.get('sides_seen')}"
+                    f" repriced={grid_reprice.get('repriced')}"
+                    f" by_source={grid_reprice.get('by_source')}",
+                    flush=True,
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(
+                    f"[layer2_shortlist] GRID_REPRICE_FAILED sport={sport}"
+                    f" {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
             result = build_layer2_rows(grid, openings=openings_index)
             sport_opportunities = list(result.get("opportunities") or [])
             # `sport` is carried on the grid row already, but stamp defensively:
