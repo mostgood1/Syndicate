@@ -1577,6 +1577,35 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   against an outcome yet. Real money before that reading is `learnings.md`
   2026-08-20's "validating against a PROXY" at its most expensive.
 
+- **HANDED TO THIS LANE 2026-08-25 ~23:0xZ by `polymarket-oddsapi-coverage-audit`
+  (session 0fd6da62): `find_first_game_offset` IS DROPPING ~8,400 GAME MARKETS
+  RIGHT NOW, and `monotonic` cannot see it.** Not edited by that lane --
+  `polymarket_us_markets.py` is yours in practice (you authored `508dbc02` and
+  `f08930f32`), and this is a premise change rather than a constant.
+  **Full item: `todo.md` `#559`. Working: `deploys.md` 2026-08-25T22:54:25Z.**
+  Probed directly, one signed read per rung:
+
+      OFFSET_BOUNDARY_PROBE boundary=20964 monotonic=True
+        games_below_boundary={'12578': 5, '16771': 5, '18867': 5}
+        12,578  GAMES 5/5 SPREAD  asc-nfl-ne-cle-2026-08-27-pos-1pt5
+        20,754  futures (LPGA)    tec-lpga-fmcham-2026-08-27-r3l-hyecho
+        20,964  BOUNDARY          tec-f1-pigp-2026-09-06-cons-alpine
+
+  The ordering is NOT `[futures][games][empty]`: a golf/F1 futures band sits
+  ABOVE a large game block and the search converges into it. `monotonic=True`
+  only checks offsets the search itself probed, so it passes while wrong.
+  `truncated=False` is true and misleading -- it paged to the end from the wrong
+  start. **`_slate_within_budget` is EXONERATED** (`dropped_for_size=0` every
+  cycle, 5.99MB headroom) -- it was the first hypothesis and it never fired.
+  **NFL wk1 is 2026-08-27 and its full-game spreads are in the invisible band**;
+  the symptom is `market_unresolved_for_position`, the same one `f08930f32` was
+  written for. Reproduce free with `SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT=1`
+  (PR #74, currently `0`); it derives its rungs from the live boundary.
+  Attempted to reach session `01Sia2rPD72eFTriy28azzs2` directly first --
+  `ListAgents` returns no reachable peer (cloud session, separate container) and
+  the CCR server exposes no session-to-session send -- so this is recorded here
+  and in `todo.md`, per this file's established fallback.
+
 ### basketball-live-momentum — OPEN — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
 - Goal: Phase A of `#514` — a shared causal-decay core and a basketball pressure-event
   builder exist as PURE FUNCTIONS, keyed on elapsed seconds, with tests. **No producer,
@@ -2152,7 +2181,69 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `KXNCAAFAWARD` / `KXNBAWINS` at all. **`stamped` rising is the outcome;
   the band caveat above applies -- matched ran 44 -> 104 -> 0 across three
   consecutive builds.**
-- **REMAINING: step 3, line-aware rungs, scoped to NFL/MLB/WNBA.**
+- **STEP 3 RETESTED 2026-08-25 23:3xZ. THE NCAAF PREMISE IS DEAD AGAIN, for a
+  SECOND and deeper reason -- and the retest found the thing that actually
+  matters.**
+  - **Why it was retested:** `INTEL_TRACE by_sport` began carrying
+    `ncaaf: 204` candidates, where the first falsification test had found none.
+    Candidates are not the rows the join receives, so this was checked rather
+    than assumed.
+  - **NCAAF: STILL NO.** `[kalshi_odds] BY_GAME_DATE`, two independent readings
+    (`23:28:23Z`, `23:35:31Z`), each over a full 6,000-market working set: the
+    **earliest date carrying ANY NCAAF market is 2026-08-29**. The board's
+    `selected_date` is **2026-08-25** (confirmed on `CONTAINER_MEMORY` /
+    `PROCESS_TREE_MEMORY`, same instance). NCAAF has no game on the board's
+    date -- the season starts on the 29th. Line-aware selection of NCAAF rungs
+    would still be selecting against an empty wanted-set. Same for NFL, whose
+    earliest market is also 2026-08-29.
+  - **THE FINDING THAT OUTRANKS THE WHOLE LANE.** Neither reading contains a
+    single market for `2026-08-25`, or for `2026-08-26`. The earliest date in
+    both is `2026-08-27`. **The 6,000-market working set the join prices
+    against holds NOTHING for the date the board is built for.**
+    That is measured twice, seven minutes apart, on different series
+    compositions.
+  - **It explains the numbers this lane has been chasing.**
+    `market_is_for_another_date` is the largest refusal bucket (2,525-4,269 of
+    6,000) *because it is literally true of the whole set*, and `matched`
+    sticks at 61-94 because only player props survive -- props skip the join's
+    date check, which is the same asymmetry `kalshi_odds_refresh` already
+    records when it refuses to filter the working set by date.
+  - **SO STEP 3 IS THE WRONG SHAPE. The bound should be DATE-AWARE BEFORE it is
+    LINE-AWARE.** Keeping the rungs nearest the board's line cannot help when
+    no rung in the set is for the board's day. Same class of change -- which
+    markets survive `MAX_MARKETS_PER_SERIES` / `MAX_STORED_MARKETS` -- and a
+    strictly larger effect. **Line-aware selection becomes worth doing only
+    after the set contains the board's own date.**
+  - **THE TICKER TIMEZONE IS SETTLED: IT IS EASTERN. The suspected off-by-one
+    is REFUTED** `[2026-08-25]`. `game_date_from_ticker`'s docstring says the
+    time is deliberately not parsed because the zone "is not settled by any
+    reading I have" -- it is settled now, and the docstring should say so.
+    Six observed tickers against their home park's standard start; only ONE
+    hypothesis survives all six:
+
+        KXMLBGAME-26AUG26**1905**HOUNYY   19:05 ET  Yankee Stadium standard
+        KXMLBGAME-26AUG26**1915**LADATL   19:15 ET  Truist Park standard
+        KXMLBGAME-26AUG26**1945**BALSTL   19:45 ET = 18:45 CT  Busch standard
+        KXMLBGAME-26AUG26**1940**TEXCWS   19:40 ET = 18:40 CT  Rate Field standard
+        KXMLBGAME-26AUG26**1845**COLWSH   18:45 ET  Nationals standard
+        KXMLBGAME-26AUG26**2105**MINATH   21:05 ET = 18:05 PT  Athletics standard
+
+    UTC would put all six between 14:45 and 17:05 ET on a weeknight, which no
+    club starts. VENUE-LOCAL fails on TEXCWS (19:40 CT) and MINATH (21:05 PT),
+    neither a real start. **EASTERN is the only reading consistent with all
+    six.**
+  - **AND THEREFORE THE OFF-BY-ONE CANNOT HAPPEN.** ET and Central differ by
+    one hour, so the calendar date differs only for a start between 00:00 and
+    01:00 ET. The observed range is 18:45-21:05 ET. **No MLB slate can shift a
+    day between the ticker's zone and the board's.** The hazard I recorded was
+    real to check and is now closed as NOT a hazard.
+- **REMAINING, reordered by what the retraction changed:** (a) fix
+  `board_by_game_date` to group on the ticker's game date -- it is the reason
+  any date reasoning here is unsafe; (b) THEN re-establish what
+  `market_is_for_another_date` actually is, from a line that means what it
+  says; (c) line-aware rungs LAST, if the re-established numbers still support
+  them. **(b) is now genuinely open** -- this lane has had two hypotheses
+  killed and should not adopt a third without a measurement.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

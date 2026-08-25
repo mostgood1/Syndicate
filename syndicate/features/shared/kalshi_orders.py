@@ -122,19 +122,45 @@ def contracts_for_stake(stake_dollars: float, price_dollars: float) -> int:
     return int(count)
 
 
-def _side_to_kalshi(side: Any) -> str:
-    """Our `over`/`under`/`yes`/`no` -> Kalshi's `yes`/`no`.
+# Board markets whose SIDE names a TEAM rather than a direction. On these the
+# contract is chosen by WHICH TICKER, not by yes/no -- see `_side_to_kalshi`.
+_TEAM_SIDED_MARKETS = frozenset({"h2h", "h2h_h1", "h2h_h2", "h2h_q1", "h2h_q2",
+                                 "h2h_q3", "h2h_q4", "h2h_p1", "h2h_p2", "h2h_p3"})
+
+
+def _side_to_kalshi(side: Any, market: Any = None) -> str:
+    """Our `over`/`under`/`yes`/`no`/`home`/`away` -> Kalshi's `yes`/`no`.
 
     Explicit, and it REFUSES an unmapped side. Defaulting to `yes` would turn an
     unrecognised side into a real bet on the opposite outcome -- the single most
     expensive silent default available in this file.
+
+    A MONEYLINE SIDE NAMES A TEAM, AND THE TEAM IS ALREADY IN THE TICKER.
+    Confirmed by the user 2026-08-25 from Kalshi's own order URLs -- one market
+    PER TEAM, each offering a BUY on both legs:
+
+        KXMLBGAME-26AUG251840BOSMIA-BOS   op_order_side=yes  op_side=BUY
+        KXMLBGAME-26AUG251840BOSMIA-MIA   op_order_side=yes  op_side=BUY
+
+    So backing Miami is `BUY YES` on the `-MIA` contract, not a NO or an ask on
+    the `-BOS` one. `kalshi_board_join` already keys a match on `board_side` and
+    stamps the ticker of the team that side names, so by the time an order is
+    built the contract IS our team and the leg is always YES.
+
+    THIS IS SAFE ONLY BECAUSE THE TICKER IS PER-TEAM, which is why it is
+    restricted to the moneyline family. Reading `home` as `yes` on a market
+    whose ticker did NOT encode our team would buy the opponent -- so a totals
+    or spread row still refuses, and `home`/`away` on anything outside
+    `_TEAM_SIDED_MARKETS` raises exactly as before.
     """
     raw = str(side or "").strip().lower()
     if raw in {"yes", "over"}:
         return "yes"
     if raw in {"no", "under"}:
         return "no"
-    raise OrderBuildError(f"unmappable_side: {side!r}")
+    if raw in {"home", "away"} and str(market or "").strip().lower() in _TEAM_SIDED_MARKETS:
+        return "yes"
+    raise OrderBuildError(f"unmappable_side: {side!r} market={market!r}")
 
 
 def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
@@ -150,7 +176,7 @@ def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str,
         # means deriving it from a catalogue that may have moved since we priced.
         raise OrderBuildError("no_venue_ticker")
 
-    side = _side_to_kalshi(getattr(request, "side", None))
+    side = _side_to_kalshi(getattr(request, "side", None), getattr(request, "market", None))
     price = price_dollars
     if price is None:
         raise OrderBuildError("no_price_dollars")
@@ -254,15 +280,38 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
     if price <= 0 or price >= 1:
         raise OrderBuildError(f"price_out_of_range: {price}")
 
-    # EVERYTHING IS QUOTED FROM THE YES SIDE. Kalshi's contract:
+    # THIS CLAIM IS CONTRADICTED BY THE VENUE'S OWN UI AND IS UNDER REVIEW.
+    #
+    # The paragraph below said an UNDER "is not `side: no` -- there is no such
+    # value", and that everything is quoted from the YES leg so an under must
+    # be an ASK at the complement. The user supplied two Kalshi order URLs for
+    # one market on 2026-08-25, and BOTH ARE BUYS:
+    #
+    #   ...KXMLBGAME-26AUG251840BOSMIA-BOS&op_order_side=yes&op_side=BUY
+    #   ...KXMLBGAME-26AUG251840BOSMIA-BOS&op_order_side=no &op_side=BUY
+    #
+    # So buying NO is a first-class operation on this venue, not a synonym for
+    # selling YES. And the order results line up with that exactly: every
+    # Kalshi order that FAILED on 2026-08-25 was an under sent as `ask`
+    # (`market_not_found`, twice), while the one that FILLED was an over sent
+    # as `bid`.
+    #
+    # NOT CHANGED YET, DELIBERATELY. Those URLs carry the UI's parameters
+    # (`op_order_side`, `op_side`), not the API body's field names, and the
+    # only body contract this repo has ever been given is the `"side": "bid"`
+    # sample from 2026-08-24. Renaming a field from a URL query string is the
+    # same guess that earned `_DEFAULT_ORDER_PATH` an http_410. What closes it
+    # is one NO-side body sample; `SUBMIT_FAILED_MARKET` collects the market's
+    # own shape in the meantime.
+    #
+    # The original claim, kept verbatim so the correction is legible:
     #
     #   "bid means buy YES, ask means sell YES. (Selling YES is economically
     #    equivalent to buying NO at 1 - price, but this endpoint quotes
     #    everything from the YES side.)"
-    #
-    # So an UNDER is not "side: no" -- there is no such value. It is an ASK at
-    # the complement of the price we want to pay for NO.
-    contract_side = _side_to_kalshi(getattr(request, "side", None))
+    contract_side = _side_to_kalshi(
+        getattr(request, "side", None), getattr(request, "market", None)
+    )
     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
 
     if contract_side == "yes":
@@ -350,7 +399,66 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         f" tif={body.get('time_in_force')}",
         flush=True,
     )
-    response = signed_request("POST", url, body=body)
+    try:
+        response = signed_request("POST", url, body=body)
+    except Exception as exc:
+        # THE MARKET'S OWN FIELDS, ON THE FAILURE, and only on the failure.
+        #
+        # Measured 2026-08-25 6:00 PM Central, three real submissions to this
+        # endpoint in one minute:
+        #
+        #   KXWNBAAST-...-4         side=bid  price=0.5000  -> FILLED
+        #   KXMLBTOTAL-...MINATH-10 side=ask  price=0.5500  -> market_not_found
+        #   KXMLBTOTAL-...CINSF-8   side=ask  price=0.5100  -> market_not_found
+        #
+        # `market_not_found` while `fetch_market` on the SAME ticker returned a
+        # live price twice in the same minute (`LIVE_PRICE ... live=0.45`). So
+        # the ticker is real and tradeable: the GET finds it and the POST does
+        # not. That leaves two candidates and the error text distinguishes
+        # neither -- an `ask` (sell YES) this endpoint will not take, or a
+        # market whose order shape differs (`market_type`, or an MVE
+        # collection: `mve_collection_ticker` is in the probe's field list).
+        #
+        # GUESSING BETWEEN THEM IS HOW THIS FILE GOT A 410. Its own comment on
+        # `_DEFAULT_ORDER_PATH` records inventing a route once already. So this
+        # asks the venue what the market IS, rather than changing the order
+        # semantics on a 1-vs-2 sample.
+        try:
+            from syndicate.features.shared.kalshi_client import fetch_market
+
+            probe = fetch_market(str(body.get("ticker") or ""))
+            market = (probe.get("market") or {}) if isinstance(probe, dict) else {}
+            print(
+                "[kalshi_orders] SUBMIT_FAILED_MARKET"
+                f" ticker={body.get('ticker')} side={body.get('side')}"
+                f" fetch_status={probe.get('status') if isinstance(probe, dict) else None}"
+                # THE EVENT THIS MARKET BELONGS TO, and on an endpoint called
+                # `/portfolio/events/orders` it is the first thing to check.
+                # The user's own market URL 2026-08-25 shows a KXMLBTOTAL
+                # market living under a KXMLBGAME event:
+                #
+                #   /markets/kxmlbgame/.../kxmlbgame-26aug251840tbdet
+                #     ?op_market_ticker=KXMLBTOTAL-26AUG251840TBDET-7
+                #
+                # So the event ticker is NOT the market ticker's own prefix,
+                # and our body sends no event field at all.
+                f" event_ticker={market.get('event_ticker')}"
+                f" market_type={market.get('market_type')}"
+                f" status={market.get('status')}"
+                f" mve_collection={market.get('mve_collection_ticker')}"
+                f" strike_type={market.get('strike_type')}"
+                f" yes_ask={market.get('yes_ask_dollars')}"
+                f" no_ask={market.get('no_ask_dollars')}"
+                f" can_close_early={market.get('can_close_early')}",
+                flush=True,
+            )
+        except Exception as probe_exc:  # noqa: BLE001 -- a diagnostic never masks the real error
+            print(
+                f"[kalshi_orders] SUBMIT_FAILED_MARKET_PROBE_ERROR"
+                f" {type(probe_exc).__name__}: {probe_exc}",
+                flush=True,
+            )
+        raise exc
     order = response.get("order") or response
 
     # `count` is what we ASKED for; the fill can be partial. Reported from the

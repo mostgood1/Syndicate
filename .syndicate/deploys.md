@@ -29839,3 +29839,172 @@ observable; the sweep still owns freshness.
 **Cleanup owed and DONE in the next entry:** `...REPORT_ON_BOOT` must go back to
 `0`. In `write` it performs a real fetch AND append on **every** boot, and peers
 restart this service constantly.
+## 2026-08-25 22:54:25Z — SETTLED: `find_first_game_offset`'s partition assumption is FALSE, and ~8,400 rows of game markets are invisible
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `f43863ed7611dd7f`
+**user instruction:** "check whether the trim is eating full-game spreads" → "probe the offsets and settle it".
+
+**verify: the probe, run on live-odds-worker at `15f14984a`.**
+
+```
+[audit_polymarket_coverage] OFFSET_BOUNDARY_PROBE status=ok boundary=20964 probes=17
+  monotonic=True rungs=[4192, 8385, 12578, 16771, 18867, 19915, 20754, 20964, 22964]
+  games_below_boundary={'12578': 5, '16771': 5, '18867': 5} at_boundary_games=1
+  verdict='BOUNDARY TOO HIGH -- 3 offset(s) below 20964 carry game rows, so part
+           of the slate is invisible to us. NOT a venue absence.'
+```
+
+**THE ORDERING IS NOT `[futures][games][empty]`. It is interleaved.** Per-offset,
+verbatim:
+
+```
+  4,192   futures  culture/science   dccc-measles-us-2026-12-31-gt4500
+  8,385   futures  politics          ushrewc-ushr-tx-09-2026-11-03-rep
+ 12,578   GAMES 5/5  SPREAD  sports  asc-nfl-ne-cle-2026-08-27-pos-1pt5   <-- NFL FULL-GAME SPREAD
+ 16,771   GAMES 5/5  TOTAL   sports  tsc-nfl-pit-buf-2026-08-27-1q-5pt5
+ 18,867   GAMES 5/5  TOTAL   sports  tsc-nfl-cin-phi-2026-08-28-4q-17pt5
+ 19,915   futures  sports (golf)     tec-dpwt-britmast-2026-08-27-r1l-jorlof
+ 20,754   futures  sports (LPGA)     tec-lpga-fmcham-2026-08-27-r3l-hyecho
+ 20,964   1/5 games, FUTURE+MONEYLINE tec-f1-pigp-2026-09-06-cons-alpine  <-- THE BOUNDARY
+ 22,964   GAMES 5/5  PROP            astatc-mlb-lad-atl-2026-08-25-xi
+```
+
+**A band of golf/F1/tennis futures sits ABOVE a large block of real game
+markets, and the binary search converged into that band.** Everything below
+20,964 is never fetched: roughly 8,400 rows, including NFL full-game spreads
+(`asc-nfl-ne-cle-2026-08-27-pos-1pt5`) and NFL segment totals.
+
+**`monotonic=True` PASSED WHILE BEING WRONG, exactly as predicted.** It only
+checks offsets the binary search happened to probe; a boundary inside a futures
+band that sits above the block still satisfies it. **A guard whose true value
+carries no information is not a guard** — and this one is the sole check on the
+assumption the whole function rests on.
+
+**This explains three separate readings that had three separate explanations:**
+
+* `games` 13,255 → 7,936 with `truncated=False` — the scan starts above a large
+  block. `truncated=False` is *technically true and materially misleading*: it
+  paged to the end, from the wrong start.
+* MLB full-game spreads leaving the join's index between 20:16Z and 22:01Z
+  (`offered: ['chc-az@-2.5', ...]` → `no_candidates|mlb|spreads: 51`).
+* `SPREAD_SIGN_AUDIT fixtures=0` at 22:17Z. **The spread question was never
+  answerable today** — the full-game spreads it needs are below the boundary.
+
+**THE BUDGET TRIM IS FULLY EXONERATED**, and was the first hypothesis:
+`dropped_for_size=0 dropped_by_date={}` on every cycle, 5.99MB headroom,
+`fetched == count`. It has never once fired.
+
+**Supersedes the audit's §2.1.** That section blamed the page ceiling
+(`rows=15000 truncated=True`, measured 19:28Z). That WAS true then and was
+fixed by `f08930f32`; the current loss is a different bug in `508dbc02`, and
+the two must not be conflated.
+
+**OWNERSHIP: NOT THIS LANE'S TO FIX.** `find_first_game_offset` belongs to the
+session that shipped `508dbc02` (`session_01Sia2rPD72eFTriy28azzs2`).
+**Diagnosed, not touched.** The fix is not a nudged constant — the partition
+premise itself is false, so a search that assumes contiguity cannot be made
+correct by moving its bounds. A linear or multi-band scan is needed, or a
+`monotonic` check that samples the whole range rather than the search path.
+
+**Money impact, stated because it is real:** every market below the boundary is
+unresolvable at order time, which surfaces as
+`OrderBuildError: market_unresolved_for_position` — the exact symptom that
+prompted `f08930f32` in the first place. NFL wk1 is 2026-08-27 and its
+full-game spreads are in the invisible band.
+
+**Probe flag `SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT` set to `0` at 22:58Z**
+— the answer is in and this hook, unlike the spread audit, calls the venue.
+`SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT` stays `1`: it reads artifacts only
+and its question is still open.
+
+**Claim released.**
+
+### 2026-08-25 23:30Z — the obligation above is CLOSED. Quiet window found, band collected.
+
+**Quiet window:** no refresh-worker deploy from `22:36:13Z` to `23:30Z` — **54
+minutes**, all readings on one SHA (`075dc3ae4`), one instance (`8c5vj`).
+
+**THREE OF THE FOUR DISCRETE CHECKS PASS. The fourth was the wrong check and
+is superseded.**
+
+**1. Side vocabulary — PASS.** `VENUE_REPRICE_KEYS sources_offered`,
+`23:08:08Z`, against `nfl|h2h|yes` before:
+
+```
+nfl     kalshi: ['nfl|h2h|new york g', 'nfl|h2h|los angeles r',
+                 'nfl|h2h|kansas city', 'nfl|h2h|indianapolis']
+soccer  kalshi: ['soccer|h2h|zulte waregem', 'soccer|h2h|kvc westerlo',
+                 'soccer|h2h|union gilloise', 'soccer|h2h|anderlecht']
+```
+
+`h2h|yes` is gone from every sport. No `spreads|over|` from kalshi anywhere —
+the spread refusal is holding. **AND THE PREDICTED RESIDUAL IS VISIBLE:**
+`new york g` and `los angeles r` are Kalshi's TRUNCATED names, which no board
+candidate carries; `kansas city` and `indianapolis` are full and will match.
+That is the limit this change was documented as having, showing up in
+production exactly as written rather than as a surprise.
+
+**2. Futures eviction — PASS, by named absence.** `JOIN_TITLES by_series`
+`23:09:27Z` no longer contains `KXNCAAFWINS`, `KXNCAAFAWARD` or `KXNBAWINS` —
+which were its top three entries at 400/400/312 — nor any division future,
+`KXNFLPLAYOFFHOST`, `KXNFLH2HWINS`, `KXNFLHIGHSCORE`, `KXNFLCOMPETE`. No
+`KXNHL*` appears in the fetch list at all.
+
+**3. `KXMLBSB` is live and fetching — PASS.** `TICK` `22:56:10Z`:
+`'KXMLBSB': (182, 'series_filter')`. Registered by this deploy, **182 markets**
+where the audit measured 44. The other registered MLB props are all fetching
+too: `KXMLBHIT` 739, `KXMLBHR` 424, `KXMLBTOTAL` 275, `KXMLBHA` 140,
+`KXMLBERA` 130.
+
+**4. `series_wanted` 193 -> ~155 — THIS PREDICTION WAS WRONG, and the reason
+is knowable rather than mysterious.** It reads **199**. The eviction did remove
+38, but the parallel session's soccer title-gate registered ~40 new soccer
+series in the same window — `KXBUNDESLIGAGAME/TOTAL/SPREAD`, `KXEREDIVISIE*`,
+`KXLALIGA*`, `KXLIGUE1*`, `KXBELGIANPLGAME`, `KXSERIEA*`, `KXEPL1H*` — all
+visible in the same `TICK`. **A net count cannot verify a change when a second
+change moves the same counter.** Check 2's named absence is the sound version
+and it passes; this row is the reminder that I picked a confounded metric.
+
+**THE BAND, board_rows=1291 only** — the 617-row builds are a different board
+population and mixing them is what made the earlier readings meaningless:
+
+```
+                    BEFORE (3 readings, 3 SHAs)   AFTER (4 readings, 1 SHA)
+matched             44 / 104 / 140                94 / 89 / 61 / 62
+                    min 44  max 140  med 104      min 61  max 94  med 89
+unreadable_title    2273 / 3379 / 3605            1563 / 1584 / 1958 / 2105
+                    min 2273 max 3605 med 3379    min 1563 max 2105 med 1958
+```
+
+**`matched` DID NOT MOVE.** The bands overlap and the after-band sits inside
+the before-band. **That is the predicted result, not a disappointment:** none
+of these three changes touches the join, and this was written down before the
+deploy rather than after it. Anyone reading `matched` up or down across this
+deploy would be reading rotation noise.
+
+**`unreadable_title` DID move, and it is the one number that separates.** Every
+after-reading sits BELOW the before-band's floor (max 2105 < min 2273); the
+median fell **3379 -> 1958, a drop of 1421**.
+
+**ATTRIBUTION, and it is only partial.** Two changes landed in this window:
+this deploy's futures eviction and `a6a877421`'s spread-synonym grammar fix.
+The eviction's share is separable because it is verified by NAMED ABSENCE
+rather than by the aggregate: `KXNCAAFWINS` 400 + `KXNCAAFAWARD` 400 +
+`KXNBAWINS` 312 = **1,112 of the ~1,421 drop**. The remaining ~309 is the
+grammar fix. Neither number is inferred from the total alone.
+
+**A NEW GAP IS NOW READABLE, which is what evicting the noise was for.**
+`JOIN_TITLES by_series` is now led by `KXNFLTOTAL: 400` on a wording nobody
+had seen while the futures were drowning the list:
+
+```
+KXNFLTOTAL   'Full Game: over 58.5 points scored?'
+KXWNBATOTAL  'Full Game: over 166.5 points?'
+KXWNBASPREAD 'Golden State wins the game by over 7.5 points'
+KXWNBA*Q*    "Washington vs Phoenix women's Pro Basketball game: Over 48.5 1Q points?"
+```
+
+`Full Game:` and the `<A> vs <B> <sport> game:` prefix are two more wordings,
+and the WNBA quarter ladder (21 markets x 12 series) is the largest block left.
+That is the next grammar increment, and it is legible only because the 1,112
+futures stopped filling the list.

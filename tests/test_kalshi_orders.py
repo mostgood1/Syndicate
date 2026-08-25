@@ -726,3 +726,135 @@ def test_a_real_price_failure_still_names_the_TICKER_it_could_not_price():
     message = str(excinfo.value)
     assert message.startswith("no_live_price:"), message
     assert "None" not in message, message
+
+
+def test_a_submit_failure_asks_the_venue_what_the_market_IS(monkeypatch, capsys):
+    """`market_not_found` ON A MARKET THE GET FINDS.
+
+    Measured 2026-08-25 6:00 PM Central, three real submissions in one minute:
+
+        KXWNBAAST-...-4          side=bid  price=0.5000  -> FILLED
+        KXMLBTOTAL-...MINATH-10  side=ask  price=0.5500  -> market_not_found
+        KXMLBTOTAL-...CINSF-8    side=ask  price=0.5100  -> market_not_found
+
+    ...while `fetch_market` on that same MINATH ticker returned a live price
+    TWICE in the same minute (`LIVE_PRICE ... live=0.45 drift=+0.0100`). The
+    ticker is real and tradeable; the GET finds it and the POST does not.
+
+    Two candidates remain and the error text distinguishes neither: an `ask`
+    (sell YES) this endpoint refuses, or a market whose order shape differs
+    (`market_type`, or an MVE collection). A 1-vs-2 sample is not enough to
+    flip order semantics -- this file's own `_DEFAULT_ORDER_PATH` comment
+    records inventing a route once already and earning a 410 for it. So the
+    failure asks the venue what the market IS.
+    """
+    from syndicate.features.shared import kalshi_auth, kalshi_client
+
+    def _boom(*_a, **_k):
+        raise orders.OrderBuildError("http_404: market_not_found")
+
+    monkeypatch.setattr(kalshi_auth, "signed_request", _boom)
+    monkeypatch.setattr(
+        kalshi_client, "fetch_market",
+        lambda ticker: {"status": "ok", "market": {
+            "market_type": "binary", "status": "active",
+            "mve_collection_ticker": None, "strike_type": "greater",
+            "yes_ask_dollars": 0.55, "no_ask_dollars": 0.45,
+            "can_close_early": True,
+        }},
+    )
+
+    with pytest.raises(orders.OrderBuildError):
+        orders.submit_order(_request(), price_dollars=0.55)
+
+    printed = capsys.readouterr().out
+    assert "SUBMIT_FAILED_MARKET" in printed, printed
+    # The fields that tell the two hypotheses apart.
+    for field in ("market_type=", "mve_collection=", "yes_ask=", "no_ask="):
+        assert field in printed, (field, printed)
+
+
+def test_the_diagnostic_never_masks_the_real_error(monkeypatch):
+    """A probe that raised would replace the venue's own rejection with our
+    own -- losing the only message that says why the order failed."""
+    from syndicate.features.shared import kalshi_auth, kalshi_client
+
+    monkeypatch.setattr(
+        kalshi_auth, "signed_request",
+        lambda *_a, **_k: (_ for _ in ()).throw(orders.OrderBuildError("http_404: real_reason")),
+    )
+    monkeypatch.setattr(
+        kalshi_client, "fetch_market",
+        lambda ticker: (_ for _ in ()).throw(RuntimeError("probe exploded")),
+    )
+
+    with pytest.raises(orders.OrderBuildError) as excinfo:
+        orders.submit_order(_request(), price_dollars=0.55)
+    assert "real_reason" in str(excinfo.value), str(excinfo.value)
+
+
+def test_a_moneyline_side_buys_YES_on_our_own_teams_contract():
+    """CONFIRMED BY THE USER 2026-08-25 from Kalshi's own order URLs. One market
+    PER TEAM, each offering a BUY on both legs:
+
+        KXMLBGAME-26AUG251840BOSMIA-BOS   op_order_side=yes  op_side=BUY
+        KXMLBGAME-26AUG251840BOSMIA-MIA   op_order_side=yes  op_side=BUY
+
+    So backing Miami is BUY YES on `-MIA`, not a NO or an ask on `-BOS`. The
+    join already keys a match on `board_side` and stamps the ticker of the team
+    that side names, so by order-build time the contract IS our team and the
+    leg is always YES.
+
+    Before this, `home`/`away` raised `unmappable_side` and no moneyline could
+    build an order at all -- untested because every h2h had already failed
+    upstream on a missing ticker.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    assert _side_to_kalshi("home", "h2h") == "yes"
+    assert _side_to_kalshi("away", "h2h") == "yes"
+    # The period moneylines are the same shape.
+    assert _side_to_kalshi("home", "h2h_h1") == "yes"
+
+
+def test_a_team_side_on_a_NON_team_ticker_still_refuses():
+    """THE GUARD THAT MAKES THE ABOVE SAFE, and the reason it is restricted to
+    the moneyline family.
+
+    A totals ticker encodes a STRIKE (`KXMLBTOTAL-...-10`), not a team. Reading
+    `home` as `yes` there would buy a market that has nothing to do with our
+    side -- so it must keep raising. `home` on a total is a defect upstream,
+    and a defect that refuses is worth far more than one that guesses.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    for market in ("totals", "totals_alt", "spreads", "batter_hits", None, ""):
+        with pytest.raises(orders.OrderBuildError, match="unmappable_side"):
+            _side_to_kalshi("home", market)
+
+
+def test_the_direction_sides_are_untouched_by_the_moneyline_path():
+    """over/under must keep mapping exactly as before -- the moneyline rule is
+    additive, not a rewrite of the leg selection every other market uses."""
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    assert _side_to_kalshi("over", "totals") == "yes"
+    assert _side_to_kalshi("under", "totals") == "no"
+    assert _side_to_kalshi("over", "h2h") == "yes"
+    assert _side_to_kalshi("yes", None) == "yes"
+    assert _side_to_kalshi("no", None) == "no"
+
+
+def test_a_moneyline_order_body_is_a_BID_not_an_ask():
+    """END TO END: the whole point of the workaround. An `ask` is what every
+    failed Kalshi order today was (`market_not_found`, twice); a moneyline must
+    never take that path."""
+    import dataclasses
+
+    request = dataclasses.replace(
+        _request(), market="h2h", side="home", line=None,
+        venue_ticker="KXMLBGAME-26AUG251840BOSMIA-MIA",
+    )
+    body = orders.order_body_v2(request, price_dollars=0.55)
+    assert body["side"] == "bid", body
+    assert body["ticker"] == "KXMLBGAME-26AUG251840BOSMIA-MIA"

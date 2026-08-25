@@ -3551,7 +3551,31 @@ def portfolio_paper_api():
     return _no_cache_response(jsonify({"ok": True, **_paper_portfolio_payload(selected_date)}))
 
 
-def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
+# Statuses that never became a position. Hidden by DEFAULT on the live page
+# [USER DECISION 2026-08-25] and never deleted -- a toggle shows them, because
+# they are the rows that say WHY a bet did not happen, which is the whole
+# diagnostic surface.
+_NON_POSITION_STATUSES = frozenset({"rejected", "failed"})
+
+
+def _is_non_position(order) -> bool:
+    """An order that never opened a position.
+
+    `rejected` never reached the venue at all. `failed` is the harder case: a
+    submit that TIMED OUT may well have landed, which is what the write-ahead
+    record exists for -- so only a failure the venue ANSWERED (a 4xx) is
+    certainly not a position. `execution_guard._is_venue_refusal` already draws
+    that line for the day's budget, and reusing it keeps the page and the cap
+    telling one story instead of two functions drifting apart.
+    """
+    from syndicate.features.shared.execution_guard import _is_venue_refusal
+
+    if str(order.get("status") or "") == "rejected":
+        return True
+    return _is_venue_refusal(order)
+
+
+def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> dict[str, Any]:
     """Real money only. The mirror image of `_paper_portfolio_payload`.
 
     A SEPARATE PAGE RATHER THAN A FILTER ON THE PAPER ONE. The two answer the
@@ -3578,6 +3602,7 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
     from pipeline.execute_portfolio import execution_enabled
 
     orders: list = []
+    hidden_orders: list = []
     ledger_error = None
     try:
         orders = [
@@ -3586,6 +3611,13 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
             if str(order.get("mode") or "") == LIVE
         ]
         orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
+        # HIDDEN, NOT DROPPED, and COUNTED either way. A page that silently
+        # omitted these would make "we placed nothing" and "we tried and were
+        # refused" look identical -- the distinction this whole system keeps
+        # paying to preserve.
+        hidden_orders = [o for o in orders if _is_non_position(o)]
+        if not show_all:
+            orders = [o for o in orders if not _is_non_position(o)]
     except Exception as exc:
         # An unreadable ledger must never render as "no live positions". That
         # is the one absence this page cannot afford to get wrong.
@@ -3654,6 +3686,8 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
     return {
         "date": selected_date,
         "orders": orders,
+        "hidden_count": len(hidden_orders),
+        "show_all": bool(show_all),
         "ledger_error": ledger_error,
         "settlement": settlement,
         "settlement_error": settlement_error,
@@ -3686,14 +3720,19 @@ def _seconds_since(stamp: Any) -> int | None:
 @intelligence_bp.get("/api/portfolio/live")
 def api_portfolio_live():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    return _no_cache_response(jsonify(_live_portfolio_payload(selected_date)))
+    show_all = str(request.args.get("show") or "").strip().lower() == "all"
+    return _no_cache_response(jsonify(_live_portfolio_payload(selected_date, show_all=show_all)))
 
 
 @intelligence_bp.get("/portfolio/live")
 def portfolio_live_page():
     """Real positions. Deliberately its own page, not a tab on the paper one."""
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    return render_template("portfolio_live.html", live=_live_portfolio_payload(selected_date))
+    show_all = str(request.args.get("show") or "").strip().lower() == "all"
+    return render_template(
+        "portfolio_live.html",
+        live=_live_portfolio_payload(selected_date, show_all=show_all),
+    )
 
 
 @intelligence_bp.get("/portfolio/paper")
