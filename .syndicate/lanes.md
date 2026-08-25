@@ -2166,6 +2166,28 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   home-away/sport-filter logic touched. Reclaim by re-adding both paths to
   that lane's Files: list whenever it wants them back, same as the prior
   carve-out's own terms.
+- **CI PYTEST-BASELINE SCOPE, 2026-08-25.** User asked to fix all CI-baseline
+  failures and find a way to shorten the ~45-minute `pytest-baseline` job.
+  Fixed 6 real bugs (soccer date-scope x2, `live_lens_loop` watermark timing,
+  3 timezone-ambiguous `date.today()` sites -- all recorded above and in
+  their own commits). The remaining original 8 CI-flagged failures are
+  confirmed genuinely elusive: they do not reproduce standalone, in their own
+  file, or bundled with a dozen others -- only inside the full ~11,000-test
+  SERIAL run, meaning some earlier test pollutes shared state before they
+  run. Not chased further; would need a bisection across thousands of tests.
+  **Speedup measured and scoped, not applied:** `pytest-xdist -n auto
+  --dist=loadscope` cuts the suite from ~45min to ~12min (3.7x, same 4-core
+  sandbox GitHub's `ubuntu-latest` also provisions). An initial read that
+  parallelization surfaces ~15 NEW resource-contention failures was CHECKED
+  and found WRONG -- every one of those 15 reproduces standalone, serially,
+  with `-n auto` nowhere involved; 12 are already in `tests/pytest_baseline.json`
+  as pre-existing tracked debt. Full write-up, the corrected finding, and the
+  concrete adoption checklist (add `pytest-xdist`, wire `-n auto` into the
+  `pytest-baseline` job only, regenerate the baseline under the new
+  invocation, confirm on real CI):
+  `.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`. Nothing in
+  `.github/workflows/ci.yml` or `requirements-dev.txt` has been touched yet --
+  this is a proposal, not a shipped change.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
