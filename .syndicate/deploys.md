@@ -28716,3 +28716,109 @@ same shape: a counter that named a problem while withholding the data needed to
 act on it. `600a8f9ae` adds the complete per-series count beside the bounded
 sample (deploy `dep-da6skvafngtc73c969ig`) — the sample teaches the grammar, the
 count answers "is this family here at all". Not yet read.
+
+---
+
+## 2026-08-25 — the capture layer's first readings, and four disproven hypotheses
+
+**Deployed:** both workers through `d58cb0b8c` → `5d3a21e4e` → `9ee23abcf` →
+`8ebf397b1` → `441ec9e2f`, all on `origin/main`.
+
+### verify 1 — the Kalshi queue starvation fix WORKED
+
+```
+17:43:04Z  TICK series_wanted=193 due=193 fetched=60 cap=60 markets=1211
+             KXNBAGAME: (6, 'series_filter')
+             KXNBAWINS: (312, 'series_filter')
+           BOARD_JOIN kalshi_markets=1211 board_rows=1290 matched=4
+```
+
+Markets **883 → 1,211 (+37%) in one tick**. `KXNBAGAME` returned markets for
+the first time, and `KXNBAWINS` alone contributed 312 from a series the queue
+had never reached. `oldest_s=145434` is still 40h and is EXPECTED on the first
+tick after the fix — series not yet reached still carry old stamps. Watch it
+fall; if it does not, the rotation is still wrong.
+
+`unreadable_title` rose 216 → 538. That is coverage, not regression: we now
+fetch series we never reached, and ~380 of the 538 are futures.
+
+### verify 2 — the daily odds layer works on both venues
+
+```
+POLYMARKET_DAILY_BOOK files=211 listed=12893 parsed=5938 opened=12893 undated=0
+  unparsed={'SPORTS_MARKET_TYPE_PROP': 5815,
+            'SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME': 1140}
+KALSHI DAILY_BOOK files=7 listed=835 parsed=673 undated=376
+  unparsed={'unreadable_title': 162}
+```
+
+12,893 Polymarket markets now recorded with movement where **73** previously
+reached anything durable. The coverage gap is a number instead of a silence.
+**`DRAWABLE_OUTCOME: 1,140`** is almost certainly the soccer three-way draw leg
+— a market the board already carries.
+
+Kalshi's `undated=376` is the futures separating themselves with no title
+parsing at all: `KXMLBALCENT-26-MIN` carries no game date where
+`KXMLBKS-26AUG24…` does.
+
+**Corrected in `9ee23abcf`:** `files=211` was over-capture — Argentine second
+division, tennis, table tennis, esports — 211 keyvalue writes every 180s for
+leagues no module models. Scoped to `SUPPORTED_SPORT_SLUGS` + soccer, with
+out-of-scope rows COUNTED BY LEAGUE so Polymarket's soccer codes become
+addable from data rather than guessed.
+
+### verify 3 — a fabricated opening, caught by its own log line
+
+```
+MOVER KXMLBKS-26AUG251907KCTOR-TORMSCHERZER31-2 open=0.0 now=0.93 move_pts=93.0
+```
+
+`yes_ask_dollars = 0.0` is NO ASK, not a price. Recorded as an opening it
+manufactures a 93-point move that never happened — and CLV is measured against
+the opening, so every bet on that market would score a beat it never got. A
+price is now strictly inside (0, 1); a one-sided book still records, because
+half a quote is a price the venue showed. Fixed in `8ebf397b1`.
+
+### verify 4 — the reconciliation latch cleared
+
+The 16:08 Polymarket order moved from `submitted` to `rejected
+venue_order_state_canceled`, and execution resumed at 17:45. The per-order read
+plus the `state` field mapping did what the latch entry predicted.
+
+### FOUR HYPOTHESES OF MINE, DISPROVEN BY THEIR OWN DIAGNOSTICS
+
+Recorded together because the pattern matters more than any one of them. Every
+one was a counter that named a problem while withholding its data, and in every
+case the fix that worked was the log line that made guessing unnecessary.
+
+1. **Kalshi club-code alias gaps.** `event_not_on_our_board` 20 → 0 when the
+   date was checked first. There is no alias gap on this slate.
+2. **`JOIN_EVENTS` would produce an alias work list.** All 8 sample slots went
+   to one game.
+3. **A missing `KXMLBGAME` grammar blocks h2h.** The complete per-series count
+   settles it: `by_series={'KXNBAWINS': 312, 'KXMLBINNINGTOTAL': 72, 'KXMLBF3':
+   30, ...}` — `KXMLBGAME` is NOT among the unreadable, and `KXNBAGAME` returns
+   markets fine. The h2h gap is elsewhere and is still unlocated.
+4. **6,838 Polymarket "player props".** `SPORTS_MARKET_TYPE_PROP` includes
+   League of Legends map winners. It is a mixed bucket and the number was an
+   inference from a type name.
+
+### verify 5 — OPEN. Polymarket totals and spreads
+
+```
+17:45:13Z  totals over 7.5  Tampa Bay Rays @ Detroit Tigers
+           slug=tsc-mlb-tb-det-2026-08-25-7pt5   (right game, right number)
+           OrderBuildError: market_unresolved_for_position
+```
+
+`_side_for_team` resolves TEAM names; a totals market's outcomes are
+`["Over","Under"]`. Every totals and spreads order on this venue has failed
+this way since it went live — only moneylines ever resolved. `441ec9e2f` fixes
+totals and REFUSES spreads by name, because a spread's outcomes are signed
+numbers that name no team and an assumed ordering already bought the wrong team
+once today. Not yet read.
+
+Also in `441ec9e2f`: the slate freshness ceiling had stopped guarding. 1800s
+documented as "twice the writer's 900s cadence" became TEN times it when the
+writer dropped to 180s — present, logged, tolerating nine missed writes. The
+cadence is now a named constant with the ceiling derived from it.
