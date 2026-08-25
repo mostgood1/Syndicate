@@ -27156,3 +27156,95 @@ correct build reads the side from the SLUG, never from array position.
 **Still `board_rows=0`**, so the resolver remains unexercised. That is the
 staleness chain, not this.
 
+
+---
+
+## 2026-08-25T00:07Z — Polymarket US goes live as a second placing venue
+
+**lane:** portfolio-decision-and-execution
+**services:** refresh-worker `dep-da6dm3ajnfac73e46i7g` (df2047f5f),
+live-odds-worker `dep-da6dpjpsrm7s73cs9en0` (5ca8409f4 + env)
+
+Three changes, deployed in order. Each has its own reading.
+
+### 1. `f32ec00ff` — the Polymarket adapter now filters BY SPORT. VERIFIED.
+
+**verify:** `VENUE_REPRICE` on refresh-worker, 2026-08-25T00:02:18Z.
+
+Before (23:45Z): `polymarket_us quotes=7040` for mlb, wnba, nfl AND soccer —
+the same number four times, because `sport` was used to BUILD THE KEY and never
+to SELECT rows. After:
+
+    mlb    polymarket_us quotes=526
+    wnba   polymarket_us quotes=178
+    nfl    polymarket_us quotes=2402
+    soccer polymarket_us no_rows  reason=no_polymarket_row_for_league_soccer
+
+Four distinct numbers and one NAMED refusal where the venue lists nothing for
+that league. This was a wrong-price path, not a missing-price path: an NFL
+market was keyed `mlb|h2h|<team>` when collected for mlb. It never bit only
+because Kalshi was fresher and won every selection — a timing accident.
+
+`selected_by_source={'kalshi': 237}` still, at kalshi age 1017s vs polymarket
+5300s. **Polymarket's slate is 5300s old against a 900s cadence — the writer is
+not ticking at its configured rate.** Open, not chased.
+
+### 2. `df2047f5f` — `kalshi_discovery` called three names it never imported.
+
+**verify:** the absence of `[kalshi_discovery] PROBE_ERROR NameError` after
+00:00Z, against nine consecutive occurrences 21:32Z–23:45Z (one per deploy).
+
+`probe`, `discover`, `KalshiError` — all used at top level, imported nowhere.
+The probe sits inside `try/except Exception` written to survive a venue that
+will not answer, so **a bug in our own code was logged as the venue not
+answering** and the function RETURNED. Everything downstream never ran once:
+AUTO_SERIES registration, LISTED, COVERAGE_GAPS, per-series true counts.
+`kalshi_polymarket_arb` reported `kalshi_moneylines_resolved: 0` on every scan
+all evening for this reason and no other.
+
+This module's own docstring exists to stop "lists nothing" being confused with
+"did not answer". It was defeated from the inside.
+
+Also now registers GAME series on the board-building process — discovery is
+per-process, so `kalshi_odds_refresh` doing it elsewhere helped nothing here.
+
+### 3. `5ca8409f4` + env — two venues can place. **REAL MONEY, USER DECISION.**
+
+`SYNDICATE_EXECUTION_VENUE` was read as ONE STRING, so exactly one venue could
+ever transact. Kalshi held the slot (`EXECUTION mode=live venue=kalshi
+spent={'dollars': 2.99, 'orders': 2}`, 23:49Z). Polymarket's path was already
+complete — auth verified live at 20:18Z (`POLYMARKET_US_AUTH ok=True`, signed
+read, 28 real row keys), submitter, resolver and ticker stamp all wired. The
+only thing in the way was a `.split(",")`.
+
+**The cap is why this needed more than an edit.** `spent_today` filters on
+`order.venue` deliberately, so `max_day_dollars` is PER VENUE: one live venue
+risks $40, two risk $80, and nobody edited a cap. The per-venue check cannot
+catch it — the new venue has spent $0 of its own $40 and is correctly allowed.
+`max_day_dollars_all_venues` now defaults to `max_day_dollars` so adding a
+venue SPLITS one budget rather than duplicating it.
+
+**Env set on live-odds-worker (dashboard, not `render.yaml` — no
+`SYNDICATE_EXECUTION*` key is declared there, so no `blueprint_sync` exposure):**
+
+    SYNDICATE_EXECUTION_VENUE                      kalshi  ->  kalshi,polymarket
+    SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES  (unset) ->  80
+
+**USER DECISION, 2026-08-25.** Offered a $2 first-order step because no live
+order has ever reached Polymarket and its YES/NO `outcomeSide` convention is
+UNVERIFIED against a real response. User chose **full live at the existing
+$10/order cap**, and $80/day across both venues — the money is held as $50 in
+each, separate balances, so a per-venue budget is the honest model.
+
+**verify: NOT YET READ.** The line that proves it is
+`[live_odds_worker] EXECUTION ... scope=polymarket` with a non-null
+`placed`/`refused`. Until that appears, Polymarket transacting is a
+CONFIGURATION, not a measurement.
+
+**THE RISK THAT IS STILL OPEN, stated because the first fill is the only thing
+that closes it:** `polymarket_us_orders._side_to_outcome` maps our side to
+`OUTCOME_SIDE_YES`/`_NO` from this venue's own vocabulary, and that mapping has
+never been confirmed by a venue response. If it is inverted, the first order
+buys the opposite side at a price never quoted for it — and it will look
+entirely plausible in the log. The first `filled` Polymarket record must be
+read against the actual position before a second slate runs.
