@@ -479,9 +479,24 @@ def run_arb_scan(
         kalshi_payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
     except Exception as exc:
         return {"status": "error", "reason": f"kalshi_artifact_read_failed: {type(exc).__name__}: {exc}"}
-    kalshi_markets = (kalshi_payload or {}).get("markets")
-    if not isinstance(kalshi_markets, list):
+    # Through the merge helper -- see `venue_quote_adapters.kalshi_outcome`.
+    # `markets` is no longer a persisted top-level key; the markets live under
+    # `series[<ticker>]["markets"]` and reading the old key returns None on
+    # every real artifact.
+    from pipeline.kalshi_odds_refresh import markets_from_state
+
+    # PRESENCE IS THE TEST, NOT EMPTINESS. An artifact holding zero markets is
+    # a real state the scan handles (it finds no arbs and says so); a document
+    # carrying NEITHER shape is a broken read. Collapsing the two would turn a
+    # quiet slate into an error and, worse, an error into a quiet slate.
+    from collections.abc import Mapping as _Mapping
+
+    payload = kalshi_payload if isinstance(kalshi_payload, _Mapping) else {}
+    if not isinstance(payload.get("series"), _Mapping) and not isinstance(
+        payload.get("markets"), list
+    ):
         return {"status": "error", "reason": "no_kalshi_markets"}
+    kalshi_markets = markets_from_state(payload)
 
     try:
         from syndicate.features.shared import polymarket_us_markets

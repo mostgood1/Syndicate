@@ -136,9 +136,33 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
     payload, mtime = _artifact(("intelligence", "kalshi_markets.json"))
     if not isinstance(payload, Mapping):
         return SourceOutcome(source="kalshi", status="error", reason="kalshi_markets.json_unreadable")
-    rows = payload.get("markets")
-    if not isinstance(rows, list):
+    # THROUGH THE MERGE HELPER, never `payload["markets"]`.
+    #
+    # That key is no longer persisted. Storing the merged list beside the
+    # per-series entries wrote the same payload twice and pushed the document
+    # past the keyvalue store's 8MB ceiling, at which point it stopped being
+    # written at all -- so the fix removed the duplicate and left the markets
+    # under `series[<ticker>]["markets"]`.
+    #
+    # THIS READER WAS NOT UPDATED WITH THE WRITER, and it cost a whole evening.
+    # Measured 2026-08-25T20:15:10Z, every sport, every cycle:
+    #
+    #   'kalshi': {'status': 'error', 'reason': 'markets_key_absent',
+    #              'quotes': 0, 'age_seconds': None}
+    #
+    # Kalshi therefore offered ZERO quotes, won zero selections, put zero
+    # positions in the plan, and `ORDER_PATH venue=kalshi` read
+    # `status=no_positions` -- which looks exactly like "Kalshi has no markets
+    # for us" and was in fact one dictionary key.
+    from pipeline.kalshi_odds_refresh import markets_from_state
+
+    if not isinstance(payload.get("series"), Mapping) and not isinstance(
+        payload.get("markets"), list
+    ):
+        # Neither shape present: the document is not a markets artifact at all.
+        # Distinct from an artifact that holds no markets right now.
         return SourceOutcome(source="kalshi", status="error", reason="markets_key_absent")
+    rows = markets_from_state(payload)
     fetched_at = _fetched_at(payload, mtime)
     if fetched_at is None:
         # No defensible age. Refusing beats emitting quotes the freshness gate
