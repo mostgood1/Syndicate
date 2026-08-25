@@ -253,6 +253,29 @@ def join_polymarket_to_board(
     def refuse(reason: str) -> None:
         refusals[reason] = refusals.get(reason, 0) + 1
 
+    # THE OUT-OF-SCOPE WORK LIST. Complete counts keyed by (venue type, league)
+    # plus one sampled row each -- the same shape that turned Kalshi's
+    # `unreadable_title` from a number into an actionable list.
+    out_of_scope_counts: dict[str, int] = {}
+    out_of_scope_samples: list[dict[str, Any]] = []
+    out_of_scope_seen: set[str] = set()
+
+    def _note_out_of_scope(venue_type: str, parsed: Mapping[str, Any], row: Mapping[str, Any]) -> None:
+        key = f"{venue_type}|{parsed.get('league')}"
+        out_of_scope_counts[key] = out_of_scope_counts.get(key, 0) + 1
+        if key in out_of_scope_seen or len(out_of_scope_samples) >= 14:
+            return
+        out_of_scope_seen.add(key)
+        out_of_scope_samples.append({
+            "key": key,
+            "slug": str(row.get("slug") or "")[:64],
+            # THE QUESTION IS THE PAYLOAD HERE. A slug says which game; only the
+            # question says what the bet IS, and that is what decides whether a
+            # parser can be written for the family.
+            "question": str(row.get("question") or "")[:90],
+            "outcomes": str(row.get("outcomes") or "")[:60],
+        })
+
     # Index the venue side once, keyed on what a board row can be asked for.
     index: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for row in markets:
@@ -260,13 +283,32 @@ def join_polymarket_to_board(
         if parsed is None:
             refuse("slug_unparseable")
             continue
-        board_market = MARKET_TYPE_TO_BOARD.get(str(row.get("sportsMarketTypeV2") or "").upper())
+        venue_type = str(row.get("sportsMarketTypeV2") or "").upper()
+        board_market = MARKET_TYPE_TO_BOARD.get(venue_type)
         if board_market is None:
-            # PROP and DRAWABLE_OUTCOME land here. Real markets, deliberately
-            # out of scope -- see the module header.
+            # PROP and DRAWABLE_OUTCOME land here. Real markets, currently out
+            # of scope -- but 6,838 of them are fetched every cycle and thrown
+            # away, so "out of scope" needs to be a MEASURED decision rather
+            # than a standing one.
+            #
+            # WHAT `PROP` ACTUALLY CONTAINS IS NOT OBVIOUS, and assuming it was
+            # already produced one wrong claim. Measured 2026-08-25T17:05:02Z:
+            #
+            #   slug='astatc-lol-bam-gng-2026-08-20-game1'
+            #   type='SPORTS_MARKET_TYPE_PROP'
+            #   question='Will Baam Esports win Game 1 vs GnG Amazigh?'
+            #
+            # That is a League of Legends MAP WINNER, not a player prop. So
+            # `PROP` is a mixed bucket and the 6,838 cannot be characterised
+            # without looking. This samples one row per (type, league) with the
+            # slug and the QUESTION -- the question is what names the bet, the
+            # slug alone does not -- and counts every one completely, so a
+            # family that is absent is distinguishable from one past the cap.
+            _note_out_of_scope(venue_type, parsed, row)
             refuse("market_type_not_a_game_line")
             continue
         if _has_segment(parsed["modifiers"]):
+            _note_out_of_scope(f"{venue_type}|SEGMENT", parsed, row)
             refuse("segment_market_not_full_game")
             continue
         outcomes, outcome_reason = _outcome_probabilities(row)
@@ -359,6 +401,16 @@ def join_polymarket_to_board(
         from syndicate.features.shared.venue_quote_adapters import probability_to_american
 
         matches.append({
+            # THE GAME. Carried because the resolvers below key on it -- see
+            # `_resolver_key`. Without it a match is `(market, player, line,
+            # side)`, which is not an identity on a game line: every MLB h2h
+            # home row in a slate collapses to one key.
+            "event_id": board_row.get("event_id"),
+            # Diagnostics only, never keyed on: `event_id` is exact and these
+            # would need aliasing. They are here so a wrong-game slug is
+            # READABLE in the artifact rather than needing a second join to spot.
+            "home_team": board_row.get("home_team"),
+            "away_team": board_row.get("away_team"),
             "market": board_market,
             "side": side,
             "line": board_line,
@@ -378,6 +430,13 @@ def join_polymarket_to_board(
         "indexed": sum(len(v) for v in index.values()),
         "refusals": refusals,
         "unreadable_shapes": shapes,
+        # What we FETCH and discard, by (venue type, league). Complete counts
+        # plus one sampled row each, so "out of scope" is a decision that can
+        # be revisited from data rather than a standing assumption.
+        "out_of_scope_counts": dict(
+            sorted(out_of_scope_counts.items(), key=lambda kv: -kv[1])
+        ),
+        "out_of_scope_samples": out_of_scope_samples,
     }
 
 
@@ -470,34 +529,81 @@ def _probability_for_side(
     return hits[0] if len(hits) == 1 else None
 
 
-def polymarket_price_resolver(matches: Sequence[Mapping[str, Any]]):
-    """Board row -> Polymarket's own American price. Mirrors Kalshi's.
+def _resolver_key(record: Mapping[str, Any]) -> tuple[str, str, str, float | None, str] | None:
+    """`(event_id, market, player, line, side)`, or None when it is not an identity.
 
-    Keyed on `(market, player, line, side)` -- the SAME identity the join
-    matched on, so a lookup cannot be looser than the join and silently
-    reintroduce the mismatches the join refuses.
+    --------------------------------------------------------------------------
+    THE GAME IS PART OF THE KEY. IT WAS NOT, AND THAT BOUGHT THE WRONG GAME.
+    --------------------------------------------------------------------------
+
+    MEASURED 2026-08-25 14:57:34Z, three attempted purchases:
+
+      board row                                       stamped slug
+      totals under 8.5 · Cincinnati Reds @ SF Giants  tsc-mlb-bal-stl-2026-08-25-8pt5
+      h2h home · Texas Rangers @ Chicago White Sox    aec-mlb-pit-sd-2026-08-25
+
+    BAL@STL on a CIN@SF row. PIT@SD on a TEX@CWS row. Both resolvers keyed on
+    `(market, player_name, line, side)` and a GAME LINE HAS NO PLAYER, so every
+    MLB h2h home row in the slate hashed to `("h2h", "", None, "home")` and the
+    index kept whichever game was written last. Same for `("totals", "", 8.5,
+    "under")`.
+
+    The JOIN was never wrong -- it matches each row through `_teams_match` and
+    refuses ambiguity. The defect was entirely in flattening that per-row result
+    into a key that no longer said which row it came from. The price resolver's
+    own docstring claimed "a lookup cannot be looser than the join"; it was
+    looser than the join, and that sentence is why nobody looked.
+
+    **THE ORDER DID NOT GO THROUGH, AND THAT WAS LUCK, NOT DESIGN.** It failed
+    at `polymarket_us_orders`' `market_unresolved_for_position` because the
+    submit-time resolver was rebuilt from a slate that happened to hold fewer
+    matches. Had it held one for that key, the order would have been submitted
+    against a different game's contract at a price quoted for that other game.
+
+    `event_id` rather than the team names: it is exact, it is on every published
+    board row (`layer2_board.py:1825`), and matching on names here would need an
+    alias table -- which is the machinery `build_live_gameline_index` refuses for
+    exactly this reason.
+
+    **A ROW WITH NO `event_id` RETURNS None AND IS NEVER INDEXED.** An empty
+    string would restore the collision under a different spelling, which is the
+    failure mode this function exists to end: not indexed means not resolved
+    means no order, and that is the direction that fails safe.
     """
     from syndicate.features.shared.kalshi_board_join import normalize_person
 
-    index: dict[tuple[str, str, float | None, str], float] = {}
+    event_id = str(record.get("event_id") or "").strip()
+    if not event_id:
+        return None
+    return (
+        event_id,
+        str(record.get("market") or "").strip().lower(),
+        normalize_person(record.get("player_name")),
+        _as_float(record.get("line")),
+        str(record.get("side") or "").strip().lower(),
+    )
+
+
+def polymarket_price_resolver(matches: Sequence[Mapping[str, Any]]):
+    """Board row -> Polymarket's own American price. Mirrors Kalshi's.
+
+    Keyed by `_resolver_key`, the SAME tuple the ticker resolver uses. Two
+    resolvers keyed by two slightly different tuples would pair a row with one
+    market's price and another's contract -- a bet placed at a price that was
+    never quoted for it, which is the hazard `kalshi_board_join._match_key`
+    states and the reason this is one shared function rather than two copies.
+    """
+    index: dict[tuple[str, str, str, float | None, str], float] = {}
     for match in matches:
         price = match.get("polymarket_american")
-        if price is None:
+        key = _resolver_key(match)
+        if price is None or key is None:
             continue
-        index[(
-            str(match.get("market") or "").strip().lower(),
-            normalize_person(match.get("player_name")),
-            _as_float(match.get("line")),
-            str(match.get("side") or "").strip().lower(),
-        )] = float(price)
+        index[key] = float(price)
 
     def resolve(row: Mapping[str, Any]) -> float | None:
-        return index.get((
-            str(row.get("market") or "").strip().lower(),
-            normalize_person(row.get("player_name")),
-            _as_float(row.get("line")),
-            str(row.get("side") or "").strip().lower(),
-        ))
+        key = _resolver_key(row)
+        return index.get(key) if key else None
 
     resolve.market_count = len(index)  # type: ignore[attr-defined]
     return resolve
@@ -511,19 +617,13 @@ def polymarket_ticker_resolver(matches: Sequence[Mapping[str, Any]]):
     float or a dict is one every caller must shape-test, and the caller that
     forgets places an order priced by a dict.
     """
-    from syndicate.features.shared.kalshi_board_join import normalize_person
-
-    index: dict[tuple[str, str, float | None, str], dict[str, Any]] = {}
+    index: dict[tuple[str, str, str, float | None, str], dict[str, Any]] = {}
     for match in matches:
         slug = str(match.get("polymarket_slug") or "")
-        if not slug:
+        key = _resolver_key(match)
+        if not slug or key is None:
             continue
-        index[(
-            str(match.get("market") or "").strip().lower(),
-            normalize_person(match.get("player_name")),
-            _as_float(match.get("line")),
-            str(match.get("side") or "").strip().lower(),
-        )] = {
+        index[key] = {
             "slug": slug,
             # Carried because `order_body` REFUSES to infer them, so a caller
             # that has the ticker also has everything the order needs.
@@ -532,12 +632,8 @@ def polymarket_ticker_resolver(matches: Sequence[Mapping[str, Any]]):
         }
 
     def resolve(row: Mapping[str, Any]) -> dict[str, Any] | None:
-        return index.get((
-            str(row.get("market") or "").strip().lower(),
-            normalize_person(row.get("player_name")),
-            _as_float(row.get("line")),
-            str(row.get("side") or "").strip().lower(),
-        ))
+        key = _resolver_key(row)
+        return index.get(key) if key else None
 
     resolve.market_count = len(index)  # type: ignore[attr-defined]
     return resolve

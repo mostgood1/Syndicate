@@ -42,6 +42,51 @@ def execution_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _venue_ticker_of(position: Mapping[str, Any]) -> str | None:
+    """The venue's contract id as a STRING, whatever shape the plan stored.
+
+    --------------------------------------------------------------------------
+    THE DICT IS STRINGIFIED HERE, AND THAT IS WHERE IT WENT WRONG
+    --------------------------------------------------------------------------
+
+    This was `str(position.get("venue_ticker")).strip()`. `venue_scope.py:190`
+    stamps `ticker_resolver(row)` verbatim, and the two venues return different
+    shapes: Kalshi a string ticker, Polymarket a dict
+    `{slug, tick_size, minimum_trade_qty}` -- because `order_body` REFUSES to
+    infer the last two and the resolver is the only thing holding them.
+
+    So a Polymarket position arrived here as a dict and left as the string
+    `"{'slug': 'aec-mlb-tex-cws-2026-08-25', 'tick_size': 0.005, ...}"`, which
+    is TRUTHY, sails past every `if not slug` guard, and is then looked up in
+    the slate as a slug. MEASURED 2026-08-25 15:50:40Z, after the deploy that
+    was supposed to fix this:
+
+        POLYMARKET_MARKET_NOT_FOUND
+          slug={'slug': 'aec-mlb-tex-cws-2026-08-25', 'tick_size': 0.005, ...}
+
+    **The first fix read the dict inside `_polymarket_resolve_market`, which is
+    one layer too late** -- by then `str()` had already run here, and
+    `isinstance(raw_ticker, Mapping)` was False on a string that merely looked
+    like a dict. The log line said so plainly and is the only reason this was
+    caught on the same slate rather than assumed fixed.
+
+    Normalised at the BOUNDARY instead, so `OrderRequest.venue_ticker` holds
+    what its type says: a string. `tick_size` and `minimum_trade_qty` are not
+    carried on the request -- `_polymarket_resolve_market` reads both from the
+    slate row, which is the venue's own current answer and outranks a value
+    captured a refresh earlier.
+    """
+    raw = position.get("venue_ticker")
+    if isinstance(raw, Mapping):
+        # Polymarket. An entry with no slug is not a contract id, and returning
+        # `"{}"` would be the same truthy-garbage bug in a smaller costume.
+        return str(raw.get("slug") or "").strip() or None
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
+
+
 def _order_from_position(position: Mapping[str, Any], selected_date: str, venue: str) -> OrderRequest | None:
     """One committed position -> one order request, or None with nothing placed.
 
@@ -96,9 +141,7 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         # there is no single contract when the price came from an aggregator's
         # best-of-many, which is exactly why the Kalshi adapter refuses without
         # one rather than picking a plausible ticker at submit time.
-        venue_ticker=(str(position.get("venue_ticker")).strip() or None)
-        if position.get("venue_ticker")
-        else None,
+        venue_ticker=_venue_ticker_of(position),
     )
 
 
@@ -175,7 +218,26 @@ def run_execution(
         try:
             from syndicate.features.shared.execution_ledger import reconcile_live_orders
 
-            reconcile_live_orders()
+            # THE VENUE WE ARE ABOUT TO PLACE ON, not the default. This called
+            # `reconcile_live_orders()` bare, and its `venue` defaults to
+            # `"kalshi"` -- so a Polymarket order was never asked about and its
+            # `submitted` row could not clear. Measured 2026-08-25T16:40:00Z:
+            # one resting Polymarket order blocked BOTH scopes, and the block
+            # was self-sustaining because the read that lifts it never ran.
+            #
+            # Both venues every pass, not just `venue`: the gate below is
+            # global -- ANY unreconciled live order blocks this run whatever
+            # venue it belongs to -- so reconciling only our own would leave us
+            # blocked by a row we deliberately declined to ask about.
+            for reconcile_venue in ("kalshi", "polymarket"):
+                outcome = reconcile_live_orders(venue=reconcile_venue)
+                if str(outcome.get("status") or "") != "ok":
+                    print(
+                        f"[execute_portfolio] RECONCILE venue={reconcile_venue}"
+                        f" status={outcome.get('status')}"
+                        f" reason={outcome.get('reason')}",
+                        flush=True,
+                    )
         except Exception as exc:
             print(
                 f"[execute_portfolio] RECONCILE_FAILED {type(exc).__name__}: {exc}",
@@ -645,7 +707,7 @@ def _polymarket_max_price_age_seconds() -> float:
     return parsed if parsed > 0 else 1800.0
 
 
-def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
+def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | None:
     """`(slug, price, tick_size, min_qty)` for one Polymarket US position, or
     `None` to refuse cleanly -- which `polymarket_us_submitter` turns into an
     `OrderBuildError` (recorded as failed, never sent at a price nobody chose,
@@ -711,21 +773,64 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
     via `kalshi_board_join._side_for_team`, the SAME resolver
     `kalshi_polymarket_arb.py` already uses and tests for the identical
     problem (Polymarket's `outcomes` carry bare team names, never "yes"/"no",
-    and never a guaranteed array order). Whether that team is
-    `OUTCOME_SIDE_YES` or `_NO` on Polymarket's own books is decided by
-    `polymarket_us_orders._side_to_outcome` from `request.side` directly, not
-    here -- and that YES/NO convention is itself UNVERIFIED against a real
-    venue response (no live order has ever been placed on this venue). Getting
-    the PRICE right for the wrong `outcomeSide` would still buy the wrong side
-    at a price never quoted for it, so this is named rather than assumed away.
+    and never a guaranteed array order).
+
+    IT ALSO SELECTS THE SIDE, and that is a correction. This docstring used to
+    end by naming the risk and leaving it: the `outcomeSide` was decided
+    separately by `_side_to_outcome` from `request.side`, the YES/NO convention
+    was "UNVERIFIED against a real venue response", and getting the price right
+    for the wrong side "would still buy the wrong side at a price never quoted
+    for it". A live order then did precisely that -- `side=home` on Texas @
+    Chicago White Sox bought TEXAS at the White Sox's price, and did not fill,
+    because the limit was priced for the outcome it was not buying.
+
+    A named risk is not a mitigation. The index this function resolves is now
+    returned and carried into `order_body`, so the price and the side are two
+    readings of one match instead of two independent guesses that happened to
+    be compared by nobody.
     """
     from syndicate.features.shared.kalshi_board_join import _side_for_team
     from syndicate.features.shared.polymarket_us_markets import GAME_SLATE_ARTIFACT
     from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
 
-    slug = str(getattr(request, "venue_ticker", "") or "").strip()
+    # `venue_ticker` CARRIES A DICT FOR THIS VENUE, NOT A STRING.
+    #
+    # MEASURED 2026-08-25 14:57:34Z, on what would have been the first two
+    # Polymarket orders ever placed:
+    #
+    #   LIVE_ORDER status=failed venue=polymarket
+    #     ticker={'slug': 'tsc-mlb-bal-stl-2026-08-25-8pt5', 'tick_size': 0.005,
+    #             'minimum_trade_qty': 0.01}
+    #     error='OrderBuildError: market_unresolved_for_position'
+    #
+    # `venue_scope.py:190` stamps `scoped_row["venue_ticker"] =
+    # ticker_resolver(row)` VERBATIM. Kalshi's resolver returns a string ticker;
+    # `polymarket_ticker_resolver` returns a dict, because `order_body` REFUSES
+    # to infer `tick_size` and `minimum_trade_qty` and the resolver is the only
+    # thing holding them. So this field legitimately holds two shapes.
+    #
+    # `str(a_dict)` is TRUTHY, so the `POLYMARKET_NO_SLUG` guard below never
+    # fired -- the stringified dict was carried forward and looked up in the
+    # slate as if it were a slug, matched nothing, and returned None. Every
+    # Polymarket order has failed this way; none has ever been placeable.
+    #
+    # Read as a dict FIRST, falling back to the string form: a caller that
+    # stamps a bare slug (a hand-built request, an older plan) still works, and
+    # nothing about that path changes.
+    raw_ticker = getattr(request, "venue_ticker", None)
+    ticker_tick = ticker_min_qty = None
+    if isinstance(raw_ticker, Mapping):
+        slug = str(raw_ticker.get("slug") or "").strip()
+        ticker_tick = raw_ticker.get("tick_size")
+        ticker_min_qty = raw_ticker.get("minimum_trade_qty")
+    else:
+        slug = str(raw_ticker or "").strip()
     if not slug:
-        print("[execute_portfolio] POLYMARKET_NO_SLUG -- venue_ticker unset", flush=True)
+        print(
+            "[execute_portfolio] POLYMARKET_NO_SLUG -- venue_ticker unset or"
+            f" carries no slug (type={type(raw_ticker).__name__})",
+            flush=True,
+        )
         return None
 
     try:
@@ -801,16 +906,25 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
     sport = getattr(request, "sport", None)
     wants_home = str(getattr(request, "side", "") or "").strip().lower() in _HOME_LIKE_SIDES
 
+    # KEEP THE INDEX. This loop already establishes exactly which entry of
+    # `outcomes` is our team -- and it used to throw that away and return only
+    # the price, leaving `order_body` to pick the side positionally from
+    # `home`/`away`. The two disagreed, and on 2026-08-25T16:08:10Z that bought
+    # TEXAS on a `side=home` row whose home team is the White Sox, at the price
+    # resolved for the White Sox. One reading now feeds both.
     price = None
-    for name, raw_price in zip(outcomes, prices):
+    outcome_index = None
+    for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
         side = _side_for_team(name, resolution, sport=sport)
         if side is not None and (side == "home") == wants_home:
             try:
                 price = float(raw_price)
             except (TypeError, ValueError):
                 price = None
+            else:
+                outcome_index = position
             break
-    if price is None:
+    if price is None or outcome_index is None:
         print(
             f"[execute_portfolio] POLYMARKET_SIDE_UNRESOLVED slug={slug}"
             f" side={getattr(request, 'side', None)}",
@@ -827,13 +941,33 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
                 f"polymarket_slippage: slug={slug} planned={planned} price={price}"
                 f" drift={drift:+.4f} max={max_slippage_dollars()} fetched_at={fetched_at}"
             )
+    # THE NAME WE RESOLVED, not just the number. A price alone cannot be
+    # checked against the venue's own order screen; the outcome name can, and
+    # that screen is what caught the inverted order.
     print(
         f"[execute_portfolio] POLYMARKET_ARTIFACT_PRICE slug={slug} price={price}"
-        f" planned={planned} fetched_at={fetched_at}",
+        f" planned={planned} fetched_at={fetched_at}"
+        f" our_side={getattr(request, 'side', None)}"
+        f" outcome_index={outcome_index} outcome={outcomes[outcome_index]!r}"
+        f" outcomes={outcomes!r}",
         flush=True,
     )
 
-    return (slug, price, row.get("orderPriceMinTickSize"), row.get("minimumTradeQty"))
+    # ARTIFACT FIRST, ticker dict as the fallback. The slate row is the venue's
+    # own current answer; the values carried on `venue_ticker` were captured at
+    # commit time by `polymarket_ticker_resolver` and are the same fields one
+    # refresh earlier. `order_body` refuses to INFER either, so having a second
+    # source for them is the difference between an order and a refusal when the
+    # artifact row is thin.
+    tick = row.get("orderPriceMinTickSize")
+    min_qty = row.get("minimumTradeQty")
+    return (
+        slug,
+        price,
+        tick if tick is not None else ticker_tick,
+        min_qty if min_qty is not None else ticker_min_qty,
+        outcome_index,
+    )
 
 
 def _status_of(request: OrderRequest) -> str | None:

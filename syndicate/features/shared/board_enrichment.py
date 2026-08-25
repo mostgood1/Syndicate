@@ -265,6 +265,29 @@ def _soccer_live_state_games(selected_date: str) -> tuple[list[dict], float | No
         age = _lens_generated_age_seconds(snapshot)
         if age is not None:
             oldest_age = age
+        # 1b. FINISHED, from the aggregate (`#547`). The block above this
+        # function says the aggregate "carries `games` -- matches IN PLAY --
+        # and NOT `match_box`", and that was true: only the per-league read
+        # below could move a chip to `final`, and that tree is a filesystem
+        # write on live-odds-worker. Every consumer that runs on refresh-worker
+        # -- the board build, and `settle_orders` -- therefore could not see a
+        # finished soccer match at all.
+        #
+        # `poll_active_leagues_for_tick` now publishes a trimmed `finals` list
+        # into this same aggregate, which crosses services through the keyvalue
+        # backend. Read here so the chip correction and the settlement resolver
+        # share ONE view of what has ended, rather than the second one growing
+        # its own reader.
+        #
+        # Absent on a snapshot written before that change, and an absent key
+        # reads as "no finals published" -- which degrades to exactly the
+        # previous behaviour rather than to a wrong answer.
+        finals = snapshot.get("finals")
+        if str(snapshot.get("date") or "") == str(selected_date) and isinstance(finals, list):
+            for record in finals:
+                if isinstance(record, dict):
+                    saw_source = True
+                    _add(record, "final")
 
     # 2. FINISHED (and in-play) from the per-league `match_box`, where local.
     source = root / "soccer_source"

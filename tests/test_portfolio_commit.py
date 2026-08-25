@@ -494,7 +494,12 @@ def test_polymarket_now_gets_a_resolver_where_it_used_to_get_None(monkeypatch):
     venue label on someone else's prices."""
     from pipeline import portfolio_commit as mod
 
+    # `event_id` is part of the resolver key and of every published board row
+    # (`layer2_board.py:1825`). Without it the row is not an identity: a key of
+    # (market, player, line, side) is shared by every h2h home row on the slate,
+    # which is how a BAL@STL slug reached a CIN@SF position on 2026-08-25.
     board = [{"market": "h2h", "side": "Padres", "line": None, "sport": "mlb",
+              "event_id": "evt-pit-sd",
               "home": "San Diego Padres", "away": "Pittsburgh Pirates",
               "selected_date": "2026-08-24"}]
     market = {"slug": "aec-mlb-pit-sd-2026-08-24",

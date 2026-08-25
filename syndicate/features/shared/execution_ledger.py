@@ -654,9 +654,32 @@ def _requested_contracts(order: Mapping[str, Any]) -> int | None:
 
 
 def _venue_reader(venue: str):
-    """The read side of a venue adapter. Only Kalshi has one."""
-    if str(venue or "").strip().lower().startswith("kalshi"):
+    """The read side of a venue adapter.
+
+    POLYMARKET WAS MISSING AND THAT TOOK THE LIVE PATH DOWN. This said "Only
+    Kalshi has one", so a Polymarket order recorded `submitted` could never be
+    corrected -- and an unreconciled order blocks live mode on EVERY venue, not
+    only its own. Measured 2026-08-25T16:40:00Z, from one resting Polymarket
+    order:
+
+        BLOCKED_ON_UNRECONCILED count=1 keys=['1984a57ed28e1cd5ccad8b16']
+        EXECUTION status=blocked reason=unreconciled_orders scope=kalshi
+        EXECUTION status=blocked reason=unreconciled_orders scope=polymarket
+
+    A gap in the read side is not a missing feature; it is a latch. Nothing in
+    the system could clear that state, because the only thing that clears it is
+    a venue read that did not exist.
+    """
+    name = str(venue or "").strip().lower()
+    if name.startswith("kalshi"):
         from syndicate.features.shared.kalshi_orders import fetch_orders, venue_order_view
+
+        return fetch_orders, venue_order_view
+    if name.startswith("polymarket"):
+        from syndicate.features.shared.polymarket_us_orders import (
+            fetch_orders,
+            venue_order_view,
+        )
 
         return fetch_orders, venue_order_view
     return None, None
@@ -719,7 +742,26 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     if not candidates:
         return {"status": "ok", "candidates": 0, "changed": 0, "orders": []}
 
-    read = fetch(limit=limit)
+    # THE IDS WE HOLD, handed to the reader. Kalshi lists the whole book in one
+    # call and ignores these; Polymarket publishes no list route at all --
+    # `GET /v1/orders` answers `code: 12` UNIMPLEMENTED -- and reads one order
+    # at a time via `GET /v1/order/{orderId}`. A reader that cannot be told
+    # WHICH orders matter can only be a list reader, so the contract carries
+    # them and each venue uses what it needs.
+    #
+    # A CANDIDATE WITH NO VENUE ID IS STILL A CANDIDATE. The submit response
+    # can be lost -- that is the case the write-ahead record exists for -- and
+    # such an order has no id to fetch by. It is simply absent from a per-order
+    # read and counts `not_found`, which changes nothing. That is the correct
+    # outcome and not a silent one: `not_found` is reported.
+    read = fetch(
+        limit=limit,
+        order_ids=[
+            str(o.get("venue_order_id") or "").strip()
+            for o in candidates
+            if str(o.get("venue_order_id") or "").strip()
+        ],
+    )
     if read.get("status") != "ok":
         # Reported, not raised, and NOTHING WRITTEN. The caller is a periodic
         # loop; a venue that is briefly unreachable must leave the ledger

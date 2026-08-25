@@ -20,8 +20,13 @@ def _isolated(tmp_path, monkeypatch):
         "SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS",
         "SYNDICATE_KALSHI_SERIES",
         "SYNDICATE_KALSHI_SERIES_PER_TICK",
+        "SYNDICATE_KALSHI_DORMANT_INTERVAL_SECONDS",
     ):
         monkeypatch.delenv(name, raising=False)
+    # NO REAL SLEEPING IN TESTS. The spacing is what makes a large per-tick cap
+    # safe against the venue; it has its own tests below, and paying it in
+    # every other test buys nothing but wall clock.
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "0")
     (tmp_path / "intelligence").mkdir(parents=True, exist_ok=True)
     yield
 
@@ -37,11 +42,16 @@ def _market(ticker, yes, series="KXMLBKS"):
     }
 
 
-def _stub(monkeypatch, calls, *, fails=()):
+def _stub(monkeypatch, calls, *, fails=(), empty=()):
+    """`fails` is a venue that would not answer. `empty` is a venue that
+    answered with an empty book -- an out-of-season series. The two must not
+    behave alike, which is what the starvation test below pins."""
     def fake(series):
         calls.append(series)
         if series in fails:
             return {"markets": [], "strategy": "failed", "reason": "http_429"}
+        if series in empty:
+            return {"markets": [], "strategy": "series_filter"}
         return {"markets": [_market(f"{series}-1", 0.4, series=series)], "strategy": "series_filter"}
 
     monkeypatch.setattr(mod, "fetch_series_markets", fake)
@@ -446,3 +456,147 @@ def test_a_bad_hot_interval_falls_back_rather_than_disabling(monkeypatch):
     for bad in ("0", "-5", "soon", ""):
         monkeypatch.setenv("SYNDICATE_KALSHI_HOT_REFRESH_SECONDS", bad)
         assert mod.hot_refresh_interval_seconds() == 30
+
+
+# --------------------------------------------------------------------------
+# An out-of-season series must not monopolise the queue forever
+# --------------------------------------------------------------------------
+
+
+def test_an_empty_series_does_not_starve_every_other_series(monkeypatch):
+    """THE WHACK-A-MOLE MECHANISM, and it is a starved queue rather than a
+    missing grammar.
+
+    `fetched_at` used to move only when markets came back. A series that
+    genuinely has none -- NBA quarter lines in August, the All-Star game,
+    parlays -- therefore never got stamped, `_due_series` saw `age=None` and
+    sorted it at `inf` ahead of everything, and it returned to the front of the
+    queue on every tick forever. With a per-tick cap of 12 and more than twelve
+    such series, the entire budget went to markets that cannot exist this month.
+
+    MEASURED 2026-08-25T16:41:09Z, twice, identical:
+
+        TICK series_wanted=191 due=191 fetched=12 cap=12 markets=883
+          this_tick={'KXATTENDMLB': (0,'series_filter'),
+                     'KXMLBASGAME': (0,'series_filter'),
+                     'KXMVENBASINGLEGAME': (0,'series_filter'), ...} ALL ZERO
+          oldest_s=142655        <- 39.6 hours
+
+    It also inverts auto-discovery: each newly registered out-of-season series
+    joins the permanent front of the queue, so registering MORE series makes
+    coverage WORSE.
+    """
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "EMPTY1,EMPTY2,LIVE1,LIVE2")
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES_PER_TICK", "2")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    calls = []
+    _stub(monkeypatch, calls, empty=("EMPTY1", "EMPTY2"))
+
+    mod.run_kalshi_odds_refresh()   # tick 1 -- the two empties sort first
+    first = list(calls)
+    calls.clear()
+    mod.run_kalshi_odds_refresh()   # tick 2 -- must move on
+    second = list(calls)
+
+    assert set(first) == {"EMPTY1", "EMPTY2"}, first
+    # THE ASSERTION THAT MATTERS: the live series get their turn.
+    assert set(second) == {"LIVE1", "LIVE2"}, (
+        f"empty series monopolised the queue: tick2 fetched {second}"
+    )
+
+
+def test_a_FAILED_series_still_backs_off_rather_than_being_stamped(monkeypatch):
+    """The control. The stamp follows a successful READ, not a non-empty
+    payload -- so a venue that would not answer must still look unfetched, or
+    the backoff that stopped the 2026-08-23 http_429s is gone."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "BROKEN")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    calls = []
+    _stub(monkeypatch, calls, fails=("BROKEN",))
+
+    mod.run_kalshi_odds_refresh()
+    state = mod._load_state() if hasattr(mod, "_load_state") else None
+    if state is not None:
+        entry = (state.get("series") or {}).get("BROKEN") or {}
+        assert entry.get("fetched_at") != entry.get("attempted_at")
+
+
+def test_an_empty_read_keeps_the_last_known_markets(monkeypatch):
+    """"Nothing open right now" is not "the previous prices were wrong".
+    Blanking on an empty read would delete a live series' prices the moment its
+    last market settled."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "A")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    calls = []
+    _stub(monkeypatch, calls)
+    first = mod.run_kalshi_odds_refresh()
+    assert len(first["markets"]) == 1
+
+    _stub(monkeypatch, calls, empty=("A",))
+    second = mod.run_kalshi_odds_refresh()
+    assert len(second["markets"]) == 1, "an empty read blanked the stored prices"
+
+
+# --------------------------------------------------------------------------
+# Cadence: the calls are FREE, so the limit is the venue's rate, not our budget
+# --------------------------------------------------------------------------
+
+
+def test_the_burst_is_bounded_by_TIME_not_only_by_the_cap(monkeypatch):
+    """The 2026-08-23 http_429s came from RATE, not count.
+
+    The per-tick cap was the only burst control, which is why it sat at 12 --
+    raising it for freshness would have put the burst straight back. Spacing
+    bounds requests per second, so the cap can be about coverage instead.
+    """
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "A,B,C")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "40")
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+
+    slept: list[float] = []
+    monkeypatch.setattr(mod.time, "sleep", lambda s: slept.append(s))
+
+    mod.run_kalshi_odds_refresh()
+    assert sorted(calls) == ["A", "B", "C"]
+    # Three calls, two gaps -- the first pays nothing, so a one-series tick is
+    # not taxed for a burst it cannot create.
+    assert slept == [0.04, 0.04]
+
+
+def test_a_bad_spacing_value_does_not_become_an_unpaced_loop(monkeypatch):
+    """The failure this guard exists to prevent. A typo must fall back to the
+    default, never to zero -- zero is precisely the unpaced loop that drew the
+    429s."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "lots")
+    assert mod.request_spacing_seconds() == mod.DEFAULT_REQUEST_SPACING_MS / 1000.0
+    monkeypatch.setenv("SYNDICATE_KALSHI_REQUEST_SPACING_MS", "-5")
+    assert mod.request_spacing_seconds() == mod.DEFAULT_REQUEST_SPACING_MS / 1000.0
+
+
+def test_a_dormant_series_waits_longer_than_a_live_one(monkeypatch):
+    """Where the tick budget was going. An out-of-season series is worth
+    checking hourly, not every two minutes -- and the budget it frees goes to
+    series that actually have markets, which is what makes a high cadence
+    affordable on a free API."""
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "LIVE,DORMANT")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+    monkeypatch.setenv("SYNDICATE_KALSHI_DORMANT_INTERVAL_SECONDS", "3600")
+    calls: list[str] = []
+    _stub(monkeypatch, calls, empty=("DORMANT",))
+
+    mod.run_kalshi_odds_refresh()      # both asked; DORMANT returns nothing
+    assert sorted(calls) == ["DORMANT", "LIVE"]
+    calls.clear()
+
+    mod.run_kalshi_odds_refresh()      # DORMANT is now on the hourly clock
+    assert calls == ["LIVE"], f"a dormant series kept consuming the budget: {calls}"
+
+
+def test_a_series_never_fetched_is_NOT_treated_as_dormant(monkeypatch):
+    """`count == 0` is a positive statement -- we asked, there was nothing.
+    Absence of `count` is unknown, and unknown must be asked at the normal
+    cadence or a newly registered series would wait an hour to be seen once."""
+    assert mod._is_dormant({}) is False
+    assert mod._is_dormant({"count": 0}) is True
+    assert mod._is_dormant({"count": 7}) is False

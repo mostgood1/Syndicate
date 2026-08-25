@@ -52,6 +52,49 @@ DEFAULT_BOOKS: tuple[str, ...] = (
 
 _DEFAULT_BOOK_SET = frozenset(DEFAULT_BOOKS)
 
+# BOOKS WE READ DIRECTLY FROM THE VENUE, so the AGGREGATOR'S copy of them must
+# not also enter the grid.
+#
+# `[USER DECISION 2026-08-25]`: turn off the OddsAPI feed for these two, keeping
+# `novig` and `prophetx` -- which have no direct feed at all (novig is
+# `switched_off`) and whose paper books would otherwise stop pricing entirely.
+#
+# THE CONFLICT THIS ENDS: one venue quoting two different numbers under one
+# name. `venue_quote_fanin.apply_venue_quotes_to_grid` writes the DIRECT price
+# with `bookmaker="kalshi"`/`"polymarket"`, and the OddsAPI shard writes its own
+# view of the same venue under the same names. Both then sit in `cells`, which
+# `layer2_board._fair_by_side` de-vigs and `book_prices` is built from -- so the
+# fair value could be computed against a price the venue is not showing, and
+# `best_bettable` could name a price we would never be filled at.
+#
+# **THIS IS A FETCH-SIDE RULE AND THE MODULE HEADER SAYS THERE ARE NONE.** That
+# rule -- "a filter on selection, never on fetch" -- exists so a price that is
+# real is never invisible. This does not violate its purpose: the price is not
+# being hidden, it is being DEDUPLICATED against a better observation of the
+# same venue. The name lives here because this file is the one owner of book
+# identity; the exclusion is applied in `book_grid`, at the single point where
+# shard rows become grid cells.
+#
+# **THE COST, STATED:** `book_prices` is built from `cells`, so the aggregator's
+# kalshi/polymarket closing prices leave the CLV join too. `order_clv`'s headline
+# is same-book CLV, and for those two venues the direct feed is now the only
+# source of both entry and close -- which is what same-book means. Whether the
+# aggregator was supplying them at all is MEASURED rather than assumed: see the
+# drop counter at the call site.
+DIRECT_FEED_BOOKS: frozenset[str] = frozenset({"kalshi", "polymarket"})
+
+
+def is_direct_feed_book(book: Any) -> bool:
+    """Do we read this book straight from the venue rather than the aggregator?
+
+    Blank/unknown is False -- the permissive direction here KEEPS a row, which
+    matches `freshest_rows_for_grid`'s own rule that rows with an empty book are
+    kept because one can still anchor a line.
+    """
+    if book is None:
+        return False
+    return str(book).strip().lower() in DIRECT_FEED_BOOKS
+
 
 def is_bettable(book: Any) -> bool:
     """Is this a book the operator holds an account with?

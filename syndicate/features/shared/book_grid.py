@@ -37,6 +37,10 @@ from syndicate.features.shared.odds_book_quotes import (
     _line_value,
     market_sides_for_quote,
 )
+from syndicate.features.shared.book_shortlist import (
+    DIRECT_FEED_BOOKS,
+    is_direct_feed_book,
+)
 from syndicate.features.shared.opportunity_signals import consensus_vigged_price
 
 # The market instance, i.e. everything except which book quoted it and which
@@ -209,10 +213,24 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
     """
     freshest: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
     anchors: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
+    dropped_direct_feed = 0
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
             continue
         if _price(row.get("price")) is None:
+            continue
+        # THE AGGREGATOR'S COPY OF A VENUE WE READ DIRECTLY (`[USER DECISION
+        # 2026-08-25]`). One venue must have ONE price source: the direct feed
+        # writes `bookmaker="kalshi"/"polymarket"` into `best` (and, on a live
+        # row, into `cells` and `consensus`), and an OddsAPI row under the same
+        # name puts a second, different number for the same venue into the same
+        # de-vig. Dropped HERE because this is the single point every shard row
+        # passes through on its way to becoming a grid cell.
+        #
+        # Counted, not silent: whether OddsAPI supplies these two at all was an
+        # open question when this was written, and a zero here answers it.
+        if is_direct_feed_book(row.get("bookmaker")):
+            dropped_direct_feed += 1
             continue
         instance = tuple(str(row.get(field) or "") for field in _INSTANCE_FIELDS)
         materialised = row if isinstance(row, dict) else dict(row)
@@ -227,6 +245,15 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
         anchor_key = instance + (str(_canonical_line(row)),)
         if anchor_key not in anchors:
             anchors[anchor_key] = (index, materialised)
+
+    if dropped_direct_feed:
+        # print, not logger.info -- CLAUDE.md: logger.info does not reach
+        # Render's collector from this process.
+        print(
+            f"[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows={dropped_direct_feed} "
+            f"books={sorted(DIRECT_FEED_BOOKS)}",
+            flush=True,
+        )
 
     # Union by original position: a row that is both an anchor and a freshest
     # cell must appear once, not twice, or the grid sees a duplicate quote.

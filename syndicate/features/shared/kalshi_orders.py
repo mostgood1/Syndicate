@@ -483,7 +483,7 @@ def fetch_order(order_id: Any) -> dict[str, Any]:
     return {"status": "ok", "order": order}
 
 
-def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
+def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
     """Every recent order, one call.
 
         GET /trade-api/v2/portfolio/orders?limit=100
@@ -498,6 +498,13 @@ def fetch_orders(*, limit: int = 100) -> dict[str, Any]:
     empty list standing in for an error. An empty `orders` on a FAILED read
     would read as "the venue holds nothing", which is the exact confusion that
     would wipe a live position out of the ledger.
+
+    `order_ids` IS ACCEPTED AND IGNORED, deliberately. Kalshi returns the whole
+    book in one call, so it needs no hint about which orders matter -- but
+    Polymarket publishes no list of settled orders and must read one at a time
+    (`GET /v1/order/{orderId}`), so the reader contract carries the ids and each
+    venue uses what it needs. Accepting-and-ignoring keeps one call site in
+    `reconcile_live_orders` rather than a per-venue branch there.
     """
     from syndicate.features.shared.kalshi_auth import signed_request
 

@@ -28086,3 +28086,633 @@ games scheduled, none live yet. On tip-off, read in this order:
    SAME minute. That pairing, and only that pairing, settles who is right.
 3. Only then decide whether wnba belongs in `_LIVE_GAME_STATE_SPORTS`, and
    whether its snapshot carries the `status.abstract` the corrector reads.
+
+### 2026-08-25 14:47:23Z — `c1f2aeaf3` — THE PORTFOLIO IS LOSING, AND THE POOLED NUMBER HID IT
+
+**services:** refresh-worker `dep-da6qgm2jnfac73bhsl30` (live 14:39:37Z),
+live-odds-worker `dep-da6qgoon74is73fv2a8g`
+
+#### verify 1: the double-count is split, and it RECONCILES EXACTLY
+
+    PNL all_time book=portfolio        settled=97 pending=65 won=41 lost=56
+      staked=$606.69 pnl=$-26.3  roi=-4.33% win_rate=42.27% venues=['kalshi','paper']
+    PNL all_time book=venue_comparison settled=84 pending=4  won=37 lost=47
+      staked=$471.83 pnl=$43.0   roi=9.11%  win_rate=44.05%
+      note=overlaps_portfolio_do_not_sum
+
+| | portfolio | comparison | sum | old pooled |
+|---|---|---|---|---|
+| settled | 97 | 84 | **181** | 181 |
+| staked | $606.69 | $471.83 | **$1,078.52** | $1,078.52 |
+| pnl | -$26.30 | +$43.00 | **+$16.70** | +$16.70 |
+
+Nothing lost, nothing invented: the same orders, arithmetic'd correctly.
+
+#### THE FINDING, and it is not cosmetic
+
+**The portfolio's real all-time return is -4.33%, not +1.55%.** The headline was
+the SHADOW books' +9.11% pulling the real book's -4.33% upward -- and the shadow
+books are the same decisions re-priced at venues we did not bet, so they
+contributed a return nobody earned. Every previous reading of "is this working"
+was taken off that blend.
+
+The market cut moved with it, `by_market_family` now being portfolio-only:
+
+| | pooled (before) | portfolio (now) |
+|---|---|---|
+| game_line | 79, -16.40% | **35, -12.08%** |
+| game_total | 78, +22.85% | **46, +11.17%** |
+| player_prop | 24, **-7.18%** | **16, -43.67%** |
+
+**`player_prop` is the one that changes the story.** The pooled -7.18% was
+`paper:kalshi/player_prop` (+74.7% on 8 shadow bets) cancelling the portfolio's
+own props. The book actually bet -43.67% on 16 prop bets, 31.25% win rate. That
+is the worst family by a wide margin and it read as the mildest.
+
+**Still nothing significant.** Portfolio z ~ -0.43; the three families are
+-0.80, +0.77, -1.18. Ninety-seven bets cannot separate a losing strategy from a
+break-even one. The value of this change is that the number is now ABOUT
+something -- a book that could have been held -- not that it is yet conclusive.
+
+#### verify 2: soccer dispatches, and the refusal is named
+
+    SETTLED date=2026-08-25 orders=9 graded=0
+      ungraded={'unmapped_market': 1, 'no_soccer_live_state_for_date': 1, 'no_live_feed': 7}
+    SETTLED date=2026-08-24 orders=15 graded=0 already_graded=12
+      ungraded={'unmapped_market': 1, 'no_soccer_live_state_for_date': 1, 'order_not_filled': 1}
+    UNMAPPED_MARKETS date=2026-08-25 {'totals': 1}
+
+**`no_resolver_for_soccer` is gone from both dates.** It was
+`{'no_resolver_for_soccer': 2}` on each; the same two orders now split 1/1, so
+the before/after pair identifies them: **of the 4 pending soccer orders, 2 are
+`totals` and 2 are game lines.**
+
+#### A GAP THE FIRST READING NAMED, and it is mine
+
+**Soccer TOTALS do not grade.** `game_line_view` covers moneylines and spreads
+only, so `is_game_line_market` is False for `totals` and the resolver refuses as
+`unmapped_market`. A total is gradeable from the same two scores this resolver
+already has (`home + away` against the line) -- MLB grades 46 of them. This is a
+missing branch, not a data gap, and `UNMAPPED_MARKETS {'totals': 1}` is the line
+that says so.
+
+#### verify 3: THE `finals` PATH IS STILL UNVERIFIED. Say so.
+
+Both dates refuse `no_soccer_live_state_for_date`, which is `_load_matches`
+returning None because `saw_source` never went True: no live matches, no finals,
+no per-league files on refresh-worker. At 14:44:48Z the poller wrote all ten
+leagues as `(0 live games, 0 box scores)`, ~380 bytes each -- correct for 09:45
+Central, before any European kickoff.
+
+**So the cross-service `finals` publish -- the half without which this whole
+change is inert -- has not yet been exercised on real data.** The unit test has
+the `off != on` control; production has not run it. First European finals land
+~16:00-17:00Z today and that is the reading that closes this.
+
+Do NOT read `no_soccer_live_state_for_date` as either success or failure of the
+finals path. It is the correct answer to "is there any soccer state on this
+service" on a morning with no football played.
+
+#### ALSO NOTED
+
+- `soccer_source/*/api/live_state/live_state_*.json` IS in
+  `artifact_publisher`'s allowlist (`:566`), which sits oddly beside
+  `board_enrichment`'s 2026-08-21 measurement that a per-league read from the
+  board build saw nothing. One of those is stale. Unresolved, and it decides
+  whether a soccer bet can be graded on a LATER date -- the aggregate is
+  single-and-current-dated, so today a soccer bet is gradeable while its date is
+  today and not after.
+- `pending=65` on the portfolio book against 97 settled. Still a large ungraded
+  tail, now attributable by name rather than pooled.
+
+### 2026-08-25 14:57:34Z — NEAR MISS: THREE ORDERS, TWO FOR THE WRONG GAME
+
+**lane:** portfolio-decision-and-execution
+**fix:** `aa5c43ee8` (deployed `dep-da6r42f10e5c73cij2hg` / `dep-da6r469srm7s73b15fl0`)
+**severity:** would have bought a contract on a DIFFERENT GAME with real money.
+
+#### WHAT THE LEDGER SHOWED
+
+    board row                                        stamped slug
+    totals under 8.5 · Cincinnati Reds @ SF Giants   tsc-mlb-bal-stl-2026-08-25-8pt5
+    h2h home · Texas Rangers @ Chicago White Sox     aec-mlb-pit-sd-2026-08-25
+    h2h home · Texas Rangers @ Chicago White Sox     (kalshi) no_live_price: None
+
+BAL@STL stamped on a CIN@SF row. PIT@SD on a TEX@CWS row.
+
+#### THE CAUSE, and it is one missing field
+
+Both Polymarket resolvers keyed on `(market, player_name, line, side)`.
+**A GAME LINE HAS NO PLAYER.** So every MLB h2h home row on the slate hashed to
+`("h2h", "", None, "home")` and the dict kept whichever game was written last.
+Same for `("totals", "", 8.5, "under")`.
+
+**The JOIN was never wrong.** `join_polymarket_to_board` matches each row through
+`_teams_match` and refuses ambiguity by name. The defect was entirely in
+FLATTENING that per-row result into a key that no longer said which row produced
+it. A correct join followed by a lossy index is indistinguishable, from the
+outside, from a broken join.
+
+#### WHY IT DID NOT SPEND MONEY, STATED HONESTLY
+
+`polymarket_us_orders` raised `market_unresolved_for_position` because the
+SUBMIT-time resolver had been rebuilt from a slate holding fewer matches and had
+no entry for that key. **That is luck, not a guard.** Had it held one, the order
+goes to the venue: right size, right price format, wrong game.
+
+There is no check anywhere between the resolver and the venue that the slug's
+teams match the position's teams. There still isn't — the fix is upstream, in
+the key.
+
+#### THE SAME KEY WAS IN KALSHI, WHICH HAS REAL MONEY ARMED
+
+`kalshi_board_join._match_key` was `(market, player, line, side)` too. It had not
+produced the failure for two reasons, **neither of which is a guard**:
+
+1. its board join currently supplies only PLAYER PROPS, and a player name
+   happens to identify a game;
+2. `float(line)` returns None for an h2h, so moneylines are not indexed at all
+   — which is exactly the third row's `no_live_price: None`.
+
+The **171 Kalshi game series registered the same day** would have removed both
+accidents at once. Fixed rather than left standing.
+
+#### AND A SECOND DEFECT THE FIX SURFACED
+
+`kalshi_price_resolver` built its key INLINE while `kalshi_ticker_resolver`
+called `_match_key` — with a docstring asserting they were the same identity.
+Adding the game moved one and left the other, and a test asking both for the
+same row got a **CIN@SF contract priced at BAL@STL's number**. That is precisely
+the failure `_match_key`'s docstring says the sharing exists to prevent,
+produced by the sharing not actually being shared. Collapsed onto one function.
+
+#### WHY THE TESTS PASSED — THE LESSON
+
+Two tests were NAMED for this property:
+
+    test_the_resolver_is_not_LOOSER_than_the_join
+    test_the_price_resolver_is_keyed_as_tightly_as_the_join
+
+Both varied LINE and SIDE **within a single game** — dimensions already in the
+key. Neither varied the game. And both fixtures carried no `event_id`, so every
+fixture row was the same nameless game and a key that omitted the game LOOKED
+like an identity.
+
+**A test named for an invariant is not a test of that invariant.** These are the
+second and third tests this session whose name asserted more than their body
+(`test_a_sport_with_no_resolver_is_named_not_silent` used soccer as its
+stand-in for "unresolvable" and kept that gap alive for as long as it passed).
+The check that works: *what does this test vary, and is the field I care about
+one of them?*
+
+#### THE RULE
+
+**A venue resolver key must contain the GAME.** `event_id`, exact, on every
+published board row (`layer2_board.py:1825`). Not team names — that needs the
+alias machinery `build_live_gameline_index` refuses for this same reason.
+
+**A record with no `event_id` is NEVER INDEXED.** An empty string rebuilds the
+collision under another spelling. Not indexed means not resolved means no order,
+which is the direction that fails safe.
+
+#### STILL OPEN
+
+- **Kalshi h2h cannot be priced at all** (`float(line)` on a None line). A
+  refusal, not a wrong purchase, so it is safe — but it is why the third order
+  died and it is unfixed.
+- **No teams-match assertion between resolver and venue.** The fix is in the
+  key; a belt-and-braces check at `submit_order` (slug's parsed teams vs the
+  position's) would have caught this class at the last moment and does not
+  exist. Worth adding.
+
+### 2026-08-25 15:50:40Z — `0531f8819` — TWO FIXES VERIFIED, ONE INERT
+
+#### verify: THE WRONG-GAME KEY IS FIXED, on live data
+
+Same row, same market, before and after `aa5c43ee8`:
+
+    14:57:34Z  TEX @ CWS h2h home  ->  aec-mlb-pit-sd-2026-08-25    WRONG GAME
+    15:50:40Z  TEX @ CWS h2h home  ->  aec-mlb-tex-cws-2026-08-25   correct
+
+The slug now names the teams on the row. That is `#547` confirmed against
+production rather than against its own tests.
+
+#### verify: THE AGGREGATOR CONFLICT WAS REAL
+
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=180 books=['kalshi','polymarket']
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=273 books=['kalshi','polymarket']
+
+**OddsAPI was supplying 180-273 duplicate kalshi/polymarket quotes PER BUILD**
+into the same `cells` the direct feed writes to -- the dict `_fair_by_side`
+de-vigs and `book_prices` is built from. Two different numbers for one venue
+under one name.
+
+Whether this was happening at all was an OPEN QUESTION when the filter was
+written, which is exactly why it was built with a counter instead of a silent
+`continue`. One build answered it. **A guard that cannot report what it caught
+is a guess with a `continue` in it.**
+
+#### THE LESSON: A FIX AT THE WRONG LAYER IS BYTE-IDENTICAL TO NO FIX
+
+`0531f8819` taught `_polymarket_resolve_market` to read a dict `venue_ticker`.
+It changed nothing:
+
+    POLYMARKET_MARKET_NOT_FOUND
+      slug={'slug': 'aec-mlb-tex-cws-2026-08-25', 'tick_size': 0.005, ...}
+
+`execute_portfolio.py:99` had already run `str(position.get("venue_ticker"))`
+when the `OrderRequest` was built, so `isinstance(raw, Mapping)` tested a STRING
+that merely looked like a dict. The refusal, the counter and the failure mode
+were unchanged from before the fix.
+
+**Nothing but the log line would have caught this.** The tests passed -- they
+called the resolver directly with a real dict, which is a shape the production
+path never delivers. The unit test proved the function worked; it could not
+prove the function was reached with that input.
+
+Rule earned: **when a fix targets a value's SHAPE, fix it where the shape is
+DECIDED, and pin the boundary rather than the consumer.** `4aea9fe2e` normalises
+at `_venue_ticker_of`, where `position` becomes `OrderRequest`, so
+`OrderRequest.venue_ticker` finally holds what its annotation says.
+
+That is the second time today a passing test described a stronger property than
+it tested (the first: two resolver tests named for tight keying that never
+varied the game).
+
+#### STILL OPEN: KALSHI h2h
+
+    LIVE_ORDER status=rejected venue=kalshi ticker=None market=h2h
+      error='OrderBuildError: no_live_price: None'
+
+Unchanged. `#547`'s key fix made a moneyline KEYABLE -- `(evt, "h2h", "", None,
+"home")` is now a valid key on both sides -- but no ticker is stamped, so the
+board join is not producing an h2h MATCH to key. Consistent with what the
+reprice reports Kalshi offering:
+
+    kalshi: ['mlb|spreads_1st_5_innings|over|2.5',
+             'mlb|totals_1st_5_innings|over|6.5', ...]
+
+Segment markets and player props; no full-game moneyline. That is a join or
+coverage question and is NOT diagnosed. Do not assume the key fix addressed it.
+
+#### NOT DEPLOYED
+
+`4aea9fe2e` is pushed and unshipped. With it, the next Polymarket execution tick
+can place a REAL order for the first time -- caps $10/order, $40/day, $80 across
+venues.
+
+---
+
+## 2026-08-25 — live-odds-worker `b51a34323`: the first real Polymarket order, on the right game
+
+**Deployed:** `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`), deploy
+`dep-da6roiqfngtc73c63l6g`, live `16:05:07Z`. Commit `b51a34323`, on
+`origin/main`. Trigger `api` (MCP), so the claim was advisory — same guard gap
+recorded on 2026-08-23.
+
+**verify:** `[execute_portfolio]` and `[polymarket_us_orders]` at `16:08:10Z`:
+
+```
+POLYMARKET_ARTIFACT_PRICE slug=aec-mlb-tex-cws-2026-08-25 price=0.495 planned=104.0
+SUBMIT url=https://api.polymarket.us/v1/orders slug=aec-mlb-tex-cws-2026-08-25
+       side=OUTCOME_SIDE_YES action=ORDER_ACTION_BUY qty=2.86
+       price={'value': '0.495', 'currency': 'USD'} tif=GOOD_TILL_CANCEL
+LIVE_ORDER status=submitted venue=polymarket ticker=aec-mlb-tex-cws-2026-08-25
+       sport=mlb market=h2h side=home price=104.0 stake=1.42
+EXECUTED placed=1 filled=0 failed=0 refused={} spent={'dollars': 1.42, 'orders': 1}
+```
+
+**What this proves.** Two separate fixes, both confirmed live and each of which
+alone would still have blocked the order.
+
+The SLUG NAMES THE RIGHT GAME. The same Texas @ Chicago White Sox row carried
+`aec-mlb-pit-sd-2026-08-25` before — Pittsburgh at San Diego, a bet on
+strangers. The resolver keyed on `(market, player, line, side)` with no event in
+it, so any row of that shape collected whatever game the index happened to hold.
+It now keys on `event_id` through a `_resolver_key` shared by the price and
+ticker resolvers, and the slug reads `tex-cws`.
+
+The TICKER REACHED THE VENUE AS A STRING. `venue_ticker` is a Mapping
+(`{'slug': ..., 'tick_size': ..., 'minimum_trade_qty': ...}`), and
+`execute_portfolio.py:99` had already flattened it with `str()` when building
+the OrderRequest — so the earlier fix teaching `_polymarket_resolve_market` to
+read a dict tested a string and was INERT. Its production line was
+byte-identical before and after. `_venue_ticker_of` now unwraps at that
+boundary.
+
+**What this does NOT prove.** `filled=0`. The order is a GTC limit at 0.495
+resting on the book, not a fill — so this proves the ORDER PATH, not an
+execution. `reconcile_live_orders()` asks the venue before the stranded-order
+gate on the next live run, and `unreconciled_orders` deliberately distinguishes
+"we do not know" from "we know it rests unfilled", so a resting order should not
+jam the next slate. That distinction has not been observed holding on a real
+resting order. Open obligation.
+
+**Kalshi is unchanged and still blocked:** `LIVE_ORDER status=rejected
+venue=kalshi ticker=None ... error='OrderBuildError: no_live_price: None'` at
+`16:08:09Z`. Different cause, tracked below.
+
+---
+
+## 2026-08-25 — refresh-worker `b51a34323` → `7f4b8808a`: the alias hypothesis was wrong
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da6rogu417fc73ei53jg`, live `16:05:07Z` (`b51a34323`); then
+`dep-da6s4pm417fc73ejdmq0` at `16:27:18Z` (`7f4b8808a`). Both on `origin/main`.
+
+**verify:** `[kalshi_odds]` at `16:14:40Z`, first Kalshi cycle on the new
+instance (`92hw7`):
+
+```
+BOARD_JOIN kalshi_markets=883 board_rows=1290 matched=5
+  reasons={'event_not_on_our_board': 20, 'market_is_for_another_date': 512,
+           'no_matching_board_row': 120, 'unreadable_title': 216,
+           'would_match_but_wrong_date': 10}
+JOIN_EVENTS unmatched=[{'kalshi': 'ATLMIL',
+  'ticker': 'KXMLBSPREAD-26AUG231910ATLMIL-MIL4', 'sport': 'mlb'}, ...x8]
+```
+
+`b51a34323` moved the `JOIN_EVENTS` print out of the `if not matched` block so
+it would show on a partial join. That worked — the line printed for the first
+time, on a join with `matched=5`.
+
+**What it proves, and it is the opposite of what was expected.** The line was
+shipped to produce the club-code alias work list for the 20
+`event_not_on_our_board` refusals. It produced no such list. All 8 samples are
+`ATLMIL` on `26AUG23` — Atlanta at Milwaukee, two days stale — and `ATLMIL` is
+a blob the resolver reads correctly. **The refusals were dated, not
+misspelled.** The alias hypothesis carried in `kalshi_board_join.py:528`
+("`OAK` against `ATH` is a real possibility") is not supported by this reading;
+the comment asserting it as fact is corrected in `7f4b8808a`.
+
+Two defects made a date failure impersonate an alias failure:
+
+- **The date was checked SECOND.** `_resolve_event` matches the blob against
+  TODAY'S board, so a game line from another date cannot resolve however well
+  its codes are read — and the date check sat below the resolver, so a stale
+  market died as `event_not_on_our_board` with its date never consulted. This is
+  the `#505` failure the reason names exist to prevent, reappearing one layer
+  down: the names were right, their ORDER let one impersonate the other.
+- **The sample was bounded on MARKETS, not codes.** `len(unmatched_samples) < 8`
+  takes the first eight markets; one event offers far more, and six spreads plus
+  two team totals of `ATLMIL` took every slot.
+
+`7f4b8808a` checks `game_date_from_ticker` before `_resolve_event` and
+deduplicates the sample by blob. Both fix-tests fail against `b51a34323`; the
+dedupe test reproduces the production symptom exactly, filling all 8 slots with
+one blob.
+
+**What this does NOT prove — the open obligation.** It does not say how many of
+the 20 are real alias gaps. It makes the NEXT reading able to answer that:
+whatever `event_not_on_our_board` still counts after the date is checked first
+is an alias gap, and the sample is then the work list it was built to be. Not
+yet read.
+
+**Unchanged and still true:** `game_lines_disabled` is ABSENT from the reasons.
+That counter fires only for a game line whose event RESOLVED, so its absence
+means zero resolved and `SYNDICATE_KALSHI_GAME_LINES` is NOT the blocker —
+turning it on would price nothing.
+
+**Also measured on the same instance:** `AGGREGATOR_DUPLICATE_DROPPED rows=180`
+then `rows=273 books=['kalshi', 'polymarket']` — the OddsAPI duplicate drop for
+the two direct-feed books is live and load-bearing.
+
+---
+
+## 2026-08-25 — live-odds-worker `13a22d668`: the first order bought the WRONG TEAM
+
+**Deployed:** `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`), deploy
+`dep-da6sa12d0e5s73d7k440`, triggered `16:38:28Z`. Commit `13a22d668`, on
+`origin/main`. Claim `polymarket-side`.
+
+**The measurement that forced it** — the venue's own order screen, against our
+ledger row, both for `16:08:10Z`:
+
+```
+ledger   side=home   h2h   Texas Rangers @ Chicago White Sox
+         venue=polymarket  slug=aec-mlb-tex-cws-2026-08-25
+         requested +104   $1.42   status=submitted
+venue    "Buy TEX"   Texas Rangers vs. Chicago White Sox
+         2.86 shares   limit 49.5c   $1.42   Pending
+```
+
+**Home is the White Sox. We bought Texas.** At 0.495 — the price that had been
+resolved for the White Sox. This is the failure the entry above recorded as an
+open obligation ("the YES/NO convention is UNVERIFIED against a real venue
+response"), arriving one cycle later as an actual inverted bet.
+
+**Root cause, and it is one bug not two.** `_polymarket_resolve_market` picked
+the PRICE by matching our team against the market's `outcomes` array — correctly
+— and then discarded the matched index. `order_body` picked the SIDE separately,
+mapping `home`→YES and `away`→NO, which is a claim about the ORDER of that array
+rather than about our side. Nothing reconciled the two, so the order named one
+outcome and paid the other's price. That is also why it never filled: a limit
+priced for the White Sox sitting on the Texas book is not a marketable order.
+**Wrong side and no fill have the same cause.**
+
+The slug cannot substitute for the array, and this is measured, not assumed:
+`aec-atp-domstr-markru` carries `outcomes: ["Martin Krumich", "Dominic Stephan
+Stricker"]` — reversed relative to its own slug (seen in `POLYMARKET_BOARD_JOIN`
+shapes, `16:14:41Z`). No positional rule derived from a slug is safe.
+
+**The fix.** The index is kept and returned, threaded through the submitter into
+`order_body`, and `outcomeSide` derives from it — so price and side are two
+readings of one match, consistent by construction. `home`/`away` now RAISE in
+`_side_to_outcome` rather than falling back positionally, so the old path cannot
+be reached again by a caller that forgets.
+
+**verify:** NOT YET READ. Open obligation, and the specific unknown is named:
+**which index the YES side buys.** Only the venue settles it. Two facts are in
+hand and they do not yet combine — `OUTCOME_SIDE_YES` bought TEX on that slug
+(venue screen), but the outcomes ARRAY for it was never logged, so TEX's index
+is unknown. The next `POLYMARKET_ARTIFACT_PRICE` prints `outcomes`,
+`outcome_index` and the resolved outcome NAME, which closes it:
+
+- if it reports `outcome='Chicago White Sox' outcome_index=1` → YES is index 0,
+  the default is right, and the order goes out as `OUTCOME_SIDE_NO`;
+- if it reports `outcome_index=0` for the White Sox → YES is index 1, and
+  `SYNDICATE_POLYMARKET_YES_OUTCOME_INDEX=1` corrects it without a build.
+
+The env override exists precisely because this convention was wrong once at the
+cost of a real order, and a build is the wrong unit of latency for that.
+
+**The previous SUBMIT line could not have caught this.** It logged
+`side=OUTCOME_SIDE_YES` and never said which team that buys, so the log agreed
+with itself while the venue bought the other team. It now carries `our_side`,
+`outcome_index`, `yes_index` and the outcome name.
+
+**Operator action outstanding:** the inverted TEX order is still RESTING
+(Pending, GTC, $1.42). It is on the wrong team and cannot be fixed by a redeploy
+— it needs cancelling at the venue.
+
+---
+
+## 2026-08-25 — refresh-worker `7f4b8808a`: there is no Kalshi alias gap
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da6s4pm417fc73ejdmq0`, live ~`16:40Z` on instance `v8kxq`. Commit
+`7f4b8808a`, on `origin/main`. Claim `kalshi-join`.
+
+**verify:** two consecutive `[kalshi_odds] BOARD_JOIN` lines, same slate, same
+883 markets, across the change:
+
+```
+16:14:40Z  b51a34323  matched=5  reasons={'event_not_on_our_board': 20,
+                                          'market_is_for_another_date': 512,
+                                          'no_matching_board_row': 120,
+                                          'unreadable_title': 216,
+                                          'would_match_but_wrong_date': 10}
+16:41:09Z  7f4b8808a  matched=4  reasons={'market_is_for_another_date': 532,
+                                          'no_matching_board_row': 121,
+                                          'unreadable_title': 216,
+                                          'would_match_but_wrong_date': 10}
+```
+
+**What this proves.** `event_not_on_our_board` went **20 → 0** and
+`market_is_for_another_date` went **512 → 532**. The same twenty refusals, moved
+from the alias counter to the date counter — which is the whole claim, and it is
+arithmetic rather than inference. `JOIN_EVENTS` correctly stopped printing:
+there are no unmatched events left to sample.
+
+**It retires a hypothesis that had been carried as fact for days.**
+`kalshi_board_join.py` had said the club map was the game-line blocker — "`OAK`
+against `ATH` is a real possibility and every such gap is an alias nobody has
+written yet" — and the previous entry shipped `JOIN_EVENTS` specifically to
+produce that alias work list. **There is no alias gap on this slate.** Every one
+of the twenty was a stale game whose blob the resolver reads correctly, and
+adding club spellings would have changed nothing. The comment is corrected in
+place rather than left to mislead the next reader.
+
+**`matched` 5 → 4 is not this change.** The hoisted date check runs only inside
+the game-line branch (`needs_event_identity`), and those matches are player
+props; `no_matching_board_row` moved 120 → 121 in the same step, which is board
+churn between two cycles 27 minutes apart.
+
+**What is now the sole h2h blocker, and it is unambiguous:**
+`unreadable_title: 216`, unchanged across both builds. The registered grammars
+cover SPREAD, F5SPREAD, F5TOTAL, TEAMTOTAL, INNINGTOTAL and F5 — there is **no
+grammar for `KXMLBGAME`**, the moneyline series, which is the market the
+rejected live order wanted. `unmapped_series` is absent from the reasons, so the
+series IS registered by AUTO_SERIES discovery (`game_added=171`) and its markets
+do reach the title parser and refuse there. `08d50a344` adds a per-series title
+sample (`JOIN_TITLES`) to read that grammar from data; deploy
+`dep-da6sbl6k1f9s73eh9tsg` carries it. Not yet read.
+
+---
+
+## 2026-08-25 — live-odds-worker `7e9c3a49a`: the live path was latched shut
+
+**Deployed:** `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`), deploy
+`dep-da6segk9v7es738aatq0`, triggered `16:48:02Z`. Commit `7e9c3a49a`, on
+`origin/main`. Claim `polymarket-side`.
+
+**The measurement:**
+
+```
+16:40:00.017Z [execute_portfolio] BLOCKED_ON_UNRECONCILED count=1
+                                  keys=['1984a57ed28e1cd5ccad8b16']
+16:40:00.028Z [live_odds_worker]  EXECUTION status=blocked
+                                  reason=unreconciled_orders scope=kalshi
+16:40:00.033Z [execute_portfolio] BLOCKED_ON_UNRECONCILED count=1
+                                  keys=['1984a57ed28e1cd5ccad8b16']
+16:40:00.033Z [live_odds_worker]  EXECUTION status=blocked
+                                  reason=unreconciled_orders scope=polymarket
+```
+
+**LIVE EXECUTION WAS DOWN ON BOTH VENUES** from `16:08:10Z` — the moment the
+first Polymarket order was placed — and no LIVE_ORDER line appears after it.
+One resting order did that, and the state was self-sustaining.
+
+**Two independent causes, each sufficient.** `_venue_reader` said *"Only Kalshi
+has one"*, so a Polymarket order recorded `submitted` had nothing that could
+correct it. And `execute_portfolio` called `reconcile_live_orders()` bare, whose
+`venue` defaults to `"kalshi"` — so even given a reader, Polymarket was never
+asked. The unreconciled gate is GLOBAL: any live order in that state blocks
+every venue.
+
+**The general lesson, and it is worth stating beyond this venue.** A venue we
+can PLACE on but cannot READ is not a half-built integration; it is a latch on
+the whole live path. The submit side and the read side are not independently
+shippable, and the asymmetry is invisible until the first order rests. The
+invariant is now a test: every venue with a submitter must have a reader, so a
+third venue cannot reintroduce this by being added to one side alone.
+
+**The operator action could not have been sufficient.** The user cancelled the
+inverted order at the venue at ~`16:45Z`. That is real and correct, and the
+ledger still could not see it — the only thing that reads a cancellation is the
+venue read that did not exist. Cancelling was necessary; it was never enough.
+
+**verify:** NOT YET READ. The next live pass should print
+`[polymarket_us_orders] ORDERS_READ n=... container=... keys=[...]
+statuses=[...]` and then place rather than block. Two things could still fail
+and both are named rather than silent:
+
+- **The list route is unverified.** `POST /v1/orders` creates; the GET default
+  is the same path, overridable via `POLYMARKET_US_ORDERS_LIST_PATH` with no
+  build — the same escape hatch the create path carries after Kalshi's create
+  route turned out to have MOVED (`http_410`). A wrong route fails as a named
+  error, never as an empty book.
+- **The status vocabulary has never been observed.** `ORDERS_READ` prints it.
+  An unmapped status reaches `unknown`, which changes nothing — so a bad
+  mapping leaves the order blocking rather than mis-booking it.
+
+**A parsing error caught before it shipped, recorded because the class recurs.**
+The first status parser split on the last underscore to strip the venue's enum
+prefix. `ORDER_STATUS_SOMETHING_NEW` tails to `new` — a RESTING status — so a
+status the venue had never shown us would have read as confidently resting
+instead of reaching `unknown`. A loose match that produces a plausible answer is
+worse than no match, because `unknown` is the value the whole design depends on.
+Now the known prefix is stripped and the remainder matched whole.
+
+---
+
+## 2026-08-25 — refresh-worker `caa915cba`: `unreadable_title` is two different facts
+
+**Deployed:** `refresh-worker`, deploy `dep-da6sbl6k1f9s73eh9tsg`, live ~`16:53Z`
+on instance `wgnsm`. Commit `caa915cba`, on `origin/main`. Claim `kalshi-join`.
+
+**verify:** `[kalshi_odds] JOIN_TITLES` at `16:56:46Z`, the first per-series
+sample of the 216 refused titles:
+
+```
+KXMLBALCENT      'Will Minnesota be the 2026 AL Central Division Winner'  KXMLBALCENT-26-MIN
+KXMLBALEAST      'Will Toronto be the 2026 AL East Division Winner'
+KXMLBALWEST      'Will Texas be the 2026 AL West Division Winner'
+KXMLBNLCENT      'Will St. Louis be the 2026 NL Central Division Winner'
+KXMLBNLEAST      'Will Washington be the 2026 NL East Division Winner'
+KXMLBNLWEST      'Will San Francisco be the 2026 NL West Division Winner'
+KXMLBF3          'first 3 innings tie'      KXMLBF3-26AUG241940TEXCWS-TIE
+KXMLBF5          'first 5 innings tie'
+KXMLBF7          'first 7 innings tie'
+KXMLBINNINGTOTAL '9th inning: Over 1.5 runs'
+```
+
+**What it proves.** `unreadable_title: 216` is not one problem. **Six of ten
+samples are SEASON FUTURES** — division winners, markets this system would never
+bet — sitting in the same counter as markets we want and cannot parse. Those are
+different facts with opposite consequences, and this is the `#505` failure
+("Kalshi has nothing we bet" vs "our join is broken" sharing a number) appearing
+one layer below where it was last fixed. Note the tickers distinguish them
+cleanly without any title parsing: `KXMLBALCENT-26-MIN` carries no game date,
+where `KXMLBF5-26AUG241940TEXCWS-TIE` does.
+
+The tie legs and the 9th-inning total are a second, smaller finding: both
+already have handling described in `kalshi_catalogue` (`_INNINGS_TIE` matches
+`first N innings tie`; the 9th-inning total is documented as needing a named
+refusal because no board key exists for it) and both are nevertheless landing in
+`unreadable_title`. Why is not yet known and should be established before any
+new grammar is written.
+
+**What it does NOT prove, and this is the correction.** It was deployed to
+confirm that the missing `KXMLBGAME` grammar is the h2h blocker. **`KXMLBGAME`
+does not appear in the sample at all.** That is NOT evidence of absence: the
+sample is one title per series capped at 10, and clearly more than 10 series
+refuse here. "Absent from the 883" and "past the cap" are different facts —
+one means there is no grammar to write and the fetch/series filter is the
+question, the other means there is. Unresolved.
+
+Third hypothesis of the session to be disproven by its own diagnostic, all the
+same shape: a counter that named a problem while withholding the data needed to
+act on it. `600a8f9ae` adds the complete per-series count beside the bounded
+sample (deploy `dep-da6skvafngtc73c969ig`) — the sample teaches the grammar, the
+count answers "is this family here at all". Not yet read.
