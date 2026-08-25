@@ -655,7 +655,14 @@ def _artifact_price(ticker: str, key: str) -> float | None:
         payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json") or {}
     except Exception:
         return None
-    for market in payload.get("markets") or []:
+    # THROUGH THE MERGE HELPER, not `payload["markets"]`. That key is no longer
+    # persisted: storing the merged list beside the per-series entries wrote the
+    # same payload twice and pushed the document past the store's 8MB ceiling,
+    # at which point it stopped being written at all. The helper reads the
+    # per-series entries and still falls back to the legacy key.
+    from pipeline.kalshi_odds_refresh import markets_from_state
+
+    for market in markets_from_state(payload):
         if str(market.get("ticker") or "") == ticker:
             return dollars_to_probability(market.get(key))
     return None

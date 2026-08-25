@@ -600,3 +600,88 @@ def test_a_series_never_fetched_is_NOT_treated_as_dormant(monkeypatch):
     assert mod._is_dormant({}) is False
     assert mod._is_dormant({"count": 0}) is True
     assert mod._is_dormant({"count": 7}) is False
+
+
+# --------------------------------------------------------------------------
+# The artifact has a hard 8MB ceiling, and it hit it
+# --------------------------------------------------------------------------
+
+
+def test_the_merged_list_is_not_persisted_twice(monkeypatch):
+    """MEASURED 2026-08-25T17:53:48Z, the tick after the queue started rotating:
+
+      KEYVALUE_WRITE_REJECTED size_bytes=13315551 max_bytes=8388608
+      COMPOSITION series=7399941 markets=6682458
+
+    The artifact stored every series' markets AND their concatenation. Same
+    payload, twice, in a document with a hard 8MB ceiling -- so it stopped
+    being written at all and the board fell back to the last good write.
+    """
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "A,B")
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+    mod.run_kalshi_odds_refresh()
+
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    payload = read_json_file(mod.markets_artifact_path())
+    assert "markets" not in payload, "the merged list is persisted twice again"
+    # ...and it is still READABLE, merged back from the per-series entries.
+    assert len(mod.markets_from_state(payload)) == 2
+
+
+def test_a_legacy_payload_still_reads(monkeypatch):
+    """A deploy must not empty the board. A payload written before the change
+    has the top-level key and no per-series markets."""
+    assert mod.markets_from_state({"markets": [{"ticker": "T1"}]})[0]["ticker"] == "T1"
+    assert mod.markets_from_state(None) == []
+    assert mod.markets_from_state({}) == []
+
+
+def test_one_ladder_series_cannot_crowd_out_a_sport(monkeypatch):
+    """`KXNCAAFSPREAD` was 2.3MB on its own -- a spread ladder with every rung
+    of every game. Bounding per series is safe only because `venue_daily_odds`
+    now records the complete book separately; this artifact is the JOIN's
+    working set, and a working set may be bounded where a record may not."""
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 3)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "BIG")
+
+    def fake(series):
+        return {"markets": [_market(f"{series}-{n}", 0.4, series=series) for n in range(10)],
+                "strategy": "series_filter"}
+
+    monkeypatch.setattr(mod, "fetch_series_markets", fake)
+    result = mod.run_kalshi_odds_refresh()
+    assert len(result["markets"]) == 3
+
+
+def test_the_trim_drops_the_STALEST_series_not_the_alphabetically_last(monkeypatch):
+    """The docstring always said "trimmed OLDEST-SERIES-FIRST"; the code was
+    `all_markets[:MAX_STORED_MARKETS]` -- the alphabetically FIRST N, because
+    `sports_series()` returns sorted tickers. `KXWNBA*` sorts LAST, so the
+    first thing a trim deleted was every WNBA market, silently, while the
+    comment claimed otherwise.
+    """
+    monkeypatch.setattr(mod, "MAX_STORED_MARKETS", 2)
+    monkeypatch.setattr(mod, "MAX_MARKETS_PER_SERIES", 10)
+    monkeypatch.setenv("SYNDICATE_KALSHI_SERIES", "AAA,ZZZ")
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "0")
+
+    calls: list[str] = []
+    _stub(monkeypatch, calls)
+    mod.run_kalshi_odds_refresh()
+
+    # Make AAA stale and ZZZ fresh, then re-merge: the FRESH one must survive.
+    from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+
+    path = mod.markets_artifact_path()
+    state = read_json_file(path)
+    state["series"]["AAA"]["fetched_at"] = "2020-01-01T00:00:00Z"
+    for n in range(3):
+        state["series"]["ZZZ"]["markets"].append(_market(f"ZZZ-{n}", 0.4, series="ZZZ"))
+    write_json_file(path, state)
+
+    monkeypatch.setenv("SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS", "999999")
+    result = mod.run_kalshi_odds_refresh()
+    kept = {m["series"] for m in result["markets"]}
+    assert kept == {"ZZZ"}, f"the stale series survived the trim: {kept}"

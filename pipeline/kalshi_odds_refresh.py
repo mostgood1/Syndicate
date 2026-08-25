@@ -119,6 +119,31 @@ def refresh_interval_seconds() -> int:
     return parsed if parsed >= 0 else DEFAULT_REFRESH_INTERVAL_SECONDS
 
 
+def markets_from_state(payload: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Every stored market, merged from the per-series entries.
+
+    The artifact stores markets ONCE, under `series[<ticker>]["markets"]`.
+    It used to also store the concatenation under `markets`, which doubled a
+    document that has a hard 8MB ceiling and took it to 13.3MB -- at which
+    point the store refused and the artifact stopped being written entirely.
+
+    Falls back to a legacy top-level `markets` key so a payload written before
+    this change still reads, rather than a deploy silently emptying the board.
+    """
+    if not payload:
+        return []
+    series = payload.get("series")
+    if isinstance(series, Mapping):
+        out: list[dict[str, Any]] = []
+        for entry in series.values():
+            if isinstance(entry, Mapping):
+                out.extend(entry.get("markets") or [])
+        if out:
+            return out
+    legacy = payload.get("markets")
+    return list(legacy) if isinstance(legacy, list) else []
+
+
 def markets_artifact_path():
     from syndicate.features.shared.refresh_state_store import reports_root
 
@@ -219,6 +244,27 @@ DEFAULT_DORMANT_INTERVAL_SECONDS = 3600
 # multi-sport catalogue is a write that starts failing silently one sport from
 # now. Trimmed OLDEST-SERIES-FIRST and reported, never silently.
 MAX_STORED_MARKETS = 6000
+
+# Markets kept per series in the JOIN'S WORKING SET.
+#
+# MEASURED 2026-08-25T17:53:48Z, the tick after the queue started rotating:
+#
+#   KEYVALUE_WRITE_REJECTED size_bytes=13315551 max_bytes=8388608
+#   WRITE_FAILED ... Shrink the payload rather than raising the ceiling
+#   COMPOSITION under=series KXNCAAFSPREAD=2306569 KXNCAAFWINS=645981
+#                            KXNCAAFGAME=635691 KXNCAAFAWARD=506778
+#
+# The artifact stopped being written AT ALL, so the board fell back to the
+# last good write. One series -- `KXNCAAFSPREAD`, a spread ladder with every
+# rung of every game -- was 2.3MB on its own.
+#
+# THIS BOUND IS SAFE ONLY BECAUSE CAPTURE MOVED. `venue_daily_odds` records
+# every market the venue lists, dated and split per sport, and wrote fine on
+# the same tick (`files=23`). So this artifact no longer has to be the record
+# of what Kalshi offers -- it is the working set the JOIN prices against, and a
+# working set may be bounded where a record may not. That separation is what
+# the capture-first layer bought.
+MAX_MARKETS_PER_SERIES = 400
 
 
 def request_spacing_seconds() -> float:
@@ -616,19 +662,44 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         fetched[series] = {"count": len(markets), "strategy": result.get("strategy")}
 
     # MERGE. Every series' last good markets, whether or not it was fetched now.
-    all_markets: list[dict[str, Any]] = []
+    #
+    # PER-SERIES BOUND FIRST, so one ladder cannot crowd out a whole sport.
     staleness: dict[str, int] = {}
+    per_series_markets: list[tuple[float, str, list[dict[str, Any]]]] = []
+    trimmed = 0
     for series in wanted:
         entry = per_series.get(series) or {}
-        all_markets.extend(entry.get("markets") or [])
+        markets = list(entry.get("markets") or [])
+        if len(markets) > MAX_MARKETS_PER_SERIES:
+            trimmed += len(markets) - MAX_MARKETS_PER_SERIES
+            markets = markets[:MAX_MARKETS_PER_SERIES]
         age = _seconds_since(entry.get("fetched_at"))
         if age is not None:
             staleness[series] = int(age)
+        per_series_markets.append((age if age is not None else float("inf"), series, markets))
 
-    trimmed = 0
-    if len(all_markets) > MAX_STORED_MARKETS:
-        trimmed = len(all_markets) - MAX_STORED_MARKETS
-        all_markets = all_markets[:MAX_STORED_MARKETS]
+    # THE TRIM IS BY STALENESS, WHICH IS WHAT THIS ALWAYS CLAIMED TO DO.
+    #
+    # It said "Trimmed OLDEST-SERIES-FIRST and reported, never silently" and
+    # the code was `all_markets[:MAX_STORED_MARKETS]` -- the alphabetically
+    # FIRST N, because `sports_series()` returns `sorted(...)`. `KXWNBA*` sorts
+    # last, so the first thing a trim deleted was every WNBA market, silently,
+    # while the comment said otherwise. Measured 2026-08-25T17:53:47Z:
+    # `markets=6000 trimmed=605` with NCAAF alone contributing thousands.
+    #
+    # Freshest series are kept: a stale series' prices are the least useful
+    # thing in the working set, which is the claim the docstring was making.
+    ordered = sorted(per_series_markets, key=lambda item: item[0])
+    all_markets: list[dict[str, Any]] = []
+    for _age, _series, markets in ordered:
+        if len(all_markets) >= MAX_STORED_MARKETS:
+            trimmed += len(markets)
+            continue
+        room = MAX_STORED_MARKETS - len(all_markets)
+        if len(markets) > room:
+            trimmed += len(markets) - room
+            markets = markets[:room]
+        all_markets.extend(markets)
 
     _record_daily_book(all_markets)
 
@@ -686,7 +757,12 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         report_catalogue_gaps(all_markets)
 
     state["series"] = per_series
-    state["markets"] = all_markets
+    # THE MERGED LIST IS NOT PERSISTED. It is `per_series`' markets
+    # concatenated, so storing both wrote the same payload twice -- measured
+    # `series=7399941` plus `markets=6682458`, which is how a 13.3MB document
+    # exceeded an 8MB ceiling and stopped being written at all. Readers get it
+    # from `markets_from_state`.
+    state.pop("markets", None)
     state["count"] = len(all_markets)
     state["fetched_at"] = _now_stamp()
     state["staleness_seconds"] = staleness
