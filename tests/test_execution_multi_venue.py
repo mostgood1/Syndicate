@@ -178,3 +178,68 @@ def test_the_worker_runs_execution_ONCE_PER_VENUE(monkeypatch):
     assert calls == ["kalshi", "polymarket"], (
         f"expected one scoped call per venue, got {calls}"
     )
+
+
+# ---------------------------------------------------------------------------
+# The key-space diagnostic.
+# ---------------------------------------------------------------------------
+
+
+def test_the_reprice_reports_BOTH_SIDES_of_an_unmatched_join():
+    """`stamped=0` alone cannot distinguish a key-space mismatch from a venue
+    that genuinely lists nothing. Recording the board's key beside the keys the
+    sources offered is what turns that into a reading."""
+    from syndicate.features.shared.venue_quote_fanin import apply_venue_quotes
+    from syndicate.features.shared.venue_quote_adapters import Quote, quote_key
+
+    # The venue publishes a team's SHORT name; the board asks by full name.
+    offered = quote_key("mlb", "h2h", "Padres", None)
+    collected = {
+        "mlb": {
+            "quotes": {
+                offered: Quote(
+                    key=offered,
+                    source="polymarket_us",
+                    sport="mlb",
+                    market="h2h",
+                    side="Padres",
+                    probability=0.55,
+                    american=-122,
+                    line=None,
+                    fetched_at=1.0,
+                )
+            },
+            "ceiling_seconds": 21600,
+            "by_source": {},
+        }
+    }
+    rows = [{"sport": "mlb", "market": "h2h", "side": "San Diego Padres", "line": None}]
+
+    result = apply_venue_quotes(rows, "2026-08-24", collected_by_sport=collected)
+
+    assert result["stamped"] == 0
+    assert result["unmatched_by_sport"] == {"mlb": 1}
+    assert result["unmatched_sample"] == ["mlb|h2h|san diego padres"]
+    # And what the source actually had, so the mismatch is visible side by side.
+    assert result["offered_sample"]["mlb"]["polymarket_us"] == ["mlb|h2h|padres"]
+
+
+def test_the_unmatched_sample_is_BOUNDED():
+    """A diagnostic that prints thousands of keys stops being read."""
+    from syndicate.features.shared.venue_quote_fanin import (
+        _UNMATCHED_SAMPLE_LIMIT,
+        apply_venue_quotes,
+    )
+
+    rows = [
+        {"sport": "mlb", "market": "h2h", "side": f"team-{index}", "line": None}
+        for index in range(50)
+    ]
+    collected = {"mlb": {"quotes": {}, "ceiling_seconds": 21600, "by_source": {}}}
+
+    result = apply_venue_quotes(rows, "2026-08-24", collected_by_sport=collected)
+
+    assert result["unmatched_by_sport"] == {"mlb": 50}, "the COUNT must be complete"
+    assert len(result["unmatched_sample"]) == _UNMATCHED_SAMPLE_LIMIT, (
+        "the SAMPLE must be bounded"
+    )

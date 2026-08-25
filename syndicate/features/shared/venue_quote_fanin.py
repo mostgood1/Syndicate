@@ -377,6 +377,8 @@ def apply_venue_quotes(
     per_source: dict[str, int] = {}
     ceilings: dict[str, int] = {}
     source_status: dict[str, Any] = {}
+    unmatched_samples: list[str] = []
+    unmatched_by_sport: dict[str, int] = {}
 
     for row in rows:
         sport = str(row.get("sport") or "").strip().lower()
@@ -403,6 +405,23 @@ def apply_venue_quotes(
         )
         quote = (payload.get("quotes") or {}).get(str(key))
         if quote is None:
+            # WHAT THE UNMATCHED KEY ACTUALLY LOOKED LIKE, bounded to a handful.
+            #
+            # MEASURED 2026-08-25T00:02Z: polymarket_us contributed 3,106 quotes
+            # across mlb/wnba/nfl and won ZERO selections
+            # (`selected_by_source={'kalshi': 237}`). Losing a freshness contest
+            # explains losing SOME; it cannot explain losing all of them, because
+            # on a game-line row Kalshi offers no quote at all and Polymarket
+            # should win by default.
+            #
+            # `stamped` alone cannot tell a key-space mismatch from a venue that
+            # genuinely lists nothing -- the same confusion that made the OddsAPI
+            # adapter silently inert on a DIFFERENT key space for an entire
+            # evening. So record the board's key beside the keys the sources
+            # actually offered, and let the log settle it instead of an argument.
+            if len(unmatched_samples) < _UNMATCHED_SAMPLE_LIMIT:
+                unmatched_samples.append(str(key))
+            unmatched_by_sport[sport] = unmatched_by_sport.get(sport, 0) + 1
             out.append(row)
             continue
         out.append(stamp_candidate_freshness(dict(row), quote))
@@ -420,7 +439,39 @@ def apply_venue_quotes(
         "ceiling_seconds_by_sport": ceilings,
         "selected_by_source": per_source,
         "by_source": source_status,
+        # THE TWO SIDES OF THE JOIN, SAMPLED, so a key-space mismatch is
+        # readable rather than inferred. `unmatched_sample` is what the BOARD
+        # asked for; `offered_sample` is what each SOURCE had. If they are
+        # shaped differently -- a team's short name against its full name, say
+        # -- these two lines say so at a glance.
+        "unmatched_by_sport": unmatched_by_sport,
+        "unmatched_sample": unmatched_samples,
+        "offered_sample": _offered_sample(by_sport),
     }
+
+
+_UNMATCHED_SAMPLE_LIMIT = 8
+_OFFERED_SAMPLE_LIMIT = 4
+
+
+def _offered_sample(by_sport: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """A few keys each source actually published, per sport.
+
+    Read from the SOURCE's own quotes rather than reconstructed, because a
+    reconstruction would be built from the same assumption the mismatch is
+    hiding in and would agree with itself.
+    """
+    sample: dict[str, Any] = {}
+    for sport, payload in (by_sport or {}).items():
+        per_source_keys: dict[str, list[str]] = {}
+        for key, quote in (payload.get("quotes") or {}).items():
+            source = getattr(quote, "source", "?")
+            bucket = per_source_keys.setdefault(str(source), [])
+            if len(bucket) < _OFFERED_SAMPLE_LIMIT:
+                bucket.append(str(key))
+        if per_source_keys:
+            sample[sport] = per_source_keys
+    return sample
 
 
 def _as_float_or_none(value: Any) -> float | None:
