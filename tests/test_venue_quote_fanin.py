@@ -375,10 +375,18 @@ def test_the_polymarket_adapter_filters_the_slate_BY_SPORT(monkeypatch):
     slate = {
         "fetched_at": time.time(),
         "markets": [
+            # FULL CLUB NAMES, which is what production actually sends for
+            # these leagues -- measured 2026-08-25T00:46Z, the offered keys were
+            # `mlb|h2h|chicago cubs` and `mlb|h2h|arizona diamondbacks`. The
+            # fixture used bare nicknames ("Padres", "Chargers"), which
+            # `canonical_team` cannot resolve for mlb or nfl; once the adapter
+            # started keying by canonical club that fixture tested the alias
+            # gap rather than the sport filter it is named for. The gap itself
+            # is covered by its own test below.
             {"slug": "aec-mlb-pit-sd-2026-08-24", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
-             "outcomes": '["Pirates","Padres"]', "outcomePrices": '["0.45","0.55"]'},
+             "outcomes": '["Pittsburgh Pirates","San Diego Padres"]', "outcomePrices": '["0.45","0.55"]'},
             {"slug": "aec-nfl-lac-ten-2026-08-28", "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
-             "outcomes": '["Chargers","Titans"]', "outcomePrices": '["0.5","0.5"]'},
+             "outcomes": '["Los Angeles Chargers","Tennessee Titans"]', "outcomePrices": '["0.5","0.5"]'},
         ],
     }
     monkeypatch.setattr(adapters, "_artifact", lambda _p: (slate, time.time()))

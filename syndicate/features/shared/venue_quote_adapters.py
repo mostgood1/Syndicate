@@ -218,13 +218,21 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
     wanted_league = str(sport or "").strip().lower()
 
     quotes: list[Quote] = []
+    # THE WORK QUEUE, not decoration. Spreads are refused pending a
+    # measurement of which team a handicap belongs to; a refusal nobody counts
+    # is indistinguishable from a venue that lists no spreads, which is the
+    # confusion this whole module is built to prevent.
+    spread_rows = 0
+    unresolved_clubs: list[str] = []
     for row in rows:
         if not isinstance(row, Mapping):
             continue
         parsed_slug = parse_slug(row.get("slug"))
         if parsed_slug is None or str(parsed_slug.get("league") or "").lower() != wanted_league:
             continue
-        parsed = _polymarket_sides(row)
+        if str(row.get("sportsMarketTypeV2") or "").upper() == "SPORTS_MARKET_TYPE_SPREAD":
+            spread_rows += 1
+        parsed = _polymarket_sides(row, sport, parsed_slug, unresolved_clubs)
         if not parsed:
             continue
         market, sides, line = parsed
@@ -243,22 +251,115 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
                     venue_ref=str(row.get("slug") or "") or None,
                 )
             )
+    if not quotes:
+        # NAMED SEPARATELY. "this league is not listed here" and "this league
+        # is listed but every market is a spread we cannot yet place" are
+        # different facts that call for different work, and a shared reason
+        # string would send someone to look at the wrong one.
+        # THREE DIFFERENT FACTS, three different reasons. "this league is not
+        # listed here", "it is listed but every market is a spread we cannot
+        # place yet", and "it is listed but we cannot NAME any of the clubs"
+        # send someone to three different places, and a shared string would
+        # send them to the wrong one. The last is the dangerous one to
+        # mis-report: an alias-map gap that reads as an absent league looks
+        # like the venue's fault instead of ours.
+        dropped = _polymarket_ok_reason(spread_rows, unresolved_clubs)
+        reason = (
+            f"no_placeable_polymarket_row_for_league_{sport} {dropped}"
+            if dropped
+            else f"no_polymarket_row_for_league_{sport}"
+        )
+        return SourceOutcome(
+            source="polymarket_us",
+            status="no_rows",
+            reason=reason,
+            quotes=[],
+            age_seconds=max(0.0, time.time() - fetched_at),
+        )
     return SourceOutcome(
         source="polymarket_us",
-        status="ok" if quotes else "no_rows",
-        reason=None if quotes else f"no_polymarket_row_for_league_{sport}",
+        status="ok",
+        # Carried on a SUCCESSFUL outcome too: spreads refused while moneylines
+        # and totals priced is the normal state until the handicap question is
+        # settled, and it must stay visible rather than vanish on success.
+        reason=_polymarket_ok_reason(spread_rows, unresolved_clubs),
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )
 
 
-def _polymarket_sides(row: Mapping[str, Any]) -> tuple[str, list[tuple[str, float | None]], float | None] | None:
-    """`(market, [(side, probability)], line)` from one Polymarket US row.
+def _polymarket_ok_reason(spread_rows: int, unresolved_clubs: list[str]) -> str | None:
+    """What was dropped on a SUCCESSFUL read, or None if nothing was.
 
-    `outcomes` and `outcomePrices` arrive as JSON STRINGS
-    (`'["Titans","Chargers"]'`), not lists -- measured 2026-08-24. Treating
-    them as lists yields no sides at all and reads as "this venue quotes
-    nothing", which is the exact confusion rule 3 exists for.
+    Carried on `status="ok"` deliberately. Spreads refused and clubs the alias
+    map cannot name are the normal state right now, not errors -- but a drop
+    that only shows up when everything else fails is a drop nobody reads. The
+    unresolved club NAMES are included (bounded) because that list is directly
+    actionable: each one is a missing `team_aliases` entry.
+    """
+    parts = []
+    if spread_rows:
+        parts.append(f"spreads_refused:{spread_rows}")
+    if unresolved_clubs:
+        sample = sorted(set(unresolved_clubs))[:6]
+        parts.append(f"clubs_unresolved:{len(unresolved_clubs)}:{sample}")
+    return " ".join(parts) if parts else None
+
+
+def _polymarket_sides(
+    row: Mapping[str, Any],
+    sport: Any = None,
+    parsed_slug: Mapping[str, Any] | None = None,
+    unresolved: list[str] | None = None,
+) -> tuple[str, list[tuple[str, float | None]], float | None] | None:
+    """`(market, [(side, probability)], line)` in THE BOARD'S OWN VOCABULARY.
+
+    --------------------------------------------------------------------------
+    WHY THIS TRANSLATES INSTEAD OF PASSING THE VENUE'S WORDS THROUGH
+    --------------------------------------------------------------------------
+
+    It used to emit the venue's raw outcome string as the side. MEASURED
+    2026-08-25T00:46:19Z, `VENUE_REPRICE_KEYS`, the two sides of the join
+    printed beside each other for the first time:
+
+        board wanted      mlb|h2h|home            mlb|totals|over|6.5
+        polymarket gave   mlb|h2h|chicago cubs    mlb|spreads|-2.50
+
+    The board keys a side by its ROLE (`home`/`away`); Polymarket keys it by
+    the TEAM'S IDENTITY (`chicago cubs`, and for WNBA the short forms `sky`,
+    `sun`, `wings`). Those cannot match by string equality no matter how fresh
+    either quote is -- which is why polymarket_us offered 3,106 quotes across
+    three sports and won ZERO of 237 selections while looking, in every other
+    counter, like a working feed. Same class as the OddsAPI adapter sitting on
+    a different key space for an entire evening.
+
+    --------------------------------------------------------------------------
+    THE ROLE COMES FROM THE SLUG, NOT FROM ARRAY POSITION
+    --------------------------------------------------------------------------
+
+    `parse_slug` gives `<away>-<home>` as a structured fact, and
+    `team_aliases.teams_match` resolves an abbreviation against a full name in
+    either direction -- both already used by `polymarket_board_join` for this
+    same problem, so the two cannot disagree about which side a name refers to.
+
+    Array position is NOT used, deliberately. Measured 2026-08-24 on real
+    spread rows: the order of `outcomes` does not reliably follow the slug --
+    1 of 5 sampled rows would have been priced on the opposite handicap. A
+    team we cannot place is REFUSED rather than assigned positionally, because
+    guessing is a bet on the wrong team half the time at a confident price.
+
+    --------------------------------------------------------------------------
+    SPREADS REFUSE, BY NAME, PENDING A MEASUREMENT
+    --------------------------------------------------------------------------
+
+    The board wants `spreads|<home|away>|<line>` -- WHOSE handicap, and what
+    number. Polymarket publishes one market per side with the handicap AS the
+    outcome (`+2.50`/`-2.50`) and a `pos`/`neg` token in the slug, but nothing
+    in the row or the slug that this module has MEASURED says which TEAM the
+    handicap belongs to. Inventing that mapping is precisely the error the
+    sign-token trap already cost once, so spreads are refused with their own
+    reason and counted. `polymarket_spread_rows` is the work queue that
+    settles it.
     """
     outcomes = _maybe_json_list(row.get("outcomes"))
     prices = _maybe_json_list(row.get("outcomePrices"))
@@ -275,8 +376,90 @@ def _polymarket_sides(row: Mapping[str, Any]) -> tuple[str, list[tuple[str, floa
         # market mapping this module has not measured. Refusing one row is
         # cheaper than inventing a market name that silently never matches.
         return None
-    sides = [(str(name), _as_float(price)) for name, price in zip(outcomes, prices)]
-    return market, sides, _as_float(row.get("line"))
+
+    from syndicate.features.shared.polymarket_board_join import (
+        _has_segment,
+        _line_from_modifiers,
+    )
+
+    modifiers = list((parsed_slug or {}).get("modifiers") or [])
+
+    # A FIRST-QUARTER TOTAL IS NOT A GAME TOTAL. The board's `totals` means the
+    # full game, and this adapter had no segment check at all -- so a `1q` or
+    # `f5` market was keyed plain `totals` and would have re-priced a full-game
+    # row at a period's number. `polymarket_board_join` already refuses these;
+    # the two consumers of this venue must not disagree about it.
+    if _has_segment(modifiers):
+        return None
+
+    # The persisted row's own `line` first, then the slug's. MEASURED: the
+    # offered keys carried no line at all (`mlb|spreads|-2.50`), because
+    # `row["line"]` is absent on these rows -- so a totals key was built
+    # without the number that decides which bet it is.
+    line = _as_float(row.get("line"))
+    if line is None:
+        line = _line_from_modifiers(modifiers)
+
+    if market == "spreads":
+        # Refused by name rather than guessed. See the docstring.
+        return None
+
+    if market == "totals":
+        sides: list[tuple[str, float | None]] = []
+        for name, price in zip(outcomes, prices):
+            token = str(name or "").strip().lower()
+            if token not in {"over", "under"}:
+                continue
+            sides.append((token, _as_float(price)))
+        # A total with no number is not a bet: `totals|over` would match any
+        # line at all, which is worse than matching none.
+        return (market, sides, line) if (sides and line is not None) else None
+
+    # MONEYLINE, KEYED BY THE CANONICAL CLUB NAME.
+    #
+    # NOT by the slug's `<away>-<home>` roles, which was the first attempt and
+    # is measurably too weak. `teams_match` against the slug abbreviation
+    # resolves `chc`/"Chicago Cubs" but NOT `sd`/"Padres", `lac`/"Chargers" or
+    # `chi`/"Sky" -- the WNBA tri-codes are absent from the alias map entirely.
+    # Production carries both shapes at once: mlb rows name clubs in full
+    # (`chicago cubs`) while wnba rows use bare nicknames (`sky`, `wings`).
+    #
+    # `canonical_team` resolves the OUTCOME NAME in every one of those cases
+    # ("Sky" -> `chicago sky`), so the club name is the vocabulary both halves
+    # of this join can actually speak. The fan-in derives the same canonical
+    # name from the board row's own `home_team`/`away_team`, which means one
+    # resolver decides both sides -- the property this repo keeps insisting on,
+    # because two resolvers disagreeing is how the halves of a join end up on
+    # different vocabularies without anyone noticing.
+    #
+    # Nothing is lost by moving off the role key: Kalshi's moneyline emits
+    # `side="yes"` (the club lives in `subject`), so `h2h|yes` matched no board
+    # row either. There was no working h2h match to preserve.
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    resolved: list[tuple[str, float | None]] = []
+    for name, price in zip(outcomes, prices):
+        club = canonical_team(sport, name)
+        # A club we cannot name is REFUSED, never taken positionally. Array
+        # order does not reliably follow the slug (measured on spread rows,
+        # 1 of 5 would have been the opposite side), and there is no reason to
+        # trust it more here.
+        #
+        # COUNTED, because this is a live coverage gap and not a theoretical
+        # one. `canonical_team` resolves a bare WNBA nickname ("Sky" ->
+        # `chicago sky`) but NOT an MLB or NFL one -- "Padres" and "Chargers"
+        # both return None. Production sends MLB clubs in full today, so
+        # nothing is lost right now; the day it sends nicknames instead, this
+        # counter is the difference between a visible alias-map gap and a feed
+        # that quietly halves.
+        if not club:
+            if unresolved is not None:
+                unresolved.append(str(name))
+            continue
+        resolved.append((club, _as_float(price)))
+    # h2h carries no line -- passing one builds `h2h|<club>|-1.5`, which no
+    # board row asks for.
+    return (market, resolved, None) if resolved else None
 
 
 def _maybe_json_list(value: Any) -> list[Any] | None:
