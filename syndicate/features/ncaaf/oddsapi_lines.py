@@ -192,6 +192,28 @@ def _alias_map() -> dict[str, str]:
     # are hand-verified answers to names the registry genuinely does not carry,
     # so they must survive a mascot collision rather than be dropped by it.
     known = {row for row in mapping.values()}
+    if not known:
+        # `#558`. THE GUARD BELOW USED TO BE SKIPPED BY EXACTLY THE CONDITION
+        # THAT BREAKS IT. `if known:` meant a POPULATED registry was validated
+        # and an ABSENT one was waved through, returning {} -- which resolves
+        # nothing while looking identical to "the feed sent names we don't
+        # carry". Measured on live-odds-worker 2026-08-25T21:03:35Z:
+        # `resolved=0 unresolved=184`, every team, reported at exit 0.
+        #
+        # Audible, not fatal: `cards.py` and `game_projections.py` call this on
+        # the WEB service to build the board, and raising there would turn a
+        # missing input into a dead page. Degrading to "no lines" is right for
+        # them. The FETCHER refuses outright instead -- see
+        # `registry_status()` and `fetch_ncaaf_oddsapi_game_lines.py`, which is
+        # the caller that would otherwise spend a credit and write nothing.
+        print(
+            "[ncaaf_odds] TEAM_REGISTRY_EMPTY path="
+            f"{team_registry_snapshot_path()} -- every team name will fail to "
+            "resolve. This file is git-tracked and reaches web via "
+            "bootstrap_data_root; a WORKER needs it pulled (it is allowlisted "
+            "in HOT_ARTIFACT_PATTERNS).",
+            flush=True,
+        )
     if known:
         for alias, canonical in _ODDSAPI_NAME_SUPPLEMENT.items():
             if canonical not in known:
@@ -204,6 +226,34 @@ def _alias_map() -> dict[str, str]:
                 )
             mapping[fold(alias)] = canonical
     return mapping
+
+
+def registry_status() -> dict[str, Any]:
+    """Is the team registry actually on THIS process's disk?
+
+    `#558`. Exists because the answer differs per SERVICE and nothing said so:
+    the CSV is git-tracked, so `bootstrap_data_root` puts it on web's disk,
+    while live-odds-worker never runs that bootstrap and had never been sent
+    the file. `_csv_rows()` returns [] for a missing path, so the resolver
+    reported 184 unresolved names at exit 0 rather than one absent input.
+
+    Callable WITHOUT spending an API credit, which is the point -- the fetcher
+    checks this before it fetches.
+    """
+    path = team_registry_snapshot_path()
+    rows = _csv_rows(path)
+    teams = {
+        str(row.get("canonical_team_name") or "").strip()
+        for row in rows
+        if str(row.get("canonical_team_name") or "").strip()
+    }
+    return {
+        "path": str(path),
+        "exists": path.is_file(),
+        "rows": len(rows),
+        "teams": len(teams),
+        "ok": bool(teams),
+    }
 
 
 @lru_cache(maxsize=1)

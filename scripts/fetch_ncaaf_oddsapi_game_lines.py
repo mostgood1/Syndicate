@@ -190,6 +190,14 @@ def append_quotes(events: list[dict[str, Any]]) -> dict[str, Any]:
     return results
 
 
+# The one artifact this fetcher READS rather than writes. Allowlisted in
+# `HOT_ARTIFACT_PATTERNS` so it can be streamed to a worker; see `#558`.
+TEAM_REGISTRY_RELATIVE_PATH = (
+    "ncaaf_source/source_artifacts/data/processed/team_registry/"
+    "ncaaf_team_registry_snapshot.csv"
+)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -210,6 +218,66 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     _load_env()
+
+    # `#558`. THE REGISTRY IS CHECKED BEFORE THE FETCH, and the order is the
+    # whole point: a credit spent against an empty alias map buys 184
+    # unresolved names and nothing else. Measured on live-odds-worker
+    # 2026-08-25T21:03:35Z, the first live call this module ever made:
+    # `events=111 teams=184 resolved=0 unresolved=184`, exit 0.
+    #
+    # The file is git-tracked, so a CHECKOUT always has it and every local test
+    # passed. `bootstrap_data_root` seeds it onto WEB's disk. live-odds-worker
+    # runs neither, so it must be PULLED -- one allowlisted artifact, streamed
+    # from web, no schedule to drift. `pull_streamed_artifact` never raises and
+    # returns (ok, written); a 304 writes nothing and is the steady state, so
+    # the re-check below reads DISK rather than trusting the return.
+    from syndicate.features.ncaaf.oddsapi_lines import registry_status
+
+    status = registry_status()
+    if not status["ok"]:
+        print(
+            f"[ncaaf_odds] TEAM_REGISTRY_MISSING path={status['path']} "
+            f"exists={status['exists']} rows={status['rows']} -- pulling",
+            flush=True,
+        )
+        try:
+            from syndicate.features.shared.artifact_publisher import pull_streamed_artifact
+
+            ok, written = pull_streamed_artifact(TEAM_REGISTRY_RELATIVE_PATH)
+            print(
+                f"[ncaaf_odds] TEAM_REGISTRY_PULL ok={ok} written={written}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                f"[ncaaf_odds] TEAM_REGISTRY_PULL_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+        # `_alias_map` and `_mascot_tails` are lru_cached and may already hold
+        # the empty map built from the pre-pull disk.
+        from syndicate.features.ncaaf import oddsapi_lines as _lines
+
+        _lines._alias_map.cache_clear()
+        _lines._mascot_tails.cache_clear()
+        status = registry_status()
+
+    if not status["ok"]:
+        # REFUSES rather than reporting a confident zero. An empty registry is
+        # an absent INPUT, not a feed full of unknown schools, and the two are
+        # indistinguishable in the unresolved list.
+        print(
+            f"[ncaaf_odds] TEAM_REGISTRY_ABSENT path={status['path']} "
+            f"exists={status['exists']} rows={status['rows']} teams={status['teams']}. "
+            "Nothing was fetched and no credit was spent. Every team name would "
+            "have failed to resolve, which is NOT the same as the feed carrying "
+            "schools we do not know.",
+            flush=True,
+        )
+        return 3
+    print(
+        f"[ncaaf_odds] TEAM_REGISTRY rows={status['rows']} teams={status['teams']}",
+        flush=True,
+    )
 
     if args.events_json:
         events = json.loads(Path(args.events_json).read_text(encoding="utf-8"))

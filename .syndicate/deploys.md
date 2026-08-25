@@ -29171,6 +29171,80 @@ book quoted it".
 
 ---
 
+## 2026-08-25T21:03Z — `508dbc02e` — live-odds-worker: the first live OddsAPI call for NCAAF, and it REFUTED the feature
+
+**What.** `#558`. `SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT=1` set on
+live-odds-worker (`srv-d91dpertqb8s73co8lt0`), which triggered
+`dep-da704j15efls7387qec0` on `508dbc02e` (verified to contain the probe
+commit `257f8dc35`). User instruction: run the report BEFORE flipping
+`SYNDICATE_ACTIVE_SPORTS`.
+
+Two readings first, both of which are the probe working as designed:
+
+```
+20:54:33Z  instance -8lbz5  NCAAF_ODDSAPI_REPORT_SKIPPED flag=off
+21:00:31Z  instance -xktlf  NCAAF_ODDSAPI_REPORT_SKIPPED flag=off
+```
+
+That is the off-case printing, which is the only thing that distinguishes
+"the flag did not reach this service" from "the probe crashed". Then, armed:
+
+**verify:**
+
+```
+21:03:35Z  instance -pxcj6
+[ncaaf_odds] EVENTS events=111 teams=184 resolved=0 unresolved=184
+[ncaaf_odds] UNRESOLVED_TEAMS 'Abilene Christian Wildcats', 'Air Force Falcons',
+   'Akron Zips', 'Alabama Crimson Tide', ... (all 184)
+[live_odds_worker] NCAAF_ODDSAPI_REPORT_DONE exit=0
+```
+
+**ZERO of 184.** Not a naming gap — `Alabama Crimson Tide` and `Clemson Tigers`
+are as plain as the feed gets, and the same resolver scored **94/94** on the
+fixture. The alias map is EMPTY.
+
+**Root cause, measured not guessed.** `_alias_map()` builds from
+`ncaaf_source/source_artifacts/data/processed/team_registry/ncaaf_team_registry_snapshot.csv`,
+resolved against `SYNDICATE_DATA_ROOT` by `ncaaf_source_artifacts_data_path`.
+
+- The file is git-tracked, so **web** has it — `bootstrap_data_root` seeds the
+  checkout onto web's mounted disk (`copied=0 unchanged=403`, 20:38:03Z). That
+  is why the board resolves teams and shows 51 games, and why every local test
+  passed.
+- **live-odds-worker has never run `bootstrap_data_root`** — zero such lines in
+  seven days of logs. Its data root holds only what the artifact sync delivers.
+- That path matches **none of the 155 `HOT_ARTIFACT_PATTERNS`**. Checked
+  programmatically against the real tuple: `book_quotes` matches,
+  `book_grid` matches, the registry matches nothing.
+
+`_csv_rows()` returns `[]` for a missing file, so the whole chain is silent.
+
+**This is `model_engine_standard.md`'s rule, and I broke it in the narrowest
+possible way.** "Every input disk-backed via `SYNDICATE_DATA_ROOT` and
+allowlisted in `HOT_ARTIFACT_PATTERNS`." I verified the OUTPUT path
+(`book_quotes`) was allowlisted — twice, and wrote it up as the reason no
+allowlist edit was needed — and never once checked the resolver's INPUT.
+
+**The guard that should have caught it is disabled by the condition that breaks
+it.** `_alias_map()` validates `_ODDSAPI_NAME_SUPPLEMENT` against the registry
+and RAISES on a name the registry does not carry — but the check is wrapped in
+`if known:`, so an empty map skips it entirely. A populated map is verified; an
+absent one is waved through.
+
+**NOT DONE, deliberately: `SYNDICATE_ACTIVE_SPORTS` was NOT flipped.** The user
+authorised the flip after the report; the report refused it. Flipping on this
+reading would have written a quote log keyed to nothing, and all 51 cards would
+show an empty market block — which on the board is indistinguishable from "no
+book quoted it", the one failure mode this design cannot self-report.
+
+**Still armed:** `SYNDICATE_NCAAF_ODDSAPI_REPORT_ON_BOOT=1` remains set on
+live-odds-worker and spends one OddsAPI credit per boot. Clear it once the fix
+is verified, or sooner if the service starts cycling.
+
+**What this deploy is worth.** It cost one credit and one restart, and it
+turned a feature I had described as "built and proven" into a measured zero
+before it could write anything. The fixture was the thing that lied: it carried
+the registry the worker does not have.
 ## 2026-08-25T20:34Z — `7ae8a1fed` — refresh-worker + live-odds-worker
 
 **VERIFIED. `selected_by_source` went `{}` -> `{'kalshi': 1852}`.**
