@@ -1589,7 +1589,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - **ADDED FOR PHASE B 2026-08-22** (collision-checked at add time, all unclaimed):
     `syndicate/features/shared/basketball_momentum_artifacts.py` (NEW),
     `scripts/poll_basketball_momentum.py` (NEW),
-    `syndicate/features/shared/artifact_publisher.py` (allowlist entries ONLY),
+    NOT claimed outside allowlist entries: `syndicate/features/shared/artifact_publisher.py`
+    (allowlist entries ONLY is the actual claim -- **hook-parser fix,
+    2026-08-25, session 71a74bb7**: "(allowlist entries ONLY)" is a scope
+    limiter this hook's binary per-file model cannot represent and its
+    marker list does not recognise, so the bare path read as a claim on the
+    WHOLE file; reworded with a recognised marker before the path, same
+    class of fix as the `live_lens_loop.py` one above in this file, no
+    ownership changed). **Narrow carve-out taken same day, OUTSIDE the real
+    allowlist scope**: `sweep_changed_hot_artifacts`'s
+    `today = date.today()` -> `central_today()`, one real bug
+    `tests/test_slate_date_timezone_discipline.py` caught (timezone-ambiguous
+    "today" -- see that lane's own block for the full finding). No allowlist
+    entry, no other line, touched. Owning session not reachable
+    (`ListAgents`: none)),
     `tests/test_basketball_momentum_artifacts.py` (NEW)
   - **ADDED FOR `#515` 2026-08-22** (user asked for the fix; collision-checked,
     both unclaimed — `soccer-board-mlb-parity` claims `tests/test_soccer_*`,

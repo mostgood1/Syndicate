@@ -36,6 +36,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Mapping
 
+from syndicate.features.shared.timezone import central_today
+
 from syndicate.features.shared.refresh_state_store import reports_root
 
 # Same bug class root-caused in intelligence_evaluation.py's
@@ -226,7 +228,7 @@ def prune_old_shadow_ledger_files(*, root: Path | None = None, today: date | Non
     base = root if root is not None else DEFAULT_SHADOW_LEDGER_ROOT
     if not base.exists():
         return {"ok": True, "removed": 0}
-    cutoff = (today or date.today()) - timedelta(days=_retention_days())
+    cutoff = (today or central_today()) - timedelta(days=_retention_days())
     removed: list[str] = []
     errors: list[str] = []
     for candidate_path in base.glob("*.jsonl"):
