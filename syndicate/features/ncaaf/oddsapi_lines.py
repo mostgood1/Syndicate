@@ -113,6 +113,49 @@ _ODDSAPI_NAME_SUPPLEMENT: Mapping[str, str] = {
     "miami oh": "Miami (OH)",
     "miami florida": "Miami",
     "miami fl": "Miami",
+
+    # --------------------------------------------------------------------
+    # `#558`, measured. The first live OddsAPI read that had a registry to
+    # resolve against (live-odds-worker 2026-08-25T21:41:08Z) returned
+    # `resolved=176 unresolved=8` over the real 111-event slate. These are
+    # those 8, each looked up in the registry rather than guessed.
+    #
+    # Both spellings are listed for every school. `resolve_team` strips a
+    # trailing MASCOT, but the mascots here are real registry mascots
+    # ("Mountaineers" belongs to West Virginia too), so stripping only ever
+    # yields the school form -- which is itself not a registry key in any of
+    # these cases. Covering both is what makes the suffix path irrelevant.
+    #
+    # THE REGISTRY USES THE SHORT FORM, the feed uses the long one. Three of
+    # these are FBS -- main-board games that would otherwise show an empty
+    # market block, which on the board reads identically to "no book quoted
+    # it".
+    "appalachian state": "App State",                    # FBS
+    "appalachian state mountaineers": "App State",
+    "southern mississippi": "Southern Miss",             # FBS
+    "southern mississippi golden eagles": "Southern Miss",
+    "southeastern louisiana": "SE Louisiana",
+    "southeastern louisiana lions": "SE Louisiana",
+    "citadel": "The Citadel",
+    "citadel bulldogs": "The Citadel",
+    "nicholls state": "Nicholls",
+    "nicholls state colonels": "Nicholls",
+
+    # THE SCHOOL WAS RENAMED and the feed still carries the old name. The
+    # registry is current; OddsAPI is not.
+    "houston baptist": "Houston Christian",              # renamed 2022
+    "houston baptist huskies": "Houston Christian",
+    "sam houston state": "Sam Houston",                  # FBS, renamed 2021
+    "sam houston state bearkats": "Sam Houston",
+
+    # A JUDGEMENT CALL, STATED AS ONE. The registry carries TWO Albanys --
+    # `UAlbany` (FCS, Great Danes) and `Albany State GA` (Division II) -- and
+    # the feed sends the bare word. A Division II school does not appear on a
+    # book's slate, so this is UAlbany; but that is an inference from the
+    # feed's composition, not something the name itself says. Written here as
+    # a hand-verified entry rather than left to the alias generator, which
+    # would have had no basis to choose and correctly refuses ambiguity.
+    "albany": "UAlbany",
 }
 
 

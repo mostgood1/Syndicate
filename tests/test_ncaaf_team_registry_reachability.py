@@ -190,3 +190,75 @@ def test_a_failing_pull_cannot_take_the_run_down(monkeypatch, tmp_path, capsys):
 
     assert fetcher.main(["--report"]) == 3  # refused, not crashed
     assert "TEAM_REGISTRY_PULL_FAILED" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# `#558` -- the 8 the first successful live read could not place
+# --------------------------------------------------------------------------
+
+# OddsAPI spelling -> registry canonical, from live-odds-worker
+# 2026-08-25T21:41:08Z (`resolved=176 unresolved=8` over the real 111-event
+# slate). Every one was looked up in the registry, not guessed.
+MEASURED_UNRESOLVED = {
+    "Appalachian State Mountaineers": "App State",
+    "Southern Mississippi Golden Eagles": "Southern Miss",
+    "Sam Houston State Bearkats": "Sam Houston",
+    "Citadel Bulldogs": "The Citadel",
+    "Houston Baptist Huskies": "Houston Christian",
+    "Nicholls State Colonels": "Nicholls",
+    "Southeastern Louisiana Lions": "SE Louisiana",
+    "Albany": "UAlbany",
+}
+
+
+@pytest.mark.parametrize("sent,canonical", sorted(MEASURED_UNRESOLVED.items()))
+def test_the_names_the_live_feed_actually_sent_now_resolve(sent, canonical):
+    assert lines.resolve_team(sent) == canonical
+
+
+@pytest.mark.parametrize(
+    "sent", ["Appalachian State", "Southern Mississippi", "Sam Houston State",
+             "Houston Baptist", "Nicholls State", "Southeastern Louisiana"]
+)
+def test_the_school_form_resolves_too_not_only_the_mascot_form(sent):
+    """`resolve_team` strips a trailing mascot, but these mascots are REAL
+    registry mascots owned by other schools, so stripping only ever yields the
+    school form -- which is not itself a registry key for any of these. Both
+    spellings are covered so the suffix path is irrelevant."""
+    assert lines.resolve_team(sent) is not None, sent
+
+
+def test_adding_app_state_did_not_steal_west_virginia():
+    """"Mountaineers" belongs to West Virginia, App State, Schreiner and
+    Western Colorado. A supplement entry keyed on the bare mascot would have
+    taken all four; these are keyed on "<school> <mascot>" and the school form
+    only."""
+    assert lines.resolve_team("West Virginia Mountaineers") == "West Virginia"
+    assert lines.resolve_team("Appalachian State Mountaineers") == "App State"
+
+
+def test_bare_mascots_still_refuse():
+    """The registry carries ~680 schools sharing mascots. A confident wrong
+    join is invisible; an unresolved name is a gap you can see."""
+    for mascot in ("Mountaineers", "Bulldogs", "Wildcats", "Lions", "Huskies"):
+        assert lines.resolve_team(mascot) is None, mascot
+
+
+def test_albany_is_a_stated_judgement_not_an_inferred_one():
+    """The registry carries BOTH `UAlbany` and `Albany State GA`. The feed
+    sends the bare word; a Division II school is not on a book's slate, so the
+    answer is UAlbany -- an inference from the slate's composition, recorded as
+    a hand-verified entry rather than left to the alias generator, which
+    correctly refuses ambiguity and would have resolved nothing."""
+    assert lines.resolve_team("Albany") == "UAlbany"
+    assert lines.resolve_team("Albany State GA") == "Albany State GA"
+
+
+def test_every_supplement_entry_names_a_real_canonical_team():
+    """`_alias_map()` raises on a supplement entry whose target is not in the
+    registry. Building the map IS the assertion -- this makes it explicit so a
+    typo fails here rather than at boot on a worker."""
+    mapping = lines._alias_map()
+    known = set(mapping.values())
+    for alias, canonical in lines._ODDSAPI_NAME_SUPPLEMENT.items():
+        assert canonical in known, f"{alias!r} -> {canonical!r}"
