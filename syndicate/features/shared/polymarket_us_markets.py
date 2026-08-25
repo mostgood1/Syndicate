@@ -74,7 +74,7 @@ it, and let the first live run correct the guesses cheaply.
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 __all__ = [
     "fetch_markets",
@@ -1021,9 +1021,31 @@ def find_first_game_offset(
         return {"status": "skipped", "reason": "credentials_absent"}
 
     probes = 0
-    seen: dict[int, bool] = {}
+    seen: dict[int, str] = {}
 
-    def _has_games(offset: int) -> bool | None:
+    # THREE PAGE STATES, NOT TWO, and conflating them is what broke this.
+    #
+    # The layout is [futures][games][empty]. The old probe returned a BOOL, so
+    # a futures page and a past-the-end empty page were both `False` -- and
+    # `False` sends the search UP (`low = mid + 1`). Its own comment claimed
+    # "the search should move DOWN, which False achieves correctly", which is
+    # the opposite of what the line below it did.
+    #
+    # Consequences, measured 2026-08-25 from 3:32 PM Central onward, on every
+    # cycle and across two instances:
+    #
+    #     POLYMARKET_US_SLATE_WRITE status=error reason=no_game_offset: ok
+    #
+    # -- a reason string that contradicts itself, because `status` was "ok"
+    # while `first_game_offset` was None. The slate artifact stopped
+    # refreshing (2,903s stale in the 3:48 PM reprice) and Polymarket could
+    # place nothing.
+    #
+    # An EMPTY page means the block is BELOW us; a FUTURES page means it is
+    # ABOVE us. Told apart, the search is correct wherever the block sits.
+    _GAMES, _FUTURES, _EMPTY = "games", "futures", "empty"
+
+    def _page(offset: int) -> str | None:
         nonlocal probes
         if offset in seen:
             return seen[offset]
@@ -1037,32 +1059,85 @@ def find_first_game_offset(
         except Exception:
             return None
         rows = [r for r in (payload.get("markets") or []) if isinstance(r, Mapping)]
-        # An empty page is past the end: no games there, and the search should
-        # move DOWN, which `False` achieves correctly.
-        found = any(is_game_market_row(r) for r in rows)
-        seen[offset] = found
-        return found
+        if not rows:
+            state = _EMPTY
+        elif any(is_game_market_row(r) for r in rows):
+            state = _GAMES
+        else:
+            state = _FUTURES
+        seen[offset] = state
+        return state
 
-    low, high = 0, int(ceiling)
+    # THE CEILING IS DERIVED, NOT TRUSTED. This function's own docstring says
+    # hardcoding 16000 "would break quietly" because ids grow as the venue
+    # lists markets -- and then hardcoded 40000 one line down. A ceiling that
+    # still shows FUTURES is a ceiling below the block, so it doubles until it
+    # reaches empty-or-games. Bounded by `max_probes` like every other probe.
+    top = int(ceiling)
+    for _ in range(6):
+        state = _page(top)
+        if state is None:
+            return {
+                "status": "error",
+                "reason": f"probe_failed_at_ceiling_{top}",
+                "probes": probes,
+                "sampled": dict(sorted(seen.items())),
+            }
+        if state != _FUTURES:
+            break
+        top *= 2
+    else:
+        # Still futures after six doublings: the partition assumption does not
+        # hold, or the catalogue is far larger than this search is shaped for.
+        # NAMED, never returned as a quiet None.
+        return {
+            "status": "error",
+            "reason": f"ceiling_below_game_block: futures at offset {top}",
+            "probes": probes,
+            "ceiling": top,
+            "sampled": dict(sorted(seen.items())),
+        }
+
+    low, high = 0, top
     while low < high:
         mid = (low + high) // 2
-        found = _has_games(mid)
-        if found is None:
-            return {"status": "error", "reason": f"probe_failed_at_offset_{mid}", "probes": probes}
-        if found:
-            high = mid
+        state = _page(mid)
+        if state is None:
+            return {
+                "status": "error",
+                "reason": f"probe_failed_at_offset_{mid}",
+                "probes": probes,
+                "sampled": dict(sorted(seen.items())),
+            }
+        if state == _FUTURES:
+            low = mid + 1          # the block is above us
         else:
-            low = mid + 1
+            high = mid             # games here, or past the end -- look lower
 
-    boundary = low if seen.get(low) or _has_games(low) else None
+    boundary = low if _page(low) == _GAMES else None
+    if boundary is None:
+        # THE FAILURE IS AN ERROR, NOT AN "ok" WITH A NULL. A status that says
+        # fine beside a result that says nothing is what produced
+        # `no_game_offset: ok` and told nobody anything. The sampled map goes
+        # with it so the next reading says WHICH shape was seen where.
+        return {
+            "status": "error",
+            "reason": "no_game_page_found",
+            "probes": probes,
+            "ceiling": top,
+            "sampled": dict(sorted(seen.items())),
+        }
     # THE ASSUMPTION, CHECKED. If any offset BELOW the boundary had games, the
     # collection is not partitioned and this answer is not trustworthy.
-    monotonic = not any(found for off, found in seen.items() if boundary is not None and off < boundary)
+    monotonic = not any(
+        state == _GAMES for off, state in seen.items() if off < boundary
+    )
     return {
         "status": "ok",
         "first_game_offset": boundary,
         "probes": probes,
         "monotonic": monotonic,
+        "ceiling": top,
         "sampled": dict(sorted(seen.items())),
     }
 
@@ -1081,7 +1156,14 @@ def fetch_game_markets(
         if located.get("status") != "ok" or located.get("first_game_offset") is None:
             return {
                 "status": "error",
-                "reason": f"no_game_offset: {located.get('reason') or located.get('status')}",
+                # The SAMPLED MAP, not just a status word. `no_game_offset: ok`
+                # was the old rendering and it is self-contradictory: it named
+                # the failure and then quoted a status that says fine. What
+                # anyone debugging needs is which offsets showed what.
+                "reason": (
+                    f"no_game_offset: {located.get('reason') or located.get('status')}"
+                    f" sampled={located.get('sampled')} probes={located.get('probes')}"
+                ),
                 "markets": [],
             }
         start_offset = int(located["first_game_offset"])
@@ -1235,7 +1317,78 @@ def _slate_row_for_storage(row: Mapping[str, Any]) -> dict[str, Any]:
     return {key: row[key] for key in _SLATE_STORAGE_FIELDS if key in row}
 
 
-def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, Any]:
+# How much of the ceiling the slate may use. The remainder is margin: the
+# envelope keys, and the fact that a row's size is estimated per-row and summed
+# rather than re-serialised at every step.
+_SLATE_BYTE_BUDGET = int(_KEYVALUE_CEILING_BYTES * 0.90)
+
+
+def _slate_date(row: Mapping[str, Any]) -> str:
+    """The row's game DATE, or "" when it carries none.
+
+    Empty sorts FIRST deliberately. A game row with no `gameStartTime` cannot
+    be ranked, and dropping what we cannot rank is how a real market disappears
+    without appearing in any count.
+    """
+    text = str(row.get("gameStartTime") or "").strip()
+    return text[:10] if len(text) >= 10 else ""
+
+
+def _slate_within_budget(
+    markets: Sequence[Mapping[str, Any]], *, budget: int = _SLATE_BYTE_BUDGET
+) -> dict[str, Any]:
+    """Keep the NEAREST games and drop the furthest-out ones, by name.
+
+    THE OLD TRUNCATION CUT BY OFFSET, WHICH IS ARBITRARY WITH RESPECT TO DATE.
+    `fetch_markets` stopped after `max_pages` and set `truncated=True`, so
+    whatever happened to sit past 30 pages was gone -- and the venue orders by
+    id, not by kickoff. Measured 2026-08-25 2:59:40 PM Central:
+
+        POLYMARKET_US_SLATE_WRITE status=ok count=13243 bytes=3920483
+          truncated=True
+
+    That is a slate we cannot resolve orders against and cannot tell which part
+    is missing. `market_unresolved_for_position` on
+    `tsc-mlb-cin-sf-2026-08-25-7pt5` at 3:55 PM is exactly the symptom: a real
+    market on tonight's game, absent from our copy for no reason connected to
+    the game.
+
+    Ordering by date makes the cut MEAN something. Tonight's slate is what we
+    trade; a market eight days out is what we can afford to lose. And the
+    dropped dates are REPORTED, so "we chose not to store this" never reads as
+    "the venue does not list it" -- the distinction this whole integration
+    keeps paying for.
+
+    Rows are measured individually and summed rather than re-serialised per
+    step: an exact check on the finished payload still runs in
+    `persist_game_slate`, and this only has to get the ORDER and the rough size
+    right.
+    """
+    import json as _json
+
+    ordered = sorted(markets, key=_slate_date)
+    kept: list[Mapping[str, Any]] = []
+    used = 0
+    dropped_by_date: dict[str, int] = {}
+    for row in ordered:
+        size = len(_json.dumps(row)) + 1
+        if used + size > budget and kept:
+            dropped_by_date[_slate_date(row) or "<undated>"] = (
+                dropped_by_date.get(_slate_date(row) or "<undated>", 0) + 1
+            )
+            continue
+        kept.append(row)
+        used += size
+    return {
+        "markets": kept,
+        "dropped": sum(dropped_by_date.values()),
+        "dropped_by_date": dict(sorted(dropped_by_date.items())),
+        "kept_through": _slate_date(kept[-1]) if kept else None,
+        "estimated_bytes": used,
+    }
+
+
+def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, Any]:
     """Fetch the joinable slate and write it for the fan-in to read.
 
     Writes `fetched_at` INTO the payload rather than relying on the file's
@@ -1256,13 +1409,34 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, An
     if slate.get("status") != "ok":
         return {"status": "error", "reason": slate.get("reason"), "written": False, "kept_previous": True}
 
-    markets = [_slate_row_for_storage(m) for m in (slate.get("markets") or [])]
+    # PAGE TO EXHAUSTION, THEN CHOOSE WHAT TO DROP -- in that order.
+    #
+    # `max_pages` defaulted to 30, so at limit=500 the fetch stopped after
+    # 15,000 rows whether or not the venue had more, and it did:
+    # `count=13243 truncated=True` on 2026-08-25 at 2:59:40 PM Central. The
+    # repo measured `games=7585, truncated=False` on 2026-08-24, so the
+    # catalogue outgrew the constant in a day -- the same failure as
+    # `find_first_game_offset`'s hardcoded ceiling, one function over.
+    #
+    # `fetch_markets` already stops on a short page, so a high bound costs
+    # nothing on a small slate and only binds on a genuinely huge one.
+    fetched = [_slate_row_for_storage(m) for m in (slate.get("markets") or [])]
+    budgeted = _slate_within_budget(fetched)
+    markets = budgeted["markets"]
     payload = {
         "fetched_at": _time.time(),
         "markets": markets,
         "count": len(markets),
         "start_offset": slate.get("start_offset"),
+        # THE FETCH's truncation, which should now be False. Kept distinct from
+        # the budget drop below: "the venue had more than we asked for" and "we
+        # chose not to store the far end" are different facts and only one of
+        # them is a bug.
         "truncated": slate.get("truncated"),
+        "fetched_count": len(fetched),
+        "dropped_for_size": budgeted["dropped"],
+        "dropped_by_date": budgeted["dropped_by_date"],
+        "kept_through": budgeted["kept_through"],
         "game_types": slate.get("game_types"),
         "game_start_min": slate.get("game_start_min"),
         "game_start_max": slate.get("game_start_max"),
@@ -1305,5 +1479,12 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, An
         "bytes": size_bytes,
         "headroom_bytes": _KEYVALUE_CEILING_BYTES - size_bytes,
         "truncated": slate.get("truncated"),
+        # NEVER SILENT. A slate that dropped its far end must say so and say
+        # which dates, or the next `market_unresolved_for_position` is
+        # indistinguishable from the venue not listing the market.
+        "fetched_count": len(fetched),
+        "dropped_for_size": budgeted["dropped"],
+        "dropped_by_date": budgeted["dropped_by_date"],
+        "kept_through": budgeted["kept_through"],
         "game_types": slate.get("game_types"),
     }

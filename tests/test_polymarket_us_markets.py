@@ -1154,13 +1154,105 @@ def test_the_partition_assumption_is_CHECKED_not_trusted(monkeypatch):
     assert result["monotonic"] is True
 
 
-def test_a_collection_with_no_games_reports_no_offset(monkeypatch):
+def test_a_collection_with_no_games_reports_an_ERROR_not_an_ok_with_a_null(monkeypatch):
+    """`status: "ok"` beside `first_game_offset: None` is what broke Polymarket.
+
+    The caller rendered it as `no_game_offset: ok` -- a reason string that
+    names a failure and then quotes a status saying fine. Measured on every
+    cycle from 2026-08-25 3:32 PM Central across two instances; the slate
+    artifact went 2,903s stale and Polymarket could place nothing.
+
+    THE FIXTURE IS REALISTIC NOW, and that is part of the fix. It used to
+    return futures at EVERY offset -- a catalogue with no end, which no venue
+    has. A real games-less catalogue is futures, then empty.
+    """
     from syndicate.features.shared import polymarket_us_auth as auth
 
     monkeypatch.setattr(auth, "credentials_present", lambda: True)
-    monkeypatch.setattr(auth, "signed_request", lambda *_a, **_k: {"markets": [
-        _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")]})
-    assert mod.find_first_game_offset()["first_game_offset"] is None
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        if offset >= 12000:
+            return {"markets": []}
+        return {"markets": [
+            _row(id=f"f-{offset}", category="sports",
+                 sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.find_first_game_offset()
+
+    assert result["status"] == "error", result
+    assert result["reason"] == "no_game_page_found", result
+    assert result.get("first_game_offset") is None
+    # The sampled map rides along, so the next reading says WHICH shape was
+    # seen WHERE rather than only that nothing was found.
+    assert result["sampled"], result
+
+
+def test_the_ceiling_is_derived_when_the_block_sits_above_it(monkeypatch):
+    """THE PRODUCTION FAILURE. `find_first_game_offset`'s own docstring says
+    hardcoding 16000 "would break quietly" because ids grow as the venue lists
+    markets -- and then hardcoded `ceiling=40000` one line down. Once the game
+    block moved above 40000 every probe below it was futures, the search
+    climbed to the ceiling, and the answer was None.
+
+    A ceiling that still shows FUTURES is a ceiling below the block, so it
+    doubles until it reaches empty-or-games.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    boundary, end = 62000, 71000
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        if offset >= end:
+            return {"markets": []}
+        kind = ("SPORTS_MARKET_TYPE_SPREAD" if offset >= boundary
+                else "SPORTS_MARKET_TYPE_FUTURE")
+        return {"markets": [_row(id=f"m-{offset}", category="sports",
+                                 sportsMarketTypeV2=kind,
+                                 gameStartTime="2026-08-28T23:30:00Z")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.find_first_game_offset()
+
+    assert result["status"] == "ok", result
+    assert result["first_game_offset"] == boundary, result
+    assert result["ceiling"] > 40000, result
+
+
+def test_an_empty_page_sends_the_search_DOWN_not_up(monkeypatch):
+    """The single line that caused it. `_has_games` returned a BOOL, so a
+    futures page and a past-the-end empty page were both False -- and False ran
+    `low = mid + 1`, which moves UP. The comment above it claimed "the search
+    should move DOWN, which False achieves correctly", asserting the opposite
+    of the line beneath it.
+
+    A block that ENDS well below the ceiling is the case that exposes it: every
+    probe above the end is empty, and treating those as "go higher" walks the
+    search off the top of the collection.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+
+    def responder(_m, url, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        if offset >= 9000:            # the block ends early; everything above is empty
+            return {"markets": []}
+        kind = ("SPORTS_MARKET_TYPE_MONEYLINE" if offset >= 8000
+                else "SPORTS_MARKET_TYPE_FUTURE")
+        return {"markets": [_row(id=f"m-{offset}", category="sports",
+                                 sportsMarketTypeV2=kind,
+                                 gameStartTime="2026-08-28T23:30:00Z")]}
+
+    monkeypatch.setattr(auth, "signed_request", responder)
+    result = mod.find_first_game_offset()
+
+    assert result["status"] == "ok", result
+    assert result["first_game_offset"] == 8000, result
 
 
 def test_fetch_game_markets_starts_at_the_located_boundary(monkeypatch):
@@ -1271,15 +1363,147 @@ def test_the_persisted_row_keeps_only_what_downstream_READS(monkeypatch, tmp_pat
 
 def test_a_slate_over_the_keyvalue_ceiling_REFUSES_before_writing(monkeypatch, tmp_path):
     """Checked before the write rather than discovered by its failure. Novig
-    hit exactly this at 9,128,668 bytes and had to trim after the outage."""
+    hit exactly this at 9,128,668 bytes and had to trim after the outage.
+
+    STILL REACHABLE AFTER THE DATE BUDGET, and that is what this now pins. The
+    budget trims the far end to 90% of the ceiling, so an ordinarily-oversized
+    slate no longer gets here -- which is the point of it. But the budget keeps
+    at least one row whatever its size, so a single enormous row still has to
+    be refused rather than written. A guard that became unreachable would be a
+    guard that had been deleted.
+    """
     from syndicate.features.shared import refresh_state_store
 
     monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
     monkeypatch.setattr(refresh_state_store, "write_json_file",
                         lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not write")))
-    huge = [mod.trimmed_row(_row(id=f"m-{i}", slug="s" * 900)) for i in range(12000)]
-    monkeypatch.setattr(mod, "fetch_game_markets", lambda **_k: {"status": "ok", "markets": huge})
+    # ONE row, larger than the ceiling on its own. The date budget cannot trim
+    # its way under this and must not pretend otherwise.
+    single = [mod.trimmed_row(_row(id="m-0", slug="s" * (9 * 1024 * 1024)))]
+    monkeypatch.setattr(mod, "fetch_game_markets", lambda **_k: {"status": "ok", "markets": single})
     result = mod.persist_game_slate()
     assert result["status"] == "too_large_to_persist"
     assert result["written"] is False
     assert "exceeds" in result["reason"]
+
+
+def test_an_ordinarily_oversized_slate_is_TRIMMED_rather_than_refused(monkeypatch, tmp_path):
+    """The behaviour change, stated as its own test. Before the date budget, a
+    slate past the ceiling wrote NOTHING and the previous artifact went stale --
+    so an over-large slate and an unreachable venue produced the same outcome.
+    Now the far dates are dropped, the near ones are stored, and the drop is
+    reported."""
+    from syndicate.features.shared import refresh_state_store
+
+    written: dict = {}
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+    monkeypatch.setattr(refresh_state_store, "write_json_file",
+                        lambda _p, payload: written.update(payload))
+    rows = (
+        [mod.trimmed_row(_row(id=f"n-{i}", slug="n" * 900,
+                              gameStartTime="2026-08-25T23:10:00Z")) for i in range(6000)]
+        + [mod.trimmed_row(_row(id=f"f-{i}", slug="f" * 900,
+                                gameStartTime="2026-09-30T23:10:00Z")) for i in range(6000)]
+    )
+    monkeypatch.setattr(mod, "fetch_game_markets", lambda **_k: {"status": "ok", "markets": rows})
+    result = mod.persist_game_slate()
+
+    assert result["status"] == "ok", result
+    assert result["written"] is True
+    assert result["dropped_for_size"] > 0, result
+    # The NEAR date survived and the far one is what was cut.
+    assert "2026-09-30" in result["dropped_by_date"], result
+    assert result["kept_through"] <= "2026-09-30"
+    assert result["bytes"] <= mod._KEYVALUE_CEILING_BYTES
+
+
+# ==========================================================================
+# The slate must be bounded by DATE, not by page offset
+# ==========================================================================
+
+
+def _slate_row(slug, date, **kw):
+    row = {
+        "slug": slug,
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "outcomes": ["Over", "Under"],
+        "outcomePrices": ["0.52", "0.48"],
+        "line": 7.5,
+        "gameStartTime": f"{date}T23:10:00Z" if date else None,
+        "orderPriceMinTickSize": 0.01,
+        "minimumTradeQty": 5,
+        "orderable": True,
+    }
+    row.update(kw)
+    return row
+
+
+def test_the_slate_drops_the_FURTHEST_games_not_an_arbitrary_page(monkeypatch):
+    """THE TRUNCATION THAT COST A REAL ORDER.
+
+    `fetch_markets` stopped after `max_pages` and set `truncated=True`, so
+    whatever sat past 30 pages was gone -- and the venue orders by id, not by
+    kickoff. Measured 2026-08-25 2:59:40 PM Central:
+
+        POLYMARKET_US_SLATE_WRITE status=ok count=13243 bytes=3920483
+          truncated=True
+
+    At 3:55 PM an order on tonight's Reds @ Giants total rejected with
+    `OrderBuildError: market_unresolved_for_position`, slug
+    `tsc-mlb-cin-sf-2026-08-25-7pt5` -- a real market on a game we were
+    trading, missing from our copy for no reason connected to the game.
+
+    Ordering the cut by date makes it MEAN something: tonight's slate is what
+    we trade, and a game eight days out is what we can afford to lose.
+    """
+    rows = (
+        [_slate_row(f"far-{i}", "2026-09-12") for i in range(20)]
+        + [_slate_row("tonight-cin-sf", "2026-08-25")]
+        + [_slate_row(f"far2-{i}", "2026-09-13") for i in range(20)]
+    )
+    # A budget that cannot hold everything, so something MUST be dropped.
+    import json
+
+    one = len(json.dumps(rows[0])) + 1
+    result = mod._slate_within_budget(rows, budget=one * 5)
+
+    kept = {r["slug"] for r in result["markets"]}
+    assert "tonight-cin-sf" in kept, result["dropped_by_date"]
+    assert result["dropped"] > 0
+    # And the drop is REPORTED by date, never silent.
+    assert set(result["dropped_by_date"]) <= {"2026-09-12", "2026-09-13"}, result
+
+
+def test_a_row_with_no_game_time_is_kept_not_quietly_discarded():
+    """A row we cannot RANK is not a row we may drop first. Dropping what
+    cannot be ordered is how a real market disappears without appearing in any
+    count -- the same absence/failure confusion, wearing a sorting key."""
+    rows = [_slate_row("undated", None), _slate_row("far", "2026-09-30")]
+    import json
+
+    result = mod._slate_within_budget(rows, budget=len(json.dumps(rows[0])) + 1)
+    assert [r["slug"] for r in result["markets"]] == ["undated"]
+    assert result["dropped_by_date"] == {"2026-09-30": 1}
+
+
+def test_a_slate_that_fits_drops_nothing_and_says_so():
+    rows = [_slate_row(f"s-{i}", "2026-08-25") for i in range(30)]
+    result = mod._slate_within_budget(rows)
+    assert result["dropped"] == 0
+    assert result["dropped_by_date"] == {}
+    assert len(result["markets"]) == 30
+
+
+def test_the_slate_pages_far_enough_to_reach_the_end_of_the_block(monkeypatch):
+    """`max_pages` defaulted to 30, so at limit=500 the fetch stopped at 15,000
+    rows whether or not the venue had more -- and it did. The repo measured
+    `games=7585, truncated=False` on 2026-08-24; a day later it was 13,243 and
+    truncated. The catalogue outgrew the constant, which is the same failure as
+    `find_first_game_offset`'s hardcoded ceiling one function over.
+    """
+    import inspect
+
+    signature = inspect.signature(mod.persist_game_slate)
+    assert signature.parameters["max_pages"].default >= 100, (
+        "a page budget this small cannot reach the end of a growing catalogue"
+    )
