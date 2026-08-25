@@ -100,6 +100,25 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # not "capture is broken".
     "*_source/source_artifacts/data/live_lens/live_momentum_*.jsonl",
     "*_source/source_artifacts/data/live_lens/momentum_events_*.json",
+    # `#558`: the CFBD team registry. NOT a model output -- a resolver INPUT,
+    # and the first one on this list that a WORKER needs and cannot get from a
+    # checkout. Measured 2026-08-25T21:03:35Z on live-odds-worker, the first
+    # live OddsAPI call ever made for NCAAF:
+    #
+    #     [ncaaf_odds] EVENTS events=111 teams=184 resolved=0 unresolved=184
+    #
+    # Every team, including "Alabama Crimson Tide". `_alias_map()` builds from
+    # this CSV; `_csv_rows()` returns [] for a missing file, so an absent
+    # registry and a registry that resolves nothing are the same silence.
+    #
+    # The asymmetry that hid it: this file IS git-tracked, so `bootstrap_data_root`
+    # seeds it onto WEB's disk (`copied=0 unchanged=403`), and every local test
+    # passed because a checkout has it. live-odds-worker has never run that
+    # bootstrap -- zero log lines in seven days -- so its data root holds only
+    # what the artifact sync delivers, and this matched none of the 155 patterns.
+    # Allowlisting PERMITS the transfer; `fetch_ncaaf_oddsapi_game_lines.py`
+    # pulls it explicitly before use, because nothing schedules it.
+    "*_source/source_artifacts/data/processed/team_registry/*.csv",
     "*_source/source_artifacts/data/processed/recommendations*.json",
     "*_source/source_artifacts/data/processed/recommendations*.csv",
     "*_source/source_artifacts/data/processed/props_recommendations*.json",
