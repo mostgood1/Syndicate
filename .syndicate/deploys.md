@@ -29084,3 +29084,87 @@ treatment.
    registration count.
 
 **Not yet read.** Deploy triggered 20:16:09Z / 20:16:16Z.
+
+---
+
+## 2026-08-25T20:31Z — `93de25cc4` — web (+ live-odds-worker on `7ae8a1fed`, refresh-worker pending)
+
+**What.** PR #61: NCAAF gets a market. `scripts/fetch_ncaaf_oddsapi_game_lines.py`
+captures h2h/spreads/totals into the SHARED `book_quotes` log, wired into the
+odds sweep as `ncaaf_game_lines_oddsapi`; `ncaaf/cards.py` reads OddsAPI first
+with CFBD as fallback and now emits the `betting` block the shared adapter
+needs; `ncaaf/game_projections.py` puts SmartSim 2.0 on the Layer 1 board with
+its measured loss to the close attached to `edge_unavailable_reason`. Plus the
+NFL autorun chain reorder (`fantasy artifact` moved BELOW its own injury and
+news producers) and 7 tests that were red on `main`.
+
+**Cumulative, checked rather than assumed.** Every SHA live on the three
+services at trigger time — `2108449` (web), `461ee74b` + `a41f8e2d` (both
+workers) — is an ancestor of `93de25cc4`. This is the check the 2026-08-15
+silent revert failed.
+
+**Deploys.**
+- web `srv-d88ahvrbc2fs73eodu30`, `dep-da6vne61egvs73espihg`, **live 20:36:44Z**,
+  commit `93de25cc4`.
+- live-odds-worker `srv-d91dpertqb8s73co8lt0`, `dep-da6vp726iojc738027og`,
+  triggered 20:35:40Z. **Render deployed `7ae8a1fed`, NOT the `93de25cc4` I
+  passed as `commitId`** — main had moved 2 minutes earlier and the API took the
+  branch tip. `7ae8a1fed` contains `93de25cc4` (verified), so nothing was
+  reverted, but do not assume `commitId` pins a SHA: both of today's deploys
+  went out on whatever the tip was at trigger time.
+- refresh-worker `srv-d91dpertqb8s73co8ls0`: **I never deployed it, and it did
+  not need me to.** I was holding it at 20:36:29Z on a preflight-equivalent read
+  showing `run_mlb_daily_sim_job.py` (pid 86, launched 20:21:47Z) and
+  `generate_smartsim2_nfl_projections.py --season 2026 --week 1` (pid 530) —
+  the second being the exact process `#324` was written after killing. While I
+  held that claim, a peer session's `dep-da6vog95efls7386hc8g` (triggered
+  20:34:09Z, `trigger=api`) went **live 20:37:48Z on `7ae8a1fed`**, which
+  contains `93de25cc4`. So refresh-worker carries this change already, and a
+  deploy from me would now be redundant — preflight rule 2.
+
+  **Both jobs I was protecting died anyway**, in that deploy: instance
+  `-8rf9h` → `-t6mqn`, and a fresh 5-game MLB sim (pid 71) launched at
+  ~20:38:44Z. This is the SECOND time today the same thing happened — the
+  20:16Z deploy killed a 9-game sim the same way (`-dkfk6` → `-8rf9h`).
+
+  **The claim did not stop it and could not have.** `deploy_claim.py` +
+  `deploy-guard.py` gate `Bash|PowerShell`; an MCP `trigger_deploy` never
+  reaches the hook. That gap was already recorded here on 2026-08-23 and is now
+  measured a second time, from the other side: I took the claim first, held it
+  the whole time, and a peer deployed through it. Holding a claim is currently
+  no evidence that nobody else will deploy your service.
+
+**Preflight could not be run as written.** No `RENDER_API_KEY` in this
+session's container (`deploy_preflight.py` exits on it), so its actual check —
+enumerate `ALL_PROCESS_MEMORY` and look at the list — was run by hand through
+the Render MCP logs API. live-odds-worker was deployed on a reading of
+`process_count: 3` (worker + shell + one defunct) at 20:35:20Z.
+
+**verify:** THE READING THAT MATTERS IS NOT ON EITHER WORKER YET, and the
+reason is the finding of this deploy:
+
+```
+[live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED date=2026-08-25
+  kept=mlb,wnba,soccer
+  dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+```
+
+`SYNDICATE_ACTIVE_SPORTS` is `mlb,wnba,soccer` on the live services. The CODE's
+season window (`ops_refresh.py:1150`) has NCAAF active since Aug 15 and I read
+that first and would have concluded the sweep covers it. **It does not.** The
+env var is checked before the calendar, so `ncaaf_game_lines_oddsapi` is
+unreachable in production no matter what is deployed. NOT flipped here: adding
+`ncaaf` starts spending OddsAPI credits on a new sport, which is a user
+decision.
+
+One reading that IS in: web served
+`GET /api/ops/artifacts/stream?path=ncaaf_source/tracking/book_quotes/2026-08-25.jsonl`
+→ **404** at 20:37:50Z, to a worker on `Python-urllib/3.11`. The consumer for
+this exact path is live and already asking for it; only the producer is gated
+off. That is the `#547` allowlist claim confirmed from the other end.
+
+**Open obligation.** Nothing here has touched real OddsAPI — no live call has
+ever been made from this work. `python scripts/fetch_ncaaf_oddsapi_game_lines.py --report`
+on live-odds-worker (one credit, no writes) is still owed, and `UNRESOLVED_TEAMS`
+in its output is the one failure mode this design cannot tell apart from "no
+book quoted it".
