@@ -574,6 +574,21 @@ repo or in production. *Confirms it:* one link from the user.
 one-off is unknown, because prefixes are not counted anywhere.
 *Confirms it:* a per-prefix counter, or a link.
 
+**§5.5 IS CLOSED, and by someone else.** `teams_match` now resolves all ten
+MLB tri-codes checked (`cle laa chc az min ath phi sea cin sf`) against
+`7b8f67b04`; the four failures recorded at `a41f8e2d` were fixed by another
+session the same evening. The gap was real when measured and is real no longer.
+
+**§5.3 HAS NOW BEEN RUN THREE TIMES IN PRODUCTION AND IS STILL UNANSWERED**
+(2026-08-25 21:47Z, 22:01Z, 22:17Z; full working in `.syndicate/deploys.md`).
+The current blocker is not the instrument: with segment markets correctly
+excluded, our slate carries **no full-game MLB spread** for any of the 18 board
+fixtures — only first-five-innings. NFL wk1 (2026-08-27) is the next slate that
+should carry full-game spreads. **Whether the missing full-game MLB spreads are
+absent at the venue or dropped by our own `_slate_within_budget` trim
+(13,233 → 7,936 markets) is UNMEASURED**, and is exactly this document's
+central distinction applied to itself.
+
 **H. The `venue_quote_adapters` "1 of 5 spread rows" measurement.** It
 contradicts §5.1's 5-of-5. Its five rows are not reproduced in any log line
 this audit could find. *Confirms it:* the ladder-vs-board comparison in §5.4,

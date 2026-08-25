@@ -29502,3 +29502,76 @@ blocked on a merge permission, so the next deploy carrying it will fire the
 hook automatically. **Unset once a clean reading exists.**
 
 **Claim released.**
+
+---
+
+## 2026-08-25 22:13–22:18Z — live-odds-worker `7b8f67b04` — the instrument is CORRECT now, and the answer is that MLB cannot answer it
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `86f40ce4cf44d122`
+**user instruction:** "merge 72 and deploy again".
+
+**What shipped.** `7b8f67b04` (main tip = PR #72's segment filter + the sibling
+Kalshi audit #66 + others, all ancestors). No `render.yaml`. Live **22:16:xxZ**.
+
+**verify: the reading.**
+
+```
+[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date=2026-08-25
+  slate_markets=7936 board_rows=1290
+  board_spread_rows=55 board_fixtures_keyed=18 board_rows_unkeyable=0
+  fixtures=0 agree_home=0 disagree=0 rate=None
+  no_board_fixture=1052 segment_skipped=74
+  verdict='UNDECIDED: n=0 < min_sample=30'
+                                  -- live-odds-worker, 2026-08-25T22:17:48.985Z
+```
+
+**PR #72 worked, and it cost every vote there was.** 74 segment slugs skipped,
+and `fixtures` went **7 -> 0**. So all seven pairings in the previous run were
+`f5` first-five-innings markets, including the two that "agreed" — the
+`rate=0.2857` of 22:01:52Z was **100% artefact**, not 71% artefact.
+
+**WHY THE ZERO, and this one is NOT an instrument bug.** The obvious suspect
+was the tri-code alias gap this audit recorded as §5.5 (`chc`/`az`/`stl`/`phx`
+returning False from `teams_match`). **Checked against `7b8f67b04`: 10 of 10
+tri-codes for the five paired fixtures now resolve** — another session has
+fixed the alias map since `a41f8e2d`, which also closes §5.5. Aliases are why
+those f5 rows paired at all.
+
+**So the finding is: our copy of the slate carries FIRST-FIVE-INNINGS spreads
+for MLB and no FULL-GAME spreads for any of the 18 board fixtures.** With
+segments correctly excluded, there is nothing left to vote.
+
+**Say this the right way round.** *Our slate* has no full-game MLB spread —
+NOT *Polymarket does not list one*. Those are the two claims this whole audit
+exists to keep apart, and the slate is now **trimmed**: 13,233 markets at
+20:34Z, 7,936 now, because `_slate_within_budget` (`f08930f32`, another
+session) drops the far dates to fit the keyvalue ceiling. **Whether full-game
+MLB spreads are absent at the venue or dropped by our own budget rule is
+UNMEASURED**, and the two need opposite responses. An earlier reading points at
+the venue rather than the trim: `POLYMARKET_UNMATCHED` at 20:16:08Z offered
+`chc-az@-2.5, -1.5, +1.5, +2.5` from the join's index, which refuses segments —
+so full-game MLB spreads existed in our slate two hours ago. That is
+suggestive, not conclusive, and it is not resolved here.
+
+**STILL UNANSWERED after three deploys: whether a Polymarket spread's sign
+belongs to the slug's `<home>` or `<away>`.** `spread_side_needs_verified_team_mapping`
+stays. Three runs, three different reasons for no answer — a dateless board
+index, a segment contamination, and now an empty full-game population. **Each
+of the first two would have produced a CONFIDENT WRONG ANSWER if the counters
+added along the way had not existed.**
+
+**What would actually answer it**, in preference order: (1) an NFL or soccer
+slate — both carry full-game spreads and neither is `f5`-shaped, and NFL wk1 is
+2026-08-27; (2) several MLB days pooled; (3) determining whether the budget
+trim is eating full-game spreads, which is a different bug and belongs to
+whoever owns `_slate_within_budget`.
+
+**Flag `SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` LEFT SET, deliberately.**
+The instrument is now correct and costs one artifact read plus one line per
+boot; the first slate that carries full-game spreads answers the question with
+no further deploy. **Unset it once a verdict other than UNDECIDED appears.**
+
+**Claim released.** Deploy discipline note: a sibling deploy (`e79841573`, the
+Kalshi audit #66) was **in flight** when this one was ready at 22:12Z. It was
+allowed to finish (live 22:10:36Z) before triggering, rather than cancelling it
+— the failure mode recorded two entries above, not repeated.
