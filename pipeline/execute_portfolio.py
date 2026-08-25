@@ -723,9 +723,44 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
     from syndicate.features.shared.polymarket_us_markets import GAME_SLATE_ARTIFACT
     from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
 
-    slug = str(getattr(request, "venue_ticker", "") or "").strip()
+    # `venue_ticker` CARRIES A DICT FOR THIS VENUE, NOT A STRING.
+    #
+    # MEASURED 2026-08-25 14:57:34Z, on what would have been the first two
+    # Polymarket orders ever placed:
+    #
+    #   LIVE_ORDER status=failed venue=polymarket
+    #     ticker={'slug': 'tsc-mlb-bal-stl-2026-08-25-8pt5', 'tick_size': 0.005,
+    #             'minimum_trade_qty': 0.01}
+    #     error='OrderBuildError: market_unresolved_for_position'
+    #
+    # `venue_scope.py:190` stamps `scoped_row["venue_ticker"] =
+    # ticker_resolver(row)` VERBATIM. Kalshi's resolver returns a string ticker;
+    # `polymarket_ticker_resolver` returns a dict, because `order_body` REFUSES
+    # to infer `tick_size` and `minimum_trade_qty` and the resolver is the only
+    # thing holding them. So this field legitimately holds two shapes.
+    #
+    # `str(a_dict)` is TRUTHY, so the `POLYMARKET_NO_SLUG` guard below never
+    # fired -- the stringified dict was carried forward and looked up in the
+    # slate as if it were a slug, matched nothing, and returned None. Every
+    # Polymarket order has failed this way; none has ever been placeable.
+    #
+    # Read as a dict FIRST, falling back to the string form: a caller that
+    # stamps a bare slug (a hand-built request, an older plan) still works, and
+    # nothing about that path changes.
+    raw_ticker = getattr(request, "venue_ticker", None)
+    ticker_tick = ticker_min_qty = None
+    if isinstance(raw_ticker, Mapping):
+        slug = str(raw_ticker.get("slug") or "").strip()
+        ticker_tick = raw_ticker.get("tick_size")
+        ticker_min_qty = raw_ticker.get("minimum_trade_qty")
+    else:
+        slug = str(raw_ticker or "").strip()
     if not slug:
-        print("[execute_portfolio] POLYMARKET_NO_SLUG -- venue_ticker unset", flush=True)
+        print(
+            "[execute_portfolio] POLYMARKET_NO_SLUG -- venue_ticker unset or"
+            f" carries no slug (type={type(raw_ticker).__name__})",
+            flush=True,
+        )
         return None
 
     try:
@@ -833,7 +868,20 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any] | None:
         flush=True,
     )
 
-    return (slug, price, row.get("orderPriceMinTickSize"), row.get("minimumTradeQty"))
+    # ARTIFACT FIRST, ticker dict as the fallback. The slate row is the venue's
+    # own current answer; the values carried on `venue_ticker` were captured at
+    # commit time by `polymarket_ticker_resolver` and are the same fields one
+    # refresh earlier. `order_body` refuses to INFER either, so having a second
+    # source for them is the difference between an order and a refusal when the
+    # artifact row is thin.
+    tick = row.get("orderPriceMinTickSize")
+    min_qty = row.get("minimumTradeQty")
+    return (
+        slug,
+        price,
+        tick if tick is not None else ticker_tick,
+        min_qty if min_qty is not None else ticker_min_qty,
+    )
 
 
 def _status_of(request: OrderRequest) -> str | None:

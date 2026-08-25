@@ -278,6 +278,44 @@ def _as_float(value: Any) -> float | None:
     return None if parsed != parsed else parsed
 
 
+def _key_line(value: Any) -> tuple[bool, float | None]:
+    """A line for the resolver key: `(ok, line)`.
+
+    **A MONEYLINE HAS NO LINE, AND REFUSING IT MADE KALSHI h2h UNPLACEABLE.**
+
+    MEASURED 2026-08-25 14:57:34Z, on a live Kalshi order:
+
+        h2h · Texas Rangers @ Chicago White Sox  +108
+        OrderBuildError: no_live_price: None
+
+    The trailing `None` is `request.venue_ticker`. Both key functions did
+    `float(match.get("line"))` inside a `try` and returned None on TypeError, so
+    an h2h -- whose line legitimately IS None -- was never indexed, no ticker was
+    ever stamped, and `_kalshi_price_for` refused for want of one. Not a data
+    gap: the market was matched and priced, and only the key could not hold it.
+
+    None is now a VALUE in the key rather than a refusal, which is safe here for
+    a reason that was not true before `#547`: the tuple leads with `event_id`, so
+    `(evt, "h2h", "", None, "home")` names exactly one bet. Without the game it
+    would have been the collision that stamped a BAL@STL slug on a CIN@SF row.
+
+    An UNPARSEABLE line is still a refusal, and that distinction is the point: a
+    market that has no line and a market whose line we could not read are
+    different facts, and only the first is safe to key.
+
+    Returns `(ok, line)`. `ok=False` means the caller must refuse -- NOT a NaN
+    sentinel, which was the first attempt here and is wrong: a module-level
+    `float("nan")` is ONE object, and a dict lookup compares by identity before
+    equality, so two rows with unreadable lines would have matched each other.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return (True, None)
+    try:
+        return (True, float(value))
+    except (TypeError, ValueError):
+        return (False, None)
+
+
 def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
     """The identity the join matched on. Shared by both resolvers ON PURPOSE.
 
@@ -315,9 +353,8 @@ def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str] | N
     event_id = str(match.get("board_event_id") or "").strip()
     if not event_id:
         return None
-    try:
-        line = float(match.get("line"))
-    except (TypeError, ValueError):
+    ok, line = _key_line(match.get("line"))
+    if not ok:
         return None
     return (
         event_id,
@@ -339,9 +376,8 @@ def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
     event_id = str(row.get("event_id") or "").strip()
     if not event_id:
         return None
-    try:
-        line = float(row.get("line"))
-    except (TypeError, ValueError):
+    ok, line = _key_line(row.get("line"))
+    if not ok:
         return None
     raw = str(row.get("market") or "").strip().lower()
     return (
