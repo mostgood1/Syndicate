@@ -27480,3 +27480,79 @@ Left open rather than asserted.
 **Board still rows=10** (`beyond_quote_age=4870` of 5075 considered). The
 reprice is reaching more rows; the freshness ceiling is still what empties the
 board.
+
+### 2026-08-25T01:37:01Z — Fresh arb scan run post-fix: matched_games still 0, but for a NEW, distinct, already-in-progress-elsewhere reason
+
+User asked to run a fresh arb scan and confirm matched games, after the
+KXMLBGAME fix (PR #57) shipped. Re-armed the boot probe
+(`SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT=1`,
+`SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_DATE=2026-08-24`), redeployed
+(`dep-da6f19gu01pc73frvdug`, live 01:36:05Z).
+
+**Result:** `{'status': 'ok', 'kalshi_discovery': 'ok', 'kalshi_moneylines_resolved':
+0, 'kalshi_refusals': {'event_no_match': 90}, 'polymarket_moneylines_resolved':
+764, 'polymarket_refusals': {'not_two_sided:2v1': 1}, 'matched_games': 0,
+'join_refusals': {}, 'opportunities': []}`
+
+**The fix from PR #57 is fully confirmed working** -- this is a real,
+independent second confirmation, not a repeat of the earlier local replay.
+`CLASSIFY_TALLY` now shows `'KXMLBGAME': {'moneyline': 90}` (was completely
+absent from the tally before the fix). `BOS_MIA_SEARCH` now finds the actual
+`KXMLBGAME` tickers directly: `KXMLBGAME-26AUG241840BOSMIA-BOS` "Boston wins",
+`-MIA` "Miami wins", plus the next two nights' games in the same series
+(26AUG25, 26AUG26). Kalshi's own catalogue-title vocabulary gap is closed.
+
+**But `kalshi_moneylines_resolved` is STILL 0 -- for a NEW, downstream, and
+already-named reason: `event_no_match` on all 90.** Read `resolve_kalshi_
+moneylines()` (`kalshi_polymarket_arb.py:135`): every correctly-classified
+moneyline market calls `match_event_blob(blob, games, sport=sport)` against
+`games_by_sport`, built from `pipeline.intelligence_state.read_layer2_
+shortlist(selected_date)`'s own `board_rows`. All 90 markets failed that match
+-- meaning Syndicate's OWN board (not Kalshi's catalogue, not this scan's
+classification) is either missing MLB rows entirely or its rows don't line up
+with Kalshi's resolved event blob for this date.
+
+**This is almost certainly the SAME board-join/board-starvation cluster
+another lane is actively fixing in parallel, right now, tonight** -- the
+concurrent deploy that raced mine twice
+(`dep-da6f4b8u01pc73fsaso0`/`dep-da6f5g942hec73csfk8g`, commit `18569e8149`,
+"Give the Polymarket join a date, and teach it the board's home/away")
+measured the SAME symptom from the Polymarket side of the identical join
+architecture at 01:23:04Z the same night:
+`POLYMARKET_BOARD_JOIN board_rows=10 matched=0` -- ten board rows total, most
+refused for date-stamping and role-vs-club-name reasons. `board_rows=10` is
+consistent with `event_no_match` on every one of 90 Kalshi moneyline markets:
+if the board is only carrying ~10 rows total (all sports), the odds that any
+of them is the specific MLB game a given Kalshi ticker names are low, and this
+scan's own diagnostic gives no per-market detail finer than the reason name.
+Not independently re-measured with a board_rows count from THIS module's own
+code path (`resolve_kalshi_moneylines` has no such print) -- inferred from the
+other lane's same-night, same-symptom measurement on the same underlying
+`read_layer2_shortlist` data, not confirmed directly here.
+
+**Not a regression from tonight's fix.** Before PR #57, all 90 markets were
+invisible upstream of `classify_market` and never reached this join step at
+all (`kalshi_refusals={}`, nothing attempted). After PR #57, all 90 correctly
+reach the join and are refused there instead. The refusal moved one stage
+downstream, which is progress, not a new problem introduced by the fix --
+this is the same "the fix works, and it just exposed the next real gap"
+pattern this whole investigation has followed all evening (unmapped_series ->
+event_no_match -> ...).
+
+**OWED, not chased further here:** whether the other lane's concurrent fix
+(`18569e8149`, live as of this scan's deploy) resolves `event_no_match` too
+is unverified -- that commit targets Polymarket-side date/role gates in
+`polymarket_board_join.py`, a different join than `resolve_kalshi_moneylines`'s
+`match_event_blob`/`event_blob_from_ticker` (Kalshi-side), so it may or may not
+share the actual root cause (a thin/stale board) even though the SYMPTOM
+matches. A follow-up scan once the board itself is confirmed non-thin (a
+`layer2_shortlist` row count check, not inferred from a sibling module's log
+line) is the next real verification step for `matched_games`, not done in
+this session.
+
+Probe flag off, redeploy raced twice by the other lane's own concurrent
+pushes before settling live at `dep-da6f5g942hec73csfk8g` (01:44:48Z, env vars
+are service-level so the flag-off change carried through regardless of which
+commit won the race) -- confirmed via absence of any further
+`[kalshi_polymarket_arb]` boot-probe log line on that boot. Deploy claim
+(refresh-worker, token `be62d278e004443f`) released.
