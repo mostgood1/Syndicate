@@ -1638,6 +1638,33 @@ def _run_execution_tick() -> None:
         ]
         # `[None]` preserves the previous unscoped call exactly: live mode
         # refuses without a scope, and paper mode wants the unrestricted plan.
+        # WHAT WOULD BUILD, BEFORE ANYTHING IS PLACED. Never submits -- see
+        # `verify_order_paths`. Reported every cycle because the alternative
+        # was learning the order path's state one slate at a time: six
+        # sequential defects on 2026-08-25, each hidden behind the one before
+        # it, each costing a real position we intended to hold. A per-market
+        # verdict turns that into one reading.
+        try:
+            from pipeline.execute_portfolio import verify_order_paths
+
+            checked = verify_order_paths(
+                central_today_iso(), venues=tuple(venues) or ("kalshi", "polymarket")
+            )
+            for venue_name, detail in (checked.get("venues") or {}).items():
+                print(
+                    f"[live_odds_worker] ORDER_PATH venue={venue_name}"
+                    f" status={detail.get('status')}"
+                    f" positions={detail.get('positions')}"
+                    f" markets={detail.get('markets')}"
+                    f" examples={detail.get('examples')}",
+                    flush=True,
+                )
+        except Exception as exc:  # noqa: BLE001 -- a diagnostic must never block a placer
+            print(
+                f"[live_odds_worker] ORDER_PATH_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         for venue in venues or [None]:
             result = run_execution(central_today_iso(), venue_scope=venue)
             print(

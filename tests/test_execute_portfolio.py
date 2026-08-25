@@ -1216,3 +1216,90 @@ def test_a_polymarket_build_error_does_not_charge_the_daily_budget():
     from syndicate.features.shared.polymarket_us_orders import OrderBuildError
 
     assert OrderBuildError.venue_contacted is False
+
+
+# --------------------------------------------------------------------------
+# The order-path verifier: confirmation on demand, without spending anything
+# --------------------------------------------------------------------------
+
+
+def test_the_verifier_reports_which_market_families_would_build(monkeypatch):
+    """The interesting question is never "did one order fail" but "which whole
+    market family cannot transact". `totals` failing on every row while `h2h`
+    succeeds is a different fact from a scattering of misses, and a per-order
+    log cannot show it."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch)
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 0.55,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]} if venue == "polymarket" else {"positions": []})
+
+    report = runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+    markets = report["venues"]["polymarket"]["markets"]
+    assert markets["h2h"]["would_build"] == 1
+
+
+def test_the_verifier_cannot_place_an_order(monkeypatch):
+    """A verifier that could spend money is not a verifier. Nothing in it
+    constructs a submitter, so an adapter that would send must never be
+    reached even when the resolve succeeds."""
+    import pipeline.execute_portfolio as runner
+    from syndicate.features.shared import polymarket_us_orders
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch)
+
+    def explode(*a, **kw):
+        raise AssertionError("the verifier submitted an order")
+
+    monkeypatch.setattr(polymarket_us_orders, "submit_order", explode)
+    monkeypatch.setattr(runner, "_venue_submitter", explode)
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 0.55,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]})
+
+    runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+
+
+def test_the_verifier_names_the_exception_rather_than_saying_failed(monkeypatch):
+    """A verifier that reported "failed" would reproduce the counter this whole
+    session has been prying data out of."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch, markets=[_polymarket_row(prices=("0.95", "0.05"))])
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 104.0,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]})
+
+    report = runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+    verdicts = report["venues"]["polymarket"]["markets"]["h2h"]
+    assert "_SlippageExceeded" in verdicts, verdicts
+
+
+def test_an_empty_plan_is_reported_as_such_not_as_success(monkeypatch):
+    """"Nothing to place" and "everything would build" must not read alike."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": []})
+    report = runner.verify_order_paths("2026-08-24", venues=("kalshi",))
+    assert report["venues"]["kalshi"]["status"] == "no_positions"

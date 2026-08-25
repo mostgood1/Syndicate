@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Sequence
 from typing import Any, Mapping
 
 from syndicate.features.shared.execution_ledger import (
@@ -1107,6 +1108,114 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
         min_qty if min_qty is not None else ticker_min_qty,
         outcome_index,
     )
+
+
+def verify_order_paths(
+    selected_date: str, *, venues: Sequence[str] = ("kalshi", "polymarket")
+) -> dict[str, Any]:
+    """Would today's plan actually BUILD an order at each venue? Never submits.
+
+    WHY THIS EXISTS. Until now the only way to learn whether the order chain
+    works was to wait for the portfolio to produce a position, let it reach a
+    real venue, and read the failure. That is how every defect on
+    2026-08-25 was found -- wrong game, dict-as-slug, wrong side, unreadable
+    venue, totals unresolvable, an inert slippage guard -- each one hidden
+    behind the one before it, each costing a slate to discover, and every one
+    of those positions was a bet we intended to hold and did not.
+
+    A chain of six sequential single-shot discoveries is not a testing
+    strategy. This runs the SAME resolve and body-build path the placer uses,
+    against the SAME production artifacts, for every position in the plan, and
+    reports what would happen -- so the next defect is found in one reading
+    rather than one slate.
+
+    IT CANNOT PLACE AN ORDER. There is no submit function anywhere in this
+    function and no adapter is constructed; the venue is contacted only by the
+    reads the resolvers already do. That is what makes it safe to run on every
+    cycle rather than only when someone is watching.
+
+    Grouped by (venue, market, verdict) because the interesting question is
+    never "did one order fail" but "which whole market family cannot transact".
+    `totals` failing on every row and `h2h` succeeding on every row is a
+    different fact from a scattering of misses, and a per-order log cannot show
+    it.
+    """
+    from pipeline.portfolio_commit import read_portfolio_plan
+
+    from pipeline import portfolio_commit
+
+    normalized = str(selected_date or "").strip()[:10]
+    out: dict[str, Any] = {"date": normalized, "venues": {}}
+
+    for venue in venues:
+        summary: dict[str, dict[str, int]] = {}
+        examples: dict[str, str] = {}
+
+        def note(market: str, verdict: str, detail: str = "") -> None:
+            bucket = summary.setdefault(market or "unknown", {})
+            bucket[verdict] = bucket.get(verdict, 0) + 1
+            if detail and verdict not in examples:
+                examples[f"{market}|{verdict}"] = detail[:160]
+
+        try:
+            plan = portfolio_commit.read_portfolio_plan_for_venue(normalized, venue) or {}
+        except Exception as exc:
+            out["venues"][venue] = {"status": "plan_unreadable", "reason": f"{type(exc).__name__}: {exc}"}
+            continue
+
+        positions = plan.get("positions")
+        if not isinstance(positions, list) or not positions:
+            out["venues"][venue] = {"status": "no_positions", "markets": {}}
+            continue
+
+        for position in positions:
+            if not isinstance(position, Mapping):
+                continue
+            request = _order_from_position(position, normalized, venue)
+            if request is None:
+                note(str(position.get("market") or ""), "incomplete_position")
+                continue
+            market = str(getattr(request, "market", "") or "")
+            try:
+                if venue == "polymarket":
+                    resolved = _polymarket_resolve_market(request)
+                    if not resolved:
+                        note(market, "market_unresolved")
+                        continue
+                    slug, price, tick, min_qty, index = resolved
+                    from syndicate.features.shared.polymarket_us_orders import order_body
+
+                    order_body(
+                        request, market_slug=slug, price_dollars=price,
+                        tick_size=tick, minimum_trade_qty=min_qty, outcome_index=index,
+                    )
+                    note(market, "would_build", f"{slug} @ {price}")
+                else:
+                    ticker = _venue_ticker_of(position)
+                    if not ticker:
+                        note(market, "no_venue_ticker")
+                        continue
+                    price = _kalshi_price_for(request)
+                    if price is None:
+                        note(market, "no_live_price", str(ticker))
+                        continue
+                    from syndicate.features.shared.kalshi_orders import order_body
+
+                    order_body(request, price_dollars=price)
+                    note(market, "would_build", f"{ticker} @ {price}")
+            except Exception as exc:
+                # The venue's own reason, by TYPE and message. A verifier that
+                # reported "failed" would reproduce the counter this whole
+                # session has been prying data out of.
+                note(market, f"{type(exc).__name__}", str(exc))
+
+        out["venues"][venue] = {
+            "status": "ok",
+            "positions": len(positions),
+            "markets": summary,
+            "examples": examples,
+        }
+    return out
 
 
 def _status_of(request: OrderRequest) -> str | None:
