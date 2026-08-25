@@ -1142,47 +1142,152 @@ def find_first_game_offset(
     }
 
 
+# Pages per `fetch_markets` call while sweeping. The sweep keeps only game
+# rows, so peak memory is one chunk of raw rows rather than the whole
+# collection -- ~5,000 instead of ~23,000.
+_SCAN_CHUNK_PAGES = 10
+
+
 def fetch_game_markets(
-    *, limit: int = 500, max_pages: int = 30, start_offset: int | None = None,
+    *, limit: int = 500, max_pages: int = 200, start_offset: int | None = None,
 ) -> dict[str, Any]:
-    """The joinable game slate: find where it starts, then page to the end.
+    """Every game market in the open catalogue. THERE IS NO BOUNDARY TO FIND.
 
-    `start_offset=None` locates the boundary with `find_first_game_offset`
-    rather than trusting a constant -- see that function for why 16000 is not
-    hardcoded.
+    --------------------------------------------------------------------------
+    WHY THIS NO LONGER BINARY-SEARCHES, AND WHY THAT WAS NEVER GOING TO WORK
+    --------------------------------------------------------------------------
+
+    This used to call `find_first_game_offset` and page from what it returned,
+    on the premise that the `closed=false` ordering is `[futures][games][empty]`.
+    **Probed directly 2026-08-25T22:54:25Z, that premise is false:**
+
+        12,578   GAMES 5/5 SPREAD   asc-nfl-ne-cle-2026-08-27-pos-1pt5
+        16,771   GAMES 5/5 TOTAL    tsc-nfl-pit-buf-2026-08-27-1q-5pt5
+        18,867   GAMES 5/5 TOTAL    tsc-nfl-cin-phi-2026-08-28-4q-17pt5
+        19,915   futures (golf)     tec-dpwt-britmast-2026-08-27-r1l-jorlof
+        20,754   futures (LPGA)     tec-lpga-fmcham-2026-08-27-r3l-hyecho
+        20,964   BOUNDARY           tec-f1-pigp-2026-09-06-cons-alpine
+        22,964   GAMES 5/5 PROP     astatc-mlb-lad-atl-2026-08-25-xi
+
+    A band of golf/F1 futures sits ABOVE a large block of game markets. Ids are
+    assigned by creation time and the venue creates futures and game markets
+    continuously, so the collection is interleaved and **no single boundary
+    exists**. The search converged into that upper futures band and everything
+    below it -- ~8,400 rows, including NFL full-game spreads two days before
+    week 1 -- was never fetched. `games` read 7,936 against 13,255 hours
+    earlier, on a scan reporting `truncated=False`.
+
+    Nothing caught it because `monotonic` only checks offsets the search itself
+    probed, so a boundary inside a futures band above the block satisfies it.
+    **A guard whose true value carries no information is not a guard**, and it
+    was the only check on the premise. Full working: `todo.md` `#559`,
+    `deploys.md` 2026-08-25T22:54:25Z.
+
+    So this SWEEPS. Correct by construction: a market is kept because it IS a
+    game market, never because of where it sits. The cost is ~46 pages instead
+    of ~17 on a free API, and the byte consequence is already handled one
+    function down by `_slate_within_budget`, which orders by game date and has
+    5.99MB of headroom it has never touched.
+
+    CHUNKED, so peak memory is one chunk of raw rows rather than the whole
+    collection. `fetch_markets` accumulates every row it reads before filtering;
+    sweeping 23,000 rows through it in one call would triple this worker's
+    retained set for no reason, on a service that has been OOM-killed before.
+
+    `start_offset` is kept for callers that genuinely want a partial sweep, and
+    is REPORTED so a partial read can never be mistaken for a complete one. The
+    default is 0 -- the whole collection.
     """
-    if start_offset is None:
-        located = find_first_game_offset()
-        if located.get("status") != "ok" or located.get("first_game_offset") is None:
-            return {
-                "status": "error",
-                # The SAMPLED MAP, not just a status word. `no_game_offset: ok`
-                # was the old rendering and it is self-contradictory: it named
-                # the failure and then quoted a status that says fine. What
-                # anyone debugging needs is which offsets showed what.
-                "reason": (
-                    f"no_game_offset: {located.get('reason') or located.get('status')}"
-                    f" sampled={located.get('sampled')} probes={located.get('probes')}"
-                ),
-                "markets": [],
-            }
-        start_offset = int(located["first_game_offset"])
-        boundary_probes = located.get("probes")
-        monotonic = located.get("monotonic")
-    else:
-        boundary_probes, monotonic = 0, None
+    swept_from = 0 if start_offset is None else int(start_offset)
+    offset = swept_from
+    kept: list[Mapping[str, Any]] = []
+    pages = scanned = futures_skipped = duplicate_ids = 0
+    game_types: set[str] = set()
+    starts: list[str] = []
+    reached_end = False
+    payload_keys: list[str] | None = None
 
-    result = fetch_markets(limit=limit, max_pages=max_pages, offset=start_offset)
-    if result.get("status") != "ok":
-        return result
-    result["start_offset"] = start_offset
-    result["boundary_probes"] = boundary_probes
-    result["boundary_monotonic"] = monotonic
-    # Keep only the joinable rows here -- this function's whole purpose.
-    result["markets"] = [m for m in (result.get("markets") or [])
-                         if m.get("sportsMarketTypeV2")
-                         and "FUTURE" not in str(m.get("sportsMarketTypeV2")).upper()]
-    return result
+    while pages < int(max_pages):
+        chunk = fetch_markets(
+            limit=limit,
+            max_pages=min(_SCAN_CHUNK_PAGES, int(max_pages) - pages),
+            offset=offset,
+        )
+        if chunk.get("status") != "ok":
+            if not kept:
+                return chunk
+            # A failure PART WAY THROUGH is a partial sweep, not a slate. Say so
+            # by name rather than returning what we happened to reach, which
+            # would read as a complete catalogue one row short.
+            return {
+                "status": "partial",
+                "reason": f"sweep_failed_at_offset_{offset}: {chunk.get('reason')}",
+                "markets": list(kept),
+                "count": len(kept),
+                "swept_from": swept_from,
+                "scanned_rows": scanned,
+                "pages": pages,
+                "truncated": True,
+            }
+
+        chunk_pages = int(chunk.get("pages") or 0)
+        scanned += int(chunk.get("total_rows") or 0)
+        duplicate_ids += int(chunk.get("duplicate_ids") or 0)
+        payload_keys = chunk.get("payload_keys") or payload_keys
+
+        # `fetch_markets` returns rows already trimmed and filtered to sporting.
+        for row in chunk.get("markets") or []:
+            if is_game_market_row(row):
+                kept.append(row)
+                market_type = sports_market_type(row)
+                if market_type:
+                    game_types.add(market_type)
+                start = _game_start(row)
+                if start:
+                    starts.append(start)
+            else:
+                futures_skipped += 1
+
+        pages += chunk_pages
+        offset += chunk_pages * int(limit)
+        if not chunk.get("truncated"):
+            # A short page: the end of the collection, which is the ONLY
+            # condition that makes this sweep complete.
+            reached_end = True
+            break
+        if chunk_pages == 0:
+            break
+
+    starts.sort()
+    return {
+        "status": "ok",
+        "markets": list(kept),
+        "count": len(kept),
+        "games": len(kept),
+        "futures": futures_skipped,
+        "game_types": sorted(game_types),
+        "total_rows": scanned,
+        "scanned_rows": scanned,
+        "pages": pages,
+        # TRUE means the sweep hit its page budget before the end of the
+        # collection -- i.e. there is more and we did not read it. False means
+        # a short page ended it, which is the only complete read.
+        "truncated": not reached_end,
+        "duplicate_ids": duplicate_ids,
+        "orderable": sum(1 for r in kept if r.get("orderable")),
+        "game_start_min": starts[0] if starts else None,
+        "game_start_max": starts[-1] if starts else None,
+        # Where the sweep began. 0 unless a caller asked for a partial read --
+        # reported so a partial can never read as a complete one.
+        "swept_from": swept_from,
+        "start_offset": swept_from,
+        # The boundary search is GONE from this path. Kept as explicit nulls so
+        # the worker's log line renders, and so anyone grepping for the old
+        # fields finds them saying "not applicable" rather than nothing.
+        "boundary_probes": None,
+        "boundary_monotonic": None,
+        "payload_keys": payload_keys,
+    }
 
 
 def probe_v1_sports_routes() -> dict[str, Any]:

@@ -1255,31 +1255,127 @@ def test_an_empty_page_sends_the_search_DOWN_not_up(monkeypatch):
     assert result["first_game_offset"] == 8000, result
 
 
-def test_fetch_game_markets_starts_at_the_located_boundary(monkeypatch):
-    _partitioned(monkeypatch, 16000)
-    result = mod.fetch_game_markets(limit=500, max_pages=2)
+def test_fetch_game_markets_sweeps_from_zero_not_from_a_boundary(monkeypatch):
+    """The premise `[futures][games][empty]` is false, so nothing is located.
+
+    Builds its own responder rather than reusing `_partitioned`, which serves
+    one row per page -- fine for offset-jumping probes, but a one-row page IS a
+    short page, which correctly ends a sweep at the first call.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    future = _row(id="f1", category="sports",
+                  sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")
+    game = _row(id="g1", category="sports",
+                sportsMarketTypeV2="SPORTS_MARKET_TYPE_SPREAD",
+                gameStartTime="2026-08-28T23:30:00Z")
+    pages = [[future], [game], []]
+
+    def _responder(_m, url, **_k):
+        index = int(url.split("offset=")[1].split("&")[0])
+        return {"markets": pages[index] if index < len(pages) else []}
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request", _responder)
+
+    result = mod.fetch_game_markets(limit=1, max_pages=10)
     assert result["status"] == "ok"
-    assert result["start_offset"] == 16000
-    # And it returns only joinable rows -- the function's whole purpose.
-    assert result["markets"]
-    assert all("FUTURE" not in str(m.get("sportsMarketTypeV2")) for m in result["markets"])
+    assert result["swept_from"] == 0
+    assert result["start_offset"] == 0
+    # The boundary search is gone from this path and says so, rather than
+    # leaving a stale number that reads as a real reading.
+    assert result["boundary_probes"] is None
+    assert result["boundary_monotonic"] is None
+    # It began at 0, in the futures, and kept going to the game above them.
+    assert [str(m.get("id")) for m in result["markets"]] == ["g1"]
+    assert result["futures"] == 1
+    assert result["truncated"] is False
+
+def test_a_game_block_BELOW_a_futures_band_is_found(monkeypatch):
+    """REGRESSION FOR `#559`, measured in production 2026-08-25T22:54:25Z.
+
+    The real ordering is interleaved -- a golf/F1 futures band sits ABOVE a
+    large block of game markets:
+
+        12,578  GAMES   asc-nfl-ne-cle-2026-08-27-pos-1pt5
+        20,754  futures tec-lpga-fmcham-2026-08-27-r3l-hyecho
+        20,964  BOUNDARY (converged here)
+        22,964  GAMES   astatc-mlb-lad-atl-2026-08-25-xi
+
+    The binary search converged into the upper band and ~8,400 rows below it
+    were never fetched, including NFL full-game spreads two days before week 1.
+    A sweep finds both blocks because a market is kept for BEING a game market,
+    never for where it sits.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    lower_game = _row(id="480471", slug="asc-nfl-ne-cle-2026-08-27-pos-1pt5",
+                      category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_SPREAD",
+                      gameStartTime="2026-08-28T00:00:00Z")
+    upper_future = _row(id="510334", slug="tec-lpga-fmcham-2026-08-27-r3l-hyecho",
+                        category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")
+    upper_game = _row(id="516878", slug="astatc-mlb-lad-atl-2026-08-25-xi",
+                      category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_PROP",
+                      gameStartTime="2026-08-25T23:15:00Z")
+    # [games][futures][games] -- one page each, then a short page to end it.
+    pages = [[lower_game], [upper_future], [upper_game], []]
+
+    def _fake(_method, url, *_a, **_k):
+        offset = int(url.split("offset=")[1].split("&")[0])
+        index = offset // 1
+        return {"markets": pages[index] if index < len(pages) else []}
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request", _fake)
+
+    result = mod.fetch_game_markets(limit=1, max_pages=10)
+    assert result["status"] == "ok"
+    slugs = {str(m.get("slug")) for m in result["markets"]}
+    # BOTH blocks, not just the one above where a boundary search would land.
+    assert "asc-nfl-ne-cle-2026-08-27-pos-1pt5" in slugs, "the block BELOW the futures band was dropped"
+    assert "astatc-mlb-lad-atl-2026-08-25-xi" in slugs
+    assert result["futures"] == 1
+    assert result["games"] == 2
 
 
-def test_fetch_game_markets_refuses_when_no_boundary_exists(monkeypatch):
+def test_a_catalogue_of_only_futures_is_an_ANSWER_not_an_error(monkeypatch):
+    """It used to refuse with `no_game_offset`. A venue listing no game market
+    is a real, reportable state -- and refusing made it indistinguishable from
+    a scan that failed, which is how the outage at 20:21Z read as `ok`."""
     from syndicate.features.shared import polymarket_us_auth as auth
 
     monkeypatch.setattr(auth, "credentials_present", lambda: True)
     monkeypatch.setattr(auth, "signed_request", lambda *_a, **_k: {"markets": [
         _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_FUTURE")]})
-    result = mod.fetch_game_markets()
-    assert result["status"] == "error"
-    assert "no_game_offset" in result["reason"]
+    result = mod.fetch_game_markets(limit=500, max_pages=3)
+    assert result["status"] == "ok"
+    assert result["games"] == 0
+    assert result["markets"] == []
+    assert result["futures"] >= 1
 
 
-# ==========================================================================
-# Persisting the slate so the fan-in can read an artifact, not the API
-# ==========================================================================
+def test_hitting_the_page_budget_reports_truncated(monkeypatch):
+    """`truncated` must mean "there is more and we did not read it". A sweep
+    that stops early while reporting completeness is the exact shape of the bug
+    this replaced."""
+    from syndicate.features.shared import polymarket_us_auth as auth
 
+    game = _row(category="sports", sportsMarketTypeV2="SPORTS_MARKET_TYPE_SPREAD",
+                gameStartTime="2026-08-28T00:00:00Z")
+
+    calls = {"n": 0}
+
+    def _always_full(_method, _url, *_a, **_k):
+        calls["n"] += 1
+        return {"markets": [dict(game, id=str(calls["n"]))]}
+
+    monkeypatch.setattr(auth, "credentials_present", lambda: True)
+    monkeypatch.setattr(auth, "signed_request", _always_full)
+
+    result = mod.fetch_game_markets(limit=1, max_pages=3)
+    assert result["status"] == "ok"
+    assert result["truncated"] is True
+    assert result["pages"] == 3
 
 def test_the_slate_is_written_with_its_own_fetched_at(monkeypatch, tmp_path):
     """An artifact republished unchanged gets a fresh mtime while its contents
