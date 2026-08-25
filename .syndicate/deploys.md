@@ -27888,12 +27888,44 @@ change, and must NOT be read as either a pass or a failure of it.
    zero MLB quotes. Soccer works on the same code (290 quotes, 42s,
    `no_side_in_key:8`). MLB's shard shape is the gap, not the parser.
 
-2. **WNBA has NO live model at all** — a producer gap, newly named:
-   `LIVE_GAMELINE_JOIN sport=wnba index=0 considered=184 projected=0
-   withheld=184 why={'no_live_gameline_projection': 166}`, and
-   `LIVE_PROJECTION_JOIN sport=wnba reason=live-lens snapshot for wnba carries
-   no liveProps (producer not wired)`. Index size ZERO with 184 rows asking is
-   exactly the distinction this line was added to make, and it took one build.
+2. ~~**WNBA has NO live model at all**~~ **— WRONG, CORRECTED SAME NIGHT.**
+
+   I wrote that off `LIVE_GAMELINE_JOIN sport=wnba index=0 considered=184`.
+   **WNBA HAS a live lens and it was building the whole time**: live-odds-worker
+   logged `[live_lens_loop] TICK_COMPLETE results={'mlb': True, 'wnba': True,
+   'soccer': True}` at 04:24:08Z — three minutes after the reading, same slate.
+   The user said so and the log agrees.
+
+   What is conditional is the STAMP (`wnba/cards.py:1381`):
+
+       source = "live_projection" if (is_live and live_margin is not None
+                                      and elapsed_min is not None) else "pregame"
+
+   `live_gameline_from_lens` accepts only `live_projection` for WNBA, so any ONE
+   of those three failing publishes a healthy snapshot that this join correctly
+   refuses — and it looked identical to no producer at all. The third is a hole
+   this repo already documents at `wnba/cards.py:1345`: the clock BLANKS between
+   periods, `elapsed_min` goes None, and the lane reverts to `pregame` for the
+   entire break (observed 2026-08-21 IND@DAL, ~20 minutes). Two WNBA games at
+   04:21Z, plausibly mid-break — **unconfirmed, which is exactly the point.**
+
+   **This is the sixth time tonight I read an unattributed zero as a missing
+   component.** The zero was real; the cause was invented. The instrument I had
+   just added was not fine-grained enough to stop me — it printed the zero and
+   not its reason, which is the same gap one level down.
+
+   `index_why=` now carries `games_in_snapshot`, `indexed`,
+   `skipped_no_team_names`, `skipped_no_accepted_lane`, and the discriminator:
+   `sources_seen`, every stamp OBSERVED rather than only the accepted ones. A
+   producer that is not wired shows `{}`. One that is wired and between periods
+   shows `{'pregame': N}`. Those were the same number and are now different
+   sentences.
+
+   The PROP half is a separate and still-open gap: `LIVE_PROJECTION_JOIN
+   sport=wnba reason=live-lens snapshot for wnba carries no liveProps (producer
+   not wired)`. That names `liveProps`, a different key from `gameLens`, and is
+   not contradicted by any of the above — but after tonight it is carried as
+   UNVERIFIED, not as fact.
 
 3. **NFL has a real team-alias gap.** `GAME_STATE_JOIN sport=nfl chips=29
    rows_matched=141 unmatched=['Seattle Seahawks', 'Tennessee Titans', 'Los
