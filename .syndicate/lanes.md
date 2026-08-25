@@ -2118,6 +2118,30 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - STAYS OPEN until a LIVE run against real OddsAPI confirms the team-name
     join (`--report`, `UNRESOLVED_TEAMS`) and the capture is seen on the
     worker.
+- **SECOND CROSS-LANE TAKE 2026-08-25, UNDER EXPLICIT USER INSTRUCTION ("fix
+  those 6 too") — `scripts/run_refresh_worker.py`, and this one is a PRODUCTION
+  BEHAVIOUR CHANGE.** `#554`; `state.md` `[nfl-autorun-chain-order]`.
+  - That file was ALREADY this repo's one contested file before I touched it:
+    `check_lane_invariants.py` reports it held by BOTH
+    `exchange-markets-api-integration` and `portfolio-ledger-service-split`.
+    I did not create that contest and have not resolved it.
+  - **Scope: the autorun `elif` blocks were REORDERED and four position comments
+    corrected. No branch logic, gating, condition or body was touched.**
+    Reverting is re-ordering the same blocks back.
+  - Why it was not left alone: `build_nfl_fantasy_projection_artifact.py`
+    consumes injury availability and news, and its branch sat ABOVE both
+    producers. One branch fires per tick, so the artifact was being built from
+    yesterday's data. Three of the six red tests were the alarm for exactly this
+    and had been unreadable because two of them could not both pass.
+  - **The priority call is UNMEASURED and the owners should confirm it.** It
+    decides which NFL job wins a tick first. It was made on
+    producer-before-consumer grounds — the rule the chain's own comments already
+    cite — not on a measurement, because the effect cannot be measured from a
+    checkout.
+  - Also fixed here, all test-side: three tests still steering the pbp read with
+    `DATA_ROOT` after `#441` moved `_pbp_path` off it, and five
+    `mocked_popen.assert_not_called()` sites that assert about the whole PROCESS
+    (green on Windows, red on Linux via `ldconfig`).
 
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

@@ -4242,6 +4242,54 @@ builder returns **51**. Different loaders; the checklist is measuring something
 the board does not use.
 
 
+## [nfl-autorun-chain-order] THE NFL AUTORUN CHAIN RAN THE FANTASY ARTIFACT ABOVE ITS OWN INPUTS — FIXED IN CODE, NOT DEPLOYED `[measured 2026-08-25, lane ncaaf-oddsapi-game-lines]`
+
+Detail: `todo.md` `#554`. Two `learnings.md` rules filed the same day.
+
+**THE DEFECT.** `build_nfl_fantasy_projection_artifact.py` reads injury
+availability (`use_injury_availability`) and the news layer.
+`_launch_autorun_nfl_fantasy_artifact` sat ABOVE both
+`_launch_autorun_nfl_injuries_fetch` and `_launch_autorun_nfl_news_capture` in
+the autorun `elif` chain. **Only one branch fires per tick** (`#341`), so on a
+busy slate the artifact was built from yesterday's injuries and news. Order now:
+
+    reconciliation -> evaluation_settlement -> pbp -> injuries -> roster
+      -> depth -> news -> fantasy artifact -> mlb -> ...
+
+Starvation is NOT reopened: everything now above the artifact is daily or
+six-hourly gated, so the NFL block needs ~6 winning ticks/day out of ~2,880.
+`#341`'s starvation came from sitting below HIGH-FREQUENCY branches, still
+forbidden by the window assertion in `test_nfl_fantasy_artifact_autorun.py`.
+
+**FOUR POSITION COMMENTS WERE STALE AND TWO CLAIMED THE SAME SLOT** — the
+fantasy artifact and the injuries fetch both read "THIRD, directly behind the pbp
+fetch"; the pbp branch said "SECOND" while sitting third. All rewritten as
+RELATIONSHIPS. **Ordinals in an ordered chain are wrong the moment anyone inserts
+above them, and nothing reports it.**
+
+**THE TESTS WERE FIGHTING EACH OTHER, WHICH IS WHY THIS SURVIVED.**
+`test_nfl_injuries_fetch_autorun`'s `index <= 2` had been UNSATISFIABLE alongside
+the same file's `injuries == pbp + 1` ever since `evaluation_settlement` was
+inserted above the pbp fetch. Two assertions that cannot both pass are not an
+alarm; the pair read as pre-existing noise and the real inversion hid behind it.
+Absolute indices replaced with relative bounds throughout.
+
+**SEVEN TESTS WERE RED ON `origin/main`**, six reported plus one found while
+verifying. Three unrelated causes: this one, plus three tests still steering the
+pbp read with `DATA_ROOT` after `#441` deliberately moved `_pbp_path` off it, plus
+a platform-dependent `mocked_popen.assert_not_called()` (on Linux
+`ctypes.util.find_library` shells out to `/sbin/ldconfig -p`; green on the Windows
+dev box, red here — and `find_library` caches, so 4 of 5 identical sites were
+passing on test ORDER alone).
+
+**CROSS-LANE AND UNMEASURED.** `scripts/run_refresh_worker.py` is claimed by TWO
+OPEN lanes and was already this repo's one contested file. The edit reorders
+existing `elif` blocks and corrects comments — no branch logic, gating or body
+touched; reverting is re-ordering the same blocks back. The priority call
+(which NFL job wins a tick first) was made on PRODUCER-BEFORE-CONSUMER grounds,
+not measured, because the effect cannot be measured from a checkout. **The
+owners should confirm it.** Nothing is deployed; `autoDeploy` is off.
+
 ## [ncaaf-oddsapi-lines] NCAAF GAME LINES — OddsAPI capture BUILT AND PROVEN OFF-LINE, NOT DEPLOYED AND NEVER RUN LIVE `[measured 2026-08-25, lane ncaaf-oddsapi-game-lines]`
 
 **Read `[ncaaf-readiness-2026]` first — this closes its stated blocker in CODE

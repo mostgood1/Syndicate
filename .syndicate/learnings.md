@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 552 rules `[generated]`
+## Index — 554 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5920,3 +5920,66 @@ reports that. Three for three.
 - Cost: none shipped -- all three were caught pre-commit. Roughly an hour, and
   every minute of it was spent inside the gap that the counted reachability test
   is designed to expose.
+
+### 2026-08-25 — FORBIDDEN: never pin a position in an ordered chain with an ABSOLUTE index, in a comment or an assertion. Both go stale silently, and two of them can become mutually unsatisfiable
+
+- What we believed: `run_refresh_worker.py`'s autorun `elif` chain was ordered as
+  documented. Four branches carried comments naming their slot ("SECOND, DIRECTLY
+  BEHIND RECONCILIATION", "THIRD, directly behind the pbp fetch"), and three
+  tests pinned absolute indices (`injuries <= 2`, `fantasy position <= 3`,
+  `roster <= 4`).
+- What was actually true: **every one of those ordinals was wrong, and two
+  different branches claimed the same slot.** `_launch_autorun_nfl_fantasy_artifact`
+  and `_launch_autorun_nfl_injuries_fetch` BOTH said "THIRD, directly behind the
+  pbp fetch"; the pbp branch itself said "SECOND" while sitting third. Worse than
+  cosmetic: the fantasy artifact CONSUMES injuries and news
+  (`use_injury_availability`), and both producers sat BELOW it, so on a busy
+  slate it built projections from yesterday's data. And because
+  `_launch_autorun_evaluation_settlement` had been inserted above the pbp fetch,
+  the injuries file's `index <= 2` directly contradicted its own
+  `injuries == pbp + 1` — two assertions in one file that could never both pass.
+- How we found out: a `-k` filter widened to include `nfl` surfaced six failures
+  that had been red on `origin/main`. Reading them as a set — rather than fixing
+  each — showed the ordinals were the common cause and that the tests were
+  fighting each other, not reporting a recent break.
+- The rule going forward: **in an ordered chain, pin RELATIONSHIPS, never
+  ordinals or indices.** In comments: "AHEAD OF EVERY JOB THAT CONSUMES IT", not
+  "SECOND". In tests: `x == producer_index + 1`, or "nothing that is not a
+  producer sits between X and Y", never `index <= 3`. A relative assertion
+  survives an insertion above it; an absolute one is wrong from that moment and
+  wrong silently. And when two assertions cannot both pass, that pair has
+  stopped being an alarm — say so and fix the conflict rather than muting either.
+  **Producer before consumer is the tiebreak** when two jobs want the same slot;
+  it is not a preference, it is the only ordering that does not feed one of them
+  stale input.
+- Cost: unknown but real and ongoing — the NFL fantasy artifact ran above its own
+  injury and news inputs for as long as those branches have existed, and three
+  tests that would have caught it were red for an unrelated, unsatisfiable reason
+  and were being read as pre-existing noise.
+
+### 2026-08-25 — FORBIDDEN: never assert `mock.assert_not_called()` on a shared primitive like `subprocess.Popen`. It asserts about the whole PROCESS, not your code, and the answer is platform- and order-dependent
+
+- What we believed: `test_refresh_worker.py`'s
+  `mocked_popen.assert_not_called()` checked that the soccer weekly autorun hands
+  off through `launch_refresh_run` instead of spawning a job itself.
+- What was actually true: it asserted that **nothing anywhere in the process
+  touched `subprocess.Popen`**, and on Linux that is false for a reason unrelated
+  to the worker — `ctypes.util.find_library` shells out to `/sbin/ldconfig -p`
+  while a dependency loads. Two calls, both `['/sbin/ldconfig', '-p']`, recorded
+  before `main()` decided anything. The Windows dev box these tests were written
+  on has no `ldconfig`, so it passed there and failed here. `find_library` also
+  caches, so only the FIRST such test in a fresh process saw it: four of the five
+  identical assertions were passing on test ORDER, not on soundness.
+- How we found out: instrumenting `Popen` to record its arguments rather than
+  trusting the count. The command list named the culprit immediately; the
+  assertion's own failure message ("Expected 'Popen' to not have been called")
+  could never have.
+- The rule going forward: **assert on the CALLS YOU MEAN, not on the absence of
+  all calls to a shared primitive.** Filter the recorded calls to the ones your
+  code would make -- here, any command referencing the repo's own scripts -- and
+  assert that list is empty. A global `assert_not_called` on `Popen`, `open`,
+  `requests.get` or similar is a test of the interpreter's whole process and will
+  eventually be decided by an import you did not write.
+- Cost: one test red on Linux for as long as this repo has been developed on
+  Windows, plus four more that were one test-ordering change away from the same
+  failure. It was being counted as pre-existing breakage rather than diagnosed.

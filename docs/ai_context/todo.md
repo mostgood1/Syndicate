@@ -225,6 +225,64 @@ Likely fix for whoever owns it: `min-width: 0` is already there, so this wants
 smaller `font-size` at strip scale, or `auto-fit`/`minmax(72px, 1fr)` so tiles
 may wrap to a second row instead of truncating.
 
+### `#554` — **The NFL autorun `elif` chain ran the fantasy artifact ABOVE its own injury and news inputs. Reordered; 7 red tests green.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, user request ("fix those 6 too")
+
+Seven tests were red on `origin/main` (six reported, a seventh found while
+verifying). Three unrelated root causes; **one of them was a live defect, not a
+stale test.**
+
+**1. THE DEFECT — producer after consumer.** `build_nfl_fantasy_projection_artifact.py`
+reads injury availability (`use_injury_availability`) and the news layer, yet
+`_launch_autorun_nfl_fantasy_artifact` sat ABOVE `_launch_autorun_nfl_injuries_fetch`
+and `_launch_autorun_nfl_news_capture` in the chain. Only one branch fires per
+tick (`#341`), so on a busy slate the artifact was built from yesterday's
+injuries and news. Chain now:
+
+    pbp -> injuries -> roster -> depth -> news -> fantasy artifact
+
+Starvation is not reopened: everything now above the artifact is daily or
+six-hourly gated, so the whole NFL block needs ~6 winning ticks a day out of
+~2,880. `#341`'s starvation came from sitting below HIGH-FREQUENCY branches,
+which the window assertion still forbids.
+
+**Four position comments were stale, and TWO CLAIMED THE SAME SLOT** — the
+fantasy artifact and the injuries fetch both said "THIRD, directly behind the pbp
+fetch". All rewritten as relationships rather than ordinals.
+
+**2. Three tests still steered the pbp read with `DATA_ROOT`.** `#441`
+deliberately moved `_pbp_path` OFF `DATA_ROOT` (measured: zero plays, degenerate-run
+guard refused, artifact 2.36 days stale at ~107 relaunches/day), so patching it
+stopped working and the tests silently reached for the REAL repo path. Now set
+`SYNDICATE_NFL_SOURCE_ROOT`, which steers the real resolver to the tmp tree the
+fixtures already write — better coverage than the stub it replaces. One of them
+carried a "still hermetic … never the real pbp_2025.csv" comment that was FALSE.
+
+**3. `mocked_popen.assert_not_called()` was platform-dependent.** It asserts
+nothing in the PROCESS touched `subprocess.Popen`; on Linux
+`ctypes.util.find_library` shells out to `/sbin/ldconfig -p`. Green on the
+Windows dev box, red here. `find_library` caches, so 4 of the 5 identical sites
+passed on test ORDER alone. All five narrowed to "no Popen call referencing the
+repo's own scripts".
+
+**Absolute position assertions removed.** `injuries <= 2` had been
+UNSATISFIABLE alongside the same file's `injuries == pbp + 1` since
+`evaluation_settlement` was inserted — two assertions that cannot both pass are
+not an alarm. Replaced with relative bounds plus the constraint that was never
+pinned: injuries must precede the artifact that consumes it. Same for the
+artifact's `position <= 3`.
+
+**CROSS-LANE, AND THIS ONE IS A PRODUCTION BEHAVIOUR CHANGE.**
+`scripts/run_refresh_worker.py` is claimed by TWO OPEN lanes
+(`exchange-markets-api-integration`, `portfolio-ledger-service-split`) — it was
+already the repo's one contested file before this. The edit is confined to
+reordering existing `elif` blocks and correcting comments; no branch logic,
+gating or body was touched, and reverting is re-ordering the same blocks back.
+**The owners should confirm the priority call**: it decides which NFL job wins a
+tick first, and it was made on producer-before-consumer grounds rather than
+measured, because the effect cannot be measured from a checkout.
+
+Nothing is deployed. `autoDeploy` is off.
+
 ### `#545` — **The soccer chip build moves to the WORKER and widens to the board's horizon: 72 uncovered fixtures -> 0.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
 `#541`'s telemetry found it and `#541`'s diagnosis named it: the chip set was a

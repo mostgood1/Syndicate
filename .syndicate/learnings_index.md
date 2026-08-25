@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 552 rules `[generated]`
+## Index — 554 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 101**
+**FORBIDDEN — 103**
 
 - [2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-…](#2026-08-22-forbidden-never-read-a-service_updated-deploy-as-shipping-code-an-env-var-change-restarts-the-service-on-the-commit-it-is-already-running)
 - [2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the sam…](#2026-08-22-forbidden-never-name-a-datastore-setting-and-a-service-env-var-by-the-same-store-without-saying-which-surface-a-4-minute-refresh-worker-outage-came-from-that-ambiguity)
@@ -81,6 +81,8 @@
 - [2026-08-25 — FORBIDDEN: never accept a backtest's "0 rows graded" as a result. An analy…](#2026-08-25-forbidden-never-accept-a-backtests-0-rows-graded-as-a-result-an-analysis-script-that-cannot-find-its-inputs-must-exit-non-zero-not-report-a-clean-zero)
 - [2026-08-25 — FORBIDDEN: never state an allowlist/config gap as "0 entries for X" when t…](#2026-08-25-forbidden-never-state-an-allowlistconfig-gap-as-0-entries-for-x-when-the-entries-are-wildcards-count-what-matches-not-what-mentions-x)
 - [2026-08-25 — FORBIDDEN: a reachability test must assert a COUNT over the whole surface,…](#2026-08-25-forbidden-a-reachability-test-must-assert-a-count-over-the-whole-surface-and-be-run-before-the-correctness-tests-two-silent-breaks-in-one-feature-neither-visible-to-a-value-assertion)
+- [2026-08-25 — FORBIDDEN: never pin a position in an ordered chain with an ABSOLUTE index…](#2026-08-25-forbidden-never-pin-a-position-in-an-ordered-chain-with-an-absolute-index-in-a-comment-or-an-assertion-both-go-stale-silently-and-two-of-them-can-become-mutually-unsatisfiable)
+- [2026-08-25 — FORBIDDEN: never assert `mock.assert_not_called()` on a shared primitive l…](#2026-08-25-forbidden-never-assert-mockassert_not_called-on-a-shared-primitive-like-subprocesspopen-it-asserts-about-the-whole-process-not-your-code-and-the-answer-is-platform--and-order-dependent)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
