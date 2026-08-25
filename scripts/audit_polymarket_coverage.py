@@ -164,6 +164,7 @@ def spread_sign_test(
     board: list[Mapping[str, Any]],
     *,
     min_sample: int = 30,
+    selected_date: str = "",
 ) -> dict[str, Any]:
     """Does the slug's `pos`/`neg` sign follow the board's HOME spread?
 
@@ -183,10 +184,19 @@ def spread_sign_test(
     from syndicate.features.shared.team_aliases import teams_match as alias_match
 
     # The board's own signed HOME spread per fixture.
+    #
+    # COUNTED, because the first production run returned a zero this dict could
+    # not explain. "the board has no spread rows", "they carry no date" and
+    # "the venue lists no spreads" are three different facts that all render as
+    # `fixtures=0`, and a line that cannot tell them apart sends the reader to
+    # the wrong one -- which is the whole subject of the audit this serves.
     home_line: dict[tuple[str, str, str, str], float] = {}
+    board_spread_rows = 0
+    skipped_board_rows = 0
     for row in board:
         if str(row.get("market") or "").strip().lower() not in {"spreads", "spread"}:
             continue
+        board_spread_rows += 1
         side = str(row.get("side") or "").strip().lower()
         try:
             line = float(row.get("line"))
@@ -201,9 +211,25 @@ def spread_sign_test(
         elif side != "home":
             continue
         sport = str(row.get("sport") or "").strip().lower()
-        date = str(row.get("selected_date") or row.get("date") or "").strip()
+        # THE CALLER'S DATE IS THE FALLBACK, AND IN PRACTICE IT DOES THE WORK.
+        #
+        # MEASURED IN PRODUCTION 2026-08-25T21:47:20Z, the first run of this
+        # test: `fixtures=0 no_board_fixture=1167`. Every one of 1,167 spread
+        # slugs failed to pair, because this dict came out EMPTY -- shortlist
+        # rows carry neither `selected_date` nor `date` (`_board_rows_for_join`
+        # returns them verbatim from `read_layer2_shortlist` and nothing stamps
+        # one on), so `all(key)` was False for every row.
+        #
+        # `join_polymarket_to_board` already documents this exact trap and
+        # already solves it the same way. Row first, so a board that DOES carry
+        # its own date still wins and a multi-date board is not collapsed onto
+        # one caller's date.
+        date = str(
+            row.get("selected_date") or row.get("date") or selected_date or ""
+        ).strip()
         key = (sport, date, str(row.get("home_team") or ""), str(row.get("away_team") or ""))
         if not all(key):
+            skipped_board_rows += 1
             continue
         home_line.setdefault(key, line)
 
@@ -265,6 +291,10 @@ def spread_sign_test(
             "refused; do not ship a mapping on this."
         )
     return {
+        # The three numbers that tell a real zero from a broken one.
+        "board_spread_rows": board_spread_rows,
+        "board_fixtures_keyed": len(home_line),
+        "board_rows_unkeyable": skipped_board_rows,
         "fixtures_compared": n,
         "agree_with_home_sign": agree,
         "disagree": disagree,
@@ -352,11 +382,16 @@ def run_spread_audit_if_enabled() -> dict[str, Any] | None:
             )
             return {"status": "refused", "reason": board_reason}
 
-        result = spread_sign_test(slate, board, min_sample=min_sample)
+        result = spread_sign_test(
+            slate, board, min_sample=min_sample, selected_date=selected_date
+        )
         print(
             f"[audit_polymarket_coverage] SPREAD_SIGN_AUDIT status=ok date={selected_date}"
             f" slate_markets={len(slate)} board_rows={len(board)}"
             f" slate_fetched_at={fetched_at}"
+            f" board_spread_rows={result['board_spread_rows']}"
+            f" board_fixtures_keyed={result['board_fixtures_keyed']}"
+            f" board_rows_unkeyable={result['board_rows_unkeyable']}"
             f" fixtures={result['fixtures_compared']}"
             f" agree_home={result['agree_with_home_sign']}"
             f" disagree={result['disagree']}"
@@ -400,7 +435,7 @@ def main() -> int:
         report["board_reason"] = board_reason
         if board:
             report["spread_sign_test"] = spread_sign_test(
-                slate, board, min_sample=args.min_sample
+                slate, board, min_sample=args.min_sample, selected_date=args.date
             )
 
     if args.json:

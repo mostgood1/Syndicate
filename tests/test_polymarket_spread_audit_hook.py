@@ -147,3 +147,82 @@ def test_an_away_board_row_is_normalised_to_home_before_comparing():
         spread_sign_test(slate, away_row, min_sample=1)["agreement_rate"]
         == spread_sign_test(slate, home_row, min_sample=1)["agreement_rate"]
     )
+
+
+# --------------------------------------------------------------------------
+# THE PRODUCTION ZERO, PINNED
+# --------------------------------------------------------------------------
+
+
+def test_a_dateless_board_row_still_pairs_via_the_callers_date():
+    """MEASURED IN PRODUCTION 2026-08-25T21:47:20Z: `fixtures=0 no_board_fixture=1167`.
+
+    Shortlist rows carry neither `selected_date` nor `date` -- `_board_rows_for_join`
+    returns them verbatim from `read_layer2_shortlist` and nothing stamps one on.
+    Requiring the row to carry its own date made the board index come out empty,
+    so all 1,167 spread slugs fell through as unpairable and the run reported a
+    zero that said nothing about Polymarket at all.
+
+    `join_polymarket_to_board` documents this exact trap and solves it with a
+    caller-supplied fallback. This pins that the audit does the same.
+    """
+    slate = [{"slug": "asc-mlb-sd-nyy-2026-08-25-neg-1pt5",
+              "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD"}]
+    dateless = [{
+        "market": "spreads", "side": "home", "line": -1.5, "sport": "mlb",
+        "home_team": "New York Yankees", "away_team": "San Diego Padres",
+    }]
+    assert spread_sign_test(slate, dateless, min_sample=1)["fixtures_compared"] == 0
+    with_fallback = spread_sign_test(
+        slate, dateless, min_sample=1, selected_date="2026-08-25"
+    )
+    assert with_fallback["fixtures_compared"] == 1
+    assert with_fallback["board_rows_unkeyable"] == 0
+
+
+def test_the_rows_own_date_still_wins_over_the_callers():
+    """A multi-date board must not be collapsed onto one caller's date."""
+    slate = [{"slug": "asc-mlb-sd-nyy-2026-08-26-neg-1pt5",
+              "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD"}]
+    tomorrow = [{
+        "market": "spreads", "side": "home", "line": -1.5, "sport": "mlb",
+        "selected_date": "2026-08-26",
+        "home_team": "New York Yankees", "away_team": "San Diego Padres",
+    }]
+    # The caller says the 25th; the row says the 26th; the slug is the 26th.
+    result = spread_sign_test(
+        slate, tomorrow, min_sample=1, selected_date="2026-08-25"
+    )
+    assert result["fixtures_compared"] == 1
+
+
+def test_a_zero_says_which_kind_of_zero_it_is():
+    """Three different facts render as `fixtures=0`; the line must separate them."""
+    slate = [{"slug": "asc-mlb-sd-nyy-2026-08-25-neg-1pt5",
+              "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD"}]
+
+    # (a) the board carries no spread rows at all
+    no_spreads = spread_sign_test(
+        slate, [{"market": "h2h", "side": "home", "sport": "mlb"}],
+        min_sample=1, selected_date="2026-08-25",
+    )
+    assert no_spreads["board_spread_rows"] == 0
+    assert no_spreads["board_fixtures_keyed"] == 0
+
+    # (b) the board HAS spread rows but none can be keyed -- the production case
+    unkeyable = spread_sign_test(
+        slate, [{"market": "spreads", "side": "home", "line": -1.5, "sport": "mlb"}],
+        min_sample=1,
+    )
+    assert unkeyable["board_spread_rows"] == 1
+    assert unkeyable["board_rows_unkeyable"] == 1
+    assert unkeyable["board_fixtures_keyed"] == 0
+
+    # (c) the board is keyed fine and the VENUE listed nothing for it
+    no_venue = spread_sign_test(
+        [], [{"market": "spreads", "side": "home", "line": -1.5, "sport": "mlb",
+              "home_team": "New York Yankees", "away_team": "San Diego Padres"}],
+        min_sample=1, selected_date="2026-08-25",
+    )
+    assert no_venue["board_fixtures_keyed"] == 1
+    assert no_venue["spread_slugs_with_no_board_fixture"] == 0
