@@ -648,3 +648,79 @@ def test_every_sport_syndicate_models_is_protected():
     for token in ("mlb", "nba", "wnba", "nfl", "nhl", "ncaaf", "ncaab"):
         parsed = mod.parse_slug(f"tsc-{token}-min-ath-2026-08-25-10pt5")
         assert mod._effective_league(parsed) == token, token
+
+
+def test_a_slug_yields_the_browsable_game_page():
+    """CONFIRMED BY THE USER 2026-08-25, one example, verbatim:
+
+        slug  tsc-mlb-cin-sf-2026-08-25-7pt5
+        url   https://polymarket.us/sports/mlb/mlb-cin-sf-2026-08-25
+
+    The slug's PREFIX and MODIFIERS are both dropped. Until this, the repo had
+    never seen a browsable Polymarket address -- the coverage audit refused to
+    construct one, correctly, and that left its gap table unactionable.
+    """
+    from syndicate.features.shared.polymarket_board_join import market_web_url
+
+    assert (
+        market_web_url("tsc-mlb-cin-sf-2026-08-25-7pt5")
+        == "https://polymarket.us/sports/mlb/mlb-cin-sf-2026-08-25"
+    )
+    # A moneyline slug carries no modifiers and lands on the same page.
+    assert (
+        market_web_url("aec-mlb-cin-sf-2026-08-25")
+        == "https://polymarket.us/sports/mlb/mlb-cin-sf-2026-08-25"
+    )
+
+
+def test_the_url_speaks_POLYMARKETS_league_vocabulary_not_ours():
+    """THE SECOND CONFIRMED EXAMPLE, and the one that mattered. User-supplied
+    2026-08-25:
+
+        astatc-epl-cry-mnc-2026-08-28 -> https://polymarket.us/sports/epl/epl-cry-mnc-2026-08-28
+
+    Syndicate calls that sport `soccer`; Polymarket calls the competition
+    `epl`. The open question was whose vocabulary the web form speaks, and it
+    is theirs -- unchanged from the slug. So every soccer row in the coverage
+    gap is checkable with a link built from what we already store, including
+    the league codes we do not yet map (`lal`, `lg1`, `sea`, `bun`).
+    """
+    from syndicate.features.shared.polymarket_board_join import market_web_url
+
+    assert (
+        market_web_url("astatc-epl-cry-mnc-2026-08-28-btts")
+        == "https://polymarket.us/sports/epl/epl-cry-mnc-2026-08-28"
+    )
+    # An unmapped soccer code builds by the same rule.
+    assert (
+        market_web_url("astatc-lal-ala-vil-2026-08-28-btts")
+        == "https://polymarket.us/sports/lal/lal-ala-vil-2026-08-28"
+    )
+
+
+def test_every_market_on_one_game_collapses_to_ONE_url():
+    """It addresses the GAME, not the MARKET, and the report must not imply
+    otherwise. The modifiers that distinguish a 7.5 total from a spread ladder
+    rung are exactly what the web form discards, so pointing someone at this
+    URL for a specific market would send them looking for something the page
+    does not single out."""
+    from syndicate.features.shared.polymarket_board_join import market_web_url
+
+    urls = {
+        market_web_url(slug)
+        for slug in (
+            "tsc-mlb-cin-sf-2026-08-25-7pt5",
+            "tsc-mlb-cin-sf-2026-08-25-8pt5",
+            "asc-mlb-cin-sf-2026-08-25-pos-1pt5",
+            "astatc-mlb-cin-sf-2026-08-25-hits-jakman-gte2",
+        )
+    }
+    assert urls == {"https://polymarket.us/sports/mlb/mlb-cin-sf-2026-08-25"}
+
+
+def test_an_unparseable_slug_yields_no_url_rather_than_a_broken_one():
+    from syndicate.features.shared.polymarket_board_join import market_web_url
+
+    assert market_web_url("garbage") is None
+    assert market_web_url("") is None
+    assert market_web_url(None) is None
