@@ -29,9 +29,17 @@ def _market(slug="aec-mlb-pit-sd-2026-08-24", kind="SPORTS_MARKET_TYPE_MONEYLINE
 
 
 def _board(market="h2h", side="Padres", line=None, home="San Diego Padres",
-           away="Pittsburgh Pirates", date="2026-08-24", sport="mlb", **kw):
+           away="Pittsburgh Pirates", date="2026-08-24", sport="mlb",
+           event_id="evt-pit-sd", **kw):
+    # `event_id` IS PART OF A BOARD ROW AND PART OF THE RESOLVER KEY.
+    #
+    # It was absent from this fixture, which is how the wrong-game defect lived
+    # here undisturbed: every fixture row was the same nameless game, so a key
+    # that omitted the game looked like an identity. Published board rows always
+    # carry one (`layer2_board.py:1825`).
     row = {"market": market, "side": side, "line": line, "home": home,
-           "away": away, "selected_date": date, "sport": sport}
+           "away": away, "selected_date": date, "sport": sport,
+           "event_id": event_id}
     row.update(kw)
     return row
 
@@ -217,7 +225,17 @@ def test_the_price_resolver_returns_polymarkets_american_price():
 
 def test_the_resolver_is_not_LOOSER_than_the_join():
     """A lookup looser than the join would silently reintroduce exactly the
-    mismatches the join refuses."""
+    mismatches the join refuses.
+
+    THIS TEST NAMED THE RIGHT PROPERTY AND TESTED A WEAKER ONE. It varies the
+    LINE and the SIDE within a single game, and both of those were in the old
+    key -- so it passed while the resolver was looser than the join in the one
+    dimension the key omitted: the GAME. Production bought that gap on
+    2026-08-25 (a BAL@STL slug stamped on a CIN@SF row).
+
+    The missing case now lives in `test_polymarket_resolver_wrong_game.py`,
+    which varies the game and holds everything else fixed. Kept here as-is
+    because the line/side dimensions are still worth pinning."""
     matches = mod.join_polymarket_to_board(
         [_market(slug="asc-mlb-pit-sd-2026-08-24-pos-1pt5",
                  kind="SPORTS_MARKET_TYPE_SPREAD", outcomes=("Padres", "Pirates"))],

@@ -278,18 +278,49 @@ def _as_float(value: Any) -> float | None:
     return None if parsed != parsed else parsed
 
 
-def _match_key(match: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
+def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
     """The identity the join matched on. Shared by both resolvers ON PURPOSE.
 
     Two resolvers keyed by two slightly different tuples would pair a row with
     one venue's price and another venue's contract -- a bet placed at a price
     that was never quoted for it.
+
+    **THE GAME IS IN THE KEY.** It was not, and Polymarket -- which had copied
+    this module's shape -- stamped a BAL@STL slug onto a CIN@SF position and a
+    PIT@SD slug onto a TEX@CWS one (measured 2026-08-25 14:57:34Z). Without
+    `board_event_id`, `("totals", "", 8.5, "over")` is one key for every 8.5
+    total on the slate and the index keeps whichever game was written last.
+
+    Kalshi has not yet produced that failure for two reasons, NEITHER of which
+    is a guard: its board join currently supplies only player props, whose
+    `player_name` happens to identify a game; and the `float(line)` below
+    returns None for an h2h with no line, so moneylines are not indexed at all.
+    The 171 game series registered on 2026-08-25 would have removed both
+    accidents at once.
+
+    A record with no event id returns None and is never indexed -- an empty
+    string would rebuild the same collision under a different spelling, and not
+    indexed means no order, which is the direction that fails safe.
+
+    **THE MARKET NAME IS TAKEN VERBATIM HERE AND CANONICALISED IN `_row_key`.**
+    That asymmetry is deliberate and load-bearing: a match's `market` is
+    `verdict["market"]`, which the join has already canonicalised, while a board
+    row carries whatever the board spells it (`pitcher_strikeouts` where the
+    canonical key is `strikeouts`). Canonicalising twice would be harmless;
+    canonicalising NEITHER side would pair `pitcher_strikeouts` with nothing.
+    Stated because a fixture built with a board-shaped market name resolves to
+    None here and looks like a key bug rather than a fixture that does not
+    match what the join emits.
     """
+    event_id = str(match.get("board_event_id") or "").strip()
+    if not event_id:
+        return None
     try:
         line = float(match.get("line"))
     except (TypeError, ValueError):
         return None
     return (
+        event_id,
         str(match.get("market") or "").strip().lower(),
         normalize_person(match.get("player_name")),
         line,
@@ -297,15 +328,24 @@ def _match_key(match: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
     )
 
 
-def _row_key(row: Mapping[str, Any]) -> tuple[str, str, float, str] | None:
+def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
+    """The board row's side of `_match_key`. The two must stay one shape.
+
+    A board row's game is `event_id`; a match carries the same value under
+    `board_event_id` because that is what the join copied off the row.
+    """
     from syndicate.features.shared.market_keys import canonical_market_key
 
+    event_id = str(row.get("event_id") or "").strip()
+    if not event_id:
+        return None
     try:
         line = float(row.get("line"))
     except (TypeError, ValueError):
         return None
     raw = str(row.get("market") or "").strip().lower()
     return (
+        event_id,
         canonical_market_key(row.get("sport"), raw) or raw,
         normalize_person(row.get("player_name")),
         line,
@@ -349,41 +389,31 @@ def kalshi_price_resolver(matches: Sequence[Mapping[str, Any]]):
     and the reason every coverage figure in this thread was about the aggregator
     rather than the venue. This prices from what Kalshi is actually quoting.
 
-    Keyed on (market, player, line, side): the same identity the join matched
-    on, so a resolver cannot pair a row with a price for a different bet. A
-    lookup that is looser than the join would silently reintroduce exactly the
-    mismatches the join refuses.
+    KEYED BY `_match_key` / `_row_key`, THE SHARED FUNCTIONS -- not by a copy.
+
+    This built its key INLINE while the ticker resolver called `_match_key`,
+    and the docstring here claimed they were "the same identity the join
+    matched on". They were the same tuple only for as long as nobody edited one
+    of them. Adding the game to `_match_key` moved the ticker resolver and left
+    this behind, and a test asking both for the same row got a CIN@SF contract
+    priced at BAL@STL's number -- which is precisely the failure `_match_key`'s
+    own docstring says the sharing exists to prevent, produced by the sharing
+    not actually being shared.
+
+    One function, two callers. The `canonical_market_key` normalisation on the
+    row side comes along with it, which this copy also lacked.
     """
-    index: dict[tuple[str, str, float, str], float] = {}
+    index: dict[tuple[str, str, str, float, str], float] = {}
     for match in matches:
-        try:
-            line = float(match.get("line"))
-        except (TypeError, ValueError):
-            continue
+        key = _match_key(match)
         price = match.get("kalshi_american")
-        if price is None:
+        if key is None or price is None:
             continue
-        key = (
-            str(match.get("market") or "").strip().lower(),
-            normalize_person(match.get("player_name")),
-            line,
-            str(match.get("board_side") or "").strip().lower(),
-        )
         index[key] = float(price)
 
     def resolve(row: Mapping[str, Any]) -> float | None:
-        try:
-            line = float(row.get("line"))
-        except (TypeError, ValueError):
-            return None
-        return index.get(
-            (
-                str(row.get("market") or "").strip().lower(),
-                normalize_person(row.get("player_name")),
-                line,
-                str(row.get("side") or "").strip().lower(),
-            )
-        )
+        key = _row_key(row)
+        return index.get(key) if key else None
 
     resolve.market_count = len(index)  # type: ignore[attr-defined]
     return resolve

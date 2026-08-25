@@ -144,7 +144,16 @@ def test_the_price_resolver_is_keyed_as_tightly_as_the_join():
     from syndicate.features.shared.kalshi_board_join import kalshi_price_resolver
 
     resolve = kalshi_price_resolver([{
-        "market": "pitcher_strikeouts", "player_name": "Andrew Abbott",
+        # `board_event_id` IS PART OF THE KEY. The join copies it off the board
+        # row, and without it every row of one market/line/side on the slate
+        # shares a bucket -- the defect that stamped a BAL@STL slug on a CIN@SF
+        # position on Polymarket, which copied this module's shape.
+        "board_event_id": "evt-1",
+        # CANONICAL, because that is what the join emits (`verdict["market"]`).
+        # `_row_key` canonicalises the ROW's market and `_match_key` takes the
+        # match's verbatim -- see `_match_key`'s docstring. A fixture using the
+        # board's raw spelling is testing a match shape the join never builds.
+        "market": "strikeouts", "player_name": "Andrew Abbott",
         "line": 6.5, "board_side": "over", "kalshi_american": -120,
     }])
     assert resolve(_row(side="Over", line=6.5)) == -120
@@ -153,6 +162,11 @@ def test_the_price_resolver_is_keyed_as_tightly_as_the_join():
     assert resolve(_row(side="Over", line=7.5)) is None
     assert resolve(_row(side="Over", line=6.5, player="Shane Baz")) is None
     assert resolve(_row(side="Over", line=6.5, market="pitcher_outs")) is None
+    # AND THE DIMENSION THIS TEST'S NAME CLAIMED AND DID NOT COVER: a different
+    # GAME. Everything else identical, which is exactly the collision the old
+    # key could not see. Cross-game coverage for both venues lives in
+    # `test_polymarket_resolver_wrong_game.py`.
+    assert resolve(_row(side="Over", line=6.5, event_id="evt-2")) is None
 
 
 # --- the join must stay inside one slate -----------------------------------
