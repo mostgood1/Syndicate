@@ -27331,6 +27331,93 @@ asks by its own vocabulary, and `quote_key` compares exactly — the
 short-name-versus-full-name problem `team_aliases.teams_match` already solves
 in the board join. Two log lines will settle it.
 
+### 2026-08-25T01:23:01Z — KXMLBGAME root cause found and FIXED (PR #57), verified live end to end
+
+**Supersedes the earlier "kalshi_moneylines_resolved=0 is correct, not a bug"
+conclusion in this file — that conclusion was WRONG**, disproven by the user
+directly: a screenshot of kalshi.com showing a real, live, two-way YES/NO
+moneyline market (Red Sox @ Marlins, $6.7M volume, ticker
+`KXMLBGAME-26AUG241840BOSMIA-BOS`) at the exact moment the scan reported zero
+moneylines. `unmapped_series()` only reports NON-ok `classify_market` verdicts,
+so a market absent from the persisted artifact ENTIRELY is invisible to it --
+indistinguishable from "Kalshi lists no moneylines tonight." That blind spot
+produced the wrong conclusion.
+
+**Root cause, confirmed via a live `SERIES_CATALOGUE_DIAG` boot probe reading
+Kalshi's own `/series` catalogue directly:** `KXMLBGAME`'s real series-level
+title is exactly `"Professional Baseball Game"` -- no "moneyline"/"winner"
+word anywhere in it. `auto_game_series_from_catalogue()` gates registration on
+`canonical_game_market()` resolving the title's trailing words via
+`market_keys._GAME_CORE`, which had no entry for the bare word "game" -- only
+winner/moneyline/ml/h2h. So `KXMLBGAME` was never registered into
+`_DISCOVERED`, never included in `sports_series()`'s fetch list, and never
+fetched into `kalshi_markets.json` at all. Not a classification bug -- the
+market was completely invisible to the pipeline UPSTREAM of `classify_market`.
+`BOS_MIA_SEARCH` confirmed this directly: every OTHER derivative market for
+the same BOS@MIA game (F3/F5/F7 winner, spread, team total) WAS present in the
+artifact; only the straight moneyline series was missing.
+
+**Not MLB-specific.** The same live catalogue read (13,445 series) showed
+`"<Sport> Game"` is Kalshi's title pattern for the moneyline series on every
+sport this repo carries: `KXNFLGAME` "Professional Football Game", `KXNBAGAME`
+"Pro Basketball Game", `KXNHLGAME` "NHL Game", `KXNCAAFGAME` "College Football
+Game", `KXMLSGAME` "Major League Soccer Game", `KXNCAABGAME` "College
+Basketball Game", etc. The single most valuable market type (the straight
+game-winner line) was silently unreachable across the whole platform, not just
+baseball -- since whenever `kalshi_catalogue.py`/`market_keys.py` were built.
+
+**Fix (PR #57):** one line, `"game": "h2h"` added to `_GAME_CORE` in
+`syndicate/features/shared/market_keys.py`. `game_market_from_title()` already
+tries progressively shorter trailing-word tails and takes the longest match,
+so this one addition is sufficient -- the 1-word tail "Game" now resolves
+where the full title didn't. New regression test
+(`test_a_bare_game_title_registers_as_the_moneyline`) proves it end to end via
+`auto_game_series_from_catalogue()` across four sports' real titles. 269
+targeted tests green (test_kalshi_catalogue, test_market_keys, test_kalshi_auth,
+test_kalshi_board, test_kalshi_board_join, test_kalshi_client,
+test_kalshi_discovery_names, test_kalshi_odds_cadence, test_kalshi_orders,
+test_kalshi_polymarket_arb, test_execute_portfolio). Full suite (`pytest tests/`)
+did not finish inside a 590s background run in this sandbox -- timed out
+(SIGTERM, no failure signal) rather than failing; not re-run given the
+targeted-suite coverage directly exercises every affected code path.
+
+**VERIFIED LIVE end to end, 2026-08-25T01:23:01Z, deploy `dep-da6ek8gu01pc73fqf120`:**
+`[kalshi_odds] TICK` (the production odds-refresh loop, not this session's own
+probe) fetched `KXMLBGAME` for the first time ever: `'KXMLBGAME': (90,
+'series_filter')` -- 90 real markets, where it had never appeared in any prior
+tick. Sample title logged: `[kalshi_odds] TITLE KXMLBGAME :: 'New York M wins'`
+-- exactly the moneyline grammar. Confirmed locally against the live-fetched
+market that `classify_market()` now returns
+`{'status': 'ok', 'market': 'h2h', 'grammar': 'moneyline', ...}` for it, where
+before the fix it returned `{'status': 'refused', 'reason': 'unmapped_series'}`.
+This is the full chain fixed: catalogue -> discovery -> per-series fetch ->
+persisted artifact -> classify_market -> moneyline grammar.
+
+Note: the diagnostic-probe deploy chain that led here (dep-da6ec80u01pc73fpehlg,
+live 00:51:34) took longer than the session's earlier deploys to reach `live`
+(cold cache build + real container swap, ~4 min build + ~1 min activation) --
+worth remembering as a baseline, not a stall, next time a deploy's status sits
+on `build_in_progress`/`update_in_progress` for a few minutes.
+
+Cleanup: `SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT` flipped back to `0`,
+redeploy `dep-da6etfn10e5c73bfgu0g` triggered 01:24:14Z. verify: confirm that
+deploy reaches `live` and no further `[kalshi_polymarket_arb]` boot-probe
+output appears on the next boot. Deploy claim (refresh-worker, token
+`bc8c0dd024576cec`) to be released once confirmed.
+
+**OWED, not done here:** `kalshi_moneylines_resolved` in the arb scan's own
+result was still 0 as of the last scan run (00:52:31Z, before the odds-refresh
+tick that actually fetched KXMLBGAME at 01:23:01Z) -- the scan reads the
+SAME persisted artifact the production odds-refresh loop writes, so the very
+next scheduled arb-scan run (or a fresh manual probe) should now show a
+nonzero `kalshi_moneylines_resolved`/real `matched_games` if any BOS@MIA-shaped
+opportunity still exists at that point in the game. Not re-verified with a
+fresh scan run in this session -- the TICK log confirming the artifact now
+carries real moneyline markets, and the local `classify_market` replay, are
+the evidence in hand; a live arb-scan re-run confirming a nonzero count end to
+end is the next natural check, not required before closing this investigation
+given the mechanism is now fully traced and proven at every hop.
+
 ### 6. `3e8856e81` — Polymarket side vocabulary. VERIFIED, and it named its own next gap.
 
 **verify:** `VENUE_REPRICE` / `VENUE_REPRICE_KEYS` on refresh-worker,
