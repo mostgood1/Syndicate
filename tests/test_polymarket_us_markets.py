@@ -1363,15 +1363,147 @@ def test_the_persisted_row_keeps_only_what_downstream_READS(monkeypatch, tmp_pat
 
 def test_a_slate_over_the_keyvalue_ceiling_REFUSES_before_writing(monkeypatch, tmp_path):
     """Checked before the write rather than discovered by its failure. Novig
-    hit exactly this at 9,128,668 bytes and had to trim after the outage."""
+    hit exactly this at 9,128,668 bytes and had to trim after the outage.
+
+    STILL REACHABLE AFTER THE DATE BUDGET, and that is what this now pins. The
+    budget trims the far end to 90% of the ceiling, so an ordinarily-oversized
+    slate no longer gets here -- which is the point of it. But the budget keeps
+    at least one row whatever its size, so a single enormous row still has to
+    be refused rather than written. A guard that became unreachable would be a
+    guard that had been deleted.
+    """
     from syndicate.features.shared import refresh_state_store
 
     monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
     monkeypatch.setattr(refresh_state_store, "write_json_file",
                         lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not write")))
-    huge = [mod.trimmed_row(_row(id=f"m-{i}", slug="s" * 900)) for i in range(12000)]
-    monkeypatch.setattr(mod, "fetch_game_markets", lambda **_k: {"status": "ok", "markets": huge})
+    # ONE row, larger than the ceiling on its own. The date budget cannot trim
+    # its way under this and must not pretend otherwise.
+    single = [mod.trimmed_row(_row(id="m-0", slug="s" * (9 * 1024 * 1024)))]
+    monkeypatch.setattr(mod, "fetch_game_markets", lambda **_k: {"status": "ok", "markets": single})
     result = mod.persist_game_slate()
     assert result["status"] == "too_large_to_persist"
     assert result["written"] is False
     assert "exceeds" in result["reason"]
+
+
+def test_an_ordinarily_oversized_slate_is_TRIMMED_rather_than_refused(monkeypatch, tmp_path):
+    """The behaviour change, stated as its own test. Before the date budget, a
+    slate past the ceiling wrote NOTHING and the previous artifact went stale --
+    so an over-large slate and an unreachable venue produced the same outcome.
+    Now the far dates are dropped, the near ones are stored, and the drop is
+    reported."""
+    from syndicate.features.shared import refresh_state_store
+
+    written: dict = {}
+    monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path)
+    monkeypatch.setattr(refresh_state_store, "write_json_file",
+                        lambda _p, payload: written.update(payload))
+    rows = (
+        [mod.trimmed_row(_row(id=f"n-{i}", slug="n" * 900,
+                              gameStartTime="2026-08-25T23:10:00Z")) for i in range(6000)]
+        + [mod.trimmed_row(_row(id=f"f-{i}", slug="f" * 900,
+                                gameStartTime="2026-09-30T23:10:00Z")) for i in range(6000)]
+    )
+    monkeypatch.setattr(mod, "fetch_game_markets", lambda **_k: {"status": "ok", "markets": rows})
+    result = mod.persist_game_slate()
+
+    assert result["status"] == "ok", result
+    assert result["written"] is True
+    assert result["dropped_for_size"] > 0, result
+    # The NEAR date survived and the far one is what was cut.
+    assert "2026-09-30" in result["dropped_by_date"], result
+    assert result["kept_through"] <= "2026-09-30"
+    assert result["bytes"] <= mod._KEYVALUE_CEILING_BYTES
+
+
+# ==========================================================================
+# The slate must be bounded by DATE, not by page offset
+# ==========================================================================
+
+
+def _slate_row(slug, date, **kw):
+    row = {
+        "slug": slug,
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "outcomes": ["Over", "Under"],
+        "outcomePrices": ["0.52", "0.48"],
+        "line": 7.5,
+        "gameStartTime": f"{date}T23:10:00Z" if date else None,
+        "orderPriceMinTickSize": 0.01,
+        "minimumTradeQty": 5,
+        "orderable": True,
+    }
+    row.update(kw)
+    return row
+
+
+def test_the_slate_drops_the_FURTHEST_games_not_an_arbitrary_page(monkeypatch):
+    """THE TRUNCATION THAT COST A REAL ORDER.
+
+    `fetch_markets` stopped after `max_pages` and set `truncated=True`, so
+    whatever sat past 30 pages was gone -- and the venue orders by id, not by
+    kickoff. Measured 2026-08-25 2:59:40 PM Central:
+
+        POLYMARKET_US_SLATE_WRITE status=ok count=13243 bytes=3920483
+          truncated=True
+
+    At 3:55 PM an order on tonight's Reds @ Giants total rejected with
+    `OrderBuildError: market_unresolved_for_position`, slug
+    `tsc-mlb-cin-sf-2026-08-25-7pt5` -- a real market on a game we were
+    trading, missing from our copy for no reason connected to the game.
+
+    Ordering the cut by date makes it MEAN something: tonight's slate is what
+    we trade, and a game eight days out is what we can afford to lose.
+    """
+    rows = (
+        [_slate_row(f"far-{i}", "2026-09-12") for i in range(20)]
+        + [_slate_row("tonight-cin-sf", "2026-08-25")]
+        + [_slate_row(f"far2-{i}", "2026-09-13") for i in range(20)]
+    )
+    # A budget that cannot hold everything, so something MUST be dropped.
+    import json
+
+    one = len(json.dumps(rows[0])) + 1
+    result = mod._slate_within_budget(rows, budget=one * 5)
+
+    kept = {r["slug"] for r in result["markets"]}
+    assert "tonight-cin-sf" in kept, result["dropped_by_date"]
+    assert result["dropped"] > 0
+    # And the drop is REPORTED by date, never silent.
+    assert set(result["dropped_by_date"]) <= {"2026-09-12", "2026-09-13"}, result
+
+
+def test_a_row_with_no_game_time_is_kept_not_quietly_discarded():
+    """A row we cannot RANK is not a row we may drop first. Dropping what
+    cannot be ordered is how a real market disappears without appearing in any
+    count -- the same absence/failure confusion, wearing a sorting key."""
+    rows = [_slate_row("undated", None), _slate_row("far", "2026-09-30")]
+    import json
+
+    result = mod._slate_within_budget(rows, budget=len(json.dumps(rows[0])) + 1)
+    assert [r["slug"] for r in result["markets"]] == ["undated"]
+    assert result["dropped_by_date"] == {"2026-09-30": 1}
+
+
+def test_a_slate_that_fits_drops_nothing_and_says_so():
+    rows = [_slate_row(f"s-{i}", "2026-08-25") for i in range(30)]
+    result = mod._slate_within_budget(rows)
+    assert result["dropped"] == 0
+    assert result["dropped_by_date"] == {}
+    assert len(result["markets"]) == 30
+
+
+def test_the_slate_pages_far_enough_to_reach_the_end_of_the_block(monkeypatch):
+    """`max_pages` defaulted to 30, so at limit=500 the fetch stopped at 15,000
+    rows whether or not the venue had more -- and it did. The repo measured
+    `games=7585, truncated=False` on 2026-08-24; a day later it was 13,243 and
+    truncated. The catalogue outgrew the constant, which is the same failure as
+    `find_first_game_offset`'s hardcoded ceiling one function over.
+    """
+    import inspect
+
+    signature = inspect.signature(mod.persist_game_slate)
+    assert signature.parameters["max_pages"].default >= 100, (
+        "a page budget this small cannot reach the end of a growing catalogue"
+    )

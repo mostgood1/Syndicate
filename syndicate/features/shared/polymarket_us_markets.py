@@ -74,7 +74,7 @@ it, and let the first live run correct the guesses cheaply.
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 __all__ = [
     "fetch_markets",
@@ -1317,7 +1317,78 @@ def _slate_row_for_storage(row: Mapping[str, Any]) -> dict[str, Any]:
     return {key: row[key] for key in _SLATE_STORAGE_FIELDS if key in row}
 
 
-def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, Any]:
+# How much of the ceiling the slate may use. The remainder is margin: the
+# envelope keys, and the fact that a row's size is estimated per-row and summed
+# rather than re-serialised at every step.
+_SLATE_BYTE_BUDGET = int(_KEYVALUE_CEILING_BYTES * 0.90)
+
+
+def _slate_date(row: Mapping[str, Any]) -> str:
+    """The row's game DATE, or "" when it carries none.
+
+    Empty sorts FIRST deliberately. A game row with no `gameStartTime` cannot
+    be ranked, and dropping what we cannot rank is how a real market disappears
+    without appearing in any count.
+    """
+    text = str(row.get("gameStartTime") or "").strip()
+    return text[:10] if len(text) >= 10 else ""
+
+
+def _slate_within_budget(
+    markets: Sequence[Mapping[str, Any]], *, budget: int = _SLATE_BYTE_BUDGET
+) -> dict[str, Any]:
+    """Keep the NEAREST games and drop the furthest-out ones, by name.
+
+    THE OLD TRUNCATION CUT BY OFFSET, WHICH IS ARBITRARY WITH RESPECT TO DATE.
+    `fetch_markets` stopped after `max_pages` and set `truncated=True`, so
+    whatever happened to sit past 30 pages was gone -- and the venue orders by
+    id, not by kickoff. Measured 2026-08-25 2:59:40 PM Central:
+
+        POLYMARKET_US_SLATE_WRITE status=ok count=13243 bytes=3920483
+          truncated=True
+
+    That is a slate we cannot resolve orders against and cannot tell which part
+    is missing. `market_unresolved_for_position` on
+    `tsc-mlb-cin-sf-2026-08-25-7pt5` at 3:55 PM is exactly the symptom: a real
+    market on tonight's game, absent from our copy for no reason connected to
+    the game.
+
+    Ordering by date makes the cut MEAN something. Tonight's slate is what we
+    trade; a market eight days out is what we can afford to lose. And the
+    dropped dates are REPORTED, so "we chose not to store this" never reads as
+    "the venue does not list it" -- the distinction this whole integration
+    keeps paying for.
+
+    Rows are measured individually and summed rather than re-serialised per
+    step: an exact check on the finished payload still runs in
+    `persist_game_slate`, and this only has to get the ORDER and the rough size
+    right.
+    """
+    import json as _json
+
+    ordered = sorted(markets, key=_slate_date)
+    kept: list[Mapping[str, Any]] = []
+    used = 0
+    dropped_by_date: dict[str, int] = {}
+    for row in ordered:
+        size = len(_json.dumps(row)) + 1
+        if used + size > budget and kept:
+            dropped_by_date[_slate_date(row) or "<undated>"] = (
+                dropped_by_date.get(_slate_date(row) or "<undated>", 0) + 1
+            )
+            continue
+        kept.append(row)
+        used += size
+    return {
+        "markets": kept,
+        "dropped": sum(dropped_by_date.values()),
+        "dropped_by_date": dict(sorted(dropped_by_date.items())),
+        "kept_through": _slate_date(kept[-1]) if kept else None,
+        "estimated_bytes": used,
+    }
+
+
+def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, Any]:
     """Fetch the joinable slate and write it for the fan-in to read.
 
     Writes `fetched_at` INTO the payload rather than relying on the file's
@@ -1338,13 +1409,34 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, An
     if slate.get("status") != "ok":
         return {"status": "error", "reason": slate.get("reason"), "written": False, "kept_previous": True}
 
-    markets = [_slate_row_for_storage(m) for m in (slate.get("markets") or [])]
+    # PAGE TO EXHAUSTION, THEN CHOOSE WHAT TO DROP -- in that order.
+    #
+    # `max_pages` defaulted to 30, so at limit=500 the fetch stopped after
+    # 15,000 rows whether or not the venue had more, and it did:
+    # `count=13243 truncated=True` on 2026-08-25 at 2:59:40 PM Central. The
+    # repo measured `games=7585, truncated=False` on 2026-08-24, so the
+    # catalogue outgrew the constant in a day -- the same failure as
+    # `find_first_game_offset`'s hardcoded ceiling, one function over.
+    #
+    # `fetch_markets` already stops on a short page, so a high bound costs
+    # nothing on a small slate and only binds on a genuinely huge one.
+    fetched = [_slate_row_for_storage(m) for m in (slate.get("markets") or [])]
+    budgeted = _slate_within_budget(fetched)
+    markets = budgeted["markets"]
     payload = {
         "fetched_at": _time.time(),
         "markets": markets,
         "count": len(markets),
         "start_offset": slate.get("start_offset"),
+        # THE FETCH's truncation, which should now be False. Kept distinct from
+        # the budget drop below: "the venue had more than we asked for" and "we
+        # chose not to store the far end" are different facts and only one of
+        # them is a bug.
         "truncated": slate.get("truncated"),
+        "fetched_count": len(fetched),
+        "dropped_for_size": budgeted["dropped"],
+        "dropped_by_date": budgeted["dropped_by_date"],
+        "kept_through": budgeted["kept_through"],
         "game_types": slate.get("game_types"),
         "game_start_min": slate.get("game_start_min"),
         "game_start_max": slate.get("game_start_max"),
@@ -1387,5 +1479,12 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 30) -> dict[str, An
         "bytes": size_bytes,
         "headroom_bytes": _KEYVALUE_CEILING_BYTES - size_bytes,
         "truncated": slate.get("truncated"),
+        # NEVER SILENT. A slate that dropped its far end must say so and say
+        # which dates, or the next `market_unresolved_for_position` is
+        # indistinguishable from the venue not listing the market.
+        "fetched_count": len(fetched),
+        "dropped_for_size": budgeted["dropped"],
+        "dropped_by_date": budgeted["dropped_by_date"],
+        "kept_through": budgeted["kept_through"],
         "game_types": slate.get("game_types"),
     }

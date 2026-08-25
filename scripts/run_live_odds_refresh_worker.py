@@ -995,6 +995,16 @@ def _polymarket_us_slate_refresh_tick() -> None:
             f" written={result.get('written')} count={result.get('count')}"
             f" bytes={result.get('bytes')} headroom={result.get('headroom_bytes')}"
             f" truncated={result.get('truncated')}"
+            # WHAT WE CHOSE NOT TO STORE, by date. Distinct from `truncated`,
+            # which is what the VENUE had beyond our page budget. A slate that
+            # dropped its far end silently makes the next
+            # `market_unresolved_for_position` indistinguishable from the venue
+            # not listing the market -- which is what happened on
+            # `tsc-mlb-cin-sf-2026-08-25-7pt5` at 3:55 PM Central.
+            f" fetched={result.get('fetched_count')}"
+            f" dropped_for_size={result.get('dropped_for_size')}"
+            f" dropped_by_date={result.get('dropped_by_date')}"
+            f" kept_through={result.get('kept_through')}"
             f" game_types={result.get('game_types')}"
             f" reason={result.get('reason')}",
             flush=True,
