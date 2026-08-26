@@ -70,6 +70,79 @@ REASON_NOT_FILLED = "order_not_filled"
 REASON_NO_PRICE = "no_fill_price"
 REASON_ALREADY_GRADED = "already_graded"
 
+# THE VENUE GETS FIRST REFUSAL ON A LIVE ORDER [user decision 2026-08-26].
+#
+# `venue_settlement.settle_from_venue` grades a live order from the venue's own
+# settlement record; this module grades it from a status WE resolve. Both skip
+# an order that already carries an `outcome`, and they run on DIFFERENT
+# SERVICES -- this one from `intelligence_state.py` on refresh-worker, the venue
+# one on live-odds-worker. So before this constant existed, whichever service
+# ticked first after a game ended owned that row permanently, and which grader
+# won was decided by timing rather than by policy.
+#
+# Deferring for a window makes the venue win in practice (both venues settle
+# within minutes to hours) while keeping this module as the FALLBACK for a
+# market the venue never settles -- which must still reach the ledger rather
+# than sit open forever. That is the whole trade, and it is why this is a delay
+# and not a refusal.
+REASON_AWAITING_VENUE = "awaiting_venue"
+REASON_AWAITING_VENUE_NO_AGE = "awaiting_venue_no_age"
+
+_DEFAULT_VENUE_GRACE_HOURS = 24.0
+
+
+def _venue_grace_hours() -> float:
+    import os
+
+    raw = os.environ.get("SYNDICATE_VENUE_SETTLEMENT_GRACE_HOURS")
+    if raw is None or not str(raw).strip():
+        return _DEFAULT_VENUE_GRACE_HOURS
+    try:
+        parsed = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return _DEFAULT_VENUE_GRACE_HOURS
+    # A negative window would mean "never defer", which is a policy change
+    # dressed as a typo. Zero is a legitimate value -- it disables the deferral
+    # deliberately -- so only negatives fall back.
+    return parsed if parsed >= 0 else _DEFAULT_VENUE_GRACE_HOURS
+
+
+def _order_age_hours(order: Mapping[str, Any]) -> float | None:
+    """How long since we placed this, in hours. None if we cannot tell.
+
+    `submitted_at` first because it is the precise stamp, `selected_date` as the
+    fallback because every order carries one -- it is the key `settle_orders`
+    already filters on. Without that fallback a single malformed stamp would
+    mean an order deferred forever, which is worse than grading it late.
+    """
+    from datetime import date as _date
+
+    now = datetime.now(timezone.utc)
+
+    text = str(order.get("submitted_at") or "").strip()
+    if text:
+        try:
+            moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            if moment.tzinfo is None:
+                moment = moment.replace(tzinfo=timezone.utc)
+            return (now - moment).total_seconds() / 3600.0
+        except ValueError:
+            pass
+
+    slate = str(order.get("selected_date") or "").strip()
+    if slate:
+        try:
+            # End of the slate day, not its start: a night game on that date has
+            # not finished at 00:00, and ageing from midnight would hand the
+            # fallback a head start it has not earned.
+            day = _date.fromisoformat(slate)
+            midnight_after = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+            return (now - midnight_after).total_seconds() / 3600.0 - 24.0
+        except ValueError:
+            pass
+
+    return None
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -225,13 +298,41 @@ def settle_orders(
             name = str(market or "<absent>")
             unmapped[name] = unmapped.get(name, 0) + 1
 
+    grace_hours = _venue_grace_hours()
+
     for order in orders:
         if order.get("outcome"):
             already += 1
             continue
+
         if str(order.get("status") or "") != "filled":
             _refuse(REASON_NOT_FILLED)
             continue
+
+        # THE VENUE FIRST, ON FILLED LIVE ORDERS ONLY. See REASON_AWAITING_VENUE
+        # above: without this, which grader owns a row is decided by which
+        # worker happened to tick first after the game ended.
+        #
+        # AFTER THE FILLED CHECK, DELIBERATELY. An unfilled order opened no
+        # position, so no venue will ever settle it -- deferring it would swap a
+        # correct `order_not_filled` refusal for a wait that can never end.
+        # Ordering this before the check did exactly that, and
+        # `test_an_unfilled_order_is_not_counted_as_a_loss` caught it.
+        #
+        # PAPER IS DELIBERATELY UNTOUCHED -- it has no venue record to wait for,
+        # so deferring it would be delay in exchange for nothing.
+        if str(order.get("mode") or "") == "live" and grace_hours > 0:
+            age = _order_age_hours(order)
+            if age is None:
+                # Deferred, and NAMED. "The venue has not settled it" and "we
+                # cannot tell how old it is" both end in an ungraded row, and
+                # only one of them is a bug -- a shared reason string would make
+                # them the same line in the counter.
+                _refuse(REASON_AWAITING_VENUE_NO_AGE)
+                continue
+            if age < grace_hours:
+                _refuse(REASON_AWAITING_VENUE)
+                continue
 
         try:
             resolved = resolver(order) or {}

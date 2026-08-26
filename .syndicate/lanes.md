@@ -1975,6 +1975,162 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Item: `todo.md #578`.
 - Blocked by: none
 
+### venue-settlement — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: live orders are settled from **the venue's own settlement record**, so
+  `settled > 0` stops being the gate the whole feedback loop is stuck behind.
+  `[user decision 2026-08-26: "do the settlement work next"]`
+- **WHY THIS IS DIFFERENT FROM THE SETTLEMENT WE ALREADY HAVE.**
+  `paper_settlement.settle_orders` grades an order against a status WE resolve —
+  our boxscore pipeline, our alias joins, our line handling. Every one of those
+  is a place to be wrong, and `#502`/the sim-weight argument both trace back to
+  a settled sample of zero. Both venues will simply state the outcome of a market
+  we hold. **This is not a better estimator; it removes the estimator.**
+- **DOCUMENTED SHAPES, READ BEFORE ANY CODE** (docs.kalshi.com /
+  docs.polymarket.us, 2026-08-26 — the balances lane earlier today proves the
+  cost of the opposite order):
+    - Kalshi `GET /portfolio/settlements` — `ticker`, `market_result`
+      (`yes|no|scalar`), `yes_count_fp`/`no_count_fp` (contracts HELD at
+      settlement), `yes_total_cost_dollars`/`no_total_cost_dollars`,
+      **`revenue` in CENTS**, `fee_cost` fixed-point dollars, `settled_time`.
+      Paged by `cursor`, filterable by `ticker`.
+    - Polymarket `GET /v1/portfolio/activities?types=ACTIVITY_TYPE_POSITION_RESOLUTION`
+      — `positionResolution.marketSlug`, `beforePosition`/`afterPosition`
+      (`UserPosition.realized` is an `Amount` decimal string), `side`
+      (`LONG|SHORT|NEUTRAL`), `updateTime`. Filterable by `marketSlug`.
+- **THE OUTCOME COMES FROM THE VENUE'S OWN ARITHMETIC, NOT FROM OUR SIDE
+  LOGIC.** Kalshi: P&L = `revenue/100 - (yes_cost + no_cost) - fee_cost`, and
+  won/lost from `market_result` against which side we actually HELD
+  (`yes_count_fp`/`no_count_fp`) — never from our `side`/`line` fields, which
+  are exactly what the alias joins get wrong. Polymarket: the realized delta
+  `afterPosition.realized - beforePosition.realized` IS the settlement P&L.
+- **IDEMPOTENCY IS THE LOAD-BEARING PROPERTY, same as the ledger's.** An order
+  already carrying an `outcome` is never re-graded or overwritten — this writes
+  into a money record that `paper_settlement` also writes. Rows are stamped
+  `settled_by: "venue"` so an AUTHORITATIVE outcome is distinguishable from an
+  INFERRED one; a later evaluation pass must be able to tell them apart.
+- **A SETTLEMENT WE CANNOT JOIN IS COUNTED, NOT DROPPED.** Two different
+  absences, both reported: settlement rows matching no order (`unjoinable`), and
+  open orders with no settlement row yet (`awaiting`). Collapsing them would make
+  "nothing has settled" and "we cannot see what settled" identical — the
+  distinction this system keeps paying to preserve.
+- Files:
+  `syndicate/features/shared/venue_settlement.py` (new),
+  `scripts/run_live_odds_refresh_worker.py` (the call site only),
+  `tests/test_venue_settlement.py` (new)
+- **Read-only, deliberately NOT claimed:** `execution_ledger.py` (uses `_load`
+  and `_persist`, edits neither — it is `portfolio-decision-and-execution`'s
+  file), `paper_settlement.py`, both auth modules.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: `off != on` through the ledger — an order with a matching venue
+  settlement gains `outcome` + `pnl_dollars` + `settled_by: "venue"`, and one
+  without gains nothing. Production reading OWED and it is the point:
+  `VENUE_SETTLEMENT settled=N unjoinable=N awaiting=N` on live-odds-worker, and
+  `settled_count > 0` on the live book for the first time.
+- **CLOSED 2026-08-26 — VERIFIED IN PRODUCTION**, live-odds-worker `022583f6`.
+  `VENUE_SETTLEMENT settled=3 already=12 awaiting=73 unjoinable=36
+  pnl_unattributed=0 refused={} errors={}`; three real orders graded with the
+  venues' exact P&L (polymarket −2.4017 lost, kalshi −4.4924 lost, polymarket
+  +5.44 won). `settled_count` 12 -> 15. Counters reconcile.
+- **THE SPLIT IS THE FINDING, not the count.** venue 3 bets −$1.45 (ROI
+  −11.88%) against inferred 12 bets +$15.05 (+51.07%); the page shows the blend
+  (+32.60%). **n=3 proves nothing** — what it establishes is that the headline
+  ROI mixes a venue record with our own inference and says so nowhere.
+- **RACE CONDITION, found AFTER deploying:** `settle_orders` runs from
+  `intelligence_state.py` on refresh-worker, venue settlement on
+  live-odds-worker, both idempotent on `outcome` — so whichever ticks first
+  after a game ends owns the row. Which source grades a live order is decided by
+  TIMING, not policy, and the comparison above can never become controlled while
+  that stands. Recommended and NOT taken (money-grading on a shared module, and
+  the choice of authority is the user's): venue gets first refusal on live
+  orders, `settle_orders` stays the fallback.
+- **DEPLOY NOTE:** preflight was HOLD and the guard correctly blocked me. The
+  documented off switch is an env var the hook reads from its OWN process, which
+  an inline prefix does not reach; I declined to forge a preflight receipt or
+  POST the API directly to dodge the hook. The user deployed from their own
+  terminal. Full block: `deploys.md` 2026-08-26 21:36Z. Item: `todo.md #579`.
+- Blocked by: none
+
+### kalshi-spread-join-sign — **OPEN (reopened 2026-08-26)** — session syndicate-43 (ENDED) — UNOWNED — six things verified; WNBA settlement is BUILT, LANDED and NOT DEPLOYED
+- Note: this lane was CLOSED earlier on 2026-08-26 and its block correctly moved
+  to `lanes_history.md`. Work continued after that close, so this is a fresh
+  block for what is still OWED — the history entry stays as the record.
+- Files: `syndicate/features/shared/{kalshi_board_join,kalshi_orders,bet_status_wnba,bet_status_soccer,polymarket_us_orders,board_enrichment}.py`,
+  `scripts/build_wnba_boxscores.py`, `pipeline/intelligence_state.py`,
+  `syndicate/blueprints/wnba.py` and their tests. **ALL CLAIMS RELEASED.**
+- VERIFIED (evidence `log/2026-08-26.md`, measurements `deploys.md`): Kalshi
+  shard 3 funded (3 MLB fills, `exchange_index=3`) · spreads join sign (15 of 30
+  inverted -> 0) · spreads PLACE correctly (`AZ2` home -1.5 -> YES, filled
+  3 @ 0.33, venue title matches the row) · WNBA id barrier
+  (`game_not_in_live_box` 9 -> absent, graded 0 -> 3) · soccer per-league read
+  (`no_soccer_live_state_for_date` -> `match_not_in_soccer_live_state`) · ESPN
+  host split (`{"ok":true,"games":3}` after the swap; 403 minutes before).
+- **OWED, in priority order:**
+  1. **DEPLOY refresh-worker, THEN read `SETTLED date=2026-08-25`.** All code is
+     on `origin/main`; the worker was NOT deployed (preflight HOLD, jobs
+     climbing 1 -> 10). `not_decided_yet: 6` is UNCHANGED and still reflects the
+     ESPN 403. PASSES only if it falls below 6 and Citron (1 reb vs over 3.5) /
+     Amoore (3 ast vs over 3.5) grade **LOST**. **DO NOT REPORT WNBA SETTLEMENT
+     AS FIXED BEFORE THAT READING** — and treat its all-time `win 100%` as
+     wins-only by construction until a loss can settle.
+  2. **Re-do the 2026-05-25..08-26 backfill through the KEYVALUE store.** The 84
+     files published via `/api/ops/artifacts/publish` sit on WEB'S FILESYSTEM
+     while the consumer reads keyvalue on refresh-worker — in production and
+     invisible to settlement. `build_wnba_boxscores.py --via-web --start --end`
+     run ON a worker lands in the right place.
+  3. **Soccer: still 0 settled all-time.** The read is fixed; needs an order
+     whose match finished with finals captured after 2026-08-26T16:11Z.
+  4. **Polymarket side resolution UNRESOLVED.** `over`->YES/`under`->NO is a
+     fixed constant while the price comes from the name-matched index, and the
+     `outcomes` array orientation VARIES per market. A cross-check guard was
+     built and REVERTED — it silently enthroned the positional reading, the
+     disputed question, and contradicted three deliberate tests. Needs venue
+     ground truth (Polymarket US credentials, on Render; the env read was
+     blocked by the permission classifier). `FILL_ABOVE_LIMIT` ships as
+     detection only.
+  5. **33 pre-existing test failures** in the soccer/board selection, confirmed
+     NOT caused by this lane (identical counts with and without the change).
+     `test_team_aliases.py` is 9 of them and the soccer join leans on it.
+- Blocked by: none
+
+### venue-first-refusal — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: on a LIVE order, the VENUE's settlement record grades it and our own
+  inference is the FALLBACK — not a race decided by which worker ticks first.
+  `[user decision 2026-08-26: "give the venue first refusal on live orders"]`
+- **THE DEFECT THIS CLOSES, measured 2026-08-26T21:36Z.**
+  `paper_settlement.settle_orders` runs from `intelligence_state.py` on
+  **refresh-worker**; `venue_settlement.settle_from_venue` runs on
+  **live-odds-worker**. Both skip an order that already carries an `outcome`, so
+  **whichever service ticks first after a game ends owns that row permanently.**
+  Which grader wins is decided by TIMING, not policy — and the venue-vs-inferred
+  comparison (venue 3 bets ROI −11.88%, inferred 12 bets +51.07%) can never
+  become controlled while that stands.
+- **THE RULE: a LIVE order is not graded by inference until the venue has had a
+  stated window to settle it.** `SYNDICATE_VENUE_SETTLEMENT_GRACE_HOURS`,
+  default 24 — long enough that the venue always wins in practice (both settle
+  within minutes to hours), short enough that a market the venue never settles
+  still reaches the ledger rather than sitting open forever.
+- **PAPER IS UNTOUCHED.** Only `mode == live` defers. The paper book has no
+  venue record to wait for, and delaying it would be delay for nothing.
+- **AGE COMES FROM `submitted_at`, FALLING BACK TO `selected_date`.** Both
+  unreadable is the only deferring-forever case, and it is COUNTED by name
+  (`awaiting_venue_no_age`) rather than silent — otherwise "the venue has not
+  settled it" and "we cannot tell how old it is" become the same never-graded
+  row.
+- Files:
+  `syndicate/features/shared/paper_settlement.py`,
+  `tests/test_venue_first_refusal.py` (new)
+- Read-only, NOT claimed: `pipeline/intelligence_state.py` (the call site is
+  unchanged), `venue_settlement.py`, `execution_ledger.py`.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: `off != on` — a freshly-submitted LIVE order is REFUSED by
+  `settle_orders` with `awaiting_venue`, the same order past the window IS
+  graded, and a PAPER order is graded either way. Production reading owed:
+  `awaiting_venue` appearing in `[paper_settlement] SETTLED ... reasons=` on
+  refresh-worker, and new live grades carrying `settled_by: "venue"`.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -6579,3 +6579,49 @@ time against a remembered number does not.** Also relevant: the worker restarted
 five times in two hours from other sessions' deploys, and two instances never
 reached the shortlist stage at all — so an absent line had a cause entirely
 outside the change under test.
+
+
+## 2026-08-26 — FORBIDDEN: TWO HOSTS ARE NOT ONE VENDOR, and "X can reach ESPN" is not a fact about X
+
+**A success against one hostname says nothing about another hostname, even when
+both belong to the same provider and serve the same path.**
+
+`WNBA_LIVE_BOX_CAPTURED date=2026-08-25 games=3 players=66` -- web fetching from
+ESPN, succeeding. I read that as *"web can reach ESPN"*, routed a producer
+through web on the strength of it, deployed, and got:
+
+    {"ok":false,"error":"HTTPError: HTTP Error 403: Forbidden","games":0}
+
+The capture uses `site.web.api.espn.com` (summary). My call used
+`site.api.espn.com` (scoreboard). **One of those answers Render and the other
+does not.** Both serve both paths, so the fix was a one-line host swap -- but
+only after a wasted deploy, because the evidence I had was about a DIFFERENT
+HOST than the one I was using.
+
+**HOW TO APPLY.** Before citing a past success as proof a hop works, compare the
+HOSTNAME, not the vendor. Write the host into the claim: "web reaches
+`site.web.api.espn.com`" is checkable; "web can reach ESPN" is not. Same rule as
+[[feedback_presence_is_not_reachability]] one level down -- the route is not the
+provider.
+
+## 2026-08-26 — FORBIDDEN: assuming an artifact "published to production" is where its CONSUMER reads
+
+**`POST /api/ops/artifacts/publish` writes `data_root() / relative_path` on
+WEB'S FILESYSTEM.** `bet_status_wnba` reads the same relative path through
+`read_text_file`, i.e. the KEYVALUE store, on REFRESH-WORKER. Same string, two
+stores, two services.
+
+I published 84 backfilled boxscore files, verified them with
+`/api/ops/artifacts/export` (which reads the same filesystem, so it agreed), and
+reported production coverage restored. **Settlement cannot see any of them.**
+The verification was circular: I checked the store I had just written to.
+
+**HOW TO APPLY.** An artifact has a WRITER and a READER and they must be shown
+to use the SAME store, not the same path string. `_keyvalue_backed(path)`
+answers it for the state store; the publish endpoint bypasses it entirely. When
+a fix depends on data reaching a consumer, verify from the consumer's side --
+read it back the way the consumer does, on the service the consumer runs on.
+This is the third shape of the same defect in one session, after
+`iterdir`-vs-`read_json_file` (soccer leagues) and web-vs-worker disks.
+Related: [[project_keyvalue_artifact_split_blinds_guards]],
+[[feedback_isolate_the_source_you_changed]].

@@ -1813,6 +1813,38 @@ def _run_execution_tick() -> None:
                 flush=True,
             )
 
+        # SETTLE FROM THE VENUE'S OWN RECORD, before placing anything.
+        #
+        # ORDER MATTERS AND THIS IS WHY IT RUNS FIRST: settling frees the day's
+        # spend and closes positions, and `check_order` reads `spent_today` off
+        # the ledger. Placing first would size tonight's slate against a book
+        # that still counts yesterday's settled bets as open.
+        #
+        # Credentials live on THIS process, so this is the only place it can
+        # run -- and it writes the execution ledger, which web must never do.
+        try:
+            from syndicate.features.shared.venue_settlement import settle_from_venue
+
+            _settled = settle_from_venue()
+            # EVERY COUNTER, not just the good one. `settled=0 awaiting=12` and
+            # `settled=0 unjoinable=12` are opposite problems, and a line that
+            # printed only the first number would read the same for both.
+            print(
+                "[live_odds_worker] VENUE_SETTLEMENT "
+                f"status={_settled.get('status')} settled={_settled.get('settled')} "
+                f"already={_settled.get('already')} awaiting={_settled.get('awaiting')} "
+                f"unjoinable={_settled.get('unjoinable')} "
+                f"pnl_unattributed={_settled.get('pnl_unattributed')} "
+                f"refused={_settled.get('refused')} errors={_settled.get('errors')} "
+                f"by_venue={_settled.get('by_venue')}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] VENUE_SETTLEMENT_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         # THE VENUE-RESTRICTED PLAN, named explicitly. Without this the call
         # read the unrestricted plan and tried to place a soccer total and an
         # MLB spread on Kalshi (2026-08-24T00:34Z) -- positions priced at other

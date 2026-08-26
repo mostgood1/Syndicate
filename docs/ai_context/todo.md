@@ -1,5 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#579` — **The venue settles our bets now, and the first reading says our own grader and the venue disagree.** — lane `venue-settlement`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T21:36Z** (live-odds-worker `022583f6`)
+
+`[user decision 2026-08-26]` *"do the settlement work next"*.
+
+**THIS DELETES AN ESTIMATOR RATHER THAN IMPROVING ONE.**
+`paper_settlement.settle_orders` grades against a status WE resolve — boxscore
+feed, team aliases, line handling, an over/under vocabulary — and its own record
+says what that costs: 80 of 171 orders on 2026-08-23 refused `unmapped_market`
+and always would have, because a spread arrives as `side="Texas Rangers",
+line=-1.5`. Both venues simply state how a market we hold resolved.
+
+**FIRST PRODUCTION READING:**
+
+    VENUE_SETTLEMENT settled=3 already=12 awaiting=73 unjoinable=36
+      pnl_unattributed=0 refused={} errors={}
+
+Three real orders graded with the venues' exact P&L (kalshi 1, polymarket 2).
+`settled_count` on the live book went 12 -> 15.
+
+**THE SPLIT IS THE FINDING.** `settled_by` keeps authoritative and inferred
+separable, and on this sample they disagree sharply: venue **3 bets, −$1.45,
+ROI −11.88%**; inferred **12 bets, +$15.05, ROI +51.07%**; the page shows the
+blend, **+32.60%**. **n=3 proves nothing** — but the headline ROI is a mixture
+of a venue record and our own inference, and nothing on the page says so.
+
+**RACE CONDITION — FOUND AFTER DEPLOYING, WHICH IS THE HONEST ORDER TO RECORD
+IT IN.** `settle_orders` runs from `intelligence_state.py` on **refresh-worker**;
+venue settlement runs on **live-odds-worker**. Both skip an order that already
+carries an `outcome`, so **whichever service ticks first after a game ends owns
+that row permanently.** Two consequences: which source grades a live order is
+decided by worker timing rather than policy, and the venue/inferred comparison
+can never become controlled while that stands.
+**RECOMMENDED, NOT TAKEN** (changes money-grading on a shared module; which
+source wins is the user's call): give the venue FIRST REFUSAL on live orders and
+keep `settle_orders` as the fallback for what the venue cannot settle — e.g.
+grade a live order by inference only once it has been `awaiting` beyond a stated
+window.
+
+**Refusals are by name and absences are two counters, never one:** `unjoinable`
+(a settlement matching no ungraded order of ours) and `awaiting` (an open order
+with no settlement yet) are opposite problems. `scalar` markets and
+both-sides-held rows refuse rather than resolve by coin flip. A MARKET's P&L is
+never split across several of our orders on it — they share the outcome and get
+no P&L, counted as `pnl_unattributed`.
+
+**OWED:** `awaiting=73` must fall as tonight's games settle. If it does not, the
+join is losing settlements to a ticker mismatch and `unjoinable` is where they
+went. 22 tests; 849 green across settlement/execution/portfolio/ledger.
+
+
 ### `#578` — **Both venue balances on `/portfolio`, and the first production run returned `path_unknown` — which is the whole reason it was built to say that.** — lane `venue-balances-on-portfolio`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T21:07:32Z** (worker + web `4f3d3fe6`)
 
 **MEASURED, both venues, stamp 7s old at 21:07:32Z:**

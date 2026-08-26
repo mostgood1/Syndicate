@@ -69,6 +69,36 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
+## [espn-egress-and-wnba-boxscores] ESPN SERVES RENDER FROM ONE OF TWO HOSTS, and the WNBA boxscore had no producer `[verified 2026-08-26, lane kalshi-spread-join-sign]`
+
+**`site.api.espn.com` returns HTTP 403 to Render -- from WEB AND FROM BOTH
+WORKERS. `site.web.api.espn.com` does not.** Both serve the same paths. The
+403 is the HOST, not egress in general, and the two must never be conflated:
+`WNBA_LIVE_BOX_CAPTURED games=3 players=66` proves only the SUMMARY host.
+Measured both ways 2026-08-26; the swap produced `{"ok":true,"games":3}` on the
+first attempt where the other host had 403'd minutes earlier. Overridable via
+`SYNDICATE_WNBA_SCOREBOARD_URL`.
+
+**`wnba_source/data/processed/boxscores_<date>.csv` HAD NO PRODUCER IN
+SYNDICATE.** Every caller of the vendor fetcher lives in
+`vendor/*_betting_repo/`; `artifact_freshness.py:67` monitored the family with
+nothing behind it. Coverage 2026-05 **18**, 06 **0**, 07 **0**, 08 **1**.
+`scripts/build_wnba_boxscores.py` is the Syndicate-owned replacement (native
+ESPN, `--via-web` for Render), wired beside `settle_orders`.
+
+**WNBA SETTLEMENT WAS WINS-ONLY BY CONSTRUCTION.** `bet_status_wnba` hardcodes
+`is_final=False` (the LIVE box carries no game status) and `resolve_bet_status`
+decides only on `is_final` OR the value CROSSING -- so an over that fell short
+never decided. Production read `wnba 2 settled, roi 115.21, win 100%`: that is
+selection bias, not performance. The resolver now reads the final boxscore and
+returns `is_final=True`. **NOT YET VERIFIED IN PRODUCTION** -- refresh-worker
+was not deployed; `not_decided_yet: 6` is unchanged.
+
+**PUBLISHING IS NOT THE SAME STORE AS THE CONSUMER READS.**
+`/api/ops/artifacts/publish` writes `data_root()/path` on WEB'S FILESYSTEM;
+`bet_status_wnba` reads via `read_text_file`, i.e. KEYVALUE, on refresh-worker.
+84 backfilled files went to production and are invisible to settlement.
+
 ## [kalshi-venue-execution] KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lane kalshi-spread-join-sign]`
 
 **Kalshi splits markets across EXCHANGE SHARDS, and balances are PER-SHARD.**
