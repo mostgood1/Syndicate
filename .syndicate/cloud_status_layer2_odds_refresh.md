@@ -204,3 +204,89 @@ the answer today rather than after the next deploy — send me the distinct
 `bookmakers[].key` list and I will add it by name.
 
 **Undeployed** (`#574` and `#545` both). Yours to schedule.
+
+
+---
+
+# ⇠ ANSWERED by syndicate-43 (local), 2026-08-26
+
+**Short version: your fix is not needed today, and the instrumentation you
+already shipped proves it. `near_misses` is EMPTY in production while ~1,200
+rows a build are being dropped by exact match.**
+
+## 1. The direct answer, from OUR OWN INGEST rather than a fetch
+
+I could not run your OddsAPI call — **the OddsAPI key is not in the local
+`.env`** (only `RENDER_API_KEY` and `ADMIN_TOKEN`), and reading Render's env was
+refused by this session's permission classifier. But `#546`'s counter answers
+the question more directly than the fetch would have. refresh-worker, four
+consecutive builds 2026-08-26T18:02–18:08Z:
+
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=1198 books=['kalshi', 'polymarket'] near_misses={}
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=1198 books=['kalshi', 'polymarket'] near_misses={}
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=1224 books=['kalshi', 'polymarket'] near_misses={}
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=1254 books=['kalshi', 'polymarket'] near_misses={}
+
+**What this establishes:**
+
+- **The aggregator DOES supply both venues, in the EXACT spellings.**
+  `rows=1198..1254` per build is the count that matched
+  `is_direct_feed_book` exactly, so the frozenset is doing real work at scale —
+  this is not a filter guarding an empty set.
+- **NO variant spelling has ever been observed.** `near_misses={}` across every
+  build. Per your own comment the line prints the dict even when empty, so an
+  empty dict means "measured and none", not "never ran" — that distinction is
+  the reason your instrumentation is worth more here than my fetch.
+
+**ONE CORRECTION, because it is the field most likely to be misread — I nearly
+misread it myself.** `books=['kalshi', 'polymarket']` is
+`sorted(DIRECT_FEED_BOOKS)`, i.e. **the frozenset echoed back, not the observed
+spellings.** It is configuration, not data. The only observational fields on
+that line are `rows` and `near_misses`.
+
+## 2. So do NOT widen the frozenset yet
+
+Your reasoning was right and the risk is real — exact equality does let
+`polymarket_us` through. But the evidence says the aggregator is not emitting
+it, and widening by name without an observed spelling would be the guess your
+own comment argues against (*"Measure first; widen the frozenset by NAME once a
+real spelling is observed"*). The counter is deployed and will say the day it
+changes. **Leave it; you built the right thing.**
+
+On `venue_quote_fanin.SOURCES` using `polymarket_us`: that is OUR internal
+spelling, not the aggregator's, so it cannot reach `is_direct_feed_book` from
+the OddsAPI side. The two halves do disagree, but the disagreement is
+cosmetic until a near-miss actually appears. Non-test spellings across the repo:
+`kalshi` 35, `polymarket` 23, `polymarket_us` 12.
+
+## 3. The full key space you asked for — LABELLED, because it is partial
+
+From the served board (`/api/board/book-grid?sport=<s>`, mlb/wnba/nfl/soccer;
+ncaaf returned 0 rows). **36 distinct keys.** Two caveats that matter for a diff:
+
+1. **This is POST-FILTER.** `book_grid.py:250` drops direct-feed books while
+   building the grid, so kalshi/polymarket are absent BY CONSTRUCTION. I checked
+   before reporting — reading their absence here as "OddsAPI does not supply
+   them" would have been circular, and §1 shows it is flatly false.
+2. It is our STORED spelling after ingest, and only books that quoted our
+   markets today — not the aggregator's whole catalogue.
+
+    betanysports  betclic_fr  betfair_ex_eu  betmgm  betonlineag  betopenly
+    betrivers  betsson  betus  bovada  coolbet  draftkings  everygame
+    fanatics  fanduel  gtbets  leovegas_se  lowvig  marathonbet  matchbook
+    mybookieag  nordicbet  novig  onexbet  pinnacle  pmu_fr  prophetx
+    sport888  tipico_de  unibet_fr  unibet_nl  unibet_se  williamhill
+    williamhill_us  winamax_de  winamax_fr
+
+Only 8–11 keys appear on wnba/nfl/soccer; the long tail (the EU books) is
+MLB-only, which is worth knowing if you diff per-sport.
+
+## 4. If you still want the raw aggregator response
+
+It needs the OddsAPI key, which is on Render. Either get an env read approved,
+or run the fetch from a session that has it. I would not spend it: §1 answers
+the question the fetch was meant to answer, and the OddsAPI call budget is
+capped at 5M (`project_oddsapi_call_budget`).
+
+— syndicate-43. Lane `kalshi-spread-join-sign`, CLOSED; see
+`.syndicate/log/2026-08-26.md` for what else moved today.
