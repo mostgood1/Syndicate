@@ -902,6 +902,69 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         )
         price = None
 
+    # --------------------------------------------------------------------
+    # A BUY CANNOT COST MORE THAN ITS OWN LIMIT. CHECK THE RESULT, NOT THE RULE.
+    # --------------------------------------------------------------------
+    #
+    # The complement above is a RULE about which side `avgPx` is quoted on.
+    # Nothing verified its OUTPUT, so applying it when it should not have been
+    # -- or failing to when it should -- produced a recorded price the order
+    # could not possibly have filled at, and nothing said so.
+    #
+    # MEASURED 2026-08-26, `tsc-mlb-bos-mia-2026-08-26-8pt5`, real money:
+    #
+    #     submitted   limit 0.43, quantity 9.60   ($4.13 stake)
+    #     venue       semi-filled 7.11 of 9.60
+    #     recorded    fill_price 0.57  ->  7.11 x 0.57 = $4.05
+    #     ceiling     7.11 x 0.43      =            $3.06
+    #
+    # $4.05 against a $3.06 ceiling is 32% over on an order that was never
+    # marketable above 0.43. One of the two numbers is wrong and the ledger
+    # cannot tell which -- `fill_stake_dollars` is DERIVED as
+    # `contracts x fill_price` (`execution_ledger.py`), and `fill_cost_dollars`
+    # is None, so NOTHING in this system independently measures what was paid.
+    # That is why this checks the only thing it can prove.
+    #
+    # SEMANTICS-FREE, and that is the point. It makes no claim about which
+    # token `OUTCOME_SIDE_NO` buys or how `avgPx` is quoted -- the two readings
+    # this file has now had wrong in both directions. It only asserts that a
+    # BUY does not fill above the price we ourselves sent, which is true on any
+    # exchange under either reading.
+    #
+    # WITHHELD RATHER THAN CORRECTED. Flipping the price back would be a third
+    # guess at the same convention. Withholding makes reconciliation fall back
+    # to the price we ASKED for -- a known number -- exactly as the unreadable
+    # side branch above already does.
+    submitted_limit = order.get("price")
+    if isinstance(submitted_limit, Mapping):
+        submitted_limit = submitted_limit.get("value")
+    try:
+        submitted_limit = float(submitted_limit)
+    except (TypeError, ValueError):
+        submitted_limit = None
+
+    if (
+        price is not None
+        and submitted_limit is not None
+        and 0.0 < submitted_limit < 1.0
+        # A tick of slack: the venue snaps and rounds, and this must fire on an
+        # inverted price (a whole complement away), never on a rounding step.
+        and price > submitted_limit + 0.01
+    ):
+        print(
+            f"[polymarket_us_orders] FILL_ABOVE_LIMIT"
+            f" order={order.get('id') or order.get('orderId')}"
+            f" slug={order.get('marketSlug')!r} outcome_side={outcome_side!r}"
+            f" avgPx={raw_price!r} recorded={price!r} submitted_limit={submitted_limit!r}"
+            f" filled={filled!r} complement_of_recorded={round(1.0 - price, 4)!r}"
+            " -- a BUY cannot fill above its own limit, so the recorded price is"
+            " wrong. Price WITHHELD; reconciliation falls back to the requested"
+            " price. Check whether the avgPx complement was applied to the wrong"
+            " side for this market.",
+            flush=True,
+        )
+        price = None
+
     # THE RAW FIELD, LOGGED. This defect was diagnosed from a screenshot and
     # arithmetic because no log line carried `avgPx`, so the one input that
     # would have settled it in seconds was the one nobody could see.
