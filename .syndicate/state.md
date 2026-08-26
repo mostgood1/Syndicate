@@ -5460,3 +5460,42 @@ card — **never yet seen on a live card.**
 **`second_half_shot_multiplier = 1.22` IS NOT WRONG.** Measured 57.1% ± 3.7pp
 second-half goal share against its assumed 55–56% — inside one standard error.
 Do not change it without a larger sample.
+
+---
+
+## Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`)
+
+**THE ONE THING A HUMAN MUST DO: fund Kalshi exchange shard 3.**
+kalshi.com/account/exchange-indexes, or the intra-account-transfer API. Roughly
+a minute. Kalshi balances are PER-SHARD and must be preallocated; shard 3 is
+"Tennis & Baseball", which is why only MLB fails. Nothing else is blocked and
+no further code change is needed.
+
+**Verified working today:** Kalshi fills on shard 0 (`KXWNBA3PT` filled
+16:03:06Z, 10 contracts @ 0.40 + 0.168 fees, ~1s round trip). Polymarket
+reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
+15/book, 25/day.
+
+**Kalshi order body — settled, do not re-litigate:**
+- `POST /portfolio/events/orders` on `external-api.kalshi.com` — CONFIRMED from
+  the venue's own docs, not inferred.
+- `exchange_index: -1` (auto-route by ticker). A literal `0` PINS shard 0 and
+  returns `market_not_found` for anything elsewhere.
+- `subaccount: 0` — omitting it was deployed, disproven, reverted. Every fill
+  the account has ever taken carries `0`.
+- `side` is `bid`/`ask` only, quoted from the YES leg. The UI's
+  `op_order_side`/`op_side` are UI params, not body fields.
+
+**Still open, none of it blocking:**
+- `#573` — refuse by READING `GET /portfolio/balance?exchange_index=N` instead
+  of a hardcoded `funded_shards` list. Self-heals the moment the shard is
+  funded; turns the last inferred step into a measurement.
+- Kalshi spreads/h2h side plumbing — **owned by syndicate-43**
+  `[USER DECISION 2026-08-26]`. `unmappable_side` is currently a GUARD, not a
+  gap: the join pairs a `+1.5` board row with the same team's `-1.5` market, so
+  clearing the refusal without fixing the join inverts ~10 bets a cycle.
+- `no_venue_ticker` on h2h — `price_source=aggregator`, so no Kalshi ticker is
+  ever stamped. Nobody holds this.
+- Polymarket per-order reads cannot detect orphans by construction (no list
+  route, `GET /v1/orders` -> `code: 12` UNIMPLEMENTED). `coverage=per_order`
+  says so on every RECONCILE line.
