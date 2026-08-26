@@ -1036,3 +1036,43 @@ def test_the_known_good_shard_list_opens_without_a_deploy(monkeypatch):
     # an empty allowlist would read as "no shard is known good".
     monkeypatch.setenv("KALSHI_ORDER_KNOWN_SHARDS", "abc,,")
     assert _known_shards() == (0,)
+
+
+def test_an_unread_shard_says_so_instead_of_printing_none():
+    """MEASURED 2026-08-26T15:32Z, and it was the pre-registered counter-verify.
+
+    The classifier printed `market_shard=None known_good_shards=[0]`, which
+    reads as "we compared and it did not match". Nothing was compared:
+    `exchange_index` was missing from `kalshi_client._MARKET_FIELDS`, so the
+    normalizer dropped it from a payload that carried `3`.
+
+    Same defect class as everything else that day -- a reading that looks like
+    an answer -- so the two cases must not share a string.
+    """
+    from syndicate.features.shared.kalshi_orders import _classified
+
+    raw = RuntimeError('http_400: {"code":"user_not_found: x"}')
+    assert "market_shard=UNREAD" in str(_classified(raw, {"ticker": "T"}, None))
+    assert "market_shard=3" in str(_classified(raw, {"ticker": "T"}, 3))
+    # Shard 0 must NOT be swallowed by the None branch -- it is a real shard and
+    # the one we are provisioned on.
+    assert "market_shard=0" in str(_classified(raw, {"ticker": "T"}, 0))
+
+
+def test_the_market_normalizer_carries_the_exchange_shard():
+    """The field that explains two days of failed MLB orders, and it was being
+    dropped by an allowlist that nobody had updated.
+
+    `normalize_market` is an allowlist on purpose -- it is why a venue rename
+    surfaces as a missing field rather than a silent None. The cost is that a
+    field nobody listed is invisible even when the raw response carries it, and
+    the whole diagnosis had to come from a session with unproxied network access
+    reading the payload directly.
+    """
+    from syndicate.features.shared.kalshi_client import normalize_market, _MARKET_FIELDS
+
+    assert "exchange_index" in _MARKET_FIELDS
+    out = normalize_market(
+        {"ticker": "KXMLBTOTAL-26AUG261940TEXCWS-8", "status": "active", "exchange_index": 3}
+    )
+    assert out["exchange_index"] == 3

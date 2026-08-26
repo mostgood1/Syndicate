@@ -584,9 +584,17 @@ def _classified(exc: BaseException, body: Mapping[str, Any], market_shard: Any) 
     if "user_not_found" not in text:
         return exc
     shards = _known_shards()
+    # UNREAD IS NOT A VALUE, and printing `market_shard=None` beside
+    # `known_good_shards=[0]` reads as "we compared and it did not match" when
+    # nothing was compared at all. MEASURED 2026-08-26T15:32Z: exactly that,
+    # because `exchange_index` was missing from `kalshi_client._MARKET_FIELDS`
+    # and the normalizer dropped it. Same defect class as everything else today
+    # -- a reading that looks like an answer -- so the two cases are now
+    # different strings.
+    shard = "UNREAD" if market_shard is None else market_shard
     return OrderBuildError(
         "venue_shard_not_provisioned:"
-        f" market_shard={market_shard} known_good_shards={list(shards)}"
+        f" market_shard={shard} known_good_shards={list(shards)}"
         f" ticker={body.get('ticker')}"
         " -- the market resolved and the ACCOUNT did not. This needs the venue"
         " to enable this account on that exchange shard; no code change fixes"

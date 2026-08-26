@@ -31571,3 +31571,58 @@ Now three buckets, because two could not tell these apart:
 unclaimed=20`. **counter-verify:** if `ours` is still non-zero, the surviving
 rows are genuinely lost ledger rows and need naming one by one — do NOT widen
 the shape test to make the number go away.
+
+---
+
+## 2026-08-26 15:32Z · READINGS on `04c575b00` — one verify PASSED, one COUNTER-VERIFY FIRED
+
+### PASSED — the orphan false alarm is closed
+
+```
+RECONCILE_ORPHANS venue=kalshi n=26 ours=0 foreign_client=6 unclaimed=20
+  sample_ours=[]
+```
+
+Exactly the pre-registered prediction (`ours=0 foreign_client=6 unclaimed=20`).
+The six were `KXMVECROSSCATEGORY` parlays placed by another client of the
+account. **No money is missing.** `sample_ours=[]` is the line that says so.
+
+### COUNTER-VERIFY FIRED — the shard number is a HOLE, not a reading
+
+The classifier works and fires on every MLB order:
+
+```
+LIVE_ORDER status=rejected venue=kalshi ticker=KXMLBTOTAL-26AUG261940TEXCWS-8
+  error='OrderBuildError: venue_shard_not_provisioned:
+    market_shard=None known_good_shards=[0] ...'
+```
+
+**`market_shard=None`.** I pre-registered this exact case: *"if `market_shard`
+comes back `None`, the public payload is not carrying the field on our read path
+and the classifier is reporting a hole rather than a shard — say that rather
+than trusting `[0]`."* So: saying it.
+
+**Cause:** `exchange_index` was never in `kalshi_client._MARKET_FIELDS`.
+`normalize_market` is an allowlist — correctly, because that is why a venue
+rename surfaces as a missing field instead of a silent `None` — and a field
+nobody listed is invisible even when the raw response carries it. The venue was
+sending `3`; we were dropping it on the floor. **That is why the whole diagnosis
+had to come from a session with unproxied network access reading the raw
+payload: our own client could not see the field that explained everything.**
+
+Two fixes:
+
+1. `exchange_index` added to `_MARKET_FIELDS`.
+2. **`market_shard=UNREAD` when the field is absent.** `None` printed beside
+   `known_good_shards=[0]` reads as *"we compared and it did not match"* when
+   nothing was compared. Third instance today of the same class — a reading that
+   looks like an answer — so the two cases no longer share a string.
+
+**verify:** next MLB rejection reads `market_shard=3 known_good_shards=[0]`.
+**counter-verify:** if it still reads `UNREAD`, the field is absent from the
+per-market GET response specifically (the peer read it from a listing), and the
+classifier must stop implying a comparison it cannot make at all.
+
+**Nothing about the conclusion changes** — MLB is on a shard this account is not
+provisioned on, established at n=9 from the venue. This only fixes whether OUR
+logs can show the number.

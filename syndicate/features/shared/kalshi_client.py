@@ -126,6 +126,17 @@ _MARKET_FIELDS = (
     "custom_strike",
     "result",
     "rules_primary",
+    # THE EXCHANGE SHARD THIS MARKET LIVES ON, and the field that explains two
+    # days of failed MLB orders. Public, no credential needed -- and it was
+    # being DROPPED here, so `SUBMIT_FAILED_MARKET` printed `exchange_index=None`
+    # for a market whose raw payload carried `3`.
+    #
+    # `normalize_market` is an allowlist, which is right: it is why a venue
+    # rename shows up as a missing field instead of a silent None. The cost is
+    # that a field nobody listed is invisible even when the raw response has it,
+    # and the whole diagnosis had to come from a session with unproxied network
+    # access reading the payload directly.
+    "exchange_index",
 )
 
 
