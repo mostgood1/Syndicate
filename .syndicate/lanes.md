@@ -1900,7 +1900,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Largest addressable bucket is now `no_matching_board_row=1838`**, not the
   date bucket. Any successor should start there.
 
-### venue-balances-on-portfolio — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+### venue-balances-on-portfolio — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
 - Goal: the Kalshi and Polymarket account balances are visible on `/portfolio`,
   beside the caps that spend them. `[user decision 2026-08-26: "are we able to
   display kalshi and polymarket balances on the portfolio page?"]`
@@ -1951,6 +1951,28 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   live-odds-worker, and a real figure (or a NAMED absence) rendered on
   `/portfolio`. **Polymarket's discovery result is the finding**: which path
   answered, or `path_unknown` against all four candidates.
+- **CLOSED 2026-08-26 — BOTH VENUES READ IN PRODUCTION**, worker + web
+  `4f3d3fe6`, stamp 7s old at 21:07:32Z: kalshi **$11.55** cash ($40.54 with
+  positions, `unit_disagreement null`), polymarket **$65.30** buying power
+  ($123.89 cash, open_orders 0.00, unsettled 0.00) via `/account/balances`.
+  Both `unit_assumption: documented` — no assumption left in the module.
+- **THE FIRST DEPLOY ANSWERED `path_unknown` AND THAT WAS THE POINT.**
+  `6fece2cd` shipped a guessed path; production returned
+  `kalshi=ok:13.84 polymarket=path_unknown` with all four candidates 404ing on
+  an identical gRPC `{"code":5}` envelope. A version that rendered `$0.00`
+  would have been indistinguishable from an empty account. The user supplied
+  the real path and both API references; `4f3d3fe6` replaced every guess with
+  a documented fact — plural path, list-by-currency shape, `buyingPower` over
+  `currentBalance`, and Kalshi's `balance_dollars` turning the cents division
+  into a cross-check.
+- **A TRAP THE DOCS CAUGHT THAT THE CODE WOULD NOT HAVE:** each Polymarket
+  balance row carries `pendingWithdrawals[].balance`, so the generic
+  balance-shaped-field scan would have reported money LEAVING the account as
+  the money in it.
+- **NEITHER VENUE CAN REACH ITS OWN DAY CAP** — kalshi $49.01 vs $11.55
+  (4.2x), polymarket $100.01 vs $65.30 (1.5x) — which the page now states
+  under the caps form. Full block: `deploys.md` 2026-08-26 21:0xZ.
+  Item: `todo.md #578`.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

@@ -32912,3 +32912,64 @@ verify: one build's `SUPERSEDED_SURVIVORS`. **If `no_group_sibling` dominates,
 the fix is to give the guard the state file's group stamps** — the same source
 that found these — rather than to change its lag. If something else dominates,
 the fix is different and this entry's hypothesis was wrong.
+
+## 2026-08-26 21:0xZ — live-odds-worker + web `4f3d3fe6` — both venue balances read, from the docs rather than from guesses
+
+**what:** `/portfolio` shows the Kalshi and Polymarket US account balances beside
+the caps that spend them. Worker fetches on the execution tick and stamps
+`venue_balances.json`; web reads the stamp with an age and never calls a venue.
+Lane `venue-balances-on-portfolio`. Item `todo.md #578`.
+
+**TWO DEPLOYS, because the first shipped a guess.** `6fece2cd` (worker
+20:43:55Z, web 20:41Z) carried the feature with a GUESSED Polymarket path.
+Its first production reading, 20:46Z, was the finding this lane existed to get:
+
+    VENUE_BALANCES kalshi=ok:13.84 polymarket=path_unknown
+
+all four candidates 404 with an identical gRPC envelope
+(`{"code":5,...}`) — the venue routing and answering, just not to those nouns.
+**The user then supplied the real path and both API references**, and
+`4f3d3fe6` replaced every guess in the module with a documented fact.
+
+**WHAT THE DOCS CHANGED (docs.kalshi.com + docs.polymarket.us, read
+2026-08-26 — and note they ARE readable from a Claude session via the browser
+tool; `kalshi_orders.py` still carries a comment saying the docs host is
+blocked, which is why the V2 order path had to be hand-supplied after a 410):**
+
+1. **The path is PLURAL** — `/v1/account/balances`. The guess list had the
+   singular. One character.
+2. **The response is a LIST keyed by `currency`, and one field in it is a
+   trap**: each row carries `pendingWithdrawals[].balance`, so the generic
+   balance-shaped-field scan would have reported money LEAVING the account as
+   the money in it. Now parsed by name against the documented shape.
+3. **`buyingPower` is not `currentBalance`**, and for a cap comparison it is
+   the right one — "unencumbered capital available for trading, factoring in
+   all security valuations and open orders" vs fiat-only.
+4. **No unit is assumed anywhere any more.** Polymarket is `number<decimal>`
+   (dollars — the `dollars_unverified` guess was right by luck). Kalshi ships
+   `balance_dollars` as a fixed-point STRING beside the int64 cents, so the
+   cents division became a CROSS-CHECK rather than an assumption.
+
+**claim:** held by this lane throughout on both services; preflight CLEAR on
+each (the worker's jobs finished on their own, nothing killed). Deploys
+dep-da7l8h15efls739fk27g (worker 21:01:56Z) and dep-da7lbion74is73ddf6n0
+(web 21:08:27Z).
+
+**verify — BOTH VENUES READ, stamp 7s old at 21:07:32Z:**
+
+    kalshi      dollars 11.55   portfolio_value_dollars 40.54
+                raw_field balance_dollars   raw_value 1154.0
+                unit_disagreement null      <- the venue agrees with itself
+    polymarket  dollars 65.30 (buyingPower)  cash_dollars 123.89
+                open_orders 0.00  unsettled 0.00  currency USD
+                path /account/balances
+    both        unit_assumption "documented"
+
+**AND THE READING IMMEDIATELY EARNED ITS PLACE ON THE PAGE.** Neither venue can
+reach its own day cap today: kalshi's $49.01 cap against **$11.55** spendable
+(4.2x), polymarket's $100.01 against **$65.30** (1.5x). Polymarket's cash and
+buying power differ by $58.59 with open orders and unsettled funds both at
+zero — collateral against open positions, not resting orders — which is exactly
+why `buyingPower` is the figure compared against a cap and `currentBalance` is
+not. Kalshi is three quarters deployed: $11.55 free of $40.54 including
+positions.
