@@ -1,5 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#567` — **Is the board build SLOW, or WAITING? Nothing on this service could tell them apart, and three wrong answers in one session came from guessing.** — lane `board-staleness-visibility`, 2026-08-26 — **INSTRUMENT SHIPPED (log-only), NOT DEPLOYED**
+
+**THE PROBLEM WITH EVERY ESTIMATE SO FAR.** Where the board build's time goes
+has been read, every single time, from the **gap between two log lines**. On
+2026-08-25 that method produced three wrong answers:
+
+| claim | reality |
+|---|---|
+| "~12.5 s per soccer league-week" | **0.17 s** — the gap was everything happening BETWEEN two builds |
+| "the per-sport window will change nothing" | took **7 minutes** off |
+| "memory is at 96–99%, its own failure mode" | anon **28–43%**, zero OOM kills in two days |
+
+A gap measures **elapsed wall time on a shared worker**. That is not the same
+quantity as the cost of whatever happens to bracket it.
+
+**WHAT THE 9m34s WINDOW ACTUALLY CONTAINS** (instance `-427jr`, 2026-08-26,
+read directly): per-sport `live_lens_tick_*` cycles, NFL `board_contract_*`
+cycles, `artifact_publisher` PULL/repair traffic, and a **~350 MB
+`refresh_odds_sources.py --soccer-leagues <one league>` CHILD PROCESS**. The
+board's own identifiable work in the same window was **~55 s** of MLB card
+contexts (`MLB_GAMES_STAGE_MS`, measured) plus soccer contexts now 89.5%
+memoised.
+
+**So the leading hypothesis is that the board build is not slow, it is QUEUED** —
+and if that is right, every fix aimed at making the board cheaper is aimed at the
+wrong thing. `#565`'s soccer memo is the cautionary case: correct, verified,
+89.5% hit rate, and worth **82 seconds**.
+
+**THE INSTRUMENT.** `BOARD_BUILD_TIMING wall_s= cpu_s= off_cpu_pct= ok=`, wrapped
+around `_build_candidate_pool` at both call sites (no reindent of an 880-line
+method). `time.process_time()` counts CPU for **this process only**, so the odds-
+refresh child burning a core does NOT appear in it — which is exactly what makes
+the wall/CPU gap readable as contention rather than hidden work.
+`off_cpu_pct` high = waiting, low = computing.
+
+**Tests pin BOTH directions.** A sleeping build must read `off_cpu_pct > 80`, a
+busy one `< 40` — without the second, the first would pass on a timer that always
+said "waiting". It also reports on a build that RAISES, which is when the timing
+matters most.
+
+**A DEFECT IN MY OWN FIRST DRAFT, fixed rather than pinned.** Both clocks were
+read BEFORE the `try`, so a raising clock would have killed the board build to
+protect a log line — the exact inversion the function's own docstring forbids.
+Worse, I wrote a test that DOCUMENTED that flaw instead of fixing it. The build
+now survives a broken clock and skips the line; the test asserts it.
+
+**NEXT: one clean build after this ships.** If `off_cpu_pct` is high, stop
+optimising the board and look at what else the worker is doing concurrently —
+starting with the sequential per-league `refresh_odds_sources.py` children.
+If it is low, the board really is doing ~9 minutes of work and the remaining
+cost is attributable inside it.
+
 ### `#566` — **There was no memory issue. `ALL_PROCESS_MEMORY` reports only the page-cache-inclusive figure, and I read it as an emergency four times in one session.** — lane `board-staleness-visibility`, 2026-08-26 — **FIXED (telemetry); NO PRODUCTION DEFECT FOUND**
 
 **THE ASK WAS "fix the memory issue". THE ANSWER IS THERE ISN'T ONE**, and that

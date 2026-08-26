@@ -3052,6 +3052,75 @@ def _state_payload_timestamp(payload: Any) -> str:
     return ""
 
 
+def _timed_candidate_pool(build, *args) -> Any:
+    """Run the candidate-pool build and report WALL vs CPU. `#567`.
+
+    THE ONE QUESTION THIS ANSWERS: is the board build SLOW, or is it WAITING?
+    Those have opposite fixes and nothing on this service currently separates
+    them.
+
+    WHY THIS EXISTS RATHER THAN ANOTHER READING OF THE LOGS. Every estimate of
+    where the board build's time goes has been taken from the GAP BETWEEN two
+    log lines, and on 2026-08-25 that method produced three wrong answers in one
+    session: "12.5 s per soccer league-week" (really 0.17 s -- the gap was
+    everything happening between two builds, not the build), "the per-sport
+    window will change nothing" (it took seven minutes off), and a memory
+    emergency read off a page-cache-inclusive percentage. A gap measures
+    ELAPSED WALL TIME ON A SHARED WORKER, which is not the same quantity as the
+    cost of the thing that happens to bracket it.
+
+    WALL MINUS CPU IS THE WHOLE POINT. Measured on `-427jr` 2026-08-26, the
+    9m34s "candidate pool" window contained per-sport `live_lens_tick_*` cycles,
+    NFL `board_contract_*` cycles, `artifact_publisher` pull traffic, and a
+    ~350 MB `refresh_odds_sources.py --soccer-leagues <one league>` CHILD
+    PROCESS -- while the board's own identifiable work in the same window was
+    ~55 s of MLB card contexts plus soccer contexts that are now 89.5% memoised.
+    If `cpu_s` is a small fraction of `wall_s`, the board is not slow, it is
+    queued behind the rest of the worker, and every fix aimed at making the
+    board cheaper is aimed at the wrong thing.
+
+    `time.process_time()` is CPU time for THIS process only. A child process
+    (the odds refresh) burning a core does NOT appear in it -- which is exactly
+    what makes the wall/CPU gap readable as contention rather than hidden work.
+
+    Never changes the result and never raises: on any failure the build's own
+    value is returned and the line is skipped. A timer that can break a board
+    build is worse than no timer.
+    """
+    # READ THE CLOCKS DEFENSIVELY. A first draft read them bare, before the
+    # try -- so a clock that raised would have killed the board build to
+    # protect a log line, which is the exact inversion this function's last
+    # paragraph forbids. Caught here rather than pinned by a test.
+    try:
+        started_wall: float | None = time.monotonic()
+        started_cpu: float | None = time.process_time()
+    except Exception:  # noqa: BLE001 - telemetry must never cost the build
+        started_wall = started_cpu = None
+    ok = True
+    try:
+        return build(*args)
+    except BaseException:
+        ok = False
+        raise
+    finally:
+        try:
+            if started_wall is None or started_cpu is None:
+                raise RuntimeError("clock unavailable at start")
+            wall = time.monotonic() - started_wall
+            cpu = time.process_time() - started_cpu
+            # `off_cpu_pct` is the fraction of the build spent NOT executing
+            # Python in this process -- IO, GIL contention, child processes,
+            # the scheduler. High means "waiting", low means "computing".
+            off_cpu_pct = round(100.0 * (1.0 - (cpu / wall)), 1) if wall > 0 else None
+            print(
+                f"[intelligence_state] BOARD_BUILD_TIMING wall_s={wall:.1f} "
+                f"cpu_s={cpu:.1f} off_cpu_pct={off_cpu_pct} ok={ok}",
+                flush=True,
+            )
+        except Exception:  # noqa: BLE001 - telemetry must never cost the build
+            pass
+
+
 def _read_state_payload(path: Path) -> dict[str, Any] | None:
     """Read the board state from the keyvalue store or the published artifact.
 
@@ -6142,7 +6211,7 @@ class IntelligenceStateService:
         cache_key = _payload_key(request_payload)
         logger.info("BETTING_BOARD_PUBLISH_START", extra={"selected_date": selected_date, "question": question})
 
-        candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+        candidate_pool = _timed_candidate_pool(self._build_candidate_pool, selected_date, source_fingerprint)
         candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
         # 2026-07-25: everything below this point (through the final return)
         # was only ever traced via logger.info/_log_stage_timing -- confirmed
@@ -6488,7 +6557,7 @@ class IntelligenceStateService:
                 self._last_run_key = cache_key
                 self._last_run_started_at = time.time()
 
-            candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+            candidate_pool = _timed_candidate_pool(self._build_candidate_pool, selected_date, source_fingerprint)
             candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
             if candidate_pool_count <= 0 and selected_date == central_today_iso() and not payload_had_explicit_date:
                 rollover_date = _next_supported_intelligence_date(selected_date)
