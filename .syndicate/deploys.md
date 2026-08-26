@@ -32239,3 +32239,68 @@ different `line` was observed more recently.
 **ALSO SEEN, unattributed:** `SWEEP_SKIPPED_DETAIL
 too_large=[mlb_source/tracking/book_quotes/2026-08-26.jsonl(18052118)]` — the
 MLB quote log is 18MB and being skipped by a sweep.
+
+---
+
+## 2026-08-26 — syndicate + refresh-worker `#575`: NFL chips 0 -> 16, and the horizon becomes the caller's to ask for
+
+**Deployed:** `syndicate` deploy `dep-da7io9ajnfac738i1cdg`, live `18:13:46Z`
+(commit `a066bafb`). `refresh-worker` deploy `dep-da7j60vavr4c73821kl0`, live
+`18:42:50Z` (commit `cdf5af5d`) — then REPLACED twice by another session's
+deploys, live SHA at verification `fed2f935` (`19:03:36Z`). Each carried `#575`
+forward; verified as ancestor AND by grepping the deployed tree every time,
+because ancestry alone does not prove the file content shipped.
+
+**verify — first completed build on the surviving instance, `19:15:44Z`:**
+
+```
+CHIP_JOIN_COVERAGE sport=nfl    chips=16  chip_dates=['2026-08-27','08-28','08-29']
+                                cards=106 by_matchup=106 no_chip_available=0 unknown_no_key=0
+CHIP_JOIN_COVERAGE sport=soccer chips=213 cards=400 by_matchup=199 by_canonical=194
+                                no_chip_available=0 unknown_no_key=7
+CHIP_JOIN_COVERAGE sport=mlb    chips=15  cards=400 no_chip_available=0
+CHIP_JOIN_COVERAGE sport=wnba   chips=2   cards=400 no_chip_available=0
+GAME_CHIPS_PUBLISHED date=2026-08-26 chips=246 sports=8 ok=True
+```
+
+**NFL `no_chip_available` 106 -> 0**, matching the local measurement exactly
+(0 -> 16 chips, 106 -> 0 misses). `chips=246` is up from 230 — the 16 new NFL
+chips. Nothing else moved: soccer held at 0 misses across its 15-date span.
+
+**What `#575` actually fixed, and it was TWO defects with one root.**
+`provider.games()` served the home rail (means "today") and the chip strip
+(means "the board's next seven days") through one signature:
+
+  * NFL returned `chips=0` because on 08-26 `preseason_week_for_date` is None
+    and `regular_season_game_ids_for_date` is None, so it fell to
+    `preseason_target_week`=4 and then filtered week 4 down to games played ON
+    08-26 — none. Correct for a rail. Fatal for a board carrying 106 cards for
+    games up to three days out.
+  * SOCCER: `#542` widened the span unconditionally and I did not check the
+    shared caller. **The home rail went 98 -> 210 games**, rendering every one
+    with a count badge claiming 210 today. My own regression, found only when
+    this task made me read the call graph properly.
+
+`include_upcoming` is now an explicit opt-in, default False, probed via
+`inspect.signature` at the call site (`_games_accepts_include_upcoming`) because
+`home.py` and the chip builder are separate blobs — an unguarded kwarg against
+an older provider would raise and blank EVERY sport's strip.
+
+**A PROCESS FAILURE WORTH MORE THAN THE FIX.** I reported this task complete
+while the regression sweep was still running; it then failed four tests I had
+caused (three in my own `#542` file, one in `test_sport_data_provider`) because
+they asserted the unconditional behaviour I had just made opt-in. The
+measurements I quoted were real; "done" was not. Same shape as the `|`-alternation
+log query earlier the same day: **acting on a result before confirming the
+method behind it.** Re-run clean at 1340 passed.
+
+**Restart churn made this expensive to verify.** The worker restarted FOUR times
+in ~80 minutes from other sessions' deploys; two instances never reached the
+shortlist stage at all, so `CHIP_JOIN_COVERAGE` was absent for 24 minutes for
+reasons unrelated to the change. Distinguishing "hasn't run" from "didn't work"
+needed a liveness check (`BUILD_SPAN_ENTER/EXIT`) rather than more polling.
+
+**Still open, named by the telemetry itself:** soccer `unknown_no_key=7` —
+`Telstar`, `Feyenoord`, `KV Kortrijk`, `Leuven`, `Genk`. Clubs `canonical_team`
+cannot place. `#540`-shaped, small, and now visible without anyone noticing a
+broken card.
