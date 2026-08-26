@@ -3667,6 +3667,81 @@ def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
     return _abort_if_memory_critical(stage, _MIN_SAFE_MEMORY_HEADROOM_BYTES)
 
 
+
+def _refresh_wnba_boxscores(selected_date: str) -> None:
+    """Produce the WNBA final boxscore artifact for `selected_date`, if needed.
+
+    PLACED BESIDE `settle_orders` DELIBERATELY. `wnba_source/data/processed/
+    boxscores_<date>.csv` is the only source that can tell WNBA settlement a
+    game is OVER, and it had NO PRODUCER AT ALL -- every caller of the vendor's
+    fetcher lives inside `vendor/*_betting_repo/`, while
+    `scripts/artifact_freshness.py:67` monitored the family for three months
+    with nothing behind it. Coverage stopped 2026-05-24. A producer that lives
+    somewhere else from its consumer is exactly how that happens, so this one
+    does not.
+
+    WHY SETTLEMENT NEEDS IT: `bet_status_wnba` hardcodes `is_final=False`
+    because the LIVE box carries no game status, so an over that never crosses
+    its line can never decide and ONLY WINNING OVERS SETTLE. Measured
+    2026-08-25: Sonia Citron 1 rebound against over 3.5 and Georgia Amoore 3
+    assists against over 3.5 are losses that can never be recorded, while
+    Natasha Mack's over 7.5 graded within minutes.
+
+    REBUILDS ONLY WHEN THE SLATE HAS MOVED. One scoreboard call says how many
+    games are final; if the artifact already covers that many, nothing is
+    fetched. That matters because this runs on every settlement pass (~3 min):
+    a slate that finishes through the evening is picked up as each game ends,
+    and a finished slate costs one cheap call thereafter rather than a full
+    refetch forever.
+
+    NEVER RAISES. Settlement failing because a producer failed would be a worse
+    outcome than the gap this closes.
+    """
+    try:
+        from scripts.build_wnba_boxscores import (
+            artifact_relative_path,
+            build_date,
+            completed_event_ids,
+        )
+        from syndicate.features.shared.refresh_state_store import (
+            data_root,
+            read_text_file,
+        )
+
+        try:
+            final_games = len(completed_event_ids(selected_date))
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"[intelligence_state] WNBA_BOXSCORES_SCOREBOARD_FAILED"
+                f" date={selected_date} {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return
+        if not final_games:
+            return
+
+        covered = 0
+        existing = read_text_file(data_root() / artifact_relative_path(selected_date))
+        if existing:
+            rows = [line for line in str(existing).splitlines()[1:] if line.strip()]
+            covered = len({line.split(",", 1)[0].strip() for line in rows})
+        if covered >= final_games:
+            return
+
+        print(
+            f"[intelligence_state] WNBA_BOXSCORES_REBUILD date={selected_date}"
+            f" final_games={final_games} covered={covered}",
+            flush=True,
+        )
+        build_date(selected_date)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[intelligence_state] WNBA_BOXSCORES_FAILED date={selected_date}"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _profile_stage(stage_name: str, callback, *args, **kwargs):
     started_at = time.perf_counter()
     try:
@@ -5541,6 +5616,7 @@ class IntelligenceStateService:
                     pass
                 for _settle_date in _dates:
                     if _settle_date:
+                        _refresh_wnba_boxscores(_settle_date)
                         settle_orders(_settle_date)
             except Exception as exc:
                 print(f"[intelligence_state] SETTLEMENT_FAILED error={exc}", flush=True)

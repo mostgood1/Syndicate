@@ -499,6 +499,8 @@
 {% set summary = portfolio_summary or {} %}
 {% set psettings = portfolio_settings or {} %}
 {% set psources = psettings.sources or {} %}
+{% set xl = execution_limits or {} %}
+{% set xlsrc = xl.sources or {} %}
 
 {% set L = live or {} %}
 {% set st = (L.settlement or {}).get('total') or {} %}
@@ -655,12 +657,79 @@
            `max_day_dollars` here is whatever the worker resolved for its LAST
            call, so a single figure reads as the account's limit while Kalshi
            and Polymarket are funded differently. #}
-        per order · {{ caps.get('max_day_orders') }}/book · {{ caps.get('max_day_orders_all_venues') }} total
+        per order · {{ caps.get('max_day_orders_all_venues') }} orders/day account-wide
       </div>
       <div class="live-tile__meta">
-        kalshi ${{ "%.0f"|format(caps.get('max_day_dollars_kalshi') or 50) }}/day ·
-        polymarket ${{ "%.0f"|format(caps.get('max_day_dollars_polymarket') or 100) }}/day
+        {# PER VENUE, DOLLARS *AND* ORDERS. The order count used to render as a
+           single "/book" figure because `limits()` resolved it flat -- true
+           only while both venues carried the same number, which stopped being
+           guaranteed the moment these became editable. #}
+        kalshi ${{ "%.0f"|format(caps.get('max_day_dollars_kalshi') or 0) }} · {{ caps.get('max_day_orders_kalshi') or caps.get('max_day_orders') }} orders
       </div>
+      <div class="live-tile__meta">
+        polymarket ${{ "%.0f"|format(caps.get('max_day_dollars_polymarket') or 0) }} · {{ caps.get('max_day_orders_polymarket') or caps.get('max_day_orders') }} orders
+      </div>
+      <div class="live-tile__meta"><a href="#venue-limits" style="color:var(--cards-accent);text-decoration:none;">Edit limits</a></div>
+    </div>
+
+    {# ---------------------------------------------------------------
+       WHAT IS ACTUALLY IN THE ACCOUNTS.
+
+       Beside the caps deliberately: a $250/day cap against a $40
+       balance is a cap that can never bind, and the two numbers are
+       only useful next to each other.
+
+       NO DOLLAR FIGURE IS EVER SHOWN FOR A FAILURE. "$0.00" and "we
+       could not read it" are opposite facts -- one says stop, the
+       other says something is broken -- so every non-`ok` state
+       renders as its own words and no number at all.
+       --------------------------------------------------------------- #}
+    {% set B = L.balances %}
+    <div class="live-tile">
+      <div class="live-tile__label">Venue balances</div>
+      {% if not B %}
+        <div class="live-tile__value">—</div>
+        <div class="live-tile__meta">worker has not reported</div>
+      {% else %}
+        {% set bv = B.venues or {} %}
+        {% set kal = bv.kalshi or {} %}
+        {% set pm = bv.polymarket or {} %}
+        <div class="live-tile__value">
+          {% if kal.status == 'ok' and pm.status == 'ok' %}
+            ${{ "%.2f"|format((kal.dollars or 0) + (pm.dollars or 0)) }}
+          {% else %}
+            {# A TOTAL OVER A PARTIAL READ IS A LIE. If either venue is
+               unreadable, the sum is not the account and must not be
+               printed as though it were. #}
+            —
+          {% endif %}
+        </div>
+        {# THE TWO NUMBERS DO NOT MEAN THE SAME THING, and the tile says which
+           is which rather than stacking them as if they did. Kalshi's is
+           available CASH (`balance`, cents, docs.kalshi.com); Polymarket's is
+           BUYING POWER — "unencumbered capital available for trading,
+           factoring in all security valuations and open orders"
+           (docs.polymarket.us). Both are the right figure to check a day cap
+           against at their own venue; neither is the other. #}
+        <div class="live-tile__meta">
+          kalshi
+          {% if kal.status == 'ok' %}<strong title="Available cash. Kalshi reports this separately from portfolio value.">${{ "%.2f"|format(kal.dollars or 0) }}</strong> cash{% if kal.get('portfolio_value_dollars') is not none %} · ${{ "%.2f"|format(kal.get('portfolio_value_dollars')) }} w/ positions{% endif %}
+          {% else %}<span class="warn" title="{{ kal.detail or '' }}">{{ kal.status|replace('_', ' ') or 'unknown' }}</span>{% endif %}
+        </div>
+        <div class="live-tile__meta">
+          polymarket
+          {% if pm.status == 'ok' %}<strong title="Buying power: unencumbered capital, after security valuations and open orders.">${{ "%.2f"|format(pm.dollars or 0) }}</strong> buying power{% if pm.get('cash_dollars') is not none %} · ${{ "%.2f"|format(pm.get('cash_dollars')) }} cash{% endif %}
+          {% else %}<span class="warn" title="{{ pm.detail or '' }}">{{ pm.status|replace('_', ' ') or 'unknown' }}</span>{% endif %}
+        </div>
+        <div class="live-tile__meta">
+          {# The age is what turns a figure into a reading. A balance from
+             forty minutes ago is not the balance. #}
+          {% if B.age_seconds is not none %}read {{ (B.age_seconds // 60) }}m ago{% else %}age unknown{% endif %}
+          {% if kal.get('unit_disagreement') %}
+            · <span class="warn" title="Kalshi's own cents and dollar-string fields disagree: {{ kal.get('unit_disagreement') }}. The venue has changed something.">venue disagrees with itself</span>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
   </div>
 
@@ -727,8 +796,123 @@
       {# The caps above this form are the WORKER's, and they are a different
          ceiling from these: these bound what the engine will COMMIT, those
          bound what it may SUBMIT. A change here does not move those. #}
-      The per-order and per-day caps in the banner above are the worker's own
-      limits and are set separately.
+      The per-order and per-day caps are set in the panel below.
+    </div>
+  </div>
+
+  {# -----------------------------------------------------------------
+     THE VENUE CAPS, EDITABLE. [user decision 2026-08-26: "we need to be
+     able to enter Polymarket and Kalshi MAX per day and orders per day
+     on this page like the other pieces like bankroll"]
+
+     THESE ARE NOT DISPLAY FIELDS. `execution_guard.limits()` reads this
+     store on the WORKER, on the same call `check_order` uses to refuse
+     an order, so a number saved here is a number that stops a submit.
+     The two account-wide ceilings are editable for exactly that reason
+     too: they are checked BEFORE the per-venue budgets, so without them
+     raising Kalshi would have been a form that changed nothing.
+     ----------------------------------------------------------------- #}
+  <div class="portfolio-bankroll" id="venue-limits">
+    <h2 class="portfolio-section-title">Live venue limits</h2>
+    <form method="post" action="/portfolio/limits" class="portfolio-bankroll__row">
+      <div class="portfolio-bankroll__field">
+        <label for="max_day_dollars_kalshi">Kalshi max $/day</label>
+        <input type="number" id="max_day_dollars_kalshi" name="max_day_dollars_kalshi"
+               step="1" min="0.01" max="10000"
+               value="{{ "%.2f"|format(xl.max_day_dollars_kalshi or 0) }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="max_day_orders_kalshi">Kalshi orders/day</label>
+        <input type="number" id="max_day_orders_kalshi" name="max_day_orders_kalshi"
+               step="1" min="1" max="1000"
+               value="{{ xl.max_day_orders_kalshi or 0 }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="max_day_dollars_polymarket">Polymarket max $/day</label>
+        <input type="number" id="max_day_dollars_polymarket" name="max_day_dollars_polymarket"
+               step="1" min="0.01" max="10000"
+               value="{{ "%.2f"|format(xl.max_day_dollars_polymarket or 0) }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="max_day_orders_polymarket">Polymarket orders/day</label>
+        <input type="number" id="max_day_orders_polymarket" name="max_day_orders_polymarket"
+               step="1" min="1" max="1000"
+               value="{{ xl.max_day_orders_polymarket or 0 }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="max_order_dollars">Max $/order</label>
+        <input type="number" id="max_order_dollars" name="max_order_dollars"
+               step="1" min="0.01" max="1000"
+               value="{{ "%.2f"|format(xl.max_order_dollars or 0) }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="max_day_dollars_all_venues">Account max $/day</label>
+        <input type="number" id="max_day_dollars_all_venues" name="max_day_dollars_all_venues"
+               step="1" min="0.01" max="20000"
+               value="{{ "%.2f"|format(xl.max_day_dollars_all_venues or 0) }}">
+      </div>
+      <div class="portfolio-bankroll__field">
+        <label for="max_day_orders_all_venues">Account orders/day</label>
+        <input type="number" id="max_day_orders_all_venues" name="max_day_orders_all_venues"
+               step="1" min="1" max="2000"
+               value="{{ xl.max_day_orders_all_venues or 0 }}">
+      </div>
+      <button type="submit" class="portfolio-bankroll__save">Save</button>
+    </form>
+
+    {# THE CEILING BINDS FIRST, AND SAYING SO IS THE POINT. Without this note
+       a user raises both venues, sees both new numbers echoed back, and
+       places against the old account ceiling with nothing anywhere reporting
+       it -- an accepted edit that does nothing. Computed in
+       `execution_limits_settings.resolve_view`, so it stays true if the
+       defaults move. #}
+    {% for note in xl.ceiling_notes or [] %}
+      {# `info` on the shipped defaults, `warn` once a stored or env value is
+         what makes the cap unreachable. Always SAID; only the colour changes. #}
+      <div class="{{ 'portfolio-bankroll__warn' if note.severity == 'warn' else 'portfolio-bankroll__meta' }}">{{ note.text }}</div>
+    {% endfor %}
+
+    {# A CAP ABOVE THE BALANCE CANNOT BIND, and that belongs where the cap is
+       typed rather than leaving the reader to compare two tiles. Shown only for
+       a venue whose balance we actually READ -- an unknown balance must never
+       produce a claim about a cap. #}
+    {% set bvv = ((L.balances or {}).get('venues')) or {} %}
+    {% for vname, capkey in [('kalshi', 'max_day_dollars_kalshi'), ('polymarket', 'max_day_dollars_polymarket')] %}
+      {% set brow = bvv.get(vname) or {} %}
+      {% if brow.get('status') == 'ok' and (xl[capkey] or 0) > (brow.get('dollars') or 0) %}
+        <div class="portfolio-bankroll__meta">
+          {{ vname|capitalize }}'s ${{ "%.2f"|format(xl[capkey] or 0) }} day cap is above its
+          ${{ "%.2f"|format(brow.get('dollars') or 0) }} balance — the account runs out before the cap does.
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="portfolio-bankroll__meta">
+      {# `sources` per field, same distinction the bankroll block draws: "you
+         set $200" and "the store lost your edit and this is the $50 default"
+         are different facts about a money cap and render identically without
+         it. #}
+      Source — Kalshi <strong>{{ xlsrc.max_day_dollars_kalshi or "default" }}</strong>/<strong>{{ xlsrc.max_day_orders_kalshi or "default" }}</strong>,
+      Polymarket <strong>{{ xlsrc.max_day_dollars_polymarket or "default" }}</strong>/<strong>{{ xlsrc.max_day_orders_polymarket or "default" }}</strong>,
+      per order <strong>{{ xlsrc.max_order_dollars or "default" }}</strong>,
+      account <strong>{{ xlsrc.max_day_dollars_all_venues or "default" }}</strong>/<strong>{{ xlsrc.max_day_orders_all_venues or "default" }}</strong>{% if xl.updated_at %}, last saved {{ xl.updated_at|central(with_date=True) }} CT{% endif %}.
+    </div>
+    {% if xl.store_error %}
+    <div class="portfolio-bankroll__warn">
+      Saved limits could not be read ({{ xl.store_error }}) — the values above are defaults, not your edits.
+      Note the kill switch reads the same store and fails closed, so live orders are already blocked while this persists.
+    </div>
+    {% endif %}
+    <div class="portfolio-bankroll__meta">
+      These bind <strong>live</strong> orders only. Paper deliberately stays uncapped, so the paper
+      ledger measures the strategy rather than the cap.
+      A saved value takes effect at the worker's next order check; the
+      <em>Caps in force</em> tile above shows what the worker last reported, and catches up
+      within one execution tick.
+      {# THE TILE AND THIS FORM ARE TWO DIFFERENT READINGS ON PURPOSE. The tile
+         is the worker's stamp -- what actually placed today's orders. This form
+         is what web resolved just now. They differ for one tick after a save,
+         and that gap is information, not a bug to paper over. #}
     </div>
   </div>
 

@@ -5574,3 +5574,46 @@ reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
 - Polymarket per-order reads cannot detect orphans by construction (no list
   route, `GET /v1/orders` -> `code: 12` UNIMPLEMENTED). `coverage=per_order`
   says so on every RECONCILE line.
+
+## [board-chip-coverage] Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26
+
+Every compact card on the board resolves a live-scoreboard chip, measured from
+refresh-worker logs the same evening:
+
+    mlb 400/400   wnba 400/400   nfl 106/106   soccer 400/400
+
+`CHIP_JOIN_COVERAGE` (`pipeline/layer2_shortlist.py`, per sport, every build) is
+the instrument. It reports `chips=`, `chip_dates=`, resolution by index
+(`by_id` / `by_matchup` / `by_canonical`), plus `needs_fallback`,
+`no_chip_available` and `unknown_no_key` with named samples. Before it existed
+this defect class was found ONLY by a person looking at the board — twice.
+
+Three causes were closed, all previously invisible:
+
+* **Phase offset.** The chip build resolved ONE matchday per league from
+  `default_week(reference_date=today)`; on a Monday that is the matchday just
+  played. 65 of 96 chips described finished fixtures. Soccer
+  `no_chip_available` 251 -> 0; NFL was the same defect via an exact-date
+  filter, 106 -> 0.
+* **Two different names for one club.** Normalisation cannot bridge
+  "Athletic Bilbao"/"Athletic Club"; both sides now carry `canonical_team`'s
+  answer as a join key.
+* **Alias gaps**, named by the telemetry itself: soccer `unknown_no_key`
+  7 -> 0.
+
+**The horizon is the CALLER's to ask for** (`include_upcoming`, default False).
+`provider.games()` serves the home rail (means "today") and the chip strip
+(means "the board's forward horizon"); overloading it silently doubled the
+soccer home rail 98 -> 210 while fixing the board.
+
+**The alias map has TWO CONSUMERS WITH DIFFERENT REACH.** `teams_match` falls
+through to a shared-suffix heuristic; `canonical_team` is map-only and the chip
+join calls it directly. A club can join fixtures fine and still return None for
+a chip key. The asymmetry is principled: `teams_match` holds BOTH names and
+answers "same club?", so a loose rule is safe; the chip index holds ONE name and
+must mint a globally unique KEY, where the same rule mints collisions.
+
+**`DIRECT_FEED_BOOKS` needs no widening.** `near_misses={}` across many builds,
+one at 27,070 rows — the aggregator uses no spelling the exact match misses.
+Reproduced independently by lane `board-staleness-visibility`.
+

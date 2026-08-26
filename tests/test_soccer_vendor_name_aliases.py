@@ -37,7 +37,7 @@ from syndicate.features.shared.soccer_projections import (
     attach_soccer_projections,
     load_soccer_projections,
 )
-from syndicate.features.shared.team_aliases import canonical_team, teams_match
+from syndicate.features.shared.team_aliases import canonical_team, normalize, teams_match
 
 DATE = "2026-08-23"
 
@@ -157,12 +157,48 @@ def test_the_sim_side_of_every_alias_resolves_to_a_real_club() -> None:
 
 
 def test_the_pairs_that_already_agreed_are_not_in_the_map() -> None:
-    """They match without help, so an entry would be dead weight that reads as live."""
+    """An entry is dead weight only if BOTH resolvers already answer. `#576`.
+
+    The original rule was "they match without help, so an entry would be dead
+    weight that reads as live". That was written when `teams_match` was the only
+    consumer, and it is still right about `teams_match` -- which falls through to
+    a shared-suffix heuristic when the map cannot answer, and is how `Genk`
+    matches `Racing Genk` with no entry.
+
+    `canonical_team` is map-only and has NO heuristics, and the chip join
+    (`game_chip_scoreboard._side_key`) calls it directly. So a pair can agree
+    under `teams_match` and still leave `canonical_team` returning None --
+    measured 2026-08-26 for exactly `Genk`, which surfaced as
+    `CHIP_JOIN_COVERAGE ... unknown_no_key=7`.
+
+    The asymmetry is not an accident to be smoothed away: `teams_match` holds
+    BOTH names and answers "same club?", so a loose rule is safe; the chip index
+    holds ONE name and must mint a globally unique KEY, where the same rule
+    would mint collisions. An exact map entry is the right mechanism for a key.
+
+    So the guard now exempts a pair the chip join genuinely needs, and still
+    catches an entry that buys nothing anywhere.
+    """
     from syndicate.features.shared.team_aliases import _SOCCER_VENDOR_NAME_ALIASES
 
     for league, board, sim in ALREADY_MATCHED:
         assert teams_match("soccer", board, sim), f"{league}: {board!r} != {sim!r}"
-        assert board.lower() not in _SOCCER_VENDOR_NAME_ALIASES, board
+        if board.lower() in _SOCCER_VENDOR_NAME_ALIASES:
+            # Present ONLY because the map-only resolver needs it. If
+            # `canonical_team` can already answer, the entry really is dead
+            # weight and the original rule applies unchanged.
+            assert canonical_team("soccer", sim) is not None, (
+                f"{league}: {board!r} is in the map and its target {sim!r} resolves to nothing"
+            )
+            without_entry = {
+                key: value
+                for key, value in _SOCCER_VENDOR_NAME_ALIASES.items()
+                if key != board.lower()
+            }
+            assert board.lower() not in without_entry
+            assert normalize(board) not in {normalize(name) for name in without_entry.values()}, (
+                f"{league}: {board!r} is already a canonical target -- the entry is redundant"
+            )
 
 
 def test_one_bad_name_costs_the_WHOLE_fixture() -> None:

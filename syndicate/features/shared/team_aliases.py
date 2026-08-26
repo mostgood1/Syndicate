@@ -283,6 +283,46 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     # `_soccer_alias_to_name` drops ambiguous DERIVED keys but cannot police a
     # hand-written one.
     "deportivo": "Deportivo La Coruña",
+    # `#576`. FIVE MORE, and unlike every batch above these were not found by
+    # hand or by reading a join log -- `#541`'s `CHIP_JOIN_COVERAGE` named them,
+    # with the exact spelling, on the line it prints every build:
+    #
+    #   sport=soccer ... unknown_no_key=7 samples=[
+    #     {'matchup': 'Ajax @ SC Telstar',        'away_key': None, ...},
+    #     {'matchup': 'ADO Den Haag @ Feyenoord', 'home_key': None, ...},
+    #     {'matchup': 'Charleroi @ KV Kortrijk',  'away_key': None, ...},
+    #     {'matchup': 'Standard Liege @ Leuven',  'home_key': None, ...},
+    #     {'matchup': 'SK Beveren @ Genk',        'home_key': None, ...}]
+    #
+    # `away_key`/`home_key` is `canonical_team`'s own answer, so a None names
+    # the UNRESOLVABLE side directly and the other side proves the fixture
+    # itself is fine. No bisecting a board, no guessing which half missed.
+    #
+    # Every one is the club's SHORT name where the artifacts carry the long one.
+    # Checked for ambiguity the way `deportivo` documents rather than assumed:
+    # across all ten configured leagues each token below appears in EXACTLY ONE
+    # canonical name (204 names in `_soccer_alias_to_name`), so none can collide.
+    "ajax": "Ajax Amsterdam",
+    "feyenoord": "Feyenoord Rotterdam",
+    "charleroi": "Royal Charleroi SC",
+    "leuven": "OH Leuven",
+    # `Genk` LOOKS REDUNDANT AND IS NOT, and the reason is the whole point of
+    # this block. `#503`'s note says "Genk matches fine" and it is RIGHT --
+    # about `teams_match`, which falls through to a shared-suffix heuristic when
+    # the map cannot answer, and which `test_the_pairs_that_already_agreed_are_
+    # not_in_the_map` pins for exactly this pair.
+    #
+    # `canonical_team` has NO heuristics; it is map-only. `teams_match` can
+    # afford a loose rule because it holds BOTH names and is only ever asked
+    # "are these the same club". The chip index holds ONE name and must mint a
+    # KEY that is globally unique, so a heuristic there would be minting
+    # collisions rather than comparing candidates. That asymmetry is why the
+    # answer is an exact map entry and NOT a looser `canonical_team`.
+    #
+    # So this entry is dead weight for the fixture join and load-bearing for the
+    # chip join. Measured 2026-08-26: `canonical_team("soccer", "Genk")` was
+    # None while `teams_match("soccer", "Genk", "Racing Genk")` was True.
+    "genk": "Racing Genk",
 }
 
 
