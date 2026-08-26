@@ -1829,6 +1829,20 @@
   // (success, empty response, or failure -- any settled fetch unblocks it).
   let gameChipsLoadedOnce = false;
 
+  // `#546`. WHEN THE WORKER LAST PUBLISHED THESE CHIPS -- not when we last
+  // fetched them. `/api/board/game-chips` has always returned `published_at`
+  // and this page has always thrown it away, which is exactly how a frozen
+  // scoreboard passed for a live one: the 60s poll keeps succeeding, the
+  // response keeps being byte-identical, and nothing on the page changes or
+  // says why.
+  //
+  // Measured 2026-08-25/26: refresh-worker took 15 deploys in 6h15m, each
+  // SIGTERMing the build in flight, median instance uptime 1202 s against a
+  // 21-minute boot-to-first-publish. The chip artifact went 20-54 minutes
+  // without moving and the strip rendered it the whole time as current. A user
+  // found it by noticing the odds-refresh timestamps had stopped.
+  let gameChipsPublishedAt = null;
+
   // #165: two candidates for the SAME real game can carry two different
   // ids -- confirmed live: 89 "WSH @ ATL" MLB candidates on 824894, one
   // stray "game" candidate on 824892 (a stale/mismatched gamePk from a
@@ -1855,6 +1869,14 @@
       }
       const json = await res.json();
       const chips = Array.isArray(json.chips) ? json.chips : [];
+      // `source` is on the response for the same reason (`#545`): a permanent
+      // publish failure and a healthy worker produce chips that look identical.
+      // A fallback build is BY DEFINITION current, so it is not stale -- it is a
+      // different problem, and conflating them would send the reader to the
+      // wrong place.
+      gameChipsPublishedAt = json.source === "worker_artifact"
+        ? (String(json.published_at || "").trim() || null)
+        : null;
       const byId = new Map();
       const byMatchup = new Map();
       const byMatchupLoose = new Map();
@@ -2452,6 +2474,46 @@
     return `${weekday} ${month} ${parsed.getDate()}`;
   }
 
+  // `#546`. SAY SO WHEN THE SCOREBOARD HAS STOPPED MOVING.
+  //
+  // SILENT WHEN HEALTHY, and that is deliberate rather than lazy: a badge that
+  // is always on is furniture, and the reader stops seeing it well before it
+  // matters. This appears only once the artifact is older than a slate's
+  // scoreboard has any business being, so its presence IS the signal.
+  //
+  // THRESHOLD 10 MINUTES, chosen against the measured cadence and not picked
+  // round. A healthy worker republishes chips well inside that; the freezes of
+  // 2026-08-25 ran 20-54 minutes. Sitting between the two is what keeps this
+  // from flapping on a normal cycle while still catching a dead producer within
+  // one poll of it mattering.
+  //
+  // DEGRADES TO SILENCE, NEVER TO A GUESS. No stamp (an inline fallback build,
+  // a fetch that never landed, a server that stopped sending the field) renders
+  // nothing at all. Painting "stale" on missing evidence would be the same
+  // error as the asserted `is_fresh: True` this fixes, pointed the other way.
+  const CHIP_STALE_AFTER_SECONDS = 600;
+
+  function chipPublishedAgeSeconds() {
+    if (!gameChipsPublishedAt) return null;
+    const parsed = Date.parse(gameChipsPublishedAt);
+    if (!Number.isFinite(parsed)) return null;
+    // Clamped at 0: the worker and the browser are different clocks, so a
+    // stamp a few seconds ahead is skew on a fresh artifact, not a bad one.
+    return Math.max(0, (Date.now() - parsed) / 1000);
+  }
+
+  function renderChipFreshness() {
+    const age = chipPublishedAgeSeconds();
+    if (age === null || age < CHIP_STALE_AFTER_SECONDS) return "";
+    const label = formatAge(age);
+    if (!label) return "";
+    // TITLE NAMES THE PRODUCER, not just the symptom. "Scores may be out of
+    // date" tells a reader nothing they can act on; "the worker has not
+    // published since X" tells them which service to look at, which is the
+    // whole difference between a warning and a diagnosis.
+    return ` <span class="board-stale-badge" title="Scoreboard artifact last published ${escapeHtml(gameChipsPublishedAt)} — refresh-worker has not republished since. Scores and clocks below are frozen at that moment.">scoreboard ${escapeHtml(label)} old</span>`;
+  }
+
   function renderGameCards(items) {
     const container = document.getElementById("board-game-cards");
     if (!container) return;
@@ -2480,7 +2542,7 @@
       return;
     }
     container.innerHTML = `
-      <h2 class="board-section-title">Games</h2>
+      <h2 class="board-section-title">Games${renderChipFreshness()}</h2>
       <div class="game-card-strip">
         ${games.map((game) => {
           const isSelected = state.game === game.key;

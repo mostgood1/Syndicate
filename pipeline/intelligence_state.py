@@ -1562,7 +1562,11 @@ def board_l2a_fallback_enabled() -> bool:
     return _env_bool(SYNDICATE_BOARD_L2A_ENABLED_FLAG, default=False)
 
 
-def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dict[str, Any]]:
+def _layer2_fallback_recommendations(
+    requested_dates: Sequence[str],
+    *,
+    vintages: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Persisted L2-A cards for these dates, shaped like a merged candidate.
 
     Reads the artifact the WORKER already wrote (`layer2_rows_to_board_cards`
@@ -1576,6 +1580,14 @@ def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dic
 
     Returns [] on any failure. A fallback that raises is worse than one that
     declines, because it would take down the board it exists to fill.
+
+    `vintages`, when given, collects each shortlist's own `written_at` -- an OUT
+    PARAMETER rather than a second return value on purpose (`#546`). The
+    alternative was a second read of these artifacts to date them, and the
+    shortlist measured 5,166,721 bytes on 2026-08-26; re-reading five megabytes
+    per request to answer "how old is this" would cost more than the staleness
+    it reports. The signature stays keyword-only and defaulted so every existing
+    caller and test is untouched.
     """
     cards: list[dict[str, Any]] = []
     for requested_date in requested_dates or ():
@@ -1585,6 +1597,10 @@ def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dic
             continue
         if not isinstance(shortlist, Mapping):
             continue
+        if vintages is not None:
+            stamp = str(shortlist.get("written_at") or "").strip()
+            if stamp:
+                vintages.append(stamp)
         for card in shortlist.get("cards") or []:
             if not isinstance(card, Mapping):
                 continue
@@ -6979,6 +6995,22 @@ def _combined_board_response_cache_ttl_seconds() -> float:
     return max(1.0, float(_env_int("SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS", 15)))
 
 
+def _combined_board_stale_after_seconds() -> float:
+    """How old the oldest input may be before the board is not fresh. `#546`.
+
+    Default 900 s, matching `_STATE_STALE_SECONDS` on the live-portfolio banner
+    rather than inventing a second threshold -- two surfaces disagreeing about
+    what "stale" means is how a page and a health check start telling different
+    stories about one system.
+
+    Chosen against the measured cadence, not picked round: boot-to-first-publish
+    is ~21 minutes under a restart, but a HEALTHY worker republishes inside ~10,
+    so 15 minutes clears normal operation and catches the 20-54 minute freezes
+    of 2026-08-25 without flapping in between.
+    """
+    return max(1.0, float(_env_int("SYNDICATE_INTELLIGENCE_BOARD_STALE_AFTER_SECONDS", 900)))
+
+
 def _read_single_date_response_for_combining(selected_date: str) -> dict[str, Any] | None:
     """One date's already-computed response, read-only. Consults both the
     in-memory snapshot the background loop already holds (cheapest -- exactly
@@ -7074,12 +7106,20 @@ def read_combined_intelligence_response(
     by_date_summary: dict[str, dict[str, Any]] = {}
     covered_sports: set[str] = set()
 
+    # `#546`. Every artifact this board is assembled from, dated. See the
+    # `state_meta` block at the bottom of this function for why an ASSERTED
+    # freshness was the defect.
+    artifact_vintages: list[str] = []
+
     for requested_date in requested_dates:
         date_response = _read_single_date_response_for_combining(requested_date)
         if date_response is None:
             by_date_summary[requested_date] = {"candidate_count": 0, "covered_sports": []}
             print(f"[intelligence_state] COMBINED_BOARD_STATE_DATE_MISS date={requested_date}", flush=True)
             continue
+        date_stamp = _state_payload_timestamp(date_response)
+        if date_stamp:
+            artifact_vintages.append(date_stamp)
         date_by_sport = date_response.get("by_sport") if isinstance(date_response.get("by_sport"), dict) else {}
         date_candidate_count = 0
         date_covered_sports: set[str] = set()
@@ -7166,7 +7206,7 @@ def read_combined_intelligence_response(
     # `#308`'s own monitor fell into. This keeps the pool independently readable.
     legacy_candidate_count = len(merged_recommendations)
     if board_l2a_fallback_enabled():
-        fallback_cards = _layer2_fallback_recommendations(requested_dates)
+        fallback_cards = _layer2_fallback_recommendations(requested_dates, vintages=artifact_vintages)
         if fallback_cards:
             # Re-promote through the SAME contract rather than appending to the
             # output: the normaliser owns ranking, dedupe and the card shape, so
@@ -7185,11 +7225,89 @@ def read_combined_intelligence_response(
     combined["by_date"] = by_date_summary
     combined["covered_sports"] = sorted(covered_sports)
     combined["candidate_count"] = len(merged_recommendations)
+    # `#546`. DERIVED FROM THE ARTIFACTS, NOT ASSERTED.
+    #
+    # This block used to read `"age_seconds": 0.0, "is_fresh": True` -- flat
+    # literals, on a function whose own docstring says it "NEVER calls
+    # _build_candidate_pool ... It only reads what ... has already built". So
+    # `computed_at` was the moment of the READ and the age was of nothing at
+    # all: a board assembled entirely from hour-old artifacts reported itself
+    # perfectly fresh, every time, by construction.
+    #
+    # WHAT THAT COST, measured 2026-08-25/26. refresh-worker took 15 deploys in
+    # 6h15m, each SIGTERMing the build in flight; median instance uptime was
+    # 1202 s against a 21-minute boot-to-first-publish, so the artifacts under
+    # this board went 20-54 minutes without moving. The board rendered them the
+    # whole time with `is_fresh: True`, and the only thing that noticed was a
+    # person watching the odds-refresh timestamps not change. **A board that
+    # cannot go stale in its own telemetry is a board whose staleness only a
+    # user can find.**
+    #
+    # TWO NUMBERS, BECAUSE EITHER ALONE IS UNATTRIBUTABLE -- the same reason
+    # `layer2_shortlist` publishes `openings_records` beside `openings_loaded`:
+    #
+    #   `age_seconds`        the OLDEST input. How stale the worst row on this
+    #                        board could be. This is what gates `is_fresh`,
+    #                        because a board is only as current as its most
+    #                        stale part.
+    #   `newest_age_seconds` the FRESHEST input. When this board last changed
+    #                        at all -- the number that goes flat when the
+    #                        producer dies, which is the failure above.
+    #
+    # A single figure cannot separate "one lagging sport" from "the whole
+    # pipeline stopped", and those need different people.
+    #
+    # `is_fresh` IS None, NOT False, WHEN NOTHING COULD BE DATED. "We could not
+    # tell" and "we checked and it is stale" are different facts, and collapsing
+    # them into False would make an unreadable stamp indistinguishable from a
+    # measured outage -- the same collapse `read_json_file_result` exists to
+    # undo. `artifacts_dated` says how many stamps the verdict actually rests
+    # on, so a thin sample is visible rather than implied. `freshness_status`
+    # carries the repo's existing `fresh`/`stale`/`unknown` vocabulary beside
+    # it, and with `computed_at` None the recompute pass skips this block
+    # entirely -- so the None survives to the client rather than being
+    # flattened to False.
+    dated = sorted(
+        (stamp, age)
+        for stamp, age in ((stamp, _timestamp_age_seconds(stamp)) for stamp in artifact_vintages)
+        if age is not None
+    )
+    stale_after = _combined_board_stale_after_seconds()
+    oldest_stamp = max(dated, key=lambda pair: pair[1])[0] if dated else None
+    oldest_age = max(age for _stamp, age in dated) if dated else None
+    newest_age = min(age for _stamp, age in dated) if dated else None
+    status = _freshness_status_from_age(oldest_age, stale_after)
     combined["state_meta"] = {
         "source": "combined_board_window",
-        "computed_at": _utc_now(),
-        "age_seconds": 0.0,
-        "is_fresh": True,
+        # `computed_at` IS THE OLDEST ARTIFACT'S STAMP, NOT THE MOMENT OF THE
+        # READ, AND THAT IS LOAD-BEARING RATHER THAN COSMETIC.
+        #
+        # `_apply_freshness_recompute` (`#334`) rebuilds `age_seconds`,
+        # `freshness_status` and `is_fresh` FROM `computed_at` on every served
+        # payload, precisely so a verdict computed at write time cannot lie at
+        # read time. With the read moment here, that pass would recompute this
+        # board's age as ~0 and hand back `is_fresh: True` -- silently undoing
+        # this fix on the way out of the door, which is the fourth time `#334`'s
+        # own comment says a plausible-looking patch missed a path.
+        #
+        # Anchoring it to the oldest input makes the block IDEMPOTENT under that
+        # recompute: it recovers the same age, against the same SLA, and lands
+        # on the same verdict. It also makes `computed_at` mean here what it
+        # means in `_snapshot_state_meta` -- when the DATA was computed.
+        "computed_at": oldest_stamp,
+        # The read moment is not lost, just renamed to what it actually is. On
+        # its own it was routinely mistaken for when the board was built.
+        "read_at": _utc_now(),
+        "age_seconds": oldest_age,
+        # Consumed BY the recompute above, so this board is judged on its own
+        # threshold rather than the 30 s intelligence-refresh interval that is
+        # the default everywhere else. A board assembled from artifacts is not
+        # a snapshot and does not turn over that fast.
+        "freshness_sla_seconds": stale_after,
+        "freshness_status": status,
+        "is_fresh": None if oldest_age is None else status == "fresh",
+        "newest_age_seconds": newest_age,
+        "artifacts_dated": len(dated),
     }
     # `#363`: the legacy pool's own size, independent of what the board shows.
     # Always emitted, so "is `#308` still live" stays a one-field question now
@@ -7244,13 +7362,24 @@ def _decorate_intelligence_board_snapshot_response(
         if not state_meta:
             freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
             normalized_updated_at = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
+            # `#546`: DERIVED FROM `computed_at`, WHICH WAS ALREADY IN HAND.
+            # This read `age_seconds: 0.0, freshness_status: "fresh",
+            # is_fresh: True` while holding `normalized_updated_at` two lines
+            # up -- the stamp that answers the question was already computed and
+            # then ignored. Uses the SAME `_timestamp_age_seconds` /
+            # `_freshness_status_from_age` pair every other freshness block in
+            # this file uses -- a second age helper here would be a parallel
+            # contract that can disagree with `_recomputed_freshness_block`,
+            # which rebuilds exactly these three fields on the served payload.
+            _age = _timestamp_age_seconds(normalized_updated_at)
+            _status = _freshness_status_from_age(_age, freshness_sla_seconds)
             state_meta = {
                 "source": source_label,
                 "computed_at": normalized_updated_at,
-                "age_seconds": 0.0,
+                "age_seconds": _age,
                 "freshness_sla_seconds": freshness_sla_seconds,
-                "freshness_status": "fresh",
-                "is_fresh": True,
+                "freshness_status": _status,
+                "is_fresh": _status == "fresh",
                 "source_fingerprint": decorated.get("source_fingerprint"),
                 "run_key": snapshot.get("latest_key"),
                 "last_run_started_at": None,
@@ -7273,13 +7402,18 @@ def _decorate_intelligence_board_snapshot_response(
         state_meta = decorated.get("state_meta") if isinstance(decorated.get("state_meta"), dict) else {}
         candidate_count = _intelligence_state_candidate_count(decorated)
         if not state_meta:
+            # `#546`: same defect, same fix as the branch above -- the stamp
+            # was in hand and the age was asserted anyway.
+            _computed_at = _utc_timestamp_string(updated_at)
+            _age = _timestamp_age_seconds(_computed_at)
+            _status = _freshness_status_from_age(_age, freshness_sla_seconds)
             state_meta = {
                 "source": source_label,
-                "computed_at": _utc_timestamp_string(updated_at),
-                "age_seconds": 0.0,
+                "computed_at": _computed_at,
+                "age_seconds": _age,
                 "freshness_sla_seconds": freshness_sla_seconds,
-                "freshness_status": "fresh",
-                "is_fresh": True,
+                "freshness_status": _status,
+                "is_fresh": _status == "fresh",
                 "source_fingerprint": decorated.get("source_fingerprint"),
                 "run_key": snapshot.get("latest_key"),
                 "last_run_started_at": None,
