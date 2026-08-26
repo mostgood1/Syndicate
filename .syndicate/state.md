@@ -5463,7 +5463,7 @@ Do not change it without a larger sample.
 
 ---
 
-## Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`)
+## [kalshi-execution] Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`)
 
 **THE ONE THING A HUMAN MUST DO: fund Kalshi exchange shard 3.**
 kalshi.com/account/exchange-indexes, or the intra-account-transfer API. Roughly
