@@ -55,10 +55,27 @@ def _quote_age_percentiles(values: list[float]) -> tuple[float, float, float] | 
 _QUOTE_KEY_ORDER = ("sport", "kind", "event_id", "bookmaker", "segment", "market", "selection", "player_name", "line")
 _QUOTE_GROUP_FIELDS = ("sport", "kind", "event_id", "segment", "market", "player_name")
 
-# How stale the NEWEST stamp in a sport's whole sidecar may be before the file
-# itself is treated as frozen. 900s matches the threshold a row must cross to be
-# examined at all, so a sport is never judged by a file staler than its rows.
-_SIDECAR_FROZEN_AFTER_SECONDS = 900.0
+# NO ABSOLUTE STALENESS THRESHOLD LIVES HERE, and the first two attempts both
+# had one. `#569`.
+#
+# A flat 900s was wrong because sweep cadence is PER SPORT and fixture-aware
+# (`#440` Phase 1b): measured 2026-08-26, nfl runs a 28800s interval when its
+# next fixture is 26h out, ncaaf 86400s, wnba 7200s. Against a 900s bar every
+# one of those reads "frozen" ALWAYS, which made the label a fact about config
+# rather than about health -- and produced a false outage report on nfl.
+#
+# Comparing against the sport's own interval is the obvious repair and is ALSO
+# wrong here: `_pregame_sweep_interval_for_tick` is fixture-aware, and the
+# decision that produced this sidecar was made on LIVE-ODDS-WORKER with that
+# service's fixture data. Recomputing it on refresh-worker can disagree --
+# verified locally, where the same call returns 7200 for nfl against
+# production's 28800, because the fixture lookup finds nothing here.
+#
+# So the comparison is to the SIDECAR'S OWN AGE, which needs no interval and no
+# cross-service agreement: a row roughly as old as the newest stamp in the file
+# was seen at the last sweep and is as fresh as that sport gets, however rarely
+# it sweeps. A row MUCH older was skipped by sweeps that demonstrably happened,
+# which is the real defect and the only case worth classifying.
 
 
 def _classify_stale_row(
@@ -112,8 +129,13 @@ def _classify_stale_row(
     # FIRST, before anything reads a sibling stamp.
     if sidecar_newest_age is None:
         return "unknown_no_sidecar_age"
-    if sidecar_newest_age > _SIDECAR_FROZEN_AFTER_SECONDS:
-        return "sidecar_frozen"
+
+    row_quote = row.get("quote")
+    row_seen = row_quote.get("quote_seen_age_seconds") if isinstance(row_quote, Mapping) else None
+    if not isinstance(row_seen, (int, float)) or isinstance(row_seen, bool):
+        return "unknown_no_row_age"
+    if float(row_seen) <= sidecar_newest_age * 1.5 + 300.0:
+        return "as_fresh_as_sweep"
 
     try:
         from syndicate.features.shared.odds_book_quotes import _KEY_FIELDS

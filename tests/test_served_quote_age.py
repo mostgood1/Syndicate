@@ -256,7 +256,7 @@ def test_a_staggered_freeze_is_NOT_an_orphaned_line():
     }
     row = _grid_row(line="8.5", seen=7200.0)
     assert _classify_stale_row(row, last_seen, NOW, 30.0) == "orphaned_line"      # live file
-    assert _classify_stale_row(row, last_seen, NOW, 14400.0) == "sidecar_frozen"  # frozen file
+    assert _classify_stale_row(row, last_seen, NOW, 14400.0) == "as_fresh_as_sweep"  # row is as fresh as the sweep
 
 
 def test_a_frozen_sidecar_also_overrides_market_gone():
@@ -266,7 +266,7 @@ def test_a_frozen_sidecar_also_overrides_market_gone():
     last_seen = {_key(line="8.5"): "2026-08-26T14:00:00Z", _key(line="9.0"): "2026-08-26T14:00:30Z"}
     row = _grid_row(line="8.5", seen=7200.0)
     assert _classify_stale_row(row, last_seen, NOW, 30.0) == "market_gone"
-    assert _classify_stale_row(row, last_seen, NOW, 14400.0) == "sidecar_frozen"
+    assert _classify_stale_row(row, last_seen, NOW, 14400.0) == "as_fresh_as_sweep"
 
 
 def test_an_unknown_sidecar_age_refuses_to_classify():
@@ -298,24 +298,77 @@ def test_the_report_line_carries_the_sidecar_age(capsys, monkeypatch):
     assert "STALE_ROW_CAUSE" in out
     assert "sidecar=" in out
     # A live file (20s) must reach a real verdict, not the frozen escape hatch.
-    assert "sidecar_frozen" not in out
+    assert "as_fresh_as_sweep" not in out
     assert "orphaned_line=1" in out
 
 
-def test_a_frozen_sidecar_is_visible_on_the_report_line(capsys, monkeypatch):
-    """The wnba shape end to end: every stamp old, so the file is frozen and
-    every row says so rather than reporting a manufactured supersession."""
+def test_a_sport_swept_rarely_reports_as_fresh_as_sweep_on_the_line(capsys, monkeypatch):
+    """The nfl shape end to end: the sport sweeps rarely, and its worst row was
+    seen at that rare sweep. The report must say healthy, not manufacture a
+    verdict about a market.
+
+    Rewritten 2026-08-26 when the flat threshold was retired. It previously set
+    up a 4000s sidecar against a 30000s row and expected `sidecar_frozen` -- but
+    under the current rule that is a row SKIPPED by sweeps that demonstrably
+    happened (the file was written 4000s ago), and classifying it is correct.
+    The property worth testing is the opposite case, which is what nfl was.
+    """
     from datetime import datetime, timedelta, timezone
     import syndicate.features.shared.odds_book_quotes as obq
 
-    def _ago(s):
-        return (datetime.now(timezone.utc) - timedelta(seconds=s)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    def _ago(sec):
+        return (datetime.now(timezone.utc) - timedelta(seconds=sec)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # Staggered freeze -- exactly what fooled the first version.
+    # Nothing seen for ~3.7h -- an 8-hour-cadence sport between sweeps.
     monkeypatch.setattr(obq, "read_quote_last_seen",
-                        lambda sport, date: {_key(line="8.5"): _ago(30000), _key(line="9.0"): _ago(4000)})
+                        lambda sport, date: {_key(line="8.5"): _ago(13169), _key(line="9.0"): _ago(13200)})
 
-    _report_stale_row_causes([_grid_row(line="8.5", seen=30000.0)], "2026-08-26")
+    _report_stale_row_causes([_grid_row(line="8.5", seen=13127.0)], "2026-08-26")
     out = capsys.readouterr().out
-    assert "sidecar_frozen=1" in out
+    assert "as_fresh_as_sweep=1" in out
     assert "orphaned_line" not in out
+    assert "market_gone" not in out
+    assert "sidecar=" in out
+
+
+# ---------------------------------------------------------------------------
+# `#569` part 4: the flat threshold called a WORKING sport broken. Interval-free.
+# ---------------------------------------------------------------------------
+
+def test_the_nfl_false_alarm_2026_08_26_reads_healthy_now():
+    """THE THIRD WRONG ANSWER, and the one that named a working feature an
+    outage.
+
+    Production 20:01Z: `FIXTURE_CADENCE sport=nfl interval=28800
+    reason=mid:26h_out` -- an 8-HOUR sweep interval, by design, because the next
+    fixture was 26 hours away. Against a flat 900s bar nfl read "frozen" always.
+
+    Its real numbers: sidecar 13169s, worst row 13127s. The row is as fresh as
+    the last sweep -- it was SEEN at that sweep. Infrequent is not broken.
+    """
+    assert _classify_stale_row(_grid_row(seen=13127.0), {_key(): NOW}, NOW, 13169.0) == "as_fresh_as_sweep"
+
+
+def test_a_row_skipped_by_sweeps_that_happened_is_still_classified():
+    """The other side, from the same reading. mlb sidecar 321s / worst row
+    5570s, wnba 3279s / 33419s -- rows 10-17x older than the newest stamp in
+    their own file, so sweeps ran and did not see them. THAT is the defect."""
+    last_seen = {_key(line="8.5"): "2026-08-26T14:00:00Z", _key(line="9.0"): "2026-08-26T15:58:00Z"}
+    assert _classify_stale_row(_grid_row(line="8.5", seen=5570.0), last_seen, NOW, 321.0) == "orphaned_line"
+    assert _classify_stale_row(_grid_row(line="8.5", seen=33419.0), last_seen, NOW, 3279.0) == "orphaned_line"
+
+
+def test_cadence_alone_never_decides_the_verdict():
+    """A SLOW sport and a FAST sport with the same row-to-sidecar ratio must get
+    the same answer. This is what the flat threshold could not do: it read the
+    sport's configured cadence as evidence about a row's health."""
+    slow = _classify_stale_row(_grid_row(seen=28000.0), {_key(): NOW}, NOW, 28000.0)   # 8h cadence
+    fast = _classify_stale_row(_grid_row(seen=400.0), {_key(): NOW}, NOW, 400.0)       # 7m cadence
+    assert slow == fast == "as_fresh_as_sweep"
+
+
+def test_a_row_far_older_than_a_slow_sweep_is_NOT_excused_by_the_slow_cadence():
+    """The guard must not become a blanket amnesty for slow sports. An 8-hour
+    cadence excuses an 8-hour-old row; it does not excuse a 40-hour-old one."""
+    last_seen = {_key(line="8.5"): "2026-08-26T14:00:00Z", _key(line="9.0"): "2026-08-26T15:58:00Z"}
+    assert _classify_stale_row(_grid_row(line="8.5", seen=144000.0), last_seen, NOW, 28800.0) != "as_fresh_as_sweep"

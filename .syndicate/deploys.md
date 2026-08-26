@@ -32654,3 +32654,39 @@ healthy sweeps. **The row-level staleness is real; my attribution of it to a
 capture outage was not.** That is still the orphaned-key / market-gone question,
 and mlb — the sport whose sidecar is genuinely live at 321s — still answers it
 `orphaned_line=2` to `market_gone=1`.
+
+### Threshold FIXED, and the repair is NOT the obvious one
+
+`sidecar_frozen` retired. The gate is now **row age vs the SIDECAR'S OWN age**,
+with no absolute threshold and no interval anywhere:
+
+    row_seen_age <= sidecar_age * 1.5 + 300   ->  as_fresh_as_sweep
+    otherwise                                 ->  classify (orphaned_line / market_gone)
+
+**Why not compare against the sport's configured interval, which is the obvious
+repair:** `_pregame_sweep_interval_for_tick` is FIXTURE-AWARE, and the decision
+that produced a given sidecar was made on **live-odds-worker** with that
+service's fixture data. Recomputing it on refresh-worker can disagree — verified
+here: the same call returns **7200 for nfl locally against production's 28800**,
+because the fixture lookup finds nothing in this container. A fourth misread was
+one import away.
+
+**The sidecar's own age needs no interval and no cross-service agreement.** A row
+roughly as old as the newest stamp in its file was SEEN at the last sweep and is
+as fresh as that sport gets, however rarely it sweeps. A row much older was
+skipped by sweeps that demonstrably happened — the only case worth classifying.
+
+Against the 19:57Z reading, retrospectively:
+
+    sport  sidecar  worst_row  ratio  verdict under the new rule
+    mlb       321s      5570s  17.4x  skipped by sweeps that happened
+    nfl     13169s     13127s   1.00  AS FRESH AS SWEEP -- healthy
+    wnba     3279s     33419s  10.2x  skipped by sweeps that happened
+
+**nfl resolves to healthy, which is what the FIXTURE_CADENCE evidence
+independently says.** Two unrelated instruments agreeing is the first thing in
+`#569` that has held up across a round.
+
+29 tests. **Mutation-checked both ways:** reinstating a flat threshold
+reproduces the nfl false alarm (2 tests red); excusing any slow sport
+unconditionally is caught as blanket amnesty (2 tests red).
