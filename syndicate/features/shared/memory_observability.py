@@ -637,6 +637,28 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
         "container_memory_max_mb": _bytes_to_mb(container_memory_max_bytes),
         "container_memory_headroom_mb": None,
         "container_memory_pct_of_max": None,
+        # `#566`. THE SAME FIX THIS MODULE ALREADY MADE FOR `CONTAINER_MEMORY`,
+        # applied to the OTHER line people read.
+        #
+        # `log_container_memory`'s docstring records it exactly: the breakdown
+        # "was simply never wired into the line that gets logged, which is the
+        # one people actually read." That was fixed for `CONTAINER_MEMORY` and
+        # left undone here -- and `ALL_PROCESS_MEMORY` is the line a deploy
+        # preflight reads, because it is the one carrying the process list.
+        #
+        # MEASURED BY BEING TAKEN IN 2026-08-25. Across one session I quoted
+        # `container_memory_pct_of_max` at 93.2%, 96.8% and 99.8% off THIS line
+        # and reported a memory emergency to the user four times. There was
+        # none: zero `oomKilled` events in the preceding two days, and anonymous
+        # memory over the same window ran 1135-1760 MB of 4096 -- **28-43%**.
+        # The 99.8% was clean page cache the kernel drops before it OOM-kills
+        # anything, which is what `#79` and `#417` already established twice.
+        #
+        # A reader who has both numbers cannot make that mistake; a reader who
+        # has only the first one reliably does. Same procfs read the guard
+        # beside it already performs, so this costs nothing new.
+        "container_memory_unreclaimable_mb": None,
+        "container_memory_unreclaimable_pct_of_max": None,
         "unexplained_memory_mb": None,
         "processes": processes,
         "process_enum_debug": {
@@ -651,6 +673,22 @@ def get_all_process_memory_snapshot() -> dict[str, Any]:
         if isinstance(container_memory_max_bytes, int) and container_memory_max_bytes > 0:
             payload["container_memory_headroom_mb"] = _bytes_to_mb(container_memory_max_bytes - container_memory_bytes)
             payload["container_memory_pct_of_max"] = round(100.0 * container_memory_bytes / container_memory_max_bytes, 1)
+        # DEGRADES TO None, NEVER TO THE MISLEADING FIGURE. An unreadable
+        # `memory.stat` (local dev, no cgroups) must leave these absent rather
+        # than fall back to `container_memory_mb` -- a reader who sees a number
+        # here is entitled to assume it is the anonymous one, and quietly
+        # serving them the page-cache-inclusive figure under this name would be
+        # worse than the omission this whole change is fixing.
+        try:
+            unreclaimable_bytes = _unreclaimable_bytes(_read_container_memory_stat(), container_memory_bytes)
+        except Exception:  # noqa: BLE001 - telemetry must never raise
+            unreclaimable_bytes = None
+        if isinstance(unreclaimable_bytes, int):
+            payload["container_memory_unreclaimable_mb"] = _bytes_to_mb(unreclaimable_bytes)
+            if isinstance(container_memory_max_bytes, int) and container_memory_max_bytes > 0:
+                payload["container_memory_unreclaimable_pct_of_max"] = round(
+                    100.0 * unreclaimable_bytes / container_memory_max_bytes, 1
+                )
     return payload
 
 

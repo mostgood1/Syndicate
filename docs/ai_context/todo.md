@@ -1,5 +1,106 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#567` — **Is the board build SLOW, or WAITING? Nothing on this service could tell them apart, and three wrong answers in one session came from guessing.** — lane `board-staleness-visibility`, 2026-08-26 — **INSTRUMENT SHIPPED (log-only), NOT DEPLOYED**
+
+**THE PROBLEM WITH EVERY ESTIMATE SO FAR.** Where the board build's time goes
+has been read, every single time, from the **gap between two log lines**. On
+2026-08-25 that method produced three wrong answers:
+
+| claim | reality |
+|---|---|
+| "~12.5 s per soccer league-week" | **0.17 s** — the gap was everything happening BETWEEN two builds |
+| "the per-sport window will change nothing" | took **7 minutes** off |
+| "memory is at 96–99%, its own failure mode" | anon **28–43%**, zero OOM kills in two days |
+
+A gap measures **elapsed wall time on a shared worker**. That is not the same
+quantity as the cost of whatever happens to bracket it.
+
+**WHAT THE 9m34s WINDOW ACTUALLY CONTAINS** (instance `-427jr`, 2026-08-26,
+read directly): per-sport `live_lens_tick_*` cycles, NFL `board_contract_*`
+cycles, `artifact_publisher` PULL/repair traffic, and a **~350 MB
+`refresh_odds_sources.py --soccer-leagues <one league>` CHILD PROCESS**. The
+board's own identifiable work in the same window was **~55 s** of MLB card
+contexts (`MLB_GAMES_STAGE_MS`, measured) plus soccer contexts now 89.5%
+memoised.
+
+**So the leading hypothesis is that the board build is not slow, it is QUEUED** —
+and if that is right, every fix aimed at making the board cheaper is aimed at the
+wrong thing. `#565`'s soccer memo is the cautionary case: correct, verified,
+89.5% hit rate, and worth **82 seconds**.
+
+**THE INSTRUMENT.** `BOARD_BUILD_TIMING wall_s= cpu_s= off_cpu_pct= ok=`, wrapped
+around `_build_candidate_pool` at both call sites (no reindent of an 880-line
+method). `time.process_time()` counts CPU for **this process only**, so the odds-
+refresh child burning a core does NOT appear in it — which is exactly what makes
+the wall/CPU gap readable as contention rather than hidden work.
+`off_cpu_pct` high = waiting, low = computing.
+
+**Tests pin BOTH directions.** A sleeping build must read `off_cpu_pct > 80`, a
+busy one `< 40` — without the second, the first would pass on a timer that always
+said "waiting". It also reports on a build that RAISES, which is when the timing
+matters most.
+
+**A DEFECT IN MY OWN FIRST DRAFT, fixed rather than pinned.** Both clocks were
+read BEFORE the `try`, so a raising clock would have killed the board build to
+protect a log line — the exact inversion the function's own docstring forbids.
+Worse, I wrote a test that DOCUMENTED that flaw instead of fixing it. The build
+now survives a broken clock and skips the line; the test asserts it.
+
+**NEXT: one clean build after this ships.** If `off_cpu_pct` is high, stop
+optimising the board and look at what else the worker is doing concurrently —
+starting with the sequential per-league `refresh_odds_sources.py` children.
+If it is low, the board really is doing ~9 minutes of work and the remaining
+cost is attributable inside it.
+
+### `#566` — **There was no memory issue. `ALL_PROCESS_MEMORY` reports only the page-cache-inclusive figure, and I read it as an emergency four times in one session.** — lane `board-staleness-visibility`, 2026-08-26 — **FIXED (telemetry); NO PRODUCTION DEFECT FOUND**
+
+**THE ASK WAS "fix the memory issue". THE ANSWER IS THERE ISN'T ONE**, and that
+is the finding rather than a deflection.
+
+    oomKilled events, 2026-08-24 -> 2026-08-26        ZERO
+    anonymous memory across the same window           1135-1760 MB of 4096 = 28-43%
+    build gate predicate (`#417` step 3)              max_bytes - unreclaimable_bytes  ✓ correct
+
+**WHAT I ACTUALLY DID.** I quoted `container_memory_pct_of_max` at **93.2%,
+96.8% and 99.8%** off `ALL_PROCESS_MEMORY` during deploy preflights and reported
+a memory emergency to the user four times. That field counts clean page cache
+the kernel drops before it OOM-kills anything. `#79` and `#417` had already
+established this twice, in prose, in the same module — `#79` measured "real
+headroom was 3393.7MB, not 867.7MB", and `#417` measured 300 consecutive
+`MEMORY_GUARD_ABORT` cycles serving a **4h12m-stale board** on the same false
+reading, with anon flat at +18.9 MB across all 300 samples.
+
+**THE REAL DEFECT, and it is a telemetry one.** `log_container_memory`'s own
+docstring names it exactly: the breakdown *"was simply never wired into the line
+that gets logged, which is the one people actually read."* **That was fixed for
+`CONTAINER_MEMORY` and left undone for `ALL_PROCESS_MEMORY`** — which is the
+line a deploy preflight reads, because it is the one carrying the process list.
+Half a fix, and the unfixed half is the one on the deploy path.
+
+`ALL_PROCESS_MEMORY` now carries `container_memory_unreclaimable_mb` and
+`container_memory_unreclaimable_pct_of_max` beside the existing figure. Same
+procfs read the guard next to it already performs. **Absent, never fallback, on
+an unreadable `memory.stat`** — degrading to `container_memory_mb` under that
+name would be worse than the omission, because a reader who sees a number there
+is entitled to assume it is the anonymous one.
+
+**Reachability proved:** removing the fields turns 5 of 6 tests red, including
+`test_the_pathological_case_from_2026_08_25_reads_correctly_now`, which pins the
+exact 99.8%-with-28%-anon shape that fooled me.
+
+**THE GENERAL RULE, because this is the FOURTH time in one session the same
+mistake produced a wrong answer:** *a headline percentage is not a measurement
+until you know what it counts.* The other three were the identity-keyed
+`week_games` memo, the "per-sport window will change nothing" prediction
+(it took 7 minutes), and the 12.5 s-per-league-week figure (really 0.17 s —
+I had measured the GAP BETWEEN builds, not the build). Every one was an
+inference from a number whose definition I had not checked.
+
+**NOT DONE, and worth someone's time:** the worker's anon does drift within a
+cycle (1135 → 1760 MB). That is a real curve and nobody has attributed it. It is
+not urgent — it is 43% of a 4 GB container with no kills in two days — but it is
+the only genuinely open memory question here.
+
 ### `#565` — **The board build's forward width is sized off `max_slate_window_days()`, so the WIDEST sport's window becomes EVERY sport's window. Widening the weekly sports hammered soccer, which nobody intended.** — lane `board-staleness-visibility`, 2026-08-26, user diagnosis — **ROOT CAUSE CONFIRMED, NOT YET FIXED**
 
 **THE USER FOUND THIS, not me:** *"we flipped weekly sports to 7 days out for
