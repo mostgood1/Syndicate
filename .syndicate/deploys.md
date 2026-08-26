@@ -30213,3 +30213,26 @@ re-read immediately before, and the block itself guaranteed a clean window: a
 halted execution path cannot have an order in flight to interrupt.
 
 **Claim released.**
+## 2026-08-25 19:52 CT — web `4b9d55158` (banner health colours)
+
+**Change.** Green = healthy, red = broken, on the whole `/portfolio/live`
+banner. Inverts the previous scheme where the healthy state was red
+("real money is live, pay attention"). Verdict computed in `_live_health`
+and exposed on `/api/portfolio/live`, so page and API cannot disagree.
+
+Two reversals recorded, not silently made:
+- ENGAGED kill switch is now RED. It is still the safe state; it is also a
+  system that cannot trade, and that is what the banner reports.
+- A silent or stale worker is RED even with every switch on.
+
+`_STATE_STALE_SECONDS` replaces three literal `900`s.
+
+**verify:** with `Job on / Mode live / Armed yes / Kill switch clear /
+Source live-odds-worker · <15m`, the badge renders
+`class="live-badge live-badge--ok"` and the banner `is-ok`.
+
+**Incidental reading, same screenshot:** CAPS IN FORCE shows
+`$10 per order · 15/book · 25 total`. `max_day_orders` is 15 — the
+`SYNDICATE_EXECUTION_MAX_DAY_ORDERS=10` override is gone. That closes the
+open question from 19:00 CT, where it still read 10 on a pre-restart
+instance.
