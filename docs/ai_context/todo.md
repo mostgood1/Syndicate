@@ -415,6 +415,59 @@ the 19m43s.** Next question is where inside `collect_candidates` it goes — the
 per-stage `CANDIDATE_STAGE` lines are already emitted and timestamped, so this
 is a reading, not an instrumentation job.
 
+### `#568` — **Every Kalshi order for four days died on `market_not_found`. The field nobody questioned was the one copied out of the sample body.** — lane `kalshi-exchange-index`, 2026-08-26, FIXED + DEPLOYED, awaiting the confirming fill
+
+**Deployed `a46797d1b` → live-odds-worker `dep-da7e2v7avr4c73bq91vg`.**
+Ledger + full elimination table: `.syndicate/deploys.md`, 2026-08-26.
+
+`exchange_index` is a SHARD SELECTOR, not furniture. The venue's field
+reference: *"If omitted, auto-routes when ticker is provided; otherwise
+defaults to 0. Use -1 to require auto-routing by ticker."* We were sending a
+literal `0`, which **pins** the order to shard 0 — so any market on another
+shard 404s `market_not_found`. Now `-1`.
+
+**THE OPERATIONAL LESSON, and it is the reason this entry exists at all.**
+Four hypotheses were opened over four days and all four were *correctly closed
+by measurement* — host, side, market shape, event field. Each elimination was
+sound. **The search never terminated because the candidate set was drawn from
+"things we chose" and this field was filed under "things the contract gave
+us".** A value copied verbatim out of a working sample gets the same
+epistemic status as a constant, and nobody re-reads a constant.
+
+**The tell was in the data the whole time and read as exoneration.** `GET
+/markets/<ticker>` returned `status=active` with both legs quoted for every
+single failing ticker. That was recorded four times as *"nothing about the
+market differs from the one that filled"* — i.e. as evidence the market was
+innocent. **Reads are not sharded.** A GET that always succeeds while the POST
+never does is not the market being fine; it is the two paths disagreeing about
+*where* to look, which is the signature of a routing field.
+
+Same shape as `#567`'s `0.0`-second span: **a reading that looks like an answer
+is more dangerous than a missing one.** Generalised rule for next time — when
+every variable *you control* has been eliminated, the next candidate set is the
+constants you inherited, and the first place to look is any field whose name
+implies a LOCATION (shard, index, region, subaccount, exchange).
+
+It also explains the successes, which no code-regression theory could: the two
+`KXMLBKS` fills on 08-24 and the `KXWNBAAST` fill on 08-25 were simply markets
+that live on shard 0 — same family, same day, same body shape as the failures.
+I spent a full pass hunting a regression in `git log` between 08-24T18:18Z and
+08-25T23:00Z. **There was never a regression.** Intermittent success across an
+otherwise identical population is a per-item property, not a point-in-time
+change; treating it as a regression cost the detour.
+
+**NOT YET VERIFIED — this is the open half.** The reading that closes it is a
+`SUBMIT ... exchange_index=-1` followed by `LIVE_ORDER status=submitted|filled`
+on one of today's failing families (`KXMLBKS`/`KXMLBHIT`/`KXMLBRBI`/`KXMLBHRR`/
+`KXMLBOUTS`). A submit that merely stops erroring is NOT the reading — a
+non-shard-0 market clearing is, which is why `exchange_index` now prints on the
+SUBMIT line and not only on the failure. **Pre-registered counter-verify:** if
+`market_not_found` persists at `-1`, the shard hypothesis is dead too, and the
+next move is to ask the venue to spell its own markets — say that out loud
+before reaching for a fifth hypothesis.
+
+Rollback with no deploy: `KALSHI_ORDER_EXCHANGE_INDEX=0`.
+
 ### `#562` — **The Kalshi working-set trim orders by STALENESS, not by date. Today survives by luck.** — lane `kalshi-line-aware-rungs` (its declared step 2), raised by `portfolio-decision-and-execution`, 2026-08-26, measured — **NOT MINE TO FIX; handed over on a user decision**
 
 `[USER DECISION 2026-08-25: let the audit session ship it]` —
