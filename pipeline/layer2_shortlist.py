@@ -125,6 +125,82 @@ def build_layer2_shortlist(
     except Exception as exc:
         openings_error = f"{type(exc).__name__}: {exc}"
 
+    # `#563`. PUBLISH THE CHIPS FIRST, BEFORE ANY SPORT IS INGESTED.
+    #
+    # This block used to sit at the BOTTOM of this function, beside the
+    # chip-join telemetry that needs `cards`. Measured 2026-08-25/26: that put
+    # the only write of the artifact the WEB serves roughly **21 minutes** after
+    # boot -- `-fzb6v` booted 00:45:38Z and printed its first
+    # `GAME_CHIPS_PUBLISHED` at 01:06:19Z. Over the same evening refresh-worker
+    # took 15 deploys and logged 15 `SIGTERM` shutdowns with a **median uptime
+    # of 1202 s (20.0 min)**, five of them under 8 minutes. So the median
+    # instance died within a minute of its first publish, and five published
+    # nothing at all: the scoreboard the user was looking at had been frozen for
+    # ~20 minutes while the worker restarted, rebuilt from zero, and was killed
+    # again. `WORKER_SHUTDOWN_KILLED_BOARD_BUILD frame=collect_candidates --
+    # this build's work is lost and will restart from zero on the next boot`
+    # fired three times saying exactly that.
+    #
+    # THE CHIPS DO NOT DEPEND ON ANY OF THE WORK THAT FOLLOWS. They are built
+    # from the per-sport provider payloads, not from the grid, the candidates or
+    # the cards -- so the ~21 minutes they used to wait bought nothing. Moving
+    # them here makes the scoreboard survive a kill at minute 19, which is where
+    # tonight's kills actually landed.
+    #
+    # DELIBERATELY NOT MOVING THE JOIN TELEMETRY. `chip_join_coverage` asks
+    # whether a CARD can find its chip, so it cannot run before cards exist. It
+    # stays at the bottom and reads `_published_chips` from here rather than
+    # rebuilding, so the coverage line describes the chips web is actually
+    # serving instead of a second, later build of them.
+    #
+    # WHOLLY GUARDED, as before: a bad slate, a missing league or a slow read
+    # must leave the shortlist exactly as it found it.
+    _published_chips: list[Any] = []
+    try:
+        from syndicate.features.shared.game_chip_scoreboard import (
+            GAME_CHIP_DEFAULT_SPORTS,
+            build_game_chips,
+        )
+
+        # `#545`. BUILT FOR THE FULL DEFAULT SPORT LIST, not just the sports on
+        # today's board, because this build is also what the WEB SERVES. Scoping
+        # it to the board's sports would mean a sport with no rows today loses
+        # its scoreboard strip entirely -- and a chip-less strip is
+        # indistinguishable from a sport with no games.
+        #
+        # `sport_slugs` is an Iterable and is consumed downstream, so it is NOT
+        # read here: draining a generator to widen a set nobody widened would
+        # take the board's sports away from the loop below. The default list is
+        # a superset of what the board can carry anyway.
+        _chip_sports = sorted(set(GAME_CHIP_DEFAULT_SPORTS))
+        _published_chips = build_game_chips(selected_date, _chip_sports) or []
+        try:
+            from pipeline.intelligence_state import write_game_chips
+
+            _published = write_game_chips(selected_date, _published_chips)
+            print(
+                f"[layer2_shortlist] GAME_CHIPS_PUBLISHED date={selected_date} "
+                f"chips={len(_published_chips)} sports={len(_chip_sports)} "
+                f"ok={bool(_published)} stage=pre_ingest",
+                flush=True,
+            )
+        except Exception as _pub_exc:
+            # Named, not silent. The web falls back to its own build, so this
+            # degrades rather than breaks -- but a permanent failure here means
+            # the request-path fan-out never actually went away, which is the
+            # whole point of `#545`.
+            print(
+                f"[layer2_shortlist] GAME_CHIPS_PUBLISH_FAILED date={selected_date} "
+                f"error={type(_pub_exc).__name__}: {_pub_exc}",
+                flush=True,
+            )
+    except Exception as _chip_exc:  # pragma: no cover - never costs the board
+        print(
+            f"[layer2_shortlist] GAME_CHIPS_BUILD_UNAVAILABLE date={selected_date} "
+            f"error={type(_chip_exc).__name__}: {_chip_exc}",
+            flush=True,
+        )
+
     opportunities: list[dict[str, Any]] = []
     per_sport_stats: dict[str, Any] = {}
 
@@ -551,7 +627,7 @@ def build_layer2_shortlist(
             # (see the comment there for why its position moved twice); this is
             # the instrument, printed here beside the other join diagnostics.
             #
-            # `benchmark_*` is the second half `#546` added: `repriced` counts
+            # `benchmark_*` is the second half `#563` added: `repriced` counts
             # sides whose PRICE moved to a venue, `benchmark_rows` counts rows
             # whose FAIR VALUE moved with it. The two being different numbers is
             # the whole finding -- the first was non-zero and the second did not
@@ -974,53 +1050,30 @@ def build_layer2_shortlist(
     # makes it visible without a user noticing first.
     #
     # WHOLLY GUARDED. Coverage telemetry must never be able to cost the board:
-    # building chips reads artifacts, and a bad slate, a missing league or a
-    # slow read has to leave the shortlist exactly as it found it.
+    # a bad slate or a slow read has to leave the shortlist exactly as it found
+    # it.
+    #
+    # `#563`: THE PUBLISH THAT USED TO LIVE HERE HAS MOVED to the top of this
+    # function -- see the `_published_chips` block there for the measurement.
+    # What remains is only the join question, which genuinely cannot run any
+    # earlier because it needs `cards`. It now MEASURES THE CHIPS THAT WERE
+    # ACTUALLY PUBLISHED rather than building a second set: `build_game_chips`
+    # holds a 30-second TTL cache and this point is ~20 minutes downstream of
+    # the publish, so a rebuild here would silently describe a DIFFERENT set of
+    # chips from the ones web is serving -- and a coverage line that does not
+    # describe the served artifact is worse than none.
+    #
+    # THE CONSEQUENCE, STATED: if the early build failed, this reports every
+    # card as `no_chip_available` rather than retrying. That is the honest
+    # reading -- web IS serving no chips for this cycle -- and the cause is named
+    # on its own line (`GAME_CHIPS_BUILD_UNAVAILABLE`) so it is separable from a
+    # join failure, which is the distinction this telemetry exists to draw.
     try:
         from syndicate.features.shared.chip_join_coverage import chip_join_coverage
-        from syndicate.features.shared.game_chip_scoreboard import (
-            GAME_CHIP_DEFAULT_SPORTS,
-            build_game_chips,
-        )
 
         _cards = shortlist.get("cards") or []
-        # `#545`. BUILT FOR THE FULL DEFAULT SPORT LIST, not just the sports on
-        # today's board, because this build is now also what the WEB SERVES.
-        # Scoping it to the board's sports would mean a sport with no rows today
-        # loses its scoreboard strip entirely -- and a chip-less strip is
-        # indistinguishable from a sport with no games.
-        _sports = sorted(
-            set(GAME_CHIP_DEFAULT_SPORTS)
-            | ({str(c.get("sport") or c.get("sport_slug") or "").strip().lower()
-                for c in _cards if isinstance(c, Mapping)} - {""})
-        )
-        if _sports:
-            _chips = build_game_chips(selected_date, _sports)
-            # PUBLISH BEFORE MEASURING. The artifact is what the board actually
-            # serves; the coverage line below is diagnostics. If the telemetry
-            # were to throw, the outer guard would swallow it and the web would
-            # be left reading yesterday's chips -- so the thing users see is
-            # written first and separately.
-            try:
-                from pipeline.intelligence_state import write_game_chips
-
-                _published = write_game_chips(selected_date, _chips)
-                print(
-                    f"[layer2_shortlist] GAME_CHIPS_PUBLISHED date={selected_date} "
-                    f"chips={len(_chips)} sports={len(_sports)} "
-                    f"ok={bool(_published)}",
-                    flush=True,
-                )
-            except Exception as _pub_exc:
-                # Named, not silent. The web falls back to its own build, so
-                # this degrades rather than breaks -- but a permanent failure
-                # here means the request-path fan-out never actually went away,
-                # which is the whole point of `#545`.
-                print(
-                    f"[layer2_shortlist] GAME_CHIPS_PUBLISH_FAILED date={selected_date} "
-                    f"error={type(_pub_exc).__name__}: {_pub_exc}",
-                    flush=True,
-                )
+        _chips = _published_chips
+        if _chips or _cards:
             # Per-sport, because one sport's healthy window says nothing about
             # another's -- MLB reads 400/400 in the same breath as soccer's 222
             # misses, and a single total would let one hide the other.

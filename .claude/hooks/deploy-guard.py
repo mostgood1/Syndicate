@@ -225,8 +225,20 @@ def _preflight(root, service, deploy_sha=None):
 
     if not seen or newest is None:
         return False, "no preflight has been run for this service"
-    if str(newest.get("verdict") or "").upper() != "CLEAR":
-        return False, "the most recent preflight returned %s, not CLEAR" % (newest.get("verdict") or "?")
+    verdict = str(newest.get("verdict") or "").upper()
+    if verdict != "CLEAR":
+        # CARRY THE PREFLIGHT'S OWN REASON, not just the verdict name. `#563`.
+        #
+        # This guard's contract is that every refusal prints the literal thing
+        # that clears it, so no session is left waiting on another. TOO_SOON is
+        # the first verdict where that thing is NOT a command -- it is elapsed
+        # time -- and "returned TOO_SOON, not CLEAR" plus this file's standing
+        # "run the preflight" remedy sends the reader into a retry loop against a
+        # clock. The preflight already computed the wait in minutes and the
+        # --allow-rapid escape; passing it through is what keeps the promise.
+        detail = str(newest.get("reason") or "").strip()
+        return False, ("the most recent preflight returned %s, not CLEAR" % (verdict or "?")
+                       + (" -- %s" % detail if detail else ""))
     age = time.time() - newest_at
     if age > PREFLIGHT_TTL_SECONDS:
         return False, "the last CLEAR preflight is %.0f min old (limit %.0f)" % (

@@ -49,6 +49,121 @@ disagree — close_time is a settlement deadline up to four days out. The
 histogram above is the game-date one and does support the claim, but the
 earlier assertion was made from the wrong instrument and should not be cited.
 
+### `#563` — **"The Layer 2 board and the compact chips are stale" was DEPLOY CADENCE, not a board defect. The board could not report its own staleness, so only a user could find it.** — lane `board-staleness-visibility` (carve-out from `layer2-sim-view-and-live-projection`), 2026-08-25, user report — **CODE SHIPPED AND COMMITTED, NOT DEPLOYED. The operational half is OPEN and is the actual fix.**
+
+Full working: `.syndicate/deploys.md`, 2026-08-25 20:2x CT.
+
+**THE REPORT.** "It refreshed now but it was sitting with stale compact cards and
+even the odds refresh times were frozen for about 20 mins."
+
+**EVERY READER WAS HEALTHY.** Chips published and web read them
+(`GAME_CHIPS_PUBLISHED chips=232 sports=8 ok=True`, **zero**
+`BOARD_GAME_CHIPS_ARTIFACT_MISSING` on web all evening). `#525`'s frozen-board
+mode was not firing — the shortlist persisted at 66.7% of the keyvalue ceiling.
+**Not memory either**, despite `CONTAINER_MEMORY` reading 90.4% of 4096 MB:
+every restart was a `SIGTERM` on a deploy boundary.
+
+**THE PRODUCER WAS KILLED AT ALMOST EXACTLY THE MOMENT IT WOULD FIRST PUBLISH.**
+
+    15 deploys 19:26:55Z -> 01:13:38Z, all trigger=api
+    15 WORKER_SHUTDOWN, all SIGTERM
+    uptime_seconds: 232, 1361, 3134, 926, 2368, 450, 1268, 1202,
+                    438, 644, 145, 4235, 443, 2783, 1787
+    median 1202 s = 20.0 min      5 of 15 under 8 minutes
+    boot-to-first-publish (-fzb6v): 20 min 41 s
+
+Confirmed three ways: every chips-publish gap contains ≥1 deploy, and the
+54-minute gap contains **five**. `WORKER_SHUTDOWN_KILLED_BOARD_BUILD
+frame=collect_candidates — this build's work is lost and will restart from zero
+on the next boot` fired three times and nobody read it. `run_mlb_daily_sim_job.py`
+was a live child on 5 of 15 — `CLAUDE.md`'s "deploying kills an in-flight MLB
+sim", measured five times in one evening.
+
+**SHIPPED (committed on `claude/stale-layer2-board-chips-jh4ars`, NOT deployed):**
+
+1. **`state_meta` derived, not asserted.** `read_combined_intelligence_response`
+   hard-coded `age_seconds: 0.0, is_fresh: True` on a function that only READS.
+   Now dates every artifact it read: `age_seconds` = oldest (gates the verdict),
+   `newest_age_seconds` = freshest (goes flat when the producer dies),
+   `is_fresh` = None when nothing could be dated. Reuses the existing
+   `_timestamp_age_seconds` / `_freshness_status_from_age` pair. The same defect
+   at two sibling sites fixed with it.
+2. **The chip strip surfaces `published_at`**, which the API always returned and
+   the page always discarded. Amber badge past 10 minutes; silent when healthy
+   and silent on an unreadable stamp.
+3. **Chips publish before the slate is ingested**, not ~21 minutes in. They
+   depend on none of the intervening work, so a kill at minute 19 now costs the
+   shortlist and not the scoreboard.
+
+**TWO DEFECTS IN THE FIRST DRAFT, both caught before push, the second invisible:**
+a duplicate `_artifact_age_seconds` beside the existing helper (a parallel
+contract); and `computed_at` holding the READ MOMENT, which
+`_apply_freshness_recompute` (`#334`) would have used to recompute the age as ~0
+and hand back `is_fresh: True` on the way out — silently reverting the change.
+`#334`'s own comment records three previous patches that each missed a path.
+`computed_at` is now the oldest artifact's stamp, making the block idempotent
+under that pass.
+
+**THE OPERATIONAL HALF IS NOW BUILT (4).** `deploy_preflight.py` gained a third
+verdict, **`TOO_SOON` (exit 5)**, refusing a deploy inside the service's minimum
+spacing — 1500 s for refresh-worker, measured from its 20 min 41 s
+boot-to-first-publish. Read from **Render's deploy list**, not a local ledger:
+the 15 deploys came from parallel sessions and only the thing every session
+deploys through can see them all.
+
+**THREE INDEPENDENT PROPERTIES, and no two imply the third:**
+
+    CLAIMED    serialisation   two deploys must not overlap
+    OFF_MAIN   composition     the second must contain the first
+    TOO_SOON   spacing         the service must have time to produce something
+
+All fifteen deploys were serialised, composed and on main. The board was frozen
+anyway.
+
+**Replayed against the real timeline** (`WouldItHavePreventedTheIncidentTests`):
+**9 of the 14 intervals refused, 5 legitimate gaps allowed.** A floor, not an
+exact count — those are finish-to-finish gaps and preflight measures to *now*,
+which is earlier, so the true figure is at least 9.
+
+`--allow-rapid` is the escape hatch, because a rate limit with no override turns
+an outage into a longer one and a revert must always be able to go out. Only
+refresh-worker has a measured interval; **live-odds-worker and web are 0 because
+their cycles are UNMEASURED, not because they are known safe** — the preflight
+prints "not rate-limited" for a 0 so the absence is visible rather than implied.
+live-odds-worker has no `WORKER_SHUTDOWN` handler, so the uptime figure that made
+refresh-worker's case does not exist for it; measure its boot-to-first-publish
+before setting one.
+
+**NOT RUN LIVE.** This container has no `RENDER_API_KEY` and the proxy 403s
+`api.render.com`, so the verdict has been exercised end to end against a mocked
+API and against the real deploy timeline, but never against the live endpoint.
+First real use is the verification.
+
+**A SECOND ID COLLISION ON THE WAY IN, and it exposes a real hole in
+`todo_id_alloc.py` rather than just bad luck.** This item was `#562`, claimed
+through the allocator at 01:49:36Z. Lane `portfolio-decision-and-execution`
+claimed the SAME id at 02:01:32Z — twelve minutes later — and pushed first, so
+theirs is `#562` (the Kalshi trim) and this renumbered to `#563` on the merge.
+
+**`O_CREAT|O_EXCL` cannot serialise two separate git checkouts.** The tool's
+premise is that an atomic create makes the read-then-claim safe, and that is
+true *within one filesystem*. `.syndicate/todo_ids/` is tracked in git, so two
+containers each created `562.claim` locally and both `O_EXCL` calls succeeded —
+the conflict only surfaced as an add/add at `git merge`, which is exactly the
+failure mode the tool's docstring says it exists to prevent (*"the loser finds
+out at `git merge`, after the entry, the code comments and the tests are all
+written and have to be renamed together"* — that is precisely what happened,
+twice in one session). **The allocator makes collisions rarer, not impossible,
+and nothing in its output says so.** A real fix needs shared state the
+checkouts actually share (the keyvalue store, or an id reserved by pushing an
+empty claim commit before the work). Not taken here — recorded, not fixed.
+
+**verify:** one clean hour with no refresh-worker deploy should show
+`GAME_CHIPS_PUBLISHED` with no gap over ~10 minutes and zero
+`WORKER_SHUTDOWN_KILLED_BOARD_BUILD`. After deploying the code above, a board
+whose artifacts are >15 min old must serve `state_meta.is_fresh: false`, and the
+chip strip must render `.board-stale-badge`.
+
 ### `#560` — **Every NO-side Polymarket fill already on the books carries the OPPOSITE side's price. Realised cost and P&L on those rows are overstated.** — lane `portfolio-decision-and-execution`, raised by `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured — **NEEDS A USER DECISION**
 
 Fix for NEW fills is live (PR #83, deploy `d92ab27b1`). This item is the HISTORY,

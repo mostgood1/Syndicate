@@ -60,6 +60,21 @@ Read-only. Performs GETs against the Render API and never writes.
 Exit codes:  0 = CLEAR (only infrastructure running)
              1 = HOLD (a job would be killed, or the deploy is redundant)
              2 = UNKNOWN (no fresh evidence -- treat as HOLD)
+             3 = CLAIMED (another holder owns this service's deploy claim)
+             4 = OFF_MAIN (the target SHA is not contained in origin/main)
+             5 = TOO_SOON (deployed again inside this service's minimum spacing)
+
+THE THREE PROPERTIES, because they are independent and each was learned
+separately -- a deploy needs all three and no two of them imply the third:
+
+    CLAIMED    serialisation   two deploys must not overlap
+    OFF_MAIN   composition     the second must contain the first
+    TOO_SOON   spacing         the service must have time to produce something
+
+`#563`: fifteen refresh-worker deploys in 6h15m were perfectly serialised and
+perfectly composed, and left the board frozen all evening anyway, because the
+median instance was SIGTERMed 1202 s into a 21-minute boot-to-first-publish
+cycle. Serialisation is not spacing.
 """
 from __future__ import annotations
 
@@ -118,6 +133,83 @@ EXIT_CLAIMED = 3
 # every later main commit contain every earlier one, by construction, which is
 # the property the claim cannot provide.
 EXIT_OFF_MAIN = 4
+# 5 = this service was deployed too recently. Separate from HOLD again, and the
+# distinction is the whole reason this exists: HOLD means "something is running
+# right now, wait for a lull", TOO_SOON means "nothing is running BECAUSE you
+# just restarted it, and it has not had time to produce anything yet".
+#
+# WHY, measured 2026-08-25/26 (`#563`, and `deploys.md` carries the working).
+# A user reported the Layer 2 board and the compact scoreboard frozen for ~20
+# minutes. Every reader was healthy; the PRODUCER was being restarted faster
+# than it could produce:
+#
+#     15 deploys 19:26:55Z -> 01:13:38Z, all trigger=api
+#     15 WORKER_SHUTDOWN, all SIGTERM
+#     median instance uptime  1202 s = 20.0 min   (5 of 15 under 8 minutes)
+#     boot-to-first-publish   20 min 41 s         (instance -fzb6v)
+#
+# The median instance died within a minute of its first publish and five
+# published nothing at all. Every chips-publish gap contained at least one
+# deploy; the 54-minute gap contained five.
+#
+# THE CLAIM CANNOT PREVENT THIS AND WAS NEVER MEANT TO. `deploy_claim.py`
+# SERIALISES deploys -- it stops two landing at once, and its own docstring is
+# careful that serialisation is not composition (which is what `OFF_MAIN`
+# added). This is the third property, and it is not implied by either:
+# serialisation is not SPACING. Fifteen deploys can be perfectly ordered,
+# perfectly composed, each correctly claimed and released, and still leave the
+# board frozen all evening -- which is exactly what happened.
+EXIT_TOO_SOON = 5
+
+# THE MINIMUM SPACING, PER SERVICE, IN SECONDS. 0 disables the check.
+#
+# ONLY refresh-worker's NUMBER IS MEASURED, and the other two are 0 for that
+# reason rather than because they are known to be safe. Stating an unmeasured
+# number here would be inventing the exact kind of threshold this repo keeps
+# paying for; the verdict line prints "not rate-limited" for a 0 so the absence
+# is VISIBLE rather than implied.
+#
+#   refresh-worker  1500 s (25 min). Boot-to-first-publish measured at 20 min
+#                   41 s, so anything under ~21 minutes guarantees a board that
+#                   never publishes. 25 gives the cycle its measured length plus
+#                   margin for a slower slate.
+#   live-odds-worker  UNMEASURED. It has no `WORKER_SHUTDOWN` handler, so the
+#                   uptime figure that made refresh-worker's case does not exist
+#                   for it. Measure its boot-to-first-publish before setting one.
+#   web             DELIBERATELY 0, and this is a judgement not a gap. A web
+#                   deploy loses no cycle -- web only reads artifacts. Its cost
+#                   is ~2 minutes of 502s, which is a different problem, and one
+#                   the deploy claim already serialises.
+#
+# Override per service with SYNDICATE_DEPLOY_MIN_INTERVAL_SECONDS_<SERVICE>
+# (dashes as underscores, upper case), or all of them with
+# SYNDICATE_DEPLOY_MIN_INTERVAL_SECONDS.
+DEFAULT_MIN_DEPLOY_INTERVAL_SECONDS = {
+    "refresh-worker": 1500,
+    "live-odds-worker": 0,
+    "web": 0,
+    "syndicate": 0,
+}
+
+# Deploy statuses that DID NOT restart the service, so they do not start the
+# clock. Everything else does, INCLUDING anything unrecognised -- rule 1 of this
+# file is that unknown must not land on the permissive branch, and a status we
+# cannot classify is exactly that.
+#
+# `canceled` IS COUNTED, and that is not conservatism for its own sake: this
+# file's own header records that cancelling a deploy which has passed
+# `build_ended` does not avoid a restart, it CAUSES one (a second
+# MALLOC_ARENA_INIT 29 s after the cancel, with the child pid namespace reset).
+# A cancel during the BUILD phase is harmless and will be over-counted here.
+# Over-counting costs a wait; under-counting costs the board.
+NON_RESTARTING_DEPLOY_STATUSES = frozenset({
+    "build_failed",
+    "pre_deploy_failed",
+    "build_in_progress",
+    "pre_deploy_in_progress",
+    "created",
+    "queued",
+})
 
 
 def _api_key() -> str:
@@ -234,6 +326,23 @@ def newest_log(service_id: str, key: str, text: str, limit: int = 20) -> tuple[s
     return matching[-1] if matching else None
 
 
+def _age_seconds(stamp: str, now: datetime) -> float | None:
+    """Seconds between an RFC3339 stamp and `now`, or None if unreadable.
+
+    DELIBERATELY NOT CLAMPED AT ZERO. A negative age means the clocks disagree,
+    and the sample-age call site already treats that as "a receipt nobody should
+    trust the rest of" -- clamping would hide it. For the deploy-spacing caller a
+    negative reads as "very recent", which refuses, which is the safe direction.
+    """
+    text = str(stamp or "").strip()
+    if not text:
+        return None
+    try:
+        return (now - datetime.fromisoformat(text.replace("Z", "+00:00"))).total_seconds()
+    except (TypeError, ValueError):
+        return None
+
+
 def parse_processes(message: str) -> dict | None:
     start = message.find("{")
     if start < 0:
@@ -323,6 +432,77 @@ def live_deploy(service_id: str, key: str) -> dict:
         if deploy.get("status") == "live":
             return deploy
     return {}
+
+
+def min_deploy_interval_seconds(service: str) -> int:
+    """The spacing this service requires, honouring both env overrides.
+
+    Per-service override wins over the global one, which wins over the table.
+    A value that will not parse falls back rather than raising: a preflight that
+    dies on a malformed env var teaches people to skip the preflight.
+    """
+    keys = (
+        "SYNDICATE_DEPLOY_MIN_INTERVAL_SECONDS_" + str(service or "").replace("-", "_").upper(),
+        "SYNDICATE_DEPLOY_MIN_INTERVAL_SECONDS",
+    )
+    for name in keys:
+        raw = str(os.environ.get(name) or "").strip()
+        if raw:
+            try:
+                return max(0, int(float(raw)))
+            except (TypeError, ValueError):
+                continue
+    return int(DEFAULT_MIN_DEPLOY_INTERVAL_SECONDS.get(service, 0))
+
+
+def _deploy_restart_moment(deploy: dict) -> str:
+    """When this deploy actually restarted the service, best available.
+
+    `finishedAt` is the moment the new instance took over, which is what the
+    spacing is measured from. A deploy still in flight has none, so its start is
+    used -- it has already restarted the service or is about to, and either way
+    firing another now is the "one build cancelled another" failure.
+    """
+    for field in ("finishedAt", "updatedAt", "createdAt"):
+        value = str(deploy.get(field) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def last_restarting_deploy(service_id: str, key: str) -> dict:
+    """The most recent deploy that restarted (or is restarting) this service.
+
+    READ FROM RENDER, NOT FROM A LOCAL LEDGER, and that is the load-bearing
+    choice. The 15 deploys that caused `#563` came from parallel sessions and
+    all carried `trigger=api`; a file in this checkout can only ever see the
+    ones this session wrote. `deploy_claim.py`'s own docstring makes the same
+    argument about cross-session coordination: the only thing that sees every
+    session's deploys is the thing every session deploys THROUGH.
+
+    Returns {} when the list cannot be read or holds nothing restarting. The
+    caller treats {} as "cannot tell" and does NOT refuse on it -- see the call
+    site for why that one unknown is deliberately permissive.
+    """
+    deploys = _get(f"https://api.render.com/v1/services/{service_id}/deploys?limit=20", key) or []
+    best: dict = {}
+    best_moment = ""
+    for row in deploys:
+        deploy = row.get("deploy", row)
+        status = str(deploy.get("status") or "").strip().lower()
+        if status in NON_RESTARTING_DEPLOY_STATUSES:
+            continue
+        moment = _deploy_restart_moment(deploy)
+        if not moment:
+            continue
+        # Lexical comparison on RFC3339 UTC, and sorted here rather than trusted
+        # from the API: this file's own header records that the deploys/logs
+        # endpoints do not return what their ordering suggests, and reading
+        # `rows[0]` as newest produced a four-hour error in the direction that
+        # says "safe to deploy".
+        if moment > best_moment:
+            best, best_moment = deploy, moment
+    return best
 
 
 # The three real services. `SERVICE_IDS` also carries `syndicate` as an alias
@@ -416,6 +596,13 @@ def _write_receipt(args, report, verdict, reason, live_commit) -> None:
             # fact -- which is the only time anyone reads it. `#465`.
             "sample_source": report.get("sample_source"),
             "sample_age_seconds": report.get("sample_age_seconds"),
+            # `#563`. On the receipt and not only in the report, so "were we
+            # hammering this service" is answerable from the deploy trail
+            # afterwards rather than by reconstructing it from the Render API by
+            # hand, which is what it took the first time.
+            "min_deploy_interval_seconds": report.get("min_deploy_interval_seconds"),
+            "seconds_since_last_deploy": (report.get("last_deploy") or {}).get("age_seconds"),
+            "allow_rapid": report.get("allow_rapid"),
         }
         (RECEIPT_DIR / f"{args.service}.json").write_text(
             json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -431,6 +618,11 @@ def main() -> int:
                         help="permit a target commit that is NOT on origin/main. Such a "
                              "deploy cannot compose with another session's -- whichever "
                              "lands second silently reverts the first. Record why in deploys.md.")
+    parser.add_argument("--allow-rapid", action="store_true",
+                        help="permit a deploy inside this service's minimum spacing. The "
+                             "escape hatch is here because a rate limit with no override "
+                             "turns an outage into a longer one -- a revert must always be "
+                             "able to go out. Record why in deploys.md.")
     parser.add_argument("--max-sample-age-seconds", type=int, default=DEFAULT_MAX_SAMPLE_AGE_SECONDS)
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
@@ -491,10 +683,7 @@ def main() -> int:
         sample = newest_log(service_id, key, "ALL_PROCESS_MEMORY")
         parsed = parse_processes(sample[1]) if sample else None
         sample_source = "log:ALL_PROCESS_MEMORY"
-    if sample and parsed:
-        age = (now - datetime.fromisoformat(sample[0].replace("Z", "+00:00"))).total_seconds()
-    else:
-        age = None
+    age = _age_seconds(sample[0], now) if (sample and parsed) else None
     report["sample_at"] = sample[0] if sample else None
     report["sample_age_seconds"] = round(age, 1) if age is not None else None
     # Which path produced the verdict. Without this the receipt cannot be
@@ -536,6 +725,55 @@ def main() -> int:
         if claim else None
     )
 
+    # `#563`. HOW LONG SINCE THIS SERVICE LAST RESTARTED.
+    #
+    # Computed unconditionally so the numbers reach the report even when the
+    # limit is 0 or overridden -- a deploy log that records "spacing not
+    # enforced" alongside the actual gap is auditable; one that records nothing
+    # cannot answer "were we hammering it" after the fact, which is the question
+    # that took a whole evening to answer by hand.
+    min_interval = min_deploy_interval_seconds(args.service)
+    report["min_deploy_interval_seconds"] = min_interval
+    last_deploy: dict = {}
+    since_last_deploy: float | None = None
+    try:
+        last_deploy = last_restarting_deploy(service_id, key)
+        since_last_deploy = _age_seconds(_deploy_restart_moment(last_deploy), now) if last_deploy else None
+    except Exception as exc:  # noqa: BLE001
+        report["last_deploy_error"] = f"{type(exc).__name__}: {exc}"
+    report["last_deploy"] = (
+        {
+            "id": last_deploy.get("id"),
+            "status": last_deploy.get("status"),
+            "commit": str((last_deploy.get("commit") or {}).get("id") or "")[:8] or None,
+            "trigger": last_deploy.get("trigger"),
+            "restarted_at": _deploy_restart_moment(last_deploy) or None,
+            "age_seconds": since_last_deploy,
+        }
+        if last_deploy else None
+    )
+
+    # TOO_SOON ONLY WHEN WE ACTUALLY KNOW, and this is the one place in this file
+    # where an unknown is deliberately NOT refused. Rule 1 says unknown must not
+    # land on the permissive branch -- it applies to the question this script
+    # exists for ("is something running that a deploy would kill"), which is
+    # answered from the process sample and still refuses on absence.
+    #
+    # This is a different question. If the deploys endpoint cannot be read, the
+    # process checks below are unaffected and still decide; refusing here as
+    # well would mean a Render API blip blocks every deploy including a revert,
+    # which is a worse failure than the one being prevented. The unknown is
+    # RECORDED (`last_deploy: null`, or `last_deploy_error`) rather than
+    # swallowed, so a preflight that could not see the history says so.
+    too_soon = (
+        min_interval > 0
+        and not args.allow_rapid
+        and since_last_deploy is not None
+        and since_last_deploy < min_interval
+    )
+    report["too_soon"] = too_soon
+    report["allow_rapid"] = bool(args.allow_rapid)
+
     stale = age is None or age > args.max_sample_age_seconds
     if off_main:
         verdict, code = "OFF_MAIN", EXIT_OFF_MAIN
@@ -554,6 +792,34 @@ def main() -> int:
             f"deploy claim on {args.service} is held by {foreign_claim.get('holder')}"
             + (f" for {str(foreign_claim.get('target_commit'))[:8]}" if foreign_claim.get("target_commit") else "")
             + ". Coordinate with them, or --force the claim if that session is gone."
+        )
+    elif too_soon:
+        # ORDERED BEFORE THE STALE-SAMPLE CHECK, and that ordering is the point
+        # rather than an accident. Immediately after a deploy the worker has
+        # usually not printed an ALL_PROCESS_MEMORY line yet, so the sample IS
+        # stale -- and UNKNOWN would mask TOO_SOON behind a reason that tells the
+        # operator to wait for a log line when what they actually need is to wait
+        # 22 more minutes. Both refuse, so the gate is unchanged either way; the
+        # REASON is what decides what the reader does next, and only one of them
+        # is true.
+        verdict, code = "TOO_SOON", EXIT_TOO_SOON
+        wait_s = max(0, int(min_interval - (since_last_deploy or 0)))
+        last = report.get("last_deploy") or {}
+        in_flight = str(last.get("status") or "").strip().lower() in {"update_in_progress", "in_progress"}
+        reason = (
+            (f"a deploy of {args.service} is STILL IN FLIGHT ({last.get('id')}, "
+             f"started {since_last_deploy:.0f}s ago). Deploying now cancels it mid-update, "
+             f"which restarts the service twice rather than once."
+             if in_flight else
+             f"{args.service} was deployed {since_last_deploy / 60:.0f} min ago "
+             f"({last.get('id')}, {last.get('trigger') or 'unknown trigger'}), "
+             f"inside its {min_interval / 60:.0f} min minimum spacing.")
+            + f" Wait {wait_s // 60} min {wait_s % 60}s."
+            + (" refresh-worker takes ~21 min from boot to its first board publish, so a"
+               " deploy inside that window leaves the board frozen and throws away the"
+               " build in flight (`#563`)." if args.service == "refresh-worker" else "")
+            + " If this is a revert or the board is already broken, --allow-rapid and say"
+              " why in deploys.md."
         )
     elif stale:
         verdict, code = "UNKNOWN", EXIT_UNKNOWN
@@ -582,6 +848,22 @@ def main() -> int:
 
     print(f"service        {args.service}  ({service_id})")
     print(f"live commit    {live_commit[:8] or '?'}   finished {deploy.get('finishedAt') or '?'}")
+    # PRINTED ON EVERY RUN, INCLUDING WHEN THE LIMIT IS OFF. A spacing rule that
+    # only appears when it fires is one nobody knows the shape of until it blocks
+    # them, and "not rate-limited" needs to be a thing a reader can SEE -- two of
+    # the three services are at 0 because their cycle is unmeasured, not because
+    # they are known to be safe.
+    _last = report.get("last_deploy") or {}
+    _gap = "unknown" if since_last_deploy is None else f"{since_last_deploy / 60:.0f} min ago"
+    if min_interval > 0:
+        _limit = f"min spacing {min_interval // 60} min"
+        if args.allow_rapid:
+            _limit += "  [OVERRIDDEN by --allow-rapid]"
+    else:
+        _limit = "not rate-limited (no measured cycle for this service)"
+    print(f"last deploy    {_gap}"
+          + (f"   {_last.get('id')} {_last.get('status') or ''} trigger={_last.get('trigger') or '?'}" if _last else "")
+          + f"   {_limit}")
     if claim:
         who = "YOU" if foreign_claim is None else claim.get("holder")
         print(f"deploy claim   held by {who}"

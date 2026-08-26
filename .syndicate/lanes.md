@@ -67,6 +67,97 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### board-staleness-visibility — OPEN — opened 2026-08-25 — **NARROW CARVE-OUT from `layer2-sim-view-and-live-projection`, taken at explicit user direction ("take that lane's files and ship fixes 1-3")**
+
+**WHY A CARVE-OUT AND NOT A CLAIM.** Every file this needs is held by OPEN lane
+`layer2-sim-view-and-live-projection` (session e47e1b67). I surfaced that
+conflict rather than editing across it, the user directed the takeover, and this
+block is the record. **Back it out and hand it over if it collides with anything
+in flight** — the same convention the `portfolio-decision-and-execution`
+carve-out above used on the same file.
+
+**WHAT THE HOLDING LANE IS WORKING ON, and why these do not collide:** its open
+items are the soccer prop FETCH (one-sided quotes), `edged > 0` for soccer,
+`no_fair_value_devig_failed` attribution, NFL live re-sim, and the shortlist's
+non-row payload. **None of them touch freshness reporting or the chip publish
+ORDER.** The one real adjacency is its item 5 (the shortlist's non-row payload
+as a fixed cost) — this changes neither the payload's contents nor its size.
+
+**THE FINDING THIS SERVES** (full measurement in `deploys.md`, 2026-08-25 20:2x
+CT): the board and chips were frozen ~20 minutes because refresh-worker took 15
+deploys in 6h15m, each SIGTERMing the build in flight. Median instance uptime
+1202 s against a 21-minute boot-to-first-publish, so the median instance died
+within a minute of its first publish and five of fifteen published nothing.
+
+**SHIPPED (committed, NOT deployed):**
+
+1. **`state_meta` is DERIVED, not asserted.** `read_combined_intelligence_response`
+   hard-coded `age_seconds: 0.0, is_fresh: True` on a function that by its own
+   docstring only READS. Now: `age_seconds` = oldest input, `newest_age_seconds`
+   = freshest, `artifacts_dated` = how many stamps the verdict rests on,
+   `is_fresh` = None when nothing could be dated. Threshold
+   `SYNDICATE_INTELLIGENCE_BOARD_STALE_AFTER_SECONDS`, default 900 to match
+   `_STATE_STALE_SECONDS` on the live banner rather than invent a second one.
+   **The same defect two functions over was fixed with it** — both persisted-state
+   branches asserted `0.0` while holding the real stamp.
+2. **The chip strip surfaces `published_at`**, which the API always returned and
+   the page always discarded. Amber badge over 10 minutes, silent under it,
+   silent on an unreadable stamp. Amber deliberately, not red: red on this board
+   already means a losing position or a broken market, and a producer outage is
+   neither.
+3. **Chips publish BEFORE the slate is ingested**, not after the cards are built.
+   They depend on none of the intervening work, so the ~21-minute wait bought
+   nothing; a kill at minute 19 now costs the shortlist and not the scoreboard.
+   The join telemetry stays at the bottom (it needs cards) and now measures the
+   chips that were ACTUALLY published rather than rebuilding a second set 20
+   minutes later past a 30 s TTL cache.
+
+**Reachability proved, not assumed**, against BOTH regressions: restoring the
+`0.0`/`True` literals turns 6 tests red; putting the read moment back in
+`computed_at` turns 3 red, including
+`test_a_stale_board_survives_the_recompute_as_stale`.
+
+**TWO DEFECTS IN MY OWN FIRST DRAFT, recorded because the second was nearly
+shipped and is invisible.**
+
+1. **A duplicate age helper.** I added `_artifact_age_seconds` beside
+   `_timestamp_age_seconds`, which already did the same job -- rule 7's parallel
+   contract, and one that could disagree with `_recomputed_freshness_block`.
+   Deleted; the existing `_timestamp_age_seconds` / `_freshness_status_from_age`
+   pair is reused, so this block now speaks the same `fresh`/`stale`/`unknown`
+   vocabulary as every other freshness block in the file.
+2. **`computed_at` held the READ MOMENT, which `#334` would have used to undo
+   the entire fix.** `_apply_freshness_recompute` rebuilds `age_seconds`,
+   `freshness_status` and `is_fresh` FROM `computed_at` on every served payload
+   -- so a read-moment stamp there recomputes the age as ~0 and hands back
+   `is_fresh: True` on the way out of the door. It is now the OLDEST artifact's
+   stamp, which makes the block idempotent under that pass, and
+   `freshness_sla_seconds` carries this board's own 900 s so the recompute does
+   not judge it against the 30 s snapshot interval. `#334`'s own comment records
+   three previous patches that each missed a path; this would have been the
+   fourth, and nothing would have failed.
+
+**A TEST OF MINE WAS THE STALE SIDE, recorded because it shipped wrong first.**
+`test_the_publish_is_attempted_exactly_once_per_build` asserted ONE
+`build_game_chips` call and measured two. The second is `attach_game_state`
+(`board_enrichment.py`), a legitimate unrelated consumer inside the sport loop.
+Counting builds would fail on correct code AND go green again if somebody
+deleted the wrong call. It asserts on the WRITE now — the publish is what web
+reads, so the publish is what must be unique.
+
+**NOT DONE — the operational half, which is the actual fix.** At a 21-minute
+cycle, refresh-worker deploys need >25 minutes of spacing. `deploy_claim.py`
+serialises deploys; **it does not rate-limit them, and serialisation is not
+spacing.** These three changes make the next freeze VISIBLE and cheaper; they do
+not stop it.
+
+- Files: `pipeline/{intelligence_state,layer2_shortlist}.py`,
+  `syndicate/templates/intelligence.html`,
+  `syndicate/static/shared/board_cards.css`,
+  `tests/test_{board_freshness_derived,game_chips_published_before_ingest}.py`,
+  `tests/js/board_chip_freshness_badge.test.mjs`.
+
+
 #### snapshot-freshness — ~~DEPLOY REQUEST~~ **WITHDRAWN 20:25Z — DONE, NOTHING IS ASKED OF YOU.** `2efe76b1` is live on refresh-worker (20:25:16Z), verified by content. Cut on YOUR `415e23cb`, deployed into a lull after `daily_update --workflow ui-daily` finished — your work was not killed. Original request kept below for the record.
 
 **Please carry ONE extra commit: `85ff37dc` on `origin/main`** — "board fix:
