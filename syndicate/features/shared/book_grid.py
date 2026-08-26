@@ -718,15 +718,74 @@ def drop_superseded_lines(
         if current is None or float(seen) < current:
             freshest[key] = float(seen)
 
+    # `#569`: WHY a stale row SURVIVED, counted per reason. Log-only.
+    #
+    # Measured on the served board 2026-08-26: three rows classified
+    # `orphaned_line` by `layer2_shortlist._classify_stale_row` -- a fresher
+    # sibling line demonstrably existed -- and this guard did not drop them.
+    # It drops plenty (`count=1560 kept=946` on one MLB build), so the rule
+    # works; something about those three is different.
+    #
+    # NOT FIXED BY LOOSENING THE RULE ON A GUESS. This guard decides what the
+    # board SHOWS, the surviving cases number three, and the rows it correctly
+    # keeps number ~946 per build. A wrong loosening empties a board to fix a
+    # rounding error, which is the failure this module's own docstring warns
+    # about ("pruning on absence is how a capture hiccup would silently empty
+    # the board"). The counter names the gap first.
+    #
+    # The candidate gaps, and the counter distinguishes them:
+    #   no_seen_age          this row has no clock, so the rule cannot apply
+    #   no_group_sibling     nothing else in the GRID shares its market
+    #   sibling_no_seen_age  siblings exist, none carries a clock
+    #   within_lag           siblings are fresher but by less than the lag
+    # The classifier that found these reads the STATE FILE, which holds every
+    # key ever observed; this guard sees only rows present in THIS grid. If
+    # `no_group_sibling` dominates, that difference IS the hole.
+    survivor_reasons: dict[str, int] = {}
+    group_members: dict[tuple[str, ...], int] = {}
+    group_has_seen: dict[tuple[str, ...], int] = {}
+    for row in grid:
+        key = _line_group_key(row)
+        group_members[key] = group_members.get(key, 0) + 1
+        if row.get("seen_age_seconds") is not None:
+            group_has_seen[key] = group_has_seen.get(key, 0) + 1
+
     kept: list[dict[str, Any]] = []
     dropped = 0
     for row in grid:
         seen = row.get("seen_age_seconds")
-        best = freshest.get(_line_group_key(row))
+        key = _line_group_key(row)
+        best = freshest.get(key)
         if seen is not None and best is not None and (float(seen) - best) > lag_seconds:
             dropped += 1
             continue
+        # Only rows a reader would call stale are worth attributing; a fresh row
+        # surviving is the rule working, not a gap in it.
+        try:
+            if seen is None:
+                if row.get("line") not in (None, ""):
+                    survivor_reasons["no_seen_age"] = survivor_reasons.get("no_seen_age", 0) + 1
+            elif float(seen) > lag_seconds:
+                if group_members.get(key, 0) <= 1:
+                    reason = "no_group_sibling"
+                elif group_has_seen.get(key, 0) <= 1:
+                    reason = "sibling_no_seen_age"
+                else:
+                    reason = "within_lag"
+                survivor_reasons[reason] = survivor_reasons.get(reason, 0) + 1
+        except Exception:
+            pass
         kept.append(row)
+
+    if survivor_reasons:
+        try:
+            print(
+                "[book_grid] SUPERSEDED_SURVIVORS "
+                + " ".join(f"{k}={v}" for k, v in sorted(survivor_reasons.items())),
+                flush=True,
+            )
+        except Exception:
+            pass
     return kept, dropped
 
 

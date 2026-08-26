@@ -32863,3 +32863,52 @@ I did NOT re-trigger. The live deploy (`1e9ec576`) was verified to contain the
 fix as an ancestor, so another deploy would have added to the churn and bought
 nothing. **`#563`'s spacing guard exists for precisely this and is going unused
 because the locks are unreachable from cloud sessions.**
+
+## `#569`: the `drop_superseded_lines` hole — MEASURED FIRST, NOT LOOSENED
+
+**I was asked to fix it and have instead shipped the measurement, deliberately.**
+The reason is arithmetic: **3 rows survive wrongly; ~946 per build survive
+correctly** (`SUPERSEDED_LINES_DROPPED count=1560 kept=946`). This guard decides
+what the BOARD SHOWS. Loosening it on a guess to catch 3 risks dropping from the
+946 — which is the failure `book_grid`'s own docstring names: *"pruning on
+absence is how a capture hiccup would silently empty the board."*
+
+**Ruled out from code, so the counter only has to separate what is left:**
+- **Not the row cap.** `drop_superseded_lines` runs BEFORE `max_rows`
+  (`book_grid.py:643`, and its comment says so on purpose).
+- **Not a threshold mismatch.** The classifier that found these uses the same
+  900s the guard uses, so a gap it calls `orphaned_line` really does exceed the
+  lag.
+
+**What is left is a SOURCE difference, and that is the leading hypothesis:**
+`_classify_stale_row` reads the **state file**, which holds every key ever
+observed. This guard compares against **rows in THIS grid**. If the fresher
+sibling never became a grid row, the guard has nothing to compare and the
+difference between those two sources IS the hole.
+
+`SUPERSEDED_SURVIVORS no_group_sibling= sibling_no_seen_age= within_lag=
+no_seen_age=` now attributes every stale survivor:
+
+    no_group_sibling     nothing else in the GRID shares its market  <- the hypothesis
+    sibling_no_seen_age  a sibling exists and carries no clock
+    within_lag           fresher, but by less than the lag (rule working)
+    no_seen_age          this row has no clock at all
+
+Fresh survivors are NOT counted — that is the rule working, and counting it
+would bury the three rows that matter under hundreds that do not.
+
+**A PRE-EXISTING FRAGILITY FOUND AND NOT SILENTLY FIXED.** A first draft of the
+never-breaks test passed `"not a number"` and failed inside the **pre-existing**
+`float(seen)` at `book_grid.py:718`, which this change does not touch. It is
+unreachable today (`_seen_age_seconds` returns float or None and nothing else),
+so it is recorded in the test's docstring rather than hardened — widening a
+filter's error handling is a separate change from measuring it.
+
+7 tests, mutation-checked twice: collapsing `no_group_sibling` into `within_lag`
+hides the leading hypothesis (2 red); counting fresh survivors buries the signal
+(2 red). 120 tests green across the grid and layer2 suites.
+
+verify: one build's `SUPERSEDED_SURVIVORS`. **If `no_group_sibling` dominates,
+the fix is to give the guard the state file's group stamps** — the same source
+that found these — rather than to change its lag. If something else dominates,
+the fix is different and this entry's hypothesis was wrong.
