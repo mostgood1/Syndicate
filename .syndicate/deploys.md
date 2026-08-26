@@ -32690,3 +32690,51 @@ independently says.** Two unrelated instruments agreeing is the first thing in
 29 tests. **Mutation-checked both ways:** reinstating a flat threshold
 reproduces the nfl false alarm (2 tests red); excusing any slow sport
 unconditionally is caught as blanket amnesty (2 tests red).
+
+### RE-READ, 20:39:45Z, instance `-vf8m9`. The fix holds and NFL is exonerated by two instruments.
+
+    STALE_ROW_CAUSE
+      mlb  [stale=161 worst=3842s  sidecar=441s   market_gone=2,orphaned_line=1]
+      nfl  [stale=54  worst=15661s sidecar=15699s as_fresh_as_sweep=3]
+      wnba [stale=377 worst=35952s sidecar=5808s  market_gone=1,orphaned_line=2]
+
+**nfl: `as_fresh_as_sweep=3`.** sidecar 15699s, worst row 15661s, **ratio 1.00** —
+its worst row was seen AT the last sweep. The false alarm is gone, and this
+agrees with `FIXTURE_CADENCE sport=nfl interval=28800 reason=mid:26h_out`, which
+was measured independently and on a different service. **Two unrelated
+instruments, one conclusion.**
+
+**wnba now CLASSIFIES instead of hiding behind `sidecar_frozen`.** sidecar 5808s
+against a worst row of 35952s — **6.2x** — so sweeps ran and skipped that row.
+Under the retired flat threshold this read `sidecar_frozen` and said nothing.
+
+**mlb**: sidecar 441s, worst 3842s, **8.7x**. Also real.
+
+### THE SETTLED ANSWER, after four revisions
+
+    sport  sidecar  worst_row  ratio  verdict
+    nfl     15699s     15661s   1.00  HEALTHY -- sweeps rarely, sees its rows
+    mlb       441s      3842s   8.7x  market_gone=2, orphaned_line=1
+    wnba     5808s     35952s   6.2x  market_gone=1, orphaned_line=2
+
+**Across the two sports with a real defect: `market_gone`=3, `orphaned_line`=3.
+An even split — BOTH causes are live and neither dominates.** That is the answer
+to the original question, and it is the first version of it where every label is
+defensible: nfl's is corroborated by a second instrument, and mlb's and wnba's
+rest on sidecars demonstrably fresher than the rows they judge.
+
+**592 of 1306 served rows (45%) carry quotes over 15 minutes old** — up from the
+212 measured at 19:15Z, driven by wnba's 377.
+
+### The measurement was nearly lost to the thing it measures
+
+My 20:07 deploy went live at 20:10:23 and was **deactivated at 20:21:32** by
+another session's deploy, which killed the cold build ~11 minutes in, just short
+of publishing. **Six commits landed on main in the 14 minutes after my merge.**
+That is deploy churn destroying a cold build — the exact mechanism this lane
+documented this morning — applied to the instrumentation measuring it.
+
+I did NOT re-trigger. The live deploy (`1e9ec576`) was verified to contain the
+fix as an ancestor, so another deploy would have added to the churn and bought
+nothing. **`#563`'s spacing guard exists for precisely this and is going unused
+because the locks are unreachable from cloud sessions.**
