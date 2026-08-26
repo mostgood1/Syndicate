@@ -43,8 +43,53 @@ rather than argued.
 **No job was killed.** Worker rebooted `499ng` -> `fzb6v`, memory 98.9% -> 62.5%,
 and a fresh MLB sim started on 15 game pks (pre-deploy runs had 9).
 
-**verify: OPEN OBLIGATION.** The reading that settles it is one cycle carrying
-BOTH lines, which must DISAGREE:
+**verify: MET `01:49:32Z`** (first printed `01:13:02Z` on `fzb6v`; also read on
+`jmqxx` after two further deploys). The two lines DISAGREE, which is the test:
+
+```
+BY_GAME_DATE   earliest key 2026-08-25 -> 1958 markets
+  KXMLBHRR 400  KXMLBRBI 400  KXMLBTB 400  KXMLBHIT 218  KXMLBSB 212
+  KXMLBKS 191   KXMLBWA 74    KXMLBGAME 26  + WNBA 37
+BY_CLOSE_DATE  earliest key 2026-08-27 -> 218
+  {'2026-08-27': 218, '2026-08-28': 587, '2026-08-29': 1499, ...}
+```
+
+`BY_CLOSE_DATE` HAS NO KEY for 2026-08-25 or 2026-08-26. So the working set held
+1,958 markets for the board's own date while the old line reported the earliest
+as 2026-08-27 -- and it still reports exactly that, now under a name where it is
+TRUE. The 2026-08-25 retraction is confirmed in production.
+
+`<undatable_ticker>` earned its keep on the `01:13:02Z` read: `{'KXEREDIVISIE':
+18}`, a season future with no event segment, bucketed honestly instead of
+borrowing a close date.
+
+**The join moved, though not only because of this change:**
+
+```
+00:35:49 (old)  matched=0    unreadable_title=2302  market_is_for_another_date=3332
+01:49:32 (new)  matched=71   unreadable_title=493   market_is_for_another_date=3282
+                no_matching_board_row=1838  stat_not_in_market_vocabulary=304
+```
+
+`unreadable_title` 2302 -> 493 is the PARALLEL session's grammar work
+(`8efdf0ff7`), not this deploy; `stat_not_in_market_vocabulary=304` is their MLB
+inning-total reclassification appearing exactly as their commit predicted. This
+deploy's own contribution is the DIAGNOSTIC, and `matched` is not attributable to
+it. Stated so the next reader does not credit one change with another's number.
+
+**A MEASUREMENT ERROR OF MINE, recorded because it is the same error the deploy
+fixes.** I reported "no pair yet" seven times between `01:13` and `01:49`. The
+pair was printing the whole time. I queried Render logs with
+`text: ["BY_GAME_DATE|BY_CLOSE_DATE"]`; that regex alternation returns
+`logs: null` in this API while each single term returns rows. I then built two
+further explanations -- dormant tier arithmetic, then board-build stage depth --
+on top of an absence that did not exist. **A null from a query you got wrong is
+indistinguishable from a null from a system that is quiet**, which is precisely
+the confusion `by_date`-meaning-`close_time` created one layer down. Query single
+terms, or verify the filter returns rows for a string known to be present.
+
+**Superseded plan text (kept, since the row is append-only):** the reading that
+settles it is one cycle carrying BOTH lines, which must DISAGREE:
 
 ```
 [kalshi_odds] BY_GAME_DATE  <game dates, from the ticker>

@@ -6190,3 +6190,25 @@ green" stops applying here.
   claim is explicitly released one at a time.
 - Cost: none — caught by running the invariant checker before committing,
   not after.
+
+## A null result from a QUERY is not a null result from the SYSTEM `[2026-08-26]`
+
+Render's log API `text` filter does NOT support regex alternation the way it
+looks like it does. `text: ["BY_GAME_DATE|BY_CLOSE_DATE"]` returns
+`logs: null`; each single term returns rows. Silently — no error, no warning,
+and `null` is exactly what a genuinely quiet service returns.
+
+Cost: seven consecutive "no output yet" reports over 36 minutes while the lines
+were printing the whole time, plus two elaborate explanations built on the
+absence (a dormant-interval calculation, then a board-build stage-depth model).
+Both were plausible, both were unfalsifiable against a filter that could not
+return anything, and both were wrong.
+
+**The rule:** before reporting that something is ABSENT from a log, prove the
+query can find something PRESENT. Query one term at a time, or include a string
+you know is in the window as a control. An unproven filter turns "I asked
+wrong" into "it did not happen", and those license opposite conclusions.
+
+This is `#370`'s error one layer up, again: the same session had just deployed a
+fix for a histogram that reported `close_time` under the name `by_date`, and
+then made the identical mistake reading the logs of that very fix.
