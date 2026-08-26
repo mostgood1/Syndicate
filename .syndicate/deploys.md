@@ -31687,3 +31687,41 @@ condition anywhere.**
 Nothing further is fixable here. **Kalshi must enable this account on exchange
 shard 3.** `KALSHI_ORDER_KNOWN_SHARDS=0,3` keeps the log honest afterwards; it
 unblocks nothing, because nothing is blocked.
+
+---
+
+## 2026-08-26 16:03Z · THE DISCRIMINATING READING — one cycle, both outcomes
+
+Everything argued about today, settled by a single execution cycle on `2709a36b8`:
+
+```
+16:02:57 SUBMIT  KXMLBHRR-26AUG261310TBDET-DETHLEE50-2  exchange_index=-1 subaccount=0
+         -> venue_shard_not_provisioned: market_shard=3 known_good_shards=[0]
+16:03:00 SUBMIT  KXMLBTOTAL-26AUG261940TEXCWS-8         exchange_index=-1 subaccount=0
+         -> venue_shard_not_provisioned: market_shard=3 known_good_shards=[0]
+16:03:05 SUBMIT  KXWNBA3PT-26AUG26TORSEA-SEAFJOHNSON4-2 exchange_index=-1 subaccount=0
+16:03:05 LIVE_ORDER status=submitted  error=None
+16:03:06 RECONCILED submitted->filled venue_status='executed'
+           contracts=10 fill_price=0.4 fees=0.168
+```
+
+`EXECUTED ... venue=kalshi placed=1`, spend `$14.87 -> $18.89`, filled `196 -> 197`.
+
+**A real Kalshi fill, ~1 second round trip, with the guard live.** Three things
+close at once:
+
+1. **The shard diagnosis is confirmed end to end by our own client.** MLB reads
+   `market_shard=3` and is refused; WNBA on shard 0 fills. Same code, same
+   credential, same body shape, seconds apart.
+2. **The peer's WNBA alarm is refuted in production, not by argument.** The
+   claim was that the guard *"is about to kill the only venue path that still
+   works"*. It placed and filled a WNBA order in the same cycle it rejected two
+   MLB ones. `known_good_shards=[0]` is printed, never evaluated.
+3. **The `subaccount` revert to `0` is vindicated by a fill.** The body that
+   filled carries `subaccount=0` — the last-known-good value, restored after
+   omission was disproven. That was the right call for the right reason:
+   omission changed nothing about the bug, and `0` is what money has always
+   moved under.
+
+**Nothing further is fixable in code.** The remaining action is Kalshi enabling
+this account on exchange shard 3.
