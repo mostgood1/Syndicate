@@ -3701,19 +3701,38 @@ def _refresh_wnba_boxscores(selected_date: str) -> None:
         from scripts.build_wnba_boxscores import (
             artifact_relative_path,
             build_date,
-            completed_event_ids,
+            fetch_via_web,
+            web_base_url,
         )
         from syndicate.features.shared.refresh_state_store import (
             data_root,
             read_text_file,
         )
 
+        # THROUGH WEB, NOT ESPN. This ran here against ESPN directly first and
+        # every attempt came back the same way:
+        #
+        #   WNBA_BOXSCORES_SCOREBOARD_FAILED date=2026-08-25
+        #     HTTPError: HTTP Error 403: Forbidden
+        #
+        # ESPN refuses Render's egress; the identical call from a laptop
+        # returned 3 games and 66 rows. Web is NOT refused --
+        # `WNBA_LIVE_BOX_CAPTURED date=2026-08-25 games=3 players=66` is the
+        # live capture making this hop successfully -- which is why
+        # `capture_wnba_live_player_box.py` calls web rather than ESPN, and why
+        # this does too.
+        #
+        # `count_only` is one scoreboard call and no per-event fetches, so the
+        # every-3-minute gate stays cheap.
+        base_url = web_base_url()
         try:
-            final_games = len(completed_event_ids(selected_date))
+            final_games = int(
+                (fetch_via_web(base_url, selected_date, count_only=True) or {}).get("games") or 0
+            )
         except Exception as exc:  # noqa: BLE001
             print(
-                f"[intelligence_state] WNBA_BOXSCORES_SCOREBOARD_FAILED"
-                f" date={selected_date} {type(exc).__name__}: {exc}",
+                f"[intelligence_state] WNBA_BOXSCORES_COUNT_FAILED"
+                f" date={selected_date} base={base_url} {type(exc).__name__}: {exc}",
                 flush=True,
             )
             return
@@ -3733,7 +3752,7 @@ def _refresh_wnba_boxscores(selected_date: str) -> None:
             f" final_games={final_games} covered={covered}",
             flush=True,
         )
-        build_date(selected_date)
+        build_date(selected_date, base_url=base_url)
     except Exception as exc:  # noqa: BLE001
         print(
             f"[intelligence_state] WNBA_BOXSCORES_FAILED date={selected_date}"

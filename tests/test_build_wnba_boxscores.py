@@ -175,7 +175,8 @@ def test_a_covered_slate_does_NOT_refetch(monkeypatch, tmp_path):
         + "401857175," + ",".join([""] * (len(mod.COLUMNS) - 1)) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(mod, "completed_event_ids", lambda d: ["401857173", "401857175"])
+    monkeypatch.setattr(mod, "fetch_via_web",
+                        lambda base, d, count_only=False: {"ok": True, "games": 2, "rows": []})
 
     called = {"n": 0}
     monkeypatch.setattr(mod, "build_date", lambda d, **kw: called.__setitem__("n", called["n"] + 1))
@@ -194,8 +195,8 @@ def test_a_slate_that_has_MOVED_is_rebuilt(monkeypatch, tmp_path):
         + "401857173," + ",".join([""] * (len(mod.COLUMNS) - 1)) + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(mod, "completed_event_ids",
-                        lambda d: ["401857173", "401857174", "401857175"])
+    monkeypatch.setattr(mod, "fetch_via_web",
+                        lambda base, d, count_only=False: {"ok": True, "games": 3, "rows": []})
     called = {"n": 0}
     monkeypatch.setattr(mod, "build_date", lambda d, **kw: called.__setitem__("n", called["n"] + 1))
     istate._refresh_wnba_boxscores("2026-08-25")
@@ -204,7 +205,8 @@ def test_a_slate_that_has_MOVED_is_rebuilt(monkeypatch, tmp_path):
 
 def test_no_final_games_fetches_nothing_further(monkeypatch, tmp_path):
     istate = _state(monkeypatch, tmp_path)
-    monkeypatch.setattr(mod, "completed_event_ids", lambda d: [])
+    monkeypatch.setattr(mod, "fetch_via_web",
+                        lambda base, d, count_only=False: {"ok": True, "games": 0, "rows": []})
     called = {"n": 0}
     monkeypatch.setattr(mod, "build_date", lambda d, **kw: called.__setitem__("n", called["n"] + 1))
     istate._refresh_wnba_boxscores("2026-08-25")
@@ -216,8 +218,54 @@ def test_a_producer_failure_NEVER_reaches_settlement(monkeypatch, tmp_path):
     than the gap this closes."""
     istate = _state(monkeypatch, tmp_path)
 
-    def _boom(_date):
-        raise RuntimeError("espn down")
+    def _boom(base, _date, count_only=False):
+        raise RuntimeError("web down")
 
-    monkeypatch.setattr(mod, "completed_event_ids", _boom)
+    monkeypatch.setattr(mod, "fetch_via_web", _boom)
     istate._refresh_wnba_boxscores("2026-08-25")  # must not raise
+
+
+def test_the_web_hop_refuses_a_not_ok_payload(monkeypatch):
+    """`ok: False` from web must RAISE, not be read as an empty slate.
+
+    Web returns 502 with a named error when it cannot reach ESPN. Treating that
+    as "no games" would write an empty artifact over a real one -- the failure
+    `capture_wnba_live_player_box` exists to refuse.
+    """
+    monkeypatch.setattr(mod, "_get", lambda url, timeout=90: {"ok": False, "error": "boom"})
+    with pytest.raises(RuntimeError, match="boom"):
+        mod.fetch_via_web("https://web", "2026-08-25")
+
+
+def test_building_via_web_uses_the_web_rows(monkeypatch, tmp_path):
+    """ESPN 403s Render's egress, so the producer takes web's rows verbatim."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
+    row = {c: "" for c in mod.COLUMNS} | {
+        "PLAYER_NAME": "Sonia Citron", "REB": "1", "game_id": "401857175",
+        "date": "2026-08-25",
+    }
+    monkeypatch.setattr(mod, "fetch_via_web",
+                        lambda base, d, count_only=False: {"ok": True, "games": 1, "rows": [row]})
+    # Would 403 on Render; must not be reached on the web path.
+    monkeypatch.setattr(mod, "completed_event_ids",
+                        lambda d: (_ for _ in ()).throw(AssertionError("must not hit ESPN")))
+
+    result = mod.build_date("2026-08-25", base_url="https://web")
+    assert result["status"] == "ok" and result["rows"] == 1
+    written = tmp_path / "wnba_source" / "data" / "processed" / "boxscores_2026-08-25.csv"
+    assert "Sonia Citron" in written.read_text(encoding="utf-8")
+
+
+def test_a_partial_slate_from_web_is_reported(monkeypatch, tmp_path, capsys):
+    """A slate short of its games must be visible, or the rebuild gate treats a
+    partial answer as a complete one and stops rebuilding."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
+    row = {c: "" for c in mod.COLUMNS} | {"PLAYER_NAME": "A", "game_id": "1"}
+    monkeypatch.setattr(mod, "fetch_via_web", lambda base, d, count_only=False: {
+        "ok": True, "games": 2, "rows": [row],
+        "failed_events": [{"event_id": "2", "error": "Timeout"}],
+    })
+    mod.build_date("2026-08-25", base_url="https://web")
+    assert "EVENT_FAILED" in capsys.readouterr().out

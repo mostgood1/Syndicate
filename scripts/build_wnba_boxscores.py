@@ -183,25 +183,86 @@ def to_csv(rows: list[dict[str, Any]]) -> str:
     return buffer.getvalue()
 
 
-def build_date(date_str: str, *, dry_run: bool = False) -> dict[str, Any]:
+
+def web_base_url() -> str:
+    """Where the final box is fetched from when we cannot reach ESPN ourselves.
+
+    Same env chain as `live_lens_loop._wnba_live_box_base_url`, because it is
+    the same hop for the same reason: the worker-to-web hostname is internal in
+    production and public everywhere else.
+    """
+    import os
+
+    return str(
+        os.environ.get("SYNDICATE_WNBA_LIVE_BOX_BASE_URL")
+        or os.environ.get("SYNDICATE_INTERNAL_WEB_BASE_URL")
+        or "https://syndicate-an21.onrender.com"
+    ).strip().rstrip("/")
+
+
+def fetch_via_web(base_url: str, date_str: str, *, count_only: bool = False) -> dict[str, Any]:
+    """Ask WEB for the date's completed games, and optionally their rows.
+
+    ESPN REFUSES RENDER'S EGRESS. Measured 2026-08-26 from `intelligence_state`
+    on refresh-worker:
+
+        WNBA_BOXSCORES_SCOREBOARD_FAILED date=2026-08-25 HTTP Error 403: Forbidden
+
+    on every attempt, while the same call from a laptop returned 3 games and 66
+    rows. Web is not refused -- `WNBA_LIVE_BOX_CAPTURED date=2026-08-25 games=3
+    players=66` is the live capture making this exact hop successfully. So the
+    producer asks web, exactly as `capture_wnba_live_player_box.py` does.
+
+    `count_only` costs ONE scoreboard call and no per-event fetches, which is
+    what makes the every-3-minute gate cheap.
+    """
+    import urllib.parse
+
+    query = urllib.parse.urlencode(
+        {"date": date_str, **({"count_only": "1"} if count_only else {})}
+    )
+    payload = _get(f"{base_url}/wnba/api/final_player_boxscore?{query}", timeout=90)
+    if not payload.get("ok"):
+        raise RuntimeError(str(payload.get("error") or "web refused the final box"))
+    return payload
+
+
+def build_date(date_str: str, *, dry_run: bool = False,
+               base_url: str | None = None) -> dict[str, Any]:
     """Fetch, assemble and persist one slate. Returns a summary, never raises."""
     from syndicate.features.shared.refresh_state_store import data_root, write_text_file
 
-    try:
-        event_ids = completed_event_ids(date_str)
-    except Exception as exc:  # noqa: BLE001
-        print(f"[wnba_boxscores] SCOREBOARD_FAILED date={date_str} "
-              f"{type(exc).__name__}: {exc}", flush=True)
-        return {"date": date_str, "status": "scoreboard_failed", "games": 0, "rows": 0}
-
     rows: list[dict[str, Any]] = []
-    for event_id in event_ids:
+    if base_url:
+        # VIA WEB, because ESPN 403s Render's egress. See `fetch_via_web`.
         try:
-            rows.extend(rows_for_event(event_id, date_str))
+            payload = fetch_via_web(base_url, date_str)
         except Exception as exc:  # noqa: BLE001
-            # One event's failure must not cost the rest of the slate.
-            print(f"[wnba_boxscores] EVENT_FAILED date={date_str} event={event_id} "
+            print(f"[wnba_boxscores] WEB_FETCH_FAILED date={date_str} "
                   f"{type(exc).__name__}: {exc}", flush=True)
+            return {"date": date_str, "status": "web_fetch_failed", "games": 0, "rows": 0}
+        event_ids = [""] * int(payload.get("games") or 0)
+        rows = [row for row in (payload.get("rows") or []) if isinstance(row, dict)]
+        for failure in payload.get("failed_events") or []:
+            # Surfaced rather than hidden: a partial slate must not be mistaken
+            # for a complete one, or the rebuild gate stops rebuilding.
+            print(f"[wnba_boxscores] EVENT_FAILED date={date_str} "
+                  f"event={failure.get('event_id')} {failure.get('error')}", flush=True)
+    else:
+        try:
+            event_ids = completed_event_ids(date_str)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[wnba_boxscores] SCOREBOARD_FAILED date={date_str} "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+            return {"date": date_str, "status": "scoreboard_failed", "games": 0, "rows": 0}
+
+        for event_id in event_ids:
+            try:
+                rows.extend(rows_for_event(event_id, date_str))
+            except Exception as exc:  # noqa: BLE001
+                # One event's failure must not cost the rest of the slate.
+                print(f"[wnba_boxscores] EVENT_FAILED date={date_str} event={event_id} "
+                      f"{type(exc).__name__}: {exc}", flush=True)
 
     if not event_ids:
         print(f"[wnba_boxscores] NO_FINAL_GAMES date={date_str} -- nothing written", flush=True)
@@ -247,6 +308,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end", help="backfill end, YYYY-MM-DD")
     parser.add_argument("--dry-run", action="store_true",
                         help="fetch and report, write nothing")
+    parser.add_argument("--via-web", action="store_true",
+                        help="fetch through the web service instead of ESPN directly"
+                             " -- required on Render, where ESPN returns 403")
     args = parser.parse_args(argv)
 
     if args.start and args.end:
@@ -259,7 +323,8 @@ def main(argv: list[str] | None = None) -> int:
     wrote = 0
     empty = 0
     for date_str in targets:
-        result = build_date(date_str, dry_run=bool(args.dry_run))
+        result = build_date(date_str, dry_run=bool(args.dry_run),
+                            base_url=web_base_url() if args.via_web else None)
         if result.get("status") in {"ok", "dry_run"}:
             wrote += 1
         elif result.get("status") == "empty":
