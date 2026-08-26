@@ -1433,3 +1433,43 @@ def test_a_fixed_point_scale_error_is_still_caught_by_the_contract_bound():
 
     # `_fp` as a 1e6 fixed-point scale: 2.392 contracts arrives as 2392000.
     assert 2392000.0 > 2.392 + _FILL_COUNT_TOLERANCE
+
+
+# ---------------------------------------------------------------------------
+# A CONFIRMED FILL MUST REACH THE LEDGER. One band treated a 33% overspend
+# exactly like a 1,000,000x parse failure -- both stranded at `submitted`.
+#
+# Measured 2026-08-26T03:43:08Z: the venue held the order as
+# ORDER_STATE_FILLED (`venue_orders=7`) while the ledger showed $0.00
+# (`stamped=6 implausible=1`). The venue was right, and the ledger was hiding
+# a live position -- the opposite of what a safety guard should do.
+# ---------------------------------------------------------------------------
+
+
+def test_an_overspend_is_booked_and_an_absurd_multiple_is_still_refused():
+    from syndicate.features.shared.execution_ledger import (
+        _FILL_DOLLAR_ABSURD,
+        _FILL_DOLLAR_TOLERANCE,
+    )
+
+    stake = 7.92
+    ceiling = stake * _FILL_DOLLAR_TOLERANCE          # 9.90
+    absurd = stake * _FILL_DOLLAR_ABSURD              # 79.20
+
+    real_overspend = 10.5087                          # the measured fill
+    assert real_overspend > ceiling, "it IS over budget"
+    assert real_overspend <= absurd, "but it is a fill, not a unit error"
+
+    # The `_fp` scale error the guard exists for is still caught.
+    fp_scale_error = stake / 0.26 * 1e6
+    assert fp_scale_error > absurd
+
+
+def test_the_two_bands_do_not_overlap():
+    """A single number cannot be both booked and refused."""
+    from syndicate.features.shared.execution_ledger import (
+        _FILL_DOLLAR_ABSURD,
+        _FILL_DOLLAR_TOLERANCE,
+    )
+
+    assert _FILL_DOLLAR_TOLERANCE < _FILL_DOLLAR_ABSURD

@@ -486,3 +486,21 @@ def test_an_unknown_side_refuses_even_when_an_index_is_available():
     for side in ("draw", "maybe", "", None):
         with pytest.raises(OrderBuildError):
             _body(request=_Request(side=side), outcome_index=1)
+
+
+def test_price_and_side_describe_the_SAME_leg():
+    """THE INVARIANT THE OVERSPEND BROKE.
+
+    `quantity_for_stake` sizes against the price it is handed. That is only
+    sound if the price is the price of the leg being BOUGHT. On 2026-08-26 it
+    was not: price 0.26 came from `outcomePrices[1]` (Over) while the side
+    resolved to NO (Under), so 30.46 contracts sized for $7.92 filled at
+    $0.345 each -- $10.51, 33% over the stake and past the reconcile ceiling.
+
+    Both now come from the same name match, so they agree by construction.
+    A quantity is only as correct as the leg its price belongs to."""
+    body = _body(request=_Request(side="over"), outcome_index=1, price_dollars=0.26)
+    assert body["outcomeSide"] == "OUTCOME_SIDE_YES"          # the Over leg
+    assert body["price"]["value"] == "0.26"                    # the Over price
+    # And the size is the stake divided by THAT price, not some other leg's.
+    assert abs(float(body["quantity"]) * 0.26 - 10.0) < 0.26   # _Request stake=10.0

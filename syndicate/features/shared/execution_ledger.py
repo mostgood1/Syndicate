@@ -739,6 +739,24 @@ _FILL_DOLLAR_TOLERANCE = 1.25
 # fixed-point scale error.
 _FILL_COUNT_TOLERANCE = 0.01
 
+# ABOVE THIS MULTIPLE OF THE STAKE, THE NUMBER IS A UNIT ERROR, NOT A FILL.
+#
+# The `_fp` scale worry this guard exists for is 100x or 1e6x. An overspend of
+# 33% is a BAD FILL -- real, confirmed by the venue, and money that has already
+# moved. Refusing to record it does not unwind it; it strands the order at
+# `submitted` forever, understates exposure, and stops reconcile converging.
+#
+# Measured 2026-08-26T03:43:08Z, the fill that forced this split:
+#
+#   venue_count=30.46 fill_price=0.345 filled_dollars=10.5087
+#   stake_ceiling=9.9 requested_stake=7.92
+#
+# The venue held it as ORDER_STATE_FILLED while our ledger showed $0.00 --
+# `venue_orders=7 stamped=6 implausible=1`. The venue was right and the ledger
+# was hiding a live position, which is the opposite of what a safety guard
+# should do.
+_FILL_DOLLAR_ABSURD = 10.0
+
 
 def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[str, Any]:
     """Correct the live ledger from what the VENUE says, not from what we sent.
@@ -917,10 +935,21 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
             except (TypeError, ValueError):
                 stake_ceiling = None
 
+            over_budget = False
             if filled_dollars is not None and stake_ceiling is not None:
-                # The dollar bound, which is the real invariant.
+                # TWO BANDS, NOT ONE. Over the tolerance is an OVERSPEND -- a
+                # real fill that cost more than planned, which gets recorded
+                # and flagged. Only an absurd multiple is a unit error, and
+                # only that is refused.
+                #
+                # One band meant a 33% overspend was treated exactly like a
+                # 1,000,000x parse failure: both stranded. A confirmed fill
+                # must reach the ledger, because the money moved whether we
+                # write it down or not, and the day budget cannot charge for
+                # what it cannot see.
                 bound = "dollars"
-                implausible_count = filled_dollars > stake_ceiling
+                implausible_count = filled_dollars > stake * _FILL_DOLLAR_ABSURD
+                over_budget = (not implausible_count) and filled_dollars > stake_ceiling
             else:
                 # No readable fill price: fall back to the contract bound rather
                 # than to no bound at all.
@@ -961,6 +990,19 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                     flush=True,
                 )
                 continue
+
+            if over_budget:
+                # RECORDED AND NAMED, not refused. The fill is real; this line
+                # is what makes the overspend findable instead of inferred from
+                # a stake that quietly does not match.
+                print(
+                    f"[execution_ledger] RECONCILE_FILL_OVER_BUDGET key={key}"
+                    f" filled_dollars={filled_dollars} stake_ceiling={stake_ceiling}"
+                    f" requested_stake={order.get('requested_stake_dollars')!r}"
+                    f" venue_count={contracts} fill_price={fill_price}"
+                    " -- BOOKED; the money moved, the ledger follows",
+                    flush=True,
+                )
 
             after = STATUS_FILLED
             # The venue's own fill price where it gave one, ours where it did
