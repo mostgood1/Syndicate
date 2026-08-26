@@ -30601,3 +30601,46 @@ reading is the deliverable; the fix wants its own lane and a daylight deploy.
 The horizon change in particular must be checked against what the board is
 meant to SHOW before it is narrowed, because `beyond_horizon` is a shortlist
 filter and the rail may legitimately want the wider window.
+
+## 2026-08-25 22:21 CT — refresh-worker `9a797af9` (`#565` per-sport slate window)
+
+**DEPLOYED OVER A HOLD, ON EXPLICIT USER DIRECTION AFTER BEING SHOWN THE COST.**
+This is the entry to read if an MLB sim is missing for 2026-08-25.
+
+**The preflight equivalent, run by hand, returned HOLD twice:**
+
+    03:15:47Z  process_count=13  memory 93.2%  headroom 279 MB
+    03:21:00Z  process_count=11  memory 99.8%  headroom 8.8 MB
+
+Killed in flight at 03:21:21Z:
+
+    run_mlb_daily_sim_job.py --date 2026-08-25 --sims 1000  (pid 1369)
+    tools/daily_update.py --workflow ui-daily               (pid 1468)
+    vendor/mlb_bettingv2 daily_update core + multi_profile + 2 forks
+    refresh_odds_sources.py --sports soccer --soccer-leagues bundesliga
+
+**The sim killed was the SECOND of the evening on this instance** — pid 856 at
+03:15 carried 15 game_pks, pid 1369 at 03:21 carried 10, so a rebuild had
+already started once. `CLAUDE.md`'s "deploying kills an in-flight MLB sim",
+measured a sixth and seventh time tonight.
+
+**MITIGATING, AND STATED AS MITIGATION NOT JUSTIFICATION:** headroom was 8.8 MB
+of 4096. At that margin the instance was close to an OOM restart which would
+have killed the same children anyway. That does not make the deploy free — it
+makes the counterfactual cheaper than it looks, and it is not why the deploy
+was taken. The user directed it.
+
+**No locks taken**, same as every deploy this session: no `RENDER_API_KEY` here,
+proxy 403s `api.render.com`, so the Render MCP was used and the guard never saw
+it.
+
+**verify:** BY CONTENT — `git merge-base --is-ancestor 0dc89b73 origin/main`
+passes and `run_refresh_worker.py` at `9a797af9` carries `_sport_covers_date`
+(3 occurrences). **The behavioural reading is `BOOK_GRID_TICK`'s new
+`out_of_window` field: expected 34 on a full 8-sport tick (56 pairs → 22).**
+
+**AND THE READING THAT DECIDES `#565`, still owed:** boot →
+first `[layer2_shortlist]` line on the new instance. It was **19m43s** on
+`-fzb6v`. If it does not move, the soccer 13m25s is the board-window fan-out
+rather than the forward-date fan-out, and this change did not touch it — which
+is the outcome the todo entry already says must not be assumed away.
