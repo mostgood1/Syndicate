@@ -1,5 +1,75 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#575` — **NFL had ZERO chips against 106 cards, and my own `#542` had doubled the soccer home rail. One root: `games()` served two callers needing different horizons.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26
+
+**THE NFL DEFECT, measured 2026-08-26T17:16:23Z by `#541`'s telemetry on its
+first real run:**
+
+```
+CHIP_JOIN_COVERAGE sport=nfl chips=0 chip_dates=None cards=106
+  no_chip_available=106
+```
+
+Every NFL compact card printed full club names. Traced, not guessed: on 08-26
+`preseason_week_for_date` is None (no preseason game that day) AND
+`regular_season_game_ids_for_date` is None (season not started), so
+`games()` falls to `preseason_target_week`=4 and then
+`_nfl_games_on_requested_date` narrows week 4 to games played ON 08-26 — of
+which there are none. **Correct for a rail meaning "today". Fatal for a strip
+serving a board whose cards run weeks ahead.**
+
+**AND I FOUND A REGRESSION OF MY OWN WHILE LOOKING.** `#542` widened soccer to
+two matchdays UNCONDITIONALLY. `games()` is shared with `_load_home_games`, and
+soccer falls through `_load_home_game_items` to
+`_compact_game_cards(home_games)` which renders every one — so the home rail
+went **98 -> 210 games**, with a count badge claiming 210 games today. Measured
+here before the fix. I shipped `#542` without checking its other caller.
+
+**THE FIX: the horizon is the CALLER's to ask for.** `games()` takes
+`include_upcoming: bool = False`. The rail keeps today; `build_game_chips`
+passes True.
+
+  * soccer: `week_offsets = (0, 1) if include_upcoming else (0,)`
+  * NFL: `include_upcoming` returns the resolved week UNFILTERED, skipping
+    `_nfl_games_on_requested_date` (kept, and pinned by test, for the rail)
+
+**PROBED, NOT ASSUMED.** `home.py` and `game_chip_scoreboard.py` are separate
+blobs and either can be a deploy behind — an unguarded kwarg would raise
+TypeError against an older provider and blank EVERY sport's strip, strictly
+worse than the narrow chips it replaces. `_games_accepts_include_upcoming`
+inspects the signature, cached per provider TYPE, and an unintrospectable
+provider assumes the OLD signature (False costs the horizon; True would raise).
+Same pattern as `layer2_board._blended_score_accepts`.
+
+**MEASURED AFTER, all three at once:**
+
+```
+NFL chips              0  -> 16
+soccer chips         210 -> 210   (coverage preserved)
+soccer HOME rail     210 ->  98   (regression repaired)
+NFL    HOME rail       0 ->   0   (unchanged; no NFL game on 08-26)
+```
+
+And on the REAL board fixtures from the production log
+(`Houston Texans @ Carolina Panthers`, `New York Giants @ New York Jets`,
+`Washington Commanders @ Baltimore Ravens`,
+`Cincinnati Bengals @ Philadelphia Eagles`, `Atlanta Falcons @ Miami Dolphins`),
+driven through the real `layer2_rows_to_board_cards` and `chip_join_coverage`:
+**`no_chip_available` 106 -> 0, `by_matchup=5`.**
+
+**A WRONG READING I CORRECTED MID-TASK, worth recording.** I first concluded the
+106 NFL board cards were REGULAR-SEASON week 1 and started building a
+preseason+regular union. Checked instead of assuming: all five sampled board
+fixtures are in **preseason week 4**, and none is in regular week 1. The union
+was unnecessary and would have added a second week of chips for no reason.
+
+**Tests:** `tests/test_chip_horizon_opt_in.py` (6) — rail vs strip for soccer,
+the signature default, the probe against an old/new/unintrospectable provider,
+and NFL's rail filter surviving while the strip is not narrowed.
+
+**Verify after deploy:** `CHIP_JOIN_COVERAGE sport=nfl` with `chips>0` and
+`no_chip_available=0`, while `sport=soccer` keeps `no_chip_available=0`.
+
 ### `#574` — **`DIRECT_FEED_BOOKS` matches EXACTLY, so an aggregator alias would slip through. The answer was not in this repo, so it is now measured on every build.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26, asked by syndicate-43
 
 **THE EXPOSURE IS REAL AND EXACTLY ONE LINE.** `is_direct_feed_book` is
