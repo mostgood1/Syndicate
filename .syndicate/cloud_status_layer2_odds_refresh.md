@@ -103,12 +103,7 @@ and for those two venues the direct feed is now the only source of it.
 - Whether Layer 1 is fed directly by both venues. Out of my lane; I only traced
   the Layer 2 read path.
 - Any venue API response shape. No egress, and I did not guess at one.
-- Whether `DIRECT_FEED_BOOKS` covers every alias the aggregator uses for these
-  venues (e.g. a `polymarket_us` vs `polymarket` spelling). `rows=417` proves it
-  matches SOMETHING substantial; it does not prove it matches everything. **That
-  is the one thing here I would actually check next**, and it is checkable
-  without egress — enumerate distinct bookmaker keys in an OddsAPI shard and
-  diff against the frozenset.
+- ~~Whether `DIRECT_FEED_BOOKS` covers every alias.~~ **CHECKED — see below.**
 
 ## Deploys
 
@@ -117,3 +112,52 @@ records: my `#545` (chip build moved off the request path) is on `origin/main`
 and **undeployed** — it needs both `syndicate` and `refresh-worker`. It is
 deliberately safe to ship with anything else; it does not require its own
 deploy.
+
+
+---
+
+## 4. `#574` — the alias question, answered as far as evidence allows
+
+**The exposure is real.** `is_direct_feed_book` is
+`str(book).strip().lower() in DIRECT_FEED_BOOKS` (`book_shortlist.py:96`)
+against `frozenset({"kalshi", "polymarket"})` — exact equality, no prefix
+match, no separator folding. `polymarket_us`, `kalshi_us`, `polymarket-us` and
+`Polymarket US` all pass straight through.
+
+That is not a hypothetical spelling: **`venue_quote_fanin.SOURCES` itself uses
+`polymarket_us`**. The two halves of this system already disagree on how to
+spell one venue.
+
+**I could not determine whether the AGGREGATOR uses such a spelling, and I am
+not guessing.** Three dead ends, each stated so you do not repeat them:
+
+  * git-tracked OddsAPI shards are a May/June MLB mirror — 338 files, **five**
+    books (`draftkings 755, fanduel 344, fanatics 122, betmgm 39,
+    williamhill_us 25`), **neither venue present at all**. The `data/**` trap.
+  * **No log line anywhere prints a book key**, so production's key space is
+    invisible to me even with log access.
+  * No egress to curl production or OddsAPI.
+
+**So the code now answers it on the next build.** `book_grid` counts NEAR
+MISSES — a book containing "kalshi"/"polymarket" that the exact match refused —
+and prints them next to the existing count:
+
+    [book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=417 books=['kalshi','polymarket']
+                near_misses={}
+
+Printed even when empty, so "matches every spelling" and "never ran" cannot
+look alike.
+
+**I did NOT widen the matcher, on purpose.** Substring matching would silently
+swallow any future book whose name merely contains these strings — dropping
+real prices with no way to notice, which is worse than the bug it fixes. Widen
+the frozenset BY NAME once a real spelling is observed.
+
+**What you can do that I cannot:** you have egress. `GET
+https://api.the-odds-api.com/v4/sports/{sport}/odds?regions=us,us2,eu&markets=h2h`
+with our key returns every bookmaker key OddsAPI serves. If any of them contains
+"kalshi" or "polymarket" in a spelling other than those two exact words, that is
+the answer today rather than after the next deploy — send me the distinct
+`bookmakers[].key` list and I will add it by name.
+
+**Undeployed** (`#574` and `#545` both). Yours to schedule.

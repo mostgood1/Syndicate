@@ -1,5 +1,64 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#574` — **`DIRECT_FEED_BOOKS` matches EXACTLY, so an aggregator alias would slip through. The answer was not in this repo, so it is now measured on every build.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26, asked by syndicate-43
+
+**THE EXPOSURE IS REAL AND EXACTLY ONE LINE.** `is_direct_feed_book` is
+`str(book).strip().lower() in DIRECT_FEED_BOOKS` (`book_shortlist.py:96`)
+against `frozenset({"kalshi", "polymarket"})` — exact equality, no prefix
+match, no separator folding. So `polymarket_us`, `kalshi_us`, `polymarket-us`
+and `Polymarket US` pass straight through the filter built to stop them, and a
+second price for one venue re-enters `_fair_by_side`'s de-vig.
+
+Not a hypothetical spelling: **`venue_quote_fanin.SOURCES` itself uses
+`polymarket_us`.** The two halves of this system already disagree on how to
+spell one venue.
+
+**I COULD NOT ANSWER IT FROM EVIDENCE, AND SAID SO RATHER THAN GUESSING:**
+
+  * git-tracked OddsAPI shards are a **May/June MLB mirror — 338 files, five
+    books** (`draftkings 755, fanduel 344, fanatics 122, betmgm 39,
+    williamhill_us 25`), **neither venue present at all**. The `data/**` trap
+    CLAUDE.md documents, hit exactly as described.
+  * **No log line anywhere prints a book key**, so production's key space is
+    invisible even with log access.
+  * No egress from a cloud session to curl production or OddsAPI.
+
+**SO THE CODE NOW REPORTS IT.** `book_grid` counts NEAR MISSES — a book whose
+name contains "kalshi" or "polymarket" that the exact match nonetheless refused
+— printed beside the existing count, empty dict included:
+
+```
+[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=417 books=['kalshi','polymarket']
+            near_misses={}
+```
+
+Printed even when empty so "the filter matches every spelling" and "this build
+never ran" cannot look alike (`#541`'s rule).
+
+**DELIBERATELY A COUNTER, NOT A WIDER MATCH.** Substring matching would silently
+swallow any future book whose name merely CONTAINS these strings — dropping real
+prices with no way to notice, worse than the bug it fixes. Widen the frozenset
+BY NAME once a real spelling is observed.
+
+**Tests:** `tests/test_direct_feed_book_aliases.py` (5). Alias cases asserted as
+MISSES so the test states the exposure rather than hiding it; a later
+substring-based matcher fails them and is forced to read this entry.
+
+**ID COLLISION, THE SECOND MECHANISM.** `scripts/todo_id_alloc.py` handed me
+`#569`, already taken by `board-staleness-visibility` on `origin/main`. The
+allocator's `O_CREAT|O_EXCL` is atomic **within one filesystem** and these
+sessions are separate checkouts pushing to one remote — so it cannot see a peer's
+claim until that claim is fetched. `#537` fixed same-tree collisions and this
+class is untouched by it. The working fix is to compute the high-water against
+`origin/main` (`git show origin/main:docs/ai_context/todo.md`, `todo_closed.md`,
+and `git ls-tree origin/main .syndicate/todo_ids/`) AFTER a fetch, which is what
+was done here. Surfaced by a rebase conflict on the claim file — the claim file
+being tracked is what made the collision loud instead of silent.
+
+**Verify after deploy:** `near_misses={}` on a build with non-zero `rows=`
+closes the question. Any populated key names the exact string to add — a
+one-word fix, by name, with evidence.
+
 ### `#572` — **CI silently drops runs under push load: 9 pushes to `main` in 40 minutes produced 6 runs, 3 of which never executed. `ci.yml` declares no `concurrency` group, so nothing is ever superseded — it just piles up until GitHub sheds it.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
 
 **Measured 2026-08-26T15:10–15:50Z on `main`:**
