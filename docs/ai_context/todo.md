@@ -1,5 +1,63 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#572` — **CI silently drops runs under push load: 9 pushes to `main` in 40 minutes produced 6 runs, 3 of which never executed. `ci.yml` declares no `concurrency` group, so nothing is ever superseded — it just piles up until GitHub sheds it.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+**Measured 2026-08-26T15:10–15:50Z on `main`:**
+
+```
+pushes to main in the window        9
+workflow runs created               6      <- 3 pushes produced NO run at all
+  startup_failure                   3      <- created, never executed
+  queued (still, minutes later)     2
+  in_progress                       1
+runs that actually executed         1 of 9 pushes
+```
+
+`startup_failure` is **not a test result.** The run is created and never starts,
+so it reports neither pass nor fail. Over a 500-run / 4-day window there are
+only 3 of them and **all 3 are in this one 22-minute window on `main`** — so
+this is a load burst, not a chronic fault. That is precisely why it is worth
+filing rather than shrugging at: it appears exactly when the repo is busiest,
+which is when CI's answer matters most.
+
+**The mechanism.** `.github/workflows/ci.yml` has **no `concurrency:` block.**
+Every push therefore starts a full run — two jobs, `pytest-baseline` carrying
+`timeout-minutes: 60` — and nothing supersedes anything. With this many parallel
+sessions pushing to `main`, in-flight runs accumulate until dispatch sheds some.
+The `cancelled` runs already in the history (9 of 500) are the same pressure
+showing up at the 60-minute cap.
+
+**What it cost, concretely, this session.** PR #94 showed **zero check runs**
+several minutes after push, with `mergeable_state: clean`. I read that as "CI
+was not triggered" and merged on that basis. The run existed — it was created at
+**16:13:10Z**, roughly 18 minutes late, *after* the merge. So the observable
+signal for "CI has not started yet" and "CI will not run" are **identical for
+tens of minutes**, and a reviewer cannot distinguish a clean PR from an
+undispatched one. That is a merge-safety property, not a convenience one.
+
+**The fix is a `concurrency` block, and the obvious version is wrong.**
+
+```yaml
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+`cancel-in-progress: true` is right for **PR branches** — a superseded push
+should not keep a 60-minute runner. It is **wrong for `main`**, where each
+commit's result is the record: cancelling means the SHA that fixed something
+never gets a verdict, and `#569` just spent a session establishing that a gate
+nobody can read the result of is worse than no gate. Use a per-ref group with
+`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`, or split the
+workflow so `main` never cancels.
+
+**Cheaper lever worth considering first:** `pytest-baseline` is a 35–60 minute
+job on every push. It does not need to run on every commit to a feature branch
+to do its job — on PRs and on `main` is enough, and that alone would remove most
+of the contention without touching cancellation semantics at all.
+
+---
+
 ### `#571` — **`test_polymarket_side_vocabulary` asserts a key set the source stopped producing. Recorded as baseline debt, NOT fixed — because the widened keys may be a mis-join risk, not just a stale expectation.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
 
 Found while regenerating `tests/pytest_baseline.json` (`#569` work). Two tests
