@@ -55,7 +55,23 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
+# THE HOST MATTERS, AND THE TWO ARE NOT INTERCHANGEABLE FROM RENDER.
+#
+# MEASURED 2026-08-26, from web and from refresh-worker:
+#   site.api.espn.com      /scoreboard  -> HTTP 403 Forbidden
+#   site.web.api.espn.com  /summary     -> works (the live capture's
+#                                          WNBA_LIVE_BOX_CAPTURED games=3
+#                                          players=66 is this host)
+# Both serve the scoreboard path; only one of them answers Render. The
+# 403 that made this producer inert was the HOST, not the endpoint, and
+# "web can reach ESPN" was true of the summary host and false of the other.
+#
+# Overridable without a deploy, because a host this project has now had wrong
+# once is the field most likely to move again.
+_SCOREBOARD = str(
+    __import__("os").environ.get("SYNDICATE_WNBA_SCOREBOARD_URL")
+    or "https://site.web.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
+).strip()
 _SUMMARY = "https://site.web.api.espn.com/apis/site/v2/sports/basketball/wnba/summary"
 
 # The column contract, taken VERBATIM from an existing artifact
