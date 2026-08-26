@@ -1,5 +1,70 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#565` — **The board build's forward width is sized off `max_slate_window_days()`, so the WIDEST sport's window becomes EVERY sport's window. Widening the weekly sports hammered soccer, which nobody intended.** — lane `board-staleness-visibility`, 2026-08-26, user diagnosis — **ROOT CAUSE CONFIRMED, NOT YET FIXED**
+
+**THE USER FOUND THIS, not me:** *"we flipped weekly sports to 7 days out for
+nfl and ncaaf. this hammered us with soccer that we didn't intend."* Confirmed in
+code.
+
+`scripts/run_refresh_worker.py:3848`, `_book_grid_forward_days()`:
+
+```python
+from syndicate.features.shared.layer1_board import max_slate_window_days
+# -1 because a window of N days is today plus N-1 forward.
+return max(0, max_slate_window_days() - 1)
+```
+
+**`max_slate_window_days()` is the MAX ACROSS ALL SPORTS**, and the worker sizes
+its forward artifact builds from it. `_SLATE_WINDOW_DAYS` is
+`{nfl: 7, ncaaf: 3, ncaab: 1, soccer: 7, …}`. So the widest entry sets the
+forward width for **every** sport at once.
+
+**The irony is in its own docstring**, and it is the useful part: the helper was
+made public so *"the worker cannot build four days while the board asks for
+seven — a constant duplicated across a producer and a consumer is the drift
+`#329` exists to remove."* It removed a per-sport drift by introducing a **global
+maximum**, which is a different bug wearing the first one's clothes. One sport's
+width is now every sport's cost, and nothing in the call site says so.
+
+**THE COST, measured** (refresh-worker `-fzb6v`): boot 00:45:38Z → first
+`[layer2_shortlist]` line 01:05:21Z = **19m43s in `_build_candidate_pool`**,
+against a shortlist that is itself **58 seconds**. Inside that, 00:48:58 →
+01:02:23 is **13m25s of soccer per-league context builds**: five
+`board_contract_begin` lines in one 60-second window, **12–14 s apart**,
+`game_count` 8–11. **~12.5 s per league-week for 8–11 fixtures.**
+
+**KALSHI AND POLYMARKET ARE EXONERATED — DO NOT RE-OPEN.** `VENUE_REPRICE`,
+`GRID_REPRICE` and `BOARD_JOIN` all run inside `build_layer2_shortlist`, the
+58-second half. They are already cheap and already artifact-backed.
+
+**THE FIX: size the forward build PER SPORT, not off the max.** The producer
+should ask `slate_window_days(sport)` for the sport it is building, which is the
+same table and keeps `#329`'s no-drift property without the global coupling.
+`SYNDICATE_BOOK_GRID_FORWARD_DAYS` overrides the whole thing today and is the
+immediate lever if the board needs relief before a code change — but note it is
+also global, so it trades one blunt instrument for another.
+
+**A WRONG FIX I BUILT AND BACKED OUT, recorded so nobody rebuilds it.** Before
+the user named the cause I added a TTL memo on `week_games(league, week, season)`
+in `soccer/cards.py`, on the theory that three adjacent window dates resolve to
+the same matchweek. **Two existing tests failed against it and they were RIGHT:**
+`test_no_fixtures_returns_empty_list` and
+`test_it_cannot_downgrade_a_started_match` patch the underlying reader and got
+the previous call's cached answer. Keyed on identity alone, it serves stale data
+whenever the artifact changes without the key changing — **exactly what
+`scope_2026-08-21_home_request_path_compute.md` warns**: *"Any cache here needs a
+vintage key (artifact `generated_at`), not just `game_pk`."* I ignored that
+warning in the same session that cited it. A memo here is still viable, but only
+vintage-keyed, and it treats a symptom of the width problem rather than the
+width.
+
+**STILL OPEN.** (a) The per-sport sizing change itself. (b) MLB's ~3 minutes:
+14 `build_cards_page_context` calls totalling ~50 s, but **25,597 ms and
+14,257 ms in two of them**, on the uncached `[home]` path that scope blamed for a
+web outage. (c) Whether soccer's own `7` is still right on its merits — it
+predates the weekly-sport change (week-scoped since 2026-07-24) and may be
+correct for soccer alone even after the coupling is broken.
+
 ### `#564` — **`#545` cost the compact scoreboard its 60-second refresh and did NOT remove the request fan-out it was written for. Web read a 5-minute-old artifact while the same process built fresh chips one function away.** — lane `board-staleness-visibility`, 2026-08-26, user report — **FIXED, web deploy**
 
 **THE REPORT** (user, after `#563` shipped): *"the compact cards used to be
