@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 555 rules `[generated]`
+## Index — 574 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6728,3 +6728,51 @@ directly, and write test fixtures to whatever that function actually returns
 rather than to a hardcoded `<tmp>/nfl_source/...` layout. Verify with
 `git status --porcelain -- data/` after the FIRST run of any new NFL test,
 before trusting the pass.
+
+
+### 2026-08-26 — FORBIDDEN: verifying a consumer against a fixture drawn from ONE producer, when the artifact has more than one producer. TWO PRODUCERS, TWO SHAPES — enumerate the shapes from production, do not assume there is one
+
+- **What we believed.** `368c7ef0` moved home's MLB live scores off a per-game
+  statsapi fan-out and onto `live_lens_report_<date>.json`, and verified it end
+  to end on the real 2026-06-01 report restamped to now: **9/9 games resolved, 0
+  statsapi calls**, `In Progress | Bottom 9th | 2 outs`, score 10-9. A real
+  artifact, current format, taken from production. It looked like the strongest
+  kind of fixture there is.
+
+- **What was actually true.** That file has TWO writers and TWO row shapes.
+  `live_lens_loop` writes the FULL shape (20 keys, `matchup.score`,
+  `gameLens[0].progress`); `scripts/refresh_mlb_oddsapi.py` fetches `slim=on`
+  and writes `{gamePk, startTime, status}` only, by its own docstring. They
+  alternate over one path. The 2026-06-01 fixture was FULL, so the verification
+  exercised the path production takes about half the time. A SLIM row still
+  carries `status`, so it satisfied the only guard the consumer had and returned
+  a state that was non-None and empty — which `#413`'s contract reads as "the
+  lens covers this game". The statsapi fallback was then skipped for the WHOLE
+  slate and the zero-fill turned two unknown scores into two zeroes.
+
+- **How we found out.** A user report four days later — "the game chips are
+  stale ... it blanks out again for a good 10 minutes". Sampling the served
+  report every ~50s showed the shape flipping: `22:39:26Z` SLIM, `22:40:48Z`
+  FULL, `22:41:57Z` SLIM carrying a `generatedAt` **2m38s earlier** than the FULL
+  it replaced. Same-instant chip-vs-StatsAPI diff: SLIM current gives 6 of 8
+  non-pregame games `0-0` with a bare `LIVE`/`FINAL` token, on BOTH serve paths;
+  FULL current gives 8 of 8 exact.
+
+- **The rule going forward.** Before verifying a consumer against an artifact,
+  **enumerate that artifact's PRODUCERS** — `git grep` the write path, not just
+  the read path — and carry a fixture from EACH one into the test. One producer
+  is an assumption, not a finding; two producers that disagree on shape is a
+  thing this repo already does. And the shapes must be READ OFF PRODUCTION over
+  a window, not inferred from the writer that happens to be documented: a single
+  sample cannot distinguish "one shape" from "the shape that was current when I
+  looked". Corollary for the consumer itself: `#413`'s "`{}` means ALL, not
+  SOME" belongs per ROW, not per FILE — a row that cannot answer must return
+  None rather than a hollow state, because a non-None empty answer suppresses
+  the fallback that would have been correct.
+
+- **Cost.** Four days of every live MLB game chip reading `0-0` with no inning
+  roughly half the time, on the Layer 2 board's headline surface, found by a user
+  and not by any instrument. `apply_live_scores` also read `0-93ms` throughout
+  and was banked as a latency win — it was fast partly because, in a slim
+  window, it was returning zeroes without doing any work. Fixed in `58be8c0d`
+  (`todo.md #581`); the two-writer race itself is `#582` and is NOT fixed.
