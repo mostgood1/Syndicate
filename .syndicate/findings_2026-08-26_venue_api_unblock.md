@@ -84,3 +84,54 @@ kalshi or polymarket lane at all. Consistent with either the enable gate being
 off or the artifact not being allowlisted/published to web. NOT DIAGNOSED --
 reading live-odds-worker env vars was blocked by the permission classifier
 (they hold venue secrets); needs the user or a session with that permission.
+
+## ROOT CAUSE OF THE KALSHI PLACEMENT FAILURE: SHARD PROVISIONING, NOT CODE
+`[2026-08-26T15:0xZ, from the user's 10:04 CT cycle + public market reads]`
+
+**The subaccount fix is DISPROVEN.** Deploy `03e4b4d1a` live 14:29:59Z; a real
+prop order reached the venue at 15:04:08Z and returned the SAME error:
+`KXMLBERA-26AUG261910MILNYM-MILDMAY3-2` -> http_400
+`{"code":"user_not_found: 22c67b4f-2bbf-4692-b325-85d508b94dc7"}`.
+
+**`exchange_index` is on the PUBLIC market payload** -- no credentials needed.
+Read for every order with a known outcome. The split is perfect, n=9:
+
+| outcome | shard | ticker |
+|---|---|---|
+| FILLED | 0 | KXMLBKS-26AUG242145CINSF-CINCBURNS26-7 (MLB, 08-24) |
+| FILLED | 0 | KXMLBKS-26AUG241840BOSMIA-MIASALCANTARA22-5 (MLB, 08-24) |
+| FILLED | 0 | KXWNBA3PT-26AUG26GSCONN-GSGWILLIAMS1-2 |
+| FILLED | 0 | KXWNBATOTAL-26AUG26TORSEA-177 |
+| FILLED | 0 | KXWNBAREB-26AUG25WSHPHX-PHXNMACK4-8 |
+| FAILED | 3 | KXMLBERA-26AUG261910MILNYM-MILDMAY3-2 |
+| FAILED | 3 | KXMLBTOTAL-26AUG261607CLELAA-9 |
+| FAILED | 3 | KXMLBSPREAD-26AUG261907KCTOR-KC2 |
+| FAILED | 3 | KXMLBKS-26AUG261940TEXCWS-TEXMGORE1-7 |
+
+**Everything that ever filled is shard 0. Everything that fails is shard 3.**
+The two MLB fills on 08-24 were shard 0, so today's MLB markets are on a shard
+those were not -- which is why this broke on 08-25 with no deploy of ours in
+between, and it retires the last hypothesis that a code regression caused it.
+
+This explains BOTH rungs of the ladder and closes it:
+- `exchange_index: 0` (pinned) -> market is not on shard 0 -> `market_not_found`
+- `exchange_index: -1` (auto)  -> routes to shard 3, market found -> `user_not_found`
+Both errors were literally true and NEITHER was ours. `-1` is still correct and
+must be kept: it is what let the venue state the real problem.
+
+**NO CODE CHANGE CAN FIX THIS.** It needs the account enabled on shard 3 --
+a venue/account action. A distinct exchange shard that is a separate entity
+would require its own account agreement, which presents exactly as
+`user_not_found` for a UUID that is valid elsewhere.
+
+**DO NOT READ WNBA FILLS AS "KALSHI WORKS".** WNBA is shard 0 and will keep
+filling regardless; that green says nothing about MLB. The only worthwhile
+code-side change is a guard that REFUSES a Kalshi order whose market
+`exchange_index` is not a shard we have ever filled on, by name -- turning a
+confusing venue 400 into a legible refusal.
+
+## Also confirmed this cycle
+- `no_venue_ticker` on an h2h order (HOU@NYY) -- the moneyline keying defect
+  recorded in the `kalshi-spread-join-sign` lane. Real, still open.
+- `spreads away 1.5 -> ...-TEX2` still present in production: the inversion the
+  join fix corrects. Fix is on `main` (`a09ec780`) and NOT deployed.
