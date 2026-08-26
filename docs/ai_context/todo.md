@@ -582,7 +582,7 @@ Land it behind a full-suite before/after, not on reasoning.
 
 ---
 
-### `#569` — **Is the BOARD stale, or is the QUOTE stale? Nothing in this repo could tell them apart, and the whole staleness investigation ran without noticing.** — lane `board-staleness-visibility`, 2026-08-26, asked by syndicate-43 — **INSTRUMENT SHIPPED (log-only), NOT DEPLOYED**
+### `#569` — **Is the BOARD stale, or is the QUOTE stale? Nothing in this repo could tell them apart, and the whole staleness investigation ran without noticing.** — lane `board-staleness-visibility`, 2026-08-26, asked by syndicate-43 — **CLOSED 2026-08-26: measured, root-caused, FIXED and verified in production**
 
 **THE BLIND SPOT, and it is mine.** Every measurement the staleness work
 produced — `#564`'s chip `written_at`, the board's derived `state_meta`, the
@@ -637,8 +637,47 @@ an unguarded check records `True` as a 1-second-old quote).
 contract in `layer2_shortlist.py` rather than computed there. Nothing in that
 lane's file was touched.
 
-12 tests. **NEXT: deploy and read one line.** If `seen_p50` is large, stop
-optimising publication and hand it to the direct-feed work.
+12 tests. **CLOSED. The full chain, each step measured rather than argued:**
+
+1. **`seen_p50=859`** on the first reading — the board republishes every ~60s and
+   ships quotes 14 minutes old at the median. syndicate-43's direct-feed case was
+   **untested, not refuted**, and every publication fix shipped that day was
+   treating a symptom.
+2. **The rows never repoll.** n=4 over 23 min: mlb and wnba worst rows aged at
+   **0.98x wall clock** — no refresh at all — while the median improved. Not a
+   cadence floor; specific rows are skipped by sweeps that happen.
+3. **Two causes, split by sport.** `market_gone`=3, `orphaned_line`=3 on the
+   sports whose sidecars were live. NFL was NOT broken — an 8-hour fixture-aware
+   interval by design (`#440` Phase 1b), and my "capture outage" call was a false
+   alarm corrected by `FIXTURE_CADENCE`.
+4. **The hole, from CODE:** `quote_rows` EXTENDS across `window_dates`
+   (`layer2_shortlist.py:616`) while `last_seen` was read for `selected_date`
+   ALONE (`:690`). Rows from other window dates had no clock, and a clockless row
+   is **invisible to `drop_superseded_lines`** — so a line the market had moved
+   off could never be dropped on a forward date. `no_seen_age=7553` against
+   `kept=15672`: 48% of a grid exempt from the guard.
+5. **Fixed and verified.** `last_seen` merged across `dates_with_rows`, newest
+   stamp winning. `no_seen_age` **7553 -> max 52**; drops rose to 824 and 2271
+   where they had been 16; and the same sport, same date, same artifact went
+   **962141 -> 962176 bytes** — the board did not empty. Those 7,553 rows gained
+   clocks and were KEPT, which is what a correct fix looks like.
+
+**FOUR CLASSIFIER REVISIONS, EVERY ONE CAUGHT BY THE NEXT PRODUCTION READING AND
+NOT BY REVIEW.** Each had the same shape: a label producible by more than one
+mechanism, reported as though it named one.
+
+    flat 900s threshold      -> called a working sport (nfl, 8h cadence) an outage
+    sibling-stamp comparison -> a staggered freeze read as supersession
+    compare to the interval  -> fixture-aware and computed on ANOTHER SERVICE
+    "3 rows survive wrongly" -> that was 3 of 9 SAMPLED, not 3 of the population
+
+**THE RULE THIS ITEM EARNED:** *a correct measurement of an unrepresentative
+case is still a wrong answer.* The instrument was right every time; the sampling
+and the naming were not.
+
+**STILL OPEN, and neither is `#569`:** the `market_gone` population (markets that
+stop being quoted while their sport sweeps normally), and wnba's own capture gap,
+which belongs to the OPEN lane `wnba-live-odds-capture-gap`.
 
 ### `#567` — **Is the board build SLOW, or WAITING? Nothing on this service could tell them apart, and three wrong answers in one session came from guessing.** — lane `board-staleness-visibility`, 2026-08-26 — **ANSWERED, AND THE ANSWER IS TWO ANSWERS: cold build `off_cpu_pct=10.4`, warm build `52.6`**
 

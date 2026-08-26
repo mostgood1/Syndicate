@@ -33136,3 +33136,88 @@ refusal on LIVE orders and stay the fallback for what the venue cannot settle.
 **OWED:** `awaiting=73` is expected tonight (open positions), but it must fall
 as tonight's games settle. If it does not, the join is losing settlements to a
 ticker mismatch and `unjoinable` is where they went.
+
+
+### RE-READ after the window merge, 21:56-21:58Z, instance `-25qml`
+
+    no_group_sibling=343 no_seen_age=52  within_lag=637   DROPPED=824  kept=3328
+    no_group_sibling=83  no_seen_age=19  within_lag=428   DROPPED=126  kept=532
+    no_group_sibling=447                 within_lag=888   DROPPED=7    kept=1335
+    no_group_sibling=199 no_seen_age=1   within_lag=201   DROPPED=16   kept=403
+    no_group_sibling=979                 within_lag=2145  DROPPED=2271 kept=3124
+
+**CONDITION 1 — `no_seen_age` collapses: MET, decisively.** `7553 -> max 52`
+across five builds, and zero on two. The clockless population is gone.
+
+**CONDITION 2 — drops rise: MET.** `count=824` and `count=2271` on the wide
+builds against `count=16` before. Superseded forward-date lines are being pruned
+for the first time.
+
+**CONDITION 3 — `kept` must not fall off a cliff: NOT ASSESSABLE FROM THIS
+SAMPLE, and I am not claiming it passed.** The tempting read is
+`kept=15672 -> kept=3124`, an 80% collapse. **That comparison is invalid:** the
+21:17 build was `selected_date 2026-08-26`, the 21:58 build is `2026-08-25`
+(confirmed from the `cards_context_begin` line beside it). Different dates,
+different inputs — pre-fix input ~15688 rows, post-fix ~5395 — and **my change
+cannot alter input size**, so the difference is the slate, not the fix.
+
+**THE EVIDENCE THAT DOES BEAR ON IT, and it is like-for-like:** two builds are
+**byte-identical before and after** — `count=7 kept=1335` and
+`count=16 kept=403`, matching their pre-fix survivor signatures exactly. **On
+grids that already had clocks, nothing changed at all.** That is precisely the
+intended blast radius: the fix touches only grids that previously carried
+clockless rows, and leaves the rest untouched.
+
+**STILL OWED: one same-date before/after on a wide grid.** Until then "the board
+did not empty" rests on the two unchanged builds plus the absence of any
+`kept`-near-zero reading, not on a direct comparison. Anyone acting on this
+should know the strongest condition is the one still unmeasured.
+
+**Minor and new:** `sibling_no_seen_age=1` appeared for the first time (zero in
+every pre-fix build). Expected — rows that gained clocks can now BE the clockless
+sibling of another row — and too small to chase.
+
+**THE HOLE IS CLOSED on the evidence available:** the mechanism was proven from
+code, the clockless population it created is gone, and the guard is now pruning
+the rows it could never see.
+
+### CONDITION 3 MET — same sport, same date, same artifact. The board did not empty.
+
+    pre-fix   21:17:21Z  instance -fwndb  PUBLISH_OK soccer_source/.../book_grid_2026-08-26.json  bytes=962141
+    post-fix  21:58:22Z  instance -25qml  PUBLISH_OK soccer_source/.../book_grid_2026-08-26.json  bytes=962176
+
+**35 bytes different out of 962 KB.** `PUBLISH_OK` rather than
+`PUBLISH_SKIPPED_UNCHANGED` on both, and the same file was
+`PUBLISH_SKIPPED_UNCHANGED checksum=320a0568ef29` at 21:54:54 on the OLD
+instance — so the 21:58:22 write is a genuine rebuild under the new code, not a
+republish of the old bytes.
+
+**AND A CORRECTION TO MY OWN ANALYSIS, caught by checking rather than by
+review.** I reported the wide pre-fix build as MLB. **It was SOCCER.** The 15672
+build at 21:17:19 published `soccer_source/...`, so the comparison I offered
+against MLB's `kept=3124` was wrong in BOTH dimensions — different sport AND
+different date. Had I not checked the publish line, I would have reported an 80%
+board collapse that never happened.
+
+**WHAT THIS RESOLVES, and it is the reassuring reading rather than the alarming
+one:** soccer 2026-08-26 carried the 7553 clockless rows and is essentially the
+same size after the fix. So those rows **gained clocks and were then KEPT** —
+becoming eligible for the supersession check is not the same as failing it, and
+almost all of them passed. The heavy pruning (`count=2271`) happened on a
+different grid entirely (MLB 2026-08-25).
+
+    rows made checkable    ~7,553
+    rows actually dropped  ~0 on that grid
+    board size change      +35 bytes
+
+**That is exactly the shape a correct fix should have**: the guard can now see
+rows it was blind to, and it declines to drop the ones that are fine.
+
+### `#569` — closed
+
+All three pre-registered conditions met, the third on a proper like-for-like
+artifact comparison rather than the invalid cross-sport one I first offered.
+The mechanism was proven from code (multi-date `quote_rows` against a
+single-date `last_seen`), the clockless population it created is gone
+(`7553 -> max 52`), superseded forward-date lines are being pruned for the first
+time, and the board is unchanged in size.

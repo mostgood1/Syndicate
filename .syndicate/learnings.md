@@ -6625,3 +6625,53 @@ This is the third shape of the same defect in one session, after
 `iterdir`-vs-`read_json_file` (soccer leagues) and web-vs-worker disks.
 Related: [[project_keyvalue_artifact_split_blinds_guards]],
 [[feedback_isolate_the_source_you_changed]].
+
+## A correct measurement of an unrepresentative case is still a wrong answer
+
+`[2026-08-26, lane board-staleness-visibility, #567/#569]`
+
+**`#567` existed because every board-build estimate had been read from the gap
+between two log lines. I fixed that, instrumented the call properly — and then
+drew four wrong conclusions from correctly-instrumented readings.** The
+instrument was right every time. The SAMPLING and the NAMING were not.
+
+**Overturned belief 1: "the board build takes 19m43s."** It is **~108s** in
+steady state (n=40, median 107.8s). Every large figure was a COLD build — first
+after a restart, 6.9x a warm one — taken in a window with 15 deploys in 6h15m
+where the worker never reached a warm build. **We were measuring restarts and
+calling it the board.**
+
+**Overturned belief 2: "the board is computing, not queued" (`off_cpu_pct=10.4`).**
+That was ONE cold build. Steady state medians **52.8%** off-CPU across 40
+samples. I reported an outlier as the answer.
+
+**Overturned belief 3: "NFL stopped capturing — new, unattributed, worth a
+lane."** NFL runs a deliberate **8-hour** fixture-aware sweep interval
+(`#440` Phase 1b, whose own comment predicted `nfl_preseason 12.00 -> 3.56
+sweeps/day`). **I called a working feature an outage** because my threshold was
+a flat 900s, which every sport with a cadence over 15 minutes trips
+unconditionally.
+
+**Overturned belief 4: "3 rows survive the guard wrongly."** That was 3 of 9
+**sampled** — the classifier reads the 3 worst rows per sport. The population
+was never measured, and I used the 3-vs-946 ratio to justify a decision.
+
+**THE COMMON SHAPE, and it is the rule:** *a label producible by more than one
+mechanism, reported as though it named one.* `sidecar_frozen` meant both "the
+capture broke" and "this sport sweeps slowly by design". `market_gone` came out
+of a frozen file as readily as a live one. `orphaned_line` came out of a
+staggered freeze as readily as a real line move.
+
+**WHAT TO DO INSTEAD, all three cheap:**
+1. **Before quoting a reading, ask what ELSE could produce this exact number.**
+   If more than one thing could, the label is not an answer yet.
+2. **Take n>1, and check the samples are comparable.** I nearly reported an 80%
+   board collapse from `kept=15672 -> kept=3124` — different SPORT and different
+   DATE. The publish line beside it settled it in one query.
+3. **Put the discriminating field ON the line.** `sidecar=<age>` and
+   `worst_seen_by_sport` are what made the later readings checkable rather than
+   trusted; the aggregate alone hid everything.
+
+**Corollary, measured the same day:** an instrument can be defeated by the thing
+it measures. Two of my own cold builds were killed mid-flight by other sessions'
+deploys — the exact deploy-churn mechanism this lane had just documented.
