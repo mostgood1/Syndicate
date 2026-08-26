@@ -2334,3 +2334,259 @@ service ~1 minute earlier.
 **Reusable:** "which service runs the code" and "what does this change on
 production TODAY" are preflight questions, not post-deploy ones. Both were
 answerable by reading, in minutes, before touching anything.
+
+---
+
+## Closed 2026-08-26 — one Polymarket evening: a false partition premise, a fill price read off the wrong side, and a counter that printed the wrong branch's numbers (`#559`, `#560`, `#561`)
+
+Three items raised and closed inside about six hours, all from the same source —
+a read-only coverage audit that kept finding execution defects it was not
+looking for. They are filed together because the shape repeats: in each one, a
+piece of code was **reporting confidently about something it had not actually
+established**.
+
+- `#559` — `find_first_game_offset` assumed the collection was partitioned, so
+  it stopped at the first game market and declared the rest futures. It was
+  landing above ~8,400 real game markets, and `monotonic` could not detect it
+  because a false partition still scans monotonically.
+- `#560` — `avgPx` is quoted on the YES side. The reader stored it verbatim, so
+  every NO-side fill was booked at its complement. The recorded number looked
+  exactly as precise as a correct one.
+- `#561` — `RECONCILE_COUNT_IMPLAUSIBLE` halted trading and printed
+  `venue_count`/`requested` for both bounds, but on the dollar branch neither of
+  those is what the comparison used. A counter that names a problem while
+  withholding its data cost most of the diagnosis time.
+
+The durable lessons are in `todo.md` under *Operational notes worth not
+rediscovering*, per this file's own rule — the settled-row boundary from `#560`
+in particular.
+
+### `#559` — **`find_first_game_offset` lands ABOVE ~8,400 rows of real game markets. Its partition premise is false and `monotonic` cannot detect it.** — **FIXED AND VERIFIED 2026-08-26T00:06:57Z: `7,936 -> 17,413` game markets, `truncated=False`, `kept_through` 09-07 -> 09-20 (PR #80, deploy `a021cd4dc`).** Downstream confirmed 00:16:12Z: `no_candidates|mlb|spreads` 51 -> gone, `indexed` 3,581 -> 7,635, `matched` 22 -> 45. Raised by lane `polymarket-oddsapi-coverage-audit`; handed to `portfolio-decision-and-execution` and then fixed at the user's explicit direction. **CLOSED 2026-08-26.**
+
+Deploy + full working: `deploys.md` 2026-08-25T22:54:25Z. Audit: `polymarket_oddsapi_coverage_audit.md` §2.0.
+
+Probed directly on live-odds-worker, 22:54:25Z, one signed read per rung:
+
+```
+OFFSET_BOUNDARY_PROBE boundary=20964 probes=17 monotonic=True
+  games_below_boundary={'12578': 5, '16771': 5, '18867': 5} at_boundary_games=1
+  verdict='BOUNDARY TOO HIGH -- 3 offset(s) below 20964 carry game rows, so part
+           of the slate is invisible to us. NOT a venue absence.'
+```
+
+**The `closed=false` ordering is not `[futures][games][empty]`.** Verbatim per offset:
+
+```
+  4,192   futures  culture/science   dccc-measles-us-2026-12-31-gt4500
+  8,385   futures  politics          ushrewc-ushr-tx-09-2026-11-03-rep
+ 12,578   GAMES 5/5  SPREAD  sports  asc-nfl-ne-cle-2026-08-27-pos-1pt5   <-- NFL FULL-GAME SPREAD
+ 16,771   GAMES 5/5  TOTAL   sports  tsc-nfl-pit-buf-2026-08-27-1q-5pt5
+ 18,867   GAMES 5/5  TOTAL   sports  tsc-nfl-cin-phi-2026-08-28-4q-17pt5
+ 19,915   futures  sports (golf)     tec-dpwt-britmast-2026-08-27-r1l-jorlof
+ 20,754   futures  sports (LPGA)     tec-lpga-fmcham-2026-08-27-r3l-hyecho
+ 20,964   1/5 games, FUTURE+MONEYLINE tec-f1-pigp-2026-09-06-cons-alpine  <-- THE BOUNDARY
+ 22,964   GAMES 5/5  PROP            astatc-mlb-lad-atl-2026-08-25-xi
+```
+
+A band of golf/F1 futures sits ABOVE a large block of game markets and the binary
+search converges into it. Everything below 20,964 is never fetched.
+
+**Why nothing caught it.** `monotonic=True` passed while being wrong: it only
+checks offsets the search itself probed, so a boundary inside a futures band
+above the block satisfies it. It is the sole check on the premise the function
+rests on, and its true value carries no information. `truncated=False` is
+technically true and materially misleading -- the scan paged to the end, from
+the wrong start.
+
+**What it explains.** `games` 13,255 -> 7,936 on a scan reporting completeness;
+MLB full-game spreads leaving the join's index between 20:16Z and 22:01Z
+(`offered: ['chc-az@-2.5', ...]` -> `no_candidates|mlb|spreads: 51`); and
+`SPREAD_SIGN_AUDIT fixtures=0` -- the spread team/sign question was never
+answerable on 2026-08-25 because the markets it needs are below the boundary.
+
+**What it is NOT.** `_slate_within_budget` was the first hypothesis and is fully
+exonerated: `dropped_for_size=0 dropped_by_date={}` every cycle, 5.99MB
+headroom, `fetched == count`. It has never fired. And it is not a venue
+absence -- the probe reads those markets directly.
+
+**Money impact.** Every market below the boundary is unresolvable at order time
+and surfaces as `OrderBuildError: market_unresolved_for_position` -- the same
+symptom that prompted `f08930f32`. **NFL wk1 is 2026-08-27 and its full-game
+spreads are in the invisible band.**
+
+**Why this is not a constant to nudge.** The partition premise is false, so a
+search assuming contiguity cannot be made correct by moving its bounds. Options
+for the owning lane: a multi-band scan, a linear sweep of the sports category,
+or a `monotonic` that samples the whole range rather than the search path --
+the last is the cheapest and would at least make the failure loud.
+
+**Reproduce for free:** `SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT=1` on
+live-odds-worker (`scripts/audit_polymarket_coverage.py::run_offset_probe_if_enabled`,
+merged in PR #74). Currently set to `0`. It derives its rungs from the live
+boundary, so it stays valid as ids grow.
+
+---
+
+**`#560` in one paragraph.** Raised the same day it closed. The fix for NEW fills shipped as `d92ab27b1`
+(PR #83); this item was the HISTORY, deliberately left alone, and it listed
+three ways to correct it while taking none — because nobody knew how many rows
+were affected. The instruction it gave itself was right: **count first.** The
+count answered the question and dissolved it — 3 rows and $3.22, not the ~$123
+feared, and all three already correct, because the reconciler re-stamps
+`fill_price` from the venue every cycle and the first pass after the fix
+overwrote the two bad values. **The lesson is the condition, not the outcome:**
+that self-heal only reaches rows where `outcome is None`
+(`execution_ledger.py:794`). A row settled before the fix would be frozen wrong
+forever. None had settled — the book was one day old and nothing had graded.
+
+### `#560` — **Every NO-side Polymarket fill on the books carried the OPPOSITE side's price. Counted: 3 rows, $3.22, and the reconciler had already restamped all three.** — lane `portfolio-decision-and-execution`, raised by `polymarket-oddsapi-coverage-audit` — **CLOSED 2026-08-26, counted and verified; no history rewrite was needed.**
+
+Fix for NEW fills is live (PR #83, deploy `d92ab27b1`). This item is the HISTORY,
+which was deliberately not rewritten. Working: `deploys.md` 2026-08-26T00:42Z.
+
+`avgPx` is quoted on the YES side. Until `d92ab27b1` the reader stored it
+verbatim, so every `under` (submitted `OUTCOME_SIDE_NO`) was recorded at its
+complement. Confirmed from venue data at 00:42:15Z:
+
+```
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5650' recorded=0.435
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5450' recorded=0.455
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5100' recorded=0.49
+outcome_side='OUTCOME_SIDE_YES' avgPx='0.3950' recorded=0.395
+outcome_side='OUTCOME_SIDE_YES' avgPx='0.5200' recorded=0.52
+```
+
+**The exposure.** `EXECUTED` at 00:42:15Z reports `filled_stake_dollars: 123.62`
+across 82 filled orders. The share of that which is NO-side is UNCOUNTED -- no
+log line separates them historically -- so the size of the error is unknown, not
+small. Visible examples from the live page: `under 9.5 MIN@ATH` shows `$1.41`
+against a `$1.18` stake; `under 7.5 CIN@SF` shows `$1.04` against `$1.00`. Those
+are `qty x wrong-side price`.
+
+**Why it matters beyond bookkeeping.** Any `paper:polymarket` result including
+those rows is not a Polymarket result -- the same class as the aggregator-priced
+Kalshi book found at 21:47Z the same evening, and the same class as `#502`'s
+`settled_count: 0`. A P&L that looks precise and is systematically wrong on one
+side is worse than a missing one.
+
+**Three options were listed:** (a) restamp from `1 - stored`; (b) re-read from
+the venue with the corrected reader; (c) exclude pre-`d92ab27b1` NO-side rows
+from P&L claims. **The count made the choice moot -- (b) had already happened by
+itself.**
+
+## THE COUNT, 2026-08-26T01:01Z
+
+`reconcile_open_orders` gates on `mode == LIVE` (`execution_ledger.py:792`), so
+paper rows never had a venue price to get wrong. The live book is small:
+`LIVE_LEDGER n=27` at 00:59:26Z, and the Polymarket slice of it is **5 filled
+orders, all `date=2026-08-25`, all `outcome=None`.** The whole live-mode
+Polymarket history is one day old -- the first order ever placed on this venue
+was 2026-08-25T16:08:10Z -- so the 30-day log retention limit does not truncate
+this count. It is a total, not a lower bound.
+
+| ticker | side | `outcomeSide` | stake | venue `avgPx` | stored now |
+|---|---|---|---|---|---|
+| `tsc-mlb-tb-det-2026-08-25-7pt5`  | over  | YES | $1.38 | 0.5200 | 0.52 |
+| `tsc-mlb-tb-det-2026-08-25-6pt5`  | over  | YES | $2.30 | 0.3950 | 0.395 |
+| `tsc-mlb-cin-sf-2026-08-25-7pt5`  | under | **NO** | $1.00 | 0.5100 | **0.49** |
+| `tsc-mlb-min-ath-2026-08-25-9pt5` | under | **NO** | $1.18 | 0.5450 | **0.455** |
+| `tsc-mlb-cle-laa-2026-08-25-6pt5` | under | **NO** | $1.04 | 0.5650 | **0.435** |
+
+**NO-side rows: 3 of 5. Stake at risk: $3.22 of the live book.** Not the
+`filled_stake_dollars: 123.62 / 82 orders` the item feared -- that figure is
+`modes: ['live','paper']` summed, and 77 of those 82 are paper or Kalshi.
+
+**All three are already correct.** Compare the 23:57:45Z dump (pre-fix) against
+the 00:59:26Z dump (post-`d92ab27b1`):
+
+```
+cin-sf-7pt5  under   fill_price 0.51  -> 0.49     (1 - 0.51  = 0.49)
+min-ath-9pt5 under   fill_price 0.545 -> 0.455    (1 - 0.545 = 0.455)
+cle-laa-6pt5 under   filled after the fix; 0.435 from birth
+tb-det-7pt5  over    0.52  -> 0.52    (YES, correctly untouched)
+tb-det-6pt5  over    submitted -> filled 0.395 (YES)
+```
+
+**Why it self-healed, and the condition that would have stopped it.** The
+reconciler re-reads every candidate each cycle and re-stamps `fill_price` from
+the venue, so the first pass after `d92ab27b1` overwrote the two bad values with
+complemented ones. That only works because the candidate filter also requires
+`outcome is None` (`execution_ledger.py:794`) -- **a NO-side row that had settled
+before the fix would be frozen at the wrong price forever, and no pass would
+revisit it.** None had settled. That is luck of timing, not design: the venue's
+Polymarket book was one day old and nothing had graded yet.
+
+**Remaining exposure: none for these 5.** The generalisable risk is the
+`outcome is None` boundary -- if a reader defect is found after rows settle,
+self-healing is unavailable and (a) or (c) come back. Worth remembering before
+the next venue-reader change.
+
+**Not covered by this count:** `side=home`/`away` orders resolve their
+`outcomeSide` from the outcomes-array index rather than from the word, so a team
+side can be NO too. It does not matter here -- every Polymarket team-side order
+in the live book is `rejected` with `market_unresolved_for_position`, so none
+carries a fill price at all.
+
+---
+
+### `#561` — **`RECONCILE_COUNT_IMPLAUSIBLE` printed one branch's numbers while a different branch decided, and the count bound had no tolerance.** — **CLOSED 2026-08-26, FIXED BY `portfolio-decision-and-execution` INDEPENDENTLY; verified by `polymarket-oddsapi-coverage-audit`.**
+
+The guard is CORRECT and has now caught two real defects in one evening. Its
+MESSAGE is the weak part, and it cost most of the diagnosis time for `#560`.
+
+```
+RECONCILE_COUNT_IMPLAUSIBLE key=939fb90b24300f32c760b7bb
+  venue_count=2.39 requested=2.3920000000000003 -- left untouched; check the `_fp` unit
+```
+
+That reads as a float-rounding quarrel. **`2.39 > 2.392` is FALSE**, so the
+contract branch never fired -- the DOLLAR branch did, and none of its inputs
+(`filled_dollars`, `fill_price`, `stake_ceiling`) are printed. A reader who
+trusts the line goes looking at quantities and finds nothing wrong with them.
+
+Also: the hint "check the `_fp` unit" is now a red herring. It was written for
+the fixed-point scale hazard; twice in a row the real cause was something else
+(a price-improved fill, then a mis-sided price).
+
+**Fix:** print which branch refused and its own operands. One line, no logic
+change. A guard whose message names the wrong quantity is a guard that costs
+more than it saves.
+
+---
+
+**CLOSED. Both halves were already on `main` before this item was filed** --
+landed independently by `portfolio-decision-and-execution` while it was being
+written. Verified against the live module rather than taken on trust:
+
+```
+_FILL_COUNT_TOLERANCE = 0.01  (additive)
+implausible = float(contracts) > float(requested_contracts) + _FILL_COUNT_TOLERANCE
+
+  venue=2.66  vs requested=2.6577777778  -> plausible   (the hazard reported here)
+  venue=2.39  vs requested=2.3920000000  -> plausible   (the order that halted trading)
+  venue=23.92 / 239.2 / 2392             -> IMPLAUSIBLE (the guard stays reachable)
+```
+
+The message half is done too: it now prints `bound=`, `fill_price`,
+`raw_fill_price`, `filled_dollars`, `stake_ceiling` and the requested pair, so
+a reader gets the operands of whichever branch actually decided.
+
+**THEIR FIX IS BETTER THAN THE ONE THIS ITEM WAS ABOUT TO SHIP, and the reason
+is worth keeping.** The plan here was to unify BOTH bounds under one
+multiplicative constant, on the argument that two constants drift
+(`learnings.md` 2026-08-23). That argument does not apply: the two bounds guard
+different error SHAPES. The dollar bound guards a PROPORTIONAL hazard -- a
+fixed-point scale error, 100x -- so a multiplicative 1.25 is right. The count
+mismatch is a FIXED artifact of the venue rounding to two decimals, bounded by
+0.005 absolute whatever the size, so an additive 0.01 is right. A 25%
+multiplicative slack on a 100-contract fill would have handed away 25
+contracts of headroom; `+0.01` hands away a hundredth, always.
+
+**Two constants because they bound two different things is correct**, and the
+"one authority" rule was pattern-matched onto a case it does not cover. Nothing
+was shipped from this lane.
+
+**Leftover, deliberately not chased:** the message still ends `check the `_fp`
+unit`. That hint was written for the fixed-point hazard and has now been wrong
+twice running -- a price-improved fill, then a mis-sided price. Comment-level,
+not worth a deploy on a money path.

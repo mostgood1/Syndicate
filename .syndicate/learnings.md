@@ -6233,3 +6233,52 @@ and only one of them was measured.
 Corollary already paid for once tonight: the same reading also covered only ONE
 of the two bounds that discard markets (`cut_total=3940` vs `trimmed=8744`). A
 gate that measures half the mechanism is not a gate yet.
+
+## A REFUSAL IN A LIST OF FAILURES IS INDISTINGUISHABLE FROM A DEFECT `[2026-08-26]`
+
+`OrderBuildError: unmappable_side: 'away' market='spreads'` — 11 orders a cycle,
+sitting in a table between `market_not_found` and `no_venue_ticker`. It read as
+one more thing to clear. A peer session called it *"a straight mapping
+omission"*; I agreed, and implemented it. **It was not a defect. It was the only
+thing standing between a mis-keyed join and ten inverted real-money bets per
+cycle.**
+
+The mapper was correct in isolation: resolve the side against the team named in
+the ticker. But the ticker stamped on those orders was the WRONG MARKET, so
+resolving against it faithfully produced a faithful inversion:
+
+```
+board:   away (Texas) +1.5 @ -185      -> intent: TEXAS +1.5 (underdog, getting runs)
+ticker:  ...TEXCWS-TEX2 = "Texas wins by over 1.5 runs?"  -> TEXAS -1.5
+mapper:  _side_to_kalshi("away","spreads","...-TEX2") -> "yes"   = TEXAS -1.5
+```
+
+Systematic: every spreads order with a ticker had `line=+1.5` and a suffix
+naming the picked team; every `-1.5` row — the one that genuinely matches a
+Kalshi "wins by over" market — had NO ticker. Root cause in
+`kalshi_board_join._match_key`, keying Kalshi's strike as a positive MAGNITUDE
+against the board's SIGNED handicap, so `1.5 == 1.5` pairs the underdog row with
+the favourite's market.
+
+**THE RULE:** before clearing a refusal, establish WHAT IT WAS REFUSING and why
+someone wrote it. A guard and a gap look identical in a counter. The cheap test
+here — compare the board row's line SIGN against the venue's own market title —
+was one the venue answers in seconds, and *neither* session ran it until both
+had a working implementation in hand.
+
+**Corollary, on how close this got.** The patch was parked, labelled
+`BACKUP ONLY — do not apply`, tested, and verified to apply cleanly. That label
+is not a safety mechanism: a working backup is exactly what a later session
+reaches for when the primary stalls, which is precisely when nobody re-derives
+whether it was ever right. **Delete a refuted artifact; do not annotate it.**
+The analysis survives in `.syndicate/handoff/README_kalshi_side_mapper.md`; the
+applicable diff is gone.
+
+**Second corollary, and the deeper one.** `kalshi_board_join` ALREADY computes a
+correct `kalshi_side` and throws it away — `venue_scope.py` stamps only the
+ticker, so `OrderRequest` carries the BOARD side and `_side_to_kalshi` is asked
+to re-derive at the boundary from data that cannot settle it. **Re-deriving at a
+boundary what an earlier stage already knew is what made the inversion
+possible.** Same shape as the unfed-input class in `model_engine_standard.md`:
+the value is available, nothing carries it across, and the recomputation is
+indistinguishable from the real thing at every level except the money.

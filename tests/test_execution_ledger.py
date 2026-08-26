@@ -1747,3 +1747,54 @@ def test_the_venue_view_reports_the_unfilled_remainder_on_both_venues():
     # live order and the count would be useless in the other direction.
     done = kalshi_view({"status": "executed", "fill_count_fp": "7.00", "remaining_count_fp": "0.00"})
     assert done["open_at_venue"] is False
+
+
+def test_the_submit_resolution_stamp_is_not_named_settlement():
+    """A peer session read `settled_at` on four OPEN orders -- populated ~400ms
+    after `submitted_at`, outcome null, filled 0.00 -- and reasonably concluded
+    settlement was being faked, proposing it as the root cause of positions not
+    reconciling.
+
+    The behaviour was right and the name was wrong. `settled_at` meant "the
+    submit resolved": the write-ahead record closed with a venue response, and
+    400ms IS the round trip. Nothing keys settlement off it -- `settle_orders`
+    filters on `outcome` and `status == "filled"` and never reads the field --
+    so a sweep cannot be fooled by it.
+
+    But it has now caught a careful reader with the source open, after two
+    module docstrings were written specifically to defuse it. That is a naming
+    defect, not a documentation one.
+    """
+    import syndicate.features.shared.execution_ledger as el
+    import inspect
+
+    source = inspect.getsource(el)
+    assert '"venue_resolved_at"' in source
+
+    # THE MIRROR MUST STAY until a migration retires it: stored rows and any
+    # outside reader still carry the old key, and dropping it silently would
+    # trade a misleading field for a missing one.
+    assert '"settled_at"' in source
+
+    # AND NOTHING MAY START READING EITHER ONE. This is the property that made
+    # the peer's theory wrong, and the only thing keeping it wrong.
+    assert '.get("settled_at")' not in source
+    # The ONLY `["settled_at"]` may be the mirror WRITE. A read would mean some
+    # code path started trusting the deprecated name again.
+    uses = [
+        line.strip()
+        for line in source.splitlines()
+        if '["settled_at"]' in line and not line.lstrip().startswith("#")
+    ]
+    assert uses == ['order["settled_at"] = resolved_at'], uses
+
+    settle = inspect.getsource(
+        __import__(
+            "syndicate.features.shared.paper_settlement", fromlist=["settle_orders"]
+        ).settle_orders
+    )
+    # READING it, not MENTIONING it -- `settle_orders` carries a comment saying
+    # explicitly that it does NOT use this field, and a bare substring check
+    # would fail on the very comment that documents the correct behaviour.
+    for reader in ('.get("settled_at")', '["settled_at"]', '.get("venue_resolved_at")'):
+        assert reader not in settle, f"the grader began keying off {reader}"
