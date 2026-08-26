@@ -55,13 +55,40 @@ and hand back `is_fresh: True` on the way out — silently reverting the change.
 `computed_at` is now the oldest artifact's stamp, making the block idempotent
 under that pass.
 
-**STILL OPEN — the operational half, which is the real fix.** At a 21-minute
-boot-to-publish cycle, refresh-worker deploys must be spaced **>25 minutes** or
-the board is frozen by construction. **`deploy_claim.py` serialises deploys; it
-does not rate-limit them, and serialisation is not spacing.** The three changes
-above make the next freeze visible and cheap; they do not prevent it. A rate
-limit (or a preflight refusal inside N minutes of the last worker deploy) is the
-unbuilt piece.
+**THE OPERATIONAL HALF IS NOW BUILT (4).** `deploy_preflight.py` gained a third
+verdict, **`TOO_SOON` (exit 5)**, refusing a deploy inside the service's minimum
+spacing — 1500 s for refresh-worker, measured from its 20 min 41 s
+boot-to-first-publish. Read from **Render's deploy list**, not a local ledger:
+the 15 deploys came from parallel sessions and only the thing every session
+deploys through can see them all.
+
+**THREE INDEPENDENT PROPERTIES, and no two imply the third:**
+
+    CLAIMED    serialisation   two deploys must not overlap
+    OFF_MAIN   composition     the second must contain the first
+    TOO_SOON   spacing         the service must have time to produce something
+
+All fifteen deploys were serialised, composed and on main. The board was frozen
+anyway.
+
+**Replayed against the real timeline** (`WouldItHavePreventedTheIncidentTests`):
+**9 of the 14 intervals refused, 5 legitimate gaps allowed.** A floor, not an
+exact count — those are finish-to-finish gaps and preflight measures to *now*,
+which is earlier, so the true figure is at least 9.
+
+`--allow-rapid` is the escape hatch, because a rate limit with no override turns
+an outage into a longer one and a revert must always be able to go out. Only
+refresh-worker has a measured interval; **live-odds-worker and web are 0 because
+their cycles are UNMEASURED, not because they are known safe** — the preflight
+prints "not rate-limited" for a 0 so the absence is visible rather than implied.
+live-odds-worker has no `WORKER_SHUTDOWN` handler, so the uptime figure that made
+refresh-worker's case does not exist for it; measure its boot-to-first-publish
+before setting one.
+
+**NOT RUN LIVE.** This container has no `RENDER_API_KEY` and the proxy 403s
+`api.render.com`, so the verdict has been exercised end to end against a mocked
+API and against the real deploy timeline, but never against the live endpoint.
+First real use is the verification.
 
 **verify:** one clean hour with no refresh-worker deploy should show
 `GAME_CHIPS_PUBLISHED` with no gap over ~10 minutes and zero
