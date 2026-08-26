@@ -1,5 +1,108 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#571` — **`test_polymarket_side_vocabulary` asserts a key set the source stopped producing. Recorded as baseline debt, NOT fixed — because the widened keys may be a mis-join risk, not just a stale expectation.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+Found while regenerating `tests/pytest_baseline.json` (`#569` work). Two tests
+fail and **reproduce standalone**, so they are real, not parallel-run flakes:
+
+```
+tests/test_polymarket_side_vocabulary.py::test_the_board_row_derives_the_SAME_key_from_its_own_teams
+  expected ["mlb|h2h|home", "mlb|h2h|arizona diamondbacks"]
+  got      ... + "mlb|h2h|arizona"            (2 extra keys)
+
+tests/test_polymarket_side_vocabulary.py::test_an_unresolvable_club_adds_NO_second_key
+  expected ["mlb|h2h|home"]
+  got      ... + "mlb|h2h|club", "mlb|h2h|real"   (4 extra keys)
+```
+
+**Attribution.** `_candidate_keys` lives in
+`syndicate/features/shared/venue_quote_fanin.py:523` and was last changed by
+`0acabd091` — *"Kalshi offered every game line under a side the board never asks
+for"* — at **2026-08-25 22:06:54Z**. The test file was last touched at
+**20:17:32Z**, an hour and a half EARLIER. So the source deliberately widened key
+derivation and the test was left asserting the narrow set. Same shape as `#564`
+(the freshness test): a fix shipped without updating the test that pinned the
+old behaviour.
+
+**WHY THIS IS NOT JUST "UPDATE THE EXPECTATIONS".** The second test's name is
+the argument: `test_an_unresolvable_club_adds_NO_second_key`. It exists to
+assert that an unresolvable club name does **not** manufacture extra join keys —
+and the source now emits `mlb|h2h|club` and `mlb|h2h|real` from the words of
+"Real Club ...". Widening keys to help **Kalshi** match may be correct for
+Kalshi and wrong here: `_candidate_keys` is SHARED across venues via
+`venue_quote_fanin`, and a bare token like `real` or `club` can collide with a
+different fixture's team. A wrong join is a quote attached to the wrong game,
+which is the `#559`-class defect this repo keeps paying for.
+
+So the test may be **right and the source wrong for the Polymarket path**, or
+the test may be stale. Rewriting the assertions to match current output would
+settle that by fiat, in the direction that makes CI quiet — the worst available
+tiebreaker. **Whoever owns `0acabd091` should say which behaviour was intended.**
+
+**Recorded, not hidden.** Both are now in `tests/pytest_baseline.json` as known
+failures. That is what the baseline is for — *"the existing debt stays visible as
+a number in a file rather than as a red check nobody reads"* — and it is
+explicitly NOT an endorsement. The gate will fail the moment either starts
+passing, which is the prompt to close this item.
+
+---
+
+### `#570` — **The pytest suite writes into git-tracked `data/`. Every full-suite run dirties the working tree, and the stray lines look like recorded production data.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+**Observed three times in one session**, each time after starting a full-suite
+run, always the same file:
+
+```
+ M data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_02.jsonl
+```
+
+One JSON record appended per run, e.g. `{"recordedAt": "2026-08-26T15:06:43+00:00",
+"date": "2026-06-02", "generatedAt": "2026-08-26T15:06:43+00:00", ...}` — three
+minutes into the run each time. I restored it with `git checkout --` on each
+occurrence rather than committing it.
+
+**The mechanism.** `syndicate/features/mlb/live_lens.py:1381` appends via
+`live_lens_log_path(selected_date)`
+(`syndicate/features/mlb/sources.py:364`), which resolves through
+`_resolve_data_path_with_reconcile` against the **repo's own `data/` root**
+unless `SYNDICATE_DATA_ROOT` is redirected. `tests/conftest.py` does **not**
+sandbox `SYNDICATE_DATA_ROOT` globally — 67 test files set it individually, so
+the convention exists but is opt-in per test, and anything that reaches this
+writer without opting in writes to the tracked mirror.
+
+**Why this is worth more than a tidy-up.** `CLAUDE.md` designates
+`data/<sport>_source/` a **cold-start safety net**, explicitly *not* a snapshot
+of what production computed, and warns that analysis drawing conclusions from it
+is reading a lossy mirror. A test-injected record is worse than lossy: it is
+**fabricated data wearing a production timestamp**. The line above says
+`recordedAt: 2026-08-26` for `date: 2026-06-02` — a future session backtesting
+2026-06-02 has no way to tell it from a real capture. This is the same failure
+class as `#502`/`#517`: a number that looks precise and is not real.
+
+The second-order risk is the commit. A dirty tree after every suite run trains
+people to `git add -A`, and `.syndicate/session_isolation_protocol.md` already
+records what that habit cost once (4,993 staged deletions, and the staged
+deletion of the only copy of a ledger archive).
+
+**NOT YET PINNED: which test.** The prime suspect is
+`tests/test_mlb_refresh_runner.py` — it is the only test file that references
+`2026-06-02` *and* `live_lens`, and it monkeypatches `_live_lens_log_path` at
+`:337` and `live_lens_log_path` at `:906`, i.e. it sandboxes the writer on some
+paths. Some path through the suite evidently still reaches the real root, and I
+did not isolate which; attributing it to that file on this evidence would be a
+guess. **To pin it:** run the suite with a watch on the file's mtime, or bisect
+by running candidate files individually against a clean tree.
+
+**The fix is probably one line, and should not be applied blind.** An autouse
+`conftest.py` fixture pointing `SYNDICATE_DATA_ROOT` at a tmpdir would stop the
+whole class. But 67 files set it themselves, and some tests read git-tracked
+mirror fixtures on purpose — a global redirect could turn "reads real fixture"
+into "reads empty dir" and convert this into a wave of silent empty-input
+passes, which is the failure mode `model_engine_standard.md` exists to prevent.
+Land it behind a full-suite before/after, not on reasoning.
+
+---
+
 ### `#569` — **Is the BOARD stale, or is the QUOTE stale? Nothing in this repo could tell them apart, and the whole staleness investigation ran without noticing.** — lane `board-staleness-visibility`, 2026-08-26, asked by syndicate-43 — **INSTRUMENT SHIPPED (log-only), NOT DEPLOYED**
 
 **THE BLIND SPOT, and it is mine.** Every measurement the staleness work
