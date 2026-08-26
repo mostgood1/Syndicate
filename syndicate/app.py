@@ -410,6 +410,24 @@ def create_app() -> Flask:
     def inject_syndicate_sports() -> dict[str, object]:
         return {"syndicate_sports": app.config.get("SYNDICATE_SPORTS", [])}
 
+    # EVERY TIME A PERSON READS IS CENTRAL [USER DECISION 2026-08-25].
+    #
+    # Registered as a FILTER rather than converted per template, because the
+    # failure was a template doing its own arithmetic: the live portfolio
+    # rendered `submitted_at[11:19]`, a raw slice of the stored UTC string, so
+    # a 6:15 PM Central order displayed as `23:15:05` -- unlabelled, five hours
+    # wrong, in the column a person uses to reconcile against the venue.
+    #
+    # Storage stays UTC on purpose. Venue payloads are UTC, `fetched_at` ages
+    # are computed against `time.time()`, and ISO strings are compared lexically
+    # throughout; rewriting stored stamps into a zone with a DST discontinuity
+    # would break all of that, and twice a year would break it silently. UTC on
+    # the wire and on disk, Central at the edge.
+    from syndicate.features.shared.timezone import central_clock, central_clock_from_epoch
+
+    app.jinja_env.filters["central"] = central_clock
+    app.jinja_env.filters["central_epoch"] = central_clock_from_epoch
+
     app.register_blueprint(home_bp)
     app.register_blueprint(intelligence_bp)
     app.register_blueprint(opportunity_board_bp)

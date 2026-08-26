@@ -194,7 +194,9 @@
       <tbody>
         {% for o in orders %}
           <tr>
-            <td>{{ o.get('selected_date') or '—' }}<span class="sub">{{ (o.get('submitted_at') or '')[11:19] }}</span></td>
+            {# CENTRAL, via the filter. This was `submitted_at[11:19]` -- a raw slice of
+               the stored UTC string, so a 6:15 PM order read `23:15:05`. #}
+            <td>{{ o.get('selected_date') or '—' }}<span class="sub">{{ o.get('submitted_at')|central }} CT</span></td>
             <td class="primary">
               {{ o.get('player_name') or o.get('side') or '—' }}
               <span class="sub">

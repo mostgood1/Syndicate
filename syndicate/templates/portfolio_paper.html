@@ -333,7 +333,7 @@
     </span>
     <span class="paper-flag">
       <span class="paper-flag__label">Plan built</span>
-      <span class="paper-flag__value" id="paper-generated-at">{{ p.generated_at or '—' }}</span>
+      <span class="paper-flag__value" id="paper-generated-at">{{ p.generated_at|central(with_date=True) or '—' }} CT</span>
     </span>
     <span class="paper-links">
       <a href="/portfolio">Your tracked bets</a> ·
@@ -718,7 +718,7 @@
         <tbody id="paper-orphans">
           {% for order in (p.orphan_orders or []) %}
             <tr>
-              <td>{{ order.submitted_at or '—' }}</td>
+              <td>{{ order.submitted_at|central(with_date=True) or '—' }}<span class="sub"> CT</span></td>
               <td class="primary">{{ (order.sport or '—')|upper }}</td>
               <td class="primary">
                 {{ order.player_name or order.side or '—' }}

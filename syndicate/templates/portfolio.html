@@ -389,7 +389,7 @@
       across at most {{ psettings.max_positions or 0 }} positions.
       {# `sources` distinguishes "you set this" from "the store lost your edit and
          this is the default" -- see portfolio_settings.py on LRU eviction. #}
-      Bankroll source: <strong>{{ psources.bankroll_units or "default" }}</strong>{% if psettings.updated_at %}, last saved {{ psettings.updated_at }}{% endif %}.
+      Bankroll source: <strong>{{ psources.bankroll_units or "default" }}</strong>{% if psettings.updated_at %}, last saved {{ psettings.updated_at|central(with_date=True) }} CT{% endif %}.
     </div>
     {% if psettings.store_error %}
     <div class="portfolio-bankroll__warn">
