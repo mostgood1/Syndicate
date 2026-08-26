@@ -31047,3 +31047,59 @@ confirming it turns red.
 **FIX:** the span now closes after BOTH branches, so the reading no longer
 depends on which service is running it. The list-fallbacks are inside it on
 purpose — they re-consume rows the stage produced, so their cost is its cost.
+
+---
+
+## 2026-08-26 · live-odds-worker · `a46797d1b` · `dep-da7e2v7avr4c73bq91vg`
+
+**lane:** `kalshi-exchange-index` · claim `1da24653dbe04293`
+**change:** ONE. `exchange_index` in the Kalshi v2 order body: `0` → `-1`.
+
+**WHAT IT WAS.** Every Kalshi order placed since 2026-08-24T18:18Z failed
+`http_404 {"code":"market_not_found"}`. Across six market families
+(`KXMLBKS`, `KXMLBOUTS`, `KXMLBHIT`, `KXMLBRBI`, `KXMLBHRR`, `KXMLBTOTAL`),
+both sides, over four days.
+
+Four hypotheses were opened and all four were correctly closed by measurement:
+
+| hypothesis | killed by |
+|---|---|
+| wrong host | `fetch_base == order_base`, GET and POST 0.5s apart |
+| wrong side (`ask` vs `bid`) | both sides fail; both sides have filled |
+| bad market / MVE | `status=active`, `market_type=binary`, both legs quoted |
+| missing event field | market's own `event_ticker` matches; no event field needed |
+
+**The field that was never questioned was the one copied out of the sample
+body.** `"exchange_index": 0` was treated as fixed furniture, next to
+`post_only: false`. It is a SHARD SELECTOR. The venue's field reference,
+supplied by the owner 2026-08-26:
+
+> Exchange shard index. If omitted, auto-routes when ticker is provided;
+> otherwise defaults to 0. Use -1 to require auto-routing by ticker.
+
+So `0` is not "the default" — it PINS the order to shard 0, and
+`market_not_found` is the only thing a matching engine can say about a ticker
+that is not on the shard it was asked about. **Reads are not sharded**, which
+is exactly why `fetch_market` resolved every single failing ticker and made the
+market look innocent each time.
+
+That also explains the successes, which no code-regression theory could: the
+two `KXMLBKS` fills on 08-24 and the `KXWNBAAST` fill on 08-25 were markets
+that happened to live on shard 0. Same family, same day, same body shape as the
+failures — which is what a per-market shard assignment looks like.
+
+**verify:** a `SUBMIT` line with `exchange_index=-1` followed by a `LIVE_ORDER
+status=submitted` (or `filled`) on a ticker whose family has been failing
+today — `KXMLBKS`/`KXMLBHIT`/`KXMLBRBI`/`KXMLBHRR`/`KXMLBOUTS`. A submit that
+merely stops erroring is not enough; the reading is a NON-SHARD-0 MARKET
+CLEARING, which is why `exchange_index` is now printed on the SUBMIT line and
+not only on the failure.
+
+**counter-verify, pre-registered:** if `market_not_found` persists at
+`exchange_index=-1`, the shard hypothesis is dead too and the next thing to
+check is whether the ORDER route resolves tickers at all for these families —
+i.e. ask the venue to spell its own markets. Do NOT reach for a fifth
+hypothesis before saying that out loud.
+
+**rollback:** `KALSHI_ORDER_EXCHANGE_INDEX=0` restores the old behaviour with
+no deploy. An unreadable value falls back to auto-routing, not to `0`.
