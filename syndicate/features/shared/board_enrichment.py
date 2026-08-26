@@ -289,16 +289,56 @@ def _soccer_live_state_games(selected_date: str) -> tuple[list[dict], float | No
                     saw_source = True
                     _add(record, "final")
 
-    # 2. FINISHED (and in-play) from the per-league `match_box`, where local.
+    # 2. FINISHED (and in-play) from the per-league `match_box`.
+    #
+    # DISCOVERY WAS FILESYSTEM WHILE THE READ IS KEYVALUE, AND THAT GAP IS WHY
+    # SOCCER HAD SETTLED ZERO ORDERS ALL-TIME.
+    #
+    # The block above says these files are "a filesystem write on
+    # live-odds-worker" and therefore unreachable from refresh-worker. THAT IS
+    # FALSE under the keyvalue backend: `_keyvalue_backed` excludes exactly one
+    # marker (`migration_runs/`), so
+    # `soccer_source/<league>/api/live_state/live_state_<date>.json` crosses
+    # services like everything else. Verified 2026-08-26.
+    #
+    # What actually failed is that the league names came from
+    # `source.iterdir()` -- a real directory listing. On refresh-worker, where
+    # `settle_orders` runs, that directory does not exist, so `league_dirs` was
+    # EMPTY and this entire branch was skipped. `read_json_file` can fetch any
+    # path it can NAME; it just had no names. The reader was never the problem.
+    #
+    # WHY IT MATTERS MORE THAN THE AGGREGATE: `match_box` spans `in` AND `post`,
+    # while the aggregate's `games` is in-play only and its `finals` list is
+    # published on a single rolling date. MEASURED 2026-08-26 -- la_liga logged
+    # `BOX_REUSED ... final_cached=1` for 2026-08-25 at 04:5xZ while settlement
+    # for that same date reported `no_soccer_live_state_for_date`. The final
+    # existed, in a file this service could have read by name, and nothing
+    # looked for it.
+    #
+    # UNION, NOT REPLACEMENT. The filesystem listing stays first: on
+    # live-odds-worker and on a dev box those directories are real, and a league
+    # present on disk but absent from the catalogue must not stop being read.
+    # The catalogue is 10 names, read once per resolver, and a name with no
+    # artifact costs one absent-key lookup.
     source = root / "soccer_source"
     try:
-        league_dirs = sorted(source.iterdir()) if source.exists() else []
+        league_names = [d.name for d in sorted(source.iterdir()) if d.is_dir()] if source.exists() else []
     except OSError:
-        league_dirs = []
+        league_names = []
+    try:
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+
+        for name in LEAGUE_DISPLAY_NAMES:
+            if name not in league_names:
+                league_names.append(name)
+    except Exception:  # pragma: no cover - deploy-skew guard
+        # A catalogue we cannot import degrades to the old filesystem-only
+        # behaviour rather than to an exception on the board build.
+        pass
+
     seen = {(g["home"].get("name"), g["away"].get("name")) for g in lens_games}
-    for league_dir in league_dirs:
-        if not league_dir.is_dir():
-            continue
+    for league_name in league_names:
+        league_dir = source / league_name
         payload = read_json_file(
             league_dir / "api" / "live_state" / f"live_state_{selected_date}.json"
         )
