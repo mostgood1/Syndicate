@@ -784,6 +784,29 @@ _FILL_COUNT_TOLERANCE = 0.01
 _FILL_DOLLAR_ABSURD = 10.0
 
 
+# OUR IDEMPOTENCY KEYS, BY SHAPE. `idempotency_key` is
+# `sha1(...).hexdigest()[:24]` -- 24 lowercase hex characters, no dashes.
+#
+# THIS EXISTS BECAUSE `bool(client_order_id)` WAS USED AS "IS THIS OURS", and it
+# reported `orphans_ours=6` at 2026-08-26T15:21Z -- six positions of real money
+# supposedly opened by this system and lost from the ledger. All six were
+# `KXMVECROSSCATEGORY` PARLAYS, a series `kalshi_client._COMBINATORIAL_SERIES_PREFIXES`
+# explicitly excludes because "the board does not bet parlays". This system has
+# no code path that can place one. Their ids are UUID-shaped
+# (`64643034-3834-3635-...`); ours are 24 bare hex characters.
+#
+# A field the venue lets ANY client set is not an identity claim on its own --
+# the Kalshi app stamps one too. Six phantom missing positions, produced by the
+# counter written to stop exactly that class of false alarm.
+_OUR_KEY_LENGTH = 24
+_HEX = frozenset("0123456789abcdef")
+
+
+def _is_our_key(client_order_id: Any) -> bool:
+    text = str(client_order_id or "").strip()
+    return len(text) == _OUR_KEY_LENGTH and all(ch in _HEX for ch in text)
+
+
 def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[str, Any]:
     """Correct the live ledger from what the VENUE says, not from what we sent.
 
@@ -1280,24 +1303,34 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                     # and probably wrong. A count that cannot distinguish the
                     # benign case from the serious one is not actionable in
                     # either direction.
-                    "ours": bool(client),
+                    "ours": _is_our_key(client),
                 }
             )
         if orphans:
             ours = [o for o in orphans if o["ours"]]
-            unclaimed = len(orphans) - len(ours)
+            # THREE BUCKETS, because two could not tell these apart. A venue
+            # order carrying SOMEONE ELSE'S client id is not the same fact as
+            # one carrying none: the first says another client of this account
+            # placed it, the second says the venue's own UI did. Neither is
+            # money we lost. Only `ours` is.
+            foreign = [o for o in orphans if not o["ours"] and o["client_order_id"]]
+            unclaimed = len(orphans) - len(ours) - len(foreign)
             # THE ROWS, NOT JUST THE COUNT. A counter that names a problem
             # while withholding its data is the defect this repo keeps
             # relearning; an orphan is only actionable if you can see which
             # ticker it is.
             print(
                 f"[execution_ledger] RECONCILE_ORPHANS venue={venue}"
-                f" n={len(orphans)} ours={len(ours)} unclaimed={unclaimed}"
+                f" n={len(orphans)} ours={len(ours)}"
+                f" foreign_client={len(foreign)} unclaimed={unclaimed}"
                 # OURS FIRST IN THE SAMPLE. With a flat cap at 5 the serious
                 # rows can be crowded out by benign history and never printed.
-                f" sample_ours={ours[:5]} sample_unclaimed={[o for o in orphans if not o['ours']][:3]}"
+                f" sample_ours={ours[:5]} sample_foreign={foreign[:2]}"
+                f" sample_unclaimed={[o for o in orphans if not o['ours'] and not o['client_order_id']][:2]}"
                 " -- at the venue, absent from our ledger; NOTHING WRITTEN"
-                " (ours=OUR client id, ledger row lost; unclaimed=placed outside this system)",
+                " (ours=OUR KEY SHAPE, ledger row LOST -- the only alarming one;"
+                " foreign_client=another client of this account;"
+                " unclaimed=no client id, placed in the venue UI)",
                 flush=True,
             )
 

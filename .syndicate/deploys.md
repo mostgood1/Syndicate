@@ -31528,3 +31528,46 @@ reporting a hole rather than a shard — say that rather than trusting `[0]`.
 
 WNBA is shard 0 and will keep filling regardless. Any green there says nothing
 about MLB. Logged to `learnings.md`.
+
+---
+
+## 2026-08-26 15:21Z · `orphans_ours=6` WAS A FALSE ALARM FROM MY OWN COUNTER
+
+The first reading after `cc80e0029`:
+
+```
+RECONCILE venue=kalshi candidates=6 venue_orders=35 coverage=book
+  orphans=26 orphans_ours=6
+```
+
+**`ours=6` looked like six positions of real money this system opened and lost
+from the ledger. All six are `KXMVECROSSCATEGORY` parlays.** That series is in
+`kalshi_client._COMBINATORIAL_SERIES_PREFIXES`, excluded outright because *"the
+board does not bet parlays"* — there is no code path here that can place one.
+
+The predicate was `"ours": bool(client_order_id)`. **The venue lets ANY client
+set that field** — the Kalshi app stamps one too — so it was never the same
+question as "is this ours". Ours are `sha1(...).hexdigest()[:24]`: 24 bare hex
+characters. Theirs are UUID-shaped (`64643034-3834-3635-3134-343632663032`).
+
+**A counter written specifically to stop a scary-but-wrong number produced a
+scary-but-wrong number, within two hours, on the same field.** The first version
+of this defect was `orphans=26` reading as "26 unknown positions"; the fix split
+it, and the split itself used a predicate that could not do the job.
+
+**The rule I keep having to relearn here: a field is not an identity claim just
+because it usually contains one.** `client_order_id` is populated by whoever
+placed the order, not by us.
+
+Now three buckets, because two could not tell these apart:
+
+| bucket | meaning | alarming? |
+|---|---|---|
+| `ours` | client id in OUR KEY SHAPE, no ledger row | **yes — money we opened and lost** |
+| `foreign_client` | a client id in someone else's format | no — another client of this account |
+| `unclaimed` | no client id at all | no — placed in the venue's UI |
+
+**verify:** next `RECONCILE_ORPHANS` reads `ours=0 foreign_client=6
+unclaimed=20`. **counter-verify:** if `ours` is still non-zero, the surviving
+rows are genuinely lost ledger rows and need naming one by one — do NOT widen
+the shape test to make the number go away.
