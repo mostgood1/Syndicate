@@ -283,6 +283,35 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     # `_soccer_alias_to_name` drops ambiguous DERIVED keys but cannot police a
     # hand-written one.
     "deportivo": "Deportivo La Coruña",
+    # `#576`. FIVE MORE, and unlike every batch above these were not found by
+    # hand or by reading a join log -- `#541`'s `CHIP_JOIN_COVERAGE` named them,
+    # with the exact spelling, on the line it prints every build:
+    #
+    #   sport=soccer ... unknown_no_key=7 samples=[
+    #     {'matchup': 'Ajax @ SC Telstar',        'away_key': None, ...},
+    #     {'matchup': 'ADO Den Haag @ Feyenoord', 'home_key': None, ...},
+    #     {'matchup': 'Charleroi @ KV Kortrijk',  'away_key': None, ...},
+    #     {'matchup': 'Standard Liege @ Leuven',  'home_key': None, ...},
+    #     {'matchup': 'SK Beveren @ Genk',        'home_key': None, ...}]
+    #
+    # `away_key`/`home_key` is `canonical_team`'s own answer, so a None names
+    # the UNRESOLVABLE side directly and the other side proves the fixture
+    # itself is fine. No bisecting a board, no guessing which half missed.
+    #
+    # Every one is the club's SHORT name where the artifacts carry the long one.
+    # Checked for ambiguity the way `deportivo` documents rather than assumed:
+    # across all ten configured leagues each token below appears in EXACTLY ONE
+    # canonical name (204 names in `_soccer_alias_to_name`), so none can collide.
+    "ajax": "Ajax Amsterdam",
+    "feyenoord": "Feyenoord Rotterdam",
+    "charleroi": "Royal Charleroi SC",
+    "leuven": "OH Leuven",
+    # CORRECTS A CLAIM MADE ABOVE. `#503`'s note says "Genk matches fine" and
+    # explains the `Royal Antwerp v Genk` miss as the Antwerp side alone. That
+    # was wrong, or has since stopped being true: measured 2026-08-26,
+    # `canonical_team("soccer", "Genk")` returns None. Both sides were broken
+    # and only one was fixed.
+    "genk": "Racing Genk",
 }
 
 
