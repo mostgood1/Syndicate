@@ -477,10 +477,27 @@ _PLAYER_PROP_TITLE = re.compile(r"\bplayer\s+(?P<stat>[A-Za-z0-9 +'-]+)$", re.IG
 #   KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2     event `26AUG242140MINATH`
 #
 # MLB carries a start time after the date, WNBA does not, so only the leading
-# `YYMMMDD` is common to both -- and that is all a date comparison needs. The
-# time is deliberately NOT parsed: whether `2140` is Eastern or UTC is not
-# settled by any reading I have, and a date taken from Kalshi's own labelling
-# of the event does not depend on the answer.
+# `YYMMMDD` is common to both -- and that is all a date comparison needs.
+#
+# THE TIME IS STILL NOT PARSED, but the zone is now SETTLED: it is EASTERN
+# `[2026-08-25]`. Six tickers against their home park's standard start, and
+# only one hypothesis survives all six:
+#
+#   ...26AUG261905HOUNYY   19:05 ET  Yankee Stadium standard
+#   ...26AUG261945BALSTL   19:45 ET = 18:45 CT  Busch standard
+#   ...26AUG261940TEXCWS   19:40 ET = 18:40 CT  Rate Field standard
+#   ...26AUG262105MINATH   21:05 ET = 18:05 PT  Athletics standard
+#
+# UTC would put all six between 14:45 and 17:05 ET on a weeknight, which no
+# club starts. VENUE-LOCAL fails on TEXCWS (19:40 CT) and MINATH (21:05 PT),
+# neither a real start.
+#
+# WHY THAT MATTERS TO A DATE THIS FUNCTION DOES PARSE. ET and Central differ by
+# one hour, so a ticker date and a board date could disagree only for a start
+# between 00:00 and 01:00 ET. The observed range is 18:45-21:05 ET, so no slate
+# can shift a day between the two zones. The off-by-one was real to check and
+# is closed as NOT a hazard -- which is what makes this date safe to compare
+# against the board's without converting anything.
 _EVENT_DATE = re.compile(r"^(?P<yy>\d{2})(?P<mon>[A-Z]{3})(?P<dd>\d{2})")
 _MONTHS = {
     "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,

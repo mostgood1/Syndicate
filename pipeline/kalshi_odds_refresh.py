@@ -1074,16 +1074,26 @@ def record_and_report(markets: list[dict[str, Any]]) -> dict[str, Any]:
     )
 
     dates = board_by_game_date(markets)
+    # BOTH GROUPINGS, side by side, because the GAP between them is the finding.
+    # `BY_GAME_DATE` used to be grouped on `close_time` -- a settlement deadline
+    # up to four days after first pitch (`#370`). On 2026-08-25 a reader took
+    # three of these readings whose earliest key was `2026-08-27`, concluded the
+    # working set held nothing for the board's date, and started designing a
+    # bound on that; two of that date's markets were in the very same set. A
+    # name and a field disagreed and one printed number could not show it.
     print(f"[kalshi_odds] BY_GAME_DATE {dates.get('by_date_series')}", flush=True)
+    print(f"[kalshi_odds] BY_CLOSE_DATE {dates.get('by_close_date')}", flush=True)
 
-    # WHICH FIELD IS THE GAME DATE? Measured 2026-08-23: all 154 markets across
-    # two series reported the same `close_time` date, and 137 different pitchers
-    # do not all pitch on one day -- so `close_time` is very likely a settlement
-    # deadline rather than first pitch, and grouping by it is grouping by the
-    # wrong thing. Rather than guess which of `open_time`/`close_time`/
-    # `expiration_time`/the ticker carries it, print one market's date fields
-    # verbatim and let the next run say. This is the same choice `probe()` made
-    # for the price fields, which is what caught the 100x error.
+    # WHICH FIELD IS THE GAME DATE? ANSWERED: the TICKER's event segment does,
+    # and no time field does. This probe asked the question -- measured
+    # 2026-08-23, all 154 markets across two series reported the same
+    # `close_time` date and 137 different pitchers do not all pitch on one day
+    # -- and `game_date_from_ticker` is the answer it produced.
+    #
+    # It stays because the answer needs to keep being visible. One line per
+    # series carries the ticker and all three time fields together, so the
+    # four-day gap is READABLE per market rather than inferable from the two
+    # histograms above. The cost of it not being readable is recorded there.
     seen_series: set[str] = set()
     for market in markets:
         series = str(market.get("series") or "")

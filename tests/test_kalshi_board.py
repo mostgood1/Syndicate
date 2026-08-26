@@ -136,21 +136,66 @@ def test_opening_line_is_none_for_an_untracked_ticker():
     assert kalshi_board.opening_line("NEVER_SEEN") is None
 
 
-def test_board_groups_by_close_day_not_close_timestamp():
-    """#370 in a new place: a night game closes after midnight UTC."""
+def test_the_game_date_is_the_ticker_not_the_close_time():
+    """The diagnostic bug, pinned.
+
+    `board_by_game_date` used to group on `close_time` and call the result the
+    game date. `close_time` is a SETTLEMENT deadline up to four days later
+    (`#370`), so a histogram of tonight's slate reported next week. On
+    2026-08-25 a reader took three such readings, concluded "the working set
+    holds nothing for the board's date", and started designing a bound on that
+    -- while two of that date's markets sat in the very set being read.
+
+    The ticker below and its close time are the recorded measurement, verbatim.
+    """
+    market = _market(
+        "KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2",
+        0.4,
+        close_time="2026-08-28T01:40:00Z",
+    )
+    board = kalshi_board.board_by_game_date([market])
+
+    assert board["by_date"] == {"2026-08-24": 1}, "grouped on the settlement deadline again"
+    assert board["by_close_date"] == {"2026-08-28": 1}
+    # FOUR DAYS apart. The point of returning both is that this gap is visible
+    # in the output rather than inferable from one number that means the other.
+    assert list(board["by_date"]) != list(board["by_close_date"])
+
+
+def test_both_groupings_are_reported_so_neither_stands_in_for_the_other():
     markets = [
-        _market("A", 0.4, close_time="2026-08-24T23:10:00Z"),
-        _market("B", 0.4, close_time="2026-08-24T02:40:00Z"),
-        _market("C", 0.4, close_time="2026-08-25T01:05:00Z", series="KXMLBOUTS"),
+        _market("KXMLBKS-26AUG251945BALSTL-X", 0.4, close_time="2026-08-27T23:10:00Z"),
+        _market("KXMLBKS-26AUG251945BALSTL-Y", 0.4, close_time="2026-08-27T02:40:00Z"),
+        _market(
+            "KXMLBOUTS-26AUG261815NYYBOS-Z",
+            0.4,
+            close_time="2026-08-28T01:05:00Z",
+            series="KXMLBOUTS",
+        ),
     ]
     board = kalshi_board.board_by_game_date(markets)
 
-    assert board["by_date"] == {"2026-08-24": 2, "2026-08-25": 1}
-    assert board["by_date_series"]["2026-08-24"] == {"KXMLBKS": 2}
-    assert board["by_date_series"]["2026-08-25"] == {"KXMLBOUTS": 1}
+    assert board["by_date"] == {"2026-08-25": 2, "2026-08-26": 1}
+    assert board["by_date_series"]["2026-08-25"] == {"KXMLBKS": 2}
+    assert board["by_date_series"]["2026-08-26"] == {"KXMLBOUTS": 1}
+
+    # Grouped on the DAY, not the timestamp: a night game closes after midnight
+    # UTC, so an exact stamp would scatter one slate across two days.
+    assert board["by_close_date"] == {"2026-08-27": 2, "2026-08-28": 1}
+    assert board["by_close_date_series"]["2026-08-27"] == {"KXMLBKS": 2}
+
+
+def test_an_undatable_ticker_is_named_not_dropped():
+    board = kalshi_board.board_by_game_date([_market("A", 0.4)])
+    # Dropping it would make the board's total silently disagree with the fetch,
+    # which is how a diagnostic starts lying -- the subject of this whole file.
+    # `game_date_from_ticker` refuses to fall back to `close_time`, so "I cannot
+    # date this" gets its own key rather than borrowing the settlement date.
+    assert board["by_date"] == {"<undatable_ticker>": 1}
+    assert board["by_close_date"] == {"2026-08-24": 1}
 
 
 def test_a_market_without_a_close_time_is_named_not_dropped():
     board = kalshi_board.board_by_game_date([_market("A", 0.4, close_time=None)])
-    # Dropping it would make the board's total silently disagree with the fetch.
-    assert board["by_date"] == {"<no_close_time>": 1}
+    assert board["by_close_date"] == {"<no_close_time>": 1}
+    assert board["by_date"] == {"<undatable_ticker>": 1}

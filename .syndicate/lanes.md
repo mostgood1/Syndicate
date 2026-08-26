@@ -2237,13 +2237,41 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     01:00 ET. The observed range is 18:45-21:05 ET. **No MLB slate can shift a
     day between the ticker's zone and the board's.** The hazard I recorded was
     real to check and is now closed as NOT a hazard.
-- **REMAINING, reordered by what the retraction changed:** (a) fix
-  `board_by_game_date` to group on the ticker's game date -- it is the reason
-  any date reasoning here is unsafe; (b) THEN re-establish what
-  `market_is_for_another_date` actually is, from a line that means what it
-  says; (c) line-aware rungs LAST, if the re-established numbers still support
-  them. **(b) is now genuinely open** -- this lane has had two hypotheses
-  killed and should not adopt a third without a measurement.
+- **(a) DONE 2026-08-26. THE DIAGNOSTIC IS FIXED, and fixing it invalidated
+  one MORE of this lane's conclusions than the retraction had reached.**
+  - `board_by_game_date` now groups on `game_date_from_ticker(ticker)` for
+    `by_date`/`by_date_series` -- the name every caller already used -- and
+    returns `by_close_date`/`by_close_date_series` alongside it. Both are
+    printed: `BY_GAME_DATE` (unchanged name, now honest) and a new
+    `BY_CLOSE_DATE`. Printing ONE of them is what let a name and a field
+    disagree unobserved for three readings.
+  - An undatable ticker gets `<undatable_ticker>`, a missing close time gets
+    `<no_close_time>`. Neither is dropped: a total that silently disagrees
+    with the fetch is how a diagnostic starts lying.
+  - Pinned by `test_the_game_date_is_the_ticker_not_the_close_time`, which
+    asserts the FOUR-DAY gap on the recorded ticker rather than asserting a
+    grouping. 12 tests in `test_kalshi_board.py`, 126 across the Kalshi
+    suites. (`test_kalshi_auth.py` cannot import `cryptography` in this
+    sandbox -- environmental, pre-existing, unrelated.)
+  - `game_date_from_ticker`'s comment now records the Eastern finding and,
+    more usefully, WHY it makes the date safe to compare unconverted.
+- **THE NCAAF "STILL NO" ABOVE IS NOT SAFE EITHER. It rested on the same wrong
+  field, and I did not catch that when I retracted the headline.** The reading
+  was "the earliest date carrying ANY NCAAF market is 2026-08-29" -- but that
+  was a CLOSE date, and a market closes AT OR AFTER its event, never before.
+  So the earliest NCAAF *game* is `<= 2026-08-29`, which does not exclude the
+  board's `2026-08-25`. The evidence is consistent with NCAAF being on the
+  board's date all along. **This does not resurrect step 3; it means step 3
+  was never actually killed, only mis-measured -- twice, and the second time
+  by me while correcting the first.** Same for the NFL claim beside it.
+  Nothing here should be re-derived from the old readings: they were taken
+  from the broken line and the fixed line has not run in production yet.
+- **REMAINING:** (b) re-read `BY_GAME_DATE` in production once the fix is
+  deployed, and re-establish from it what `market_is_for_another_date`
+  actually counts -- from a line that means what it says; (c) THEN decide
+  date-aware vs line-aware bounds on those numbers. **(b) is genuinely open**
+  -- this lane has now had three conclusions killed by the same field, and
+  should not adopt a fourth without a measurement.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
