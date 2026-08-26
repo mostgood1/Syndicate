@@ -139,6 +139,15 @@
   .live-table tr:last-child td { border-bottom: none; }
   .live-table .primary { font-weight: 600; color: var(--cards-text); }
   .sub { display: block; font-size: 10px; color: var(--cards-text-dim); }
+  .live-dates { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 0 0 10px; font-size: 11px; }
+  .live-dates__label { color: var(--cards-text-dim); text-transform: uppercase; letter-spacing: .05em; margin-right: 3px; }
+  .live-dates a, .live-dates span.is-active {
+    padding: 2px 9px; border-radius: 999px; text-decoration: none;
+    border: 1px solid var(--cards-line); color: var(--cards-text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .live-dates a:hover { border-color: var(--cards-line-strong); color: var(--cards-text-soft); }
+  .live-dates .is-active { border-color: var(--cards-accent); color: var(--cards-accent); }
   .live-toggle { margin: 0 0 10px; font-size: 12px; color: var(--cards-text-dim); }
   .live-toggle a { color: var(--cards-accent); }
   .live-empty { border: 1px dashed var(--cards-line-strong); border-radius: 10px; padding: 18px; text-align: center;
@@ -916,6 +925,37 @@
     </div>
   </div>
 
+  {# ---------------------------------------------------------------
+     DATE FILTER. Opt-in via `?on=`, never the default -- this book is
+     all-dates by construction because a page that hides yesterday's
+     open bet behind a date picker will one day let one expire
+     unwatched. The count of OPEN positions being held back is what
+     keeps that guarantee, so it is stated whenever the filter is on.
+     --------------------------------------------------------------- #}
+  {% if L.date_options %}
+    <div class="live-dates">
+      <span class="live-dates__label">Slate</span>
+      {% if L.on_date %}
+        <a href="?date={{ qs_date }}{% if L.show_all %}&amp;show=all{% endif %}#live">All dates</a>
+      {% else %}
+        <span class="is-active">All dates</span>
+      {% endif %}
+      {% for d in L.date_options[:10] %}
+        {% if d == L.on_date %}
+          <span class="is-active">{{ d }}</span>
+        {% else %}
+          <a href="?date={{ qs_date }}{% if L.show_all %}&amp;show=all{% endif %}&amp;on={{ d }}#live">{{ d }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% if L.on_date and L.hidden_open_dated %}
+      <div class="live-note">
+        <strong>{{ L.hidden_open_dated }} open position(s) on other dates are hidden by this filter.</strong>
+        They are still live. The totals and the performance pivots below count the whole book, not this slate.
+      </div>
+    {% endif %}
+  {% endif %}
+
   {% if not orders %}
     <div class="live-empty">
       {% if L.ledger_error %}
@@ -951,10 +991,22 @@
               {# CENTRAL, via the filter. This was `submitted_at[11:19]` -- a raw slice of
                  the stored UTC string, so a 6:15 PM order read `23:15:05`. #}
               <td>{{ o.get('selected_date') or '—' }}<span class="sub">{{ o.get('submitted_at')|central }} CT</span></td>
+              {# NAME THE TEAM, DO NOT MAKE THE READER DECODE A ROLE AND A SLUG.
+                 REPORTED BY THE USER 2026-08-26 on a real order: the row read
+                 `home` beside `aec-mlb-cle-laa-2026-08-26`, and the natural
+                 reading of that slug is that we bought CLE. We had not -- the
+                 venue's outcomes array for that market is
+                 ['Los Angeles Angels', 'Cleveland Guardians'], REVERSED against
+                 its own slug, so `home` correctly matched the Angels by name.
+                 The order was right and the ROW was unreadable, which on a
+                 real-money page is its own defect: nobody should have to pull
+                 the submit log to learn which team they own. #}
+              {% set team = o.get('home_team') if (o.get('side')|lower == 'home') else (o.get('away_team') if (o.get('side')|lower == 'away') else None) %}
               <td class="primary">
-                {{ o.get('player_name') or o.get('side') or '—' }}
+                {{ o.get('player_name') or team or o.get('side') or '—' }}
                 <span class="sub">
                   {{ o.get('market') or '—' }}{% if o.get('line') is not none %} {{ o.get('side') }} {{ o.get('line') }}{% endif %}
+                  {% if team %}· {{ o.get('side') }}{% endif %}
                   {% if o.get('away_team') or o.get('home_team') %}· {{ o.get('away_team') or '?' }} @ {{ o.get('home_team') or '?' }}{% endif %}
                 </span>
               </td>
@@ -986,16 +1038,53 @@
               </td>
               <td>{{ o.get('status') or '—' }}
                 {% if o.get('error') %}<span class="sub warn">{{ o.get('error') }}</span>{% endif %}</td>
+              {# OUTCOME, OR -- FOR AN OPEN BET -- WHERE IT STANDS RIGHT NOW.
+                 An open row's Outcome and P&L cells are empty by definition, so
+                 the live status and the market mark go there rather than into
+                 two new columns. A settled row is untouched. #}
               <td>
                 {% set outcome = o.get('outcome') %}
                 {% if outcome == 'won' %}<span class="pos">WON</span>
                 {% elif outcome == 'lost' %}<span class="neg">LOST</span>
                 {% elif outcome == 'push' %}PUSH
-                {% else %}<span class="sub">open</span>{% endif %}
+                {% else %}
+                  {% set ls = o.get('live_status') or {} %}
+                  {% set st = ls.get('status') %}
+                  {% if st == 'live_ahead' %}<span class="pos">AHEAD</span>
+                  {% elif st == 'live_behind' %}<span class="neg">BEHIND</span>
+                  {% elif st == 'live_tied' %}<span class="warn">TIED</span>
+                  {% elif st == 'not_started' %}<span class="sub">not started</span>
+                  {% elif st %}<span class="sub">{{ st|replace('_', ' ') }}</span>
+                  {% else %}<span class="sub">open</span>{% endif %}
+                  {# THE CURRENT NUMBER AGAINST THE LINE -- the thing a person
+                     watching a slate is actually looking for. #}
+                  {% if ls.get('current_value') is not none %}
+                    <span class="sub">{{ ls.get('current_value') }} vs {{ ls.get('line') }}</span>
+                  {% elif ls.get('unavailable_reason') %}
+                    {# NAMED, NOT BLANK. This feature raised UnboundLocalError
+                       every cycle for months and nobody saw it, because an
+                       unresolved status and a missing one look identical when
+                       both render as nothing. #}
+                    <span class="sub">{{ ls.get('unavailable_reason')|replace('_', ' ') }}</span>
+                  {% endif %}
+                {% endif %}
                 {% if o.get('settled_value') is not none %}<span class="sub">{{ o.get('settled_value') }} vs {{ o.get('line') }}</span>{% endif %}
               </td>
               <td class="{{ 'pos' if (o.get('pnl_dollars') or 0) > 0 else ('neg' if (o.get('pnl_dollars') or 0) < 0 else '') }}">
-                {% if o.get('pnl_dollars') is not none %}{{ "%+.2f"|format(o.get('pnl_dollars')) }}{% else %}—{% endif %}
+                {% if o.get('pnl_dollars') is not none %}{{ "%+.2f"|format(o.get('pnl_dollars')) }}
+                {% else %}
+                  &mdash;
+                  {# HAS THE MARKET MOVED TOWARD US SINCE WE TOOK IT. A different
+                     question from "is it winning", and the one that has an
+                     answer for far more rows -- it needs no per-sport resolver. #}
+                  {% set lm = o.get('live_mark') or {} %}
+                  {% if lm.get('clv_pct') is not none %}
+                    <span class="sub {{ 'pos' if lm.get('clv_pct') > 0 else ('neg' if lm.get('clv_pct') < 0 else '') }}">
+                      {{ "%+.1f"|format(lm.get('clv_pct')) }} pts vs taken</span>
+                  {% elif lm.get('reason') %}
+                    <span class="sub">{{ lm.get('reason')|replace('_', ' ') }}</span>
+                  {% endif %}
+                {% endif %}
               </td>
             </tr>
           {% endfor %}

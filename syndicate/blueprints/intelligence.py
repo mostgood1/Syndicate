@@ -3808,7 +3808,99 @@ def _live_health(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {**fields, "ok": all(fields.values())}
 
 
-def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> dict[str, Any]:
+# How many dated plans an open book may pull to decorate itself. The live book
+# spans EVERY date; plans are per date. Two covers today and last night's
+# late finishes, which is the whole span over which "live" means anything -- a
+# three-day-old open order is not live, it is stuck, and giving it a status
+# would dress up a problem as a scoreboard.
+_LIVE_STATUS_MAX_PLAN_DATES = 2
+
+
+def _attach_open_bet_status(orders: list) -> list:
+    """Decorate OPEN orders with the worker's live status and CLV mark.
+
+    Returns new dicts rather than mutating: these came out of the execution
+    ledger, and a display concern must never be able to write into a money
+    record even by accident.
+
+    Never raises. An unreadable plan leaves the cells blank -- the page's job is
+    to render the book, and a decoration that can break it is worse than one
+    that is absent.
+    """
+    open_orders = [o for o in orders if not o.get("outcome")]
+    if not open_orders:
+        return orders
+
+    dates = sorted(
+        {str(o.get("selected_date") or "").strip() for o in open_orders if o.get("selected_date")},
+        reverse=True,
+    )[:_LIVE_STATUS_MAX_PLAN_DATES]
+    if not dates:
+        return orders
+
+    status_by_key: dict[str, dict] = {}
+    mark_by_key: dict[str, dict] = {}
+    try:
+        from pipeline.portfolio_commit import read_portfolio_plan
+
+        for date in dates:
+            try:
+                plan = read_portfolio_plan(date)
+            except Exception:
+                continue
+            if not isinstance(plan, dict):
+                continue
+            for row in ((plan.get("bet_status") or {}).get("rows") or []):
+                key = str(row.get("idempotency_key") or "")
+                if key:
+                    status_by_key.setdefault(key, row)
+            for row in ((plan.get("live_marks") or {}).get("marks") or []):
+                key = str(row.get("idempotency_key") or "")
+                if key:
+                    mark_by_key.setdefault(key, row)
+    except Exception:
+        _LOGGER.exception("OPEN_BET_STATUS_JOIN_FAILURE")
+        return orders
+
+    if not status_by_key and not mark_by_key:
+        return orders
+
+    decorated: list = []
+    for order in orders:
+        if order.get("outcome"):
+            # A settled row has an outcome and a P&L; a live status on it would
+            # be stale by definition and would compete with the real answer.
+            decorated.append(order)
+            continue
+        key = str(order.get("idempotency_key") or "")
+        status = status_by_key.get(key)
+        mark = mark_by_key.get(key)
+        if not status and not mark:
+            decorated.append(order)
+            continue
+        row = dict(order)
+        if status:
+            row["live_status"] = {
+                "status": status.get("status"),
+                "current_value": status.get("current_value"),
+                "line": status.get("line"),
+                "margin": status.get("margin"),
+                "unavailable_reason": status.get("unavailable_reason"),
+            }
+        if mark:
+            row["live_mark"] = {
+                "clv_pct": mark.get("clv_pct"),
+                "current_price": mark.get("current_price"),
+                "taken_price": mark.get("taken_price"),
+                "reason": mark.get("reason"),
+            }
+        decorated.append(row)
+    return decorated
+
+
+def _live_portfolio_payload(
+    selected_date: str, *, show_all: bool = False, on_date: str | None = None
+) -> dict[str, Any]:
     """Real money only. The mirror image of `_paper_portfolio_payload`.
 
     A SEPARATE PAGE RATHER THAN A FILTER ON THE PAPER ONE. The two answer the
@@ -3836,7 +3928,10 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
     from pipeline.execute_portfolio import execution_enabled
 
     orders: list = []
+    whole_book: list = []
     hidden_orders: list = []
+    hidden_open_dated: list = []
+    date_options: list = []
     periods: dict[str, Any] = {}
     ledger_error = None
     try:
@@ -3852,6 +3947,13 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
         # displaying. A rollup that moved when a display toggle flipped would
         # be a rollup nobody could quote.
         periods = period_rollup(orders)
+        # THE WHOLE BOOK, CAPTURED BEFORE ANY DISPLAY FILTER TOUCHES IT.
+        # `periods` above already had this right; the settlement summary below
+        # did not -- it ran on whatever `orders` had been narrowed to, so the
+        # `?show=` toggle already moved the headline W/L and P&L, and the date
+        # filter would have moved them a great deal more. A rollup that changes
+        # when a display control flips is a rollup nobody can quote.
+        whole_book = list(orders)
         # HIDDEN, NOT DROPPED, and COUNTED either way. A page that silently
         # omitted these would make "we placed nothing" and "we tried and were
         # refused" look identical -- the distinction this whole system keeps
@@ -3859,6 +3961,37 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
         hidden_orders = [o for o in orders if _is_non_position(o)]
         if not show_all:
             orders = [o for o in orders if not _is_non_position(o)]
+
+        # THE DATE FILTER, AND WHY IT IS OPT-IN AND NEVER THE DEFAULT.
+        #
+        # This book is all-dates by construction, because "a real position is
+        # not interesting only on the day it was opened, and a page that hides
+        # yesterday's open bet behind a date picker is a page that will one day
+        # let one expire unwatched". A filter that DEFAULTED to today would be
+        # exactly that page.
+        #
+        # So `?on=` is a separate parameter from `?date=` (which only builds
+        # links and defaults to today). Absent, nothing is filtered. Present,
+        # the page counts how many OPEN positions it is hiding and says so --
+        # the number is what keeps the guarantee: you cannot lose track of a
+        # live bet without the page telling you it is holding one back.
+        if on_date:
+            date_options = sorted(
+                {str(o.get("selected_date") or "") for o in orders if o.get("selected_date")},
+                reverse=True,
+            )
+            hidden_open_dated = [
+                o
+                for o in orders
+                if str(o.get("selected_date") or "") != on_date and not o.get("outcome")
+            ]
+            orders = [o for o in orders if str(o.get("selected_date") or "") == on_date]
+        else:
+            date_options = sorted(
+                {str(o.get("selected_date") or "") for o in orders if o.get("selected_date")},
+                reverse=True,
+            )
+            hidden_open_dated = []
     except Exception as exc:
         # An unreadable ledger must never render as "no live positions". That
         # is the one absence this page cannot afford to get wrong.
@@ -3868,7 +4001,7 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
     settlement = None
     settlement_error = None
     try:
-        settlement = settlement_summary(None, orders=orders)
+        settlement = settlement_summary(None, orders=whole_book)
     except Exception as exc:
         settlement_error = f"{type(exc).__name__}: {exc}"
         _LOGGER.exception("LIVE_SETTLEMENT_SUMMARY_FAILURE")
@@ -3967,6 +4100,24 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
             "state_age_seconds": None,
         }
 
+    # WHERE EACH OPEN BET STANDS. A JOIN, NOT A COMPUTATION.
+    #
+    # `portfolio_commit` already writes both of these into
+    # `portfolio_plan_<date>.json` on the worker every cycle, and that artifact
+    # already crosses to web. Recomputing either here would be compute in a
+    # request path, which is the one thing this service must not do.
+    #
+    #   live_marks  every order re-priced against the current board -- "has the
+    #               market moved toward me". No per-sport resolver, so it
+    #               populates broadly (82 of 442 marked, 2026-08-26T22:5xZ).
+    #   bet_status  where the bet stands against the GAME -- "is it winning".
+    #               Only MLB has a live resolver, so most rows carry a NAMED
+    #               reason instead. That is deliberate and visible: this feature
+    #               spent months raising `UnboundLocalError` every cycle and
+    #               nobody saw it, because an unresolved status and a missing
+    #               one both render as a blank.
+    orders = _attach_open_bet_status(orders)
+
     # WHAT IS ACTUALLY IN THE ACCOUNTS, from the worker's stamp -- never from a
     # call here. Web holds no venue credential and must not; a page that hit
     # the venue per request would also be a second independent live caller,
@@ -3989,6 +4140,11 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
         "balances": balances,
         "hidden_count": len(hidden_orders),
         "show_all": bool(show_all),
+        # THE FILTER'S OWN STATE, and the count that keeps its guarantee: a page
+        # holding back an OPEN position must say how many.
+        "on_date": on_date or None,
+        "hidden_open_dated": len(hidden_open_dated),
+        "date_options": date_options,
         "periods": periods,
         "health": _live_health(payload_state),
         "stale_after_seconds": _STATE_STALE_SECONDS,
@@ -4027,7 +4183,10 @@ def _seconds_since(stamp: Any) -> int | None:
 def api_portfolio_live():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     show_all = str(request.args.get("show") or "").strip().lower() == "all"
-    return _no_cache_response(jsonify(_live_portfolio_payload(selected_date, show_all=show_all)))
+    on_date = str(request.args.get("on") or "").strip() or None
+    return _no_cache_response(
+        jsonify(_live_portfolio_payload(selected_date, show_all=show_all, on_date=on_date))
+    )
 
 
 @intelligence_bp.get("/portfolio/live")
@@ -4093,6 +4252,7 @@ def portfolio_home():
 
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     show_all = str(request.args.get("show") or "").strip().lower() == "all"
+    on_date = str(request.args.get("on") or "").strip() or None
     summary = build_portfolio_summary(limit=100)
     # THE CAPS AS *THIS* PROCESS RESOLVES THEM, which is not the same object as
     # the worker's stamped `limits` in the live payload. The form must edit the
@@ -4109,7 +4269,7 @@ def portfolio_home():
         portfolio_summary=summary,
         portfolio_settings=resolve_settings().as_dict(),
         execution_limits=execution_limits,
-        live=_live_portfolio_payload(selected_date, show_all=show_all),
+        live=_live_portfolio_payload(selected_date, show_all=show_all, on_date=on_date),
     )
 
 

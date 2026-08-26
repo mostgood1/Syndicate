@@ -336,7 +336,7 @@ def test_the_page_never_prints_a_total_over_a_partial_read(client, monkeypatch):
     monkeypatch.setattr(
         bp,
         "_live_portfolio_payload",
-        lambda date, show_all=False: {
+        lambda date, show_all=False, on_date=None: {
             "date": date,
             "orders": [],
             "health": {},
@@ -365,7 +365,7 @@ def test_no_stamp_reads_as_not_reported_rather_than_no_money(client, monkeypatch
     monkeypatch.setattr(
         bp,
         "_live_portfolio_payload",
-        lambda date, show_all=False: {
+        lambda date, show_all=False, on_date=None: {
             "date": date, "orders": [], "health": {}, "limits": {}, "kill_switch": {}, "balances": None,
         },
     )
