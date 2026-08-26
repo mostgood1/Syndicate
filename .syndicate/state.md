@@ -88,9 +88,15 @@ That is "we cannot see it", NOT "Kalshi does not list it".
 40,000. `singles` swung 24 -> 650 between consecutive runs on pagination luck.
 **Every per-series count derived from it is a floor.**
 
-**THE BOTTLENECK IS THE JOIN, NOT CAPTURE.** `BOARD_JOIN` 20:16:06Z:
-`kalshi_markets=6000 board_rows=1290 matched=54`, **`unreadable_title=3703`
--- 62% of the working set**; 20:19:38Z: `board_rows=617 matched=0`.
+**THE BOTTLENECK IS THE JOIN, NOT CAPTURE.** Latest `BOARD_JOIN` 2026-08-26
+`01:49:32Z`: `kalshi_markets=6000 board_rows=1291 matched=71`,
+`market_is_for_another_date=3282 no_matching_board_row=1838
+unreadable_title=493 stat_not_in_market_vocabulary=304`. `unreadable_title`
+fell 3703 -> 493 on the title-grammar work (`8efdf0ff7`, `1c6e10281`), and
+`no_matching_board_row` is now the largest addressable bucket.
+`market_is_for_another_date` is NOT addressable -- it is a DESCRIPTION:
+`BY_GAME_DATE` summed is 1958 today / 60 tomorrow / 3982 beyond, so a lookahead
+venue plus a date-blind cap must produce it `[verified 2026-08-26]`.
 `VENUE_REPRICE_KEYS` on ten consecutive readings 19:35-20:18Z lists Kalshi in
 **NO `sources_offered` bucket** for any sport. **So no OddsAPI market may be
 cancelled in favour of Kalshi yet** -- that turns a metered market into a

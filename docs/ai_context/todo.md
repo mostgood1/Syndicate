@@ -468,7 +468,37 @@ before reaching for a fifth hypothesis.
 
 Rollback with no deploy: `KALSHI_ORDER_EXCHANGE_INDEX=0`.
 
-### `#562` — **The Kalshi working-set trim orders by STALENESS, not by date. Today survives by luck.** — lane `kalshi-line-aware-rungs` (its declared step 2), raised by `portfolio-decision-and-execution`, 2026-08-26, measured — **NOT MINE TO FIX; handed over on a user decision**
+### `#562` — **The Kalshi working-set trim orders by STALENESS, not by date. Today survives by luck.** — lane `kalshi-line-aware-rungs` (its declared step 2), raised by `portfolio-decision-and-execution`, 2026-08-26, measured — **OWNING LANE ANSWERED IT: the DEPTH prize is 133, not ~1,600. STILL OPEN, but for the ORDERING half only.**
+
+**`[OWNING LANE, 2026-08-26 03:11:30Z, confirmed identical 03:17:03Z]` THE
+"REAL PRIZE IS DEPTH" CLAIM BELOW IS REFUTED AS MEASURED.** This lane shipped
+`[kalshi_odds] PRECAP_CUT_BY_DATE`, which dates the markets the per-series cap
+CUTS rather than the ones it keeps — the histogram below can only ever show
+survivors, so it could not answer this:
+
+    capped_series=8  cut_total=3940
+      KXMLBHRR 532 -> cut 132   {'2026-08-25': 132}
+      KXMLBTB  401 -> cut   1   {'2026-08-25': 1}
+      6 NCAAF/NFL series        cut 3807, ZERO on 2026-08-25
+
+**133 of 3,940 cut markets are date-eligible — 3.4%.** Freeing future-dated
+slots would recover 133 rungs, not the ~1,600 this item's depth argument
+implies, and each would still have to clear `no_matching_board_row`.
+
+**TWO LIMITS, both against that verdict, both still open:**
+1. Taken at 03:11Z with the slate OVER. `KXMLBHRR` cut 747 at 01:49Z and 132 at
+   03:11Z; `KXMLBHIT`/`KXMLBRBI` are no longer capped at all. **The mid-slate
+   number is unmeasured and likely several times higher.** Code is live; this
+   needs only a reading during a live slate.
+2. It measures the per-series cap ONLY — `cut_total=3940` vs `TICK
+   trimmed=8744`. The outer `MAX_STORED_MARKETS` staleness trim discards ~4,800
+   more and is equally date-blind. **Undated.**
+
+**WHAT SURVIVES UNTOUCHED: the ORDERING argument.** "Today survives by luck" is
+correct and is NOT what was refuted. Sorting by staleness alone means a stale
+MLB series can be evicted for a September future with no counter naming it, and
+that risk is real whatever the depth prize turns out to be. Fix the ordering on
+its own merits; do not justify it with the depth number until (1) and (2) exist.
 
 `[USER DECISION 2026-08-25: let the audit session ship it]` —
 `pipeline/kalshi_odds_refresh.py` is in that lane's `Files:` and "evict the
