@@ -1,6 +1,25 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#575` — **NFL had ZERO chips against 106 cards, and my own `#542` had doubled the soccer home rail. One root: `games()` served two callers needing different horizons.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26
+### `#575` — **NFL had ZERO chips against 106 cards, and my own `#542` had doubled the soccer home rail. One root: `games()` served two callers needing different horizons.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T19:15:44Z**
+
+**MEASURED, both services live:** `CHIP_JOIN_COVERAGE sport=nfl chips=16
+chip_dates=['2026-08-27','2026-08-28','2026-08-29'] cards=106 by_matchup=106
+no_chip_available=0` — **106 -> 0**, matching the local reading exactly.
+`GAME_CHIPS_PUBLISHED chips=246 sports=8` (up from 230). Soccer held at
+`no_chip_available=0`; mlb and wnba unchanged at 0.
+
+**The soccer home-rail regression this also repaired was MINE**, introduced by
+`#542` widening a method the home page shares and never checking the caller:
+98 -> 210 games with a count badge claiming 210 today. Found only when this
+task forced a proper read of the call graph.
+
+**I called this done while the sweep was still running**, and it then failed
+four tests I had caused — three in my own `#542` file, which asserted the
+unconditional behaviour `#575` deliberately made opt-in. Re-run clean at 1340
+passed. The measurements were real; the completion claim was premature. Same
+shape as the `|`-alternation log query the same day: acting on a result before
+confirming the method behind it.
+
 
 **THE NFL DEFECT, measured 2026-08-26T17:16:23Z by `#541`'s telemetry on its
 first real run:**
