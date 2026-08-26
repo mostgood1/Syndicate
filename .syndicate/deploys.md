@@ -31891,3 +31891,79 @@ live-odds-worker (single-key endpoint, readback confirmed) after the user moved
 $25 to exchange shard 3. Env vars are service-level, so the peer's deploy
 injects it too. verify PENDING -- see the CORRECTION entry above for why the
 shard was never Kalshi's to enable.
+
+---
+
+## 2026-08-26 — syndicate + refresh-worker: `#545` chip build off the request path, `#542` week span, `#574` alias counter
+
+**Deployed:** `syndicate` (`srv-d88ahvrbc2fs73eodu30`) deploy `dep-da7hfrajnfac738e788g`,
+live `16:47:34Z`, commit `e738ab85`. `refresh-worker` (`srv-d91dpertqb8s73co8ls0`)
+deploy `dep-da7hltqfngtc73fhdng0`, live `17:00:13Z`, commit `448dc87d`. Both
+verified to CONTAIN `e1f94e45` and `94cd8e9e` by `merge-base --is-ancestor` and
+by grepping the deployed trees, not by ancestry alone. Claims held on both.
+Web first, deliberately: it degrades to `fallback_inline_build` while the worker
+has not yet published, which is the designed behaviour and cost nothing.
+
+**verify — `#545`, the chip build now runs in the WORKER:**
+
+```
+[layer2_shortlist] GAME_CHIPS_PUBLISHED date=2026-08-26 chips=230 sports=8 ok=True
+```
+17:15:49Z and again 17:21:41Z. Eight sports, published for the WHOLE default
+list rather than only the sports on the board, so a sport with no rows today
+still gets a scoreboard strip.
+
+**verify — `#542`, the phase offset is CLOSED. This is the headline:**
+
+```
+CHIP_JOIN_COVERAGE sport=soccer chips=213
+  chip_dates=['2026-08-22' ... '2026-09-05']   # fifteen dates
+  cards=400 by_matchup=212 by_canonical=181
+  needs_fallback=0 no_chip_available=0 unknown_no_key=7
+```
+
+**`no_chip_available` 251 -> 0.** Before, 65 of 96 chips described fixtures
+already played and 72 of 105 fixtures in the board's window had no chip at all.
+The span now runs 08-22 to 09-05 and every soccer card in the window resolves.
+`by_canonical=181` is `#540` carrying 181 cards on its own.
+
+**verify — `#574`, the alias question is CLOSED:**
+
+```
+AGGREGATOR_DUPLICATE_DROPPED rows=524   near_misses={}
+AGGREGATOR_DUPLICATE_DROPPED rows=27070 near_misses={}
+AGGREGATOR_DUPLICATE_DROPPED rows=584   near_misses={}
+```
+
+Four consecutive builds, empty every time, one at **27,070 rows**. The
+aggregator is NOT using a spelling the exact match misses. `DIRECT_FEED_BOOKS`
+needs no widening, and syndicate-43's key list is now confirmation rather than
+the deciding evidence.
+
+**WHAT THE TELEMETRY CAUGHT ON ITS FIRST REAL RUN — NFL HAS NO CHIPS AT ALL:**
+
+```
+CHIP_JOIN_COVERAGE sport=nfl chips=0 chip_dates=None cards=106
+  no_chip_available=106
+```
+
+Every one of 106 NFL cards is chip-less, so every NFL compact card prints full
+club names. Not caused by this deploy — it was true before and nothing reported
+it. This is precisely the class of defect `#541` was built to surface, found by
+reading a log instead of by a user noticing. **Open, not diagnosed.**
+
+Soccer's `unknown_no_key=7` names its own alias gaps directly: `Telstar`,
+`Feyenoord`, `KV Kortrijk`, `Leuven`, `Genk` — clubs `canonical_team` cannot
+place. Small, nameable, `#540`-shaped.
+
+**A MEASUREMENT ERROR OF MINE, RECORDED BECAUSE IT NEARLY BECAME A FALSE
+INCIDENT.** I reported twice that no `GAME_CHIPS_PUBLISHED` line existed and
+was about to investigate a publish failure. The lines were there the whole time.
+My query passed ONE string containing `|` alternation
+(`"A|B|C"`) to the Render log `text` filter, which matches it LITERALLY and
+returns nothing. The working form is a LIST of separate strings, `["A","B","C"]`
+— which I had used correctly earlier in the same session and then stopped using.
+**An empty log result is not evidence of absence until the query shape is known
+to match something.** The tell was `["layer2_shortlist"]` returning health lines
+in a window where the alternation query had returned null.
+
