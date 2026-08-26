@@ -31781,4 +31781,4 @@ is". The doc that settled it took one fetch.
 rather than inferred — refuse on `balance == 0` for the market's shard, with the
 balance in the message. Strictly better than a hardcoded list, and it self-heals
 the moment the shard is funded instead of needing an env var flipped. Left as
-`#570`.
+`#572`.
