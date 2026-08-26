@@ -2184,48 +2184,41 @@ Four deploys were taken during this session and each is recorded in
 - **Largest addressable bucket is now `no_matching_board_row=1838`**, not the
   date bucket. Any successor should start there.
 
-### kalshi-spread-join-sign — OPEN — opened 2026-08-26 — session syndicate-43
+### kalshi-spread-join-sign — **CLOSED 2026-08-26** — session syndicate-43 — all four outcomes MET; two shipped-but-undemonstrated items handed on
 - Goal: no Kalshi spread market is ever paired with the board row for the
-  OPPOSITE handicap. Testable outcome: over the served board and the open
-  KXMLBSPREAD markets, zero matches where `kalshi_side == "yes"` sits on a
-  board line other than `-X`, and zero where YES is not on the club the title
-  names.
-- Files: `syndicate/features/shared/kalshi_board_join.py`,
-  `tests/test_kalshi_board_join.py`
-- Hypothesis (CONFIRMED): the join keyed on Kalshi's bare magnitude, so a
-  market stating a MARGIN (`T wins by over X` = `T -X`) paired with the board's
-  `+X` handicap row purely because the magnitudes are equal.
-- Falsification test: if the board wrote both sides of a spread at the same
-  sign, the magnitude key would be sound and the pairing correct. FALSIFIED —
-  the served board writes opposite signs per side (TEX @ CWS 2026-08-26:
-  away `+1.5` at -185, home `-1.5` at +155).
-- Verification: RAN. Real `join_kalshi_to_board` over the served board and 90
-  open KXMLBSPREAD markets. BEFORE: 30 matched, **15 with YES on `+1.5`**.
-  AFTER: 30 matched, **0 violations** of either invariant, plus 30 named
-  `spread_line_orientation_mismatch` refusals. Two new tests FAIL against the
-  pre-fix join and pass after (checked by reverting the source, keeping the
-  tests). 635 kalshi/execution/portfolio/venue_scope tests pass.
-- Blast radius: NONE at the venue while it stands alone. `_side_to_kalshi`
-  still refuses `home`/`away` on spreads, so spread orders continue to refuse
-  at build time rather than place. This lane removes the inversion; it does not
-  enable placement.
-- STILL OPEN, deliberately not fixed here:
-  1. `kalshi_side` is computed correctly by the join and then THROWN AWAY —
-     `venue_scope.py` stamps only `ticker_resolver(row)`, so `OrderRequest`
-     carries the BOARD side and `_side_to_kalshi` is asked to re-derive at a
-     boundary that cannot settle it. Plumbing it needs
-     `pipeline/portfolio_commit.py`, which is CLAIMED by
-     `portfolio-decision-and-execution` (session 9324a3e5). NOT TAKEN.
-  2. h2h game lines never match at all: this lookup passes `verdict["line"]`
-     as None while `_event_key` indexes moneylines at 0.0. Fixing it would
-     newly ENABLE h2h placement — a live-money change owed its own deploy and
-     its own reading.
-  3. `team_side_unresolved` counts 8 -> 16 on the same slate (one count per
-     candidate line). Counting artifact, no behaviour change.
-- Venue facts established this lane (cloud sessions cannot reach these hosts):
-  full findings in `.syndicate/findings_2026-08-26_venue_api_unblock.md`.
+  OPPOSITE handicap, and spreads can place. **MET.**
+- Files: `syndicate/features/shared/{kalshi_board_join,kalshi_orders,bet_status_wnba,bet_status_soccer,polymarket_us_orders}.py`
+  + their tests. **ALL CLAIMS RELEASED.**
+- Verification (evidence in `log/2026-08-26.md`, measurements in `deploys.md`):
+  - spreads join — real join over the served board + 90 open KXMLBSPREAD:
+    15 of 30 matches had YES on `+1.5` BEFORE, **0 violations AFTER**
+  - spreads place — 17:26:18Z `KXMLBSPREAD-26AUG261540CHCAZ-AZ2` home `-1.5`
+    -> YES, **filled 3 @ 0.33**, venue title matches the row. First ever.
+  - WNBA settlement — `game_not_in_live_box` **9 -> ABSENT**, graded **0 -> 3**,
+    all-time wnba **0 -> 2**. First WNBA settlement ever.
+  - Kalshi shard — **3 MLB fills on `exchange_index=3`** after the user funded it
+- Deployed: refresh-worker `1d1a6195` (16:11:32Z), live-odds-worker `448dc87d`
+  (17:18:18Z). `render.yaml` untouched throughout — no `blueprint_sync`.
+- **OWED, and the reason this is worth reopening rather than forgetting:**
+  1. **Soccer settlement is 0 ALL-TIME and the fix is UNDEMONSTRATED.** Dated
+     finals retention is deployed but only accumulates FORWARD. Discharged by a
+     soccer order grading on a date whose finals were captured after
+     2026-08-26T16:11Z. Do not report it as fixed before that.
+  2. **Polymarket side resolution is UNRESOLVED.** `over`->YES/`under`->NO is a
+     FIXED constant while the price comes from the name-matched index, and the
+     `outcomes` array orientation VARIES per market (`bos-mia-8pt5` is reversed).
+     One order recorded a complement price. A guard cross-checking the two was
+     built and **REVERTED** — it silently makes the positional reading
+     authoritative, which is the disputed question, and it contradicted three
+     deliberate tests. **Needs venue ground truth, which needs the Polymarket US
+     credentials (on Render; the env read was blocked by the permission
+     classifier).** `FILL_ABOVE_LIMIT` is deployed as detection in the meantime.
+  3. **A peer is waiting on this session.** Lane `polymarket-oddsapi-coverage-audit`
+     asked (commit `e1f94e45`, file channel — cloud->local SendMessage is refused)
+     for the distinct OddsAPI `bookmakers[].key` set. The OddsAPI key is NOT in
+     the local `.env`; the served board's `cells` are keyed by bookmaker and
+     answer it without one.
 - Blocked by: none
-
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

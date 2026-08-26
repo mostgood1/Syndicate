@@ -6419,3 +6419,83 @@ NAMESPACE is the thing that does not span machines.
 **Generalisation:** a lock is only a lock over the state everyone contends on.
 Ask what storage the lock lives in and who can see it, before trusting what it
 says.
+
+
+## 2026-08-26 — FORBIDDEN: treating ARITHMETIC ON A DERIVED FIELD as a measurement
+
+**A number you computed from another stored number is not evidence about the
+world. Dividing it back out recovers your own input, and it will look like a
+reading.**
+
+**MEASURED, and it produced a wrong finding reported to the user as fact.**
+Investigating a Polymarket order that appeared mispriced, I wrote:
+
+    IMPLIED PRICE PAID = fill_stake / contracts = 4.05 / 7.11 = 0.5696
+
+and concluded *"a real overpay, not a reporting artifact."* It is not a
+measurement of anything. `execution_ledger.py:996`:
+
+    filled_dollars = contracts * fill_price
+
+`fill_stake_dollars` IS `contracts x fill_price`, so dividing by `contracts`
+returns `fill_price` — the very field under suspicion — with the appearance of
+independent corroboration. `venue_order_view` sets `"fill_cost_dollars": None`,
+so **NOTHING in this system independently measures what was paid.** The correct
+statement was "the ledger RECORDS 0.57 and nothing here can tell us what was
+paid", which is a different investigation with a different next step.
+
+**HOW TO APPLY.** Before using a stored number as evidence, find its WRITER. If
+it was computed from another field in the same record, it can corroborate
+nothing about that field, and any ratio between them is an identity. Reach for
+an input the system did not compute: the SUBMITTED value, the venue's own cash
+field, a second service's copy. The check that finally worked here compares the
+recorded fill against the price WE SENT — an independent input — and is the
+`FILL_ABOVE_LIMIT` guard.
+
+**THE SAME SESSION, THE SAME SHAPE, THREE MORE TIMES**, which is why this is a
+rule and not a note:
+
+- **A guard that "needs no venue semantics" but silently picks a side.** I built
+  a cross-check between `_side_to_outcome` (name axis) and
+  `outcome_side_for_index` (POSITIONAL) and claimed it was semantics-free. It
+  makes the positional reading authoritative — precisely the disputed question —
+  and it contradicted three deliberate tests asserting the opposite convention.
+  Reverted before landing. **A cross-check between two readings is not neutral;
+  it enthrones one of them.**
+- **A background run that exited 0 having never run.** `pytest -k ...` returned
+  exit 0 with 110KB of output and NO summary line: the process never collected a
+  test. Exit status described the shell, not the suite.
+- **A watcher that "found" the thing by matching the wrong string.** Searching
+  logs for `SETTLED` matched `settled_count` inside `INTEL_TRACE`, reporting
+  "11 settlement passes" when zero had run. The filter had to require
+  `SETTLED date=`.
+
+Related: [[feedback_read_the_field_you_already_have]],
+[[feedback_confirm_the_code_ran]], [[feedback_instrument_blindness]],
+[[feedback_rate_not_count]].
+
+## 2026-08-26 — FORBIDDEN: concluding a VENUE must act because its error names your account
+
+**`user_not_found: <uuid>` from a venue is a statement about a REQUEST, not about
+your account's existence.** I read it as "the exchange has no record of us here,
+so the venue must enable us", shipped that as the remedy, and it went LIVE IN A
+PRODUCTION ERROR STRING telling any reader to contact Kalshi support:
+
+    "the market resolved and the ACCOUNT did not. This needs the venue to enable
+     this account on that exchange shard; no code change fixes it."
+
+**It was never the venue's move.** The user challenged it; reading the venue
+instead of restating the conclusion took minutes.
+`GET /trade-api/v2/exchange/status` enumerates shards as PRODUCTS — `0 Default`,
+`1 Combos`, `2 Crypto`, `3 Tennis & Baseball` — ALL `trading_active`, and
+docs.kalshi.com/getting_started/exchange_sharding.md says plainly: *"Subaccount
+balances are local to a specific exchange instance"* and *"Programmatic traders
+must preallocate collateral on a given exchange shard before order placement."*
+A one-minute transfer by the account holder. It was fixed the same hour.
+
+**HOW TO APPLY.** Before asserting that a counterparty must act, read what the
+counterparty documents about the thing it just refused. The diagnosis and the
+REMEDY are two claims; evidence for the first is not evidence for the second,
+and the remedy is the half that gets pasted into an error message and sends
+someone to the wrong place for a day. Related:
+[[feedback_retraction_is_not_innocence]], [[feedback_presence_is_not_reachability]].
