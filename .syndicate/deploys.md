@@ -30973,3 +30973,35 @@ should account for ~313s of a cold build, and `ODDS_HISTORY_LOAD_SECONDS` should
 name soccer as the worst shard. If the overview span comes back SMALL, the 313s
 is somewhere else in that stretch and this instrumentation was aimed wrong —
 say so rather than reaching for the next hypothesis.
+
+## 2026-08-26 05:07:07Z — refresh-worker `1ea0107d` (PR #90, `#567` spans)
+
+Off-protocol, same reason as every deploy tonight: no `RENDER_API_KEY` in this
+container and the agent proxy 403s `api.render.com`, so `deploy_claim.py` and
+`deploy_preflight.py` are both unreachable. Triggered via Render MCP on explicit
+user direction ("merge and deploy"). **The commit IS on `origin/main`**, so the
+one rule that could still be honoured was.
+
+**DEPLOYED WITH A REGRESSION SWEEP STILL IN FLIGHT, and that is a real risk I
+took on the user's explicit instruction after flagging it twice.** What IS green:
+the 10 new tests for the helpers themselves, including a mutation-checked
+pairing invariant. What is NOT yet known: the broader board-path sweep
+(`test_intelligence_state.py` and friends) had produced no output at merge time.
+Mitigating: the change is log-only — three ENTER/EXIT print pairs and one
+report line, no control flow touched, both helpers wrapped so they cannot raise.
+If the sweep comes back red the revert is `git revert` of one commit.
+
+verify: on the first COLD build after boot, expect
+
+    BUILD_SPAN_EXIT stage=build_intelligence_overview elapsed_s=~313
+    BUILD_SPAN_EXIT stage=candidate_building elapsed_s=?
+    BUILD_SPAN_EXIT stage=manifest_odds_history_join elapsed_s=?
+    ODDS_HISTORY_LOAD_SECONDS total_s= sports= soccer=<largest> ...
+
+**candidate_building + manifest_odds_history_join should sum to ~181s.** If the
+overview span comes back SMALL, this instrumentation was aimed wrong and the
+313s lives elsewhere in that stretch — SAY THAT rather than reaching for the
+next hypothesis. That is the whole discipline `#567` exists to enforce.
+
+**Read a COLD build, not a warm one.** The warm build runs 167s against the cold
+build's 748s, so a warm sample will show small spans and prove nothing.
