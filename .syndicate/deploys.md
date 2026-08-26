@@ -32496,3 +32496,197 @@ old page (the whole section rendered unstyled, `is-up`/`is-down` coloured
 nothing), and the live half had been referencing `--cards-border`, which is
 defined nowhere in `app.css` — every such rule was silently falling back to a
 hardcoded hex. Both corrected against the real tokens.
+
+## 2026-08-26 19:40:17Z — refresh-worker `752d83ba` (PR #98, `#569` classifier fix)
+
+Off-protocol as all day. `4245ba3e` (my fix) verified an ancestor of the
+deployed SHA, so the fix shipped.
+
+**I AGAIN CARRIED ANOTHER LANE'S COMMIT, AND THIS ONE SAYS NOT TO DEPLOY IT.**
+`752d83ba` "Anchor the live buying engine to /portfolio" ends its own message
+with **"NOT DEPLOYED -- the production reading is owed."** I deployed it anyway,
+because a deploy takes `main`'s tip and it had landed there between my merge and
+my trigger. **Second time today** (the first was `fed2f935`), and the pattern is
+now clear enough to name: **on a repo this busy, "merge then trigger" is a race,
+and the loser is whichever lane pushed in between.**
+
+**BLAST RADIUS, measured rather than assumed — it is small, and that is luck:**
+`752d83ba` is `portfolio.html`, `portfolio_paper.html`, the deleted
+`portfolio_live.html`, and the `/portfolio/live` -> `/portfolio` redirect in
+`syndicate/blueprints/intelligence.py`. **All of it is WEB-SERVED, and I
+deployed REFRESH-WORKER.** The web service still runs its own earlier deploy, so
+the user-facing `/portfolio` merge is NOT live. The code sits in the worker's
+process where nothing serves those routes.
+
+**It also edited `syndicate/blueprints/intelligence.py`, which THIS LANE holds.**
+Checked for collision with `#564`'s chip endpoint: **zero** — their diff touches
+only the portfolio routes and one comment, and matches `game.chips`,
+`_game_chip_artifact_max_age`, `worker_artifact` **0 times**. No functional
+conflict. Recorded because a cross-lane edit to a claimed file should be visible
+even when it turns out to be harmless.
+
+**I cannot tell that lane directly** — cross-session send is refused from this
+cloud session ("credential accepted for its own work but not for delivering to
+another session"). This entry is the notification.
+
+**THE FIX FOR THE RACE, for whoever hits it next:** re-check `origin/main`'s tip
+immediately before triggering and abort if it moved since the merge. The
+alternative — deploying your own SHA rather than the tip — is deploying off-main,
+which `CLAUDE.md` forbids for a measured reason (two off-main deploys do not
+contain each other and the second silently reverts the first).
+
+verify: `STALE_ROW_CAUSE ... sidecar=<age>` per sport, with wnba reading
+`sidecar_frozen` rather than the `orphaned_line=2` it manufactured at 19:15Z.
+
+### verify MET. `sidecar_frozen` fires, and it INVALIDATES most of the 19:15Z reading.
+
+19:57:35Z, instance `-96gj5`:
+
+    STALE_ROW_CAUSE
+      mlb  [stale=145 worst=5570s  sidecar=321s   market_gone=1,orphaned_line=2]
+      nfl  [stale=54  worst=13127s sidecar=13169s sidecar_frozen=3]
+      wnba [stale=377 worst=33419s sidecar=3279s  sidecar_frozen=3]
+
+**THE FIX WORKS.** wnba read `orphaned_line=2 of 3` at 19:15Z with a sidecar
+that was not being written; it now reads `sidecar_frozen=3`. The false positive
+is gone, and the sidecar age is on the line so the verdict is checkable rather
+than trusted.
+
+**AND IT FOUND A SECOND SPORT I HAD NOT SUSPECTED. NFL's sidecar is frozen too —
+`sidecar=13169s`, 3.7 HOURS.** At 19:15Z nfl reported `market_gone=3`, which I
+passed on as a real finding. **It was equally worthless**: a frozen file
+produces `market_gone` just as readily as `orphaned_line`, which is exactly why
+the fix had to override BOTH labels rather than only the one that looked wrong.
+
+**WHAT THE 19:15Z READING ACTUALLY SAID, corrected:** I reported
+"`market_gone`=6, `orphaned_line`=3, the feed stopping is dominant". **6 of
+those 9 labels came from frozen sidecars and meant nothing.** The real content
+of that reading was 3 MLB labels.
+
+### The corrected finding
+
+    sport  sidecar    verdict
+    mlb      321s     LIVE      -> labels valid: market_gone=1, orphaned_line=2
+    wnba    3279s     FROZEN    -> we stopped observing wnba 55 min ago
+    nfl    13169s     FROZEN    -> we stopped observing nfl 3.7 HOURS ago
+
+**TWO OF THE THREE SPORTS CARRYING STALE ROWS HAVE STOPPED CAPTURING QUOTES
+ENTIRELY.** That is not a board defect and not a market-closure story — it is a
+capture outage, and it is the largest thing on this board:
+
+- **wnba** — cause already owned by the OPEN lane `wnba-live-odds-capture-gap`
+  (the reuse guard upstream of the appending child). Its stale row count has
+  grown **27 -> 377** since 19:15Z.
+- **nfl** — **NEW, UNATTRIBUTED, and nobody is holding it.** 3.7 hours with no
+  sidecar write. Worth a lane.
+
+**ON THE ONE SPORT WHERE THE MEASUREMENT IS SOUND, THE GRID IS THE PROBLEM:**
+mlb `orphaned_line=2` to `market_gone=1`. Superseded lines ARE reaching the
+board, so `drop_superseded_lines` has a real hole — the relative-guard gap
+described above. That inverts the earlier "the feed stopping is dominant"
+reading on the only sport entitled to answer.
+
+**METHOD NOTE.** This is the second time in `#569` that a reading survived one
+round and died on the next, and both times the cause was the same: a label that
+could be produced by more than one mechanism, reported as though it named one.
+`sidecar=<age>` on the line is what makes the current numbers checkable; quote
+them WITH it.
+
+### "WHY DID NFL STOP CAPTURING" — IT DID NOT. I RAISED A FALSE ALARM.
+
+live-odds-worker, 20:01:44Z, printing the decision as it makes it:
+
+    FIXTURE_CADENCE sport=nfl   interval=28800 reason=mid:26h_out
+    FIXTURE_CADENCE sport=ncaaf interval=86400 reason=far:67h_out
+    FIXTURE_CADENCE sport=wnba  interval=None  reason=imminent_handoff_to_t_window:10697s
+
+    PREGAME_CADENCE_DETAIL  ncaaf:marker_age_s=76825/interval_s=86400
+                            nfl:marker_age_s=17919/interval_s=28800
+                            wnba:marker_age_s=3557/interval_s=7200
+    PREGAME_CADENCE_SKIPPED sports=ncaaf,nfl,wnba
+
+**NFL is on a deliberate 28800s = 8-HOUR sweep interval because its next fixture
+is 26 hours out.** `marker_age 17919s (5.0h) < interval 28800s (8h)`, so it was
+correctly skipped. This is `#440` Phase 1b's fixture-aware cadence gate, and
+`_pregame_sweep_interval_for_tick`'s own comment states the intended effect in
+advance: *"mlb 12.00 -> 5.45/day, wnba 12.00 -> 5.83, **nfl_preseason 12.00 ->
+3.56**."* 24h / 8h = 3 sweeps a day. **Measured behaviour matches the design
+note exactly.**
+
+**I reported it as "NEW, UNATTRIBUTED, and nobody is holding it. Worth a lane."
+It is none of those.** It is a shipped, measured, intentional cadence reduction,
+and I called a working feature an outage.
+
+### AND THE SAME IS TRUE OF WNBA — my earlier attribution was also wrong
+
+wnba: `interval_s=7200` (2h), `marker_age_s=3557` (59 min) -> **also correctly
+skipped, also by design.** I attributed wnba's `sidecar_frozen` to the OPEN lane
+`wnba-live-odds-capture-gap`'s reuse-guard bug. That bug is real and was
+measured on 2026-08-21, but **it is not what today's reading shows**: a 59-minute
+sidecar under a 2-hour designed interval is the gate working, not the guard
+failing. I should not have reached for a known bug to explain a number I had not
+checked against its own configured interval.
+
+### THE CLASSIFIER IS WRONG A THIRD TIME, SAME ERROR CLASS
+
+`sidecar_frozen` fires at a **flat 900s**. Every sport whose designed cadence
+exceeds 15 minutes trips it unconditionally:
+
+    sport   designed interval   flat threshold   verdict
+    nfl           28800s             900s        ALWAYS "frozen"
+    ncaaf         86400s             900s        ALWAYS "frozen"
+    wnba           7200s             900s        ALWAYS "frozen"
+
+**So `sidecar_frozen` currently means "this sport sweeps less often than every
+15 minutes", which is a fact about the CONFIG, not about health.** Third label
+in `#569` produced by more than one mechanism and reported as though it named
+one — after I wrote that exact warning into the previous entry.
+
+**THE FIX, not made and NOT to be made blind:** compare the sidecar age against
+the sport's OWN `interval_s` (both are already printed on
+`PREGAME_CADENCE_DETAIL`), not a constant. `frozen` should mean
+`marker_age > interval * k`, and anything inside its interval is HEALTHY.
+
+**WHAT STILL STANDS, and it is the one thing that does:** a healthy cadence does
+NOT explain a 9.3-hour-old SERVED ROW. wnba's worst is `33419s` against a 2-hour
+sweep interval — that key has gone unobserved across roughly five successive
+healthy sweeps. **The row-level staleness is real; my attribution of it to a
+capture outage was not.** That is still the orphaned-key / market-gone question,
+and mlb — the sport whose sidecar is genuinely live at 321s — still answers it
+`orphaned_line=2` to `market_gone=1`.
+
+### Threshold FIXED, and the repair is NOT the obvious one
+
+`sidecar_frozen` retired. The gate is now **row age vs the SIDECAR'S OWN age**,
+with no absolute threshold and no interval anywhere:
+
+    row_seen_age <= sidecar_age * 1.5 + 300   ->  as_fresh_as_sweep
+    otherwise                                 ->  classify (orphaned_line / market_gone)
+
+**Why not compare against the sport's configured interval, which is the obvious
+repair:** `_pregame_sweep_interval_for_tick` is FIXTURE-AWARE, and the decision
+that produced a given sidecar was made on **live-odds-worker** with that
+service's fixture data. Recomputing it on refresh-worker can disagree — verified
+here: the same call returns **7200 for nfl locally against production's 28800**,
+because the fixture lookup finds nothing in this container. A fourth misread was
+one import away.
+
+**The sidecar's own age needs no interval and no cross-service agreement.** A row
+roughly as old as the newest stamp in its file was SEEN at the last sweep and is
+as fresh as that sport gets, however rarely it sweeps. A row much older was
+skipped by sweeps that demonstrably happened — the only case worth classifying.
+
+Against the 19:57Z reading, retrospectively:
+
+    sport  sidecar  worst_row  ratio  verdict under the new rule
+    mlb       321s      5570s  17.4x  skipped by sweeps that happened
+    nfl     13169s     13127s   1.00  AS FRESH AS SWEEP -- healthy
+    wnba     3279s     33419s  10.2x  skipped by sweeps that happened
+
+**nfl resolves to healthy, which is what the FIXTURE_CADENCE evidence
+independently says.** Two unrelated instruments agreeing is the first thing in
+`#569` that has held up across a round.
+
+29 tests. **Mutation-checked both ways:** reinstating a flat threshold
+reproduces the nfl false alarm (2 tests red); excusing any slow sport
+unconditionally is caught as blanket amnesty (2 tests red).
