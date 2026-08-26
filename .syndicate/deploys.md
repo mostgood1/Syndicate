@@ -32427,3 +32427,72 @@ both outcomes off one input.
 
 **Mutation-checked:** removing the gate reintroduces the shipped bug and turns 3
 tests red; defaulting an unknown sidecar age to "live" turns 1 red.
+
+## 2026-08-26 19:50:37Z — web `752d83ba` — the live buying engine is anchored to `/portfolio`
+
+**what:** `/portfolio` now renders BOTH books — the execution ledger's real
+orders (banner, health flags, tiles, order table, day/month/year pivots) and
+the prediction ledger's user-logged bets — labelled, separately headed, never
+summed. `/portfolio/live` is a 302 to `/portfolio#live` carrying the query
+string verbatim; `portfolio_live.html` is deleted rather than left as a second
+copy of a real-money surface. The five editable settings move INTO the live
+half, beside the book they govern. `/portfolio/paper` untouched and linked from
+both directions. Lane `portfolio-live-primary`, a NARROW CARVE-OUT from
+`portfolio-decision-and-execution` at explicit user direction — that lane's
+owning session (`01Sia2rPD72eFTriy28azzs2`, cloud) is not a reachable peer
+(`ListAgents`, 12 peers, absent), same fallback it recorded itself twice on
+2026-08-24/25.
+
+**claim:** acquired 19:34:33Z holder `portfolio-live-primary`, preflight CLEAR
+twice (19:31:04Z and 19:34:5xZ) — *"CLEAR: only infrastructure processes
+running"*, four gunicorn pids and nothing else. Deployed as a SEPARATE command
+per protocol. Released 19:5xZ with the token.
+
+**blast radius, stated before deploying and approved by the user:** web was on
+`a066bafb`, **17 commits behind main**, so this shipped 16 other lanes' commits
+too (soccer settlement filesystem→keyvalue, layer-2 board chip staleness,
+quote-age classifier). Deploying only my own commit is not available —
+`deploy_preflight` returns `OFF_MAIN`, and the ledger's own 2026-08-15 entry is
+what happens when two deploy branches do not contain each other.
+
+**deploy:** dep-da7jvugae00c73dgnbng, build 19:35:26–19:37:06Z (succeeded),
+`update_in_progress` for ~13 minutes with a 502 window mid-swap, live
+19:50:37Z. **The long update phase is not new and not mine** — `[bootstrap]
+LOCK pid=64 ... policy=seed_only` at 19:39:11Z is `_bootstrap_render_data`
+syncing the data root at import, and this service logged
+`server_failed ... HTTP health check failed (timed out after 5 seconds)`
+followed by `server_available` 19s later on the 16:47Z deploy as well.
+
+**verify — READ FROM THE SERVED PAGE, not from the deploy status.** `GET
+/portfolio/live?date=` (the exact URL the user pasted) → `/portfolio?date=#live`.
+On that page:
+
+    banner        live-banner is-ok   badge "LIVE — REAL MONEY"
+    flags         Job on · Mode live · Armed yes · Kill switch clear
+                  Source live-odds-worker · 4m ago
+    tiles         Positions 37 (all dates) · Settled 6W-4L, 27 open
+                  P/L +21.66 (+93.89% on $23.07 settled)
+                  Caps $10/order · 15/book · 25 total
+    inputs        bankroll_units=1000.00  max_slate_exposure_fraction=0.201
+                  min_ev_pct=0.0  max_positions=35  min_stake_units=1.00
+                  — all five present and editable, carrying the USER's stored
+                  edits (35 positions, 0.0 EV floor), not the defaults
+    order table   37 rows · 83 hidden non-positions with a Show them toggle
+    pivots        3 period rows, styled
+    tracked half  present (`id="tracked"`), paper link present
+
+`/portfolio/paper` still 200s, 16 positions committed for 2026-08-26, $60.99
+staked, and links back to `/portfolio#live` + `/portfolio#tracked`.
+
+**THE `?date=` IN THE USER'S OWN URL WAS A BUG AND IS NOW FIXED, measured.**
+The old template read `L.selected_date`; the payload's key is `date`. Jinja
+renders an undefined as nothing and raises nothing, so every show/period link
+the live page built dropped the date silently — which is how a URL ending
+`?date=` reached the user in the first place. Post-deploy the same link reads
+`?date=2026-08-26&show=all` and the period tab `?date=2026-08-26&period=month#live`.
+
+**Also shipped and visible:** the Performance pivots had NO CSS at all on the
+old page (the whole section rendered unstyled, `is-up`/`is-down` coloured
+nothing), and the live half had been referencing `--cards-border`, which is
+defined nowhere in `app.css` — every such rule was silently falling back to a
+hardcoded hex. Both corrected against the real tokens.
