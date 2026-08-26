@@ -2228,6 +2228,24 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `main` (soccer h2h / DRAWABLE_OUTCOME / league token, from `e2781211`).
   Confirmed pre-existing by stashing this lane's work and re-running. Belongs to
   `exchange-markets-api-integration`.
+- **DEPLOYED AND VERIFIED 2026-08-26T23:23:11Z**, web `61405c99`. Served row for
+  the user's reported order now reads `Los Angeles Angels / h2h · home ·
+  Cleveland Guardians @ Los Angeles Angels`. 126 open orders, 123 decorated,
+  date chips render, AHEAD/BEHIND and "pts vs taken" both showing. Deploy
+  succeeded with NO `server_failed` after the swap.
+- **MY PRE-BUILD COVERAGE ESTIMATE WAS BACKWARDS.** Measured off the whole plan
+  (`bet_status` 3/442, `live_marks` 82/442) I predicted status would be ~5%
+  useful. On the open LIVE book it is **status 81/126, marks 18/126** — the
+  inverse. The plan is dominated by paper soccer rows with no resolver; the live
+  book is MLB/WNBA where the resolver works. A true number against the wrong
+  denominator.
+- **CROSS-CHECK:** 14 won + 14 lost = 28 open-but-decided bets, exactly the
+  `awaiting_venue: 28` from `#580`'s deferral, computed independently.
+- **CLAIM COORDINATED, NOT FORCED:** `web` was held by `mlb-chip-live-state`
+  (`syndicate-f6`); messaged both interactive peers, they released, and I
+  verified `merge-base --is-ancestor 58be8c0d 61405c99` before deploying so
+  their `home.py` fix was carried forward rather than reverted.
+  Full block: `deploys.md` 2026-08-26 23:23:11Z. Item: `todo.md #581`.
 - Verification: 21 tests; 671 green across portfolio/settlement/execution/venue
   suites. Local render confirms AHEAD/BEHIND with the number, `no live feed`
   by name, `+2.4 pts vs taken`, the hidden-open-bets banner, and the team name.

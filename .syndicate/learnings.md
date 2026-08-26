@@ -6776,3 +6776,52 @@ before trusting the pass.
   and was banked as a latency win — it was fast partly because, in a slim
   window, it was returning zeroes without doing any work. Fixed in `58be8c0d`
   (`todo.md #581`); the two-writer race itself is `#582` and is NOT fixed.
+## 2026-08-26 — RULE: a measurement can be REAL and still describe the WRONG POPULATION. State the denominator before you generalise a rate.
+
+**Two instances the same evening, in two different sessions, in opposite
+directions — which is why this is a rule and not an anecdote.**
+
+**Instance 1 (`open-bet-live-status`, `#581`).** Measured off the whole
+portfolio plan artifact: `bet_status` resolved **3 of 442**, `live_marks`
+**82 of 442**. Reported to the user as "the status column will be ~5% useful,
+the marks will populate broadly", and the build was scoped on that. Measured
+again after deploying, on the population the feature actually serves — the OPEN
+LIVE book — **status 81 of 126, marks 18 of 126. The inverse.** The 442-row
+plan is dominated by PAPER SOCCER rows, which have no live resolver and so
+answer `no_live_feed`; the live book is MLB/WNBA-heavy where the resolver
+works. And a game in progress has usually LEFT the board, so the marks thin out
+in exactly the rows where the statuses arrive. Neither number was wrong. The
+denominator was.
+
+**Instance 2 (lane `mlb-chip-live-state`, reported unprompted by that session,
+and it belongs to `todo.md #581`'s VERIFICATION rather than to the fix — the
+error was made while checking the fix, not in it).** "12 wrong on the worker
+path", from four samples that turned out to be **ONE artifact re-read as it
+aged 18.7s → 114.8s**. Three misses counted four times, and all three were
+ordinary artifact age rather than the defect being hunted.
+**Repeated reads of one object are one sample.**
+
+**WHY THIS IS NOT JUST `feedback_rate_not_count`.** That rule says: supply a
+denominator. This one says: **supply the RIGHT denominator, and say what it
+is.** Both instances above HAD a denominator — 442 and 4 — and both were
+quoted with it. The failure was that the population measured was not the
+population the claim was about, and nothing in the phrasing exposed the gap.
+
+**HOW TO APPLY.**
+- Before generalising a rate, write the population down: *"N of M, measured over
+  <what>"*. If the sentence you are about to say is about a different <what>,
+  you do not have the number yet.
+- A plan/board/catalogue artifact is usually a MIXED population (paper and live,
+  every sport, every venue). A feature that serves one slice must be sized on
+  that slice.
+- Repeated observations of one object are one observation. Count distinct
+  objects, not reads.
+- **MAKE THAT STRUCTURAL, NOT A HABIT** (that lane's own point, and it is the
+  mechanical half of this rule). Instance 2's sampler polled
+  `/api/board/game-chips` on a fixed interval and recorded every response, when
+  it should have keyed on the artifact's `published_at` and collapsed reads
+  sharing one. **A rule that depends on someone remembering to check the
+  denominator will fail again; a sampler that cannot emit the duplicate will
+  not.** Where you are building the instrument, dedupe at the source.
+- The cheap check is to re-measure on the real population AFTER shipping and
+  compare. Both instances above were caught that way, not by reasoning.

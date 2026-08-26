@@ -1,5 +1,71 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#581` — **Live status on open bets — and my pre-build coverage estimate was BACKWARDS.** — lane `open-bet-live-status`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T23:23:11Z** (web `61405c99`)
+
+`[user 2026-08-26]` *"can we append live game or prop status to the open bets"*
+-> *"ship both"*; *"portfolio needs a date filter"*.
+
+**NOTHING NEW IS COMPUTED.** `portfolio_commit` already writes
+`plan["bet_status"]` and `plan["live_marks"]` into `portfolio_plan_<date>.json`
+and that artifact already crosses to web. A join and a rendering — recomputing
+either in a request handler is the one thing this service must not do.
+
+**THE ESTIMATE THAT WAS WRONG, AND WHY IT MATTERS MORE THAN THE FEATURE.**
+Measured off the WHOLE plan: `bet_status` 3/442, `live_marks` 82/442. I told the
+user status would be "~5% useful" and marks would populate broadly. On the
+actual open LIVE book:
+
+    live status   81 of 126 resolved  (18 ahead, 19 behind, 16 not started,
+                                       28 already decided)
+    live mark     18 of 126 priced    (98 market_not_on_board, 7 book_no_longer_quoting)
+
+**Exactly the inverse.** The 442-row plan is dominated by PAPER SOCCER rows with
+no resolver; the live book is MLB/WNBA-heavy where the resolver works, and a
+game in progress has usually left the board so marks thin out precisely where
+statuses arrive. The measurement was real; the POPULATION it was generalised to
+was wrong — the same shape as `#508`'s storage figure, a true number against the
+wrong denominator. **Before sizing any board feature off the plan artifact,
+check whether the plan's population is the one the feature serves.**
+
+**A CROSS-CHECK THAT LANDED UNPROMPTED:** 14 `won` + 14 `lost` = **28 open bets
+decided but ungraded**, exactly the `awaiting_venue: 28` that `#580`'s deferral
+reported from a completely independent computation. Two paths agreeing on the
+same 28.
+
+**A REAL BUG FOUND WRITING ITS TEST:** `settlement_summary` ran on the DISPLAY
+list, so the pre-existing `?show=` toggle already moved the headline W/L and
+P&L, and the date filter would have moved them far more. `periods` had it right;
+settlement now reads the whole book too.
+
+**THE DATE FILTER KEEPS THE ALL-DATES GUARANTEE.** `?on=` is opt-in and never
+the default — this book is all-dates precisely so a page cannot "let one expire
+unwatched" — and whenever it is on the page states how many OPEN positions it is
+holding back. That count IS the guarantee.
+
+**A USER-REPORTED SIDE INVERSION THAT WAS A DISPLAY DEFECT, NOT A MONEY ONE.**
+A row read `home` beside `aec-mlb-cle-laa-2026-08-26` and the natural reading is
+that we bought CLE. Submit log 21:44:25Z: `our_side=home outcome_index=0
+outcome='Los Angeles Angels' outcomes=['Los Angeles Angels','Cleveland
+Guardians']` — the array is REVERSED against its own slug, `home` matched the
+Angels BY NAME, and the submit went `OUTCOME_SIDE_YES` on index 0. Order
+correct; the 2026-08-25 fix works. Game-line rows now lead with the team name.
+**`outcome_index: null` in the ledger is NOT evidence** — not an `OrderRequest`
+field at all, so it reads null on correct orders too. Trusting it would have
+produced a false inverted-order report on real money.
+
+**FLAGGED, NOT MINE:** `tests/test_venue_quote_adapters.py` — 3 failures on main
+(soccer h2h / DRAWABLE_OUTCOME / league token, `e2781211`), confirmed
+pre-existing by stashing this lane's work. Belongs to
+`exchange-markets-api-integration`. Peer also reports
+`check_lane_invariants.py` shows `scripts/run_refresh_worker.py` contested
+between that lane and `portfolio-ledger-service-split`.
+
+**METHOD NOTE FOR ANY SESSION USING `pending_deploys.py`:** it listed a peer's
+`home.py` commit as web-only, but `pipeline/layer2_shortlist.py:511` calls
+`build_game_chips`, which imports `home.py`, so refresh-worker executes it too.
+**It is not a coverage answer.**
+
+
 ### `#581` — **The MLB game chips read `0-0` with no inning for every live game, about half the time. A live-lens row that could not answer was being counted as an answer.** — lane `mlb-chip-live-state`, 2026-08-26, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-26T23:10Z** (web `58be8c0d`)
 
 `[user report]` "these game chips on main page (layer 2 board) are stale" ...

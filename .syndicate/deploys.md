@@ -33379,3 +33379,65 @@ that tool as a coverage answer for this file.
 **STILL OPEN:** the two-writer race itself, `todo.md #582`. This change makes the
 consumer correct whichever writer wins; it does not stop a slim, sometimes older
 report being published over a full one.
+
+## 2026-08-26 23:23:11Z — web `61405c99` — live status on open bets, a date filter that cannot lose one, and the team named
+
+**what:** open rows on `/portfolio` carry the worker's live bet status and market
+mark; `?on=` filters by slate date; game-line rows lead with the TEAM NAME.
+Lane `open-bet-live-status`. Item `todo.md #581`.
+
+**claim:** `web` was held by lane `mlb-chip-live-state` (session `syndicate-f6`)
+from 22:57:53Z. **Not forced** — messaged both interactive peers, they released
+at ~23:16Z, claim taken 23:16:33Z, preflight CLEAR, released after the reading.
+**Ancestry verified rather than taken on trust:** `merge-base --is-ancestor
+58be8c0d 61405c99` — their `home.py` live-scores fix is carried forward, not
+rolled back.
+
+**deploy:** dep-da7n7sc9v7es73f1c5bg, started 23:17:05Z, build_ended 23:20:54Z,
+**deploy_ended succeeded 23:23:11Z with NO `server_failed` after it.** The only
+unhealthy in the window is the peer's 23:07:51Z -> server_available 23:08:11Z.
+
+**verify — the served page, and the user's own row:**
+
+    2026-08-26 16:44:25 CT   Los Angeles Angels
+                             h2h · home · Cleveland Guardians @ Los Angeles Angels
+                             polymarket aec-mlb-cle-laa-2026-08-26 +257 $3.41 19¢
+
+    open orders 126 · decorated 123 · date chips render
+    AHEAD/BEHIND and "pts vs taken" both rendering
+
+**MY PRE-BUILD COVERAGE ESTIMATE WAS BACKWARDS, and this is the entry's point.**
+I measured off the WHOLE portfolio plan — `bet_status` 3/442, `live_marks`
+82/442 — and told the user status would be "~5% useful" while marks populated
+broadly. On the actual open LIVE book:
+
+    live status   81 of 126 resolved  (18 ahead, 19 behind, 16 not started,
+                                       28 already decided)
+    live mark     18 of 126 priced    (98 market_not_on_board,
+                                       7 book_no_longer_quoting)
+
+**The inverse.** The 442-row plan is dominated by PAPER SOCCER rows with no
+resolver, while the live book is MLB/WNBA-heavy where the resolver works — and a
+game in progress has usually left the board, so the marks thin out exactly where
+the statuses arrive. The measurement was real; the POPULATION it was generalised
+to was wrong. Same shape as `#508`'s stale storage figure: a true number applied
+to the wrong denominator.
+
+**A CROSS-CHECK THAT LANDED ON ITS OWN.** 14 `won` + 14 `lost` = **28 open bets
+decided but ungraded** — exactly the `awaiting_venue: 28` the settlement
+deferral reported at 22:1xZ from a completely independent computation. Two
+paths agreeing that the same 28 bets are decided and waiting on the venue.
+
+**A REAL BUG FOUND WRITING A TEST, not in production:** `settlement_summary` ran
+on the DISPLAY list, so the pre-existing `?show=` toggle already moved the
+headline W/L and P&L. `periods` had it right; settlement now reads the whole
+book. A rollup that changes when a display control flips is not quotable.
+
+**THE USER'S SIDE-INVERSION REPORT WAS A DISPLAY DEFECT, NOT A MONEY ONE.**
+Submit log 21:44:25Z: `our_side=home outcome_index=0 outcome='Los Angeles
+Angels' outcomes=['Los Angeles Angels','Cleveland Guardians']` — the array is
+REVERSED against the `cle-laa` slug, `home` matched the Angels by NAME, and the
+submit went `OUTCOME_SIDE_YES` on index 0. The order was right; the 2026-08-25
+fix works. **`outcome_index: null` in the ledger is NOT evidence** — it is not
+an `OrderRequest` field at all, so it reads null on correct orders too. Trusting
+it would have produced a false inverted-order report on real money.
