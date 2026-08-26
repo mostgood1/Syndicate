@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-08-26 — refresh-worker `f9f7cb6e7`: the pre-cap histogram, which refuted the change it was built to justify
+
+**Deployed:** `dep-da74r49srm7s73fde360`, live `02:23:47Z`, superseded by
+`34717822` at `02:36:47Z` — which still carries the code (verified by content).
+Claim held and released. Preflight by hand: `ALL_PROCESS_MEMORY` at `02:18:24Z`,
+20s old, `process_count=2`, both infrastructure — CLEAR.
+
+**verify: MET `03:11:30Z`, confirmed identical at `03:17:03Z`.**
+
+```
+capped_series=8 cut_total=3940
+KXMLBHRR 532 -> cut 132  {'2026-08-25': 132}   <- the only date-eligible cuts
+KXMLBTB  401 -> cut   1  {'2026-08-25': 1}
+six NCAAF/NFL series      cut 3807             <- zero on 2026-08-25
+```
+
+**IT REFUTED THE HYPOTHESIS THAT MOTIVATED IT.** Step (b) predicted eviction
+re-prioritisation would recover ~1,600 joinable markets. The answer is **133**,
+3.4% of what the cap cuts. Same code either way, opposite verdicts — which is
+what the line was for. Shipping on the un-measured reasoning would have been
+real work for nothing.
+
+**TWO LIMITS, both against the verdict.** (1) Taken at 3am with the slate over:
+`KXMLBHRR` cut 747 at `01:49Z` and 132 now, so the mid-slate number is likely
+several times higher. (2) It measures the per-series cap only — `cut_total=3940`
+against `TICK trimmed=8744`, so the outer `MAX_STORED_MARKETS` trim's ~4,800 is
+still undated and is date-blind too.
+
+**Refuted post-slate, unproven mid-slate, half the trimming unmeasured. Do not
+ship an eviction change before both readings exist.**
+
+**Deploy cadence note, recorded because I was part of it.** PR #85 measured 15
+refresh-worker deploys in 6h15m, median instance uptime 1202s against a 20m41s
+boot-to-first-publish — the worker was being redeployed before it could finish a
+board build. Two of those deploys were mine (`00:42Z`, `02:21Z`), and my
+`02:21Z` instance lived 13 minutes and never reached the Kalshi stage. This
+reading only exists because `rtc68` got 35 uninterrupted minutes. Preflight now
+has `TOO_SOON` (exit 5) for exactly this.
+
+---
+
 ## 2026-08-26 — refresh-worker `d92ab27b1`: the board's date histogram now means the game date
 
 **Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy

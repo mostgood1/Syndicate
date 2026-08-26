@@ -2440,6 +2440,43 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     prefix, so it is likely -- but the histogram only sees survivors. The
     measurement that would settle it is a per-series date histogram taken
     BEFORE the cap, from `full_markets`.
+- **THE PRE-CAP MEASUREMENT REFUTED MY OWN STEP (b) HYPOTHESIS `2026-08-26
+  03:11:30Z` and `03:17:03Z` (identical, reproducible), deploy
+  `dep-da74r49srm7s73fde360` live `02:23:47Z`, code still live under `34717822`.**
+
+        capped_series=8  cut_total=3940
+        KXNCAAFSPREAD 2026 -> cut 1626   08-25: 0
+        KXNCAAFTOTAL  1482 -> cut 1082   08-25: 0
+        KXNFLSPREAD    795 -> cut  395   08-25: 0
+        KXNCAAFGAME    678 -> cut  278   08-25: 0
+        KXNCAAF1H      618 -> cut  218   08-25: 0
+        KXNFLTOTAL     608 -> cut  208   08-25: 0
+        KXMLBHRR       532 -> cut  132   08-25: 132   <- all today
+        KXMLBTB        401 -> cut    1   08-25: 1     <- all today
+
+  - I predicted eviction re-prioritisation would recover **~1,600** joinable
+    markets. It is **133** -- 3.4% of the 3,940 cut. Everything else the cap
+    discards is lookahead that could not have joined today anyway. **The gate
+    caught my own claim, which is what it was built for**; shipping on step
+    (b)'s reasoning would have bought a number that rounds to nothing against
+    `matched=71`, and those 133 would still have to clear
+    `no_matching_board_row`.
+  - **LIMIT 1, AND IT CUTS AGAINST THE VERDICT: it is 3am and the slate is
+    over.** At `01:49Z` `KXMLBHRR` fetched 1147 and cut 747; at `03:11Z` it
+    fetches 532 and cuts 132, and `KXMLBHIT`/`KXMLBRBI` are no longer capped at
+    all. MLB markets retire as games finish. If those earlier 747 cuts were also
+    all `08-25` -- which this shape suggests -- the MID-SLATE figure is several
+    times 133. **This proves the change is not worth making AT 3AM. It does not
+    prove it mid-slate, which is when the join matters.**
+  - **LIMIT 2: it measures ONE of the two bounds.** `cut_total=3940` vs `TICK
+    trimmed=8744`. This line covers the per-series cap only; the outer
+    `MAX_STORED_MARKETS` staleness trim is the other ~4,800 and is still
+    UNDATED. That trim is date-blind too, so it may be cutting today's markets
+    where this measurement cannot see.
+  - **VERDICT: refuted post-slate, UNPROVEN mid-slate, half the trimming still
+    unmeasured.** Decisive reading = the same line during a live slate, plus the
+    same treatment for the outer trim. Do NOT ship an eviction change before
+    both.
 - **SUPERSEDED:** (b) re-read `BY_GAME_DATE` in production once the fix is
   deployed, and re-establish from it what `market_is_for_another_date`
   actually counts -- from a line that means what it says; (c) THEN decide
