@@ -634,7 +634,7 @@ the 19m43s.** Next question is where inside `collect_candidates` it goes — the
 per-stage `CANDIDATE_STAGE` lines are already emitted and timestamped, so this
 is a reading, not an instrumentation job.
 
-### `#572` — **Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list.** — lane `kalshi-exchange-index`, 2026-08-26, NOT STARTED, handed over
+### `#573` — **Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list.** — lane `kalshi-exchange-index`, 2026-08-26, NOT STARTED, handed over
 
 `GET /portfolio/balance` accepts an `exchange_index` parameter — *"both values
 include all exchange indexes unless exchange_index is provided"*. That makes the
