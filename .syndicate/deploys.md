@@ -31047,3 +31047,56 @@ confirming it turns red.
 **FIX:** the span now closes after BOTH branches, so the reading no longer
 depends on which service is running it. The list-fallbacks are inside it on
 purpose — they re-consume rows the stage produced, so their cost is its cost.
+
+---
+
+## 2026-08-26 12:28Z — SEVEN HOURS OF STEADY STATE. THE BOARD BUILD IS NOT SLOW.
+
+The 05:07 deploy ran unattended for 7 hours (session container restarted; the
+worker did not). `BOARD_BUILD_TIMING` therefore has a real steady-state series
+for the first time, and it does not say what every reading before it said.
+
+    n=40 builds, 10:33Z -> 12:27Z, instance -9gvzf, no restarts
+
+    wall_s     min 61.4   median 107.8   mean 107.0   p90 145.5   max 172.3
+    off_cpu    min 12.8   median 52.8    mean 53.8    max 70.5
+
+    the 747.8s cold build = 6.9x the steady-state median
+
+**THE BOARD BUILD IS ~1.8 MINUTES IN STEADY STATE.** Not 19m43s, not 12m28s,
+not 11m22s. Those were all COLD builds — the first build after a restart.
+
+**EVERY DURATION IN THIS FILE ABOVE THIS ENTRY WAS MEASURED ON A COLD BUILD AND
+GENERALISED TO "THE BOARD BUILD".** Mine included, and `#565`'s headline
+("the board build takes 19m43s") most of all. That number was taken during the
+deploy-churn window — 15 refresh-worker deploys in 6h15m, median uptime 1202s —
+where **the worker never survived long enough to reach a warm build.** We were
+measuring restarts and calling it the board.
+
+**AND IT IS MOSTLY WAITING, NOT COMPUTING.** Steady-state off-CPU is 53%
+median, 40 of 40 samples above 36%. The single reading that said "computing,
+not queued" (`off_cpu_pct=10.4`) is the cold build, and it is now an outlier
+against 40 contrary samples rather than the answer. **I reported it as the
+answer to `#567` two entries above. It was the answer for one build.**
+
+### What this does to the open work
+
+- **`#565` "the board build takes 19m43s" is closed by re-measurement, not by a
+  fix.** The steady-state build was probably never 19 minutes. The per-sport
+  window and soccer memo were real improvements to the COLD path and their
+  measurements stand — but they were not fixing what the item said they were.
+- **The 313s / 181s / 150s decomposition is a decomposition OF THE COLD BUILD.**
+  Still worth having, still the right target for boot cost, but it is not where
+  a steady-state build spends its 108 seconds. The spans just deployed will
+  show where that goes, and it will be a different answer.
+- **The real lever on staleness is RESTART FREQUENCY, not build cost.** A cold
+  build is 6.9x a warm one, and `#563`'s deploy-spacing guard (1500s minimum on
+  refresh-worker) is therefore the highest-value thing shipped last night —
+  higher than either performance change.
+
+**THE METHOD FAILURE, and it is the same one `#567` was created to stop.**
+`#567`'s own premise was "every estimate so far was read from the gap between
+two log lines". I fixed that, instrumented the call properly — and then drew a
+conclusion from **one sample of the least representative build there is.** The
+instrument was right; the sampling was wrong. *A correct measurement of an
+unrepresentative case is still a wrong answer.*
