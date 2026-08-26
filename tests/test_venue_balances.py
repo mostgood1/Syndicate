@@ -71,17 +71,44 @@ def _kalshi(monkeypatch, *, creds="ok", payload=None, raises=None):
     monkeypatch.setattr(auth, "signed_request", fake)
 
 
-def test_kalshi_cents_become_dollars_and_the_assumption_is_stamped(monkeypatch):
-    """The unit is an ASSUMPTION. Both it and the raw value are recorded, so a
-    live run can correct the constant without reverse-engineering a rendered
-    number -- the discipline that caught the 100x price error."""
+def test_kalshi_cents_become_dollars(monkeypatch):
+    """`balance` is documented as int64 CENTS (docs.kalshi.com, read
+    2026-08-26). Production read 1384 -> $13.84 at 20:46Z, which is the same
+    arithmetic this pins."""
     _kalshi(monkeypatch, payload={"balance": 4231})
     row = vb.fetch_kalshi_balance()
     assert row["status"] == "ok"
     assert row["dollars"] == 42.31
-    assert row["raw_value"] == 4231
-    assert row["unit_assumption"] == "cents"
+    assert row["raw_field"] == "balance(cents)"
+    assert row["unit_assumption"] == "documented"
     assert row["path"] == "/portfolio/balance"
+
+
+def test_kalshi_prefers_the_documented_dollar_string(monkeypatch):
+    """`balance_dollars` is documented as fixed-point dollars, so reading it
+    REMOVES this module's last unit assumption rather than restating it."""
+    _kalshi(monkeypatch, payload={"balance": 56, "balance_dollars": "0.5600"})
+    row = vb.fetch_kalshi_balance()
+    assert row["dollars"] == 0.56
+    assert row["raw_field"] == "balance_dollars"
+    assert row["unit_disagreement"] is None
+
+
+def test_kalshi_reports_when_the_venue_disagrees_with_itself(monkeypatch):
+    """Two representations of one number that stop matching means the venue
+    changed something under us. A silently-picked winner would hide it."""
+    _kalshi(monkeypatch, payload={"balance": 4231, "balance_dollars": "99.00"})
+    row = vb.fetch_kalshi_balance()
+    assert row["unit_disagreement"] == {"balance_dollars": 99.0, "balance_cents": 4231.0}
+
+
+def test_kalshi_portfolio_value_is_kept_apart_from_spendable_cash(monkeypatch):
+    """Cash and cash-plus-positions are different questions. Conflating them
+    overstates what can be deployed by exactly what is already at risk."""
+    _kalshi(monkeypatch, payload={"balance": 1384, "portfolio_value": 9900})
+    row = vb.fetch_kalshi_balance()
+    assert row["dollars"] == 13.84
+    assert row["portfolio_value_dollars"] == 99.0
 
 
 def test_kalshi_without_a_credential_says_so_and_shows_no_number(monkeypatch):
@@ -122,35 +149,78 @@ def _polymarket(monkeypatch, responder, *, present=True):
     monkeypatch.setattr(auth, "signed_request", lambda method, url, **kw: responder(url))
 
 
-def test_polymarket_discovers_the_path_that_answers(monkeypatch):
-    from syndicate.features.shared.polymarket_us_auth import PolymarketUSAuthError
+def _pm_payload(**over):
+    row = {"currentBalance": 40.5, "currency": "USD", "buyingPower": 31.25,
+           "openOrders": 9.25, "unsettledFunds": 0}
+    row.update(over)
+    return {"balances": [row]}
 
+
+def test_polymarket_reads_the_documented_path_first(monkeypatch):
+    """`/account/balances` is PLURAL, and that one character is why the first
+    production discovery round returned `path_unknown`. Measured
+    2026-08-26T20:46Z: all four guesses -- including the singular
+    `/account/balance` -- 404'd with a gRPC `code: 5` envelope."""
     seen: list[str] = []
-
-    def responder(url):
-        seen.append(url)
-        if url.endswith("/account/balance"):
-            return {"available_balance": 40.5}
-        raise PolymarketUSAuthError(f"http_404: {url}")
-
-    _polymarket(monkeypatch, responder)
+    _polymarket(monkeypatch, lambda url: seen.append(url) or _pm_payload())
     row = vb.fetch_polymarket_balance()
     assert row["status"] == "ok"
-    assert row["path"] == "/account/balance"
-    assert row["dollars"] == 40.5
-    # It tried the first candidate and stopped at the one that worked.
-    assert len(seen) == 2
+    assert row["path"] == "/account/balances"
+    assert seen == ["https://api.polymarket.us/v1/account/balances"]
 
 
-def test_polymarket_does_not_divide_by_a_unit_it_has_never_read(monkeypatch):
-    """Kalshi documents cents; this venue documents nothing we have read.
-    Dividing here would be inventing a fact, so the raw value is carried and
-    the assumption is labelled unverified."""
-    _polymarket(monkeypatch, lambda url: {"balance": 40.5})
+def test_polymarket_uses_buying_power_not_the_cash_balance(monkeypatch):
+    """The docs define buyingPower as unencumbered capital available for
+    trading, factoring in security valuations and open orders -- what can
+    actually be deployed. A day cap checked against `currentBalance` would look
+    reachable while every dollar sat in resting orders."""
+    _polymarket(monkeypatch, lambda url: _pm_payload())
+    row = vb.fetch_polymarket_balance()
+    assert row["dollars"] == 31.25
+    assert row["buying_power_dollars"] == 31.25
+    assert row["cash_dollars"] == 40.5
+    assert row["open_orders_dollars"] == 9.25
+
+
+def test_polymarket_never_reports_a_pending_withdrawal_as_the_balance(monkeypatch):
+    """Each row carries `pendingWithdrawals[].balance`. A generic scan for a
+    balance-shaped field would report money LEAVING the account as the money in
+    it. The documented shape is parsed by name for exactly this reason."""
+    payload = {"balances": [{"currency": "USD",
+                             "pendingWithdrawals": [{"id": "w1", "balance": 500.0}]}]}
+    _polymarket(monkeypatch, lambda url: payload)
+    row = vb.fetch_polymarket_balance()
+    assert row["status"] == "path_unknown"
+    assert "dollars" not in row
+
+
+def test_polymarket_picks_the_usd_row_out_of_several(monkeypatch):
+    payload = {"balances": [
+        {"currency": "POINTS", "buyingPower": 9999.0},
+        {"currency": "USD", "buyingPower": 12.0},
+    ]}
+    _polymarket(monkeypatch, lambda url: payload)
+    assert vb.fetch_polymarket_balance()["dollars"] == 12.0
+
+
+def test_polymarket_refuses_to_guess_when_no_row_says_usd(monkeypatch):
+    """Which pile of money is spendable is not something to guess at."""
+    payload = {"balances": [
+        {"currency": "POINTS", "buyingPower": 9999.0},
+        {"currency": "CREDITS", "buyingPower": 1.0},
+    ]}
+    _polymarket(monkeypatch, lambda url: payload)
+    assert vb.fetch_polymarket_balance()["status"] == "path_unknown"
+
+
+def test_polymarket_figures_are_dollars_and_are_not_divided(monkeypatch):
+    """Every field is `number<decimal>` per the reference -- DOLLARS, not
+    cents. This was an open assumption labelled `dollars_unverified` until the
+    docs settled it."""
+    _polymarket(monkeypatch, lambda url: _pm_payload(buyingPower=40.5))
     row = vb.fetch_polymarket_balance()
     assert row["dollars"] == 40.5
-    assert row["raw_value"] == 40.5
-    assert row["unit_assumption"] == "dollars_unverified"
+    assert row["unit_assumption"] == "documented"
 
 
 def test_polymarket_reports_path_unknown_rather_than_a_zero(monkeypatch):
@@ -188,7 +258,7 @@ def test_a_pinned_path_skips_discovery_entirely(monkeypatch):
 
     def responder(url):
         seen.append(url)
-        return {"balance": 12.0}
+        return _pm_payload(buyingPower=12.0)
 
     monkeypatch.setenv("POLYMARKET_US_BALANCE_PATH", "/v2/cash")
     _polymarket(monkeypatch, responder)
@@ -208,7 +278,7 @@ def test_a_previously_discovered_path_is_reused(monkeypatch):
         },
     )
     seen: list[str] = []
-    _polymarket(monkeypatch, lambda url: seen.append(url) or {"balance": 1.0})
+    _polymarket(monkeypatch, lambda url: seen.append(url) or _pm_payload())
     vb.fetch_polymarket_balance()
     assert seen == ["https://api.polymarket.us/v1/account/balance"]
 

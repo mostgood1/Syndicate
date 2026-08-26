@@ -704,22 +704,29 @@
             —
           {% endif %}
         </div>
+        {# THE TWO NUMBERS DO NOT MEAN THE SAME THING, and the tile says which
+           is which rather than stacking them as if they did. Kalshi's is
+           available CASH (`balance`, cents, docs.kalshi.com); Polymarket's is
+           BUYING POWER — "unencumbered capital available for trading,
+           factoring in all security valuations and open orders"
+           (docs.polymarket.us). Both are the right figure to check a day cap
+           against at their own venue; neither is the other. #}
         <div class="live-tile__meta">
           kalshi
-          {% if kal.status == 'ok' %}<strong>${{ "%.2f"|format(kal.dollars or 0) }}</strong>
+          {% if kal.status == 'ok' %}<strong title="Available cash. Kalshi reports this separately from portfolio value.">${{ "%.2f"|format(kal.dollars or 0) }}</strong> cash{% if kal.get('portfolio_value_dollars') is not none %} · ${{ "%.2f"|format(kal.get('portfolio_value_dollars')) }} w/ positions{% endif %}
           {% else %}<span class="warn" title="{{ kal.detail or '' }}">{{ kal.status|replace('_', ' ') or 'unknown' }}</span>{% endif %}
         </div>
         <div class="live-tile__meta">
           polymarket
-          {% if pm.status == 'ok' %}<strong>${{ "%.2f"|format(pm.dollars or 0) }}</strong>
+          {% if pm.status == 'ok' %}<strong title="Buying power: unencumbered capital, after security valuations and open orders.">${{ "%.2f"|format(pm.dollars or 0) }}</strong> buying power{% if pm.get('cash_dollars') is not none %} · ${{ "%.2f"|format(pm.get('cash_dollars')) }} cash{% endif %}
           {% else %}<span class="warn" title="{{ pm.detail or '' }}">{{ pm.status|replace('_', ' ') or 'unknown' }}</span>{% endif %}
         </div>
         <div class="live-tile__meta">
           {# The age is what turns a figure into a reading. A balance from
              forty minutes ago is not the balance. #}
           {% if B.age_seconds is not none %}read {{ (B.age_seconds // 60) }}m ago{% else %}age unknown{% endif %}
-          {% if pm.status == 'ok' and pm.unit_assumption == 'dollars_unverified' %}
-            · <span class="warn" title="This venue documents no unit anywhere we have read. The raw value is stamped in the artifact; the first live read decides.">pm unit unconfirmed</span>
+          {% if kal.get('unit_disagreement') %}
+            · <span class="warn" title="Kalshi's own cents and dollar-string fields disagree: {{ kal.get('unit_disagreement') }}. The venue has changed something.">venue disagrees with itself</span>
           {% endif %}
         </div>
       {% endif %}
