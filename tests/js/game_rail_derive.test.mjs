@@ -228,3 +228,67 @@ const outC = deriveGameCards([
 console.log();
 console.log('same text, duplicate has a WRONG date ->', outC.length, 'card(s)');
 console.log('ASSERT #165 follow-up #3 still merges   :', outC.length === 1 ? 'PASS' : 'FAIL');
+
+
+// --------------------------------------------------------------------------
+// `#583`: THE RAIL'S DATE FILTER MUST APPLY TO CANDIDATE-BACKED GAMES TOO.
+//
+// Production defect, 2026-08-26, user report: "all NFL games that are not today
+// are also showing up" -- on the Today tab. `railDate` appeared exactly ONCE in
+// the template, inside the loop that seats cards from UNCLAIMED CHIPS. A group
+// derived from board CANDIDATES was never date-filtered, so any game with rows
+// seated a card whatever the day tab said. Measured the same minute:
+// /api/board/game-chips?sports=nfl returned 16 chips dated Aug 27 (1), Aug 28
+// (8), Aug 29 (7) -- zero today -- and all 16 have board rows.
+//
+// THIS SECTION DISCRIMINATES: case A fails against the pre-change function
+// (2 cards, not 1). B and C must pass in BOTH states -- B is the boundary the
+// filter must not cross (the chip's date wins over the candidate's, `#165`
+// follow-up #3), C is the undated-is-kept rule shared with the chip loop.
+// --------------------------------------------------------------------------
+resetChips();
+state.date = '2026-08-26';
+state.sport = 'all';
+
+// 2026-08-27T00:30Z is 7:30P CT on the TWENTY-SIXTH -- today. The Thursday game
+// at 2026-08-27T23:00Z is 6:00P CT on the twenty-seventh -- not today.
+const todayChip  = mkChip('nfl','g-today','AAA','BBB','pregame','2026-08-27T00:30:00Z');
+const futureChip = mkChip('nfl','g-thu','PIT','BUF','pregame','2026-08-27T23:00:00Z');
+for (const c of [todayChip, futureChip]) {
+  gameChipsById.set(`nfl|${c.game_key}`, c);
+  gameChipsByMatchup.set(`nfl|${c.matchup.toLowerCase()}`, c);
+}
+const outD = deriveGameCards([
+  {sport:'nfl',sport_slug:'nfl',event_id:'g-today',matchup:'AAA @ BBB',market_state:'pregame'},
+  {sport:'nfl',sport_slug:'nfl',event_id:'g-thu',  matchup:'PIT @ BUF',market_state:'pregame'},
+]);
+const nD = outD.map(g=>g.matchup);
+console.log();
+console.log('candidate-backed, mixed dates ->', outD.length, 'card(s):', nD.join(' | ') || '(none)');
+console.log('ASSERT a NON-today CANDIDATE game is out:', !nD.includes('PIT @ BUF') ? 'PASS' : 'FAIL');
+console.log('ASSERT the today CANDIDATE game is kept :', nD.includes('AAA @ BBB') ? 'PASS' : 'FAIL');
+
+// --- CASE B: the chip's date beats the candidate's, which can be WRONG. -----
+// `#165` follow-up #3 measured gamePk 824892 stamped 2026-07-31 while showing
+// the same live score and inning as 824894, dated 2026-07-30. A row whose own
+// game_date says yesterday, but whose chip says today, is TODAY.
+resetChips();
+const misdatedChip = mkChip('mlb','g-misdated','SSS','TTT','live','2026-08-27T00:30:00Z'); // today CT
+gameChipsById.set('mlb|g-misdated', misdatedChip);
+gameChipsByMatchup.set(`mlb|${misdatedChip.matchup.toLowerCase()}`, misdatedChip);
+const outE = deriveGameCards([
+  {sport:'mlb',sport_slug:'mlb',event_id:'g-misdated',matchup:'SSS @ TTT',
+   market_state:'live',game_date:'2026-08-25'},
+]);
+console.log('ASSERT chip date beats a wrong row date :',
+  outE.map(g=>g.matchup).includes('SSS @ TTT') ? 'PASS' : 'FAIL');
+
+// --- CASE C: an undated group is KEPT, same rule as the chip loop. ----------
+// No chip resolves and the row carries no date at all. Absent evidence is not
+// evidence of a different day; dropping it would hide the game entirely.
+resetChips();
+const outF = deriveGameCards([
+  {sport:'soccer',sport_slug:'soccer',event_id:'g-undated',matchup:'UUU @ VVV',market_state:'pregame'},
+]);
+console.log('ASSERT an UNDATED group is still kept   :',
+  outF.map(g=>g.matchup).includes('UUU @ VVV') ? 'PASS' : 'FAIL');

@@ -2409,6 +2409,44 @@
       const chip = chipForGame(group);
       group.startTimeUtc = chip && chip.start_time_utc ? chip.start_time_utc : null;
     }
+    // `#583`. THE RAIL'S DATE FILTER, APPLIED TO CANDIDATE-BACKED GAMES TOO.
+    //
+    // `railDate` used to appear exactly ONCE in this file -- in the loop above
+    // that seats cards from UNCLAIMED CHIPS. Groups derived from board
+    // CANDIDATES were never date-filtered at all, so any game with rows on the
+    // board seated a mini-card whatever the day tab said. That stays invisible
+    // only while the candidate pool is one day wide, and it is not: `#565`
+    // widened the board's forward window to the WIDEST sport's window.
+    //
+    // USER REPORT 2026-08-26: "all NFL games that are not today are also
+    // showing up", on the Today tab. Measured the same minute,
+    // `/api/board/game-chips?sports=nfl` returned 16 chips --
+    //
+    //     2026-08-27  1     2026-08-28  8     2026-08-29  7     today  0
+    //
+    // -- and every one of those games has board rows, so every one seated a
+    // card. The chip feed is deliberately multi-day and CORRECT (`7805f5a8`:
+    // "the strip asks for the board's horizon, the rail still asks for today");
+    // the rail's half of that sentence was only ever true for chip-seeded
+    // cards.
+    //
+    // THE CHIP'S DATE WINS OVER THE CANDIDATE'S, and that order is load-bearing
+    // rather than stylistic: `#165` follow-up #3 measured a candidate carrying
+    // its OWN resolvable but WRONG date -- gamePk 824892 stamped `2026-07-31`
+    // while showing the same live score and inning as 824894, dated
+    // `2026-07-30`. A candidate-level date cannot be trusted where a chip
+    // disagrees.
+    //
+    // AN UNDATED GROUP IS KEPT -- the same rule as the chip loop above, for the
+    // same reason. Absent evidence is not evidence of a different day, and
+    // dropping it would hide a game whose provider gave no timestamp, which is
+    // the case `game_chip_scoreboard.py`'s day-prefix fallback exists for.
+    const dateFilteredGames = gamesList.filter((group) => {
+      if (!railDate) return true;
+      const chip = chipForGame(group);
+      const groupDate = (chip ? chipCentralDate(chip) : null) || group.fallbackDate || null;
+      return !groupDate || groupDate === railDate;
+    });
     // Precise chip start time wins when available; a chip-less card (a
     // game outside today's /api/board/game-chips window, e.g. soccer's
     // week-keyed schedule) still sorts by its own date rather than falling
@@ -2444,7 +2482,10 @@
       if (chip && chip.state) return chip.state === "final";
       return Boolean(group.allFinal);
     };
-    return gamesList.sort((a, b) => {
+    // `#583`: the DATE-FILTERED list, not `gamesList`. Sorting and returning
+    // the unfiltered one is how the filter above ships inert -- it computes a
+    // correct answer that nothing reads, and every card still seats.
+    return dateFilteredGames.sort((a, b) => {
       const aFinal = isFinal(a);
       const bFinal = isFinal(b);
       // Ahead of the live test on purpose: these are disjoint (a game cannot

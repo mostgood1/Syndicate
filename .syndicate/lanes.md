@@ -946,7 +946,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   converts a degraded path into an outage.
 
 
-### layer2-rail-duplicate-nfl-cards — OPEN, **UNOWNED** (session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT; nothing held, all deploy claims released) — **SHIPPED AND VERIFIED-BY-REPLAY; ONE BEHAVIOURAL READ OWED** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
+### layer2-rail-duplicate-nfl-cards — OPEN, **ADOPTED 2026-08-26 by session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272** (was UNOWNED; opening session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT, nothing held, all deploy claims released) — **`#583` NOW ALSO IN SCOPE: the rail's date filter never applied to candidate-backed games. THE ORIGINAL BEHAVIOURAL READ IS STILL OWED AND IS NOT DISCHARGED BY THE ADOPTION.** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
 - Goal: today's NFL preseason games appear ONCE each on the Layer 2 compact
   game-card rail, not twice. **Testable outcome:** each game seats exactly one
   mini card, and clicking it filters the board to ALL that game's rows (both
@@ -984,6 +984,34 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   deploy record: `.syndicate/deploys.md`.
 - Blocked by: none.
 
+- **WHY ADOPTED RATHER THAN LEFT ALONE `[2026-08-26]`.** `lane-guard` blocked an
+  edit to `syndicate/templates/intelligence.html` from lane
+  `mlb-chip-live-state`, correctly — this lane claims that file. Checked before
+  taking it: status line says UNOWNED, opening session `23024227` is archived and
+  absent from `ListAgents`, no `.current-lane.<session>` marker anywhere names
+  this slug, and no live session narrates it. That is the ORPHAN case the
+  2026-08-18 sweep cleaned up across 8 lanes, and the sanctioned remedy is to
+  adopt rather than to edit across lanes or to widen another lane's `Files:`
+  into a contested claim.
+- **`#583`, the newly added work.** USER REPORT 2026-08-26: "all NFL games that
+  are not today are also showing up", on the Today tab. Root cause: `railDate`
+  appeared exactly ONCE in the template — inside the loop that seats cards from
+  UNCLAIMED CHIPS. Groups derived from board CANDIDATES were never date-filtered,
+  so any game with rows seated a card whatever the day tab said. Measured the
+  same minute: `/api/board/game-chips?sports=nfl` returned 16 chips dated Aug 27
+  (1), Aug 28 (8), Aug 29 (7) — **zero today** — and every one has board rows.
+  The chip feed is deliberately multi-day and correct (`7805f5a8`); the rail's
+  half of that was only ever true for chip-seeded cards.
+- **Testable outcome for `#583`:** on the Today tab, the rail seats a card only
+  for games whose date resolves to today, or whose date does not resolve at all.
+  Verified by `tests/js/game_rail_derive.test.mjs` discriminating, plus a
+  production read of the served rail against
+  `/api/board/game-chips?sports=nfl`'s date histogram.
+- **INHERITED AND STILL OWED, restated so adoption does not bury it:** a
+  behavioural read on a LIVE board carrying BOTH row families for one game — an
+  ESPN-id `candidate_type=game` watchlist row co-existing with `layer2_shortlist`
+  rows. Everything behind the original fix is REPLAY. A census on the current
+  payload reads 0 either way; that is not confirmation.
 ### wnba-halftime-elapsed — **OPEN, UNOWNED** `[session 1f76348c ARCHIVED 2026-08-21 ~16:1xZ]` — **ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) and on the workers (`3b41696d` is an ancestor of refresh-worker's SHA). Unit-verified both directions: 3 break tests FAIL pre-fix, 2 narrowness tests PASS in both states. **THE BREAK BEHAVIOUR ITSELF IS UNOBSERVED IN PRODUCTION** — a 20-minute watcher caught no blank-clock state, and the one suggestive reading (a board row at 'End of 1st' keeping a live lane at model 0.2155 vs its 0.27 pregame baseline) was INDIRECT, via the board. Next WNBA break discharges it. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: the live win/cover probability must keep using the live margin during a
   BETWEEN-PERIODS break, instead of silently reverting to the pregame number.
