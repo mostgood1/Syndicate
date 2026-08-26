@@ -30083,3 +30083,49 @@ a short page ended the read, which is the only complete condition. The old
 different claim.
 
 **Claim released.**
+
+## 2026-08-25 19:25 CT — live-odds-worker `59d9197f8` (Kalshi order host)
+
+**Change.** On `market_not_found` only, re-send the order to the host
+`fetch_market` resolved the ticker from. No-op when the two agree.
+
+**Why.** `SUBMIT_FAILED_MARKET` (00:00 CT, 23:59:10Z) cleared every other
+hypothesis:
+
+    ticker=KXMLBTOTAL-26AUG252138CLELAA-7 side=ask fetch_status=ok
+    event_ticker=KXMLBTOTAL-26AUG252138CLELAA market_type=binary
+    status=active mve_collection=None strike_type=greater
+    yes_ask=0.5700 no_ask=0.4400
+
+Active, binary, not an MVE, both asks quoted. And `KXMLBTOTAL-...TBDET-7`
+failed on `side=over` (a `bid`, the form that filled for WNBA), so the
+bid/ask hypothesis is dead. `_BASE_URLS` is a fallback chain for reads and a
+pin for writes; that asymmetry is what is left.
+
+Also retired: the event is the market's own series prefix, NOT the
+`KXMLBGAME` event the web UI renders these under. The order body needs no
+event field.
+
+**verify:** a `SUBMIT_RETRY_BASE from=... to=...` line on the next
+KXMLBTOTAL order. Its ABSENCE alongside a fresh `SUBMIT_FAILED_MARKET`
+carrying `fetch_base == order_base` refutes the host hypothesis outright —
+that is the reading that settles it either way.
+
+**NOT YET READ.** Execution has been blocked on `unreconciled_orders` since
+00:27:38Z, so no Kalshi order has been attempted under this build. Claim
+released; another session owns the reconcile.
+
+## 2026-08-25 19:30 CT — web `737bda53f` (portfolio day/month/year pivots)
+
+**verify:** `Performance` section on `/portfolio/live`, with `?period=month`
+and `?period=year` collapsing the same orders.
+
+**Note.** Web 502'd 00:10:31–00:15:43Z on the PREVIOUS deploy's rollover
+(`2a083a8df`), reported by the user. Cleared on its own; this deploy opens a
+second window of the same kind.
+
+## 2026-08-26 00:35Z — `e90bdcf30` pushed to main, NOT deployed
+
+Reconcile guard: names which bound tripped and prints its inputs; contract
+bound gains a 0.01 rounding tolerance. Another session owns this area —
+pushed to main only, no deploy taken, live-odds-worker claim released.
