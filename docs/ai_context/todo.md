@@ -1,6 +1,60 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#578` — **Venue balances on `/portfolio`: Kalshi verified, Polymarket's path DISCOVERED rather than guessed, and no failure ever renders as `$0.00`.** — lane `venue-balances-on-portfolio`, 2026-08-26 — **SHIPPED, NOT DEPLOYED**
+### `#578` — **Both venue balances on `/portfolio`, and the first production run returned `path_unknown` — which is the whole reason it was built to say that.** — lane `venue-balances-on-portfolio`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T21:07:32Z** (worker + web `4f3d3fe6`)
+
+**MEASURED, both venues, stamp 7s old at 21:07:32Z:**
+
+    kalshi      $11.55 cash   ($40.54 including open positions)
+                raw_field balance_dollars, raw_value 1154.0,
+                unit_disagreement null -- the venue agrees with itself
+    polymarket  $65.30 buying power   ($123.89 cash)
+                open_orders 0.00, unsettled 0.00, currency USD
+                path /account/balances
+    both        unit_assumption "documented"
+
+**THE FIRST DEPLOY RETURNED `path_unknown`, AND THAT IS THE FEATURE WORKING.**
+`6fece2cd` shipped with a guessed path; production answered
+`VENUE_BALANCES kalshi=ok:13.84 polymarket=path_unknown`, all four candidates
+404 with an identical gRPC `{"code":5}` envelope. A version that had guessed
+harder, or rendered `$0.00`, would have been indistinguishable from an empty
+account. The user then supplied the real path and both API references.
+
+**WHAT THE DOCS REPLACED.** (1) The path is PLURAL -- `/v1/account/balances`;
+the guess list had the singular, one character out. (2) The response is a LIST
+keyed by `currency` and each row carries `pendingWithdrawals[].balance`, so a
+generic field scan would have reported money LEAVING the account as the money
+in it -- now parsed by name. (3) `buyingPower` is not `currentBalance` and is
+the right figure for a cap comparison. (4) **No unit is assumed anywhere any
+more**: Polymarket is `number<decimal>`, and Kalshi ships `balance_dollars` as
+a fixed-point string beside the int64 cents, so the division became a
+CROSS-CHECK.
+
+**THE READING EARNED ITS PLACE IMMEDIATELY.** Neither venue can reach its own
+day cap: kalshi $49.01 cap vs $11.55 spendable (4.2x), polymarket $100.01 vs
+$65.30 (1.5x). Polymarket's cash and buying power differ by $58.59 with open
+orders AND unsettled funds both zero -- collateral against open positions --
+which is precisely why a cap is checked against buying power and not cash.
+
+**FOLLOW-ON, from mapping both references (`deploys.md` 2026-08-26 21:0xZ):**
+`GET /portfolio/settlements` and `/markets/{id}/settlement` would let the venue
+settle our positions directly, which is the shortest path to `settled > 0` --
+the gate the whole feedback loop is stuck behind. `gateway.polymarket.us` serves
+markets/events/series/sports/books/BBO with NO key, while we sign every one of
+those reads against the private host. `GET /sports/leagues/{slug}/events`
+replaces `find_first_game_offset` (`#559`) with a mechanism instead of a
+heuristic. Kalshi order groups enforce a contract cap AT THE EXCHANGE, which
+survives our worker dying mid-slate as an in-process cap cannot. **None of
+these are verified -- documented only.**
+
+**CORRECTION OWED TO `kalshi_orders.py`:** its comment says the replacement
+order path is unknown because "the docs host is blocked from this environment".
+It is not -- both references were read from a Claude session today via the
+browser tool. That belief is why the V2 path had to be hand-supplied after a
+410. Also, the order READ path still defaults to legacy `/portfolio/orders`
+via `KALSHI_ORDER_READ_PATH`; the 410 was on the write path only, so reads are
+probably fine, but that is an assumption rather than a check.
+
+
 
 `[user 2026-08-26]` *"are we able to display kalshi and polymarket balances on
 the portfolio page?"* Yes, and the answer is shaped by two constraints that both
