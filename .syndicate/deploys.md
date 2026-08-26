@@ -30842,3 +30842,93 @@ on 99 targeted tests; the broad result now backs it. Two earlier sweep attempts
 exited 124 (timeout) and one exited 4 (`--timeout` not installed, pytest-timeout
 absent) — neither was a failure, and I should not have described either as
 inconclusive evidence of anything.
+
+### CORRECTION to the paragraph above, from the SECOND build on the same instance
+
+I wrote "the board is computing, not queued" as a general conclusion. **It is
+true of the COLD build only.** The next build on the same instance:
+
+    cold (first build after boot)  wall_s=747.8  cpu_s=670.1  off_cpu_pct=10.4
+    warm (next build, same pid)    wall_s=167.0  cpu_s= 79.2  off_cpu_pct=52.6
+
+**The warm build is 4.5x faster AND spends half its time off-CPU.** So the
+board has two different failure shapes and one reading cannot describe both.
+Anyone quoting `off_cpu_pct=10.4` must say which build it came from.
+
+**WHY THIS MATTERS FOR THE ORIGINAL INCIDENT, and it closes the loop on it:**
+the reported symptom was a board frozen ~20 minutes. A restart forces a COLD
+build, and the cold build is the 12-minute one. Earlier tonight the
+refresh-worker took **15 deploys in 6h15m** (median uptime 1202s) — shorter than
+one cold build. So essentially **every build in that window was a cold build,
+and several were killed before finishing.** Deploy churn and board staleness are
+the same fact, not two.
+
+### What changed 4-6 hours ago — the board build WAS faster, and the step is findable
+
+`BUILD_SPAN_EXIT stage=candidate_collection_with_fallback` predates tonight's
+work, so production carries its own history. Excluding cache hits (`0.0`):
+
+    16:38 76s  16:54 69s  17:04 76s  17:14 78s  17:30 85s  17:40 81s  17:51 96s
+    18:05 88s  18:19 144s 18:31 94s  18:40 77s  18:50 99s
+    19:09 79s  19:19 79s  19:33 67s  19:41 61s  19:47 48s  20:08 88s
+    -------------------------------- STEP --------------------------------
+    20:28 142s 20:44 183s 21:07 164s 21:37 149s 21:48 162s 21:58 150s
+    22:10 141s 22:52 364s          (04:47 today) 150s
+
+**Median ~80s through 20:08Z, ~150-180s from 20:28Z on. The step brackets one
+deploy and only one:**
+
+    20:20:57Z  461ee74b  "Register the MLB props and soccer the board was already asking for"
+
+Instance ids confirm the restart across the step (`-dkfk6` at 20:08, `-8rf9h` at
+20:28). No other deploy landed in the gap.
+
+**THE MECHANISM IS IN THE COMMIT MESSAGE AND IT IS NOT A DEFECT.** It registered
+six more MLB player-prop series (KXMLBRBI, KXMLBTB, KXMLBERA, KXMLBHA, ...) that
+the board had been asking for by name and never fetching, and made soccer
+registrable by competition title. The board got slower because it is now
+CONSIDERING MARKETS IT PREVIOUSLY COULD NOT SEE. That is the change working.
+
+**And it keeps growing without another deploy** — the commit says so explicitly:
+*"Any of them registers the moment Kalshi lists it, with no deploy."* That is
+why the curve CLIMBS after the step (142 -> 183 -> 164 -> 150 -> 162 -> 141 ->
+364) instead of stepping once and holding. Later work compounded it: `#559` took
+Polymarket 7,936 -> 17,413 markets (00:13Z), Kalshi grammars added 1,040 (01:06Z)
+and 1,958 (01:54Z).
+
+**HONEST LIMITS ON THIS ATTRIBUTION.** (a) It is a correlation with the only
+deploy in the gap plus a plausible mechanism — not a bisect. (b) 18:19Z already
+read 144s BEFORE the step, so run-to-run variance is real and no single sample
+proves anything. (c) This span is 150s of a 748s build; the 313s block has NO
+historical series, so **"the whole build doubled because of 461ee74b" is NOT
+supported** — only that this one stage did. The spans shipped below are what
+would extend the series to the rest of the function.
+
+---
+
+## 2026-08-26 — `#567` follow-through: spans on the two silent blocks (NOT YET DEPLOYED)
+
+`_build_span_enter` / `_build_span_exit` in `pipeline/intelligence_state.py`,
+wrapping the three stages that had no production log line:
+
+- `build_intelligence_overview` — the **313s** block. Timed all along via
+  `_profile_stage` -> logger.info, which does not reach Render's collector, so
+  it has been measured for months and read by nobody.
+- `candidate_building` — same cause, `_log_stage_timing` is logger.info.
+- `manifest_odds_history_join` — never timed at all, plus a new
+  `ODDS_HISTORY_LOAD_SECONDS total_s= sports= <slug>=<s> ...` line reporting
+  `_load_odds_history_payload_for_sport` **per sport, sorted worst-first**, so
+  the expensive shard names itself rather than being averaged away.
+
+ENTER/EXIT pairs, no reindent of the loops (a whitespace-only diff over
+unmeasured code is where a real change hides). Both helpers never raise and
+report `elapsed_s=unknown` on an unreadable clock rather than inventing a
+number. 10 tests, including both directions (a busy span must read longer than
+an idle one), a broken clock, a broken stdout, and a **mutation-checked**
+pairing invariant — deleting one `_build_span_exit` turns it red, verified.
+
+verify (when deployed): `BUILD_SPAN_EXIT stage=build_intelligence_overview`
+should account for ~313s of a cold build, and `ODDS_HISTORY_LOAD_SECONDS` should
+name soccer as the worst shard. If the overview span comes back SMALL, the 313s
+is somewhere else in that stretch and this instrumentation was aimed wrong —
+say so rather than reaching for the next hypothesis.
