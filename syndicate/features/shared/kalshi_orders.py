@@ -262,6 +262,52 @@ _DEFAULT_ORDER_PATH = "/portfolio/events/orders"
 _V2_TIME_IN_FORCE = "good_till_canceled"
 _V2_SELF_TRADE_PREVENTION = "taker_at_cross"
 
+# `exchange_index` IS A SHARD SELECTOR, NOT A CONSTANT. THIS IS THE BUG.
+#
+# The sample body carried `"exchange_index": 0` and it was copied as if it were
+# part of the contract's fixed furniture, alongside `post_only: false`. The
+# field reference the owner supplied 2026-08-26 says otherwise, verbatim:
+#
+#   exchange_index -- Exchange shard index. If omitted, auto-routes when
+#   ticker is provided; otherwise defaults to 0. Use -1 to require
+#   auto-routing by ticker.
+#
+# So sending 0 does not mean "the default"; it PINS the order to shard 0. A
+# market that lives on any other shard is not there, and the matching engine
+# says so with the only words it has for a ticker it cannot see on the shard it
+# was asked about: `market_not_found`.
+#
+# THAT IS EXACTLY THE SHAPE THAT HAS BEEN MEASURED ALL WEEK, and it is the only
+# hypothesis left that survives every reading:
+#
+#   * GET /markets/<ticker> returns `status=active` with both legs quoted --
+#     reads are not sharded, so the market genuinely exists (measured on
+#     KXMLBKS, KXMLBOUTS, KXMLBHIT, KXMLBRBI, KXMLBHRR, KXMLBTOTAL).
+#   * The POST 404s from the SAME host, 0.5s later (`fetch_base` ==
+#     `order_base`, measured 2026-08-26T01:18:47Z) -- so it is not the host.
+#   * BOTH sides fail and both sides have filled -- so it is not `bid`/`ask`.
+#   * The body is byte-identical in shape to the two KXMLBKS submits that
+#     SUCCEEDED on 2026-08-24 -- so it is not a field name or a unit.
+#   * Successes and failures are the same market family on the same day, which
+#     is what a per-market shard assignment looks like and what a code
+#     regression does not.
+#
+# -1 rather than omitting the key: both auto-route, but -1 REQUIRES routing by
+# ticker, so a future body that loses its ticker fails loudly instead of
+# quietly landing on shard 0 again. Overridable without a deploy because this
+# is the field the venue is most likely to keep moving.
+_V2_EXCHANGE_INDEX_AUTO = -1
+
+
+def _v2_exchange_index() -> int:
+    raw = (os.environ.get("KALSHI_ORDER_EXCHANGE_INDEX") or "").strip()
+    if not raw:
+        return _V2_EXCHANGE_INDEX_AUTO
+    try:
+        return int(raw)
+    except ValueError:
+        return _V2_EXCHANGE_INDEX_AUTO
+
 
 def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
     """The body `POST /portfolio/events/orders` takes. PURE -- no clock, no net.
@@ -345,7 +391,7 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
         "cancel_order_on_pause": False,
         "reduce_only": False,
         "subaccount": 0,
-        "exchange_index": 0,
+        "exchange_index": _v2_exchange_index(),
     }
 
 
@@ -437,7 +483,12 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         f" ticker={body.get('ticker')} side={body.get('side')}"
         f" count={body.get('count')}"
         f" price={body.get('price') or [v for k, v in body.items() if 'price' in k]}"
-        f" tif={body.get('time_in_force')}",
+        f" tif={body.get('time_in_force')}"
+        # THE FIELD UNDER TEST. Printed on the SUBMIT and not only on the
+        # failure, because the reading that settles this is a shard other than
+        # 0 filling -- and a line that only appears when things break cannot
+        # show that.
+        f" exchange_index={body.get('exchange_index')}",
         flush=True,
     )
     try:
@@ -460,7 +511,16 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         # BOTH asks quoted (`yes_ask=0.5700 no_ask=0.4400`). Nothing about the
         # market differs from the one that filled.
         #
-        # WHAT IS LEFT IS THE HOST. `_BASE_URLS` is a three-entry FALLBACK
+        # RESOLVED 2026-08-26: IT WAS `exchange_index`. The paragraphs below
+        # are the elimination that got there, kept because each one closed a
+        # hypothesis that would otherwise be re-opened. The answer is in
+        # `_V2_EXCHANGE_INDEX_AUTO`: a literal 0 pins the order to shard 0, and
+        # `market_not_found` is what a matching engine says about a ticker that
+        # is not on the shard it was asked about. Everything below correctly
+        # ruled out the host, the side, the market shape and the event field --
+        # it just never questioned a field copied out of the sample body.
+        #
+        # THE HOST -- RULED OUT. `_BASE_URLS` is a three-entry FALLBACK
         # CHAIN for reads -- `fetch_market` walks it until one answers and
         # returns which one did -- while `_orders_url()` pins `_BASE_URLS[0]`
         # unconditionally. A market served by base[1] would GET fine and POST
