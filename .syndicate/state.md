@@ -69,6 +69,52 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
+## [kalshi-venue-execution] KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lane kalshi-spread-join-sign]`
+
+**Kalshi splits markets across EXCHANGE SHARDS, and balances are PER-SHARD.**
+`GET /trade-api/v2/exchange/status`: `0 Default`, `1 Combos`, `2 Crypto`,
+**`3 Tennis & Baseball`** — all `trading_active`. `exchange_index` is on the
+PUBLIC market payload, so the shard of any ticker is readable WITHOUT
+credentials. MLB is shard 3; NFL, NBA and WNBA are shard 0.
+
+**The account had collateral only on shard 0, so every MLB order failed.** Split
+perfect at n=12: every fill ever is on a funded shard, every failure was shard 3
+before funding. `exchange_index: 0` (pinned) gave `market_not_found`; `-1`
+(auto-route) gave `user_not_found: <uuid>`. **Both errors were literally true and
+NEITHER was ours.** Discharged 2026-08-26 after the user moved $25 to shard 3 —
+three MLB fills, all `executed`, all `exchange_index=3`.
+
+**THIS IS THE ACCOUNT HOLDER'S ACTION, NOT THE VENUE'S.**
+docs.kalshi.com/getting_started/exchange_sharding.md: *"Subaccount balances are
+local to a specific exchange instance"*, *"Programmatic traders must preallocate
+collateral on a given exchange shard before order placement."* Fund at
+kalshi.com/account/exchange-indexes or via the intra-account-transfer API;
+`set-target-balance-allocation` auto-rebalances. `KALSHI_ORDER_KNOWN_SHARDS`
+(live-odds-worker) is `0,3`.
+
+**The order contract is CONFIRMED FROM THE DOCS, not inferred:**
+`POST /portfolio/events/orders`; `side` is `bid`/`ask` **quoted from the YES leg
+only** (no `action` field, no separate buy/sell); `exchange_index: -1` requires
+auto-routing by ticker.
+
+**SPREADS WERE PAIRING WITH THE OPPOSITE BET.** A Kalshi spread states a MARGIN
+(`"Texas wins by over 1.5 runs"` = `TEX -1.5`); the board writes a HANDICAP, so
+that game's rows are `TEX +1.5` / `CWS -1.5`. The join keyed on Kalshi's bare
+MAGNITUDE, so `1.5 == 1.5` paired the market with the `+1.5` row. Measured over
+the served board and 90 open KXMLBSPREAD markets: **15 of 30 matches put YES on
+`+1.5`**; on the live book all 11 spread orders carried the ticker of the club
+they were FADING. Only `_side_to_kalshi` refusing `home`/`away` kept it off the
+venue. FIXED both ends — the join names both reachable rows (NAMED club at `-X`
+-> YES, OTHER club at `+X` -> NO) and the order builder derives the leg from the
+SIGN of the line. AFTER: 0 violations. First spread order ever placed
+2026-08-26T17:26:18Z, `KXMLBSPREAD-26AUG261540CHCAZ-AZ2` home `-1.5` -> YES,
+filled 3 @ 0.33, venue title *"Arizona wins by over 1.5 runs?"* matching the row.
+
+**Cloud sessions cannot reach the venue or docs hosts** (`connect_rejected`),
+which is why several comments in this path recorded guesses. Both hosts answer
+from a non-proxied network. Venue facts:
+`.syndicate/findings_2026-08-26_venue_api_unblock.md`.
+
 ## [kalshi-coverage-vs-oddsapi] KALSHI COVERAGE: capture is healthy, the JOIN is the bottleneck, and two prop vocabularies do not exist `[verified 2026-08-25, lane kalshi-oddsapi-coverage-audit]`
 
 Full audit: `docs/ai_context/kalshi_oddsapi_coverage_audit.md` (branch
@@ -142,6 +188,20 @@ is right and should stand -- the EXAMPLE is falsified and misleads anyone who
 checks it.
 
 ## [portfolio-settlement] PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[verified 2026-08-22, lane portfolio-ledger-service-split]`
+
+**SETTLEMENT BY SPORT `[verified 2026-08-26, lane kalshi-spread-join-sign]`:**
+MLB settles (157 all-time). **WNBA settled ZERO until 2026-08-26** — the order
+carries the OddsAPI board hash while `live_player_box_<date>.json` carries ESPN
+ids, two namespaces that cannot meet, so every order refused
+`game_not_in_live_box`. FIXED by matchup recovery on the WNBA tri-code pair
+(`bet_status_wnba`), the same shape `bet_status_mlb` already used. Reading
+16:24:12Z: `game_not_in_live_box` **9 -> ABSENT**, `graded` **0 -> 3**
+(`outcomes={'won': 3}`), all-time wnba `0 -> 2`. **SOCCER IS STILL ZERO
+ALL-TIME.** Its cause is known and a fix is deployed but UNDEMONSTRATED:
+`live/soccer_live_lens.json` is a ROLLING SINGLE-DATE snapshot and both readers
+gate on `date == selected_date`, so once it rolls the yesterday pass (which
+`settle_orders` runs deliberately) can read nothing on refresh-worker. Dated
+finals retention added; it only accumulates FORWARD.
 
 **`/api/portfolio/summary` read `settled_count: 0, avg_clv: null` for weeks, and
 settlement was never the cause.** Three defects, stacked; the first two are FIXED
@@ -5460,3 +5520,57 @@ card — **never yet seen on a live card.**
 **`second_half_shot_multiplier = 1.22` IS NOT WRONG.** Measured 57.1% ± 3.7pp
 second-half goal share against its assumed 55–56% — inside one standard error.
 Do not change it without a larger sample.
+
+---
+
+## [kalshi-execution] Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`)
+
+**DONE 2026-08-26: shard 3 is FUNDED — $25 moved to exchange index 3**, and
+`KALSHI_ORDER_KNOWN_SHARDS=0,3` is set on live-odds-worker (set by
+syndicate-43, readback confirmed). Kalshi balances are PER-SHARD and must be
+preallocated; shard 3 is "Tennis & Baseball", which is why only MLB failed.
+
+**VERIFIED 16:19:13Z — MLB IS FILLING. Funding shard 3 was the whole blocker.**
+
+```
+RECONCILED KXMLBHRR-26AUG261310TBDET-DETHLEE50-2 submitted->filled
+  contracts=11 fill_price=0.4  fees=0.0924
+RECONCILED KXMLBTOTAL-26AUG261940TEXCWS-8        submitted->filled
+  contracts=5  fill_price=0.47 fees=0.0436
+```
+
+Those are the SAME two tickers that returned `market_shard=3` refusals an hour
+earlier. First MLB fills since 08-24. ~$6.75 of the $25 committed.
+
+**The next constraint is collateral, not correctness:** $25 on shard 3 against a
+$10/order cap is a couple of orders per cycle. Expect insufficient-collateral
+errors rather than shard errors from here.
+
+**Verified working today:** Kalshi fills on shard 0 (`KXWNBA3PT` filled
+16:03:06Z, 10 contracts @ 0.40 + 0.168 fees, ~1s round trip). Polymarket
+reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
+15/book, 25/day.
+
+**Kalshi order body — settled, do not re-litigate:**
+- `POST /portfolio/events/orders` on `external-api.kalshi.com` — CONFIRMED from
+  the venue's own docs, not inferred.
+- `exchange_index: -1` (auto-route by ticker). A literal `0` PINS shard 0 and
+  returns `market_not_found` for anything elsewhere.
+- `subaccount: 0` — omitting it was deployed, disproven, reverted. Every fill
+  the account has ever taken carries `0`.
+- `side` is `bid`/`ask` only, quoted from the YES leg. The UI's
+  `op_order_side`/`op_side` are UI params, not body fields.
+
+**Still open, none of it blocking:**
+- `#573` — refuse by READING `GET /portfolio/balance?exchange_index=N` instead
+  of a hardcoded `funded_shards` list. Self-heals the moment the shard is
+  funded; turns the last inferred step into a measurement.
+- Kalshi spreads/h2h side plumbing — **owned by syndicate-43**
+  `[USER DECISION 2026-08-26]`. `unmappable_side` is currently a GUARD, not a
+  gap: the join pairs a `+1.5` board row with the same team's `-1.5` market, so
+  clearing the refusal without fixing the join inverts ~10 bets a cycle.
+- `no_venue_ticker` on h2h — `price_source=aggregator`, so no Kalshi ticker is
+  ever stamped. Nobody holds this.
+- Polymarket per-order reads cannot detect orphans by construction (no list
+  route, `GET /v1/orders` -> `code: 12` UNIMPLEMENTED). `coverage=per_order`
+  says so on every RECONCILE line.

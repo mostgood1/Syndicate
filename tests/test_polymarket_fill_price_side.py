@@ -87,3 +87,77 @@ def test_the_blocked_order_now_passes_the_dollar_bound():
     # And the uncomplemented value must NOT have cleared it -- otherwise this
     # test would pass even with the bug restored.
     assert 2.39 * 0.565 > 1.04 * 1.25
+
+
+def test_a_fill_above_our_own_limit_is_WITHHELD_not_recorded(capsys):
+    """THE BOS/MIA ORDER, and the check that would have caught it live.
+
+    The complement rule above is a RULE about which side `avgPx` is quoted on.
+    Nothing verified its OUTPUT, so when it was applied to a market it should
+    not have been, the ledger recorded a price the order could never have
+    filled at -- and said nothing.
+
+    MEASURED 2026-08-26, `tsc-mlb-bos-mia-2026-08-26-8pt5`, real money:
+        submitted  limit 0.43, quantity 9.60 ($4.13)
+        venue      semi-filled 7.11 of 9.60
+        recorded   fill_price 0.57 -> 7.11 x 0.57 = $4.05
+        ceiling    7.11 x 0.43     =            $3.06     32% over
+
+    This asserts the only thing provable without venue semantics: a BUY does
+    not fill above the price we ourselves sent.
+    """
+    view = venue_order_view(_order(
+        marketSlug="tsc-mlb-bos-mia-2026-08-26-8pt5",
+        cumQuantity="7.11",
+        avgPx="0.43",                       # complemented to 0.57 by the rule
+        outcomeSide="OUTCOME_SIDE_NO",
+        price={"value": "0.43", "currency": "USD"},   # our submitted limit
+    ))
+
+    # The fill is REAL and must survive -- only the price is untrustworthy.
+    assert view["state"] == "filled"
+    assert view["filled_count"] == 7.11
+    # WITHHELD, not corrected: flipping it back would be a third guess at the
+    # same convention. Reconciliation falls back to the price we asked for.
+    assert view["fill_price"] is None
+
+    out = capsys.readouterr().out
+    assert "FILL_ABOVE_LIMIT" in out
+    assert "submitted_limit=0.43" in out
+
+
+def test_a_normal_NO_fill_is_untouched_by_the_limit_check(capsys):
+    """The check must not fire on the case the complement rule exists for.
+
+    `under 6.5 CLE@LAA`: avgPx 0.565 on the wire, 0.435 to us, against a limit
+    of 0.44. 0.435 <= 0.44, so this is a normal fill and nothing is withheld.
+    """
+    view = venue_order_view(_order(
+        avgPx="0.565",
+        outcomeSide="OUTCOME_SIDE_NO",
+        price={"value": "0.44", "currency": "USD"},
+    ))
+    assert view["fill_price"] == 0.435
+    assert "FILL_ABOVE_LIMIT" not in capsys.readouterr().out
+
+
+def test_a_rounding_step_over_the_limit_does_NOT_fire(capsys):
+    """The venue snaps to a tick. This must catch an INVERTED price -- a whole
+    complement away -- never a rounding step, or it would withhold good prices
+    and reconciliation would drift onto requested prices for no reason.
+    """
+    view = venue_order_view(_order(
+        avgPx="0.44", outcomeSide="OUTCOME_SIDE_YES",
+        price={"value": "0.435", "currency": "USD"},
+    ))
+    assert view["fill_price"] == 0.44
+    assert "FILL_ABOVE_LIMIT" not in capsys.readouterr().out
+
+
+def test_an_absent_limit_cannot_withhold_anything(capsys):
+    """A venue row with no readable limit must leave the price alone. The check
+    is a refutation, and with nothing to refute against it has no opinion.
+    """
+    view = venue_order_view(_order(avgPx="0.40", outcomeSide="OUTCOME_SIDE_YES"))
+    assert view["fill_price"] == 0.40
+    assert "FILL_ABOVE_LIMIT" not in capsys.readouterr().out

@@ -5707,7 +5707,7 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.mlb.cards import build_cards_page_context
         from syndicate.features.mlb.cards import _enrich_games_with_tracked_market_lines
 
@@ -5818,7 +5818,7 @@ class _NBADataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.nba.cards import build_cards_page_context
 
         payload = build_cards_page_context(context.context_label, allow_stored_date_fallback=_allow_stored_date_fallback())
@@ -5868,7 +5868,7 @@ class _WNBADataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.wnba.cards import build_cards_page_context
 
         payload = build_cards_page_context(context.context_label, allow_stored_date_fallback=False)
@@ -5934,7 +5934,7 @@ class _NHLDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.nhl.cards import build_cards_page_context
 
         payload = build_cards_page_context(context.context_label)
@@ -5985,7 +5985,7 @@ class _NCAABDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.ncaab.cards import build_cards_page_context
 
         payload = build_cards_page_context(context.context_label)
@@ -6114,7 +6114,7 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return _football_in_season(today_value)
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         # Regular season and preseason never overlap on the calendar, so
         # this gates on season phase and returns ONE or the other, never a
         # merge of both -- merging two different schedules' games into one
@@ -6208,6 +6208,11 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
                 except Exception:
                     regular_board = []
                 regular_games = _stamp_market_recommendations(regular_games, regular_board)
+                if include_upcoming:
+                    # `#575`. The whole week, for the chip strip. Narrowing to
+                    # the requested date is right for a rail meaning "today"
+                    # and wrong for the board, whose cards run a week ahead.
+                    return regular_games
                 return [
                     game
                     for game in regular_games
@@ -6222,6 +6227,25 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
         except Exception:
             board_games = []
         games = _stamp_market_recommendations(games, board_games)
+        if include_upcoming:
+            # `#575`. THE MEASURED DEFECT: `CHIP_JOIN_COVERAGE sport=nfl chips=0
+            # ... cards=106 no_chip_available=106` (2026-08-26T17:16:23Z). Every
+            # NFL compact card printed full club names and nothing reported it
+            # until `#541`'s telemetry existed.
+            #
+            # Root cause, traced rather than guessed: on 2026-08-26
+            # `preseason_week_for_date` is None (no preseason game that day) AND
+            # `regular_season_game_ids_for_date` is None (season not started), so
+            # this falls to `preseason_target_week` = 4 and then
+            # `_nfl_games_on_requested_date` filters week 4's games down to the
+            # ones played on 08-26 -- of which there are none. Correct for a
+            # "today" rail. Fatal for a strip serving a board carrying 106 cards
+            # for games up to two weeks out.
+            #
+            # Returning the resolved week UNFILTERED is what the board needs;
+            # the chip's own `status_token` already prefixes a date on anything
+            # that is not today, so a future fixture reads as one.
+            return games
         return _nfl_games_on_requested_date(games, context.context_label)
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
@@ -6247,7 +6271,7 @@ class _NCAAFDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return _football_in_season(today_value)
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         # Layer 2 fix, mirrors _NFLDataProvider.games(): switched from
         # build_cards_page_context (a stale/historical saved-summary
         # snapshot path) to build_smartsim_cards_page_context, the real
@@ -6399,7 +6423,7 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
 
         return bool(active_leagues_for_date(today_value))
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.soccer.cards import build_cards_page_context
 
         # THE DATE THE CALLER ASKED FOR, not the wall clock.
@@ -6459,8 +6483,22 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
             # of a season) would otherwise emit every fixture twice, and two
             # chips for one fixture is a collision the browser's canonical index
             # resolves by DISCARDING BOTH.
+            # `#575`. THE NEXT WEEK IS FOR THE CHIP STRIP, NOT THE HOME RAIL.
+            #
+            # `#542` widened this unconditionally and that was half a fix: it
+            # closed the board's coverage (soccer `no_chip_available` 251 -> 0)
+            # and, unnoticed, DOUBLED the home rail from 98 games to 210,
+            # because `_load_home_game_items` falls through to
+            # `_compact_game_cards(home_games)` for soccer and renders every one
+            # -- with a count badge then claiming 210 games today. Measured here
+            # 2026-08-26 before this fix.
+            #
+            # The horizon is now the CALLER's to ask for, which is the only way
+            # one method can serve a rail that means "today" and a strip that
+            # means "the board's next seven days".
             seen_ids: set[str] = set()
-            for week_offset in (0, 1):
+            week_offsets = (0, 1) if include_upcoming else (0,)
+            for week_offset in week_offsets:
                 target_week = int(week) + week_offset
                 try:
                     payload = build_cards_page_context(league, target_week, season)

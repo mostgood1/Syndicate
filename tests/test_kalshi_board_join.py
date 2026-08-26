@@ -587,12 +587,24 @@ def _spread_market(**kw):
 
 
 def _tex_cws_rows(market="spreads", line=3.5, sides=("away", "home")):
+    """Board rows for TEX @ CHW.
+
+    A SPREAD IS WRITTEN WITH OPPOSITE SIGNS PER SIDE, and this helper used to
+    give both sides the same positive line -- which no board does. Measured on
+    the served book 2026-08-26, TEX @ CWS: `away line=+1.5 price=-185`,
+    `home line=-1.5 price=+155`. The flat fixture is what let the join's
+    magnitude-only lookup look correct in tests while pairing every spread with
+    the opposite bet in production. A total is NOT signed: it has one line and
+    two directions, which is why the signing keys off the market.
+    """
+    signed = str(market).startswith("spreads")
     return [
         {
             "sport": "mlb",
             "event_id": "e1",
             "market": market,
-            "line": line,
+            # away favoured by `line`, home taking the points.
+            "line": (-line if side == "away" else line) if signed else line,
             "side": side,
             "away_team": "TEX",
             "home_team": "CHW",
@@ -908,3 +920,78 @@ def test_the_unreadable_sample_is_bounded_and_the_count_still_is_not(monkeypatch
     assert len(report["unreadable_titles"]) == 3, "the sample must stay bounded"
     assert len(report["unreadable_by_series"]) == 9, "every series must still be NAMED"
     assert report["reasons"][REASON_UNREADABLE_TITLE] == 9
+
+
+def _tex_dog_rows(line=1.5):
+    """The production shape that produced the inversion: TEX is the UNDERDOG.
+
+    Copied from the served board 2026-08-26 (TEX @ CWS): away +1.5, home -1.5.
+    """
+    return [
+        {
+            "sport": "mlb",
+            "event_id": "e1",
+            "market": "spreads",
+            "line": line if side == "away" else -line,
+            "side": side,
+            "away_team": "TEX",
+            "home_team": "CHW",
+        }
+        for side in ("away", "home")
+    ]
+
+
+def test_a_spread_never_pairs_with_the_opposite_handicap(monkeypatch):
+    """THE INVERSION THIS FIX EXISTS TO STOP, pinned as a refusal.
+
+    "Texas wins by over 1.5 runs" is TEX -1.5. When the board has TEX at +1.5
+    -- Texas taking the points, the OPPOSITE bet -- this market describes a
+    margin our board never wrote a row for, so it must pair with NOTHING.
+
+    Before the sign fix the join keyed on the bare magnitude, found the +1.5
+    row because 1.5 == 1.5, saw its side (`away`) match the named club, and
+    priced it as YES. Measured on the live book: 11 of 11 spread orders were
+    stamped with a ticker naming the team they were FADING. Only
+    `_side_to_kalshi`'s refusal of `home`/`away` on spreads kept them off the
+    venue -- this test is what makes that refusal unnecessary rather than
+    load-bearing.
+    """
+    from syndicate.features.shared.kalshi_board_join import REASON_SPREAD_ORIENTATION
+
+    market = _spread_market(
+        title="Texas wins by over 1.5 runs?",
+        ticker="KXMLBSPREAD-26AUG241940TEXCWS-TEX2",
+    )
+    report = _priced([market], _tex_dog_rows(), monkeypatch)
+
+    assert report["matched"] == 0, report["matches"]
+    assert report["reasons"][REASON_SPREAD_ORIENTATION] == 2
+    # Stated as its own assertion because this is the money question, and a
+    # count of zero could be reached by an unrelated refusal.
+    assert not [
+        m
+        for m in report["matches"]
+        if m["board_side"] == "away" and m["kalshi_side"] == "yes"
+    ]
+
+
+def test_the_favourites_market_pairs_both_rows_the_right_way_round(monkeypatch):
+    """Same slate, the market that DOES describe a bet the board wrote.
+
+    CHW is the home favourite at -1.5, so "Chicago White Sox wins by over 1.5"
+    is YES on the home row, and its NO is the away row taking +1.5. One ticker,
+    both rows, opposite sides -- and the line carried on each match is the
+    BOARD's signed line, so the ticker resolver's index cannot rebuild the
+    same +X/-X collision one layer later.
+    """
+    market = _spread_market(
+        title="Chicago White Sox wins by over 1.5 runs?",
+        ticker="KXMLBSPREAD-26AUG241940TEXCWS-CHW2",
+    )
+    report = _priced([market], _tex_dog_rows(), monkeypatch)
+
+    by_side = {m["board_side"]: m for m in report["matches"]}
+    assert by_side["home"]["kalshi_side"] == "yes"
+    assert by_side["home"]["line"] == -1.5
+    assert by_side["away"]["kalshi_side"] == "no"
+    assert by_side["away"]["line"] == 1.5

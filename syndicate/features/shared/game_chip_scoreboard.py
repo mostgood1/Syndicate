@@ -12,10 +12,12 @@ single, artifact-backed source instead of each re-deriving game state.
 
 from __future__ import annotations
 
+import inspect
 import re
 import threading
 import time
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any
 
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE, central_today_iso
@@ -527,6 +529,22 @@ GAME_CHIP_DEFAULT_SPORTS: tuple[str, ...] = (
 )
 
 
+@lru_cache(maxsize=32)
+def _games_accepts_include_upcoming_by_type(provider_type: type) -> bool:
+    try:
+        return "include_upcoming" in inspect.signature(provider_type.games).parameters
+    except (TypeError, ValueError):
+        # Unintrospectable: assume the OLD signature. False costs the wider
+        # horizon; True would raise and blank every sport's strip.
+        return False
+
+
+def _games_accepts_include_upcoming(provider: Any) -> bool:
+    """Cached per provider TYPE, not per call -- this runs once per sport per
+    build and `signature()` is not free."""
+    return _games_accepts_include_upcoming_by_type(type(provider))
+
+
 def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, Any]]:
     from syndicate.features.shared.sport_data_provider import get_sport_data_provider
 
@@ -549,7 +567,20 @@ def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, An
         try:
             context = provider.resolve_context(requested_date=date_value)
             is_active_today = provider.is_active(today_value=today_value, context_label=context.context_label)
-            games = provider.games(context, is_active_today=is_active_today)
+            # `#575`. ASK FOR THE BOARD'S HORIZON, not just today.
+            #
+            # PROBED, NOT ASSUMED. `home.py` and this file are separate blobs
+            # and either can be a deploy behind the other -- the exact hazard
+            # `layer2_board._blended_score_accepts` exists for. An unguarded
+            # kwarg would raise TypeError against an older provider and take out
+            # the WHOLE scoreboard strip for every sport, which is strictly
+            # worse than the narrow chips it replaces.
+            if _games_accepts_include_upcoming(provider):
+                games = provider.games(
+                    context, is_active_today=is_active_today, include_upcoming=True
+                )
+            else:
+                games = provider.games(context, is_active_today=is_active_today)
         except Exception:
             continue
         for game in games or []:

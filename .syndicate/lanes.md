@@ -1917,7 +1917,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none. All deploy claims released (`deploy_claim.py status`: all
   four services free).
 
-### polymarket-oddsapi-coverage-audit — OPEN — opened 2026-08-25 — session 0fd6da62-c2cc-543e-b5ea-47d428412dc0
+### polymarket-oddsapi-coverage-audit — **CLAIMS RELEASED 2026-08-26 ~17:0xZ, session archived** — opened 2026-08-25 — session 0fd6da62-c2cc-543e-b5ea-47d428412dc0 (GONE) — **ONE LIVE ENV FLAG IS STILL SET ON `live-odds-worker`, see CLOSE-OUT at the end of this block**
 - Goal: a per-sport, per-market-family map of what Polymarket US LISTS versus
   what Syndicate RESOLVES versus what the board CARRIES versus what OddsAPI
   SUPPLIES, every row observed in a production log line with its timestamp, so
@@ -2082,6 +2082,71 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   slug's `<home>`, ~0.0 means `<away>`, **anything between FALSIFIES the
   symmetric-ladder finding and spreads must stay refused.**
 
+#### CLOSE-OUT 2026-08-26 ~17:0xZ — claims released, session archived
+
+**Deploy claims: NONE HELD.** Verified, not assumed — `deploy_claim.py status`
+reports `web`, `syndicate`, `refresh-worker`, `live-odds-worker` all **free**.
+Four deploys were taken during this session and each is recorded in
+`deploys.md` with the reading that proves it.
+
+**Files: released.** Working tree clean, everything merged to `origin/main`
+(PRs #93, #94, #95, #96). Nothing half-landed.
+
+**THE ONE PIECE OF LIVE STATE THIS SESSION LEAVES BEHIND:**
+
+> **`SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT=1` IS STILL SET ON
+> `live-odds-worker`.** It is a read-only analyser that prints one
+> `SPREAD_SIGN_AUDIT` line per boot and changes no behaviour, so leaving it is
+> safe — but it is not free, and nobody else knows it is there. **Whoever next
+> boots that service: read the line, then unset the flag.** The verdict is
+> still `UNDECIDED` at n=2 (`agree_home=2 disagree=0`,
+> `board_rows_unkeyable=0`, `segment_skipped=495`) because the board rolled to
+> 2026-08-26 carrying only two spread rows. NFL week 1 (2026-08-27) is what
+> gives it a sample. Reading rule is unchanged and is stated above: `rate` ~1.0
+> means `<home>`, ~0.0 means `<away>`, **anything between falsifies the
+> symmetric-ladder finding and spreads must stay refused.**
+
+**What shipped, all measured:**
+
+- The audit itself — `docs/ai_context/polymarket_oddsapi_coverage_audit.md`.
+- `#559` — `find_first_game_offset`'s partition premise was false. Full sweep:
+  **7,936 -> 17,413** game markets, `truncated=False`; downstream
+  `no_candidates|mlb|spreads` 51 -> gone.
+- `#560` — NO-side fills were booked at the YES-side price. **Counted: 3 rows,
+  $3.22**, and all three had already been restamped by the reconciler. Closed
+  and archived with the lesson promoted to `todo.md`: the self-heal only
+  reaches rows where `outcome is None`, so **a settled row is permanent**.
+- `#561` — verified another lane's independent fix rather than shipping mine;
+  their additive `_FILL_COUNT_TOLERANCE` is more correct than the multiplicative
+  one I had planned, because the two bounds guard different error SHAPES.
+- The pytest baseline, regenerated **15 -> 19 of 11,745**.
+- `#570`, `#571`, `#572` filed. `#572` includes the fix AND why the obvious
+  form of it is wrong (`cancel-in-progress` on `main` destroys the record).
+- `.github/workflows/pytest-baseline-update.yml` — dispatch-only, opens a PR.
+
+**WHAT IS NOT DONE, stated plainly so nobody re-derives it:**
+
+1. **CI IS STILL RED, and regenerating the baseline did not fix it.** The gate
+   returned **exit 1 = `EXIT_NEW_FAILURES`** on `682f66e98` — CI failed tests
+   that the regenerated baseline does not contain. **The names were never
+   read**: log artifacts 403 through this session's proxy, and the check-run
+   annotation carries only `Process completed with exit code 1`. They are in
+   run `32988066215`, step *"Full pytest suite (enforced — no NEW failures vs
+   the baseline)"*, printed as `N NEW FAILURE(S) -- not in the baseline:`.
+   **Read that list before regenerating anything** — if they are the same 5
+   order-dependent tests `#569` identified (they pass standalone, fail under
+   `--dist=loadscope`), stabilising those beats recording them.
+2. **The `psutil` explanation is REFUTED, not untested.** `ci.yml` documents
+   that psutil's presence changes which backend `memory_observability` picks.
+   Checked: psutil and playwright are absent in BOTH environments, same Python
+   3.11, same args. So the container/CI divergence is real and unexplained.
+3. **`pytest-baseline-update` has never run.** Dispatching it needs
+   `actions: write`; this session's token returned `403 Resource not
+   accessible by integration`. Run it from the Actions tab or
+   `gh workflow run pytest-baseline-update.yml --ref main`.
+4. **`#571` needs the owner of `0acabd091`**, not this lane, to say whether the
+   widened `_candidate_keys` output is intended for the Polymarket path.
+
 ### kalshi-line-aware-rungs — OPEN — **CLAIMS RELEASED 2026-08-26 03:3xZ, session archived** — BLOCKED ON TWO MEASUREMENTS, do not resume the original goal first — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45 (GONE)
 
 - **CLAIMS RELEASED. The files below are FREE to take.** The lane stays OPEN
@@ -2119,6 +2184,41 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Largest addressable bucket is now `no_matching_board_row=1838`**, not the
   date bucket. Any successor should start there.
 
+### kalshi-spread-join-sign — **CLOSED 2026-08-26** — session syndicate-43 — all four outcomes MET; two shipped-but-undemonstrated items handed on
+- Goal: no Kalshi spread market is ever paired with the board row for the
+  OPPOSITE handicap, and spreads can place. **MET.**
+- Files: `syndicate/features/shared/{kalshi_board_join,kalshi_orders,bet_status_wnba,bet_status_soccer,polymarket_us_orders}.py`
+  + their tests. **ALL CLAIMS RELEASED.**
+- Verification (evidence in `log/2026-08-26.md`, measurements in `deploys.md`):
+  - spreads join — real join over the served board + 90 open KXMLBSPREAD:
+    15 of 30 matches had YES on `+1.5` BEFORE, **0 violations AFTER**
+  - spreads place — 17:26:18Z `KXMLBSPREAD-26AUG261540CHCAZ-AZ2` home `-1.5`
+    -> YES, **filled 3 @ 0.33**, venue title matches the row. First ever.
+  - WNBA settlement — `game_not_in_live_box` **9 -> ABSENT**, graded **0 -> 3**,
+    all-time wnba **0 -> 2**. First WNBA settlement ever.
+  - Kalshi shard — **3 MLB fills on `exchange_index=3`** after the user funded it
+- Deployed: refresh-worker `1d1a6195` (16:11:32Z), live-odds-worker `448dc87d`
+  (17:18:18Z). `render.yaml` untouched throughout — no `blueprint_sync`.
+- **OWED, and the reason this is worth reopening rather than forgetting:**
+  1. **Soccer settlement is 0 ALL-TIME and the fix is UNDEMONSTRATED.** Dated
+     finals retention is deployed but only accumulates FORWARD. Discharged by a
+     soccer order grading on a date whose finals were captured after
+     2026-08-26T16:11Z. Do not report it as fixed before that.
+  2. **Polymarket side resolution is UNRESOLVED.** `over`->YES/`under`->NO is a
+     FIXED constant while the price comes from the name-matched index, and the
+     `outcomes` array orientation VARIES per market (`bos-mia-8pt5` is reversed).
+     One order recorded a complement price. A guard cross-checking the two was
+     built and **REVERTED** — it silently makes the positional reading
+     authoritative, which is the disputed question, and it contradicted three
+     deliberate tests. **Needs venue ground truth, which needs the Polymarket US
+     credentials (on Render; the env read was blocked by the permission
+     classifier).** `FILL_ABOVE_LIMIT` is deployed as detection in the meantime.
+  3. **A peer is waiting on this session.** Lane `polymarket-oddsapi-coverage-audit`
+     asked (commit `e1f94e45`, file channel — cloud->local SendMessage is refused)
+     for the distinct OddsAPI `bookmakers[].key` set. The OddsAPI key is NOT in
+     the local `.env`; the served board's `cells` are keyed by bookmaker and
+     answer it without one.
+- Blocked by: none
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

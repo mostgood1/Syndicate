@@ -12,9 +12,27 @@ MLB cost a day because the board stamps `game_pk` from `row["event_id"]` -- the
 OddsAPI hash -- while StatsAPI wants a numeric gamePk, and `int()` cannot parse
 a hash. Every MLB order resolved to `no_game_pk`.
 
-WNBA has no such gap: `live_player_box_<date>.json` is keyed by `event_id`, the
-SAME id the order carries. No schedule lookup, no matchup recovery, no
-doubleheader ambiguity. The id on the record is the id in the artifact.
+WNBA WAS BELIEVED TO HAVE NO SUCH GAP. IT HAS THE IDENTICAL ONE, AND THIS
+PARAGRAPH USED TO SAY OTHERWISE: "the id on the record is the id in the
+artifact". MEASURED IN PRODUCTION 2026-08-26 -- WNBA had settled ZERO orders
+all-time while MLB had settled 157, and the refusal was `game_not_in_live_box`
+on every one:
+
+    order   event_id "1fb615886a5e9855f01b8c3824e8d937"  (the OddsAPI board hash)
+    box     event_id "WSH@PHX"                           (2026-08-25)
+    box     event_id "401857177"                         (2026-08-26, ESPN)
+
+`_public_live_player_boxscore_payload` echoes back whatever event id its CALLER
+passed, and that caller works in ESPN ids. The board hash is never among them,
+so the two namespaces cannot meet and the lookup could never hit. The old claim
+was an assumption written as a fact and never measured; the fixture that
+'proved' it set both ids to the same string.
+
+So this now does what `bet_status_mlb` does: try the id, then RECOVER FROM THE
+MATCHUP. The recovery key is the WNBA tri-code pair, because the players in the
+box already carry a canonical `team_tri` and `team_aliases.canonical_team`
+deliberately refuses the tri-codes WNBA shares with the NBA (PHX, CHI and DAL
+all return None) -- which is precisely the game this was failing on.
 
 --------------------------------------------------------------------------
 NO FINAL FLAG IN THIS ARTIFACT, AND THAT IS STATED RATHER THAN GUESSED
@@ -54,6 +72,12 @@ REASON_NO_TEAM_SCORES = "no_team_scores_in_player_box"
 REASON_UNMAPPED_MARKET = "unmapped_market"
 REASON_PLAYER_NOT_FOUND = "player_not_in_box"
 REASON_NO_STAT = "stat_not_in_box"
+# The box has no row under the order's event id AND the order carries no teams
+# to recover from. Distinct from `game_not_in_live_box`, which now means "we
+# tried the matchup too and the game genuinely is not in the capture" -- the
+# same split `bet_status_mlb` draws between `no_matchup_on_order` and
+# `matchup_not_on_schedule`.
+REASON_NO_MATCHUP_ON_ORDER = "no_matchup_on_order"
 
 # Canonical board market -> the key the live box row carries.
 # Canonical because `market_keys` owns that vocabulary (`#224`); the RAW board
@@ -148,9 +172,22 @@ def wnba_status_resolver(selected_date: str):
         index = box_index()
         if index is None:
             return {"unavailable_reason": REASON_NO_BOX}
-        players = index.get(event_id)
+        players = index["by_event"].get(event_id)
+        recovered = False
         if players is None:
-            return {"unavailable_reason": REASON_GAME_NOT_IN_BOX}
+            # THE ID MISSING IS THE NORMAL CASE, NOT AN ERROR: the order carries
+            # the board's OddsAPI hash and the box carries an ESPN id. Recover
+            # from the matchup, exactly as MLB does.
+            key_pair = _matchup_key(order.get("away_team"), order.get("home_team"))
+            if key_pair is None:
+                # The ledger row is too thin to recover from -- a different fact
+                # from "the game is not in the capture", and the two must not
+                # share a counter or the work list points at the wrong job.
+                return {"unavailable_reason": REASON_NO_MATCHUP_ON_ORDER}
+            players = index["by_matchup"].get(key_pair)
+            if players is None:
+                return {"unavailable_reason": REASON_GAME_NOT_IN_BOX}
+            recovered = True
 
         row = players.get(normalize_name(order.get("player_name")))
         if row is None:
@@ -173,6 +210,9 @@ def wnba_status_resolver(selected_date: str):
                 return {"unavailable_reason": REASON_NO_STAT}
 
         return {
+            # How the game was found. A recovery that is invisible is a recovery
+            # nobody can audit on the day it joins the wrong game.
+            "matched_by": "matchup" if recovered else "event_id",
             "current_value": value,
             # ALWAYS False -- this artifact carries no game status. See the
             # module docstring: overs still decide on crossing because these are
@@ -185,8 +225,47 @@ def wnba_status_resolver(selected_date: str):
     return resolve
 
 
+
+def _wnba_tri(value):
+    """A WNBA tri-code for a team name, or None.
+
+    `wnba/cards.py` owns this vocabulary and already maps full names onto the
+    same codes the box's `team_tri` carries. Imported rather than restated: a
+    second table here is how two spellings drift, and `bet_status_mlb` reaches
+    into `mlb/cards.py` for `_schedule_raw_games` for exactly the same reason.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        from syndicate.features.wnba.cards import _canonical_wnba_tri
+    except Exception:
+        return None
+    try:
+        tri = _canonical_wnba_tri(text)
+    except Exception:
+        return None
+    tri = str(tri or "").strip().upper()
+    return tri or None
+
+
+def _matchup_key(one, two):
+    """An order-independent key for the two clubs in a game.
+
+    A frozenset, not a tuple: home/away is exactly the convention most likely to
+    be written the other way round on one of the two sides, and a swapped pair
+    that silently fails to join is indistinguishable from an absent game.
+    """
+    left, right = _wnba_tri(one), _wnba_tri(two)
+    if not left or not right or left == right:
+        return None
+    return frozenset((left, right))
+
 def _load_box_index(selected_date: str, normalize_name) -> dict[str, dict[str, Mapping[str, Any]]] | None:
-    """`event_id -> {normalized player name -> row}`, or None if unreadable.
+    """Both indexes over the box, or None if unreadable.
+
+    `{"by_event": {event_id: {player -> row}},
+      "by_matchup": {frozenset(tri, tri): {player -> row}}}`
 
     None means "we could not read the box", which is NOT the same as a box with
     no games in it -- the caller reports them as different reasons.
@@ -204,6 +283,7 @@ def _load_box_index(selected_date: str, normalize_name) -> dict[str, dict[str, M
     payload = record.get("payload") if isinstance(record.get("payload"), Mapping) else record
 
     index: dict[str, dict[str, Mapping[str, Any]]] = {}
+    by_matchup: dict[Any, dict[str, Mapping[str, Any]]] = {}
     for game in payload.get("games") or []:
         if not isinstance(game, Mapping):
             continue
@@ -211,11 +291,32 @@ def _load_box_index(selected_date: str, normalize_name) -> dict[str, dict[str, M
         if not event_id:
             continue
         players: dict[str, Mapping[str, Any]] = {}
+        tris: set[str] = set()
         for player in game.get("players") or []:
             if not isinstance(player, Mapping):
                 continue
             key = normalize_name(player.get("player") or player.get("player_name"))
             if key:
                 players[key] = player
+            tri = str(player.get("team_tri") or "").strip().upper()
+            if tri:
+                tris.add(tri)
         index[event_id] = players
-    return index
+
+        # THE MATCHUP, from the two clubs actually present in the box. Taken
+        # from the PLAYERS because that is the only place this artifact records
+        # a team at all -- the game object carries an id and a player list and
+        # nothing else. An `AAA@BBB` event id is a second source, since the
+        # live-lens path emits that shape on some dates and bare ESPN ids on
+        # others.
+        if len(tris) != 2 and "@" in event_id:
+            parts = [part.strip() for part in event_id.split("@", 1)]
+            if len(parts) == 2 and all(parts):
+                tris = {t for t in (_wnba_tri(parts[0]), _wnba_tri(parts[1])) if t}
+        if len(tris) == 2:
+            # A DOUBLEHEADER WOULD COLLIDE HERE, so the first game wins and the
+            # second keeps only its event id rather than overwriting. Recovering
+            # the WRONG game of a pair grades a bet against the wrong score,
+            # which is worse than not grading it.
+            by_matchup.setdefault(frozenset(tris), players)
+    return {"by_event": index, "by_matchup": by_matchup}

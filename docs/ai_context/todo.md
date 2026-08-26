@@ -1,5 +1,295 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#575` — **NFL had ZERO chips against 106 cards, and my own `#542` had doubled the soccer home rail. One root: `games()` served two callers needing different horizons.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26
+
+**THE NFL DEFECT, measured 2026-08-26T17:16:23Z by `#541`'s telemetry on its
+first real run:**
+
+```
+CHIP_JOIN_COVERAGE sport=nfl chips=0 chip_dates=None cards=106
+  no_chip_available=106
+```
+
+Every NFL compact card printed full club names. Traced, not guessed: on 08-26
+`preseason_week_for_date` is None (no preseason game that day) AND
+`regular_season_game_ids_for_date` is None (season not started), so
+`games()` falls to `preseason_target_week`=4 and then
+`_nfl_games_on_requested_date` narrows week 4 to games played ON 08-26 — of
+which there are none. **Correct for a rail meaning "today". Fatal for a strip
+serving a board whose cards run weeks ahead.**
+
+**AND I FOUND A REGRESSION OF MY OWN WHILE LOOKING.** `#542` widened soccer to
+two matchdays UNCONDITIONALLY. `games()` is shared with `_load_home_games`, and
+soccer falls through `_load_home_game_items` to
+`_compact_game_cards(home_games)` which renders every one — so the home rail
+went **98 -> 210 games**, with a count badge claiming 210 games today. Measured
+here before the fix. I shipped `#542` without checking its other caller.
+
+**THE FIX: the horizon is the CALLER's to ask for.** `games()` takes
+`include_upcoming: bool = False`. The rail keeps today; `build_game_chips`
+passes True.
+
+  * soccer: `week_offsets = (0, 1) if include_upcoming else (0,)`
+  * NFL: `include_upcoming` returns the resolved week UNFILTERED, skipping
+    `_nfl_games_on_requested_date` (kept, and pinned by test, for the rail)
+
+**PROBED, NOT ASSUMED.** `home.py` and `game_chip_scoreboard.py` are separate
+blobs and either can be a deploy behind — an unguarded kwarg would raise
+TypeError against an older provider and blank EVERY sport's strip, strictly
+worse than the narrow chips it replaces. `_games_accepts_include_upcoming`
+inspects the signature, cached per provider TYPE, and an unintrospectable
+provider assumes the OLD signature (False costs the horizon; True would raise).
+Same pattern as `layer2_board._blended_score_accepts`.
+
+**MEASURED AFTER, all three at once:**
+
+```
+NFL chips              0  -> 16
+soccer chips         210 -> 210   (coverage preserved)
+soccer HOME rail     210 ->  98   (regression repaired)
+NFL    HOME rail       0 ->   0   (unchanged; no NFL game on 08-26)
+```
+
+And on the REAL board fixtures from the production log
+(`Houston Texans @ Carolina Panthers`, `New York Giants @ New York Jets`,
+`Washington Commanders @ Baltimore Ravens`,
+`Cincinnati Bengals @ Philadelphia Eagles`, `Atlanta Falcons @ Miami Dolphins`),
+driven through the real `layer2_rows_to_board_cards` and `chip_join_coverage`:
+**`no_chip_available` 106 -> 0, `by_matchup=5`.**
+
+**A WRONG READING I CORRECTED MID-TASK, worth recording.** I first concluded the
+106 NFL board cards were REGULAR-SEASON week 1 and started building a
+preseason+regular union. Checked instead of assuming: all five sampled board
+fixtures are in **preseason week 4**, and none is in regular week 1. The union
+was unnecessary and would have added a second week of chips for no reason.
+
+**Tests:** `tests/test_chip_horizon_opt_in.py` (6) — rail vs strip for soccer,
+the signature default, the probe against an old/new/unintrospectable provider,
+and NFL's rail filter surviving while the strip is not narrowed.
+
+**Verify after deploy:** `CHIP_JOIN_COVERAGE sport=nfl` with `chips>0` and
+`no_chip_available=0`, while `sport=soccer` keeps `no_chip_available=0`.
+
+### `#574` — **`DIRECT_FEED_BOOKS` matches EXACTLY, so an aggregator alias would slip through. The answer was not in this repo, so it is now measured on every build.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26, asked by syndicate-43
+
+**THE EXPOSURE IS REAL AND EXACTLY ONE LINE.** `is_direct_feed_book` is
+`str(book).strip().lower() in DIRECT_FEED_BOOKS` (`book_shortlist.py:96`)
+against `frozenset({"kalshi", "polymarket"})` — exact equality, no prefix
+match, no separator folding. So `polymarket_us`, `kalshi_us`, `polymarket-us`
+and `Polymarket US` pass straight through the filter built to stop them, and a
+second price for one venue re-enters `_fair_by_side`'s de-vig.
+
+Not a hypothetical spelling: **`venue_quote_fanin.SOURCES` itself uses
+`polymarket_us`.** The two halves of this system already disagree on how to
+spell one venue.
+
+**I COULD NOT ANSWER IT FROM EVIDENCE, AND SAID SO RATHER THAN GUESSING:**
+
+  * git-tracked OddsAPI shards are a **May/June MLB mirror — 338 files, five
+    books** (`draftkings 755, fanduel 344, fanatics 122, betmgm 39,
+    williamhill_us 25`), **neither venue present at all**. The `data/**` trap
+    CLAUDE.md documents, hit exactly as described.
+  * **No log line anywhere prints a book key**, so production's key space is
+    invisible even with log access.
+  * No egress from a cloud session to curl production or OddsAPI.
+
+**SO THE CODE NOW REPORTS IT.** `book_grid` counts NEAR MISSES — a book whose
+name contains "kalshi" or "polymarket" that the exact match nonetheless refused
+— printed beside the existing count, empty dict included:
+
+```
+[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=417 books=['kalshi','polymarket']
+            near_misses={}
+```
+
+Printed even when empty so "the filter matches every spelling" and "this build
+never ran" cannot look alike (`#541`'s rule).
+
+**DELIBERATELY A COUNTER, NOT A WIDER MATCH.** Substring matching would silently
+swallow any future book whose name merely CONTAINS these strings — dropping real
+prices with no way to notice, worse than the bug it fixes. Widen the frozenset
+BY NAME once a real spelling is observed.
+
+**Tests:** `tests/test_direct_feed_book_aliases.py` (5). Alias cases asserted as
+MISSES so the test states the exposure rather than hiding it; a later
+substring-based matcher fails them and is forced to read this entry.
+
+**ID COLLISION, THE SECOND MECHANISM.** `scripts/todo_id_alloc.py` handed me
+`#569`, already taken by `board-staleness-visibility` on `origin/main`. The
+allocator's `O_CREAT|O_EXCL` is atomic **within one filesystem** and these
+sessions are separate checkouts pushing to one remote — so it cannot see a peer's
+claim until that claim is fetched. `#537` fixed same-tree collisions and this
+class is untouched by it. The working fix is to compute the high-water against
+`origin/main` (`git show origin/main:docs/ai_context/todo.md`, `todo_closed.md`,
+and `git ls-tree origin/main .syndicate/todo_ids/`) AFTER a fetch, which is what
+was done here. Surfaced by a rebase conflict on the claim file — the claim file
+being tracked is what made the collision loud instead of silent.
+
+**Verify after deploy:** `near_misses={}` on a build with non-zero `rows=`
+closes the question. Any populated key names the exact string to add — a
+one-word fix, by name, with evidence.
+
+### `#572` — **CI silently drops runs under push load: 9 pushes to `main` in 40 minutes produced 6 runs, 3 of which never executed. `ci.yml` declares no `concurrency` group, so nothing is ever superseded — it just piles up until GitHub sheds it.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+**Measured 2026-08-26T15:10–15:50Z on `main`:**
+
+```
+pushes to main in the window        9
+workflow runs created               6      <- 3 pushes produced NO run at all
+  startup_failure                   3      <- created, never executed
+  queued (still, minutes later)     2
+  in_progress                       1
+runs that actually executed         1 of 9 pushes
+```
+
+`startup_failure` is **not a test result.** The run is created and never starts,
+so it reports neither pass nor fail. Over a 500-run / 4-day window there are
+only 3 of them and **all 3 are in this one 22-minute window on `main`** — so
+this is a load burst, not a chronic fault. That is precisely why it is worth
+filing rather than shrugging at: it appears exactly when the repo is busiest,
+which is when CI's answer matters most.
+
+**The mechanism.** `.github/workflows/ci.yml` has **no `concurrency:` block.**
+Every push therefore starts a full run — two jobs, `pytest-baseline` carrying
+`timeout-minutes: 60` — and nothing supersedes anything. With this many parallel
+sessions pushing to `main`, in-flight runs accumulate until dispatch sheds some.
+The `cancelled` runs already in the history (9 of 500) are the same pressure
+showing up at the 60-minute cap.
+
+**What it cost, concretely, this session.** PR #94 showed **zero check runs**
+several minutes after push, with `mergeable_state: clean`. I read that as "CI
+was not triggered" and merged on that basis. The run existed — it was created at
+**16:13:10Z**, roughly 18 minutes late, *after* the merge. So the observable
+signal for "CI has not started yet" and "CI will not run" are **identical for
+tens of minutes**, and a reviewer cannot distinguish a clean PR from an
+undispatched one. That is a merge-safety property, not a convenience one.
+
+**The fix is a `concurrency` block, and the obvious version is wrong.**
+
+```yaml
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+`cancel-in-progress: true` is right for **PR branches** — a superseded push
+should not keep a 60-minute runner. It is **wrong for `main`**, where each
+commit's result is the record: cancelling means the SHA that fixed something
+never gets a verdict, and `#569` just spent a session establishing that a gate
+nobody can read the result of is worse than no gate. Use a per-ref group with
+`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`, or split the
+workflow so `main` never cancels.
+
+**Cheaper lever worth considering first:** `pytest-baseline` is a 35–60 minute
+job on every push. It does not need to run on every commit to a feature branch
+to do its job — on PRs and on `main` is enough, and that alone would remove most
+of the contention without touching cancellation semantics at all.
+
+---
+
+### `#571` — **`test_polymarket_side_vocabulary` asserts a key set the source stopped producing. Recorded as baseline debt, NOT fixed — because the widened keys may be a mis-join risk, not just a stale expectation.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+Found while regenerating `tests/pytest_baseline.json` (`#569` work). Two tests
+fail and **reproduce standalone**, so they are real, not parallel-run flakes:
+
+```
+tests/test_polymarket_side_vocabulary.py::test_the_board_row_derives_the_SAME_key_from_its_own_teams
+  expected ["mlb|h2h|home", "mlb|h2h|arizona diamondbacks"]
+  got      ... + "mlb|h2h|arizona"            (2 extra keys)
+
+tests/test_polymarket_side_vocabulary.py::test_an_unresolvable_club_adds_NO_second_key
+  expected ["mlb|h2h|home"]
+  got      ... + "mlb|h2h|club", "mlb|h2h|real"   (4 extra keys)
+```
+
+**Attribution.** `_candidate_keys` lives in
+`syndicate/features/shared/venue_quote_fanin.py:523` and was last changed by
+`0acabd091` — *"Kalshi offered every game line under a side the board never asks
+for"* — at **2026-08-25 22:06:54Z**. The test file was last touched at
+**20:17:32Z**, an hour and a half EARLIER. So the source deliberately widened key
+derivation and the test was left asserting the narrow set. Same shape as `#564`
+(the freshness test): a fix shipped without updating the test that pinned the
+old behaviour.
+
+**WHY THIS IS NOT JUST "UPDATE THE EXPECTATIONS".** The second test's name is
+the argument: `test_an_unresolvable_club_adds_NO_second_key`. It exists to
+assert that an unresolvable club name does **not** manufacture extra join keys —
+and the source now emits `mlb|h2h|club` and `mlb|h2h|real` from the words of
+"Real Club ...". Widening keys to help **Kalshi** match may be correct for
+Kalshi and wrong here: `_candidate_keys` is SHARED across venues via
+`venue_quote_fanin`, and a bare token like `real` or `club` can collide with a
+different fixture's team. A wrong join is a quote attached to the wrong game,
+which is the `#559`-class defect this repo keeps paying for.
+
+So the test may be **right and the source wrong for the Polymarket path**, or
+the test may be stale. Rewriting the assertions to match current output would
+settle that by fiat, in the direction that makes CI quiet — the worst available
+tiebreaker. **Whoever owns `0acabd091` should say which behaviour was intended.**
+
+**Recorded, not hidden.** Both are now in `tests/pytest_baseline.json` as known
+failures. That is what the baseline is for — *"the existing debt stays visible as
+a number in a file rather than as a red check nobody reads"* — and it is
+explicitly NOT an endorsement. The gate will fail the moment either starts
+passing, which is the prompt to close this item.
+
+---
+
+### `#570` — **The pytest suite writes into git-tracked `data/`. Every full-suite run dirties the working tree, and the stray lines look like recorded production data.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+**Observed three times in one session**, each time after starting a full-suite
+run, always the same file:
+
+```
+ M data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_02.jsonl
+```
+
+One JSON record appended per run, e.g. `{"recordedAt": "2026-08-26T15:06:43+00:00",
+"date": "2026-06-02", "generatedAt": "2026-08-26T15:06:43+00:00", ...}` — three
+minutes into the run each time. I restored it with `git checkout --` on each
+occurrence rather than committing it.
+
+**The mechanism.** `syndicate/features/mlb/live_lens.py:1381` appends via
+`live_lens_log_path(selected_date)`
+(`syndicate/features/mlb/sources.py:364`), which resolves through
+`_resolve_data_path_with_reconcile` against the **repo's own `data/` root**
+unless `SYNDICATE_DATA_ROOT` is redirected. `tests/conftest.py` does **not**
+sandbox `SYNDICATE_DATA_ROOT` globally — 67 test files set it individually, so
+the convention exists but is opt-in per test, and anything that reaches this
+writer without opting in writes to the tracked mirror.
+
+**Why this is worth more than a tidy-up.** `CLAUDE.md` designates
+`data/<sport>_source/` a **cold-start safety net**, explicitly *not* a snapshot
+of what production computed, and warns that analysis drawing conclusions from it
+is reading a lossy mirror. A test-injected record is worse than lossy: it is
+**fabricated data wearing a production timestamp**. The line above says
+`recordedAt: 2026-08-26` for `date: 2026-06-02` — a future session backtesting
+2026-06-02 has no way to tell it from a real capture. This is the same failure
+class as `#502`/`#517`: a number that looks precise and is not real.
+
+The second-order risk is the commit. A dirty tree after every suite run trains
+people to `git add -A`, and `.syndicate/session_isolation_protocol.md` already
+records what that habit cost once (4,993 staged deletions, and the staged
+deletion of the only copy of a ledger archive).
+
+**NOT YET PINNED: which test.** The prime suspect is
+`tests/test_mlb_refresh_runner.py` — it is the only test file that references
+`2026-06-02` *and* `live_lens`, and it monkeypatches `_live_lens_log_path` at
+`:337` and `live_lens_log_path` at `:906`, i.e. it sandboxes the writer on some
+paths. Some path through the suite evidently still reaches the real root, and I
+did not isolate which; attributing it to that file on this evidence would be a
+guess. **To pin it:** run the suite with a watch on the file's mtime, or bisect
+by running candidate files individually against a clean tree.
+
+**The fix is probably one line, and should not be applied blind.** An autouse
+`conftest.py` fixture pointing `SYNDICATE_DATA_ROOT` at a tmpdir would stop the
+whole class. But 67 files set it themselves, and some tests read git-tracked
+mirror fixtures on purpose — a global redirect could turn "reads real fixture"
+into "reads empty dir" and convert this into a wave of silent empty-input
+passes, which is the failure mode `model_engine_standard.md` exists to prevent.
+Land it behind a full-suite before/after, not on reasoning.
+
+---
+
 ### `#569` — **Is the BOARD stale, or is the QUOTE stale? Nothing in this repo could tell them apart, and the whole staleness investigation ran without noticing.** — lane `board-staleness-visibility`, 2026-08-26, asked by syndicate-43 — **INSTRUMENT SHIPPED (log-only), NOT DEPLOYED**
 
 **THE BLIND SPOT, and it is mine.** Every measurement the staleness work
@@ -472,6 +762,28 @@ why `#563`'s fix 3 (publish chips at the top of the shortlist) recovered only
 the 19m43s.** Next question is where inside `collect_candidates` it goes — the
 per-stage `CANDIDATE_STAGE` lines are already emitted and timestamped, so this
 is a reading, not an instrumentation job.
+
+### `#573` — **Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list.** — lane `kalshi-exchange-index`, 2026-08-26, NOT STARTED, handed over
+
+`GET /portfolio/balance` accepts an `exchange_index` parameter — *"both values
+include all exchange indexes unless exchange_index is provided"*. That makes the
+shard guard's premise **directly testable** instead of inferred.
+
+Today's guard compares the market's shard against `_KNOWN_GOOD_SHARDS = (0,)`,
+a list derived from where we have historically filled. It works, but it is a
+proxy for the real question, and it needs `KALSHI_ORDER_KNOWN_SHARDS` flipped by
+hand the moment the user funds a shard.
+
+Reading the balance instead:
+- refuses on `balance == 0` for the market's shard, with the balance IN the
+  message, so the row says `shard=3 balance=$0.00` rather than asserting a cause;
+- **self-heals** — the moment collateral lands on shard 3, orders resume with no
+  env var and no deploy;
+- turns the last inferred step in this chain into a measurement.
+
+Context:  2026-08-26, and the lesson in 
+("a diagnosis and its remedy are separate claims"). The remedy half of this
+chain was wrong once already and was live in a production error string.
 
 ### `#568` — **Every Kalshi order for four days died on `market_not_found`. The field nobody questioned was the one copied out of the sample body.** — lane `kalshi-exchange-index`, 2026-08-26, FIXED + DEPLOYED, awaiting the confirming fill
 

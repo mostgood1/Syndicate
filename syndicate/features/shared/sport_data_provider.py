@@ -72,7 +72,34 @@ class SportDataProvider(Protocol):
         week: int | None = None,
     ) -> SportContext: ...
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]: ...
+    def games(
+        self,
+        context: SportContext,
+        *,
+        is_active_today: bool,
+        include_upcoming: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Games for this context.
+
+        `include_upcoming` (`#575`) ASKS A DIFFERENT QUESTION, and the two
+        callers genuinely need different answers:
+
+        * the HOME RAIL wants what is on TODAY -- a rail headed "today" that
+          lists next weekend's fixtures is wrong, and its count badge is wrong
+          with it;
+        * the CHIP STRIP hydrates the Layer 2 board, whose odds horizon runs
+          SEVEN DAYS FORWARD, so a chip only for today leaves every future card
+          printing full club names.
+
+        Overloading one method for both is what produced BOTH defects measured
+        2026-08-26: soccer chips opened on a matchday already played
+        (`no_chip_available=251`), and NFL returned `chips=0` against 106 cards
+        because its filter is exact-date and no NFL game falls on 08-26.
+
+        Default False, so a provider that does not implement it, and every
+        existing caller, behave exactly as before.
+        """
+        raise NotImplementedError
 
     def pregame_props(
         self,

@@ -31458,6 +31458,7 @@ behaviour is identical either way. The next deploy needs a merge first —
 `origin/main` has moved to `8cecf484` (another lane's Kalshi shard-routing work,
 todo `#568`).
 
+<<<<<<< HEAD
 ## 2026-08-26 15:04:54Z — refresh-worker `44c1c564` (PR #92, `#569` quote-age)
 
 Off-protocol, same cause as every deploy today: no `RENDER_API_KEY` here and the
@@ -31662,3 +31663,581 @@ different `line` was observed more recently.
 **ALSO SEEN, unattributed:** `SWEEP_SKIPPED_DETAIL
 too_large=[mlb_source/tracking/book_quotes/2026-08-26.jsonl(18052118)]` — the
 MLB quote log is 18MB and being skipped by a sweep.
+=======
+---
+
+## 2026-08-26 · CLOSED · Kalshi MLB is an ACCOUNT PROVISIONING problem, not a bug
+
+**Closed by syndicate-43 with the reading neither of us could take from the
+cloud: `exchange_index` is on the PUBLIC market payload. n=9, perfect split,
+no exceptions.**
+
+| result | shard | ticker |
+|---|---|---|
+| FILLED | 0 | `KXMLBKS-26AUG242145CINSF-CINCBURNS26-7` (MLB, 08-24) |
+| FILLED | 0 | `KXMLBKS-26AUG241840BOSMIA-MIASALCANTARA22-5` (MLB, 08-24) |
+| FILLED | 0 | `KXWNBA3PT` / `KXWNBATOTAL` / `KXWNBAREB` |
+| FAILED | 3 | `KXMLBERA` / `KXMLBTOTAL` / `KXMLBSPREAD` / `KXMLBKS` (all 08-26) |
+
+**The account is provisioned on shard 0. MLB migrated to shard 3.** The two MLB
+fills on 08-24 were shard 0, which is why this broke on 08-25 with no deploy of
+ours in between — and which finally retires the code-regression hypothesis I
+burned a pass hunting in `git log`.
+
+**Both rungs of the ladder were literally true and neither was ours:**
+
+```
+exchange_index 0 (pinned)  -> market is not on shard 0 -> market_not_found
+exchange_index -1 (auto)   -> routes to shard 3, FOUND -> user_not_found
+```
+
+`-1` stays. It was the correct change: it is what let the venue tell us the real
+problem instead of a 404.
+
+### My subaccount fix is DISPROVEN, and I said in advance what that meant
+
+Deployed 14:29:59Z; a real prop order reached the venue 15:04:08Z
+(`KXMLBERA-26AUG261910MILNYM-MILDMAY3-2`) and returned the identical
+`user_not_found`. The pre-registered counter-verify was: *"if `user_not_found`
+persists with the field omitted, this is NOT ours to fix in code — the account
+is not provisioned on that shard and it needs Kalshi support. Do not hunt a
+third field."* That is exactly what happened, so the ladder stops here.
+
+**Reverted `subaccount` to `0`** rather than leaving it omitted. It is the
+configuration every known fill happened under, and omission is unproven in both
+directions. On a money path, *"changed nothing for the bug"* is not a reason to
+keep a change; last-known-good is. `KALSHI_ORDER_SUBACCOUNT=` (set-but-empty)
+omits it again with no deploy.
+
+### The one code-side change worth anything
+
+`user_not_found` now becomes `venue_shard_not_provisioned: market_shard=3
+known_good_shards=[0] ticker=...`, with a sentence saying no code change fixes
+it and naming the env var that opens it. It does not retry, does not fall back,
+does not alter the request, and chains the original exception. The account UUID
+in the venue's text is deliberately NOT copied — the ledger renders on a web
+page.
+
+`KALSHI_ORDER_KNOWN_SHARDS=0,3` makes it legible again the moment the venue
+provisions the account. **That is the actual fix and it belongs to a human:
+contacting Kalshi to enable this account on shard 3** — plausibly its own
+account agreement, which would present exactly as "user not found" for a UUID
+that is valid everywhere else.
+
+**verify:** next Kalshi MLB failure logs `venue_shard_not_provisioned
+market_shard=3` instead of a raw `http_400`, and `SUBMIT_FAILED_MARKET` carries
+`exchange_index=3`. **counter-verify:** if `market_shard` comes back `None`, the
+public payload is not carrying the field on our read path and the classifier is
+reporting a hole rather than a shard — say that rather than trusting `[0]`.
+
+### DO NOT read WNBA fills as "Kalshi works now"
+
+WNBA is shard 0 and will keep filling regardless. Any green there says nothing
+about MLB. Logged to `learnings.md`.
+
+---
+
+## 2026-08-26 15:21Z · `orphans_ours=6` WAS A FALSE ALARM FROM MY OWN COUNTER
+
+The first reading after `cc80e0029`:
+
+```
+RECONCILE venue=kalshi candidates=6 venue_orders=35 coverage=book
+  orphans=26 orphans_ours=6
+```
+
+**`ours=6` looked like six positions of real money this system opened and lost
+from the ledger. All six are `KXMVECROSSCATEGORY` parlays.** That series is in
+`kalshi_client._COMBINATORIAL_SERIES_PREFIXES`, excluded outright because *"the
+board does not bet parlays"* — there is no code path here that can place one.
+
+The predicate was `"ours": bool(client_order_id)`. **The venue lets ANY client
+set that field** — the Kalshi app stamps one too — so it was never the same
+question as "is this ours". Ours are `sha1(...).hexdigest()[:24]`: 24 bare hex
+characters. Theirs are UUID-shaped (`64643034-3834-3635-3134-343632663032`).
+
+**A counter written specifically to stop a scary-but-wrong number produced a
+scary-but-wrong number, within two hours, on the same field.** The first version
+of this defect was `orphans=26` reading as "26 unknown positions"; the fix split
+it, and the split itself used a predicate that could not do the job.
+
+**The rule I keep having to relearn here: a field is not an identity claim just
+because it usually contains one.** `client_order_id` is populated by whoever
+placed the order, not by us.
+
+Now three buckets, because two could not tell these apart:
+
+| bucket | meaning | alarming? |
+|---|---|---|
+| `ours` | client id in OUR KEY SHAPE, no ledger row | **yes — money we opened and lost** |
+| `foreign_client` | a client id in someone else's format | no — another client of this account |
+| `unclaimed` | no client id at all | no — placed in the venue's UI |
+
+**verify:** next `RECONCILE_ORPHANS` reads `ours=0 foreign_client=6
+unclaimed=20`. **counter-verify:** if `ours` is still non-zero, the surviving
+rows are genuinely lost ledger rows and need naming one by one — do NOT widen
+the shape test to make the number go away.
+
+---
+
+## 2026-08-26 15:32Z · READINGS on `04c575b00` — one verify PASSED, one COUNTER-VERIFY FIRED
+
+### PASSED — the orphan false alarm is closed
+
+```
+RECONCILE_ORPHANS venue=kalshi n=26 ours=0 foreign_client=6 unclaimed=20
+  sample_ours=[]
+```
+
+Exactly the pre-registered prediction (`ours=0 foreign_client=6 unclaimed=20`).
+The six were `KXMVECROSSCATEGORY` parlays placed by another client of the
+account. **No money is missing.** `sample_ours=[]` is the line that says so.
+
+### COUNTER-VERIFY FIRED — the shard number is a HOLE, not a reading
+
+The classifier works and fires on every MLB order:
+
+```
+LIVE_ORDER status=rejected venue=kalshi ticker=KXMLBTOTAL-26AUG261940TEXCWS-8
+  error='OrderBuildError: venue_shard_not_provisioned:
+    market_shard=None known_good_shards=[0] ...'
+```
+
+**`market_shard=None`.** I pre-registered this exact case: *"if `market_shard`
+comes back `None`, the public payload is not carrying the field on our read path
+and the classifier is reporting a hole rather than a shard — say that rather
+than trusting `[0]`."* So: saying it.
+
+**Cause:** `exchange_index` was never in `kalshi_client._MARKET_FIELDS`.
+`normalize_market` is an allowlist — correctly, because that is why a venue
+rename surfaces as a missing field instead of a silent `None` — and a field
+nobody listed is invisible even when the raw response carries it. The venue was
+sending `3`; we were dropping it on the floor. **That is why the whole diagnosis
+had to come from a session with unproxied network access reading the raw
+payload: our own client could not see the field that explained everything.**
+
+Two fixes:
+
+1. `exchange_index` added to `_MARKET_FIELDS`.
+2. **`market_shard=UNREAD` when the field is absent.** `None` printed beside
+   `known_good_shards=[0]` reads as *"we compared and it did not match"* when
+   nothing was compared. Third instance today of the same class — a reading that
+   looks like an answer — so the two cases no longer share a string.
+
+**verify:** next MLB rejection reads `market_shard=3 known_good_shards=[0]`.
+**counter-verify:** if it still reads `UNREAD`, the field is absent from the
+per-market GET response specifically (the peer read it from a listing), and the
+classifier must stop implying a comparison it cannot make at all.
+
+**Nothing about the conclusion changes** — MLB is on a shard this account is not
+provisioned on, established at n=9 from the venue. This only fixes whether OUR
+logs can show the number.
+
+---
+
+## 2026-08-26 15:46Z · VERIFY PASSED — `market_shard=3`, read by our own client
+
+`2709a36b8` live 15:44:25Z. The pre-registered verify was *"next MLB rejection
+reads `market_shard=3 known_good_shards=[0]`"*:
+
+```
+15:46:52 LIVE_ORDER status=rejected venue=kalshi
+  ticker=KXMLBHRR-26AUG261310TBDET-DETHLEE50-2
+  venue_shard_not_provisioned: market_shard=3 known_good_shards=[0]
+15:46:54 LIVE_ORDER status=rejected venue=kalshi
+  ticker=KXMLBTOTAL-26AUG261940TEXCWS-8
+  venue_shard_not_provisioned: market_shard=3 known_good_shards=[0]
+```
+
+**This is the first time this system has read the shard itself.** Every prior
+statement about shard 3 came from a session with unproxied network access
+reading the raw payload; ours dropped the field in `normalize_market`. The
+number now agrees, independently, from our own client. syndicate-43's n=9
+finding is confirmed rather than merely relayed.
+
+**Read carefully — one line in the same window still says `None` and is NOT a
+contradiction.** `LIVE_LEDGER_ROW` at 15:45:26 replays the error STRING STORED
+on the row, and those rows were written at 15:32Z under the old code. The fresh
+`LIVE_ORDER` lines at 15:46 carry `3`. A stored message is a historical
+artifact, not a current reading — worth stating because two lines a minute
+apart appear to disagree and only one of them is a measurement.
+
+### The peer's WNBA alarm: refuted by production, not by argument
+
+Claimed: the guard *"is about to kill the only venue path that still works"* by
+refusing on `None not in [0]`. From the SAME 15:32:08Z cycle in which the
+classifier was rejecting MLB:
+
+```
+LIVE_PRICE ticker=KXWNBA3PT-26AUG26GSCONN-GSGWILLIAMS1-2 planned=0.39 live=0.39
+ORDER_PATH venue=kalshi status=ok positions=13
+  markets={... 'player_threes': {'would_build': 1} ...}
+```
+
+`would_build` on the WNBA row, no `venue_shard_not_provisioned` on any `KXWNBA*`
+ticker, and two WNBA orders sitting FILLED today (`KXWNBA3PT` @ 0.39,
+`KXWNBAPTS` @ 0.51). The MLB rows in that same line ALSO read `would_build` —
+they build fine and fail at the venue, which is exactly the signature of a
+post-hoc renamer.
+
+Structural proof taken before acting, from the AST rather than from reading:
+`_known_shards` is called only from `_classified`; `_classified` only from
+inside an `except` handler; the try-body is the submit itself. A successful
+submit never reaches it, and any other exception returns identity-unchanged.
+
+**`known_good_shards=[0]` is printed for a human. It is not evaluated as a
+condition anywhere.**
+
+### Status: this is now entirely a venue-side action
+
+Nothing further is fixable here. **Kalshi must enable this account on exchange
+shard 3.** `KALSHI_ORDER_KNOWN_SHARDS=0,3` keeps the log honest afterwards; it
+unblocks nothing, because nothing is blocked.
+
+---
+
+## 2026-08-26 16:03Z · THE DISCRIMINATING READING — one cycle, both outcomes
+
+Everything argued about today, settled by a single execution cycle on `2709a36b8`:
+
+```
+16:02:57 SUBMIT  KXMLBHRR-26AUG261310TBDET-DETHLEE50-2  exchange_index=-1 subaccount=0
+         -> venue_shard_not_provisioned: market_shard=3 known_good_shards=[0]
+16:03:00 SUBMIT  KXMLBTOTAL-26AUG261940TEXCWS-8         exchange_index=-1 subaccount=0
+         -> venue_shard_not_provisioned: market_shard=3 known_good_shards=[0]
+16:03:05 SUBMIT  KXWNBA3PT-26AUG26TORSEA-SEAFJOHNSON4-2 exchange_index=-1 subaccount=0
+16:03:05 LIVE_ORDER status=submitted  error=None
+16:03:06 RECONCILED submitted->filled venue_status='executed'
+           contracts=10 fill_price=0.4 fees=0.168
+```
+
+`EXECUTED ... venue=kalshi placed=1`, spend `$14.87 -> $18.89`, filled `196 -> 197`.
+
+**A real Kalshi fill, ~1 second round trip, with the guard live.** Three things
+close at once:
+
+1. **The shard diagnosis is confirmed end to end by our own client.** MLB reads
+   `market_shard=3` and is refused; WNBA on shard 0 fills. Same code, same
+   credential, same body shape, seconds apart.
+2. **The peer's WNBA alarm is refuted in production, not by argument.** The
+   claim was that the guard *"is about to kill the only venue path that still
+   works"*. It placed and filled a WNBA order in the same cycle it rejected two
+   MLB ones. `known_good_shards=[0]` is printed, never evaluated.
+3. **The `subaccount` revert to `0` is vindicated by a fill.** The body that
+   filled carries `subaccount=0` — the last-known-good value, restored after
+   omission was disproven. That was the right call for the right reason:
+   omission changed nothing about the bug, and `0` is what money has always
+   moved under.
+
+**Nothing further is fixable in code.** The remaining action is Kalshi enabling
+this account on exchange shard 3.
+
+---
+
+## 2026-08-26 · CORRECTION · the shard remedy was wrong and was LIVE IN AN ERROR STRING
+
+syndicate-43 retracted their own remedy after the user challenged it, and went
+and read the venue instead of restating the conclusion. **The diagnosis was
+right; the remedy attached to it was not, and I had shipped it verbatim.**
+
+**What it said:** *"the market resolved and the ACCOUNT did not. This needs the
+venue to enable this account on that exchange shard; no code change fixes it."*
+That sends whoever reads the board to Kalshi support.
+
+**What it is.** `GET /trade-api/v2/exchange/status` enumerates the shards, and
+they are PRODUCT shards, not separate exchange entities — all four
+`trading_active`:
+
+```
+0 Default    1 Combos    2 Crypto    3 Tennis & Baseball
+```
+
+**Shard 3 is where BASEBALL lives**, which is the whole reason only MLB failed.
+`KXNFLGAME`, `KXNBA`, `KXWNBAPTS` are all index 0.
+
+Kalshi's sharding doc, verbatim:
+
+> "Subaccount balances are local to a specific exchange instance."
+> "Programmatic traders must preallocate collateral on a given exchange shard
+> before order placement."
+
+So `user_not_found` on shard 3 is consistent with **having no collateral there**,
+not with the account being unknown. **Nothing needs enabling. Money needs
+moving** — kalshi.com/account/exchange-indexes or the intra-account-transfer
+API, by the account holder, in about a minute.
+
+**Renamed `venue_shard_not_provisioned` -> `venue_shard_unfunded`**, and the
+message now names the action and where to take it. `known_good_shards` ->
+`funded_shards`.
+
+### THE LESSON — a confident wrong remedy inside a correct diagnosis
+
+This is the more dangerous shape than a wrong diagnosis. The shard finding was
+measured, n=9, confirmed in production from two independent clients — and the
+remedy rode in on that credibility without ever being checked against a source.
+I printed it into a production error string, where it would have been read as
+settled by anyone who hit it.
+
+**The rule: a diagnosis and its remedy are separate claims and need separate
+evidence.** "What is broken" being measured says nothing about "whose move it
+is". The doc that settled it took one fetch.
+
+**Not shipped, and worth doing:** `GET /portfolio/balance` accepts an
+`exchange_index` parameter, which makes this guard's premise DIRECTLY TESTABLE
+rather than inferred — refuse on `balance == 0` for the market's shard, with the
+balance in the message. Strictly better than a hardcoded list, and it self-heals
+the moment the shard is funded instead of needing an env var flipped. Left as
+`#573`.
+
+---
+
+## 2026-08-26 16:19Z · MLB IS FILLING — the shard chain is closed end to end
+
+The user funded exchange shard 3 ($25) and syndicate-43 set
+`KALSHI_ORDER_KNOWN_SHARDS=0,3`. First MLB fills since 08-24:
+
+```
+RECONCILED KXMLBHRR-26AUG261310TBDET-DETHLEE50-2 submitted->filled
+  venue_status='executed' contracts=11 fill_price=0.4  fees=0.0924
+RECONCILED KXMLBTOTAL-26AUG261940TEXCWS-8        submitted->filled
+  venue_status='executed' contracts=5  fill_price=0.47 fees=0.0436
+```
+
+**The same two tickers that returned `market_shard=3` an hour earlier.** Of the
+three pre-registered outcomes — fills, a new venue error, or the env var not
+taking — this is the first. Shard funding was the entire remaining blocker.
+
+**The full chain, every link measured:**
+
+| link | how it was established |
+|---|---|
+| `exchange_index: 0` pins shard 0 | venue field reference; error moved on change |
+| MLB lives on shard 3 | `exchange_index` on the public payload, n=9 perfect split |
+| shard 3 is "Tennis & Baseball" | `GET /exchange/status` enumeration |
+| `user_not_found` = no collateral | Kalshi sharding doc, verbatim |
+| funding it fixes MLB | **these two fills** |
+
+**Next constraint is collateral, not correctness.** $25 on shard 3 against a
+$10/order cap is a couple of orders per cycle; expect insufficient-collateral
+errors from here, which are a different and much more legible failure.
+
+
+## 2026-08-26 16:11:32Z — refresh-worker `1d1a6195` — WNBA SETTLEMENT UNBLOCKED, VERIFIED
+
+lane: kalshi-spread-join-sign · deploy dep-da7gtrjbc2fs73cqfti0
+claim held; preflight CLEAR after waiting out 3 in-flight jobs rather than
+killing them (`build_soccer_artifacts --league la_liga` was one). render.yaml
+UNCHANGED across the range, so no blueprint_sync.
+
+Three code changes shipped (10 commits in range, 4 of them a peer's):
+  `kalshi_board_join.py`  spreads margin-vs-handicap sign
+  `bet_status_wnba.py`    matchup recovery (box carries ESPN ids, order carries
+                          the OddsAPI board hash)
+  `bet_status_soccer.py`  dated finals retention
+
+verify: **`SETTLED date=2026-08-25`: `game_not_in_live_box` 9 -> ABSENT, and
+`graded` 0 -> non-zero.** Read 16:24:12Z, first settlement pass on the new code.
+
+    BEFORE (14:57:30Z, 44c1c564)
+      graded=0 already_graded=120 outcomes={}
+      ungraded={'no_soccer_live_state_for_date':3,'order_not_filled':20,
+                'game_not_in_live_box':9}
+      PNL_CUT all_time by_sport=[('mlb',157,..),('soccer',0,..),('wnba',0,..)]
+
+    AFTER (16:24:12Z, 1d1a6195)
+      graded=3 already_graded=120 outcomes={'won':3}
+      ungraded={'no_soccer_live_state_for_date':3,'order_not_filled':20,
+                'not_decided_yet':6}
+      PNL_CUT all_time by_sport=[..,('wnba', 2, 2.5, 115.21, 100.0)]
+
+**WNBA PASSES.** 3 graded, all won. The other 6 moved to `not_decided_yet` --
+the OTHER half of the prediction: the matchup resolves, the grader sees the
+stats, the bets simply are not decided (this artifact carries no final flag, so
+unders wait rather than settle on a guess). WNBA all-time 0 -> 2 settled: the
+first WNBA settlement this platform has ever made.
+
+**SOCCER IS NOT VERIFIED.** `no_soccer_live_state_for_date: 3` UNCHANGED, and
+that was predicted before the deploy: the dated finals record only accumulates
+FORWARD, and 2026-08-25's aggregate rolled hours ago, so those three are
+permanently ungradeable. Soccer stays 0 settled all-time. SHIPPED, UNDEMONSTRATED
+-- the reading that discharges it is a soccer order grading on a date whose
+finals were captured after 16:11Z. Do not report it as fixed until then.
+
+Unchanged and correct: `no_live_feed:194` (MLB not started), `order_not_filled:59`
+(rejected orders), `no_live_box_for_date:7` (tonight's WNBA box not captured yet),
+`unmapped_market:3`.
+
+NOT fixed here: MLB spreads still refuse `unmappable_side` at build time. The
+join fix removes the INVERSION; the side plumbing is blocked on
+`pipeline/portfolio_commit.py`, claimed by `portfolio-decision-and-execution`.
+**That refusal is the safe state and must not be cleared without the plumbing** --
+before the join fix it would have bought the opposite team.
+
+## 2026-08-26 16:23:12Z · INCIDENT · a peer deploy CANCELLED mine while I held the claim
+
+    dep-da7h54bm6pss73fmo2n0  f1a2c78f  CANCELED 16:23:12Z   <- mine
+    dep-da7h5rrbc2fs73cr8u9g  2e5f425e  started immediately  <- peer
+
+`deploy_claim.py status --service live-odds-worker` read "HELD by
+kalshi-spread-join-sign" in the PRIMARY tree throughout.
+
+**No revert: 2e5f425e is NEWER than f1a2c78f and ledger-only.** So this is not
+the 2026-08-15 silent-revert outcome. But it is that SHAPE, and it demonstrates
+the per-tree claim weakness ACROSS ENVIRONMENTS rather than merely across
+worktrees: a cloud session has its own `.syndicate/deploy_claims/`, so the lock
+is invisible in BOTH directions and neither side is warned. The guard hook only
+protects a session that runs it out of `$CLAUDE_PROJECT_DIR`.
+
+Harmless here only by luck of ordering. Recorded so the next occurrence is not
+read as a fresh discovery. See learnings 2026-08-21 "THE DEPLOY CLAIM IS NOT A
+GLOBAL LOCK ONCE SESSIONS USE WORKTREES", extended 2026-08-26.
+
+env change, same window: `KALSHI_ORDER_KNOWN_SHARDS` 0 -> `0,3` on
+live-odds-worker (single-key endpoint, readback confirmed) after the user moved
+$25 to exchange shard 3. Env vars are service-level, so the peer's deploy
+injects it too. verify PENDING -- see the CORRECTION entry above for why the
+shard was never Kalshi's to enable.
+
+---
+
+## 2026-08-26 — syndicate + refresh-worker: `#545` chip build off the request path, `#542` week span, `#574` alias counter
+
+**Deployed:** `syndicate` (`srv-d88ahvrbc2fs73eodu30`) deploy `dep-da7hfrajnfac738e788g`,
+live `16:47:34Z`, commit `e738ab85`. `refresh-worker` (`srv-d91dpertqb8s73co8ls0`)
+deploy `dep-da7hltqfngtc73fhdng0`, live `17:00:13Z`, commit `448dc87d`. Both
+verified to CONTAIN `e1f94e45` and `94cd8e9e` by `merge-base --is-ancestor` and
+by grepping the deployed trees, not by ancestry alone. Claims held on both.
+Web first, deliberately: it degrades to `fallback_inline_build` while the worker
+has not yet published, which is the designed behaviour and cost nothing.
+
+**verify — `#545`, the chip build now runs in the WORKER:**
+
+```
+[layer2_shortlist] GAME_CHIPS_PUBLISHED date=2026-08-26 chips=230 sports=8 ok=True
+```
+17:15:49Z and again 17:21:41Z. Eight sports, published for the WHOLE default
+list rather than only the sports on the board, so a sport with no rows today
+still gets a scoreboard strip.
+
+**verify — `#542`, the phase offset is CLOSED. This is the headline:**
+
+```
+CHIP_JOIN_COVERAGE sport=soccer chips=213
+  chip_dates=['2026-08-22' ... '2026-09-05']   # fifteen dates
+  cards=400 by_matchup=212 by_canonical=181
+  needs_fallback=0 no_chip_available=0 unknown_no_key=7
+```
+
+**`no_chip_available` 251 -> 0.** Before, 65 of 96 chips described fixtures
+already played and 72 of 105 fixtures in the board's window had no chip at all.
+The span now runs 08-22 to 09-05 and every soccer card in the window resolves.
+`by_canonical=181` is `#540` carrying 181 cards on its own.
+
+**verify — `#574`, the alias question is CLOSED:**
+
+```
+AGGREGATOR_DUPLICATE_DROPPED rows=524   near_misses={}
+AGGREGATOR_DUPLICATE_DROPPED rows=27070 near_misses={}
+AGGREGATOR_DUPLICATE_DROPPED rows=584   near_misses={}
+```
+
+Four consecutive builds, empty every time, one at **27,070 rows**. The
+aggregator is NOT using a spelling the exact match misses. `DIRECT_FEED_BOOKS`
+needs no widening, and syndicate-43's key list is now confirmation rather than
+the deciding evidence.
+
+**WHAT THE TELEMETRY CAUGHT ON ITS FIRST REAL RUN — NFL HAS NO CHIPS AT ALL:**
+
+```
+CHIP_JOIN_COVERAGE sport=nfl chips=0 chip_dates=None cards=106
+  no_chip_available=106
+```
+
+Every one of 106 NFL cards is chip-less, so every NFL compact card prints full
+club names. Not caused by this deploy — it was true before and nothing reported
+it. This is precisely the class of defect `#541` was built to surface, found by
+reading a log instead of by a user noticing. **Open, not diagnosed.**
+
+Soccer's `unknown_no_key=7` names its own alias gaps directly: `Telstar`,
+`Feyenoord`, `KV Kortrijk`, `Leuven`, `Genk` — clubs `canonical_team` cannot
+place. Small, nameable, `#540`-shaped.
+
+**A MEASUREMENT ERROR OF MINE, RECORDED BECAUSE IT NEARLY BECAME A FALSE
+INCIDENT.** I reported twice that no `GAME_CHIPS_PUBLISHED` line existed and
+was about to investigate a publish failure. The lines were there the whole time.
+My query passed ONE string containing `|` alternation
+(`"A|B|C"`) to the Render log `text` filter, which matches it LITERALLY and
+returns nothing. The working form is a LIST of separate strings, `["A","B","C"]`
+— which I had used correctly earlier in the same session and then stopped using.
+**An empty log result is not evidence of absence until the query shape is known
+to match something.** The tell was `["layer2_shortlist"]` returning health lines
+in a window where the alternation query had returned null.
+
+
+
+## 2026-08-26 17:18:18Z — live-odds-worker `448dc87d` — SPREADS PLACE, AND CORRECTLY. VERIFIED.
+
+lane: kalshi-spread-join-sign · deploy dep-da7ht2favr4c73ftr400
+claim re-acquired (the earlier one had EXPIRED at 52 min -- replaced rather than
+deployed under a dead lock). preflight CLEAR. render.yaml UNCHANGED, no
+blueprint_sync.
+
+carries: the spreads leg mapping (`_spread_side_from_line`), the Polymarket
+`FILL_ABOVE_LIMIT` check, and the join sign fix.
+
+verify: **a spread order after the deploy must NOT refuse `unmappable_side`.**
+Read 17:26:18Z, 8 minutes after live:
+
+    KXMLBSPREAD-26AUG261540CHCAZ-AZ2
+    side=home line=-1.5  ->  FILLED, 3 contracts @ 0.33, venue_status=executed
+    still refusing unmappable_side: 0 of 1
+
+**THE FIRST KALSHI SPREAD ORDER THIS PLATFORM HAS EVER PLACED.**
+
+AND IT BOUGHT THE RIGHT BET, checked against the venue rather than asserted:
+
+    venue title : "Arizona wins by over 1.5 runs?"   (names Arizona)
+    board row   : Arizona (home) -1.5
+    rule        : line < 0 -> YES
+    YES pays    : Arizona wins by over 1.5  ==  Arizona -1.5   MATCHES THE ROW
+
+That is the whole point of the fix and the reason it was gated for so long.
+Before the join's sign fix this same `-1.5` row got NO TICKER AT ALL, while the
+`+1.5` row got the ticker of the club it was FADING -- so lifting the refusal
+without the join fix would have bought the opposite team, 11 orders a cycle.
+
+`exchange_index: 3` on that market, so this is ALSO a third independent
+confirmation that funding shard 3 was the Kalshi blocker.
+
+## 2026-08-26 — Kalshi shard 3: RESOLVED, and my remedy was wrong before it was right
+
+The account had collateral only on shard 0; baseball lives on shard 3
+("Tennis & Baseball"). The user moved $25. Three MLB fills followed, all on
+`exchange_index=3`:
+
+    16:19:07Z  KXMLBHRR-26AUG261310TBDET-DETHLEE50-2   11 @ 0.40   executed
+    16:19:08Z  KXMLBTOTAL-26AUG261940TEXCWS-8           5 @ 0.47   executed
+    17:26:18Z  KXMLBSPREAD-26AUG261540CHCAZ-AZ2         3 @ 0.33   executed
+
+The only prior MLB fills (2026-08-24) were `exchange_index=0`. The split that
+diagnosed this was perfect at n=9 and is now n=12.
+
+**ATTRIBUTION CORRECTION, recorded because it would otherwise be misread:** the
+first two fills landed at 16:19, BEFORE I set `KALSHI_ORDER_KNOWN_SHARDS=0,3`
+(~16:20) and before any deploy of mine. The env var did NOT unblock them -- the
+peer session's `4d0d4d52` (carry `exchange_index` through the normalizer) had
+already made the guard read the real shard, and with collateral present the
+orders simply went through. My env var was belt-and-braces. Checking the
+timestamps is the only thing that caught this; the obvious story was wrong.
+
+**AND THE REMEDY I SHIPPED INTO AN ERROR STRING WAS WRONG.** It said the venue
+had to "enable this account on that exchange shard; no code change fixes it",
+which sends a reader to Kalshi support. Shards are PRODUCT shards, all
+`trading_active`, and docs.kalshi.com/getting_started/exchange_sharding.md says
+"Subaccount balances are local to a specific exchange instance" and
+"Programmatic traders must preallocate collateral on a given exchange shard
+before order placement." It was always the account holder's action, and a
+one-minute transfer. See the CORRECTION entry above.
+
+verify: DISCHARGED by the three fills above.
+>>>>>>> origin/main

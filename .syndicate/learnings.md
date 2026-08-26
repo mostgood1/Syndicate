@@ -4302,6 +4302,41 @@ Bash hook, and nothing would report it.
   `REPO_ROOT` — deliberately NOT done on 2026-08-21 while three sessions were
   actively deploying against the current behaviour. Tracked in `todo.md`.
 
+**CONFIRMED 2026-08-26, AND THE GUARD'S OWN REMEDY TEXT IS PART OF THE TRAP.**
+
+Ran `deploy_claim.py acquire` and then `deploy_preflight.py` from the session
+worktree. Both succeeded. The preflight printed `deploy claim held by YOU` and
+`CLEAR: only infrastructure processes running`. The deploy was still blocked,
+and the guard reported BOTH locks as missing plus no lane at all:
+
+    your lane: <none -- run `/lane open <slug> "<goal>"`>
+    claim      NOT HELD by anyone -- take it
+    preflight  the most recent preflight returned HOLD, not CLEAR
+
+**It is THREE pieces of per-tree state, not one.** The 2026-08-21 entry above
+names the CLAIM. The PREFLIGHT RESULT and the `.current-lane.<session_id>`
+MARKER resolve the same way. A session that followed CLAUDE.md's worktree
+instruction has none of the three where the guard looks, and the guard reads
+`$CLAUDE_PROJECT_DIR` — always the primary tree.
+
+**The remedy the guard prints does not say which tree to run it in.** Following
+it verbatim from the worktree re-runs the same two commands, gets the same two
+successes, and blocks again — a loop that reads as a broken guard rather than as
+a path problem. Writing the lane marker and retaking both locks in the PRIMARY
+tree cleared it on the first attempt.
+
+All three are gitignored runtime state (`.syndicate/deploy_claims/`,
+`.syndicate/.current-lane.<id>`), so taking them in the primary tree does NOT
+touch the shared index and is safe to do from a worktree session.
+
+**How to apply:** take the claim, run the preflight, and write the lane marker
+in the PRIMARY tree — `C:/Users/tempadmin/OneDrive/Coding/Syndicate` — even
+though all your code work is in the worktree. Run the preflight there too: a
+worktree `CLEAR` is not the reading the guard will consult. Note the preflight
+itself may DIFFER between trees when the primary is behind `origin/main` (it was
+593 commits behind here), so treat the current worktree copy's verdict as the
+substantive safety check and the primary's as the guard's bookkeeping.
+
 ## 2026-08-21 — FORBIDDEN: taking a CODE COMMENT as authority for WHICH SERVICE runs something
 
 **Three instances in one session**, the third of which shipped:
@@ -6282,3 +6317,185 @@ boundary what an earlier stage already knew is what made the inversion
 possible.** Same shape as the unfed-input class in `model_engine_standard.md`:
 the value is available, nothing carries it across, and the recomputation is
 indistinguishable from the real thing at every level except the money.
+
+## A GREEN PATH ON A SHARED VENUE PROVES NOTHING ABOUT THE BROKEN ONE `[2026-08-26]`
+
+Kalshi MLB failed for two days while WNBA filled normally, same credential, same
+code, same endpoint. The whole time, "Kalshi orders are working" was true and
+useless: **WNBA is on exchange shard 0, which this account is provisioned on;
+MLB migrated to shard 3, which it is not.** n=9, perfect split — every order that
+ever filled is shard 0, every failure is shard 3.
+
+The two MLB fills on 08-24 were shard 0. That is why it "broke" on 08-25 with no
+deploy in between, and why a code-regression hunt through `git log` found
+nothing: **there was no regression. The venue moved the markets.**
+
+Both errors were literally true and neither was ours:
+
+```
+exchange_index 0 (pinned)  -> market is not on shard 0 -> market_not_found
+exchange_index -1 (auto)   -> routes to shard 3, FOUND -> user_not_found
+```
+
+**The rule:** when one slice of a venue works and another does not, find the
+axis that separates them BEFORE theorising about code. Here it was a public
+field on the market payload (`exchange_index`) — no credential, one GET. I had
+even read that field in a log line (`KALSHI_SERIES_CATALOGUE ... row_keys=[...
+'exchange_index' ...]`) and used it to argue FOR a hypothesis instead of asking
+what value our own failing markets carried.
+
+**Corollary — intermittent success across an otherwise identical population is a
+PER-ITEM property, not a point-in-time change.** I treated "worked Monday, fails
+Wednesday" as a regression and searched the diff. The correct first question was
+"what is different about the items that fail", which the venue answers directly.
+
+**Corollary — a fix that moves the error inward is working, and must not be read
+as failure.** `market_not_found` -> `user_not_found` was progress; I called the
+shard fix refuted an hour before it was confirmed, by reading my own probe line
+(which fires on ANY exception) instead of the error string underneath it.
+
+## A DIAGNOSIS AND ITS REMEDY ARE SEPARATE CLAIMS `[2026-08-26]`
+
+The Kalshi shard finding was measured, n=9, perfect split, confirmed in
+production from two independent clients. The REMEDY attached to it — *"the venue
+must enable this account on that shard; no code change fixes it"* — was never
+checked against anything. It rode in on the diagnosis's credibility, and I
+printed it into a **production error string**, where the next person to hit it
+would read it as settled.
+
+It was wrong. `GET /exchange/status` shows shards are PRODUCT partitions, all
+active (0 Default, 1 Combos, 2 Crypto, 3 Tennis & Baseball). Kalshi's doc:
+*"Subaccount balances are local to a specific exchange instance"* and
+*"Programmatic traders must preallocate collateral on a given exchange shard
+before order placement."* `user_not_found` meant NO FUNDS THERE. The fix was the
+account holder moving money — about a minute — not a support ticket.
+
+**A confident wrong remedy inside a correct diagnosis is more dangerous than a
+wrong diagnosis**, because the diagnosis's evidence launders it and nobody
+re-checks the half that had none.
+
+**The rule:** "what is broken" and "whose move it is" are different claims
+needing different evidence. Before writing a remedy into anything durable — an
+error string, a ledger entry, a message to the user — ask what was READ to
+support it, not what was inferred. Here the answer was one fetch of a doc page.
+
+**Corollary:** the same goes for the error text itself. An error message that
+names a remedy is making a claim with the system's authority behind it, and it
+outlives the conversation that produced it.
+
+## THE DEPLOY CLAIM DOES NOT SERIALISE ACROSS ENVIRONMENTS `[2026-08-26]`
+
+**I cancelled another session's in-flight build while it correctly held the
+claim.** Measured:
+
+```
+dep-da7h54bm6pss73fmo2n0  f1a2c78f  CANCELED 16:23:12Z   <- theirs, mid-build
+dep-da7h5rrbc2fs73cr8u9g  2e5f425e  started immediately  <- mine
+```
+
+`deploy_claim.py status --service live-odds-worker` read **HELD by
+kalshi-spread-join-sign** in the primary tree at that moment. My own container
+said the service was free, and I had "acquired" it there — twice, plus a
+careless probe that re-acquired and had to be released again.
+
+**The claim directory resolves from `REPO_ROOT`, so it is per-tree and
+per-environment.** A cloud session gets its own. Two sessions can each hold
+"the" claim on the same service, simultaneously, both correctly, and neither
+can see the other. `acquire` succeeding proves nothing about the other
+environment.
+
+This is exactly the 2026-08-15 shape the claim was built to prevent — two
+deploys that do not contain each other. It did not bite this time only because
+`2e5f425e` was newer and ledger-only, so nothing was reverted. **Serialisation
+that silently covers one environment is worse than none, because it is trusted.**
+
+**The rule for a cloud/remote session:** `deploy_claim.py acquire` in your own
+container is a local no-op with respect to every other environment. Before
+deploying, check the claim state that the PRIMARY tree sees — and if you cannot
+reach it, say so and coordinate explicitly rather than treating a local
+`ACQUIRED` as authority. The atomic `O_CREAT|O_EXCL` lock is sound; its
+NAMESPACE is the thing that does not span machines.
+
+**Generalisation:** a lock is only a lock over the state everyone contends on.
+Ask what storage the lock lives in and who can see it, before trusting what it
+says.
+
+
+## 2026-08-26 — FORBIDDEN: treating ARITHMETIC ON A DERIVED FIELD as a measurement
+
+**A number you computed from another stored number is not evidence about the
+world. Dividing it back out recovers your own input, and it will look like a
+reading.**
+
+**MEASURED, and it produced a wrong finding reported to the user as fact.**
+Investigating a Polymarket order that appeared mispriced, I wrote:
+
+    IMPLIED PRICE PAID = fill_stake / contracts = 4.05 / 7.11 = 0.5696
+
+and concluded *"a real overpay, not a reporting artifact."* It is not a
+measurement of anything. `execution_ledger.py:996`:
+
+    filled_dollars = contracts * fill_price
+
+`fill_stake_dollars` IS `contracts x fill_price`, so dividing by `contracts`
+returns `fill_price` — the very field under suspicion — with the appearance of
+independent corroboration. `venue_order_view` sets `"fill_cost_dollars": None`,
+so **NOTHING in this system independently measures what was paid.** The correct
+statement was "the ledger RECORDS 0.57 and nothing here can tell us what was
+paid", which is a different investigation with a different next step.
+
+**HOW TO APPLY.** Before using a stored number as evidence, find its WRITER. If
+it was computed from another field in the same record, it can corroborate
+nothing about that field, and any ratio between them is an identity. Reach for
+an input the system did not compute: the SUBMITTED value, the venue's own cash
+field, a second service's copy. The check that finally worked here compares the
+recorded fill against the price WE SENT — an independent input — and is the
+`FILL_ABOVE_LIMIT` guard.
+
+**THE SAME SESSION, THE SAME SHAPE, THREE MORE TIMES**, which is why this is a
+rule and not a note:
+
+- **A guard that "needs no venue semantics" but silently picks a side.** I built
+  a cross-check between `_side_to_outcome` (name axis) and
+  `outcome_side_for_index` (POSITIONAL) and claimed it was semantics-free. It
+  makes the positional reading authoritative — precisely the disputed question —
+  and it contradicted three deliberate tests asserting the opposite convention.
+  Reverted before landing. **A cross-check between two readings is not neutral;
+  it enthrones one of them.**
+- **A background run that exited 0 having never run.** `pytest -k ...` returned
+  exit 0 with 110KB of output and NO summary line: the process never collected a
+  test. Exit status described the shell, not the suite.
+- **A watcher that "found" the thing by matching the wrong string.** Searching
+  logs for `SETTLED` matched `settled_count` inside `INTEL_TRACE`, reporting
+  "11 settlement passes" when zero had run. The filter had to require
+  `SETTLED date=`.
+
+Related: [[feedback_read_the_field_you_already_have]],
+[[feedback_confirm_the_code_ran]], [[feedback_instrument_blindness]],
+[[feedback_rate_not_count]].
+
+## 2026-08-26 — FORBIDDEN: concluding a VENUE must act because its error names your account
+
+**`user_not_found: <uuid>` from a venue is a statement about a REQUEST, not about
+your account's existence.** I read it as "the exchange has no record of us here,
+so the venue must enable us", shipped that as the remedy, and it went LIVE IN A
+PRODUCTION ERROR STRING telling any reader to contact Kalshi support:
+
+    "the market resolved and the ACCOUNT did not. This needs the venue to enable
+     this account on that exchange shard; no code change fixes it."
+
+**It was never the venue's move.** The user challenged it; reading the venue
+instead of restating the conclusion took minutes.
+`GET /trade-api/v2/exchange/status` enumerates shards as PRODUCTS — `0 Default`,
+`1 Combos`, `2 Crypto`, `3 Tennis & Baseball` — ALL `trading_active`, and
+docs.kalshi.com/getting_started/exchange_sharding.md says plainly: *"Subaccount
+balances are local to a specific exchange instance"* and *"Programmatic traders
+must preallocate collateral on a given exchange shard before order placement."*
+A one-minute transfer by the account holder. It was fixed the same hour.
+
+**HOW TO APPLY.** Before asserting that a counterparty must act, read what the
+counterparty documents about the thing it just refused. The diagnosis and the
+REMEDY are two claims; evidence for the first is not evidence for the second,
+and the remedy is the half that gets pasted into an error message and sends
+someone to the wrong place for a day. Related:
+[[feedback_retraction_is_not_innocence]], [[feedback_presence_is_not_reachability]].

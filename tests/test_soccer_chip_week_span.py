@@ -18,6 +18,12 @@ it was the only league with zero uncovered fixtures.
 It also DECAYS through the day: `by_matchup` fell 94 -> 7 between 15:34Z and
 20:36Z as the board rolled forward past the fixtures the chips described. So
 coverage was thinnest exactly when the next slate is the one being bet.
+
+`#575`: THE WIDENING IS NOW OPT-IN, so every call here passes
+`include_upcoming=True` — these tests are about the CHIP STRIP. Widening it
+unconditionally was half a fix: `games()` is shared with the home rail, which
+renders everything it is given, so the rail went 98 -> 210 games with a count
+badge claiming 210 today. `test_chip_horizon_opt_in.py` guards the rail side.
 """
 
 from __future__ import annotations
@@ -52,7 +58,7 @@ def test_it_asks_for_the_current_week_and_the_next(monkeypatch):
     monkeypatch.setattr(provider, "_active_leagues", lambda today: ["la_liga"])
     monkeypatch.setattr(provider, "_league_season_week", lambda lg, ctx, today: (2026, 5))
 
-    games = provider.games(_Ctx(), is_active_today=True)
+    games = provider.games(_Ctx(), is_active_today=True, include_upcoming=True)
 
     assert [w for _, w, _ in asked] == [5, 6], "current matchday alone is the defect"
     assert len(games) == 2
@@ -76,7 +82,7 @@ def test_a_fixture_in_both_weeks_is_emitted_once(monkeypatch):
     monkeypatch.setattr(provider, "_active_leagues", lambda today: ["la_liga"])
     monkeypatch.setattr(provider, "_league_season_week", lambda lg, ctx, today: (2026, 5))
 
-    games = provider.games(_Ctx(), is_active_today=True)
+    games = provider.games(_Ctx(), is_active_today=True, include_upcoming=True)
 
     assert len(games) == 1
 
@@ -96,7 +102,7 @@ def test_a_missing_next_week_does_not_cost_the_current_one(monkeypatch):
     monkeypatch.setattr(provider, "_active_leagues", lambda today: ["la_liga"])
     monkeypatch.setattr(provider, "_league_season_week", lambda lg, ctx, today: (2026, 5))
 
-    games = provider.games(_Ctx(), is_active_today=True)
+    games = provider.games(_Ctx(), is_active_today=True, include_upcoming=True)
 
     assert [g["event_id"] for g in games] == ["wk5"]
 
@@ -114,7 +120,7 @@ def test_one_broken_league_does_not_empty_the_sport(monkeypatch):
     monkeypatch.setattr(provider, "_active_leagues", lambda today: ["broken", "la_liga"])
     monkeypatch.setattr(provider, "_league_season_week", lambda lg, ctx, today: (2026, 5))
 
-    games = provider.games(_Ctx(), is_active_today=True)
+    games = provider.games(_Ctx(), is_active_today=True, include_upcoming=True)
 
     assert {g["event_id"] for g in games} == {"la_liga-5", "la_liga-6"}
 
@@ -136,6 +142,6 @@ def test_a_fixture_with_no_id_is_still_emitted(monkeypatch):
     monkeypatch.setattr(provider, "_active_leagues", lambda today: ["la_liga"])
     monkeypatch.setattr(provider, "_league_season_week", lambda lg, ctx, today: (2026, 5))
 
-    games = provider.games(_Ctx(), is_active_today=True)
+    games = provider.games(_Ctx(), is_active_today=True, include_upcoming=True)
 
     assert len(games) == 2

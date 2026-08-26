@@ -128,7 +128,7 @@ _TEAM_SIDED_MARKETS = frozenset({"h2h", "h2h_h1", "h2h_h2", "h2h_q1", "h2h_q2",
                                  "h2h_q3", "h2h_q4", "h2h_p1", "h2h_p2", "h2h_p3"})
 
 
-def _side_to_kalshi(side: Any, market: Any = None) -> str:
+def _side_to_kalshi(side: Any, market: Any = None, line: Any = None) -> str:
     """Our `over`/`under`/`yes`/`no`/`home`/`away` -> Kalshi's `yes`/`no`.
 
     Explicit, and it REFUSES an unmapped side. Defaulting to `yes` would turn an
@@ -158,9 +158,58 @@ def _side_to_kalshi(side: Any, market: Any = None) -> str:
         return "yes"
     if raw in {"no", "under"}:
         return "no"
-    if raw in {"home", "away"} and str(market or "").strip().lower() in _TEAM_SIDED_MARKETS:
+    market_key = str(market or "").strip().lower()
+    if raw in {"home", "away"} and market_key in _TEAM_SIDED_MARKETS:
         return "yes"
+    if raw in {"home", "away"} and market_key.startswith("spreads"):
+        return _spread_side_from_line(side, market, line)
     raise OrderBuildError(f"unmappable_side: {side!r} market={market!r}")
+
+
+def _spread_side_from_line(side: Any, market: Any, line: Any) -> str:
+    """A SPREAD'S LEG IS DECIDED BY THE SIGN OF ITS LINE. Nothing else here can.
+
+    A Kalshi spread market states a MARGIN -- "Texas wins by over 1.5 runs" --
+    and `kalshi_board_join` pairs it with exactly two board rows, by
+    construction:
+
+        the NAMED club at -X   -> YES pays when it covers
+        the OTHER club at +X   -> NO pays when it does not
+
+    So `yes` if and only if the row's line is NEGATIVE. The sign IS the leg.
+
+    WHY NOT READ THE TICKER. The ticker names a club, and comparing that club
+    to ours needs a tri-code table -- `team_aliases.canonical_team` refuses the
+    codes shared across leagues, which is exactly where this would be used. The
+    sign needs no table and cannot be ambiguous.
+
+    WHY THIS IS SAFE NOW AND WAS NOT BEFORE. Until the join's sign fix
+    (2026-08-26) a `+1.5` row was stamped with the ticker of the club it was
+    FADING -- 11 of 11 orders on the live book -- so `yes` on that ticker would
+    have bought the opposite bet. `_side_to_kalshi` refusing `home`/`away` was
+    the only thing stopping it. The refusal is lifted ONLY because the join now
+    guarantees the pairing above, and `test_the_join_and_the_order_builder_agree`
+    fails if that guarantee ever stops holding.
+
+    A ZERO OR ABSENT LINE REFUSES. A spread with no number is not a pick'em, it
+    is a row we cannot place, and defaulting it either way is a real bet on a
+    leg nobody chose.
+    """
+    try:
+        value = float(line)
+    except (TypeError, ValueError):
+        raise OrderBuildError(
+            f"spread_line_missing: {line!r} side={side!r} market={market!r}"
+            " -- a spread's leg comes from the sign of its line"
+        ) from None
+    if value < 0:
+        return "yes"
+    if value > 0:
+        return "no"
+    raise OrderBuildError(
+        f"spread_line_zero: side={side!r} market={market!r}"
+        " -- a zero spread names no leg"
+    )
 
 
 def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
@@ -324,22 +373,32 @@ _V2_EXCHANGE_INDEX_AUTO = -1
 # shard 0 was -- it names a subaccount that may not exist for this key on this
 # shard, which is precisely what the error says.
 #
-# OMITTED BY DEFAULT, because that is the branch the reference prescribes for a
-# restricted key and the unrestricted case falls back to primary anyway.
-# `KALSHI_ORDER_SUBACCOUNT` puts a number back with no deploy -- WNBA orders
-# currently fill with `subaccount: 0`, so that is the rollback if omitting it
-# breaks the path that works.
+# DISPROVEN 2026-08-26, AND REVERTED TO 0. Omitting the field was deployed at
+# 14:29:59Z; a real prop order reached the venue at 15:04:08Z and came back with
+# the identical `user_not_found`. The field was never the problem.
+#
+# Back to `0` rather than left omitted, because `0` is the configuration under
+# which EVERY KNOWN FILL HAPPENED and omitting it is unproven in both
+# directions. On a money path, "changed nothing for the bug" is not a reason to
+# keep a change; last-known-good is. `KALSHI_ORDER_SUBACCOUNT=` (empty) omits it
+# again with no deploy if that is ever wanted.
 _SUBACCOUNT_OMITTED = object()
+_SUBACCOUNT_DEFAULT = 0
 
 
 def _v2_subaccount() -> Any:
-    raw = (os.environ.get("KALSHI_ORDER_SUBACCOUNT") or "").strip()
+    raw = os.environ.get("KALSHI_ORDER_SUBACCOUNT")
+    if raw is None:
+        return _SUBACCOUNT_DEFAULT
+    raw = raw.strip()
     if not raw:
+        # Set-but-empty is an explicit request to OMIT. Distinguishable from
+        # unset only because this reads the variable before stripping it.
         return _SUBACCOUNT_OMITTED
     try:
         return int(raw)
     except ValueError:
-        return _SUBACCOUNT_OMITTED
+        return _SUBACCOUNT_DEFAULT
 
 
 def _v2_exchange_index() -> int:
@@ -399,7 +458,11 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
     #    equivalent to buying NO at 1 - price, but this endpoint quotes
     #    everything from the YES side.)"
     contract_side = _side_to_kalshi(
-        getattr(request, "side", None), getattr(request, "market", None)
+        getattr(request, "side", None),
+        getattr(request, "market", None),
+        # THE SIGNED BOARD LINE. A spread's leg is not expressible without it --
+        # see `_spread_side_from_line`.
+        getattr(request, "line", None),
     )
     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
 
@@ -509,6 +572,116 @@ def _retry_url_for(url: str, fetch_base: str) -> str:
     return f"{base}{path}"
 
 
+# Shards this account has ever actually filled on. MEASURED 2026-08-26, n=9,
+# a perfect split with no exceptions:
+#
+#   FILLED shard 0   KXMLBKS-26AUG242145CINSF-CINCBURNS26-7      (MLB, 08-24)
+#   FILLED shard 0   KXMLBKS-26AUG241840BOSMIA-MIASALCANTARA22-5 (MLB, 08-24)
+#   FILLED shard 0   KXWNBA3PT / KXWNBATOTAL / KXWNBAREB
+#   FAILED shard 3   KXMLBERA / KXMLBTOTAL / KXMLBSPREAD / KXMLBKS  (all 08-26)
+#
+# The two MLB fills on 08-24 were shard 0. **MLB MIGRATED TO SHARD 3**, which is
+# why this broke on 08-25 with no deploy of ours in between, and it retires the
+# last code-regression hypothesis.
+#
+# ENV-OVERRIDABLE, and that is the point: the fix is the ACCOUNT HOLDER
+# MOVING COLLATERAL onto that shard, not a patch and not a support ticket.
+# Kalshi balances are local to an exchange instance and must be
+# preallocated. Once shard 3 is funded, `KALSHI_ORDER_KNOWN_SHARDS=0,3`
+# makes it legible again with no deploy.
+_KNOWN_GOOD_SHARDS = (0,)
+
+
+def _known_shards() -> tuple[int, ...]:
+    raw = (os.environ.get("KALSHI_ORDER_KNOWN_SHARDS") or "").strip()
+    if not raw:
+        return _KNOWN_GOOD_SHARDS
+    out: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.append(int(part))
+        except ValueError:
+            continue
+    return tuple(out) or _KNOWN_GOOD_SHARDS
+
+
+def _classified(exc: BaseException, body: Mapping[str, Any], market_shard: Any) -> BaseException:
+    """Give the venue's 400 a name a human can act on. Never masks the cause.
+
+    ------------------------------------------------------------------
+    `user_not_found` ON A SHARD MEANS NO COLLATERAL THERE, NOT NO ACCOUNT
+    ------------------------------------------------------------------
+
+    Two rungs of a ladder, both errors literally true, neither a bug here:
+
+        exchange_index 0 (pinned) -> market is not on shard 0 -> market_not_found
+        exchange_index -1 (auto)  -> routes to shard 3, found -> user_not_found
+
+    CORRECTED 2026-08-26, AND THE FIRST VERSION OF THIS DOCSTRING SENT PEOPLE TO
+    THE WRONG PLACE. It said the venue had to "enable this account on that
+    shard" and that "no code change fixes it" -- so a reader was pointed at
+    Kalshi support for something the account holder can do in about a minute.
+
+    `GET /trade-api/v2/exchange/status` enumerates the shards, and they are
+    PRODUCT shards, not separate exchange entities -- all four trading_active:
+
+        0 Default        1 Combos        2 Crypto        3 Tennis & Baseball
+
+    Shard 3 is where BASEBALL lives, which is the whole reason only MLB fails.
+    `KXNFLGAME`, `KXNBA` and `KXWNBAPTS` are all index 0.
+
+    Kalshi's sharding doc, verbatim:
+
+        "Subaccount balances are local to a specific exchange instance."
+        "Programmatic traders must preallocate collateral on a given exchange
+         shard before order placement."
+
+    So `user_not_found` here is consistent with HAVING NO FUNDS ON THAT SHARD,
+    not with the account being unknown. **Nothing needs enabling. Money needs
+    moving** -- at kalshi.com/account/exchange-indexes, or via the
+    intra-account-transfer API, by the account holder.
+
+    THE LESSON, and it is why the whole paragraph is rewritten rather than
+    patched: the shard DIAGNOSIS was right and confirmed in production, and a
+    REMEDY was attached to it by inference rather than by reading. A confident
+    wrong remedy inside a correct diagnosis is worse than no remedy, because it
+    inherits the diagnosis's credibility and nobody re-checks it.
+
+    This does not retry, does not fall back, and does not change the request. It
+    renames the failure so the ledger row says what to DO. The original
+    exception is chained by the caller and nothing is swallowed.
+
+    NO ACCOUNT IDENTIFIER IS COPIED INTO THE MESSAGE. The venue's text carries a
+    user UUID; the ledger is rendered on a web page, so the shard and the ticker
+    are what travel.
+    """
+    text = str(exc)
+    if "user_not_found" not in text:
+        return exc
+    shards = _known_shards()
+    # UNREAD IS NOT A VALUE, and printing `market_shard=None` beside
+    # `known_good_shards=[0]` reads as "we compared and it did not match" when
+    # nothing was compared at all. MEASURED 2026-08-26T15:32Z: exactly that,
+    # because `exchange_index` was missing from `kalshi_client._MARKET_FIELDS`
+    # and the normalizer dropped it. Same defect class as everything else today
+    # -- a reading that looks like an answer -- so the two cases are now
+    # different strings.
+    shard = "UNREAD" if market_shard is None else market_shard
+    return OrderBuildError(
+        "venue_shard_unfunded:"
+        f" market_shard={shard} funded_shards={list(shards)}"
+        f" ticker={body.get('ticker')}"
+        " -- Kalshi balances are PER-SHARD and must be preallocated before"
+        " order placement. This is not a venue permission and not a code fault:"
+        " move collateral to that shard at kalshi.com/account/exchange-indexes"
+        " (or via the intra-account-transfer API), then add it to"
+        " KALSHI_ORDER_KNOWN_SHARDS."
+    )
+
+
 def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
     """Send one order. Returns the shape `place_order` expects from an adapter.
 
@@ -582,12 +755,16 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         # http_410 (see `_DEFAULT_ORDER_PATH`); re-sending to a host Kalshi
         # itself just served this ticker from is not inventing one.
         fetch_base = ""
+        market_shard: Any = None
         try:
             from syndicate.features.shared.kalshi_client import fetch_market
 
             probe = fetch_market(str(body.get("ticker") or ""))
             market = (probe.get("market") or {}) if isinstance(probe, dict) else {}
             fetch_base = str(probe.get("base") or "") if isinstance(probe, dict) else ""
+            # THE SHARD THIS MARKET LIVES ON. Public field, no credential
+            # needed, and the single most load-bearing number in this file.
+            market_shard = market.get("exchange_index")
             print(
                 "[kalshi_orders] SUBMIT_FAILED_MARKET"
                 f" ticker={body.get('ticker')} side={body.get('side')}"
@@ -619,7 +796,8 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                 f" strike_type={market.get('strike_type')}"
                 f" yes_ask={market.get('yes_ask_dollars')}"
                 f" no_ask={market.get('no_ask_dollars')}"
-                f" can_close_early={market.get('can_close_early')}",
+                f" can_close_early={market.get('can_close_early')}"
+                f" exchange_index={market_shard}",
                 flush=True,
             )
             # THE EVENT'S OWN MARKET LIST, and the last question standing.
@@ -697,7 +875,7 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                     flush=True,
                 )
                 return _order_result(request, body, response, price_dollars=price_dollars)
-        raise exc
+        raise _classified(exc, body, market_shard) from exc
     return _order_result(request, body, response, price_dollars=price_dollars)
 
 

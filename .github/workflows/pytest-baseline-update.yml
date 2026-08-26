@@ -1,0 +1,145 @@
+# Regenerate `tests/pytest_baseline.json` FROM CI, and open a PR with the result.
+#
+# WHY THIS EXISTS: the baseline records which tests are known to fail, and the
+# gate in `ci.yml` fails when that set changes in EITHER direction. So the file
+# is only correct if it was recorded in the SAME environment that enforces it.
+#
+# Measured 2026-08-26 (`#569`): a baseline regenerated on a dev container --
+# same Python 3.11, same `-n auto --dist=loadscope`, psutil and playwright
+# absent in both -- still produced `EXIT_NEW_FAILURES` (exit 1) when the gate
+# ran it on a CI runner. CI found failures the container did not. Whatever the
+# remaining difference is, it is not one anybody has enumerated, and the fix is
+# to stop guessing: record the baseline where the gate runs.
+#
+# MANUAL TRIGGER ONLY. This runs the full suite and writes a file that silences
+# a gate; it should be an act, not a side effect of pushing.
+#
+# IT OPENS A PR, IT DOES NOT COMMIT TO `main`. The diff is the review surface --
+# a baseline that grows deserves a human asking why before it lands.
+
+name: pytest-baseline-update
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why regenerate now (goes in the PR body)"
+        required: false
+        default: "Manual regeneration"
+
+# `#572`: ci.yml declares no concurrency group and runs pile up under push
+# load. This job is an hour long; two of them at once is pure waste, and the
+# later one wins anyway.
+concurrency:
+  group: pytest-baseline-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    # Longer than ci.yml's 60: that cap has been TRUNCATING runs (5 cancelled
+    # at exactly 1:00:0x in the 500-run window), and a regeneration that gets
+    # killed at the cap writes nothing.
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # THIS BLOCK MUST STAY IDENTICAL TO `ci.yml`'s `pytest-baseline` JOB.
+      # It is the whole point: a baseline recorded against a different install
+      # set reports phantom regressions on the first gated run. `ci.yml` spells
+      # out why requirements-dev.txt is NOT installed wholesale -- psutil's mere
+      # PRESENCE changes which backend `memory_observability` picks, and two
+      # baselined failures are memory tests. If you change one of these two
+      # lists, change both, in the same commit.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "$(grep -E '^pytest>' requirements-dev.txt)"
+          pip install "$(grep -E '^pytest-xdist' requirements-dev.txt)"
+
+      - name: Record the environment the baseline is being cut against
+        run: |
+          {
+            echo "### Environment"
+            echo '```'
+            python -V
+            echo "psutil:     $(python -c 'import psutil' 2>/dev/null && echo PRESENT || echo ABSENT)"
+            echo "playwright: $(python -c 'import playwright' 2>/dev/null && echo PRESENT || echo ABSENT)"
+            echo "cores:      $(nproc)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Same args as the gate. `--update` always exits 0; the interesting
+      # output is the file.
+      - name: Regenerate the baseline
+        run: python scripts/pytest_baseline.py --update -- tests/ -n auto --dist=loadscope
+
+      # The delta goes in the JOB SUMMARY, not just the log. Logs are not
+      # readable from every environment that needs this answer (a cloud agent
+      # session gets 403 on the log artifact host); the summary is served by
+      # the API.
+      - name: Summarise the delta
+        id: delta
+        run: |
+          if git diff --quiet -- tests/pytest_baseline.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "### Baseline unchanged — the gate and the recorded set already agree." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, subprocess
+          before = json.loads(subprocess.run(
+              ["git", "show", "HEAD:tests/pytest_baseline.json"],
+              capture_output=True, text=True).stdout)
+          after = json.load(open("tests/pytest_baseline.json"))
+          b, a = set(before["failing"]), set(after["failing"])
+          print("### Baseline delta\n")
+          print(f"- collected: {before['total_testcases']} -> {after['total_testcases']}")
+          print(f"- failing:   {before['failing_count']} -> {after['failing_count']}\n")
+          print(f"**Now passing (removed) — {len(b - a)}**\n")
+          for k in sorted(b - a):
+              print(f"- `{k}`")
+          print(f"\n**Newly failing (added) — {len(a - b)}**\n")
+          for k in sorted(a - b):
+              print(f"- `{k}`")
+          PY
+
+      - name: Open a PR with the regenerated baseline
+        if: steps.delta.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="ci/pytest-baseline-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add tests/pytest_baseline.json
+          git commit -m "Regenerate the pytest baseline from CI
+
+          Recorded on the runner that enforces the gate, which is the only
+          environment whose answer counts. Trigger reason: ${{ inputs.reason }}
+
+          Delta is in the workflow run's job summary."
+          git push -u origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "Regenerate the pytest baseline from CI" \
+            --body "Regenerated by \`pytest-baseline-update\` on a CI runner.
+
+          **Reason:** ${{ inputs.reason }}
+
+          **Read the [job summary](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for the delta** — which tests started passing and which started failing.
+
+          Before merging, check the *newly failing* list. The baseline is a record of accepted debt, not a place to put a regression: anything in that list that is a real break should be fixed, not recorded."

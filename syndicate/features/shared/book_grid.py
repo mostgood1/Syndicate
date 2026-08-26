@@ -214,6 +214,24 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
     freshest: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
     anchors: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
     dropped_direct_feed = 0
+    # `#546`. WHICH SPELLINGS DID NOT MATCH. `is_direct_feed_book` compares
+    # `str(book).strip().lower()` against the frozenset EXACTLY -- no prefix, no
+    # separator folding -- so `polymarket_us`, `kalshi_us` or `Polymarket US`
+    # would sail straight through the filter that exists to stop them.
+    #
+    # Whether the aggregator ever uses such a spelling could not be answered
+    # from this repo: the git-tracked shards are a May/June MLB mirror carrying
+    # five books (draftkings, fanduel, betmgm, fanatics, williamhill_us) and
+    # neither venue at all, and no log line anywhere prints a book key. So this
+    # counts the NEAR MISSES instead of guessing -- a book whose name contains
+    # "kalshi" or "polymarket" that `is_direct_feed_book` nonetheless refused.
+    #
+    # DELIBERATELY A COUNTER, NOT A WIDER MATCH. Making the filter itself
+    # substring-based would silently swallow any future book whose name merely
+    # contains these strings, which is a worse failure than the one it fixes:
+    # it drops real prices with no way to notice. Measure first; widen the
+    # frozenset by NAME once a real spelling is observed.
+    direct_feed_near_misses: dict[str, int] = {}
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
             continue
@@ -232,6 +250,11 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
         if is_direct_feed_book(row.get("bookmaker")):
             dropped_direct_feed += 1
             continue
+        _book_name = str(row.get("bookmaker") or "").strip().lower()
+        if _book_name and ("kalshi" in _book_name or "polymarket" in _book_name):
+            # Reached only when the exact match above already refused, so every
+            # key counted here is a spelling the filter is missing TODAY.
+            direct_feed_near_misses[_book_name] = direct_feed_near_misses.get(_book_name, 0) + 1
         instance = tuple(str(row.get(field) or "") for field in _INSTANCE_FIELDS)
         materialised = row if isinstance(row, dict) else dict(row)
         key = instance + (
@@ -246,12 +269,18 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
         if anchor_key not in anchors:
             anchors[anchor_key] = (index, materialised)
 
-    if dropped_direct_feed:
+    if dropped_direct_feed or direct_feed_near_misses:
         # print, not logger.info -- CLAUDE.md: logger.info does not reach
         # Render's collector from this process.
+        #
+        # `near_misses` prints even when empty (whenever the line prints at all),
+        # because "the filter matches every spelling" and "this build never ran"
+        # must not look alike -- the same reason `#541`'s coverage line reports
+        # its zeroes.
         print(
             f"[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows={dropped_direct_feed} "
-            f"books={sorted(DIRECT_FEED_BOOKS)}",
+            f"books={sorted(DIRECT_FEED_BOOKS)} "
+            f"near_misses={dict(sorted(direct_feed_near_misses.items()))}",
             flush=True,
         )
 

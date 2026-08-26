@@ -47,6 +47,156 @@ def _quote_age_percentiles(values: list[float]) -> tuple[float, float, float] | 
     return (_at(0.5), _at(0.9), ordered[-1])
 
 
+# `_KEY_FIELDS` positions in `odds_book_quotes._quote_key`'s "|"-joined string.
+# The GROUP is every field that identifies the market; bookmaker, selection and
+# line are what VARY within it. Mirrors `book_grid._line_group_key` plus the
+# `kind` term, and is asserted against the real `_KEY_FIELDS` at call time so a
+# reordering there cannot silently mis-slice this.
+_QUOTE_KEY_ORDER = ("sport", "kind", "event_id", "bookmaker", "segment", "market", "selection", "player_name", "line")
+_QUOTE_GROUP_FIELDS = ("sport", "kind", "event_id", "segment", "market", "player_name")
+
+
+def _classify_stale_row(row: Mapping[str, Any], last_seen: Mapping[str, str], now_iso: str) -> str:
+    """`orphaned_line` vs `market_gone` for one never-refreshing row. `#569`.
+
+    THE DISCRIMINATOR, and it is the whole point of this function. A row whose
+    `seen_age` grows at 1.0x wall clock got there one of two ways, and they have
+    OPPOSITE fixes:
+
+      orphaned_line  the market is LIVE and still being quoted, but this row's
+                     (bookmaker, selection, line) triple was superseded. `line`
+                     is in `_KEY_FIELDS`, so a book moving its line MINTS A NEW
+                     KEY and the old one can never be observed again --
+                     documented as intended at `odds_book_quotes.py:120`.
+                     `drop_superseded_lines` is supposed to catch these and did
+                     not.  ->  the GRID is serving a superseded line.
+
+      market_gone    NOTHING in the group has been seen recently. The feed
+                     stopped quoting this market entirely, so there is no
+                     fresher sibling for `drop_superseded_lines` to compare
+                     against and nothing drops it.  ->  the FEED stopped, and
+                     only the 14-hour ceiling bounds it.
+
+    Decided by asking the STATE FILE, not the grid: the grid has already had
+    superseded lines dropped, so the orphan we are looking for may not be in it.
+    The state file keeps every key ever observed, which is exactly why it can
+    answer this and the grid cannot.
+    """
+    try:
+        from syndicate.features.shared.odds_book_quotes import _KEY_FIELDS
+
+        if tuple(_KEY_FIELDS) != _QUOTE_KEY_ORDER:
+            return "unknown_key_order_changed"
+    except Exception:
+        return "unknown_no_key_fields"
+
+    want = {f: str(row.get(f) or "") for f in _QUOTE_GROUP_FIELDS}
+    idx = {f: _QUOTE_KEY_ORDER.index(f) for f in _QUOTE_GROUP_FIELDS}
+    row_line = str(row.get("line") or "")
+
+    freshest_other_line = ""
+    for key, stamp in last_seen.items():
+        parts = key.split("|")
+        if len(parts) != len(_QUOTE_KEY_ORDER):
+            continue
+        if any(parts[idx[f]] != want[f] for f in _QUOTE_GROUP_FIELDS):
+            continue
+        if parts[-1] == row_line:
+            continue  # same line, different book/selection -- not the orphan test
+        if stamp > freshest_other_line:
+            freshest_other_line = str(stamp)
+
+    if not freshest_other_line:
+        return "market_gone"
+    # A sibling line observed materially more recently than this row means the
+    # market is live and this row is the orphan. 15 min mirrors
+    # `_STALE_ALT_LINE_LAG_SECONDS`, so a "yes" here is a row that guard should
+    # have dropped.
+    try:
+        from datetime import datetime, timezone
+
+        def _dt(v: str):
+            return datetime.fromisoformat(v.replace("Z", "+00:00")).replace(tzinfo=timezone.utc) if v else None
+
+        now = _dt(now_iso)
+        sib = _dt(freshest_other_line)
+        if now is None or sib is None:
+            return "unknown_unparsable_stamp"
+        sib_age = (now - sib).total_seconds()
+    except Exception:
+        return "unknown_unparsable_stamp"
+
+    row_age = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    seen = row_age.get("quote_seen_age_seconds") if isinstance(row_age, Mapping) else None
+    if not isinstance(seen, (int, float)) or isinstance(seen, bool):
+        return "unknown_no_row_age"
+    return "orphaned_line" if (float(seen) - sib_age) > 900 else "market_gone"
+
+
+def _report_stale_row_causes(rows: Any, selected_date: Any, *, per_sport: int = 3) -> None:
+    """Attribute the WORST never-refreshing rows to a cause. `#569`.
+
+    Bounded to the `per_sport` worst rows per sport: this reads a per-sport
+    state file (MLB's is ~2MB) and the question is about the tail, not the
+    distribution. The distribution is already on `QUOTE_AGE_SERVED`.
+
+    Never raises, and every failure mode reports as its own `unknown_*` label
+    rather than defaulting into `market_gone` -- a diagnostic that guesses when
+    it cannot tell is worse than one that says so, because the guess is what
+    gets quoted back.
+    """
+    try:
+        if not isinstance(rows, list) or not rows:
+            return
+        from datetime import datetime, timezone
+
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        worst: dict[str, list[tuple[float, Mapping[str, Any]]]] = {}
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            quote = row.get("quote")
+            if not isinstance(quote, Mapping):
+                continue
+            seen = quote.get("quote_seen_age_seconds")
+            if not isinstance(seen, (int, float)) or isinstance(seen, bool):
+                continue
+            if float(seen) < 900:
+                continue  # only rows a reader would call stale
+            slug = str(row.get("sport") or row.get("sport_slug") or "?").strip().lower() or "?"
+            worst.setdefault(slug, []).append((float(seen), row))
+        if not worst:
+            print("[layer2_shortlist] STALE_ROW_CAUSE none_over_900s", flush=True)
+            return
+
+        from syndicate.features.shared.odds_book_quotes import read_quote_last_seen
+
+        parts: list[str] = []
+        for slug, entries in sorted(worst.items()):
+            entries.sort(key=lambda kv: kv[0], reverse=True)
+            try:
+                last_seen = read_quote_last_seen(slug, str(selected_date or ""))
+            except Exception:
+                parts.append(f"{slug}:unknown_no_state_file={len(entries)}")
+                continue
+            if not last_seen:
+                parts.append(f"{slug}:unknown_empty_state_file={len(entries)}")
+                continue
+            counts: dict[str, int] = {}
+            for _age, row in entries[:per_sport]:
+                label = _classify_stale_row(row, last_seen, now_iso)
+                counts[label] = counts.get(label, 0) + 1
+            parts.append(
+                f"{slug}[stale={len(entries)} worst={entries[0][0]:.0f}s "
+                + ",".join(f"{k}={v}" for k, v in sorted(counts.items()))
+                + "]"
+            )
+        print("[layer2_shortlist] STALE_ROW_CAUSE " + " ".join(parts), flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[layer2_shortlist] STALE_ROW_CAUSE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
 def _report_served_quote_ages(rows: Any) -> None:
     """Report how old the QUOTES on the published board were AT PUBLISH TIME.
 
@@ -1080,6 +1230,7 @@ def build_layer2_shortlist(
     # dropped rows past `max_quote_age_seconds` by here -- so this reports the
     # ages that SURVIVED, which is the number the board actually shows.
     _report_served_quote_ages(shortlist.get("rows"))
+    _report_stale_row_causes(shortlist.get("rows"), selected_date)
 
     # BOARD CARDS ARE BUILT HERE, ON THE WORKER, AND PERSISTED.
     #

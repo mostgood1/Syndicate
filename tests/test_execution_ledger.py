@@ -1645,7 +1645,7 @@ def test_an_orphan_we_placed_is_distinguished_from_one_we_did_not(monkeypatch, t
         coverage="book",
         venue_rows=[
             {"client_order_id": "", "order_id": "hand", "state": "filled", "ticker": "T-MANUAL"},
-            {"client_order_id": "lost-row", "order_id": "v7", "state": "filled", "ticker": "T-LOST"},
+            {"client_order_id": "aaaabbbbccccddddeeeeffff", "order_id": "v7", "state": "filled", "ticker": "T-LOST"},
             {"client_order_id": "ours", "order_id": "v1", "state": "resting", "ticker": "T-OURS"},
         ],
         ledger_rows=[_ledger_row("ours", venue_order_id="v1")],
@@ -1798,3 +1798,57 @@ def test_the_submit_resolution_stamp_is_not_named_settlement():
     # would fail on the very comment that documents the correct behaviour.
     for reader in ('.get("settled_at")', '["settled_at"]', '.get("venue_resolved_at")'):
         assert reader not in settle, f"the grader began keying off {reader}"
+
+
+def test_a_client_id_from_another_client_is_not_ours(monkeypatch, tmp_path, capsys):
+    """MEASURED 2026-08-26T15:21Z, and it was a FALSE ALARM FROM THIS COUNTER.
+
+    `orphans_ours=6` reported six positions of real money supposedly opened by
+    this system and lost from the ledger. All six were `KXMVECROSSCATEGORY`
+    parlays -- a series `kalshi_client._COMBINATORIAL_SERIES_PREFIXES` excludes
+    outright because "the board does not bet parlays". There is no code path
+    here that can place one.
+
+    The predicate was `bool(client_order_id)`. But the venue lets ANY client set
+    that field -- the Kalshi app stamps one too -- so it was never the same
+    question as "is this ours". Ours are `sha1(...).hexdigest()[:24]`: 24 bare
+    hex characters. Theirs are UUID-shaped.
+
+    A counter written specifically to stop a scary-but-wrong number produced a
+    scary-but-wrong number.
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="book",
+        venue_rows=[
+            # Real shape from production: a parlay, UUID-style client id.
+            {
+                "client_order_id": "64643034-3834-3635-3134-343632663032",
+                "order_id": "p1",
+                "state": "filled",
+                "ticker": "KXMVECROSSCATEGORY-S2026294A1D9EC9F-C7A8EA4A823",
+            },
+            # No client id at all -- placed in the venue's own UI.
+            {"client_order_id": "", "order_id": "u1", "state": "filled", "ticker": "T-UI"},
+            # OUR key shape, and NOT in the ledger. The one that matters.
+            {
+                "client_order_id": "aaaabbbbccccddddeeeeffff",
+                "order_id": "v7",
+                "state": "filled",
+                "ticker": "T-LOST",
+            },
+        ],
+        ledger_rows=[_ledger_row("3b60977b194ee39ef1aa3229", venue_order_id="v1")],
+    )
+    out = el.reconcile_live_orders(venue="kalshi")
+    by_ticker = {o["ticker"]: o["ours"] for o in out["orphans"]}
+    assert by_ticker["KXMVECROSSCATEGORY-S2026294A1D9EC9F-C7A8EA4A823"] is False
+    assert by_ticker["T-UI"] is False
+    assert by_ticker["T-LOST"] is True
+
+    printed = capsys.readouterr().out
+    # THREE BUCKETS. Two could not tell a parlay from a lost row.
+    assert "ours=1" in printed
+    assert "foreign_client=1" in printed
+    assert "unclaimed=1" in printed
