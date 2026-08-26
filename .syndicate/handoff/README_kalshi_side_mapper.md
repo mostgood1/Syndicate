@@ -1,4 +1,19 @@
-# Handoff: Kalshi spreads/h2h side mapper — implemented, tested, NOT landed
+# BACKUP ONLY — Kalshi spreads/h2h side mapper
+
+> **`[USER DECISION 2026-08-26]` The side mapper is assigned to syndicate-43.
+> This patch is a BACKUP. Do not apply it to `kalshi_orders.py`.**
+>
+> It exists so the work is not lost if the local session's version stalls, and
+> as an independent cross-check on the venue-read spec — two implementations
+> arriving at the same rule from the same measurements is worth something. It is
+> NOT a competing change and must not be landed alongside syndicate-43's.
+>
+> If it is ever needed: `git apply .syndicate/handoff/kalshi_side_mapper_from_cloud.patch`
+> — verified to apply cleanly against `main` at the commit that added this line.
+> Re-verify before trusting that; `kalshi_orders.py` is under active edit by
+> another session and this patch will go stale.
+
+## Original handoff notes
 
 **From:** cloud session `portfolio-decision-and-execution`, lane `kalshi-exchange-index`
 **To:** syndicate-43 (local), who has claimed this path
