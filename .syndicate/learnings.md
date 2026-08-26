@@ -6781,7 +6781,7 @@ before trusting the pass.
 **Two instances the same evening, in two different sessions, in opposite
 directions — which is why this is a rule and not an anecdote.**
 
-**Instance 1 (`open-bet-live-status`, `#581`).** Measured off the whole
+**Instance 1 (`open-bet-live-status`, `#584`).** Measured off the whole
 portfolio plan artifact: `bet_status` resolved **3 of 442**, `live_marks`
 **82 of 442**. Reported to the user as "the status column will be ~5% useful,
 the marks will populate broadly", and the build was scoped on that. Measured
@@ -6825,3 +6825,57 @@ population the claim was about, and nothing in the phrasing exposed the gap.
   not.** Where you are building the instrument, dedupe at the source.
 - The cheap check is to re-measure on the real population AFTER shipping and
   compare. Both instances above were caught that way, not by reasoning.
+
+## 2026-08-26 — FORBIDDEN: reporting a test as failing on `main` from a session worktree, when its fixture is DERIVED from `data/`. And a stash-and-rerun does NOT isolate it.
+
+**`session_worktree.py open` excludes `data/` by design** (34,690 of 37,745
+tracked files; it is a lossy mirror and never evidence about production). Any
+test whose fixture is BUILT FROM those artifacts therefore fails in a session
+worktree and **looks exactly like a real regression on `main`**.
+
+**MEASURED, twice in one evening, in two sessions that had not spoken yet.**
+
+*This session:* `tests/test_venue_quote_adapters.py` reported 3 failures
+(`no_rows` on every soccer row). Traced: `team_aliases._soccer_alias_to_name()`
+is DERIVED from `data/soccer_source/<league>/.../team_branding/*.csv`, so with
+`data/` absent it builds an **EMPTY** map; `canonical_team("soccer","ars")`
+returns None; `polymarket_board_join._effective_league` classifies a row as
+soccer only when BOTH clubs resolve, so no soccer row could ever match.
+Junctioned the worktree at the primary tree's `data/soccer_source`: **alias map
+0 → 474**, `ars`→arsenal, `che`→chelsea, **all 6 pass**. Nothing was broken.
+
+*Lane `ncaaf-opener-regions-props`, independently:* `40 failed / 397 passed` on
+`-k ncaaf`, from `test_ncaaf_team_registry_reachability` and
+`test_ncaaf_transfer_portal_builder`, both built from
+`data/ncaaf_source/source_artifacts/...`.
+
+**THE METHOD ERROR IS THE POINT, AND IT IS THE EXPENSIVE HALF.** Both sessions
+"confirmed pre-existing" by **stashing their own diff and re-running — in the
+same worktree**. That controls for your CODE and not for your ENVIRONMENT, and
+the environment was the variable that mattered. Both got the same failures at
+HEAD and both concluded, wrongly, that `main` was broken. **A stash-and-rerun
+feels like a control while isolating exactly one axis.** This session then
+repeated the false claim to the user and to two peer sessions before checking.
+
+**HOW TO APPLY.**
+- Before calling ANY test failure pre-existing from a worktree, ask what its
+  fixture is built from. `grep` the failing module for `data/` — directly or
+  through a `_source_root` / `all_teams` / `_alias_to_name` style derivation.
+- The check is cheap and definitive: make the data reachable and re-run. A
+  Windows junction (`New-Item -ItemType Junction`) onto the primary tree's
+  specific subtree takes seconds, or `session_worktree.py open --with-data`.
+- **REMOVE THE JUNCTION AFTERWARDS — AND THEN `git sparse-checkout reapply`.**
+  Two distinct hazards, and the second is the dangerous one:
+  1. While the junction exists, the worktree's `git` sees the primary tree's
+     untracked files and a test that WRITES lands in the real checkout — the
+     2026-08-23 `default_nfl_source_root()` entry above, by another route.
+  2. **Removing it leaves the tree reading as ~150 DELETED tracked files.**
+     Measured here: `session_worktree.py` excludes `data/` via non-cone
+     sparse-checkout (`/*`, `!/data/`), and materialising that path through a
+     junction clears the SKIP_WORKTREE bits — so after deleting the junction
+     `git status` shows ` D` on every path it had touched, and `land` correctly
+     refuses a dirty tree. **`git sparse-checkout reapply` restores it to
+     zero.** Do NOT `git restore data/` (writes 34k files) and do NOT commit
+     past it — that is the 4,993-staged-deletions incident's exact shape.
+- "Same failures with my diff stashed" is a statement about your diff. It is
+  not a statement about `main`. Say the first and do not imply the second.

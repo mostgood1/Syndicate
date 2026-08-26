@@ -33384,7 +33384,7 @@ report being published over a full one.
 
 **what:** open rows on `/portfolio` carry the worker's live bet status and market
 mark; `?on=` filters by slate date; game-line rows lead with the TEAM NAME.
-Lane `open-bet-live-status`. Item `todo.md #581`.
+Lane `open-bet-live-status`. Item `todo.md #584`.
 
 **claim:** `web` was held by lane `mlb-chip-live-state` (session `syndicate-f6`)
 from 22:57:53Z. **Not forced** — messaged both interactive peers, they released

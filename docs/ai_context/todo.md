@@ -104,7 +104,7 @@ naming the slug). `lane-guard` blocked the edit first, correctly; the lane was
 adopted rather than edited across. Its inherited behavioural read is restated in
 the lane block, not discharged by the adoption.
 
-### `#581` — **Live status on open bets — and my pre-build coverage estimate was BACKWARDS.** — lane `open-bet-live-status`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T23:23:11Z** (web `61405c99`)
+### `#584` — **Live status on open bets — and my pre-build coverage estimate was BACKWARDS.** — lane `open-bet-live-status`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T23:23:11Z** (web `61405c99`)
 
 `[user 2026-08-26]` *"can we append live game or prop status to the open bets"*
 -> *"ship both"*; *"portfolio needs a date filter"*.

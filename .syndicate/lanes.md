@@ -2273,7 +2273,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   (`syndicate-f6`); messaged both interactive peers, they released, and I
   verified `merge-base --is-ancestor 58be8c0d 61405c99` before deploying so
   their `home.py` fix was carried forward rather than reverted.
-  Full block: `deploys.md` 2026-08-26 23:23:11Z. Item: `todo.md #581`.
+  Full block: `deploys.md` 2026-08-26 23:23:11Z. Item: `todo.md #584`.
 - Verification: 21 tests; 671 green across portfolio/settlement/execution/venue
   suites. Local render confirms AHEAD/BEHIND with the number, `no live feed`
   by name, `+2.4 pts vs taken`, the hidden-open-bets banner, and the team name.
