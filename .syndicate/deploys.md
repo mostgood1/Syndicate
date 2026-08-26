@@ -33075,3 +33075,46 @@ correctness justifies.
 
 5 tests, mutation-checked (reverting to the single-date read turns 2 red).
 68 green across window-merge, survivors, quote-age and layer2 suites.
+
+### RE-READ after the window merge, 21:56-21:58Z, instance `-25qml`
+
+    no_group_sibling=343 no_seen_age=52  within_lag=637   DROPPED=824  kept=3328
+    no_group_sibling=83  no_seen_age=19  within_lag=428   DROPPED=126  kept=532
+    no_group_sibling=447                 within_lag=888   DROPPED=7    kept=1335
+    no_group_sibling=199 no_seen_age=1   within_lag=201   DROPPED=16   kept=403
+    no_group_sibling=979                 within_lag=2145  DROPPED=2271 kept=3124
+
+**CONDITION 1 — `no_seen_age` collapses: MET, decisively.** `7553 -> max 52`
+across five builds, and zero on two. The clockless population is gone.
+
+**CONDITION 2 — drops rise: MET.** `count=824` and `count=2271` on the wide
+builds against `count=16` before. Superseded forward-date lines are being pruned
+for the first time.
+
+**CONDITION 3 — `kept` must not fall off a cliff: NOT ASSESSABLE FROM THIS
+SAMPLE, and I am not claiming it passed.** The tempting read is
+`kept=15672 -> kept=3124`, an 80% collapse. **That comparison is invalid:** the
+21:17 build was `selected_date 2026-08-26`, the 21:58 build is `2026-08-25`
+(confirmed from the `cards_context_begin` line beside it). Different dates,
+different inputs — pre-fix input ~15688 rows, post-fix ~5395 — and **my change
+cannot alter input size**, so the difference is the slate, not the fix.
+
+**THE EVIDENCE THAT DOES BEAR ON IT, and it is like-for-like:** two builds are
+**byte-identical before and after** — `count=7 kept=1335` and
+`count=16 kept=403`, matching their pre-fix survivor signatures exactly. **On
+grids that already had clocks, nothing changed at all.** That is precisely the
+intended blast radius: the fix touches only grids that previously carried
+clockless rows, and leaves the rest untouched.
+
+**STILL OWED: one same-date before/after on a wide grid.** Until then "the board
+did not empty" rests on the two unchanged builds plus the absence of any
+`kept`-near-zero reading, not on a direct comparison. Anyone acting on this
+should know the strongest condition is the one still unmeasured.
+
+**Minor and new:** `sibling_no_seen_age=1` appeared for the first time (zero in
+every pre-fix build). Expected — rows that gained clocks can now BE the clockless
+sibling of another row — and too small to chase.
+
+**THE HOLE IS CLOSED on the evidence available:** the mechanism was proven from
+code, the clockless population it created is gone, and the guard is now pruning
+the rows it could never see.
