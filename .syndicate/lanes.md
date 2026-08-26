@@ -2082,7 +2082,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   slug's `<home>`, ~0.0 means `<away>`, **anything between FALSIFIES the
   symmetric-ladder finding and spreads must stay refused.**
 
-### kalshi-line-aware-rungs — OPEN — BLOCKED ON TWO MEASUREMENTS, do not resume the original goal first — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+### kalshi-line-aware-rungs — OPEN — **CLAIMS RELEASED 2026-08-26 03:3xZ, session archived** — BLOCKED ON TWO MEASUREMENTS, do not resume the original goal first — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45 (GONE)
+
+- **CLAIMS RELEASED. The files below are FREE to take.** The lane stays OPEN
+  because real work remains, but no live session holds it — do not treat the
+  `Files:` list as a lock. Whoever picks this up should re-claim what they need.
+  Nothing here is uncommitted: tree clean at `d2d44dbaf`, all shipped code live
+  under `34717822`.
 
 - **Files:** `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_odds_cadence.py`,
   `tests/test_kalshi_precap_cut_by_date.py` (NEW),
