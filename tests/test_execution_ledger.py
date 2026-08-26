@@ -1221,6 +1221,12 @@ def test_the_measured_polymarket_fill_fields_are_the_ones_read():
         "cumQuantity": "2.86",
         "leavesQuantity": "0",
         "avgPx": "0.495",
+        # THE SIDE IS PART OF A REAL ROW. The measured `ORDERS_READ` key list
+        # carries both `outcomeSide` and `side`, and `avgPx` is quoted on the
+        # YES side -- a NO order's fill is its complement, which is what
+        # halted both venues on 2026-08-26T00:23Z. A fixture without it was
+        # claiming a shape the venue does not send.
+        "outcomeSide": "OUTCOME_SIDE_YES",
         "marketSlug": "aec-mlb-tex-cws-2026-08-25",
         "id": "o-1",
     })
@@ -1278,6 +1284,10 @@ def test_a_fractional_fill_books_its_real_dollar_value(monkeypatch):
         return {"status": "ok", "orders": [{
             "id": "o-frac", "state": "ORDER_STATE_FILLED",
             "cumQuantity": "2.65", "avgPx": "0.52",
+            # `over` -> YES, so `avgPx` is already our side. This is the row
+            # the screenshot shows reading DIRECT: requested -108 = 0.5192,
+            # filled 0.52. An `under` on the same game would arrive as 0.48.
+            "outcomeSide": "OUTCOME_SIDE_YES",
             "marketSlug": "tsc-mlb-tb-det-2026-08-25-7pt5",
         }]}
 

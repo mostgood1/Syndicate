@@ -761,6 +761,7 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         state = "unknown"
 
     price = None
+    raw_price = None
     # `avgPx` is the venue's own average fill price, from the measured keys.
     for field in ("avgPx", "averageFillPrice", "average_fill_price", "avgPrice", "fillPrice"):
         raw_price = order.get(field)
@@ -774,6 +775,70 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
             price = None
         else:
             break
+
+    # --------------------------------------------------------------------
+    # `avgPx` IS QUOTED ON THE YES SIDE. A NO ORDER'S FILL IS ITS COMPLEMENT.
+    # --------------------------------------------------------------------
+    #
+    # Taking it at face value recorded the OTHER SIDE'S price on every `under`,
+    # and it halted all trading on both venues on 2026-08-26T00:23:37Z:
+    #
+    #   RECONCILE_COUNT_IMPLAUSIBLE key=939fb90b24300f32c760b7bb
+    #     venue_count=2.39 requested=2.3920000000000003
+    #   EXECUTION status=blocked reason=unreconciled_orders  (x2 venues)
+    #
+    # `under 6.5 CLE@LAA`, +130, $1.04 -> 2.392 contracts, filled 2.39. At the
+    # true NO price 0.435 that is $1.04, inside the $1.30 ceiling. At the YES
+    # price 0.565 it is $1.35 -- over by 3.9%, and refused. The message printed
+    # the CONTRACT pair, which looks fine, while the DOLLAR branch was what
+    # actually refused.
+    #
+    # CONFIRMED FROM FOUR FILLS, by a property that needs no venue access: a
+    # BUY cannot fill above its own limit.
+    #
+    #   side   requested   venue avgPx   1 - avgPx
+    #   over      0.4405        0.40        0.60     direct
+    #   under     0.4545        0.55        0.45     COMPLEMENT
+    #   under     0.4902        0.51        0.49     COMPLEMENT
+    #   over      0.5192        0.52        0.48     direct
+    #
+    # 0.55 against a 0.4545 limit is impossible; 1 - 0.55 = 0.45 is exact.
+    #
+    # THE SIDE IS READ FROM THE VENUE'S OWN ROW, never from our ledger. The
+    # ledger says what we MEANT to buy; only the venue says what it filled, and
+    # reconciliation exists precisely because those can differ.
+    outcome_side = str(
+        order.get("outcomeSide") or order.get("outcome_side") or order.get("side") or ""
+    ).strip().upper()
+    is_no = outcome_side.endswith("NO")
+    is_yes = outcome_side.endswith("YES")
+
+    if price is not None and 0.0 < price < 1.0 and is_no:
+        price = round(1.0 - price, 4)
+    elif price is not None and not (is_yes or is_no):
+        # AN UNREADABLE SIDE IS A REFUSAL, NOT A COIN FLIP. Complementing a YES
+        # price inverts a correct number; leaving a NO price inverts it the
+        # other way. Both are wrong and neither is detectable downstream, so
+        # the price is withheld and reconciliation falls back to the price we
+        # asked for -- a known number rather than a guessed one.
+        print(
+            f"[polymarket_us_orders] FILL_PRICE_SIDE_UNREADABLE"
+            f" order={order.get('id') or order.get('orderId')}"
+            f" outcome_side={outcome_side!r} avgPx={raw_price!r}"
+            " -- price withheld rather than guessed",
+            flush=True,
+        )
+        price = None
+
+    # THE RAW FIELD, LOGGED. This defect was diagnosed from a screenshot and
+    # arithmetic because no log line carried `avgPx`, so the one input that
+    # would have settled it in seconds was the one nobody could see.
+    if raw_price not in (None, ""):
+        print(
+            f"[polymarket_us_orders] FILL_PRICE order={order.get('id') or order.get('orderId')}"
+            f" outcome_side={outcome_side!r} avgPx={raw_price!r} recorded={price!r}",
+            flush=True,
+        )
 
     return {
         "state": state,
