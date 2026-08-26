@@ -135,6 +135,13 @@ def test_a_missing_artifact_falls_back_and_labels_itself(reports_root, monkeypat
     from syndicate.app import app
 
     payload = app.test_client().get("/api/board/game-chips?date=2026-08-24&sports=soccer").get_json()
-    assert payload["source"] == "fallback_inline_build"
+    # `#564` RENAMED THIS LABEL, and split it: an inline build now happens for
+    # two distinct reasons -- the artifact is MISSING (this case) or the artifact
+    # is STALE (the ordinary case, since the worker publishes every ~5 minutes).
+    # `fallback_inline_build` could not tell them apart, and they need different
+    # responses: missing means the worker never published, stale means it is
+    # behind. Nothing outside these tests read the old name -- the page keys its
+    # staleness badge on `source == "worker_artifact"`.
+    assert payload["source"] == "inline_artifact_missing"
     assert [c["game_key"] for c in payload["chips"]] == ["9"]
     assert payload["published_at"] is None
