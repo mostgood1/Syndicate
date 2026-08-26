@@ -30129,3 +30129,87 @@ second window of the same kind.
 Reconcile guard: names which bound tripped and prints its inputs; contract
 bound gains a 0.01 rounding tolerance. Another session owns this area —
 pushed to main only, no deploy taken, live-odds-worker claim released.
+
+---
+
+## 2026-08-26 00:37–00:42Z — live-odds-worker `d92ab27b1` — **THE HALT IS CLEARED. `avgPx` is quoted on the YES side.**
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `c3e02e3a9c87c68a`
+**user instruction:** "fix the reader" → "merge 83 and deploy" → "make sure the block is cleared".
+
+**verify: both venues executing, and the diagnosis confirmed from venue data.**
+
+```
+[live_odds_worker] EXECUTION status=ok reason=None mode=live venue=kalshi      scope=kalshi      00:42:13Z
+[live_odds_worker] EXECUTION status=ok reason=None mode=live venue=polymarket  scope=polymarket  00:42:15Z
+[execution_ledger] RECONCILE venue=polymarket candidates=5 venue_orders=5
+  changed=0 not_found=0 unknown=0 implausible=0 stamped=5
+[execute_portfolio] EXECUTED ... summary={... 'unreconciled': 0}
+```
+
+`implausible` **1 -> 0**, `stamped` **4 -> 5**, `unreconciled: 0`, and
+`status=blocked reason=unreconciled_orders` is gone from BOTH scopes. All
+trading had been halted since ~00:23:37Z.
+
+**THE HYPOTHESIS, CONFIRMED TO THE FOURTH DECIMAL, from the venue's own
+`outcomeSide` rather than from arithmetic:**
+
+```
+order=C3GHTNSE0FSM outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5650' recorded=0.435  <- the blocking order
+order=C3FPKCFNPFSN outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5450' recorded=0.455
+order=C3E1TJPV4FSM outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5100' recorded=0.49
+order=C3FWZ2RW6FSM outcome_side='OUTCOME_SIDE_YES' avgPx='0.3950' recorded=0.395
+order=C3BQTKSXWFSG outcome_side='OUTCOME_SIDE_YES' avgPx='0.5200' recorded=0.52
+```
+
+Every NO complemented, every YES untouched. `0.565 -> 0.435` on the order that
+held the gate is exactly the number predicted from the screenshot before any
+venue field was visible.
+
+**HOW THIS WAS FOUND, because the route matters more than the fix.** The UI
+banner said *"1 order sent with an unknown result. A restart between submit and
+record leaves exactly these."* **That was wrong**, and it pointed at me: my own
+deploy landed 00:01:20Z, 2m09s after the order was submitted at 23:59:11Z, and
+did restart the worker. Both facts were true and unrelated. The reconciler
+could see the order perfectly well the whole time (`venue_orders=5 not_found=0
+unknown=0`); it was refusing to stamp it.
+
+**And the refusal printed the wrong pair of numbers.**
+`RECONCILE_COUNT_IMPLAUSIBLE venue_count=2.39 requested=2.392` looks like a
+float-rounding quarrel. `2.39 > 2.392` is FALSE, so the CONTRACT branch never
+fired -- the DOLLAR branch did, and its inputs were never printed. A guard that
+reports one branch's numbers while a different branch decided is a guard that
+sends every reader to the wrong place.
+
+**CONFIRMED WITH NO VENUE ACCESS, from four rows in a user screenshot**, by a
+property that cannot be argued with: a BUY cannot fill above its own limit.
+0.55 against a 0.4545 limit is impossible; `1 - 0.55 = 0.45` is exact. The
+split was by SIDE on all four, and `over`/`under` predicted it perfectly.
+
+**THE GUARD WAS RIGHT AND THE READER WAS WRONG.** `_FILL_DOLLAR_TOLERANCE` is
+1.25; the mis-sided price inflated the fill by ~30% and tripped it by 3.9%.
+That guard has now caught two genuine defects in one evening (the 18:50Z
+contract-bound version, and this) -- it is doing its job and its MESSAGE is the
+weak part, not its logic.
+
+**STILL WRONG, AND DELIBERATELY NOT TOUCHED: every NO-side fill already on the
+books carries the complement.** `EXECUTED` reports `filled_stake_dollars:
+123.62` over 82 filled orders; an unknown share of that is overstated, and any
+`paper:polymarket` P&L including those rows is not a Polymarket result -- the
+same class as the aggregator-priced Kalshi book found at 21:47Z tonight.
+**Rewriting settled history is a separate decision and is not mine to take
+unasked.**
+
+**FLAGGED, NOT DIAGNOSED:** the same tick shows `EXECUTION ... venue=kalshi
+placed=0 duplicates=1`. Probably dedupe working as intended on a re-offered
+position; not verified, and recorded rather than passed over as noise.
+
+**A PREFLIGHT GAP OF MY OWN, recorded because it was luck that it cost
+nothing.** Before the 00:01:20Z deploy I did NOT re-check the unreconciled gate
+-- I had checked it at 21:20Z, three deploys earlier, and carried the result
+forward. A stale preflight is not a preflight. It did not cause this defect,
+but it is exactly how a deploy lands mid-submit. For THIS deploy the gate was
+re-read immediately before, and the block itself guaranteed a clean window: a
+halted execution path cannot have an order in flight to interrupt.
+
+**Claim released.**

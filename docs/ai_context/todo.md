@@ -1,6 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#559` — **`find_first_game_offset` lands ABOVE ~8,400 rows of real game markets. Its partition premise is false and `monotonic` cannot detect it.** — lane `portfolio-decision-and-execution` (session `9324a3e5`, authored `508dbc02`/`f08930f32` and owns `polymarket_us_markets.py` in practice), raised by lane `polymarket-oddsapi-coverage-audit`, 2026-08-25, measured — **NOT MINE TO FIX; HANDED OVER**
+### `#560` — **Every NO-side Polymarket fill already on the books carries the OPPOSITE side's price. Realised cost and P&L on those rows are overstated.** — lane `portfolio-decision-and-execution`, raised by `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured — **NEEDS A USER DECISION**
+
+Fix for NEW fills is live (PR #83, deploy `d92ab27b1`). This item is the HISTORY,
+which was deliberately not rewritten. Working: `deploys.md` 2026-08-26T00:42Z.
+
+`avgPx` is quoted on the YES side. Until `d92ab27b1` the reader stored it
+verbatim, so every `under` (submitted `OUTCOME_SIDE_NO`) was recorded at its
+complement. Confirmed from venue data at 00:42:15Z:
+
+```
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5650' recorded=0.435
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5450' recorded=0.455
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5100' recorded=0.49
+outcome_side='OUTCOME_SIDE_YES' avgPx='0.3950' recorded=0.395
+outcome_side='OUTCOME_SIDE_YES' avgPx='0.5200' recorded=0.52
+```
+
+**The exposure.** `EXECUTED` at 00:42:15Z reports `filled_stake_dollars: 123.62`
+across 82 filled orders. The share of that which is NO-side is UNCOUNTED -- no
+log line separates them historically -- so the size of the error is unknown, not
+small. Visible examples from the live page: `under 9.5 MIN@ATH` shows `$1.41`
+against a `$1.18` stake; `under 7.5 CIN@SF` shows `$1.04` against `$1.00`. Those
+are `qty x wrong-side price`.
+
+**Why it matters beyond bookkeeping.** Any `paper:polymarket` result including
+those rows is not a Polymarket result -- the same class as the aggregator-priced
+Kalshi book found at 21:47Z the same evening, and the same class as `#502`'s
+`settled_count: 0`. A P&L that looks precise and is systematically wrong on one
+side is worse than a missing one.
+
+**Three options, none taken:** (a) recompute the stored fill price for every
+NO-side Polymarket row from `1 - stored` and restamp -- cheap, but it edits
+settled money records; (b) re-read the affected orders from the venue and
+restamp from `avgPx` with the corrected reader -- authoritative, needs the
+orders to still be retrievable; (c) leave history, and EXCLUDE pre-`d92ab27b1`
+NO-side rows from any P&L claim, which is the honest minimum.
+
+**Whichever is chosen, the count comes first.** Nobody currently knows how many
+rows or how many dollars are affected, and that number should exist before a
+decision, not after.
+
+---
+
+### `#561` — **`RECONCILE_COUNT_IMPLAUSIBLE` prints one branch's numbers while a different branch decided.** — lane `portfolio-decision-and-execution`, raised by `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+The guard is CORRECT and has now caught two real defects in one evening. Its
+MESSAGE is the weak part, and it cost most of the diagnosis time for `#560`.
+
+```
+RECONCILE_COUNT_IMPLAUSIBLE key=939fb90b24300f32c760b7bb
+  venue_count=2.39 requested=2.3920000000000003 -- left untouched; check the `_fp` unit
+```
+
+That reads as a float-rounding quarrel. **`2.39 > 2.392` is FALSE**, so the
+contract branch never fired -- the DOLLAR branch did, and none of its inputs
+(`filled_dollars`, `fill_price`, `stake_ceiling`) are printed. A reader who
+trusts the line goes looking at quantities and finds nothing wrong with them.
+
+Also: the hint "check the `_fp` unit" is now a red herring. It was written for
+the fixed-point scale hazard; twice in a row the real cause was something else
+(a price-improved fill, then a mis-sided price).
+
+**Fix:** print which branch refused and its own operands. One line, no logic
+change. A guard whose message names the wrong quantity is a guard that costs
+more than it saves.
+
+### `#559` — **`find_first_game_offset` lands ABOVE ~8,400 rows of real game markets. Its partition premise is false and `monotonic` cannot detect it.** — **FIXED AND VERIFIED 2026-08-26T00:06:57Z: `7,936 -> 17,413` game markets, `truncated=False`, `kept_through` 09-07 -> 09-20 (PR #80, deploy `a021cd4dc`).** Downstream confirmed 00:16:12Z: `no_candidates|mlb|spreads` 51 -> gone, `indexed` 3,581 -> 7,635, `matched` 22 -> 45. Raised by lane `polymarket-oddsapi-coverage-audit`; handed to `portfolio-decision-and-execution` and then fixed at the user's explicit direction. **Ready to archive to `todo_closed.md`.**
 
 Deploy + full working: `deploys.md` 2026-08-25T22:54:25Z. Audit: `polymarket_oddsapi_coverage_audit.md` §2.0.
 
