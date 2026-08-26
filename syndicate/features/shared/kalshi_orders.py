@@ -593,7 +593,13 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                     f" event={event_ticker} status={listed.get('status')}"
                     f" count={len(tickers)}"
                     f" ours_listed={ours in tickers}"
-                    f" sample={tickers[:6]}",
+                    f" sample={tickers[:6]}"
+                    # THE REASON, which this line withheld for a full day.
+                    # It printed `status=error count=0` and stopped -- naming a
+                    # failure while keeping the one field that says what failed.
+                    # That is the exact defect this repo keeps relearning, and
+                    # it was in the diagnostic written to break the deadlock.
+                    f" reason={str(listed.get('reason') or '')[:400]}",
                     flush=True,
                 )
         except Exception as probe_exc:  # noqa: BLE001 -- a diagnostic never masks the real error

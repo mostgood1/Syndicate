@@ -1231,17 +1231,44 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                     "ticker": seen.get("ticker"),
                     "venue_status": seen.get("venue_status"),
                     "filled_count": seen.get("filled_count"),
+                    # WHICH KIND OF ORPHAN, and the whole point of the split.
+                    #
+                    # Every order this system places stamps the idempotency key
+                    # as `client_order_id`. So:
+                    #
+                    #   no client id     -> not ours. Placed by hand in the
+                    #                       venue's UI, or predating the
+                    #                       stamp. Account history, not a
+                    #                       tracking failure.
+                    #   client id we do  -> OURS, and the ledger row is gone.
+                    #   not hold            That is real money this system
+                    #                       opened and cannot see.
+                    #
+                    # Measured 2026-08-26T13:18Z: `orphans=26`, every sampled
+                    # row with `client_order_id: ''` and dated 08-07 or 08-23,
+                    # across NFL/WNBA/MLB. Reported as one number it reads as
+                    # "26 positions we do not know about", which is alarming
+                    # and probably wrong. A count that cannot distinguish the
+                    # benign case from the serious one is not actionable in
+                    # either direction.
+                    "ours": bool(client),
                 }
             )
         if orphans:
+            ours = [o for o in orphans if o["ours"]]
+            unclaimed = len(orphans) - len(ours)
             # THE ROWS, NOT JUST THE COUNT. A counter that names a problem
             # while withholding its data is the defect this repo keeps
             # relearning; an orphan is only actionable if you can see which
             # ticker it is.
             print(
                 f"[execution_ledger] RECONCILE_ORPHANS venue={venue}"
-                f" n={len(orphans)} sample={orphans[:5]}"
-                " -- at the venue, absent from our ledger; NOTHING WRITTEN",
+                f" n={len(orphans)} ours={len(ours)} unclaimed={unclaimed}"
+                # OURS FIRST IN THE SAMPLE. With a flat cap at 5 the serious
+                # rows can be crowded out by benign history and never printed.
+                f" sample_ours={ours[:5]} sample_unclaimed={[o for o in orphans if not o['ours']][:3]}"
+                " -- at the venue, absent from our ledger; NOTHING WRITTEN"
+                " (ours=OUR client id, ledger row lost; unclaimed=placed outside this system)",
                 flush=True,
             )
 
@@ -1253,7 +1280,11 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         # COVERAGE ON THE SAME LINE AS THE COUNTS IT QUALIFIES. Read without
         # it, `not_found=0 venue_orders=15` on a per-order venue looks exactly
         # like a clean full-book reconciliation and is not one.
-        f" coverage={coverage} orphans={len(orphans) if coverage == 'book' else 'n/a'}",
+        f" coverage={coverage}"
+        f" orphans={len(orphans) if coverage == 'book' else 'n/a'}"
+        # THE ONE THAT MATTERS, ON THE SUMMARY LINE. `orphans=26` alone cannot
+        # say whether anything is wrong; `orphans_ours` can.
+        f" orphans_ours={len([o for o in orphans if o['ours']]) if coverage == 'book' else 'n/a'}",
         flush=True,
     )
     return {

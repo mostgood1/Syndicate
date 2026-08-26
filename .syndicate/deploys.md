@@ -31163,3 +31163,76 @@ states `ORDER_STATE_FILLED`, `ORDER_STATE_NEW`, `ORDER_STATE_PARTIALLY_FILLED`.
 Checked and sound: `avgPx='0.0000'` appears only on `NEW` rows, and the view
 reads fill SIZE before status, so `cumQuantity=0` lands on the resting branch
 where fill_price is nulled. The zero never reaches a filled row.
+
+---
+
+## 2026-08-26 13:20Z · READINGS on `524a1add5` / `a46797d1b`
+
+### 1. THE SHARD HYPOTHESIS IS DEAD. Pre-registered, so it is said plainly.
+
+```
+13:13:44 SUBMIT ticker=KXMLBTOTAL-26AUG261610PHISEA-7 side=ask exchange_index=-1
+13:13:44 SUBMIT_FAILED_MARKET  fetch_status=ok status=active yes_ask=0.5500
+13:20:15 SUBMIT ticker=KXMLBTOTAL-26AUG261945BALSTL-8  side=ask exchange_index=-1
+13:20:15 SUBMIT_FAILED_MARKET  fetch_status=ok status=active yes_ask=0.5700
+```
+
+`exchange_index=-1` reached the venue and `market_not_found` persisted. Five
+hypotheses now dead: host, side, market shape, event field, shard. **The
+per-series `exchange_index` in the catalogue was real corroboration for a wrong
+theory** — a fact can be true, relevant, and still not the cause.
+
+### 2. BUT THE READING HANDED OVER A MUCH SHARPER CUT
+
+```
+13:13:49 SUBMIT ticker=KXWNBA3PT-26AUG26GSCONN-GSGWILLIAMS1-2 side=bid  -> NO FAILURE LINE
+13:13:44 SUBMIT ticker=KXMLBTOTAL-...                          side=ask -> market_not_found
+```
+
+**WNBA submits succeed. MLB submits fail.** Same code, same body, same host,
+same second. Every failure this week is `KXMLB*`; both fills are `KXWNBA*`.
+
+That does NOT contradict the 08-24 `KXMLBKS` successes — it sharpens the
+question to: *what changed for MLB, and only MLB, between 08-24T18:18Z and
+08-25T23:00Z?* Which is where the search should have stayed rather than
+following a field-reference into a shard theory.
+
+### 3. ORPHANS: 26 — AND THE NUMBER NEEDS SPLITTING BEFORE IT MEANS ANYTHING
+
+```
+RECONCILE venue=kalshi     candidates=5  venue_orders=34 coverage=book      orphans=26
+RECONCILE venue=polymarket candidates=15 venue_orders=15 coverage=per_order orphans=n/a
+```
+
+Both new fields read correctly. But every sampled orphan has
+`client_order_id: ''` and a date from 08-07 or 08-23 — NFL, WNBA, MLB:
+
+```
+KXNFLGAME-26AUG23SEATEN-TEN            executed filled=22
+KXWNBAGAME-26AUG07ATLWSH-ATL           executed filled=2
+KXWNBAPTS-26AUG07PHXCONN-...-15        executed filled=5
+```
+
+**Our orders always stamp the idempotency key as `client_order_id`.** An empty
+one means the order did not come from this system. So `orphans=26` is almost
+certainly account history, not lost money — but the counter as shipped cannot
+say which, and *"26 positions we do not know about"* is exactly the kind of
+number that starts a panic. Splitting `orphans_unclaimed` (no client id —
+placed elsewhere) from `orphans_ours` (a client id we do not hold — a ledger
+row genuinely lost) is the next change. Only the second is a tracking failure.
+
+### 4. A RESTING ORDER WAS BEING REPORTED AS A FAULT — found by the USER
+
+The live page called every `submitted` row *"sent with an unknown result —
+check them against the venue"*. The user checked them against the venue: four
+Polymarket orders were resting there as ordinary good-till-cancelled limit
+orders, exactly as placed.
+
+`reconciled_at` already distinguishes them and was not being used. Now split:
+`unreconciled` (never read back — the write-ahead case) keeps the red banner;
+`resting` (read back, venue says live and unfilled) gets a neutral note.
+
+**The collapse pointed the alarming way, which is the direction that matters.**
+A warning that fires on the system working correctly teaches the reader to
+ignore the warning — and this one is the last line of defence against a
+double-spend.

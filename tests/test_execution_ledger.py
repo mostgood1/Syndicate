@@ -1582,3 +1582,81 @@ def test_a_per_order_read_reports_orphans_as_unknown_rather_than_zero(monkeypatc
     assert out["coverage"] == "per_order"
     # None, NOT []. "We cannot see orphans" is not "we looked and found none".
     assert out["orphans"] is None
+
+
+def test_a_resting_order_is_not_reported_as_an_unknown_result():
+    """REPORTED BY THE USER 2026-08-26, who checked the venue and found the page
+    wrong: four Polymarket orders the live page called "sent with an unknown
+    result" were resting at Polymarket as ordinary good-till-cancelled limit
+    orders, exactly as placed.
+
+    `reconciled_at` is the discriminator -- a row carrying it HAS been read back
+    from the venue, so its result is known. The collapse pointed the ALARMING
+    way, which is the direction that matters: a warning that fires on the system
+    working correctly teaches the reader to ignore the warning, and this one is
+    the last line of defence against a double-spend.
+    """
+    from syndicate.blueprints.intelligence import _live_portfolio_payload
+    from syndicate.features.shared import execution_ledger as el
+    from syndicate.features.shared.execution_ledger import STATUS_SUBMITTED
+
+    read_back = {
+        "idempotency_key": "resting",
+        "mode": "live",
+        "status": STATUS_SUBMITTED,
+        "venue": "polymarket_us",
+        "selected_date": "2026-08-26",
+        "reconciled_at": "2026-08-26T13:20:00Z",
+        "venue_status": "order_state_new",
+    }
+    never_read = {
+        "idempotency_key": "silent",
+        "mode": "live",
+        "status": STATUS_SUBMITTED,
+        "venue": "polymarket_us",
+        "selected_date": "2026-08-26",
+    }
+    original = el._load
+    el._load = lambda: {"orders": [read_back, never_read]}
+    try:
+        payload = _live_portfolio_payload("2026-08-26")
+    finally:
+        el._load = original
+
+    assert [o["idempotency_key"] for o in payload["resting"]] == ["resting"]
+    assert [o["idempotency_key"] for o in payload["unreconciled"]] == ["silent"]
+
+
+def test_an_orphan_we_placed_is_distinguished_from_one_we_did_not(monkeypatch, tmp_path, capsys):
+    """`orphans=26` is not actionable in either direction.
+
+    Every order this system places stamps the idempotency key as
+    `client_order_id`. An orphan with none was placed outside this system --
+    account history. An orphan carrying one we do not hold is OURS, and its
+    ledger row is gone: real money this system opened and cannot see.
+
+    Measured 2026-08-26T13:18Z: 26 orphans, every sampled row with an empty
+    client id and dated 08-07 or 08-23. Reported as one number it reads as "26
+    positions we do not know about" -- alarming, and probably wrong.
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="book",
+        venue_rows=[
+            {"client_order_id": "", "order_id": "hand", "state": "filled", "ticker": "T-MANUAL"},
+            {"client_order_id": "lost-row", "order_id": "v7", "state": "filled", "ticker": "T-LOST"},
+            {"client_order_id": "ours", "order_id": "v1", "state": "resting", "ticker": "T-OURS"},
+        ],
+        ledger_rows=[_ledger_row("ours", venue_order_id="v1")],
+    )
+    out = el.reconcile_live_orders(venue="kalshi")
+    by_ticker = {o["ticker"]: o for o in out["orphans"]}
+    assert by_ticker["T-MANUAL"]["ours"] is False
+    assert by_ticker["T-LOST"]["ours"] is True
+
+    printed = capsys.readouterr().out
+    assert "ours=1" in printed and "unclaimed=1" in printed
+    # THE SERIOUS ROW MUST BE PRINTED. A flat sample cap lets benign history
+    # crowd out the one row that means money is missing.
+    assert "T-LOST" in printed
