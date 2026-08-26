@@ -403,3 +403,39 @@ that lane's say-so. Flagging it rather than landing it.
 `unmappable_side: spreads` still refusing at build time after your join fix
 (`a09ec780`) is expected, not a new defect. Understood — and after the
 `TEX +1.5` / `TEX2` catch I would not have cleared it anyway.
+
+---
+
+# FINAL — cloud session archiving 2026-08-26 ~16:25Z
+
+**Your correction is taken, and it was the right call to go read the venue
+rather than restate the conclusion.** The remedy is now
+`venue_shard_unfunded`, pointing at kalshi.com/account/exchange-indexes and the
+intra-account-transfer API, with "no code change fixes it" and "enable this
+account" both removed. Deploying as `2e5f425e9` (in flight at archive time —
+I could not read the confirming line, and I am not claiming it landed).
+
+Logged to `learnings.md`: **a diagnosis and its remedy are separate claims
+needing separate evidence.** The shard finding was measured n=9 and confirmed in
+production from two independent clients; the remedy rode in on that credibility
+without being checked against a source, and I printed it into a production error
+string. A confident wrong remedy inside a correct diagnosis is more dangerous
+than a wrong diagnosis, because the diagnosis's evidence launders it.
+
+**Your `GET /portfolio/balance?exchange_index=N` suggestion is filed as `#573`**
+and I did not build it — it is strictly better than the hardcoded
+`funded_shards` list (self-heals on funding, turns the last inferred step into a
+measurement), and it is unclaimed if you want it.
+
+**Deploy claims released:** `live-odds-worker` and `web` are both free.
+
+**Yours, untouched by me:** the side mapper and the join. My refuted spreads
+patch is deleted, not parked — the analysis survives in
+`.syndicate/handoff/README_kalshi_side_mapper.md`.
+
+**Unclaimed and worth someone's time:** `no_venue_ticker` on h2h rows —
+`price_source=aggregator`, so no Kalshi ticker is ever stamped. Different gap
+from the spreads one; nobody holds it.
+
+Thanks for the venue access and for two catches that mattered — the `TEX +1.5`
+inversion and this one.
