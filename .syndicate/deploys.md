@@ -31457,3 +31457,74 @@ in this session with a verdict that actually arrived.
 behaviour is identical either way. The next deploy needs a merge first —
 `origin/main` has moved to `8cecf484` (another lane's Kalshi shard-routing work,
 todo `#568`).
+
+---
+
+## 2026-08-26 · CLOSED · Kalshi MLB is an ACCOUNT PROVISIONING problem, not a bug
+
+**Closed by syndicate-43 with the reading neither of us could take from the
+cloud: `exchange_index` is on the PUBLIC market payload. n=9, perfect split,
+no exceptions.**
+
+| result | shard | ticker |
+|---|---|---|
+| FILLED | 0 | `KXMLBKS-26AUG242145CINSF-CINCBURNS26-7` (MLB, 08-24) |
+| FILLED | 0 | `KXMLBKS-26AUG241840BOSMIA-MIASALCANTARA22-5` (MLB, 08-24) |
+| FILLED | 0 | `KXWNBA3PT` / `KXWNBATOTAL` / `KXWNBAREB` |
+| FAILED | 3 | `KXMLBERA` / `KXMLBTOTAL` / `KXMLBSPREAD` / `KXMLBKS` (all 08-26) |
+
+**The account is provisioned on shard 0. MLB migrated to shard 3.** The two MLB
+fills on 08-24 were shard 0, which is why this broke on 08-25 with no deploy of
+ours in between — and which finally retires the code-regression hypothesis I
+burned a pass hunting in `git log`.
+
+**Both rungs of the ladder were literally true and neither was ours:**
+
+```
+exchange_index 0 (pinned)  -> market is not on shard 0 -> market_not_found
+exchange_index -1 (auto)   -> routes to shard 3, FOUND -> user_not_found
+```
+
+`-1` stays. It was the correct change: it is what let the venue tell us the real
+problem instead of a 404.
+
+### My subaccount fix is DISPROVEN, and I said in advance what that meant
+
+Deployed 14:29:59Z; a real prop order reached the venue 15:04:08Z
+(`KXMLBERA-26AUG261910MILNYM-MILDMAY3-2`) and returned the identical
+`user_not_found`. The pre-registered counter-verify was: *"if `user_not_found`
+persists with the field omitted, this is NOT ours to fix in code — the account
+is not provisioned on that shard and it needs Kalshi support. Do not hunt a
+third field."* That is exactly what happened, so the ladder stops here.
+
+**Reverted `subaccount` to `0`** rather than leaving it omitted. It is the
+configuration every known fill happened under, and omission is unproven in both
+directions. On a money path, *"changed nothing for the bug"* is not a reason to
+keep a change; last-known-good is. `KALSHI_ORDER_SUBACCOUNT=` (set-but-empty)
+omits it again with no deploy.
+
+### The one code-side change worth anything
+
+`user_not_found` now becomes `venue_shard_not_provisioned: market_shard=3
+known_good_shards=[0] ticker=...`, with a sentence saying no code change fixes
+it and naming the env var that opens it. It does not retry, does not fall back,
+does not alter the request, and chains the original exception. The account UUID
+in the venue's text is deliberately NOT copied — the ledger renders on a web
+page.
+
+`KALSHI_ORDER_KNOWN_SHARDS=0,3` makes it legible again the moment the venue
+provisions the account. **That is the actual fix and it belongs to a human:
+contacting Kalshi to enable this account on shard 3** — plausibly its own
+account agreement, which would present exactly as "user not found" for a UUID
+that is valid everywhere else.
+
+**verify:** next Kalshi MLB failure logs `venue_shard_not_provisioned
+market_shard=3` instead of a raw `http_400`, and `SUBMIT_FAILED_MARKET` carries
+`exchange_index=3`. **counter-verify:** if `market_shard` comes back `None`, the
+public payload is not carrying the field on our read path and the classifier is
+reporting a hole rather than a shard — say that rather than trusting `[0]`.
+
+### DO NOT read WNBA fills as "Kalshi works now"
+
+WNBA is shard 0 and will keep filling regardless. Any green there says nothing
+about MLB. Logged to `learnings.md`.

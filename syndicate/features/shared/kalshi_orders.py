@@ -324,22 +324,32 @@ _V2_EXCHANGE_INDEX_AUTO = -1
 # shard 0 was -- it names a subaccount that may not exist for this key on this
 # shard, which is precisely what the error says.
 #
-# OMITTED BY DEFAULT, because that is the branch the reference prescribes for a
-# restricted key and the unrestricted case falls back to primary anyway.
-# `KALSHI_ORDER_SUBACCOUNT` puts a number back with no deploy -- WNBA orders
-# currently fill with `subaccount: 0`, so that is the rollback if omitting it
-# breaks the path that works.
+# DISPROVEN 2026-08-26, AND REVERTED TO 0. Omitting the field was deployed at
+# 14:29:59Z; a real prop order reached the venue at 15:04:08Z and came back with
+# the identical `user_not_found`. The field was never the problem.
+#
+# Back to `0` rather than left omitted, because `0` is the configuration under
+# which EVERY KNOWN FILL HAPPENED and omitting it is unproven in both
+# directions. On a money path, "changed nothing for the bug" is not a reason to
+# keep a change; last-known-good is. `KALSHI_ORDER_SUBACCOUNT=` (empty) omits it
+# again with no deploy if that is ever wanted.
 _SUBACCOUNT_OMITTED = object()
+_SUBACCOUNT_DEFAULT = 0
 
 
 def _v2_subaccount() -> Any:
-    raw = (os.environ.get("KALSHI_ORDER_SUBACCOUNT") or "").strip()
+    raw = os.environ.get("KALSHI_ORDER_SUBACCOUNT")
+    if raw is None:
+        return _SUBACCOUNT_DEFAULT
+    raw = raw.strip()
     if not raw:
+        # Set-but-empty is an explicit request to OMIT. Distinguishable from
+        # unset only because this reads the variable before stripping it.
         return _SUBACCOUNT_OMITTED
     try:
         return int(raw)
     except ValueError:
-        return _SUBACCOUNT_OMITTED
+        return _SUBACCOUNT_DEFAULT
 
 
 def _v2_exchange_index() -> int:
@@ -509,6 +519,81 @@ def _retry_url_for(url: str, fetch_base: str) -> str:
     return f"{base}{path}"
 
 
+# Shards this account has ever actually filled on. MEASURED 2026-08-26, n=9,
+# a perfect split with no exceptions:
+#
+#   FILLED shard 0   KXMLBKS-26AUG242145CINSF-CINCBURNS26-7      (MLB, 08-24)
+#   FILLED shard 0   KXMLBKS-26AUG241840BOSMIA-MIASALCANTARA22-5 (MLB, 08-24)
+#   FILLED shard 0   KXWNBA3PT / KXWNBATOTAL / KXWNBAREB
+#   FAILED shard 3   KXMLBERA / KXMLBTOTAL / KXMLBSPREAD / KXMLBKS  (all 08-26)
+#
+# The two MLB fills on 08-24 were shard 0. **MLB MIGRATED TO SHARD 3**, which is
+# why this broke on 08-25 with no deploy of ours in between, and it retires the
+# last code-regression hypothesis.
+#
+# ENV-OVERRIDABLE, and that is the point: the fix for this is ACCOUNT
+# PROVISIONING at the venue, not a patch. When shard 3 is enabled for this
+# account, `KALSHI_ORDER_KNOWN_SHARDS=0,3` makes it legible again with no
+# deploy.
+_KNOWN_GOOD_SHARDS = (0,)
+
+
+def _known_shards() -> tuple[int, ...]:
+    raw = (os.environ.get("KALSHI_ORDER_KNOWN_SHARDS") or "").strip()
+    if not raw:
+        return _KNOWN_GOOD_SHARDS
+    out: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.append(int(part))
+        except ValueError:
+            continue
+    return tuple(out) or _KNOWN_GOOD_SHARDS
+
+
+def _classified(exc: BaseException, body: Mapping[str, Any], market_shard: Any) -> BaseException:
+    """Give the venue's 400 a name a human can act on. Never masks the cause.
+
+    ------------------------------------------------------------------
+    `user_not_found` IS NOT A BUG IN THIS REPO AND NO PATCH FIXES IT
+    ------------------------------------------------------------------
+
+    Two rungs of a ladder, both errors literally true, neither ours:
+
+        exchange_index 0 (pinned) -> market is not on shard 0 -> market_not_found
+        exchange_index -1 (auto)  -> routes to shard 3, found -> user_not_found
+
+    The account is provisioned on shard 0. MLB moved to shard 3. What unblocks
+    it is the venue enabling this account on that shard -- plausibly its own
+    account agreement, which would present exactly as "user not found" for a
+    UUID that is perfectly valid elsewhere.
+
+    So this does not retry, does not fall back, and does not change the request.
+    It renames the failure so the ledger row says what is wrong instead of
+    showing a raw 400 that reads like a credential fault. The original exception
+    is chained by the caller (`raise ... from exc`) and nothing is swallowed.
+
+    NO ACCOUNT IDENTIFIER IS COPIED INTO THE MESSAGE. The venue's text carries a
+    user UUID; the ledger is rendered on a web page, so the shard and the ticker
+    are what travel.
+    """
+    text = str(exc)
+    if "user_not_found" not in text:
+        return exc
+    shards = _known_shards()
+    return OrderBuildError(
+        "venue_shard_not_provisioned:"
+        f" market_shard={market_shard} known_good_shards={list(shards)}"
+        f" ticker={body.get('ticker')}"
+        " -- the market resolved and the ACCOUNT did not. This needs the venue"
+        " to enable this account on that exchange shard; no code change fixes"
+        " it. Set KALSHI_ORDER_KNOWN_SHARDS once it is provisioned."
+    )
+
+
 def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
     """Send one order. Returns the shape `place_order` expects from an adapter.
 
@@ -582,12 +667,16 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         # http_410 (see `_DEFAULT_ORDER_PATH`); re-sending to a host Kalshi
         # itself just served this ticker from is not inventing one.
         fetch_base = ""
+        market_shard: Any = None
         try:
             from syndicate.features.shared.kalshi_client import fetch_market
 
             probe = fetch_market(str(body.get("ticker") or ""))
             market = (probe.get("market") or {}) if isinstance(probe, dict) else {}
             fetch_base = str(probe.get("base") or "") if isinstance(probe, dict) else ""
+            # THE SHARD THIS MARKET LIVES ON. Public field, no credential
+            # needed, and the single most load-bearing number in this file.
+            market_shard = market.get("exchange_index")
             print(
                 "[kalshi_orders] SUBMIT_FAILED_MARKET"
                 f" ticker={body.get('ticker')} side={body.get('side')}"
@@ -619,7 +708,8 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                 f" strike_type={market.get('strike_type')}"
                 f" yes_ask={market.get('yes_ask_dollars')}"
                 f" no_ask={market.get('no_ask_dollars')}"
-                f" can_close_early={market.get('can_close_early')}",
+                f" can_close_early={market.get('can_close_early')}"
+                f" exchange_index={market_shard}",
                 flush=True,
             )
             # THE EVENT'S OWN MARKET LIST, and the last question standing.
@@ -697,7 +787,7 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                     flush=True,
                 )
                 return _order_result(request, body, response, price_dollars=price_dollars)
-        raise exc
+        raise _classified(exc, body, market_shard) from exc
     return _order_result(request, body, response, price_dollars=price_dollars)
 
 

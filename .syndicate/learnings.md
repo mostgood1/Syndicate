@@ -6282,3 +6282,39 @@ boundary what an earlier stage already knew is what made the inversion
 possible.** Same shape as the unfed-input class in `model_engine_standard.md`:
 the value is available, nothing carries it across, and the recomputation is
 indistinguishable from the real thing at every level except the money.
+
+## A GREEN PATH ON A SHARED VENUE PROVES NOTHING ABOUT THE BROKEN ONE `[2026-08-26]`
+
+Kalshi MLB failed for two days while WNBA filled normally, same credential, same
+code, same endpoint. The whole time, "Kalshi orders are working" was true and
+useless: **WNBA is on exchange shard 0, which this account is provisioned on;
+MLB migrated to shard 3, which it is not.** n=9, perfect split — every order that
+ever filled is shard 0, every failure is shard 3.
+
+The two MLB fills on 08-24 were shard 0. That is why it "broke" on 08-25 with no
+deploy in between, and why a code-regression hunt through `git log` found
+nothing: **there was no regression. The venue moved the markets.**
+
+Both errors were literally true and neither was ours:
+
+```
+exchange_index 0 (pinned)  -> market is not on shard 0 -> market_not_found
+exchange_index -1 (auto)   -> routes to shard 3, FOUND -> user_not_found
+```
+
+**The rule:** when one slice of a venue works and another does not, find the
+axis that separates them BEFORE theorising about code. Here it was a public
+field on the market payload (`exchange_index`) — no credential, one GET. I had
+even read that field in a log line (`KALSHI_SERIES_CATALOGUE ... row_keys=[...
+'exchange_index' ...]`) and used it to argue FOR a hypothesis instead of asking
+what value our own failing markets carried.
+
+**Corollary — intermittent success across an otherwise identical population is a
+PER-ITEM property, not a point-in-time change.** I treated "worked Monday, fails
+Wednesday" as a regression and searched the diff. The correct first question was
+"what is different about the items that fail", which the venue answers directly.
+
+**Corollary — a fix that moves the error inward is working, and must not be read
+as failure.** `market_not_found` -> `user_not_found` was progress; I called the
+shard fix refuted an hour before it was confirmed, by reading my own probe line
+(which fires on ANY exception) instead of the error string underneath it.

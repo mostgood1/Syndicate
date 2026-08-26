@@ -305,11 +305,11 @@ def test_the_v2_body_matches_the_supplied_contract(monkeypatch):
     assert body["self_trade_prevention_type"] == "taker_at_cross"
     assert body["post_only"] is False
     assert body["reduce_only"] is False
-    # OMITTED, and this is the second field the sample body got wrong for us.
-    # The reference says a subaccount-restricted key must omit it or send its
-    # locked subaccount; a literal 0 names a subaccount that may not exist for
-    # this key. See `_v2_subaccount`.
-    assert "subaccount" not in body
+    # BACK TO 0. Omitting it was deployed and DISPROVEN -- a real order reached
+    # the venue 2026-08-26T15:04:08Z with the identical `user_not_found`. `0` is
+    # the configuration every known fill happened under, and on a money path
+    # "changed nothing for the bug" is not a reason to keep a change.
+    assert body["subaccount"] == 0
     # NOT 0 -- and the sample body is not the authority on this one field.
     # `exchange_index` is a SHARD SELECTOR: the venue's field reference says it
     # auto-routes when omitted and that -1 REQUIRES routing by ticker, so a
@@ -948,7 +948,7 @@ def test_the_shard_index_is_overridable_without_a_deploy(monkeypatch):
     assert build_order_body(_req(), price_dollars=0.56)["exchange_index"] == -1
 
 
-def test_the_subaccount_is_omitted_by_default_and_restorable_without_a_deploy(monkeypatch):
+def test_the_subaccount_is_the_known_good_zero_and_omittable_without_a_deploy(monkeypatch):
     """The second field copied out of the sample as if it were furniture.
 
     CONFIRMED 2026-08-26 that `exchange_index` was the first: flipping it 0 ->
@@ -964,14 +964,75 @@ def test_the_subaccount_is_omitted_by_default_and_restorable_without_a_deploy(mo
 
     monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
     monkeypatch.delenv("KALSHI_ORDER_SUBACCOUNT", raising=False)
-    assert "subaccount" not in build_order_body(_req(), price_dollars=0.56)
-
-    # The rollback path: WNBA orders currently FILL with `subaccount: 0`, so if
-    # omitting it breaks the venue that works, this restores it with no deploy.
-    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "0")
     assert build_order_body(_req(), price_dollars=0.56)["subaccount"] == 0
 
-    # Unreadable falls back to OMITTED, not to 0 -- same rule as the shard
-    # index: a garbled override is not a request for the value under suspicion.
-    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "primary")
+    # SET-BUT-EMPTY omits it. Distinguishable from unset only because
+    # `_v2_subaccount` reads the variable before stripping it, which is the
+    # whole reason it does.
+    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "")
     assert "subaccount" not in build_order_body(_req(), price_dollars=0.56)
+
+    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "2")
+    assert build_order_body(_req(), price_dollars=0.56)["subaccount"] == 2
+
+    # Unreadable falls back to the KNOWN-GOOD value, not to omission: a garbled
+    # override must not silently select the unproven branch.
+    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "primary")
+    assert build_order_body(_req(), price_dollars=0.56)["subaccount"] == 0
+
+
+def test_user_not_found_is_renamed_to_the_shard_problem_it_actually_is():
+    """CLOSED 2026-08-26 by syndicate-43, n=9, a perfect split with no exception:
+    every order that ever FILLED is on exchange shard 0, every order that fails
+    is on shard 3. The two MLB fills on 08-24 were shard 0 -- MLB MIGRATED to
+    shard 3, which is why this broke on 08-25 with no deploy in between.
+
+    Both rungs of the ladder were literally true and neither was ours:
+
+        exchange_index 0  -> market is not on shard 0 -> market_not_found
+        exchange_index -1 -> routes to shard 3, found -> user_not_found
+
+    So the raw 400 reads like a credential fault and is nothing of the kind. It
+    is renamed so the ledger row says what is actually wrong, and names the
+    env var that unblocks it once the venue provisions the account.
+    """
+    from syndicate.features.shared.kalshi_orders import _classified, OrderBuildError
+
+    raw = RuntimeError(
+        'KalshiAuthError: http_400: {"error":{"code":"user_not_found: '
+        '22c67b4f-2bbf-4692-b325-85d508b94dc7"}}'
+    )
+    out = _classified(raw, {"ticker": "KXMLBERA-26AUG261910MILNYM-MILDMAY3-2"}, 3)
+    assert isinstance(out, OrderBuildError)
+    text = str(out)
+    assert "venue_shard_not_provisioned" in text
+    assert "market_shard=3" in text and "known_good_shards=[0]" in text
+    # NO ACCOUNT IDENTIFIER TRAVELS. The venue's text carries a user UUID and
+    # the ledger is rendered on a web page.
+    assert "22c67b4f" not in text
+
+    # ANY OTHER ERROR PASSES THROUGH UNTOUCHED, identity-equal. A classifier
+    # that rewrote unrelated failures would hide the next real one.
+    other = RuntimeError('http_404: {"code":"market_not_found"}')
+    assert _classified(other, {}, None) is other
+
+
+def test_the_known_good_shard_list_opens_without_a_deploy(monkeypatch):
+    """What unblocks this is the VENUE enabling the account on shard 3 -- a
+    support action, not a patch. The code's job is to stop lying about it and to
+    get out of the way the moment it is done."""
+    from syndicate.features.shared.kalshi_orders import _known_shards, _classified
+
+    monkeypatch.delenv("KALSHI_ORDER_KNOWN_SHARDS", raising=False)
+    assert _known_shards() == (0,)
+
+    monkeypatch.setenv("KALSHI_ORDER_KNOWN_SHARDS", "0,3")
+    assert _known_shards() == (0, 3)
+    assert "known_good_shards=[0, 3]" in str(
+        _classified(RuntimeError("user_not_found: x"), {"ticker": "T"}, 3)
+    )
+
+    # Garbage falls back to the measured list rather than to an empty one --
+    # an empty allowlist would read as "no shard is known good".
+    monkeypatch.setenv("KALSHI_ORDER_KNOWN_SHARDS", "abc,,")
+    assert _known_shards() == (0,)
