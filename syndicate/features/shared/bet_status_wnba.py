@@ -95,6 +95,23 @@ _MARKET_TO_BOX_KEY: dict[str, str] = {
 # explicitly rather than parsed out of the market name: `player_points_rebounds`
 # and `player_points_rebounds_assists` differ by one token and a prefix rule
 # would price one as the other.
+# THE SAME STATS IN THE FINAL BOXSCORE'S SPELLING. `boxscores_<date>.csv` is
+# written by `scripts/build_wnba_boxscores.py` from ESPN's official box AFTER a
+# game is complete, so unlike the live capture it carries a value that will not
+# change again -- which is the whole reason settlement can trust it as final.
+#
+# A SEPARATE TABLE RATHER THAN A RENAME, because the two artifacts genuinely
+# spell these differently (`threes_made` vs `FG3M`) and folding them would make
+# a future divergence silent.
+_BOX_KEY_TO_CSV: dict[str, str] = {
+    "pts": "PTS",
+    "reb": "REB",
+    "ast": "AST",
+    "threes_made": "FG3M",
+    "mp": "MIN",
+}
+
+
 _MARKET_TO_BOX_SUM: dict[str, tuple[str, ...]] = {
     "player_points_rebounds": ("pts", "reb"),
     "player_points_assists": ("pts", "ast"),
@@ -135,6 +152,14 @@ def wnba_status_resolver(selected_date: str):
         cache["index"] = _load_box_index(selected_date, normalize_name)
         return cache["index"]
 
+    def final_box():
+        # Read ONCE per resolver, same rule as the live box: a slate of forty
+        # orders must not mean forty reads of one unchanging artifact.
+        if "final" in cache:
+            return cache["final"]
+        cache["final"] = _load_final_box(selected_date, normalize_name)
+        return cache["final"]
+
     def resolve(order: Mapping[str, Any]) -> dict[str, Any]:
         if str(order.get("sport") or "").strip().lower() != "wnba":
             # This resolver is handed every order; a non-WNBA one is not a
@@ -168,6 +193,36 @@ def wnba_status_resolver(selected_date: str):
         event_id = str(order.get("event_id") or "").strip()
         if not event_id:
             return {"unavailable_reason": REASON_NO_EVENT_ID}
+
+        # THE FINAL BOXSCORE FIRST, because it is the only reading that can be
+        # DECIDED. It exists only for completed games, so a hit here means the
+        # game is over and the value will not change again -- which is what lets
+        # a losing over settle instead of waiting forever.
+        finals = final_box()
+        if finals is not None:
+            row = finals.get(normalize_name(order.get("player_name")))
+            if row is not None:
+                if sum_keys is not None:
+                    parts = [row.get(key) for key in sum_keys]
+                    if any(part is None for part in parts):
+                        # A partial sum is a smaller number that looks real.
+                        return {"unavailable_reason": REASON_NO_STAT}
+                    value = sum(parts)
+                else:
+                    value = row.get(box_key)
+                    if value is None:
+                        return {"unavailable_reason": REASON_NO_STAT}
+                return {
+                    "matched_by": "final_boxscore",
+                    "current_value": value,
+                    # THE POINT OF ALL OF THIS.
+                    "is_final": True,
+                    "started": True,
+                }
+            # The player is not in the final box. FALLS THROUGH to the live box
+            # rather than refusing: a box for the date can exist while an
+            # earlier game of a doubleheader is still being written, and a DNP
+            # is deliberately absent rather than zeroed.
 
         index = box_index()
         if index is None:
@@ -224,6 +279,58 @@ def wnba_status_resolver(selected_date: str):
 
     return resolve
 
+
+
+
+def _load_final_box(selected_date: str, normalize_name):
+    """`normalized player name -> {stat -> float}` from the FINAL boxscore, or None.
+
+    THE FINAL FLAG THIS MODULE NEVER HAD. The live player box carries no game
+    status, so `is_final` was hardcoded False and `resolve_bet_status` decides
+    only on `is_final` OR the value crossing its line. An over that falls short
+    therefore NEVER decided, and ONLY WINNING OVERS SETTLED.
+
+    MEASURED 2026-08-25 against ESPN: Sonia Citron 1 rebound against over 3.5
+    and Georgia Amoore 3 assists against over 3.5 are losses that could never be
+    recorded, while Natasha Mack's over 7.5 (8 rebounds) graded within minutes.
+    A win rate computed over that is 100% by construction.
+
+    `build_wnba_boxscores` writes ONLY completed games, so a player's presence
+    here IS the assertion that their game is over. None means no final box for
+    the date -- NOT that the game is unfinished, which is why the caller falls
+    back to the live box rather than refusing.
+    """
+    import csv as _csv
+    import io as _io
+
+    from syndicate.features.shared.refresh_state_store import data_root, read_text_file
+
+    try:
+        raw = read_text_file(
+            data_root() / f"wnba_source/data/processed/boxscores_{selected_date}.csv"
+        )
+    except Exception:
+        return None
+    if not raw:
+        return None
+    try:
+        rows = list(_csv.DictReader(_io.StringIO(str(raw))))
+    except Exception:
+        return None
+
+    index: dict[str, dict[str, float]] = {}
+    for row in rows:
+        key = normalize_name(row.get("PLAYER_NAME"))
+        if not key:
+            continue
+        stats: dict[str, float] = {}
+        for box_key, column in _BOX_KEY_TO_CSV.items():
+            value = _as_float(row.get(column))
+            if value is not None:
+                stats[box_key] = value
+        if stats:
+            index[key] = stats
+    return index or None
 
 
 def _wnba_tri(value):

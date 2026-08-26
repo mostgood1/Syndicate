@@ -295,3 +295,110 @@ def test_a_doubleheader_never_recovers_into_the_wrong_game(_isolated):
     verdict = mod.wnba_status_resolver("2026-08-23")(_order(event_id="hash"))
     # The FIRST game's value, never the second's, and never a blend.
     assert verdict["current_value"] == 22.0
+
+
+# ---------------------------------------------------------------------------
+# THE FINAL BOXSCORE. Until this existed, only WINNING overs could settle.
+# ---------------------------------------------------------------------------
+
+def _write_final_box(tmp_path, date="2026-08-23", rows=()):
+    """`boxscores_<date>.csv` as `scripts/build_wnba_boxscores.py` writes it."""
+    import csv as _csv
+
+    from scripts.build_wnba_boxscores import COLUMNS
+
+    path = tmp_path / "wnba_source" / "data" / "processed" / f"boxscores_{date}.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = _csv.DictWriter(handle, fieldnames=list(COLUMNS), lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({column: row.get(column, "") for column in COLUMNS})
+    return path
+
+
+def test_a_LOSING_over_settles_once_the_final_box_exists(_isolated):
+    """THE BIAS THIS FIXES, and the reason it is not cosmetic.
+
+    `is_final` was hardcoded False because the LIVE box carries no game status,
+    and `resolve_bet_status` decides only on `is_final` OR the value crossing.
+    So an over that fell short NEVER decided: it sat `not_decided_yet` forever
+    while winners graded in minutes, and every WNBA performance figure computed
+    over that set was 100% wins BY CONSTRUCTION.
+
+    MEASURED 2026-08-25 against ESPN: Sonia Citron finished with 1 rebound
+    against an over 3.5 — a real loss that could never be recorded.
+    """
+    _write_final_box(_isolated, rows=[
+        {"PLAYER_NAME": "Sonia Citron", "REB": "1", "PTS": "19", "AST": "9",
+         "FG3M": "3", "MIN": "29"},
+    ])
+    verdict = mod.wnba_status_resolver("2026-08-23")(
+        _order(player_name="Sonia Citron", market="player_rebounds", side="over", line=3.5)
+    )
+
+    assert verdict.get("unavailable_reason") is None, verdict
+    assert verdict["current_value"] == 1.0
+    # The whole point: the game is OVER, so the bet is decided and can lose.
+    assert verdict["is_final"] is True
+    assert verdict["matched_by"] == "final_boxscore"
+
+
+def test_the_final_box_decides_a_bet_the_live_box_left_hanging(_isolated):
+    """End to end through `resolve_bet_status`: a short over must come back
+    DECIDED, not "live_behind"."""
+    from syndicate.features.shared.bet_status import resolve_bet_status
+
+    _write_final_box(_isolated, rows=[
+        {"PLAYER_NAME": "Georgia Amoore", "AST": "3", "PTS": "7", "REB": "3",
+         "FG3M": "1", "MIN": "27"},
+    ])
+    resolved = mod.wnba_status_resolver("2026-08-23")(
+        _order(player_name="Georgia Amoore", market="player_assists", side="over", line=3.5)
+    )
+    status = resolve_bet_status(
+        market="player_assists", side="over", line=3.5,
+        current_value=resolved["current_value"],
+        is_final=resolved["is_final"], started=True,
+    )
+    assert status["decided"] is True, status
+
+
+def test_the_final_box_OUTRANKS_the_live_one(_isolated):
+    """A live capture mid-game and a final box for the same player disagree by
+    definition. The final one wins, or a bet settles against a half-time value.
+    """
+    _write_box(_isolated, games=[_game(players=[_player(name="Natasha Mack", reb=5)])])
+    _write_final_box(_isolated, rows=[
+        {"PLAYER_NAME": "Natasha Mack", "REB": "8", "PTS": "19", "AST": "0",
+         "FG3M": "0", "MIN": "25"},
+    ])
+    verdict = mod.wnba_status_resolver("2026-08-23")(
+        _order(player_name="Natasha Mack", market="player_rebounds", side="over", line=7.5)
+    )
+    assert verdict["current_value"] == 8.0
+    assert verdict["is_final"] is True
+
+
+def test_a_player_absent_from_the_final_box_FALLS_BACK_to_live(_isolated):
+    """A box for the date can exist while another game is still being written,
+    and a DNP is deliberately absent rather than zeroed. Neither may be read as
+    "this player scored nothing"."""
+    _write_box(_isolated, games=[_game(players=[_player()])])
+    _write_final_box(_isolated, rows=[
+        {"PLAYER_NAME": "Someone Else", "PTS": "10"},
+    ])
+    verdict = mod.wnba_status_resolver("2026-08-23")(_order())
+    assert verdict["current_value"] == 22.0
+    assert verdict["is_final"] is False
+    assert verdict["matched_by"] == "event_id"
+
+
+def test_a_combination_market_sums_from_the_final_box(_isolated):
+    _write_final_box(_isolated, rows=[
+        {"PLAYER_NAME": "A'ja Wilson", "PTS": "22", "REB": "9", "AST": "3", "FG3M": "1"},
+    ])
+    resolve = mod.wnba_status_resolver("2026-08-23")
+    assert resolve(_order(market="player_points_rebounds"))["current_value"] == 31.0
+    out = resolve(_order(market="player_points_rebounds_assists"))
+    assert out["current_value"] == 34.0 and out["is_final"] is True
