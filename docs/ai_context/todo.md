@@ -1,5 +1,118 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#578` — **Venue balances on `/portfolio`: Kalshi verified, Polymarket's path DISCOVERED rather than guessed, and no failure ever renders as `$0.00`.** — lane `venue-balances-on-portfolio`, 2026-08-26 — **SHIPPED, NOT DEPLOYED**
+
+`[user 2026-08-26]` *"are we able to display kalshi and polymarket balances on
+the portfolio page?"* Yes, and the answer is shaped by two constraints that both
+point the same way.
+
+**THE PAGE MUST NOT CALL THE VENUE.** Web holds no credential and must not:
+`KALSHI_PRIVATE_KEY` / `POLYMARKET_US_*` are dashboard-set on live-odds-worker,
+deliberately absent from `render.yaml` (`#284`). And a second independent live
+caller of a venue is a NAMED incident class here (`#139`/`#144`/`#148`) — it is
+why `_polymarket_resolve_market` was rewritten in August to read the persisted
+artifact instead. A balance widget hitting the venue per page load is that
+mistake with a nicer UI: one handler, N viewers, no rate budget. So the worker
+fetches on its execution tick, stamps `venue_balances.json`, and the page reads
+it with an age — the same hop, and the same reasoning, as `execution_state.json`.
+Stamped in the same breath as the caps, because the two numbers a person
+compares are "what may I spend" and "what do I have".
+
+**THE ONLY DANGEROUS BUG IS A ZERO.** "The account is empty" and "we could not
+read the account" are opposite facts — one says stop trading, the other says
+something is broken — and the naive version renders both as `$0.00`. Every
+failure carries a named status and NO dollar figure (`credentials_absent`,
+`auth_error`, `path_unknown`, `shape_unrecognised`), and the two-venue total is
+withheld entirely unless BOTH read, because a sum over a partial read is a lie
+with a dollar sign on it.
+
+**KALSHI IS VERIFIED AND POLYMARKET IS NOT.** `GET
+/trade-api/v2/portfolio/balance` is exercised — 200 from a signed call
+2026-08-23T22:53Z while unauthenticated reads were 429ing
+(`kalshi_client.py:252`). `api.polymarket.us` has NO balance path documented
+anywhere in this repo (`polymarket_us_auth.probe_auth()` asks `/markets`), and
+the sandbox proxy denies CONNECT to venue hosts so it cannot be found from a
+session. The path is therefore DISCOVERED once from four read-only candidates,
+the winner recorded and reused, and `path_unknown` is a real reportable state
+rather than a guess that 404s forever. A 401 stops discovery — a bad credential
+cannot be fixed by another path.
+
+**THE UNIT IS AN ASSUMPTION AND IS LABELLED.** Kalshi documents cents: divided,
+stamped `unit_assumption: cents`, raw value beside it. Polymarket documents
+nothing we have read: carried UNDIVIDED and labelled `dollars_unverified`, because
+dividing there would be inventing a fact. Same discipline that caught the 100x
+price error before it shipped.
+
+Also: the caps panel now says when a day cap sits above its venue's balance
+("Kalshi's $50.00 day cap is above its $41.07 balance"), shown only for a venue
+whose balance actually read. 19 tests, including that a boolean `available: true`
+is not a $1.00 account, and that `record_venue_balances` cannot raise into the
+tick that places orders.
+
+**OWED, and it is the point of the item:** deploy web + live-odds-worker, then
+read `VENUE_BALANCES kalshi=… polymarket=…` on the worker. **Which Polymarket
+path answers — or `path_unknown` against all four — is the finding.** If it
+answers, the second reading owed is whether its raw value is dollars or cents;
+`raw_value` is stamped so the artifact alone settles it.
+
+
+### `#577` — **The venue day-caps are user-editable, they BIND on the worker, and the web half shipped first as a ridealong.** — lane `portfolio-venue-caps-editable`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T20:27:26Z** (all three services `1e9ec576`)
+
+`[user decision 2026-08-26]` *"we need to be able to enter Polymarket and Kalshi
+MAX per day and orders per day on this page like the other pieces like
+bankroll."*
+
+**THE WHOLE RISK WAS AN INERT FORM AND THERE WERE THREE WAYS TO BUILD ONE.**
+Each is closed and each has a test driving `check_order` — the function that
+actually refuses — not the settings module in isolation.
+
+1. `limits()` read `os.environ` and nothing else, and it runs on
+   live-odds-worker. A store only web could write would render, accept a
+   number, echo it back, and place against the old one.
+2. `max_day_orders` was FLAT while `max_day_dollars` had been per-venue since
+   2026-08-25 — `spent_today` filtered orders per venue and compared that count
+   against an account-shaped number. Both venues defaulting to 15 hid it.
+   "Kalshi 5 a day" would have been stored, displayed, and unenforced.
+3. `max_day_dollars_all_venues` is checked BEFORE the per-venue budgets and
+   defaults to $150, so raising Kalshi to $200 moves nothing on its own. Both
+   ceilings are editable for that reason, and the page says so out loud when
+   the venue caps sum above the ceiling.
+
+**AND THEN THE FOURTH WAY HAPPENED AT THE DEPLOY LAYER.** Another session's
+deploy of `1e9ec576` (20:18:42Z, `trigger=api`) carried this commit to **web**
+and **refresh-worker** while live-odds-worker stayed on `448dc87d`. The user
+asked *"check if your changes just went as a ridealong"* — they had. Web served
+all seven inputs at 20:21:46Z against a worker that could not read them.
+Measured before acting: every `source` read `default`, so **no edit was made
+inside the inert window**. Closed by deploying the worker at 20:25:29Z.
+**A change split across services is inert in exactly the same way a change split
+across layers is, and only the deploy check catches it.**
+
+**VERIFIED BY THE USER'S OWN SAVE**, 20:27:26Z, which is stronger evidence than
+the test: all seven fields `source: "stored"` (kalshi 49.01/20, polymarket
+100.01/20, account 150.01/40, 10.01 per order) AND the worker's stamp carrying
+`max_day_dollars_kalshi 49.01`, `max_day_dollars_polymarket 100.01`, plus the
+new per-venue order keys absent from the old stamp. A number typed in a browser
+reached `limits()` on the worker and is what `check_order` enforces.
+
+**A CORRECTION WORTH KEEPING.** The pre-deploy stamp read `max_day_dollars: 40`
+beside `max_day_dollars_kalshi: 50` — which looks exactly like the
+display-vs-enforcement split this fixes. **It was not.** The worker's env-vars
+set `_KALSHI=50` and `_POLYMARKET=100` explicitly; the `40` is the flat fallback
+for a venue with no per-venue entry, i.e. neither of ours. The code defect was
+real (`limits()` returned the per-venue figures from the DEFAULT map, ignoring
+the env override computed 25 lines above) but **masked in production because
+those env values happen to equal the code defaults**. Reading the env instead of
+inferring from the stamp is the only thing that separated a real finding from a
+confident wrong one.
+
+**Also fixed:** paper stays uncapped (a stored cap binds live only, or the paper
+ledger becomes evidence about the cap instead of the strategy), and the
+unreachable-ceiling note is `info` on the shipped defaults — 15+15 books against
+a 25 ceiling is the DESIGNED gap, and a permanent orange banner over a
+correctly-working system is what the resting-orders fix was written to stop.
+
+
 ### `#576` — **The live buying engine is anchored to `/portfolio`, and the URL the user pasted asking for it was itself the bug.** — lane `portfolio-live-primary`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T19:5xZ** (web `752d83ba`)
 
 `[user decision 2026-08-26]` *"I want the main portfolio page merged with

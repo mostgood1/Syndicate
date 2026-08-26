@@ -2275,7 +2275,7 @@ Four deploys were taken during this session and each is recorded in
   Full block: `deploys.md` 2026-08-26 19:50:37Z. Item: `todo.md #576`.
 - Blocked by: none
 
-### portfolio-venue-caps-editable — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+### portfolio-venue-caps-editable — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
 - Goal: the venue day-caps are USER-EDITABLE on `/portfolio`, the way bankroll
   is, and the edit REACHES THE WORKER rather than only the page.
   `[user decision 2026-08-26: "we need to be able to enter Polymarket and Kalshi
@@ -2328,6 +2328,32 @@ Four deploys were taken during this session and each is recorded in
   orders); `record_execution_state`'s stamp carries the stored numbers;
   `/portfolio` renders the fields editable and a POST persists; production
   reading owed — the banner's per-venue figures must change after an edit.
+- **CLOSED 2026-08-26 — VERIFIED IN PRODUCTION, by the user's own save.** All
+  three services on `1e9ec576`; live-odds-worker live 20:25:29Z. At 20:27:26Z a
+  real form save read back with all seven fields `source: "stored"` (kalshi
+  49.01/20, polymarket 100.01/20, account 150.01/40, 10.01 per order) AND the
+  worker's stamp carrying `max_day_dollars_kalshi 49.01` /
+  `max_day_dollars_polymarket 100.01` plus the new per-venue order keys that the
+  `448dc87d` stamp did not have. A number typed in a browser reached `limits()`
+  on the worker and is what `check_order` enforces — `off != on` in production,
+  not only in the 22 tests.
+- **THE WEB HALF SHIPPED FIRST AS A RIDEALONG, and the user caught it.** Another
+  session deployed `1e9ec576` at 20:18:42Z carrying `d07e9490` to web and
+  refresh-worker while live-odds-worker stayed on `448dc87d` — a form that saves
+  a cap against a worker that cannot read it. Window measured and found HARMLESS
+  (every `source` read `default` at 20:21:46Z, so nothing was saved into it) and
+  closed by the worker deploy. **Lesson for the ledger: a change split across
+  SERVICES is inert exactly as a change split across LAYERS is, and only the
+  deploy-time check catches it.**
+- **A CORRECTION, kept because the wrong version was one sentence from being
+  reported:** the pre-deploy stamp's `max_day_dollars: 40` beside
+  `max_day_dollars_kalshi: 50` looks like the display-vs-enforcement split this
+  lane fixes. It is not — `_KALSHI=50`/`_POLYMARKET=100` are both set in the
+  worker's env and the `40` is the flat fallback for a venue with no per-venue
+  entry. The code defect was real and MASKED because the env values equal the
+  code defaults. Reading the env rather than inferring from the stamp is the
+  only thing that separated a finding from a confident wrong one.
+  Full block: `deploys.md` 2026-08-26 20:25:29Z. Item: `todo.md #577`.
 - Blocked by: none
 
 ### venue-balances-on-portfolio — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
