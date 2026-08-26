@@ -2119,6 +2119,48 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **Largest addressable bucket is now `no_matching_board_row=1838`**, not the
   date bucket. Any successor should start there.
 
+### kalshi-spread-join-sign — OPEN — opened 2026-08-26 — session syndicate-43
+- Goal: no Kalshi spread market is ever paired with the board row for the
+  OPPOSITE handicap. Testable outcome: over the served board and the open
+  KXMLBSPREAD markets, zero matches where `kalshi_side == "yes"` sits on a
+  board line other than `-X`, and zero where YES is not on the club the title
+  names.
+- Files: `syndicate/features/shared/kalshi_board_join.py`,
+  `tests/test_kalshi_board_join.py`
+- Hypothesis (CONFIRMED): the join keyed on Kalshi's bare magnitude, so a
+  market stating a MARGIN (`T wins by over X` = `T -X`) paired with the board's
+  `+X` handicap row purely because the magnitudes are equal.
+- Falsification test: if the board wrote both sides of a spread at the same
+  sign, the magnitude key would be sound and the pairing correct. FALSIFIED —
+  the served board writes opposite signs per side (TEX @ CWS 2026-08-26:
+  away `+1.5` at -185, home `-1.5` at +155).
+- Verification: RAN. Real `join_kalshi_to_board` over the served board and 90
+  open KXMLBSPREAD markets. BEFORE: 30 matched, **15 with YES on `+1.5`**.
+  AFTER: 30 matched, **0 violations** of either invariant, plus 30 named
+  `spread_line_orientation_mismatch` refusals. Two new tests FAIL against the
+  pre-fix join and pass after (checked by reverting the source, keeping the
+  tests). 635 kalshi/execution/portfolio/venue_scope tests pass.
+- Blast radius: NONE at the venue while it stands alone. `_side_to_kalshi`
+  still refuses `home`/`away` on spreads, so spread orders continue to refuse
+  at build time rather than place. This lane removes the inversion; it does not
+  enable placement.
+- STILL OPEN, deliberately not fixed here:
+  1. `kalshi_side` is computed correctly by the join and then THROWN AWAY —
+     `venue_scope.py` stamps only `ticker_resolver(row)`, so `OrderRequest`
+     carries the BOARD side and `_side_to_kalshi` is asked to re-derive at a
+     boundary that cannot settle it. Plumbing it needs
+     `pipeline/portfolio_commit.py`, which is CLAIMED by
+     `portfolio-decision-and-execution` (session 9324a3e5). NOT TAKEN.
+  2. h2h game lines never match at all: this lookup passes `verdict["line"]`
+     as None while `_event_key` indexes moneylines at 0.0. Fixing it would
+     newly ENABLE h2h placement — a live-money change owed its own deploy and
+     its own reading.
+  3. `team_side_unresolved` counts 8 -> 16 on the same slate (one count per
+     candidate line). Counting artifact, no behaviour change.
+- Venue facts established this lane (cloud sessions cannot reach these hosts):
+  full findings in `.syndicate/findings_2026-08-26_venue_api_unblock.md`.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
