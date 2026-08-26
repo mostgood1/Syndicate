@@ -31541,3 +31541,61 @@ is expected. (c) 249 of 1305 rows carry a book clock but no seen clock
 **FOR syndicate-43:** this is positive evidence for the direct-feed architecture
 and it is now measured rather than argued. The number to beat is
 `seen_p50=859`. Re-read it warm before committing to it.
+
+### WARM SAMPLE, n=4 over 23 min, same instance `-96j6j`, no restart. THE COLD READING WAS WRONG TOO.
+
+    time       rows    p50   wnba    mlb   nfl soccer
+    15:17:46   1305    859  16650   9882   829    893   (cold)
+    15:29:31   1305   1549  17341  10572  1222   1174
+    15:33:49   1305   1813  17604  10834  1486   1436
+    15:40:52   1305   1898  18014  11244  1898   1852
+
+Aging rate, Δage ÷ Δwall (**1.00 = NOT REFRESHED AT ALL**; 0.00 = fully refreshed):
+
+    window                wall     p50   wnba    mlb    nfl soccer
+    15:17:46->15:29:31     705    0.98   0.98   0.98   0.56   0.40
+    15:29:31->15:33:49     258    1.02   1.02   1.02   1.02   1.02
+    15:33:49->15:40:52     423    0.20   0.97   0.97   0.97   0.98
+
+**THE WORST ROW IN MLB AND WNBA WAS NEVER REFRESHED ONCE IN 23 MINUTES.** Both
+tracked wall-clock at 0.98 across the full span: wnba 16650 -> 18014, mlb
+9882 -> 11244. Their served staleness grew monotonically from 4.6h to 5.0h and
+2.7h to 3.1h. `book_max` reached **80578s = 22.4 hours**.
+
+**THIS RETRACTS THE COLD READING, WHICH I REPORTED ~40 MINUTES AGO.** I called
+`seen_p50=859` a "~14-minute upstream poll floor". It is not a floor and it is
+not a poll interval:
+
+- p50 in the last window moved at **0.20** — the median DOES improve, so rows
+  are refreshing.
+- The per-sport worst moved at **0.97** in the same window — the stale rows are
+  refreshing NEVER.
+
+**It is not a cadence problem. Specific rows are never repolled and age without
+bound, while the rows around them refresh normally.** A median hides this
+completely, which is why `worst_seen_by_sport` is on the line — that field is
+the only reason this was visible, and it was added on a hunch about uneven
+shards rather than for this.
+
+**AND THE GATE PERMITS IT, BY DESIGN.** `SHORTLIST_MAX_QUOTE_AGE_SECONDS =
+14 * 3600` (`layer2_board.py:489`) — **14 hours.** A 5-hour-old wnba quote is
+nowhere near the ceiling, so nothing drops it. Not obviously a bug (that
+constant carries its own reasoning at :418-489) but it is the number that lets
+a 22-hour book age reach the board.
+
+**THIRD REVISION OF THIS ANSWER IN ONE SESSION**, and each revision came from
+taking more samples rather than from new reasoning:
+
+    publication is broken          -> true, but not what the user saw
+    upstream poll floor ~14 min    -> wrong; retracted here
+    specific rows never refresh    -> current, n=4
+
+**Anomaly worth someone's time, NOT explained:** the 15:37:12 publish carried
+`rows=400 seen_p50=315` with only soccer in `worst_seen_by_sport` — a different,
+smaller, much FRESHER build interleaved with the 1305-row ones. Whatever path
+produces that one is getting quotes 6x fresher.
+
+**FOR syndicate-43:** the direct-feed case does not rest on the median. It rests
+on rows that never refresh at all under the current feed, with a 14-hour
+tolerance permitting them. `seen_max` and `worst_seen_by_sport` are the numbers
+to beat, not `seen_p50`.
