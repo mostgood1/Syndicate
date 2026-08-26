@@ -30751,3 +30751,94 @@ today-only tick reads as "the fix stopped working".
 league-week builds, MLB's ~3 minutes of uncached `[home]` card contexts, and
 whatever else. Same treatment required — measure the call, do not infer from the
 gap.
+
+---
+
+## 2026-08-26 04:37:16Z — refresh-worker `e11639c4` (#567 board build timing, #566 unreclaimable memory)
+
+Off-protocol: no `deploy_claim.py` acquire, no `deploy_preflight.py` receipt.
+`RENDER_API_KEY` is absent from this container and the agent proxy 403s
+`api.render.com`, so both locks were unreachable; deployed via Render MCP on
+explicit user direction. Deploy live in 2m41s.
+
+verify: **the first full board build under instrumentation printed**
+
+    [intelligence_state] BOARD_BUILD_TIMING wall_s=747.8 cpu_s=670.1 off_cpu_pct=10.4 ok=True
+    [intelligence_state] CANDIDATE_POOL_READY date=2026-08-25 count=23
+
+**`off_cpu_pct=10.4` ANSWERS THE QUESTION `#567` WAS BUILT TO ANSWER: the board
+is NOT waiting on anything. It is computing.** The pre-registered decision was
+"high off-CPU -> go look at what else the worker runs concurrently; low -> the
+cost is inside `_build_candidate_pool`". It is low. Stop hunting for contention.
+
+**CAVEAT ON MY OWN INSTRUMENT, stated before anyone builds on the number:**
+`time.process_time()` sums CPU over ALL THREADS in the process, not the calling
+thread. So `off_cpu_pct` measures whether the PROCESS was idle, not whether the
+BOARD THREAD was. The live-lens loop logs continuously throughout the build
+window, so some of those 670 CPU-seconds are certainly its. What the reading
+proves is that the worker process is CPU-saturated for the whole 12.5 minutes —
+which under the GIL is one core's worth regardless of which thread holds it, so
+the "not queued on I/O" conclusion survives. "The board thread burned 670s" does
+not. Use `time.thread_time()` if the per-thread split is ever needed.
+
+### The decomposition, from existing log timestamps (build began 04:38:01.9Z)
+
+| block | window | elapsed |
+|---|---|---|
+| pulls + memory guards before the sport loop | 04:38:01.9 -> 04:38:58.3 | 56s |
+| **8-sport candidate generation, all of it** | 04:38:58.3 -> 04:39:44.9 | **47s** |
+| silent, inside `build_intelligence_overview` post-loop | 04:39:44.9 -> 04:44:58.3 | **313s** |
+| `candidate_collection_with_fallback` (a SECOND collection) | 04:44:58.9 -> 04:47:28.6 | **150s** |
+| unspanned remainder to `CANDIDATE_POOL_READY` | 04:47:28.6 -> 04:50:29.8 | **181s** |
+
+**CANDIDATE GENERATION IS NOT THE COST. It is 47 seconds of a 748-second
+function — 6%.** Per-sport durations are trivial: ncaaf produced 255 candidates
+in 27ms, soccer 268 in 1.77s, nfl 16 in 4ms, nhl/ncaab/nba zero instantly. The
+one real gap INSIDE the loop is nfl-exit 04:39:07.4 -> ncaaf-enter 04:39:42.6,
+**35 seconds with nothing logged**, which is per-sport artifact loading, not
+generation.
+
+**748s is WORSE than the 11m22s (682s) baseline recorded above, not better.**
+Boot-cycle effects are the obvious confound (this is the first build after a
+restart, cold caches) so it is not yet evidence of a regression — but it is not
+evidence of improvement either, and nothing in this deploy was meant to change
+the duration.
+
+**Three unattributed blocks now have names and sizes**, which is what `#567` was
+for. The 313s silent block is the biggest single target and sits after the last
+sport exits, inside `build_intelligence_overview`. The 150s
+`candidate_collection_with_fallback` is a SECOND full collection pass after the
+sport loop already ran — worth understanding before optimising either.
+
+**Forward-slate cost is visible and is the same root cause the user named:**
+
+    odds_history_candidate_date_supplement sport=soccer shards_merged=6 entry_count=4358
+      candidate_dates = 2026-08-26, 08-27, 08-28, 08-29, 08-30, 09-04
+
+2026-08-29 alone is 7.4MB / 2547 entries, 08-30 3.97MB, 08-28 2.16MB — ~15MB of
+JSON parsed per build, each shard probed at three separate paths. Soccer's 268
+candidates are 199 steam. The per-sport window fix (`#565`) pruned the BOOK GRID
+pulls; it did not prune this supplement.
+
+**Whole build produced `count=23` candidates.** 748 seconds, 23 candidates.
+
+### `#566` confirmed working
+
+Both figures now print side by side, and the gap is exactly the discrepancy that
+misled me four times tonight into reporting a memory problem that did not exist:
+
+    04:38:49  pct_of_max 35.8   unreclaimable_pct_of_max 16.5
+    04:39:10  pct_of_max 42.9   unreclaimable_pct_of_max 19.2
+    04:46:53  pct_of_max 55.2   unreclaimable_pct_of_max 29.1
+
+Peak unreclaimable across the whole cycle is 29.1% of 4096MB. No memory problem.
+Zero oomKilled. Quote `unreclaimable`, never `pct_of_max`.
+
+### Regression evidence
+
+The broad sweep that was still running when `e11639c4` was merged has since
+finished: **280 passed, 8 subtests passed, 16m49s, exit 0.** The merge was made
+on 99 targeted tests; the broad result now backs it. Two earlier sweep attempts
+exited 124 (timeout) and one exited 4 (`--timeout` not installed, pytest-timeout
+absent) — neither was a failure, and I should not have described either as
+inconclusive evidence of anything.
