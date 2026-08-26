@@ -112,6 +112,12 @@ REASON_UNKNOWN_MARKET = "unmapped_market"
 # side token is read properly.
 REASON_TEAM_TOTAL = "team_totals_needs_a_per_team_score"
 REASON_NO_SCORES = "match_carries_no_scores"
+# The rolling aggregate is readable but has moved on to another date, and no
+# settlement record was kept for the date we are grading. Distinct from
+# `no_soccer_live_state_for_date`, which means we could read nothing at all:
+# this one says the window CLOSED, which is a different job for whoever reads
+# the counter -- it points at retention, not at the poller being down.
+REASON_FINALS_WINDOW_CLOSED = "soccer_finals_window_closed"
 
 # The combined-goals family. `team_totals` is deliberately ABSENT -- see the
 # module docstring. Mirrors `live_gameline_join._TOTALS_MARKETS`, which is the
@@ -246,6 +252,94 @@ def soccer_status_resolver(selected_date: str):
     return resolve
 
 
+
+def _finals_record_path(root, selected_date: str):
+    return root / "live" / f"soccer_finals_{selected_date}.json"
+
+
+def _remember_finals(selected_date: str, matches) -> None:
+    """Keep this date's FINISHED matches where a later tick can still find them.
+
+    WHY SETTLEMENT HAS TO KEEP ITS OWN RECORD. `live/soccer_live_lens.json` is a
+    ROLLING SINGLE-DATE snapshot, and both of its readers gate on
+    `snapshot["date"] == selected_date` -- correctly, since answering for one
+    date out of another date's match state would grade the wrong scoreline.
+    But `settle_orders` deliberately runs for TODAY AND YESTERDAY (a slate that
+    starts before midnight UTC files its orders under the previous date), and
+    the moment the aggregate rolls, the yesterday pass can read NOTHING: the
+    per-league `match_box` tree is a filesystem write on live-odds-worker and
+    settlement runs on refresh-worker. So yesterday's pass was structurally
+    impossible for soccer -- which is the sport that needs it most, since
+    European matches finish within a couple of hours of the UTC date roll.
+
+    MEASURED 2026-08-26: soccer had settled ZERO orders all-time, and at
+    14:57Z the pass for 2026-08-25 reported `no_soccer_live_state_for_date: 3`
+    while the aggregate had already rolled to 2026-08-26.
+
+    UNIONED, NEVER REPLACED. A tick that can see only some of the day's finals
+    must not erase the ones an earlier tick recorded, and the poller itself
+    rebuilds nothing it has already marked final. Same trim the poller applies:
+    a handful of scalars per finished match, so this cannot grow with squad
+    size or trip the aggregate's 1MB write warning.
+
+    NEVER RAISES. Settlement failing because a cache write failed would be a
+    worse outcome than the gap this closes.
+    """
+    finished = [m for m in matches if m.get("final")]
+    if not finished:
+        return
+    try:
+        from syndicate.features.shared.refresh_state_store import (
+            data_root,
+            read_json_file,
+            write_json_file,
+        )
+
+        path = _finals_record_path(data_root(), selected_date)
+        merged: dict[Any, dict[str, Any]] = {}
+        existing = read_json_file(path)
+        if isinstance(existing, Mapping) and str(existing.get("date") or "") == str(selected_date):
+            for record in existing.get("matches") or []:
+                if isinstance(record, Mapping):
+                    merged[(record.get("home_team"), record.get("away_team"))] = dict(record)
+        added = 0
+        for record in finished:
+            key = (record.get("home_team"), record.get("away_team"))
+            if key not in merged:
+                added += 1
+            merged[key] = dict(record)
+        if not added:
+            # Nothing new this tick. Skipping the write keeps a settled day
+            # from being rewritten every three minutes for the rest of it.
+            return
+        write_json_file(path, {"date": str(selected_date), "matches": list(merged.values())})
+    except Exception:
+        return
+
+
+def _recall_finals(selected_date: str):
+    """This date's finished matches from settlement's own record, or None.
+
+    None means nothing was kept -- NOT that the day had no matches. The caller
+    keeps those two as different reasons, which is the same split the rest of
+    this module draws and the reason `_load_matches` returns None rather than
+    an empty list.
+    """
+    try:
+        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+        record = read_json_file(_finals_record_path(data_root(), selected_date))
+    except Exception:
+        return None
+    if not isinstance(record, Mapping):
+        return None
+    if str(record.get("date") or "") != str(selected_date):
+        # A record written for another date cannot answer for this one, for
+        # exactly the reason the aggregate is date-gated in the first place.
+        return None
+    out = [dict(m) for m in (record.get("matches") or []) if isinstance(m, Mapping)]
+    return out or None
+
 def _load_matches(selected_date: str) -> list[dict[str, Any]] | None:
     """Every soccer match this service can see, in play OR finished.
 
@@ -276,9 +370,12 @@ def _load_matches(selected_date: str) -> list[dict[str, Any]] | None:
     try:
         resolved = _soccer_live_state_games(selected_date)
     except Exception:
-        return None
+        resolved = None
     if resolved is None:
-        return None
+        # THE AGGREGATE HAS ROLLED PAST THIS DATE (or could not be read at all).
+        # Settlement's own kept record is the only thing that can still answer,
+        # and it is what makes the yesterday pass possible for soccer.
+        return _recall_finals(selected_date)
 
     games, _age = resolved
     out: list[dict[str, Any]] = []
@@ -299,4 +396,7 @@ def _load_matches(selected_date: str) -> list[dict[str, Any]] | None:
                 "final": str(game.get("state") or "").strip().lower() == "final",
             }
         )
+    # Kept BEFORE returning, so the window is recorded on every tick that can
+    # still see it rather than only on the one that happens to grade.
+    _remember_finals(selected_date, out)
     return out

@@ -321,3 +321,109 @@ def test_string_scores_are_coerced_because_ESPN_ships_them(monkeypatch):
         _order(market="totals", side="over", line=2.5)
     )
     assert verdict["current_value"] == 3.0
+
+
+@pytest.fixture
+def _isolated(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
+    return tmp_path
+
+
+def _live_state(records):
+    """Stand in for the rolling aggregate: a list, or None once it has rolled."""
+    return None if records is None else ([dict(r) for r in records], 0.0)
+
+
+def _aggregate(monkeypatch, records):
+    from syndicate.features.shared import board_enrichment
+
+    monkeypatch.setattr(
+        board_enrichment, "_soccer_live_state_games", lambda _d: _live_state(records)
+    )
+
+
+def _chelsea_final():
+    return {
+        "home": {"name": "Chelsea"}, "away": {"name": "Fulham"},
+        "home_score": 2, "away_score": 1, "state": "final",
+    }
+
+
+def test_a_finished_match_survives_the_aggregate_rolling_to_the_next_date(_isolated, monkeypatch):
+    """THE GAP THIS FIX EXISTS FOR.
+
+    `live/soccer_live_lens.json` is a ROLLING SINGLE-DATE snapshot and both of
+    its readers gate on `snapshot["date"] == selected_date` -- correctly. But
+    `settle_orders` runs for TODAY AND YESTERDAY, and the moment the aggregate
+    rolls, the yesterday pass could read nothing at all: the per-league
+    `match_box` tree is a filesystem write on live-odds-worker while settlement
+    runs on refresh-worker. So yesterday's pass was structurally impossible for
+    soccer -- the sport that needs it most, since European matches finish within
+    hours of the UTC date roll.
+
+    MEASURED 2026-08-26: soccer had settled ZERO orders all-time, and the 14:57Z
+    pass for 2026-08-25 reported `no_soccer_live_state_for_date: 3` while the
+    aggregate had already moved to 2026-08-26.
+    """
+    # Tick one: the aggregate still holds this date, and the match has ended.
+    _aggregate(monkeypatch, [_chelsea_final()])
+    first = soccer.soccer_status_resolver("2026-08-25")(_order())
+    assert first["is_final"] is True
+
+    # Tick two: the aggregate has rolled. Nothing else on this service can see
+    # a finished soccer match -- and the bet must still grade.
+    _aggregate(monkeypatch, None)
+    second = soccer.soccer_status_resolver("2026-08-25")(_order())
+    assert second.get("unavailable_reason") is None, second
+    assert second["is_final"] is True
+    assert second["current_value"] == 1
+
+
+def test_the_kept_record_never_answers_for_another_date(_isolated, monkeypatch):
+    """Answering one date out of another date's match state grades the wrong
+    scoreline, which is the reason the aggregate is date-gated to begin with.
+    """
+    _aggregate(monkeypatch, [_chelsea_final()])
+    soccer.soccer_status_resolver("2026-08-25")(_order())
+
+    _aggregate(monkeypatch, None)
+    verdict = soccer.soccer_status_resolver("2026-08-26")(_order())
+    assert verdict["unavailable_reason"] == soccer.REASON_NO_LIVE_STATE
+
+
+def test_a_later_tick_cannot_erase_an_earlier_tick_s_finals(_isolated, monkeypatch):
+    """The poller rebuilds nothing it has already marked final, so a late tick
+    legitimately carries only some of the day's finished matches. Replacing
+    rather than unioning would drop the rest.
+    """
+    _aggregate(monkeypatch, [_chelsea_final()])
+    soccer.soccer_status_resolver("2026-08-25")(_order())
+
+    # A later tick that can see a DIFFERENT finished match and not Chelsea's.
+    _aggregate(monkeypatch, [{
+        "home": {"name": "Arsenal"}, "away": {"name": "Everton"},
+        "home_score": 3, "away_score": 0, "state": "final",
+    }])
+    soccer.soccer_status_resolver("2026-08-25")(_order(home_team="Arsenal", away_team="Everton"))
+
+    _aggregate(monkeypatch, None)
+    resolve = soccer.soccer_status_resolver("2026-08-25")
+    assert resolve(_order())["is_final"] is True                       # Chelsea survived
+    assert resolve(_order(home_team="Arsenal", away_team="Everton"))["is_final"] is True
+
+
+def test_an_unfinished_match_is_never_kept(_isolated, monkeypatch):
+    """Only a decided match may be remembered. Keeping an in-play scoreline and
+    replaying it after the aggregate rolls would settle a bet against a
+    half-time score, which is worse than not settling it.
+    """
+    _aggregate(monkeypatch, [{
+        "home": {"name": "Chelsea"}, "away": {"name": "Fulham"},
+        "home_score": 1, "away_score": 0, "state": "live",
+    }])
+    soccer.soccer_status_resolver("2026-08-25")(_order())
+
+    _aggregate(monkeypatch, None)
+    verdict = soccer.soccer_status_resolver("2026-08-25")(_order())
+    assert verdict["unavailable_reason"] == soccer.REASON_NO_LIVE_STATE
