@@ -5470,11 +5470,21 @@ Do not change it without a larger sample.
 syndicate-43, readback confirmed). Kalshi balances are PER-SHARD and must be
 preallocated; shard 3 is "Tennis & Baseball", which is why only MLB failed.
 
-**UNVERIFIED AT SESSION CLOSE — three outcomes, keep them distinct:**
-- MLB fills or rests -> shard funding was the whole blocker.
-- A NEW venue error -> past our guard, the venue now has an opinion. Watch
-  for insufficient collateral: **$25 against a $10/order cap is two orders**.
-- `venue_shard_unfunded` still -> the env var did not take.
+**VERIFIED 16:19:13Z — MLB IS FILLING. Funding shard 3 was the whole blocker.**
+
+```
+RECONCILED KXMLBHRR-26AUG261310TBDET-DETHLEE50-2 submitted->filled
+  contracts=11 fill_price=0.4  fees=0.0924
+RECONCILED KXMLBTOTAL-26AUG261940TEXCWS-8        submitted->filled
+  contracts=5  fill_price=0.47 fees=0.0436
+```
+
+Those are the SAME two tickers that returned `market_shard=3` refusals an hour
+earlier. First MLB fills since 08-24. ~$6.75 of the $25 committed.
+
+**The next constraint is collateral, not correctness:** $25 on shard 3 against a
+$10/order cap is a couple of orders per cycle. Expect insufficient-collateral
+errors rather than shard errors from here.
 
 **Verified working today:** Kalshi fills on shard 0 (`KXWNBA3PT` filled
 16:03:06Z, 10 contracts @ 0.40 + 0.168 fees, ~1s round trip). Polymarket

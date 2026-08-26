@@ -31782,3 +31782,35 @@ rather than inferred — refuse on `balance == 0` for the market's shard, with t
 balance in the message. Strictly better than a hardcoded list, and it self-heals
 the moment the shard is funded instead of needing an env var flipped. Left as
 `#573`.
+
+---
+
+## 2026-08-26 16:19Z · MLB IS FILLING — the shard chain is closed end to end
+
+The user funded exchange shard 3 ($25) and syndicate-43 set
+`KALSHI_ORDER_KNOWN_SHARDS=0,3`. First MLB fills since 08-24:
+
+```
+RECONCILED KXMLBHRR-26AUG261310TBDET-DETHLEE50-2 submitted->filled
+  venue_status='executed' contracts=11 fill_price=0.4  fees=0.0924
+RECONCILED KXMLBTOTAL-26AUG261940TEXCWS-8        submitted->filled
+  venue_status='executed' contracts=5  fill_price=0.47 fees=0.0436
+```
+
+**The same two tickers that returned `market_shard=3` an hour earlier.** Of the
+three pre-registered outcomes — fills, a new venue error, or the env var not
+taking — this is the first. Shard funding was the entire remaining blocker.
+
+**The full chain, every link measured:**
+
+| link | how it was established |
+|---|---|
+| `exchange_index: 0` pins shard 0 | venue field reference; error moved on change |
+| MLB lives on shard 3 | `exchange_index` on the public payload, n=9 perfect split |
+| shard 3 is "Tennis & Baseball" | `GET /exchange/status` enumeration |
+| `user_not_found` = no collateral | Kalshi sharding doc, verbatim |
+| funding it fixes MLB | **these two fills** |
+
+**Next constraint is collateral, not correctness.** $25 on shard 3 against a
+$10/order cap is a couple of orders per cycle; expect insufficient-collateral
+errors from here, which are a different and much more legible failure.
