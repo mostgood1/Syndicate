@@ -732,6 +732,13 @@ def _venue_reader(venue: str):
 # error -- off by 100x or 1000x, never by 5%.
 _FILL_DOLLAR_TOLERANCE = 1.25
 
+# VENUE ROUNDING, not a real overfill. Kalshi sells whole contracts and
+# Polymarket sells hundredths (`minimumTradeQty: 0.01`), so a venue count is
+# reported to two decimals while ours is a raw quotient. One cent of a
+# contract of slack costs nothing against a guard whose target is a 100x
+# fixed-point scale error.
+_FILL_COUNT_TOLERANCE = 0.01
+
 
 def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[str, Any]:
     """Correct the live ledger from what the VENUE says, not from what we sent.
@@ -912,20 +919,44 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
 
             if filled_dollars is not None and stake_ceiling is not None:
                 # The dollar bound, which is the real invariant.
+                bound = "dollars"
                 implausible_count = filled_dollars > stake_ceiling
             else:
                 # No readable fill price: fall back to the contract bound rather
                 # than to no bound at all.
+                #
+                # WITH A ROUNDING TOLERANCE, because the venues round and we do
+                # not. Measured 2026-08-26 00:27:38Z: `venue_count=2.39
+                # requested=2.3920000000000003` -- the venue reported two
+                # decimals against our raw float, and an exact `>` on that pair
+                # is a coin flip on the third digit. The failure this guards
+                # against is a fixed-point scale error, which is 100x; two
+                # thousandths of a contract is not it.
+                bound = "contracts"
                 implausible_count = (
                     contracts is not None
                     and requested_contracts is not None
-                    and contracts > requested_contracts
+                    and float(contracts) > float(requested_contracts) + _FILL_COUNT_TOLERANCE
                 )
             if implausible_count:
                 implausible += 1
+                # THE NUMBERS THE BRANCH ACTUALLY COMPARED, not a pair that
+                # merely describes the order. The previous line printed
+                # `venue_count` and `requested` for BOTH bounds -- but on the
+                # dollar branch neither of those is what was compared, so a
+                # reader (this one, twice) works backwards from two numbers
+                # that cannot produce the verdict. A counter that names a
+                # problem while withholding its data is a recurring defect in
+                # this repo; this is that defect, in the code that halts
+                # trading.
                 print(
                     f"[execution_ledger] RECONCILE_COUNT_IMPLAUSIBLE key={key}"
+                    f" bound={bound}"
                     f" venue_count={contracts} requested={requested_contracts}"
+                    f" fill_price={fill_price} raw_fill_price={seen.get('fill_price')!r}"
+                    f" filled_dollars={filled_dollars} stake_ceiling={stake_ceiling}"
+                    f" requested_stake={order.get('requested_stake_dollars')!r}"
+                    f" requested_price={order.get('requested_price')!r}"
                     " -- left untouched; check the `_fp` unit",
                     flush=True,
                 )

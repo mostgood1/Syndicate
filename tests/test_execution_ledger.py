@@ -1393,3 +1393,33 @@ def test_the_tolerance_is_wide_enough_for_fees_and_narrow_enough_to_bound():
     from syndicate.features.shared import execution_ledger as mod
 
     assert 1.05 < mod._FILL_DOLLAR_TOLERANCE < 2.0
+
+
+# ---------------------------------------------------------------------------
+# THE RECONCILE BOUND. It has halted ALL trading on BOTH venues twice:
+#
+#   2026-08-25 18:50:34 CT  venue_count=5.82 requested=5.221   (price improvement)
+#   2026-08-26 00:27:38 CT  venue_count=2.39 requested=2.392   (venue rounding)
+#
+# Its target is a fixed-point scale error -- 100x -- and both misfires were
+# fractions of a contract. A guard that refuses good fills is a guard that
+# stops the system it protects.
+# ---------------------------------------------------------------------------
+
+
+def test_venue_rounding_is_not_an_implausible_fill():
+    """`2.39` against `2.3920000000000003` is the venue reporting two decimals
+    against our raw quotient, not an overfill."""
+    from syndicate.features.shared.execution_ledger import _FILL_COUNT_TOLERANCE
+
+    assert not (2.39 > 2.3920000000000003 + _FILL_COUNT_TOLERANCE)
+    # And the tolerance is nowhere near wide enough to admit the thing the
+    # bound exists for.
+    assert 2.392 * 100 > 2.392 + _FILL_COUNT_TOLERANCE
+
+
+def test_a_fixed_point_scale_error_is_still_caught_by_the_contract_bound():
+    from syndicate.features.shared.execution_ledger import _FILL_COUNT_TOLERANCE
+
+    # `_fp` as a 1e6 fixed-point scale: 2.392 contracts arrives as 2392000.
+    assert 2392000.0 > 2.392 + _FILL_COUNT_TOLERANCE
