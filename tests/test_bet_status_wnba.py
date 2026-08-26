@@ -27,11 +27,18 @@ def _game(event_id="evt-1", players=None):
     return {"event_id": event_id, "players": players or []}
 
 
-def _player(name="A'ja Wilson", pts=22, reb=9, ast=3, threes=1):
-    return {"player": name, "pts": pts, "reb": reb, "ast": ast, "threes_made": threes, "mp": "30:12"}
+def _player(name="A'ja Wilson", pts=22, reb=9, ast=3, threes=1, team_tri="LVA"):
+    # `team_tri` is on every row the real capture writes
+    # (`_public_live_player_boxscore_payload`), and it is the ONLY place that
+    # artifact records a team -- so it is what matchup recovery keys on.
+    return {"player": name, "pts": pts, "reb": reb, "ast": ast,
+            "threes_made": threes, "mp": "30:12", "team_tri": team_tri}
 
 
 def _order(**kw):
+    # A REAL ORDER CARRIES ITS MATCHUP. `home_team`/`away_team` are on every row
+    # the live book writes, and leaving them off the fixture is what let the
+    # id-only lookup look sufficient for as long as it did.
     order = {
         "sport": "wnba",
         "event_id": "evt-1",
@@ -39,6 +46,8 @@ def _order(**kw):
         "player_name": "A'ja Wilson",
         "side": "over",
         "line": 19.5,
+        "away_team": "Las Vegas Aces",
+        "home_team": "Phoenix Mercury",
     }
     order.update(kw)
     return order
@@ -97,7 +106,12 @@ def test_a_missing_box_and_a_missing_game_are_different_reasons(_isolated):
     absent = mod.wnba_status_resolver("2026-08-23")(_order())
     assert absent["unavailable_reason"] == mod.REASON_NO_BOX
 
-    _write_box(_isolated, games=[_game(event_id="other")])
+    # A different game AND a different matchup, or recovery would correctly
+    # find it and this would no longer be testing what it says it tests.
+    _write_box(
+        _isolated,
+        games=[_game(event_id="other", players=[_player(team_tri="SEA"), _player(name="Skylar Diggins", team_tri="MIN")])],
+    )
     missing_game = mod.wnba_status_resolver("2026-08-23")(_order())
     assert missing_game["unavailable_reason"] == mod.REASON_GAME_NOT_IN_BOX
 
@@ -207,3 +221,77 @@ def test_an_actually_unknown_market_still_says_so(monkeypatch):
     resolve = mod.wnba_status_resolver("2026-08-22")
     out = resolve({"sport": "wnba", "market": "player_double_double", "side": "over"})
     assert out["unavailable_reason"] == mod.REASON_UNMAPPED_MARKET
+
+
+def test_the_board_hash_is_recovered_from_the_matchup(_isolated):
+    """THE BUG THIS FIX EXISTS FOR, in the exact shape production had it.
+
+    WNBA had settled ZERO orders all-time while MLB had settled 157, and every
+    refusal was `game_not_in_live_box`. The order carries the board's OddsAPI
+    hash; the box carries an ESPN id. The two namespaces can never meet, so the
+    id lookup could never hit -- for ANY WNBA order, on any date.
+
+    The old fixture concealed it by setting both ids to the same string.
+    """
+    _write_box(
+        _isolated,
+        games=[
+            _game(
+                event_id="401857177",  # ESPN's id, as the real capture writes it
+                players=[_player(team_tri="LVA"), _player(name="Kahleah Copper", team_tri="PHX")],
+            )
+        ],
+    )
+    verdict = mod.wnba_status_resolver("2026-08-23")(
+        _order(event_id="1fb615886a5e9855f01b8c3824e8d937")  # the board hash
+    )
+
+    assert verdict.get("unavailable_reason") is None
+    assert verdict["current_value"] == 22.0
+    # Stated explicitly: if this ever silently reverts to an id match the test
+    # would still pass on the value alone.
+    assert verdict["matched_by"] == "matchup"
+
+
+def test_a_thin_order_says_so_instead_of_blaming_the_capture(_isolated):
+    """"The ledger row has no teams" and "the game is not in the capture" send
+    the next person to two different jobs, so they get two different reasons.
+    """
+    _write_box(_isolated, games=[_game(event_id="401857177", players=[_player()])])
+    verdict = mod.wnba_status_resolver("2026-08-23")(
+        _order(event_id="hash", away_team=None, home_team=None)
+    )
+    assert verdict["unavailable_reason"] == mod.REASON_NO_MATCHUP_ON_ORDER
+
+
+def test_recovery_survives_a_swapped_home_and_away(_isolated):
+    """The key is order-independent on purpose.
+
+    Home/away is the convention most likely to be written the other way round on
+    one of the two sides, and a swapped pair that fails to join is
+    indistinguishable from a game that is genuinely absent.
+    """
+    _write_box(
+        _isolated,
+        games=[_game(event_id="401857177", players=[_player(team_tri="LVA"), _player(name="Kahleah Copper", team_tri="PHX")])],
+    )
+    verdict = mod.wnba_status_resolver("2026-08-23")(
+        _order(event_id="hash", away_team="Phoenix Mercury", home_team="Las Vegas Aces")
+    )
+    assert verdict["current_value"] == 22.0
+
+
+def test_a_doubleheader_never_recovers_into_the_wrong_game(_isolated):
+    """Two games, one matchup. Grading against the wrong one of a pair is worse
+    than not grading, so the second game keeps only its event id.
+    """
+    _write_box(
+        _isolated,
+        games=[
+            _game(event_id="game-1", players=[_player(pts=22, team_tri="LVA"), _player(name="Kahleah Copper", team_tri="PHX")]),
+            _game(event_id="game-2", players=[_player(pts=99, team_tri="LVA"), _player(name="Kahleah Copper", team_tri="PHX")]),
+        ],
+    )
+    verdict = mod.wnba_status_resolver("2026-08-23")(_order(event_id="hash"))
+    # The FIRST game's value, never the second's, and never a blend.
+    assert verdict["current_value"] == 22.0
