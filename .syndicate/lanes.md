@@ -2266,6 +2266,35 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   by me while correcting the first.** Same for the NFL claim beside it.
   Nothing here should be re-derived from the old readings: they were taken
   from the broken line and the fixed line has not run in production yet.
+- **STEP 3 RETESTED A THIRD TIME, `2026-08-26 01:49-01:55Z`, ON THE FIXED LINE.
+  NCAAF IS DEAD -- and this is the first of the three tests whose measurement
+  actually supports its conclusion.**
+  - **Kalshi side, `BY_GAME_DATE` (game dates, from the ticker):** earliest
+    NCAAF key is **`2026-08-27`** (`KXNCAAFGAME` 20, `KXNCAAFSPREAD` 73,
+    `KXNCAAFTOTAL` 57), then 08-28, 08-29, 09-05, 09-12. **No `2026-08-25` or
+    `2026-08-26` key at all.** The board's date is `2026-08-25`.
+  - So the first reading's `2026-08-29` was wrong by two days (it was a CLOSE
+    date), and this morning's correction -- that `<= 2026-08-29` cannot exclude
+    08-25 -- was valid reasoning that landed on the wrong side. Right conclusion,
+    twice, from two measurements that could not support it.
+  - **BOARD SIDE, AND IT IS THE BINDING ONE.** `LAYER2_SHORTLIST date=2026-08-25
+    rows=1291 sports=['mlb','nfl','soccer','wnba']` and `BOARD_JOIN
+    board_rows=1291` -- the counts match exactly, so the join's board side IS the
+    shortlist, and **NCAAF is not in it**. That holds whatever Kalshi lists: with
+    no NCAAF board row there is nothing for an NCAAF market to join to. Upstream
+    of the date question and strictly stronger.
+  - **Line-aware NCAAF rung selection is closed.** Not "no market on the date"
+    (true but not binding) -- "no board row in the set the join runs against".
+- **NEW AND UNMEASURED, board-side, NOT this lane's:** `BOARD_OVERVIEW_READY
+  date=2026-08-25 ... ncaaf:g=51` while the shortlist carries ZERO ncaaf rows.
+  Do NOT read `g=51` as 51 NCAAF games on a Tuesday in August with the season
+  starting that weekend; the same line carries `beyond_horizon=2392`, so `g=`
+  is likely a horizon window rather than a date count. Where NCAAF rows die
+  between overview and shortlist is a real open question and it is board-side.
+- **ALSO SEEN, unrelated, flagged not chased:** `01:52:42Z
+  BOARD_OVERVIEW_READY date=2026-08-25 sports=0` -- an overview with zero
+  sports, 15 minutes after one with 8. An empty overview looks like a quiet day
+  rather than a fault, which is why it is written down.
 - **REMAINING:** (b) re-read `BY_GAME_DATE` in production once the fix is
   deployed, and re-establish from it what `market_is_for_another_date`
   actually counts -- from a line that means what it says; (c) THEN decide
