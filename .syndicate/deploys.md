@@ -30307,3 +30307,40 @@ Source live-odds-worker · <15m`, the badge renders
 `SYNDICATE_EXECUTION_MAX_DAY_ORDERS=10` override is gone. That closes the
 open question from 19:00 CT, where it still read 10 on a pre-restart
 instance.
+
+## 2026-08-25 20:13 CT — refresh-worker `8efdf0ff7` (Kalshi total grammars)
+
+**lane:** none opened — `kalshi_catalogue.py` is claimed by no `Files:` bullet;
+collision-checked against `kalshi-line-aware-rungs` (audit session 281da8c3),
+which owns `venue_quote_adapters.py`, `venue_quote_fanin.py`,
+`kalshi_odds_refresh.py`. None touched.
+
+**Change.** Two title grammars, from the audit's top finding
+(`unreadable_title` 62% = "the largest single lever in the system"):
+
+- `Will there be over <line> <stat>?` — NFL quarter totals, 640 markets
+- `<period>: Over <line> <stat>` — the general form of the first-N-innings
+  grammar, 400 markets
+
+**COST PAID, deliberately.** A 5-game MLB sim (`tip_off_window`, pks
+823098/823259/823989/824962/825042) plus a Serie A odds refresh were in flight
+and this deploy killed them. Accepted because the user asked for the deploy
+explicitly and both re-fire on their own schedule. The worker was also at
+`container_memory_pct_of_max: 99.5` with 19MB headroom and 12 processes, so
+the restart relieves an OOM risk rather than only costing one.
+
+**verify: TWO readings on the next `[kalshi_odds]` tick, and they differ.**
+
+1. `GAP series=KXNFL1QTOTAL reason=unreadable_title` should be GONE (all four
+   quarters). Those 640 markets are now priceable — `totals_q1..q4`.
+2. `GAP series=KXMLBINNINGTOTAL` should CHANGE REASON, not disappear:
+   `unreadable_title` -> `stat_not_in_market_vocabulary`, `detail='9th inning
+   runs'`. That is a reclassification, NOT a price. The board has no
+   single-inning total and this deploy does not invent one.
+
+Aggregate: `BOARD_JOIN reasons.unreadable_title` was 2,171-2,302 of 6,000
+across the 00:16-00:35Z ticks. It should fall by roughly 1,040 minus whatever
+the 400-cap already truncated. `matched` rising is the prize but is NOT
+promised here — the audit's own sequence is "fix the join, measure matched per
+family, then cancel", and the join is a separate defect (`matched=54 of 1,290`,
+then `0 of 617`).
