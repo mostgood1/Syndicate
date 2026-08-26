@@ -1167,9 +1167,20 @@ def _polymarket_us_slate_probe_at_boot() -> None:
                 flush=True,
             )
 
-        # THE JOINABLE SLATE. Boundary located rather than hardcoded: ids grow
-        # as the venue lists markets, so it moves daily.
-        slate = pm.fetch_game_markets(limit=500, max_pages=30)
+        # THE JOINABLE SLATE, swept whole -- there is no boundary to locate
+        # (`todo.md` #559). The budget MUST match the writer's, and this line
+        # is why: measured 2026-08-26T00:06:13Z, minutes after the sweep went
+        # live, this diagnostic still carried `max_pages=30` and printed
+        #
+        #     POLYMARKET_US_GAMES games=4674 rows=15000 pages=30 truncated=True
+        #
+        # while `persist_game_slate` -- the call that actually writes the
+        # artifact -- reported `count=17413 truncated=False` on the same boot.
+        # 30 pages sufficed only while the scan started at offset ~21,000; a
+        # sweep from 0 needs ~46. A diagnostic that under-reads its own subject
+        # by 73% is the failure this whole audit is about, one layer in: a
+        # number that looks like coverage and is a property of the reader.
+        slate = pm.fetch_game_markets(limit=500, max_pages=200)
         print(
             f"[live_odds_worker] POLYMARKET_US_GAMES status={slate.get('status')}"
             f" start_offset={slate.get('start_offset')}"
