@@ -99,6 +99,11 @@ REASON_GAME_LINES_DISABLED = "game_lines_disabled"
 # resolved game. Its own reason because it is the LAST guard before a bet
 # on the wrong team, and it must never be quietly folded into "no row".
 REASON_TEAM_SIDE_UNRESOLVED = "team_side_unresolved"
+# A board row sitting at one of the two lines a spread market can name, but
+# wearing the OTHER club. Counted by name rather than skipped: this is how many
+# Kalshi spreads describe a margin our board never wrote a row for, and a silent
+# `continue` here is exactly the shape `learnings.md` forbids.
+REASON_SPREAD_ORIENTATION = "spread_line_orientation_mismatch"
 # A market whose ticker carries no readable game date. Separated from every
 # other refusal because it is the ONLY one that would previously have been
 # silently mis-dated instead of refused.
@@ -497,6 +502,8 @@ def join_kalshi_to_board(
     Absent, the check is skipped rather than guessed at -- a caller that does
     not know the slate date should get the old behaviour, not a silent filter.
     """
+    from syndicate.features.shared.kalshi_catalogue import GRAMMAR_TEAM_SPREAD
+
     by_key: dict[tuple[str, str, float], list[Mapping[str, Any]]] = {}
     # A SECOND INDEX, keyed by GAME rather than by player. A game line has no
     # player to key on, so `by_key`'s (market, player, line) cannot reach it --
@@ -702,9 +709,43 @@ def join_kalshi_to_board(
             # `needs_event_mapping` even when the event HAD resolved, so 60
             # game lines a build were identified and then dropped -- the flag
             # bought measurement and nothing else.
-            game_rows = by_event.get(
-                (str(resolution.get("event_id") or ""), verdict["market"], verdict["line"])
+            # WHICH BOARD LINE DOES THIS KALSHI MARKET NAME?
+            #
+            # A TEAM SPREAD STATES A MARGIN, NOT A HANDICAP, AND THE TWO CARRY
+            # OPPOSITE SIGNS. "Texas wins by over 1.5 runs" is the board's
+            # `TEX -1.5`; the board writes that same game's other row as
+            # `CWS +1.5`. Keying this lookup on Kalshi's bare magnitude paired
+            # the market with `TEX +1.5` -- THE ROW FOR THE OPPOSITE BET --
+            # purely because 1.5 == 1.5.
+            #
+            # MEASURED 2026-08-26 against the live book: all 11 spread orders
+            # carrying a ticker named THE TEAM THEY WERE FADING (TEX +1.5 ->
+            # ...-TEX2, KC +1.5 -> ...-KC2), while every -1.5 row -- the one
+            # that genuinely corresponds to a "wins by over" market -- was
+            # stamped with no ticker at all. Nothing reached the venue only
+            # because `_side_to_kalshi` refuses `home`/`away` on spreads; that
+            # refusal was the last guard, not a gap to close.
+            #
+            # So both reachable rows are named explicitly, with the club each
+            # one must wear:
+            #     the NAMED club at -X  -> YES pays when it covers
+            #     the OTHER club at +X  -> NO pays when it does not
+            event_id = str(resolution.get("event_id") or "")
+            market_key = verdict["market"]
+            is_team_spread = (
+                verdict.get("grammar") == GRAMMAR_TEAM_SPREAD
+                and verdict.get("line") is not None
             )
+            if is_team_spread:
+                strike = float(verdict["line"])
+                wanted: tuple[tuple[Any, Any], ...] = ((-strike, True), (strike, False))
+            else:
+                wanted = ((verdict["line"], None),)
+
+            game_rows: list[tuple[Mapping[str, Any], Any, Any]] = []
+            for board_line, expect_named in wanted:
+                for candidate in by_event.get((event_id, market_key, board_line)) or ():
+                    game_rows.append((candidate, board_line, expect_named))
             if not game_rows:
                 _refuse(REASON_NO_BOARD_ROW)
                 continue
@@ -719,7 +760,7 @@ def join_kalshi_to_board(
             # on the grammar, and getting it wrong is a real bet on the
             # opposite outcome at a confident price.
             subject = verdict.get("subject")
-            for row in game_rows:
+            for row, board_line, expect_named in game_rows:
                 board_side = str(row.get("side") or "").strip().lower()
                 if subject:
                     # A TEAM-NAMED market: "Texas wins by over 3.5 runs" is YES
@@ -743,7 +784,15 @@ def join_kalshi_to_board(
                         continue
                     # YES pays when the NAMED club covers. So the board row for
                     # that club takes the yes quote, and the other side takes no.
-                    kalshi_side = "yes" if board_side == named else "no"
+                    is_named = board_side == named
+                    if expect_named is not None and is_named is not expect_named:
+                        # The right line wearing the wrong club: this market's
+                        # margin belongs to the other team, so our board never
+                        # wrote a row for it. REFUSED BY NAME -- pricing it here
+                        # is precisely the inversion this block exists to stop.
+                        _refuse(REASON_SPREAD_ORIENTATION)
+                        continue
+                    kalshi_side = "yes" if is_named else "no"
                 else:
                     # A TOTAL names no club, so the side is the direction the
                     # title already gave us.
@@ -766,7 +815,11 @@ def join_kalshi_to_board(
                         "market": verdict["market"],
                         "player_name": None,
                         "team": subject,
-                        "line": verdict["line"],
+                        # THE BOARD'S SIGNED LINE, not Kalshi's magnitude.
+                        # `_match_key` and `_row_key` must name the same bet;
+                        # storing the strike here would rebuild the +X/-X
+                        # collision inside the ticker resolver's index.
+                        "line": board_line,
                         "board_side": board_side,
                         "kalshi_side": kalshi_side,
                         "kalshi_american": kalshi_price,
