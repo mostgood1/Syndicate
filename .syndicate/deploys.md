@@ -31626,3 +31626,64 @@ classifier must stop implying a comparison it cannot make at all.
 **Nothing about the conclusion changes** — MLB is on a shard this account is not
 provisioned on, established at n=9 from the venue. This only fixes whether OUR
 logs can show the number.
+
+---
+
+## 2026-08-26 15:46Z · VERIFY PASSED — `market_shard=3`, read by our own client
+
+`2709a36b8` live 15:44:25Z. The pre-registered verify was *"next MLB rejection
+reads `market_shard=3 known_good_shards=[0]`"*:
+
+```
+15:46:52 LIVE_ORDER status=rejected venue=kalshi
+  ticker=KXMLBHRR-26AUG261310TBDET-DETHLEE50-2
+  venue_shard_not_provisioned: market_shard=3 known_good_shards=[0]
+15:46:54 LIVE_ORDER status=rejected venue=kalshi
+  ticker=KXMLBTOTAL-26AUG261940TEXCWS-8
+  venue_shard_not_provisioned: market_shard=3 known_good_shards=[0]
+```
+
+**This is the first time this system has read the shard itself.** Every prior
+statement about shard 3 came from a session with unproxied network access
+reading the raw payload; ours dropped the field in `normalize_market`. The
+number now agrees, independently, from our own client. syndicate-43's n=9
+finding is confirmed rather than merely relayed.
+
+**Read carefully — one line in the same window still says `None` and is NOT a
+contradiction.** `LIVE_LEDGER_ROW` at 15:45:26 replays the error STRING STORED
+on the row, and those rows were written at 15:32Z under the old code. The fresh
+`LIVE_ORDER` lines at 15:46 carry `3`. A stored message is a historical
+artifact, not a current reading — worth stating because two lines a minute
+apart appear to disagree and only one of them is a measurement.
+
+### The peer's WNBA alarm: refuted by production, not by argument
+
+Claimed: the guard *"is about to kill the only venue path that still works"* by
+refusing on `None not in [0]`. From the SAME 15:32:08Z cycle in which the
+classifier was rejecting MLB:
+
+```
+LIVE_PRICE ticker=KXWNBA3PT-26AUG26GSCONN-GSGWILLIAMS1-2 planned=0.39 live=0.39
+ORDER_PATH venue=kalshi status=ok positions=13
+  markets={... 'player_threes': {'would_build': 1} ...}
+```
+
+`would_build` on the WNBA row, no `venue_shard_not_provisioned` on any `KXWNBA*`
+ticker, and two WNBA orders sitting FILLED today (`KXWNBA3PT` @ 0.39,
+`KXWNBAPTS` @ 0.51). The MLB rows in that same line ALSO read `would_build` —
+they build fine and fail at the venue, which is exactly the signature of a
+post-hoc renamer.
+
+Structural proof taken before acting, from the AST rather than from reading:
+`_known_shards` is called only from `_classified`; `_classified` only from
+inside an `except` handler; the try-body is the submit itself. A successful
+submit never reaches it, and any other exception returns identity-unchanged.
+
+**`known_good_shards=[0]` is printed for a human. It is not evaluated as a
+condition anywhere.**
+
+### Status: this is now entirely a venue-side action
+
+Nothing further is fixable here. **Kalshi must enable this account on exchange
+shard 3.** `KALSHI_ORDER_KNOWN_SHARDS=0,3` keeps the log honest afterwards; it
+unblocks nothing, because nothing is blocked.
