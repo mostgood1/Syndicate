@@ -709,6 +709,12 @@ def fetch_order(order_id: Any) -> dict[str, Any]:
     return {"status": "ok", "order": order}
 
 
+# HOW MUCH OF THE ACCOUNT ONE READ SEES. Declared, not inferred: the
+# reconciler needs to know whether an orphan scan is even possible BEFORE it
+# decides whether a zero-candidate pass is worth a venue call.
+ORDER_READ_COVERAGE = "book"
+
+
 def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
     """Every recent order, one call.
 
@@ -773,7 +779,13 @@ def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
         )
     else:
         print("[kalshi_orders] ORDERS_READ n=0", flush=True)
-    return {"status": "ok", "orders": orders}
+    # COVERAGE, DECLARED BY THE READER. Kalshi lists the WHOLE book and
+    # ignores the ids it is handed, so a venue order absent from our ledger is
+    # visible here and nowhere else. `reconcile_live_orders` uses this to know
+    # whether `not_found=0` means "we agree with the venue" or only "we asked
+    # about what we already believed" -- two very different guarantees that
+    # were printing the same line.
+    return {"status": "ok", "orders": orders, "coverage": "book"}
 
 
 def _int_or_none(value: Any) -> int | None:

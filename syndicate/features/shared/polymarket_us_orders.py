@@ -611,6 +611,13 @@ def probe_order_list_routes(*, limit: int = 1) -> dict[str, Any]:
     return {"status": "ok", "routes": out}
 
 
+# PER-ORDER. `GET /v1/orders` answers `code: 12` UNIMPLEMENTED here, so one
+# read sees exactly the ids it was handed and never the account. An orphan scan
+# is impossible against this reader, and saying so up front is what stops a
+# zero-candidate pass from making a pointless call that 501s every cycle.
+ORDER_READ_COVERAGE = "per_order"
+
+
 def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) -> dict[str, Any]:
     """Every recent order, one call. Same contract as `kalshi_orders.fetch_orders`.
 
@@ -681,7 +688,19 @@ def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) ->
                 f" errors={errors[:2]}",
                 flush=True,
             )
-        return {"status": "ok", "orders": rows, "count": len(rows), "errors": errors}
+        # PER_ORDER, AND SAYING SO IS THE POINT. This branch reads exactly the
+        # ids it was handed, so the returned count can never exceed the asked
+        # count and an order that exists at Polymarket but not in our ledger is
+        # INVISIBLE to it -- which is precisely the case the write-ahead record
+        # exists for. Reporting `book` here would let a tautology
+        # (`venue_orders == candidates`) read as independent confirmation.
+        return {
+            "status": "ok",
+            "orders": rows,
+            "count": len(rows),
+            "errors": errors,
+            "coverage": "per_order",
+        }
 
     try:
         payload = signed_request("GET", _orders_list_url(limit))
@@ -742,7 +761,7 @@ def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) ->
             f" states={sorted({str(o.get('state') or o.get('status') or '') for o in orders})}",
             flush=True,
         )
-    return {"status": "ok", "orders": orders, "count": len(orders)}
+    return {"status": "ok", "orders": orders, "count": len(orders), "coverage": "book"}
 
 
 def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:

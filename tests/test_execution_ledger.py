@@ -546,9 +546,11 @@ def _reader(orders, *, ok: bool = True):
         # real signature rather than the one it wishes existed.
         if not ok:
             return {"status": "error", "reason": "KalshiAuthError: http_503"}
-        return {"status": "ok", "orders": list(orders)}
+        return {"status": "ok", "orders": list(orders), "coverage": "book"}
 
-    return fetch, venue_order_view
+    # THREE, not two: the coverage travels with the reader so a zero-candidate
+    # pass can know whether an orphan scan is even possible before it calls.
+    return fetch, venue_order_view, "book"
 
 
 def test_a_phantom_fill_is_corrected_to_submitted(monkeypatch):
@@ -1107,9 +1109,12 @@ def test_polymarket_has_a_venue_reader():
     # LIVE venues only -- paper orders never reconcile (the candidate filter
     # requires mode == LIVE), so a paper book needs no reader.
     for venue in ("polymarket", "kalshi"):
-        fetch, view = mod._venue_reader(venue)
+        fetch, view, coverage = mod._venue_reader(venue)
         assert fetch is not None, f"{venue} can be placed on but never reconciled"
         assert view is not None
+        # A reader that will not say how much of the account it sees makes
+        # `not_found=0` unreadable -- that is the whole point of the field.
+        assert coverage in {"book", "per_order"}, f"{venue} declares no read coverage"
 
 
 def test_every_venue_we_can_place_on_can_also_be_read():
@@ -1121,7 +1126,7 @@ def test_every_venue_we_can_place_on_can_also_be_read():
     for venue in ("kalshi", "polymarket"):
         if runner._venue_submitter(venue) is None:
             continue
-        fetch, _ = mod._venue_reader(venue)
+        fetch, _, _coverage = mod._venue_reader(venue)
         assert fetch is not None, f"{venue} has a submitter but no reader"
 
 
@@ -1291,7 +1296,9 @@ def test_a_fractional_fill_books_its_real_dollar_value(monkeypatch):
             "marketSlug": "tsc-mlb-tb-det-2026-08-25-7pt5",
         }]}
 
-    monkeypatch.setattr(mod, "_venue_reader", lambda venue: (fetch, venue_order_view))
+    monkeypatch.setattr(
+        mod, "_venue_reader", lambda venue: (fetch, venue_order_view, "book")
+    )
     mod.reconcile_live_orders(venue="polymarket")
 
     order = mod.find_order(key)
@@ -1473,3 +1480,105 @@ def test_the_two_bands_do_not_overlap():
     )
 
     assert _FILL_DOLLAR_TOLERANCE < _FILL_DOLLAR_ABSURD
+
+
+# ----------------------------------------------------------------------
+# ORPHANS: a position the venue holds and the ledger does not.
+# ----------------------------------------------------------------------
+
+
+def _orphan_env(monkeypatch, tmp_path, *, venue_rows, coverage, ledger_rows):
+    """One reconcile pass against a stubbed venue reader."""
+    import syndicate.features.shared.execution_ledger as el
+
+    monkeypatch.setattr(el, "_load", lambda: {"orders": list(ledger_rows)})
+    monkeypatch.setattr(el, "_persist", lambda state: None)
+
+    def _fetch(*, limit=100, order_ids=None):
+        return {"status": "ok", "orders": list(venue_rows), "coverage": coverage}
+
+    def _view(row):
+        return dict(row)
+
+    monkeypatch.setattr(el, "_venue_reader", lambda venue: (_fetch, _view, coverage))
+    return el
+
+
+def _ledger_row(key, **kw):
+    row = {
+        "idempotency_key": key,
+        "mode": "live",
+        "status": "submitted",
+        "outcome": None,
+        "venue": "kalshi",
+        "requested_stake_dollars": 5.0,
+    }
+    row.update(kw)
+    return row
+
+
+def test_a_venue_order_with_no_ledger_row_is_reported_as_an_orphan(monkeypatch, tmp_path, capsys):
+    """The mirror of `not_found`, and the one that is real money.
+
+    Everything the reconciler does walks OUR rows outward. An order live at the
+    venue with no row here is invisible to that direction -- and it is exactly
+    what a lost submit response leaves behind.
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="book",
+        venue_rows=[
+            {"client_order_id": "ours", "order_id": "v1", "state": "resting", "ticker": "T-OURS"},
+            {"client_order_id": "theirs", "order_id": "v2", "state": "resting", "ticker": "T-ORPHAN"},
+        ],
+        ledger_rows=[_ledger_row("ours", venue_order_id="v1")],
+    )
+    out = el.reconcile_live_orders(venue="kalshi")
+    assert out["coverage"] == "book"
+    assert [o["ticker"] for o in out["orphans"]] == ["T-ORPHAN"]
+    printed = capsys.readouterr().out
+    # THE TICKER, not just a count. An orphan you cannot name is not actionable.
+    assert "RECONCILE_ORPHANS" in printed and "T-ORPHAN" in printed
+
+
+def test_a_filled_ledger_row_is_not_an_orphan_just_because_it_stopped_being_a_candidate(
+    monkeypatch, tmp_path
+):
+    """Orphans are diffed against the WHOLE live ledger, not the candidates.
+
+    A settled order is legitimately still in the venue's book. Diffing against
+    the candidate list would report every graded bet as an unknown position and
+    bury the one row that matters.
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="book",
+        venue_rows=[{"client_order_id": "graded", "order_id": "v9", "state": "filled", "ticker": "T-DONE"}],
+        ledger_rows=[_ledger_row("graded", status="filled", outcome="won", venue_order_id="v9")],
+    )
+    out = el.reconcile_live_orders(venue="kalshi")
+    # Not a candidate (it has an outcome) and NOT an orphan either.
+    assert out["candidates"] == 0
+    assert out["orphans"] in (None, [])
+
+
+def test_a_per_order_read_reports_orphans_as_unknown_rather_than_zero(monkeypatch, tmp_path):
+    """`0` would be a lie. Polymarket's reader fetches only the ids we hand it.
+
+    `GET /v1/orders` answers `code: 12` UNIMPLEMENTED there, so `venue_orders ==
+    candidates` is a tautology and an orphan count from it would be a false
+    assurance -- the exact shape of "an empty result mistaken for an answer".
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="per_order",
+        venue_rows=[{"client_order_id": "ours", "order_id": "v1", "state": "resting"}],
+        ledger_rows=[_ledger_row("ours", venue="polymarket_us", venue_order_id="v1")],
+    )
+    out = el.reconcile_live_orders(venue="polymarket")
+    assert out["coverage"] == "per_order"
+    # None, NOT []. "We cannot see orphans" is not "we looked and found none".
+    assert out["orphans"] is None
