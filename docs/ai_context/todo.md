@@ -1,5 +1,52 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#571` — **`test_polymarket_side_vocabulary` asserts a key set the source stopped producing. Recorded as baseline debt, NOT fixed — because the widened keys may be a mis-join risk, not just a stale expectation.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+Found while regenerating `tests/pytest_baseline.json` (`#569` work). Two tests
+fail and **reproduce standalone**, so they are real, not parallel-run flakes:
+
+```
+tests/test_polymarket_side_vocabulary.py::test_the_board_row_derives_the_SAME_key_from_its_own_teams
+  expected ["mlb|h2h|home", "mlb|h2h|arizona diamondbacks"]
+  got      ... + "mlb|h2h|arizona"            (2 extra keys)
+
+tests/test_polymarket_side_vocabulary.py::test_an_unresolvable_club_adds_NO_second_key
+  expected ["mlb|h2h|home"]
+  got      ... + "mlb|h2h|club", "mlb|h2h|real"   (4 extra keys)
+```
+
+**Attribution.** `_candidate_keys` lives in
+`syndicate/features/shared/venue_quote_fanin.py:523` and was last changed by
+`0acabd091` — *"Kalshi offered every game line under a side the board never asks
+for"* — at **2026-08-25 22:06:54Z**. The test file was last touched at
+**20:17:32Z**, an hour and a half EARLIER. So the source deliberately widened key
+derivation and the test was left asserting the narrow set. Same shape as `#564`
+(the freshness test): a fix shipped without updating the test that pinned the
+old behaviour.
+
+**WHY THIS IS NOT JUST "UPDATE THE EXPECTATIONS".** The second test's name is
+the argument: `test_an_unresolvable_club_adds_NO_second_key`. It exists to
+assert that an unresolvable club name does **not** manufacture extra join keys —
+and the source now emits `mlb|h2h|club` and `mlb|h2h|real` from the words of
+"Real Club ...". Widening keys to help **Kalshi** match may be correct for
+Kalshi and wrong here: `_candidate_keys` is SHARED across venues via
+`venue_quote_fanin`, and a bare token like `real` or `club` can collide with a
+different fixture's team. A wrong join is a quote attached to the wrong game,
+which is the `#559`-class defect this repo keeps paying for.
+
+So the test may be **right and the source wrong for the Polymarket path**, or
+the test may be stale. Rewriting the assertions to match current output would
+settle that by fiat, in the direction that makes CI quiet — the worst available
+tiebreaker. **Whoever owns `0acabd091` should say which behaviour was intended.**
+
+**Recorded, not hidden.** Both are now in `tests/pytest_baseline.json` as known
+failures. That is what the baseline is for — *"the existing debt stays visible as
+a number in a file rather than as a red check nobody reads"* — and it is
+explicitly NOT an endorsement. The gate will fail the moment either starts
+passing, which is the prompt to close this item.
+
+---
+
 ### `#570` — **The pytest suite writes into git-tracked `data/`. Every full-suite run dirties the working tree, and the stray lines look like recorded production data.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
 
 **Observed three times in one session**, each time after starting a full-suite
