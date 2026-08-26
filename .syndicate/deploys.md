@@ -31005,3 +31005,45 @@ next hypothesis. That is the whole discipline `#567` exists to enforce.
 
 **Read a COLD build, not a warm one.** The warm build runs 167s against the cold
 build's 748s, so a warm sample will show small spans and prove nothing.
+
+### The 05:07 deploy shipped a BROKEN instrument. Caught in 5 minutes by its own verify.
+
+    05:10:44.335843  BUILD_SPAN_ENTER stage=build_intelligence_overview date=2026-08-26
+    05:10:44.335853  BUILD_SPAN_EXIT  stage=build_intelligence_overview elapsed_s=0.0
+    05:11:01.168     SPORT_LOOP_ENTER sport=mlb          <- 17s AFTER the span closed
+
+**I wrapped the wrong branch, and the code says so in a comment I read past:**
+
+    if not summary_parts:
+        # refresh-worker never has self._app set (see
+        # start_intelligence_state_background_loop in
+        # scripts/run_refresh_worker.py, no app passed), so this branch runs
+        # on every worker cycle.
+
+The span covered `if self._app is not None:` — never true on the refresh-worker
+— and closed before the fallback branch that actually does the work. So it
+reported **0.0 seconds for the most expensive stage in the build**.
+
+**AN INSTRUMENT REPORTING 0.0 IS WORSE THAN NO INSTRUMENT, because 0.0 looks
+like an answer.** Had this not been checked against a live build, the next
+reader would have concluded the overview was free and gone hunting elsewhere —
+which is precisely the class of wrong turn `#567` exists to prevent, committed
+by the item meant to prevent it.
+
+**Caught by the pre-registered verify**, written before the deploy: *"If the
+overview span comes back SMALL, this instrumentation was aimed wrong — SAY THAT
+rather than reaching for the next hypothesis."* It came back small. It was
+aimed wrong.
+
+**MY TESTS DID NOT CATCH IT AND ONE OF THEM LOOKED LIKE IT SHOULD HAVE.**
+`test_every_opened_span_is_also_closed` passed the whole time: both ENTER and
+EXIT existed, correctly paired, in the right order. **Pairing is not the
+property that matters — ENCLOSURE is.** New test
+`test_every_overview_call_is_actually_inside_the_span_that_claims_to_time_it`
+asserts every `build_intelligence_overview` call site sits BETWEEN the ENTER and
+the EXIT, and is mutation-checked by reintroducing the exact shipped bug and
+confirming it turns red.
+
+**FIX:** the span now closes after BOTH branches, so the reading no longer
+depends on which service is running it. The list-fallbacks are inside it on
+purpose — they re-consume rows the stage produced, so their cost is its cost.

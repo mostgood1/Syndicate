@@ -122,3 +122,41 @@ def test_the_per_sport_history_report_survives_having_nothing_to_report():
     assert sorted(empty.items(), key=lambda kv: kv[1], reverse=True) == []
     assert " ".join(f"{k}={v}" for k, v in empty.items()) == ""
     assert round(sum(empty.values()), 2) == 0
+
+
+def test_every_overview_call_is_actually_inside_the_span_that_claims_to_time_it():
+    """THE BUG `test_every_opened_span_is_also_closed` COULD NOT SEE.
+
+    The first deployed version of this span wrapped only the
+    `self._app is not None` branch and closed BEFORE the
+    `if not summary_parts:` fallback -- which is the branch that actually runs
+    on the refresh-worker, as that branch's own comment has said all along:
+    "refresh-worker never has self._app set ... so this branch runs on every
+    worker cycle."
+
+    Both ENTER and EXIT existed, so the pairing test above passed. Production
+    then reported `elapsed_s=0.0` for the most expensive stage in the build
+    while the sport loop ran 17 seconds after the EXIT. **An instrument
+    reporting 0.0 is worse than no instrument, because 0.0 looks like an
+    answer.** Pairing is not enough; ENCLOSURE is the property that matters.
+    """
+    source = inspect.getsource(intelligence_state.IntelligenceStateService._build_candidate_pool)
+
+    start = source.index('_build_span_enter("build_intelligence_overview"')
+    end = source.index('_build_span_exit("build_intelligence_overview"')
+    assert start < end, "the overview span closes before it opens"
+
+    call = '"data_ingestion", build_intelligence_overview,'
+    total = source.count(call)
+    inside = source[start:end].count(call)
+
+    assert total >= 2, (
+        "expected both the app-context branch and the worker fallback branch; "
+        "if this method was refactored, re-check that the span still encloses "
+        "whatever replaced them"
+    )
+    assert inside == total, (
+        f"{total - inside} of {total} build_intelligence_overview call(s) sit OUTSIDE "
+        "the span timing them -- the span will report 0.0 on whichever service "
+        "takes the uncovered branch"
+    )

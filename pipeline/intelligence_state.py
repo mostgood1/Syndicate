@@ -4854,6 +4854,18 @@ class IntelligenceStateService:
         # collector -- so this stage has been timed all along and read by nobody.
         # For scale: all eight sports' candidate GENERATION is 47s of that same
         # build. Anyone optimising generation is optimising 6% of the function.
+        #
+        # THE SPAN MUST ENCLOSE **BOTH** BRANCHES BELOW, and the first version of
+        # it did not. It wrapped only the `self._app is not None` branch and
+        # closed before the `if not summary_parts:` fallback -- which is the
+        # branch that actually runs here, as the comment on it has said all
+        # along: "refresh-worker never has self._app set ... so this branch runs
+        # on every worker cycle." Deployed 05:09:45Z and it read
+        # `elapsed_s=0.0` while the sport loop ran 17 seconds LATER, outside the
+        # span. An instrument reporting 0.0 for the most expensive stage in the
+        # function is worse than no instrument, because 0.0 looks like an answer.
+        # Closing after both branches is what makes the reading independent of
+        # which service is running it.
         _overview_mark = _build_span_enter("build_intelligence_overview", selected_date)
         if self._app is not None:
             try:
@@ -4865,10 +4877,6 @@ class IntelligenceStateService:
             except RuntimeError:
                 summary_parts.clear()
                 returned = None
-        # Closed here rather than after the list-fallback below: the fallback is
-        # a re-read of rows this call already produced, and folding it in would
-        # attribute its cost to the overview.
-        _build_span_exit("build_intelligence_overview", _overview_mark)
         if not summary_parts and isinstance(returned, list) and returned:
             print(
                 f"[intelligence_state] OVERVIEW_STREAM_FELL_BACK_TO_LIST sports={len(returned)}",
@@ -4896,6 +4904,10 @@ class IntelligenceStateService:
                     if isinstance(_row, Mapping):
                         _consume_sport(dict(_row))
             returned = None
+        # Closed only HERE, after every branch that can build the overview. The
+        # list-fallbacks are inside the span on purpose: they re-consume rows
+        # this stage produced, so their cost is the overview's cost.
+        _build_span_exit("build_intelligence_overview", _overview_mark)
         # `overview` is deliberately NOT rebound to the rows. Anything below
         # that still needs the whole list is a bug this cutover must surface,
         # not paper over.
