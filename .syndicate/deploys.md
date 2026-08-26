@@ -32239,3 +32239,45 @@ different `line` was observed more recently.
 **ALSO SEEN, unattributed:** `SWEEP_SKIPPED_DETAIL
 too_large=[mlb_source/tracking/book_quotes/2026-08-26.jsonl(18052118)]` — the
 MLB quote log is 18MB and being skipped by a sweep.
+
+## 2026-08-26 18:58:07Z — refresh-worker `fed2f935` (PR #97, `#569` cause classifier)
+
+Off-protocol as all day: no `RENDER_API_KEY`, proxy 403s `api.render.com`.
+Render MCP, on explicit user direction ("run the key-level dump").
+
+**I DEPLOYED ANOTHER LANE'S COMMIT, and it should be said plainly.** I triggered
+after merging PR #97 (`bf7b6136`), but the deploy takes `main`'s TIP, and between
+my merge and the trigger another lane pushed **`fed2f935` "Soccer settlement:
+league DISCOVERY was filesystem while the READ is keyvalue"**. Verified
+`bf7b6136` IS an ancestor of the deployed SHA, so my change shipped — but so did
+theirs, and I did not ask them. Not a mistake in mechanism (deploying main's tip
+is the rule, and the alternative is deploying off-main, which is forbidden and
+worse) but the owning lane did not choose this moment. If it needed to wait,
+this is where it stopped waiting.
+
+### Why this needed a deploy at all
+
+**The key-level dump CANNOT be run from this session.** The state file lives on
+Render's mounted disk; `data/mlb_source/tracking/book_quotes/` **does not exist
+in this checkout at all** (verified, not assumed), and the ops endpoint is 403 at
+the proxy. So the analysis had to become telemetry that runs where the data is.
+That is the fix for the constraint, not a workaround for it.
+
+verify: `STALE_ROW_CAUSE <sport>[stale=N worst=Ns orphaned_line=n,market_gone=n]`
+
+    orphaned_line dominant  -> the GRID is serving superseded lines.
+                               drop_superseded_lines has a hole. Our bug.
+    market_gone   dominant  -> the FEED stopped quoting those markets.
+                               No fresher sibling exists, so that relative guard
+                               correctly drops nothing. Upstream, and the
+                               14-hour ceiling is the only thing bounding it.
+
+**Expect the two sports to disagree**, and that is the point of splitting them:
+wnba's sidecar is not written at all (`wrote=False`), so its rows should read
+`market_gone` for a reason that is really "we stopped looking", while mlb's
+sidecar IS written (`wrote=True`, 30s) so mlb is the genuine test of the
+orphaned-key mechanism.
+
+**An `unknown_*` label is a real outcome, not a failure to report.** Every branch
+that cannot decide says which branch it was rather than defaulting into
+`market_gone` — the guess is what would get quoted back.
