@@ -1,0 +1,229 @@
+diff --git a/syndicate/features/shared/kalshi_orders.py b/syndicate/features/shared/kalshi_orders.py
+index 96431e150..978b3fe0e 100644
+--- a/syndicate/features/shared/kalshi_orders.py
++++ b/syndicate/features/shared/kalshi_orders.py
+@@ -52,6 +52,7 @@ purpose.
+ from __future__ import annotations
+ 
+ import math
++import re
+ import os
+ from collections.abc import Mapping
+ from typing import Any
+@@ -128,7 +129,65 @@ _TEAM_SIDED_MARKETS = frozenset({"h2h", "h2h_h1", "h2h_h2", "h2h_q1", "h2h_q2",
+                                  "h2h_q3", "h2h_q4", "h2h_p1", "h2h_p2", "h2h_p3"})
+ 
+ 
+-def _side_to_kalshi(side: Any, market: Any = None) -> str:
++# Markets whose ticker NAMES ONE TEAM and offers both legs on it. The moneyline
++# family plus spreads, confirmed against the live venue 2026-08-26.
++_TEAM_TICKER_MARKETS = _TEAM_SIDED_MARKETS | {"spreads", "spread", "run_line", "puck_line"}
++
++# `26AUG261907` -- two-digit year, three-letter month, two-day, four-digit time.
++# The club codes are whatever follows, concatenated away-then-home.
++_EVENT_DATE_PREFIX = re.compile(r"^\d{2}[A-Z]{3}\d{2}(?:\d{4})?", re.IGNORECASE)
++
++
++def _ticker_team_is_home(venue_ticker: Any) -> bool | None:
++    """Is the team named in this ticker the HOME team? None if unreadable.
++
++    ------------------------------------------------------------------
++    THE VENUE HAS NO HOME/AWAY AXIS. IT NAMES A TEAM.
++    ------------------------------------------------------------------
++
++    Measured from the live venue 2026-08-26 (event `KXMLBSPREAD-26AUG261907KCTOR`,
++    KC @ TOR) -- SIX markets, both teams times three strikes:
++
++        KXMLBSPREAD-...-KC2   floor_strike 1.5   "Kansas City wins by over 1.5"
++        KXMLBSPREAD-...-TOR2  floor_strike 1.5   "Toronto wins by over 1.5"
++        ... -KC3/-TOR3 at 2.5, -KC4/-TOR4 at 3.5
++
++    So `home`/`away` is not a thing to MAP -- it is a thing to RESOLVE against
++    the ticker. Our team is the one the ticker names (`yes`) or the other one
++    (`no`): TOR +1.5 is NO on `-KC2`, because KC failing to win by more than 1.5
++    IS Toronto +1.5.
++
++    `yes_sub_title == no_sub_title` on these markets, so the side CANNOT be read
++    from the sub-title -- it does not discriminate. The ticker suffix is the
++    only signal, which is why this reads the suffix and nothing else.
++
++    EXACTLY ONE OF THE TWO TESTS MUST HOLD. A code that both starts and ends the
++    pair, or neither, is a string we do not understand, and guessing which team
++    we just bought is the most expensive mistake available in this file -- it
++    buys the OPPONENT at a price that looked right. `None` means refuse.
++    """
++    text = str(venue_ticker or "").strip().upper()
++    parts = text.split("-")
++    if len(parts) < 3:
++        return None
++    event, suffix = parts[1], parts[2]
++    # Strip the trailing strike digits: `KC2` -> `KC`, `TOR` -> `TOR`.
++    team = suffix.rstrip("0123456789")
++    if not team:
++        return None
++    stripped = _EVENT_DATE_PREFIX.sub("", event)
++    if not stripped or team not in stripped:
++        return None
++    starts = stripped.startswith(team)
++    ends = stripped.endswith(team)
++    if starts == ends:
++        # Both or neither. Both would need a team to play itself; neither means
++        # the pair is not two concatenated codes. Either way we cannot say.
++        return None
++    return ends
++
++
++def _side_to_kalshi(side: Any, market: Any = None, venue_ticker: Any = None) -> str:
+     """Our `over`/`under`/`yes`/`no`/`home`/`away` -> Kalshi's `yes`/`no`.
+ 
+     Explicit, and it REFUSES an unmapped side. Defaulting to `yes` would turn an
+@@ -158,8 +217,23 @@ def _side_to_kalshi(side: Any, market: Any = None) -> str:
+         return "yes"
+     if raw in {"no", "under"}:
+         return "no"
+-    if raw in {"home", "away"} and str(market or "").strip().lower() in _TEAM_SIDED_MARKETS:
+-        return "yes"
++    if raw in {"home", "away"}:
++        name = str(market or "").strip().lower()
++        if name in _TEAM_SIDED_MARKETS and venue_ticker is None:
++            # The moneyline case as it stood: `kalshi_board_join` stamps the
++            # ticker of the team the side names, so the leg is always YES. Kept
++            # for callers that pass no ticker.
++            return "yes"
++        if name in _TEAM_TICKER_MARKETS:
++            ticker_is_home = _ticker_team_is_home(venue_ticker)
++            if ticker_is_home is None:
++                # NAMED, not defaulted. `unmappable_side` said the vocabulary
++                # was missing; the vocabulary was never the problem. This says
++                # the TICKER could not be read, which is a different fix.
++                raise OrderBuildError(
++                    f"ticker_team_unreadable: {venue_ticker!r} side={side!r} market={market!r}"
++                )
++            return "yes" if (raw == "home") == ticker_is_home else "no"
+     raise OrderBuildError(f"unmappable_side: {side!r} market={market!r}")
+ 
+ 
+@@ -176,7 +250,9 @@ def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str,
+         # means deriving it from a catalogue that may have moved since we priced.
+         raise OrderBuildError("no_venue_ticker")
+ 
+-    side = _side_to_kalshi(getattr(request, "side", None), getattr(request, "market", None))
++    side = _side_to_kalshi(
++        getattr(request, "side", None), getattr(request, "market", None), ticker
++    )
+     price = price_dollars
+     if price is None:
+         raise OrderBuildError("no_price_dollars")
+@@ -399,7 +475,7 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
+     #    equivalent to buying NO at 1 - price, but this endpoint quotes
+     #    everything from the YES side.)"
+     contract_side = _side_to_kalshi(
+-        getattr(request, "side", None), getattr(request, "market", None)
++        getattr(request, "side", None), getattr(request, "market", None), ticker
+     )
+     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
+ 
+diff --git a/tests/test_kalshi_orders.py b/tests/test_kalshi_orders.py
+index de71aedf6..66a524f9b 100644
+--- a/tests/test_kalshi_orders.py
++++ b/tests/test_kalshi_orders.py
+@@ -837,10 +837,23 @@ def test_a_team_side_on_a_NON_team_ticker_still_refuses():
+     """
+     from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+ 
+-    for market in ("totals", "totals_alt", "spreads", "batter_hits", None, ""):
++    # `spreads` moved OUT of this list on 2026-08-26: the venue lists one
++    # spread market per team (`-KC2` / `-TOR2`), so it IS team-ticketed and now
++    # resolves against the ticker. Everything here still encodes a STRIKE.
++    for market in ("totals", "totals_alt", "batter_hits", None, ""):
+         with pytest.raises(orders.OrderBuildError, match="unmappable_side"):
+             _side_to_kalshi("home", market)
+ 
++    # A spread with NO TICKER TO READ still refuses -- and that is the property
++    # this test exists for. The reason is now more precise (the vocabulary was
++    # never missing; the ticker was unreadable), but the safety is identical:
++    # a team side is never resolved by guessing.
++    with pytest.raises(orders.OrderBuildError, match="ticker_team_unreadable"):
++        _side_to_kalshi("home", "spreads")
++    # ...and a ticker whose team is not one of the two in the event.
++    with pytest.raises(orders.OrderBuildError, match="ticker_team_unreadable"):
++        _side_to_kalshi("home", "spreads", "KXMLBSPREAD-26AUG261907KCTOR-XYZ2")
++
+ 
+ def test_the_direction_sides_are_untouched_by_the_moneyline_path():
+     """over/under must keep mapping exactly as before -- the moneyline rule is
+@@ -975,3 +988,74 @@ def test_the_subaccount_is_omitted_by_default_and_restorable_without_a_deploy(mo
+     # index: a garbled override is not a request for the value under suspicion.
+     monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "primary")
+     assert "subaccount" not in build_order_body(_req(), price_dollars=0.56)
++
++
++def test_a_team_spread_resolves_against_the_ticker_not_a_home_away_vocabulary():
++    """MEASURED AT THE VENUE 2026-08-26, event `KXMLBSPREAD-26AUG261907KCTOR`.
++
++    Six markets, both teams times three strikes, all `strike_type: greater`:
++
++        -KC2  floor_strike 1.5  "Kansas City wins by over 1.5 runs?"
++        -TOR2 floor_strike 1.5  "Toronto wins by over 1.5 runs?"
++        -KC3/-TOR3 at 2.5, -KC4/-TOR4 at 3.5
++
++    So `unmappable_side: 'away' market='spreads'` -- 11 orders/cycle -- was
++    never a missing vocabulary entry. THE VENUE HAS NO HOME/AWAY AXIS. It names
++    a team, and our side is `yes` on our team's contract or `no` on the
++    opponent's.
++
++    `yes_sub_title == no_sub_title` on these markets, so the side cannot be read
++    from the sub-title; the ticker suffix is the only signal.
++    """
++    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
++
++    KC2 = "KXMLBSPREAD-26AUG261907KCTOR-KC2"
++    TOR2 = "KXMLBSPREAD-26AUG261907KCTOR-TOR2"
++
++    # KC is AWAY (first code in `KCTOR`). "KC -1.5" is YES on the KC contract.
++    assert _side_to_kalshi("away", "spreads", KC2) == "yes"
++    # "TOR +1.5" is NO on the SAME contract -- KC failing to win by more than
++    # 1.5 IS Toronto +1.5. This is the row that used to refuse.
++    assert _side_to_kalshi("home", "spreads", KC2) == "no"
++    # And "TOR -1.5" is YES on Toronto's own contract.
++    assert _side_to_kalshi("home", "spreads", TOR2) == "yes"
++    assert _side_to_kalshi("away", "spreads", TOR2) == "no"
++
++
++def test_the_moneyline_resolves_by_the_same_rule_and_keeps_its_old_answer():
++    """H2H has the identical shape -- `KXMLBGAME-...-KC` / `-TOR`, two markets.
++
++    The old code returned `yes` unconditionally because the board join stamps
++    OUR team's ticker. That stays true, so the answer must not change for a
++    correctly stamped row -- but it is now DERIVED rather than assumed, which is
++    what makes a mis-stamped ticker fail loudly instead of buying the opponent.
++    """
++    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
++
++    assert _side_to_kalshi("away", "h2h", "KXMLBGAME-26AUG261907KCTOR-KC") == "yes"
++    assert _side_to_kalshi("home", "h2h", "KXMLBGAME-26AUG261907KCTOR-TOR") == "yes"
++    # The mis-stamp that used to be invisible: our HOME side on the AWAY team's
++    # contract is a NO, not a YES.
++    assert _side_to_kalshi("home", "h2h", "KXMLBGAME-26AUG261907KCTOR-KC") == "no"
++    # No ticker at all keeps the old behaviour for callers that pass none.
++    assert _side_to_kalshi("home", "h2h") == "yes"
++
++
++def test_the_real_failing_spread_rows_from_production_now_resolve():
++    """The exact tickers that logged `unmappable_side` on 2026-08-26."""
++    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
++
++    cases = [
++        ("away", "KXMLBSPREAD-26AUG261845COLWSH-COL2", "yes"),   # COL @ WSH
++        ("away", "KXMLBSPREAD-26AUG261940TEXCWS-TEX2", "yes"),   # TEX @ CWS
++        ("away", "KXMLBSPREAD-26AUG261610PITSD-PIT2", "yes"),    # PIT @ SD
++        ("home", "KXMLBSPREAD-26AUG261310TBDET-DET2", "yes"),    # TB @ DET
++        ("home", "KXMLBSPREAD-26AUG261540CHCAZ-AZ2", "yes"),     # CHC @ AZ
++        ("away", "KXMLBSPREAD-26AUG261907KCTOR-KC2", "yes"),     # KC @ TOR
++        ("home", "KXMLBSPREAD-26AUG261915LADATL-ATL2", "yes"),   # LAD @ ATL
++        ("away", "KXMLBSPREAD-26AUG261945BALSTL-BAL2", "yes"),   # BAL @ STL
++        ("away", "KXMLBSPREAD-26AUG261905HOUNYY-HOU2", "yes"),   # HOU @ NYY
++        ("away", "KXMLBSPREAD-26AUG261545CINSF-CIN2", "yes"),    # CIN @ SF
++    ]
++    for side, ticker, expected in cases:
++        assert _side_to_kalshi(side, "spreads", ticker) == expected, ticker

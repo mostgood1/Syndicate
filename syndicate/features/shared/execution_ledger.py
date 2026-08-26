@@ -135,8 +135,8 @@ _LEAN_FIELDS = (
     # thing we buy could differ with nothing recording that they did.
     "venue_ticker",
     # HOW THE BET ACTUALLY WENT. Distinct from `status` (what the ORDER did at
-    # the venue) and from `settled_at` (when the ORDER reached a terminal state,
-    # stamped seconds after a paper fill and hours before the game ends).
+    # the venue) and from `venue_resolved_at` (when the SUBMIT resolved --
+    # stamped ~400ms after submitting, hours before the game ends).
     # Conflating those two is the reason `settled_count` read 0 while orders
     # were filling normally: nothing had ever graded a WAGER.
     "outcome",
@@ -150,6 +150,24 @@ _LEAN_FIELDS = (
     "fill_price",
     "fill_stake_dollars",
     "fees_dollars",
+    # WHEN THE SUBMIT RESOLVED -- the write-ahead record being closed with a
+    # venue response. NOT when the bet was decided. Grading is `outcome` +
+    # `graded_at`, and `paper_settlement` exists because that distinction was
+    # lost once already ("`settled_count` has been 0 for as long as it has been
+    # reported ... Nobody had written the grader").
+    "venue_resolved_at",
+    # DEPRECATED MIRROR of `venue_resolved_at`, kept only so stored rows and any
+    # outside reader keep working. NOTHING IN THIS REPO READS IT -- verified by
+    # grep 2026-08-26 -- and its sole measurable effect has been to mislead: a
+    # peer session reading `settled_at` populated 400ms after `submitted_at` on
+    # four OPEN orders reasonably concluded settlement was being faked, and
+    # proposed it as the root cause of positions not reconciling. It was not; a
+    # settlement sweep cannot be fooled by a field it never reads
+    # (`settle_orders` keys on `outcome` and `status == "filled"`).
+    #
+    # A name that needs a warning in two module docstrings to defuse, and still
+    # catches a careful reader with the source open, is not a documentation
+    # problem. Write both, read neither, retire the liar.
     "settled_at",
     "venue_order_id",
     "error",
@@ -367,6 +385,7 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         # "no fee" -- the same reason `outcome` is None rather than absent.
         # Filled in by reconciliation from the venue's own charge.
         "fees_dollars": None,
+        "venue_resolved_at": None,
         "settled_at": None,
         "venue_order_id": None,
         "error": None,
@@ -396,7 +415,11 @@ def complete_order(
         order["fill_stake_dollars"] = fill_stake_dollars
         order["venue_order_id"] = venue_order_id
         order["error"] = error
-        order["settled_at"] = _utc_now()
+        # BOTH, for now. The new name is the true one; the old is a mirror so
+        # no stored row or outside consumer changes shape under them.
+        resolved_at = _utc_now()
+        order["venue_resolved_at"] = resolved_at
+        order["settled_at"] = resolved_at
         updated = dict(order)
         break
     if updated is not None:
