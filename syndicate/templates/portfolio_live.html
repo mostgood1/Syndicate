@@ -248,5 +248,67 @@
       </tbody>
     </table>
   {% endif %}
+
+  {# ---------------------------------------------------------------------
+     THE PIVOTS. [USER DECISION 2026-08-25] daily, monthly, yearly.
+
+     Built from the WHOLE live book, not the filtered table above -- the
+     `?show=` toggle changes what is displayed, never what is counted, so
+     these numbers are quotable regardless of how the page is set.
+
+     Pivoted on the SLATE date, not the submit stamp: a 9pm Central first
+     pitch is already tomorrow in UTC, so keying on the stamp would split one
+     evening across two rows.
+     --------------------------------------------------------------------- #}
+  {% set P = L.periods or {} %}
+  {% if P.get('by_day') %}
+    {% set view = request.args.get('period', 'day') %}
+    {% set rows = P.get('by_' ~ view) or P.get('by_day') %}
+    <section class="live-periods">
+      <div class="live-periods__head">
+        <h2>Performance</h2>
+        <nav class="live-periods__tabs">
+          {% for tab in ['day', 'month', 'year'] %}
+            {% if tab == view %}
+              <span class="is-active">{{ tab }}</span>
+            {% else %}
+              <a href="?date={{ L.selected_date }}{% if L.show_all %}&amp;show=all{% endif %}&amp;period={{ tab }}">{{ tab }}</a>
+            {% endif %}
+          {% endfor %}
+        </nav>
+      </div>
+      {% if P.get('undated') %}
+        {# A pivot quietly missing bets says so, rather than just being short. #}
+        <div class="live-periods__note">
+          {{ P.get('undated') }} order(s) have no readable slate date and are not in these totals.
+        </div>
+      {% endif %}
+      <table class="live-table">
+        <thead>
+          <tr><th>{{ view|capitalize }}</th><th>Orders</th><th>Open</th><th>Settled</th>
+              <th>W-L-P</th><th>Staked</th><th>P&amp;L</th><th>ROI</th><th>Win%</th></tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.key }}</td>
+              <td>{{ r.orders }}</td>
+              <td>{{ r.pending }}</td>
+              <td>{{ r.settled }}</td>
+              <td>{{ r.won }}-{{ r.lost }}-{{ r.push }}</td>
+              <td>${{ "%.2f"|format(r.staked_dollars) }}</td>
+              <td class="{% if r.pnl_dollars > 0 %}is-up{% elif r.pnl_dollars < 0 %}is-down{% endif %}">
+                ${{ "%.2f"|format(r.pnl_dollars) }}
+              </td>
+              {# None, never 0.0%: nothing graded and break-even are opposite
+                 facts that format identically. #}
+              <td>{% if r.roi_pct is not none %}{{ "%.1f"|format(r.roi_pct) }}%{% else %}&mdash;{% endif %}</td>
+              <td>{% if r.win_pct is not none %}{{ "%.1f"|format(r.win_pct) }}%{% else %}&mdash;{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
 </main>
 {% endblock %}

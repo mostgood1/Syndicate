@@ -480,3 +480,56 @@ def test_the_page_and_the_cap_agree_on_what_is_not_a_position(monkeypatch):
     timed_out = _live_order("failed", "ReadTimeout")
     assert _is_non_position(timed_out) is False
     assert _is_venue_refusal(timed_out) is False
+
+
+# ---------------------------------------------------------------------------
+# THE PIVOTS. [USER DECISION 2026-08-25] daily, monthly, yearly views.
+#
+# REACHABILITY FIRST, per this repo's own standard: a rollup that computes
+# correctly and never reaches the page is indistinguishable from one that was
+# never built, at every level except looking at it.
+# ---------------------------------------------------------------------------
+
+
+def test_the_period_pivot_reaches_the_page(app_client, live_env):
+    live_env["orders"] = [
+        _order(idempotency_key="k1", selected_date="2026-08-25", status="filled",
+               fill_stake_dollars=2.0, outcome="won", pnl_dollars=1.5),
+        _order(idempotency_key="k2", selected_date="2026-07-04", status="filled",
+               fill_stake_dollars=2.0, outcome="lost", pnl_dollars=-2.0),
+    ]
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "Performance" in body
+    assert "2026-08-25" in body
+    # The day view is the default, so July's own DAY row is present too.
+    assert "2026-07-04" in body
+
+
+def test_the_month_and_year_views_are_selectable(app_client, live_env):
+    live_env["orders"] = [
+        _order(idempotency_key="k1", selected_date="2026-08-25", status="filled",
+               fill_stake_dollars=2.0, outcome="won", pnl_dollars=1.5),
+        _order(idempotency_key="k2", selected_date="2026-07-04", status="filled",
+               fill_stake_dollars=2.0, outcome="lost", pnl_dollars=-2.0),
+    ]
+    month = app_client.get("/portfolio/live?period=month").get_data(as_text=True)
+    assert "2026-08<" in month or ">2026-08<" in month
+    year = app_client.get("/portfolio/live?period=year").get_data(as_text=True)
+    # One row for 2026 -- both orders, collapsed.
+    assert ">2026<" in year
+
+
+def test_the_pivot_does_not_move_when_the_show_toggle_flips(app_client, live_env):
+    """The `?show=` toggle changes what is DISPLAYED, never what is counted.
+    A rollup that moved with a display toggle would not be quotable."""
+    live_env["orders"] = [
+        _order(idempotency_key="k1", selected_date="2026-08-25", status="filled",
+               fill_stake_dollars=2.0),
+        _order(idempotency_key="k2", selected_date="2026-08-25", status="rejected",
+               error="zero_kelly_stake"),
+    ]
+    hidden = intelligence_bp._live_portfolio_payload("2026-08-25")
+    shown = intelligence_bp._live_portfolio_payload("2026-08-25", show_all=True)
+    assert hidden["periods"] == shown["periods"]
+    # And the refused order is not in the count either way.
+    assert hidden["periods"]["by_day"][0]["orders"] == 1

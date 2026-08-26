@@ -3599,10 +3599,12 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
     )
     from syndicate.features.shared.execution_guard import kill_switch_engaged, limits
     from syndicate.features.shared.paper_settlement import settlement_summary
+    from syndicate.features.shared.portfolio_periods import period_rollup
     from pipeline.execute_portfolio import execution_enabled
 
     orders: list = []
     hidden_orders: list = []
+    periods: dict[str, Any] = {}
     ledger_error = None
     try:
         orders = [
@@ -3611,6 +3613,12 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
             if str(order.get("mode") or "") == LIVE
         ]
         orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
+        # FROM THE WHOLE BOOK, BEFORE THE VIEW FILTER. The pivots answer "how
+        # has this done", which is a question about every live order ever
+        # placed -- not about whichever subset the `?show=` toggle is
+        # displaying. A rollup that moved when a display toggle flipped would
+        # be a rollup nobody could quote.
+        periods = period_rollup(orders)
         # HIDDEN, NOT DROPPED, and COUNTED either way. A page that silently
         # omitted these would make "we placed nothing" and "we tried and were
         # refused" look identical -- the distinction this whole system keeps
@@ -3688,6 +3696,7 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
         "orders": orders,
         "hidden_count": len(hidden_orders),
         "show_all": bool(show_all),
+        "periods": periods,
         "ledger_error": ledger_error,
         "settlement": settlement,
         "settlement_error": settlement_error,
