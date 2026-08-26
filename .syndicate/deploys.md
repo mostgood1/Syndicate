@@ -33280,3 +33280,102 @@ that would have looked identical to the silence.
 split on `/api/portfolio/live` tomorrow — and unlike tonight's (venue 3 bets
 ROI −11.88% vs inferred 12 bets +51.07%) it will finally be a controlled
 comparison rather than the outcome of a race.
+
+---
+
+## 2026-08-26 — web `58be8c0d`: a slim live-lens row is not coverage; MLB chips stopped reading 0-0
+
+**Deployed:** `web` (`srv-d88ahvrbc2fs73eodu30`), deploy
+`dep-da7mvg7avr4c73b6b1m0`, triggered `22:59:12Z`, `deploy_ended 23:05:21Z`,
+live commit confirmed `58be8c0d` at `23:05:38Z`. Claim held by
+`mlb-chip-live-state` and preflight `CLEAR` for the exact target
+(`--target-commit 58be8c0d`, sample age 0s, only infrastructure processes).
+
+**Claim/preflight gotcha, recorded because it cost a cycle.** Both were first
+run from the SESSION WORKTREE and the hook did not see them —
+`.claude/hooks/deploy-guard.py` reads `$CLAUDE_PROJECT_DIR`, i.e. the PRIMARY
+tree, so a claim taken in a worktree reads as "NOT HELD by anyone". Take the
+claim and run preflight from the primary tree even when the code lives in a
+worktree.
+
+**THE DEFECT.** `live_lens_report_<date>.json` has TWO writers over one path.
+`live_lens_loop` writes the FULL row shape (20 keys, `matchup.score` and
+`gameLens[0].progress`); `scripts/refresh_mlb_oddsapi.py` fetches `slim=on` and
+writes `{gamePk, startTime, status}` only, as its own docstring states. Served
+report sampled every ~50s:
+
+    22:39:26Z SLIM   22:40:48Z FULL   22:38:10Z SLIM  <- generatedAt 2m38s
+                                                         EARLIER than the FULL
+                                                         it replaced
+    22:43:52Z FULL   22:46:07Z SLIM   22:47:08Z FULL   22:48:08Z SLIM ...
+
+A slim row carries `status`, so it satisfied the only guard
+`_mlb_live_lens_state_from_row` had and returned a state that was non-None and
+empty — no score, no inning. `#413`'s consumer contract reads non-None as "the
+lens covers this game", so `_apply_mlb_live_scores` skipped its statsapi
+fallback for EVERY game on the slate, and its zero-fill then turned two unknown
+scores into two zeroes.
+
+**verify: MET.** Same-instant `/api/board/game-chips` vs MLB StatsAPI, tagged by
+the lens shape and the serve path at that instant.
+
+CONTROL, pre-deploy, the SLIM windows (22:32:42Z–22:35:46Z, 22:39:44Z–22:41:25Z):
+
+    6 of 8 non-pregame games read `0-0` with a bare `LIVE`/`FINAL` token, on
+    BOTH serve paths -- worker_artifact AND inline_artifact_stale.
+    Truth at the same instant: CIN Top 9 4-9, CLE Top 9 2-3, PIT Bot 8 0-2,
+    PHI Top 9 6-0, TB Final 3-0, CHC Final 0-2.
+
+AFTER, on the INLINE path (the path this change alters), `23:08:36Z`–`23:10:30Z`:
+
+    32 scored-game readings, 0 score mismatches, 4 wrong on the inning token.
+    All 4 are the SAME transition artifact -- a game that had just thrown its
+    first pitch reading `LIVE` instead of `TOP 1` (HOU @ NYY, MIL @ NYM); both
+    resolved to `TOP 1` within ~90s.
+
+A full read at `23:10:14Z`, `src=inline_artifact_stale age=288.2` (so: inline
+build, the path that used to fabricate zeroes):
+
+    TB @ DET   FINAL 3-0   | Final Bottom 9 3-0        MATCH
+    CHC @ AZ   FINAL 0-2   | Final Top 9 0-2           MATCH
+    CIN @ SF   FINAL 10-9  | Game Over Bottom 9 10-9   MATCH
+    CLE @ LAA  FINAL 4-3   | Final Bottom 9 4-3        MATCH
+    PIT @ SD   FINAL 0-3   | Final Top 9 0-3           MATCH
+    PHI @ SEA  FINAL 6-0   | Final Bottom 9 6-0        MATCH
+    BOS @ MIA  BOT 2 0-1   | In Progress Bottom 2 0-1  MATCH
+    COL @ WSH  TOP 2 0-0   | In Progress Bottom 2 0-0  half-inning lag
+    HOU @ NYY  TOP 1 0-0   | In Progress Top 1 0-0     MATCH
+    KC @ TOR   TOP 1 0-0   | In Progress Top 1 0-0     MATCH
+    MIL @ NYM  LIVE  0-0   | In Progress Top 1 0-0     just started
+    LAD @ ATL  LIVE  0-0   | Warmup Top 1 0-0          correctly unscored
+
+**A READING THAT LOOKS LIKE A PASS AND IS NOT — do not repeat it.** The first
+post-deploy sample was `LENS=SLIM src=worker_artifact mismatched=0 ALL MATCH`.
+That proves nothing: refresh-worker was still on `ebfec2ed` (unfixed), and the
+lens shape sampled is **web's** copy. Each service holds its own, so a worker
+artifact built while the WORKER's lens was FULL matches StatsAPI regardless of
+what web is running. The only falsifying cell is `(LENS=SLIM, src=inline_*)`.
+
+**THE LATENCY RISK THIS TAKES ON, stated rather than claimed away.** The fix
+restores the statsapi fan-out for slim rows, and `render-web-request-path` fixed
+web's SIGTERMs by removing exactly that. One `unhealthy` fired at `23:07:51Z`
+(recovered `23:08:11Z`). Baseline over the previous 9h and 10 web deploys: **2
+unhealthy events total**, one of them at `16:48:45Z`, 70s after an unrelated
+`deploy_ended` — same message, same ~20s recovery. Mine matches that shape and
+does not stand out; n is too small to separate them. Post-deploy latency:
+`/healthz` 0.14–0.31s, `/api/board/game-chips` 0.16–2.2s over 5 pairs. **The
+discriminator is a SECOND unhealthy with no deploy behind it.** Watcher armed;
+rollback target `34b30330`.
+
+**NOT DEPLOYED: refresh-worker**, which runs the same code —
+`pipeline/layer2_shortlist.py:511` calls `build_game_chips`, which imports
+`syndicate/blueprints/home.py` to register the sport providers. Its claim was
+held by `ncaaf-opener-regions-props` from `22:57:41Z`; not forced. That session
+was asked to carry `9be130e0` (a descendant of this commit) on its own deploy.
+**`scripts/pending_deploys.py` listed `58be8c0d` as pending for web ONLY** — its
+service-to-file map does not know refresh-worker executes `home.py`. Do not read
+that tool as a coverage answer for this file.
+
+**STILL OPEN:** the two-writer race itself, `todo.md #582`. This change makes the
+consumer correct whichever writer wins; it does not stop a slim, sometimes older
+report being published over a full one.

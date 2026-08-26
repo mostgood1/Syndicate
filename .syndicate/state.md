@@ -5711,3 +5711,41 @@ fixture lookup finds nothing there.
 4096MB, zero oomKilled over two days. `container_memory_pct_of_max` counts page
 cache; `ALL_PROCESS_MEMORY` now carries `container_memory_unreclaimable_*`
 beside it. **Quote the unreclaimable figure.**
+
+
+## [mlb-live-lens-row-shape] The live-lens report has TWO writers and TWO row shapes — verified 2026-08-26 (lane `mlb-chip-live-state`)
+
+**`live_lens_report_<date>.json` is written by two producers over one path, and
+they do not agree on the row shape.** `live_lens_loop` writes the FULL shape —
+20 keys per row, including `matchup.score` and `gameLens[0].progress`.
+`scripts/refresh_mlb_oddsapi.py` fetches `/api/cron/live-lens-reports?slim=on`
+and writes `{gamePk, startTime, status}` only; its own docstring says so, and
+`slim=on` is deliberate (commit `5c12acf2`, a full slate payload caused a prior
+incident).
+
+**The served copy flips continuously.** Sampled every ~50s on 2026-08-26:
+`22:39:26Z` SLIM, `22:40:48Z` FULL, `22:41:57Z` SLIM — and that last one carried
+a `generatedAt` **2m38s EARLIER** than the FULL it replaced. An older report
+overwriting a newer one, not merely a poorer one.
+
+**A SLIM ROW IS NOT AN ANSWER, AND IT USED TO PASS FOR ONE.** It carries
+`status`, so `abstract`/`detailed` are populated and any guard keyed on those is
+satisfied. `_mlb_live_lens_state_from_row` returned non-None with
+`away_pts`/`home_pts` None and no inning; `#413`'s consumer contract reads
+non-None as "covered", so `_apply_mlb_live_scores` skipped statsapi for the
+WHOLE slate and zero-filled. Measured: SLIM current gives 6 of 8 non-pregame MLB
+chips `0-0` with a bare `LIVE`/`FINAL` token on both serve paths; FULL current
+gives 8 of 8 exact against StatsAPI. Fixed in `58be8c0d` (`todo.md #581`); the
+writer race itself is `#582` and is NOT fixed.
+
+**HOW TO READ A LENS-SHAPE MEASUREMENT.** The shape sampled through
+`/api/ops/artifacts/export` is **web's** copy. Each service holds its own, so a
+SLIM reading on web says nothing about what refresh-worker's chip build saw. Any
+before/after on this must name the service AND the serve path (`source` on
+`/api/board/game-chips`), not just the shape.
+
+**`scripts/pending_deploys.py` does not know refresh-worker executes
+`syndicate/blueprints/home.py`.** It listed a `home.py` commit as pending for web
+only. `pipeline/layer2_shortlist.py:511` calls `build_game_chips`, which imports
+`home.py` to register the sport providers. Do not use that tool as a coverage
+answer for this file.

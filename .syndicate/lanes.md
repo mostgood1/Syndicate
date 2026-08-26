@@ -2153,7 +2153,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   2026-08-26 22:07:31Z. Item: `todo.md #580`.
 - Blocked by: none
 
-### mlb-chip-live-state — OPEN — opened 2026-08-26 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272
+### mlb-chip-live-state — OPEN — opened 2026-08-26 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 — **FIXED AND VERIFIED ON WEB (`58be8c0d`, live 23:05:38Z). ROOT CAUSE: `live_lens_report_<date>.json` has TWO writers over one path and the SLIM one was being read as an answer. TWO THINGS OWED — see below.**
 - Goal: every LIVE/FINAL MLB game chip on the Layer 2 board strip carries its
   real score and its real inning token, on BOTH serve paths (`worker_artifact`
   and `inline_artifact_stale`), for as long as the game is live.
@@ -2233,6 +2233,41 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   by name, `+2.4 pts vs taken`, the hidden-open-bets banner, and the team name.
   **Production reading OWED — NOT DEPLOYED.**
 - Blocked by: none
+- **VERIFIED IN PRODUCTION, on the falsifying cell.** `(LENS=SLIM,
+  src=inline_artifact_stale)` is the only state that can disprove the fix — web
+  building chips itself against its own slim lens. CONTROL (pre-deploy SLIM
+  windows 22:32:42Z-22:35:46Z, 22:39:44Z-22:41:25Z): **6 of 8 non-pregame games
+  `0-0` with a bare `LIVE`/`FINAL` token, on BOTH serve paths.** AFTER
+  (23:08:36Z-23:12:45Z, inline path): **32+ scored-game readings, 0 score
+  mismatches**; 4 inning-token misses, all the same transition artifact (a game
+  seconds after first pitch reading `LIVE` before `TOP 1`, resolving in ~90s).
+  Full read: `deploys.md` 2026-08-26 web `58be8c0d`.
+- **A READING THAT LOOKS LIKE A PASS AND IS NOT:** `LENS=SLIM
+  src=worker_artifact ALL MATCH`. The lens shape sampled is WEB's copy; each
+  service holds its own, so a worker artifact built while the WORKER's lens was
+  FULL matches regardless of what web runs. Do not bank it.
+- **OWED 1 — refresh-worker is NOT deployed.** It runs the same code
+  (`pipeline/layer2_shortlist.py:511` -> `build_game_chips` -> imports
+  `home.py`), so its published artifact still goes blank in a slim window. Its
+  claim was held by `ncaaf-opener-regions-props` from 22:57:41Z and was NOT
+  forced; that session was asked to carry `9be130e0` (a descendant of this
+  commit). Discharge by reading `(LENS=SLIM, src=worker_artifact)` once the
+  worker carries `58be8c0d` or later.
+- **OWED 2 — the latency risk is unresolved, not cleared.** This restores the
+  statsapi fan-out for slim rows, and `render-web-request-path` fixed web's
+  SIGTERMs by removing exactly that. One `unhealthy` at 23:07:51Z (recovered
+  23:08:11Z) against a baseline of **2 unhealthy in the previous 9h/10 deploys**,
+  one of which was 70s after an unrelated deploy with the same message and the
+  same ~20s recovery. Mine matches that shape; n cannot separate them. **The
+  discriminator is a SECOND unhealthy with no deploy behind it.** Rollback
+  target `34b30330`.
+- **NOT FIXED, deliberately:** the two-writer race itself — `todo.md #582`, with
+  both candidate fixes and why neither is a ten-line guard.
+- Note: `scripts/pending_deploys.py` listed this commit as pending for web ONLY.
+  Its service-to-file map does not know refresh-worker executes `home.py`.
+- Note: `check_lane_invariants.py` reports one contested file,
+  `scripts/run_refresh_worker.py`, held by `exchange-markets-api-integration`
+  and `portfolio-ledger-service-split`. Pre-existing, not this lane's.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

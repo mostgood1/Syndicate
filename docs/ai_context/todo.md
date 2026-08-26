@@ -1,5 +1,96 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#581` — **The MLB game chips read `0-0` with no inning for every live game, about half the time. A live-lens row that could not answer was being counted as an answer.** — lane `mlb-chip-live-state`, 2026-08-26, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-26T23:10Z** (web `58be8c0d`)
+
+`[user report]` "these game chips on main page (layer 2 board) are stale" ...
+"there are times the board is totally updated and then it blanks out again for a
+good 10 minutes". Both halves are one bug.
+
+**TWO WRITERS, ONE PATH.** `live_lens_report_<date>.json` is written by
+`live_lens_loop` in the FULL row shape (20 keys, `matchup.score`,
+`gameLens[0].progress`) and by `scripts/refresh_mlb_oddsapi.py` in the SLIM
+shape — `{gamePk, startTime, status}` only, which that module's own docstring
+states outright. Served report sampled every ~50s: `22:39:26Z` SLIM,
+`22:40:48Z` FULL, `22:41:57Z` SLIM carrying a `generatedAt` **2m38s earlier than
+the FULL it replaced**.
+
+**WHY A SLIM ROW WAS FATAL.** It carries `status`, so it satisfied the only
+guard `_mlb_live_lens_state_from_row` had, and the function returned a state
+that was non-None and empty of everything that matters. `#413`'s consumer
+contract reads non-None as "the lens covers this game", so
+`_apply_mlb_live_scores` never entered its statsapi fallback for ANY game on the
+slate — and its zero-fill then turned two unknown scores into two zeroes.
+Measured: SLIM current gives 6 of 8 non-pregame games `0-0` with a bare
+`LIVE`/`FINAL` token, on BOTH serve paths; FULL current gives 8 of 8 exact.
+
+**THE FIX** is `#413`'s own "{} means ALL, not SOME" rule applied per ROW rather
+than per FILE. A row claiming live/final with neither a score nor an inning is
+refused and falls through to statsapi; a PREGAME row is still coverage. Second,
+narrower fix: the zero-fill now requires the OTHER side to have reported a
+number, so an unreported game renders `-` rather than a fabricated `0-0`.
+
+**IT DOES NOT UNDO `render-web-request-path`.** That fixed `apply_live_scores`
+3318-8400ms to 0-93ms, and the part doing the work is `_mlb_feed_live_states`
+being single-flight behind a 20s TTL: at most ONE request thread pays a fetch,
+all others take the last good value immediately. A FULL report still answers
+every game with zero network — pinned by a test.
+
+**WHY THE ORIGINAL VERIFICATION MISSED IT.** `368c7ef0` was measured end to end
+on the real 2026-06-01 report restamped to now — 9/9 games resolved, 0 statsapi
+calls. **That report was FULL.** The fixture picked the path production only
+takes half the time.
+
+**A POST-DEPLOY READING THAT LOOKS LIKE A PASS AND IS NOT.** `LENS=SLIM
+src=worker_artifact mismatched=0 ALL MATCH` proves nothing while refresh-worker
+is unfixed: the lens shape sampled is **web's** copy, and each service holds its
+own. Only `(LENS=SLIM, src=inline_*)` can falsify.
+
+**VERIFIED:** 32+ scored-game readings on the inline path, 0 score mismatches,
+4 inning-token misses all from the same transition artifact (a game seconds
+after first pitch reading `LIVE` before `TOP 1`, resolving within ~90s). Full
+read and the pre-deploy control: `.syndicate/deploys.md`, 2026-08-26 web
+`58be8c0d`.
+
+**OWED:** refresh-worker runs the same code (`pipeline/layer2_shortlist.py:511`
+calls `build_game_chips`, which imports `home.py`) and was NOT deployed — its
+claim was held by `ncaaf-opener-regions-props`. Confirm the worker artifact
+stops going blank once it carries `58be8c0d` or later. Note
+`scripts/pending_deploys.py` listed this commit as web-only; its
+service-to-file map is wrong for `home.py`.
+
+### `#582` — **`refresh_mlb_oddsapi.py` publishes a SLIM live-lens report over the FULL one, sometimes one generated minutes EARLIER. Root cause of `#581`, still unfixed.** — lane `mlb-chip-live-state`, 2026-08-26, measured — **NOT FIXED, deliberately**
+
+`#581` makes the consumer correct whichever writer wins, so the reported symptom
+is closed. This is the cause underneath it and it is still live.
+
+**MEASURED** (served report, ~50s sampling, 2026-08-26 22:40Z-23:00Z): the shape
+flips FULL/SLIM continuously, and at `22:41:57Z` the slim copy carried a
+`generatedAt` of `17:38:10-05:00` against the `17:40:48-05:00` full copy it
+replaced. **An older report overwriting a newer one is a defect independent of
+the shape**, and it costs every consumer of `gameLens`, not only the chips.
+
+**WHY IT IS NOT A TEN-LINE GUARD.** The two writers live on DIFFERENT SERVICES
+with unshared disks — the loop's full report and `refresh_mlb_oddsapi.py`'s slim
+one only meet in the hot-artifact store. A local `generatedAt`/shape comparison
+inside `_write_live_lens_reports_payload` cannot see the other writer's copy, so
+the guard has to sit in the publish layer, or the slim writer has to stop
+sharing the path.
+
+**TWO CANDIDATE FIXES, neither taken:**
+
+1. **Guard the publish.** `publish_hot_artifact` refuses to replace a stored
+   report with one older by `generatedAt`, or poorer in shape at equal vintage.
+   Correct for every consumer, but it changes a shared publish path used by far
+   more than MLB.
+2. **Stop sharing the path.** The slim writer targets
+   `live_lens_report_slim_<date>.json`; its only real consumer is
+   `_mlb_live_lens_prop_candidates_from_artifact`, which reads `trackedProps`.
+   Narrower, but it moves a file two services and an allowlist know about.
+
+**DO NOT "just revert slim mode".** `refresh_mlb_oddsapi.py` records why it
+exists — commit `5c12acf2`, a full non-slim payload for the whole slate was the
+direct cause of a prior incident, and the OOM/disk risk is the same today.
+
 ### `#580` — **The venue gets first refusal on live orders. `awaiting_venue: 28`, and 28 was the exact pre-deploy count.** — lane `venue-first-refusal`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T22:1xZ** (refresh-worker `ebfec2ed`)
 
 `[user decision 2026-08-26]` *"give the venue first refusal on live orders"*.
