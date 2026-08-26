@@ -441,6 +441,22 @@ def fetch_event_markets(event_ticker: str) -> dict[str, Any]:
         if not isinstance(markets, list):
             errors.append(f"unexpected_shape:{sorted(payload)[:6]}")
             continue
+        if not markets:
+            # AN EMPTY LIST IS NOT AN ANSWER, and accepting one as `status=ok`
+            # is what made this probe useless on the run it was built for.
+            #
+            # Measured 2026-08-26T09:34-11:44Z: `count=0 ours_listed=False` on
+            # EIGHT different events whose markets we had just fetched prices
+            # for. Read as data, that says Kalshi lists nothing. It actually
+            # said the query was wrong -- the same "a null from a query you got
+            # wrong is indistinguishable from a null from a quiet system"
+            # failure this repo logged hours earlier.
+            #
+            # So an empty result now REFUSES and carries the payload's own keys
+            # and the URL, which is what a reader needs to fix the query rather
+            # than mis-trust the venue.
+            errors.append(f"empty_markets url={url} keys={sorted(payload)[:8]}")
+            continue
         return {
             "status": "ok",
             "base": base,
