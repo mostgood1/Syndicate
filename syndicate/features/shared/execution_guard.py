@@ -98,6 +98,70 @@ _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE: dict[str, float] = {
     "polymarket": 100.0,
 }
 
+# PER-VENUE ORDER-COUNT CAPS, the count twin of the dollar map above.
+#
+# WHY THIS DID NOT EXIST AND WHY IT HAD TO. `max_day_orders` was FLAT -- one
+# number for whichever venue was asking -- while `max_day_dollars` had been
+# per-venue since 2026-08-25. So `spent_today` filtered orders per venue and
+# then compared that count against an account-shaped number. Both venues
+# happening to default to 15 hid it. The moment a user sets "Kalshi 5 orders a
+# day" the two readings diverge, and the flat field would have accepted the
+# edit and enforced nothing -- a field that displays a policy it does not
+# apply. Both entries are the previous flat default, so nothing already
+# configured changes meaning.
+_DEFAULT_MAX_DAY_ORDERS_BY_VENUE: dict[str, int] = {
+    "kalshi": _DEFAULT_MAX_DAY_ORDERS,
+    "polymarket": _DEFAULT_MAX_DAY_ORDERS,
+}
+
+# THE NAME OF THE ENV VAR BEHIND EACH USER-EDITABLE CAP.
+#
+# Exported because `execution_limits_settings.resolve_view` needs to tell "you
+# set this" from "an operator set the env var" from "nobody set anything", and
+# a second hand-written copy of these names in that file is a mapping that
+# drifts. One table, two readers.
+LIVE_LIMIT_FIELDS: dict[str, str] = {
+    "max_order_dollars": "SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS",
+    "max_day_dollars_kalshi": "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI",
+    "max_day_dollars_polymarket": "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_POLYMARKET",
+    "max_day_orders_kalshi": "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_KALSHI",
+    "max_day_orders_polymarket": "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_POLYMARKET",
+    "max_day_dollars_all_venues": "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES",
+    "max_day_orders_all_venues": "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_ALL_VENUES",
+}
+
+
+def _stored_live_limit(name: str, paper: bool) -> float | None:
+    """A cap the USER saved on `/portfolio`, or None.
+
+    THIS IS THE HOP THAT MAKES THE FORM REAL. Everything else in this file
+    reads `os.environ`, and this module runs on **live-odds-worker** -- the web
+    service that renders the form has none of those variables. Without this
+    read the settings page would accept a number, show it back, and place
+    orders against the old one.
+
+    Read FRESH on every call rather than cached. A cached cap is a cap that
+    does not respond to the edit that lowered it, and this is a ≤25-orders-a-day
+    path where `spent_today` already reads the same store per check.
+
+    PAPER IS EXEMPT BY DESIGN -- see the module docstring on why the paper
+    numbers stay inert. A user's live cap must not quietly truncate the tail of
+    every paper slate and turn that ledger into evidence about the cap.
+
+    Never raises. A store that cannot answer sends the caller to its env-then-
+    default chain, which is safe here only because `kill_switch_engaged()`
+    fails CLOSED on the same store and `check_order` consults it before any
+    live order is placed.
+    """
+    if paper:
+        return None
+    try:
+        from syndicate.features.shared.execution_limits_settings import stored_limit
+
+        return stored_limit(name)
+    except Exception:
+        return None
+
 # PAPER defaults, deliberately INERT. The mechanism must run on paper -- a cap
 # whose first exercise is with money on it has not been tested -- but the
 # NUMBERS must not, because the paper books exist to record what the strategy
@@ -180,26 +244,52 @@ def limits(mode: str | None = None, venue: str | None = None) -> dict[str, Any]:
     paper = resolved != LIVE
     normalized_venue = str(venue or "").strip().lower() or None
 
-    max_day_dollars_default = _DEFAULT_PAPER_MAX_DAY_DOLLARS if paper else _DEFAULT_MAX_DAY_DOLLARS
-    if not paper and normalized_venue in _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE:
-        max_day_dollars_default = _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE[normalized_venue]
-    # A per-venue env override, e.g. `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI`
-    # -- checked BEFORE the flat env var, same precedence direction as every
-    # other override in this file (the more specific knob wins).
-    max_day_dollars_env = (
-        f"SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_{normalized_venue.upper()}"
-        if normalized_venue
-        else "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS"
-    )
-    max_day_dollars = _float_env(
-        max_day_dollars_env,
-        _float_env("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS", max_day_dollars_default),
-    )
+    # ------------------------------------------------------------------
+    # PER-VENUE DOLLARS: stored (the user's edit) > per-venue env > flat env >
+    # default. The store layer is new; the rest is the existing chain, kept in
+    # the same order, because the more specific knob has always won here.
+    # ------------------------------------------------------------------
+    def _venue_day_dollars(name: str | None) -> float:
+        default = _DEFAULT_PAPER_MAX_DAY_DOLLARS if paper else _DEFAULT_MAX_DAY_DOLLARS
+        if not paper and name in _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE:
+            default = _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE[name]
+        if name:
+            saved = _stored_live_limit(f"max_day_dollars_{name}", paper)
+            if saved is not None:
+                return float(saved)
+        env_name = (
+            f"SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_{name.upper()}"
+            if name
+            else "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS"
+        )
+        return _float_env(env_name, _float_env("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS", default))
+
+    def _venue_day_orders(name: str | None) -> int:
+        default = _DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS
+        if not paper and name in _DEFAULT_MAX_DAY_ORDERS_BY_VENUE:
+            default = _DEFAULT_MAX_DAY_ORDERS_BY_VENUE[name]
+        if name:
+            saved = _stored_live_limit(f"max_day_orders_{name}", paper)
+            if saved is not None:
+                return int(saved)
+        env_name = (
+            f"SYNDICATE_EXECUTION_MAX_DAY_ORDERS_{name.upper()}"
+            if name
+            else "SYNDICATE_EXECUTION_MAX_DAY_ORDERS"
+        )
+        return _int_env(env_name, _int_env("SYNDICATE_EXECUTION_MAX_DAY_ORDERS", default))
+
+    def _stored_or_env_float(field: str, env_name: str, default: float) -> float:
+        saved = _stored_live_limit(field, paper)
+        return float(saved) if saved is not None else _float_env(env_name, default)
+
+    max_day_dollars = _venue_day_dollars(normalized_venue)
 
     return {
         "mode": resolved,
         "venue": normalized_venue,
-        "max_order_dollars": _float_env(
+        "max_order_dollars": _stored_or_env_float(
+            "max_order_dollars",
             "SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS",
             _DEFAULT_PAPER_MAX_ORDER_DOLLARS if paper else _DEFAULT_MAX_ORDER_DOLLARS,
         ),
@@ -209,13 +299,24 @@ def limits(mode: str | None = None, venue: str | None = None) -> dict[str, Any]:
         # and a page rendering that single figure as "the" daily cap reads as
         # an account limit while the two books are funded differently -- the
         # live portfolio banner showed exactly one number for months.
-        "max_day_dollars_by_venue": dict(_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE),
-        "max_day_dollars_kalshi": _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE["kalshi"],
-        "max_day_dollars_polymarket": _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE["polymarket"],
-        "max_day_orders": _int_env(
-            "SYNDICATE_EXECUTION_MAX_DAY_ORDERS",
-            _DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS,
-        ),
+        #
+        # THESE ARE NOW RESOLVED, NOT THE RAW DEFAULT MAP. They used to be
+        # `_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE[...]` read straight out -- so a
+        # `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI` twenty-five lines above
+        # moved ENFORCEMENT while the banner kept printing $50. The page and
+        # the guard disagreeing about a money cap is the exact failure this
+        # file's comments keep repairing elsewhere; it was true here too.
+        "max_day_dollars_by_venue": {
+            name: _venue_day_dollars(name) for name in _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE
+        },
+        "max_day_dollars_kalshi": _venue_day_dollars("kalshi"),
+        "max_day_dollars_polymarket": _venue_day_dollars("polymarket"),
+        "max_day_orders": _venue_day_orders(normalized_venue),
+        "max_day_orders_by_venue": {
+            name: _venue_day_orders(name) for name in _DEFAULT_MAX_DAY_ORDERS_BY_VENUE
+        },
+        "max_day_orders_kalshi": _venue_day_orders("kalshi"),
+        "max_day_orders_polymarket": _venue_day_orders("polymarket"),
         # THE ACCOUNT-WIDE CEILINGS, ACROSS EVERY VENUE AT ONCE.
         #
         # `max_day_dollars` is enforced PER VENUE -- `spent_today` filters on
@@ -236,7 +337,14 @@ def limits(mode: str | None = None, venue: str | None = None) -> dict[str, Any]:
         # number), that edit must still move the combined ceiling -- "nobody
         # edits a cap and total exposure doubles" applies to the flat knob too,
         # and it is the more specific signal than the two venues' code defaults.
-        "max_day_dollars_all_venues": _float_env(
+        #
+        # EDITABLE TOO, and that is not scope creep -- it is what stops the two
+        # per-venue fields above from being an inert form. This ceiling is
+        # checked BEFORE them and defaults to $150, so raising Kalshi to $200
+        # on the settings page changes nothing at all while it stands. The page
+        # says so out loud when the two venue budgets sum above it.
+        "max_day_dollars_all_venues": _stored_or_env_float(
+            "max_day_dollars_all_venues",
             "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES",
             (
                 _DEFAULT_PAPER_MAX_DAY_DOLLARS
@@ -247,9 +355,12 @@ def limits(mode: str | None = None, venue: str | None = None) -> dict[str, Any]:
                 )
             ),
         ),
-        "max_day_orders_all_venues": _int_env(
-            "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_ALL_VENUES",
-            _DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS_ALL_VENUES,
+        "max_day_orders_all_venues": int(
+            _stored_or_env_float(
+                "max_day_orders_all_venues",
+                "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_ALL_VENUES",
+                float(_DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS_ALL_VENUES),
+            )
         ),
     }
 

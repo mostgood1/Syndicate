@@ -2275,6 +2275,61 @@ Four deploys were taken during this session and each is recorded in
   Full block: `deploys.md` 2026-08-26 19:50:37Z. Item: `todo.md #576`.
 - Blocked by: none
 
+### portfolio-venue-caps-editable — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: the venue day-caps are USER-EDITABLE on `/portfolio`, the way bankroll
+  is, and the edit REACHES THE WORKER rather than only the page.
+  `[user decision 2026-08-26: "we need to be able to enter Polymarket and Kalshi
+  MAX per day and orders per day on this page like the other pieces like
+  bankroll"]`
+- **THE WHOLE RISK IS AN INERT FEATURE, and this lane has three ways to build
+  one.** (1) `limits()` reads ENV ONLY and runs on live-odds-worker; a stored
+  value web can write but the worker never reads is a form that changes
+  nothing. (2) `max_day_orders` is currently FLAT — `check_order` resolves
+  dollars per venue and orders not at all — so a per-venue orders field would
+  be accepted, displayed, and unenforced. (3) `max_day_dollars_all_venues`
+  defaults to $150 and binds BEFORE the per-venue caps, so raising Kalshi to
+  $200 moves nothing until the account ceiling moves too. Every one of these
+  is silent. **Acceptance is `off != on` through `check_order`, not a form
+  that POSTs 200.**
+- **ALSO FOUND, pre-existing and shipping in the same pass:**
+  `limits()` lines 213-214 return `max_day_dollars_kalshi` /
+  `_polymarket` straight from `_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE`, ignoring the
+  per-venue env override the same function computes 25 lines above. So
+  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI` would move ENFORCEMENT and not
+  the number the banner prints — the page and the guard disagreeing, which is
+  the exact class this file's own comments keep repairing.
+- **PAPER STAYS UNCAPPED, deliberately.** `execution_guard`'s own docstring
+  says the paper numbers must stay inert or "the ledger [becomes] evidence
+  about the cap instead of about the strategy". Stored caps therefore bind LIVE
+  only; paper keeps its defaults unless an env var is set. Pinned by a test.
+- **FAIL-SAFE DIRECTION, stated because it inverts for a CAP.** For a bankroll,
+  absent → default is safe. For a spending cap, a store that loses a LOWERED
+  value would fall back UPWARD. Accepted here only because
+  `kill_switch_engaged()` already fails CLOSED on the same store, so a store
+  failure blocks live orders before any cap is consulted; a `store_error` is
+  surfaced on the page regardless.
+- Files:
+  `syndicate/features/shared/execution_limits_settings.py` (new),
+  `syndicate/features/shared/execution_guard.py`,
+  `syndicate/blueprints/intelligence.py` (portfolio routes only),
+  `syndicate/templates/portfolio.html`,
+  `tests/test_execution_limits_settings.py` (new),
+  `tests/test_portfolio_live_page.py`
+- **CARVE-OUT EXTENDED** from `portfolio-decision-and-execution` (session
+  `01Sia2rPD72eFTriy28azzs2`, still not a reachable peer per `ListAgents`) on
+  `blueprints/intelligence.py` + `templates/portfolio.html`, at explicit user
+  direction, same terms as `portfolio-live-primary` earlier today.
+  `execution_guard.py` is held by NO open lane — checked against every OPEN
+  block before claiming.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: `check_order` refuses at a STORED cap and allows at the default
+  with the store empty (`off != on`, both directions, per venue, dollars AND
+  orders); `record_execution_state`'s stamp carries the stored numbers;
+  `/portfolio` renders the fields editable and a POST persists; production
+  reading owed — the banner's per-venue figures must change after an edit.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -3374,6 +3374,67 @@ def portfolio_settings_form():
     return redirect("/portfolio#bankroll", code=303)
 
 
+@intelligence_bp.get("/api/portfolio/limits")
+def portfolio_limits_api():
+    """The venue caps in force, and where each number came from.
+
+    A pure read. `sources` matters more here than anywhere else on this page:
+    "$200 because you set it" and "$50 because the store lost your edit" are
+    the difference between a funded day and a truncated one, and they render
+    identically without it.
+    """
+    from syndicate.features.shared.execution_limits_settings import resolve_view
+
+    return _no_cache_response(jsonify({"ok": True, "limits": resolve_view()}))
+
+
+@intelligence_bp.post("/api/portfolio/limits")
+def portfolio_limits_update_api():
+    """Partial edit. Out-of-range or unknown fields are rejected BY NAME.
+
+    Same contract as `/api/portfolio/settings`: 400 when nothing was accepted,
+    200 with a populated `rejected` when some fields landed -- a partial
+    success is not a failure, and discarding the good half would be worse.
+    """
+    from syndicate.features.shared.execution_limits_settings import update_limits
+
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict) or not payload:
+        response = jsonify({"ok": False, "error": "a JSON object with at least one field is required."})
+        response.status_code = 400
+        return _no_cache_response(response)
+
+    view, rejected = update_limits(payload)
+    accepted = [key for key in payload if key not in rejected]
+    response = jsonify({"ok": bool(accepted), "limits": view, "accepted": accepted, "rejected": rejected})
+    if not accepted:
+        response.status_code = 400
+    return _no_cache_response(response)
+
+
+@intelligence_bp.get("/portfolio/limits")
+def portfolio_limits_page():
+    """The form lives on `/portfolio`; this sends a browser there.
+
+    Same trap `/portfolio/settings` was: a URL that answers only POST returns
+    405 to whoever guesses it, with no hint where the form actually is. A
+    redirect rather than a second copy of the fields, for the same reason.
+    """
+    return redirect("/portfolio#venue-limits", code=303)
+
+
+@intelligence_bp.post("/portfolio/limits")
+def portfolio_limits_form():
+    # Plain page-form action, matching `/portfolio/settings` -- the caps form
+    # sits beside the bankroll form and posts the same way.
+    from syndicate.features.shared.execution_limits_settings import EDITABLE_FIELDS, update_limits
+
+    changes = {name: request.form.get(name) for name in EDITABLE_FIELDS if request.form.get(name) not in (None, "")}
+    if changes:
+        update_limits(changes)
+    return redirect("/portfolio#venue-limits", code=303)
+
+
 @intelligence_bp.get("/api/portfolio/plan")
 def portfolio_plan_api():
     """Stage A's committed plan for a date, read from the worker's artifact.
@@ -4010,15 +4071,27 @@ def portfolio_home():
     STILL A PURE READ. Both payloads read artifacts the workers wrote -- no
     simulation, no order placement, nothing recomputed in a request handler.
     """
+    from syndicate.features.shared.execution_limits_settings import resolve_view
     from syndicate.features.shared.portfolio_settings import resolve_settings
 
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     show_all = str(request.args.get("show") or "").strip().lower() == "all"
     summary = build_portfolio_summary(limit=100)
+    # THE CAPS AS *THIS* PROCESS RESOLVES THEM, which is not the same object as
+    # the worker's stamped `limits` in the live payload. The form must edit the
+    # values it will actually write, and the banner must keep reporting what the
+    # worker last had in force -- if those two disagree, the page has to be able
+    # to show both rather than pick one.
+    try:
+        execution_limits = resolve_view()
+    except Exception as exc:
+        _LOGGER.exception("EXECUTION_LIMITS_VIEW_FAILURE")
+        execution_limits = {"store_error": f"{type(exc).__name__}: {exc}", "sources": {}, "ceiling_notes": []}
     return render_template(
         "portfolio.html",
         portfolio_summary=summary,
         portfolio_settings=resolve_settings().as_dict(),
+        execution_limits=execution_limits,
         live=_live_portfolio_payload(selected_date, show_all=show_all),
     )
 
