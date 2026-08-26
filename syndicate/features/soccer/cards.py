@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import copy
+import threading
+import time
 from datetime import datetime
 from datetime import timezone
 from typing import Any
@@ -2358,7 +2361,153 @@ def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
     return games
 
 
+# `#565`. THE SOCCER FORWARD-SLATE FAN-OUT, and the ONE key that makes memoising
+# it safe.
+#
+# THE COST, measured on refresh-worker `-fzb6v` 2026-08-26. In one 60-second
+# window soccer emitted five `board_contract_begin` lines **12-14 seconds apart**
+# with `game_count` 8-11, so **~12.5 s per league-week**.
+# `_SoccerDataProvider.games()` (`home.py:6478`) runs `10 leagues x 2 matchdays =
+# 20` of these PER DATE, and the candidate pool asks for each board-window date --
+# and adjacent dates resolve to the SAME weeks, so it is largely the same 20
+# builds repeated. That was 13m25s of a 19m43s board build.
+#
+# WHY THE OBVIOUS CACHE IS A TRAP, and this comment exists because I built that
+# cache first and had to back it out. These payloads carry `live_state`, and
+# `game_chip_scoreboard._game_flags` reads it to set each chip's live/final
+# state. A plain TTL memo on `(league, week, season)` FREEZES LIVE SOCCER SCORES
+# for the TTL -- re-creating the exact staleness `#564` was opened to fix, on the
+# same surface, in the same week. Two existing tests caught the symptom; this is
+# the cause.
+#
+# THE KEY INCLUDES THE THING THAT WOULD GO STALE. `scope_2026-08-21_home_request
+# _path_compute.md` states the rule outright: *"Any cache here needs a vintage
+# key (artifact `generated_at`), not just `game_pk`."* The vintage here is the
+# LIVE POLLER'S OWN ARTIFACT: if any match's state moved, the fingerprint moves,
+# the key misses, and the context is rebuilt. A cached entry can therefore only
+# ever be served while nothing live has changed -- which is precisely when it is
+# indistinguishable from a fresh build.
+#
+# `live_state_payload` is deliberately uncached upstream ("overwritten by the
+# poller every cycle") and is ONE `read_json_file` per league, against the 12.5 s
+# it guards. That asymmetry is what makes this viable at all.
+#
+# THE TTL IS A BACKSTOP, NOT THE MECHANISM. It bounds the OTHER inputs --
+# `recommendations_payload`, which turns over on a once-per-date cadence, not a
+# live one. 600 s sits inside the board's own 5-20 minute publish cadence.
+# `SYNDICATE_SOCCER_CARDS_CONTEXT_TTL_SECONDS=0` disables the whole thing without
+# a deploy.
+_CARDS_CONTEXT_CACHE: dict[tuple, tuple[float, dict[str, Any]]] = {}
+_CARDS_CONTEXT_STATS = {"hits": 0, "misses": 0, "seconds_saved": 0.0}
+_CARDS_CONTEXT_LOCK = threading.Lock()
+
+
+def _cards_context_ttl_seconds() -> float:
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_SOCCER_CARDS_CONTEXT_TTL_SECONDS") or "").strip()
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            pass
+    return 600.0
+
+
+def _live_vintage(league: str) -> str:
+    """A fingerprint of this league's LIVE state right now. `#565`.
+
+    Changes the moment any match's status or clock moves, which is what makes it
+    safe to key a cache on. Cheap by construction: one `read_json_file` for
+    today's payload, and only the fields that decide a chip's state are read --
+    not the whole document.
+
+    RETURNS A DISTINCT MARKER ON FAILURE, never a constant that could collide
+    with a real reading. An unreadable live payload must not look like "the same
+    live state as last time" -- that is the freeze this key exists to prevent --
+    so `error` is its own vintage and `absent` is another, and neither equals a
+    healthy fingerprint.
+    """
+    try:
+        payload = live_state_payload(league, central_today_iso())
+    except Exception:
+        return "error"
+    if not isinstance(payload, dict):
+        return "absent"
+    parts: list[str] = []
+    for section in ("games", "match_box"):
+        block = payload.get(section)
+        if not isinstance(block, dict):
+            continue
+        for event_id in sorted(block):
+            entry = block.get(event_id)
+            if not isinstance(entry, dict):
+                continue
+            parts.append(
+                "|".join(
+                    (
+                        str(event_id),
+                        str(entry.get("status") or ""),
+                        str(entry.get("status_state") or ""),
+                        str(entry.get("status_display_clock") or entry.get("status_detail") or ""),
+                        str(entry.get("home_score") or ""),
+                        str(entry.get("away_score") or ""),
+                    )
+                )
+            )
+    if not parts:
+        return "quiet"
+    import hashlib
+
+    return hashlib.sha1("\n".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def soccer_cards_context_cache_stats() -> dict[str, Any]:
+    with _CARDS_CONTEXT_LOCK:
+        return dict(_CARDS_CONTEXT_STATS)
+
+
+def reset_soccer_cards_context_cache_stats() -> None:
+    with _CARDS_CONTEXT_LOCK:
+        _CARDS_CONTEXT_STATS.update({"hits": 0, "misses": 0, "seconds_saved": 0.0})
+
+
+def clear_soccer_cards_context_cache() -> None:
+    """Drop every entry. For tests, and for a caller that knows it must not reuse."""
+    with _CARDS_CONTEXT_LOCK:
+        _CARDS_CONTEXT_CACHE.clear()
+
+
 def build_cards_page_context(league: str, week: int | None = None, season: int | None = None) -> dict[str, Any]:
+    ttl = _cards_context_ttl_seconds()
+    if ttl <= 0:
+        return _build_cards_page_context_uncached(league, week, season)
+
+    key = (normalize_league(league), week, season, _live_vintage(normalize_league(league)))
+    now = time.monotonic()
+    with _CARDS_CONTEXT_LOCK:
+        hit = _CARDS_CONTEXT_CACHE.get(key)
+        if hit is not None and (now - hit[0]) < ttl:
+            _CARDS_CONTEXT_STATS["hits"] += 1
+            _CARDS_CONTEXT_STATS["seconds_saved"] += hit[2]
+            return copy.deepcopy(hit[1])
+
+    started = time.monotonic()
+    built = _build_cards_page_context_uncached(league, week, season)
+    elapsed = time.monotonic() - started
+
+    with _CARDS_CONTEXT_LOCK:
+        _CARDS_CONTEXT_STATS["misses"] += 1
+        _CARDS_CONTEXT_CACHE[key] = (time.monotonic(), built, elapsed)
+        # Bounded: 10 leagues x 2 matchdays x a few live vintages. The cap stops
+        # a long-lived worker accumulating an entry per poller cycle.
+        if len(_CARDS_CONTEXT_CACHE) > 96:
+            oldest = min(_CARDS_CONTEXT_CACHE, key=lambda k: _CARDS_CONTEXT_CACHE[k][0])
+            _CARDS_CONTEXT_CACHE.pop(oldest, None)
+    return copy.deepcopy(built)
+
+
+def _build_cards_page_context_uncached(league: str, week: int | None = None, season: int | None = None) -> dict[str, Any]:
     league = normalize_league(league)
     resolved_season = int(season) if season else default_season(league)
     weeks = available_weeks(league, resolved_season)

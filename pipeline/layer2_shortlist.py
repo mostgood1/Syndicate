@@ -1042,6 +1042,39 @@ def build_layer2_shortlist(
     if cards_compat_note:
         shortlist["cards_compat_note"] = cards_compat_note
 
+    # `#565`. DID THE SOCCER CONTEXT MEMO ACTUALLY DEDUPE, AND AT WHAT COST?
+    #
+    # Printed at the end of the build so the counts describe a complete cycle,
+    # and reset immediately after so each build's line stands alone.
+    #
+    # `hits` is the saving. `misses` is the floor -- the number of DISTINCT
+    # league-weeks this build genuinely had to construct, which is the number
+    # that matters if the build is still slow afterwards. A high miss count with
+    # near-zero hits means the live vintage is churning every cycle and the
+    # memo cannot help; that is a real possible outcome on a busy match evening
+    # and it must be visible rather than inferred from the clock.
+    try:
+        from syndicate.features.soccer.cards import (
+            reset_soccer_cards_context_cache_stats,
+            soccer_cards_context_cache_stats,
+        )
+
+        _cc = soccer_cards_context_cache_stats()
+        _cc_total = int(_cc.get("hits") or 0) + int(_cc.get("misses") or 0)
+        print(
+            f"[layer2_shortlist] SOCCER_CONTEXT_CACHE hits={_cc.get('hits')} "
+            f"misses={_cc.get('misses')} calls={_cc_total} "
+            f"seconds_saved={round(float(_cc.get('seconds_saved') or 0.0), 1)}",
+            flush=True,
+        )
+        reset_soccer_cards_context_cache_stats()
+    except Exception as _cc_exc:  # pragma: no cover - telemetry must never cost the board
+        print(
+            f"[layer2_shortlist] SOCCER_CONTEXT_CACHE_UNAVAILABLE "
+            f"{type(_cc_exc).__name__}: {_cc_exc}",
+            flush=True,
+        )
+
     # `#541`. CAN EVERY CARD FIND ITS CHIP? Twice this defect has been found by
     # a person looking at the board -- MLS 2026-08-22, La Liga 2026-08-24 --
     # and both times every count on this line was healthy while some cards

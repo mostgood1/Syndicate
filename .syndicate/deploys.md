@@ -30642,3 +30642,95 @@ reading is the deliverable; the fix wants its own lane and a daylight deploy.
 The horizon change in particular must be checked against what the board is
 meant to SHOW before it is narrowed, because `beyond_horizon` is a shortlist
 filter and the rail may legitimately want the wider window.
+
+## 2026-08-25 22:21 CT — refresh-worker `9a797af9` (`#565` per-sport slate window)
+
+**DEPLOYED OVER A HOLD, ON EXPLICIT USER DIRECTION AFTER BEING SHOWN THE COST.**
+This is the entry to read if an MLB sim is missing for 2026-08-25.
+
+**The preflight equivalent, run by hand, returned HOLD twice:**
+
+    03:15:47Z  process_count=13  memory 93.2%  headroom 279 MB
+    03:21:00Z  process_count=11  memory 99.8%  headroom 8.8 MB
+
+Killed in flight at 03:21:21Z:
+
+    run_mlb_daily_sim_job.py --date 2026-08-25 --sims 1000  (pid 1369)
+    tools/daily_update.py --workflow ui-daily               (pid 1468)
+    vendor/mlb_bettingv2 daily_update core + multi_profile + 2 forks
+    refresh_odds_sources.py --sports soccer --soccer-leagues bundesliga
+
+**The sim killed was the SECOND of the evening on this instance** — pid 856 at
+03:15 carried 15 game_pks, pid 1369 at 03:21 carried 10, so a rebuild had
+already started once. `CLAUDE.md`'s "deploying kills an in-flight MLB sim",
+measured a sixth and seventh time tonight.
+
+**MITIGATING, AND STATED AS MITIGATION NOT JUSTIFICATION:** headroom was 8.8 MB
+of 4096. At that margin the instance was close to an OOM restart which would
+have killed the same children anyway. That does not make the deploy free — it
+makes the counterfactual cheaper than it looks, and it is not why the deploy
+was taken. The user directed it.
+
+**No locks taken**, same as every deploy this session: no `RENDER_API_KEY` here,
+proxy 403s `api.render.com`, so the Render MCP was used and the guard never saw
+it.
+
+**verify:** BY CONTENT — `git merge-base --is-ancestor 0dc89b73 origin/main`
+passes and `run_refresh_worker.py` at `9a797af9` carries `_sport_covers_date`
+(3 occurrences). **The behavioural reading is `BOOK_GRID_TICK`'s new
+`out_of_window` field: expected 34 on a full 8-sport tick (56 pairs → 22).**
+
+**AND THE READING THAT DECIDES `#565`, still owed:** boot →
+first `[layer2_shortlist]` line on the new instance. It was **19m43s** on
+`-fzb6v`. If it does not move, the soccer 13m25s is the board-window fan-out
+rather than the forward-date fan-out, and this change did not touch it — which
+is the outcome the todo entry already says must not be assumed away.
+
+### `#565` VERIFIED — both owed readings are in, and my prediction was WRONG in the conservative direction
+
+**Reading 1 — `out_of_window`: 34.** Exactly the predicted figure (56 → 22 pairs).
+`BOOK_GRID_TICK` 03:35:26Z on instance `-b4vms`:
+
+    out_of_window=34  next_interval_seconds=120  rebuilt_previous=2026-08-24
+    written=[mlb:3268, wnba:1027, nfl:1339, soccer:340,
+             mlb:816@08-24, wnba:643@08-24, nfl:1352@08-24, soccer:2094@08-24,
+             soccer:406@08-26, soccer:669@08-27, soccer:1067@08-28,
+             soccer:4401@08-29, soccer:3771@08-30, soccer:807@08-31]
+
+**The `written` list is the better evidence than the count**: every FORWARD date
+is now soccer only. `mlb`, `wnba`, `nba`, `nhl`, `ncaaf`, `ncaab` were each being
+built across those six dates to serve boards that ask for one.
+
+**Reading 2 — boot to board build: 19m43s → 12m44s.**
+
+    baseline  -fzb6v   boot 00:45:38Z -> first [layer2_shortlist] 01:05:21Z   19m43s
+    now       -b4vms   boot 03:24:05Z -> GAME_CHIPS_PUBLISHED    03:36:49Z   12m44s
+
+(The second is measured to the chips publish because `#563` moved that to the TOP
+of `build_layer2_shortlist`, so it now marks the same instant the first
+`[layer2_shortlist]` line marked before.)
+
+**I PREDICTED NO CHANGE AND SAID SO REPEATEDLY** — "soccer saves nothing from
+this", "expect reading 2 near 19-20 minutes". **Seven minutes came off.** Pruning
+34 `(sport, date)` pairs removed enough artifact-pull work ahead of the candidate
+pool to get there sooner. NOT a controlled comparison — different slate, different
+load — but seven minutes is well outside the noise, and the error was mine in the
+direction of under-claiming.
+
+**STILL 12m44s, so `#565` is not closed.** The remaining soccer cost is traced to
+`_SoccerDataProvider.games()` (`home.py:6478`): **10 leagues × 2 matchdays = 20
+`build_cards_page_context` calls per date at ~12.5 s each ≈ 250 s per date**, and
+adjacent board-window dates usually resolve to the SAME weeks, so it is largely
+the same 20 builds repeated.
+
+**THE OBVIOUS CACHE IS A TRAP AND THIS IS THE ENTRY THAT SAYS SO.**
+`build_cards_page_context` payloads carry `live_state`, and
+`game_chip_scoreboard._game_flags` reads it to set each chip's live/final state.
+A TTL memo on `(league, week, season)` would freeze live soccer scores for the
+TTL — **re-creating the exact staleness `#564` was opened to fix.** That is also
+the real reason the `week_games` memo earlier tonight was wrong; the failing
+tests caught the symptom, this is the cause.
+
+**The correct fix separates them:** memoise the expensive stable half (fixtures +
+simulated projections) and re-attach live state on every read. That is a change
+to `build_cards_page_context`'s contract, not a wrapper around it.

@@ -81,6 +81,36 @@ warning in the same session that cited it. A memo here is still viable, but only
 vintage-keyed, and it treats a symptom of the width problem rather than the
 width.
 
+**SOCCER'S OWN FAN-OUT IS NOW MEMOISED, VINTAGE-KEYED (2026-08-26, user
+direction "I need this fixed and shipped now").** `build_cards_page_context` is
+cached on `(league, week, season, live_vintage)` where the vintage is a
+fingerprint of the LIVE POLLER'S artifact for today -- event ids with their
+status, state, clock and scores. **If anything live moves, the key moves and the
+context rebuilds**, so a cached entry can only ever be served while nothing live
+has changed, which is exactly when it is indistinguishable from a fresh build.
+
+That is the rule `scope_2026-08-21_home_request_path_compute.md` states outright
+(*"needs a vintage key, not just `game_pk`"*) and that my first attempt tonight
+ignored. `live_state_payload` is uncached upstream by design and is ONE
+`read_json_file` per league, against the 12.5 s it guards -- that asymmetry is
+what makes this viable.
+
+TTL 600 s is a BACKSTOP for the non-live inputs (`recommendations_payload`, a
+once-per-date artifact), not the mechanism.
+`SYNDICATE_SOCCER_CARDS_CONTEXT_TTL_SECONDS=0` disables it without a deploy.
+`error`/`absent`/`quiet` are three DISTINCT vintages, so an unreadable live
+payload can never masquerade as "same as last time".
+
+**Reachability proved on the property that matters:** removing the vintage from
+the key turns all four live-invalidation tests red
+(`test_a_live_score_change_invalidates` and siblings).
+
+**Measured by the build itself:** `SOCCER_CONTEXT_CACHE hits= misses= calls=
+seconds_saved=`. `misses` is the floor -- the DISTINCT league-weeks a build
+genuinely had to construct. **A high miss count with near-zero hits is a real
+possible outcome on a busy match evening** (the live vintage churning every
+cycle), and it must be read off that line rather than inferred from the clock.
+
 **STILL OPEN.** (a) The per-sport sizing change itself. (b) MLB's ~3 minutes:
 14 `build_cards_page_context` calls totalling ~50 s, but **25,597 ms and
 14,257 ms in two of them**, on the uncached `[home]` path that scope blamed for a
