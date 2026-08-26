@@ -837,9 +837,17 @@ def test_a_team_side_on_a_NON_team_ticker_still_refuses():
     """
     from syndicate.features.shared.kalshi_orders import _side_to_kalshi
 
-    for market in ("totals", "totals_alt", "spreads", "batter_hits", None, ""):
+    # `spreads` LEFT THIS LIST 2026-08-26 and gained its own path: a spread
+    # ticker names a club AND a strike, and the sign of the board line says
+    # which leg. It still refuses without one -- see the test below.
+    for market in ("totals", "totals_alt", "batter_hits", None, ""):
         with pytest.raises(orders.OrderBuildError, match="unmappable_side"):
             _side_to_kalshi("home", market)
+
+    # A spread with NO line is still a refusal, just a better-named one: the
+    # leg is genuinely unknowable rather than merely unmapped.
+    with pytest.raises(orders.OrderBuildError, match="spread_line_missing"):
+        _side_to_kalshi("home", "spreads")
 
 
 def test_the_direction_sides_are_untouched_by_the_moneyline_path():
@@ -1114,3 +1122,78 @@ def test_the_shard_error_points_at_funding_not_at_venue_support():
     assert "no code change fixes it" not in text
     assert "enable this account" not in text
     assert "not_provisioned" not in text
+
+
+def test_a_spread_leg_comes_from_the_SIGN_of_the_line():
+    """THE PLUMBING THAT LETS SPREADS PLACE AT ALL.
+
+    `kalshi_board_join` pairs a spread market with exactly two board rows:
+    the NAMED club at -X takes YES, the OTHER club at +X takes NO. So the sign
+    of the line IS the leg, and it needs no tri-code table -- which matters,
+    because `team_aliases.canonical_team` refuses the codes shared across
+    leagues, exactly where a ticker comparison would have needed them.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    # The favourite laying the points: our club IS the ticker's club.
+    assert _side_to_kalshi("away", "spreads", -1.5) == "yes"
+    assert _side_to_kalshi("home", "spreads", -1.5) == "yes"
+    # Taking the points: the ticker names the OTHER club, so we want its NO.
+    assert _side_to_kalshi("away", "spreads", 1.5) == "no"
+    assert _side_to_kalshi("home", "spreads", 1.5) == "no"
+    # Period spreads are the same shape.
+    assert _side_to_kalshi("home", "spreads_1st_5_innings", -1.5) == "yes"
+
+
+def test_a_spread_with_no_usable_line_REFUSES_rather_than_picking_a_leg():
+    """A zero or absent line names no leg, and defaulting either way is a real
+    bet on a side nobody chose -- the most expensive silent default in this
+    file, and the one its own docstring is written against.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    with pytest.raises(orders.OrderBuildError, match="spread_line_zero"):
+        _side_to_kalshi("home", "spreads", 0.0)
+    for bad in (None, "", "not-a-number"):
+        with pytest.raises(orders.OrderBuildError, match="spread_line_missing"):
+            _side_to_kalshi("home", "spreads", bad)
+
+
+def test_the_join_and_the_order_builder_agree(monkeypatch):
+    """THE COUPLING TEST. The sign rule above is only correct because the JOIN
+    guarantees it, and that guarantee lives in a different module.
+
+    This drives the real `join_kalshi_to_board` and asserts, for every spread
+    match it produces, that `kalshi_side` is exactly what `_side_to_kalshi`
+    would derive from the board line's sign. If the join's orientation ever
+    changes, this fails HERE -- rather than silently placing the opposite bet,
+    which is what happened for 11 of 11 orders before the join's sign fix.
+    """
+    from syndicate.features.shared import kalshi_board_join as J
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "on")
+
+    # TEX @ CWS with CWS the home favourite: away +1.5, home -1.5 -- the shape
+    # the served board actually carries (measured 2026-08-26).
+    rows = [
+        {"sport": "mlb", "event_id": "e1", "market": "spreads", "line": 1.5,
+         "side": "away", "away_team": "TEX", "home_team": "CHW",
+         "quote": {"price": -110}},
+        {"sport": "mlb", "event_id": "e1", "market": "spreads", "line": -1.5,
+         "side": "home", "away_team": "TEX", "home_team": "CHW",
+         "quote": {"price": -110}},
+    ]
+    markets = [{
+        "ticker": "KXMLBSPREAD-26AUG241940TEXCWS-CHW2", "series": "KXMLBSPREAD",
+        "title": "Chicago White Sox wins by over 1.5 runs?",
+        "yes_american": -110, "no_american": -110,
+    }]
+
+    report = J.join_kalshi_to_board(markets, rows)
+    spreads = [m for m in report["matches"] if m["market"] == "spreads"]
+    assert spreads, report.get("refusals") or report.get("reasons")
+
+    for match in spreads:
+        derived = _side_to_kalshi(match["board_side"], "spreads", match["line"])
+        assert derived == match["kalshi_side"], match

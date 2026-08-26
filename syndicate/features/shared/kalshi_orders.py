@@ -128,7 +128,7 @@ _TEAM_SIDED_MARKETS = frozenset({"h2h", "h2h_h1", "h2h_h2", "h2h_q1", "h2h_q2",
                                  "h2h_q3", "h2h_q4", "h2h_p1", "h2h_p2", "h2h_p3"})
 
 
-def _side_to_kalshi(side: Any, market: Any = None) -> str:
+def _side_to_kalshi(side: Any, market: Any = None, line: Any = None) -> str:
     """Our `over`/`under`/`yes`/`no`/`home`/`away` -> Kalshi's `yes`/`no`.
 
     Explicit, and it REFUSES an unmapped side. Defaulting to `yes` would turn an
@@ -158,9 +158,58 @@ def _side_to_kalshi(side: Any, market: Any = None) -> str:
         return "yes"
     if raw in {"no", "under"}:
         return "no"
-    if raw in {"home", "away"} and str(market or "").strip().lower() in _TEAM_SIDED_MARKETS:
+    market_key = str(market or "").strip().lower()
+    if raw in {"home", "away"} and market_key in _TEAM_SIDED_MARKETS:
         return "yes"
+    if raw in {"home", "away"} and market_key.startswith("spreads"):
+        return _spread_side_from_line(side, market, line)
     raise OrderBuildError(f"unmappable_side: {side!r} market={market!r}")
+
+
+def _spread_side_from_line(side: Any, market: Any, line: Any) -> str:
+    """A SPREAD'S LEG IS DECIDED BY THE SIGN OF ITS LINE. Nothing else here can.
+
+    A Kalshi spread market states a MARGIN -- "Texas wins by over 1.5 runs" --
+    and `kalshi_board_join` pairs it with exactly two board rows, by
+    construction:
+
+        the NAMED club at -X   -> YES pays when it covers
+        the OTHER club at +X   -> NO pays when it does not
+
+    So `yes` if and only if the row's line is NEGATIVE. The sign IS the leg.
+
+    WHY NOT READ THE TICKER. The ticker names a club, and comparing that club
+    to ours needs a tri-code table -- `team_aliases.canonical_team` refuses the
+    codes shared across leagues, which is exactly where this would be used. The
+    sign needs no table and cannot be ambiguous.
+
+    WHY THIS IS SAFE NOW AND WAS NOT BEFORE. Until the join's sign fix
+    (2026-08-26) a `+1.5` row was stamped with the ticker of the club it was
+    FADING -- 11 of 11 orders on the live book -- so `yes` on that ticker would
+    have bought the opposite bet. `_side_to_kalshi` refusing `home`/`away` was
+    the only thing stopping it. The refusal is lifted ONLY because the join now
+    guarantees the pairing above, and `test_the_join_and_the_order_builder_agree`
+    fails if that guarantee ever stops holding.
+
+    A ZERO OR ABSENT LINE REFUSES. A spread with no number is not a pick'em, it
+    is a row we cannot place, and defaulting it either way is a real bet on a
+    leg nobody chose.
+    """
+    try:
+        value = float(line)
+    except (TypeError, ValueError):
+        raise OrderBuildError(
+            f"spread_line_missing: {line!r} side={side!r} market={market!r}"
+            " -- a spread's leg comes from the sign of its line"
+        ) from None
+    if value < 0:
+        return "yes"
+    if value > 0:
+        return "no"
+    raise OrderBuildError(
+        f"spread_line_zero: side={side!r} market={market!r}"
+        " -- a zero spread names no leg"
+    )
 
 
 def order_body(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
@@ -409,7 +458,11 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
     #    equivalent to buying NO at 1 - price, but this endpoint quotes
     #    everything from the YES side.)"
     contract_side = _side_to_kalshi(
-        getattr(request, "side", None), getattr(request, "market", None)
+        getattr(request, "side", None),
+        getattr(request, "market", None),
+        # THE SIGNED BOARD LINE. A spread's leg is not expressible without it --
+        # see `_spread_side_from_line`.
+        getattr(request, "line", None),
     )
     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
 
