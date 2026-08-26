@@ -32468,3 +32468,57 @@ contain each other and the second silently reverts the first).
 
 verify: `STALE_ROW_CAUSE ... sidecar=<age>` per sport, with wnba reading
 `sidecar_frozen` rather than the `orphaned_line=2` it manufactured at 19:15Z.
+
+### verify MET. `sidecar_frozen` fires, and it INVALIDATES most of the 19:15Z reading.
+
+19:57:35Z, instance `-96gj5`:
+
+    STALE_ROW_CAUSE
+      mlb  [stale=145 worst=5570s  sidecar=321s   market_gone=1,orphaned_line=2]
+      nfl  [stale=54  worst=13127s sidecar=13169s sidecar_frozen=3]
+      wnba [stale=377 worst=33419s sidecar=3279s  sidecar_frozen=3]
+
+**THE FIX WORKS.** wnba read `orphaned_line=2 of 3` at 19:15Z with a sidecar
+that was not being written; it now reads `sidecar_frozen=3`. The false positive
+is gone, and the sidecar age is on the line so the verdict is checkable rather
+than trusted.
+
+**AND IT FOUND A SECOND SPORT I HAD NOT SUSPECTED. NFL's sidecar is frozen too —
+`sidecar=13169s`, 3.7 HOURS.** At 19:15Z nfl reported `market_gone=3`, which I
+passed on as a real finding. **It was equally worthless**: a frozen file
+produces `market_gone` just as readily as `orphaned_line`, which is exactly why
+the fix had to override BOTH labels rather than only the one that looked wrong.
+
+**WHAT THE 19:15Z READING ACTUALLY SAID, corrected:** I reported
+"`market_gone`=6, `orphaned_line`=3, the feed stopping is dominant". **6 of
+those 9 labels came from frozen sidecars and meant nothing.** The real content
+of that reading was 3 MLB labels.
+
+### The corrected finding
+
+    sport  sidecar    verdict
+    mlb      321s     LIVE      -> labels valid: market_gone=1, orphaned_line=2
+    wnba    3279s     FROZEN    -> we stopped observing wnba 55 min ago
+    nfl    13169s     FROZEN    -> we stopped observing nfl 3.7 HOURS ago
+
+**TWO OF THE THREE SPORTS CARRYING STALE ROWS HAVE STOPPED CAPTURING QUOTES
+ENTIRELY.** That is not a board defect and not a market-closure story — it is a
+capture outage, and it is the largest thing on this board:
+
+- **wnba** — cause already owned by the OPEN lane `wnba-live-odds-capture-gap`
+  (the reuse guard upstream of the appending child). Its stale row count has
+  grown **27 -> 377** since 19:15Z.
+- **nfl** — **NEW, UNATTRIBUTED, and nobody is holding it.** 3.7 hours with no
+  sidecar write. Worth a lane.
+
+**ON THE ONE SPORT WHERE THE MEASUREMENT IS SOUND, THE GRID IS THE PROBLEM:**
+mlb `orphaned_line=2` to `market_gone=1`. Superseded lines ARE reaching the
+board, so `drop_superseded_lines` has a real hole — the relative-guard gap
+described above. That inverts the earlier "the feed stopping is dominant"
+reading on the only sport entitled to answer.
+
+**METHOD NOTE.** This is the second time in `#569` that a reading survived one
+round and died on the next, and both times the cause was the same: a label that
+could be produced by more than one mechanism, reported as though it named one.
+`sidecar=<age>` on the line is what makes the current numbers checkable; quote
+them WITH it.
