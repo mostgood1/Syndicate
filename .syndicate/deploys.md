@@ -32034,3 +32034,208 @@ before order placement." It was always the account holder's action, and a
 one-minute transfer. See the CORRECTION entry above.
 
 verify: DISCHARGED by the three fills above.
+
+## 2026-08-26 15:04:54Z — refresh-worker `44c1c564` (PR #92, `#569` quote-age)
+
+Off-protocol, same cause as every deploy today: no `RENDER_API_KEY` here and the
+proxy 403s `api.render.com`, so `deploy_claim.py`/`deploy_preflight.py` are
+unreachable. Render MCP, on explicit user direction ("ship it"). Commit IS on
+`origin/main`. Log-only change; 311 tests green (all `test_layer2_*` plus
+`test_served_quote_age.py`) before merge.
+
+verify: **one `QUOTE_AGE_SERVED` line from one cycle answers the question.**
+
+    [layer2_shortlist] QUOTE_AGE_SERVED at=publish rows= no_clock=
+      seen_n/p50/p90/max  book_n/p50/p90/max  worst_seen_by_sport <slug>=<s>
+
+Read `seen_p50` against the ~60s publish cadence:
+
+    seen_p50 small  -> PUBLICATION. This lane's ground, and already fixed twice.
+    seen_p50 large  -> UPSTREAM. syndicate-43's direct-feed case is right and
+                       every publication fix shipped today was treating a symptom.
+
+**A large `seen_p50` would mean this lane spent a day on the wrong layer.** That
+is the outcome to look for FIRST, not last — it is the one that costs something
+to admit, which is exactly why it should be checked before the comfortable one.
+
+### Merging PR #92 surfaced a silent deletion on `main`
+
+`docs/ai_context/todo.md` lost its title line — `# Syndicate TODO — canonical
+cross-session list` — somewhere in another lane's edit. Present in the
+merge-base, absent on `origin/main`. **Restored in this merge.**
+
+Checked the rest of the file rather than assuming that was all: `#559`, `#560`
+and `#561` also left `todo.md`, and those ARE legitimate — all three are in
+`todo_closed.md` on main (3, 6 and 3 occurrences). Verified they were NOT
+resurrected by this resolution.
+
+**Both `deploys.md` conflicts today resolved by KEEPING BOTH SIDES.** These files
+are append-only ledgers and "resolve" on one is almost always a union, never a
+choice. The other side was the `kalshi-exchange-index` lane's entry.
+
+### verify MET, AND IT GOES AGAINST THIS LANE. `seen_p50=859`.
+
+First cycle after boot, 15:17:46Z, instance `-96j6j`:
+
+    QUOTE_AGE_SERVED at=publish rows=1305 no_clock=0
+      seen_n=1056  seen_p50=859   seen_p90=1790   seen_max=16650
+      book_n=1305  book_p50=879   book_p90=11598  book_max=79206
+      worst_seen_by_sport  wnba=16650  mlb=9882  soccer=893  nfl=829
+
+**The pre-registered reading was: `seen_p50` large -> UPSTREAM, syndicate-43 is
+right, and every publication fix shipped today was treating a symptom. It is
+859 seconds. That is the outcome, and it is the one that costs something.**
+
+    publish cadence          ~60s
+    median served quote age  859s = 14.3 min      -> 14x the cadence
+    p90                     1790s = 29.8 min
+    worst served row       16650s =  4.6 h (wnba); mlb 9882s = 2.7 h
+
+**THE BOARD CANNOT BE FRESHER THAN ITS UPSTREAM POLL, AND THAT FLOOR IS ~14
+MINUTES.** Publishing faster cannot go below it. `#564`'s chip cadence fix and
+the derived `state_meta` were both real defects and both stay fixed — but
+**neither was the cause of what the user actually saw**, and I reported the
+staleness investigation as essentially closed twice before measuring this.
+
+**WHAT WAS ACTUALLY WRONG WITH MY ACCOUNT.** The user's words were "the compact
+cards were stale AND the odds refresh times were frozen for about 20 mins".
+I read "frozen refresh times" as *the timestamp display is not updating* and
+went after publication. It is at least as consistent with *the refresh genuinely
+is not happening*, and 859s median says the second reading was available the
+whole time. **Two true causes found early (`#545`'s cadence regression, the
+hard-coded `is_fresh`) is what stopped the search** — the same failure mode
+`#569`'s entry names, committed while writing it.
+
+**HONEST LIMITS.** (a) ONE cycle, and a COLD one — the first build after boot,
+when a poll may not yet have landed. This needs a warm-cycle sample before
+anyone sizes work against 859s. (b) `seen_p50` (859) and `book_p50` (879) are
+nearly EQUAL at the median: we are looking about as often as prices move, so at
+the median this is a poll-interval floor, not a broken feed. They diverge hard
+in the tail (p90 1790 vs 11598), which is `#370`'s motionless-market effect and
+is expected. (c) 249 of 1305 rows carry a book clock but no seen clock
+(`seen_n=1056`, `no_clock=0`) — those are measured on one clock only.
+
+**FOR syndicate-43:** this is positive evidence for the direct-feed architecture
+and it is now measured rather than argued. The number to beat is
+`seen_p50=859`. Re-read it warm before committing to it.
+
+### WARM SAMPLE, n=4 over 23 min, same instance `-96j6j`, no restart. THE COLD READING WAS WRONG TOO.
+
+    time       rows    p50   wnba    mlb   nfl soccer
+    15:17:46   1305    859  16650   9882   829    893   (cold)
+    15:29:31   1305   1549  17341  10572  1222   1174
+    15:33:49   1305   1813  17604  10834  1486   1436
+    15:40:52   1305   1898  18014  11244  1898   1852
+
+Aging rate, Δage ÷ Δwall (**1.00 = NOT REFRESHED AT ALL**; 0.00 = fully refreshed):
+
+    window                wall     p50   wnba    mlb    nfl soccer
+    15:17:46->15:29:31     705    0.98   0.98   0.98   0.56   0.40
+    15:29:31->15:33:49     258    1.02   1.02   1.02   1.02   1.02
+    15:33:49->15:40:52     423    0.20   0.97   0.97   0.97   0.98
+
+**THE WORST ROW IN MLB AND WNBA WAS NEVER REFRESHED ONCE IN 23 MINUTES.** Both
+tracked wall-clock at 0.98 across the full span: wnba 16650 -> 18014, mlb
+9882 -> 11244. Their served staleness grew monotonically from 4.6h to 5.0h and
+2.7h to 3.1h. `book_max` reached **80578s = 22.4 hours**.
+
+**THIS RETRACTS THE COLD READING, WHICH I REPORTED ~40 MINUTES AGO.** I called
+`seen_p50=859` a "~14-minute upstream poll floor". It is not a floor and it is
+not a poll interval:
+
+- p50 in the last window moved at **0.20** — the median DOES improve, so rows
+  are refreshing.
+- The per-sport worst moved at **0.97** in the same window — the stale rows are
+  refreshing NEVER.
+
+**It is not a cadence problem. Specific rows are never repolled and age without
+bound, while the rows around them refresh normally.** A median hides this
+completely, which is why `worst_seen_by_sport` is on the line — that field is
+the only reason this was visible, and it was added on a hunch about uneven
+shards rather than for this.
+
+**AND THE GATE PERMITS IT, BY DESIGN.** `SHORTLIST_MAX_QUOTE_AGE_SECONDS =
+14 * 3600` (`layer2_board.py:489`) — **14 hours.** A 5-hour-old wnba quote is
+nowhere near the ceiling, so nothing drops it. Not obviously a bug (that
+constant carries its own reasoning at :418-489) but it is the number that lets
+a 22-hour book age reach the board.
+
+**THIRD REVISION OF THIS ANSWER IN ONE SESSION**, and each revision came from
+taking more samples rather than from new reasoning:
+
+    publication is broken          -> true, but not what the user saw
+    upstream poll floor ~14 min    -> wrong; retracted here
+    specific rows never refresh    -> current, n=4
+
+**Anomaly worth someone's time, NOT explained:** the 15:37:12 publish carried
+`rows=400 seen_p50=315` with only soccer in `worst_seen_by_sport` — a different,
+smaller, much FRESHER build interleaved with the 1305-row ones. Whatever path
+produces that one is getting quotes 6x fresher.
+
+**FOR syndicate-43:** the direct-feed case does not rest on the median. It rests
+on rows that never refresh at all under the current feed, with a 14-hour
+tolerance permitting them. `seen_max` and `worst_seen_by_sport` are the numbers
+to beat, not `seen_p50`.
+
+### WHY THOSE ROWS NEVER REPOLL — TWO DIFFERENT CAUSES, ONE PER SPORT
+
+Traced 2026-08-26 16:2xZ. `ODDS_SWEEP_OUTCOME` is the decisive line and it
+already existed:
+
+    15:21:19  sport=wnba wrote=False exists=True since_launch_s=122   sidecar_age_s=947
+    16:12:15  sport=wnba wrote=False exists=True since_launch_s=3178  sidecar_age_s=4002
+    16:04:30  sport=mlb  wrote=True  exists=True since_launch_s=150   sidecar_age_s=30
+    16:12:15  sport=mlb  wrote=True  exists=True since_launch_s=615   sidecar_age_s=494
+
+**WNBA: `wrote=False`. The last-seen sidecar is NOT BEING WRITTEN AT ALL.**
+`sidecar_age_s` went 947 -> 4002 across 3055s of wall clock — **a ratio of
+1.00**, the same signature as the served quote age. Every wnba key ages with
+the clock because nothing ever restamps it.
+
+**This is an ALREADY-ROOT-CAUSED finding belonging to the OPEN lane
+`wnba-live-odds-capture-gap`** (session 2bffd747, 2026-08-21 00:45Z): the
+autorun is fine, but `refresh_wnba_oddsapi_props.py`'s **REUSE GUARD** sits
+upstream and returns `reused_artifact_bundle` every tick, so the child that
+appends `book_quotes` never spawns. Its staleness bound is the PREGAME sweep
+interval (2h) and its reuse key carries no phase term, so a 240s live autorun
+cannot outrun it. **Their fix, their lane — I am not touching it.** What this
+adds is (a) confirmation it is STILL LIVE five days later and (b) the board-side
+cost, which their lane could not see: **5.0 hours of served quote staleness on
+the published board.**
+
+**MLB: `wrote=True`, sidecar_age 30s.** The sidecar IS being refreshed, so
+MLB is NOT an append failure and the wnba cause does not apply. MLB's
+never-refreshing rows are the **ORPHANED-KEY** mechanism, and the code documents
+it as intended behaviour:
+
+1. `_KEY_FIELDS` includes **`line`** (`odds_book_quotes.py:104-126`). Its own
+   comment: *"a book MOVING its line now mints a new key rather than updating
+   one, so both observations persist."* Correct for an append-only change log.
+2. `append_book_quotes` restamps `state[key]` **only for keys present in the
+   incoming payload**. An orphaned key can never appear again, so its
+   `captured_at` freezes and `seen_age = now - frozen` grows at exactly 1.0x
+   wall clock, without bound.
+3. `drop_superseded_lines` (`book_grid.py:671`) is a **RELATIVE** guard: it
+   drops a row only when a FRESHER SIBLING in the same `_line_group_key` group
+   — `(sport, event_id, kind, market, segment, player_name)` — leads it by
+   >15 min. **When a market stops being quoted ENTIRELY, every member of its
+   group ages together, there is no fresher sibling, and nothing is dropped.**
+4. The only absolute bound left is `SHORTLIST_MAX_QUOTE_AGE_SECONDS = 14 * 3600`
+   (`layer2_board.py:489`) — **14 hours.**
+
+**The gap in one sentence: supersession catches "the book moved off this line"
+and nothing catches "the feed stopped quoting this market at all."** That is
+why `SUPERSEDED_LINES_DROPPED count=1560 kept=946` fires heavily on MLB while
+MLB's worst row still ages at 0.97 — the guard is working, on a different
+failure.
+
+**NOT VERIFIED, and it should be before anyone builds on it:** I have not
+confirmed that MLB's specific never-refreshing rows ARE orphaned keys rather
+than settled/closed markets. The mechanism is proven to exist and to be
+unguarded; that these particular rows take it is inference. The test is to dump
+the worst-`seen_age` MLB keys and check whether a same-group key with a
+different `line` was observed more recently.
+
+**ALSO SEEN, unattributed:** `SWEEP_SKIPPED_DETAIL
+too_large=[mlb_source/tracking/book_quotes/2026-08-26.jsonl(18052118)]` — the
+MLB quote log is 18MB and being skipped by a sweep.

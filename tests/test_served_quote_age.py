@@ -134,3 +134,99 @@ def test_the_report_is_wired_into_the_shortlist_build():
 
     source = inspect.getsource(layer2_shortlist.build_layer2_shortlist)
     assert "_report_served_quote_ages(" in source, "computed and never called"
+
+
+# ---------------------------------------------------------------------------
+# `#569` part 2: WHY a row never repolls. orphaned_line vs market_gone.
+# ---------------------------------------------------------------------------
+
+from pipeline.layer2_shortlist import _classify_stale_row, _report_stale_row_causes
+
+NOW = "2026-08-26T16:00:00Z"
+
+
+def _grid_row(line="8.5", seen=7200.0, event="E1", market="totals", player=""):
+    return {
+        "sport": "mlb", "kind": "game", "event_id": event, "segment": "full_game",
+        "market": market, "player_name": player, "line": line,
+        "quote": {"quote_seen_age_seconds": seen},
+    }
+
+
+def _key(line="8.5", book="fanduel", sel="over", event="E1", market="totals", player=""):
+    # _KEY_FIELDS order: sport|kind|event_id|bookmaker|segment|market|selection|player_name|line
+    return f"mlb|game|{event}|{book}|full_game|{market}|{sel}|{player}|{line}"
+
+
+def test_a_live_market_whose_line_moved_is_an_ORPHANED_LINE():
+    """The book moved 8.5 -> 9.0. The 8.5 key can never be observed again, but
+    the market is plainly live. drop_superseded_lines should have caught it."""
+    last_seen = {
+        _key(line="8.5"): "2026-08-26T14:00:00Z",   # 2h old, the orphan
+        _key(line="9.0"): "2026-08-26T15:58:00Z",   # 2m old, the live sibling
+    }
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "orphaned_line"
+
+
+def test_a_market_the_feed_stopped_quoting_is_MARKET_GONE():
+    """Every line in the group is equally old. No fresher sibling exists, so
+    drop_superseded_lines has nothing to compare and correctly drops nothing."""
+    last_seen = {
+        _key(line="8.5"): "2026-08-26T14:00:00Z",
+        _key(line="9.0"): "2026-08-26T14:00:30Z",
+    }
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "market_gone"
+
+
+def test_a_different_market_never_counts_as_a_fresh_sibling():
+    """A collision here would attribute one market's freshness to another and
+    report a dead feed as a tidy grid bug."""
+    last_seen = {
+        _key(line="8.5"): "2026-08-26T14:00:00Z",
+        _key(line="9.0", market="spreads"): "2026-08-26T15:58:00Z",
+        _key(line="9.0", event="E2"): "2026-08-26T15:58:00Z",
+        _key(line="9.0", player="Ohtani"): "2026-08-26T15:58:00Z",
+    }
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "market_gone"
+
+
+def test_the_same_line_on_another_book_is_not_the_orphan_test():
+    """Another book quoting the SAME line does not mean this line was
+    superseded -- supersession is about the line moving, not about coverage."""
+    last_seen = {
+        _key(line="8.5", book="fanduel"): "2026-08-26T14:00:00Z",
+        _key(line="8.5", book="draftkings"): "2026-08-26T15:58:00Z",
+    }
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "market_gone"
+
+
+def test_a_reordered_key_schema_reports_unknown_rather_than_guessing():
+    """This function slices a positional string. If `_KEY_FIELDS` is reordered
+    the slice silently means something else, so it is asserted at call time and
+    the answer degrades to `unknown`, never to a plausible label."""
+    import pipeline.layer2_shortlist as mod
+    real = mod._QUOTE_KEY_ORDER
+    try:
+        mod._QUOTE_KEY_ORDER = ("sport", "line")  # disagree with _KEY_FIELDS
+        got = _classify_stale_row(_grid_row(), {_key(): NOW}, NOW)
+    finally:
+        mod._QUOTE_KEY_ORDER = real
+    assert got == "unknown_key_order_changed"
+
+
+def test_the_report_never_raises_on_junk(capsys):
+    for rows in (None, [], "nope", [None, 7], [{"quote": {"quote_seen_age_seconds": True}}]):
+        _report_stale_row_causes(rows, "2026-08-26")
+    assert "STALE_ROW_CAUSE_FAILED" not in capsys.readouterr().out
+
+
+def test_rows_under_the_threshold_are_reported_as_none_rather_than_silence(capsys):
+    _report_stale_row_causes([_grid_row(seen=60.0)], "2026-08-26")
+    assert "STALE_ROW_CAUSE none_over_900s" in capsys.readouterr().out
+
+
+def test_the_cause_report_is_wired_into_the_build():
+    import inspect
+    from pipeline import layer2_shortlist
+    src = inspect.getsource(layer2_shortlist.build_layer2_shortlist)
+    assert "_report_stale_row_causes(" in src, "computed and never called"
