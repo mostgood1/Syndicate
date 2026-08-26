@@ -135,3 +135,56 @@ confusing venue 400 into a legible refusal.
   recorded in the `kalshi-spread-join-sign` lane. Real, still open.
 - `spreads away 1.5 -> ...-TEX2` still present in production: the inversion the
   join fix corrects. Fix is on `main` (`a09ec780`) and NOT deployed.
+
+## `settled_at` IS NOT THE RECONCILIATION BUG — I WAS WRONG, AND WHAT IS
+`[2026-08-26T15:2xZ]`
+
+**RETRACTED:** I reported `settled_at` stamped ~400ms after `submitted_at` on
+four OPEN orders as a live candidate for "closed positions not reconciling".
+It is not. `settled_at` is a DEPRECATED MIRROR of `venue_resolved_at`, meaning
+*the SUBMIT resolved at the venue* -- correctly stamped the instant the venue
+acknowledges. Nothing in the execution path reads it. The one apparent reader,
+`intelligence_evaluation.py:189`, operates on INTELLIGENCE PREDICTION-LEDGER
+records (they carry `query`/`response`/`artifact_metadata`), not execution
+orders, and uses it only as a date fallback for chunk naming. Verified
+independently rather than taken on the peer session's word. `settle_orders`
+keys on `outcome` and `status == "filled"`, so a sweep cannot be fooled by it.
+The field is a BAD NAME, not a bad behaviour; the peer session has annotated it
+for retirement.
+
+**THE ACTUAL GAP, from refresh-worker logs (the counters web cannot read):**
+
+    SETTLED date=2026-08-25 orders=152 graded=0 already_graded=120
+      ungraded={'no_soccer_live_state_for_date': 3, 'order_not_filled': 20,
+                'game_not_in_live_box': 9}
+    SETTLED date=2026-08-26 orders=243 graded=0 already_graded=0
+      ungraded={'no_live_feed': 175, 'no_soccer_live_state_for_date': 3,
+                'order_not_filled': 57, 'unmapped_market': 3,
+                'no_live_box_for_date': 5}
+    UNMAPPED_MARKETS date=2026-08-26 {'totals': 3}
+    PNL all_time by_sport=[('mlb', 157, ...), ('soccer', 0, ...), ('wnba', 0, ...)]
+
+**THE GRADER WORKS. MLB HAS SETTLED 157 ORDERS ALL-TIME.** What does not
+settle is WNBA and SOCCER, and both are ZERO ALL-TIME:
+
+- **WNBA `game_not_in_live_box` / `no_live_box_for_date`.** `bet_status_wnba`
+  resolves against `wnba_source/data/live/live_player_box_<date>.json`
+  (`_load_box_index`). For 08-25 that artifact WAS readable -- the reason is
+  `game_not_in_live_box`, not `no_box`, and the two are deliberately different
+  reasons -- it simply does not contain WSH@PHX. The three Kalshi positions on
+  that game are `venue_status: executed`, reconciled 15:04:11Z, game finished
+  13.3h earlier, `outcome: None`, `graded_at: None`.
+- **Soccer `no_soccer_live_state_for_date`**, same class, 0 settled all-time
+  despite `#547` adding the resolver.
+- `unmapped_market {'totals': 3}` is a third, smaller gap.
+- `no_live_feed: 175` on 08-26 is EXPECTED (MLB games had not started) and
+  `order_not_filled: 57` is correct (rejected/failed orders).
+
+**THIS IS DOWNSTREAM OF AN ALREADY-OPEN LANE, NOT A NEW DEFECT.**
+`wnba-live-odds-capture-gap` diagnosed the cause: the reuse guard in
+`refresh_wnba_oddsapi_props.py` returns `reused_artifact_bundle` every tick, so
+the child that appends the live capture never spawns; its staleness bound is
+the 2h PREGAME sweep interval and its reuse key carries no phase term, so a
+240s live autorun cannot outrun it. The settlement symptom and that capture gap
+are the same root cause seen from opposite ends. Fixing settlement code would
+achieve nothing -- there is no box to grade against.
