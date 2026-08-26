@@ -31145,3 +31145,59 @@ build and none of the warm one.
 **NEXT: instrument the tail** — `_merge_candidate_pools` onward to the return.
 That is the only remaining unobserved stretch and it is the one that matters in
 steady state. And it is ~60% off-CPU, so expect waiting, not computing.
+
+## 2026-08-26 13:2xZ — the board-path sweep finally completed: 2 failed, 293 passed
+
+Three earlier attempts never produced a verdict (two timed out, one died at 21
+tests when a detached `nohup` did not survive the shell). **I deployed twice
+while calling this evidence "still running".** It has now run, and it found
+something.
+
+### One failure was MINE, and it shipped hours before I knew
+
+`test_state_compute_persists_freshness_metadata_on_board_snapshot` — PASSED at
+`20bb673e^`, FAILED after. Confirmed by running it against a worktree at the
+pre-change commit, not inferred.
+
+**But the test was asserting the bug.** Its fixture is stamped
+`2026-06-15T20:00:00Z` and read 72 days later, and it asserted
+`freshness_status == "fresh"`. That is precisely
+`read_combined_intelligence_response` hard-coding
+`{"age_seconds": 0.0, "is_fresh": True}` regardless of what it had just read —
+the defect behind "the board sat stale for 20 minutes while still presenting as
+current". **The assertion is what made the bug look intentional.**
+
+Fixed by pinning BOTH directions, not by flipping the string: stale-only
+assertions would pass just as happily on a function hard-coded to `"stale"`,
+which is the same defect pointing the other way.
+
+**My first attempt at the fresh case ALSO failed**, and the reason is worth
+keeping: this read path's SLA is **30 seconds**, not the combined board's 900.
+A 30s-old stamp lands on the boundary and read stale at 30.99s. The test now
+asserts `age_seconds < freshness_sla_seconds` rather than a literal, so an SLA
+change cannot make it pass for the wrong reason.
+
+### The other failure was NOT mine, and it was a FALSE ALARM ABOUT THIS EXACT INCIDENT
+
+`test_compute_response_recomputes_when_cached_snapshot_is_stale` was already red
+at `3d1cf99f`, before any of tonight's work.
+
+It mocked `syndicate.features.intelligence.collect_all_recommendations`.
+**`pipeline/` contains ZERO references to that function** — the compute path
+uses `collect_candidates_with_fallback_merge`, bound at import in
+`intelligence_state` (line 32). The mock never fired, so `call_count` was 0.
+
+**A red test named "recomputes when cached snapshot is stale" was sitting on
+main throughout an investigation into a stale board.** It was wrong. The
+recompute works: the two assertions ABOVE the failing one — `ok`, and
+`candidate_pool` present, a key the cached snapshot does not carry — only pass
+on a real recompute. Repaired by patching the function actually on the path,
+at `pipeline.intelligence_state.<name>` (patching the defining module would
+miss it exactly as the old target did).
+
+**THE LESSON, and it is not "run the tests".** I ran them; the runs kept dying
+and I let "still running" stand in for "green" across two deploys. A test suite
+whose verdict never arrives is not weak evidence — it is NO evidence, and it
+should be treated as a blocker to state, not a caveat to mention. What saved
+this was that the failing assertion happened to be the bug rather than the fix.
+That was luck.

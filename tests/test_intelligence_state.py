@@ -1398,8 +1398,61 @@ class IntelligenceStateTests(unittest.TestCase):
 
         self.assertIsNotNone(legacy_response)
         self.assertIn("state_meta", legacy_response)
-        self.assertEqual(legacy_response["state_meta"]["freshness_status"], "fresh")
+        # `#564`. This asserted "fresh" until 2026-08-26, and it was asserting a
+        # BUG: the fixture above is stamped 2026-06-15T20:00:00Z and is read
+        # months later, so "fresh" was never a property of this snapshot -- it
+        # was `read_combined_intelligence_response` hard-coding
+        # `{"age_seconds": 0.0, "is_fresh": True}` regardless of what it had
+        # just read. That is the defect behind the reported symptom (a board
+        # frozen ~20 minutes while still presenting as current), and this
+        # assertion is what made it look intentional.
+        #
+        # Now derived from the artifact's own stamp, so an ancient fixture reads
+        # stale. Deterministic, not clock-flaky: 2026-06-15 is fixed and only
+        # recedes further from any future run date.
+        self.assertEqual(legacy_response["state_meta"]["freshness_status"], "stale")
+        self.assertIs(legacy_response["state_meta"]["is_fresh"], False)
+        self.assertGreater(legacy_response["state_meta"]["age_seconds"], 86400)
         self.assertEqual(legacy_response["state_last_updated"], "2026-06-15T20:00:00Z")
+
+        # BOTH DIRECTIONS. Without a fresh case, the assertions above would pass
+        # just as happily on a function that hard-coded "stale" -- which is the
+        # same class of defect as the one they replaced, pointing the other way.
+        # 2s, not 30s: this read path's SLA is 30 SECONDS (not the combined
+        # board's 900), so a 30s-old stamp lands exactly on the boundary and
+        # reads stale by a rounding margin. Measured 30.99s > 30 on the first
+        # attempt at this test. The assertions below check age AGAINST the
+        # reported SLA rather than against a literal, so a future SLA change
+        # cannot make this pass for the wrong reason.
+        recent_stamp = (
+            datetime.now(timezone.utc) - timedelta(seconds=2)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with tempfile.TemporaryDirectory() as fresh_dir:
+            fresh_root = Path(fresh_dir)
+            fresh_snapshot_path = fresh_root / "legacy_board_snapshot.json"
+            refresh_state_store.write_json_file(
+                fresh_snapshot_path,
+                {
+                    "latest_key": "legacy-key",
+                    "updated_at": recent_stamp,
+                    "response": {
+                        "ok": True,
+                        "selected_date": "2026-06-15",
+                        "top_opportunities": [{"name": "Play 1"}],
+                        "analysis": {"recommendations": []},
+                    },
+                },
+            )
+            with patch.object(intelligence_state_module, "BOARD_SNAPSHOT_PATH", fresh_snapshot_path), patch.object(intelligence_state_module, "reports_root", return_value=fresh_root):
+                fresh_response = intelligence_state_module.read_latest_intelligence_board_snapshot_response(
+                    {"question": "top edges today", "date": "2026-06-15"}
+                )
+
+        self.assertIsNotNone(fresh_response)
+        fresh_meta = fresh_response["state_meta"]
+        self.assertLess(fresh_meta["age_seconds"], fresh_meta["freshness_sla_seconds"])
+        self.assertEqual(fresh_meta["freshness_status"], "fresh")
+        self.assertIs(fresh_meta["is_fresh"], True)
 
     def test_queue_refresh_persists_pending_payloads_for_worker_reload(self) -> None:
         service = IntelligenceStateService()
@@ -3350,7 +3403,24 @@ class IntelligenceStateTests(unittest.TestCase):
 
             with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
                 with patch("pipeline.intelligence_state.build_intelligence_status", return_value={"selected_date": "2026-06-10", "sports": []}):
-                    with patch("syndicate.features.intelligence.collect_all_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_collect:
+                    # `collect_all_recommendations` until 2026-08-26, which had
+                    # not been on this path for some time: `intelligence_state`
+                    # imports `collect_candidates_with_fallback_merge` (line 32)
+                    # and has ZERO references to `collect_all_recommendations`.
+                    # So the mock never fired, `call_count` was 0, and the test
+                    # was RED on main -- reporting "the board does not recompute
+                    # when stale", which is the exact symptom under
+                    # investigation on 2026-08-25/26 and cost a detour to
+                    # exonerate. The recompute was working the whole time: the
+                    # two assertions ABOVE the failing one (`ok`, and
+                    # `candidate_pool` present -- a key the cached snapshot does
+                    # not carry) only pass on a real recompute.
+                    #
+                    # Patched at `pipeline.intelligence_state.<name>`, not at the
+                    # defining module: the name is bound at import there, so
+                    # patching the source module would miss it exactly as the
+                    # old target did.
+                    with patch("pipeline.intelligence_state.collect_candidates_with_fallback_merge", return_value=[{"name": "Play 1", "sport": "MLB", "sport_slug": "mlb", "market": "Hits", "score": 91.0}]) as mocked_collect:
                         with patch("pipeline.intelligence_state._balanced_recommendation_order", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_rank:
                             with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"headline": "Test", "recommendations": []}) as mocked_pipeline:
                                 with patch.object(service, "_source_state_fingerprint", return_value="fingerprint-1"):
