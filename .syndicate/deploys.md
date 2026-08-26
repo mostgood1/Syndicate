@@ -31599,3 +31599,66 @@ produces that one is getting quotes 6x fresher.
 on rows that never refresh at all under the current feed, with a 14-hour
 tolerance permitting them. `seen_max` and `worst_seen_by_sport` are the numbers
 to beat, not `seen_p50`.
+
+### WHY THOSE ROWS NEVER REPOLL — TWO DIFFERENT CAUSES, ONE PER SPORT
+
+Traced 2026-08-26 16:2xZ. `ODDS_SWEEP_OUTCOME` is the decisive line and it
+already existed:
+
+    15:21:19  sport=wnba wrote=False exists=True since_launch_s=122   sidecar_age_s=947
+    16:12:15  sport=wnba wrote=False exists=True since_launch_s=3178  sidecar_age_s=4002
+    16:04:30  sport=mlb  wrote=True  exists=True since_launch_s=150   sidecar_age_s=30
+    16:12:15  sport=mlb  wrote=True  exists=True since_launch_s=615   sidecar_age_s=494
+
+**WNBA: `wrote=False`. The last-seen sidecar is NOT BEING WRITTEN AT ALL.**
+`sidecar_age_s` went 947 -> 4002 across 3055s of wall clock — **a ratio of
+1.00**, the same signature as the served quote age. Every wnba key ages with
+the clock because nothing ever restamps it.
+
+**This is an ALREADY-ROOT-CAUSED finding belonging to the OPEN lane
+`wnba-live-odds-capture-gap`** (session 2bffd747, 2026-08-21 00:45Z): the
+autorun is fine, but `refresh_wnba_oddsapi_props.py`'s **REUSE GUARD** sits
+upstream and returns `reused_artifact_bundle` every tick, so the child that
+appends `book_quotes` never spawns. Its staleness bound is the PREGAME sweep
+interval (2h) and its reuse key carries no phase term, so a 240s live autorun
+cannot outrun it. **Their fix, their lane — I am not touching it.** What this
+adds is (a) confirmation it is STILL LIVE five days later and (b) the board-side
+cost, which their lane could not see: **5.0 hours of served quote staleness on
+the published board.**
+
+**MLB: `wrote=True`, sidecar_age 30s.** The sidecar IS being refreshed, so
+MLB is NOT an append failure and the wnba cause does not apply. MLB's
+never-refreshing rows are the **ORPHANED-KEY** mechanism, and the code documents
+it as intended behaviour:
+
+1. `_KEY_FIELDS` includes **`line`** (`odds_book_quotes.py:104-126`). Its own
+   comment: *"a book MOVING its line now mints a new key rather than updating
+   one, so both observations persist."* Correct for an append-only change log.
+2. `append_book_quotes` restamps `state[key]` **only for keys present in the
+   incoming payload**. An orphaned key can never appear again, so its
+   `captured_at` freezes and `seen_age = now - frozen` grows at exactly 1.0x
+   wall clock, without bound.
+3. `drop_superseded_lines` (`book_grid.py:671`) is a **RELATIVE** guard: it
+   drops a row only when a FRESHER SIBLING in the same `_line_group_key` group
+   — `(sport, event_id, kind, market, segment, player_name)` — leads it by
+   >15 min. **When a market stops being quoted ENTIRELY, every member of its
+   group ages together, there is no fresher sibling, and nothing is dropped.**
+4. The only absolute bound left is `SHORTLIST_MAX_QUOTE_AGE_SECONDS = 14 * 3600`
+   (`layer2_board.py:489`) — **14 hours.**
+
+**The gap in one sentence: supersession catches "the book moved off this line"
+and nothing catches "the feed stopped quoting this market at all."** That is
+why `SUPERSEDED_LINES_DROPPED count=1560 kept=946` fires heavily on MLB while
+MLB's worst row still ages at 0.97 — the guard is working, on a different
+failure.
+
+**NOT VERIFIED, and it should be before anyone builds on it:** I have not
+confirmed that MLB's specific never-refreshing rows ARE orphaned keys rather
+than settled/closed markets. The mechanism is proven to exist and to be
+unguarded; that these particular rows take it is inference. The test is to dump
+the worst-`seen_age` MLB keys and check whether a same-group key with a
+different `line` was observed more recently.
+
+**ALSO SEEN, unattributed:** `SWEEP_SKIPPED_DETAIL
+too_large=[mlb_source/tracking/book_quotes/2026-08-26.jsonl(18052118)]` — the
+MLB quote log is 18MB and being skipped by a sweep.
