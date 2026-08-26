@@ -3830,6 +3830,62 @@ def _book_grid_refresh_interval_seconds() -> int:
 _BOOK_GRID_FORWARD_INTERVAL_MULTIPLE = 6
 
 
+def _book_grid_per_sport_window_enabled() -> bool:
+    """Prune (sport, date) pairs no board will ever read. `#565`.
+
+    Off switch without a deploy: `SYNDICATE_BOOK_GRID_PER_SPORT_WINDOW=0`
+    restores the previous behaviour of building every sport for every forward
+    date.
+    """
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_PER_SPORT_WINDOW") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _sport_covers_date(sport: str, anchor_date: str, build_date: str) -> bool:
+    """Is `build_date` inside THIS sport's own slate window? `#565`.
+
+    THE BUG THIS CLOSES. `_book_grid_forward_days` returns the MAXIMUM window
+    across all sports, and the tick below then builds every sport for every date
+    in that span -- so the widest sport's window silently became every sport's
+    cost. `_SLATE_WINDOW_DAYS` is `{nfl: 7, ncaaf: 3, ncaab: 1, soccer: 7, ...}`,
+    so ncaab was being built seven days out to serve a board that asks for one.
+    Reported by the user, who recognised the shape immediately: *"we flipped
+    weekly sports to 7 days out for nfl and ncaaf. this hammered us with soccer
+    that we didn't intend."*
+
+    MEASURED COST on refresh-worker `-fzb6v`, 2026-08-26: boot 00:45:38Z -> first
+    `[layer2_shortlist]` line 01:05:21Z is **19m43s** inside
+    `_build_candidate_pool`, against a shortlist that is itself 58 seconds. Of
+    that, 00:48:58 -> 01:02:23 is **13m25s of soccer per-league context builds**
+    -- five `board_contract_begin` lines in one 60-second window, 12-14 seconds
+    apart, `game_count` 8-11.
+
+    READS THE SAME TABLE `#329` INSISTED ON, just per sport instead of at the
+    max. That keeps the property `max_slate_window_days`' docstring was written
+    for -- the producer cannot build a narrower window than the consumer asks
+    for -- while dropping the coupling that made it every sport's window. The two
+    goals were never in tension; taking the max was simply the coarser way to
+    reach the first one.
+
+    UNKNOWN DATES ARE BUILT, not skipped. An unparseable anchor or build date
+    means we cannot tell whether a board wants it, and the permissive branch
+    costs one shard while the strict branch would silently stop publishing a
+    date some board is reading. That asymmetry is why this returns True on
+    failure rather than False.
+    """
+    if not _book_grid_per_sport_window_enabled():
+        return True
+    try:
+        from syndicate.features.shared.layer1_board import slate_window_days
+
+        offset = (date.fromisoformat(build_date) - date.fromisoformat(anchor_date)).days
+    except Exception:
+        return True
+    if offset <= 0:
+        return True
+    return offset <= max(0, int(slate_window_days(sport)) - 1)
+
+
 def _book_grid_forward_days() -> int:
     """How many days past today to build, covering the widest slate window.
 
@@ -3837,6 +3893,11 @@ def _book_grid_forward_days() -> int:
     the worker cannot build four days while the board asks for seven. A constant
     duplicated across a producer and a consumer is the drift `#329` exists to
     remove -- and this is exactly where it would reappear.
+
+    STILL THE MAXIMUM, deliberately: this sizes the DATE LIST, which has to span
+    the widest sport or that sport loses dates. `#565` fixed the coupling at the
+    per-sport level instead -- see `_sport_covers_date` -- because the union of
+    dates is not the problem; building every sport across it was.
     """
     raw = str(os.environ.get("SYNDICATE_BOOK_GRID_FORWARD_DAYS") or "").strip()
     if raw:
@@ -3938,8 +3999,15 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     written: list[str] = []
     skipped: list[str] = []
     any_live_today = False
+    out_of_window = 0
     for build_date in dates:
         for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
+            # `#565`. Skip the pairs no board will ever read, BEFORE the shard
+            # reconcile below -- which is the expensive half (an HTTP Range pull
+            # per sport per date, plus its `.state.json` sidecar).
+            if not _sport_covers_date(sport, selected_date, build_date):
+                out_of_window += 1
+                continue
             try:
                 # RECONCILE THE SHARD FIRST (`#331`). This worker is not the
                 # service that captures odds -- live-odds-worker is, and it
@@ -4062,6 +4130,13 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         "date": selected_date,
         "written": written,
         "skipped_no_shard": skipped,
+        # `#565`. How many (sport, date) pairs this tick did NOT build because
+        # the date is outside that sport's own slate window. Reported rather
+        # than silent, for the reason the whole item exists: the previous
+        # behaviour -- every sport across the widest sport's window -- was
+        # invisible at every level except the clock. A zero here means the
+        # pruning is doing nothing and the cost is somewhere else.
+        "out_of_window": out_of_window,
         "rebuilt_previous": previous_date if rebuild_previous else None,
         # Which cadence the NEXT tick will use, and why. A board rebuilding every
         # 10 minutes during a live slate looks identical to one rebuilding every

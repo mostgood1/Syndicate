@@ -37,12 +37,35 @@ against a shortlist that is itself **58 seconds**. Inside that, 00:48:58 →
 `GRID_REPRICE` and `BOARD_JOIN` all run inside `build_layer2_shortlist`, the
 58-second half. They are already cheap and already artifact-backed.
 
-**THE FIX: size the forward build PER SPORT, not off the max.** The producer
-should ask `slate_window_days(sport)` for the sport it is building, which is the
-same table and keeps `#329`'s no-drift property without the global coupling.
-`SYNDICATE_BOOK_GRID_FORWARD_DAYS` overrides the whole thing today and is the
-immediate lever if the board needs relief before a code change — but note it is
-also global, so it trades one blunt instrument for another.
+**FIXED (`_sport_covers_date`, `run_refresh_worker.py`).** The date list still
+spans the widest sport — it has to, or that sport loses dates — but the tick now
+skips any `(sport, date)` pair outside **that sport's own** `slate_window_days`,
+before the expensive half (an HTTP Range pull per pair plus its `.state.json`
+sidecar). `#329`'s property survives: every sport still gets its own FULL window.
+Off switch: `SYNDICATE_BOOK_GRID_PER_SPORT_WINDOW=0`. Count reported per tick as
+`out_of_window`, so a no-op is visible.
+
+**MEASURED SAVING: 56 → 22 pairs per tick, 60% fewer.**
+
+    sport     own window   before   after   saved
+    mlb                1        7       1       6
+    nba                1        7       1       6
+    wnba               1        7       1       6
+    nhl                1        7       1       6
+    ncaaf              3        7       3       4
+    ncaab              1        7       1       6
+    nfl                7        7       7       0
+    soccer             7        7       7       0
+
+**AND THE HONEST LIMIT: SOCCER SAVES NOTHING HERE.** Its own window genuinely is
+7, so the coupling was never what widened soccer — five OTHER sports were being
+built six days out to serve one-day boards. This removes a large real waste and
+**may not be the 13m25s of soccer context builds.** Whether it is turns on
+something not yet distinguished: 7 forward dates × 10 leagues = 70 and
+3 board-window dates × 20 league-matchdays = 60 both fit the ~65 measured, and
+counts alone cannot separate them. **The next build's `out_of_window` plus its
+boot-to-`[layer2_shortlist]` span settles it. Do not claim the 19 minutes is
+fixed until that reading is in.**
 
 **A WRONG FIX I BUILT AND BACKED OUT, recorded so nobody rebuilds it.** Before
 the user named the cause I added a TTL memo on `week_games(league, week, season)`
