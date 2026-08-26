@@ -30389,3 +30389,42 @@ the 400-cap already truncated. `matched` rising is the prize but is NOT
 promised here — the audit's own sequence is "fix the join, measure matched per
 family, then cancel", and the join is a separate defect (`matched=54 of 1,290`,
 then `0 of 617`).
+
+## 2026-08-25 20:55 CT — FOR `kalshi-line-aware-rungs`: the date-priority prize, measured
+
+**Not mine to fix** — `pipeline/kalshi_odds_refresh.py` is in that lane's
+`Files:` and "evict the futures that can never join" is its declared step 2.
+`[USER DECISION 2026-08-25: let the audit session ship it]`. Recorded here
+because the measurement is in hand and the fix is not mine to write.
+
+**Summed from the `BY_GAME_DATE` histogram that lane just shipped**
+(`[kalshi_odds] BY_GAME_DATE`, 2026-08-26T01:49:32Z):
+
+    working set (capped)      6000
+      today     2026-08-25    1958   32.6%
+      tomorrow  2026-08-26      60    1.0%
+      beyond tomorrow         3982   66.4%
+
+    biggest: 08-28 -> 1566 (NFL, 3 days out) · 08-29 -> 930 · 09-12 -> 311
+    furthest: 2026-10-20 NBA, eight weeks out, holding slots today
+
+**THE ORDERING IS THE DEFECT, NOT THE OCCUPANCY.** All 1,958 of today's
+markets currently fit, so date-priority would not add any of them THIS tick.
+But `_ordered` sorts by STALENESS only, so today survives by luck. On a full
+NCAAF Saturday, or any tick where an MLB series is momentarily stale, today's
+markets are evicted in favour of a September future and nothing says so. The
+existing comment already records this class of bug once -- the trim claimed
+"oldest-series-first" while slicing alphabetically, deleting every WNBA market
+silently.
+
+**A SECOND CUT SITS UNDERNEATH IT.** Three of today's MLB prop series are at
+exactly 400 -- `KXMLBHRR`, `KXMLBRBI`, `KXMLBTB` -- which is
+`MAX_MARKETS_PER_SERIES`. Those ladders are truncated TODAY, and the 3,982
+future-dated slots are what could hold their deeper rungs. So the prize from
+date-priority is not "today fits" (it already does) but "today fits DEEPER",
+which is the same prize step 3 (line-aware rungs) is after.
+
+**Corroborating join reading, same tick:** `BOARD_JOIN kalshi_markets=6000
+matched=71 reasons={'market_is_for_another_date': 3282, ...}` -- 3,282 against
+3,982 non-today by the histogram, two independent counts of the same thing
+agreeing to within the tomorrow bucket.
