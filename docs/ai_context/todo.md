@@ -1,5 +1,63 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#564` — **`#545` cost the compact scoreboard its 60-second refresh and did NOT remove the request fan-out it was written for. Web read a 5-minute-old artifact while the same process built fresh chips one function away.** — lane `board-staleness-visibility`, 2026-08-26, user report — **FIXED, web deploy**
+
+**THE REPORT** (user, after `#563` shipped): *"the compact cards used to be
+updated every 60s so something caused a regression."* Correct, and `#563`'s
+diagnosis was incomplete: it blamed deploy cadence, which made the freeze acute
+but not chronic.
+
+**THE MECHANISM.** Before `#545` this handler called `build_game_chips` inline,
+and that call holds a **30-second TTL cache** — so the page's 60-second poll
+always got a scoreboard at most 30 s old. `#545` replaced it with an
+unconditional read of the worker's artifact, written once per
+`build_layer2_shortlist`.
+
+**MEASURED IN A WINDOW WITH NO DEPLOYS AT ALL** (22:36:13Z → 23:48:19Z), so
+this is not the deploy storm:
+
+    consecutive GAME_CHIPS_PUBLISHED gaps
+    4m58s  3m23s  5m19s  18m55s  7m20s  5m02s  3m30s
+
+A 60-second scoreboard became a ~5-minute one on a quiet evening.
+
+**AND `#545` NEVER REMOVED THE FAN-OUT.** Web still builds chips inline several
+times a minute — `_refresh_layer2_live_state` calls the same `build_game_chips`
+for the L2-A live restate, logging `LAYER2_LIVE_RESTATED` at 02:39:34, 02:40:23,
+02:40:45, 02:42:20, 02:42:24 and 02:44:56Z on instance `-clq85`. **The cost
+`#545` moved to the worker was never actually taken off web; only the benefit
+was.** The handler read a five-minute-old artifact while the same process held
+fresh chips in a 30-second cache.
+
+**THE FIX.** Serve the artifact while it is **fresh** (≤120 s, two poll
+intervals), rebuild inline when it is not. Not "always build inline": an inline
+build is newer by construction, so a plain fresher-wins would never read the
+artifact again and would reinstate the fan-out unconditionally. The threshold
+keeps the worker authoritative exactly when it is keeping up — the state `#545`
+wanted, and the state a faster publish cadence would restore.
+
+Bounded, not per-request: `build_game_chips` caches on `(date, sports)` for 30 s,
+so a hot endpoint costs one real build per 30 s regardless of traffic.
+
+An **undateable** artifact counts as stale; a **failed** inline build falls back
+to the stale artifact rather than blanking the strip (`source` says which). Back
+it out without a deploy by setting
+`SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS` very high, which restores
+`#545`'s behaviour exactly.
+
+**Reachability proved:** making the artifact unconditionally authoritative again
+turns 5 of 11 tests in `test_game_chips_endpoint_freshness.py` red.
+
+**STILL OPEN, AND IT IS THE BIGGER ONE — `#565`: the board build takes 19m43s.**
+Boot 00:45:38Z → first `[layer2_shortlist]` line 01:05:21Z → chips 01:06:19Z.
+`build_layer2_shortlist` itself is **58 seconds**; `_build_candidate_pool` ahead
+of it is **19m43s**. That is why a restart costs ~20 minutes of frozen board, and
+why `#563`'s fix 3 (publish chips at the top of the shortlist) recovered only
+~1 minute rather than the ~20 I claimed for it. **Nothing shipped so far touches
+the 19m43s.** Next question is where inside `collect_candidates` it goes — the
+per-stage `CANDIDATE_STAGE` lines are already emitted and timestamped, so this
+is a reading, not an instrumentation job.
+
 ### `#562` — **The Kalshi working-set trim orders by STALENESS, not by date. Today survives by luck.** — lane `kalshi-line-aware-rungs` (its declared step 2), raised by `portfolio-decision-and-execution`, 2026-08-26, measured — **NOT MINE TO FIX; handed over on a user decision**
 
 `[USER DECISION 2026-08-25: let the audit session ship it]` —

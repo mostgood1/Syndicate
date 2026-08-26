@@ -151,10 +151,20 @@ serialises deploys; **it does not rate-limit them, and serialisation is not
 spacing.** These three changes make the next freeze VISIBLE and cheaper; they do
 not stop it.
 
+- **`#564` ADDED 2026-08-26** — `#545` cost the compact scoreboard its 60-second
+  refresh AND never removed the request fan-out it was written for. Web read a
+  ~5-minute-old artifact while the same process built fresh chips several times
+  a minute for the L2-A live restate. Endpoint now serves the artifact while
+  fresh (≤120 s) and rebuilds inline when it is not. **`blueprints/intelligence.py`
+  claimed NARROWLY** — one handler in a large file; the lane that holds it,
+  `portfolio-decision-and-execution`, holds it for the PORTFOLIO routes and
+  touches nothing here. Back it out and hand it over if it collides.
 - Files: `pipeline/{intelligence_state,layer2_shortlist}.py`,
-  `syndicate/templates/intelligence.html`,
-  `syndicate/static/shared/board_cards.css`,
-  `tests/test_{board_freshness_derived,game_chips_published_before_ingest}.py`,
+  `syndicate/blueprints/intelligence.py` (the `/api/board/game-chips` handler
+  ONLY), `syndicate/templates/intelligence.html`,
+  `syndicate/static/shared/board_cards.css`, `scripts/deploy_preflight.py`,
+  `.claude/hooks/deploy-guard.py`,
+  `tests/test_{board_freshness_derived,game_chips_published_before_ingest,game_chips_endpoint_freshness,deploy_preflight}.py`,
   `tests/js/board_chip_freshness_badge.test.mjs`.
 
 

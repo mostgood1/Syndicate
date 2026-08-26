@@ -19,6 +19,12 @@ from pipeline.intelligence_state import queue_board_state_refresh
 from pipeline.intelligence_state import canonical_board_state_enabled
 from pipeline.intelligence_state import canonical_board_state_shadow_compare_enabled
 from pipeline.intelligence_state import read_intelligence_board_state
+# `#564`. THE REPO'S EXISTING AGE HELPER, not a second one. Adding a
+# parallel implementation is the mistake this session already made once
+# tonight (`#563`) and had to back out: two age functions can disagree, and
+# `_recomputed_freshness_block` rebuilds freshness verdicts from the same
+# kind of stamp elsewhere in this payload.
+from pipeline.intelligence_state import _timestamp_age_seconds
 from pipeline.intelligence_state import read_latest_intelligence_board_state
 from pipeline.intelligence_state import slice_intelligence_board_state_for_request
 from pipeline.intelligence_state import read_combined_intelligence_response
@@ -2182,6 +2188,27 @@ def intelligence_status_api():
 _GAME_CHIP_DEFAULT_SPORTS = list(GAME_CHIP_DEFAULT_SPORTS)
 
 
+def _game_chip_artifact_max_age_seconds() -> float:
+    """How old the worker's chip artifact may be before this handler rebuilds. `#564`.
+
+    120 s, chosen against the page's own poll rather than picked round: the
+    board polls `/api/board/game-chips` every 60 seconds, so a two-poll
+    allowance keeps the artifact authoritative through ordinary publish jitter
+    and gives way the moment the worker actually falls behind.
+
+    Raise it toward the publish cadence to favour the worker and accept a
+    staler scoreboard; set it very high to restore `#545`'s
+    always-read-the-artifact behaviour exactly.
+    """
+    raw = str(os.environ.get("SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS") or "").strip()
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            pass
+    return 120.0
+
+
 @intelligence_bp.get("/api/board/game-chips")
 def board_game_chips_api():
     # Shared scoreboard hydration for the Layer 1 and Layer 2 mini game
@@ -2203,40 +2230,104 @@ def board_game_chips_api():
     # published, the other is this service recomputing. Without it, a permanent
     # publish failure is invisible -- the board keeps working and the request
     # fan-out `#545` set out to remove is quietly still running.
+    # `#564`. SERVE THE FRESHER OF THE TWO, rather than always preferring the
+    # artifact.
+    #
+    # THE REGRESSION THIS FIXES, reported by the user: "the compact cards used
+    # to be updated every 60s". They did. Before `#545` this handler called
+    # `build_game_chips` inline, and that call holds its own 30-second TTL
+    # cache -- so the page's 60-second poll always got a scoreboard at most 30
+    # seconds old. `#545` replaced it with an unconditional read of the worker's
+    # artifact, which is written once per `build_layer2_shortlist`.
+    #
+    # MEASURED 2026-08-25, in a window with NO DEPLOYS AT ALL (22:36:13Z ->
+    # 23:48:19Z), consecutive `GAME_CHIPS_PUBLISHED` gaps were:
+    #
+    #     4m58s  3m23s  5m19s  18m55s  7m20s  5m02s  3m30s
+    #
+    # So a 60-second scoreboard became a ~5-minute one on a quiet evening, and a
+    # 20-54 minute one while refresh-worker was being redeployed. The deploy
+    # storm made it acute; this made it chronic.
+    #
+    # AND `#545` DID NOT ACTUALLY REMOVE THE FAN-OUT IT WAS WRITTEN FOR. Web
+    # still builds chips inline several times a minute -- `_refresh_layer2_live_state`
+    # (`intelligence_state.py`) calls the same `build_game_chips` for the L2-A
+    # live restate on the board path, which logs `LAYER2_LIVE_RESTATED` at
+    # 02:39:34, 02:40:23, 02:40:45, 02:42:20, 02:42:24, 02:44:56Z on one
+    # instance. So the cost `#545` moved to the worker was never actually taken
+    # off web; only the BENEFIT was. This handler was reading a five-minute-old
+    # artifact while the same process built fresh chips one function away.
+    #
+    # WHY A THRESHOLD RATHER THAN "ALWAYS BUILD INLINE": an inline build is
+    # always newer by construction, so a plain "fresher wins" would never read
+    # the artifact again and would reinstate the full per-request fan-out
+    # unconditionally. The threshold keeps the worker's artifact authoritative
+    # whenever it is actually keeping up -- which is the state `#545` wanted and
+    # the state a faster publish cadence would restore -- and only pays for a
+    # build when it is not.
+    #
+    # THE INLINE BUILD IS BOUNDED, not per-request: `build_game_chips` caches on
+    # (date, sports) for 30 seconds, so a hot endpoint costs one real build per
+    # 30 seconds regardless of traffic.
+    artifact_max_age = _game_chip_artifact_max_age_seconds()
     chips: list = []
     source = "worker_artifact"
     published = None
+    artifact_age: float | None = None
     try:
         from pipeline.intelligence_state import read_game_chips
 
         published = read_game_chips(selected_date)
     except Exception:
         _LOGGER.exception("BOARD_GAME_CHIPS_ARTIFACT_READ_FAILURE")
-    if isinstance(published, dict) and isinstance(published.get("chips"), list):
+
+    has_artifact = isinstance(published, dict) and isinstance(published.get("chips"), list)
+    if has_artifact:
+        artifact_age = _timestamp_age_seconds(published.get("written_at"))
+
+    def _from_artifact() -> list:
         wanted = {str(slug).strip().lower() for slug in sports}
-        chips = [
+        return [
             chip
             for chip in published["chips"]
             if isinstance(chip, dict) and str(chip.get("sport") or "").strip().lower() in wanted
         ]
+
+    # An UNDATEABLE artifact counts as stale. It is the same rule the rest of
+    # this fix follows -- an unreadable stamp is not evidence of freshness -- and
+    # here the pessimistic branch is cheap and always correct, just slower.
+    artifact_is_fresh = (
+        has_artifact and artifact_age is not None and artifact_age <= artifact_max_age
+    )
+
+    if artifact_is_fresh:
+        chips = _from_artifact()
     else:
-        # FALLBACK, KEPT DELIBERATELY. The rule says a request must not backfill
-        # missing data -- and the honest reading is that this is a cache miss on
-        # a DISPLAY artifact, not missing data on the board itself. Removing it
-        # would blank every sport's scoreboard strip for the whole window
-        # between a deploy and the worker's next shortlist build, which is a
-        # visible regression traded for a purity that buys the user nothing.
-        # It is named `fallback_inline_build` in the response and logged, so it
-        # can never be the silent status quo.
-        source = "fallback_inline_build"
-        _LOGGER.warning(
-            "BOARD_GAME_CHIPS_ARTIFACT_MISSING date=%s -- building inline", selected_date
+        source = (
+            "inline_artifact_stale" if has_artifact else "inline_artifact_missing"
+        )
+        _LOGGER.info(
+            "BOARD_GAME_CHIPS_INLINE date=%s reason=%s artifact_age=%s limit=%s",
+            selected_date,
+            source,
+            None if artifact_age is None else round(artifact_age, 1),
+            artifact_max_age,
         )
         try:
             chips = build_game_chips(selected_date, sports)
         except Exception:
             _LOGGER.exception("BOARD_GAME_CHIPS_FAILURE")
-            chips = []
+            # A STALE SCOREBOARD BEATS NO SCOREBOARD. Before this, a failed
+            # inline build returned [] and blanked every sport's strip. If an
+            # artifact exists at all, serving it degraded is strictly better
+            # than serving nothing -- and `source` says which happened, so it
+            # cannot pass for a healthy read.
+            if has_artifact:
+                chips = _from_artifact()
+                source = "stale_artifact_after_inline_failure"
+            else:
+                chips = []
+                source = "unavailable"
     return _no_cache_response(
         jsonify(
             {
@@ -2244,7 +2335,14 @@ def board_game_chips_api():
                 "date": selected_date,
                 "chips": chips,
                 "source": source,
+                # ALWAYS THE ARTIFACT'S STAMP, even when chips were built
+                # inline, so a reader can see how far behind the worker is. The
+                # page keys its staleness badge on `source` being
+                # `worker_artifact`, so an inline serve correctly shows no badge
+                # -- the scoreboard is fresh, whatever the worker is doing.
                 "published_at": (published or {}).get("written_at") if isinstance(published, dict) else None,
+                "artifact_age_seconds": None if artifact_age is None else round(artifact_age, 1),
+                "artifact_max_age_seconds": artifact_max_age,
             }
         )
     )
