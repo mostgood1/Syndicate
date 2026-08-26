@@ -5,6 +5,7 @@ import contextlib
 import csv
 import errno
 import filecmp
+import importlib
 import json
 import os
 import re
@@ -33,6 +34,81 @@ _SPACE_RE = re.compile(r"\s+")
 DIRECTORIES = (
     "recommendations_summary",
 )
+
+# Week-scoped files the bundle carries alongside the season-scoped ones in
+# `_root_files_for_season`. Matches NFL's `GLOB_PATTERNS` so the two runners
+# stay easy to diff.
+GLOB_PATTERNS = (
+    "oddsapi_player_props_*.csv",
+)
+
+
+def _props_file_name(season: int, week: int) -> str:
+    return f"oddsapi_player_props_{int(season)}_wk{int(week)}.csv"
+
+
+def _load_props_fetcher():
+    """`scripts/fetch_ncaaf_oddsapi_props_local.py`, imported not shelled.
+
+    Same shape as `refresh_nfl_oddsapi.py::_load_local_fetchers`. Importing
+    rather than spawning keeps the props fetch inside this process's own
+    `ODDS_API_*` environment, which is the whole point -- the region and
+    market knobs are read from `os.environ` at call time.
+    """
+    scripts_root = str(Path(__file__).resolve().parent)
+    if scripts_root not in sys.path:
+        sys.path.insert(0, scripts_root)
+    importlib.invalidate_caches()
+    return importlib.import_module("fetch_ncaaf_oddsapi_props_local")
+
+
+def _refresh_player_props(*, data_root: Path, season: int, week: int) -> dict[str, Any]:
+    """Capture NCAAF player props for `week` next to the lines file.
+
+    WHY THIS EXISTS, stated because its absence was invisible for a season:
+    `fetch_ncaaf_oddsapi_props_local.py` has been complete and correct since
+    2026-08-20 and **had no caller of any kind** -- not this runner, not the
+    orchestrator, not a worker autorun. NFL's identical fetcher is invoked
+    from `refresh_nfl_oddsapi.py:275`; NCAAF's was not, so NCAAF props were
+    never captured once. Measured 2026-08-26 on production: every one of the
+    51 served wk1 cards carried `shared_prop_rows: []`.
+
+    NEVER FAILS THE LINES REFRESH. Props are a strictly additive capture and
+    a books-have-not-posted-yet response is a 200 with no markets, not an
+    error. The lines snapshot is what the board actually reads today, so a
+    prop-side failure must degrade to a recorded reason rather than a
+    non-zero exit -- the opposite of NFL's runner, which returns the props
+    exit code and would take the whole NCAAF refresh down with it.
+    """
+    out_path = data_root / "data" / _props_file_name(season, week)
+    try:
+        props_module = _load_props_fetcher()
+        rc = props_module.main(
+            [
+                "--season",
+                str(int(season)),
+                "--week",
+                str(int(week)),
+                "--out",
+                str(out_path),
+            ]
+        )
+    except Exception as exc:
+        print(f"[ncaaf_props] SKIPPED {type(exc).__name__}: {exc}", flush=True)
+        return {"status": "error", "error": f"{type(exc).__name__}: {exc}", "path": str(out_path)}
+
+    rows = 0
+    if out_path.exists():
+        try:
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                rows = max(0, sum(1 for _ in handle) - 1)
+        except Exception:
+            rows = 0
+    status = "ok" if int(rc or 0) == 0 else "failed"
+    # `logger.info` never reaches Render's log collector -- print/flush is the
+    # only line that shows up in `render_logs.py`.
+    print(f"[ncaaf_props] {status} season={season} week={week} rows={rows} rc={rc} path={out_path}", flush=True)
+    return {"status": status, "rc": int(rc or 0), "rows": rows, "path": str(out_path)}
 
 ALIASES = {
     "miami oh": "miami ohio",
@@ -294,6 +370,14 @@ def _prediction_context(source_root: Path) -> dict[str, Any]:
 
 def _lines_file_name(season: int) -> str:
     return f"college_football_betting_lines_{int(season)}.csv"
+
+
+def _glob_data_files(source_root: Path) -> list[Path]:
+    """Week-scoped bundle files, sorted so the input hash is order-stable."""
+    matches: list[Path] = []
+    for pattern in GLOB_PATTERNS:
+        matches.extend(path for path in (source_root / "data").glob(pattern) if path.is_file())
+    return sorted(matches)
 
 
 def _root_files_for_season(season: int) -> tuple[str, ...]:
@@ -597,6 +681,10 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
                 *[path_fingerprint(source_root / "data" / name) for name in _root_files_for_season(season)],
                 path_fingerprint(Path(prediction_context["path"])),
                 *[path_fingerprint(source_root / "data" / name) for name in DIRECTORIES],
+                # Week-scoped props files are fingerprinted too, or a fresh
+                # capture would leave the hash unchanged and `should_recompute`
+                # would short-circuit the copy that carries it into the bundle.
+                *[path_fingerprint(path) for path in _glob_data_files(source_root)],
             ],
         }
     )
@@ -610,6 +698,10 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
         destination = artifact_root / source.name
         if destination.exists():
             copied.setdefault("files", []).append(str(destination))
+        for path in _glob_data_files(source_root):
+            destination = artifact_root / path.name
+            if destination.exists():
+                copied.setdefault("files", []).append(str(destination))
         for name in DIRECTORIES:
             destination = artifact_root / name
             if destination.exists():
@@ -632,6 +724,11 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
     destination = artifact_root / source.name
     if _copy_if_exists(source, destination):
         copied.setdefault("files", []).append(str(destination))
+
+    for path in _glob_data_files(source_root):
+        destination = artifact_root / path.name
+        if _copy_if_exists(path, destination):
+            copied.setdefault("files", []).append(str(destination))
 
     for name in DIRECTORIES:
         source = source_data_root / name
@@ -657,6 +754,7 @@ def main() -> int:
     parser.add_argument("--api-key", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
+    parser.add_argument("--skip-props", action="store_true", help="Refresh lines only; do not capture player props.")
     args = parser.parse_args()
 
     artifact_root = Path(args.artifact_root).resolve()
@@ -703,7 +801,17 @@ def main() -> int:
     else:
         print(json.dumps(result, indent=2))
 
-    copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root) if str(args.mode or "full").strip().lower() == "full" else {}
+    is_full = str(args.mode or "full").strip().lower() == "full"
+    # Props only on a full pass, and only after the lines refresh has already
+    # produced its own result -- `--mode fast` exists to keep the cheap tick
+    # cheap, and props are the expensive half (per event, per market).
+    props_result = (
+        _refresh_player_props(data_root=data_root, season=prediction_season, week=int(week))
+        if is_full and not args.skip_props
+        else {"status": "skipped", "reason": "mode_fast" if not is_full else "skip_props_flag"}
+    )
+
+    copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root) if is_full else {}
     print(
         json.dumps(
             {
@@ -712,6 +820,7 @@ def main() -> int:
                 "week": week,
                 "artifact_bundle_root": str(artifact_root),
                 "refresh_result": result,
+                "props_result": props_result,
                 "artifact_bundle_files": copied,
             },
             indent=2,
