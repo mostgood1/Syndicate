@@ -858,3 +858,48 @@ def test_a_moneyline_order_body_is_a_BID_not_an_ask():
     body = orders.order_body_v2(request, price_dollars=0.55)
     assert body["side"] == "bid", body
     assert body["ticker"] == "KXMLBGAME-26AUG251840BOSMIA-MIA"
+
+
+# ---------------------------------------------------------------------------
+# THE ORDER HOST. `_BASE_URLS` is a fallback CHAIN for reads and a PIN for
+# writes, and that asymmetry is the leading explanation for the only failure
+# this endpoint produces: `market_not_found` on a POST to base[0] for a ticker
+# `fetch_market` resolved somewhere else. Measured 2026-08-25/26 -- four
+# KXMLBTOTAL orders, on BOTH sides, all 404, while the probe reported the
+# market active with both asks quoted.
+# ---------------------------------------------------------------------------
+
+
+def test_no_retry_when_the_order_host_already_served_the_read():
+    """THE SAFETY PROPERTY. If the hypothesis is wrong the two hosts agree and
+    nothing about the money path changes -- this stays pure measurement."""
+    from syndicate.features.shared.kalshi_client import _BASE_URLS
+
+    assert orders._retry_url_for(f"{_BASE_URLS[0]}/portfolio/events/orders", _BASE_URLS[0]) == ""
+
+
+def test_retry_targets_the_host_that_resolved_the_ticker():
+    from syndicate.features.shared.kalshi_client import _BASE_URLS
+
+    url = orders._retry_url_for(f"{_BASE_URLS[0]}/portfolio/events/orders", _BASE_URLS[1])
+    assert url == f"{_BASE_URLS[1]}/portfolio/events/orders"
+
+
+def test_never_retries_against_a_host_kalshi_has_not_served():
+    """Inventing a route is what earned this file an http_410."""
+    assert orders._retry_url_for(
+        "https://external-api.kalshi.com/trade-api/v2/portfolio/events/orders",
+        "https://orders.kalshi.example/trade-api/v2",
+    ) == ""
+
+
+def test_only_market_not_found_retries():
+    """A 404 from a mistyped PATH is a different failure, and retrying it
+    against a second host would just repeat it."""
+    assert orders._is_market_not_found(
+        RuntimeError('http_404: {"error":{"code":"market_not_found"}}')
+    )
+    assert not orders._is_market_not_found(
+        RuntimeError('http_404: {"error":{"code":"not_found","message":"path"}}')
+    )
+    assert not orders._is_market_not_found(RuntimeError("http_401: unauthorized"))

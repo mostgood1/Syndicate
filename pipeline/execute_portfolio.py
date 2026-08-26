@@ -597,10 +597,13 @@ def _kalshi_price_for(request) -> float | None:
     planned = _artifact_price(ticker, key)
 
     live = None
+    event_ticker = ""
     try:
         result = fetch_market(ticker)
         if result.get("status") == "ok":
-            live = dollars_to_probability((result.get("market") or {}).get(key))
+            market = result.get("market") or {}
+            live = dollars_to_probability(market.get(key))
+            event_ticker = str(market.get("event_ticker") or "")
         else:
             print(
                 f"[execute_portfolio] LIVE_PRICE_UNAVAILABLE ticker={ticker}"
@@ -636,7 +639,7 @@ def _kalshi_price_for(request) -> float | None:
             )
         print(
             f"[execute_portfolio] LIVE_PRICE ticker={ticker} planned={planned}"
-            f" live={live} drift={drift:+.4f}",
+            f" live={live} drift={drift:+.4f} event_ticker={event_ticker or '-'}",
             flush=True,
         )
     return live

@@ -376,6 +376,47 @@ def _orders_url() -> str:
     return override or f"{base.rstrip('/')}{path}"
 
 
+def _base_of(url: str) -> str:
+    """The HOST of an order URL, for a log line that has to be scannable."""
+    text = str(url or "")
+    parts = text.split("/", 3)
+    return parts[2] if len(parts) > 2 else text
+
+
+def _is_market_not_found(exc: BaseException) -> bool:
+    """Kalshi's 404 for a ticker the ORDER route will not resolve.
+
+    Matched on the error CODE in the body, not on the 404 alone: a 404 from a
+    mistyped path is a different failure and must not trigger a retry that
+    would just repeat it against a second host.
+    """
+    return "market_not_found" in str(exc)
+
+
+def _retry_url_for(url: str, fetch_base: str) -> str:
+    """The same order path on the host the GET resolved -- or "" for no retry.
+
+    Empty whenever the two agree, which is the whole safety property: if the
+    read and the write already talk to the same host, this is measurement only
+    and nothing about the money path changes.
+    """
+    base = str(fetch_base or "").strip().rstrip("/")
+    if not base or not url:
+        return ""
+    if url.startswith(base + "/"):
+        return ""
+    from syndicate.features.shared.kalshi_client import _BASE_URLS
+
+    if base not in _BASE_URLS:
+        # A host Kalshi never served us from is a host we do not send orders
+        # to. Inventing one is what earned this file an http_410.
+        return ""
+    path = (os.environ.get("KALSHI_ORDER_PATH") or _DEFAULT_ORDER_PATH).strip()
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{base}{path}"
+
+
 def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
     """Send one order. Returns the shape `place_order` expects from an adapter.
 
@@ -404,34 +445,45 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
     except Exception as exc:
         # THE MARKET'S OWN FIELDS, ON THE FAILURE, and only on the failure.
         #
-        # Measured 2026-08-25 6:00 PM Central, three real submissions to this
-        # endpoint in one minute:
+        # Measured 2026-08-25/26, every real submission this endpoint has taken:
         #
-        #   KXWNBAAST-...-4         side=bid  price=0.5000  -> FILLED
-        #   KXMLBTOTAL-...MINATH-10 side=ask  price=0.5500  -> market_not_found
-        #   KXMLBTOTAL-...CINSF-8   side=ask  price=0.5100  -> market_not_found
+        #   KXWNBAAST-...-4          side=bid  -> FILLED
+        #   KXMLBTOTAL-...MINATH-10  side=ask  -> market_not_found
+        #   KXMLBTOTAL-...CINSF-8    side=ask  -> market_not_found
+        #   KXMLBTOTAL-...CLELAA-7   side=ask  -> market_not_found
+        #   KXMLBTOTAL-...TBDET-7    side=BID  -> market_not_found
         #
-        # `market_not_found` while `fetch_market` on the SAME ticker returned a
-        # live price twice in the same minute (`LIVE_PRICE ... live=0.45`). So
-        # the ticker is real and tradeable: the GET finds it and the POST does
-        # not. That leaves two candidates and the error text distinguishes
-        # neither -- an `ask` (sell YES) this endpoint will not take, or a
-        # market whose order shape differs (`market_type`, or an MVE
-        # collection: `mve_collection_ticker` is in the probe's field list).
+        # THAT LAST ROW KILLED THE SIDE HYPOTHESIS. An over (`bid`, the exact
+        # form that filled for WNBA) fails on KXMLBTOTAL too, so `ask` is not
+        # what the venue is objecting to. The probe also cleared the market
+        # itself: `market_type=binary status=active mve_collection=None`, with
+        # BOTH asks quoted (`yes_ask=0.5700 no_ask=0.4400`). Nothing about the
+        # market differs from the one that filled.
         #
-        # GUESSING BETWEEN THEM IS HOW THIS FILE GOT A 410. Its own comment on
-        # `_DEFAULT_ORDER_PATH` records inventing a route once already. So this
-        # asks the venue what the market IS, rather than changing the order
-        # semantics on a 1-vs-2 sample.
+        # WHAT IS LEFT IS THE HOST. `_BASE_URLS` is a three-entry FALLBACK
+        # CHAIN for reads -- `fetch_market` walks it until one answers and
+        # returns which one did -- while `_orders_url()` pins `_BASE_URLS[0]`
+        # unconditionally. A market served by base[1] would GET fine and POST
+        # 404 to base[0], on either side, which is exactly the shape observed.
+        #
+        # So the base that answered is printed, and the retry below acts ONLY
+        # when it actually differs. If the hypothesis is wrong the two bases
+        # are equal, the retry never fires, and this stays pure measurement --
+        # which is the point. Inventing a route is how this file earned an
+        # http_410 (see `_DEFAULT_ORDER_PATH`); re-sending to a host Kalshi
+        # itself just served this ticker from is not inventing one.
+        fetch_base = ""
         try:
             from syndicate.features.shared.kalshi_client import fetch_market
 
             probe = fetch_market(str(body.get("ticker") or ""))
             market = (probe.get("market") or {}) if isinstance(probe, dict) else {}
+            fetch_base = str(probe.get("base") or "") if isinstance(probe, dict) else ""
             print(
                 "[kalshi_orders] SUBMIT_FAILED_MARKET"
                 f" ticker={body.get('ticker')} side={body.get('side')}"
                 f" fetch_status={probe.get('status') if isinstance(probe, dict) else None}"
+                f" fetch_base={fetch_base or '-'} order_base={_base_of(url)}"
                 # THE EVENT THIS MARKET BELONGS TO, and on an endpoint called
                 # `/portfolio/events/orders` it is the first thing to check.
                 # The user's own market URL 2026-08-25 shows a KXMLBTOTAL
@@ -458,65 +510,39 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                 f" {type(probe_exc).__name__}: {probe_exc}",
                 flush=True,
             )
+
+        # ONE RETRY, on ONE error code, to ONE host -- the one that just served
+        # this ticker. Bounded that tightly because it is a money path.
+        #
+        # Safe to re-send: `market_not_found` is a 404 from the route itself,
+        # so nothing was placed, and `client_order_id` carries the idempotency
+        # key regardless -- a duplicate is Kalshi's to reject, which is the
+        # same protection the first send relies on.
+        retry_url = _retry_url_for(url, fetch_base) if _is_market_not_found(exc) else ""
+        if retry_url:
+            print(
+                f"[kalshi_orders] SUBMIT_RETRY_BASE ticker={body.get('ticker')}"
+                f" from={_base_of(url)} to={_base_of(retry_url)}",
+                flush=True,
+            )
+            try:
+                response = signed_request("POST", retry_url, body=body)
+            except Exception as retry_exc:
+                print(
+                    f"[kalshi_orders] SUBMIT_RETRY_BASE_FAILED"
+                    f" ticker={body.get('ticker')} {type(retry_exc).__name__}: {retry_exc}",
+                    flush=True,
+                )
+                raise retry_exc from exc
+            else:
+                print(
+                    f"[kalshi_orders] SUBMIT_RETRY_BASE_OK ticker={body.get('ticker')}"
+                    f" base={_base_of(retry_url)}",
+                    flush=True,
+                )
+                return _order_result(request, body, response, price_dollars=price_dollars)
         raise exc
-    order = response.get("order") or response
-
-    # `count` is what we ASKED for; the fill can be partial. Reported from the
-    # response where the response says so, and from the request only where it
-    # does not -- a partial fill recorded as a full one is a position size we
-    # believe and do not hold.
-    # `count` is a QUOTED DECIMAL in the v2 body ("8.00"), so `int()` on it
-    # raises -- which would turn a successful submit into a `failed` record
-    # after the money had already moved, the worst possible place to throw.
-    requested = int(float(body["count"]))
-
-    # WHAT THE VENUE ACTUALLY SAYS HAPPENED -- never a default of `filled`.
-    #
-    # MEASURED 2026-08-24T13:12Z, and this is the worst bug of the run: our
-    # ledger read `status=filled fill_price=0.54` for an order that was RESTING
-    # and unfilled on Kalshi. The line was `str(order.get("status") or
-    # "filled")` -- an accepted-but-unexecuted order returns a status we did not
-    # map, or none, and the default booked a position that does not exist.
-    #
-    # A created order and an executed order are different facts. Defaulting the
-    # UNKNOWN case to the most committal one is exactly backwards: settlement
-    # grades a bet that never happened, P&L books it, and reconciliation against
-    # the venue becomes impossible because our record and their book disagree
-    # about whether a trade occurred.
-    #
-    # So: filled ONLY on an explicit executed/filled status, or on a positive
-    # filled_count. Anything else is `submitted` -- the write-ahead state that
-    # means "the venue has it, the outcome is not known here" -- which is
-    # precisely true of a resting limit order.
-    raw_status = str(order.get("status") or "").strip().lower()
-    filled_raw = order.get("filled_count")
-    try:
-        filled_count = int(float(filled_raw)) if filled_raw is not None else None
-    except (TypeError, ValueError):
-        filled_count = None
-
-    executed = raw_status in _VENUE_FILLED_STATUSES or bool(filled_count)
-    if executed:
-        contracts = filled_count if filled_count is not None else requested
-        status = "filled"
-        fill_price = price_dollars
-    else:
-        # RESTING, PENDING, or a status we have never seen. None of them is a
-        # fill, and a fill_price on an unfilled order is a number that will be
-        # believed.
-        contracts = 0
-        status = "submitted"
-        fill_price = None
-
-    return {
-        "status": status,
-        "venue_order_id": order.get("order_id") or order.get("id"),
-        "venue_status": raw_status or None,
-        "fill_price": fill_price,
-        "fill_stake_dollars": round(contracts * float(price_dollars or 0.0), 2),
-        "contracts": contracts,
-        "requested_contracts": requested,
-    }
+    return _order_result(request, body, response, price_dollars=price_dollars)
 
 
 # ---------------------------------------------------------------------------
@@ -924,3 +950,69 @@ def kalshi_submitter(price_for):
         return submit_order(request, price_dollars=float(price))
 
     return _submit
+
+
+def _order_result(
+    request: Any, body: Mapping[str, Any], response: Mapping[str, Any], *,
+    price_dollars: float | None,
+) -> dict[str, Any]:
+    """Read one accepted submit's response. SHARED by the first send and the
+    base retry, so the two can never disagree about what a fill is."""
+    order = response.get("order") or response
+
+    # `count` is what we ASKED for; the fill can be partial. Reported from the
+    # response where the response says so, and from the request only where it
+    # does not -- a partial fill recorded as a full one is a position size we
+    # believe and do not hold.
+    # `count` is a QUOTED DECIMAL in the v2 body ("8.00"), so `int()` on it
+    # raises -- which would turn a successful submit into a `failed` record
+    # after the money had already moved, the worst possible place to throw.
+    requested = int(float(body["count"]))
+
+    # WHAT THE VENUE ACTUALLY SAYS HAPPENED -- never a default of `filled`.
+    #
+    # MEASURED 2026-08-24T13:12Z, and this is the worst bug of the run: our
+    # ledger read `status=filled fill_price=0.54` for an order that was RESTING
+    # and unfilled on Kalshi. The line was `str(order.get("status") or
+    # "filled")` -- an accepted-but-unexecuted order returns a status we did not
+    # map, or none, and the default booked a position that does not exist.
+    #
+    # A created order and an executed order are different facts. Defaulting the
+    # UNKNOWN case to the most committal one is exactly backwards: settlement
+    # grades a bet that never happened, P&L books it, and reconciliation against
+    # the venue becomes impossible because our record and their book disagree
+    # about whether a trade occurred.
+    #
+    # So: filled ONLY on an explicit executed/filled status, or on a positive
+    # filled_count. Anything else is `submitted` -- the write-ahead state that
+    # means "the venue has it, the outcome is not known here" -- which is
+    # precisely true of a resting limit order.
+    raw_status = str(order.get("status") or "").strip().lower()
+    filled_raw = order.get("filled_count")
+    try:
+        filled_count = int(float(filled_raw)) if filled_raw is not None else None
+    except (TypeError, ValueError):
+        filled_count = None
+
+    executed = raw_status in _VENUE_FILLED_STATUSES or bool(filled_count)
+    if executed:
+        contracts = filled_count if filled_count is not None else requested
+        status = "filled"
+        fill_price = price_dollars
+    else:
+        # RESTING, PENDING, or a status we have never seen. None of them is a
+        # fill, and a fill_price on an unfilled order is a number that will be
+        # believed.
+        contracts = 0
+        status = "submitted"
+        fill_price = None
+
+    return {
+        "status": status,
+        "venue_order_id": order.get("order_id") or order.get("id"),
+        "venue_status": raw_status or None,
+        "fill_price": fill_price,
+        "fill_stake_dollars": round(contracts * float(price_dollars or 0.0), 2),
+        "contracts": contracts,
+        "requested_contracts": requested,
+    }
