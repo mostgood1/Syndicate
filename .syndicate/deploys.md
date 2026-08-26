@@ -30528,3 +30528,76 @@ deploy should show `GAME_CHIPS_PUBLISHED` at the loop's own cadence with no gap
 exceeding ~10 minutes, and zero `WORKER_SHUTDOWN_KILLED_BOARD_BUILD`.
 
 **No deploy taken, no claim held.**
+
+## 2026-08-25 21:59 CT — web `c23b2bfd` (`#564` chip cadence) + the `#565` reading
+
+**OFF-PROTOCOL, same reason and same user direction as the 21:29/21:33 entry
+above:** no `RENDER_API_KEY` in this container, proxy 403s `api.render.com`, so
+neither lock was taken and the deploy went through the Render MCP.
+
+**web `dep-da75d4e7bikc739h9q5g`** on `c23b2bfd`, build 02:59:29Z.
+
+**verify:** BY CONTENT at the merged SHA — `git merge-base --is-ancestor
+a918f4cb origin/main` passes and `blueprints/intelligence.py` at `c23b2bfd`
+carries `inline_artifact_stale`. Behavioural acceptance is the served
+`source` field: with the worker publishing every ~5 min, a poll should now
+return `inline_artifact_stale` rather than `worker_artifact`, and the strip
+should advance every 60 s. **NOT YET READ — production HTTP is unreachable from
+this session, so this one is owed.**
+
+**Earlier tonight, same session:** web `34717822` live 02:32:45Z and
+refresh-worker `34717822` live 02:36:47Z (`#563`). refresh-worker preflight run
+BY HAND against its own evidence: 0 jobs in flight, sample 90 s old, 80 min
+since last deploy, memory 53.4%.
+
+---
+
+## `#565` — WHERE THE 19-MINUTE BOARD BUILD GOES. Measured, not inferred.
+
+**It is NOT Kalshi or Polymarket.** Those run inside `build_layer2_shortlist`
+(`VENUE_REPRICE`, `GRID_REPRICE`, `BOARD_JOIN`) and **that whole function is 58
+seconds** — first `[layer2_shortlist]` line 01:05:21Z, `GAME_CHIPS_PUBLISHED`
+01:06:19Z. A user hypothesis that the exchange steps should be pulled out of the
+selection process was checked and does not hold: they are already cheap.
+
+**Instance `-fzb6v`, boot 00:45:38Z → shortlist starts 01:05:21Z = 19m43s:**
+
+| span | length | what |
+|---|---|---|
+| 00:47:43 → 00:48:58 | ~1m | `CANDIDATE_STAGE` steps, seconds each |
+| **00:48:58 → 01:02:23** | **13m25s** | **soccer per-league card contexts** |
+| 01:02:23 → 01:05:19 | ~3m | MLB `build_cards_page_context` |
+
+**THE SOCCER NUMBER, read directly.** In 00:55:00–00:56:00 there are exactly
+**five** `board_contract_begin` lines for soccer — 05.8s, 19.4s, 32.5s, 44.7s,
+56.4s — so the gaps are **13.6, 13.0, 12.2, 11.7 seconds**. `game_count` on
+those five: 11, 10, 9, 11, 8.
+
+**~12.5 SECONDS PER LEAGUE-CONTEXT, FOR 8-11 GAMES.** And the arithmetic
+closes: the same build logs `leagues_indexed` = **10** and `dates_read` =
+`['2026-08-25' … '2026-08-31']` = **7 dates**. 10 × 7 = **70 contexts × 12.5 s ≈
+14.6 min**, against a measured 13m25s.
+
+So it is NOT redundant rebuilding of one context — it is a real 70-way fan-out,
+each leg slow. `apply_game_board_contract` is the emitter; the loaders in
+`simulation_adapter.py` (`_loader_soccer` → `build_cards_page_context`) have **no
+cache of any kind**.
+
+**THE LEVER, and it is the cheap one.** The same build then logs
+`LAYER2_SHORTLIST … beyond_horizon=2392`. **It builds seven days of soccer
+contexts and then discards 2,392 rows for being beyond the horizon.** The
+horizon is applied AFTER the expensive work rather than before it. Narrowing
+`dates_read` to the horizon the shortlist will actually keep should remove most
+of the 13m25s without changing a single published row.
+
+**MLB's 3 minutes is a second, smaller lever:** 14 `build_cards_page_context`
+calls totalling ~50 s, but two of them are **25,597 ms** and **14,257 ms** — 40
+seconds in two calls, on the same uncached `[home]` path that
+`scope_2026-08-21_home_request_path_compute.md` blamed for a web outage.
+
+**NOT FIXED. Deliberately.** This is `_build_candidate_pool` — another lane's
+core path — at 22:00 CT with live games, after three deploys tonight. The
+reading is the deliverable; the fix wants its own lane and a daylight deploy.
+The horizon change in particular must be checked against what the board is
+meant to SHOW before it is narrowed, because `beyond_horizon` is a shortlist
+filter and the rail may legitimately want the wider window.
