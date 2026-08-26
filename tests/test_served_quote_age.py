@@ -165,7 +165,7 @@ def test_a_live_market_whose_line_moved_is_an_ORPHANED_LINE():
         _key(line="8.5"): "2026-08-26T14:00:00Z",   # 2h old, the orphan
         _key(line="9.0"): "2026-08-26T15:58:00Z",   # 2m old, the live sibling
     }
-    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "orphaned_line"
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW, 30.0) == "orphaned_line"
 
 
 def test_a_market_the_feed_stopped_quoting_is_MARKET_GONE():
@@ -175,7 +175,7 @@ def test_a_market_the_feed_stopped_quoting_is_MARKET_GONE():
         _key(line="8.5"): "2026-08-26T14:00:00Z",
         _key(line="9.0"): "2026-08-26T14:00:30Z",
     }
-    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "market_gone"
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW, 30.0) == "market_gone"
 
 
 def test_a_different_market_never_counts_as_a_fresh_sibling():
@@ -187,7 +187,7 @@ def test_a_different_market_never_counts_as_a_fresh_sibling():
         _key(line="9.0", event="E2"): "2026-08-26T15:58:00Z",
         _key(line="9.0", player="Ohtani"): "2026-08-26T15:58:00Z",
     }
-    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "market_gone"
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW, 30.0) == "market_gone"
 
 
 def test_the_same_line_on_another_book_is_not_the_orphan_test():
@@ -197,7 +197,7 @@ def test_the_same_line_on_another_book_is_not_the_orphan_test():
         _key(line="8.5", book="fanduel"): "2026-08-26T14:00:00Z",
         _key(line="8.5", book="draftkings"): "2026-08-26T15:58:00Z",
     }
-    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "market_gone"
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW, 30.0) == "market_gone"
 
 
 def test_a_reordered_key_schema_reports_unknown_rather_than_guessing():
@@ -208,7 +208,7 @@ def test_a_reordered_key_schema_reports_unknown_rather_than_guessing():
     real = mod._QUOTE_KEY_ORDER
     try:
         mod._QUOTE_KEY_ORDER = ("sport", "line")  # disagree with _KEY_FIELDS
-        got = _classify_stale_row(_grid_row(), {_key(): NOW}, NOW)
+        got = _classify_stale_row(_grid_row(), {_key(): NOW}, NOW, 30.0)
     finally:
         mod._QUOTE_KEY_ORDER = real
     assert got == "unknown_key_order_changed"
@@ -230,3 +230,92 @@ def test_the_cause_report_is_wired_into_the_build():
     from pipeline import layer2_shortlist
     src = inspect.getsource(layer2_shortlist.build_layer2_shortlist)
     assert "_report_stale_row_causes(" in src, "computed and never called"
+
+
+# ---------------------------------------------------------------------------
+# `#569` part 3: the FALSE POSITIVE that part 2 shipped, and its fix.
+# ---------------------------------------------------------------------------
+
+def test_a_staggered_freeze_is_NOT_an_orphaned_line():
+    """THE PRODUCTION WRONG ANSWER, 2026-08-26 19:15Z.
+
+    wnba read `orphaned_line=2 of 3` while `ODDS_SWEEP_OUTCOME` said
+    `wrote=False` -- its sidecar was not being written at all. When writes stop
+    every key freezes at a STAGGERED moment, so a key frozen shortly before the
+    stop looks hours fresher than one frozen well before it, and the
+    fresher-sibling test read that as supersession.
+
+    Identical sibling stamps to `test_a_live_market_whose_line_moved_is_an
+    ORPHANED_LINE` -- the ONLY difference is that the sidecar itself is stale.
+    That is the whole point: sibling stamps cannot separate these two, and only
+    the file's own freshness can.
+    """
+    last_seen = {
+        _key(line="8.5"): "2026-08-26T14:00:00Z",
+        _key(line="9.0"): "2026-08-26T15:58:00Z",
+    }
+    row = _grid_row(line="8.5", seen=7200.0)
+    assert _classify_stale_row(row, last_seen, NOW, 30.0) == "orphaned_line"      # live file
+    assert _classify_stale_row(row, last_seen, NOW, 14400.0) == "sidecar_frozen"  # frozen file
+
+
+def test_a_frozen_sidecar_also_overrides_market_gone():
+    """`sidecar_frozen` replaces BOTH labels, not just the wrong one. Reporting
+    `market_gone` off a dead file would be right by accident and would send the
+    next reader to the feed when the answer is that we stopped looking."""
+    last_seen = {_key(line="8.5"): "2026-08-26T14:00:00Z", _key(line="9.0"): "2026-08-26T14:00:30Z"}
+    row = _grid_row(line="8.5", seen=7200.0)
+    assert _classify_stale_row(row, last_seen, NOW, 30.0) == "market_gone"
+    assert _classify_stale_row(row, last_seen, NOW, 14400.0) == "sidecar_frozen"
+
+
+def test_an_unknown_sidecar_age_refuses_to_classify():
+    """Absent, not assumed live. Defaulting to "the file is fine" is how the
+    first version got wnba wrong, and it must not be reachable by omission."""
+    last_seen = {_key(line="8.5"): "2026-08-26T14:00:00Z", _key(line="9.0"): "2026-08-26T15:58:00Z"}
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW, None) == "unknown_no_sidecar_age"
+    # And the parameter's DEFAULT must not smuggle a live file in either.
+    assert _classify_stale_row(_grid_row(line="8.5", seen=7200.0), last_seen, NOW) == "unknown_no_sidecar_age"
+
+
+def test_the_report_line_carries_the_sidecar_age(capsys, monkeypatch):
+    """A reader must be able to see the file was live, not take it on trust.
+
+    Patches the state reader: with no real state file this path correctly
+    short-circuits to `unknown_empty_state_file`, which is right behaviour and
+    the wrong thing to assert against.
+    """
+    from datetime import datetime, timedelta, timezone
+    import syndicate.features.shared.odds_book_quotes as obq
+
+    fresh = (datetime.now(timezone.utc) - timedelta(seconds=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    old_stamp = (datetime.now(timezone.utc) - timedelta(seconds=7200)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    monkeypatch.setattr(obq, "read_quote_last_seen",
+                        lambda sport, date: {_key(line="8.5"): old_stamp, _key(line="9.0"): fresh})
+
+    _report_stale_row_causes([_grid_row(line="8.5", seen=7200.0)], "2026-08-26")
+    out = capsys.readouterr().out
+    assert "STALE_ROW_CAUSE" in out
+    assert "sidecar=" in out
+    # A live file (20s) must reach a real verdict, not the frozen escape hatch.
+    assert "sidecar_frozen" not in out
+    assert "orphaned_line=1" in out
+
+
+def test_a_frozen_sidecar_is_visible_on_the_report_line(capsys, monkeypatch):
+    """The wnba shape end to end: every stamp old, so the file is frozen and
+    every row says so rather than reporting a manufactured supersession."""
+    from datetime import datetime, timedelta, timezone
+    import syndicate.features.shared.odds_book_quotes as obq
+
+    def _ago(s):
+        return (datetime.now(timezone.utc) - timedelta(seconds=s)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Staggered freeze -- exactly what fooled the first version.
+    monkeypatch.setattr(obq, "read_quote_last_seen",
+                        lambda sport, date: {_key(line="8.5"): _ago(30000), _key(line="9.0"): _ago(4000)})
+
+    _report_stale_row_causes([_grid_row(line="8.5", seen=30000.0)], "2026-08-26")
+    out = capsys.readouterr().out
+    assert "sidecar_frozen=1" in out
+    assert "orphaned_line" not in out

@@ -55,9 +55,36 @@ def _quote_age_percentiles(values: list[float]) -> tuple[float, float, float] | 
 _QUOTE_KEY_ORDER = ("sport", "kind", "event_id", "bookmaker", "segment", "market", "selection", "player_name", "line")
 _QUOTE_GROUP_FIELDS = ("sport", "kind", "event_id", "segment", "market", "player_name")
 
+# How stale the NEWEST stamp in a sport's whole sidecar may be before the file
+# itself is treated as frozen. 900s matches the threshold a row must cross to be
+# examined at all, so a sport is never judged by a file staler than its rows.
+_SIDECAR_FROZEN_AFTER_SECONDS = 900.0
 
-def _classify_stale_row(row: Mapping[str, Any], last_seen: Mapping[str, str], now_iso: str) -> str:
-    """`orphaned_line` vs `market_gone` for one never-refreshing row. `#569`.
+
+def _classify_stale_row(
+    row: Mapping[str, Any],
+    last_seen: Mapping[str, str],
+    now_iso: str,
+    sidecar_newest_age: float | None = None,
+) -> str:
+    """`sidecar_frozen` / `orphaned_line` / `market_gone` for one stale row. `#569`.
+
+    **`sidecar_frozen` IS THE FIRST QUESTION, and it was missing from the first
+    version — which produced a WRONG ANSWER in production, not a near miss.**
+    Measured 2026-08-26 19:15Z: wnba read `orphaned_line=2 of 3` while its
+    sidecar was not being written AT ALL (`ODDS_SWEEP_OUTCOME wrote=False`).
+
+    Why the old test had to fail there: when a sidecar stops being written every
+    key freezes, but at STAGGERED moments — whichever instant each was last
+    observed before writes stopped. A key frozen 10 minutes before the stop
+    looks hours fresher than one frozen 4 hours before it, and a
+    "fresher sibling exists" test reads that as supersession. **A staggered
+    freeze and a live line move are indistinguishable from sibling stamps
+    alone.** The only thing that separates them is whether the FILE is still
+    advancing, which is a property of the sidecar and not of any row in it.
+
+    So: if nothing in the whole sidecar is recent, the answer is "we stopped
+    looking", and neither of the other two labels may be returned.
 
     THE DISCRIMINATOR, and it is the whole point of this function. A row whose
     `seen_age` grows at 1.0x wall clock got there one of two ways, and they have
@@ -82,6 +109,12 @@ def _classify_stale_row(row: Mapping[str, Any], last_seen: Mapping[str, str], no
     The state file keeps every key ever observed, which is exactly why it can
     answer this and the grid cannot.
     """
+    # FIRST, before anything reads a sibling stamp.
+    if sidecar_newest_age is None:
+        return "unknown_no_sidecar_age"
+    if sidecar_newest_age > _SIDECAR_FROZEN_AFTER_SECONDS:
+        return "sidecar_frozen"
+
     try:
         from syndicate.features.shared.odds_book_quotes import _KEY_FIELDS
 
@@ -183,12 +216,26 @@ def _report_stale_row_causes(rows: Any, selected_date: Any, *, per_sport: int = 
             if not last_seen:
                 parts.append(f"{slug}:unknown_empty_state_file={len(entries)}")
                 continue
+            # The sidecar's OWN freshness, computed once per sport. Reported on
+            # the line whether or not it changes the labels: a reader must be
+            # able to see that a sport was judged against a live file.
+            sidecar_age: float | None = None
+            try:
+                newest = max(last_seen.values())
+                parsed = datetime.fromisoformat(str(newest).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                sidecar_age = max(0.0, (datetime.now(timezone.utc) - parsed).total_seconds())
+            except Exception:
+                sidecar_age = None
+
             counts: dict[str, int] = {}
             for _age, row in entries[:per_sport]:
-                label = _classify_stale_row(row, last_seen, now_iso)
+                label = _classify_stale_row(row, last_seen, now_iso, sidecar_age)
                 counts[label] = counts.get(label, 0) + 1
+            age_txt = "unknown" if sidecar_age is None else f"{sidecar_age:.0f}s"
             parts.append(
-                f"{slug}[stale={len(entries)} worst={entries[0][0]:.0f}s "
+                f"{slug}[stale={len(entries)} worst={entries[0][0]:.0f}s sidecar={age_txt} "
                 + ",".join(f"{k}={v}" for k, v in sorted(counts.items()))
                 + "]"
             )
