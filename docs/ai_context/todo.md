@@ -1,5 +1,61 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#576` — **The live buying engine is anchored to `/portfolio`, and the URL the user pasted asking for it was itself the bug.** — lane `portfolio-live-primary`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T19:5xZ** (web `752d83ba`)
+
+`[user decision 2026-08-26]` *"I want the main portfolio page merged with
+`/portfolio/live` ... our live buying engine anchored to the primary portfolio
+page ... and all the editable inputs to remain editable on the page."*
+
+**WHY THE SPLIT WAS WRONG, and it is not the argument that created it.** The
+reason `/portfolio/live` was its own page was that simulated positions shown
+beside real ones get mistaken for bets somebody placed. That argument is about
+SIMULATION, and `/portfolio/paper` is untouched, still running, still linked
+both ways. Real money and the user's own logged bets are both real. The cost of
+the split was that the one surface that spends money sat a click off the nav
+and nobody had it open — 37 live positions and 83 refused orders were on a page
+you had to know to visit.
+
+**THE `?date=` WAS A DEFECT, not a formatting quirk of the link they sent.**
+The template read `L.selected_date`; `_live_portfolio_payload` returns `date`.
+Jinja renders an undefined as nothing and raises nothing, so every `show=` and
+`period=` link that page built dropped the date **silently** — the class of
+failure this repo keeps paying for, where the broken thing and the working
+thing render identically. Measured post-deploy: `?date=2026-08-26&show=all`.
+
+**Shipped:** `/portfolio` renders both books, separately headed and never
+summed. `/portfolio/live` is a 302 to `/portfolio#live` carrying the query
+string verbatim — **a redirect, not a second render**, for the reason
+`/portfolio/settings` already gave about this same form: two copies of one
+surface drift, and the one nobody edits is the one somebody trusts.
+`portfolio_live.html` deleted; a test fails if it returns. The five editable
+settings move INTO the live half beside the book they govern, and a test now
+asserts every name in `portfolio_settings.EDITABLE_FIELDS` is on the page, so a
+field cannot become uneditable by being forgotten in a template edit.
+
+**Two silent-cosmetic defects fixed in passing:** the Performance pivots had NO
+CSS whatsoever (the section rendered as unstyled markup; `is-up`/`is-down`
+coloured nothing), and the live half referenced `--cards-border`, which
+`app.css` does not define — every such rule had been falling back to a
+hardcoded hex, so the real-money page was the one surface not on the design
+tokens.
+
+**Production reading** (`deploys.md` 2026-08-26 19:50:37Z has the full block):
+banner `is-ok`, Job on / Mode live / Armed yes / Kill switch clear / Source
+live-odds-worker 4m ago; 37 positions, 6W-4L, +$21.66 on $23.07 settled; all
+five inputs carrying the USER's stored edits (35 positions, 0.0 EV floor), not
+defaults; 83 hidden non-positions behind the toggle; `/portfolio/paper` 200 with
+16 committed positions.
+
+**CARVE-OUT, recorded rather than negotiated.** Every file here is
+`portfolio-decision-and-execution`'s (session `01Sia2rPD72eFTriy28azzs2`, which
+authored `bbfc3906` six hours earlier). It is not a reachable peer —
+`ListAgents` returns 12 sessions and it is not among them — so this follows the
+same fallback that lane itself recorded twice on 2026-08-24/25. Scope taken was
+exactly the two page routes, the two templates, one link on the paper page, and
+the live page's tests. **Nothing about the execution ledger, the commit job,
+the guard, sizing, or the payload's contents was touched.**
+
+
 ### `#575` — **NFL had ZERO chips against 106 cards, and my own `#542` had doubled the soccer home rail. One root: `games()` served two callers needing different horizons.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T19:15:44Z**
 
 **MEASURED, both services live:** `CHIP_JOIN_COVERAGE sport=nfl chips=16

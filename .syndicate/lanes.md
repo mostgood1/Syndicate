@@ -2219,7 +2219,7 @@ Four deploys were taken during this session and each is recorded in
      the local `.env`; the served board's `cells` are keyed by bookmaker and
      answer it without one.
 - Blocked by: none
-### portfolio-live-primary — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+### portfolio-live-primary — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
 - Goal: `/portfolio` IS the live buying engine's page. The whole of
   `/portfolio/live` renders there, `/portfolio/live` redirects to it rather
   than keeping a second copy, `/portfolio/paper` stays running and linked, and
@@ -2261,6 +2261,18 @@ Four deploys were taken during this session and each is recorded in
   and links to `/portfolio`; `tests/test_portfolio_live_page.py`,
   `tests/test_portfolio_paper_page.py`, `tests/test_portfolio_settings.py` all
   green. Production reading owed after deploy.
+- **CLOSED 2026-08-26 — every outcome MET AND VERIFIED IN PRODUCTION.** web
+  `752d83ba` live 19:50:37Z. `/portfolio/live?date=` -> `/portfolio?date=#live`;
+  banner `is-ok` with Job on / Mode live / Armed yes / Kill switch clear /
+  Source live-odds-worker 4m ago; 37 live positions, 6W-4L, +$21.66 on $23.07
+  settled; all five editable inputs present carrying the USER's stored edits
+  (max_positions 35, min_ev_pct 0.0), not defaults; 83 hidden non-positions
+  behind the toggle; pivots styled; `/portfolio/paper` 200 with 16 committed
+  positions, linking back both ways. Links now carry a REAL date
+  (`?date=2026-08-26&show=all`) — the `L.selected_date`/`date` key mismatch that
+  produced the user's own `?date=` URL is fixed and measured. 47 tests in
+  `test_portfolio_live_page.py`, 387 across every portfolio-related suite.
+  Full block: `deploys.md` 2026-08-26 19:50:37Z. Item: `todo.md #576`.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
