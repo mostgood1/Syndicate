@@ -6675,3 +6675,56 @@ staggered freeze as readily as a real line move.
 **Corollary, measured the same day:** an instrument can be defeated by the thing
 it measures. Two of my own cold builds were killed mid-flight by other sessions'
 deploys — the exact deploy-churn mechanism this lane had just documented.
+
+## 2026-08-23 — RULE: editing a fast-appended shared ledger from a stale local copy manufactures a fake conflict
+
+**Twice in one session, on `.syndicate/deploys.md`.** I read the file, appended
+a new section with `Edit`, committed, pushed, opened a PR — and GitHub reported
+"Pull Request has merge conflicts" on a PURE APPEND with nothing else touched.
+The cause both times: `main` had moved between my read and my push (this repo
+runs many parallel sessions appending to the same few ledger files), so my
+commit's diff was computed against a base that was already behind. A rebase
+onto `origin/main` then showed the "conflict" for what it was — an EMPTY
+`<<<<<<< HEAD` block, meaning nothing textually competed; git was just confused
+by a diff shaped as "replace the whole stale tail" instead of "append after the
+current tail."
+
+**HOW TO APPLY, for any edit to `deploys.md`/`state.md`/`lanes.md`/a daily
+`log/*.md` in this repo:** before writing the addition, `git fetch origin main`
+and `git show origin/main:<file> > <file>` to sync the LOCAL COPY to the
+CURRENT tip first, THEN append. If a commit was already made against a stale
+base, `git rebase origin/main` and resolve by keeping whichever side has actual
+content (the empty side is never the real answer). Diff against `origin/main`
+before pushing, not just `git diff --stat` against your own HEAD — a stale HEAD
+makes a 20-line addition look and diff like hundreds of unrelated lines the
+rest of the repo already has.
+
+## 2026-08-23 — RULE: an empty tmp dir for `SYNDICATE_NFL_SOURCE_ROOT` can still resolve to the REAL checkout, and a test can write into it
+
+**`default_nfl_source_root()` (`syndicate/features/nfl/sources.py`) probes
+several candidate roots for `upcoming_recs_*.csv` — an artifact family
+UNRELATED to what a test is usually checking — and falls back to the first
+candidate if none match.** A test that only sets the env var and writes into a
+fresh `tmp_path` assumes the env var wins; it does not, if that tmp dir has no
+`upcoming_recs_*.csv` in it. The probe walks past the empty tmp candidates and
+lands on the LOCAL REPO'S OWN `data/nfl_source/`, which DOES carry that file
+(tracked in git) — so the function returns the real checkout path, and
+anything the test writes under "the test root" lands in the actual working
+tree instead.
+
+**Caught by `git status --porcelain -- data/nfl_source/` after a first test run
+showed unexpected new files (`data/nfl_source/fantasy/news_archive/*.json`) —
+cleaned up with `rm -rf` before it was ever committed.** `tests/test_nfl_fantasy_artifact.py` already carries this exact
+warning in a comment ("in an empty directory, settles on a `source_artifacts/`
+variant") for the sibling write-path function
+(`nfl_artifact_output_root`) — this is the same trap on the READ-path
+resolver, one level up.
+
+**HOW TO APPLY.** For any NFL fixture needing an isolated source root, do not
+trust `SYNDICATE_NFL_SOURCE_ROOT` alone — `monkeypatch.setattr` the resolver
+function itself (`default_nfl_source_root` / `nfl_artifact_output_root`,
+wherever the module under test imports it from) to return the tmp path
+directly, and write test fixtures to whatever that function actually returns
+rather than to a hardcoded `<tmp>/nfl_source/...` layout. Verify with
+`git status --porcelain -- data/` after the FIRST run of any new NFL test,
+before trusting the pass.

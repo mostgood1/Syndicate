@@ -4821,6 +4821,23 @@ artifacts ON THE WORKER; set `SYNDICATE_NFL_FANTASY_USAGE_STRICT=1` on web so a
 request-path pbp parse fails loudly. A new usage FIELD needs
 `build_nfl_fantasy_usage.py --force`, not just a deploy.
 
+**BUZZ DUPLICATE-ACROSS-DAYS FIXED AND LIVE `[web 60ca2486, verified by Render
+deploy record 2026-08-23T23:53:42Z]`.** The `[measured 22:28.../23:29...]`
+line above proves the CAPTURE-time merge (`capture_nfl_news.py`, one day's
+file) deduped correctly by article id. It does NOT cover the separate READ-time
+aggregation `recent_news_by_player()` does across its 21-day window — that had
+NO dedup at all, so a story surviving several days on ESPN's feed was counted
+and DISPLAYED once per day it was captured, not once per distinct story,
+crowding out real coverage under the `[:6]` cap. Fixed: dedupe by article id
+(headline fallback) across the whole window, not just within one day's file.
+Also fixed `date.today()` → `datetime.now(timezone.utc).date()` in the same
+walk-back (`#518` timezone guard) and stale "Hover the badge" copy → "Click"
+(the badge has been a click-to-open dialog since `003a5866`, not a tooltip;
+the popup already rendered `description`, contrary to how the leftover copy
+read). PR #24 (fix) + PR #26/#27 (ledger). Full detail and the deploy's actual
+composition (73 commits rode along, unrelated to this fix) in
+`.syndicate/deploys.md`, 2026-08-23 23:42-23:53Z entry + correction.
+
 ## [nfl-player-props-model] NFL PLAYER-PROP MODEL: `#471` FULLY CLOSED, ALL 6 TUNED CONSTANTS STABILITY-VERIFIED, ALLOWLIST GAP FIXED+LIVE — WEB DEPLOY OF THE FIX SET IN FLIGHT, NOT YET CONFIRMED `[verified 2026-08-19]`
 
 `syndicate/features/nfl/player_stats.player_rate` (rolling season-to-date
