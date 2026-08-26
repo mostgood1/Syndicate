@@ -30307,3 +30307,103 @@ Source live-odds-worker · <15m`, the badge renders
 `SYNDICATE_EXECUTION_MAX_DAY_ORDERS=10` override is gone. That closes the
 open question from 19:00 CT, where it still read 10 on a pre-restart
 instance.
+
+## 2026-08-25 20:2x CT — DIAGNOSIS, NO DEPLOY — "the Layer 2 board and the compact chips are stale" is DEPLOY CADENCE, not a board defect
+
+**Reported symptom** (user, ~20:15 CT): the Layer 2 board and the compact game
+chips sat frozen "and even the odds refresh times were frozen for about 20
+mins", then recovered on their own.
+
+**VERDICT: nothing in the board, chip or artifact-read path is broken. The
+PRODUCER was being restarted faster than it can produce.** Every reader
+checked out healthy; the publisher never got to finish.
+
+**What was RULED OUT first, so nobody re-walks it.**
+
+- Chips ARE published and web IS reading them, not falling back:
+  `GAME_CHIPS_PUBLISHED date=2026-08-25 chips=232 sports=8 ok=True`, and
+  **zero** `BOARD_GAME_CHIPS_ARTIFACT_MISSING` on web all evening.
+- `#525`'s frozen-board mode (keyvalue write refuses, worker keeps serving the
+  last good shortlist) is NOT firing: `KEYVALUE_WRITE_LARGE size_bytes=5,166,721`
+  against `max_bytes=8,388,608` — **66.7%**, and `LAYER2_SHORTLIST rows=1291`
+  persisted.
+- NOT memory, despite the reading. `CONTAINER_MEMORY` sits at **90.4% of 4096 MB**
+  (headroom ~392 MB) and that is worth its own lane — but it did not cause
+  tonight's restarts. Every one is a `SIGTERM` whose `uptime_seconds` lands
+  exactly on a deploy boundary.
+
+**THE MEASUREMENT.**
+
+`refresh-worker` (`srv-d91dpertqb8s73co8ls0`) took **15 deploys between
+19:26:55Z and 01:13:38Z**, every one `trigger: api`. It logged **15
+`WORKER_SHUTDOWN ... "signal": "SIGTERM"`** in the same window.
+
+    uptime_seconds, in order:
+      232, 1361, 3134, 926, 2368, 450, 1268, 1202, 438, 644, 145,
+      4235, 443, 2783, 1787
+
+    median uptime            1202 s  = 20.0 min
+    boots under 8 minutes    5 of 15   (145, 232, 438, 443, 450)
+
+**Boot-to-first-publish is 20 min 41 s.** Instance `-fzb6v` booted 00:45:38Z
+(SIGTERM 01:15:25Z at `uptime_seconds: 1787`) and printed its first
+`GAME_CHIPS_PUBLISHED` at 01:06:19Z.
+
+**So the median instance is killed within a minute of when it would first
+publish.** That is the whole mechanism, and it is why the freeze the user
+timed was ~20 minutes rather than ~5.
+
+**Every publish gap has at least one deploy inside it, and the biggest gap has
+the most** — three independent confirmations:
+
+| chips publish gap | length | deploys finishing inside |
+|---|---|---|
+| 22:00:22Z → 22:54:41Z | 54 min | **5** (22:08:59 canceled, 22:11:36, 22:20:28, 22:32:25, 22:36:13) |
+| 23:43:08Z → 00:13:25Z | 30 min | 2 (23:48:19, 23:56:56) |
+| 00:34:33Z → 01:06:19Z | 32 min | 1 (00:45:13) |
+
+**THE WORKER ALREADY SAYS THIS OUT LOUD** and nobody was reading it —
+`WORKER_SHUTDOWN_KILLED_BOARD_BUILD frame=collect_candidates uptime_s=... --
+this build's work is lost and will restart from zero on the next boot`, fired
+**3 times** (19:01:16Z at 232 s, 19:25:54Z at 1361 s, 22:35:19Z at 145 s).
+Five more boots died before any build was in flight at all.
+
+`WORKER_SHUTDOWN` also names what else went with it: `run_mlb_daily_sim_job.py
+--date 2026-08-25`, `daily_update.py --workflow ui-daily` and the two
+`vendor/mlb_bettingv2` daily updates were live children on 5 of the 15
+shutdowns. That is `CLAUDE.md`'s "deploying kills an in-flight MLB sim",
+measured, five times in one evening.
+
+**WHY IT LOOKS LIKE A UI BUG AND IS NOT.** A frozen artifact and a fresh one
+are byte-identical in shape, so every surface renders the last good publish as
+though it were current. `read_combined_intelligence_response` makes that worse
+by hard-coding `state_meta = {"age_seconds": 0.0, "is_fresh": True}` on a read
+of artifacts of unknown vintage, and `/api/board/game-chips` returns a real
+`published_at` that the page does not surface. **A board that cannot go stale
+in its own telemetry is a board whose staleness only a user can find** — which
+is exactly how this was found.
+
+**NOT FIXED HERE, AND WHY.** The three candidate fixes all live in files held
+by OPEN lane `layer2-sim-view-and-live-projection`
+(`pipeline/intelligence_state.py`, `pipeline/layer2_shortlist.py`,
+`layer2_board.py`, `templates/intelligence.html`). Surfaced, not edited:
+
+1. **Derive `state_meta.age_seconds` from the artifacts' own `written_at`**
+   instead of asserting 0.0, and let `is_fresh` follow it.
+2. **Surface `published_at` on the chip strip**, so a frozen scoreboard says so.
+3. **Publish chips EARLY in the cycle**, not after the full shortlist build.
+   They are cheap; today a kill at minute 19 costs the whole 21-minute cycle
+   including a chip build that could have landed in the first minute.
+
+**THE OPERATIONAL LEVER IS THE REAL FIX AND IT IS NOT CODE.** At a 21-minute
+boot-to-publish cycle, refresh-worker deploys must be spaced **>25 minutes** or
+the board is frozen by construction. 15 deploys in 6h15m is one every 25
+minutes on average and five inside one 54-minute window. `deploy_claim.py`
+serialises deploys; **it does not rate-limit them**, and serialisation is not
+spacing.
+
+**verify (for whoever acts on this):** one clean hour with no refresh-worker
+deploy should show `GAME_CHIPS_PUBLISHED` at the loop's own cadence with no gap
+exceeding ~10 minutes, and zero `WORKER_SHUTDOWN_KILLED_BOARD_BUILD`.
+
+**No deploy taken, no claim held.**
