@@ -35,11 +35,19 @@ DIRECTORIES = (
     "recommendations_summary",
 )
 
-# Week-scoped files the bundle carries alongside the season-scoped ones in
-# `_root_files_for_season`. Matches NFL's `GLOB_PATTERNS` so the two runners
-# stay easy to diff.
+# Week-scoped capture files, relative to `<source_root>/data/`.
+#
+# NOT copied into the artifact bundle, and that is a reversal of this file's
+# first version. The bundle copy is FLAT (`artifact_root / path.name`), so a
+# props file landing there becomes
+# `ncaaf_source/source_artifacts/oddsapi_player_props_*.csv` -- a path the hot
+# artifact allowlist does NOT match, checked against the real matcher. The
+# result would be a second, stale, undeliverable copy sitting next to the live
+# one. Delivery to web is `publish_hot_artifact` on the canonical
+# `data/processed/` path instead; this tuple exists so the input hash notices a
+# fresh capture.
 GLOB_PATTERNS = (
-    "oddsapi_player_props_*.csv",
+    "processed/oddsapi_player_props_*.csv",
 )
 
 
@@ -80,7 +88,12 @@ def _refresh_player_props(*, data_root: Path, season: int, week: int) -> dict[st
     non-zero exit -- the opposite of NFL's runner, which returns the props
     exit code and would take the whole NCAAF refresh down with it.
     """
-    out_path = data_root / "data" / _props_file_name(season, week)
+    # UNDER `data/processed/`. The hot-artifact allowlist already carries
+    # `*_source/data/processed/oddsapi_player_props_*.csv`, so this path
+    # crosses to web with no edit to `artifact_publisher.py` -- which matters
+    # beyond tidiness: that file is claimed by another OPEN lane. Verified
+    # against `is_hot_artifact_relative_path`, not by reading the pattern.
+    out_path = data_root / "data" / "processed" / _props_file_name(season, week)
     try:
         props_module = _load_props_fetcher()
         rc = props_module.main(
@@ -105,10 +118,32 @@ def _refresh_player_props(*, data_root: Path, season: int, week: int) -> dict[st
         except Exception:
             rows = 0
     status = "ok" if int(rc or 0) == 0 else "failed"
+
+    # PUBLISH, or the capture stops on the worker's disk. Render will not share
+    # a disk between the worker and web, so an artifact the worker writes is
+    # invisible to the board until it is pushed across. `#208`'s lesson runs the
+    # other way too: the allowlist PERMITS the transfer, it does not perform one.
+    #
+    # Best-effort by contract -- `publish_hot_artifact` returns False and never
+    # raises on "not configured", "not allowlisted", "file missing" or a network
+    # error, so this cannot fail the refresh either.
+    published = False
+    if rows > 0:
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            published = bool(publish_hot_artifact(out_path))
+        except Exception as exc:
+            print(f"[ncaaf_props] PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
+
     # `logger.info` never reaches Render's log collector -- print/flush is the
     # only line that shows up in `render_logs.py`.
-    print(f"[ncaaf_props] {status} season={season} week={week} rows={rows} rc={rc} path={out_path}", flush=True)
-    return {"status": status, "rc": int(rc or 0), "rows": rows, "path": str(out_path)}
+    print(
+        f"[ncaaf_props] {status} season={season} week={week} rows={rows} rc={rc} "
+        f"published={published} path={out_path}",
+        flush=True,
+    )
+    return {"status": status, "rc": int(rc or 0), "rows": rows, "published": published, "path": str(out_path)}
 
 ALIASES = {
     "miami oh": "miami ohio",
@@ -698,10 +733,6 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
         destination = artifact_root / source.name
         if destination.exists():
             copied.setdefault("files", []).append(str(destination))
-        for path in _glob_data_files(source_root):
-            destination = artifact_root / path.name
-            if destination.exists():
-                copied.setdefault("files", []).append(str(destination))
         for name in DIRECTORIES:
             destination = artifact_root / name
             if destination.exists():
@@ -724,11 +755,6 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
     destination = artifact_root / source.name
     if _copy_if_exists(source, destination):
         copied.setdefault("files", []).append(str(destination))
-
-    for path in _glob_data_files(source_root):
-        destination = artifact_root / path.name
-        if _copy_if_exists(path, destination):
-            copied.setdefault("files", []).append(str(destination))
 
     for name in DIRECTORIES:
         source = source_data_root / name

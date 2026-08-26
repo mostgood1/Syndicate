@@ -158,22 +158,53 @@ def test_props_failure_never_fails_the_lines_refresh(monkeypatch, tmp_path):
     assert "RuntimeError" in result["error"]
 
 
-def test_props_file_is_carried_into_the_artifact_bundle(tmp_path):
-    """Written next to the lines file, and picked up by the bundle glob.
+def test_props_file_lands_where_the_allowlist_already_reaches(tmp_path):
+    """`data/processed/`, and the glob that fingerprints it agrees.
 
-    Without this the capture would land on the worker's disk and stop there.
+    One directory shallower and the capture can never cross to web -- and it
+    fails as an empty props panel, not as an error.
+    `tests/test_ncaaf_props_board.py` pins the allowlist half of this; this
+    pins the writer half.
     """
-    data_dir = tmp_path / "data"
-    data_dir.mkdir(parents=True)
-    (data_dir / "oddsapi_player_props_2026_wk1.csv").write_text("player,book\n", encoding="utf-8")
-    (data_dir / "oddsapi_player_props_2026_wk2.csv").write_text("player,book\n", encoding="utf-8")
-    (data_dir / "college_football_betting_lines_2026.csv").write_text("x\n", encoding="utf-8")
+    processed = tmp_path / "data" / "processed"
+    processed.mkdir(parents=True)
+    (processed / "oddsapi_player_props_2026_wk1.csv").write_text("player,book\n", encoding="utf-8")
+    (processed / "oddsapi_player_props_2026_wk2.csv").write_text("player,book\n", encoding="utf-8")
+    (tmp_path / "data" / "college_football_betting_lines_2026.csv").write_text("x\n", encoding="utf-8")
 
     found = [path.name for path in runner._glob_data_files(tmp_path)]
     assert found == [
         "oddsapi_player_props_2026_wk1.csv",
         "oddsapi_player_props_2026_wk2.csv",
-    ], f"bundle glob picked up {found}"
+    ], f"fingerprint glob picked up {found}"
+
+
+def test_the_props_file_is_NOT_copied_flat_into_the_artifact_bundle():
+    """A flat bundle copy would be undeliverable, so it must not happen.
+
+    `artifact_root / path.name` would land it at
+    `ncaaf_source/source_artifacts/oddsapi_player_props_*.csv`, which the
+    allowlist does not match -- a second, stale, unreachable copy beside the
+    live one. Delivery is `publish_hot_artifact` on the canonical path.
+    """
+    source = (REPO_ROOT / "scripts" / "refresh_ncaaf_oddsapi.py").read_text(encoding="utf-8")
+    # Checked as the COPY LOOP, not as the expression -- the expression also
+    # appears in the comment in that file explaining why it must not be there,
+    # and a substring test on it fails against its own documentation.
+    assert "_copy_if_exists(path, destination)" not in source
+    assert "publish_hot_artifact" in source
+
+
+def test_the_capture_is_published_not_just_written():
+    """Allowlisting PERMITS a transfer; it does not perform one (`#208`).
+
+    Without the publish call the CSV sits on the worker disk forever, because
+    Render cannot share a disk between the worker and web.
+    """
+    source = (REPO_ROOT / "scripts" / "refresh_ncaaf_oddsapi.py").read_text(encoding="utf-8")
+    assert "published = bool(publish_hot_artifact(out_path))" in source
+    # Guarded on rows, so an empty pregame capture does not burn egress.
+    assert "if rows > 0:" in source
 
 
 def test_bundle_glob_is_sorted_so_the_input_hash_is_stable(tmp_path):

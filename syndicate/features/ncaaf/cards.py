@@ -25,6 +25,7 @@ from syndicate.features.ncaaf.sources import load_json
 from syndicate.features.ncaaf.sources import ncaaf_target_week
 from syndicate.features.ncaaf.sources import summary_path
 from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import load_games_season
+from syndicate.features.ncaaf import props as ncaaf_props
 from syndicate.features.ncaaf.smartsim2_blend import compute_blend
 from syndicate.features.ncaaf.smartsim2_projection import CONSENSUS_SOURCE_LABEL
 from syndicate.features.ncaaf.smartsim2_projection import LEGACY_ENGINE_SOURCE_LABEL
@@ -2105,6 +2106,17 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
     return {
         "gamePk": f"{week}_{away_team}_{home_team}".replace(" ", "_"),
         "card_variant": "ncaaf_main",
+        # Same block as the standalone card below, on the ENGINE path.
+        #
+        # Both paths carry it because which one a game takes is decided by
+        # whether the legacy engine happens to have a row for that (season,
+        # week) -- nothing to do with props. Wiring only the path that is live
+        # today would mean props silently disappearing from a card the moment
+        # an engine row appeared for it, which reads to a user as "the books
+        # pulled the market".
+        "prop_recommendations": ncaaf_props.prop_recommendations_for_game(
+            season=season, week=week, home_team=home_team, away_team=away_team
+        ),
         "away": {
             "abbr": away_abbr,
             "name": away_team,
@@ -2396,6 +2408,24 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
         # `state.md` records costing a whole NFL analysis via nflverse's
         # `spread_line`. `tests/test_ncaaf_oddsapi_game_lines.py` pins it.
         "betting": _smartsim2_standalone_betting(row, projection),
+        # THE BLOCK THAT PUTS PROPS ON THE BOARD.
+        #
+        # `game_board_contract._build_prop_rows` reads exactly this key and
+        # nothing else -- `{"away": [...], "home": [...]}` -- and derives each
+        # row's heading from the LIST IT IS IN. Nothing else in this card had
+        # to change, and the shared contract did not have to change at all.
+        #
+        # Measured on production 2026-08-26, before this: all 51 served wk1
+        # cards carried `shared_prop_rows: []` while 6 of 6 probed openers had
+        # real markets upstream. The comment two hundred lines up in this file
+        # said "NCAAF has no props pipeline yet" and was accurate.
+        #
+        # Returns `{}` when nothing was captured for this game, which is the
+        # correct pregame state for a slate whose books have not posted yet --
+        # NOT an error, and not something to backfill on the request path.
+        "prop_recommendations": ncaaf_props.prop_recommendations_for_game(
+            season=season, week=week, home_team=home_team, away_team=away_team
+        ),
         "ncaaf_card": {
             "version": _NCAAF_CARD_CONTRACT_VERSION,
             "summary": {

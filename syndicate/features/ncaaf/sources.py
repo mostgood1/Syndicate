@@ -54,6 +54,28 @@ def roster_snapshot_path() -> Path:
     return ncaaf_source_artifacts_data_path("processed", "roster", "ncaaf_roster_snapshot.csv")
 
 
+def ncaaf_player_props_path(season: int, week: int) -> Path:
+    """The captured OddsAPI player-prop CSV for one (season, week).
+
+    UNDER `data/processed/`, AND THAT IS LOAD-BEARING. The hot-artifact
+    allowlist already carries `*_source/data/processed/oddsapi_player_props_*.csv`
+    (`artifact_publisher.HOT_ARTIFACT_PATTERNS`), so writing here means the
+    capture can cross from the worker to web with NO allowlist change.
+
+    Verified against the real matcher, not by reading the pattern:
+
+        ncaaf_source/data/processed/oddsapi_player_props_2026_wk1.csv  ALLOWED
+        ncaaf_source/data/oddsapi_player_props_2026_wk1.csv            blocked
+        ncaaf_source/source_artifacts/oddsapi_player_props_2026_wk1.csv blocked
+
+    NFL sits at `nfl_source/oddsapi_player_props_*.csv` with its OWN
+    single-sport pattern line, added because its writer had already chosen a
+    shallower path. Do not copy that shape here -- it needs an allowlist edit
+    and this does not.
+    """
+    return data_path("processed", f"oddsapi_player_props_{int(season)}_wk{int(week)}.csv")
+
+
 def player_game_stats_snapshot_path() -> Path:
     return ncaaf_source_artifacts_data_path("processed", "player_game_stats", "ncaaf_player_game_stats_snapshot.csv")
 
