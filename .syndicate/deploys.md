@@ -31967,3 +31967,70 @@ returns nothing. The working form is a LIST of separate strings, `["A","B","C"]`
 to match something.** The tell was `["layer2_shortlist"]` returning health lines
 in a window where the alternation query had returned null.
 
+
+
+## 2026-08-26 17:18:18Z — live-odds-worker `448dc87d` — SPREADS PLACE, AND CORRECTLY. VERIFIED.
+
+lane: kalshi-spread-join-sign · deploy dep-da7ht2favr4c73ftr400
+claim re-acquired (the earlier one had EXPIRED at 52 min -- replaced rather than
+deployed under a dead lock). preflight CLEAR. render.yaml UNCHANGED, no
+blueprint_sync.
+
+carries: the spreads leg mapping (`_spread_side_from_line`), the Polymarket
+`FILL_ABOVE_LIMIT` check, and the join sign fix.
+
+verify: **a spread order after the deploy must NOT refuse `unmappable_side`.**
+Read 17:26:18Z, 8 minutes after live:
+
+    KXMLBSPREAD-26AUG261540CHCAZ-AZ2
+    side=home line=-1.5  ->  FILLED, 3 contracts @ 0.33, venue_status=executed
+    still refusing unmappable_side: 0 of 1
+
+**THE FIRST KALSHI SPREAD ORDER THIS PLATFORM HAS EVER PLACED.**
+
+AND IT BOUGHT THE RIGHT BET, checked against the venue rather than asserted:
+
+    venue title : "Arizona wins by over 1.5 runs?"   (names Arizona)
+    board row   : Arizona (home) -1.5
+    rule        : line < 0 -> YES
+    YES pays    : Arizona wins by over 1.5  ==  Arizona -1.5   MATCHES THE ROW
+
+That is the whole point of the fix and the reason it was gated for so long.
+Before the join's sign fix this same `-1.5` row got NO TICKER AT ALL, while the
+`+1.5` row got the ticker of the club it was FADING -- so lifting the refusal
+without the join fix would have bought the opposite team, 11 orders a cycle.
+
+`exchange_index: 3` on that market, so this is ALSO a third independent
+confirmation that funding shard 3 was the Kalshi blocker.
+
+## 2026-08-26 — Kalshi shard 3: RESOLVED, and my remedy was wrong before it was right
+
+The account had collateral only on shard 0; baseball lives on shard 3
+("Tennis & Baseball"). The user moved $25. Three MLB fills followed, all on
+`exchange_index=3`:
+
+    16:19:07Z  KXMLBHRR-26AUG261310TBDET-DETHLEE50-2   11 @ 0.40   executed
+    16:19:08Z  KXMLBTOTAL-26AUG261940TEXCWS-8           5 @ 0.47   executed
+    17:26:18Z  KXMLBSPREAD-26AUG261540CHCAZ-AZ2         3 @ 0.33   executed
+
+The only prior MLB fills (2026-08-24) were `exchange_index=0`. The split that
+diagnosed this was perfect at n=9 and is now n=12.
+
+**ATTRIBUTION CORRECTION, recorded because it would otherwise be misread:** the
+first two fills landed at 16:19, BEFORE I set `KALSHI_ORDER_KNOWN_SHARDS=0,3`
+(~16:20) and before any deploy of mine. The env var did NOT unblock them -- the
+peer session's `4d0d4d52` (carry `exchange_index` through the normalizer) had
+already made the guard read the real shard, and with collateral present the
+orders simply went through. My env var was belt-and-braces. Checking the
+timestamps is the only thing that caught this; the obvious story was wrong.
+
+**AND THE REMEDY I SHIPPED INTO AN ERROR STRING WAS WRONG.** It said the venue
+had to "enable this account on that exchange shard; no code change fixes it",
+which sends a reader to Kalshi support. Shards are PRODUCT shards, all
+`trading_active`, and docs.kalshi.com/getting_started/exchange_sharding.md says
+"Subaccount balances are local to a specific exchange instance" and
+"Programmatic traders must preallocate collateral on a given exchange shard
+before order placement." It was always the account holder's action, and a
+one-minute transfer. See the CORRECTION entry above.
+
+verify: DISCHARGED by the three fills above.
