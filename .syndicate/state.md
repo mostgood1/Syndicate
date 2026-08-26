@@ -5647,3 +5647,50 @@ must mint a globally unique KEY, where the same rule mints collisions.
 one at 27,070 rows — the aggregator uses no spelling the exact match misses.
 Reproduced independently by lane `board-staleness-visibility`.
 
+
+## [board-quote-staleness] Board freshness vs QUOTE staleness — verified 2026-08-26 (lane `board-staleness-visibility`)
+
+**THE BOARD BUILD IS ~108s IN STEADY STATE.** n=40 unattended builds, median
+107.8s, p90 145.5s. **A COLD build (first after restart) is 747.8s — 6.9x.**
+Every figure in older entries (19m43s, 12m44s, 11m22s) is a COLD build
+generalised; they were measured in a window with 15 deploys in 6h15m where the
+worker never reached a warm build. **Quote a board-build duration only with
+cold/warm attached.**
+
+**Cold-build decomposition:** `build_intelligence_overview` 295.1s,
+`candidate_collection_with_fallback` 178.0s, `candidate_building` 0.01s,
+`manifest_odds_history_join` 0.32s. **All eight sports' candidate generation is
+47s — 6% of the build.** Optimising generation optimises nothing.
+
+**Per-sport odds-history load is CHEAP:** total 0.2s across 5 sports, mlb 0.19s,
+**soccer 0.01s**. Do not size work against an assumption that shard reads are
+expensive.
+
+**THE BOARD SERVES STALE QUOTES, and publication freshness cannot see it.**
+`seen_p50=859s` against a ~60s publish cadence. Every publication-time
+instrument (`written_at`, `state_meta`, the stale badge) reads FRESH on a board
+carrying 14-minute-old quotes. Use `QUOTE_AGE_SERVED`.
+
+**`last_seen` MUST be read across the same dates as `quote_rows`.** Fixed
+2026-08-26: `quote_rows` extends across `window_dates` while `last_seen` read
+`selected_date` alone, leaving rows clockless — and **a clockless row is
+invisible to `drop_superseded_lines`**, which requires a clock on both sides by
+design. Measured before the fix: `no_seen_age=7553` against `kept=15672`, 48% of
+a grid exempt from the guard. After: `no_seen_age` max 52, drops 16 -> 824/2271,
+artifact 962141 -> 962176 bytes.
+
+**NFL's sweep cadence is FIXTURE-AWARE AND CORRECT, not an outage.**
+`FIXTURE_CADENCE sport=nfl interval=28800 reason=mid:26h_out` — 8 hours by
+design (`#440` Phase 1b, which predicted nfl_preseason 12.00 -> 3.56 sweeps/day).
+ncaaf 86400s, wnba 7200s. **Judge a sport's sidecar against its OWN interval or
+against its rows' ages — never a flat threshold.**
+
+**`_pregame_sweep_interval_for_tick` DISAGREES ACROSS SERVICES.** It is
+fixture-aware; the decision is made on **live-odds-worker**. Recomputing it on
+refresh-worker returns 7200 for nfl against production's 28800, because the
+fixture lookup finds nothing there.
+
+**NO MEMORY PROBLEM EXISTS ON refresh-worker.** Peak unreclaimable 29.1% of
+4096MB, zero oomKilled over two days. `container_memory_pct_of_max` counts page
+cache; `ALL_PROCESS_MEMORY` now carries `container_memory_unreclaimable_*`
+beside it. **Quote the unreclaimable figure.**

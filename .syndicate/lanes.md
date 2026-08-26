@@ -67,7 +67,7 @@ death, never life — do not invert it.
 
 ## OPEN
 
-### board-staleness-visibility — OPEN — opened 2026-08-25 — **NARROW CARVE-OUT from `layer2-sim-view-and-live-projection`, taken at explicit user direction ("take that lane's files and ship fixes 1-3")**
+### board-staleness-visibility — **CLOSED 2026-08-26** — opened 2026-08-25 — **CARVE-OUT RELEASED back to `layer2-sim-view-and-live-projection`.** `#563`/`#564`/`#565`/`#566`/`#567`/`#569` all shipped, merged to main and DEPLOYED; tree clean, no held files. **Root cause of the reported staleness: the board serves quotes ~14 min old (`seen_p50=859s`) against a ~60s publish cadence — a DATE mismatch left 48% of a grid clockless and invisible to `drop_superseded_lines`; fixed and verified (`no_seen_age` 7553 -> 52, artifact 962141 -> 962176 bytes).** Narrative in `.syndicate/log/2026-08-26.md`; facts in `state.md [board-quote-staleness]`. **STILL OPEN AND UNOWNED:** `market_gone` root cause; the untraced ~112-141s steady-state board tail; `#563` TOO_SOON never exercised against live Render.
 
 **WHY A CARVE-OUT AND NOT A CLAIM.** Every file this needs is held by OPEN lane
 `layer2-sim-view-and-live-projection` (session e47e1b67). I surfaced that
