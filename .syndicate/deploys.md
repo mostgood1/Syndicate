@@ -32522,3 +32522,66 @@ round and died on the next, and both times the cause was the same: a label that
 could be produced by more than one mechanism, reported as though it named one.
 `sidecar=<age>` on the line is what makes the current numbers checkable; quote
 them WITH it.
+
+### "WHY DID NFL STOP CAPTURING" — IT DID NOT. I RAISED A FALSE ALARM.
+
+live-odds-worker, 20:01:44Z, printing the decision as it makes it:
+
+    FIXTURE_CADENCE sport=nfl   interval=28800 reason=mid:26h_out
+    FIXTURE_CADENCE sport=ncaaf interval=86400 reason=far:67h_out
+    FIXTURE_CADENCE sport=wnba  interval=None  reason=imminent_handoff_to_t_window:10697s
+
+    PREGAME_CADENCE_DETAIL  ncaaf:marker_age_s=76825/interval_s=86400
+                            nfl:marker_age_s=17919/interval_s=28800
+                            wnba:marker_age_s=3557/interval_s=7200
+    PREGAME_CADENCE_SKIPPED sports=ncaaf,nfl,wnba
+
+**NFL is on a deliberate 28800s = 8-HOUR sweep interval because its next fixture
+is 26 hours out.** `marker_age 17919s (5.0h) < interval 28800s (8h)`, so it was
+correctly skipped. This is `#440` Phase 1b's fixture-aware cadence gate, and
+`_pregame_sweep_interval_for_tick`'s own comment states the intended effect in
+advance: *"mlb 12.00 -> 5.45/day, wnba 12.00 -> 5.83, **nfl_preseason 12.00 ->
+3.56**."* 24h / 8h = 3 sweeps a day. **Measured behaviour matches the design
+note exactly.**
+
+**I reported it as "NEW, UNATTRIBUTED, and nobody is holding it. Worth a lane."
+It is none of those.** It is a shipped, measured, intentional cadence reduction,
+and I called a working feature an outage.
+
+### AND THE SAME IS TRUE OF WNBA — my earlier attribution was also wrong
+
+wnba: `interval_s=7200` (2h), `marker_age_s=3557` (59 min) -> **also correctly
+skipped, also by design.** I attributed wnba's `sidecar_frozen` to the OPEN lane
+`wnba-live-odds-capture-gap`'s reuse-guard bug. That bug is real and was
+measured on 2026-08-21, but **it is not what today's reading shows**: a 59-minute
+sidecar under a 2-hour designed interval is the gate working, not the guard
+failing. I should not have reached for a known bug to explain a number I had not
+checked against its own configured interval.
+
+### THE CLASSIFIER IS WRONG A THIRD TIME, SAME ERROR CLASS
+
+`sidecar_frozen` fires at a **flat 900s**. Every sport whose designed cadence
+exceeds 15 minutes trips it unconditionally:
+
+    sport   designed interval   flat threshold   verdict
+    nfl           28800s             900s        ALWAYS "frozen"
+    ncaaf         86400s             900s        ALWAYS "frozen"
+    wnba           7200s             900s        ALWAYS "frozen"
+
+**So `sidecar_frozen` currently means "this sport sweeps less often than every
+15 minutes", which is a fact about the CONFIG, not about health.** Third label
+in `#569` produced by more than one mechanism and reported as though it named
+one — after I wrote that exact warning into the previous entry.
+
+**THE FIX, not made and NOT to be made blind:** compare the sidecar age against
+the sport's OWN `interval_s` (both are already printed on
+`PREGAME_CADENCE_DETAIL`), not a constant. `frozen` should mean
+`marker_age > interval * k`, and anything inside its interval is HEALTHY.
+
+**WHAT STILL STANDS, and it is the one thing that does:** a healthy cadence does
+NOT explain a 9.3-hour-old SERVED ROW. wnba's worst is `33419s` against a 2-hour
+sweep interval — that key has gone unobserved across roughly five successive
+healthy sweeps. **The row-level staleness is real; my attribution of it to a
+capture outage was not.** That is still the orphaned-key / market-gone question,
+and mlb — the sport whose sidecar is genuinely live at 321s — still answers it
+`orphaned_line=2` to `market_gone=1`.
