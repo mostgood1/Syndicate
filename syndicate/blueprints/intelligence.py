@@ -3967,9 +3967,26 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
             "state_age_seconds": None,
         }
 
+    # WHAT IS ACTUALLY IN THE ACCOUNTS, from the worker's stamp -- never from a
+    # call here. Web holds no venue credential and must not; a page that hit
+    # the venue per request would also be a second independent live caller,
+    # which is a named incident class in this repo (`#139`/`#144`/`#148`).
+    # `None` means the worker has not reported, and the page renders that as
+    # unknown rather than as no money.
+    balances = None
+    try:
+        from syndicate.features.shared.venue_balances import read_venue_balances
+
+        balances = read_venue_balances()
+    except Exception:
+        _LOGGER.exception("VENUE_BALANCES_READ_FAILURE")
+    if isinstance(balances, dict):
+        balances = {**balances, "age_seconds": _seconds_since(balances.get("recorded_at"))}
+
     return {
         "date": selected_date,
         "orders": orders,
+        "balances": balances,
         "hidden_count": len(hidden_orders),
         "show_all": bool(show_all),
         "periods": periods,

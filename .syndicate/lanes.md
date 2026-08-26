@@ -2330,6 +2330,59 @@ Four deploys were taken during this session and each is recorded in
   reading owed — the banner's per-venue figures must change after an edit.
 - Blocked by: none
 
+### venue-balances-on-portfolio — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: the Kalshi and Polymarket account balances are visible on `/portfolio`,
+  beside the caps that spend them. `[user decision 2026-08-26: "are we able to
+  display kalshi and polymarket balances on the portfolio page?"]`
+- **THE PAGE MUST NOT CALL THE VENUE, and there are two independent reasons.**
+  (1) Web holds no credential and must not: `KALSHI_PRIVATE_KEY` /
+  `POLYMARKET_US_*` are dashboard-set on live-odds-worker and deliberately
+  absent from `render.yaml` (`#284`). (2) A second independent live caller of a
+  venue is a NAMED incident class here (`#139`/`#144`/`#148`) — it is why
+  `_polymarket_resolve_market` was rewritten in August to read the persisted
+  artifact. A widget calling per page load would be that, with N viewers.
+  **So: worker fetches on the execution tick, stamps
+  `reports/intelligence/venue_balances.json`, page reads with an age** — the
+  same hop `execution_state.json` already uses.
+- **THE ONE DANGEROUS BUG IS A ZERO.** "The account is empty" and "we could not
+  read the account" are opposite facts — one says stop, the other says
+  something is broken — and both render as `$0.00`. Every failure carries a
+  NAMED status and NO dollar figure: `credentials_absent`, `auth_error`,
+  `path_unknown`, `shape_unrecognised`. A total is not printed at all unless
+  BOTH venues read, because a sum over a partial read is a lie with a dollar
+  sign on it.
+- **KALSHI IS VERIFIED, POLYMARKET IS NOT, AND THE CODE DOES NOT PRETEND.**
+  `GET /trade-api/v2/portfolio/balance` is exercised (200 from a signed call
+  2026-08-23T22:53Z while unauthenticated reads were 429ing —
+  `kalshi_client.py:252`). `api.polymarket.us` has NO balance path documented
+  anywhere in this repo; `polymarket_us_auth.probe_auth()` asks `/markets`.
+  So the path is DISCOVERED once from a short read-only candidate list, the
+  winner recorded and reused, and `path_unknown` is a real state rather than a
+  guess that 404s forever. **The UNIT is likewise an assumption**: Kalshi
+  documents cents and it is divided and labelled; Polymarket documents nothing
+  we have read, so its raw value is carried undivided and labelled
+  `dollars_unverified`. Same discipline that caught the 100x price error.
+- Files:
+  `syndicate/features/shared/venue_balances.py` (new),
+  `scripts/run_live_odds_refresh_worker.py` (the stamp call only),
+  `syndicate/blueprints/intelligence.py` (`_live_portfolio_payload` only),
+  `syndicate/templates/portfolio.html`,
+  `tests/test_venue_balances.py` (new)
+- **CARVE-OUT EXTENDED** from `portfolio-decision-and-execution` (session
+  `01Sia2rPD72eFTriy28azzs2`, still not a reachable peer) on
+  `blueprints/intelligence.py` + `templates/portfolio.html`, at explicit user
+  direction, same terms as the two portfolio lanes earlier today.
+  `run_live_odds_refresh_worker.py` and both auth modules are held by no OPEN
+  lane; the auth modules are READ ONLY here and unedited.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: 19 tests green covering every named absence state; production
+  reading OWED and it is the point of the lane — `VENUE_BALANCES kalshi=… ` on
+  live-odds-worker, and a real figure (or a NAMED absence) rendered on
+  `/portfolio`. **Polymarket's discovery result is the finding**: which path
+  answered, or `path_unknown` against all four candidates.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

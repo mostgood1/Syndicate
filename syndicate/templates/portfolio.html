@@ -671,6 +671,59 @@
       </div>
       <div class="live-tile__meta"><a href="#venue-limits" style="color:var(--cards-accent);text-decoration:none;">Edit limits</a></div>
     </div>
+
+    {# ---------------------------------------------------------------
+       WHAT IS ACTUALLY IN THE ACCOUNTS.
+
+       Beside the caps deliberately: a $250/day cap against a $40
+       balance is a cap that can never bind, and the two numbers are
+       only useful next to each other.
+
+       NO DOLLAR FIGURE IS EVER SHOWN FOR A FAILURE. "$0.00" and "we
+       could not read it" are opposite facts -- one says stop, the
+       other says something is broken -- so every non-`ok` state
+       renders as its own words and no number at all.
+       --------------------------------------------------------------- #}
+    {% set B = L.balances %}
+    <div class="live-tile">
+      <div class="live-tile__label">Venue balances</div>
+      {% if not B %}
+        <div class="live-tile__value">—</div>
+        <div class="live-tile__meta">worker has not reported</div>
+      {% else %}
+        {% set bv = B.venues or {} %}
+        {% set kal = bv.kalshi or {} %}
+        {% set pm = bv.polymarket or {} %}
+        <div class="live-tile__value">
+          {% if kal.status == 'ok' and pm.status == 'ok' %}
+            ${{ "%.2f"|format((kal.dollars or 0) + (pm.dollars or 0)) }}
+          {% else %}
+            {# A TOTAL OVER A PARTIAL READ IS A LIE. If either venue is
+               unreadable, the sum is not the account and must not be
+               printed as though it were. #}
+            —
+          {% endif %}
+        </div>
+        <div class="live-tile__meta">
+          kalshi
+          {% if kal.status == 'ok' %}<strong>${{ "%.2f"|format(kal.dollars or 0) }}</strong>
+          {% else %}<span class="warn" title="{{ kal.detail or '' }}">{{ kal.status|replace('_', ' ') or 'unknown' }}</span>{% endif %}
+        </div>
+        <div class="live-tile__meta">
+          polymarket
+          {% if pm.status == 'ok' %}<strong>${{ "%.2f"|format(pm.dollars or 0) }}</strong>
+          {% else %}<span class="warn" title="{{ pm.detail or '' }}">{{ pm.status|replace('_', ' ') or 'unknown' }}</span>{% endif %}
+        </div>
+        <div class="live-tile__meta">
+          {# The age is what turns a figure into a reading. A balance from
+             forty minutes ago is not the balance. #}
+          {% if B.age_seconds is not none %}read {{ (B.age_seconds // 60) }}m ago{% else %}age unknown{% endif %}
+          {% if pm.status == 'ok' and pm.unit_assumption == 'dollars_unverified' %}
+            · <span class="warn" title="This venue documents no unit anywhere we have read. The raw value is stamped in the artifact; the first live read decides.">pm unit unconfirmed</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
   </div>
 
   {# -----------------------------------------------------------------
@@ -810,6 +863,21 @@
       {# `info` on the shipped defaults, `warn` once a stored or env value is
          what makes the cap unreachable. Always SAID; only the colour changes. #}
       <div class="{{ 'portfolio-bankroll__warn' if note.severity == 'warn' else 'portfolio-bankroll__meta' }}">{{ note.text }}</div>
+    {% endfor %}
+
+    {# A CAP ABOVE THE BALANCE CANNOT BIND, and that belongs where the cap is
+       typed rather than leaving the reader to compare two tiles. Shown only for
+       a venue whose balance we actually READ -- an unknown balance must never
+       produce a claim about a cap. #}
+    {% set bvv = ((L.balances or {}).get('venues')) or {} %}
+    {% for vname, capkey in [('kalshi', 'max_day_dollars_kalshi'), ('polymarket', 'max_day_dollars_polymarket')] %}
+      {% set brow = bvv.get(vname) or {} %}
+      {% if brow.get('status') == 'ok' and (xl[capkey] or 0) > (brow.get('dollars') or 0) %}
+        <div class="portfolio-bankroll__meta">
+          {{ vname|capitalize }}'s ${{ "%.2f"|format(xl[capkey] or 0) }} day cap is above its
+          ${{ "%.2f"|format(brow.get('dollars') or 0) }} balance — the account runs out before the cap does.
+        </div>
+      {% endif %}
     {% endfor %}
 
     <div class="portfolio-bankroll__meta">

@@ -1781,6 +1781,38 @@ def _run_execution_tick() -> None:
                 flush=True,
             )
 
+        # AND WHAT IS ACTUALLY IN THE ACCOUNTS. Same reason, same hop: the
+        # credentials are env vars on THIS process and web has none of them, so
+        # a balance can only reach the page by being stamped here.
+        #
+        # STAMPED IN THE SAME BREATH AS THE CAPS ABOVE deliberately -- the two
+        # numbers a person compares are "what may I spend" and "what do I
+        # have", and reading them minutes apart is how you conclude a cap is
+        # safe against a balance that has since been drawn down.
+        #
+        # `print`, not `logger.info`: the latter never reaches Render's
+        # collector on this service.
+        try:
+            from syndicate.features.shared.venue_balances import record_venue_balances
+
+            _balances = record_venue_balances(recorded_by="live-odds-worker")
+            print(
+                "[live_odds_worker] VENUE_BALANCES "
+                + " ".join(
+                    f"{name}={row.get('status')}"
+                    + (f":{row.get('dollars')}" if row.get("status") == "ok" else "")
+                    for name, row in sorted((_balances.get("venues") or {}).items())
+                ),
+                flush=True,
+            )
+        except Exception as exc:
+            # A balance is a nicety. It must never be able to stop the tick
+            # that places orders.
+            print(
+                f"[live_odds_worker] VENUE_BALANCES_STAMP_FAILED {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         # THE VENUE-RESTRICTED PLAN, named explicitly. Without this the call
         # read the unrestricted plan and tried to place a soccer total and an
         # MLB spread on Kalshi (2026-08-24T00:34Z) -- positions priced at other
