@@ -5465,11 +5465,16 @@ Do not change it without a larger sample.
 
 ## [kalshi-execution] Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`)
 
-**THE ONE THING A HUMAN MUST DO: fund Kalshi exchange shard 3.**
-kalshi.com/account/exchange-indexes, or the intra-account-transfer API. Roughly
-a minute. Kalshi balances are PER-SHARD and must be preallocated; shard 3 is
-"Tennis & Baseball", which is why only MLB fails. Nothing else is blocked and
-no further code change is needed.
+**DONE 2026-08-26: shard 3 is FUNDED — $25 moved to exchange index 3**, and
+`KALSHI_ORDER_KNOWN_SHARDS=0,3` is set on live-odds-worker (set by
+syndicate-43, readback confirmed). Kalshi balances are PER-SHARD and must be
+preallocated; shard 3 is "Tennis & Baseball", which is why only MLB failed.
+
+**UNVERIFIED AT SESSION CLOSE — three outcomes, keep them distinct:**
+- MLB fills or rests -> shard funding was the whole blocker.
+- A NEW venue error -> past our guard, the venue now has an opinion. Watch
+  for insufficient collateral: **$25 against a $10/order cap is two orders**.
+- `venue_shard_unfunded` still -> the env var did not take.
 
 **Verified working today:** Kalshi fills on shard 0 (`KXWNBA3PT` filled
 16:03:06Z, 10 contracts @ 0.40 + 0.168 fees, ~1s round trip). Polymarket

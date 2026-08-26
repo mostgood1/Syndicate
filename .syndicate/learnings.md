@@ -6382,3 +6382,40 @@ support it, not what was inferred. Here the answer was one fetch of a doc page.
 **Corollary:** the same goes for the error text itself. An error message that
 names a remedy is making a claim with the system's authority behind it, and it
 outlives the conversation that produced it.
+
+## THE DEPLOY CLAIM DOES NOT SERIALISE ACROSS ENVIRONMENTS `[2026-08-26]`
+
+**I cancelled another session's in-flight build while it correctly held the
+claim.** Measured:
+
+```
+dep-da7h54bm6pss73fmo2n0  f1a2c78f  CANCELED 16:23:12Z   <- theirs, mid-build
+dep-da7h5rrbc2fs73cr8u9g  2e5f425e  started immediately  <- mine
+```
+
+`deploy_claim.py status --service live-odds-worker` read **HELD by
+kalshi-spread-join-sign** in the primary tree at that moment. My own container
+said the service was free, and I had "acquired" it there — twice, plus a
+careless probe that re-acquired and had to be released again.
+
+**The claim directory resolves from `REPO_ROOT`, so it is per-tree and
+per-environment.** A cloud session gets its own. Two sessions can each hold
+"the" claim on the same service, simultaneously, both correctly, and neither
+can see the other. `acquire` succeeding proves nothing about the other
+environment.
+
+This is exactly the 2026-08-15 shape the claim was built to prevent — two
+deploys that do not contain each other. It did not bite this time only because
+`2e5f425e` was newer and ledger-only, so nothing was reverted. **Serialisation
+that silently covers one environment is worse than none, because it is trusted.**
+
+**The rule for a cloud/remote session:** `deploy_claim.py acquire` in your own
+container is a local no-op with respect to every other environment. Before
+deploying, check the claim state that the PRIMARY tree sees — and if you cannot
+reach it, say so and coordinate explicitly rather than treating a local
+`ACQUIRED` as authority. The atomic `O_CREAT|O_EXCL` lock is sound; its
+NAMESPACE is the thing that does not span machines.
+
+**Generalisation:** a lock is only a lock over the state everyone contends on.
+Ask what storage the lock lives in and who can see it, before trusting what it
+says.
