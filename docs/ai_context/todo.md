@@ -43,7 +43,7 @@ decision, not after.
 
 ---
 
-### `#561` — **`RECONCILE_COUNT_IMPLAUSIBLE` prints one branch's numbers while a different branch decided.** — lane `portfolio-decision-and-execution`, raised by `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+### `#561` — **`RECONCILE_COUNT_IMPLAUSIBLE` printed one branch's numbers while a different branch decided, and the count bound had no tolerance.** — **CLOSED 2026-08-26, FIXED BY `portfolio-decision-and-execution` INDEPENDENTLY; verified by `polymarket-oddsapi-coverage-audit`. Ready to archive.**
 
 The guard is CORRECT and has now caught two real defects in one evening. Its
 MESSAGE is the weak part, and it cost most of the diagnosis time for `#560`.
@@ -65,6 +65,45 @@ the fixed-point scale hazard; twice in a row the real cause was something else
 **Fix:** print which branch refused and its own operands. One line, no logic
 change. A guard whose message names the wrong quantity is a guard that costs
 more than it saves.
+
+---
+
+**CLOSED. Both halves were already on `main` before this item was filed** --
+landed independently by `portfolio-decision-and-execution` while it was being
+written. Verified against the live module rather than taken on trust:
+
+```
+_FILL_COUNT_TOLERANCE = 0.01  (additive)
+implausible = float(contracts) > float(requested_contracts) + _FILL_COUNT_TOLERANCE
+
+  venue=2.66  vs requested=2.6577777778  -> plausible   (the hazard reported here)
+  venue=2.39  vs requested=2.3920000000  -> plausible   (the order that halted trading)
+  venue=23.92 / 239.2 / 2392             -> IMPLAUSIBLE (the guard stays reachable)
+```
+
+The message half is done too: it now prints `bound=`, `fill_price`,
+`raw_fill_price`, `filled_dollars`, `stake_ceiling` and the requested pair, so
+a reader gets the operands of whichever branch actually decided.
+
+**THEIR FIX IS BETTER THAN THE ONE THIS ITEM WAS ABOUT TO SHIP, and the reason
+is worth keeping.** The plan here was to unify BOTH bounds under one
+multiplicative constant, on the argument that two constants drift
+(`learnings.md` 2026-08-23). That argument does not apply: the two bounds guard
+different error SHAPES. The dollar bound guards a PROPORTIONAL hazard -- a
+fixed-point scale error, 100x -- so a multiplicative 1.25 is right. The count
+mismatch is a FIXED artifact of the venue rounding to two decimals, bounded by
+0.005 absolute whatever the size, so an additive 0.01 is right. A 25%
+multiplicative slack on a 100-contract fill would have handed away 25
+contracts of headroom; `+0.01` hands away a hundredth, always.
+
+**Two constants because they bound two different things is correct**, and the
+"one authority" rule was pattern-matched onto a case it does not cover. Nothing
+was shipped from this lane.
+
+**Leftover, deliberately not chased:** the message still ends `check the `_fp`
+unit`. That hint was written for the fixed-point hazard and has now been wrong
+twice running -- a price-improved fill, then a mis-sided price. Comment-level,
+not worth a deploy on a money path.
 
 ### `#559` — **`find_first_game_offset` lands ABOVE ~8,400 rows of real game markets. Its partition premise is false and `monotonic` cannot detect it.** — **FIXED AND VERIFIED 2026-08-26T00:06:57Z: `7,936 -> 17,413` game markets, `truncated=False`, `kept_through` 09-07 -> 09-20 (PR #80, deploy `a021cd4dc`).** Downstream confirmed 00:16:12Z: `no_candidates|mlb|spreads` 51 -> gone, `indexed` 3,581 -> 7,635, `matched` 22 -> 45. Raised by lane `polymarket-oddsapi-coverage-audit`; handed to `portfolio-decision-and-execution` and then fixed at the user's explicit direction. **Ready to archive to `todo_closed.md`.**
 
