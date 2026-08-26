@@ -426,3 +426,63 @@ def test_a_non_route_error_does_not_probe(monkeypatch, capsys):
     )
     mod.fetch_orders()
     assert "ORDER_LIST_ROUTE_PROBE" not in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# THE REVERSED OUTCOMES ARRAY BOUGHT THE WRONG SIDE, with real money.
+#
+# Measured 2026-08-26T03:06:28Z:
+#   outcomes=['Under', 'Over']  our_side=over  outcome_index=1  yes_index=0
+#   -> SUBMIT side=OUTCOME_SIDE_NO   ... and NO on that market is Under.
+#
+# `yes_outcome_index()` is venue-wide; this market proves the YES leg is a
+# property of the MARKET. For an over/under that question never needed
+# answering -- the outcome's own name settles it at any position.
+# ---------------------------------------------------------------------------
+
+
+def test_over_buys_YES_even_when_Over_sits_at_index_one():
+    """THE REGRESSION. Index 1 against yes_index 0 used to yield NO -- Under."""
+    assert _body(request=_Request(side="over"), outcome_index=1)["outcomeSide"] == (
+        "OUTCOME_SIDE_YES"
+    )
+
+
+def test_over_buys_YES_when_Over_sits_at_index_zero_too():
+    """The name is authoritative at EITHER position -- that is the point."""
+    assert _body(request=_Request(side="over"), outcome_index=0)["outcomeSide"] == (
+        "OUTCOME_SIDE_YES"
+    )
+
+
+def test_under_buys_NO_at_either_position():
+    for index in (0, 1):
+        body = _body(request=_Request(side="under"), outcome_index=index)
+        assert body["outcomeSide"] == "OUTCOME_SIDE_NO", index
+
+
+def test_a_team_side_still_resolves_by_INDEX_not_by_name():
+    """The OPPOSITE rule, and it must not regress -- a club name carries no
+    yes/no information, so the array position is the only sound source. This
+    is the Texas/White Sox fix, made on the same venue the same morning."""
+    assert _body(request=_Request(side="home"), outcome_index=0)["outcomeSide"] == (
+        "OUTCOME_SIDE_YES"
+    )
+    assert _body(request=_Request(side="home"), outcome_index=1)["outcomeSide"] == (
+        "OUTCOME_SIDE_NO"
+    )
+
+
+def test_a_team_side_with_no_index_still_refuses():
+    """Refusing beats guessing positionally -- unchanged."""
+    with pytest.raises(OrderBuildError, match="side_needs_outcome_index"):
+        _body(request=_Request(side="home"), outcome_index=None)
+
+
+def test_an_unknown_side_refuses_even_when_an_index_is_available():
+    """THE HOLE I OPENED AND CLOSED. My first version routed every non-team
+    side to the index, so `draw` would have resolved to whatever position was
+    passed -- a real bet on an outcome nobody named. It must raise."""
+    for side in ("draw", "maybe", "", None):
+        with pytest.raises(OrderBuildError):
+            _body(request=_Request(side=side), outcome_index=1)

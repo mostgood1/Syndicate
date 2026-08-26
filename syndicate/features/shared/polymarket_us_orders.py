@@ -165,6 +165,35 @@ def outcome_side_for_index(index: Any) -> str:
     return _SIDE_YES if position == yes_outcome_index() else _SIDE_NO
 
 
+# The sides that must be read POSITIONALLY, and only these. A club name
+# carries no yes/no information, so the array index is the only sound source.
+_POSITIONAL_SIDES = frozenset({"home", "away"})
+
+
+def _resolve_outcome_side(side: Any, outcome_index: Any) -> str:
+    """Which leg to buy: by NAME where the name states it, by INDEX where only
+    the array can, and REFUSED where neither is true.
+
+    The third branch is not a formality. Routing every non-team side to the
+    index would make an unrecognised side (`draw`, a typo, an empty string)
+    resolve to whatever position happened to be passed -- a real bet on an
+    outcome nobody named. `_side_to_outcome` raises for those, and it is
+    reached here precisely so it keeps doing so.
+    """
+    raw = str(side or "").strip().lower()
+    if raw in _POSITIONAL_SIDES and outcome_index is not None:
+        return outcome_side_for_index(outcome_index)
+    # Everything else lands on the NAME rule, which resolves
+    # `over`/`under`/`yes`/`no` and RAISES for the rest.
+    #
+    # A team side with no index arrives here deliberately, so it keeps its own
+    # refusal -- `side_needs_outcome_index`, which says a team must be resolved
+    # against the outcomes array. Routing it to `outcome_side_for_index(None)`
+    # also refuses, but as `outcome_index_unreadable`, which describes the
+    # symptom and not the cause. On a money path the reason is the useful half.
+    return _side_to_outcome(side)
+
+
 def _side_to_outcome(side: Any) -> str:
     """Our `over`/`under`/`yes`/`no` -> the venue's outcome side.
 
@@ -307,16 +336,40 @@ def order_body(
         # NO, not a SELL of YES at the complement. Kalshi's inversion does not
         # belong here and its absence is deliberate.
         #
-        # THE INDEX WINS WHEN THE RESOLVER FOUND ONE. It is the position our
-        # own team occupies in this market's `outcomes` array -- the same
-        # reading that selected the price -- so price and side describe one
-        # outcome by construction. Falling back to the side name is for the
-        # `yes`/`no`/`over`/`under` markets that name no team; `home`/`away`
-        # refuse there rather than guessing positionally again.
-        "outcomeSide": (
-            outcome_side_for_index(outcome_index)
-            if outcome_index is not None
-            else _side_to_outcome(getattr(request, "side", None))
+        # WHICH READING IS AUTHORITATIVE DEPENDS ON WHETHER OUR SIDE NAME
+        # CARRIES THE YES/NO AXIS. It is not "index when we have one".
+        #
+        # `over`/`under`/`yes`/`no` ARE the axis. `home`/`away` are not -- a
+        # team name says nothing about which leg of a binary market it is, so
+        # there the INDEX is the only sound source and `_side_to_outcome`
+        # refuses them outright.
+        #
+        # THE INDEX RULE WAS APPLIED TO BOTH AND IT BOUGHT THE WRONG SIDE.
+        # Measured 2026-08-26T03:06:28Z, real money:
+        #
+        #   POLYMARKET_ARTIFACT_PRICE our_side=over outcome_index=1
+        #       outcome='Over' outcomes=['Under', 'Over']
+        #   SUBMIT side=OUTCOME_SIDE_NO action=BUY qty=30.46 price=0.26
+        #       our_side=over outcome_index=1 yes_index=0
+        #
+        # The array is REVERSED -- `Over` sits at index 1 -- so
+        # `outcome_side_for_index(1)` with `yes_index=0` returned NO, and NO on
+        # that market is Under. We asked for Over and bought Under, at the
+        # price resolved for Over. Both halves are the same defect the
+        # Texas/White Sox order hit this morning, with the polarity reversed:
+        # there the SIDE was positional and the price was matched; here the
+        # price was matched and the SIDE was positional.
+        #
+        # `yes_outcome_index()` is a VENUE-WIDE constant, and this market
+        # proves the YES leg is a property of the market, not of the venue.
+        # For an over/under that question does not need answering at all --
+        # the outcome's own name settles it, whatever position it holds.
+        #
+        # The price still comes from the matched index, and is now consistent:
+        # buying YES (`Over`) at `outcomePrices[1]` (Over's price) describes
+        # one outcome again.
+        "outcomeSide": _resolve_outcome_side(
+            getattr(request, "side", None), outcome_index
         ),
         "action": _ACTION_BUY,
         "manualOrderIndicator": _MANUAL_INDICATOR,
