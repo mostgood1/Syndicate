@@ -34,6 +34,123 @@ from typing import Any, Iterable, Mapping
 _UNSET = object()
 
 
+def _quote_age_percentiles(values: list[float]) -> tuple[float, float, float] | None:
+    """(p50, p90, max) over a sorted copy, or None when there is nothing to report."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    def _at(fraction: float) -> float:
+        # Nearest-rank. No interpolation on purpose: these are observation ages
+        # in seconds and an interpolated age is not an age anything actually had.
+        index = min(len(ordered) - 1, max(0, int(round(fraction * (len(ordered) - 1)))))
+        return ordered[index]
+    return (_at(0.5), _at(0.9), ordered[-1])
+
+
+def _report_served_quote_ages(rows: Any) -> None:
+    """Report how old the QUOTES on the published board were AT PUBLISH TIME.
+
+    THE QUESTION THIS EXISTS TO ANSWER, asked by syndicate-43 on 2026-08-26 and
+    which nothing in this repo could answer: **when the board looks stale, is
+    the BOARD stale or is the QUOTE stale?**
+
+    Everything the `board-staleness-visibility` lane measured was artifact
+    PUBLICATION time -- `written_at` on the chip artifact, artifact stamps on
+    `state_meta`. None of it touches the age of the quote INSIDE the artifact.
+    A board republished every 60 seconds carrying twenty-minute-old venue
+    quotes reads fresh on every one of those instruments: recent `written_at`,
+    recent `published_at`, `is_fresh` true, no stale badge. That failure mode
+    was invisible, and it is exactly the one a direct Kalshi/Polymarket feed
+    would fix while a publication fix would not.
+
+    **BOTH CLOCKS, REPORTED SEPARATELY, because they answer different questions**
+    -- `_row_quote_age_seconds`'s own docstring (`layer2_board.py`, `#370`)
+    establishes this with production measurements, and collapsing them here
+    would throw away the distinction it was written to draw:
+
+        seen_age   how long since WE LOOKED at this market
+        book_age   how long since the PRICE MOVED
+
+    Its 2026-08-11 reading: wnba `book` median 376.2m against `seen` median
+    68.5m. A motionless market ages without limit on the book clock while our
+    observation of it stays current, so `book_age` alone would read as an
+    outage that is not there -- and `seen_age` alone would miss a feed that has
+    genuinely stopped.
+
+    **HOW TO READ IT.** These ages are measured at PUBLISH time, so `seen_p50`
+    is how old our observation already was at the instant the board shipped.
+    Set against the publish cadence (`written_at` age at serve, ~60s):
+
+        seen_p50 small  + board looks stale  -> PUBLICATION. This lane's ground.
+        seen_p50 large  + board looks fresh  -> UPSTREAM. The direct-feed case.
+
+    Read-only over rows this function does not own. `layer2_board.py` belongs to
+    the OPEN lane `layer2-sim-view-and-live-projection`, so the fields are read
+    from the row contract here rather than computed there. Never raises: an
+    instrument must not be able to take down the build it measures.
+    """
+    try:
+        if not isinstance(rows, list) or not rows:
+            return
+        seen: list[float] = []
+        book: list[float] = []
+        no_clock = 0
+        worst_seen_sport: dict[str, float] = {}
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            quote = row.get("quote")
+            if not isinstance(quote, Mapping):
+                no_clock += 1
+                continue
+            got = False
+            raw_seen = quote.get("quote_seen_age_seconds")
+            if isinstance(raw_seen, (int, float)) and not isinstance(raw_seen, bool):
+                seen.append(float(raw_seen))
+                got = True
+                slug = str(row.get("sport_slug") or row.get("sport") or "?").strip().lower() or "?"
+                if float(raw_seen) > worst_seen_sport.get(slug, -1.0):
+                    worst_seen_sport[slug] = float(raw_seen)
+            raw_book = quote.get("book_age_seconds")
+            if isinstance(raw_book, (int, float)) and not isinstance(raw_book, bool):
+                book.append(float(raw_book))
+                got = True
+            if not got:
+                no_clock += 1
+
+        seen_stats = _quote_age_percentiles(seen)
+        book_stats = _quote_age_percentiles(book)
+
+        def _fmt(label: str, stats: tuple[float, float, float] | None, count: int) -> str:
+            if stats is None:
+                # ABSENT, never zero. A zero here would read as "our observation
+                # is current", which is the opposite of "we have no clock".
+                return f"{label}_n={count} {label}_p50=absent {label}_p90=absent {label}_max=absent"
+            p50, p90, worst = stats
+            return (
+                f"{label}_n={count} {label}_p50={p50:.0f} "
+                f"{label}_p90={p90:.0f} {label}_max={worst:.0f}"
+            )
+
+        worst_by_sport = " ".join(
+            f"{slug}={age:.0f}"
+            for slug, age in sorted(worst_seen_sport.items(), key=lambda kv: kv[1], reverse=True)
+        )
+        print(
+            "[layer2_shortlist] QUOTE_AGE_SERVED at=publish "
+            f"rows={len(rows)} no_clock={no_clock} "
+            + _fmt("seen", seen_stats, len(seen)) + " "
+            + _fmt("book", book_stats, len(book))
+            + (f" worst_seen_by_sport {worst_by_sport}" if worst_by_sport else ""),
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[layer2_shortlist] QUOTE_AGE_SERVED_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _reprice_grid_from_venues(grid: Any, sport: Any, selected_date: Any) -> dict:
     """Move a sport's grid onto the live venues, and never take the board down.
 
@@ -957,6 +1074,12 @@ def build_layer2_shortlist(
     # showing zero rows attributable to its slate rather than to a broken read.
     shortlist["per_sport_ingest"] = per_sport_stats
     shortlist["opportunities_considered"] = len(opportunities)
+
+    # `#569`. Measured on the SELECTED rows, not on `opportunities`: the served
+    # board is what a user calls stale, and the quote-age gate has already
+    # dropped rows past `max_quote_age_seconds` by here -- so this reports the
+    # ages that SURVIVED, which is the number the board actually shows.
+    _report_served_quote_ages(shortlist.get("rows"))
 
     # BOARD CARDS ARE BUILT HERE, ON THE WORKER, AND PERSISTED.
     #
