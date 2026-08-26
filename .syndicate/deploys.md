@@ -32404,3 +32404,26 @@ Both causes are confirmed present on a sport where the measurement is sound.
 (healthy), mlb's 11244s -> 6117s, while **wnba climbed 18014s -> 30932s — 8.6
 hours** and still rising at wall-clock rate. wnba is the outlier and its cause
 is already owned by the OPEN lane `wnba-live-odds-capture-gap`.
+
+### Classifier FIXED: `sidecar_frozen` is now the first question
+
+The 19:15Z reading's wnba labels were a false positive of my own making. Fixed by
+asking the SIDECAR'S OWN freshness before any sibling stamp is read:
+
+    sidecar newest stamp older than 900s  ->  sidecar_frozen, and neither other
+                                              label may be returned
+    unknown sidecar age                   ->  unknown_no_sidecar_age, never
+                                              assumed live
+
+The report line now carries `sidecar=<age>` per sport whether or not it changes
+the verdict, so a reader can see a sport was judged against a live file rather
+than take it on trust.
+
+**Why sibling stamps could never have answered this:** the fixed test uses
+IDENTICAL sibling stamps to the `orphaned_line` case and differs only in the
+sidecar's own age. Sibling stamps cannot separate a staggered freeze from a live
+line move; only the file's freshness can. That is pinned as one test asserting
+both outcomes off one input.
+
+**Mutation-checked:** removing the gate reintroduces the shipped bug and turns 3
+tests red; defaulting an unknown sidecar age to "live" turns 1 red.
