@@ -6499,3 +6499,83 @@ REMEDY are two claims; evidence for the first is not evidence for the second,
 and the remedy is the half that gets pasted into an error message and sends
 someone to the wrong place for a day. Related:
 [[feedback_retraction_is_not_innocence]], [[feedback_presence_is_not_reachability]].
+
+---
+
+## 2026-08-26 — An empty log query is not evidence of absence until the query shape is known to match
+
+Lane `layer2-sim-view-and-live-projection`, session `e47e1b67`.
+
+**OVERTURNED:** that a null result from the Render log `text` filter means the
+line is not there.
+
+Passing ONE string containing `|` alternation (`["A|B|C"]`) matches it
+LITERALLY and returns nothing. The working form is a LIST of separate strings
+(`["A","B","C"]`). I used the correct form early in the session, switched to the
+broken one, and twice reported `GAME_CHIPS_PUBLISHED` missing while it was
+present — one step from investigating a publish failure that had not happened.
+
+The tell: `["layer2_shortlist"]` returned health lines in the SAME window where
+the alternation query returned null. **Before concluding absence, confirm the
+query returns something you already know is there.**
+
+## 2026-08-26 — A before/after comparison where both sides are the same tree always agrees
+
+Same lane. I "confirmed" three failures were pre-existing by running `git stash`
+on an already-clean tree — which stashed nothing — so the "before" run was the
+same commit as the "after" run and produced an identical result that looked like
+proof. Caught only because `git stash pop` reported "No stash entries found".
+
+**Use a detached worktree at the parent commit** (`git worktree add --detach
+<path> <sha>~1`), which cannot silently be the same tree. Done correctly later
+the same session for `test_it_cannot_downgrade_a_started_match`.
+
+## 2026-08-26 — One shared method, two callers wanting different answers: check the OTHER caller
+
+Same lane, twice in one day, and the second instance was my own regression.
+
+`#542` widened `provider.games()` to two matchdays to fix the board's chip
+coverage. `games()` is ALSO the home rail's source, which renders everything it
+is given — the rail went **98 -> 210 games** with a count badge claiming 210
+today. Nothing failed; no test covered it; I found it only when a later task
+made me read the call graph.
+
+Identically, `_SOCCER_VENDOR_NAME_ALIASES` has two consumers: `teams_match`
+falls through to heuristics, `canonical_team` is map-only. A club can join
+fixtures fine and still return None for a chip key — so an entry that an
+existing test calls redundant can be load-bearing.
+
+**Before changing a shared resolver, enumerate its callers and state what each
+one needs.** The fix in both cases was to make the difference EXPLICIT
+(`include_upcoming`; the two-resolver rule in the invariant), not to pick one
+caller's answer and hope.
+
+## 2026-08-26 — "Done" before the sweep returns is a claim about the future
+
+Same lane. I reported the NFL fix complete while the regression sweep was still
+running; it then failed FOUR tests I had caused — three in my own `#542` file,
+which asserted the behaviour `#575` deliberately made opt-in. The measurements I
+quoted were real; the completion claim was not. Same shape as the alternation
+query: **acting on a result before confirming the method behind it.**
+
+## 2026-08-26 — `-k` chosen by TOPIC misses the files you edited
+
+Same lane. I ran `-k "chip or scoreboard or ..."` and reported a clean surface
+— but the change edited `pipeline/intelligence_state.py` and
+`syndicate/blueprints/home.py`, whose tests that selector never ran. Three more
+failures existed there (all pre-existing, verified). Earlier the same day `#539`
+shipped with a guard test a `-k` filter had skipped.
+
+**Choose `-k` from the FILES TOUCHED, not the topic being worked on.**
+
+## 2026-08-26 — An estimated window is one sample until you measure the spans
+
+Same lane. I called a board build "past its window" at 16 minutes, from a single
+prior run where `candidate_collection_with_fallback` took 222s. That run it took
+**447s** and the build was healthy throughout.
+
+**`BUILD_SPAN_ENTER`/`BUILD_SPAN_EXIT` distinguishes SLOW from STUCK; elapsed
+time against a remembered number does not.** Also relevant: the worker restarted
+five times in two hours from other sessions' deploys, and two instances never
+reached the shortlist stage at all — so an absent line had a cause entirely
+outside the change under test.
