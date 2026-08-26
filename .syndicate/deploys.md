@@ -31495,3 +31495,49 @@ resurrected by this resolution.
 **Both `deploys.md` conflicts today resolved by KEEPING BOTH SIDES.** These files
 are append-only ledgers and "resolve" on one is almost always a union, never a
 choice. The other side was the `kalshi-exchange-index` lane's entry.
+
+### verify MET, AND IT GOES AGAINST THIS LANE. `seen_p50=859`.
+
+First cycle after boot, 15:17:46Z, instance `-96j6j`:
+
+    QUOTE_AGE_SERVED at=publish rows=1305 no_clock=0
+      seen_n=1056  seen_p50=859   seen_p90=1790   seen_max=16650
+      book_n=1305  book_p50=879   book_p90=11598  book_max=79206
+      worst_seen_by_sport  wnba=16650  mlb=9882  soccer=893  nfl=829
+
+**The pre-registered reading was: `seen_p50` large -> UPSTREAM, syndicate-43 is
+right, and every publication fix shipped today was treating a symptom. It is
+859 seconds. That is the outcome, and it is the one that costs something.**
+
+    publish cadence          ~60s
+    median served quote age  859s = 14.3 min      -> 14x the cadence
+    p90                     1790s = 29.8 min
+    worst served row       16650s =  4.6 h (wnba); mlb 9882s = 2.7 h
+
+**THE BOARD CANNOT BE FRESHER THAN ITS UPSTREAM POLL, AND THAT FLOOR IS ~14
+MINUTES.** Publishing faster cannot go below it. `#564`'s chip cadence fix and
+the derived `state_meta` were both real defects and both stay fixed — but
+**neither was the cause of what the user actually saw**, and I reported the
+staleness investigation as essentially closed twice before measuring this.
+
+**WHAT WAS ACTUALLY WRONG WITH MY ACCOUNT.** The user's words were "the compact
+cards were stale AND the odds refresh times were frozen for about 20 mins".
+I read "frozen refresh times" as *the timestamp display is not updating* and
+went after publication. It is at least as consistent with *the refresh genuinely
+is not happening*, and 859s median says the second reading was available the
+whole time. **Two true causes found early (`#545`'s cadence regression, the
+hard-coded `is_fresh`) is what stopped the search** — the same failure mode
+`#569`'s entry names, committed while writing it.
+
+**HONEST LIMITS.** (a) ONE cycle, and a COLD one — the first build after boot,
+when a poll may not yet have landed. This needs a warm-cycle sample before
+anyone sizes work against 859s. (b) `seen_p50` (859) and `book_p50` (879) are
+nearly EQUAL at the median: we are looking about as often as prices move, so at
+the median this is a poll-interval floor, not a broken feed. They diverge hard
+in the tail (p90 1790 vs 11598), which is `#370`'s motionless-market effect and
+is expected. (c) 249 of 1305 rows carry a book clock but no seen clock
+(`seen_n=1056`, `no_clock=0`) — those are measured on one clock only.
+
+**FOR syndicate-43:** this is positive evidence for the direct-feed architecture
+and it is now measured rather than argued. The number to beat is
+`seen_p50=859`. Re-read it warm before committing to it.
