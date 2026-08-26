@@ -32973,3 +32973,105 @@ zero — collateral against open positions, not resting orders — which is exac
 why `buyingPower` is the figure compared against a cap and `currentBalance` is
 not. Kalshi is three quarters deployed: $11.55 free of $40.54 including
 positions.
+
+### `SUPERSEDED_SURVIVORS` — FIRST READING, 21:14-21:18Z, instance `-fwndb`
+
+    no_group_sibling=7    no_seen_age=19     within_lag=2
+    no_group_sibling=447  (none)             within_lag=888
+    no_group_sibling=199  no_seen_age=1      within_lag=199
+    no_group_sibling=274  no_seen_age=1      within_lag=484
+    no_group_sibling=267  no_seen_age=2      within_lag=380
+    no_group_sibling=199  no_seen_age=7553   within_lag=199   <- outlier
+    no_group_sibling=271  no_seen_age=1      within_lag=392
+
+**`sibling_no_seen_age` IS ZERO IN EVERY BUILD.** That candidate gap does not
+exist and can be struck.
+
+**`within_lag` IS THE LARGEST CATEGORY, AND IT IS NOT A HOLE.** A stale row whose
+freshest sibling is within 900s of it is a market where EVERY line is old — the
+`market_gone` population. There is nothing fresher to move to, so keeping it is
+the rule working exactly as specified. **Most stale survivors are not a defect.**
+
+**`no_group_sibling` at 199-447 per build is the dominant CANDIDATE hole**, and
+the decision rule I wrote before the reading pointed at the state-file fix if it
+dominated. It dominates among candidates (447 against 0) — **but I have to state
+what this reading does NOT establish**: a row with no sibling in the grid may
+simply be a market that genuinely has ONE line, which is `market_gone` and
+correctly kept. `no_group_sibling` is CONSISTENT with the source-difference
+hypothesis; it does not prove it.
+
+**What would prove it:** for rows counted `no_group_sibling`, ask whether the
+STATE FILE holds a fresher line for that same group. That is exactly what
+`_classify_stale_row` does, and its sample found `orphaned_line` — but it samples
+only the **3 worst rows per sport**, so "3 orphaned" is 3 of 9 sampled, not 3 of
+the population. **The true size of the hole is still unmeasured, and I should not
+have implied 3 was it.**
+
+**NEW AND UNEXPLAINED: one build reported `no_seen_age=7553`** against 1-19 in
+every other. Seven thousand rows carrying no observation clock at all, in a
+single grid build. Whatever that is, it is larger than the thing I was chasing,
+and it is not what this counter was built to find.
+
+**NOT FIXING ON THIS.** The reading narrows the field — one gap eliminated, one
+shown to be the rule working — but the load-bearing question (how many
+`no_group_sibling` rows have a fresher line in the state file) needs the state
+file joined in, which is one more measurement, not a fix.
+
+## `#569`: THE HOLE IS FOUND, AND IT IS A DATE MISMATCH. Chasing the outlier found it.
+
+**The `no_seen_age=7553` outlier was not a distraction from the
+`drop_superseded_lines` hole — it WAS the hole, seen from the other side.**
+
+The 21:17:19.948Z build:
+
+    SUPERSEDED_SURVIVORS no_group_sibling=199 no_seen_age=7553 within_lag=199
+    SUPERSEDED_LINES_DROPPED count=16 kept=15672
+
+**48% of a 15,672-row grid carrying no observation clock.** The NFL grid beside
+it was 403 rows, so this is the wide multi-date one.
+
+### The mechanism, from CODE not inference
+
+    pipeline/layer2_shortlist.py:616   for window_date in window_dates:
+                                           quote_rows.extend(chunk)     <- MANY dates
+    pipeline/layer2_shortlist.py:690   last_seen = read_quote_last_seen(
+                                           sport, selected_date)        <- ONE date
+
+The accumulation loop's own comment says it: *"it EXTENDS across a window, so
+NFL accumulated five shards at once."* Every row from any window date other than
+`selected_date` had **no `last_seen` entry**, so `_seen_age_seconds` returned
+None.
+
+**AND A ROW WITH NO CLOCK IS INVISIBLE TO `drop_superseded_lines`.** That guard
+requires `seen_age_seconds` on the row AND on its group's freshest — deliberately,
+because "pruning on absence is how a capture hiccup would silently empty the
+board". So **a line the market had moved off could never be dropped on a forward
+date.** The same absence also pins `_freshness_factor` at its harshest discount
+for those rows.
+
+**This is a sharper answer than the hypothesis I registered.** I predicted a
+state-file-vs-grid source difference. It is a **DATE** mismatch between two reads
+in the same function — and `no_group_sibling`, which I had called the leading
+candidate, is NOT the hole (it holds steady at 199 in the same build).
+
+### The fix
+
+`last_seen` is now merged across `dates_with_rows` — the same dates that produced
+the rows — newest stamp winning for a key seen on several shards, since the field
+answers "when did we last LOOK" and the latest look is the answer whichever shard
+recorded it. Falls back to `[selected_date]` when every shard read failed.
+
+**EXPECT A VISIBLE CHANGE, and watch for it:** ~7,500 rows per wide build gain a
+clock. `SUPERSEDED_LINES_DROPPED` should RISE (superseded forward-date lines
+become droppable for the first time) and `SUPERSEDED_SURVIVORS no_seen_age`
+should COLLAPSE toward the 1-19 the narrow builds already show. If `no_seen_age`
+stays high, the merge is not reaching the rows and this diagnosis is wrong.
+
+**A drop count that rises a LOT is the risk worth naming:** these rows have never
+been eligible for pruning, so the first build under the fix prunes a backlog. If
+`kept` falls off a cliff rather than easing, back it out — that is the board
+emptying, which this guard's docstring warns about and which no amount of
+correctness justifies.
+
+5 tests, mutation-checked (reverting to the single-date read turns 2 red).
+68 green across window-merge, survivors, quote-age and layer2 suites.
