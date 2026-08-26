@@ -31201,3 +31201,14 @@ whose verdict never arrives is not weak evidence — it is NO evidence, and it
 should be treated as a blocker to state, not a caveat to mention. What saved
 this was that the failing assertion happened to be the bug rather than the fix.
 That was luck.
+
+**VERDICT AFTER THE REPAIRS: `249 passed, 14 subtests, 0 failed` in 21m30s**
+(`tests/test_intelligence_state.py` + `test_build_span_instrumentation.py` +
+`test_board_freshness_derived.py`). The board path is green for the first time
+in this session with a verdict that actually arrived.
+
+**Nothing to deploy from this.** The repairs are test-only; production runs
+`dba9306d`, which carries the code change and not these tests, so deployed
+behaviour is identical either way. The next deploy needs a merge first —
+`origin/main` has moved to `8cecf484` (another lane's Kalshi shard-routing work,
+todo `#568`).
