@@ -912,12 +912,45 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
             flush=True,
         )
 
+    remaining = None
+    for field in ("leavesQuantity", "leaves_quantity", "remainingQuantity"):
+        value = order.get(field)
+        if value in (None, ""):
+            continue
+        try:
+            remaining = float(value)
+        except (TypeError, ValueError):
+            remaining = None
+        else:
+            break
+
     return {
         "state": state,
         "venue_status": raw_status or None,
         "filled_count": filled,
         "fill_price": price,
         "fill_cost_dollars": None,
+        # STILL WORKING AT THE VENUE, which `state` alone cannot say.
+        #
+        # REPORTED BY THE USER 2026-08-26 from the Polymarket Orders tab: five
+        # open orders there — four Pending and one **Semi-filled** (BOS/MIA,
+        # 7.11 of 9.60) — against four on our page. A partially filled order is
+        # BOTH things at once: a real position for the filled part AND a live
+        # order for the remainder. `state` has one slot, the fill outranks the
+        # status (deliberately — reading it the other way reconciles a real
+        # position away to zero), so the row books as `filled` and vanishes
+        # from every count of what is still open.
+        #
+        # The consequences are not cosmetic: the remainder can still fill,
+        # `cancel_stale_resting_orders` never sees it, and the page tells you
+        # you have one fewer order working than you do.
+        #
+        # So the open-ness is carried SEPARATELY rather than by overloading
+        # `state`. `leavesQuantity` is the venue's own word for the unfilled
+        # remainder and is already in the measured key list.
+        "open_at_venue": bool(remaining) or state == "resting",
+        "remaining_count": remaining,
+
         "fees_dollars": None,
         "order_id": order.get("id") or order.get("orderId"),
         "client_order_id": order.get("clientOrderId") or order.get("client_order_id"),

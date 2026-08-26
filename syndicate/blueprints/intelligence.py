@@ -3838,7 +3838,24 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
     # double-spend.
     submitted_rows = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
     unreconciled = [o for o in submitted_rows if not o.get("reconciled_at")]
-    resting = [o for o in submitted_rows if o.get("reconciled_at")]
+
+    # OPEN AT THE VENUE, from the venue's own answer -- NOT from our status.
+    #
+    # Counting `submitted` rows missed the partially filled ones. The user's
+    # Polymarket Orders tab 2026-08-26 listed FIVE open orders (four Pending,
+    # one Semi-filled at 7.11 of 9.60) against four here, because the
+    # semi-filled row books as `filled` and left every count of what is still
+    # working. It is both things at once, and `venue_open` is the field that
+    # says so.
+    #
+    # `reconciled_at` is still required: an order we never read back is an
+    # unknown, not a resting one, and it belongs in the banner above.
+    resting = [
+        o
+        for o in orders
+        if o.get("reconciled_at")
+        and (o.get("venue_open") or str(o.get("status") or "") == STATUS_SUBMITTED)
+    ]
 
     # THE WORKER'S STATE, NOT THIS PROCESS'S. The switches and caps are env
     # vars on live-odds-worker; the web service has none of them, so reading

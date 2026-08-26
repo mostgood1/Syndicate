@@ -554,6 +554,15 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                 #
                 # So the event ticker is NOT the market ticker's own prefix,
                 # and our body sends no event field at all.
+                # THE TICKER KALSHI ECHOES BACK, against the one we sent.
+                # `fetch_market` does `GET /markets/{key}` and accepts any body
+                # carrying a `ticker` -- it never checks that the ticker
+                # RETURNED is the ticker ASKED FOR. A listing endpoint can
+                # resolve an alias or a redirect; an order book cannot. If
+                # these two strings differ, that is the whole answer, and it
+                # has been one comparison away for four days.
+                f" ours={body.get('ticker')!r} venue_ticker={market.get('ticker')!r}"
+                f" ticker_echo_matches={str(market.get('ticker') or '') == str(body.get('ticker') or '')}"
                 f" event_ticker={market.get('event_ticker')}"
                 f" market_type={market.get('market_type')}"
                 f" status={market.get('status')}"
@@ -1006,6 +1015,23 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
             if price is not None:
                 break
 
+    # STILL WORKING AT THE VENUE. Same contract Polymarket's view now carries,
+    # and for the same reason: a PARTIAL fill is both a real position and a
+    # live order for the remainder, while `state` has one slot and the fill
+    # outranks the status. `remaining_count_fp` is Kalshi's own word for the
+    # unfilled part and is already in the measured key list.
+    remaining = None
+    for field in ("remaining_count_fp", "remaining_count"):
+        value = order.get(field)
+        if value in (None, ""):
+            continue
+        try:
+            remaining = float(value)
+        except (TypeError, ValueError):
+            remaining = None
+        else:
+            break
+
     return {
         "state": state,
         "venue_status": raw_status or None,
@@ -1013,6 +1039,8 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         "fill_price": price,
         "fill_cost_dollars": fill_cost,
         "fees_dollars": fees,
+        "open_at_venue": bool(remaining) or state == "resting",
+        "remaining_count": remaining,
         # BOTH LEGS, carried rather than resolved. Which one we are paying
         # depends on our side, which this function does not know -- and Kalshi
         # hands over both, so guessing is unnecessary.

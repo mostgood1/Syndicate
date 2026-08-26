@@ -1660,3 +1660,90 @@ def test_an_orphan_we_placed_is_distinguished_from_one_we_did_not(monkeypatch, t
     # THE SERIOUS ROW MUST BE PRINTED. A flat sample cap lets benign history
     # crowd out the one row that means money is missing.
     assert "T-LOST" in printed
+
+
+def test_a_partially_filled_order_still_counts_as_working_at_the_venue():
+    """REPORTED BY THE USER 2026-08-26 from the Polymarket Orders tab.
+
+    Five open orders there -- four Pending and one Semi-filled at 7.11 of 9.60
+    -- against four on our page. A partial fill is BOTH a real position and a
+    live order for the remainder, but `state` has one slot and the fill
+    deliberately outranks the status (reading it the other way reconciles a
+    real position away to zero). So the row books `filled` and disappears from
+    every count of what is still working.
+
+    Not cosmetic: the remainder can still fill, `cancel_stale_resting_orders`
+    never sees it, and the page under-reports live orders by one.
+    """
+    from syndicate.blueprints.intelligence import _live_portfolio_payload
+    from syndicate.features.shared import execution_ledger as el
+
+    rows = [
+        {
+            "idempotency_key": "semi",
+            "mode": "live",
+            "status": "filled",
+            "venue": "polymarket_us",
+            "selected_date": "2026-08-26",
+            "reconciled_at": "2026-08-26T14:00:00Z",
+            "venue_open": True,
+            "venue_remaining_count": 2.49,
+        },
+        {
+            "idempotency_key": "done",
+            "mode": "live",
+            "status": "filled",
+            "venue": "polymarket_us",
+            "selected_date": "2026-08-26",
+            "reconciled_at": "2026-08-26T14:00:00Z",
+            "venue_open": False,
+        },
+        {
+            "idempotency_key": "pending",
+            "mode": "live",
+            "status": "submitted",
+            "venue": "polymarket_us",
+            "selected_date": "2026-08-26",
+            "reconciled_at": "2026-08-26T14:00:00Z",
+            "venue_open": True,
+        },
+    ]
+    original = el._load
+    el._load = lambda: {"orders": rows}
+    try:
+        payload = _live_portfolio_payload("2026-08-26")
+    finally:
+        el._load = original
+
+    keys = {o["idempotency_key"] for o in payload["resting"]}
+    # The semi-filled one is working; the completely filled one is not.
+    assert keys == {"semi", "pending"}
+
+
+def test_the_venue_view_reports_the_unfilled_remainder_on_both_venues():
+    """One contract, two adapters. A third venue must not reintroduce the gap
+    by shipping a view that answers `state` and nothing else."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view as kalshi_view
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view as poly_view
+
+    kalshi = kalshi_view(
+        {"status": "executed", "fill_count_fp": "7.00", "remaining_count_fp": "3.00"}
+    )
+    assert kalshi["state"] == "filled"
+    assert kalshi["open_at_venue"] is True and kalshi["remaining_count"] == 3.0
+
+    poly = poly_view(
+        {
+            "state": "ORDER_STATE_PARTIALLY_FILLED",
+            "cumQuantity": "7.11",
+            "leavesQuantity": "2.49",
+            "outcomeSide": "OUTCOME_SIDE_YES",
+        }
+    )
+    assert poly["state"] == "filled"
+    assert poly["open_at_venue"] is True and poly["remaining_count"] == 2.49
+
+    # A COMPLETE fill is not open. Otherwise every settled bet would read as a
+    # live order and the count would be useless in the other direction.
+    done = kalshi_view({"status": "executed", "fill_count_fp": "7.00", "remaining_count_fp": "0.00"})
+    assert done["open_at_venue"] is False

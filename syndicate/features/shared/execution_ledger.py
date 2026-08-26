@@ -1120,6 +1120,12 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
 
         stamp = {
             **new_fields,
+            # OPEN-NESS IS ORTHOGONAL TO STATUS, and stamping it here is what
+            # lets the page count what is actually working at the venue. A
+            # partially filled row is `filled` AND open; a resting row is
+            # `submitted` AND open; a completely filled row is neither.
+            "venue_open": bool(seen.get("open_at_venue")),
+            "venue_remaining_count": seen.get("remaining_count"),
             "venue_status": seen.get("venue_status"),
             "venue_order_id": seen.get("order_id") or order.get("venue_order_id"),
             "reconciled_at": _utc_now(),

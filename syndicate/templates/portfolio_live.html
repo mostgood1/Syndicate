@@ -149,9 +149,10 @@
      it as a failure. #}
   {% if L.resting %}
     <div class="live-note">
-      <strong>{{ L.resting|length }} order(s) resting at the venue.</strong>
-      Confirmed live and unfilled at the last read &mdash; a limit order waiting for its price,
-      not a problem. They become positions if they fill.
+      <strong>{{ L.resting|length }} order(s) working at the venue.</strong>
+      Confirmed live at the last read &mdash; a limit order waiting for its price, not a problem.
+      A partly filled order counts here <em>and</em> as a position: the filled part is money
+      down, the remainder is still working.
     </div>
   {% endif %}
 
