@@ -2051,6 +2051,48 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   terminal. Full block: `deploys.md` 2026-08-26 21:36Z. Item: `todo.md #579`.
 - Blocked by: none
 
+### kalshi-spread-join-sign — **OPEN (reopened 2026-08-26)** — session syndicate-43 (ENDED) — UNOWNED — six things verified; WNBA settlement is BUILT, LANDED and NOT DEPLOYED
+- Note: this lane was CLOSED earlier on 2026-08-26 and its block correctly moved
+  to `lanes_history.md`. Work continued after that close, so this is a fresh
+  block for what is still OWED — the history entry stays as the record.
+- Files: `syndicate/features/shared/{kalshi_board_join,kalshi_orders,bet_status_wnba,bet_status_soccer,polymarket_us_orders,board_enrichment}.py`,
+  `scripts/build_wnba_boxscores.py`, `pipeline/intelligence_state.py`,
+  `syndicate/blueprints/wnba.py` and their tests. **ALL CLAIMS RELEASED.**
+- VERIFIED (evidence `log/2026-08-26.md`, measurements `deploys.md`): Kalshi
+  shard 3 funded (3 MLB fills, `exchange_index=3`) · spreads join sign (15 of 30
+  inverted -> 0) · spreads PLACE correctly (`AZ2` home -1.5 -> YES, filled
+  3 @ 0.33, venue title matches the row) · WNBA id barrier
+  (`game_not_in_live_box` 9 -> absent, graded 0 -> 3) · soccer per-league read
+  (`no_soccer_live_state_for_date` -> `match_not_in_soccer_live_state`) · ESPN
+  host split (`{"ok":true,"games":3}` after the swap; 403 minutes before).
+- **OWED, in priority order:**
+  1. **DEPLOY refresh-worker, THEN read `SETTLED date=2026-08-25`.** All code is
+     on `origin/main`; the worker was NOT deployed (preflight HOLD, jobs
+     climbing 1 -> 10). `not_decided_yet: 6` is UNCHANGED and still reflects the
+     ESPN 403. PASSES only if it falls below 6 and Citron (1 reb vs over 3.5) /
+     Amoore (3 ast vs over 3.5) grade **LOST**. **DO NOT REPORT WNBA SETTLEMENT
+     AS FIXED BEFORE THAT READING** — and treat its all-time `win 100%` as
+     wins-only by construction until a loss can settle.
+  2. **Re-do the 2026-05-25..08-26 backfill through the KEYVALUE store.** The 84
+     files published via `/api/ops/artifacts/publish` sit on WEB'S FILESYSTEM
+     while the consumer reads keyvalue on refresh-worker — in production and
+     invisible to settlement. `build_wnba_boxscores.py --via-web --start --end`
+     run ON a worker lands in the right place.
+  3. **Soccer: still 0 settled all-time.** The read is fixed; needs an order
+     whose match finished with finals captured after 2026-08-26T16:11Z.
+  4. **Polymarket side resolution UNRESOLVED.** `over`->YES/`under`->NO is a
+     fixed constant while the price comes from the name-matched index, and the
+     `outcomes` array orientation VARIES per market. A cross-check guard was
+     built and REVERTED — it silently enthroned the positional reading, the
+     disputed question, and contradicted three deliberate tests. Needs venue
+     ground truth (Polymarket US credentials, on Render; the env read was
+     blocked by the permission classifier). `FILL_ABOVE_LIMIT` ships as
+     detection only.
+  5. **33 pre-existing test failures** in the soccer/board selection, confirmed
+     NOT caused by this lane (identical counts with and without the change).
+     `test_team_aliases.py` is 9 of them and the soccer join leans on it.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
