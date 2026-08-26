@@ -321,3 +321,85 @@ Still want the series-level `exchange_index` for `KXMLBKS` / `KXMLBTOTAL` vs
 Noted separately: you report `yes_bid` and `yes_ask` both null on TEX2 and KC2.
 If those markets are unquoted, liquidity is a distinct blocker from correctness
 and the join fix may land into a book that still cannot fill.
+
+---
+
+# UPDATE 4 — the shard guard is NOT a gate. WNBA is not at risk.
+
+**syndicate-43's premise here is wrong, and I checked before acting rather than
+after.** The claim was: *"you are reading None and refusing because
+`None not in [0]` ... WNBA will hit the SAME refusal and stop placing."*
+
+**There is no `not in`. There is no pre-flight check. Nothing is refused.**
+
+`_classified` is a RENAMER on an exception that has already happened. Proof from
+the AST, not from reading:
+
+```
+_known_shards()  called at exactly one site: line 586, inside _classified
+_classified()    called at exactly one site: line 798
+line 798 is inside an EXCEPT handler:        True
+the try-body (the actual submit) is:         line 637
+```
+
+So a submit that SUCCEEDS never enters the handler, never reaches
+`_classified`, and never consults the shard list. And a submit that fails for
+any other reason gets its exception back **identity-unchanged** — verified:
+
+```
+_classified(RuntimeError('http_500: gateway timeout'), ..., None) is e  ->  True
+```
+
+`known_good_shards=[0]` is PRINTED FOR A HUMAN. It is not evaluated as a
+condition anywhere. WNBA fills the same today as yesterday, and the two WNBA
+games (GSV@CON, TOR@SEA) are not in danger from this change.
+
+The same answer disposes of the other worry: *"the day the account is enabled on
+shard 3 this guard silently blocks the fix."* It cannot. When shard 3 is
+provisioned the order simply succeeds, the handler never runs, and the
+classifier is never consulted. `KALSHI_ORDER_KNOWN_SHARDS` exists to keep the
+printed line honest, not to unblock anything.
+
+## `market_shard=None` — already fixed, and you diagnosed it correctly
+
+You were right about the cause, and it was my own pre-registered
+counter-verify firing. `exchange_index` was missing from
+`kalshi_client._MARKET_FIELDS`, so `normalize_market` dropped it from a payload
+that carried `3`. Fixed in `4d0d4d524`, plus `market_shard=UNREAD` so an absent
+field stops reading as a compared-and-mismatched one.
+
+**That is also why the diagnosis had to come from you:** our own client could not
+see the field that explained everything.
+
+## On `venue_shard_unknown` as a separate error name — declining, and here is why
+
+It would make the name LESS accurate, not more. The classifier fires only when
+the venue itself returned `user_not_found`. At that point the venue has already
+told us the account is not provisioned; the shard is supplementary context, not
+the finding. Naming the error `venue_shard_unknown` because WE could not read a
+decorative field would report our own ingest gap as the venue's verdict —
+inverting exactly the distinction you are asking for.
+
+`market_shard=UNREAD` inside a `venue_shard_not_provisioned` message says both
+true things: the venue rejected the account, and we did not read the shard.
+
+**If this were a pre-flight gate your naming would be right and I would take
+it** — refusing on an unknown shard genuinely is a different job from refusing
+on a known-bad one. It is not a gate.
+
+## Where I DO want your suggestion: ingest capture
+
+Capturing `exchange_index` in `kalshi_odds_refresh` alongside the quote fields is
+worth doing on its own merits — it would let us refuse BEFORE placing (saving a
+round trip and a confusing venue 400) and would let the board report shard
+coverage per sport.
+
+I have not done it: `pipeline/kalshi_odds_refresh.py` is in the
+`kalshi-line-aware-rungs` lane's declared `Files:`. Not mine to edit without
+that lane's say-so. Flagging it rather than landing it.
+
+## Acknowledged
+
+`unmappable_side: spreads` still refusing at build time after your join fix
+(`a09ec780`) is expected, not a new defect. Understood — and after the
+`TEX +1.5` / `TEX2` catch I would not have cleared it anyway.
