@@ -32815,3 +32815,100 @@ minutes based on a single prior run where `candidate_collection_with_fallback`
 took 222s. This run it took **447s**. The build was healthy throughout; my
 baseline was one sample. `BUILD_SPAN_ENTER/EXIT` is what distinguishes "slow"
 from "stuck" — not elapsed time against a remembered number.
+
+### RE-READ, 20:39:45Z, instance `-vf8m9`. The fix holds and NFL is exonerated by two instruments.
+
+    STALE_ROW_CAUSE
+      mlb  [stale=161 worst=3842s  sidecar=441s   market_gone=2,orphaned_line=1]
+      nfl  [stale=54  worst=15661s sidecar=15699s as_fresh_as_sweep=3]
+      wnba [stale=377 worst=35952s sidecar=5808s  market_gone=1,orphaned_line=2]
+
+**nfl: `as_fresh_as_sweep=3`.** sidecar 15699s, worst row 15661s, **ratio 1.00** —
+its worst row was seen AT the last sweep. The false alarm is gone, and this
+agrees with `FIXTURE_CADENCE sport=nfl interval=28800 reason=mid:26h_out`, which
+was measured independently and on a different service. **Two unrelated
+instruments, one conclusion.**
+
+**wnba now CLASSIFIES instead of hiding behind `sidecar_frozen`.** sidecar 5808s
+against a worst row of 35952s — **6.2x** — so sweeps ran and skipped that row.
+Under the retired flat threshold this read `sidecar_frozen` and said nothing.
+
+**mlb**: sidecar 441s, worst 3842s, **8.7x**. Also real.
+
+### THE SETTLED ANSWER, after four revisions
+
+    sport  sidecar  worst_row  ratio  verdict
+    nfl     15699s     15661s   1.00  HEALTHY -- sweeps rarely, sees its rows
+    mlb       441s      3842s   8.7x  market_gone=2, orphaned_line=1
+    wnba     5808s     35952s   6.2x  market_gone=1, orphaned_line=2
+
+**Across the two sports with a real defect: `market_gone`=3, `orphaned_line`=3.
+An even split — BOTH causes are live and neither dominates.** That is the answer
+to the original question, and it is the first version of it where every label is
+defensible: nfl's is corroborated by a second instrument, and mlb's and wnba's
+rest on sidecars demonstrably fresher than the rows they judge.
+
+**592 of 1306 served rows (45%) carry quotes over 15 minutes old** — up from the
+212 measured at 19:15Z, driven by wnba's 377.
+
+### The measurement was nearly lost to the thing it measures
+
+My 20:07 deploy went live at 20:10:23 and was **deactivated at 20:21:32** by
+another session's deploy, which killed the cold build ~11 minutes in, just short
+of publishing. **Six commits landed on main in the 14 minutes after my merge.**
+That is deploy churn destroying a cold build — the exact mechanism this lane
+documented this morning — applied to the instrumentation measuring it.
+
+I did NOT re-trigger. The live deploy (`1e9ec576`) was verified to contain the
+fix as an ancestor, so another deploy would have added to the churn and bought
+nothing. **`#563`'s spacing guard exists for precisely this and is going unused
+because the locks are unreachable from cloud sessions.**
+
+## `#569`: the `drop_superseded_lines` hole — MEASURED FIRST, NOT LOOSENED
+
+**I was asked to fix it and have instead shipped the measurement, deliberately.**
+The reason is arithmetic: **3 rows survive wrongly; ~946 per build survive
+correctly** (`SUPERSEDED_LINES_DROPPED count=1560 kept=946`). This guard decides
+what the BOARD SHOWS. Loosening it on a guess to catch 3 risks dropping from the
+946 — which is the failure `book_grid`'s own docstring names: *"pruning on
+absence is how a capture hiccup would silently empty the board."*
+
+**Ruled out from code, so the counter only has to separate what is left:**
+- **Not the row cap.** `drop_superseded_lines` runs BEFORE `max_rows`
+  (`book_grid.py:643`, and its comment says so on purpose).
+- **Not a threshold mismatch.** The classifier that found these uses the same
+  900s the guard uses, so a gap it calls `orphaned_line` really does exceed the
+  lag.
+
+**What is left is a SOURCE difference, and that is the leading hypothesis:**
+`_classify_stale_row` reads the **state file**, which holds every key ever
+observed. This guard compares against **rows in THIS grid**. If the fresher
+sibling never became a grid row, the guard has nothing to compare and the
+difference between those two sources IS the hole.
+
+`SUPERSEDED_SURVIVORS no_group_sibling= sibling_no_seen_age= within_lag=
+no_seen_age=` now attributes every stale survivor:
+
+    no_group_sibling     nothing else in the GRID shares its market  <- the hypothesis
+    sibling_no_seen_age  a sibling exists and carries no clock
+    within_lag           fresher, but by less than the lag (rule working)
+    no_seen_age          this row has no clock at all
+
+Fresh survivors are NOT counted — that is the rule working, and counting it
+would bury the three rows that matter under hundreds that do not.
+
+**A PRE-EXISTING FRAGILITY FOUND AND NOT SILENTLY FIXED.** A first draft of the
+never-breaks test passed `"not a number"` and failed inside the **pre-existing**
+`float(seen)` at `book_grid.py:718`, which this change does not touch. It is
+unreachable today (`_seen_age_seconds` returns float or None and nothing else),
+so it is recorded in the test's docstring rather than hardened — widening a
+filter's error handling is a separate change from measuring it.
+
+7 tests, mutation-checked twice: collapsing `no_group_sibling` into `within_lag`
+hides the leading hypothesis (2 red); counting fresh survivors buries the signal
+(2 red). 120 tests green across the grid and layer2 suites.
+
+verify: one build's `SUPERSEDED_SURVIVORS`. **If `no_group_sibling` dominates,
+the fix is to give the guard the state file's group stamps** — the same source
+that found these — rather than to change its lag. If something else dominates,
+the fix is different and this entry's hypothesis was wrong.
