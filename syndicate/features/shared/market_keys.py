@@ -214,6 +214,22 @@ _PERIOD_SUFFIX: dict[str, str] = {
     "1st period": "p1", "first period": "p1", "p1": "p1",
     "2nd period": "p2", "second period": "p2", "p2": "p2",
     "3rd period": "p3", "third period": "p3", "p3": "p3",
+    # "FULL GAME" IS THE ABSENCE OF A PERIOD, mapped to the empty suffix so
+    # `total_market_from_stat` returns a bare `totals`. Kalshi words its NFL
+    # game total "Full Game: over 58.5 points scored?", which names the whole
+    # game the way every other entry here names a part of one.
+    #
+    # Measured 2026-08-26T01:49:32Z, the tick that first read these titles:
+    #
+    #   GAP series=KXNFLTOTAL count=304 reason=stat_not_in_market_vocabulary
+    #       detail='Full Game points scored'
+    #
+    # 304 markets, parsed and then refused one gate later for want of this
+    # line -- which is exactly the shape the coverage audit records for
+    # KXMLBHRR ("the series registered, was fetched, and then every market
+    # refused one gate later"). The refusal was correct: `totals_full game` is
+    # not a board key and inventing one would have been worse.
+    "full game": "", "fullgame": "", "full-game": "",
 }
 
 # What a GAME TOTAL counts, per sport. The unit and nothing else.
