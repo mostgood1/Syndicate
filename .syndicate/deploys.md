@@ -32427,3 +32427,44 @@ both outcomes off one input.
 
 **Mutation-checked:** removing the gate reintroduces the shipped bug and turns 3
 tests red; defaulting an unknown sidecar age to "live" turns 1 red.
+
+## 2026-08-26 19:40:17Z — refresh-worker `752d83ba` (PR #98, `#569` classifier fix)
+
+Off-protocol as all day. `4245ba3e` (my fix) verified an ancestor of the
+deployed SHA, so the fix shipped.
+
+**I AGAIN CARRIED ANOTHER LANE'S COMMIT, AND THIS ONE SAYS NOT TO DEPLOY IT.**
+`752d83ba` "Anchor the live buying engine to /portfolio" ends its own message
+with **"NOT DEPLOYED -- the production reading is owed."** I deployed it anyway,
+because a deploy takes `main`'s tip and it had landed there between my merge and
+my trigger. **Second time today** (the first was `fed2f935`), and the pattern is
+now clear enough to name: **on a repo this busy, "merge then trigger" is a race,
+and the loser is whichever lane pushed in between.**
+
+**BLAST RADIUS, measured rather than assumed — it is small, and that is luck:**
+`752d83ba` is `portfolio.html`, `portfolio_paper.html`, the deleted
+`portfolio_live.html`, and the `/portfolio/live` -> `/portfolio` redirect in
+`syndicate/blueprints/intelligence.py`. **All of it is WEB-SERVED, and I
+deployed REFRESH-WORKER.** The web service still runs its own earlier deploy, so
+the user-facing `/portfolio` merge is NOT live. The code sits in the worker's
+process where nothing serves those routes.
+
+**It also edited `syndicate/blueprints/intelligence.py`, which THIS LANE holds.**
+Checked for collision with `#564`'s chip endpoint: **zero** — their diff touches
+only the portfolio routes and one comment, and matches `game.chips`,
+`_game_chip_artifact_max_age`, `worker_artifact` **0 times**. No functional
+conflict. Recorded because a cross-lane edit to a claimed file should be visible
+even when it turns out to be harmless.
+
+**I cannot tell that lane directly** — cross-session send is refused from this
+cloud session ("credential accepted for its own work but not for delivering to
+another session"). This entry is the notification.
+
+**THE FIX FOR THE RACE, for whoever hits it next:** re-check `origin/main`'s tip
+immediately before triggering and abort if it moved since the merge. The
+alternative — deploying your own SHA rather than the tip — is deploying off-main,
+which `CLAUDE.md` forbids for a measured reason (two off-main deploys do not
+contain each other and the second silently reverts the first).
+
+verify: `STALE_ROW_CAUSE ... sidecar=<age>` per sport, with wnba reading
+`sidecar_frozen` rather than the `orphaned_line=2` it manufactured at 19:15Z.
