@@ -31103,3 +31103,63 @@ hypothesis before saying that out loud.
 
 **rollback:** `KALSHI_ORDER_EXCHANGE_INDEX=0` restores the old behaviour with
 no deploy. An unreadable value falls back to auto-routing, not to `0`.
+
+---
+
+## 2026-08-26 · live-odds-worker · `524a1add5` · `dep-da7ect942hec73b73igg`
+
+**lane:** `kalshi-exchange-index` · claim `1da24653dbe04293`
+**change:** reconciliation reads the OTHER direction. Does not touch order
+submission — disjoint code path from `a46797d1b`, and each has its own log
+line, so the two readings do not confound each other. Noted because the
+one-change-per-deploy rule was bent here deliberately.
+
+**WHAT WAS MISSING.** Reconciliation only ever walked OUR rows outward and
+asked the venue about each. That can correct a row we already hold. The mirror
+failure — an order live at the venue with NO row here — was invisible, and it
+is exactly what a lost submit response leaves behind.
+
+**MEASURED 2026-08-26T12:57Z:** Kalshi returned `venue_orders=33` while we
+asked about `candidates=4`. Twenty-nine orders on our own account were read
+into memory every cycle and compared to nothing.
+
+**AND THE TWO VENUES WERE PRINTING THE SAME LINE FOR DIFFERENT GUARANTEES:**
+
+```
+RECONCILE venue=kalshi     candidates=4  venue_orders=33 not_found=0   <- book read
+RECONCILE venue=polymarket candidates=15 venue_orders=15 not_found=0   <- per-order read
+```
+
+The second is a TAUTOLOGY. `polymarket_us_orders.fetch_orders` fetches exactly
+the ids it is handed (`GET /v1/orders` answers `code: 12` UNIMPLEMENTED, so
+there is no list route), which makes `venue_orders == candidates` arithmetic
+rather than agreement. Same defect class as `#567`'s 0.0-second span: **a
+reading that looks like an answer.** `coverage=book|per_order` now rides on the
+line, and `orphans=n/a` — not `0` — where a scan is impossible.
+
+**A TEST CAUGHT A HOLE REVIEW DID NOT.** The zero-candidate early return
+skipped the venue read entirely, so the orphan scan never ran in the state
+where an orphan is MOST dangerous: nothing open here to prompt a look, a live
+position there.
+
+**verify:** `RECONCILE venue=kalshi ... coverage=book orphans=N` on the next
+cycle, and `coverage=per_order orphans=n/a` for polymarket. If `N > 0`, a
+`RECONCILE_ORPHANS` line naming the tickers — that is real money the ledger
+does not know about and it needs a decision, not a code change.
+
+**counter-verify:** `orphans=0` is a real finding too — it says the 29
+unexamined Kalshi orders are all rows we already hold, and the gap was
+reporting rather than money. Say which one it turned out to be.
+
+**Also fixed:** the PERIODIC worker loop called `reconcile_live_orders()` bare,
+so its venue defaulted to `kalshi` — the same defect `execute_portfolio` was
+fixed for on 08-25, left standing here. The pass that exists precisely to catch
+a resting order filling after we stopped watching never asked Polymarket
+anything; Polymarket rows were only reconciled as a side effect of a portfolio
+run happening to execute.
+
+**Polymarket book, read clean at 12:57:29Z** (`asked=15 n=15 errors=[]`):
+states `ORDER_STATE_FILLED`, `ORDER_STATE_NEW`, `ORDER_STATE_PARTIALLY_FILLED`.
+Checked and sound: `avgPx='0.0000'` appears only on `NEW` rows, and the view
+reads fill SIZE before status, so `cumQuantity=0` lands on the resting branch
+where fill_price is nulled. The zero never reaches a filled row.
