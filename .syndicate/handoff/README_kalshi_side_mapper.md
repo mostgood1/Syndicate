@@ -1,93 +1,88 @@
-# BACKUP ONLY — Kalshi spreads/h2h side mapper
+# REFUTED — the Kalshi spreads side mapper, and why the patch was DELETED
 
-> **`[USER DECISION 2026-08-26]` The side mapper is assigned to syndicate-43.
-> This patch is a BACKUP. Do not apply it to `kalshi_orders.py`.**
+> **`[2026-08-26]` The patch that used to sit beside this file has been removed
+> from the repository, deliberately. Applying it would have placed real money on
+> the EXACT OPPOSITE BET, roughly 10 orders per cycle.**
 >
-> It exists so the work is not lost if the local session's version stalls, and
-> as an independent cross-check on the venue-read spec — two implementations
-> arriving at the same rule from the same measurements is worth something. It is
-> NOT a competing change and must not be landed alongside syndicate-43's.
->
-> If it is ever needed: `git apply .syndicate/handoff/kalshi_side_mapper_from_cloud.patch`
-> — verified to apply cleanly against `main` at the commit that added this line.
-> Re-verify before trusting that; `kalshi_orders.py` is under active edit by
-> another session and this patch will go stale.
+> It was labelled "BACKUP ONLY — do not apply". That was not enough. A working,
+> tested, cleanly-applying patch labelled *backup* is a thing a future session
+> reaches for when the primary stalls — which is precisely the situation in
+> which nobody re-derives whether it was ever correct. **The label was doing
+> the work that deletion should have been doing.** The knowledge is kept below;
+> the loaded gun is not.
 
-## Original handoff notes
+## What was wrong
 
-**From:** cloud session `portfolio-decision-and-execution`, lane `kalshi-exchange-index`
-**To:** syndicate-43 (local), who has claimed this path
-**Patch:** `kalshi_side_mapper_from_cloud.patch` (against `dc2d76939`)
+Caught by syndicate-43, who had supplied the rule in the first place and then
+checked the board's LINE SIGN, which neither of us had done.
 
-## Why this exists
+The mapper resolved a side against the team named in the ticker. That part is
+accurate. **The ticker stamped on the order was the wrong market**, so
+faithfully resolving against it produced a faithful inversion.
 
-I implemented the mapper from your venue-read spec before your file claim
-arrived. Rather than land it on `main` and collide with you mid-ladder, or
-throw away working tested code, it is parked here. **Take it, take pieces of
-it, or ignore it — your call, you hold the path.** I have reverted my working
-tree so `kalshi_orders.py` on `main` is untouched by me.
-
-## What it does — same rule you specified, independently arrived at
-
-`_ticker_team_is_home(venue_ticker) -> bool | None`, and `_side_to_kalshi`
-gains a third argument `venue_ticker`.
+Verified by hand, cloud session, on the exact production row:
 
 ```
-selected team == team named in the ticker suffix -> "yes"
-selected team == the other team                  -> "no"
+board row  TEX @ CWS spreads:  away (Texas) line = +1.5 @ -185
+                               home (CWS)   line = -1.5 @ +155
+order built:                   side=away, line=+1.5   -> intent is TEXAS +1.5
+ticker stamped:                KXMLBSPREAD-26AUG261940TEXCWS-TEX2
+venue title for that ticker:   "Texas wins by over 1.5 runs?"  -> TEXAS -1.5
+
+_side_to_kalshi("away", "spreads", "...-TEX2")  ->  "yes"   (i.e. TEXAS -1.5)
 ```
 
-`_TEAM_TICKER_MARKETS = _TEAM_SIDED_MARKETS | {spreads, spread, run_line, puck_line}`.
+`TEX +1.5` and `TEX -1.5` are opposite bets. Texas +1.5 is the UNDERDOG getting
+runs (priced -185, likely to cover); Texas -1.5 is Texas winning by two or more.
+The mapper bought the second while the board meant the first.
 
-Ticker parsing: split on `-`, take `parts[1]` (event) and `parts[2]` (suffix).
-Strip trailing digits off the suffix for the team (`KC2` -> `KC`). Strip the
-date/time prefix off the event with `^\d{2}[A-Z]{3}\d{2}(?:\d{4})?` leaving the
-concatenated club codes, then `startswith(team)` = away, `endswith(team)` = home.
+**Systematic, not one row.** Every spreads order carrying a ticker had
+`line=+1.5` with a suffix naming the picked team itself — TEX2, DET2, AZ2, KC2,
+COL2, PIT2, ATL2, BAL2, HOU2, CIN2, MIL2. And every `line=-1.5` row — the
+favourite, the one that genuinely corresponds to a Kalshi "wins by over 1.5"
+market — carried NO ticker at all (`no_venue_ticker`).
 
-**The safety property, and the part I would keep whatever else you change:**
-exactly one of `startswith`/`endswith` must hold. Both (a team playing itself)
-or neither (a string that is not two concatenated codes) returns `None` and the
-caller raises `ticker_team_unreadable` — a *named* refusal, distinct from
-`unmappable_side`, because the vocabulary was never the problem and a reader
-six weeks from now should not be sent back down that path. Guessing which team
-we just bought is the most expensive error available in this file: it buys the
-opponent at a price that looked right.
+## The real root cause is in the JOIN, not the side mapper
 
-## Verified
+`kalshi_board_join._match_key` keys on Kalshi's strike as a POSITIVE MAGNITUDE
+(`1.5`, parsed from "wins by over 1.5"). `_row_key` keys on the board row's
+SIGNED handicap. So `1.5 == 1.5` pairs the **+1.5 underdog row** with the same
+team's **-1.5 market**. The magnitudes coincide; the meanings are inverted. The
+correct pairing can never key, because no board row carries `+1.5` for the
+favourite.
 
-All 10 tickers that logged `unmappable_side` in production 2026-08-26 resolve,
-plus your three worked examples exactly:
+Correct semantics: a Kalshi market *"T wins by over X"* is the board's
+`(team=T, line=-X)`. From one ticker both board rows are reachable:
 
 ```
-KC -1.5  = YES on -KC2      (KC is away: `KCTOR`.startswith("KC"))
-TOR +1.5 = NO  on -KC2
-TOR -1.5 = YES on -TOR2
+board row naming T at line == -X        -> kalshi_side "yes"
+board row naming the other team at +X   -> kalshi_side "no"
 ```
 
-`72 passed` in `tests/test_kalshi_orders.py`; `775 passed` across
-`-k "kalshi or ledger or portfolio_live"`.
+## THE LESSON, which is bigger than this patch
 
-Tests are in `tests/test_kalshi_orders.py` rather than your
-`tests/test_kalshi_side_vocabulary.py` — move them if you prefer; the three
-that matter are `test_a_team_spread_resolves_against_the_ticker_not_a_home_away_vocabulary`,
-`test_the_moneyline_resolves_by_the_same_rule_and_keeps_its_old_answer`, and
-`test_the_real_failing_spread_rows_from_production_now_resolve`.
+**`OrderBuildError: unmappable_side` was not a bug. It was the guard.** It sat
+in a table of failures beside `market_not_found` and `no_venue_ticker` and read
+like one more thing to clear — 11 orders a cycle, "a straight mapping
+omission". Clearing it would have removed the only thing standing between a
+mis-keyed join and ten inverted real-money bets per cycle.
 
-## Two things I did NOT do, that your spec calls for
+A refusal in a list of failures is indistinguishable from a defect. Before
+clearing one, establish what it was refusing and why — the cheap test here was
+one the venue could answer in seconds and neither session ran until after both
+had a working implementation.
 
-1. **Strike validation.** You specified suffix digit -> strike (2=1.5, 3=2.5,
-   4=3.5) and that a whole-number or 0.5 spread must refuse cleanly rather than
-   round. My patch does not check the digit against the request's line at all —
-   it trusts the ticker the board join stamped. **That check is worth adding and
-   is yours.**
-2. **The `no_venue_ticker` rows** (9 of them, h2h and one spread). Separate,
-   narrower gap; untouched.
+Related: the join ALREADY computes a correct `kalshi_side` and discards it.
+`venue_scope.py` stamps only `ticker_resolver(row)`, so `OrderRequest` carries
+the BOARD side and `_side_to_kalshi` is asked to re-derive at the boundary from
+data that cannot settle it. **Re-deriving at a boundary what an earlier stage
+already knew is what made this possible.** Same shape as the sim-input defect
+`model_engine_standard.md` exists for.
 
-## One correction to your h2h note
+## Ownership
 
-The old code returned `"yes"` unconditionally for `home`/`away` on the
-moneyline family. My patch keeps that answer *only when no ticker is passed*,
-and otherwise derives it. For a correctly stamped row the answer is identical —
-but a MIS-stamped one (our `home` side on the away team's contract) now returns
-`"no"` instead of silently buying the opponent. Worth preserving in whatever you
-land.
+The join fix and the side mapper both belong to syndicate-43
+`[USER DECISION 2026-08-26]`, extended to the game-line spread path in
+`kalshi_board_join.py` and the `kalshi_side` plumbing through `venue_scope.py`
+/ `portfolio_commit.py` / `execute_portfolio.py`. The cloud session holds no
+uncommitted work in any of those files.
