@@ -2093,6 +2093,44 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
      `test_team_aliases.py` is 9 of them and the soccer join leans on it.
 - Blocked by: none
 
+### venue-first-refusal — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: on a LIVE order, the VENUE's settlement record grades it and our own
+  inference is the FALLBACK — not a race decided by which worker ticks first.
+  `[user decision 2026-08-26: "give the venue first refusal on live orders"]`
+- **THE DEFECT THIS CLOSES, measured 2026-08-26T21:36Z.**
+  `paper_settlement.settle_orders` runs from `intelligence_state.py` on
+  **refresh-worker**; `venue_settlement.settle_from_venue` runs on
+  **live-odds-worker**. Both skip an order that already carries an `outcome`, so
+  **whichever service ticks first after a game ends owns that row permanently.**
+  Which grader wins is decided by TIMING, not policy — and the venue-vs-inferred
+  comparison (venue 3 bets ROI −11.88%, inferred 12 bets +51.07%) can never
+  become controlled while that stands.
+- **THE RULE: a LIVE order is not graded by inference until the venue has had a
+  stated window to settle it.** `SYNDICATE_VENUE_SETTLEMENT_GRACE_HOURS`,
+  default 24 — long enough that the venue always wins in practice (both settle
+  within minutes to hours), short enough that a market the venue never settles
+  still reaches the ledger rather than sitting open forever.
+- **PAPER IS UNTOUCHED.** Only `mode == live` defers. The paper book has no
+  venue record to wait for, and delaying it would be delay for nothing.
+- **AGE COMES FROM `submitted_at`, FALLING BACK TO `selected_date`.** Both
+  unreadable is the only deferring-forever case, and it is COUNTED by name
+  (`awaiting_venue_no_age`) rather than silent — otherwise "the venue has not
+  settled it" and "we cannot tell how old it is" become the same never-graded
+  row.
+- Files:
+  `syndicate/features/shared/paper_settlement.py`,
+  `tests/test_venue_first_refusal.py` (new)
+- Read-only, NOT claimed: `pipeline/intelligence_state.py` (the call site is
+  unchanged), `venue_settlement.py`, `execution_ledger.py`.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: `off != on` — a freshly-submitted LIVE order is REFUSED by
+  `settle_orders` with `awaiting_venue`, the same order past the window IS
+  graded, and a PAPER order is graded either way. Production reading owed:
+  `awaiting_venue` appearing in `[paper_settlement] SETTLED ... reasons=` on
+  refresh-worker, and new live grades carrying `settled_by: "venue"`.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
