@@ -2153,6 +2153,27 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   2026-08-26 22:07:31Z. Item: `todo.md #580`.
 - Blocked by: none
 
+### mlb-chip-live-state — OPEN — opened 2026-08-26 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272
+- Goal: every LIVE/FINAL MLB game chip on the Layer 2 board strip carries its
+  real score and its real inning token, on BOTH serve paths (`worker_artifact`
+  and `inline_artifact_stale`), for as long as the game is live.
+- Files: `syndicate/blueprints/home.py`, `tests/test_home_mlb_live_lens_states.py`
+- Hypothesis: `live_lens_report_<date>.json` has TWO writers alternating over one
+  path — the live-lens loop writes the FULL row shape, and
+  `scripts/refresh_mlb_oddsapi.py` writes the SLIM shape (`{gamePk, startTime,
+  status}` only, by its own docstring). `_mlb_live_lens_state_from_row` accepts a
+  SLIM row as a COVERED game (non-None, `in_progress` True, `away_pts`/`home_pts`
+  None, no inning), so `_apply_mlb_live_scores` never reaches its statsapi
+  fallback and coerces both scores to 0.
+- Falsification test: if the chips blanked while the on-disk lens still carried
+  `matchup.score` / `gameLens[0].progress`, the lens shape is NOT the cause.
+  Checked on production 2026-08-26 22:27-22:38Z: the two states track the shape
+  exactly, both directions.
+- Verification: same-instant chip-vs-StatsAPI diff on production across at least
+  one full FULL->SLIM->FULL lens cycle, with zero live games reading `0-0` or a
+  bare `LIVE`/`FINAL` token during the SLIM window.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

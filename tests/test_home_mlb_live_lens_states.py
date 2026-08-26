@@ -230,3 +230,124 @@ def test_callers_cannot_reach_into_the_cached_lens_state(lens):
         first[0]["live_state"]["away_pts"] = 999
         second = home_module._apply_mlb_live_scores(games, DATE)
     assert second[0]["live_state"]["away_pts"] == 4
+
+
+# ---------------------------------------------------------------------------
+# A SLIM ROW IS NOT COVERAGE
+#
+# Every row below is copied from the report production actually served on
+# 2026-08-26 -- both shapes, same game (`gamePk` 823096, PHI @ SEA), 3m13s
+# apart:
+#
+#     22:32:56-05:00  SLIM  {gamePk, startTime, status}           15 of 15 rows
+#     22:36:09-05:00  FULL  20 keys incl. matchup.score/gameLens  15 of 15 rows
+#
+# `live_lens_report_<date>.json` has TWO writers. `live_lens_loop` writes the
+# full shape; `scripts/refresh_mlb_oddsapi.py` fetches with `slim=on` and
+# publishes the slim shape over the same path -- its own docstring says
+# "always the slim shape ... {gamePk, startTime, status} only". They alternate,
+# and the slim writer was measured putting a report generated 2m38s EARLIER
+# over a newer full one.
+#
+# While the slim copy was current, EVERY live MLB game chip on the Layer 2
+# board strip read `0-0` with a bare `LIVE`/`FINAL` token -- 6 of 8 non-pregame
+# games, on both the `worker_artifact` and the `inline_artifact_stale` serve
+# path. While the full copy was current, all 8 matched StatsAPI exactly.
+#
+# The verification behind `368c7ef0` used the real 2026-06-01 report restamped
+# to now. That report was FULL. The fixture picked the path production only
+# takes half the time.
+# ---------------------------------------------------------------------------
+
+
+SLIM_LIVE_ROW = {"gamePk": 823096, "startTime": "3:10 PM", "status": {"abstract": "Live", "detailed": "In Progress"}}
+SLIM_FINAL_ROW = {"gamePk": 824234, "startTime": "12:10 PM", "status": {"abstract": "Final", "detailed": "Final"}}
+SLIM_PREGAME_ROW = {"gamePk": 823506, "startTime": "6:05 PM", "status": {"abstract": "Preview", "detailed": "Pre-Game"}}
+
+
+def test_a_slim_live_row_is_not_treated_as_coverage(lens):
+    # The defect. This used to resolve to a state that was non-None and empty
+    # of everything that matters -- `away_pts`/`home_pts` None, no inning --
+    # which the consumer contract reads as "the lens covers this game".
+    lens(_report([SLIM_LIVE_ROW]))
+    assert home_module._mlb_live_lens_states(DATE) == {}
+
+
+def test_a_slim_final_row_is_not_treated_as_coverage(lens):
+    lens(_report([SLIM_FINAL_ROW]))
+    assert home_module._mlb_live_lens_states(DATE) == {}
+
+
+def test_a_slim_pregame_row_is_still_coverage(lens):
+    # A pregame row has nothing to report and the lens genuinely covers it.
+    # Refusing these as well would send a full evening's pregame slate to
+    # statsapi for an answer that is already correct.
+    lens(_report([SLIM_PREGAME_ROW]))
+    state = home_module._mlb_live_lens_states(DATE)[823506]
+    assert state["in_progress"] is False
+    assert state["final"] is False
+
+
+def test_a_live_row_carrying_only_a_score_is_still_coverage(lens):
+    # `test_a_game_with_no_progress_block_still_resolves` above, restated as
+    # the boundary this refusal must not cross: a score alone is an answer.
+    lens(_report([_game(1, away=0, home=0)]))
+    assert home_module._mlb_live_lens_states(DATE)[1]["away_pts"] == 0
+
+
+def test_a_slim_slate_sends_every_live_game_to_the_network_path(lens):
+    # End to end, on the measured symptom: score and inning back on the game
+    # dict the chip strip is built from.
+    lens(_report([SLIM_LIVE_ROW]))
+    seen = {}
+
+    def _fan_out(game_pks, selected_date, **kwargs):
+        seen["pks"] = list(game_pks)
+        return {
+            823096: {
+                "away_pts": 6,
+                "home_pts": 0,
+                "in_progress": True,
+                "final": False,
+                "status": "In Progress | Bottom 9th | 0 outs",
+            }
+        }
+
+    games = [{"gamePk": 823096, "away": {}, "home": {}, "status": {}}]
+    with patch.object(home_module, "_mlb_feed_live_states", _fan_out):
+        enriched = home_module._apply_mlb_live_scores(games, DATE)
+
+    # Before the fix this list was empty -- the slim row counted as coverage,
+    # so the fan-out was never entered for any game on the slate.
+    assert seen["pks"] == [823096]
+    assert enriched[0]["away"]["score"] == 6
+    assert enriched[0]["home"]["score"] == 0
+    assert enriched[0]["status"]["detailed"] == "In Progress | Bottom 9th | 0 outs"
+
+
+def test_a_live_game_with_neither_score_reported_is_not_rendered_as_nil_nil(lens):
+    # Belt-and-braces behind the row-level refusal, and the general rule: the
+    # zero-fill is sound only while the OTHER side proves the source actually
+    # reported this game. With nothing reported, `0-0` is a fabrication; an
+    # unset score renders "-", which is honestly "unknown".
+    state = {"away_pts": None, "home_pts": None, "in_progress": True, "final": False, "status": "In Progress"}
+    games = [{"gamePk": 7, "away": {}, "home": {}, "status": {}}]
+    with patch.object(home_module, "_mlb_live_lens_states", return_value={7: state}), patch.object(
+        home_module, "_mlb_feed_live_states", return_value={}
+    ):
+        enriched = home_module._apply_mlb_live_scores(games, DATE)
+    assert "score" not in enriched[0]["away"]
+    assert "score" not in enriched[0]["home"]
+
+
+def test_one_side_reported_still_zero_fills_the_other(lens):
+    # The case the zero-fill was written for, which must keep working:
+    # StatsAPI returns a real number for one side and null for the other.
+    state = {"away_pts": 4, "home_pts": None, "in_progress": True, "final": False, "status": "In Progress"}
+    games = [{"gamePk": 7, "away": {}, "home": {}, "status": {}}]
+    with patch.object(home_module, "_mlb_live_lens_states", return_value={7: state}), patch.object(
+        home_module, "_mlb_feed_live_states", return_value={}
+    ):
+        enriched = home_module._apply_mlb_live_scores(games, DATE)
+    assert enriched[0]["away"]["score"] == 4
+    assert enriched[0]["home"]["score"] == 0

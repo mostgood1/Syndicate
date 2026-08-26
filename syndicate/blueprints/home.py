@@ -3730,6 +3730,13 @@ def _mlb_inning_ordinal(inning: Any) -> str:
     return f"{value}{suffix}"
 
 
+def _mlb_lens_score_present(value: Any) -> bool:
+    """Is this a score the lens actually reported? `0` is, `None`/`""` is not."""
+    if value is None:
+        return False
+    return bool(str(value).strip())
+
+
 def _mlb_live_lens_state_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
     status = row.get("status") if isinstance(row.get("status"), dict) else {}
     abstract = str(status.get("abstract") or "").strip()
@@ -3748,6 +3755,56 @@ def _mlb_live_lens_state_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
     inning = _mlb_inning_ordinal(progress.get("inning"))
     half = str(progress.get("half") or "").strip().lower()
     outs = progress.get("outs")
+
+    # A ROW THAT CANNOT ANSWER IS NOT A COVERED GAME. `#413`'s "{} MEANS ALL,
+    # NOT SOME" rule, applied per ROW instead of per FILE -- which is where it
+    # was always needed, because this file has TWO writers and they do not
+    # agree on the row shape:
+    #
+    #   * `live_lens_loop` writes the FULL shape -- 20 keys per row, including
+    #     `matchup.score` and `gameLens[0].progress`.
+    #   * `scripts/refresh_mlb_oddsapi.py` writes the SLIM shape and says so in
+    #     its own docstring: "{gamePk, startTime, status} only". It fetches with
+    #     `slim=on` deliberately (a full slate payload caused a prior incident)
+    #     and then publishes over the same path.
+    #
+    # MEASURED ON PRODUCTION 2026-08-26, sampling the served report every ~50s:
+    # 22:39:26 SLIM, 22:40:48 FULL, 22:38:10 SLIM -- the third sample is not a
+    # typo, the slim writer put a report generated 2m38s EARLIER over a newer
+    # full one. Whenever the slim copy was current, EVERY live MLB game chip on
+    # the Layer 2 strip read `0-0` with a bare `LIVE`/`FINAL` token instead of a
+    # score and an inning (6 of 8 non-pregame games, both serve paths); whenever
+    # the full copy was current, all 8 matched StatsAPI exactly.
+    #
+    # A SLIM ROW STILL SATISFIED THE GUARD ABOVE -- it carries `status`, so
+    # `abstract`/`detailed` are populated -- and this function returned a state
+    # that was non-None and empty of everything that matters. `#413`'s consumer
+    # contract reads a non-None state as "the lens covers this game", so
+    # `_apply_mlb_live_scores` skipped the statsapi fallback for every game on
+    # the slate and then turned two unknown scores into two zeroes. An unfed
+    # field is indistinguishable from a working one at every level except the
+    # data.
+    #
+    # `368c7ef0` was verified end to end on the real 2026-06-01 report restamped
+    # to now -- 9/9 games resolved, 0 statsapi calls. That report was FULL. The
+    # fixture picked the path production only takes half the time.
+    #
+    # THE COST OF FALLING THROUGH IS BOUNDED, so this does not undo
+    # `render-web-request-path`'s latency fix: `_mlb_feed_live_states` is
+    # single-flight behind a 20s TTL, so at most ONE request thread ever pays a
+    # fetch and every other thread takes the last good value immediately.
+    #
+    # GATED ON LIVE/FINAL, not applied to every row. A PREGAME row legitimately
+    # has no score and no inning, and the lens really does cover it -- there is
+    # nothing to report yet. Refusing those too would send all seven of a
+    # typical evening's pregame games to statsapi for an answer that is already
+    # correct, which is a cost with no reading behind it.
+    row_is_live = _mlb_status_is_live(abstract, detailed)
+    row_is_final = _mlb_status_is_final(abstract, detailed)
+    has_score = _mlb_lens_score_present(score.get("away")) or _mlb_lens_score_present(score.get("home"))
+    has_progress = bool(inning and half)
+    if (row_is_live or row_is_final) and not has_score and not has_progress:
+        return None
 
     # Same three bits, same order, same separator as `_mlb_feed_live_state`.
     status_bits = [
@@ -3882,16 +3939,29 @@ def _apply_mlb_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
         # the game state itself confirms live/final, treat a missing runs
         # value as 0 rather than leaving that side's score unset -- an
         # actually-unknown score only makes sense pregame.
+        #
+        # ONE SIDE MISSING IS THE CASE THAT WAS MEASURED; BOTH SIDES MISSING IS
+        # A DIFFERENT ANIMAL. The rule above reads a null as "this side has not
+        # scored", which is a sound inference only while the OTHER side proves
+        # the source actually reported this game. When neither side carries a
+        # number, nothing has been reported and `0-0` is a fabrication -- and it
+        # is the fabrication a slim live-lens row produced for every live MLB
+        # game on 2026-08-26 (see `_mlb_live_lens_state_from_row`). Leaving the
+        # scores unset renders "-", which is honestly "unknown" rather than
+        # confidently wrong. Belt-and-braces behind the row-level refusal: it
+        # closes the same hole for any FUTURE source that reports a live game
+        # with no scores at all.
         in_progress_or_final = bool(live_state.get("in_progress") or live_state.get("final"))
         away_pts = live_state.get("away_pts")
         home_pts = live_state.get("home_pts")
+        one_side_reported = away_pts is not None or home_pts is not None
         if away_pts is not None:
             away["score"] = away_pts
-        elif in_progress_or_final:
+        elif in_progress_or_final and one_side_reported:
             away["score"] = 0
         if home_pts is not None:
             home["score"] = home_pts
-        elif in_progress_or_final:
+        elif in_progress_or_final and one_side_reported:
             home["score"] = 0
         updated["away"] = away
         updated["home"] = home
