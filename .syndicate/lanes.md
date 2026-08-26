@@ -1975,6 +1975,60 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Item: `todo.md #578`.
 - Blocked by: none
 
+### venue-settlement — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: live orders are settled from **the venue's own settlement record**, so
+  `settled > 0` stops being the gate the whole feedback loop is stuck behind.
+  `[user decision 2026-08-26: "do the settlement work next"]`
+- **WHY THIS IS DIFFERENT FROM THE SETTLEMENT WE ALREADY HAVE.**
+  `paper_settlement.settle_orders` grades an order against a status WE resolve —
+  our boxscore pipeline, our alias joins, our line handling. Every one of those
+  is a place to be wrong, and `#502`/the sim-weight argument both trace back to
+  a settled sample of zero. Both venues will simply state the outcome of a market
+  we hold. **This is not a better estimator; it removes the estimator.**
+- **DOCUMENTED SHAPES, READ BEFORE ANY CODE** (docs.kalshi.com /
+  docs.polymarket.us, 2026-08-26 — the balances lane earlier today proves the
+  cost of the opposite order):
+    - Kalshi `GET /portfolio/settlements` — `ticker`, `market_result`
+      (`yes|no|scalar`), `yes_count_fp`/`no_count_fp` (contracts HELD at
+      settlement), `yes_total_cost_dollars`/`no_total_cost_dollars`,
+      **`revenue` in CENTS**, `fee_cost` fixed-point dollars, `settled_time`.
+      Paged by `cursor`, filterable by `ticker`.
+    - Polymarket `GET /v1/portfolio/activities?types=ACTIVITY_TYPE_POSITION_RESOLUTION`
+      — `positionResolution.marketSlug`, `beforePosition`/`afterPosition`
+      (`UserPosition.realized` is an `Amount` decimal string), `side`
+      (`LONG|SHORT|NEUTRAL`), `updateTime`. Filterable by `marketSlug`.
+- **THE OUTCOME COMES FROM THE VENUE'S OWN ARITHMETIC, NOT FROM OUR SIDE
+  LOGIC.** Kalshi: P&L = `revenue/100 - (yes_cost + no_cost) - fee_cost`, and
+  won/lost from `market_result` against which side we actually HELD
+  (`yes_count_fp`/`no_count_fp`) — never from our `side`/`line` fields, which
+  are exactly what the alias joins get wrong. Polymarket: the realized delta
+  `afterPosition.realized - beforePosition.realized` IS the settlement P&L.
+- **IDEMPOTENCY IS THE LOAD-BEARING PROPERTY, same as the ledger's.** An order
+  already carrying an `outcome` is never re-graded or overwritten — this writes
+  into a money record that `paper_settlement` also writes. Rows are stamped
+  `settled_by: "venue"` so an AUTHORITATIVE outcome is distinguishable from an
+  INFERRED one; a later evaluation pass must be able to tell them apart.
+- **A SETTLEMENT WE CANNOT JOIN IS COUNTED, NOT DROPPED.** Two different
+  absences, both reported: settlement rows matching no order (`unjoinable`), and
+  open orders with no settlement row yet (`awaiting`). Collapsing them would make
+  "nothing has settled" and "we cannot see what settled" identical — the
+  distinction this system keeps paying to preserve.
+- Files:
+  `syndicate/features/shared/venue_settlement.py` (new),
+  `scripts/run_live_odds_refresh_worker.py` (the call site only),
+  `tests/test_venue_settlement.py` (new)
+- **Read-only, deliberately NOT claimed:** `execution_ledger.py` (uses `_load`
+  and `_persist`, edits neither — it is `portfolio-decision-and-execution`'s
+  file), `paper_settlement.py`, both auth modules.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: `off != on` through the ledger — an order with a matching venue
+  settlement gains `outcome` + `pnl_dollars` + `settled_by: "venue"`, and one
+  without gains nothing. Production reading OWED and it is the point:
+  `VENUE_SETTLEMENT settled=N unjoinable=N awaiting=N` on live-odds-worker, and
+  `settled_count > 0` on the live book for the first time.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
