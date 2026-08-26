@@ -30008,3 +30008,78 @@ KXWNBA*Q*    "Washington vs Phoenix women's Pro Basketball game: Over 48.5 1Q po
 and the WNBA quarter ladder (21 markets x 12 series) is the largest block left.
 That is the next grammar increment, and it is legible only because the 1,112
 futures stopped filling the list.
+
+---
+
+## 2026-08-26 00:01–00:07Z — live-odds-worker `a021cd4dc` — **#559 FIXED AND VERIFIED: 7,936 → 17,413 game markets**
+
+**lane:** `polymarket-oddsapi-coverage-audit` · **claim token** `e52743089280b1e5`
+**user instruction:** "can you fix 559 yourself?" → "merge 80 and deploy".
+
+**verify: the writer, which is the number that reaches production.**
+
+```
+[live_odds_worker] POLYMARKET_US_SLATE_WRITE status=ok written=True
+  count=17413 bytes=5160936 headroom=3227672 truncated=False fetched=17413
+  dropped_for_size=0 dropped_by_date={} kept_through=2026-09-20
+                                  -- live-odds-worker, 2026-08-26T00:06:57.486Z
+```
+
+| | before (`15f14984a`) | after (`a021cd4dc`) |
+|---|---:|---:|
+| game markets persisted | 7,936 | **17,413** |
+| `truncated` | False *(from the wrong start)* | **False** *(swept to the end)* |
+| `kept_through` | 2026-09-07 | **2026-09-20** |
+| artifact bytes | 2,403,051 | 5,160,936 |
+
+**+9,477 markets, more than the ~8,400 the probe predicted** — the probe sampled
+five rows per rung and could only ever give a lower bound. The far end of the
+window is back too: 09-07 → 09-20 is the block that sat above the old boundary.
+
+**A REGRESSION I SHIPPED AND CAUGHT IN THE SAME READING.** The first line I read
+was NOT the writer:
+
+```
+POLYMARKET_US_GAMES status=ok start_offset=0 boundary_probes=None monotonic=None
+  games=4674 futures=7019 rows=15000 pages=30 truncated=True
+```
+
+`games=4674` — worse than the 7,936 I was replacing. **It is the BOOT
+DIAGNOSTIC, not the writer**, and it still carried `max_pages=30` hardcoded at
+`run_live_odds_refresh_worker.py:1172`. Thirty pages sufficed only while the
+scan started at offset ~21,000; a sweep from 0 needs ~46. The writer
+(`persist_game_slate`, `max_pages=200`) was complete on the same boot.
+
+**I nearly "fixed" the wrong thing.** The instinct on seeing 4,674 was to treat
+the sweep as broken. Checking WHICH call produced the number took one grep and
+changed the conclusion completely — a diagnostic under-reading its own subject
+by 73% is this audit's own subject, one layer in. Budget matched to the
+writer's in a follow-up PR; **until that deploys, `POLYMARKET_US_GAMES` on this
+service is an UNDERCOUNT and must not be quoted.**
+
+**TWO CONSEQUENCES TO WATCH, both mine, both real.**
+
+1. **The artifact more than doubled: 2.40MB → 5.16MB, headroom 5.99MB → 3.23MB.**
+   That is 62% of the 8MB keyvalue ceiling. `_slate_within_budget` still reports
+   `dropped_for_size=0` — it has never fired — but it will, and sooner than
+   before. When it does, the drop is by game date and reported, which is the
+   behaviour it was built for. Every consumer of this artifact now loads 2.1x
+   the bytes.
+2. **refresh-worker sat at 78.1% of 4GB** (`CONTAINER_MEMORY memory_current_mb
+   3199.7`) at 00:12:24Z during a soccer board build. That is not caused by this
+   change — it reads the artifact, it does not sweep — but this service has an
+   OOM history and the artifact it loads just doubled. Worth a look if kills
+   resume.
+
+**STILL OWED, and it is the downstream half:** no `POLYMARKET_BOARD_JOIN` or
+`VENUE_REPRICE` line has been emitted since the write, so **MLB full-game
+spreads returning to the join's index is UNCONFIRMED**. The acceptance reading
+is `no_candidates|mlb|spreads` regaining candidates, and `SPREAD_SIGN_AUDIT`
+finding full-game rungs to vote on. The flag is still armed for the latter.
+
+**The sweep's own correctness, stated precisely:** `truncated=False` now means
+a short page ended the read, which is the only complete condition. The old
+`truncated=False` meant "paged to the end from wherever we started". Same field,
+different claim.
+
+**Claim released.**
