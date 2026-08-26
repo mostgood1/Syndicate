@@ -31814,3 +31814,80 @@ taking — this is the first. Shard funding was the entire remaining blocker.
 **Next constraint is collateral, not correctness.** $25 on shard 3 against a
 $10/order cap is a couple of orders per cycle; expect insufficient-collateral
 errors from here, which are a different and much more legible failure.
+
+
+## 2026-08-26 16:11:32Z — refresh-worker `1d1a6195` — WNBA SETTLEMENT UNBLOCKED, VERIFIED
+
+lane: kalshi-spread-join-sign · deploy dep-da7gtrjbc2fs73cqfti0
+claim held; preflight CLEAR after waiting out 3 in-flight jobs rather than
+killing them (`build_soccer_artifacts --league la_liga` was one). render.yaml
+UNCHANGED across the range, so no blueprint_sync.
+
+Three code changes shipped (10 commits in range, 4 of them a peer's):
+  `kalshi_board_join.py`  spreads margin-vs-handicap sign
+  `bet_status_wnba.py`    matchup recovery (box carries ESPN ids, order carries
+                          the OddsAPI board hash)
+  `bet_status_soccer.py`  dated finals retention
+
+verify: **`SETTLED date=2026-08-25`: `game_not_in_live_box` 9 -> ABSENT, and
+`graded` 0 -> non-zero.** Read 16:24:12Z, first settlement pass on the new code.
+
+    BEFORE (14:57:30Z, 44c1c564)
+      graded=0 already_graded=120 outcomes={}
+      ungraded={'no_soccer_live_state_for_date':3,'order_not_filled':20,
+                'game_not_in_live_box':9}
+      PNL_CUT all_time by_sport=[('mlb',157,..),('soccer',0,..),('wnba',0,..)]
+
+    AFTER (16:24:12Z, 1d1a6195)
+      graded=3 already_graded=120 outcomes={'won':3}
+      ungraded={'no_soccer_live_state_for_date':3,'order_not_filled':20,
+                'not_decided_yet':6}
+      PNL_CUT all_time by_sport=[..,('wnba', 2, 2.5, 115.21, 100.0)]
+
+**WNBA PASSES.** 3 graded, all won. The other 6 moved to `not_decided_yet` --
+the OTHER half of the prediction: the matchup resolves, the grader sees the
+stats, the bets simply are not decided (this artifact carries no final flag, so
+unders wait rather than settle on a guess). WNBA all-time 0 -> 2 settled: the
+first WNBA settlement this platform has ever made.
+
+**SOCCER IS NOT VERIFIED.** `no_soccer_live_state_for_date: 3` UNCHANGED, and
+that was predicted before the deploy: the dated finals record only accumulates
+FORWARD, and 2026-08-25's aggregate rolled hours ago, so those three are
+permanently ungradeable. Soccer stays 0 settled all-time. SHIPPED, UNDEMONSTRATED
+-- the reading that discharges it is a soccer order grading on a date whose
+finals were captured after 16:11Z. Do not report it as fixed until then.
+
+Unchanged and correct: `no_live_feed:194` (MLB not started), `order_not_filled:59`
+(rejected orders), `no_live_box_for_date:7` (tonight's WNBA box not captured yet),
+`unmapped_market:3`.
+
+NOT fixed here: MLB spreads still refuse `unmappable_side` at build time. The
+join fix removes the INVERSION; the side plumbing is blocked on
+`pipeline/portfolio_commit.py`, claimed by `portfolio-decision-and-execution`.
+**That refusal is the safe state and must not be cleared without the plumbing** --
+before the join fix it would have bought the opposite team.
+
+## 2026-08-26 16:23:12Z · INCIDENT · a peer deploy CANCELLED mine while I held the claim
+
+    dep-da7h54bm6pss73fmo2n0  f1a2c78f  CANCELED 16:23:12Z   <- mine
+    dep-da7h5rrbc2fs73cr8u9g  2e5f425e  started immediately  <- peer
+
+`deploy_claim.py status --service live-odds-worker` read "HELD by
+kalshi-spread-join-sign" in the PRIMARY tree throughout.
+
+**No revert: 2e5f425e is NEWER than f1a2c78f and ledger-only.** So this is not
+the 2026-08-15 silent-revert outcome. But it is that SHAPE, and it demonstrates
+the per-tree claim weakness ACROSS ENVIRONMENTS rather than merely across
+worktrees: a cloud session has its own `.syndicate/deploy_claims/`, so the lock
+is invisible in BOTH directions and neither side is warned. The guard hook only
+protects a session that runs it out of `$CLAUDE_PROJECT_DIR`.
+
+Harmless here only by luck of ordering. Recorded so the next occurrence is not
+read as a fresh discovery. See learnings 2026-08-21 "THE DEPLOY CLAIM IS NOT A
+GLOBAL LOCK ONCE SESSIONS USE WORKTREES", extended 2026-08-26.
+
+env change, same window: `KALSHI_ORDER_KNOWN_SHARDS` 0 -> `0,3` on
+live-odds-worker (single-key endpoint, readback confirmed) after the user moved
+$25 to exchange shard 3. Env vars are service-level, so the peer's deploy
+injects it too. verify PENDING -- see the CORRECTION entry above for why the
+shard was never Kalshi's to enable.
