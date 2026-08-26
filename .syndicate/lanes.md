@@ -2219,6 +2219,50 @@ Four deploys were taken during this session and each is recorded in
      the local `.env`; the served board's `cells` are keyed by bookmaker and
      answer it without one.
 - Blocked by: none
+### portfolio-live-primary — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: `/portfolio` IS the live buying engine's page. The whole of
+  `/portfolio/live` renders there, `/portfolio/live` redirects to it rather
+  than keeping a second copy, `/portfolio/paper` stays running and linked, and
+  every editable input (`bankroll_units`, `max_slate_exposure_fraction`,
+  `min_ev_pct`, `max_positions`, `min_stake_units`) is still editable on the
+  merged page. `[user decision 2026-08-26]`
+- **NARROW CARVE-OUT, taken at explicit user direction**, from two OPEN lanes
+  that between them hold every file this needs:
+  `portfolio-decision-and-execution` (session 9324a3e5 / cloud session
+  `01Sia2rPD72eFTriy28azzs2`) holds `blueprints/intelligence.py`,
+  `templates/portfolio.html`, `templates/portfolio_paper.html`;
+  `templates/portfolio_live.html` + `tests/test_portfolio_live_page.py` are
+  that lane's work too (authored through `bbfc3906`, 2026-08-26T14:23Z) though
+  never added to its `Files:` list. **Not reachable to ask first**: `ListAgents`
+  shows 12 peers and that session is not among them (cloud session, separate
+  container) — the same fallback that lane itself recorded twice on
+  2026-08-24/25. Scope taken is exactly: the two page routes
+  (`portfolio_home`, `portfolio_live_page`), the two templates, the paper
+  page's one cross-link, and the live page's tests. **Nothing about the
+  execution ledger, the commit job, the guard, sizing, or the payload's
+  contents is touched** — `_live_portfolio_payload` and `_live_health` are read
+  and re-rendered, not edited. Reclaim by re-adding these paths to that lane's
+  `Files:` list.
+- Files:
+  `syndicate/blueprints/intelligence.py` (routes `portfolio_home`,
+  `portfolio_live_page` only),
+  `syndicate/templates/portfolio.html`,
+  `syndicate/templates/portfolio_live.html` (deleted — its body moves into
+  `portfolio.html`; a second copy of a real-money surface is the drift the
+  `/portfolio/settings` redirect already refused to build),
+  `syndicate/templates/portfolio_paper.html` (one link),
+  `tests/test_portfolio_live_page.py`
+- Hypothesis: n/a (build, not diagnostic).
+- Falsification test: n/a.
+- Verification: `/portfolio` renders 200 carrying BOTH surfaces —
+  `id="bankroll"` with all five `name=` inputs, and the live banner, live
+  tiles, live order table and period pivots; `/portfolio/live?date=` returns a
+  redirect to `/portfolio` preserving the query; `/portfolio/paper` still 200s
+  and links to `/portfolio`; `tests/test_portfolio_live_page.py`,
+  `tests/test_portfolio_paper_page.py`, `tests/test_portfolio_settings.py` all
+  green. Production reading owed after deploy.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

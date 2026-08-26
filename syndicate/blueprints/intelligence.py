@@ -3458,7 +3458,10 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # is contacted, nothing here is a real wager." A live order rendered
         # under that sentence is a real position wearing a disclaimer that it is
         # not one -- the single most dangerous thing this surface could show.
-        # Live orders have their own page: `/portfolio/live`.
+        # Live orders render on `/portfolio` (merged there 2026-08-26; the old
+        # `/portfolio/live` redirects). This filter is what keeps them off THIS
+        # page, and the merge did not move it -- the wall is between live and
+        # SIMULATED, not between live and the user's own real logged bets.
         all_orders = [
             order
             for order in (_load().get("orders") or [])
@@ -3951,13 +3954,26 @@ def api_portfolio_live():
 
 @intelligence_bp.get("/portfolio/live")
 def portfolio_live_page():
-    """Real positions. Deliberately its own page, not a tab on the paper one."""
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    show_all = str(request.args.get("show") or "").strip().lower() == "all"
-    return render_template(
-        "portfolio_live.html",
-        live=_live_portfolio_payload(selected_date, show_all=show_all),
-    )
+    """MERGED INTO `/portfolio`. This is now a redirect, not a page.
+
+    [user decision 2026-08-26] "I want our live buying engine anchored to the
+    primary portfolio page." The live book used to live here, one click off the
+    nav, which meant the single surface that spends real money was the one
+    nobody had open. Its whole body is now the first half of `portfolio.html`.
+
+    A REDIRECT RATHER THAN A SECOND RENDER of the same payload, for the reason
+    `portfolio_settings_page` gives immediately above: two renderings of the
+    same fields drift, and the one nobody edits is the one somebody trusts. The
+    URL is kept because it is bookmarked and linked from the paper page's
+    history, and a 404 on a real-money book is a bad way to learn about a
+    rename.
+
+    The query string is carried through verbatim -- `?show=all`, `?period=` and
+    `?date=` all belong to the merged page and dropping them would silently
+    reset the reader's view.
+    """
+    query = request.query_string.decode("utf-8", "replace")
+    return redirect(f"/portfolio?{query}#live" if query else "/portfolio#live", code=302)
 
 
 @intelligence_bp.get("/portfolio/paper")
@@ -3976,13 +3992,34 @@ def portfolio_paper_home():
 
 @intelligence_bp.get("/portfolio")
 def portfolio_home():
+    """The primary portfolio page, and the live buying engine is anchored here.
+
+    TWO LEDGERS ON ONE PAGE, LABELLED AND NEVER SUMMED: the execution ledger's
+    real orders (what `/portfolio/live` used to render on its own) above, and
+    the prediction ledger's user-logged bets below. `portfolio_summary.
+    _is_user_placed_bet` exists because auto-tracked model rows once flooded
+    this page with 1000+ "tracked plays" nobody had bet -- that wall stays up,
+    which is why the two halves carry their own headings, their own totals and
+    their own JSON links rather than a merged tile row.
+
+    PAPER STAYS ON ITS OWN PAGE. The old argument for splitting live off was
+    that simulated positions beside real ones get mistaken for wagers somebody
+    placed; that argument is about SIMULATION, and `/portfolio/paper` is
+    untouched and still linked. Real money and real logged bets are both real.
+
+    STILL A PURE READ. Both payloads read artifacts the workers wrote -- no
+    simulation, no order placement, nothing recomputed in a request handler.
+    """
     from syndicate.features.shared.portfolio_settings import resolve_settings
 
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    show_all = str(request.args.get("show") or "").strip().lower() == "all"
     summary = build_portfolio_summary(limit=100)
     return render_template(
         "portfolio.html",
         portfolio_summary=summary,
         portfolio_settings=resolve_settings().as_dict(),
+        live=_live_portfolio_payload(selected_date, show_all=show_all),
     )
 
 

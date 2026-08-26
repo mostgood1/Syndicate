@@ -336,11 +336,12 @@
       <span class="paper-flag__value" id="paper-generated-at">{{ p.generated_at|central(with_date=True) or '—' }} CT</span>
     </span>
     <span class="paper-links">
-      <a href="/portfolio">Your tracked bets</a> ·
-      {# The real book is a SEPARATE page, and it has to be reachable from here:
-         a live position nobody can navigate to is a live position nobody
-         watches. #}
-      <a href="/portfolio/live">Live book</a> ·
+      {# The real book is on `/portfolio` as of 2026-08-26 -- it used to be a
+         separate page at `/portfolio/live`, which still redirects there. It
+         has to be reachable from here either way: a live position nobody can
+         navigate to is a live position nobody watches. #}
+      <a href="/portfolio#live">Live book</a> ·
+      <a href="/portfolio#tracked">Your tracked bets</a> ·
       <a href="/api/portfolio/paper?date={{ p.date }}">JSON</a>
     </span>
   </div>

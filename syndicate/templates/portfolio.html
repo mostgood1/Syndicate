@@ -7,59 +7,38 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
 {% endblock %}
 
+{#
+  THE PRIMARY PORTFOLIO PAGE, AND THE LIVE BUYING ENGINE IS ANCHORED TO IT.
+  [user decision 2026-08-26]
+
+  `/portfolio/live` used to be its own page. It is now a redirect here, and its
+  whole body is the first half of this file. The argument for splitting them was
+  real -- simulated positions shown beside real ones get mistaken for bets
+  somebody placed -- but that argument is about PAPER, and paper is still its
+  own page at `/portfolio/paper`. Real money and the user's own logged bets are
+  both real; keeping the engine on a URL nobody lands on meant the one surface
+  that spends money was the one nobody had open.
+
+  ONE COPY, NOT TWO. `/portfolio/live` redirects rather than rendering a second
+  template, for the same reason `/portfolio/settings` redirects here instead of
+  carrying its own copy of the form: two renderings of the same fields drift,
+  and the one nobody edits is the one somebody trusts.
+
+  THE TWO HALVES STAY LABELLED AND SEPARATE. Every count in the live half comes
+  from the execution ledger (`_live_portfolio_payload`); every count in the
+  logged-bets half comes from the prediction ledger (`build_portfolio_summary`).
+  They are different books and they are never summed.
+#}
+
 {% block content %}
 <style>
   body.syndicate-body .cards-shell {
     max-width: 1220px;
   }
 
-  .portfolio-tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-
-  .portfolio-tile {
-    border: 1px solid var(--cards-line);
-    border-radius: 14px;
-    background: rgba(8, 18, 30, 0.72);
-    padding: 12px 14px;
-  }
-
-  .portfolio-tile__label {
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--cards-text-dim);
-  }
-
-  .portfolio-tile__value {
-    font-size: 22px;
-    font-weight: 600;
-    margin-top: 4px;
-    color: var(--cards-text);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .portfolio-tile__value.pos { color: #2ecc71; }
-  .portfolio-tile__value.neg { color: #e74c3c; }
-
-  .portfolio-tile__meta {
-    font-size: 11px;
-    color: var(--cards-text-dim);
-    margin-top: 2px;
-  }
-
-  .portfolio-note {
-    border: 1px solid var(--cards-line);
-    border-radius: 14px;
-    background: rgba(241, 196, 15, 0.06);
-    color: var(--cards-text-soft);
-    padding: 10px 14px;
-    font-size: 12.5px;
-    margin-bottom: 16px;
-  }
+  /* ---------------------------------------------------------------- */
+  /* Shared chrome                                                     */
+  /* ---------------------------------------------------------------- */
 
   .portfolio-section-title {
     font-size: 13px;
@@ -69,9 +48,141 @@
     margin: 0 0 8px;
   }
 
+  .portfolio-band {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 26px 0 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--cards-line);
+  }
+
+  .portfolio-band:first-of-type {
+    margin-top: 4px;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  .portfolio-band h2 {
+    font-size: 15px;
+    margin: 0;
+    color: var(--cards-text);
+  }
+
+  .portfolio-band__note {
+    font-size: 11.5px;
+    color: var(--cards-text-dim);
+  }
+
+  .portfolio-band__links {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--cards-text-dim);
+  }
+
+  .portfolio-band__links a { color: var(--cards-accent); text-decoration: none; }
+  .portfolio-band__links a:hover { text-decoration: underline; }
+
+  /* ---------------------------------------------------------------- */
+  /* Live book -- the buying engine                                    */
+  /* ---------------------------------------------------------------- */
+
+  .live-banner {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 8px 12px; border-radius: 10px; margin-bottom: 12px;
+    border: 1px solid var(--cards-line); background: var(--cards-surface);
+  }
+  /* GREEN IS HEALTHY, RED IS BROKEN. [USER DECISION 2026-08-25]
+     This INVERTS what these colours used to mean: `on` was red, because red
+     said "real money is live, pay attention". The cost was that a fully
+     working system rendered as a wall of red, leaving no way to see at a
+     glance that something had actually broken. Danger and health cannot both
+     own one pixel; health won. */
+  .live-badge { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; }
+  .live-badge--ok { background: #14532d; color: #bbf7d0; }
+  .live-badge--bad { background: #7f1d1d; color: #fee2e2; }
+  .live-flag { font-size: 11px; display: inline-flex; gap: 4px; align-items: center; }
+  .live-flag__label { color: var(--cards-text-dim); }
+  .live-flag__value { font-weight: 600; }
+  .live-flag__value.ok { color: #4ade80; }
+  .live-flag__value.bad { color: #f87171; }
+  /* The WHOLE line takes the verdict, not just the values: a green badge
+     beside grey labels reads as decoration, and the ask was for the line. */
+  .live-banner.is-ok { border-color: rgba(74,222,128,.45); }
+  .live-banner.is-bad { border-color: rgba(248,113,113,.5); }
+  .live-banner.is-ok .live-banner__msg { color: #4ade80; }
+  .live-banner.is-bad .live-banner__msg { color: #f87171; }
+  .live-banner.is-ok .live-flag__label { color: rgba(74,222,128,.62); }
+  .live-banner.is-bad .live-flag__label { color: rgba(248,113,113,.66); }
+  .live-banner__links { margin-left: auto; font-size: 11px; }
+  .live-banner__links a { color: var(--cards-accent); text-decoration: none; }
+
+  .live-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .live-tile { border: 1px solid var(--cards-line); border-radius: 10px; padding: 8px 10px; background: var(--cards-surface); }
+  .live-tile__label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--cards-text-dim); }
+  .live-tile__value { font-size: 19px; font-weight: 700; margin-top: 2px; color: var(--cards-text); font-variant-numeric: tabular-nums; }
+  .live-tile__meta { font-size: 10px; color: var(--cards-text-dim); margin-top: 2px; }
+  .pos { color: #4ade80; } .neg { color: #f87171; } .warn { color: #fbbf24; }
+
+  .live-table-wrap {
+    border: 1px solid var(--cards-line);
+    border-radius: 16px;
+    overflow-x: auto;
+    background: rgba(8, 18, 30, 0.6);
+  }
+  .live-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 760px; }
+  .live-table th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--cards-text-dim); border-bottom: 1px solid var(--cards-line-strong);
+    background: rgba(15, 30, 47, 0.9); padding: 8px 10px; }
+  .live-table td { padding: 8px 10px; border-bottom: 1px solid var(--cards-line); vertical-align: top; color: var(--cards-text-soft); }
+  .live-table tr:last-child td { border-bottom: none; }
+  .live-table .primary { font-weight: 600; color: var(--cards-text); }
+  .sub { display: block; font-size: 10px; color: var(--cards-text-dim); }
+  .live-toggle { margin: 0 0 10px; font-size: 12px; color: var(--cards-text-dim); }
+  .live-toggle a { color: var(--cards-accent); }
+  .live-empty { border: 1px dashed var(--cards-line-strong); border-radius: 10px; padding: 18px; text-align: center;
+    color: var(--cards-text-dim); font-size: 12px; }
+  .live-error { border: 1px solid #7f1d1d; background: rgba(127,29,29,.18); color: #fecaca;
+    border-radius: 10px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
+  /* NEUTRAL, NOT RED. A resting limit order is the system working; styling it
+     like the unknown-result banner is what made four healthy orders read as a
+     fault. */
+  .live-note { border: 1px solid #1e3a5f; background: rgba(30,58,95,.22); color: #bfdbfe;
+    border-radius: 10px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
+
+  /* THE PIVOTS HAD NO STYLES AT ALL on the old `/portfolio/live` -- the whole
+     Performance section rendered as raw unstyled markup, and `is-up`/`is-down`
+     coloured nothing. Both are defined here. */
+  .live-periods { margin-top: 18px; }
+  .live-periods__head {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
+  }
+  .live-periods__head h2 {
+    font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--cards-text-dim); margin: 0;
+  }
+  .live-periods__tabs { display: inline-flex; gap: 4px; font-size: 11px; }
+  .live-periods__tabs a,
+  .live-periods__tabs span {
+    padding: 3px 10px; border-radius: 999px; text-decoration: none;
+    border: 1px solid var(--cards-line); color: var(--cards-text-dim);
+    text-transform: capitalize;
+  }
+  .live-periods__tabs a:hover { border-color: var(--cards-line-strong); color: var(--cards-text-soft); }
+  .live-periods__tabs .is-active { border-color: var(--cards-accent); color: var(--cards-accent); }
+  .live-periods__note { font-size: 11px; color: #fbbf24; margin-bottom: 8px; }
+  .live-table .is-up { color: #4ade80; }
+  .live-table .is-down { color: #f87171; }
+
+  /* ---------------------------------------------------------------- */
+  /* Bankroll & staking policy -- the knobs the engine spends          */
+  /* ---------------------------------------------------------------- */
+
   .portfolio-bankroll {
     border: 1px solid var(--cards-line);
-    border-radius: 10px;
+    border-radius: 14px;
+    background: var(--cards-surface);
     padding: 14px 16px;
     margin-bottom: 20px;
   }
@@ -130,6 +241,58 @@
     font-size: 11.5px;
     color: #e6a23c;
     margin-top: 6px;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Your logged bets                                                  */
+  /* ---------------------------------------------------------------- */
+
+  .portfolio-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .portfolio-tile {
+    border: 1px solid var(--cards-line);
+    border-radius: 14px;
+    background: rgba(8, 18, 30, 0.72);
+    padding: 12px 14px;
+  }
+
+  .portfolio-tile__label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--cards-text-dim);
+  }
+
+  .portfolio-tile__value {
+    font-size: 22px;
+    font-weight: 600;
+    margin-top: 4px;
+    color: var(--cards-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .portfolio-tile__value.pos { color: #2ecc71; }
+  .portfolio-tile__value.neg { color: #e74c3c; }
+
+  .portfolio-tile__meta {
+    font-size: 11px;
+    color: var(--cards-text-dim);
+    margin-top: 2px;
+  }
+
+  .portfolio-note {
+    border: 1px solid var(--cards-line);
+    border-radius: 14px;
+    background: rgba(241, 196, 15, 0.06);
+    color: var(--cards-text-soft);
+    padding: 10px 14px;
+    font-size: 12.5px;
+    margin-bottom: 16px;
   }
 
   .portfolio-sport-grid {
@@ -337,21 +500,182 @@
 {% set psettings = portfolio_settings or {} %}
 {% set psources = psettings.sources or {} %}
 
+{% set L = live or {} %}
+{% set st = (L.settlement or {}).get('total') or {} %}
+{% set caps = L.limits or {} %}
+{% set switch = L.kill_switch or {} %}
+{% set orders = L.orders or [] %}
+{# THE PAYLOAD'S KEY IS `date`. This was `L.selected_date`, which no payload
+   has ever carried, so every link the page built came out as `?date=` with an
+   empty value -- which is the URL a user pasted back on 2026-08-26 asking for
+   this merge. An undefined in Jinja renders as nothing and raises nothing. #}
+{% set qs_date = L.date or '' %}
+
 <main class="portfolio-page">
-  <div class="portfolio-pulse" id="portfolio-pulse" role="status" aria-live="polite">
-    <span class="portfolio-pulse__dot"></span>
-    <span id="portfolio-pulse-text">Live</span>
+
+  {# =================================================================
+     LIVE BOOK -- the buying engine. Anchored here [user decision
+     2026-08-26]; `/portfolio/live` redirects to this section.
+     ================================================================= #}
+
+  <div class="portfolio-band">
+    <h2 id="live">Live book</h2>
+    <span class="portfolio-band__note">Real submissions to a real venue, across all dates.</span>
+    <span class="portfolio-band__links">
+      <a href="/portfolio/paper">Paper portfolio</a> ·
+      <a href="/api/portfolio/live">Live JSON</a>
+    </span>
   </div>
 
-  <div class="portfolio-paper-link">
-    This page is <strong>your</strong> logged bets. The model's own sized, simulated portfolio lives on
-    <a href="/portfolio/paper">the paper portfolio</a> — kept separate so simulated positions can never be
-    mistaken for wagers you placed. Real-money submissions are on
-    <a href="/portfolio/live">the live book</a>, separate again for the same reason in reverse.
+  {# THE VERDICT COMES FROM THE PAYLOAD, not from six conditions re-derived
+     here. `_live_health` decides what green means, so the page and
+     `/api/portfolio/live` cannot disagree about whether the system is well. #}
+  {% set H = L.health or {} %}
+  <div class="live-banner {{ 'is-ok' if H.get('ok') else 'is-bad' }}">
+    {# The badge reads from whether anything CAN place, not from a label. Four
+       switches have to agree; any one of them off means nothing moves. Green
+       when they do -- the tag says LIVE, and live is the working state. #}
+    {% set armed = H.get('job') and H.get('mode') and H.get('armed') and H.get('kill_switch') %}
+    <span class="live-badge {{ 'live-badge--ok' if armed else 'live-badge--bad' }}">
+      {{ 'LIVE — REAL MONEY' if armed else 'LIVE MODE OFF' }}
+    </span>
+    <span class="live-banner__msg" style="font-size:12px">
+      {% if armed %}
+        Orders on this page are real submissions to a real venue.
+      {% else %}
+        Nothing can be placed right now. Positions below, if any, were placed earlier.
+      {% endif %}
+    </span>
+    <span class="live-flag"><span class="live-flag__label">Job</span>
+      <span class="live-flag__value {{ 'ok' if H.get('job') else 'bad' }}">{{ 'on' if L.execution_enabled else 'off' }}</span></span>
+    <span class="live-flag"><span class="live-flag__label">Mode</span>
+      <span class="live-flag__value {{ 'ok' if H.get('mode') else 'bad' }}">{{ L.execution_mode or '—' }}</span></span>
+    <span class="live-flag"><span class="live-flag__label">Armed</span>
+      <span class="live-flag__value {{ 'ok' if H.get('armed') else 'bad' }}">{{ 'yes' if L.live_armed else 'no' }}</span></span>
+    <span class="live-flag"><span class="live-flag__label">Kill switch</span>
+      {# ENGAGED IS RED, reversing the note that used to sit here ("engaged is
+         the SAFE state, so it is not painted as an error"). It is still the
+         safe state; it is also a system that cannot trade, and that is what
+         this banner now reports. Safe and not-working are not in conflict. #}
+      <span class="live-flag__value {{ 'ok' if H.get('kill_switch') else 'bad' }}">
+        {{ 'ENGAGED' if switch.get('engaged') else 'clear' }}</span></span>
+    {# WHERE THESE NUMBERS COME FROM. The switches live on the worker; this
+       page used to read the WEB process's env and print "LIVE MODE OFF" over a
+       live, armed book with the wrong caps. Naming the source is what stops a
+       reader trusting the wrong process's view. #}
+    <span class="live-flag"><span class="live-flag__label">Source</span>
+      {% if L.state_source == 'worker' %}
+        <span class="live-flag__value {{ 'ok' if H.get('source') else 'bad' }}">
+          {{ L.state_recorded_by or 'worker' }}{% if L.state_age_seconds is not none %} · {{ (L.state_age_seconds // 60) }}m ago{% endif %}</span>
+      {% else %}
+        <span class="live-flag__value bad" title="The worker has not reported. These are the WEB service's own settings, which are not what places orders.">web env (worker silent)</span>
+      {% endif %}</span>
   </div>
 
-  <div class="portfolio-note" id="portfolio-note" {% if (summary.settled_count or 0) > 0 %}hidden{% endif %}>Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>
+  {% if L.state_source != 'worker' %}
+    <div class="live-error">
+      <strong>The worker has not reported its execution state.</strong>
+      The switches and caps below are this web service's own environment, which is
+      <strong>not</strong> what decides whether orders are placed — that is
+      live-odds-worker's. Treat them as unknown, not as off.
+    </div>
+  {% elif not H.get('source') %}
+    <div class="live-error">
+      Worker last reported <strong>{{ (L.state_age_seconds // 60) }} minutes ago</strong>.
+      These settings may be stale — a stopped worker's last known state looks
+      identical to its current one.
+    </div>
+  {% endif %}
 
+  {% if L.ledger_error %}
+    <div class="live-error">
+      Ledger unreadable: <code>{{ L.ledger_error }}</code>.
+      This is <strong>not</strong> the same as having no live positions — it means we cannot see them.
+    </div>
+  {% endif %}
+
+  {% if L.unreconciled %}
+    <div class="live-error">
+      <strong>{{ L.unreconciled|length }} order(s) sent with an unknown result.</strong>
+      We never read these back from the venue &mdash; a restart between submit and record
+      leaves exactly these. Check them against the venue before placing anything else
+      &mdash; do not re-submit.
+    </div>
+  {% endif %}
+
+  {# RESTING IS NOT AN ERROR. These were read back from the venue and it said
+     they are live and unfilled. They used to sit in the banner above under
+     "unknown result", which is what a limit order looks like when you describe
+     it as a failure. #}
+  {% if L.resting %}
+    <div class="live-note">
+      <strong>{{ L.resting|length }} order(s) working at the venue.</strong>
+      Confirmed live at the last read &mdash; a limit order waiting for its price, not a problem.
+      A partly filled order counts here <em>and</em> as a position: the filled part is money
+      down, the remainder is still working.
+    </div>
+  {% endif %}
+
+  <div class="live-tiles">
+    <div class="live-tile">
+      <div class="live-tile__label">Positions</div>
+      <div class="live-tile__value">{{ orders|length }}</div>
+      <div class="live-tile__meta">all dates</div>
+    </div>
+    <div class="live-tile">
+      <div class="live-tile__label">Settled</div>
+      {% if st.get('settled') %}
+        <div class="live-tile__value">
+          <span class="pos">{{ st.get('won', 0) }}W</span> · <span class="neg">{{ st.get('lost', 0) }}L</span>{% if st.get('push') %} · {{ st.get('push') }}P{% endif %}
+        </div>
+        <div class="live-tile__meta">{{ st.get('pending', 0) }} still open</div>
+      {% else %}
+        <div class="live-tile__value">—</div>
+        <div class="live-tile__meta">{{ st.get('pending', 0) }} open, none decided</div>
+      {% endif %}
+    </div>
+    <div class="live-tile">
+      <div class="live-tile__label">Profit / loss</div>
+      {% if st.get('settled') %}
+        <div class="live-tile__value {{ 'pos' if (st.get('pnl_dollars') or 0) > 0 else ('neg' if (st.get('pnl_dollars') or 0) < 0 else '') }}">
+          {{ "%+.2f"|format(st.get('pnl_dollars') or 0) }}</div>
+        <div class="live-tile__meta">
+          {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% on {% endif %}${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled</div>
+      {% else %}
+        <div class="live-tile__value">—</div>
+        {# 0.00 on nothing settled and 0.00 on fifty are the same string. #}
+        <div class="live-tile__meta">nothing settled yet</div>
+      {% endif %}
+    </div>
+    <div class="live-tile">
+      <div class="live-tile__label">Caps in force</div>
+      <div class="live-tile__value">${{ "%.0f"|format(caps.get('max_order_dollars') or 0) }}</div>
+      <div class="live-tile__meta">
+        {# THE PER-VENUE CAPS, because one number cannot describe two books.
+           `max_day_dollars` here is whatever the worker resolved for its LAST
+           call, so a single figure reads as the account's limit while Kalshi
+           and Polymarket are funded differently. #}
+        per order · {{ caps.get('max_day_orders') }}/book · {{ caps.get('max_day_orders_all_venues') }} total
+      </div>
+      <div class="live-tile__meta">
+        kalshi ${{ "%.0f"|format(caps.get('max_day_dollars_kalshi') or 50) }}/day ·
+        polymarket ${{ "%.0f"|format(caps.get('max_day_dollars_polymarket') or 100) }}/day
+      </div>
+    </div>
+  </div>
+
+  {# -----------------------------------------------------------------
+     THE ENGINE'S EDITABLE INPUTS, and they sit INSIDE the live section
+     deliberately [user decision 2026-08-26: "all the editable inputs
+     remain editable on the page"]. These five fields are what the
+     buying engine spends -- the bankroll it sizes against and the four
+     gates that decide how much of it one slate may commit -- so they
+     belong beside the book they govern rather than under the logged
+     bets they do not touch.
+
+     `/portfolio/settings` (GET) redirects to `#bankroll`; that anchor
+     is this element and moving it would break the redirect silently.
+     ----------------------------------------------------------------- #}
   <div class="portfolio-bankroll" id="bankroll">
     <h2 class="portfolio-section-title">Bankroll &amp; staking policy</h2>
     <form method="post" action="/portfolio/settings" class="portfolio-bankroll__row">
@@ -400,8 +724,192 @@
       Stakes are quarter-Kelly, shrunk again by how much settled evidence each market has.
       With nothing settled yet every market sits at the 0.25 credibility floor, so sizing
       is deliberately about 1/16th of full Kelly.
+      {# The caps above this form are the WORKER's, and they are a different
+         ceiling from these: these bound what the engine will COMMIT, those
+         bound what it may SUBMIT. A change here does not move those. #}
+      The per-order and per-day caps in the banner above are the worker's own
+      limits and are set separately.
     </div>
   </div>
+
+  {% if not orders %}
+    <div class="live-empty">
+      {% if L.ledger_error %}
+        Cannot read the ledger — see above. This page is not claiming there are no positions.
+      {% else %}
+        No live positions have ever been placed.
+      {% endif %}
+    </div>
+  {% else %}
+    {# HIDDEN, NOT DROPPED. A page that silently omitted refused orders would
+       make "we placed nothing" and "we tried and were refused" identical. #}
+    {% if L.hidden_count %}
+      <div class="live-toggle">
+        {% if L.show_all %}
+          Showing all {{ L.hidden_count }} order(s) that never opened a position.
+          <a href="?date={{ qs_date }}">Hide them</a>
+        {% else %}
+          {{ L.hidden_count }} order(s) never opened a position and are hidden.
+          They do not count against the daily order cap.
+          <a href="?date={{ qs_date }}&amp;show=all">Show them</a>
+        {% endif %}
+      </div>
+    {% endif %}
+    <div class="live-table-wrap">
+      <table class="live-table">
+        <thead>
+          <tr><th>Date</th><th>Selection</th><th>Venue</th><th>Requested</th><th>Filled</th>
+              <th>Status</th><th>Outcome</th><th>P&amp;L</th></tr>
+        </thead>
+        <tbody>
+          {% for o in orders %}
+            <tr>
+              {# CENTRAL, via the filter. This was `submitted_at[11:19]` -- a raw slice of
+                 the stored UTC string, so a 6:15 PM order read `23:15:05`. #}
+              <td>{{ o.get('selected_date') or '—' }}<span class="sub">{{ o.get('submitted_at')|central }} CT</span></td>
+              <td class="primary">
+                {{ o.get('player_name') or o.get('side') or '—' }}
+                <span class="sub">
+                  {{ o.get('market') or '—' }}{% if o.get('line') is not none %} {{ o.get('side') }} {{ o.get('line') }}{% endif %}
+                  {% if o.get('away_team') or o.get('home_team') %}· {{ o.get('away_team') or '?' }} @ {{ o.get('home_team') or '?' }}{% endif %}
+                </span>
+              </td>
+              <td>{{ o.get('venue') or '—' }}<span class="sub">{{ o.get('venue_ticker') or '' }}</span></td>
+              <td>
+                {% set rp = o.get('requested_price') %}
+                {% if rp is none %}—
+                {% elif rp > -1 and rp < 1 %}{{ "%.0f"|format(rp * 100) }}&cent;
+                {% else %}{{ "%+d"|format(rp|int) }}{% endif %}
+                <span class="sub">${{ "%.2f"|format(o.get('requested_stake_dollars') or 0) }}</span></td>
+              <td>
+                {# KALSHI PRICES ARE DOLLARS, NOT AMERICAN ODDS. `int(0.54)` is 0,
+                   so `%+d` rendered every Kalshi fill as "+0" -- the column was
+                   destroying the number it existed to show, beside a REQUESTED
+                   column carrying American odds from the board. Two units, one
+                   table, and the reader has no way to tell. #}
+                {% set fp = o.get('fill_price') %}
+                {% if fp is none %}—
+                {% elif fp > -1 and fp < 1 %}{{ "%.0f"|format(fp * 100) }}&cent;
+                {% else %}{{ "%+d"|format(fp|int) }}{% endif %}
+                {# The gap between requested and filled IS the slippage, and it is
+                   the number a person checks first after a real submit. #}
+                <span class="sub">${{ "%.2f"|format(o.get('fill_stake_dollars') or 0) }}{#
+                   THE FEE, WHERE THE VENUE REPORTED ONE. $0.02 on a $1.08 fill is
+                   ~1.9%, against edges this system will act on at 3% -- so it is
+                   shown beside the stake rather than folded into it. Absent means
+                   the venue reported none, which is not the same as zero and so
+                   renders as nothing at all. #}{% if o.get('fees_dollars') %} + ${{ "%.2f"|format(o.get('fees_dollars')) }} fee{% endif %}</span>
+              </td>
+              <td>{{ o.get('status') or '—' }}
+                {% if o.get('error') %}<span class="sub warn">{{ o.get('error') }}</span>{% endif %}</td>
+              <td>
+                {% set outcome = o.get('outcome') %}
+                {% if outcome == 'won' %}<span class="pos">WON</span>
+                {% elif outcome == 'lost' %}<span class="neg">LOST</span>
+                {% elif outcome == 'push' %}PUSH
+                {% else %}<span class="sub">open</span>{% endif %}
+                {% if o.get('settled_value') is not none %}<span class="sub">{{ o.get('settled_value') }} vs {{ o.get('line') }}</span>{% endif %}
+              </td>
+              <td class="{{ 'pos' if (o.get('pnl_dollars') or 0) > 0 else ('neg' if (o.get('pnl_dollars') or 0) < 0 else '') }}">
+                {% if o.get('pnl_dollars') is not none %}{{ "%+.2f"|format(o.get('pnl_dollars')) }}{% else %}—{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {# ---------------------------------------------------------------------
+     THE PIVOTS. [USER DECISION 2026-08-25] daily, monthly, yearly.
+
+     Built from the WHOLE live book, not the filtered table above -- the
+     `?show=` toggle changes what is displayed, never what is counted, so
+     these numbers are quotable regardless of how the page is set.
+
+     Pivoted on the SLATE date, not the submit stamp: a 9pm Central first
+     pitch is already tomorrow in UTC, so keying on the stamp would split one
+     evening across two rows.
+     --------------------------------------------------------------------- #}
+  {% set P = L.periods or {} %}
+  {% if P.get('by_day') %}
+    {% set view = request.args.get('period', 'day') %}
+    {% set rows = P.get('by_' ~ view) or P.get('by_day') %}
+    <section class="live-periods">
+      <div class="live-periods__head">
+        <h2>Live performance</h2>
+        <nav class="live-periods__tabs">
+          {% for tab in ['day', 'month', 'year'] %}
+            {% if tab == view %}
+              <span class="is-active">{{ tab }}</span>
+            {% else %}
+              <a href="?date={{ qs_date }}{% if L.show_all %}&amp;show=all{% endif %}&amp;period={{ tab }}#live">{{ tab }}</a>
+            {% endif %}
+          {% endfor %}
+        </nav>
+      </div>
+      {% if P.get('undated') %}
+        {# A pivot quietly missing bets says so, rather than just being short. #}
+        <div class="live-periods__note">
+          {{ P.get('undated') }} order(s) have no readable slate date and are not in these totals.
+        </div>
+      {% endif %}
+      <div class="live-table-wrap">
+        <table class="live-table">
+          <thead>
+            <tr><th>{{ view|capitalize }}</th><th>Orders</th><th>Open</th><th>Settled</th>
+                <th>W-L-P</th><th>Staked</th><th>P&amp;L</th><th>ROI</th><th>Win%</th></tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                <td>{{ r.key }}</td>
+                <td>{{ r.orders }}</td>
+                <td>{{ r.pending }}</td>
+                <td>{{ r.settled }}</td>
+                <td>{{ r.won }}-{{ r.lost }}-{{ r.push }}</td>
+                <td>${{ "%.2f"|format(r.staked_dollars) }}</td>
+                <td class="{% if r.pnl_dollars > 0 %}is-up{% elif r.pnl_dollars < 0 %}is-down{% endif %}">
+                  ${{ "%.2f"|format(r.pnl_dollars) }}
+                </td>
+                {# None, never 0.0%: nothing graded and break-even are opposite
+                   facts that format identically. #}
+                <td>{% if r.roi_pct is not none %}{{ "%.1f"|format(r.roi_pct) }}%{% else %}&mdash;{% endif %}</td>
+                <td>{% if r.win_pct is not none %}{{ "%.1f"|format(r.win_pct) }}%{% else %}&mdash;{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+
+  {# =================================================================
+     YOUR LOGGED BETS -- a DIFFERENT book, from a different ledger.
+     Never summed with the live one above.
+     ================================================================= #}
+
+  <div class="portfolio-band">
+    <h2 id="tracked">Your logged bets</h2>
+    <span class="portfolio-band__note">Wagers you recorded yourself, from the prediction ledger.</span>
+    <span class="portfolio-band__links">
+      <a href="/api/portfolio/summary">Summary JSON</a>
+    </span>
+  </div>
+
+  <div class="portfolio-pulse" id="portfolio-pulse" role="status" aria-live="polite">
+    <span class="portfolio-pulse__dot"></span>
+    <span id="portfolio-pulse-text">Live</span>
+  </div>
+
+  <div class="portfolio-paper-link">
+    This section is <strong>your</strong> logged bets, kept apart from the live book above because they
+    are different ledgers. The model's own sized, simulated portfolio stays on
+    <a href="/portfolio/paper">the paper portfolio</a> — still running, and kept separate so simulated
+    positions can never be mistaken for wagers anyone placed.
+  </div>
+
+  <div class="portfolio-note" id="portfolio-note" {% if (summary.settled_count or 0) > 0 %}hidden{% endif %}>Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>
 
   <div class="portfolio-tiles" id="portfolio-tiles">
     <div class="portfolio-tile">

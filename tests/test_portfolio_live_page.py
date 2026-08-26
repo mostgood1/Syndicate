@@ -1,4 +1,11 @@
-"""`/portfolio/live` -- the real-money book, and the wall between it and paper.
+"""The real-money book, and the wall between it and paper.
+
+MERGED 2026-08-26: this book renders on `/portfolio`, the primary page, and
+`/portfolio/live` is now a redirect there. The page assertions below therefore
+GET `/portfolio`; `/api/portfolio/live` is unchanged and still the payload
+under test. The wall this file exists to guard is unmoved -- it was never
+between live and the user's own logged bets, both of which are real. It is
+between live and PAPER, and paper is still its own page.
 
 Two things are worth testing here and they are both about CONFUSION, not
 arithmetic:
@@ -166,19 +173,19 @@ def test_an_unreadable_ledger_is_never_rendered_as_no_positions(app_client, live
     payload = _payload(live_env)
     assert "keyvalue unreachable" in payload["ledger_error"]
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "not claiming there are no positions" in body
     assert "No live positions have ever been placed" not in body
 
 
 def test_no_positions_says_so_plainly(app_client, live_env):
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "No live positions have ever been placed" in body
 
 
 def test_nothing_settled_is_not_a_zero_pnl(app_client, live_env):
     live_env["orders"] = [_order(outcome=None, pnl_dollars=None)]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     # "+0.00" on nothing decided and "+0.00" on fifty decided are the same
     # string, and only one of them means the book is flat.
     assert "nothing settled yet" in body
@@ -216,13 +223,13 @@ def test_any_one_switch_off_means_the_badge_is_not_real_money(app_client, live_e
     else:
         live_env["kill_switch"] = {"engaged": True, "source": "env"}
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "LIVE MODE OFF" in body
     assert "LIVE — REAL MONEY" not in body
 
 
 def test_all_four_on_is_the_only_state_that_says_real_money(app_client, live_env):
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "LIVE — REAL MONEY" in body
     assert "real submissions to a real venue" in body
 
@@ -253,7 +260,7 @@ def test_a_submitted_order_is_flagged_as_unreconciled(app_client, live_env):
     payload = _payload(live_env)
     assert len(payload["unreconciled"]) == 1
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "unknown result" in body
     assert "do not re-submit" in body
 
@@ -265,7 +272,7 @@ def test_a_filled_order_is_not_flagged_as_unreconciled(live_env):
 
 def test_the_page_shows_the_venue_ticker_and_the_slippage(app_client, live_env):
     live_env["orders"] = [_order()]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "KXWNBAPTS-25AUG23-TG-17.5" in body
     # Requested -110, filled -115: the gap is what a person checks first after
     # a real submit, so both numbers have to be on the row.
@@ -275,7 +282,7 @@ def test_the_page_shows_the_venue_ticker_and_the_slippage(app_client, live_env):
 
 def test_the_caps_in_force_are_on_the_page(app_client, live_env, monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "5")
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "$5" in body
 
 
@@ -286,7 +293,78 @@ def test_the_caps_in_force_are_on_the_page(app_client, live_env, monkeypatch):
 
 def test_the_paper_page_links_to_the_live_book(app_client, live_env):
     body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
-    assert 'href="/portfolio/live"' in body
+    assert 'href="/portfolio#live"' in body
+
+
+# --------------------------------------------------------------------------
+# THE MERGE. [user decision 2026-08-26] The live book is anchored to
+# `/portfolio`; `/portfolio/live` is a redirect and not a second render.
+# --------------------------------------------------------------------------
+
+
+def test_the_old_live_url_redirects_to_the_primary_page(app_client, live_env):
+    """Bookmarked, and linked from months of history. A 404 on a real-money
+    book is a bad way to learn about a rename."""
+    r = app_client.get("/portfolio/live")
+    assert r.status_code == 302
+    assert r.headers["Location"] == "/portfolio#live"
+
+
+def test_the_redirect_carries_the_query_string(app_client, live_env):
+    """`?show=all`, `?period=` and `?date=` all belong to the merged page.
+    Dropping them silently resets the reader's view."""
+    r = app_client.get("/portfolio/live?date=2026-08-23&show=all&period=month")
+    assert r.status_code == 302
+    assert r.headers["Location"] == "/portfolio?date=2026-08-23&show=all&period=month#live"
+
+
+def test_only_one_template_renders_the_live_book(app_client, live_env):
+    """The reason `/portfolio/live` redirects instead of rendering.
+
+    Two copies of a real-money surface drift, and the one nobody edits is the
+    one somebody trusts -- the same argument `/portfolio/settings` already
+    made about the bankroll form.
+    """
+    from pathlib import Path
+
+    import syndicate
+
+    templates = Path(syndicate.__file__).resolve().parent / "templates"
+    assert not (templates / "portfolio_live.html").exists()
+
+
+def test_the_editable_inputs_survived_the_merge(app_client, live_env):
+    """[user decision 2026-08-26] "all the editable inputs remain editable on
+    the page". Every field `portfolio_settings` will accept has to be on the
+    merged page, or an edit to it silently becomes impossible."""
+    from syndicate.features.shared.portfolio_settings import EDITABLE_FIELDS
+
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    for name in EDITABLE_FIELDS:
+        assert f'name="{name}"' in body, name
+    assert 'action="/portfolio/settings"' in body
+
+
+def test_the_live_and_logged_books_are_both_on_the_page_and_labelled(app_client, live_env):
+    """Two ledgers, one page. They are never summed, so they must never read
+    as one table -- each half carries its own heading."""
+    live_env["orders"] = [_order()]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'id="live"' in body
+    assert 'id="tracked"' in body
+    # The live half's own row, and the logged half's own container.
+    assert "KXWNBAPTS-25AUG23-TG-17.5" in body
+    assert 'id="portfolio-positions"' in body
+
+
+def test_the_live_links_carry_a_real_date(app_client, live_env):
+    """`L.selected_date` was never a key of this payload -- the key is `date`.
+    Jinja renders an undefined as nothing and raises nothing, so every link the
+    page built came out as `?date=`, which is the URL a user pasted back."""
+    live_env["orders"] = [_order(), _order(idempotency_key="k-2", status="rejected", error="refused")]
+    body = app_client.get(f"/portfolio?date={DATE}").get_data(as_text=True)
+    assert "?date=" in body
+    assert f"?date={DATE}" in body
 
 
 def test_the_api_and_the_page_read_the_same_payload(app_client, live_env):
@@ -340,7 +418,7 @@ def test_the_page_shows_the_workers_switches_not_the_webs(app_client, live_env, 
     assert payload["state_source"] == "worker"
     assert payload["limits"]["max_order_dollars"] == 10.0
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "LIVE — REAL MONEY" in body
     assert "$10" in body
     assert "live-odds-worker" in body
@@ -355,7 +433,7 @@ def test_no_worker_stamp_is_reported_as_unknown_not_as_off(app_client, live_env,
     payload = intelligence_bp._live_portfolio_payload(DATE)
     assert payload["state_source"] == "web_env"
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "worker has not reported" in body
     assert "Treat them as unknown, not as off" in body
 
@@ -377,7 +455,7 @@ def test_a_stale_stamp_says_so(app_client, live_env, monkeypatch):
             "limits": {"max_order_dollars": 10.0, "max_day_dollars": 40.0, "max_day_orders": 10},
         },
     )
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "may be stale" in body
 
 
@@ -390,7 +468,7 @@ def test_a_kalshi_dollar_price_renders_as_cents_not_american_odds(app_client, li
     board. Two units in one table with nothing to tell them apart.
     """
     live_env["orders"] = [_order(fill_price=0.54, requested_price=0.46)]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "54&cent;" in body or "54¢" in body
     assert "+0" not in body
 
@@ -398,7 +476,7 @@ def test_a_kalshi_dollar_price_renders_as_cents_not_american_odds(app_client, li
 def test_an_american_price_still_renders_as_american(app_client, live_env):
     """The other venues quote American odds and must not become cents."""
     live_env["orders"] = [_order(fill_price=-117.0, requested_price=163.0)]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "-117" in body
     assert "+163" in body
 
@@ -498,7 +576,7 @@ def test_the_period_pivot_reaches_the_page(app_client, live_env):
         _order(idempotency_key="k2", selected_date="2026-07-04", status="filled",
                fill_stake_dollars=2.0, outcome="lost", pnl_dollars=-2.0),
     ]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "Performance" in body
     assert "2026-08-25" in body
     # The day view is the default, so July's own DAY row is present too.
@@ -512,9 +590,9 @@ def test_the_month_and_year_views_are_selectable(app_client, live_env):
         _order(idempotency_key="k2", selected_date="2026-07-04", status="filled",
                fill_stake_dollars=2.0, outcome="lost", pnl_dollars=-2.0),
     ]
-    month = app_client.get("/portfolio/live?period=month").get_data(as_text=True)
+    month = app_client.get("/portfolio?period=month").get_data(as_text=True)
     assert "2026-08<" in month or ">2026-08<" in month
-    year = app_client.get("/portfolio/live?period=year").get_data(as_text=True)
+    year = app_client.get("/portfolio?period=year").get_data(as_text=True)
     # One row for 2026 -- both orders, collapsed.
     assert ">2026<" in year
 
@@ -561,7 +639,7 @@ def test_a_healthy_live_book_is_green(app_client, live_env, monkeypatch):
     })
     payload = intelligence_bp._live_portfolio_payload(DATE)
     assert payload["health"]["ok"] is True
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     # ANCHORED ON THE MARKUP. Both class names appear in the stylesheet, so a
     # bare substring test passes whatever the badge actually renders.
     assert 'class="live-badge live-badge--ok"' in body
@@ -599,7 +677,7 @@ def test_each_broken_switch_turns_the_line_red(app_client, live_env, monkeypatch
         health = intelligence_bp._live_portfolio_payload(DATE)["health"]
         assert health[field] is False, field
         assert health["ok"] is False, field
-        body = app_client.get("/portfolio/live").get_data(as_text=True)
+        body = app_client.get("/portfolio").get_data(as_text=True)
         assert 'class="live-badge live-badge--bad"' in body, field
         assert 'class="live-banner is-bad"' in body, field
 
@@ -615,7 +693,7 @@ def test_an_engaged_kill_switch_is_red(app_client, live_env):
     state"). It is still safe, and it is also a system that cannot trade --
     which is exactly what this banner reports."""
     live_env["kill_switch"] = {"engaged": True, "source": "env"}
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "ENGAGED" in body
     assert intelligence_bp._live_portfolio_payload(DATE)["health"]["kill_switch"] is False
 
