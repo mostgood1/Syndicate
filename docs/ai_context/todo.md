@@ -1,5 +1,54 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#562` — **The Kalshi working-set trim orders by STALENESS, not by date. Today survives by luck.** — lane `kalshi-line-aware-rungs` (its declared step 2), raised by `portfolio-decision-and-execution`, 2026-08-26, measured — **NOT MINE TO FIX; handed over on a user decision**
+
+`[USER DECISION 2026-08-25: let the audit session ship it]` —
+`pipeline/kalshi_odds_refresh.py` is in that lane's `Files:` and "evict the
+futures that can never join" is its own next step. Recorded here rather than
+edited, per the cross-lane rule.
+
+**Summed from the `BY_GAME_DATE` histogram that lane shipped**
+(`[kalshi_odds] BY_GAME_DATE`, refresh-worker, 2026-08-26T01:49:32Z):
+
+    working set (capped)      6000
+      today     2026-08-25    1958   32.6%
+      tomorrow  2026-08-26      60    1.0%
+      beyond tomorrow         3982   66.4%
+
+    biggest non-today: 08-28 -> 1566 (NFL, 3 days out) · 08-29 -> 930 · 09-12 -> 311
+    furthest out:      2026-10-20 NBA, EIGHT WEEKS away, holding slots today
+
+**THE ORDERING IS THE DEFECT, NOT THE OCCUPANCY, and this is the part worth
+not misreading.** All 1,958 of today's markets currently FIT inside the 6,000,
+so date-priority would not add one of today's markets on this tick. What is
+wrong is that `ordered = sorted(per_series_markets, key=lambda item: item[0])`
+sorts by staleness ALONE. Today survives by luck. On a full NCAAF Saturday, or
+any tick where an MLB series is momentarily stale, today's markets are evicted
+in favour of a September future and no counter says which.
+
+That file already records this exact class of bug once: the trim claimed
+"oldest-series-first" while slicing alphabetically, silently deleting every
+WNBA market. Same failure, different key.
+
+**THE REAL PRIZE IS DEPTH, NOT PRESENCE.** Three of today's MLB prop series sit
+at exactly 400 — `KXMLBHRR`, `KXMLBRBI`, `KXMLBTB` — which is
+`MAX_MARKETS_PER_SERIES`. Those ladders are truncated TODAY, and the 3,982
+future-dated slots are what could hold their remaining rungs. So this converges
+with step 3 (line-aware rungs) rather than competing with it: freeing the slots
+is only worth it if the rungs kept are the ones near the board's line.
+
+**Corroborated by an independent count, same tick.** `BOARD_JOIN
+kalshi_markets=6000 matched=71 reasons={'market_is_for_another_date': 3282,
+...}` — 3,282 against the histogram's 3,982 non-today, agreeing to within the
+tomorrow bucket. Two different readers of the same fact.
+
+**Caveat this raiser owes.** I earlier called `market_is_for_another_date` "the
+largest lever, bigger than unreadable_title" off the join line alone. That was
+before this lane's own retraction showed `BY_CLOSE_DATE` and `BY_GAME_DATE`
+disagree — close_time is a settlement deadline up to four days out. The
+histogram above is the game-date one and does support the claim, but the
+earlier assertion was made from the wrong instrument and should not be cited.
+
 ### `#560` — **Every NO-side Polymarket fill already on the books carries the OPPOSITE side's price. Realised cost and P&L on those rows are overstated.** — lane `portfolio-decision-and-execution`, raised by `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured — **NEEDS A USER DECISION**
 
 Fix for NEW fills is live (PR #83, deploy `d92ab27b1`). This item is the HISTORY,
