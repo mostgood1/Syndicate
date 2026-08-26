@@ -31100,3 +31100,48 @@ two log lines". I fixed that, instrumented the call properly — and then drew a
 conclusion from **one sample of the least representative build there is.** The
 instrument was right; the sampling was wrong. *A correct measurement of an
 unrepresentative case is still a wrong answer.*
+
+## 2026-08-26 12:31Z — refresh-worker `dba9306d` (PR #91, span fix). VERIFY MET, PREDICTION REFUTED.
+
+Deploy live ~12:31Z. First cold build under the corrected span, 12:56:40Z,
+`wall_s=657.3 cpu_s=556.5 off_cpu_pct=15.3`:
+
+    BUILD_SPAN_EXIT stage=build_intelligence_overview       elapsed_s=295.1
+    BUILD_SPAN_EXIT stage=candidate_collection_with_fallback elapsed_s=178.01
+    BUILD_SPAN_EXIT stage=candidate_building                 elapsed_s=0.01
+    BUILD_SPAN_EXIT stage=manifest_odds_history_join         elapsed_s=0.32
+    ODDS_HISTORY_LOAD_SECONDS total_s=0.2 sports=5 mlb=0.19 soccer=0.01 wnba=0.0 nfl=0.0 ncaaf=0.0
+
+**The span reads 295.1s where it read 0.0 before. The fix is confirmed** and the
+~313s gap-derived estimate is corroborated by direct measurement (295.1s).
+
+**MY PREDICTION FOR THE OTHER 181s WAS WRONG, AND WRONG IN THE SPECIFIC WAY I
+BUILT THE INSTRUMENT TO CATCH.** I predicted `candidate_building` +
+`manifest_odds_history_join` would sum to ~181s and that SOCCER would be the
+expensive odds-history shard — that is why the per-sport breakdown exists at
+all, and the deploys entry above says so.
+
+    predicted   candidate_building + manifest join  ~181s, soccer worst
+    measured    0.33s combined; soccer 0.01s, mlb 0.19s, total 0.2s
+
+**Soccer is the CHEAPEST sport in the loop.** The 15MB of forward-dated soccer
+shards I flagged as a cost driver are read in ten milliseconds — the reading was
+right about the VOLUME and wrong that volume was TIME. Same error as the 12.5s
+figure and the memory percentage: a number whose units I had not checked.
+
+**THE REAL REMAINING BLOCK IS THE TAIL, AND IT IS IN BOTH BUILDS:**
+
+    cold  manifest EXIT 12:54:19.4 -> BOARD_BUILD_TIMING 12:56:40.0  = 140.6s
+    warm  manifest EXIT 12:59:00.2 -> BOARD_BUILD_TIMING 13:00:52.0  = 111.9s
+
+The warm build at 13:00:52 is `wall_s=141.2 off_cpu_pct=62.6` with overview,
+collection, building and join ALL reading 0.0. **Its entire cost is that tail.**
+
+**So the tail IS the steady-state board build** — the 108s median, the thing that
+runs 400+ times a day — while the overview and collection blocks are boot-only
+costs paid once per restart. Everything instrumented so far explains the COLD
+build and none of the warm one.
+
+**NEXT: instrument the tail** — `_merge_candidate_pools` onward to the return.
+That is the only remaining unobserved stretch and it is the one that matters in
+steady state. And it is ~60% off-CPU, so expect waiting, not computing.
