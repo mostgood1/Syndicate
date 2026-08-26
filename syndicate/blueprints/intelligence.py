@@ -3555,6 +3555,13 @@ def portfolio_paper_api():
 # [USER DECISION 2026-08-25] and never deleted -- a toggle shows them, because
 # they are the rows that say WHY a bet did not happen, which is the whole
 # diagnostic surface.
+# HOW OLD A WORKER STAMP CAN BE AND STILL BE "NOW". The worker restamps every
+# execution tick; fifteen minutes is several missed ticks, which is a worker
+# that has stopped rather than one that is between cycles. Named once because
+# the banner, the warning strip, and the health verdict must agree -- three
+# copies of `900` is three places to forget one.
+_STATE_STALE_SECONDS = 900
+
 _NON_POSITION_STATUSES = frozenset({"rejected", "failed"})
 
 
@@ -3573,6 +3580,51 @@ def _is_non_position(order) -> bool:
     if str(order.get("status") or "") == "rejected":
         return True
     return _is_venue_refusal(order)
+
+
+def _live_health(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Per-field health for the banner, and one verdict over all of it.
+
+    [USER DECISION 2026-08-25] "green when everything is healthy and red when
+    anything is an issue."
+
+    COMPUTED HERE, NOT IN THE TEMPLATE. The banner is the one line a person
+    reads before deciding whether the system is placing bets, so what makes it
+    green has to be assertable -- and the API should answer the same question
+    the page does rather than leaving a caller to re-derive it from six fields.
+
+    THE COLOUR IS ABOUT HEALTH, NOT DANGER, and that is an inversion. These
+    values were painted RED when on: red meant "real money is live, pay
+    attention". But that made a fully working system render as a wall of red
+    and gave a reader no way to see, at a glance, that something had broken.
+    Under the new rule red means BROKEN, so `armed` -- the state that used to
+    justify red -- is exactly what makes it green.
+
+    ENGAGED IS THEREFORE RED, which reverses this file's previous note that
+    "engaged is the SAFE state, so it is not painted as an error". Both
+    readings are defensible; they cannot both colour one pixel. Engaged means
+    nothing can trade, and "nothing can trade" is the condition this banner
+    now exists to surface. Safe, and not working, are not in conflict.
+    """
+    switch = payload.get("kill_switch") or {}
+    age = payload.get("state_age_seconds")
+    fields = {
+        "job": bool(payload.get("execution_enabled")),
+        "mode": str(payload.get("execution_mode") or "") == "live",
+        "armed": bool(payload.get("live_armed")),
+        # Engaged is a working kill switch AND a stopped system. Red.
+        "kill_switch": not switch.get("engaged"),
+        # A stamp from the worker, recent enough to be about now. Web's own env
+        # is not a reading of the process that places orders, so it is never ok
+        # -- "the worker has not reported" and "execution is off" are different
+        # facts and this must not render them the same.
+        "source": (
+            payload.get("state_source") == "worker"
+            and age is not None
+            and age <= _STATE_STALE_SECONDS
+        ),
+    }
+    return {**fields, "ok": all(fields.values())}
 
 
 def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> dict[str, Any]:
@@ -3697,6 +3749,8 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
         "hidden_count": len(hidden_orders),
         "show_all": bool(show_all),
         "periods": periods,
+        "health": _live_health(payload_state),
+        "stale_after_seconds": _STATE_STALE_SECONDS,
         "ledger_error": ledger_error,
         "settlement": settlement,
         "settlement_error": settlement_error,

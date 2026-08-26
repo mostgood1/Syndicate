@@ -10,14 +10,28 @@
     padding: 8px 12px; border-radius: 8px; margin-bottom: 12px;
     border: 1px solid var(--cards-border, #384152); background: var(--cards-surface, #11151d);
   }
+  /* GREEN IS HEALTHY, RED IS BROKEN. [USER DECISION 2026-08-25]
+     This INVERTS what these colours used to mean: `on` was red, because red
+     said "real money is live, pay attention". The cost was that a fully
+     working system rendered as a wall of red, leaving no way to see at a
+     glance that something had actually broken. Danger and health cannot both
+     own one pixel; health won. */
   .live-badge { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; }
-  .live-badge--real { background: #7f1d1d; color: #fee2e2; }
-  .live-badge--dark { background: #1f2937; color: #9ca3af; }
+  .live-badge--ok { background: #14532d; color: #bbf7d0; }
+  .live-badge--bad { background: #7f1d1d; color: #fee2e2; }
   .live-flag { font-size: 11px; display: inline-flex; gap: 4px; align-items: center; }
   .live-flag__label { color: var(--cards-text-dim, #9099a8); }
   .live-flag__value { font-weight: 600; }
-  .live-flag__value.on { color: #f87171; }
-  .live-flag__value.off { color: #6b7280; }
+  .live-flag__value.ok { color: #4ade80; }
+  .live-flag__value.bad { color: #f87171; }
+  /* The WHOLE line takes the verdict, not just the values: a green badge
+     beside grey labels reads as decoration, and the ask was for the line. */
+  .live-banner.is-ok { border-color: rgba(74,222,128,.45); }
+  .live-banner.is-bad { border-color: rgba(248,113,113,.5); }
+  .live-banner.is-ok .live-banner__msg { color: #4ade80; }
+  .live-banner.is-bad .live-banner__msg { color: #f87171; }
+  .live-banner.is-ok .live-flag__label { color: rgba(74,222,128,.62); }
+  .live-banner.is-bad .live-flag__label { color: rgba(248,113,113,.66); }
   .live-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
   .live-tile { border: 1px solid var(--cards-border, #384152); border-radius: 8px; padding: 8px 10px; background: var(--cards-surface, #11151d); }
   .live-tile__label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--cards-text-dim, #9099a8); }
@@ -47,14 +61,19 @@
 {% set orders = L.orders or [] %}
 
 <main class="live-page">
-  <div class="live-banner">
+  {# THE VERDICT COMES FROM THE PAYLOAD, not from six conditions re-derived
+     here. `_live_health` decides what green means, so the page and
+     `/api/portfolio/live` cannot disagree about whether the system is well. #}
+  {% set H = L.health or {} %}
+  <div class="live-banner {{ 'is-ok' if H.get('ok') else 'is-bad' }}">
     {# The badge reads from whether anything CAN place, not from a label. Four
-       switches have to agree; any one of them off means nothing moves. #}
-    {% set armed = L.execution_enabled and L.execution_mode == 'live' and L.live_armed and not switch.get('engaged') %}
-    <span class="live-badge {{ 'live-badge--real' if armed else 'live-badge--dark' }}">
+       switches have to agree; any one of them off means nothing moves. Green
+       when they do -- the tag says LIVE, and live is the working state. #}
+    {% set armed = H.get('job') and H.get('mode') and H.get('armed') and H.get('kill_switch') %}
+    <span class="live-badge {{ 'live-badge--ok' if armed else 'live-badge--bad' }}">
       {{ 'LIVE — REAL MONEY' if armed else 'LIVE MODE OFF' }}
     </span>
-    <span style="font-size:12px">
+    <span class="live-banner__msg" style="font-size:12px">
       {% if armed %}
         Orders on this page are real submissions to a real venue.
       {% else %}
@@ -62,14 +81,17 @@
       {% endif %}
     </span>
     <span class="live-flag"><span class="live-flag__label">Job</span>
-      <span class="live-flag__value {{ 'on' if L.execution_enabled else 'off' }}">{{ 'on' if L.execution_enabled else 'off' }}</span></span>
+      <span class="live-flag__value {{ 'ok' if H.get('job') else 'bad' }}">{{ 'on' if L.execution_enabled else 'off' }}</span></span>
     <span class="live-flag"><span class="live-flag__label">Mode</span>
-      <span class="live-flag__value {{ 'on' if L.execution_mode == 'live' else 'off' }}">{{ L.execution_mode or '—' }}</span></span>
+      <span class="live-flag__value {{ 'ok' if H.get('mode') else 'bad' }}">{{ L.execution_mode or '—' }}</span></span>
     <span class="live-flag"><span class="live-flag__label">Armed</span>
-      <span class="live-flag__value {{ 'on' if L.live_armed else 'off' }}">{{ 'yes' if L.live_armed else 'no' }}</span></span>
+      <span class="live-flag__value {{ 'ok' if H.get('armed') else 'bad' }}">{{ 'yes' if L.live_armed else 'no' }}</span></span>
     <span class="live-flag"><span class="live-flag__label">Kill switch</span>
-      {# Engaged is the SAFE state, so it is not painted as an error. #}
-      <span class="live-flag__value {{ 'off' if switch.get('engaged') else 'on' }}">
+      {# ENGAGED IS RED, reversing the note that used to sit here ("engaged is
+         the SAFE state, so it is not painted as an error"). It is still the
+         safe state; it is also a system that cannot trade, and that is what
+         this banner now reports. Safe and not-working are not in conflict. #}
+      <span class="live-flag__value {{ 'ok' if H.get('kill_switch') else 'bad' }}">
         {{ 'ENGAGED' if switch.get('engaged') else 'clear' }}</span></span>
     {# WHERE THESE NUMBERS COME FROM. The switches live on the worker; this
        page used to read the WEB process's env and print "LIVE MODE OFF" over a
@@ -77,10 +99,10 @@
        reader trusting the wrong process's view. #}
     <span class="live-flag"><span class="live-flag__label">Source</span>
       {% if L.state_source == 'worker' %}
-        <span class="live-flag__value {{ 'off' if (L.state_age_seconds or 0) > 900 else 'on' }}">
+        <span class="live-flag__value {{ 'ok' if H.get('source') else 'bad' }}">
           {{ L.state_recorded_by or 'worker' }}{% if L.state_age_seconds is not none %} · {{ (L.state_age_seconds // 60) }}m ago{% endif %}</span>
       {% else %}
-        <span class="live-flag__value off" title="The worker has not reported. These are the WEB service's own settings, which are not what places orders.">web env (worker silent)</span>
+        <span class="live-flag__value bad" title="The worker has not reported. These are the WEB service's own settings, which are not what places orders.">web env (worker silent)</span>
       {% endif %}</span>
     <span class="live-links"><a href="/portfolio/paper">Paper book</a> · <a href="/api/portfolio/live">JSON</a></span>
   </div>
@@ -92,7 +114,7 @@
       <strong>not</strong> what decides whether orders are placed — that is
       live-odds-worker's. Treat them as unknown, not as off.
     </div>
-  {% elif (L.state_age_seconds or 0) > 900 %}
+  {% elif not H.get('source') %}
     <div class="live-error">
       Worker last reported <strong>{{ (L.state_age_seconds // 60) }} minutes ago</strong>.
       These settings may be stale — a stopped worker's last known state looks

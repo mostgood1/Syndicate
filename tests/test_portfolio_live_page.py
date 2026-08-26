@@ -533,3 +533,125 @@ def test_the_pivot_does_not_move_when_the_show_toggle_flips(app_client, live_env
     assert hidden["periods"] == shown["periods"]
     # And the refused order is not in the count either way.
     assert hidden["periods"]["by_day"][0]["orders"] == 1
+
+
+# ---------------------------------------------------------------------------
+# THE BANNER COLOUR. [USER DECISION 2026-08-25] green when healthy, red when
+# anything is an issue.
+#
+# This INVERTED the previous scheme, where `on` was red because red meant
+# "real money is live, pay attention". A working system rendered as a wall of
+# red and a broken one looked the same. These tests pin the new direction so
+# it cannot quietly drift back.
+# ---------------------------------------------------------------------------
+
+
+def test_a_healthy_live_book_is_green(app_client, live_env, monkeypatch):
+    """A WORKER STAMP IS PART OF HEALTHY. The fixture's default leaves
+    `read_execution_state` returning None, which is `web env (worker silent)`
+    -- correctly not green, however the switches read."""
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    live_env["orders"] = [_order()]
+    monkeypatch.setattr(ledger_mod, "read_execution_state", lambda: {
+        "execution_mode": "live", "live_armed": True, "execution_enabled": True,
+        "kill_switch": {"engaged": False}, "limits": {},
+        "recorded_by": "live-odds-worker",
+        "recorded_at": _now_iso(),
+    })
+    payload = intelligence_bp._live_portfolio_payload(DATE)
+    assert payload["health"]["ok"] is True
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    # ANCHORED ON THE MARKUP. Both class names appear in the stylesheet, so a
+    # bare substring test passes whatever the badge actually renders.
+    assert 'class="live-badge live-badge--ok"' in body
+    assert 'class="live-badge live-badge--bad"' not in body
+    assert "LIVE — REAL MONEY" in body
+    assert 'class="live-banner is-ok"' in body
+
+
+def test_each_broken_switch_turns_the_line_red(app_client, live_env, monkeypatch):
+    """One field is enough. The verdict is `all()`, not a majority.
+
+    Given a healthy worker stamp first, so each case fails on the field under
+    test rather than on a silent worker -- a test that is red for the wrong
+    reason proves nothing about the reason it names."""
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    def stamp(**over):
+        base = {
+            "execution_mode": "live", "live_armed": True, "execution_enabled": True,
+            "kill_switch": {"engaged": False}, "limits": {},
+            "recorded_by": "live-odds-worker", "recorded_at": _now_iso(),
+        }
+        base.update(over)
+        monkeypatch.setattr(ledger_mod, "read_execution_state", lambda: base)
+
+    for field, break_it in (
+        ("job", lambda: stamp(execution_enabled=False)),
+        ("mode", lambda: stamp(execution_mode="paper")),
+        ("armed", lambda: stamp(live_armed=False)),
+        ("kill_switch", lambda: stamp(kill_switch={"engaged": True, "source": "env"})),
+    ):
+        stamp()
+        assert intelligence_bp._live_portfolio_payload(DATE)["health"]["ok"] is True
+        break_it()
+        health = intelligence_bp._live_portfolio_payload(DATE)["health"]
+        assert health[field] is False, field
+        assert health["ok"] is False, field
+        body = app_client.get("/portfolio/live").get_data(as_text=True)
+        assert 'class="live-badge live-badge--bad"' in body, field
+        assert 'class="live-banner is-bad"' in body, field
+
+
+def _now_iso():
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def test_an_engaged_kill_switch_is_red(app_client, live_env):
+    """DELIBERATE REVERSAL. Engaged used to be painted as fine ("the SAFE
+    state"). It is still safe, and it is also a system that cannot trade --
+    which is exactly what this banner reports."""
+    live_env["kill_switch"] = {"engaged": True, "source": "env"}
+    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    assert "ENGAGED" in body
+    assert intelligence_bp._live_portfolio_payload(DATE)["health"]["kill_switch"] is False
+
+
+def test_a_silent_worker_is_red_even_with_every_switch_on(app_client, live_env):
+    """"The worker has not reported" and "execution is off" are different
+    facts. Neither is healthy, and web's own env is not a reading of the
+    process that places orders."""
+    health = intelligence_bp._live_portfolio_payload(DATE)["health"]
+    # The fixture leaves `read_execution_state` returning None -> web_env.
+    payload = intelligence_bp._live_portfolio_payload(DATE)
+    if payload["state_source"] != "worker":
+        assert health["source"] is False
+        assert health["ok"] is False
+
+
+def test_a_stale_worker_stamp_is_red(monkeypatch):
+    """A stamp from forty minutes ago is not current state. A stopped worker's
+    last known settings look identical to its live ones."""
+    from syndicate.blueprints.intelligence import _live_health, _STATE_STALE_SECONDS
+
+    healthy = {
+        "execution_enabled": True, "execution_mode": "live", "live_armed": True,
+        "kill_switch": {"engaged": False}, "state_source": "worker",
+        "state_age_seconds": 60,
+    }
+    assert _live_health(healthy)["ok"] is True
+    stale = {**healthy, "state_age_seconds": _STATE_STALE_SECONDS + 1}
+    assert _live_health(stale)["source"] is False
+    assert _live_health(stale)["ok"] is False
+    # The boundary belongs to fresh.
+    assert _live_health({**healthy, "state_age_seconds": _STATE_STALE_SECONDS})["source"] is True
+
+
+def test_the_api_answers_the_same_health_question_as_the_page(app_client, live_env):
+    """A caller must not have to re-derive green from six fields."""
+    api = app_client.get("/api/portfolio/live").get_json()
+    assert "health" in api
+    assert set(api["health"]) == {"job", "mode", "armed", "kill_switch", "source", "ok"}
