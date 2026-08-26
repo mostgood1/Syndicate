@@ -31457,3 +31457,41 @@ in this session with a verdict that actually arrived.
 behaviour is identical either way. The next deploy needs a merge first —
 `origin/main` has moved to `8cecf484` (another lane's Kalshi shard-routing work,
 todo `#568`).
+
+## 2026-08-26 15:04:54Z — refresh-worker `44c1c564` (PR #92, `#569` quote-age)
+
+Off-protocol, same cause as every deploy today: no `RENDER_API_KEY` here and the
+proxy 403s `api.render.com`, so `deploy_claim.py`/`deploy_preflight.py` are
+unreachable. Render MCP, on explicit user direction ("ship it"). Commit IS on
+`origin/main`. Log-only change; 311 tests green (all `test_layer2_*` plus
+`test_served_quote_age.py`) before merge.
+
+verify: **one `QUOTE_AGE_SERVED` line from one cycle answers the question.**
+
+    [layer2_shortlist] QUOTE_AGE_SERVED at=publish rows= no_clock=
+      seen_n/p50/p90/max  book_n/p50/p90/max  worst_seen_by_sport <slug>=<s>
+
+Read `seen_p50` against the ~60s publish cadence:
+
+    seen_p50 small  -> PUBLICATION. This lane's ground, and already fixed twice.
+    seen_p50 large  -> UPSTREAM. syndicate-43's direct-feed case is right and
+                       every publication fix shipped today was treating a symptom.
+
+**A large `seen_p50` would mean this lane spent a day on the wrong layer.** That
+is the outcome to look for FIRST, not last — it is the one that costs something
+to admit, which is exactly why it should be checked before the comfortable one.
+
+### Merging PR #92 surfaced a silent deletion on `main`
+
+`docs/ai_context/todo.md` lost its title line — `# Syndicate TODO — canonical
+cross-session list` — somewhere in another lane's edit. Present in the
+merge-base, absent on `origin/main`. **Restored in this merge.**
+
+Checked the rest of the file rather than assuming that was all: `#559`, `#560`
+and `#561` also left `todo.md`, and those ARE legitimate — all three are in
+`todo_closed.md` on main (3, 6 and 3 occurrences). Verified they were NOT
+resurrected by this resolution.
+
+**Both `deploys.md` conflicts today resolved by KEEPING BOTH SIDES.** These files
+are append-only ledgers and "resolve" on one is almost always a union, never a
+choice. The other side was the `kalshi-exchange-index` lane's entry.
