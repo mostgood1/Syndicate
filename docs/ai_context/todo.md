@@ -660,96 +660,6 @@ empty claim commit before the work). Not taken here — recorded, not fixed.
 whose artifacts are >15 min old must serve `state_meta.is_fresh: false`, and the
 chip strip must render `.board-stale-badge`.
 
-### `#560` — **Every NO-side Polymarket fill already on the books carried the OPPOSITE side's price.** — lane `portfolio-decision-and-execution`, raised by `polymarket-oddsapi-coverage-audit`, 2026-08-26, counted — **NO DECISION NEEDED: the affected population is 3 rows and the reconciler has already restamped all of them. Ready to archive.**
-
-Fix for NEW fills is live (PR #83, deploy `d92ab27b1`). This item is the HISTORY,
-which was deliberately not rewritten. Working: `deploys.md` 2026-08-26T00:42Z.
-
-`avgPx` is quoted on the YES side. Until `d92ab27b1` the reader stored it
-verbatim, so every `under` (submitted `OUTCOME_SIDE_NO`) was recorded at its
-complement. Confirmed from venue data at 00:42:15Z:
-
-```
-outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5650' recorded=0.435
-outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5450' recorded=0.455
-outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5100' recorded=0.49
-outcome_side='OUTCOME_SIDE_YES' avgPx='0.3950' recorded=0.395
-outcome_side='OUTCOME_SIDE_YES' avgPx='0.5200' recorded=0.52
-```
-
-**The exposure.** `EXECUTED` at 00:42:15Z reports `filled_stake_dollars: 123.62`
-across 82 filled orders. The share of that which is NO-side is UNCOUNTED -- no
-log line separates them historically -- so the size of the error is unknown, not
-small. Visible examples from the live page: `under 9.5 MIN@ATH` shows `$1.41`
-against a `$1.18` stake; `under 7.5 CIN@SF` shows `$1.04` against `$1.00`. Those
-are `qty x wrong-side price`.
-
-**Why it matters beyond bookkeeping.** Any `paper:polymarket` result including
-those rows is not a Polymarket result -- the same class as the aggregator-priced
-Kalshi book found at 21:47Z the same evening, and the same class as `#502`'s
-`settled_count: 0`. A P&L that looks precise and is systematically wrong on one
-side is worse than a missing one.
-
-**Three options were listed:** (a) restamp from `1 - stored`; (b) re-read from
-the venue with the corrected reader; (c) exclude pre-`d92ab27b1` NO-side rows
-from P&L claims. **The count made the choice moot -- (b) had already happened by
-itself.**
-
-## THE COUNT, 2026-08-26T01:01Z
-
-`reconcile_open_orders` gates on `mode == LIVE` (`execution_ledger.py:792`), so
-paper rows never had a venue price to get wrong. The live book is small:
-`LIVE_LEDGER n=27` at 00:59:26Z, and the Polymarket slice of it is **5 filled
-orders, all `date=2026-08-25`, all `outcome=None`.** The whole live-mode
-Polymarket history is one day old -- the first order ever placed on this venue
-was 2026-08-25T16:08:10Z -- so the 30-day log retention limit does not truncate
-this count. It is a total, not a lower bound.
-
-| ticker | side | `outcomeSide` | stake | venue `avgPx` | stored now |
-|---|---|---|---|---|---|
-| `tsc-mlb-tb-det-2026-08-25-7pt5`  | over  | YES | $1.38 | 0.5200 | 0.52 |
-| `tsc-mlb-tb-det-2026-08-25-6pt5`  | over  | YES | $2.30 | 0.3950 | 0.395 |
-| `tsc-mlb-cin-sf-2026-08-25-7pt5`  | under | **NO** | $1.00 | 0.5100 | **0.49** |
-| `tsc-mlb-min-ath-2026-08-25-9pt5` | under | **NO** | $1.18 | 0.5450 | **0.455** |
-| `tsc-mlb-cle-laa-2026-08-25-6pt5` | under | **NO** | $1.04 | 0.5650 | **0.435** |
-
-**NO-side rows: 3 of 5. Stake at risk: $3.22 of the live book.** Not the
-`filled_stake_dollars: 123.62 / 82 orders` the item feared -- that figure is
-`modes: ['live','paper']` summed, and 77 of those 82 are paper or Kalshi.
-
-**All three are already correct.** Compare the 23:57:45Z dump (pre-fix) against
-the 00:59:26Z dump (post-`d92ab27b1`):
-
-```
-cin-sf-7pt5  under   fill_price 0.51  -> 0.49     (1 - 0.51  = 0.49)
-min-ath-9pt5 under   fill_price 0.545 -> 0.455    (1 - 0.545 = 0.455)
-cle-laa-6pt5 under   filled after the fix; 0.435 from birth
-tb-det-7pt5  over    0.52  -> 0.52    (YES, correctly untouched)
-tb-det-6pt5  over    submitted -> filled 0.395 (YES)
-```
-
-**Why it self-healed, and the condition that would have stopped it.** The
-reconciler re-reads every candidate each cycle and re-stamps `fill_price` from
-the venue, so the first pass after `d92ab27b1` overwrote the two bad values with
-complemented ones. That only works because the candidate filter also requires
-`outcome is None` (`execution_ledger.py:794`) -- **a NO-side row that had settled
-before the fix would be frozen at the wrong price forever, and no pass would
-revisit it.** None had settled. That is luck of timing, not design: the venue's
-Polymarket book was one day old and nothing had graded yet.
-
-**Remaining exposure: none for these 5.** The generalisable risk is the
-`outcome is None` boundary -- if a reader defect is found after rows settle,
-self-healing is unavailable and (a) or (c) come back. Worth remembering before
-the next venue-reader change.
-
-**Not covered by this count:** `side=home`/`away` orders resolve their
-`outcomeSide` from the outcomes-array index rather than from the word, so a team
-side can be NO too. It does not matter here -- every Polymarket team-side order
-in the live book is `rejected` with `market_unresolved_for_position`, so none
-carries a fill price at all.
-
----
-
 ### `#561` — **`RECONCILE_COUNT_IMPLAUSIBLE` printed one branch's numbers while a different branch decided, and the count bound had no tolerance.** — **CLOSED 2026-08-26, FIXED BY `portfolio-decision-and-execution` INDEPENDENTLY; verified by `polymarket-oddsapi-coverage-audit`. Ready to archive.**
 
 The guard is CORRECT and has now caught two real defects in one evening. Its
@@ -39335,6 +39245,35 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ---
 
 ## Operational notes worth not rediscovering
+
+### A ledger defect stops being self-healing the moment the row settles (`#560`, 2026-08-26)
+
+The reconciler re-reads the venue and re-stamps `fill_price` on every cycle, so
+a fixed reader repairs history by itself on its first pass — for the rows it
+still visits. `reconcile_open_orders`' candidate filter requires
+`mode == LIVE`, a status of `submitted`/`filled`, **and `outcome is None`**
+(`execution_ledger.py:789-796`). A settled row is not a candidate, so a wrong
+value inside one is permanent: no deploy reaches it, and no counter will report
+it as unfixed.
+
+`#560` got the good half of that by luck. Three NO-side Polymarket fills had
+been recorded at the YES-side price; all three were still ungraded when
+`d92ab27b1` shipped, so the next cycle corrected them and the item closed with
+nothing to decide. Had the same defect been found a day later, the same three
+rows would have needed a manual restamp of settled money records — the option
+the item least wanted to take.
+
+**So on any venue-reader or fill-accounting defect, the first question is not
+"how many rows are wrong" but "how many of the wrong rows have already
+settled".** The second number is the one that costs something. The first
+usually fixes itself.
+
+Corollary for sizing: scope the count by the filter the repair path actually
+uses, not by the ledger's headline totals. `#560` estimated its exposure from
+`filled_stake_dollars: 123.62` across 82 orders and was wrong by two orders of
+magnitude — that figure sums `modes: ['live','paper']`, and paper rows never
+reconcile against a venue at all. The real population was 5 orders.
+
 
 ### A test can be stale and mirror-dependent at once — and fixing one instance is not sweeping the class (`#288`, 2026-08-13)
 

@@ -2334,3 +2334,114 @@ service ~1 minute earlier.
 **Reusable:** "which service runs the code" and "what does this change on
 production TODAY" are preflight questions, not post-deploy ones. Both were
 answerable by reading, in minutes, before touching anything.
+
+---
+
+## Closed 2026-08-26 — the NO-side fill price, and a self-heal that was luck of timing (`#560`)
+
+Raised the same day it closed. The fix for NEW fills shipped as `d92ab27b1`
+(PR #83); this item was the HISTORY, deliberately left alone, and it listed
+three ways to correct it while taking none — because nobody knew how many rows
+were affected. The instruction it gave itself was right: **count first.**
+
+The count answered the question and dissolved it. The affected population is 3
+rows and $3.22, not the ~$123 the item had feared, and all three were already
+correct by the time anyone looked — the reconciler re-stamps `fill_price` from
+the venue every cycle, so the first pass after the fix overwrote the two bad
+values with their complements.
+
+**The lesson is the condition, not the outcome.** That self-heal only reaches
+rows the reconciler still considers candidates, and
+`execution_ledger.py:794` requires `outcome is None`. A NO-side row that had
+SETTLED before the fix would be frozen at the wrong price and never revisited.
+None had settled — the venue's book was one day old and nothing had graded yet.
+Next venue-reader defect, the first question is how many affected rows have
+already settled, because those are the ones no deploy can repair.
+
+### `#560` — **Every NO-side Polymarket fill on the books carried the OPPOSITE side's price. Counted: 3 rows, $3.22, and the reconciler had already restamped all three.** — lane `portfolio-decision-and-execution`, raised by `polymarket-oddsapi-coverage-audit` — **CLOSED 2026-08-26, counted and verified; no history rewrite was needed.**
+
+Fix for NEW fills is live (PR #83, deploy `d92ab27b1`). This item is the HISTORY,
+which was deliberately not rewritten. Working: `deploys.md` 2026-08-26T00:42Z.
+
+`avgPx` is quoted on the YES side. Until `d92ab27b1` the reader stored it
+verbatim, so every `under` (submitted `OUTCOME_SIDE_NO`) was recorded at its
+complement. Confirmed from venue data at 00:42:15Z:
+
+```
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5650' recorded=0.435
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5450' recorded=0.455
+outcome_side='OUTCOME_SIDE_NO'  avgPx='0.5100' recorded=0.49
+outcome_side='OUTCOME_SIDE_YES' avgPx='0.3950' recorded=0.395
+outcome_side='OUTCOME_SIDE_YES' avgPx='0.5200' recorded=0.52
+```
+
+**The exposure.** `EXECUTED` at 00:42:15Z reports `filled_stake_dollars: 123.62`
+across 82 filled orders. The share of that which is NO-side is UNCOUNTED -- no
+log line separates them historically -- so the size of the error is unknown, not
+small. Visible examples from the live page: `under 9.5 MIN@ATH` shows `$1.41`
+against a `$1.18` stake; `under 7.5 CIN@SF` shows `$1.04` against `$1.00`. Those
+are `qty x wrong-side price`.
+
+**Why it matters beyond bookkeeping.** Any `paper:polymarket` result including
+those rows is not a Polymarket result -- the same class as the aggregator-priced
+Kalshi book found at 21:47Z the same evening, and the same class as `#502`'s
+`settled_count: 0`. A P&L that looks precise and is systematically wrong on one
+side is worse than a missing one.
+
+**Three options were listed:** (a) restamp from `1 - stored`; (b) re-read from
+the venue with the corrected reader; (c) exclude pre-`d92ab27b1` NO-side rows
+from P&L claims. **The count made the choice moot -- (b) had already happened by
+itself.**
+
+## THE COUNT, 2026-08-26T01:01Z
+
+`reconcile_open_orders` gates on `mode == LIVE` (`execution_ledger.py:792`), so
+paper rows never had a venue price to get wrong. The live book is small:
+`LIVE_LEDGER n=27` at 00:59:26Z, and the Polymarket slice of it is **5 filled
+orders, all `date=2026-08-25`, all `outcome=None`.** The whole live-mode
+Polymarket history is one day old -- the first order ever placed on this venue
+was 2026-08-25T16:08:10Z -- so the 30-day log retention limit does not truncate
+this count. It is a total, not a lower bound.
+
+| ticker | side | `outcomeSide` | stake | venue `avgPx` | stored now |
+|---|---|---|---|---|---|
+| `tsc-mlb-tb-det-2026-08-25-7pt5`  | over  | YES | $1.38 | 0.5200 | 0.52 |
+| `tsc-mlb-tb-det-2026-08-25-6pt5`  | over  | YES | $2.30 | 0.3950 | 0.395 |
+| `tsc-mlb-cin-sf-2026-08-25-7pt5`  | under | **NO** | $1.00 | 0.5100 | **0.49** |
+| `tsc-mlb-min-ath-2026-08-25-9pt5` | under | **NO** | $1.18 | 0.5450 | **0.455** |
+| `tsc-mlb-cle-laa-2026-08-25-6pt5` | under | **NO** | $1.04 | 0.5650 | **0.435** |
+
+**NO-side rows: 3 of 5. Stake at risk: $3.22 of the live book.** Not the
+`filled_stake_dollars: 123.62 / 82 orders` the item feared -- that figure is
+`modes: ['live','paper']` summed, and 77 of those 82 are paper or Kalshi.
+
+**All three are already correct.** Compare the 23:57:45Z dump (pre-fix) against
+the 00:59:26Z dump (post-`d92ab27b1`):
+
+```
+cin-sf-7pt5  under   fill_price 0.51  -> 0.49     (1 - 0.51  = 0.49)
+min-ath-9pt5 under   fill_price 0.545 -> 0.455    (1 - 0.545 = 0.455)
+cle-laa-6pt5 under   filled after the fix; 0.435 from birth
+tb-det-7pt5  over    0.52  -> 0.52    (YES, correctly untouched)
+tb-det-6pt5  over    submitted -> filled 0.395 (YES)
+```
+
+**Why it self-healed, and the condition that would have stopped it.** The
+reconciler re-reads every candidate each cycle and re-stamps `fill_price` from
+the venue, so the first pass after `d92ab27b1` overwrote the two bad values with
+complemented ones. That only works because the candidate filter also requires
+`outcome is None` (`execution_ledger.py:794`) -- **a NO-side row that had settled
+before the fix would be frozen at the wrong price forever, and no pass would
+revisit it.** None had settled. That is luck of timing, not design: the venue's
+Polymarket book was one day old and nothing had graded yet.
+
+**Remaining exposure: none for these 5.** The generalisable risk is the
+`outcome is None` boundary -- if a reader defect is found after rows settle,
+self-healing is unavailable and (a) or (c) come back. Worth remembering before
+the next venue-reader change.
+
+**Not covered by this count:** `side=home`/`away` orders resolve their
+`outcomeSide` from the outcomes-array index rather than from the word, so a team
+side can be NO too. It does not matter here -- every Polymarket team-side order
+in the live book is `rejected` with `market_unresolved_for_position`, so none
+carries a fill price at all.
