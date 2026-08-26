@@ -33016,3 +33016,62 @@ and it is not what this counter was built to find.
 shown to be the rule working — but the load-bearing question (how many
 `no_group_sibling` rows have a fresher line in the state file) needs the state
 file joined in, which is one more measurement, not a fix.
+
+## `#569`: THE HOLE IS FOUND, AND IT IS A DATE MISMATCH. Chasing the outlier found it.
+
+**The `no_seen_age=7553` outlier was not a distraction from the
+`drop_superseded_lines` hole — it WAS the hole, seen from the other side.**
+
+The 21:17:19.948Z build:
+
+    SUPERSEDED_SURVIVORS no_group_sibling=199 no_seen_age=7553 within_lag=199
+    SUPERSEDED_LINES_DROPPED count=16 kept=15672
+
+**48% of a 15,672-row grid carrying no observation clock.** The NFL grid beside
+it was 403 rows, so this is the wide multi-date one.
+
+### The mechanism, from CODE not inference
+
+    pipeline/layer2_shortlist.py:616   for window_date in window_dates:
+                                           quote_rows.extend(chunk)     <- MANY dates
+    pipeline/layer2_shortlist.py:690   last_seen = read_quote_last_seen(
+                                           sport, selected_date)        <- ONE date
+
+The accumulation loop's own comment says it: *"it EXTENDS across a window, so
+NFL accumulated five shards at once."* Every row from any window date other than
+`selected_date` had **no `last_seen` entry**, so `_seen_age_seconds` returned
+None.
+
+**AND A ROW WITH NO CLOCK IS INVISIBLE TO `drop_superseded_lines`.** That guard
+requires `seen_age_seconds` on the row AND on its group's freshest — deliberately,
+because "pruning on absence is how a capture hiccup would silently empty the
+board". So **a line the market had moved off could never be dropped on a forward
+date.** The same absence also pins `_freshness_factor` at its harshest discount
+for those rows.
+
+**This is a sharper answer than the hypothesis I registered.** I predicted a
+state-file-vs-grid source difference. It is a **DATE** mismatch between two reads
+in the same function — and `no_group_sibling`, which I had called the leading
+candidate, is NOT the hole (it holds steady at 199 in the same build).
+
+### The fix
+
+`last_seen` is now merged across `dates_with_rows` — the same dates that produced
+the rows — newest stamp winning for a key seen on several shards, since the field
+answers "when did we last LOOK" and the latest look is the answer whichever shard
+recorded it. Falls back to `[selected_date]` when every shard read failed.
+
+**EXPECT A VISIBLE CHANGE, and watch for it:** ~7,500 rows per wide build gain a
+clock. `SUPERSEDED_LINES_DROPPED` should RISE (superseded forward-date lines
+become droppable for the first time) and `SUPERSEDED_SURVIVORS no_seen_age`
+should COLLAPSE toward the 1-19 the narrow builds already show. If `no_seen_age`
+stays high, the merge is not reaching the rows and this diagnosis is wrong.
+
+**A drop count that rises a LOT is the risk worth naming:** these rows have never
+been eligible for pruning, so the first build under the fix prunes a backlog. If
+`kept` falls off a cliff rather than easing, back it out — that is the board
+emptying, which this guard's docstring warns about and which no amount of
+correctness justifies.
+
+5 tests, mutation-checked (reverting to the single-date read turns 2 red).
+68 green across window-merge, survivors, quote-age and layer2 suites.

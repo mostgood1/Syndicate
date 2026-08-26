@@ -687,7 +687,34 @@ def build_layer2_shortlist(
             # leaves `seen_age_seconds` absent and the old behaviour intact.
             last_seen_error: str | None = None
             try:
-                last_seen = read_quote_last_seen(sport, selected_date)
+                # `#569`. MERGED ACROSS THE SAME DATES THE ROWS CAME FROM, and
+                # reading only `selected_date` here was a real defect.
+                #
+                # `quote_rows` above EXTENDS across `window_dates` -- its own
+                # comment says so ("NFL accumulated five shards at once") -- while
+                # this read covered ONE date. Every row from any other window date
+                # therefore had no entry, so `_seen_age_seconds` returned None,
+                # and a row with no clock is INVISIBLE to
+                # `drop_superseded_lines`: that guard requires `seen_age_seconds`
+                # on the row AND on its group's freshest, by design, because
+                # pruning on absence would empty the board.
+                #
+                # So a line the market had moved off could never be dropped on a
+                # forward date. MEASURED 2026-08-26 21:17:19Z, one grid build:
+                # `SUPERSEDED_SURVIVORS no_seen_age=7553` against
+                # `SUPERSEDED_LINES_DROPPED kept=15672` -- 48% of the grid
+                # carrying no clock, and every one of them exempt from the guard.
+                # The same absence also pins `_freshness_factor` at its harshest
+                # discount for those rows.
+                #
+                # NEWEST WINS on a key seen on more than one date: this answers
+                # "when did we last look at this market", and the latest look is
+                # the answer regardless of which shard recorded it.
+                last_seen = {}
+                for _seen_date in (dates_with_rows or [selected_date]):
+                    for _key, _stamp in (read_quote_last_seen(sport, str(_seen_date)) or {}).items():
+                        if _stamp and _stamp > last_seen.get(_key, ""):
+                            last_seen[_key] = _stamp
             except Exception as exc:
                 # Swallowing this is correct -- last-seen is an enhancement and
                 # its absence must not fail the build -- but swallowing it
