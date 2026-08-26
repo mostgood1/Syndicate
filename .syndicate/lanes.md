@@ -2172,6 +2172,66 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Verification: same-instant chip-vs-StatsAPI diff on production across at least
   one full FULL->SLIM->FULL lens cycle, with zero live games reading `0-0` or a
   bare `LIVE`/`FINAL` token during the SLIM window.
+### open-bet-live-status — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: every OPEN bet on `/portfolio` shows where it stands, plus a date
+  filter. `[user 2026-08-26: "can we append live game or prop status to the open
+  bets" -> "ship both"; "portfolio needs a date filter"]`
+- **THIS LANE BLOCK WAS WRITTEN, THEN LOST, THEN REWRITTEN.** It was inserted
+  when the lane opened and was absent from `lanes.md` by commit time — the code
+  changes survived, only the ledger edit did not. The one unusual thing done in
+  between was a `git stash --include-untracked` / `stash pop` cycle (used to
+  prove three `test_venue_quote_adapters` failures were pre-existing rather than
+  mine). **Cause not definitively established; recorded because a silently
+  vanishing ledger edit is worse than the bug it was describing.** Stashes are
+  REPO-GLOBAL, not per-worktree — `git stash list` here shows other sessions'
+  entries at the top — so a stash in a shared-repo worktree is a cross-session
+  object and should be avoided in favour of a scratch copy.
+- **NOTHING IS COMPUTED FOR THIS.** `portfolio_commit` already writes
+  `plan["bet_status"]` and `plan["live_marks"]` into
+  `portfolio_plan_<date>.json`, and that artifact already crosses to web. A
+  join and a rendering, never compute in a request path.
+- **COVERAGE MEASURED BEFORE BUILDING** (`/api/portfolio/plan`, 22:5xZ):
+  `live_marks` **82 of 442** (`moved_toward 42 / moved_against 22`), no
+  per-sport resolver needed; `bet_status` **3 of 442**, `no_live_feed: 419`
+  because only MLB has a live resolver. Shipping the second anyway is the
+  point — it never once worked (an `UnboundLocalError` every cycle) and hid as
+  "a page column that renders an honest-looking blank". Reasons now render BY
+  NAME.
+- **A REAL BUG FOUND WRITING ITS TEST:** `settlement_summary` ran on the
+  DISPLAY list, so the pre-existing `?show=` toggle already moved the headline
+  W/L and P&L, and the date filter would have moved them far more. `periods`
+  had it right; settlement now reads the whole book too.
+- **THE DATE FILTER KEEPS THE ALL-DATES GUARANTEE.** `?on=` is opt-in and
+  never the default, because this book is all-dates precisely so a page cannot
+  "let one expire unwatched". Whenever it is on, the page states how many OPEN
+  positions it is holding back — that count IS the guarantee.
+- **NAME THE TEAM `[user-reported, real order]`.** A row read `home` beside
+  `aec-mlb-cle-laa-2026-08-26` and the natural reading of that slug is that we
+  bought CLE. **We had not, and the order was correct**: the venue's outcomes
+  array is `['Los Angeles Angels', 'Cleveland Guardians']` — REVERSED against
+  its own slug — so `home` matched the Angels by NAME at index 0 and the submit
+  went `OUTCOME_SIDE_YES` on index 0 (`SUBMIT ... our_side=home outcome_index=0
+  yes_index=0`, 21:44:25Z). The 2026-08-25 side-inversion fix is working. The
+  ROW was unreadable, which on a real-money page is its own defect. Game-line
+  rows now lead with the team name.
+  **`outcome_index: null` in the ledger is NOT evidence** — it is not a field
+  on `OrderRequest`, only a local in `execute_portfolio`. Reading that null as
+  "no index was resolved" would have produced a false side-inversion report.
+- Files: `syndicate/blueprints/intelligence.py`,
+  `syndicate/templates/portfolio.html`, `tests/test_open_bet_live_status.py`,
+  `tests/test_venue_balances.py` (stub signatures only)
+- **CARVE-OUT** from `portfolio-decision-and-execution` on
+  `blueprints/intelligence.py` + `templates/portfolio.html`, at explicit user
+  direction, same terms as the portfolio lanes earlier today.
+  `pipeline/portfolio_commit.py` read only, not edited.
+- **FLAGGED, NOT MINE:** `tests/test_venue_quote_adapters.py` has 3 failures on
+  `main` (soccer h2h / DRAWABLE_OUTCOME / league token, from `e2781211`).
+  Confirmed pre-existing by stashing this lane's work and re-running. Belongs to
+  `exchange-markets-api-integration`.
+- Verification: 21 tests; 671 green across portfolio/settlement/execution/venue
+  suites. Local render confirms AHEAD/BEHIND with the number, `no live feed`
+  by name, `+2.4 pts vs taken`, the hidden-open-bets banner, and the team name.
+  **Production reading OWED — NOT DEPLOYED.**
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
