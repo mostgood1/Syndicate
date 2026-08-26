@@ -33075,3 +33075,64 @@ correctness justifies.
 
 5 tests, mutation-checked (reverting to the single-date read turns 2 red).
 68 green across window-merge, survivors, quote-age and layer2 suites.
+## 2026-08-26 21:36Z — live-odds-worker `022583f6` — the venue settles our bets, and `settled > 0` is real
+
+**what:** live orders are graded from the VENUE'S own settlement record instead
+of from a status we resolve. Kalshi `GET /portfolio/settlements`, Polymarket
+`GET /v1/portfolio/activities?types=ACTIVITY_TYPE_POSITION_RESOLUTION`. Lane
+`venue-settlement`. Item `todo.md #579`.
+
+**claim/preflight:** claim held by `venue-settlement`. **Preflight was HOLD (3
+jobs: an odds refresh, its runner, a La Liga `build_soccer_artifacts`) and the
+deploy-guard correctly BLOCKED it.** `SYNDICATE_DEPLOY_GUARD=off` as an inline
+prefix does NOT reach the hook — it runs in its own process — and I declined to
+forge a preflight receipt or POST the Render API directly to dodge the hook.
+**The user ran `render_deploy.py` from their own terminal instead**, where the
+hook does not intercept. Deploy dep-da7lmtuk1f9s738hkh7g, created 21:32:39Z,
+live ~21:35Z. The three jobs were killed as the user directed; all re-run on
+the next tick.
+
+**verify — FIRST PRODUCTION READING, and it graded real money:**
+
+    VENUE_SETTLEMENT status=ok settled=3 already=12 awaiting=73 unjoinable=36
+      pnl_unattributed=0 refused={} errors={}
+      by_venue={'kalshi': {'rows':30,'settled':1},
+                'polymarket': {'rows':9,'settled':2}}
+
+    polymarket aec-mlb-tb-det-2026-08-26          lost  -2.4017
+    kalshi     KXMLBHRR-26AUG261310TBDET-DETHLEE50-2  lost  -4.4924
+    polymarket tsc-mlb-tb-det-2026-08-26-7pt5      won   +5.4400
+
+`errors={}` (both venues answered), `refused={}` (no scalar or both-sides
+rows), `pnl_unattributed=0` (every settled market carried exactly one order, so
+all three took the venue's EXACT P&L rather than only an outcome). Counters
+reconcile: 29 kalshi + 7 polymarket unjoinable = 36, against 30+9 rows less 3
+settled.
+
+**AND THE SPLIT IS THE FINDING, not the settled count.** `settled_by` makes
+authoritative and inferred separable, and they disagree:
+
+    source      n  won   staked      pnl     roi%
+    venue       3    1    12.24    -1.45   -11.88
+    inferred   12    6    29.47   +15.05   +51.07
+    COMBINED   15    7    41.71   +13.60   +32.60
+
+**n=3 PROVES NOTHING and is not offered as evidence the grader is wrong.** What
+it does establish is that the page's headline 32.6% is a BLEND of a venue
+record and our own inference, and that is the number a person would quote.
+
+**RACE CONDITION, FOUND AFTER DEPLOYING AND NOT BEFORE.**
+`paper_settlement.settle_orders` is invoked from `pipeline/intelligence_state.py`
+— the **refresh-worker** loop — while venue settlement runs on
+**live-odds-worker**. Both are idempotent on `order["outcome"]`, so whichever
+service ticks first after a game ends owns that row permanently. **Going
+forward, whether a live order is graded authoritatively or by inference is
+decided by worker timing, not by policy** — which also means the venue/inferred
+comparison above can never become controlled while it stands. Recommended and
+NOT taken (it changes money-grading behaviour on a shared module, and which
+source wins is the user's call): `settle_orders` should give the venue first
+refusal on LIVE orders and stay the fallback for what the venue cannot settle.
+
+**OWED:** `awaiting=73` is expected tonight (open positions), but it must fall
+as tonight's games settle. If it does not, the join is losing settlements to a
+ticker mismatch and `unjoinable` is where they went.

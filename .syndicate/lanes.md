@@ -1975,7 +1975,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Item: `todo.md #578`.
 - Blocked by: none
 
-### venue-settlement — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+### venue-settlement — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
 - Goal: live orders are settled from **the venue's own settlement record**, so
   `settled > 0` stops being the gate the whole feedback loop is stuck behind.
   `[user decision 2026-08-26: "do the settlement work next"]`
@@ -2027,6 +2027,28 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   without gains nothing. Production reading OWED and it is the point:
   `VENUE_SETTLEMENT settled=N unjoinable=N awaiting=N` on live-odds-worker, and
   `settled_count > 0` on the live book for the first time.
+- **CLOSED 2026-08-26 — VERIFIED IN PRODUCTION**, live-odds-worker `022583f6`.
+  `VENUE_SETTLEMENT settled=3 already=12 awaiting=73 unjoinable=36
+  pnl_unattributed=0 refused={} errors={}`; three real orders graded with the
+  venues' exact P&L (polymarket −2.4017 lost, kalshi −4.4924 lost, polymarket
+  +5.44 won). `settled_count` 12 -> 15. Counters reconcile.
+- **THE SPLIT IS THE FINDING, not the count.** venue 3 bets −$1.45 (ROI
+  −11.88%) against inferred 12 bets +$15.05 (+51.07%); the page shows the blend
+  (+32.60%). **n=3 proves nothing** — what it establishes is that the headline
+  ROI mixes a venue record with our own inference and says so nowhere.
+- **RACE CONDITION, found AFTER deploying:** `settle_orders` runs from
+  `intelligence_state.py` on refresh-worker, venue settlement on
+  live-odds-worker, both idempotent on `outcome` — so whichever ticks first
+  after a game ends owns the row. Which source grades a live order is decided by
+  TIMING, not policy, and the comparison above can never become controlled while
+  that stands. Recommended and NOT taken (money-grading on a shared module, and
+  the choice of authority is the user's): venue gets first refusal on live
+  orders, `settle_orders` stays the fallback.
+- **DEPLOY NOTE:** preflight was HOLD and the guard correctly blocked me. The
+  documented off switch is an env var the hook reads from its OWN process, which
+  an inline prefix does not reach; I declined to forge a preflight receipt or
+  POST the API directly to dodge the hook. The user deployed from their own
+  terminal. Full block: `deploys.md` 2026-08-26 21:36Z. Item: `todo.md #579`.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
