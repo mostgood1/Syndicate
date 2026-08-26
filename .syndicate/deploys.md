@@ -32750,3 +32750,68 @@ production only because those env values happen to equal the code defaults**. It
 would have surfaced the first time anyone set Kalshi to a different number.
 Stated because the wrong version of this line was one sentence from being
 reported as a live production defect.
+
+---
+
+## 2026-08-26 — syndicate + refresh-worker `#576`: soccer `unknown_no_key` 7 -> 0, the last chip gap closed
+
+**Deployed:** both services on commit `1e9ec576` — worker `dep-da7kk60u01pc73dn4dsg`
+live `20:21:32Z`, web `dep-da7kk8nqj5pc73840o8g`. No SHA drift this time: the
+deploy carried the exact commit, so verification needed no ancestry check.
+
+**verify — first completed build, `20:39:45Z`:**
+
+```
+CHIP_JOIN_COVERAGE sport=soccer chips=213 cards=400
+  by_matchup=197 by_canonical=203
+  needs_fallback=0 no_chip_available=0 unknown_no_key=0 samples=[]
+GAME_CHIPS_PUBLISHED date=2026-08-26 chips=246 sports=8 ok=True
+```
+
+**`unknown_no_key` 7 -> 0**, `samples=[]`. `by_canonical` 194 -> 203, which is
+the five newly-resolvable clubs landing. `no_chip_available` held at 0, so the
+`#575` result is intact. **Every one of 400 soccer cards now resolves a chip.**
+
+Combined with `#575` (nfl 106 -> 0) and `#542` (soccer 251 -> 0), the board's
+compact cards are at FULL chip coverage across all four sports for the first
+time: mlb 400/400, wnba 400/400, nfl 106/106, soccer 400/400.
+
+**THE FIX WAS FIVE MAP ENTRIES; THE FINDING WAS THAT THE MAP HAS TWO CONSUMERS
+WITH DIFFERENT REACH.** `teams_match` falls through to a shared-suffix heuristic
+when the map cannot answer; `canonical_team` is map-only, and the chip join
+calls THAT one directly. So a club can join fixtures fine and still return None
+for a chip key — which is exactly what `Genk` was doing.
+
+The asymmetry is principled, and it is why the answer is an exact entry rather
+than a looser resolver: `teams_match` holds BOTH names and answers "same club?",
+so a loose rule is safe; the chip index holds ONE name and must mint a globally
+unique KEY, where the same rule would mint collisions.
+
+**TWO CORRECTIONS OF MINE, both caught by existing guards rather than by me:**
+
+1. I named the WRONG FIVE CLUBS in three consecutive summaries — reading each
+   sample as naming its failing club, when the `None` key names it. The failing
+   five were Ajax, Feyenoord, Charleroi, Leuven, Genk; Telstar and KV Kortrijk
+   resolve fine. The fix was built against the measured list, not my description.
+2. I committed a comment claiming `#503` was WRONG about "Genk matches fine".
+   `#503` was right — about `teams_match`. I read a claim about one resolver as
+   a claim about the system, and an existing test
+   (`test_the_pairs_that_already_agreed_are_not_in_the_map`) caught it by
+   failing. Corrected in place; the invariant now encodes the two-resolver rule.
+
+**Tests:** `tests/test_soccer_alias_gaps.py` (12), including the ambiguity check
+`deportivo` documents applied rather than assumed — each token appears in
+exactly ONE of 204 canonical names.
+
+**Sweeps:** narrow (alias consumers) 226 passed; broad post-fix **1358 passed,
+1 failed** — `test_soccer_board_mlb_parity::test_it_cannot_downgrade_a_started_match`,
+confirmed pre-existing in a detached worktree at `1e9ec576~2`. Verified against
+a DIFFERENT COMMIT this time, not a stashed clean tree: an earlier check today
+"proved" a failure pre-existing by stashing nothing, so both sides were the same
+commit and agreed vacuously.
+
+**Estimate error worth keeping:** I called the build "past the window" at 16
+minutes based on a single prior run where `candidate_collection_with_fallback`
+took 222s. This run it took **447s**. The build was healthy throughout; my
+baseline was one sample. `BUILD_SPAN_ENTER/EXIT` is what distinguishes "slow"
+from "stuck" — not elapsed time against a remembered number.
