@@ -299,6 +299,49 @@ _V2_SELF_TRADE_PREVENTION = "taker_at_cross"
 _V2_EXCHANGE_INDEX_AUTO = -1
 
 
+# `subaccount` IS THE SECOND FIELD COPIED FROM THE SAMPLE AS FURNITURE.
+#
+# CONFIRMED 2026-08-26: switching `exchange_index` 0 -> -1 changed the venue's
+# answer, cleanly and with no exceptions either side of the deploy:
+#
+#   before 12:55:08Z   http_404 {"code":"market_not_found"}
+#   after  12:55:08Z   http_400 {"code":"user_not_found: <account uuid>"}
+#
+# So `-1` DID route by ticker and the matching engine DID find the market. It
+# then failed on the USER instead. The order got one layer deeper, which is
+# what a correct fix to a layered failure looks like.
+#
+# `user_not_found` naming a UUID means the shard that owns the market has no
+# record of the account the request was made for. Two things can cause that,
+# and only one is ours to fix. The venue's own field reference:
+#
+#   subaccount -- The subaccount number to use for this order. 0 is the
+#   primary subaccount. Subaccount-restricted API keys must OMIT this field
+#   or pass their locked subaccount.
+#
+# We send a literal 0 on every order, exactly as `exchange_index` was sent.
+# If this key is subaccount-restricted, 0 is not "the default" any more than
+# shard 0 was -- it names a subaccount that may not exist for this key on this
+# shard, which is precisely what the error says.
+#
+# OMITTED BY DEFAULT, because that is the branch the reference prescribes for a
+# restricted key and the unrestricted case falls back to primary anyway.
+# `KALSHI_ORDER_SUBACCOUNT` puts a number back with no deploy -- WNBA orders
+# currently fill with `subaccount: 0`, so that is the rollback if omitting it
+# breaks the path that works.
+_SUBACCOUNT_OMITTED = object()
+
+
+def _v2_subaccount() -> Any:
+    raw = (os.environ.get("KALSHI_ORDER_SUBACCOUNT") or "").strip()
+    if not raw:
+        return _SUBACCOUNT_OMITTED
+    try:
+        return int(raw)
+    except ValueError:
+        return _SUBACCOUNT_OMITTED
+
+
 def _v2_exchange_index() -> int:
     raw = (os.environ.get("KALSHI_ORDER_EXCHANGE_INDEX") or "").strip()
     if not raw:
@@ -378,7 +421,7 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
 
     from syndicate.features.shared.execution_ledger import idempotency_key
 
-    return {
+    body: dict[str, Any] = {
         "ticker": ticker,
         "client_order_id": idempotency_key(request),
         "side": book_side,
@@ -390,9 +433,12 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
         "post_only": False,
         "cancel_order_on_pause": False,
         "reduce_only": False,
-        "subaccount": 0,
         "exchange_index": _v2_exchange_index(),
     }
+    subaccount = _v2_subaccount()
+    if subaccount is not _SUBACCOUNT_OMITTED:
+        body["subaccount"] = subaccount
+    return body
 
 
 def build_order_body(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
@@ -488,7 +534,10 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         # failure, because the reading that settles this is a shard other than
         # 0 filling -- and a line that only appears when things break cannot
         # show that.
-        f" exchange_index={body.get('exchange_index')}",
+        f" exchange_index={body.get('exchange_index')}"
+        # PRESENT OR ABSENT, on the SUBMIT. `exchange_index` had to be added to
+        # this line before its fix could be read at all; this one starts there.
+        f" subaccount={body.get('subaccount', '<omitted>')}",
         flush=True,
     )
     try:

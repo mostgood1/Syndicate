@@ -31236,3 +31236,61 @@ orders, exactly as placed.
 A warning that fires on the system working correctly teaches the reader to
 ignore the warning — and this one is the last line of defence against a
 double-spend.
+
+---
+
+## 2026-08-26 · CORRECTION · the shard fix WORKED and I reported it dead
+
+**I called `exchange_index` refuted at 13:20Z. It was not.** The user's own
+order table settles it, and the split is perfect with no exception either side:
+
+| window | error |
+|---|---|
+| every order before the 12:55:08Z deploy | `http_404 {"code":"market_not_found"}` |
+| every order after it (08:13–08:20 CT) | `http_400 {"code":"user_not_found: <account uuid>"}` |
+
+**HOW I GOT IT WRONG, because the mechanism matters more than the mistake.**
+I read `SUBMIT_FAILED_MARKET` in the worker log and saw it still firing. That
+line is MY OWN PROBE and it fires on *any* exception — it never carried the
+error code. I treated the probe's presence as the venue's answer and never
+re-read the error string. **The same defect I had flagged twice that morning,
+committed while writing the fix for it.** The counter-verify I pre-registered
+said what to do if `market_not_found` persisted; it did not persist, and I did
+not check.
+
+**WHAT IT ACTUALLY MEANS — the layered failure, one layer down:**
+
+```
+exchange_index: 0   -> pinned to shard 0 -> market is not there  -> market_not_found
+exchange_index: -1  -> auto-routed by ticker -> MARKET FOUND     -> user_not_found
+```
+
+The matching engine now resolves the market and fails on the ACCOUNT. That is
+what a correct fix to a stacked failure looks like: the error moves inward.
+
+**AND IT ANSWERS THE ORIGINAL QUESTION.** "What changed for MLB between 08-24
+and 08-25" — Kalshi moved MLB markets onto an exchange shard our account is not
+provisioned on. WNBA never moved, which is why `KXWNBAPTS`, `KXWNBA3PT`,
+`KXWNBAREB`, `KXWNBAAST` and `KXWNBATOTAL` have filled throughout while every
+`KXMLB*` failed. No code regression was ever involved; I spent a pass hunting
+one in `git log`.
+
+**NEXT, AND IT IS THE SAME MISTAKE A SECOND TIME.** `subaccount: 0` is the
+other field copied out of the sample as furniture. The venue's reference:
+
+> `subaccount` — 0 is the primary subaccount. Subaccount-restricted API keys
+> must **omit** this field or pass their locked subaccount.
+
+A literal 0 names a subaccount that may not exist for this key on this shard,
+which is exactly what `user_not_found` says. Now omitted by default;
+`KALSHI_ORDER_SUBACCOUNT=0` restores it with no deploy.
+
+**verify:** a `SUBMIT ... exchange_index=-1 subaccount=<omitted>` on a `KXMLB*`
+ticker followed by `status=submitted`. **counter-verify, and say it out loud:**
+if `user_not_found` persists with the field omitted, this is NOT ours to fix in
+code — the account is not provisioned on that shard and it needs Kalshi
+support. Do not look for a third field.
+
+**RISK, stated because it is real:** WNBA orders currently FILL with
+`subaccount: 0`. Omitting it could break the one venue path that works. The env
+override is the rollback and needs no deploy.
