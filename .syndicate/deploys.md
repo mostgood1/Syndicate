@@ -32912,3 +32912,46 @@ verify: one build's `SUPERSEDED_SURVIVORS`. **If `no_group_sibling` dominates,
 the fix is to give the guard the state file's group stamps** — the same source
 that found these — rather than to change its lag. If something else dominates,
 the fix is different and this entry's hypothesis was wrong.
+
+### `SUPERSEDED_SURVIVORS` — FIRST READING, 21:14-21:18Z, instance `-fwndb`
+
+    no_group_sibling=7    no_seen_age=19     within_lag=2
+    no_group_sibling=447  (none)             within_lag=888
+    no_group_sibling=199  no_seen_age=1      within_lag=199
+    no_group_sibling=274  no_seen_age=1      within_lag=484
+    no_group_sibling=267  no_seen_age=2      within_lag=380
+    no_group_sibling=199  no_seen_age=7553   within_lag=199   <- outlier
+    no_group_sibling=271  no_seen_age=1      within_lag=392
+
+**`sibling_no_seen_age` IS ZERO IN EVERY BUILD.** That candidate gap does not
+exist and can be struck.
+
+**`within_lag` IS THE LARGEST CATEGORY, AND IT IS NOT A HOLE.** A stale row whose
+freshest sibling is within 900s of it is a market where EVERY line is old — the
+`market_gone` population. There is nothing fresher to move to, so keeping it is
+the rule working exactly as specified. **Most stale survivors are not a defect.**
+
+**`no_group_sibling` at 199-447 per build is the dominant CANDIDATE hole**, and
+the decision rule I wrote before the reading pointed at the state-file fix if it
+dominated. It dominates among candidates (447 against 0) — **but I have to state
+what this reading does NOT establish**: a row with no sibling in the grid may
+simply be a market that genuinely has ONE line, which is `market_gone` and
+correctly kept. `no_group_sibling` is CONSISTENT with the source-difference
+hypothesis; it does not prove it.
+
+**What would prove it:** for rows counted `no_group_sibling`, ask whether the
+STATE FILE holds a fresher line for that same group. That is exactly what
+`_classify_stale_row` does, and its sample found `orphaned_line` — but it samples
+only the **3 worst rows per sport**, so "3 orphaned" is 3 of 9 sampled, not 3 of
+the population. **The true size of the hole is still unmeasured, and I should not
+have implied 3 was it.**
+
+**NEW AND UNEXPLAINED: one build reported `no_seen_age=7553`** against 1-19 in
+every other. Seven thousand rows carrying no observation clock at all, in a
+single grid build. Whatever that is, it is larger than the thing I was chasing,
+and it is not what this counter was built to find.
+
+**NOT FIXING ON THIS.** The reading narrows the field — one gap eliminated, one
+shown to be the rule working — but the load-bearing question (how many
+`no_group_sibling` rows have a fresher line in the state file) needs the state
+file joined in, which is one more measurement, not a fix.
