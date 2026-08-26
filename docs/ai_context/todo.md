@@ -634,6 +634,28 @@ the 19m43s.** Next question is where inside `collect_candidates` it goes — the
 per-stage `CANDIDATE_STAGE` lines are already emitted and timestamped, so this
 is a reading, not an instrumentation job.
 
+### `#572` — **Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list.** — lane `kalshi-exchange-index`, 2026-08-26, NOT STARTED, handed over
+
+`GET /portfolio/balance` accepts an `exchange_index` parameter — *"both values
+include all exchange indexes unless exchange_index is provided"*. That makes the
+shard guard's premise **directly testable** instead of inferred.
+
+Today's guard compares the market's shard against `_KNOWN_GOOD_SHARDS = (0,)`,
+a list derived from where we have historically filled. It works, but it is a
+proxy for the real question, and it needs `KALSHI_ORDER_KNOWN_SHARDS` flipped by
+hand the moment the user funds a shard.
+
+Reading the balance instead:
+- refuses on `balance == 0` for the market's shard, with the balance IN the
+  message, so the row says `shard=3 balance=$0.00` rather than asserting a cause;
+- **self-heals** — the moment collateral lands on shard 3, orders resume with no
+  env var and no deploy;
+- turns the last inferred step in this chain into a measurement.
+
+Context:  2026-08-26, and the lesson in 
+("a diagnosis and its remedy are separate claims"). The remedy half of this
+chain was wrong once already and was live in a production error string.
+
 ### `#568` — **Every Kalshi order for four days died on `market_not_found`. The field nobody questioned was the one copied out of the sample body.** — lane `kalshi-exchange-index`, 2026-08-26, FIXED + DEPLOYED, awaiting the confirming fill
 
 **Deployed `a46797d1b` → live-odds-worker `dep-da7e2v7avr4c73bq91vg`.**

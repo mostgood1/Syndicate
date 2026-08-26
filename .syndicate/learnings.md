@@ -6353,3 +6353,32 @@ Wednesday" as a regression and searched the diff. The correct first question was
 as failure.** `market_not_found` -> `user_not_found` was progress; I called the
 shard fix refuted an hour before it was confirmed, by reading my own probe line
 (which fires on ANY exception) instead of the error string underneath it.
+
+## A DIAGNOSIS AND ITS REMEDY ARE SEPARATE CLAIMS `[2026-08-26]`
+
+The Kalshi shard finding was measured, n=9, perfect split, confirmed in
+production from two independent clients. The REMEDY attached to it — *"the venue
+must enable this account on that shard; no code change fixes it"* — was never
+checked against anything. It rode in on the diagnosis's credibility, and I
+printed it into a **production error string**, where the next person to hit it
+would read it as settled.
+
+It was wrong. `GET /exchange/status` shows shards are PRODUCT partitions, all
+active (0 Default, 1 Combos, 2 Crypto, 3 Tennis & Baseball). Kalshi's doc:
+*"Subaccount balances are local to a specific exchange instance"* and
+*"Programmatic traders must preallocate collateral on a given exchange shard
+before order placement."* `user_not_found` meant NO FUNDS THERE. The fix was the
+account holder moving money — about a minute — not a support ticket.
+
+**A confident wrong remedy inside a correct diagnosis is more dangerous than a
+wrong diagnosis**, because the diagnosis's evidence launders it and nobody
+re-checks the half that had none.
+
+**The rule:** "what is broken" and "whose move it is" are different claims
+needing different evidence. Before writing a remedy into anything durable — an
+error string, a ledger entry, a message to the user — ask what was READ to
+support it, not what was inferred. Here the answer was one fetch of a doc page.
+
+**Corollary:** the same goes for the error text itself. An error message that
+names a remedy is making a claim with the system's authority behind it, and it
+outlives the conversation that produced it.

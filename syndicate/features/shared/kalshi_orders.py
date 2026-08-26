@@ -531,10 +531,11 @@ def _retry_url_for(url: str, fetch_base: str) -> str:
 # why this broke on 08-25 with no deploy of ours in between, and it retires the
 # last code-regression hypothesis.
 #
-# ENV-OVERRIDABLE, and that is the point: the fix for this is ACCOUNT
-# PROVISIONING at the venue, not a patch. When shard 3 is enabled for this
-# account, `KALSHI_ORDER_KNOWN_SHARDS=0,3` makes it legible again with no
-# deploy.
+# ENV-OVERRIDABLE, and that is the point: the fix is the ACCOUNT HOLDER
+# MOVING COLLATERAL onto that shard, not a patch and not a support ticket.
+# Kalshi balances are local to an exchange instance and must be
+# preallocated. Once shard 3 is funded, `KALSHI_ORDER_KNOWN_SHARDS=0,3`
+# makes it legible again with no deploy.
 _KNOWN_GOOD_SHARDS = (0,)
 
 
@@ -558,23 +559,47 @@ def _classified(exc: BaseException, body: Mapping[str, Any], market_shard: Any) 
     """Give the venue's 400 a name a human can act on. Never masks the cause.
 
     ------------------------------------------------------------------
-    `user_not_found` IS NOT A BUG IN THIS REPO AND NO PATCH FIXES IT
+    `user_not_found` ON A SHARD MEANS NO COLLATERAL THERE, NOT NO ACCOUNT
     ------------------------------------------------------------------
 
-    Two rungs of a ladder, both errors literally true, neither ours:
+    Two rungs of a ladder, both errors literally true, neither a bug here:
 
         exchange_index 0 (pinned) -> market is not on shard 0 -> market_not_found
         exchange_index -1 (auto)  -> routes to shard 3, found -> user_not_found
 
-    The account is provisioned on shard 0. MLB moved to shard 3. What unblocks
-    it is the venue enabling this account on that shard -- plausibly its own
-    account agreement, which would present exactly as "user not found" for a
-    UUID that is perfectly valid elsewhere.
+    CORRECTED 2026-08-26, AND THE FIRST VERSION OF THIS DOCSTRING SENT PEOPLE TO
+    THE WRONG PLACE. It said the venue had to "enable this account on that
+    shard" and that "no code change fixes it" -- so a reader was pointed at
+    Kalshi support for something the account holder can do in about a minute.
 
-    So this does not retry, does not fall back, and does not change the request.
-    It renames the failure so the ledger row says what is wrong instead of
-    showing a raw 400 that reads like a credential fault. The original exception
-    is chained by the caller (`raise ... from exc`) and nothing is swallowed.
+    `GET /trade-api/v2/exchange/status` enumerates the shards, and they are
+    PRODUCT shards, not separate exchange entities -- all four trading_active:
+
+        0 Default        1 Combos        2 Crypto        3 Tennis & Baseball
+
+    Shard 3 is where BASEBALL lives, which is the whole reason only MLB fails.
+    `KXNFLGAME`, `KXNBA` and `KXWNBAPTS` are all index 0.
+
+    Kalshi's sharding doc, verbatim:
+
+        "Subaccount balances are local to a specific exchange instance."
+        "Programmatic traders must preallocate collateral on a given exchange
+         shard before order placement."
+
+    So `user_not_found` here is consistent with HAVING NO FUNDS ON THAT SHARD,
+    not with the account being unknown. **Nothing needs enabling. Money needs
+    moving** -- at kalshi.com/account/exchange-indexes, or via the
+    intra-account-transfer API, by the account holder.
+
+    THE LESSON, and it is why the whole paragraph is rewritten rather than
+    patched: the shard DIAGNOSIS was right and confirmed in production, and a
+    REMEDY was attached to it by inference rather than by reading. A confident
+    wrong remedy inside a correct diagnosis is worse than no remedy, because it
+    inherits the diagnosis's credibility and nobody re-checks it.
+
+    This does not retry, does not fall back, and does not change the request. It
+    renames the failure so the ledger row says what to DO. The original
+    exception is chained by the caller and nothing is swallowed.
 
     NO ACCOUNT IDENTIFIER IS COPIED INTO THE MESSAGE. The venue's text carries a
     user UUID; the ledger is rendered on a web page, so the shard and the ticker
@@ -593,12 +618,14 @@ def _classified(exc: BaseException, body: Mapping[str, Any], market_shard: Any) 
     # different strings.
     shard = "UNREAD" if market_shard is None else market_shard
     return OrderBuildError(
-        "venue_shard_not_provisioned:"
-        f" market_shard={shard} known_good_shards={list(shards)}"
+        "venue_shard_unfunded:"
+        f" market_shard={shard} funded_shards={list(shards)}"
         f" ticker={body.get('ticker')}"
-        " -- the market resolved and the ACCOUNT did not. This needs the venue"
-        " to enable this account on that exchange shard; no code change fixes"
-        " it. Set KALSHI_ORDER_KNOWN_SHARDS once it is provisioned."
+        " -- Kalshi balances are PER-SHARD and must be preallocated before"
+        " order placement. This is not a venue permission and not a code fault:"
+        " move collateral to that shard at kalshi.com/account/exchange-indexes"
+        " (or via the intra-account-transfer API), then add it to"
+        " KALSHI_ORDER_KNOWN_SHARDS."
     )
 
 

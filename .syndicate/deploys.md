@@ -31725,3 +31725,60 @@ close at once:
 
 **Nothing further is fixable in code.** The remaining action is Kalshi enabling
 this account on exchange shard 3.
+
+---
+
+## 2026-08-26 · CORRECTION · the shard remedy was wrong and was LIVE IN AN ERROR STRING
+
+syndicate-43 retracted their own remedy after the user challenged it, and went
+and read the venue instead of restating the conclusion. **The diagnosis was
+right; the remedy attached to it was not, and I had shipped it verbatim.**
+
+**What it said:** *"the market resolved and the ACCOUNT did not. This needs the
+venue to enable this account on that exchange shard; no code change fixes it."*
+That sends whoever reads the board to Kalshi support.
+
+**What it is.** `GET /trade-api/v2/exchange/status` enumerates the shards, and
+they are PRODUCT shards, not separate exchange entities — all four
+`trading_active`:
+
+```
+0 Default    1 Combos    2 Crypto    3 Tennis & Baseball
+```
+
+**Shard 3 is where BASEBALL lives**, which is the whole reason only MLB failed.
+`KXNFLGAME`, `KXNBA`, `KXWNBAPTS` are all index 0.
+
+Kalshi's sharding doc, verbatim:
+
+> "Subaccount balances are local to a specific exchange instance."
+> "Programmatic traders must preallocate collateral on a given exchange shard
+> before order placement."
+
+So `user_not_found` on shard 3 is consistent with **having no collateral there**,
+not with the account being unknown. **Nothing needs enabling. Money needs
+moving** — kalshi.com/account/exchange-indexes or the intra-account-transfer
+API, by the account holder, in about a minute.
+
+**Renamed `venue_shard_not_provisioned` -> `venue_shard_unfunded`**, and the
+message now names the action and where to take it. `known_good_shards` ->
+`funded_shards`.
+
+### THE LESSON — a confident wrong remedy inside a correct diagnosis
+
+This is the more dangerous shape than a wrong diagnosis. The shard finding was
+measured, n=9, confirmed in production from two independent clients — and the
+remedy rode in on that credibility without ever being checked against a source.
+I printed it into a production error string, where it would have been read as
+settled by anyone who hit it.
+
+**The rule: a diagnosis and its remedy are separate claims and need separate
+evidence.** "What is broken" being measured says nothing about "whose move it
+is". The doc that settled it took one fetch.
+
+**Not shipped, and worth doing:** `GET /portfolio/balance` accepts an
+`exchange_index` parameter, which makes this guard's premise DIRECTLY TESTABLE
+rather than inferred — refuse on `balance == 0` for the market's shard, with the
+balance in the message. Strictly better than a hardcoded list, and it self-heals
+the moment the shard is funded instead of needing an env var flipped. Left as
+`#570`.

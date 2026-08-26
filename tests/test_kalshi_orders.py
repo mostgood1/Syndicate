@@ -1005,8 +1005,12 @@ def test_user_not_found_is_renamed_to_the_shard_problem_it_actually_is():
     out = _classified(raw, {"ticker": "KXMLBERA-26AUG261910MILNYM-MILDMAY3-2"}, 3)
     assert isinstance(out, OrderBuildError)
     text = str(out)
-    assert "venue_shard_not_provisioned" in text
-    assert "market_shard=3" in text and "known_good_shards=[0]" in text
+    assert "venue_shard_unfunded" in text
+    assert "market_shard=3" in text and "funded_shards=[0]" in text
+    # POINTS AT THE ACTION, not at support. The first version said the venue
+    # had to enable the account; the account holder moves collateral.
+    assert "exchange-indexes" in text
+    assert "no code change fixes it" not in text
     # NO ACCOUNT IDENTIFIER TRAVELS. The venue's text carries a user UUID and
     # the ledger is rendered on a web page.
     assert "22c67b4f" not in text
@@ -1028,7 +1032,7 @@ def test_the_known_good_shard_list_opens_without_a_deploy(monkeypatch):
 
     monkeypatch.setenv("KALSHI_ORDER_KNOWN_SHARDS", "0,3")
     assert _known_shards() == (0, 3)
-    assert "known_good_shards=[0, 3]" in str(
+    assert "funded_shards=[0, 3]" in str(
         _classified(RuntimeError("user_not_found: x"), {"ticker": "T"}, 3)
     )
 
@@ -1076,3 +1080,37 @@ def test_the_market_normalizer_carries_the_exchange_shard():
         {"ticker": "KXMLBTOTAL-26AUG261940TEXCWS-8", "status": "active", "exchange_index": 3}
     )
     assert out["exchange_index"] == 3
+
+
+def test_the_shard_error_points_at_funding_not_at_venue_support():
+    """CORRECTED 2026-08-26, and the wrong version was live in production.
+
+    The message said the venue had to "enable this account on that exchange
+    shard" and that "no code change fixes it" -- sending whoever read the board
+    to Kalshi support for something the account holder does in about a minute.
+
+    `GET /exchange/status` lists PRODUCT shards, all trading_active: 0 Default,
+    1 Combos, 2 Crypto, 3 Tennis & Baseball. Kalshi's sharding doc: "Subaccount
+    balances are local to a specific exchange instance" and "Programmatic
+    traders must preallocate collateral on a given exchange shard before order
+    placement." So `user_not_found` there means NO FUNDS ON THAT SHARD.
+
+    A confident wrong remedy inside a correct diagnosis is worse than no remedy:
+    it inherits the diagnosis's credibility and nobody re-checks it.
+    """
+    from syndicate.features.shared.kalshi_orders import _classified
+
+    text = str(
+        _classified(
+            RuntimeError('http_400: {"code":"user_not_found: x"}'),
+            {"ticker": "KXMLBTOTAL-26AUG261940TEXCWS-8"},
+            3,
+        )
+    )
+    # The action, and where to take it.
+    assert "exchange-indexes" in text or "intra-account-transfer" in text
+    assert "PER-SHARD" in text
+    # The retired claims must not come back.
+    assert "no code change fixes it" not in text
+    assert "enable this account" not in text
+    assert "not_provisioned" not in text
