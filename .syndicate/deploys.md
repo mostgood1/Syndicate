@@ -30693,3 +30693,61 @@ tests caught the symptom, this is the cause.
 **The correct fix separates them:** memoise the expensive stable half (fixtures +
 simulated projections) and re-attach live state on every read. That is a change
 to `build_cards_page_context`'s contract, not a wrapper around it.
+
+## 2026-08-25 23:00 CT — refresh-worker `a128a23e` (`#565` soccer context memo) — VERIFIED, AND IT CORRECTS MY OWN MEASUREMENT
+
+**Live 04:00:00Z.** Preflight by hand: 6 processes, **no MLB sim in flight**
+(past `post_mlb_sim_tick`); what died was an eredivisie odds refresh + artifact
+build, both of which re-run next cycle. Memory 96.8%.
+
+**READING 1 — the memo works and saves FAR LESS than I claimed.**
+
+    04:12:00Z  SOCCER_CONTEXT_CACHE hits=519 misses=61 calls=580 seconds_saved=88.2
+
+89.5% hit rate, 61 distinct league-weeks genuinely built, **88.2 seconds saved
+— 0.17 s per hit.** No live staleness; the vintage key did its job.
+
+**MY 12.5-SECOND-PER-LEAGUE-WEEK FIGURE WAS WRONG, and this is the correction.**
+I derived it from the GAPS BETWEEN consecutive `board_contract_begin` lines
+(13.6 / 13.0 / 12.2 s). **That gap is everything happening between two builds,
+not the build.** `seconds_saved` is measured with `time.monotonic()` around the
+actual call, so it is the real number and the inference was not. I built the
+case for this change on a figure attributed to the wrong thing.
+
+**READING 2 — independent, and it agrees.**
+
+    boot 04:00:00Z -> GAME_CHIPS_PUBLISHED 04:11:22Z = 11m22s
+
+    original                 19m43s
+    after per-sport window   12m44s
+    after soccer memo        11m22s
+
+**82 seconds faster against 88.2 s of measured saving** — two independently
+computed numbers landing within 7%. That agreement is the strongest evidence
+tonight that a measurement is real.
+
+**THE BOARD BUILD IS 19m43s -> 11m22s, 42% OFF. THE SPLIT IS NOT WHAT I
+PREDICTED AT ANY POINT:**
+
+| change | I claimed | actual |
+|---|---|---|
+| per-sport slate window | "soccer saves nothing, expect no change" | **-7m** |
+| soccer context memo | "removes most of the remaining cost" | **-82s** |
+
+**Wrong in both directions, and both times for the same reason: I inferred a
+mechanism from LOG SPACING instead of instrumenting the call.** The
+instrumentation is now in place, which is why these two numbers are trustworthy
+where the earlier ones were not. **The rule for whoever takes `#565` next: put a
+timer around the call before proposing a fix for it.** Every wrong turn tonight
+— the identity-keyed `week_games` memo, the "no change expected" prediction, the
+12.5 s figure — came from skipping that step.
+
+**`out_of_window` behaves as designed and would be misread on a single sample:**
+`34` on the forward ticks (every `interval x 6` = 12 min), `0` on today-only
+ticks, because there is nothing forward to prune on those. Sampling only a
+today-only tick reads as "the fix stopped working".
+
+**STILL OPEN at 11m22s.** The remaining time is genuinely UNATTRIBUTED: 61 real
+league-week builds, MLB's ~3 minutes of uncached `[home]` card contexts, and
+whatever else. Same treatment required — measure the call, do not infer from the
+gap.
