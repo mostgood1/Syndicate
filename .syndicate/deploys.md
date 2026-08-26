@@ -33221,3 +33221,62 @@ The mechanism was proven from code (multi-date `quote_rows` against a
 single-date `last_seen`), the clockless population it created is gone
 (`7553 -> max 52`), superseded forward-date lines are being pruned for the first
 time, and the board is unchanged in size.
+
+## 2026-08-26 22:07:31Z — refresh-worker `ebfec2ed` — the venue gets first refusal on live orders
+
+**what:** a LIVE order is no longer graded by `paper_settlement.settle_orders`
+until the venue has had a stated window to settle it
+(`SYNDICATE_VENUE_SETTLEMENT_GRACE_HOURS`, default 24). Lane
+`venue-first-refusal`. Item `todo.md #580`.
+
+**why:** measured 21:36Z, `settle_orders` runs from `intelligence_state.py` on
+refresh-worker while `venue_settlement.settle_from_venue` runs on
+live-odds-worker, and both skip an order already carrying an `outcome`. So
+**whichever service ticked first after a game ended owned that row
+permanently** — which grader won was decided by TIMING, not policy.
+
+**claim/preflight:** claim held by `venue-first-refusal`. **Preflight was HOLD
+with 7 jobs — an MLB daily sim mid-run (`run_mlb_daily_sim_job.py` ->
+`daily_update.py --workflow ui-daily`) plus three spawned multiprocessing
+workers — and the guard correctly blocked me.** As at 21:3xZ, the documented
+off switch is an env var the hook reads from its OWN process and an inline
+prefix does not reach it; I again declined to forge a preflight receipt or POST
+the API directly. **The user ran `render_deploy.py` from their own terminal**
+after being told the cost, and the sim was killed as directed. Deploy
+dep-da7m78s9v7es739huge0, created 22:07:31Z, live ~22:11Z. Claim released
+22:2xZ once the deploy was complete.
+
+**verify — `awaiting_venue: 28`, AND 28 IS THE EXACT PRE-DEPLOY COUNT.**
+
+    [paper_settlement] SETTLED date=2026-08-26 orders=435 graded=0
+      already_graded=6
+      ungraded={'no_live_feed': 314, 'match_not_in_soccer_live_state': 3,
+                'awaiting_venue': 28, 'order_not_filled': 74,
+                'unmapped_market': 3, 'no_live_box_for_date': 7}
+
+Counted from the served ledger BEFORE deploying: 28 orders with
+`status=filled` and no `outcome` on 2026-08-26. Every one of them would
+otherwise have been graded by inference tonight, permanently, before the venue
+was asked. The other counters prove it DISCRIMINATES rather than deferring
+everything: `order_not_filled: 74` still refuses on its own reason (the bug the
+first version had — the deferral ran BEFORE the filled check, so an unfilled
+order would have waited forever for a settlement on a position never opened;
+`test_an_unfilled_order_is_not_counted_as_a_loss` caught it), the paper reasons
+are unchanged, and 2026-08-25 stays at `already_graded=129`.
+
+**A READING I NEARLY GOT WRONG, recorded because the method is the lesson.**
+The first watcher queried the logs with no time floor and returned `SETTLED`
+lines from 21:28–21:42Z — all BEFORE the 22:07:31Z deploy. `awaiting_venue` was
+absent from them and I was one step from reporting "the deferral is not firing".
+Worse, I had already cited that batch's `date=2026-08-25 graded=6` as evidence
+the past-window fallback worked; it was the OLD code, which had no window at
+all. **Corrected before it reached a conclusion, by timestamping the lines
+against the deploy.** The watcher now floors on `startTime`. The discriminator
+that kept this honest: `SETTLEMENT_FAILED: 0` post-deploy ruled out the raise
+that would have looked identical to the silence.
+
+**OWED:** with the race closed, tonight's settlements should now arrive
+`settled_by: "venue"` rather than inferred. The reading is the venue/inferred
+split on `/api/portfolio/live` tomorrow — and unlike tonight's (venue 3 bets
+ROI −11.88% vs inferred 12 bets +51.07%) it will finally be a controlled
+comparison rather than the outcome of a race.

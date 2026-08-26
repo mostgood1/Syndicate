@@ -2093,7 +2093,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
      `test_team_aliases.py` is 9 of them and the soccer join leans on it.
 - Blocked by: none
 
-### venue-first-refusal — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
+### venue-first-refusal — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
 - Goal: on a LIVE order, the VENUE's settlement record grades it and our own
   inference is the FALLBACK — not a race decided by which worker ticks first.
   `[user decision 2026-08-26: "give the venue first refusal on live orders"]`
@@ -2129,6 +2129,28 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   graded, and a PAPER order is graded either way. Production reading owed:
   `awaiting_venue` appearing in `[paper_settlement] SETTLED ... reasons=` on
   refresh-worker, and new live grades carrying `settled_by: "venue"`.
+- **CLOSED 2026-08-26 — VERIFIED IN PRODUCTION**, refresh-worker `ebfec2ed`:
+  `ungraded={... 'awaiting_venue': 28, 'order_not_filled': 74 ...}`.
+  **28 is the EXACT pre-deploy count** of filled-and-ungraded live orders on
+  2026-08-26, measured off the served ledger before deploying — every one would
+  otherwise have been graded by inference tonight before the venue was asked.
+  `order_not_filled: 74` proves it discriminates rather than deferring
+  everything; paper and 2026-08-25 are untouched.
+- **A BUG AN EXISTING TEST CAUGHT:** the first version ran the deferral BEFORE
+  the filled check, so an unfilled live order would have waited forever for a
+  settlement on a position never opened.
+  `test_an_unfilled_order_is_not_counted_as_a_loss` failed and said so.
+- **A READING I NEARLY GOT WRONG:** the first watcher had no `startTime` floor
+  and returned `SETTLED` lines from 21:28–21:42Z — all BEFORE the 22:07:31Z
+  deploy. `awaiting_venue` was absent from them and I was one step from
+  reporting the deferral dead; I had also cited that batch's `08-25 graded=6` as
+  proof the fallback worked when it was the OLD code with no window at all.
+  Caught by timestamping against the deploy. `SETTLEMENT_FAILED: 0` was the
+  discriminator that ruled out the raise which looks identical to silence.
+- **DEPLOY NOTE:** preflight was HOLD with an MLB daily sim mid-run and the
+  guard blocked me; the user deployed from their own terminal after being told
+  the cost, and the sim was killed as directed. Full block: `deploys.md`
+  2026-08-26 22:07:31Z. Item: `todo.md #580`.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

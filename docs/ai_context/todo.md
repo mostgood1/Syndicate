@@ -1,5 +1,59 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#580` — **The venue gets first refusal on live orders. `awaiting_venue: 28`, and 28 was the exact pre-deploy count.** — lane `venue-first-refusal`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T22:1xZ** (refresh-worker `ebfec2ed`)
+
+`[user decision 2026-08-26]` *"give the venue first refusal on live orders"*.
+
+**THE RACE THIS CLOSES, measured 21:36Z.** `paper_settlement.settle_orders`
+runs from `intelligence_state.py` on **refresh-worker**;
+`venue_settlement.settle_from_venue` runs on **live-odds-worker**. Both skip an
+order already carrying an `outcome`, so **whichever service ticked first after a
+game ended owned that row permanently** — which grader won was decided by TIMING
+rather than policy, and the venue/inferred comparison could never become
+controlled while that stood.
+
+**VERIFIED:**
+
+    [paper_settlement] SETTLED date=2026-08-26 orders=435 graded=0
+      already_graded=6
+      ungraded={'no_live_feed': 314, 'awaiting_venue': 28,
+                'order_not_filled': 74, 'unmapped_market': 3, ...}
+
+**28 is not approximately right, it is the number.** Counted from the served
+ledger before deploying: exactly 28 orders `status=filled` with no `outcome` on
+2026-08-26. Every one would otherwise have been graded by inference tonight,
+permanently, before the venue was asked. And the other counters prove it
+DISCRIMINATES rather than deferring everything — `order_not_filled: 74` still
+refuses on its own reason, paper is untouched, 2026-08-25 unchanged.
+
+**A BUG AN EXISTING TEST CAUGHT.** The first version ordered the deferral BEFORE
+the filled check, so an unfilled live order would have waited forever for a
+settlement on a position that was never opened.
+`test_an_unfilled_order_is_not_counted_as_a_loss` failed and said so.
+
+**AND A READING I NEARLY GOT WRONG — the method is the lesson.** The first
+watcher queried logs with no time floor and returned `SETTLED` lines from
+21:28–21:42Z, all BEFORE the 22:07:31Z deploy. `awaiting_venue` was absent and I
+was one step from reporting "the deferral is not firing"; I had also already
+cited that batch's `date=2026-08-25 graded=6` as proof the past-window fallback
+worked, when it was the OLD code with no window at all. Caught by timestamping
+the lines against the deploy. **The discriminator that kept it honest was
+`SETTLEMENT_FAILED: 0`** — ruling out the raise that would have looked identical
+to the silence. Watchers now floor on `startTime`.
+
+**DESIGN:** a DELAY, not a refusal — a market the venue never settles still
+reaches the ledger after the window, so a ticker we got wrong does not mean a
+position that is never scored. Paper is exempt (no venue record to wait for).
+Age from `submitted_at`, falling back to `selected_date` aged from the END of
+the slate day. Zero disables deliberately; a negative falls back to the default,
+because "never defer" is a policy change dressed as a typo.
+
+**OWED:** tonight's settlements should now arrive `settled_by: "venue"`. The
+reading is the venue/inferred split tomorrow — and unlike tonight's (venue 3
+bets ROI −11.88% vs inferred 12 bets +51.07%) it will be a controlled
+comparison rather than the outcome of a race.
+
+
 ### `#579` — **The venue settles our bets now, and the first reading says our own grader and the venue disagree.** — lane `venue-settlement`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T21:36Z** (live-odds-worker `022583f6`)
 
 `[user decision 2026-08-26]` *"do the settlement work next"*.
