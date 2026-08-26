@@ -504,6 +504,38 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                 f" can_close_early={market.get('can_close_early')}",
                 flush=True,
             )
+            # THE EVENT'S OWN MARKET LIST, and the last question standing.
+            #
+            # Measured 2026-08-26T01:18:47Z: the GET and the POST went to the
+            # SAME host (`fetch_base` == `order_base`), 1.9s apart, and only
+            # the POST 404'd. That killed the host hypothesis -- the fourth
+            # killed this week, after side, market shape and event field.
+            #
+            # What has never been checked is whether the ticker the MARKET
+            # endpoint answers to is the ticker the ORDER BOOK knows. A
+            # listing can resolve an alias; an order book cannot. Every failure
+            # so far is a 3-segment KXMLBTOTAL ticker while the one FILL was a
+            # 4-segment player prop, so asking the venue to spell its own
+            # markets is the cheapest way to see a mismatch that would produce
+            # exactly GET-ok/POST-404.
+            #
+            # Printed as a COMPARISON, not a dump: whether our ticker is in the
+            # venue's own list is the entire finding.
+            event_ticker = str(market.get("event_ticker") or "")
+            if event_ticker:
+                from syndicate.features.shared.kalshi_client import fetch_event_markets
+
+                listed = fetch_event_markets(event_ticker)
+                tickers = listed.get("tickers") or []
+                ours = str(body.get("ticker") or "")
+                print(
+                    "[kalshi_orders] SUBMIT_FAILED_EVENT_MARKETS"
+                    f" event={event_ticker} status={listed.get('status')}"
+                    f" count={len(tickers)}"
+                    f" ours_listed={ours in tickers}"
+                    f" sample={tickers[:6]}",
+                    flush=True,
+                )
         except Exception as probe_exc:  # noqa: BLE001 -- a diagnostic never masks the real error
             print(
                 f"[kalshi_orders] SUBMIT_FAILED_MARKET_PROBE_ERROR"
