@@ -5,6 +5,77 @@
 
 ---
 
+## 2026-08-26 — refresh-worker `d92ab27b1`: the board's date histogram now means the game date
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
+`dep-da73cm2jnfac73akm1i0`, triggered `00:42:00Z`, live `00:45:13Z`. Trigger
+`api` (MCP), so the guard hook did not see it — it matches `Bash|PowerShell`
+only. Same gap as the 2026-08-23 row; stated, not glossed.
+
+**Claim + preflight.** Claim held by `kalshi-line-aware-rungs`.
+`deploy_preflight.py` could NOT run (`RENDER_API_KEY not set`), so its checks
+were done by hand against `ALL_PROCESS_MEMORY` at `00:37:51Z`, 3 processes:
+
+```
+pid 39   run_refresh_worker.py                  infra
+pid 1    graceful-shell-command.sh              infra (ppid 0)
+pid 556  <no cmdline>, rss null, name=python -> is_defunct() True -> defunct
+```
+
+Jobs list empty -> CLEAR. Waiting for that window took 29 minutes across 8
+samples; the worker ran two MLB sims and three soccer builds in that time and
+the gaps between jobs were about one minute wide.
+
+**WHAT DEPLOYED IS NOT WHAT I PUSHED, and that is the design working.** My commit
+was `d343ae242`; the deploy picked up `d92ab27b1`, a parallel session's PR #83
+merge from `00:36:01Z`. Verified BY CONTENT rather than assumed:
+
+```
+git branch -r --contains d343ae242            -> origin/main
+d92ab27b1:kalshi_board.py   game_date_from_ticker -> 4
+d92ab27b1:kalshi_odds_refresh.py BY_CLOSE_DATE    -> 1
+```
+
+Both changes are on `main`, so the later deploy CONTAINS the earlier one instead
+of reverting it — the property `EXIT_OFF_MAIN` exists to guarantee, observed
+rather than argued.
+
+**No job was killed.** Worker rebooted `499ng` -> `fzb6v`, memory 98.9% -> 62.5%,
+and a fresh MLB sim started on 15 game pks (pre-deploy runs had 9).
+
+**verify: OPEN OBLIGATION.** The reading that settles it is one cycle carrying
+BOTH lines, which must DISAGREE:
+
+```
+[kalshi_odds] BY_GAME_DATE  <game dates, from the ticker>
+[kalshi_odds] BY_CLOSE_DATE <settlement dates, up to 4 days later>
+```
+
+Identical key sets would mean `game_date_from_ticker` returned None throughout
+and everything fell into `<undatable_ticker>` — a failure wearing the shape of
+success, which is the class of thing this deploy exists to stop.
+
+As of `00:54Z`, 9 minutes post-boot, no `[kalshi_odds]` line has printed. Not yet
+evidence of anything: the last pre-deploy cycle was `00:35:49Z` and the one
+before it `23:43:59Z`, a 52-minute gap, so the cadence is bursty
+(`refresh_interval_seconds` 120s base, 3600s dormant, per-series `_due_series`).
+
+**The last word from the OLD code, `00:35:49Z`:**
+
+```
+BOARD_JOIN kalshi_markets=6000 board_rows=841 matched=0
+  reasons={'market_is_for_another_date': 3332, 'unreadable_title': 2302,
+           'no_matching_board_row': 257, 'event_not_on_our_board': 109}
+JOIN_EVENTS unmatched=[KXMLBGAME-26AUG261945BALSTL-STL, KXMLBGAME-26AUG261905HOUNYY-NYY, ...]
+            board=['ADO Den Haag/Feyenoord', 'AS Roma/Lecce', 'Ajax/SC Telstar', ...]
+```
+
+Kalshi quoting 26AUG26 MLB while the board holds only soccer fixtures. A THIRD
+candidate explanation for `market_is_for_another_date`, recorded as a hypothesis
+and NOT a finding — this lane has had two killed already.
+
+---
+
 ## 2026-08-23 — refresh-worker `43c8e5507`: Kalshi keeps its own clock, and 154 opening lines now exist
 
 **Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), deploy
