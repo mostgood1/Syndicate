@@ -1,4 +1,4 @@
-// `#546`. The compact scoreboard must SAY SO when it has stopped moving.
+// `#562`. The compact scoreboard must SAY SO when it has stopped moving.
 //
 // WHY THIS EXISTS. Reported 2026-08-25: "it was sitting with stale compact
 // cards and even the odds refresh times were frozen for about 20 mins". Nothing
