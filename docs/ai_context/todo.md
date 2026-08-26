@@ -1,5 +1,61 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#570` — **The pytest suite writes into git-tracked `data/`. Every full-suite run dirties the working tree, and the stray lines look like recorded production data.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+**Observed three times in one session**, each time after starting a full-suite
+run, always the same file:
+
+```
+ M data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_02.jsonl
+```
+
+One JSON record appended per run, e.g. `{"recordedAt": "2026-08-26T15:06:43+00:00",
+"date": "2026-06-02", "generatedAt": "2026-08-26T15:06:43+00:00", ...}` — three
+minutes into the run each time. I restored it with `git checkout --` on each
+occurrence rather than committing it.
+
+**The mechanism.** `syndicate/features/mlb/live_lens.py:1381` appends via
+`live_lens_log_path(selected_date)`
+(`syndicate/features/mlb/sources.py:364`), which resolves through
+`_resolve_data_path_with_reconcile` against the **repo's own `data/` root**
+unless `SYNDICATE_DATA_ROOT` is redirected. `tests/conftest.py` does **not**
+sandbox `SYNDICATE_DATA_ROOT` globally — 67 test files set it individually, so
+the convention exists but is opt-in per test, and anything that reaches this
+writer without opting in writes to the tracked mirror.
+
+**Why this is worth more than a tidy-up.** `CLAUDE.md` designates
+`data/<sport>_source/` a **cold-start safety net**, explicitly *not* a snapshot
+of what production computed, and warns that analysis drawing conclusions from it
+is reading a lossy mirror. A test-injected record is worse than lossy: it is
+**fabricated data wearing a production timestamp**. The line above says
+`recordedAt: 2026-08-26` for `date: 2026-06-02` — a future session backtesting
+2026-06-02 has no way to tell it from a real capture. This is the same failure
+class as `#502`/`#517`: a number that looks precise and is not real.
+
+The second-order risk is the commit. A dirty tree after every suite run trains
+people to `git add -A`, and `.syndicate/session_isolation_protocol.md` already
+records what that habit cost once (4,993 staged deletions, and the staged
+deletion of the only copy of a ledger archive).
+
+**NOT YET PINNED: which test.** The prime suspect is
+`tests/test_mlb_refresh_runner.py` — it is the only test file that references
+`2026-06-02` *and* `live_lens`, and it monkeypatches `_live_lens_log_path` at
+`:337` and `live_lens_log_path` at `:906`, i.e. it sandboxes the writer on some
+paths. Some path through the suite evidently still reaches the real root, and I
+did not isolate which; attributing it to that file on this evidence would be a
+guess. **To pin it:** run the suite with a watch on the file's mtime, or bisect
+by running candidate files individually against a clean tree.
+
+**The fix is probably one line, and should not be applied blind.** An autouse
+`conftest.py` fixture pointing `SYNDICATE_DATA_ROOT` at a tmpdir would stop the
+whole class. But 67 files set it themselves, and some tests read git-tracked
+mirror fixtures on purpose — a global redirect could turn "reads real fixture"
+into "reads empty dir" and convert this into a wave of silent empty-input
+passes, which is the failure mode `model_engine_standard.md` exists to prevent.
+Land it behind a full-suite before/after, not on reasoning.
+
+---
+
 ### `#569` — **Is the BOARD stale, or is the QUOTE stale? Nothing in this repo could tell them apart, and the whole staleness investigation ran without noticing.** — lane `board-staleness-visibility`, 2026-08-26, asked by syndicate-43 — **INSTRUMENT SHIPPED (log-only), NOT DEPLOYED**
 
 **THE BLIND SPOT, and it is mine.** Every measurement the staleness work
