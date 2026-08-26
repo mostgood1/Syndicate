@@ -32281,3 +32281,61 @@ orphaned-key mechanism.
 **An `unknown_*` label is a real outcome, not a failure to report.** Every branch
 that cannot decide says which branch it was rather than defaulting into
 `market_gone` — the guess is what would get quoted back.
+
+### `STALE_ROW_CAUSE` — FIRST READING, 19:15:44Z, instance `-m55dw`
+
+    QUOTE_AGE_SERVED rows=1306 no_clock=0
+      seen_n=1044 seen_p50=749 seen_p90=2091 seen_max=30932
+      book_n=1306 book_p50=927 book_p90=18462 book_max=66836
+      worst_seen_by_sport wnba=30932 nfl=10640 mlb=6117 soccer=140
+
+    STALE_ROW_CAUSE
+      mlb  [stale=131 worst=6117s   market_gone=2, orphaned_line=1]
+      nfl  [stale=54  worst=10640s  market_gone=3]
+      wnba [stale=27  worst=30932s  market_gone=1, orphaned_line=2]
+
+**BOTH MECHANISMS ARE REAL AND PRESENT. It was never going to be one.** Of the
+9 classified rows, **`market_gone`=6, `orphaned_line`=3** — so the dominant
+cause is the FEED stopping, with a genuine minority of grid-side orphans that
+`drop_superseded_lines` should have caught.
+
+**212 of 1306 served rows (16%) carry quotes older than 15 minutes**
+(mlb 131, nfl 54, wnba 27).
+
+### THE CLASSIFIER IS WRONG FOR WNBA, AND THIS READING IS WHAT SHOWS IT
+
+I predicted wnba would read `market_gone`, because its sidecar is not written at
+all (`ODDS_SWEEP_OUTCOME sport=wnba wrote=False`). It read **`orphaned_line`=2
+of 3.** That is not a surprising truth — **it is a FALSE POSITIVE, and the
+mechanism is mine:**
+
+`orphaned_line` is decided by "a same-group key with a different line has a
+stamp materially fresher than this row." When a sidecar STOPS BEING WRITTEN,
+every key freezes — but at **staggered** times, whichever moment each was last
+observed before the writes stopped. A key frozen 10 minutes before the stop
+looks 4 hours "fresher" than one frozen 4 hours before it. **My test cannot tell
+a staggered freeze from a live supersession**, and it labels the first as the
+second.
+
+**So the wnba labels are unusable, and by the same argument any sport whose
+sidecar is not advancing.** The classifier is only valid where
+`ODDS_SWEEP_OUTCOME` reports `wrote=True`.
+
+    mlb   wrote=True   -> labels TRUSTWORTHY.  2 market_gone, 1 orphaned_line
+    wnba  wrote=False  -> labels UNUSABLE.     the freeze itself produces them
+    nfl   UNVERIFIED   -> check before quoting its 3 market_gone
+
+**THE FIX, not yet made:** gate the classification on the sidecar's own
+freshness, or compare against the sidecar's MAX stamp rather than a sibling's —
+if no key in the whole file is recent, the answer is "we stopped looking",
+regardless of how the frozen stamps are spread. That is a real defect in `#569`
+part 2 and it should be fixed before anyone sizes work off the split.
+
+**WHAT SURVIVES IT.** MLB is the sport the mechanism was built to test, its
+sidecar IS advancing, and it returns **2 `market_gone` to 1 `orphaned_line`.**
+Both causes are confirmed present on a sport where the measurement is sound.
+
+**Movement since 15:40 worth noting:** soccer's worst collapsed 1852s -> **140s**
+(healthy), mlb's 11244s -> 6117s, while **wnba climbed 18014s -> 30932s — 8.6
+hours** and still rising at wall-clock rate. wnba is the outlier and its cause
+is already owned by the OPEN lane `wnba-live-odds-capture-gap`.
