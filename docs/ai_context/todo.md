@@ -1,3 +1,63 @@
+# Syndicate TODO — canonical cross-session list
+
+### `#569` — **Is the BOARD stale, or is the QUOTE stale? Nothing in this repo could tell them apart, and the whole staleness investigation ran without noticing.** — lane `board-staleness-visibility`, 2026-08-26, asked by syndicate-43 — **INSTRUMENT SHIPPED (log-only), NOT DEPLOYED**
+
+**THE BLIND SPOT, and it is mine.** Every measurement the staleness work
+produced — `#564`'s chip `written_at`, the board's derived `state_meta`, the
+stale badge — is on artifact **PUBLICATION** time. **None of it touches the age
+of the quote INSIDE the artifact.**
+
+    a board republished every 60s carrying 20-minute-old venue quotes reads:
+      written_at        seconds old      ✓ fresh
+      published_at      seconds old      ✓ fresh
+      state_meta        is_fresh: true   ✓ fresh
+      stale badge       not rendered     ✓ fresh
+
+**That failure mode was invisible to every instrument shipped in this lane**, and
+it is precisely the one a direct Kalshi/Polymarket feed would fix while a
+publication fix would not. syndicate-43 asked whether the two had been
+separated. They had not. **The direct-feed hypothesis is UNTESTED, not refuted.**
+
+**Why it was missed:** the reported symptom (frozen odds-refresh times, chips not
+updating ~20 min) pointed at publication, and publication turned out to be
+genuinely broken **twice** — `#545`'s cadence regression and the hard-coded
+`is_fresh: True`. Two true causes in a row is exactly what stops the search.
+
+**THE INSTRUMENT.** `QUOTE_AGE_SERVED at=publish rows= no_clock= seen_n/p50/p90/max
+book_n/p50/p90/max worst_seen_by_sport <slug>=<s> ...` in
+`pipeline/layer2_shortlist.py`, over the **SELECTED** rows (the quote-age gate
+has already dropped rows past `max_quote_age_seconds`, so this reports the ages
+that SURVIVED — what the board actually shows).
+
+**BOTH CLOCKS, SEPARATELY.** `_row_quote_age_seconds` (`layer2_board.py`, `#370`)
+establishes with production measurements that these answer different questions:
+
+    seen_age   how long since WE LOOKED       wnba 2026-08-11:  68.5m
+    book_age   how long since the PRICE MOVED wnba 2026-08-11: 376.2m
+
+A motionless market ages without limit on the book clock while our observation
+stays current. Collapsing them reports an outage that is not there; using only
+`seen` misses a feed that has genuinely stopped. **Mutation-checked: collapsing
+the two turns 3 tests red.**
+
+**HOW TO READ IT**, against the ~60s publish cadence:
+
+    seen_p50 small + board looks stale  -> PUBLICATION. This lane's ground.
+    seen_p50 large + board looks fresh  -> UPSTREAM. syndicate-43's case.
+
+**Absent, never zero,** on a missing clock — zero reads as "our observation is
+current", the opposite of "we have no clock". Same rule as `#566`.
+Mutation-checked. Bools rejected explicitly (`isinstance(True, int)` is True, so
+an unguarded check records `True` as a 1-second-old quote).
+
+**LANE BOUNDARY RESPECTED.** `layer2_board.py` is held by the OPEN lane
+`layer2-sim-view-and-live-projection`, so the fields are read from the row
+contract in `layer2_shortlist.py` rather than computed there. Nothing in that
+lane's file was touched.
+
+12 tests. **NEXT: deploy and read one line.** If `seen_p50` is large, stop
+optimising publication and hand it to the direct-feed work.
+
 ### `#567` — **Is the board build SLOW, or WAITING? Nothing on this service could tell them apart, and three wrong answers in one session came from guessing.** — lane `board-staleness-visibility`, 2026-08-26 — **ANSWERED, AND THE ANSWER IS TWO ANSWERS: cold build `off_cpu_pct=10.4`, warm build `52.6`**
 
 **THE PROBLEM WITH EVERY ESTIMATE SO FAR.** Where the board build's time goes

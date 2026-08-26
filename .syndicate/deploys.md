@@ -31294,3 +31294,166 @@ support. Do not look for a third field.
 **RISK, stated because it is real:** WNBA orders currently FILL with
 `subaccount: 0`. Omitting it could break the one venue path that works. The env
 override is the rollback and needs no deploy.
+
+## 2026-08-26 12:28Z — SEVEN HOURS OF STEADY STATE. THE BOARD BUILD IS NOT SLOW.
+
+The 05:07 deploy ran unattended for 7 hours (session container restarted; the
+worker did not). `BOARD_BUILD_TIMING` therefore has a real steady-state series
+for the first time, and it does not say what every reading before it said.
+
+    n=40 builds, 10:33Z -> 12:27Z, instance -9gvzf, no restarts
+
+    wall_s     min 61.4   median 107.8   mean 107.0   p90 145.5   max 172.3
+    off_cpu    min 12.8   median 52.8    mean 53.8    max 70.5
+
+    the 747.8s cold build = 6.9x the steady-state median
+
+**THE BOARD BUILD IS ~1.8 MINUTES IN STEADY STATE.** Not 19m43s, not 12m28s,
+not 11m22s. Those were all COLD builds — the first build after a restart.
+
+**EVERY DURATION IN THIS FILE ABOVE THIS ENTRY WAS MEASURED ON A COLD BUILD AND
+GENERALISED TO "THE BOARD BUILD".** Mine included, and `#565`'s headline
+("the board build takes 19m43s") most of all. That number was taken during the
+deploy-churn window — 15 refresh-worker deploys in 6h15m, median uptime 1202s —
+where **the worker never survived long enough to reach a warm build.** We were
+measuring restarts and calling it the board.
+
+**AND IT IS MOSTLY WAITING, NOT COMPUTING.** Steady-state off-CPU is 53%
+median, 40 of 40 samples above 36%. The single reading that said "computing,
+not queued" (`off_cpu_pct=10.4`) is the cold build, and it is now an outlier
+against 40 contrary samples rather than the answer. **I reported it as the
+answer to `#567` two entries above. It was the answer for one build.**
+
+### What this does to the open work
+
+- **`#565` "the board build takes 19m43s" is closed by re-measurement, not by a
+  fix.** The steady-state build was probably never 19 minutes. The per-sport
+  window and soccer memo were real improvements to the COLD path and their
+  measurements stand — but they were not fixing what the item said they were.
+- **The 313s / 181s / 150s decomposition is a decomposition OF THE COLD BUILD.**
+  Still worth having, still the right target for boot cost, but it is not where
+  a steady-state build spends its 108 seconds. The spans just deployed will
+  show where that goes, and it will be a different answer.
+- **The real lever on staleness is RESTART FREQUENCY, not build cost.** A cold
+  build is 6.9x a warm one, and `#563`'s deploy-spacing guard (1500s minimum on
+  refresh-worker) is therefore the highest-value thing shipped last night —
+  higher than either performance change.
+
+**THE METHOD FAILURE, and it is the same one `#567` was created to stop.**
+`#567`'s own premise was "every estimate so far was read from the gap between
+two log lines". I fixed that, instrumented the call properly — and then drew a
+conclusion from **one sample of the least representative build there is.** The
+instrument was right; the sampling was wrong. *A correct measurement of an
+unrepresentative case is still a wrong answer.*
+
+## 2026-08-26 12:31Z — refresh-worker `dba9306d` (PR #91, span fix). VERIFY MET, PREDICTION REFUTED.
+
+Deploy live ~12:31Z. First cold build under the corrected span, 12:56:40Z,
+`wall_s=657.3 cpu_s=556.5 off_cpu_pct=15.3`:
+
+    BUILD_SPAN_EXIT stage=build_intelligence_overview       elapsed_s=295.1
+    BUILD_SPAN_EXIT stage=candidate_collection_with_fallback elapsed_s=178.01
+    BUILD_SPAN_EXIT stage=candidate_building                 elapsed_s=0.01
+    BUILD_SPAN_EXIT stage=manifest_odds_history_join         elapsed_s=0.32
+    ODDS_HISTORY_LOAD_SECONDS total_s=0.2 sports=5 mlb=0.19 soccer=0.01 wnba=0.0 nfl=0.0 ncaaf=0.0
+
+**The span reads 295.1s where it read 0.0 before. The fix is confirmed** and the
+~313s gap-derived estimate is corroborated by direct measurement (295.1s).
+
+**MY PREDICTION FOR THE OTHER 181s WAS WRONG, AND WRONG IN THE SPECIFIC WAY I
+BUILT THE INSTRUMENT TO CATCH.** I predicted `candidate_building` +
+`manifest_odds_history_join` would sum to ~181s and that SOCCER would be the
+expensive odds-history shard — that is why the per-sport breakdown exists at
+all, and the deploys entry above says so.
+
+    predicted   candidate_building + manifest join  ~181s, soccer worst
+    measured    0.33s combined; soccer 0.01s, mlb 0.19s, total 0.2s
+
+**Soccer is the CHEAPEST sport in the loop.** The 15MB of forward-dated soccer
+shards I flagged as a cost driver are read in ten milliseconds — the reading was
+right about the VOLUME and wrong that volume was TIME. Same error as the 12.5s
+figure and the memory percentage: a number whose units I had not checked.
+
+**THE REAL REMAINING BLOCK IS THE TAIL, AND IT IS IN BOTH BUILDS:**
+
+    cold  manifest EXIT 12:54:19.4 -> BOARD_BUILD_TIMING 12:56:40.0  = 140.6s
+    warm  manifest EXIT 12:59:00.2 -> BOARD_BUILD_TIMING 13:00:52.0  = 111.9s
+
+The warm build at 13:00:52 is `wall_s=141.2 off_cpu_pct=62.6` with overview,
+collection, building and join ALL reading 0.0. **Its entire cost is that tail.**
+
+**So the tail IS the steady-state board build** — the 108s median, the thing that
+runs 400+ times a day — while the overview and collection blocks are boot-only
+costs paid once per restart. Everything instrumented so far explains the COLD
+build and none of the warm one.
+
+**NEXT: instrument the tail** — `_merge_candidate_pools` onward to the return.
+That is the only remaining unobserved stretch and it is the one that matters in
+steady state. And it is ~60% off-CPU, so expect waiting, not computing.
+
+## 2026-08-26 13:2xZ — the board-path sweep finally completed: 2 failed, 293 passed
+
+Three earlier attempts never produced a verdict (two timed out, one died at 21
+tests when a detached `nohup` did not survive the shell). **I deployed twice
+while calling this evidence "still running".** It has now run, and it found
+something.
+
+### One failure was MINE, and it shipped hours before I knew
+
+`test_state_compute_persists_freshness_metadata_on_board_snapshot` — PASSED at
+`20bb673e^`, FAILED after. Confirmed by running it against a worktree at the
+pre-change commit, not inferred.
+
+**But the test was asserting the bug.** Its fixture is stamped
+`2026-06-15T20:00:00Z` and read 72 days later, and it asserted
+`freshness_status == "fresh"`. That is precisely
+`read_combined_intelligence_response` hard-coding
+`{"age_seconds": 0.0, "is_fresh": True}` regardless of what it had just read —
+the defect behind "the board sat stale for 20 minutes while still presenting as
+current". **The assertion is what made the bug look intentional.**
+
+Fixed by pinning BOTH directions, not by flipping the string: stale-only
+assertions would pass just as happily on a function hard-coded to `"stale"`,
+which is the same defect pointing the other way.
+
+**My first attempt at the fresh case ALSO failed**, and the reason is worth
+keeping: this read path's SLA is **30 seconds**, not the combined board's 900.
+A 30s-old stamp lands on the boundary and read stale at 30.99s. The test now
+asserts `age_seconds < freshness_sla_seconds` rather than a literal, so an SLA
+change cannot make it pass for the wrong reason.
+
+### The other failure was NOT mine, and it was a FALSE ALARM ABOUT THIS EXACT INCIDENT
+
+`test_compute_response_recomputes_when_cached_snapshot_is_stale` was already red
+at `3d1cf99f`, before any of tonight's work.
+
+It mocked `syndicate.features.intelligence.collect_all_recommendations`.
+**`pipeline/` contains ZERO references to that function** — the compute path
+uses `collect_candidates_with_fallback_merge`, bound at import in
+`intelligence_state` (line 32). The mock never fired, so `call_count` was 0.
+
+**A red test named "recomputes when cached snapshot is stale" was sitting on
+main throughout an investigation into a stale board.** It was wrong. The
+recompute works: the two assertions ABOVE the failing one — `ok`, and
+`candidate_pool` present, a key the cached snapshot does not carry — only pass
+on a real recompute. Repaired by patching the function actually on the path,
+at `pipeline.intelligence_state.<name>` (patching the defining module would
+miss it exactly as the old target did).
+
+**THE LESSON, and it is not "run the tests".** I ran them; the runs kept dying
+and I let "still running" stand in for "green" across two deploys. A test suite
+whose verdict never arrives is not weak evidence — it is NO evidence, and it
+should be treated as a blocker to state, not a caveat to mention. What saved
+this was that the failing assertion happened to be the bug rather than the fix.
+That was luck.
+
+**VERDICT AFTER THE REPAIRS: `249 passed, 14 subtests, 0 failed` in 21m30s**
+(`tests/test_intelligence_state.py` + `test_build_span_instrumentation.py` +
+`test_board_freshness_derived.py`). The board path is green for the first time
+in this session with a verdict that actually arrived.
+
+**Nothing to deploy from this.** The repairs are test-only; production runs
+`dba9306d`, which carries the code change and not these tests, so deployed
+behaviour is identical either way. The next deploy needs a merge first —
+`origin/main` has moved to `8cecf484` (another lane's Kalshi shard-routing work,
+todo `#568`).
