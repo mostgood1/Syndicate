@@ -82,13 +82,17 @@ class SoccerDataProviderTests(unittest.TestCase):
             "syndicate.features.soccer.cards.build_cards_page_context",
             return_value={"games": fake_games},
         ) as mocked:
-            games = self.provider.games(context, is_active_today=True)
+            games = self.provider.games(context, is_active_today=True, include_upcoming=True)
         # `#545`: the CURRENT matchday and the NEXT. Asking for the current one
         # alone was the defect -- `default_week` answers "which matchday are we
         # in", which on a Monday is the one that just finished, while the board
         # carries a seven-day FORWARD horizon. Measured in production
         # 2026-08-24T20:36:39Z: 65 of 96 soccer chips described already-played
         # fixtures and 72 of the 105 fixtures in the board's window had none.
+        #
+        # `#575`: now OPT-IN. `#545` widened this unconditionally and the home
+        # rail shares this method -- it went 98 -> 210 games with a count badge
+        # claiming 210 today. The strip asks for the horizon; the rail does not.
         self.assertEqual(
             [call.args for call in mocked.call_args_list],
             [("mls", 17, 2026), ("mls", 18, 2026)],
