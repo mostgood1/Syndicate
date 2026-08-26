@@ -622,6 +622,18 @@ def run_portfolio_commit(
     # while another decided -- a value stated without its provenance.
     bankroll_source = str((settings.sources or {}).get("bankroll_units") or "?")
 
+    # THE TOP MARKET UNDER EACH REFUSAL, because "98 rows had no model edge"
+    # cannot answer "why are no PROP positions being taken" and that is the
+    # question the counts get asked. Trimmed to the leader per reason: the full
+    # breakdown is in the artifact, and a log line that printed every market
+    # would be read by nobody.
+    by_market = plan.get("refusals_by_market") or {}
+    leaders = {
+        reason: f"{next(iter(markets))}:{next(iter(markets.values()))}"
+        for reason, markets in by_market.items()
+        if markets
+    }
+
     # print, not logger.info -- logger.info never reaches Render's collector.
     print(
         f"[portfolio_commit] PLAN_WRITTEN date={normalized} "
@@ -629,7 +641,7 @@ def run_portfolio_commit(
         f"positions={totals.get('positions')} staked=${totals.get('staked_dollars')} "
         f"bankroll=${plan.get('bankroll_units')} bankroll_source={bankroll_source} "
         f"scale={totals.get('slate_scale_factor')} "
-        f"refusals={plan.get('refusals')}",
+        f"refusals={plan.get('refusals')} top_market_per_refusal={leaders}",
         flush=True,
     )
     # ---- paper2: the same pipeline, restricted to one venue's prices --------

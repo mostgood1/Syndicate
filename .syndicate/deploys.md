@@ -43,8 +43,53 @@ rather than argued.
 **No job was killed.** Worker rebooted `499ng` -> `fzb6v`, memory 98.9% -> 62.5%,
 and a fresh MLB sim started on 15 game pks (pre-deploy runs had 9).
 
-**verify: OPEN OBLIGATION.** The reading that settles it is one cycle carrying
-BOTH lines, which must DISAGREE:
+**verify: MET `01:49:32Z`** (first printed `01:13:02Z` on `fzb6v`; also read on
+`jmqxx` after two further deploys). The two lines DISAGREE, which is the test:
+
+```
+BY_GAME_DATE   earliest key 2026-08-25 -> 1958 markets
+  KXMLBHRR 400  KXMLBRBI 400  KXMLBTB 400  KXMLBHIT 218  KXMLBSB 212
+  KXMLBKS 191   KXMLBWA 74    KXMLBGAME 26  + WNBA 37
+BY_CLOSE_DATE  earliest key 2026-08-27 -> 218
+  {'2026-08-27': 218, '2026-08-28': 587, '2026-08-29': 1499, ...}
+```
+
+`BY_CLOSE_DATE` HAS NO KEY for 2026-08-25 or 2026-08-26. So the working set held
+1,958 markets for the board's own date while the old line reported the earliest
+as 2026-08-27 -- and it still reports exactly that, now under a name where it is
+TRUE. The 2026-08-25 retraction is confirmed in production.
+
+`<undatable_ticker>` earned its keep on the `01:13:02Z` read: `{'KXEREDIVISIE':
+18}`, a season future with no event segment, bucketed honestly instead of
+borrowing a close date.
+
+**The join moved, though not only because of this change:**
+
+```
+00:35:49 (old)  matched=0    unreadable_title=2302  market_is_for_another_date=3332
+01:49:32 (new)  matched=71   unreadable_title=493   market_is_for_another_date=3282
+                no_matching_board_row=1838  stat_not_in_market_vocabulary=304
+```
+
+`unreadable_title` 2302 -> 493 is the PARALLEL session's grammar work
+(`8efdf0ff7`), not this deploy; `stat_not_in_market_vocabulary=304` is their MLB
+inning-total reclassification appearing exactly as their commit predicted. This
+deploy's own contribution is the DIAGNOSTIC, and `matched` is not attributable to
+it. Stated so the next reader does not credit one change with another's number.
+
+**A MEASUREMENT ERROR OF MINE, recorded because it is the same error the deploy
+fixes.** I reported "no pair yet" seven times between `01:13` and `01:49`. The
+pair was printing the whole time. I queried Render logs with
+`text: ["BY_GAME_DATE|BY_CLOSE_DATE"]`; that regex alternation returns
+`logs: null` in this API while each single term returns rows. I then built two
+further explanations -- dormant tier arithmetic, then board-build stage depth --
+on top of an absence that did not exist. **A null from a query you got wrong is
+indistinguishable from a null from a system that is quiet**, which is precisely
+the confusion `by_date`-meaning-`close_time` created one layer down. Query single
+terms, or verify the filter returns rows for a string known to be present.
+
+**Superseded plan text (kept, since the row is append-only):** the reading that
+settles it is one cycle carrying BOTH lines, which must DISAGREE:
 
 ```
 [kalshi_odds] BY_GAME_DATE  <game dates, from the ticker>
@@ -30307,6 +30352,82 @@ Source live-odds-worker · <15m`, the badge renders
 `SYNDICATE_EXECUTION_MAX_DAY_ORDERS=10` override is gone. That closes the
 open question from 19:00 CT, where it still read 10 on a pre-restart
 instance.
+
+## 2026-08-25 20:13 CT — refresh-worker `8efdf0ff7` (Kalshi total grammars)
+
+**lane:** none opened — `kalshi_catalogue.py` is claimed by no `Files:` bullet;
+collision-checked against `kalshi-line-aware-rungs` (audit session 281da8c3),
+which owns `venue_quote_adapters.py`, `venue_quote_fanin.py`,
+`kalshi_odds_refresh.py`. None touched.
+
+**Change.** Two title grammars, from the audit's top finding
+(`unreadable_title` 62% = "the largest single lever in the system"):
+
+- `Will there be over <line> <stat>?` — NFL quarter totals, 640 markets
+- `<period>: Over <line> <stat>` — the general form of the first-N-innings
+  grammar, 400 markets
+
+**COST PAID, deliberately.** A 5-game MLB sim (`tip_off_window`, pks
+823098/823259/823989/824962/825042) plus a Serie A odds refresh were in flight
+and this deploy killed them. Accepted because the user asked for the deploy
+explicitly and both re-fire on their own schedule. The worker was also at
+`container_memory_pct_of_max: 99.5` with 19MB headroom and 12 processes, so
+the restart relieves an OOM risk rather than only costing one.
+
+**verify: TWO readings on the next `[kalshi_odds]` tick, and they differ.**
+
+1. `GAP series=KXNFL1QTOTAL reason=unreadable_title` should be GONE (all four
+   quarters). Those 640 markets are now priceable — `totals_q1..q4`.
+2. `GAP series=KXMLBINNINGTOTAL` should CHANGE REASON, not disappear:
+   `unreadable_title` -> `stat_not_in_market_vocabulary`, `detail='9th inning
+   runs'`. That is a reclassification, NOT a price. The board has no
+   single-inning total and this deploy does not invent one.
+
+Aggregate: `BOARD_JOIN reasons.unreadable_title` was 2,171-2,302 of 6,000
+across the 00:16-00:35Z ticks. It should fall by roughly 1,040 minus whatever
+the 400-cap already truncated. `matched` rising is the prize but is NOT
+promised here — the audit's own sequence is "fix the join, measure matched per
+family, then cancel", and the join is a separate defect (`matched=54 of 1,290`,
+then `0 of 617`).
+
+## 2026-08-25 20:55 CT — FOR `kalshi-line-aware-rungs`: the date-priority prize, measured
+
+**Not mine to fix** — `pipeline/kalshi_odds_refresh.py` is in that lane's
+`Files:` and "evict the futures that can never join" is its declared step 2.
+`[USER DECISION 2026-08-25: let the audit session ship it]`. Recorded here
+because the measurement is in hand and the fix is not mine to write.
+
+**Summed from the `BY_GAME_DATE` histogram that lane just shipped**
+(`[kalshi_odds] BY_GAME_DATE`, 2026-08-26T01:49:32Z):
+
+    working set (capped)      6000
+      today     2026-08-25    1958   32.6%
+      tomorrow  2026-08-26      60    1.0%
+      beyond tomorrow         3982   66.4%
+
+    biggest: 08-28 -> 1566 (NFL, 3 days out) · 08-29 -> 930 · 09-12 -> 311
+    furthest: 2026-10-20 NBA, eight weeks out, holding slots today
+
+**THE ORDERING IS THE DEFECT, NOT THE OCCUPANCY.** All 1,958 of today's
+markets currently fit, so date-priority would not add any of them THIS tick.
+But `_ordered` sorts by STALENESS only, so today survives by luck. On a full
+NCAAF Saturday, or any tick where an MLB series is momentarily stale, today's
+markets are evicted in favour of a September future and nothing says so. The
+existing comment already records this class of bug once -- the trim claimed
+"oldest-series-first" while slicing alphabetically, deleting every WNBA market
+silently.
+
+**A SECOND CUT SITS UNDERNEATH IT.** Three of today's MLB prop series are at
+exactly 400 -- `KXMLBHRR`, `KXMLBRBI`, `KXMLBTB` -- which is
+`MAX_MARKETS_PER_SERIES`. Those ladders are truncated TODAY, and the 3,982
+future-dated slots are what could hold their deeper rungs. So the prize from
+date-priority is not "today fits" (it already does) but "today fits DEEPER",
+which is the same prize step 3 (line-aware rungs) is after.
+
+**Corroborating join reading, same tick:** `BOARD_JOIN kalshi_markets=6000
+matched=71 reasons={'market_is_for_another_date': 3282, ...}` -- 3,282 against
+3,982 non-today by the histogram, two independent counts of the same thing
+agreeing to within the tomorrow bucket.
 
 ## 2026-08-25 20:2x CT — DIAGNOSIS, NO DEPLOY — "the Layer 2 board and the compact chips are stale" is DEPLOY CADENCE, not a board defect
 

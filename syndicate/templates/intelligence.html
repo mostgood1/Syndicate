@@ -1829,7 +1829,7 @@
   // (success, empty response, or failure -- any settled fetch unblocks it).
   let gameChipsLoadedOnce = false;
 
-  // `#562`. WHEN THE WORKER LAST PUBLISHED THESE CHIPS -- not when we last
+  // `#563`. WHEN THE WORKER LAST PUBLISHED THESE CHIPS -- not when we last
   // fetched them. `/api/board/game-chips` has always returned `published_at`
   // and this page has always thrown it away, which is exactly how a frozen
   // scoreboard passed for a live one: the 60s poll keeps succeeding, the
@@ -2474,7 +2474,7 @@
     return `${weekday} ${month} ${parsed.getDate()}`;
   }
 
-  // `#562`. SAY SO WHEN THE SCOREBOARD HAS STOPPED MOVING.
+  // `#563`. SAY SO WHEN THE SCOREBOARD HAS STOPPED MOVING.
   //
   // SILENT WHEN HEALTHY, and that is deliberate rather than lazy: a badge that
   // is always on is furniture, and the reader stops seeing it well before it

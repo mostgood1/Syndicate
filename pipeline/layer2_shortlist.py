@@ -125,7 +125,7 @@ def build_layer2_shortlist(
     except Exception as exc:
         openings_error = f"{type(exc).__name__}: {exc}"
 
-    # `#562`. PUBLISH THE CHIPS FIRST, BEFORE ANY SPORT IS INGESTED.
+    # `#563`. PUBLISH THE CHIPS FIRST, BEFORE ANY SPORT IS INGESTED.
     #
     # This block used to sit at the BOTTOM of this function, beside the
     # chip-join telemetry that needs `cards`. Measured 2026-08-25/26: that put
@@ -627,7 +627,7 @@ def build_layer2_shortlist(
             # (see the comment there for why its position moved twice); this is
             # the instrument, printed here beside the other join diagnostics.
             #
-            # `benchmark_*` is the second half `#562` added: `repriced` counts
+            # `benchmark_*` is the second half `#563` added: `repriced` counts
             # sides whose PRICE moved to a venue, `benchmark_rows` counts rows
             # whose FAIR VALUE moved with it. The two being different numbers is
             # the whole finding -- the first was non-zero and the second did not
@@ -1053,7 +1053,7 @@ def build_layer2_shortlist(
     # a bad slate or a slow read has to leave the shortlist exactly as it found
     # it.
     #
-    # `#562`: THE PUBLISH THAT USED TO LIVE HERE HAS MOVED to the top of this
+    # `#563`: THE PUBLISH THAT USED TO LIVE HERE HAS MOVED to the top of this
     # function -- see the `_published_chips` block there for the measurement.
     # What remains is only the join question, which genuinely cannot run any
     # earlier because it needs `cards`. It now MEASURES THE CHIPS THAT WERE

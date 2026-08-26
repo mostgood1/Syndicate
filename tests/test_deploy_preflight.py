@@ -198,7 +198,7 @@ class FleetCommitTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
-# `#562` -- SPACING. The third independent property, after serialisation
+# `#563` -- SPACING. The third independent property, after serialisation
 # (CLAIMED) and composition (OFF_MAIN).
 #
 # Measured 2026-08-25/26: refresh-worker took 15 deploys in 6h15m, all
@@ -454,7 +454,7 @@ class WouldItHavePreventedTheIncidentTests(unittest.TestCase):
     """Replay the REAL 2026-08-25 refresh-worker deploy timeline through the check.
 
     Not a synthetic scenario: these are the fifteen deploys read from
-    `/v1/services/srv-d91dpertqb8s73co8ls0/deploys` while diagnosing `#562`,
+    `/v1/services/srv-d91dpertqb8s73co8ls0/deploys` while diagnosing `#563`,
     with their real statuses and triggers. Every one was `trigger=api`, on main,
     and correctly claimed -- so `CLAIMED` and `OFF_MAIN` both passed on all
     fifteen, which is precisely why a third property was needed.

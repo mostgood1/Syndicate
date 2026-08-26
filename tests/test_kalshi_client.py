@@ -336,3 +336,62 @@ def test_a_signing_failure_never_costs_the_unauthenticated_read(monkeypatch):
     # Returns None rather than propagating, so the read that worked before this
     # function existed still works.
     assert kalshi_client._signed_headers_or_none("https://x/trade-api/v2/markets") is None
+
+
+# ---------------------------------------------------------------------------
+# `fetch_event_markets` -- the probe for the LAST live `market_not_found`
+# hypothesis: that the ticker the MARKET endpoint answers to is not the ticker
+# the ORDER BOOK knows.
+# ---------------------------------------------------------------------------
+
+
+def test_event_markets_reports_the_venues_own_tickers(monkeypatch):
+    from syndicate.features.shared import kalshi_client as kc
+
+    monkeypatch.setattr(kc, "_get", lambda url: {
+        "event": {"event_ticker": "KXMLBTOTAL-26AUG251907KCTOR"},
+        "markets": [
+            {"ticker": "KXMLBTOTAL-26AUG251907KCTOR-8"},
+            {"ticker": "KXMLBTOTAL-26AUG251907KCTOR-9"},
+        ],
+    })
+    out = kc.fetch_event_markets("KXMLBTOTAL-26AUG251907KCTOR")
+    assert out["status"] == "ok"
+    assert out["tickers"] == [
+        "KXMLBTOTAL-26AUG251907KCTOR-8",
+        "KXMLBTOTAL-26AUG251907KCTOR-9",
+    ]
+
+
+def test_event_markets_reads_markets_nested_under_event(monkeypatch):
+    """Both shapes occur across Kalshi's routes; reading only one would report
+    an empty list for a populated event -- the false negative this whole
+    module exists to prevent."""
+    from syndicate.features.shared import kalshi_client as kc
+
+    monkeypatch.setattr(kc, "_get", lambda url: {
+        "event": {"markets": [{"ticker": "KXA-1"}]},
+    })
+    assert kc.fetch_event_markets("KXA")["tickers"] == ["KXA-1"]
+
+
+def test_event_markets_returns_a_named_failure_never_raises(monkeypatch):
+    """It runs INSIDE an exception handler on the order path. Raising would
+    replace the real order error with its own."""
+    from syndicate.features.shared import kalshi_client as kc
+
+    def boom(url):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(kc, "_get", boom)
+    out = kc.fetch_event_markets("KXA")
+    assert out["status"] == "error"
+    assert "network down" in out["reason"]
+    assert kc.fetch_event_markets("")["reason"] == "no_event_ticker"
+
+
+def test_event_markets_refuses_an_unexpected_shape_rather_than_reporting_zero(monkeypatch):
+    from syndicate.features.shared import kalshi_client as kc
+
+    monkeypatch.setattr(kc, "_get", lambda url: {"unexpected": True})
+    assert kc.fetch_event_markets("KXA")["status"] == "error"

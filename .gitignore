@@ -163,6 +163,13 @@ reports/intelligence/execution_ledger.json
 reports/intelligence/execution_state.json
 reports/intelligence/kalshi_markets.json
 reports/intelligence/kalshi_market_history.json
+# THE BANKROLL, and the worst of this list to commit by accident. It is the
+# STORED tier of `resolve_settings`, which outranks env AND default -- so a
+# copy from a laptop landing here would set production's stake sizing to
+# whatever a local test last wrote, and no environment variable could override
+# it. Added 2026-08-26 after a `POST /portfolio/settings` round-trip test wrote
+# bankroll=1000/max_positions=25 into this exact path.
+reports/intelligence/portfolio_settings.json
 reports/intelligence/evaluation_ledger_chunks/
 # Same class as the chunks above: a per-date JSONL ledger the shortlist WRITES
 # at runtime (`clv_openings`/`openings_records` in its payload). In production

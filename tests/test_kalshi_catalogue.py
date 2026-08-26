@@ -430,10 +430,40 @@ def test_the_game_line_titles_kalshi_actually_uses_parse():
 
 def test_a_period_the_board_cannot_key_is_refused_not_flattened():
     """`9th inning: Over 1.5 runs` has no board key. Dropping the period and
-    calling it a game total would be a bet on a different thing entirely."""
-    from syndicate.features.shared.kalshi_catalogue import _parse_title
+    calling it a game total would be a bet on a different thing entirely.
 
-    assert _parse_title("9th inning: Over 1.5 runs") is None
+    THE INTENT IS UNCHANGED; THE LEVEL IT IS ASSERTED AT MOVED `[2026-08-26]`.
+    This used to read `_parse_title(...) is None` -- the title was refused by
+    being UNPARSEABLE, which also made it `unreadable_title` and therefore
+    invisible: 400 KXMLBINNINGTOTAL markets sat in that bucket with no name
+    attached to them.
+
+    The title now parses, and the PERIOD IS CARRIED INTO THE STAT TEXT rather
+    than dropped, so the vocabulary refuses it by name. That is a strictly
+    stronger position than not parsing: nothing is flattened, and the market
+    lands in the work queue as `stat_not_in_market_vocabulary` carrying
+    `9th inning runs`.
+
+    Safe because `_parse_title` has exactly ONE production caller
+    (`classify_market`), which runs the vocabulary on its result immediately --
+    there is no path from a parsed title to a price that skips it. Both halves
+    are asserted here so the guarantee cannot quietly become one-sided."""
+    from syndicate.features.shared.kalshi_catalogue import _parse_title, classify_market
+
+    parsed = _parse_title("9th inning: Over 1.5 runs")
+    # The period SURVIVES parsing -- it is not dropped to a game total.
+    assert parsed["stat_text"] == "9th inning runs"
+
+    # And it still cannot become a priced market.
+    out = classify_market(
+        {
+            "series": "KXMLBINNINGTOTAL",
+            "ticker": "KXMLBINNINGTOTAL-26AUG26BOSMIA-1",
+            "title": "9th inning: Over 1.5 runs",
+        }
+    )
+    assert out["status"] == "refused"
+    assert out.get("market") is None
 
 
 def test_the_tie_leg_is_refused():
@@ -1361,3 +1391,102 @@ def test_the_draw_leg_of_a_period_three_way_is_known_and_refused():
     assert _parse_title("Will neither team win the 2nd Half?") is None
     # And it must not swallow a real moneyline.
     assert _parse_title("Chicago Sky wins")["grammar"] == "moneyline"
+
+
+# ---------------------------------------------------------------------------
+# THE TWO GRAMMARS BEHIND 1,040 `unreadable_title` MARKETS.
+#
+# Measured on refresh-worker 2026-08-26T00:21:12Z, one tick:
+#
+#   GAP KXMLBINNINGTOTAL count=400 reason=unreadable_title
+#       sample='9th inning: Over 1.5 runs'
+#   GAP KXNFL1QTOTAL     count=160 reason=unreadable_title
+#       sample='Will there be over 7.5 1Q points scored?'
+#   ... 2Q, 3Q, 4Q identical at 160 each
+#
+# `unreadable_title` was 2,171-2,302 of 6,000 at the join in the same window --
+# the audit's largest single lever, and bigger than every registry gap combined.
+# ---------------------------------------------------------------------------
+
+
+def _classified(series, title, sport):
+    """Classify one market with `series` registered, and LEAVE NO TRACE.
+
+    `register_discovered` writes to a module-level dict that lives for the
+    whole process. Registering without restoring leaked KXNFL2QTOTAL and
+    KXEPLCORNERS into `test_kalshi_odds_cadence`'s series list and failed it --
+    a test that breaks a different file is worse than no test."""
+    from syndicate.features.shared import kalshi_catalogue as cat
+
+    before = dict(cat._DISCOVERED)
+    cat.register_discovered({series: sport})
+    try:
+        return cat.classify_market(
+            {"series": series, "ticker": f"{series}-26AUG26BOSMIA-7", "title": title}
+        )
+    finally:
+        cat._DISCOVERED.clear()
+        cat._DISCOVERED.update(before)
+
+
+def test_nfl_quarter_totals_resolve_to_the_board_period_key():
+    """640 markets. The period lives INSIDE the stat ("1Q points scored"), and
+    `total_market_from_stat` already owns that table -- the grammar passes the
+    stat verbatim rather than keeping a second copy of it."""
+    for series, quarter in (
+        ("KXNFL1QTOTAL", "1Q"), ("KXNFL2QTOTAL", "2Q"),
+        ("KXNFL3QTOTAL", "3Q"), ("KXNFL4QTOTAL", "4Q"),
+    ):
+        out = _classified(series, f"Will there be over 7.5 {quarter} points scored?", "nfl")
+        assert out["status"] == "ok", (series, out)
+        assert out["market"] == f"totals_q{quarter[0]}"
+        assert out["line"] == 7.5
+        assert out["side"] == "over"
+
+
+def test_the_under_side_is_read_as_under():
+    out = _classified("KXNFL1QTOTAL", "Will there be under 7.5 1Q points scored?", "nfl")
+    assert out["side"] == "under"
+
+
+def test_a_single_inning_total_refuses_BY_NAME_rather_than_as_unreadable():
+    """400 markets, and this is a RECLASSIFICATION, not new pricing.
+
+    `_PERIOD_SUFFIX` has no single-inning spelling because the BOARD has no
+    single-inning total. Minting `i1..i9` to make this resolve would create a
+    key nothing joins -- the invented-spelling error this module records twice
+    already. So the win is that it lands in the work queue carrying its real
+    text instead of being invisible."""
+    out = _classified("KXMLBINNINGTOTAL", "9th inning: Over 1.5 runs", "mlb")
+    assert out["status"] == "refused"
+    assert out["reason"] == "stat_not_in_market_vocabulary"
+    assert out["detail"] == "9th inning runs"
+
+
+def test_the_existing_totals_grammars_are_unchanged():
+    """The new fallback runs AFTER `_PERIOD_TOTAL`; running it first would take
+    these matches over and route them through the vocabulary instead."""
+    assert _classified("KXMLBTOTAL", "First 5 innings: Over 6.5 runs", "mlb")["market"] == (
+        "totals_1st_5_innings"
+    )
+    assert _classified("KXMLBTOTAL", "Over 7.5 runs scored?", "mlb")["market"] == "totals"
+    assert _classified("KXMLBGAME", "Boston Red Sox wins", "mlb")["market"] == "h2h"
+
+
+def test_corners_still_refuse_with_their_real_text():
+    """The audit is explicit: "Needs a corners market. Do not widen the totals
+    unit." A grammar that MATCHES must still let the vocabulary refuse."""
+    out = _classified("KXEPLCORNERS", "Will there be over 9.5 corners?", "soccer")
+    assert out["status"] == "refused"
+    assert out["reason"] == "stat_not_in_market_vocabulary"
+    assert out["detail"] == "corners"
+
+
+def test_the_period_prefix_is_bounded_so_a_prose_colon_is_not_a_period():
+    """`[^:]{1,40}` -- an unbounded prefix would swallow any sentence with a
+    colon in it and call whatever followed a period."""
+    from syndicate.features.shared.kalshi_catalogue import _ANY_PERIOD_TOTAL
+
+    assert _ANY_PERIOD_TOTAL.match("9th inning: Over 1.5 runs")
+    long_prefix = "x" * 41
+    assert not _ANY_PERIOD_TOTAL.match(f"{long_prefix}: Over 1.5 runs")

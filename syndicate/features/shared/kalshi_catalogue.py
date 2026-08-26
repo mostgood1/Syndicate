@@ -410,6 +410,45 @@ _PERIOD_TOTAL = re.compile(
     re.IGNORECASE,
 )
 
+# "Will there be over 7.5 1Q points scored?"  (a GAME total -- names no team)
+#
+# Measured 2026-08-26 00:21:12Z, 640 markets refused as `unreadable_title`
+# across KXNFL1QTOTAL/2Q/3Q/4Q at 160 each. The period lives INSIDE the stat
+# ("1Q points scored"), which is why the stat is passed through VERBATIM
+# rather than being resolved here: `total_market_from_stat` already maps
+# "1Q points scored" -> `totals_q1` off `_PERIOD_SUFFIX`, and a regex that
+# decided the period itself would be a second, divergent copy of that table.
+#
+# The refusal path matters as much as the match. A unit this sport does not
+# count comes back None from the vocabulary and lands as
+# `stat_not_in_market_vocabulary` CARRYING ITS REAL TEXT -- named in the work
+# queue instead of invisible. That is the whole difference between the two
+# reasons, and it is why this grammar deliberately does not filter.
+_GAME_TOTAL_WILL_THERE_BE = re.compile(
+    r"^\s*will\s+there\s+be\s+(?P<direction>over|under|more\s+than|less\s+than)\s+"
+    r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# "9th inning: Over 1.5 runs"  (a GAME total under ANY period prefix)
+#
+# The general form of `_PERIOD_TOTAL` above, which only ever matched
+# "first <N> innings:". Measured the same tick: KXMLBINNINGTOTAL, 400 markets,
+# sample '9th inning: Over 1.5 runs' -- unreadable for want of a colon prefix
+# it did not anticipate.
+#
+# THIS ONE WILL MOSTLY REFUSE, AND THAT IS THE POINT. `_PERIOD_SUFFIX` has no
+# single-inning spelling because the BOARD has no single-inning total, so
+# "9th inning runs" resolves to None and the market lands as
+# `stat_not_in_market_vocabulary`. Adding `i1..i9` to make it resolve would
+# mint a board key nothing joins -- the invented-spelling error this module
+# already records twice. Named refusal now; a board market first, if ever.
+_ANY_PERIOD_TOTAL = re.compile(
+    r"^\s*(?P<period>[^:]{1,40}?)\s*:\s*(?P<direction>over|under|more\s+than|less\s+than)\s+"
+    r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
 # "Will Texas score over 7.5 runs?"  (a TEAM total -- names the team)
 _TEAM_SCORES = re.compile(
     r"^\s*will\s+(?:the\s+)?(?P<team>.+?)\s+score\s+(?P<direction>over|under)\s+"
@@ -1032,6 +1071,33 @@ def _parse_title(title: str) -> dict[str, Any] | None:
             "stat_text": f"totals_{period}",
             "line": float(match.group("line")),
             "side": match.group("direction").strip().lower(),
+        }
+
+    # AFTER `_PERIOD_TOTAL`, deliberately. That one already resolves the
+    # first-N-innings spelling to a board key; this is the general fallback for
+    # every other period prefix, and running it first would take those matches
+    # over and route them through the vocabulary instead.
+    match = _ANY_PERIOD_TOTAL.match(title)
+    if match:
+        return {
+            "grammar": GRAMMAR_TEAM_TOTAL,
+            # Names no team -- the game comes from the ticker.
+            "subject": None,
+            # VERBATIM, period and all. `total_market_from_stat` owns the
+            # period table; a second copy here would drift from it.
+            "stat_text": f"{match.group('period').strip()} {match.group('stat').strip()}",
+            "line": float(match.group("line")),
+            "side": _direction(match.group("direction")),
+        }
+
+    match = _GAME_TOTAL_WILL_THERE_BE.match(title)
+    if match:
+        return {
+            "grammar": GRAMMAR_TEAM_TOTAL,
+            "subject": None,
+            "stat_text": match.group("stat").strip(),
+            "line": float(match.group("line")),
+            "side": _direction(match.group("direction")),
         }
 
     match = _TEAM_SCORES.match(title)

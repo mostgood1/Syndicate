@@ -1,4 +1,4 @@
-"""`#562` -- the scoreboard artifact must be written BEFORE the slate is ingested.
+"""`#563` -- the scoreboard artifact must be written BEFORE the slate is ingested.
 
 WHY THIS FILE EXISTS. `write_game_chips` used to be called at the BOTTOM of
 `build_layer2_shortlist`, beside the chip-join telemetry that genuinely needs

@@ -352,7 +352,7 @@
 
   <div class="portfolio-note" id="portfolio-note" {% if (summary.settled_count or 0) > 0 %}hidden{% endif %}>Awaiting grading -- {{ summary.total_tracked or 0 }} tracked play{{ '' if (summary.total_tracked or 0) == 1 else 's' }}, 0 settled yet. Win rate, ROI, and CLV populate once reconciliation grades results.</div>
 
-  <div class="portfolio-bankroll">
+  <div class="portfolio-bankroll" id="bankroll">
     <h2 class="portfolio-section-title">Bankroll &amp; staking policy</h2>
     <form method="post" action="/portfolio/settings" class="portfolio-bankroll__row">
       <div class="portfolio-bankroll__field">

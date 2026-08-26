@@ -655,3 +655,38 @@ def test_the_api_answers_the_same_health_question_as_the_page(app_client, live_e
     api = app_client.get("/api/portfolio/live").get_json()
     assert "health" in api
     assert set(api["health"]) == {"job", "mode", "armed", "kill_switch", "source", "ok"}
+
+
+# ---------------------------------------------------------------------------
+# `/portfolio/settings` WAS A TRAP. It is the form's POST action, not a page,
+# so a browser typing it got 405 with no hint where the form lives. Measured
+# 2026-08-26T01:21:20Z on production, from a URL this assistant had just told
+# the user to open.
+# ---------------------------------------------------------------------------
+
+
+def test_the_settings_url_a_browser_would_guess_reaches_the_form(app_client):
+    r = app_client.get("/portfolio/settings")
+    assert r.status_code == 303
+    assert r.headers["Location"].endswith("/portfolio#bankroll")
+
+
+def test_the_form_anchor_exists_on_the_page_it_points_at(app_client):
+    """A redirect to a fragment that no element carries scrolls to the top and
+    looks like the redirect failed."""
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'id="bankroll"' in body
+    # And the form it anchors is really there, with the two fields that matter.
+    assert 'name="bankroll_units"' in body
+    assert 'name="max_positions"' in body
+
+
+def test_saving_returns_to_the_form_not_the_top_of_the_page(app_client, monkeypatch):
+    from syndicate.features.shared import portfolio_settings as ps
+
+    seen = {}
+    monkeypatch.setattr(ps, "update_settings", lambda changes: seen.update(changes) or (None, {}))
+    r = app_client.post("/portfolio/settings", data={"bankroll_units": "1000", "max_positions": "25"})
+    assert r.status_code == 303
+    assert r.headers["Location"].endswith("/portfolio#bankroll")
+    assert seen == {"bankroll_units": "1000", "max_positions": "25"}

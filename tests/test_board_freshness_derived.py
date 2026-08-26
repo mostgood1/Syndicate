@@ -1,4 +1,4 @@
-"""`#562` -- the board must be able to REPORT that it is stale.
+"""`#563` -- the board must be able to REPORT that it is stale.
 
 WHY THIS FILE EXISTS. `read_combined_intelligence_response` hard-coded
 `state_meta = {"age_seconds": 0.0, "is_fresh": True}` on a function whose own

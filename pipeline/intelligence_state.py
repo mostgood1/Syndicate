@@ -1582,7 +1582,7 @@ def _layer2_fallback_recommendations(
     declines, because it would take down the board it exists to fill.
 
     `vintages`, when given, collects each shortlist's own `written_at` -- an OUT
-    PARAMETER rather than a second return value on purpose (`#562`). The
+    PARAMETER rather than a second return value on purpose (`#563`). The
     alternative was a second read of these artifacts to date them, and the
     shortlist measured 5,166,721 bytes on 2026-08-26; re-reading five megabytes
     per request to answer "how old is this" would cost more than the staleness
@@ -6996,7 +6996,7 @@ def _combined_board_response_cache_ttl_seconds() -> float:
 
 
 def _combined_board_stale_after_seconds() -> float:
-    """How old the oldest input may be before the board is not fresh. `#562`.
+    """How old the oldest input may be before the board is not fresh. `#563`.
 
     Default 900 s, matching `_STATE_STALE_SECONDS` on the live-portfolio banner
     rather than inventing a second threshold -- two surfaces disagreeing about
@@ -7106,7 +7106,7 @@ def read_combined_intelligence_response(
     by_date_summary: dict[str, dict[str, Any]] = {}
     covered_sports: set[str] = set()
 
-    # `#562`. Every artifact this board is assembled from, dated. See the
+    # `#563`. Every artifact this board is assembled from, dated. See the
     # `state_meta` block at the bottom of this function for why an ASSERTED
     # freshness was the defect.
     artifact_vintages: list[str] = []
@@ -7225,7 +7225,7 @@ def read_combined_intelligence_response(
     combined["by_date"] = by_date_summary
     combined["covered_sports"] = sorted(covered_sports)
     combined["candidate_count"] = len(merged_recommendations)
-    # `#562`. DERIVED FROM THE ARTIFACTS, NOT ASSERTED.
+    # `#563`. DERIVED FROM THE ARTIFACTS, NOT ASSERTED.
     #
     # This block used to read `"age_seconds": 0.0, "is_fresh": True` -- flat
     # literals, on a function whose own docstring says it "NEVER calls
@@ -7362,7 +7362,7 @@ def _decorate_intelligence_board_snapshot_response(
         if not state_meta:
             freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
             normalized_updated_at = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
-            # `#562`: DERIVED FROM `computed_at`, WHICH WAS ALREADY IN HAND.
+            # `#563`: DERIVED FROM `computed_at`, WHICH WAS ALREADY IN HAND.
             # This read `age_seconds: 0.0, freshness_status: "fresh",
             # is_fresh: True` while holding `normalized_updated_at` two lines
             # up -- the stamp that answers the question was already computed and
@@ -7402,7 +7402,7 @@ def _decorate_intelligence_board_snapshot_response(
         state_meta = decorated.get("state_meta") if isinstance(decorated.get("state_meta"), dict) else {}
         candidate_count = _intelligence_state_candidate_count(decorated)
         if not state_meta:
-            # `#562`: same defect, same fix as the branch above -- the stamp
+            # `#563`: same defect, same fix as the branch above -- the stamp
             # was in hand and the age was asserted anyway.
             _computed_at = _utc_timestamp_string(updated_at)
             _age = _timestamp_age_seconds(_computed_at)

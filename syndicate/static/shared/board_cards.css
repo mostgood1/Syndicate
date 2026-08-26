@@ -126,7 +126,7 @@ body.syndicate-body .cards-shell {
   font-size: 1rem;
 }
 
-/* `#562`. The scoreboard-frozen badge on the "Games" heading.
+/* `#563`. The scoreboard-frozen badge on the "Games" heading.
    AMBER, NOT RED, and the distinction is the point: red on this board already
    means a bet went the wrong way (.board-sparkline--down) or a market is
    broken. A frozen scoreboard is neither -- the data on screen was correct

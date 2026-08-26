@@ -156,3 +156,50 @@ class MarketKeyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# "FULL GAME" IS THE ABSENCE OF A PERIOD. Measured 2026-08-26T01:49:32Z, on the
+# first tick that could read these titles at all:
+#
+#   GAP series=KXNFLTOTAL count=304 reason=stat_not_in_market_vocabulary
+#       detail='Full Game points scored'
+#       sample='Full Game: over 58.5 points scored?'
+#
+# 304 markets parsed and then refused one gate later for want of one entry --
+# the same shape the coverage audit records for KXMLBHRR.
+# ---------------------------------------------------------------------------
+
+
+def test_full_game_resolves_to_the_bare_game_total():
+    from syndicate.features.shared.market_keys import total_market_from_stat
+
+    assert total_market_from_stat("nfl", "Full Game points scored") == "totals"
+    assert total_market_from_stat("nfl", "full game points") == "totals"
+    assert total_market_from_stat("mlb", "Full Game runs") == "totals"
+
+
+def test_full_game_does_not_disturb_the_real_periods():
+    from syndicate.features.shared.market_keys import total_market_from_stat
+
+    assert total_market_from_stat("nfl", "1Q points scored") == "totals_q1"
+    assert total_market_from_stat("nfl", "2nd half points") == "totals_h2"
+    assert total_market_from_stat("nfl", "points scored") == "totals"
+
+
+def test_full_game_with_no_unit_is_still_refused():
+    """The `token == phrase` guard. A title naming a period and no stat says
+    nothing about WHAT is being counted, and guessing the sport's default unit
+    would price a market we did not read."""
+    from syndicate.features.shared.market_keys import total_market_from_stat
+
+    assert total_market_from_stat("nfl", "Full Game") is None
+
+
+def test_full_game_does_not_widen_the_totals_unit():
+    """The audit is explicit: "Needs a corners market. Do not widen the totals
+    unit." Stripping a period must never make a foreign unit acceptable."""
+    from syndicate.features.shared.market_keys import total_market_from_stat
+
+    assert total_market_from_stat("soccer", "Full Game corners") is None
+    assert total_market_from_stat("nfl", "Full Game receptions") is None

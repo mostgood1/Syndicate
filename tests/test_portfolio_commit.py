@@ -787,3 +787,83 @@ def test_the_plan_log_names_where_the_bankroll_came_from(capsys, monkeypatch, tm
     resolved = ps.resolve_settings()
     assert resolved.bankroll_units == 1000.0
     assert resolved.sources["bankroll_units"] == "stored"
+
+
+# ---------------------------------------------------------------------------
+# WHICH MARKETS DIE WHERE. "98 rows had no model edge" cannot answer "why are
+# no PROP positions being taken", and that is the question the counts get
+# asked -- Kalshi's inventory is prop-heavy (batter_home_runs, strikeouts,
+# player_threes) while every position taken has been a total or a moneyline.
+# ---------------------------------------------------------------------------
+
+
+def test_refusals_are_attributed_to_the_market_that_was_refused():
+    from syndicate.features.shared.portfolio_commit import commit_portfolio
+    from syndicate.features.shared.portfolio_settings import PortfolioSettings
+
+    settings = PortfolioSettings(bankroll_units=1000.0, min_ev_pct=2.0, max_positions=25)
+
+    def row(market, **over):
+        base = {
+            "sport": "mlb", "market": market, "side": "over", "line": 1.5,
+            "quote": {"price": -110}, "ev_pct": 5.0, "model_edge_pct": 3.0,
+            # `sizing_inputs_from_row` gates on this BEFORE the EV floor, so a
+            # row without it never reaches `below_min_ev_pct` at all -- which is
+            # what the first version of this test got wrong.
+            "score": {"price_reliability": 1.0},
+        }
+        base.update(over)
+        return base
+
+    plan = commit_portfolio(
+        [
+            # No model edge -- a prop the sim does not cover.
+            row("batter_home_runs", model_edge_pct=None),
+            row("batter_home_runs", model_edge_pct=None),
+            row("strikeouts", model_edge_pct=None),
+            # Below the EV floor -- a game line the sim DOES cover.
+            row("totals", ev_pct=0.5),
+        ],
+        selected_date="2026-08-25",
+        settings=settings,
+    )
+
+    by_market = plan["refusals_by_market"]
+    assert by_market["no_model_edge_pct"] == {"batter_home_runs": 2, "strikeouts": 1}
+    assert by_market["below_min_ev_pct"] == {"totals": 1}
+
+    # The per-market totals must reconcile with the flat counter, or one of the
+    # two is lying about the same rows.
+    for reason, count in plan["refusals"].items():
+        assert sum(by_market[reason].values()) == count, reason
+
+
+def test_markets_are_ordered_by_count_so_the_leader_is_first():
+    """The log line prints only the leader per reason; if ordering were
+    arbitrary it would print an arbitrary market and read as the cause."""
+    from syndicate.features.shared.portfolio_commit import commit_portfolio
+    from syndicate.features.shared.portfolio_settings import PortfolioSettings
+
+    rows = [
+        {"sport": "mlb", "market": "strikeouts", "side": "over", "line": 1.5,
+         "quote": {"price": -110}, "ev_pct": 5.0}
+    ] * 1 + [
+        {"sport": "mlb", "market": "batter_home_runs", "side": "over", "line": 1.5,
+         "quote": {"price": -110}, "ev_pct": 5.0}
+    ] * 3
+    plan = commit_portfolio(rows, selected_date="2026-08-25",
+                            settings=PortfolioSettings(bankroll_units=1000.0))
+    markets = plan["refusals_by_market"]["no_model_edge_pct"]
+    assert list(markets) == ["batter_home_runs", "strikeouts"]
+
+
+def test_a_refusal_with_no_market_is_counted_not_dropped():
+    """Silently omitting it would make the per-market totals disagree with
+    `refusals` for no visible reason."""
+    from syndicate.features.shared.portfolio_commit import commit_portfolio
+    from syndicate.features.shared.portfolio_settings import PortfolioSettings
+
+    plan = commit_portfolio(["not a mapping"], selected_date="2026-08-25",
+                            settings=PortfolioSettings())
+    assert plan["refusals"]["row_not_a_mapping"] == 1
+    assert plan["refusals_by_market"]["row_not_a_mapping"] == {"unkeyed": 1}

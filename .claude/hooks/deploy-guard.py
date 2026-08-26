@@ -227,7 +227,7 @@ def _preflight(root, service, deploy_sha=None):
         return False, "no preflight has been run for this service"
     verdict = str(newest.get("verdict") or "").upper()
     if verdict != "CLEAR":
-        # CARRY THE PREFLIGHT'S OWN REASON, not just the verdict name. `#562`.
+        # CARRY THE PREFLIGHT'S OWN REASON, not just the verdict name. `#563`.
         #
         # This guard's contract is that every refusal prints the literal thing
         # that clears it, so no session is left waiting on another. TOO_SOON is

@@ -280,6 +280,10 @@ MAX_STORED_MARKETS = 6000
 # working set may be bounded where a record may not. That separation is what
 # the capture-first layer bought.
 MAX_MARKETS_PER_SERIES = 400
+# How many capped series `PRECAP_CUT_BY_DATE` names. The count of capped series
+# and the total cut are ALWAYS printed, so this bounds the log without letting a
+# partial list impersonate a complete one.
+MAX_CAP_COST_SERIES = 12
 
 
 def request_spacing_seconds() -> float:
@@ -627,6 +631,7 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
             flush=True,
         )
 
+    from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
     from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
 
     path = markets_artifact_path()
@@ -751,17 +756,62 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     # set at all -- see `_record_daily_book`.
     full_markets: list[dict[str, Any]] = []
     trimmed = 0
+    # WHAT THE PER-SERIES CAP COSTS, BY DATE, MEASURED ON THE MARKETS IT CUTS.
+    #
+    # `BY_GAME_DATE` is built from the WORKING SET, so it can only ever show
+    # SURVIVORS. Reading the cut markets' dates off the kept markets' dates is
+    # the same inference that produced `#370` and its diagnostic sequel: a
+    # number that describes one population being read as if it described
+    # another. This counts the cut ones directly, which is the only way the
+    # question is answerable.
+    #
+    # It exists to gate a change rather than to decorate the log. Measured
+    # 2026-08-26T01:49:32Z, `trimmed=8744` of 14,744 fetched -- 59% discarded
+    # before the join runs -- with `KXMLBHRR` 1147 -> 400, `KXMLBTB` 879 -> 400
+    # and `KXMLBHIT` 744 -> 400, all three series dated entirely to the board's
+    # own slate. IF those cuts are mostly the board's date, re-prioritising
+    # eviction recovers ~1,600 joinable markets; if they are mostly lookahead,
+    # it recovers close to nothing. Same code either way, opposite verdicts, and
+    # nothing already logged separates them.
+    cap_cost: list[tuple[int, str, int, dict[str, int]]] = []
     for series in wanted:
         entry = per_series.get(series) or {}
         markets = list(entry.get("markets") or [])
         full_markets.extend(markets)
         if len(markets) > MAX_MARKETS_PER_SERIES:
             trimmed += len(markets) - MAX_MARKETS_PER_SERIES
+            # THE CUT SLICE, before it stops existing. Dated with the SAME
+            # function the join uses, so the two numbers are comparable; an
+            # undatable ticker is named rather than dropped, for the reason
+            # `board_by_game_date` gives at length.
+            cut_dates: dict[str, int] = {}
+            for cut_market in markets[MAX_MARKETS_PER_SERIES:]:
+                cut_date = game_date_from_ticker(cut_market.get("ticker")) or "<undatable_ticker>"
+                cut_dates[cut_date] = cut_dates.get(cut_date, 0) + 1
+            cap_cost.append(
+                (len(markets) - MAX_MARKETS_PER_SERIES, series, len(markets), cut_dates)
+            )
             markets = markets[:MAX_MARKETS_PER_SERIES]
         age = _seconds_since(entry.get("fetched_at"))
         if age is not None:
             staleness[series] = int(age)
         per_series_markets.append((age if age is not None else float("inf"), series, markets))
+
+    # BIGGEST LOSSES FIRST, and BOUNDED -- a per-tick line naming every capped
+    # series would be the `MAX_UNREADABLE_SAMPLES` mistake again, where the
+    # noisiest families reached the cap first and the interesting ones were
+    # counted but never sampled. The TOTAL is always reported, so a bounded list
+    # cannot read as a complete one.
+    if cap_cost:
+        cap_cost.sort(reverse=True)
+        shown = cap_cost[:MAX_CAP_COST_SERIES]
+        print(
+            f"[kalshi_odds] PRECAP_CUT_BY_DATE capped_series={len(cap_cost)}"
+            f" cut_total={sum(item[0] for item in cap_cost)}"
+            f" shown={len(shown)}"
+            f" detail={ {series: {'fetched': fetched, 'cut': cut_n, 'cut_by_date': dates} for cut_n, series, fetched, dates in shown} }",
+            flush=True,
+        )
 
     # THE TRIM IS BY STALENESS, WHICH IS WHAT THIS ALWAYS CLAIMED TO DO.
     #

@@ -71,7 +71,7 @@ separately -- a deploy needs all three and no two of them imply the third:
     OFF_MAIN   composition     the second must contain the first
     TOO_SOON   spacing         the service must have time to produce something
 
-`#562`: fifteen refresh-worker deploys in 6h15m were perfectly serialised and
+`#563`: fifteen refresh-worker deploys in 6h15m were perfectly serialised and
 perfectly composed, and left the board frozen all evening anyway, because the
 median instance was SIGTERMed 1202 s into a 21-minute boot-to-first-publish
 cycle. Serialisation is not spacing.
@@ -138,7 +138,7 @@ EXIT_OFF_MAIN = 4
 # right now, wait for a lull", TOO_SOON means "nothing is running BECAUSE you
 # just restarted it, and it has not had time to produce anything yet".
 #
-# WHY, measured 2026-08-25/26 (`#562`, and `deploys.md` carries the working).
+# WHY, measured 2026-08-25/26 (`#563`, and `deploys.md` carries the working).
 # A user reported the Layer 2 board and the compact scoreboard frozen for ~20
 # minutes. Every reader was healthy; the PRODUCER was being restarted faster
 # than it could produce:
@@ -474,7 +474,7 @@ def last_restarting_deploy(service_id: str, key: str) -> dict:
     """The most recent deploy that restarted (or is restarting) this service.
 
     READ FROM RENDER, NOT FROM A LOCAL LEDGER, and that is the load-bearing
-    choice. The 15 deploys that caused `#562` came from parallel sessions and
+    choice. The 15 deploys that caused `#563` came from parallel sessions and
     all carried `trigger=api`; a file in this checkout can only ever see the
     ones this session wrote. `deploy_claim.py`'s own docstring makes the same
     argument about cross-session coordination: the only thing that sees every
@@ -596,7 +596,7 @@ def _write_receipt(args, report, verdict, reason, live_commit) -> None:
             # fact -- which is the only time anyone reads it. `#465`.
             "sample_source": report.get("sample_source"),
             "sample_age_seconds": report.get("sample_age_seconds"),
-            # `#562`. On the receipt and not only in the report, so "were we
+            # `#563`. On the receipt and not only in the report, so "were we
             # hammering this service" is answerable from the deploy trail
             # afterwards rather than by reconstructing it from the Render API by
             # hand, which is what it took the first time.
@@ -725,7 +725,7 @@ def main() -> int:
         if claim else None
     )
 
-    # `#562`. HOW LONG SINCE THIS SERVICE LAST RESTARTED.
+    # `#563`. HOW LONG SINCE THIS SERVICE LAST RESTARTED.
     #
     # Computed unconditionally so the numbers reach the report even when the
     # limit is 0 or overridden -- a deploy log that records "spacing not
@@ -817,7 +817,7 @@ def main() -> int:
             + f" Wait {wait_s // 60} min {wait_s % 60}s."
             + (" refresh-worker takes ~21 min from boot to its first board publish, so a"
                " deploy inside that window leaves the board frozen and throws away the"
-               " build in flight (`#562`)." if args.service == "refresh-worker" else "")
+               " build in flight (`#563`)." if args.service == "refresh-worker" else "")
             + " If this is a revert or the board is already broken, --allow-rapid and say"
               " why in deploys.md."
         )

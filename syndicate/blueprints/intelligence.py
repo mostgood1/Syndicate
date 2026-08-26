@@ -3244,6 +3244,25 @@ def portfolio_settings_update_api():
     return _no_cache_response(response)
 
 
+@intelligence_bp.get("/portfolio/settings")
+def portfolio_settings_page():
+    """The form lives on `/portfolio`; this sends a browser there.
+
+    WHY THIS EXISTS. `/portfolio/settings` was POST-only -- it is the form's
+    ACTION, not a page -- so typing it in a browser returned 405 with no hint
+    where the form actually is. Measured 2026-08-26T01:21:20Z: a real 405 from
+    a real browser, on a URL this assistant had itself just told the user to
+    open, followed by three GETs of the JSON API looking for the same thing.
+    The name is the obvious guess for "where do I change settings", and a URL
+    that answers only one verb is a trap for whoever guesses it.
+
+    A redirect rather than a second copy of the form: two renderings of the
+    same five fields would drift, and the one nobody edits would be the one
+    somebody trusts.
+    """
+    return redirect("/portfolio#bankroll", code=303)
+
+
 @intelligence_bp.post("/portfolio/settings")
 def portfolio_settings_form():
     # Plain page-form action, matching /portfolio/bets/<id>/delete above:
@@ -3254,7 +3273,7 @@ def portfolio_settings_form():
     changes = {name: request.form.get(name) for name in EDITABLE_FIELDS if request.form.get(name) not in (None, "")}
     if changes:
         update_settings(changes)
-    return redirect("/portfolio", code=303)
+    return redirect("/portfolio#bankroll", code=303)
 
 
 @intelligence_bp.get("/api/portfolio/plan")

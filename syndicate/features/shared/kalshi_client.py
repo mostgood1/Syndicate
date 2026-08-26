@@ -403,6 +403,56 @@ def fetch_market(ticker: str) -> dict[str, Any]:
     return {"status": "error", "reason": "; ".join(errors) or "no_base_responded"}
 
 
+def fetch_event_markets(event_ticker: str) -> dict[str, Any]:
+    """The market tickers KALSHI ITSELF lists under one event.
+
+    THE ONE QUESTION LEFT ON `market_not_found`. Measured 2026-08-26T01:18:47Z:
+    `GET /markets/KXMLBTOTAL-26AUG251907KCTOR-8` returns 200 with live quotes,
+    and `POST /portfolio/events/orders` with that exact ticker, on the SAME
+    host, in the same second, returns `market_not_found`. Four hypotheses have
+    been measured and killed -- side, market shape, event field, and host.
+
+    What has never been checked is whether the ticker the MARKET endpoint
+    answers to is the ticker the ORDER endpoint expects. A market listing can
+    resolve an alias; an order book cannot. If this returns tickers that differ
+    from ours, that is the whole bug, and it is not a guess -- it is the
+    venue's own spelling of its own markets.
+
+    Read-only and unauthenticated, like every other fetch here. Returns a NAMED
+    failure rather than raising: this runs inside an exception handler and must
+    never replace the real error with its own.
+    """
+    key = str(event_ticker or "").strip()
+    if not key:
+        return {"status": "error", "reason": "no_event_ticker"}
+
+    errors: list[str] = []
+    for base in _BASE_URLS:
+        url = f"{base}/events/{key}?with_nested_markets=true"
+        try:
+            payload = _get(url)
+        except Exception as exc:
+            errors.append(f"{type(exc).__name__}: {exc}")
+            continue
+        event = payload.get("event")
+        markets = payload.get("markets")
+        if not isinstance(markets, list) and isinstance(event, Mapping):
+            markets = event.get("markets")
+        if not isinstance(markets, list):
+            errors.append(f"unexpected_shape:{sorted(payload)[:6]}")
+            continue
+        return {
+            "status": "ok",
+            "base": base,
+            "tickers": [
+                str(m.get("ticker") or "")
+                for m in markets
+                if isinstance(m, Mapping)
+            ],
+        }
+    return {"status": "error", "reason": "; ".join(errors) or "no_base_responded"}
+
+
 def is_combinatorial_series(series: Any) -> bool:
     text = str(series or "").strip().upper()
     return any(text.startswith(prefix) for prefix in _COMBINATORIAL_SERIES_PREFIXES)
