@@ -4302,6 +4302,41 @@ Bash hook, and nothing would report it.
   `REPO_ROOT` — deliberately NOT done on 2026-08-21 while three sessions were
   actively deploying against the current behaviour. Tracked in `todo.md`.
 
+**CONFIRMED 2026-08-26, AND THE GUARD'S OWN REMEDY TEXT IS PART OF THE TRAP.**
+
+Ran `deploy_claim.py acquire` and then `deploy_preflight.py` from the session
+worktree. Both succeeded. The preflight printed `deploy claim held by YOU` and
+`CLEAR: only infrastructure processes running`. The deploy was still blocked,
+and the guard reported BOTH locks as missing plus no lane at all:
+
+    your lane: <none -- run `/lane open <slug> "<goal>"`>
+    claim      NOT HELD by anyone -- take it
+    preflight  the most recent preflight returned HOLD, not CLEAR
+
+**It is THREE pieces of per-tree state, not one.** The 2026-08-21 entry above
+names the CLAIM. The PREFLIGHT RESULT and the `.current-lane.<session_id>`
+MARKER resolve the same way. A session that followed CLAUDE.md's worktree
+instruction has none of the three where the guard looks, and the guard reads
+`$CLAUDE_PROJECT_DIR` — always the primary tree.
+
+**The remedy the guard prints does not say which tree to run it in.** Following
+it verbatim from the worktree re-runs the same two commands, gets the same two
+successes, and blocks again — a loop that reads as a broken guard rather than as
+a path problem. Writing the lane marker and retaking both locks in the PRIMARY
+tree cleared it on the first attempt.
+
+All three are gitignored runtime state (`.syndicate/deploy_claims/`,
+`.syndicate/.current-lane.<id>`), so taking them in the primary tree does NOT
+touch the shared index and is safe to do from a worktree session.
+
+**How to apply:** take the claim, run the preflight, and write the lane marker
+in the PRIMARY tree — `C:/Users/tempadmin/OneDrive/Coding/Syndicate` — even
+though all your code work is in the worktree. Run the preflight there too: a
+worktree `CLEAR` is not the reading the guard will consult. Note the preflight
+itself may DIFFER between trees when the primary is behind `origin/main` (it was
+593 commits behind here), so treat the current worktree copy's verdict as the
+substantive safety check and the primary's as the guard's bookkeeping.
+
 ## 2026-08-21 — FORBIDDEN: taking a CODE COMMENT as authority for WHICH SERVICE runs something
 
 **Three instances in one session**, the third of which shipped:
