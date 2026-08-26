@@ -30792,3 +30792,184 @@ today-only tick reads as "the fix stopped working".
 league-week builds, MLB's ~3 minutes of uncached `[home]` card contexts, and
 whatever else. Same treatment required — measure the call, do not infer from the
 gap.
+
+---
+
+## 2026-08-26 04:37:16Z — refresh-worker `e11639c4` (#567 board build timing, #566 unreclaimable memory)
+
+Off-protocol: no `deploy_claim.py` acquire, no `deploy_preflight.py` receipt.
+`RENDER_API_KEY` is absent from this container and the agent proxy 403s
+`api.render.com`, so both locks were unreachable; deployed via Render MCP on
+explicit user direction. Deploy live in 2m41s.
+
+verify: **the first full board build under instrumentation printed**
+
+    [intelligence_state] BOARD_BUILD_TIMING wall_s=747.8 cpu_s=670.1 off_cpu_pct=10.4 ok=True
+    [intelligence_state] CANDIDATE_POOL_READY date=2026-08-25 count=23
+
+**`off_cpu_pct=10.4` ANSWERS THE QUESTION `#567` WAS BUILT TO ANSWER: the board
+is NOT waiting on anything. It is computing.** The pre-registered decision was
+"high off-CPU -> go look at what else the worker runs concurrently; low -> the
+cost is inside `_build_candidate_pool`". It is low. Stop hunting for contention.
+
+**CAVEAT ON MY OWN INSTRUMENT, stated before anyone builds on the number:**
+`time.process_time()` sums CPU over ALL THREADS in the process, not the calling
+thread. So `off_cpu_pct` measures whether the PROCESS was idle, not whether the
+BOARD THREAD was. The live-lens loop logs continuously throughout the build
+window, so some of those 670 CPU-seconds are certainly its. What the reading
+proves is that the worker process is CPU-saturated for the whole 12.5 minutes —
+which under the GIL is one core's worth regardless of which thread holds it, so
+the "not queued on I/O" conclusion survives. "The board thread burned 670s" does
+not. Use `time.thread_time()` if the per-thread split is ever needed.
+
+### The decomposition, from existing log timestamps (build began 04:38:01.9Z)
+
+| block | window | elapsed |
+|---|---|---|
+| pulls + memory guards before the sport loop | 04:38:01.9 -> 04:38:58.3 | 56s |
+| **8-sport candidate generation, all of it** | 04:38:58.3 -> 04:39:44.9 | **47s** |
+| silent, inside `build_intelligence_overview` post-loop | 04:39:44.9 -> 04:44:58.3 | **313s** |
+| `candidate_collection_with_fallback` (a SECOND collection) | 04:44:58.9 -> 04:47:28.6 | **150s** |
+| unspanned remainder to `CANDIDATE_POOL_READY` | 04:47:28.6 -> 04:50:29.8 | **181s** |
+
+**CANDIDATE GENERATION IS NOT THE COST. It is 47 seconds of a 748-second
+function — 6%.** Per-sport durations are trivial: ncaaf produced 255 candidates
+in 27ms, soccer 268 in 1.77s, nfl 16 in 4ms, nhl/ncaab/nba zero instantly. The
+one real gap INSIDE the loop is nfl-exit 04:39:07.4 -> ncaaf-enter 04:39:42.6,
+**35 seconds with nothing logged**, which is per-sport artifact loading, not
+generation.
+
+**748s is WORSE than the 11m22s (682s) baseline recorded above, not better.**
+Boot-cycle effects are the obvious confound (this is the first build after a
+restart, cold caches) so it is not yet evidence of a regression — but it is not
+evidence of improvement either, and nothing in this deploy was meant to change
+the duration.
+
+**Three unattributed blocks now have names and sizes**, which is what `#567` was
+for. The 313s silent block is the biggest single target and sits after the last
+sport exits, inside `build_intelligence_overview`. The 150s
+`candidate_collection_with_fallback` is a SECOND full collection pass after the
+sport loop already ran — worth understanding before optimising either.
+
+**Forward-slate cost is visible and is the same root cause the user named:**
+
+    odds_history_candidate_date_supplement sport=soccer shards_merged=6 entry_count=4358
+      candidate_dates = 2026-08-26, 08-27, 08-28, 08-29, 08-30, 09-04
+
+2026-08-29 alone is 7.4MB / 2547 entries, 08-30 3.97MB, 08-28 2.16MB — ~15MB of
+JSON parsed per build, each shard probed at three separate paths. Soccer's 268
+candidates are 199 steam. The per-sport window fix (`#565`) pruned the BOOK GRID
+pulls; it did not prune this supplement.
+
+**Whole build produced `count=23` candidates.** 748 seconds, 23 candidates.
+
+### `#566` confirmed working
+
+Both figures now print side by side, and the gap is exactly the discrepancy that
+misled me four times tonight into reporting a memory problem that did not exist:
+
+    04:38:49  pct_of_max 35.8   unreclaimable_pct_of_max 16.5
+    04:39:10  pct_of_max 42.9   unreclaimable_pct_of_max 19.2
+    04:46:53  pct_of_max 55.2   unreclaimable_pct_of_max 29.1
+
+Peak unreclaimable across the whole cycle is 29.1% of 4096MB. No memory problem.
+Zero oomKilled. Quote `unreclaimable`, never `pct_of_max`.
+
+### Regression evidence
+
+The broad sweep that was still running when `e11639c4` was merged has since
+finished: **280 passed, 8 subtests passed, 16m49s, exit 0.** The merge was made
+on 99 targeted tests; the broad result now backs it. Two earlier sweep attempts
+exited 124 (timeout) and one exited 4 (`--timeout` not installed, pytest-timeout
+absent) — neither was a failure, and I should not have described either as
+inconclusive evidence of anything.
+
+### CORRECTION to the paragraph above, from the SECOND build on the same instance
+
+I wrote "the board is computing, not queued" as a general conclusion. **It is
+true of the COLD build only.** The next build on the same instance:
+
+    cold (first build after boot)  wall_s=747.8  cpu_s=670.1  off_cpu_pct=10.4
+    warm (next build, same pid)    wall_s=167.0  cpu_s= 79.2  off_cpu_pct=52.6
+
+**The warm build is 4.5x faster AND spends half its time off-CPU.** So the
+board has two different failure shapes and one reading cannot describe both.
+Anyone quoting `off_cpu_pct=10.4` must say which build it came from.
+
+**WHY THIS MATTERS FOR THE ORIGINAL INCIDENT, and it closes the loop on it:**
+the reported symptom was a board frozen ~20 minutes. A restart forces a COLD
+build, and the cold build is the 12-minute one. Earlier tonight the
+refresh-worker took **15 deploys in 6h15m** (median uptime 1202s) — shorter than
+one cold build. So essentially **every build in that window was a cold build,
+and several were killed before finishing.** Deploy churn and board staleness are
+the same fact, not two.
+
+### What changed 4-6 hours ago — the board build WAS faster, and the step is findable
+
+`BUILD_SPAN_EXIT stage=candidate_collection_with_fallback` predates tonight's
+work, so production carries its own history. Excluding cache hits (`0.0`):
+
+    16:38 76s  16:54 69s  17:04 76s  17:14 78s  17:30 85s  17:40 81s  17:51 96s
+    18:05 88s  18:19 144s 18:31 94s  18:40 77s  18:50 99s
+    19:09 79s  19:19 79s  19:33 67s  19:41 61s  19:47 48s  20:08 88s
+    -------------------------------- STEP --------------------------------
+    20:28 142s 20:44 183s 21:07 164s 21:37 149s 21:48 162s 21:58 150s
+    22:10 141s 22:52 364s          (04:47 today) 150s
+
+**Median ~80s through 20:08Z, ~150-180s from 20:28Z on. The step brackets one
+deploy and only one:**
+
+    20:20:57Z  461ee74b  "Register the MLB props and soccer the board was already asking for"
+
+Instance ids confirm the restart across the step (`-dkfk6` at 20:08, `-8rf9h` at
+20:28). No other deploy landed in the gap.
+
+**THE MECHANISM IS IN THE COMMIT MESSAGE AND IT IS NOT A DEFECT.** It registered
+six more MLB player-prop series (KXMLBRBI, KXMLBTB, KXMLBERA, KXMLBHA, ...) that
+the board had been asking for by name and never fetching, and made soccer
+registrable by competition title. The board got slower because it is now
+CONSIDERING MARKETS IT PREVIOUSLY COULD NOT SEE. That is the change working.
+
+**And it keeps growing without another deploy** — the commit says so explicitly:
+*"Any of them registers the moment Kalshi lists it, with no deploy."* That is
+why the curve CLIMBS after the step (142 -> 183 -> 164 -> 150 -> 162 -> 141 ->
+364) instead of stepping once and holding. Later work compounded it: `#559` took
+Polymarket 7,936 -> 17,413 markets (00:13Z), Kalshi grammars added 1,040 (01:06Z)
+and 1,958 (01:54Z).
+
+**HONEST LIMITS ON THIS ATTRIBUTION.** (a) It is a correlation with the only
+deploy in the gap plus a plausible mechanism — not a bisect. (b) 18:19Z already
+read 144s BEFORE the step, so run-to-run variance is real and no single sample
+proves anything. (c) This span is 150s of a 748s build; the 313s block has NO
+historical series, so **"the whole build doubled because of 461ee74b" is NOT
+supported** — only that this one stage did. The spans shipped below are what
+would extend the series to the rest of the function.
+
+---
+
+## 2026-08-26 — `#567` follow-through: spans on the two silent blocks (NOT YET DEPLOYED)
+
+`_build_span_enter` / `_build_span_exit` in `pipeline/intelligence_state.py`,
+wrapping the three stages that had no production log line:
+
+- `build_intelligence_overview` — the **313s** block. Timed all along via
+  `_profile_stage` -> logger.info, which does not reach Render's collector, so
+  it has been measured for months and read by nobody.
+- `candidate_building` — same cause, `_log_stage_timing` is logger.info.
+- `manifest_odds_history_join` — never timed at all, plus a new
+  `ODDS_HISTORY_LOAD_SECONDS total_s= sports= <slug>=<s> ...` line reporting
+  `_load_odds_history_payload_for_sport` **per sport, sorted worst-first**, so
+  the expensive shard names itself rather than being averaged away.
+
+ENTER/EXIT pairs, no reindent of the loops (a whitespace-only diff over
+unmeasured code is where a real change hides). Both helpers never raise and
+report `elapsed_s=unknown` on an unreadable clock rather than inventing a
+number. 10 tests, including both directions (a busy span must read longer than
+an idle one), a broken clock, a broken stdout, and a **mutation-checked**
+pairing invariant — deleting one `_build_span_exit` turns it red, verified.
+
+verify (when deployed): `BUILD_SPAN_EXIT stage=build_intelligence_overview`
+should account for ~313s of a cold build, and `ODDS_HISTORY_LOAD_SECONDS` should
+name soccer as the worst shard. If the overview span comes back SMALL, the 313s
+is somewhere else in that stretch and this instrumentation was aimed wrong —
+say so rather than reaching for the next hypothesis.

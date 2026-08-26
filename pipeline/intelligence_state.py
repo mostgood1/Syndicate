@@ -3052,6 +3052,70 @@ def _state_payload_timestamp(payload: Any) -> str:
     return ""
 
 
+def _build_span_enter(label: str, selected_date: str | None) -> float | None:
+    """Open a BUILD_SPAN and return a start mark for `_build_span_exit`. `#567`.
+
+    WHY A SECOND SPAN HELPER EXISTS BESIDE `_build_candidate_pool`'s own
+    `_span`: that one wraps a CALLABLE, which is the right shape for the three
+    calls it already covers and the wrong shape for an inline block. Wrapping
+    the manifest/odds-history loop in a callable (or a `with`) would reindent
+    it, and a reindent of a loop nobody has measured is exactly the diff that
+    hides a real change inside whitespace. ENTER/EXIT as two statements
+    measures the same span with no reindent at all.
+
+    ENTER/EXIT PAIRS, not a completion line, for the reason `_span`'s own
+    docstring gives: a hang leaves the ENTER with no EXIT, and that is what
+    NAMES the call. A completion-only log goes silent for the whole span
+    exactly as the code does today.
+
+    `print`, not `logger.info`: logger.info does not reach Render's collector
+    (CLAUDE.md), which is why `_log_stage_timing("candidate_building", ...)`
+    has been running for months and appears in zero production log lines.
+    That silent stage is one of the two this helper exists to open up.
+
+    NEVER RAISES, and returns None rather than a time on a broken clock. An
+    instrument must not be able to kill the build it measures -- the same rule
+    `_timed_candidate_pool` states, and it is stated again here because the
+    first draft of that function got it wrong in exactly this way (clocks read
+    outside the guard) and shipped a test documenting the flaw.
+    """
+    try:
+        print(f"[intelligence_state] BUILD_SPAN_ENTER stage={label} date={selected_date}", flush=True)
+    except Exception:
+        pass
+    try:
+        return time.monotonic()
+    except Exception:
+        return None
+
+
+def _build_span_exit(label: str, started: float | None) -> None:
+    """Close a BUILD_SPAN opened by `_build_span_enter`. Never raises. `#567`.
+
+    `time.monotonic`, not `time.time` as the older `_span` uses: this measures
+    a DURATION, and a wall clock adjusted mid-span reports a duration that
+    never happened. Reported as `elapsed_s=unknown` rather than as a plausible
+    number when the clock was unreadable at ENTER -- an absent reading is
+    recoverable, an invented one is not.
+
+    A span that ends via `return` (the memory-abort guards inside the manifest
+    loop each return early) leaves its ENTER unclosed. That is deliberate and
+    reads correctly: those guards print their own reason first, so a dangling
+    ENTER beneath a `MEMORY_GUARD_ABORT` line is the abort, not a hang.
+    """
+    try:
+        if started is None:
+            print(f"[intelligence_state] BUILD_SPAN_EXIT stage={label} elapsed_s=unknown", flush=True)
+            return
+        print(
+            f"[intelligence_state] BUILD_SPAN_EXIT stage={label} "
+            f"elapsed_s={round(time.monotonic() - started, 2)}",
+            flush=True,
+        )
+    except Exception:
+        pass
+
+
 def _timed_candidate_pool(build, *args) -> Any:
     """Run the candidate-pool build and report WALL vs CPU. `#567`.
 
@@ -4782,6 +4846,15 @@ class IntelligenceStateService:
         # have been updated. Costs nothing on the streamed path, where the
         # returned list is empty by construction.
         returned = None
+        # `#567`. THE BIGGEST SINGLE BLOCK IN THE BUILD, AND IT HAD NO LOG LINE.
+        # Measured 2026-08-26 on the first build after boot: 313 SECONDS between
+        # the last sport exiting the loop below and `post_build_overview`, out of
+        # a 747.8s build. It was invisible because the only timing on it goes
+        # through `_profile_stage` -> logger.info, which does not reach Render's
+        # collector -- so this stage has been timed all along and read by nobody.
+        # For scale: all eight sports' candidate GENERATION is 47s of that same
+        # build. Anyone optimising generation is optimising 6% of the function.
+        _overview_mark = _build_span_enter("build_intelligence_overview", selected_date)
         if self._app is not None:
             try:
                 with self._app.app_context():
@@ -4792,6 +4865,10 @@ class IntelligenceStateService:
             except RuntimeError:
                 summary_parts.clear()
                 returned = None
+        # Closed here rather than after the list-fallback below: the fallback is
+        # a re-read of rows this call already produced, and folding it in would
+        # attribute its cost to the overview.
+        _build_span_exit("build_intelligence_overview", _overview_mark)
         if not summary_parts and isinstance(returned, list) and returned:
             print(
                 f"[intelligence_state] OVERVIEW_STREAM_FELL_BACK_TO_LIST sports={len(returned)}",
@@ -5004,6 +5081,12 @@ class IntelligenceStateService:
                     f"date={selected_date} -- keeping candidates unfiltered",
                     flush=True,
                 )
+        # `#567`: `_log_stage_timing` below is logger.info and reaches Render's
+        # collector zero times, so this loop -- which serialises, scores and
+        # market-id-stamps EVERY candidate -- has never appeared in a production
+        # log. Opened here so the 181s between the collection span and
+        # `CANDIDATE_POOL_READY` can be split between this and the manifest join.
+        _candidate_build_mark = _build_span_enter("candidate_building", selected_date)
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
@@ -5034,17 +5117,37 @@ class IntelligenceStateService:
             )
             candidate_entries.append(candidate_entry)
         _log_stage_timing("candidate_building", (time.perf_counter() - candidate_build_started_at) * 1000.0)
+        _build_span_exit("candidate_building", _candidate_build_mark)
         _diag_log_all_process_memory("post_candidate_building")
         if _abort_build_candidate_pool_if_memory_critical("post_candidate_building"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
 
+        # `#567`, the other half of the unattributed 181s. This loop reloads a
+        # per-sport odds-history payload and joins it against every candidate.
+        # `_load_odds_history_payload_for_sport` is the specific suspect and it
+        # is timed PER SPORT below, because the shards are wildly uneven: the
+        # 2026-08-26 build read soccer shards of 7.4MB (2,547 entries), 3.97MB
+        # and 2.16MB while nba/nhl/ncaab read nothing at all. A single total for
+        # the loop would average that away and need a second deploy to recover,
+        # which is the round trip this instrumentation exists to avoid.
+        _manifest_mark = _build_span_enter("manifest_odds_history_join", selected_date)
+        _history_load_seconds: dict[str, float] = {}
         manifests = self._available_sport_manifests(selected_date)
         candidate_pools: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
         manifest_shard_keys = {sport_slug: resolve_current_shard_key(sport_slug, selected_date) for sport_slug in manifests}
         for sport_slug, manifest in manifests.items():
             if _abort_build_candidate_pool_if_memory_critical(f"manifest_loop_sport={sport_slug}"):
                 return self._empty_candidate_pool(selected_date, source_fingerprint)
+            try:
+                _history_mark: float | None = time.monotonic()
+            except Exception:
+                _history_mark = None
             odds_history_payload = self._load_odds_history_payload_for_sport(sport_slug, manifest_shard_keys[sport_slug])
+            if _history_mark is not None:
+                try:
+                    _history_load_seconds[sport_slug] = time.monotonic() - _history_mark
+                except Exception:
+                    pass
             odds_history_markets = self._odds_history_market_states(odds_history_payload)
             sport_candidates: list[dict[str, Any]] = []
             for candidate in candidate_entries:
@@ -5080,6 +5183,21 @@ class IntelligenceStateService:
         global_pool = self._merge_candidate_pools(candidate_pools)
         if not candidate_pools:
             global_pool = []
+        # Per-sport, sorted by cost, so the worst shard NAMES ITSELF instead of
+        # being inferred from the total. Wrapped whole: a reporting line must
+        # never be able to take down the build it reports on.
+        try:
+            _slowest = sorted(_history_load_seconds.items(), key=lambda kv: kv[1], reverse=True)
+            print(
+                "[intelligence_state] ODDS_HISTORY_LOAD_SECONDS "
+                f"total_s={round(sum(_history_load_seconds.values()), 2)} "
+                f"sports={len(_history_load_seconds)} "
+                + " ".join(f"{slug}={round(seconds, 2)}" for slug, seconds in _slowest),
+                flush=True,
+            )
+        except Exception:
+            pass
+        _build_span_exit("manifest_odds_history_join", _manifest_mark)
 
         # Effectively-decided live props get one last pass here, on the final
         # merged pool, because this is the only point where every field is

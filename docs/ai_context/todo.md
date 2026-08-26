@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#567` — **Is the board build SLOW, or WAITING? Nothing on this service could tell them apart, and three wrong answers in one session came from guessing.** — lane `board-staleness-visibility`, 2026-08-26 — **INSTRUMENT SHIPPED (log-only), NOT DEPLOYED**
+### `#567` — **Is the board build SLOW, or WAITING? Nothing on this service could tell them apart, and three wrong answers in one session came from guessing.** — lane `board-staleness-visibility`, 2026-08-26 — **ANSWERED, AND THE ANSWER IS TWO ANSWERS: cold build `off_cpu_pct=10.4`, warm build `52.6`**
 
 **THE PROBLEM WITH EVERY ESTIMATE SO FAR.** Where the board build's time goes
 has been read, every single time, from the **gap between two log lines**. On
@@ -46,11 +46,149 @@ protect a log line — the exact inversion the function's own docstring forbids.
 Worse, I wrote a test that DOCUMENTED that flaw instead of fixing it. The build
 now survives a broken clock and skips the line; the test asserts it.
 
-**NEXT: one clean build after this ships.** If `off_cpu_pct` is high, stop
-optimising the board and look at what else the worker is doing concurrently —
-starting with the sequential per-league `refresh_odds_sources.py` children.
-If it is low, the board really is doing ~9 minutes of work and the remaining
-cost is attributable inside it.
+**THE ANSWER**, deployed `e11639c4` live 04:37:16Z, first full build after boot:
+
+    [intelligence_state] BOARD_BUILD_TIMING wall_s=747.8 cpu_s=670.1 off_cpu_pct=10.4 ok=True
+    [intelligence_state] CANDIDATE_POOL_READY date=2026-08-25 count=23
+
+**`off_cpu_pct=10.4`. The pre-registered decision above resolves to the SECOND
+branch: the board is computing, not queued.** The leading hypothesis in this
+item — "the board build is not slow, it is QUEUED" — is **WRONG for the cold
+build, and is now retired for it.** Nobody should spend more time on the
+concurrent-children theory on the strength of that reading.
+
+**CORRECTION, from the SECOND build on the same instance — one reading does not
+describe both builds:**
+
+    cold (first build after boot)  wall_s=747.8  cpu_s=670.1  off_cpu_pct=10.4
+    warm (next build, same pid)    wall_s=167.0  cpu_s= 79.2  off_cpu_pct=52.6
+
+**The warm build is 4.5x faster AND spends half its time off-CPU.** So the board
+has two distinct shapes and I over-generalised the first one. Anyone quoting
+`off_cpu_pct=10.4` must say which build it came from. The queued hypothesis is
+retired for the COLD build only; for the warm build it is still live and
+unexamined.
+
+**THIS CLOSES THE LOOP ON THE ORIGINAL INCIDENT.** The report was a board frozen
+~20 minutes. A restart forces a COLD build, and the cold build is the 12-minute
+one. The refresh-worker took **15 deploys in 6h15m** that evening, median uptime
+1202s — shorter than a single cold build. So nearly every build in the window was
+cold, and several were killed before finishing. **Deploy churn and board
+staleness are the same fact, not two independent problems.**
+
+**A CAVEAT ON THIS INSTRUMENT THAT THE PARAGRAPH ABOVE GETS HALF-RIGHT.**
+`time.process_time()` excludes CHILD processes (so the `refresh_odds_sources.py`
+child genuinely does not appear — that part stands) but it SUMS ALL THREADS in
+this process. The live-lens loop logs continuously through the whole build
+window, so some of those 670 CPU-seconds are certainly its, not the board's.
+**What the reading proves is that the WORKER PROCESS is CPU-saturated for the
+full 12.5 minutes; it does not prove the board thread itself burned 670s.**
+Under the GIL that is one core's worth either way, so "not blocked on I/O"
+survives — but anyone needing the per-thread split must use `time.thread_time()`.
+Stated here because the whole point of `#567` was to stop inferring from numbers
+whose definition nobody checked.
+
+**WHERE THE 748 SECONDS GO** (existing log timestamps, build began 04:38:01.9Z):
+
+| block | window | elapsed |
+|---|---|---|
+| pulls + memory guards before the sport loop | 04:38:01.9 -> 04:38:58.3 | 56s |
+| **8-sport candidate generation, ALL of it** | 04:38:58.3 -> 04:39:44.9 | **47s** |
+| silent, inside `build_intelligence_overview` post-loop | 04:39:44.9 -> 04:44:58.3 | **313s** |
+| `candidate_collection_with_fallback` (a SECOND collection) | 04:44:58.9 -> 04:47:28.6 | **150s** |
+| unspanned remainder to `CANDIDATE_POOL_READY` | 04:47:28.6 -> 04:50:29.8 | **181s** |
+
+**CANDIDATE GENERATION IS 6% OF THE BUILD.** ncaaf: 255 candidates in **27ms**.
+soccer: 268 in 1.77s. nfl: 16 in 4ms. nba/nhl/ncaab: zero, instantly. Anyone
+optimising candidate generation is optimising 47 seconds out of 748.
+
+**THE THREE REAL TARGETS, in size order — all now named, none yet explained:**
+
+1. **313s silent block** after the last sport exits, inside
+   `build_intelligence_overview`. Biggest single item. No log line at all.
+2. **181s unspanned remainder** between `BUILD_SPAN_EXIT
+   candidate_collection_with_fallback` and `CANDIDATE_POOL_READY`. The `_span`
+   helper exists; these stages are simply not wrapped in it.
+3. **150s `candidate_collection_with_fallback`** — a SECOND full collection pass
+   after the sport loop already ran one. Understand WHY it runs before
+   optimising it; it may be redundant work rather than slow work.
+
+Smaller and already visible: a **35-second gap INSIDE the sport loop**
+(nfl exits 04:39:07.4, ncaaf enters 04:39:42.6) with nothing logged — per-sport
+artifact loading, not generation.
+
+**748s is WORSE than the 11m22s (682s) baseline in `deploys.md`.** This was the
+first build after a restart with cold caches, so it is not yet evidence of a
+regression — and nothing in `e11639c4` was meant to change the duration. Needs a
+warm-cycle sample before anyone reads it either way.
+
+**Whole build produced `count=23` candidates.** 748 seconds, 23 candidates.
+
+**FORWARD-SLATE COST IS STILL THERE AND `#565` DID NOT REMOVE IT:**
+
+    odds_history_candidate_date_supplement sport=soccer shards_merged=6 entry_count=4358
+      candidate_dates = 2026-08-26, 08-27, 08-28, 08-29, 08-30, 09-04
+
+2026-08-29 alone is 7.4MB / 2547 entries, 08-30 3.97MB, 08-28 2.16MB — ~15MB of
+JSON parsed per build, each shard probed at three separate paths. **`#565`'s
+per-sport window pruned the BOOK GRID pulls; it does not touch this supplement**,
+which still reaches 9 days forward for soccer. Same root cause the user named
+(weekly sports widened to 7 days, soccer collateral), second call site.
+
+**WHY IT WAS FASTER BEFORE — the step is findable and it is NOT a defect.**
+`BUILD_SPAN_EXIT stage=candidate_collection_with_fallback` predates tonight, so
+production carries its own history. Excluding cache hits (`0.0`):
+
+    16:38 76s  16:54 69s  17:04 76s  17:14 78s  17:30 85s  17:40 81s  17:51 96s
+    18:05 88s  18:19 144s 18:31 94s  18:40 77s  18:50 99s
+    19:09 79s  19:19 79s  19:33 67s  19:41 61s  19:47 48s  20:08 88s
+    -------------------------------- STEP --------------------------------
+    20:28 142s 20:44 183s 21:07 164s 21:37 149s 21:48 162s 21:58 150s
+    22:10 141s 22:52 364s          (04:47 today) 150s
+
+Median ~80s through 20:08Z, ~150-180s after. **The step brackets exactly one
+deploy:** `20:20:57Z 461ee74b "Register the MLB props and soccer the board was
+already asking for"`. Instance ids confirm the restart across it (`-dkfk6` ->
+`-8rf9h`); no other deploy landed in the gap.
+
+**The mechanism is in that commit and it is the change WORKING.** It registered
+six MLB player-prop series the board had been asking for by name and never
+fetching, and made soccer registrable by competition title. The board is slower
+because it now considers markets it previously could not see. **And it keeps
+growing with no further deploy** — the commit says so: *"Any of them registers
+the moment Kalshi lists it, with no deploy."* That is why the curve CLIMBS after
+the step rather than stepping once. Later work compounded it: `#559` took
+Polymarket 7,936 -> 17,413 markets, Kalshi grammars +1,040 then +1,958.
+
+**LIMITS ON THIS ATTRIBUTION, because it is a correlation and not a bisect:**
+18:19Z already read 144s BEFORE the step, so variance is real; and this span is
+150s of a 748s build while the 313s block has NO historical series. **"The whole
+build doubled because of 461ee74b" is NOT supported** — only that this one stage
+did.
+
+**SHIPPED (not yet deployed): spans on all three silent stages.**
+`_build_span_enter`/`_build_span_exit` wrap `build_intelligence_overview` (the
+313s block), `candidate_building`, and `manifest_odds_history_join`, plus a new
+`ODDS_HISTORY_LOAD_SECONDS` line timing `_load_odds_history_payload_for_sport`
+**per sport, sorted worst-first** — the shards are wildly uneven (soccer 7.4MB /
+2,547 entries against nba/nhl/ncaab reading nothing), so one total would average
+the culprit away and cost another deploy to recover.
+
+The first two were ALREADY TIMED and invisible: `_profile_stage` and
+`_log_stage_timing` both go to `logger.info`, which does not reach Render's
+collector. **Months of timing data on the biggest block in the build, written to
+a sink nobody reads.**
+
+ENTER/EXIT pairs with no reindent of the loops. Both helpers never raise and
+report `elapsed_s=unknown` on a broken clock rather than inventing a number.
+10 tests: both directions (busy span > idle span), broken clock, broken stdout,
+and a **mutation-checked** pairing invariant — deleting one `_build_span_exit`
+turns it red, verified rather than assumed.
+
+**NEXT:** deploy, then read one COLD build. If
+`BUILD_SPAN_EXIT stage=build_intelligence_overview` accounts for ~313s, the
+target is named. **If it comes back SMALL, this instrumentation was aimed wrong
+— say that, rather than reaching for the next hypothesis.**
 
 ### `#566` — **There was no memory issue. `ALL_PROCESS_MEMORY` reports only the page-cache-inclusive figure, and I read it as an emergency four times in one session.** — lane `board-staleness-visibility`, 2026-08-26 — **FIXED (telemetry); NO PRODUCTION DEFECT FOUND**
 
