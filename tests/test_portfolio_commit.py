@@ -763,3 +763,27 @@ def test_nothing_is_dropped_by_the_preference_only_reordered():
     assert plan["refusals"].get("beyond_max_positions") == 1
     # The aggregator row was the one cut, and it is still COUNTED.
     assert {p["event_id"] for p in plan["positions"]} == {"venue-a", "venue-b"}
+
+
+def test_the_plan_log_names_where_the_bankroll_came_from(capsys, monkeypatch, tmp_path):
+    """A bankroll printed without its provenance sends a reader to the wrong
+    knob. `resolve_settings` is stored > env > default and the three are fixed
+    in three different places -- the settings form, the Render dashboard, and
+    this repo -- and they do not override symmetrically: setting the env var
+    while a stored value exists changes nothing and looks like it worked."""
+    from syndicate.features.shared import portfolio_settings as ps
+
+    monkeypatch.delenv("SYNDICATE_BANKROLL_UNITS", raising=False)
+    monkeypatch.setattr(ps, "_read_stored", lambda: ({}, None))
+    assert ps.resolve_settings().sources["bankroll_units"] == "default"
+
+    monkeypatch.setenv("SYNDICATE_BANKROLL_UNITS", "250")
+    resolved = ps.resolve_settings()
+    assert resolved.bankroll_units == 250.0
+    assert resolved.sources["bankroll_units"] == "env"
+
+    # STORED WINS. This is the asymmetry the log line exists to expose.
+    monkeypatch.setattr(ps, "_read_stored", lambda: ({"bankroll_units": 1000.0}, None))
+    resolved = ps.resolve_settings()
+    assert resolved.bankroll_units == 1000.0
+    assert resolved.sources["bankroll_units"] == "stored"

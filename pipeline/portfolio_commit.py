@@ -454,10 +454,15 @@ def run_portfolio_commit(
             "failures": failures,
         }
 
+    # RESOLVED ONCE. Read twice, this would be two answers whenever the stored
+    # settings change mid-run -- and the log line below would then describe a
+    # bankroll the plan was not sized with.
+    settings = resolve_settings()
+
     plan = commit_portfolio(
         rows,
         selected_date=normalized,
-        settings=resolve_settings(),
+        settings=settings,
         # S6 HOOK. Layer 2 rows carry no `historical_profile`, so this is empty
         # today and every market therefore sizes at `_MIN_SAMPLE_CREDIBILITY`
         # (0.25) -- which is correct while `settled_count` is 0 platform-wide.
@@ -601,12 +606,29 @@ def run_portfolio_commit(
         return {"status": "error", "reason": f"write_failed: {exc}", "date": normalized}
 
     totals = plan.get("totals") or {}
+
+    # WHERE THE BANKROLL CAME FROM, not just what it is.
+    #
+    # `resolve_settings` is stored > env > default per field, and the three are
+    # fixed in DIFFERENT PLACES: stored is the settings form, env is the Render
+    # dashboard, default is this repo. A line that prints `bankroll=$250.0`
+    # without the source sends a reader to change the wrong one -- and the two
+    # do not override symmetrically, so setting the env var while a stored
+    # value exists changes nothing at all and looks like it worked.
+    #
+    # Measured 2026-08-26 00:35:49Z: `bankroll=$250.0` against a stated policy
+    # of $1000, with no way to tell from any log which of the three won. Same
+    # defect as `RECONCILE_COUNT_IMPLAUSIBLE` printing one branch's numbers
+    # while another decided -- a value stated without its provenance.
+    bankroll_source = str((settings.sources or {}).get("bankroll_units") or "?")
+
     # print, not logger.info -- logger.info never reaches Render's collector.
     print(
         f"[portfolio_commit] PLAN_WRITTEN date={normalized} "
         f"rows_in={plan.get('rows_in')} sized={plan.get('sized')} "
         f"positions={totals.get('positions')} staked=${totals.get('staked_dollars')} "
-        f"bankroll=${plan.get('bankroll_units')} scale={totals.get('slate_scale_factor')} "
+        f"bankroll=${plan.get('bankroll_units')} bankroll_source={bankroll_source} "
+        f"scale={totals.get('slate_scale_factor')} "
         f"refusals={plan.get('refusals')}",
         flush=True,
     )
