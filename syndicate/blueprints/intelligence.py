@@ -3809,10 +3809,53 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
         settlement_error = f"{type(exc).__name__}: {exc}"
         _LOGGER.exception("LIVE_SETTLEMENT_SUMMARY_FAILURE")
 
-    # SENT, OR POSSIBLY SENT, WITH AN UNKNOWN RESULT. A restart between submit
-    # and record produces exactly these, and they are the rows a person needs to
-    # see first -- they must be checked against the venue rather than retried.
-    unreconciled = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
+    # ------------------------------------------------------------------
+    # A RESTING ORDER IS NOT AN UNKNOWN RESULT.
+    # ------------------------------------------------------------------
+    #
+    # This was every `submitted` row, under the banner "sent with an unknown
+    # result -- check them against the venue". REPORTED BY THE USER
+    # 2026-08-26, who did check them against the venue: four Polymarket orders
+    # the page called unknown were sitting at Polymarket as ordinary
+    # good-till-cancelled limit orders, exactly as placed.
+    #
+    # They are different facts and they need different words:
+    #
+    #   UNKNOWN   we sent it and never read it back. A restart between submit
+    #             and record leaves exactly this, and it is the case the
+    #             write-ahead record exists for. Genuinely alarming.
+    #   RESTING   the venue was asked, answered, and said the order is live and
+    #             unfilled (`ORDER_STATE_NEW`). Completely healthy -- it is
+    #             what a limit order does.
+    #
+    # `reconciled_at` is the discriminator and it already exists: it was added
+    # 2026-08-24 precisely because "nothing changed" and "nothing was learned"
+    # are different facts. A row carrying it HAS been read back.
+    #
+    # THE COLLAPSE POINTED THE ALARMING WAY, which is why it had to go. A
+    # warning that fires on the system working correctly teaches the reader to
+    # ignore the warning, and this one is the last line of defence against a
+    # double-spend.
+    submitted_rows = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
+    unreconciled = [o for o in submitted_rows if not o.get("reconciled_at")]
+
+    # OPEN AT THE VENUE, from the venue's own answer -- NOT from our status.
+    #
+    # Counting `submitted` rows missed the partially filled ones. The user's
+    # Polymarket Orders tab 2026-08-26 listed FIVE open orders (four Pending,
+    # one Semi-filled at 7.11 of 9.60) against four here, because the
+    # semi-filled row books as `filled` and left every count of what is still
+    # working. It is both things at once, and `venue_open` is the field that
+    # says so.
+    #
+    # `reconciled_at` is still required: an order we never read back is an
+    # unknown, not a resting one, and it belongs in the banner above.
+    resting = [
+        o
+        for o in orders
+        if o.get("reconciled_at")
+        and (o.get("venue_open") or str(o.get("status") or "") == STATUS_SUBMITTED)
+    ]
 
     # THE WORKER'S STATE, NOT THIS PROCESS'S. The switches and caps are env
     # vars on live-odds-worker; the web service has none of them, so reading
@@ -3872,6 +3915,8 @@ def _live_portfolio_payload(selected_date: str, *, show_all: bool = False) -> di
         "settlement": settlement,
         "settlement_error": settlement_error,
         "unreconciled": unreconciled,
+        # Shown as information, not as an error. See the note above.
+        "resting": resting,
         **payload_state,
     }
 

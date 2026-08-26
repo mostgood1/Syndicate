@@ -395,3 +395,17 @@ def test_event_markets_refuses_an_unexpected_shape_rather_than_reporting_zero(mo
 
     monkeypatch.setattr(kc, "_get", lambda url: {"unexpected": True})
     assert kc.fetch_event_markets("KXA")["status"] == "error"
+
+
+def test_an_empty_market_list_is_refused_not_reported_as_ok(monkeypatch):
+    """THE PROBE'S OWN FAILURE. `count=0 ours_listed=False` was printed for
+    eight events whose markets had just been priced -- a wrong query wearing
+    an answer's clothes. An empty list must carry the payload keys and the URL
+    so the QUERY is what gets fixed, not trust in the venue."""
+    from syndicate.features.shared import kalshi_client as kc
+
+    monkeypatch.setattr(kc, "_get", lambda url: {"event": {"event_ticker": "KXA"}, "markets": []})
+    out = kc.fetch_event_markets("KXA")
+    assert out["status"] == "error"
+    assert "empty_markets" in out["reason"]
+    assert "keys=" in out["reason"]

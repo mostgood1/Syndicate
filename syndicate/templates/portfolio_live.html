@@ -50,6 +50,11 @@
     color: var(--cards-text-dim, #9099a8); font-size: 12px; }
   .live-error { border: 1px solid #7f1d1d; background: rgba(127,29,29,.18); color: #fecaca;
     border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
+  /* NEUTRAL, NOT RED. A resting limit order is the system working; styling it
+     like the unknown-result banner is what made four healthy orders read as a
+     fault. */
+  .live-note { border: 1px solid #1e3a5f; background: rgba(30,58,95,.22); color: #bfdbfe;
+    border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
   .live-links { font-size: 11px; margin-left: auto; }
   .live-links a { color: var(--cards-accent, #60a5fa); text-decoration: none; }
 </style>
@@ -132,8 +137,22 @@
   {% if L.unreconciled %}
     <div class="live-error">
       <strong>{{ L.unreconciled|length }} order(s) sent with an unknown result.</strong>
-      A restart between submit and record leaves exactly these. Check them against the venue
-      before placing anything else — do not re-submit.
+      We never read these back from the venue &mdash; a restart between submit and record
+      leaves exactly these. Check them against the venue before placing anything else
+      &mdash; do not re-submit.
+    </div>
+  {% endif %}
+
+  {# RESTING IS NOT AN ERROR. These were read back from the venue and it said
+     they are live and unfilled. They used to sit in the banner above under
+     "unknown result", which is what a limit order looks like when you describe
+     it as a failure. #}
+  {% if L.resting %}
+    <div class="live-note">
+      <strong>{{ L.resting|length }} order(s) working at the venue.</strong>
+      Confirmed live at the last read &mdash; a limit order waiting for its price, not a problem.
+      A partly filled order counts here <em>and</em> as a position: the filled part is money
+      down, the remainder is still working.
     </div>
   {% endif %}
 

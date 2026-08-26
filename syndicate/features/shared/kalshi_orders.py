@@ -262,6 +262,95 @@ _DEFAULT_ORDER_PATH = "/portfolio/events/orders"
 _V2_TIME_IN_FORCE = "good_till_canceled"
 _V2_SELF_TRADE_PREVENTION = "taker_at_cross"
 
+# `exchange_index` IS A SHARD SELECTOR, NOT A CONSTANT. THIS IS THE BUG.
+#
+# The sample body carried `"exchange_index": 0` and it was copied as if it were
+# part of the contract's fixed furniture, alongside `post_only: false`. The
+# field reference the owner supplied 2026-08-26 says otherwise, verbatim:
+#
+#   exchange_index -- Exchange shard index. If omitted, auto-routes when
+#   ticker is provided; otherwise defaults to 0. Use -1 to require
+#   auto-routing by ticker.
+#
+# So sending 0 does not mean "the default"; it PINS the order to shard 0. A
+# market that lives on any other shard is not there, and the matching engine
+# says so with the only words it has for a ticker it cannot see on the shard it
+# was asked about: `market_not_found`.
+#
+# THAT IS EXACTLY THE SHAPE THAT HAS BEEN MEASURED ALL WEEK, and it is the only
+# hypothesis left that survives every reading:
+#
+#   * GET /markets/<ticker> returns `status=active` with both legs quoted --
+#     reads are not sharded, so the market genuinely exists (measured on
+#     KXMLBKS, KXMLBOUTS, KXMLBHIT, KXMLBRBI, KXMLBHRR, KXMLBTOTAL).
+#   * The POST 404s from the SAME host, 0.5s later (`fetch_base` ==
+#     `order_base`, measured 2026-08-26T01:18:47Z) -- so it is not the host.
+#   * BOTH sides fail and both sides have filled -- so it is not `bid`/`ask`.
+#   * The body is byte-identical in shape to the two KXMLBKS submits that
+#     SUCCEEDED on 2026-08-24 -- so it is not a field name or a unit.
+#   * Successes and failures are the same market family on the same day, which
+#     is what a per-market shard assignment looks like and what a code
+#     regression does not.
+#
+# -1 rather than omitting the key: both auto-route, but -1 REQUIRES routing by
+# ticker, so a future body that loses its ticker fails loudly instead of
+# quietly landing on shard 0 again. Overridable without a deploy because this
+# is the field the venue is most likely to keep moving.
+_V2_EXCHANGE_INDEX_AUTO = -1
+
+
+# `subaccount` IS THE SECOND FIELD COPIED FROM THE SAMPLE AS FURNITURE.
+#
+# CONFIRMED 2026-08-26: switching `exchange_index` 0 -> -1 changed the venue's
+# answer, cleanly and with no exceptions either side of the deploy:
+#
+#   before 12:55:08Z   http_404 {"code":"market_not_found"}
+#   after  12:55:08Z   http_400 {"code":"user_not_found: <account uuid>"}
+#
+# So `-1` DID route by ticker and the matching engine DID find the market. It
+# then failed on the USER instead. The order got one layer deeper, which is
+# what a correct fix to a layered failure looks like.
+#
+# `user_not_found` naming a UUID means the shard that owns the market has no
+# record of the account the request was made for. Two things can cause that,
+# and only one is ours to fix. The venue's own field reference:
+#
+#   subaccount -- The subaccount number to use for this order. 0 is the
+#   primary subaccount. Subaccount-restricted API keys must OMIT this field
+#   or pass their locked subaccount.
+#
+# We send a literal 0 on every order, exactly as `exchange_index` was sent.
+# If this key is subaccount-restricted, 0 is not "the default" any more than
+# shard 0 was -- it names a subaccount that may not exist for this key on this
+# shard, which is precisely what the error says.
+#
+# OMITTED BY DEFAULT, because that is the branch the reference prescribes for a
+# restricted key and the unrestricted case falls back to primary anyway.
+# `KALSHI_ORDER_SUBACCOUNT` puts a number back with no deploy -- WNBA orders
+# currently fill with `subaccount: 0`, so that is the rollback if omitting it
+# breaks the path that works.
+_SUBACCOUNT_OMITTED = object()
+
+
+def _v2_subaccount() -> Any:
+    raw = (os.environ.get("KALSHI_ORDER_SUBACCOUNT") or "").strip()
+    if not raw:
+        return _SUBACCOUNT_OMITTED
+    try:
+        return int(raw)
+    except ValueError:
+        return _SUBACCOUNT_OMITTED
+
+
+def _v2_exchange_index() -> int:
+    raw = (os.environ.get("KALSHI_ORDER_EXCHANGE_INDEX") or "").strip()
+    if not raw:
+        return _V2_EXCHANGE_INDEX_AUTO
+    try:
+        return int(raw)
+    except ValueError:
+        return _V2_EXCHANGE_INDEX_AUTO
+
 
 def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
     """The body `POST /portfolio/events/orders` takes. PURE -- no clock, no net.
@@ -332,7 +421,7 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
 
     from syndicate.features.shared.execution_ledger import idempotency_key
 
-    return {
+    body: dict[str, Any] = {
         "ticker": ticker,
         "client_order_id": idempotency_key(request),
         "side": book_side,
@@ -344,9 +433,12 @@ def order_body_v2(request: Any, *, price_dollars: float | None = None) -> dict[s
         "post_only": False,
         "cancel_order_on_pause": False,
         "reduce_only": False,
-        "subaccount": 0,
-        "exchange_index": 0,
+        "exchange_index": _v2_exchange_index(),
     }
+    subaccount = _v2_subaccount()
+    if subaccount is not _SUBACCOUNT_OMITTED:
+        body["subaccount"] = subaccount
+    return body
 
 
 def build_order_body(request: Any, *, price_dollars: float | None = None) -> dict[str, Any]:
@@ -437,7 +529,15 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         f" ticker={body.get('ticker')} side={body.get('side')}"
         f" count={body.get('count')}"
         f" price={body.get('price') or [v for k, v in body.items() if 'price' in k]}"
-        f" tif={body.get('time_in_force')}",
+        f" tif={body.get('time_in_force')}"
+        # THE FIELD UNDER TEST. Printed on the SUBMIT and not only on the
+        # failure, because the reading that settles this is a shard other than
+        # 0 filling -- and a line that only appears when things break cannot
+        # show that.
+        f" exchange_index={body.get('exchange_index')}"
+        # PRESENT OR ABSENT, on the SUBMIT. `exchange_index` had to be added to
+        # this line before its fix could be read at all; this one starts there.
+        f" subaccount={body.get('subaccount', '<omitted>')}",
         flush=True,
     )
     try:
@@ -460,7 +560,16 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
         # BOTH asks quoted (`yes_ask=0.5700 no_ask=0.4400`). Nothing about the
         # market differs from the one that filled.
         #
-        # WHAT IS LEFT IS THE HOST. `_BASE_URLS` is a three-entry FALLBACK
+        # RESOLVED 2026-08-26: IT WAS `exchange_index`. The paragraphs below
+        # are the elimination that got there, kept because each one closed a
+        # hypothesis that would otherwise be re-opened. The answer is in
+        # `_V2_EXCHANGE_INDEX_AUTO`: a literal 0 pins the order to shard 0, and
+        # `market_not_found` is what a matching engine says about a ticker that
+        # is not on the shard it was asked about. Everything below correctly
+        # ruled out the host, the side, the market shape and the event field --
+        # it just never questioned a field copied out of the sample body.
+        #
+        # THE HOST -- RULED OUT. `_BASE_URLS` is a three-entry FALLBACK
         # CHAIN for reads -- `fetch_market` walks it until one answers and
         # returns which one did -- while `_orders_url()` pins `_BASE_URLS[0]`
         # unconditionally. A market served by base[1] would GET fine and POST
@@ -494,6 +603,15 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                 #
                 # So the event ticker is NOT the market ticker's own prefix,
                 # and our body sends no event field at all.
+                # THE TICKER KALSHI ECHOES BACK, against the one we sent.
+                # `fetch_market` does `GET /markets/{key}` and accepts any body
+                # carrying a `ticker` -- it never checks that the ticker
+                # RETURNED is the ticker ASKED FOR. A listing endpoint can
+                # resolve an alias or a redirect; an order book cannot. If
+                # these two strings differ, that is the whole answer, and it
+                # has been one comparison away for four days.
+                f" ours={body.get('ticker')!r} venue_ticker={market.get('ticker')!r}"
+                f" ticker_echo_matches={str(market.get('ticker') or '') == str(body.get('ticker') or '')}"
                 f" event_ticker={market.get('event_ticker')}"
                 f" market_type={market.get('market_type')}"
                 f" status={market.get('status')}"
@@ -533,7 +651,13 @@ def submit_order(request: Any, *, price_dollars: float | None = None) -> dict[st
                     f" event={event_ticker} status={listed.get('status')}"
                     f" count={len(tickers)}"
                     f" ours_listed={ours in tickers}"
-                    f" sample={tickers[:6]}",
+                    f" sample={tickers[:6]}"
+                    # THE REASON, which this line withheld for a full day.
+                    # It printed `status=error count=0` and stopped -- naming a
+                    # failure while keeping the one field that says what failed.
+                    # That is the exact defect this repo keeps relearning, and
+                    # it was in the diagnostic written to break the deadlock.
+                    f" reason={str(listed.get('reason') or '')[:400]}",
                     flush=True,
                 )
         except Exception as probe_exc:  # noqa: BLE001 -- a diagnostic never masks the real error
@@ -649,6 +773,12 @@ def fetch_order(order_id: Any) -> dict[str, Any]:
     return {"status": "ok", "order": order}
 
 
+# HOW MUCH OF THE ACCOUNT ONE READ SEES. Declared, not inferred: the
+# reconciler needs to know whether an orphan scan is even possible BEFORE it
+# decides whether a zero-candidate pass is worth a venue call.
+ORDER_READ_COVERAGE = "book"
+
+
 def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
     """Every recent order, one call.
 
@@ -713,7 +843,13 @@ def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
         )
     else:
         print("[kalshi_orders] ORDERS_READ n=0", flush=True)
-    return {"status": "ok", "orders": orders}
+    # COVERAGE, DECLARED BY THE READER. Kalshi lists the WHOLE book and
+    # ignores the ids it is handed, so a venue order absent from our ledger is
+    # visible here and nowhere else. `reconcile_live_orders` uses this to know
+    # whether `not_found=0` means "we agree with the venue" or only "we asked
+    # about what we already believed" -- two very different guarantees that
+    # were printing the same line.
+    return {"status": "ok", "orders": orders, "coverage": "book"}
 
 
 def _int_or_none(value: Any) -> int | None:
@@ -928,6 +1064,23 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
             if price is not None:
                 break
 
+    # STILL WORKING AT THE VENUE. Same contract Polymarket's view now carries,
+    # and for the same reason: a PARTIAL fill is both a real position and a
+    # live order for the remainder, while `state` has one slot and the fill
+    # outranks the status. `remaining_count_fp` is Kalshi's own word for the
+    # unfilled part and is already in the measured key list.
+    remaining = None
+    for field in ("remaining_count_fp", "remaining_count"):
+        value = order.get(field)
+        if value in (None, ""):
+            continue
+        try:
+            remaining = float(value)
+        except (TypeError, ValueError):
+            remaining = None
+        else:
+            break
+
     return {
         "state": state,
         "venue_status": raw_status or None,
@@ -935,6 +1088,8 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         "fill_price": price,
         "fill_cost_dollars": fill_cost,
         "fees_dollars": fees,
+        "open_at_venue": bool(remaining) or state == "resting",
+        "remaining_count": remaining,
         # BOTH LEGS, carried rather than resolved. Which one we are paying
         # depends on our side, which this function does not know -- and Kalshi
         # hands over both, so guessing is unnecessary.

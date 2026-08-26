@@ -12719,3 +12719,413 @@ lost no protection and no open lane left the session-start digest.
   FACT row carries an observation timestamp, and the SUSPECTED section is
   separated from the observed one.
 - Blocked by: none.
+
+---
+
+## `kalshi-line-aware-rungs` — full block as of 2026-08-26 03:2xZ, moved verbatim at checkpoint
+
+> Narrative lives in `.syndicate/log/2026-08-26.md`. Kept here because the
+> measurements and the three killed hypotheses are the reason the lane's
+> remaining work is scoped the way it is.
+
+### kalshi-line-aware-rungs — OPEN — RE-SCOPED after its own falsification test — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45
+- **RE-SCOPED 2026-08-25, on the user's instruction "fix the side vocabulary
+  first".** The test below voided this lane's original headline example, and
+  surfaced two things that outrank it. Order is now: **(1) side vocabulary
+  [DONE], (2) evict the futures that can never join, (3) line-aware rungs,
+  scoped to NFL/MLB/WNBA.** The slug is kept because lane identity is stable.
+- **Files ADDED for step 1** (checked UNCLAIMED against `lane-guard`'s own
+  `_claims()` over all OPEN lanes before editing):
+  `syndicate/features/shared/venue_quote_adapters.py`,
+  `syndicate/features/shared/venue_quote_fanin.py`,
+  `tests/test_kalshi_side_vocabulary.py` (NEW).
+- Goal: **`[kalshi_odds] BOARD_JOIN matched` rises on an unchanged `board_rows`,
+  with no increase in `kalshi_markets`.** The working-set bound keeps the ladder
+  rungs NEAREST THE BOARD'S LINE instead of the first 400 in API order.
+- Files: `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_odds_cadence.py`,
+  `tests/test_kalshi_line_aware_rungs.py` (NEW).
+  Checked with `lane-guard`'s OWN `_claims()` over 153 claims from OPEN lanes:
+  all three UNCLAIMED.
+- **WHY, measured 2026-08-25** (audit `docs/ai_context/kalshi_oddsapi_coverage_audit.md`):
+  - `kalshi_board_join.py:772` keys the join on `(board_market, player_key,
+    LINE)` — an EXACT line match. Kalshi lists every strike as its own market;
+    the board carries one line per market. **So at most one rung of a ladder can
+    ever match.**
+  - `MAX_MARKETS_PER_SERIES = 400` keeps `markets[:400]` — **API order, not
+    proximity to the board's line.** `KXNCAAFSPREAD` has **1994** rungs, so the
+    board's line is more likely in the discarded 1594 than in the kept 400.
+    `KXNFLSPREAD` 795. Per-tick `trimmed=` ran 862–2983.
+  - Best reading (20:55:47Z): `matched=87` of `board_rows=1290`, with
+    `no_matching_board_row=1036` — **93% of everything that survived the date
+    check**. That is the bucket this lane attacks.
+- Hypothesis: **the wanted (market, line) set is reachable from inside
+  `kalshi_odds_refresh` without editing anything another lane holds.**
+  `pipeline.intelligence_state.read_layer2_shortlist(date)` is a public,
+  keyvalue-backed reader (`intelligence_state.py:2115`). IMPORTING that module
+  is not editing it — `pipeline/intelligence_state.py` is held by OPEN lane
+  `layer2-sim-view-and-live-projection` and **is deliberately NOT claimed
+  here**. If a parameter must instead be threaded through
+  `intelligence_state.py:5211`'s call site, this lane is BLOCKED on that lane
+  and must say so rather than edit across.
+- Falsification test (run FIRST, before any selection code):
+  1. `read_layer2_shortlist(today)` returns rows carrying a usable `market` and
+     `line` per row. **If it does not, the hypothesis is dead.**
+  2. Those rows cover the sports whose ladders are being truncated — NCAAF and
+     NFL. A wanted-line set that omits them cannot improve the number this lane
+     is judged on.
+- **KNOWN HAZARDS, to be measured not assumed:**
+  - `_shed_rows_to_fit_keyvalue` **sheds shortlist rows** to fit the 8MB
+    ceiling, and `venue_daily_odds.py:49` records the shortlist already
+    occupying 5.0MB of it. **The persisted row set may be a SUBSET of the
+    board.** A wanted-line set built from a shed artifact silently optimises
+    for the rows that survived shedding.
+  - Freshness: the in-memory shortlist exists before `run_kalshi_odds_refresh()`
+    at the call site, but whether `write_layer2_shortlist` has run by then
+    decides if the persisted read is same-tick or one tick stale. One tick is
+    almost certainly fine (lines move slowly) — **but it must be read, not
+    assumed.**
+  - **DO NOT touch `_record_daily_book(full_markets)`.** It runs BEFORE both
+    bounds and is what keeps whole ladders for CLV; `intelligence_state.py:5204`
+    states the lookahead prices it captures "become the OPENING prices a CLV
+    grade needs". That separation was broken once already and fixed in
+    `e4ae9ebec`. This lane changes only the WORKING SET.
+  - `learnings.md 2026-08-23 FORBIDDEN`: a module may not hold its own list of
+    market names. The selection must compare board keys produced by
+    `market_keys`, never a private spelling.
+  - Degrade safely: with **no** wanted lines (first tick of a boot, empty
+    shortlist, failed read) the selection must fall back to today's behaviour,
+    not keep nothing. A board-starved tick must not empty the working set.
+- Verification: **`matched` rises against a BASELINE BAND, not a single reading.**
+  `matched` swung **87 → 44** on an identical `board_rows=1290` between
+  consecutive builds 20:55:47Z → 21:09:46Z, because the working set is a
+  rotating window (60 of 193 series per tick, staleness-trimmed). **Collect the
+  band across >=6 builds before and after, or the rotation will read as the
+  result.** `kalshi_markets` must stay at 6000 — a rise there means more was
+  fetched and the comparison is void.
+- Blocked by: none. **Cheap precondition, not a blocker:** audit
+  recommendation #4 (make `no_matching_board_row` name the KEY it wanted) turns
+  this lane's target bucket from a number into a ranked list, and is one log
+  line. Worth doing first if anyone is in that file.
+- **FALSIFICATION TEST RUN 2026-08-25 ~21:1xZ. RESULT: part 1 PASSES, part 2
+  FAILS FOR NCAAF. The lane's headline example is VOID and the lane needs
+  re-scoping before any code is written.**
+  - **Part 1 PASS.** `_board_key` and `_event_key`
+    (`kalshi_board_join.py`) both read `row["line"]` and canonicalise
+    `row["market"]` through `market_keys`. Board rows carry a usable
+    (market, line). A row whose line will not `float()` is dropped from the
+    index, so the wanted-line set is well defined.
+  - **Part 2 FAILS FOR NCAAF, passes for NFL.** `VENUE_REPRICE_KEYS
+    unmatched_by_sport={'mlb': 2589, 'wnba': 1458, 'nfl': 2572, 'soccer': 9414}`
+    (21:12:14Z) has **NO `ncaaf` key at all**, and `JOIN_EVENTS board=[...]`
+    (21:09:46Z) lists NFL and soccer clubs and **no college teams**.
+    **The board carries no NCAAF rows**, so `KXNCAAFSPREAD`'s 1994 rungs have
+    no board line to be near. Selecting them line-aware would optimise against
+    an EMPTY wanted-set. NCAAF is out of scope for this lane until the board
+    carries it.
+- **WHAT THE TEST SURFACED INSTEAD — two findings that outrank this lane's
+  premise. `[kalshi_odds] JOIN_TITLES by_series` ALREADY EXISTS
+  (`kalshi_odds_refresh.py:1195`), so audit rec #4 is half-built and the
+  breakdown was free:**
+  1. **THE SIDE VOCABULARY DISAGREES, on every game line, in every sport.**
+     `sources_offered` 21:12:14Z now carries `kalshi` for all four sports (it
+     carried none during the audit), and what it offers is
+     `nfl|h2h|**yes**` and `nfl|spreads|**over**|7.5` while the board asks for
+     `mlb|spreads|**away**|1` / `mlb|spreads|**home**|-1.5` and
+     `soccer|h2h|**real betis**`. Confirmed in code, not inferred:
+     `_TEAM_SPREAD_WINS_BY` sets `side` to over/under and `_MONEYLINE` sets it
+     to `"yes"` (`kalshi_catalogue.py`). A spread quoted `over` can never meet a
+     board row keyed `home`, at ANY line. `venue_quote_fanin._candidate_keys`
+     already exists for exactly this ("the board keys a moneyline side by its
+     ROLE; Polymarket keys it by the CLUB") -- Kalshi's vocabulary is simply
+     not among its candidates. **Cheaper than this lane and it affects h2h +
+     spreads across every sport.**
+  2. **71% of `unreadable_title` can never join at all.** Complete breakdown
+     21:13:07Z, `unreadable_title=3379`: `KXNCAAFWINS 400` + `KXNCAAFAWARD 400`
+     + `KXNBAWINS 312` = **1,112 season futures** (audit §6 over-registration,
+     each capped at EXACTLY 400 -- they are consuming the per-series bound),
+     plus **1,280 NFL quarter markets** (8 series x 160) the board has no key
+     for. **2,392 of 3,379.** Reclaiming those slots is free and needs no
+     grammar.
+     Genuinely worth reading: `KXNFLTOTAL 400` unreadable on the
+     "Will there be over N points scored?" wording, and soccer now in the set
+     and failing on the wordings already identified (`KXMLSTOTAL 90`,
+     `KXMLSSPREAD 60`, `KXSERIEATOTAL 60`, `KXSERIEASPREAD 40`,
+     `KXSERIEAGAME 39`).
+- **ROTATION VARIANCE CONFIRMED, and it is larger than first thought.** Three
+  consecutive builds: `matched=44` (21:09:46Z), `104` (21:13:07Z), `0`
+  (21:15:49Z) -- the last on `board_rows=617` rather than 1290. The
+  `by_series` sets differ almost completely between builds. **No single
+  reading can measure any change here.** The band requirement in the
+  Verification line above is now measured, not assumed.
+- **RECOMMENDED RE-SCOPE (not taken unilaterally -- this lane's own rule is to
+  surface, not to widen):** do the side-vocabulary fix first, the futures
+  eviction second, and line-aware rungs THIRD and scoped to NFL/MLB/WNBA.
+- **STEP 1 DONE 2026-08-25 — SIDE VOCABULARY. Not deployed.** 655 tests green
+  across the venue/quote surface and its downstream consumers.
+  - **Moneylines are now keyed by the TEAM, not by `yes`.** `_MONEYLINE` had
+    already parsed the club into `subject` and `kalshi_outcome` was discarding
+    it. Verified end to end: Kalshi `'Texas wins'` publishes `mlb|h2h|texas`
+    where it published `mlb|h2h|yes`, and a board row
+    `h2h|home` on Texas Rangers now offers `mlb|h2h|texas` among its candidates.
+  - **The disambiguation happens where BOTH clubs are known**, which is the
+    only place it is safe. `_candidate_keys` builds the city/nickname keys from
+    the board row and **drops any token the OPPONENT shares** -- `chicago` is
+    offered to NEITHER side of Cubs/White Sox, pinned by a test on both rows.
+    Same bound and same refusal as `kalshi_board_join._side_for_team`.
+  - **ONE NORMALISER, imported by both halves** (`team_quote_token` /
+    `team_name_tokens` in `venue_quote_adapters`, imported by the fan-in), per
+    `learnings.md` 2026-08-23 -- a private copy in either file is the drift this
+    repo paid for three times in one day.
+  - **TOTALS AND PROPS DELIBERATELY UNTOUCHED, and this is the load-bearing
+    part.** They also say over/under and the board asks over/under, so they were
+    the only families already meeting. A blanket side rewrite would have broken
+    exactly what worked. A regression test pins that a `totals` row still
+    produces `['mlb|totals|over|8.5']` and gains no team keys.
+  - **SPREADS REFUSED BY NAME, pending the sign convention** -- the precedent is
+    `polymarket_us_outcome`, which refuses spreads "pending a measurement of
+    which team a handicap belongs to". Kalshi's `'Texas wins by over 3.5 runs'`
+    is Texas -3.5 while the board carries a signed line per role; and `under` is
+    **not** the mirror of `over` on this grammar ("wins by under 3.5" is "wins,
+    by less than 3.5", which is not the other side of a handicap). These
+    published `spreads|over|<line>` and matched nothing, so refusing costs no
+    existing match -- it converts a SILENT non-match into a counted one.
+  - **KNOWN RESIDUAL, measured not hidden: Kalshi TRUNCATES team names.**
+    `'New York M'` (Mets) tokenises to `new york m`, which no board candidate
+    carries, so those still will not match. Fixing it needs Kalshi's truncation
+    RULE read off real titles rather than inferred from one sample. The new
+    `h2h_keyed_by_team` / `h2h_team_unresolved` counters on the adapter's
+    `reason` are what will size this in production.
+- **STEP 2 DONE 2026-08-25 — FUTURES EVICTED. Not deployed.** 497 tests green.
+  38 series to `SERIES_OUT_OF_SCOPE`: **1,661 markets** freed from a 6,000
+  working set and **38 of 193 fetch slots -- 20% of the rotation**, so a live
+  ladder stops waiting ~8 minutes behind markets that cannot be bet.
+  `KXNCAAFWINS` (618 listed) and `KXNCAAFAWARD` (509) were each capped at
+  EXACTLY 400, consuming the whole per-series bound, and all 800 were
+  `unreadable_title`.
+  - **The eviction bites at REGISTRATION**, which is what keeps them out of
+    `sports_series()` and therefore out of the fetch. Refusing later would
+    still spend the request.
+  - **A DATE FILTER WAS THE OBVIOUS FIX AND IS FORBIDDEN BY PRIOR ART IN THIS
+    FILE.** `kalshi_odds_refresh.py` records that dropping undated markets
+    "was tried and reverted" -- player props skip the join's date check, so a
+    prop whose ticker shape does not parse was silently dropped from the venue
+    we actually trade, and six tests caught it. Read before writing; the
+    series-level eviction is both safer and strictly better.
+  - **GUARDED.** Evicting by ticker is only safe if checked: `KXNBAWINS` sits
+    beside `KXNBAGAME`, `KXNHLCENTRAL` beside the NHL game lines. A test pins
+    that all 15 real game-line series still register, that none is
+    out-of-scope, and that `SERIES_SPORT` and `SERIES_OUT_OF_SCOPE` never
+    share a ticker.
+  - **Deliberately NOT a title-pattern rule** -- the series-level titles these
+    register on have not been read, and inventing a pattern from market titles
+    is the guess this integration exists to refuse. All 38 observed, counts
+    recorded beside each.
+- **NEXT ACTION:** read `[layer2_shortlist] VENUE_REPRICE_KEYS` after a deploy.
+  `sources_offered` for kalshi must show `h2h|<team>` where it showed
+  `h2h|yes`, and `by_source` must carry `spreads_refused:<n>` and
+  `h2h_keyed_by_team:<n>`. For step 2: `TICK series_wanted` **193 -> ~155**
+  and `JOIN_TITLES by_series` no longer naming `KXNCAAFWINS` /
+  `KXNCAAFAWARD` / `KXNBAWINS` at all. **`stamped` rising is the outcome;
+  the band caveat above applies -- matched ran 44 -> 104 -> 0 across three
+  consecutive builds.**
+- **STEP 3 RETESTED 2026-08-25 23:3xZ. THE NCAAF PREMISE IS DEAD AGAIN, for a
+  SECOND and deeper reason -- and the retest found the thing that actually
+  matters.**
+  - **Why it was retested:** `INTEL_TRACE by_sport` began carrying
+    `ncaaf: 204` candidates, where the first falsification test had found none.
+    Candidates are not the rows the join receives, so this was checked rather
+    than assumed.
+  - **NCAAF: STILL NO.** `[kalshi_odds] BY_GAME_DATE`, two independent readings
+    (`23:28:23Z`, `23:35:31Z`), each over a full 6,000-market working set: the
+    **earliest date carrying ANY NCAAF market is 2026-08-29**. The board's
+    `selected_date` is **2026-08-25** (confirmed on `CONTAINER_MEMORY` /
+    `PROCESS_TREE_MEMORY`, same instance). NCAAF has no game on the board's
+    date -- the season starts on the 29th. Line-aware selection of NCAAF rungs
+    would still be selecting against an empty wanted-set. Same for NFL, whose
+    earliest market is also 2026-08-29.
+  - **THE FINDING THAT OUTRANKS THE WHOLE LANE.** Neither reading contains a
+    single market for `2026-08-25`, or for `2026-08-26`. The earliest date in
+    both is `2026-08-27`. **The 6,000-market working set the join prices
+    against holds NOTHING for the date the board is built for.**
+    That is measured twice, seven minutes apart, on different series
+    compositions.
+  - **It explains the numbers this lane has been chasing.**
+    `market_is_for_another_date` is the largest refusal bucket (2,525-4,269 of
+    6,000) *because it is literally true of the whole set*, and `matched`
+    sticks at 61-94 because only player props survive -- props skip the join's
+    date check, which is the same asymmetry `kalshi_odds_refresh` already
+    records when it refuses to filter the working set by date.
+  - **SO STEP 3 IS THE WRONG SHAPE. The bound should be DATE-AWARE BEFORE it is
+    LINE-AWARE.** Keeping the rungs nearest the board's line cannot help when
+    no rung in the set is for the board's day. Same class of change -- which
+    markets survive `MAX_MARKETS_PER_SERIES` / `MAX_STORED_MARKETS` -- and a
+    strictly larger effect. **Line-aware selection becomes worth doing only
+    after the set contains the board's own date.**
+  - **THE TICKER TIMEZONE IS SETTLED: IT IS EASTERN. The suspected off-by-one
+    is REFUTED** `[2026-08-25]`. `game_date_from_ticker`'s docstring says the
+    time is deliberately not parsed because the zone "is not settled by any
+    reading I have" -- it is settled now, and the docstring should say so.
+    Six observed tickers against their home park's standard start; only ONE
+    hypothesis survives all six:
+
+        KXMLBGAME-26AUG26**1905**HOUNYY   19:05 ET  Yankee Stadium standard
+        KXMLBGAME-26AUG26**1915**LADATL   19:15 ET  Truist Park standard
+        KXMLBGAME-26AUG26**1945**BALSTL   19:45 ET = 18:45 CT  Busch standard
+        KXMLBGAME-26AUG26**1940**TEXCWS   19:40 ET = 18:40 CT  Rate Field standard
+        KXMLBGAME-26AUG26**1845**COLWSH   18:45 ET  Nationals standard
+        KXMLBGAME-26AUG26**2105**MINATH   21:05 ET = 18:05 PT  Athletics standard
+
+    UTC would put all six between 14:45 and 17:05 ET on a weeknight, which no
+    club starts. VENUE-LOCAL fails on TEXCWS (19:40 CT) and MINATH (21:05 PT),
+    neither a real start. **EASTERN is the only reading consistent with all
+    six.**
+  - **AND THEREFORE THE OFF-BY-ONE CANNOT HAPPEN.** ET and Central differ by
+    one hour, so the calendar date differs only for a start between 00:00 and
+    01:00 ET. The observed range is 18:45-21:05 ET. **No MLB slate can shift a
+    day between the ticker's zone and the board's.** The hazard I recorded was
+    real to check and is now closed as NOT a hazard.
+- **(a) DONE 2026-08-26. THE DIAGNOSTIC IS FIXED, and fixing it invalidated
+  one MORE of this lane's conclusions than the retraction had reached.**
+  - `board_by_game_date` now groups on `game_date_from_ticker(ticker)` for
+    `by_date`/`by_date_series` -- the name every caller already used -- and
+    returns `by_close_date`/`by_close_date_series` alongside it. Both are
+    printed: `BY_GAME_DATE` (unchanged name, now honest) and a new
+    `BY_CLOSE_DATE`. Printing ONE of them is what let a name and a field
+    disagree unobserved for three readings.
+  - An undatable ticker gets `<undatable_ticker>`, a missing close time gets
+    `<no_close_time>`. Neither is dropped: a total that silently disagrees
+    with the fetch is how a diagnostic starts lying.
+  - Pinned by `test_the_game_date_is_the_ticker_not_the_close_time`, which
+    asserts the FOUR-DAY gap on the recorded ticker rather than asserting a
+    grouping. 12 tests in `test_kalshi_board.py`, 126 across the Kalshi
+    suites. (`test_kalshi_auth.py` cannot import `cryptography` in this
+    sandbox -- environmental, pre-existing, unrelated.)
+  - `game_date_from_ticker`'s comment now records the Eastern finding and,
+    more usefully, WHY it makes the date safe to compare unconverted.
+- **THE NCAAF "STILL NO" ABOVE IS NOT SAFE EITHER. It rested on the same wrong
+  field, and I did not catch that when I retracted the headline.** The reading
+  was "the earliest date carrying ANY NCAAF market is 2026-08-29" -- but that
+  was a CLOSE date, and a market closes AT OR AFTER its event, never before.
+  So the earliest NCAAF *game* is `<= 2026-08-29`, which does not exclude the
+  board's `2026-08-25`. The evidence is consistent with NCAAF being on the
+  board's date all along. **This does not resurrect step 3; it means step 3
+  was never actually killed, only mis-measured -- twice, and the second time
+  by me while correcting the first.** Same for the NFL claim beside it.
+  Nothing here should be re-derived from the old readings: they were taken
+  from the broken line and the fixed line has not run in production yet.
+- **STEP 3 RETESTED A THIRD TIME, `2026-08-26 01:49-01:55Z`, ON THE FIXED LINE.
+  NCAAF IS DEAD -- and this is the first of the three tests whose measurement
+  actually supports its conclusion.**
+  - **Kalshi side, `BY_GAME_DATE` (game dates, from the ticker):** earliest
+    NCAAF key is **`2026-08-27`** (`KXNCAAFGAME` 20, `KXNCAAFSPREAD` 73,
+    `KXNCAAFTOTAL` 57), then 08-28, 08-29, 09-05, 09-12. **No `2026-08-25` or
+    `2026-08-26` key at all.** The board's date is `2026-08-25`.
+  - So the first reading's `2026-08-29` was wrong by two days (it was a CLOSE
+    date), and this morning's correction -- that `<= 2026-08-29` cannot exclude
+    08-25 -- was valid reasoning that landed on the wrong side. Right conclusion,
+    twice, from two measurements that could not support it.
+  - **BOARD SIDE, AND IT IS THE BINDING ONE.** `LAYER2_SHORTLIST date=2026-08-25
+    rows=1291 sports=['mlb','nfl','soccer','wnba']` and `BOARD_JOIN
+    board_rows=1291` -- the counts match exactly, so the join's board side IS the
+    shortlist, and **NCAAF is not in it**. That holds whatever Kalshi lists: with
+    no NCAAF board row there is nothing for an NCAAF market to join to. Upstream
+    of the date question and strictly stronger.
+  - **Line-aware NCAAF rung selection is closed.** Not "no market on the date"
+    (true but not binding) -- "no board row in the set the join runs against".
+- **NEW AND UNMEASURED, board-side, NOT this lane's:** `BOARD_OVERVIEW_READY
+  date=2026-08-25 ... ncaaf:g=51` while the shortlist carries ZERO ncaaf rows.
+  Do NOT read `g=51` as 51 NCAAF games on a Tuesday in August with the season
+  starting that weekend; the same line carries `beyond_horizon=2392`, so `g=`
+  is likely a horizon window rather than a date count. Where NCAAF rows die
+  between overview and shortlist is a real open question and it is board-side.
+- **ALSO SEEN, unrelated, flagged not chased:** `01:52:42Z
+  BOARD_OVERVIEW_READY date=2026-08-25 sports=0` -- an overview with zero
+  sports, 15 minutes after one with 8. An empty overview looks like a quiet day
+  rather than a fault, which is why it is written down.
+- **STEP (b) DONE `2026-08-26 01:49:32Z`. `market_is_for_another_date` IS NOT A
+  DEFECT -- it is a DESCRIPTION, and this lane spent three cycles treating it as
+  a symptom.**
+  - The reason now means what it says: `game_date_from_ticker(ticker) !=
+    wanted_date` where `wanted_date = selected_date`
+    (`kalshi_board_join.py:801-819`), renamed from
+    `market_closes_on_another_date` when the field was fixed.
+  - `BY_GAME_DATE` summed: 6000 working set = **1958 today (32.6%)**, 60
+    tomorrow (1.0%), **3982 beyond (66.4%)**. Largest: 08-28 -> 1566 (NFL
+    quarters), 08-29 -> 930, 09-12 -> 311. Furthest: 2026-10-20 NBA, eight weeks
+    out, holding slots today. Refusal count 3282 vs 4042 markets not on the
+    date; the 760 gap is wrong-date markets refused earlier by title/vocabulary
+    gates. **A lookahead venue plus a date-blind cap MUST produce this number.**
+  - **THE DEFECT IS ONE LEVEL UP: WHAT FILLS THE 6,000 SLOTS.** `TICK
+    markets=6000 trimmed=8744` -- Kalshi returned **14,744** and 59% was
+    discarded before the join ran. Both bounds are date- AND sport-blind:
+    `markets[:MAX_MARKETS_PER_SERIES]` is a prefix slice
+    (`kalshi_odds_refresh.py:758-760`) and the outer trim orders by series
+    staleness (`:777`).
+
+        KXNCAAFSPREAD 2026 -> 400   KXNCAAFTOTAL 1482 -> 400   KXNCAAFGAME 678 -> 400
+        KXMLBHRR      1147 -> 400   KXMLBTB       879 -> 400   KXMLBHIT     744 -> 400
+        KXNFLSPREAD    795 -> 400   KXNFLTOTAL    608 -> 400   KXMLBRBI     487 -> 400
+
+  - **NCAAF holds ~1,200 slots (20%) and can produce ZERO joins** -- not in the
+    shortlist at all, and earliest game 08-27 anyway. **NFL holds ~2,200** for
+    games 2-4 days out (1,406 on 08-28 alone). Together **~3,400 of 6,000 slots
+    (57%) belong to sports that cannot match today**, while the one sport that
+    can -- MLB props, all dated 08-25 -- is truncated by the same cap, losing
+    747 from `KXMLBHRR`, 479 from `KXMLBTB`, 344 from `KXMLBHIT`.
+  - **AND THE USUAL OBJECTION DOES NOT REACH IT.** A date FILTER was tried and
+    reverted, correctly: the lookahead is the point, because `kalshi_board.py`'s
+    opening lines need tomorrow's markets days early for CLV. But
+    `_record_daily_book(full_markets)` runs BEFORE both bounds, so capture keeps
+    all 14,744 regardless. The working set is ONLY the join's input.
+    Prioritising it costs nothing in capture or CLV. **The change is eviction
+    PRIORITY, not a filter** -- same class the lane wanted (which markets
+    survive the bound), on the right axis: not line, not date, but *can this
+    sport join at all today*.
+  - **NOT PROVEN, stated as such:** that the markets cut from `KXMLBHRR` et al.
+    were themselves dated 08-25. All 400 SURVIVORS are, and the slice is a
+    prefix, so it is likely -- but the histogram only sees survivors. The
+    measurement that would settle it is a per-series date histogram taken
+    BEFORE the cap, from `full_markets`.
+- **THE PRE-CAP MEASUREMENT REFUTED MY OWN STEP (b) HYPOTHESIS `2026-08-26
+  03:11:30Z` and `03:17:03Z` (identical, reproducible), deploy
+  `dep-da74r49srm7s73fde360` live `02:23:47Z`, code still live under `34717822`.**
+
+        capped_series=8  cut_total=3940
+        KXNCAAFSPREAD 2026 -> cut 1626   08-25: 0
+        KXNCAAFTOTAL  1482 -> cut 1082   08-25: 0
+        KXNFLSPREAD    795 -> cut  395   08-25: 0
+        KXNCAAFGAME    678 -> cut  278   08-25: 0
+        KXNCAAF1H      618 -> cut  218   08-25: 0
+        KXNFLTOTAL     608 -> cut  208   08-25: 0
+        KXMLBHRR       532 -> cut  132   08-25: 132   <- all today
+        KXMLBTB        401 -> cut    1   08-25: 1     <- all today
+
+  - I predicted eviction re-prioritisation would recover **~1,600** joinable
+    markets. It is **133** -- 3.4% of the 3,940 cut. Everything else the cap
+    discards is lookahead that could not have joined today anyway. **The gate
+    caught my own claim, which is what it was built for**; shipping on step
+    (b)'s reasoning would have bought a number that rounds to nothing against
+    `matched=71`, and those 133 would still have to clear
+    `no_matching_board_row`.
+  - **LIMIT 1, AND IT CUTS AGAINST THE VERDICT: it is 3am and the slate is
+    over.** At `01:49Z` `KXMLBHRR` fetched 1147 and cut 747; at `03:11Z` it
+    fetches 532 and cuts 132, and `KXMLBHIT`/`KXMLBRBI` are no longer capped at
+    all. MLB markets retire as games finish. If those earlier 747 cuts were also
+    all `08-25` -- which this shape suggests -- the MID-SLATE figure is several
+    times 133. **This proves the change is not worth making AT 3AM. It does not
+    prove it mid-slate, which is when the join matters.**
+  - **LIMIT 2: it measures ONE of the two bounds.** `cut_total=3940` vs `TICK
+    trimmed=8744`. This line covers the per-series cap only; the outer
+    `MAX_STORED_MARKETS` staleness trim is the other ~4,800 and is still
+    UNDATED. That trim is date-blind too, so it may be cutting today's markets
+    where this measurement cannot see.
+  - **VERDICT: refuted post-slate, UNPROVEN mid-slate, half the trimming still
+    unmeasured.** Decisive reading = the same line during a live slate, plus the
+    same treatment for the outer trim. Do NOT ship an eviction change before
+    both.
+- **SUPERSEDED:** (b) re-read `BY_GAME_DATE` in production once the fix is
+  deployed, and re-establish from it what `market_is_for_another_date`
+  actually counts -- from a line that means what it says; (c) THEN decide
+  date-aware vs line-aware bounds on those numbers. **(b) is genuinely open**
+  -- this lane has now had three conclusions killed by the same field, and
+  should not adopt a fourth without a measurement.

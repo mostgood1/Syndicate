@@ -1640,7 +1640,27 @@ def _live_ledger_at_boot() -> None:
     try:
         from syndicate.features.shared.execution_ledger import reconcile_live_orders
 
-        reconciled = reconcile_live_orders()
+        # BOTH VENUES. This called `reconcile_live_orders()` bare, and its
+        # `venue` defaults to `"kalshi"` -- the same defect `execute_portfolio`
+        # was fixed for on 2026-08-25 and which was left standing here. So the
+        # PERIODIC pass, the one that exists precisely to catch a resting order
+        # that fills after we stopped watching, never asked Polymarket
+        # anything. Polymarket rows were only ever reconciled as a side effect
+        # of a portfolio run happening to execute.
+        #
+        # Kalshi first and its result kept: the stale-cancel below is a VENUE
+        # WRITE driven by `resting`, and widening what it acts on is a
+        # different decision from widening what we read. Polymarket's pass runs
+        # for its ledger corrections only.
+        reconciled = reconcile_live_orders(venue="kalshi")
+        try:
+            reconcile_live_orders(venue="polymarket")
+        except Exception as exc:
+            print(
+                f"[live_odds_worker] LEDGER_RECONCILE_FAILED venue=polymarket"
+                f" {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
         # THEN PULL THE DEAD ONES OFF THE BOOK. Separate call, separate log,
         # because this is the only VENUE WRITE outside order placement -- a

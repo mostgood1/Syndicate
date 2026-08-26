@@ -713,17 +713,20 @@ def _venue_reader(venue: str):
     """
     name = str(venue or "").strip().lower()
     if name.startswith("kalshi"):
-        from syndicate.features.shared.kalshi_orders import fetch_orders, venue_order_view
-
-        return fetch_orders, venue_order_view
-    if name.startswith("polymarket"):
-        from syndicate.features.shared.polymarket_us_orders import (
-            fetch_orders,
-            venue_order_view,
-        )
-
-        return fetch_orders, venue_order_view
-    return None, None
+        from syndicate.features.shared import kalshi_orders as adapter
+    elif name.startswith("polymarket"):
+        from syndicate.features.shared import polymarket_us_orders as adapter
+    else:
+        return None, None, "unknown"
+    # THE COVERAGE COMES WITH THE READER, not from its result. A zero-candidate
+    # pass has to decide whether an orphan scan is possible BEFORE it makes the
+    # call -- asking a per-order reader for a list it does not have would 501
+    # every cycle and turn "nothing to do" into a recurring error.
+    return (
+        adapter.fetch_orders,
+        adapter.venue_order_view,
+        getattr(adapter, "ORDER_READ_COVERAGE", "unknown"),
+    )
 
 
 # How far past the requested stake a fill may land before it is refused as a
@@ -798,7 +801,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
 
     Idempotent: a second pass over unchanged orders reports zero changes.
     """
-    fetch, view = _venue_reader(venue)
+    fetch, view, declared_coverage = _venue_reader(venue)
     if fetch is None:
         return {"status": "skipped", "reason": f"no_reader_for_venue:{venue}"}
 
@@ -812,8 +815,30 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         and o.get("outcome") is None
         and str(o.get("venue") or "").strip().lower().startswith(str(venue).strip().lower())
     ]
+    if not candidates and declared_coverage != "book":
+        # NOTHING TO CORRECT AND NOTHING TO DISCOVER. A per-order reader can
+        # only see the ids it is handed, and with no candidates there are none
+        # -- the call would fall through to a list route this venue does not
+        # implement and error every cycle.
+        return {
+            "status": "ok",
+            "candidates": 0,
+            "changed": 0,
+            "orders": [],
+            "coverage": declared_coverage,
+            "orphans": None,
+        }
     if not candidates:
-        return {"status": "ok", "candidates": 0, "changed": 0, "orders": []}
+        # A BOOK READER STILL READS. An empty ledger is the state where an
+        # orphan is MOST dangerous, not least: nothing here is open, so nothing
+        # would ever prompt a look, while the venue may be holding a live
+        # position from a submit whose response we lost. Falling through to the
+        # scan below costs one read and is the only thing that can find it.
+        print(
+            f"[execution_ledger] RECONCILE_ORPHAN_SCAN_ONLY venue={venue}"
+            " candidates=0 -- reading the book anyway",
+            flush=True,
+        )
 
     # THE IDS WE HOLD, handed to the reader. Kalshi lists the whole book in one
     # call and ignores these; Polymarket publishes no list route at all --
@@ -1095,6 +1120,12 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
 
         stamp = {
             **new_fields,
+            # OPEN-NESS IS ORTHOGONAL TO STATUS, and stamping it here is what
+            # lets the page count what is actually working at the venue. A
+            # partially filled row is `filled` AND open; a resting row is
+            # `submitted` AND open; a completely filled row is neither.
+            "venue_open": bool(seen.get("open_at_venue")),
+            "venue_remaining_count": seen.get("remaining_count"),
             "venue_status": seen.get("venue_status"),
             "venue_order_id": seen.get("order_id") or order.get("venue_order_id"),
             "reconciled_at": _utc_now(),
@@ -1146,11 +1177,120 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 f" fees={row['fees_dollars']}",
                 flush=True,
             )
+    # ------------------------------------------------------------------
+    # THE OTHER DIRECTION: A POSITION THE VENUE HOLDS AND WE DO NOT.
+    # ------------------------------------------------------------------
+    #
+    # Everything above walks OUR rows and asks the venue about each. That can
+    # only ever correct a row we already have. The mirror failure -- an order
+    # live at the venue with no row here at all -- is invisible to it, and it
+    # is real money: a submit whose response was lost leaves a write-ahead row
+    # with no venue id, and a submit that never got written at all leaves
+    # nothing.
+    #
+    # MEASURED 2026-08-26T12:57Z, which is why this exists: Kalshi returned
+    # `venue_orders=33` while we asked about `candidates=4`. Twenty-nine orders
+    # on our own account were read into memory every cycle and never compared
+    # to anything.
+    #
+    # ONLY MEANINGFUL ON A BOOK READ. Polymarket publishes no list route
+    # (`GET /v1/orders` answers `code: 12` UNIMPLEMENTED) so its reader fetches
+    # exactly the ids we hand it -- `venue_orders == candidates` is a tautology
+    # there, not a reconciliation, and an orphan count of 0 from it would be a
+    # false assurance rather than a finding. The coverage is asked for, not
+    # inferred from the counts, because the counts are exactly what a
+    # per-order read makes uninformative.
+    #
+    # NOTHING IS WRITTEN. This reports; it does not invent ledger rows from
+    # venue data. What it buys is that the gap becomes a number somebody can
+    # see, instead of a silence.
+    coverage = str(read.get("coverage") or "unknown")
+    orphans: list[dict[str, Any]] = []
+    if coverage == "book":
+        # THE WHOLE LIVE LEDGER, not just the candidates. A filled or settled
+        # order is legitimately in the venue's book and is not an orphan; only
+        # a venue order matching NO row we hold is.
+        known_keys = {
+            str(o.get("idempotency_key") or "").strip()
+            for o in orders
+            if str(o.get("mode") or "") == LIVE
+        }
+        known_keys.discard("")
+        known_ids = {
+            str(o.get("venue_order_id") or "").strip()
+            for o in orders
+            if str(o.get("mode") or "") == LIVE
+        }
+        known_ids.discard("")
+        for raw in read.get("orders") or []:
+            seen = view(raw)
+            client = str(seen.get("client_order_id") or "").strip()
+            venue_id = str(seen.get("order_id") or "").strip()
+            if client and client in known_keys:
+                continue
+            if venue_id and venue_id in known_ids:
+                continue
+            orphans.append(
+                {
+                    "order_id": venue_id,
+                    "client_order_id": client,
+                    "ticker": seen.get("ticker"),
+                    "venue_status": seen.get("venue_status"),
+                    "filled_count": seen.get("filled_count"),
+                    # WHICH KIND OF ORPHAN, and the whole point of the split.
+                    #
+                    # Every order this system places stamps the idempotency key
+                    # as `client_order_id`. So:
+                    #
+                    #   no client id     -> not ours. Placed by hand in the
+                    #                       venue's UI, or predating the
+                    #                       stamp. Account history, not a
+                    #                       tracking failure.
+                    #   client id we do  -> OURS, and the ledger row is gone.
+                    #   not hold            That is real money this system
+                    #                       opened and cannot see.
+                    #
+                    # Measured 2026-08-26T13:18Z: `orphans=26`, every sampled
+                    # row with `client_order_id: ''` and dated 08-07 or 08-23,
+                    # across NFL/WNBA/MLB. Reported as one number it reads as
+                    # "26 positions we do not know about", which is alarming
+                    # and probably wrong. A count that cannot distinguish the
+                    # benign case from the serious one is not actionable in
+                    # either direction.
+                    "ours": bool(client),
+                }
+            )
+        if orphans:
+            ours = [o for o in orphans if o["ours"]]
+            unclaimed = len(orphans) - len(ours)
+            # THE ROWS, NOT JUST THE COUNT. A counter that names a problem
+            # while withholding its data is the defect this repo keeps
+            # relearning; an orphan is only actionable if you can see which
+            # ticker it is.
+            print(
+                f"[execution_ledger] RECONCILE_ORPHANS venue={venue}"
+                f" n={len(orphans)} ours={len(ours)} unclaimed={unclaimed}"
+                # OURS FIRST IN THE SAMPLE. With a flat cap at 5 the serious
+                # rows can be crowded out by benign history and never printed.
+                f" sample_ours={ours[:5]} sample_unclaimed={[o for o in orphans if not o['ours']][:3]}"
+                " -- at the venue, absent from our ledger; NOTHING WRITTEN"
+                " (ours=OUR client id, ledger row lost; unclaimed=placed outside this system)",
+                flush=True,
+            )
+
     print(
         f"[execution_ledger] RECONCILE venue={venue} candidates={len(candidates)}"
         f" venue_orders={len(read.get('orders') or [])} changed={len(changed)}"
         f" not_found={not_found} unknown={unknown} implausible={implausible}"
-        f" stamped={stamped}",
+        f" stamped={stamped}"
+        # COVERAGE ON THE SAME LINE AS THE COUNTS IT QUALIFIES. Read without
+        # it, `not_found=0 venue_orders=15` on a per-order venue looks exactly
+        # like a clean full-book reconciliation and is not one.
+        f" coverage={coverage}"
+        f" orphans={len(orphans) if coverage == 'book' else 'n/a'}"
+        # THE ONE THAT MATTERS, ON THE SUMMARY LINE. `orphans=26` alone cannot
+        # say whether anything is wrong; `orphans_ours` can.
+        f" orphans_ours={len([o for o in orphans if o['ours']]) if coverage == 'book' else 'n/a'}",
         flush=True,
     )
     return {
@@ -1161,6 +1301,10 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         "unknown": unknown,
         "implausible": implausible,
         "stamped": stamped,
+        "coverage": coverage,
+        # `None`, not `[]`, when the read cannot see orphans at all. An empty
+        # list would say "we looked and there were none".
+        "orphans": orphans if coverage == "book" else None,
         # Handed out rather than acted on here: reconciliation READS the venue
         # and must stay something safe to run anywhere. Cancelling is a WRITE,
         # and it gets its own call and its own log line.

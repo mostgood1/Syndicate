@@ -6212,3 +6212,24 @@ wrong" into "it did not happen", and those license opposite conclusions.
 This is `#370`'s error one layer up, again: the same session had just deployed a
 fix for a histogram that reported `close_time` under the name `by_date`, and
 then made the identical mistake reading the logs of that very fix.
+
+## A measurement taken from the right population can still be taken at the wrong TIME `[2026-08-26]`
+
+`PRECAP_CUT_BY_DATE` was built specifically to stop a change being shipped on an
+un-measured claim, and it worked: it refuted its own author's prediction of
+~1,600 recoverable markets with a measured 133.
+
+But the reading was taken at 03:11Z, after the MLB slate had finished. The same
+series had cut 747 markets at 01:49Z and cut 132 by 03:11Z, because a venue
+retires a slate's markets as its games end. **The population was correct; the
+clock was not.** A number that is honest about WHAT it counted can still be
+silently unrepresentative of WHEN, and "measured" reads as settled either way.
+
+**The rule:** when a quantity varies with a live event, state the phase of that
+event beside the number, and say explicitly which phase the conclusion covers.
+Here: refuted post-slate, UNPROVEN mid-slate — those license different actions,
+and only one of them was measured.
+
+Corollary already paid for once tonight: the same reading also covered only ONE
+of the two bounds that discard markets (`cut_total=3940` vs `trimmed=8744`). A
+gate that measures half the mechanism is not a gate yet.

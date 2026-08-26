@@ -305,8 +305,17 @@ def test_the_v2_body_matches_the_supplied_contract(monkeypatch):
     assert body["self_trade_prevention_type"] == "taker_at_cross"
     assert body["post_only"] is False
     assert body["reduce_only"] is False
-    assert body["subaccount"] == 0
-    assert body["exchange_index"] == 0
+    # OMITTED, and this is the second field the sample body got wrong for us.
+    # The reference says a subaccount-restricted key must omit it or send its
+    # locked subaccount; a literal 0 names a subaccount that may not exist for
+    # this key. See `_v2_subaccount`.
+    assert "subaccount" not in body
+    # NOT 0 -- and the sample body is not the authority on this one field.
+    # `exchange_index` is a SHARD SELECTOR: the venue's field reference says it
+    # auto-routes when omitted and that -1 REQUIRES routing by ticker, so a
+    # literal 0 pins every order to shard 0 and 404s `market_not_found` for
+    # any market that lives elsewhere. See `_V2_EXCHANGE_INDEX_AUTO`.
+    assert body["exchange_index"] == -1
     # The v1 fields are GONE, not merely unused — sending them alongside the
     # new ones is how a request gets rejected for a reason nobody can read.
     for dead in ("action", "type", "yes_price", "no_price", "yes_price_dollars"):
@@ -903,3 +912,66 @@ def test_only_market_not_found_retries():
         RuntimeError('http_404: {"error":{"code":"not_found","message":"path"}}')
     )
     assert not orders._is_market_not_found(RuntimeError("http_401: unauthorized"))
+
+
+def test_the_order_body_auto_routes_by_ticker_instead_of_pinning_shard_zero(monkeypatch):
+    """The regression that produced a week of `market_not_found`.
+
+    A GET on those tickers returned `status=active` with both legs quoted, from
+    the SAME host the POST 404'd on, 0.5s apart -- so the market existed and
+    only the ORDER could not see it. `exchange_index: 0` is why: it is a shard
+    selector, not furniture, and pinning shard 0 hides every market on another
+    shard behind the only error a matching engine has for that.
+    """
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    monkeypatch.delenv("KALSHI_ORDER_EXCHANGE_INDEX", raising=False)
+    body = build_order_body(_req(), price_dollars=0.56)
+    assert body["exchange_index"] == -1
+    # The ticker is what -1 routes BY, so it must be present and non-empty --
+    # -1 with no ticker is the one combination the venue rejects outright.
+    assert body["ticker"]
+
+
+def test_the_shard_index_is_overridable_without_a_deploy(monkeypatch):
+    """Rollback path. This field is the venue's to move, not ours to freeze."""
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    monkeypatch.setenv("KALSHI_ORDER_EXCHANGE_INDEX", "0")
+    assert build_order_body(_req(), price_dollars=0.56)["exchange_index"] == 0
+
+    # Garbage falls back to auto-routing rather than to 0. An unreadable
+    # override is not a request for the setting that broke this.
+    monkeypatch.setenv("KALSHI_ORDER_EXCHANGE_INDEX", "auto")
+    assert build_order_body(_req(), price_dollars=0.56)["exchange_index"] == -1
+
+
+def test_the_subaccount_is_omitted_by_default_and_restorable_without_a_deploy(monkeypatch):
+    """The second field copied out of the sample as if it were furniture.
+
+    CONFIRMED 2026-08-26 that `exchange_index` was the first: flipping it 0 ->
+    -1 moved the venue's answer from `market_not_found` to `user_not_found`,
+    cleanly, with no exception on either side of the deploy. The order routed
+    to the right shard and then failed on the ACCOUNT.
+
+    `subaccount: 0` is the same shape of assumption, and the venue's reference
+    says so outright: a subaccount-restricted key must omit the field or send
+    its locked subaccount.
+    """
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    monkeypatch.delenv("KALSHI_ORDER_SUBACCOUNT", raising=False)
+    assert "subaccount" not in build_order_body(_req(), price_dollars=0.56)
+
+    # The rollback path: WNBA orders currently FILL with `subaccount: 0`, so if
+    # omitting it breaks the venue that works, this restores it with no deploy.
+    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "0")
+    assert build_order_body(_req(), price_dollars=0.56)["subaccount"] == 0
+
+    # Unreadable falls back to OMITTED, not to 0 -- same rule as the shard
+    # index: a garbled override is not a request for the value under suspicion.
+    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "primary")
+    assert "subaccount" not in build_order_body(_req(), price_dollars=0.56)
