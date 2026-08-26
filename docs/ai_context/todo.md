@@ -1,5 +1,51 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#583` — **The Games rail's date filter never applied to candidate-backed games. `railDate` appeared ONCE in the template, in the branch that seats cards from unclaimed chips.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-26, user report — **FIXED AND TESTED, NOT YET DEPLOYED**
+
+`[user report]` "all NFL games that are not today are also showing up" — on the
+Today tab.
+
+**ROOT CAUSE.** `railDate` occurred exactly once in
+`syndicate/templates/intelligence.html`, inside the loop that seats cards from
+UNCLAIMED CHIPS. Groups derived from board CANDIDATES were never date-filtered
+at all, so any game with rows on the board seated a mini card whatever the day
+tab said. Invisible only while the candidate pool is one day wide — and `#565`
+widened the board's forward window to the WIDEST sport's window.
+
+**MEASURED THE SAME MINUTE**, `/api/board/game-chips?sports=nfl`:
+
+    2026-08-27  1     2026-08-28  8     2026-08-29  7     today  0
+
+All 16 have board rows, so all 16 seated cards. **The chip feed is deliberately
+multi-day and CORRECT** (`7805f5a8`: "the strip asks for the board's horizon,
+the rail still asks for today"). The rail's half of that sentence was only ever
+true for chip-seeded cards.
+
+**THE CHIP'S DATE WINS OVER THE CANDIDATE'S**, and the order is load-bearing:
+`#165` follow-up #3 measured gamePk 824892 stamped `2026-07-31` while showing
+the same live score and inning as 824894, dated `2026-07-30`. **An undated group
+is KEPT** — the rule the chip loop already followed.
+
+**IT SHIPPED INERT FIRST AND WAS CAUGHT BEFORE LANDING.** The filter built
+`dateFilteredGames` while the function still returned `gamesList.sort(...)` — a
+correct answer nothing read, every card still seating. The return site now says
+so in a comment.
+
+**TESTS:** 4 assertions added to `tests/js/game_rail_derive.test.mjs`. The first
+DISCRIMINATES (FAIL pre-change, PASS post); three are boundaries passing in BOTH
+states — chip date beating a wrong row date, the today game kept, an undated
+group surviving. All 15 pre-existing assertions still pass.
+
+**OWED:** deploy to web, then read the served rail on the Today tab against
+`/api/board/game-chips?sports=nfl`'s date histogram. Landed on main as
+`2a36960c`.
+
+**LANE NOTE:** `layer2-rail-duplicate-nfl-cards` was OPEN but UNOWNED (session
+`23024227` archived 2026-08-20, absent from `ListAgents`, no per-session marker
+naming the slug). `lane-guard` blocked the edit first, correctly; the lane was
+adopted rather than edited across. Its inherited behavioural read is restated in
+the lane block, not discharged by the adoption.
+
 ### `#581` — **Live status on open bets — and my pre-build coverage estimate was BACKWARDS.** — lane `open-bet-live-status`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T23:23:11Z** (web `61405c99`)
 
 `[user 2026-08-26]` *"can we append live game or prop status to the open bets"*
