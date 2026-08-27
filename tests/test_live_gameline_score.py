@@ -100,7 +100,14 @@ def test_the_level_final_counters_make_an_exclusion_visible():
 def test_model_and_market_are_scored_on_identical_rows():
     """The load-bearing assertion. If the market were scored on a different
     population the comparison would be meaningless, and it would still LOOK
-    like a number."""
+    like a number.
+
+    NOTE its blind spot, found 2026-08-27: EVERY record in this fixture carries
+    a market price, so the populations cannot diverge here no matter what the
+    implementation does. It asserted a property on data that could not violate
+    it, and passed for weeks while production ran n 94 vs 90. The real
+    regression test is the one below.
+    """
     finals = {"g1": True, "g2": False}
     recs = [_rec("g1", 0.80, 0.60), _rec("g2", 0.30, 0.40)]
     out = score_ledger_records(recs, finals)
@@ -111,6 +118,50 @@ def test_model_and_market_are_scored_on_identical_rows():
     assert out["all_records"]["market"]["brier"] == pytest.approx(0.16)
     # NEGATIVE means the model beat the market.
     assert out["all_records"]["model_minus_market_brier"] == pytest.approx(-0.095)
+
+
+def test_the_difference_is_paired_when_a_row_carries_no_market_price():
+    """THE REGRESSION. `market_fair_prob` can be absent where
+    `model_home_win_prob` is not, so the market list is a SUBSET of the model
+    list. Subtracting their Briers spans two different row sets and describes no
+    population at all. Measured on pooled MLB `last_per_game` 2026-08-27:
+    model n 94 vs market n 90.
+    """
+    finals = {"g1": True, "g2": False}
+    recs = [_rec("g1", 0.80, 0.60), _rec("g2", 0.30, None)]
+    block = score_ledger_records(recs, finals)["all_records"]
+
+    # The populations really do diverge on this fixture ...
+    assert block["model"]["n"] == 2
+    assert block["market"]["n"] == 1
+    assert block["rows_without_market_prob"] == 1
+
+    # ... and the difference is taken ONLY on the row both sides have.
+    assert block["model_paired"]["n"] == 1
+    assert block["populations_matched"] is True
+    # paired model: (0.8-1)^2 = 0.04   market: (0.6-1)^2 = 0.16  -> -0.12
+    assert block["model_paired"]["brier"] == pytest.approx(0.04)
+    assert block["model_minus_market_brier"] == pytest.approx(-0.12)
+    # The pre-fix value was model_all(0.065) - market(0.16) = -0.095. If this
+    # ever reads -0.095 again the pairing has been lost.
+    assert block["model_minus_market_brier"] != pytest.approx(-0.095)
+
+    # `model` is deliberately UNCHANGED -- the model's score over all its rows
+    # is a real quantity, it is just not what the difference may use.
+    assert block["model"]["brier"] == pytest.approx(0.065)
+
+
+def test_every_population_is_paired_not_just_all_records():
+    """`last_per_game` was the cut that got quoted, and `priceable_only` only
+    LOOKED immune (25,504/25,504) because priceable rows happen to carry a
+    price. That is a property of the data, not a guarantee."""
+    finals = {"g1": True, "g2": False}
+    recs = [_rec("g1", 0.80, 0.60), _rec("g2", 0.30, None)]
+    out = score_ledger_records(recs, finals)
+    for cut in ("all_records", "last_per_game", "priceable_only"):
+        block = out[cut]
+        assert block["populations_matched"] is True, cut
+        assert block["model_paired"]["n"] == block["market"]["n"], cut
 
 
 def test_a_record_whose_game_has_no_outcome_is_counted_not_dropped():

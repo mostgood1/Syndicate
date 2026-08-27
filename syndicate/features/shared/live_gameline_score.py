@@ -225,8 +225,10 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
     """
     model_all: list[tuple[float, bool]] = []
     market_all: list[tuple[float, bool]] = []
+    model_all_paired: list[tuple[float, bool]] = []
     model_priceable: list[tuple[float, bool]] = []
     market_priceable: list[tuple[float, bool]] = []
+    model_priceable_paired: list[tuple[float, bool]] = []
     last: dict[str, tuple[str, float, float | None, bool]] = {}
     unscored: dict[str, int] = {}
     considered = 0
@@ -266,10 +268,14 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         model_all.append((model_p, won))
         if market_p is not None:
             market_all.append((market_p, won))
+            # THE MODEL, ON EXACTLY THE ROWS THE MARKET IS SCORED ON. See
+            # `_paired` below for why the difference cannot use `model_all`.
+            model_all_paired.append((model_p, won))
         if bool(rec.get("priceable")):
             model_priceable.append((model_p, won))
             if market_p is not None:
                 market_priceable.append((market_p, won))
+                model_priceable_paired.append((model_p, won))
         # LATEST record per game, chosen by `recorded_at` rather than by file
         # order. The ledger is append-only so the two normally agree -- but
         # "normally" is not a guarantee, and a merged or re-pulled file would
@@ -282,35 +288,62 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
 
     model_last = [(p, w) for _s, p, _m, w in last.values()]
     market_last = [(m, w) for _s, _p, m, w in last.values() if m is not None]
+    model_last_paired = [(p, w) for _s, p, m, w in last.values() if m is not None]
 
     def _delta(a: dict[str, Any], b: dict[str, Any]) -> float | None:
         if a.get("brier") is None or b.get("brier") is None:
             return None
         return round(a["brier"] - b["brier"], 5)
 
+    def _paired(model_full: dict[str, Any], model_pair: dict[str, Any],
+                market: dict[str, Any]) -> dict[str, Any]:
+        """One population's block, with the DIFFERENCE taken pairwise.
+
+        **THE DIFFERENCE MUST NOT USE `model`.** A record carries
+        `model_home_win_prob` whenever it is scored at all, but `market_fair_prob`
+        can be absent -- so the market list is a SUBSET of the model list, and
+        subtracting their Briers spans two different row sets. Measured
+        2026-08-27 on pooled MLB `last_per_game`: **model n 94 vs market n 90**,
+        a difference of +0.11825 that described no population at all. The module
+        docstring had promised the opposite in bold ("both are scored on exactly
+        the same rows") and `all_records` had ALREADY been caught doing this at
+        1526 vs 1449 and written off as "UNSOUND" rather than fixed.
+
+        `priceable_only` looked immune -- 25,504/25,504 -- but it has the same
+        shape and was matched only because priceable rows happen to carry a
+        price. That is a property of the data, not a guarantee, so it is paired
+        here too rather than trusted.
+
+        `model` is kept unchanged: the model's score over ALL its rows is a real
+        quantity and dropping it would lose information. It simply is not the
+        term the difference is entitled to use.
+        """
+        block = {
+            "model": model_full,
+            "market": market,
+            "model_paired": model_pair,
+            # The exclusion, COUNTED. Nothing counted it, which is why "n 94 vs
+            # 90" had to be spotted by eye in a printout.
+            "rows_without_market_prob": max(0, int(model_full.get("n") or 0) - int(market.get("n") or 0)),
+            "populations_matched": (model_pair.get("n") or 0) == (market.get("n") or 0),
+            # NEGATIVE means the model beat the market. Named in full rather
+            # than as "skill" so nobody has to guess the sign.
+            "model_minus_market_brier": _delta(model_pair, market),
+        }
+        return block
+
     all_model, all_market = _score(model_all), _score(market_all)
     lp_model, lp_market = _score(model_last), _score(market_last)
     pr_model, pr_market = _score(model_priceable), _score(market_priceable)
+    all_model_pair = _score(model_all_paired)
+    lp_model_pair = _score(model_last_paired)
+    pr_model_pair = _score(model_priceable_paired)
 
     return {
         "records_considered": considered,
         "games_with_outcome": len(last),
         "unscored": unscored,
-        "all_records": {
-            "model": all_model,
-            "market": all_market,
-            # NEGATIVE means the model beat the market. Named in full rather
-            # than as "skill" so nobody has to guess the sign.
-            "model_minus_market_brier": _delta(all_model, all_market),
-        },
-        "last_per_game": {
-            "model": lp_model,
-            "market": lp_market,
-            "model_minus_market_brier": _delta(lp_model, lp_market),
-        },
-        "priceable_only": {
-            "model": pr_model,
-            "market": pr_market,
-            "model_minus_market_brier": _delta(pr_model, pr_market),
-        },
+        "all_records": _paired(all_model, all_model_pair, all_market),
+        "last_per_game": _paired(lp_model, lp_model_pair, lp_market),
+        "priceable_only": _paired(pr_model, pr_model_pair, pr_market),
     }
