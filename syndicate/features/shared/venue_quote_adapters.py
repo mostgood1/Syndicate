@@ -184,6 +184,52 @@ def _parse_iso(text: str) -> float | None:
 # --------------------------------------------------------------------------
 
 
+_MIRROR_SIDE = {"over": "under", "under": "over"}
+
+
+def _kalshi_leg_probability(row: Mapping[str, Any], leg: str) -> float | None:
+    """The quoted probability for one leg of a Kalshi contract, or None.
+
+    THIS READ WAS BROKEN AND SILENTLY SO. It used to be
+
+        _as_float(row.get("yes_bid") or row.get("last_price"))
+
+    and NEITHER FIELD IS PERSISTED. `kalshi_odds_refresh._LEAN_MARKET_FIELDS`
+    is the whole schema that reaches this artifact -- `yes_ask_dollars`,
+    `no_ask_dollars`, `yes_american`, `no_american`, `yes_probability`,
+    `no_probability` -- and `_lean_market` at its one call site (line 895) drops
+    everything else. `yes_bid` and `last_price` are `normalize_market` diagnosis
+    fields that never survive persistence.
+
+    So `probability` was None on EVERY Kalshi quote, `probability_to_american`
+    turned that into None, and the adapter published 400 nfl / 400 ncaaf / 121
+    wnba quotes carrying no price at all. `status` read `ok` because `quotes`
+    was non-empty -- the exact "count that looks like coverage while carrying
+    nothing" failure this module's header was written about, and the same one
+    that hid the OddsAPI key-space bug for an evening.
+
+    `yes_probability` first because it is already 0..1 and computed by
+    `kalshi_client` from the ask; `*_ask_dollars` as the fallback, since a
+    binary contract's price in dollars IS its probability. The cents guard is
+    kept: Kalshi has quoted CENTS on some routes, and 54 read as a probability
+    is the 100x error its first live run found.
+    """
+    prefix = "yes" if leg == "yes" else "no"
+    value = _as_float(row.get(f"{prefix}_probability"))
+    if value is None:
+        value = _as_float(row.get(f"{prefix}_ask_dollars"))
+    if value is None:
+        return None
+    if value > 1.0:
+        value = value / 100.0
+    if value <= 0.0 or value >= 1.0:
+        # A degenerate price is not a quote. Refused rather than published as a
+        # certainty, which `probability_to_american` would turn into a
+        # nonsensical payout.
+        return None
+    return value
+
+
 def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
     payload, mtime = _artifact(("intelligence", "kalshi_markets.json"))
     if not isinstance(payload, Mapping):
@@ -227,6 +273,7 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
     # that lists nothing, which is the confusion this whole module exists to
     # prevent.
     spread_rows = 0
+    no_price = 0
     h2h_unresolved = 0
     h2h_keyed = 0
     try:
@@ -307,11 +354,9 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
             spread_rows += 1
             continue
 
-        probability = _as_float(row.get("yes_bid") or row.get("last_price"))
-        if probability is not None and probability > 1.0:
-            # Kalshi has quoted CENTS on some routes. 54 is not a probability;
-            # converting it as one is the 100x error its first live run found.
-            probability = probability / 100.0
+        probability = _kalshi_leg_probability(row, "yes")
+        if probability is None:
+            no_price += 1
         if market == "h2h":
             h2h_keyed += 1
         else:
@@ -330,6 +375,53 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
                 venue_ref=str(row.get("ticker") or "") or None,
             )
         )
+
+        # THE OTHER SIDE OF A THRESHOLD MARKET, FROM ITS OWN QUOTED PRICE.
+        #
+        # Kalshi titles every total as an OVER ("Full Game: over 58.5 points
+        # scored?"), so `classify_market` reads `side="over"` for all of them
+        # and this adapter published only that leg. The board asks for both.
+        # Measured on production 2026-08-27, `board_wanted_by_sport`:
+        #
+        #     ncaaf  board wants  ncaaf|totals|under|52.5
+        #            kalshi has   ncaaf|totals|over|71.5      (over only, 400 quotes)
+        #     nfl    board wants  nfl|totals|under|36
+        #
+        # Every `under` row the board carried was unmatchable against a venue
+        # that does list that bet -- it lists it as the NO leg of the same
+        # contract.
+        #
+        # PRICED FROM `no_*`, NEVER DERIVED FROM THE YES LEG. `kalshi_board_
+        # join`'s header is the rule and it is not a style preference:
+        # "`yes_ask_dollars` and `no_ask_dollars` are separately quoted; they do
+        # not sum to 1 (the gap is the spread) ... deriving the Under from the
+        # Over's price would erase the spread and invent an edge that is not
+        # there." A `1 - p` here would manufacture EV on a money path.
+        #
+        # Threshold markets only. `h2h`'s NO leg is "the other team wins",
+        # which needs the opponent's name to key and is refused above rather
+        # than guessed; `spreads` is refused outright pending its sign
+        # convention.
+        mirrored = _MIRROR_SIDE.get(side)
+        if mirrored and market != "h2h":
+            mirror_probability = _kalshi_leg_probability(row, "no")
+            if mirror_probability is None:
+                no_price += 1
+            else:
+                quotes.append(
+                    Quote(
+                        key=quote_key(sport, market, mirrored, line),
+                        source="kalshi",
+                        sport=str(sport or ""),
+                        market=market,
+                        side=mirrored,
+                        probability=mirror_probability,
+                        american=probability_to_american(mirror_probability),
+                        line=line,
+                        fetched_at=fetched_at,
+                        venue_ref=str(row.get("ticker") or "") or None,
+                    )
+                )
     return SourceOutcome(
         source="kalshi",
         status="ok" if quotes else "no_rows",
@@ -338,14 +430,14 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         # moneylines and props price is the normal state until the sign
         # question is settled, and it must stay visible rather than vanish the
         # moment anything else succeeds.
-        reason=_kalshi_ok_reason(spread_rows, h2h_keyed, h2h_unresolved)
+        reason=_kalshi_ok_reason(spread_rows, h2h_keyed, h2h_unresolved, no_price)
         or (None if quotes else "no_kalshi_market_classified_to_this_sport"),
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )
 
 
-def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int) -> str | None:
+def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int, no_price: int = 0) -> str | None:
     """What this adapter could not key, by name and count.
 
     `h2h_keyed` is reported alongside the refusals rather than only on failure:
@@ -360,6 +452,13 @@ def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int) -> 
         parts.append(f"h2h_team_unresolved:{h2h_unresolved}")
     if h2h_keyed:
         parts.append(f"h2h_keyed_by_team:{h2h_keyed}")
+    if no_price:
+        # THE COUNTER THAT WOULD HAVE CAUGHT THIS. Every Kalshi quote was
+        # published priceless for as long as the adapter read `yes_bid`, and
+        # nothing said so: `quotes` was non-empty, so `status` read `ok`. A leg
+        # we cannot price is now named and counted like every other refusal
+        # here.
+        parts.append(f"leg_without_price:{no_price}")
     return " ".join(parts) if parts else None
 
 
