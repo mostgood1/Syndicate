@@ -14350,3 +14350,214 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   (the count cannot discriminate at n=47 projections); prop-model calibration
   has zero 2026 outcomes; `cfbd_lines_*.json` are untracked and single-machine.
 - Blocked by: none.
+
+
+## boot-sync-healthcheck-kill — full working block, moved 2026-08-27 at checkpoint
+> Narrative moved out of `lanes.md` to keep it under the digest cap. The
+> session record is `.syndicate/log/2026-08-27.md`; the measurements are in
+> `deploys.md`. Nothing here was edited.
+
+### boot-sync-healthcheck-kill — OPEN — opened 2026-08-27 — session 64625b4d
+- Goal: a web boot no longer costs the container 72-115s of blocking file walk,
+  and `/healthz` is answered inside Render's 5s budget for every second of the
+  boot sync. Measured as: zero `server_failed` across the next 5 deploys.
+- Files: `scripts/bootstrap_data_root.py`, `syndicate/app.py`
+- Hypothesis: the boot sync starves `/healthz` of a request slot and Render
+  kills the fresh instance. **Measured 2026-08-27, one full cycle:** deploy
+  `dep-da89vgfavr4c73esmuqg` ended 20:39:54Z, gunicorn booted 20:39:49Z (pid 61),
+  sync began 20:40:09Z on `mlb_source/source_artifacts`, and instance `-2q9r9`
+  was killed at 20:41:44Z on `HTTP health check failed (timed out after 5
+  seconds)` — **115s after boot**. Replacement booted 20:41:37Z (pid 39),
+  reclaimed the stale lock at 20:41:57Z (`pid=61 alive=False age=108s`, the
+  2026-08-20 container-local-lock fix working), finished the sync 20:43:09Z
+  (72s) and survived. Same shape as the 2026-08-20 reading in
+  `syndicate/app.py:99` (killed 63s in).
+- **The cost is for nothing.** Every completed run reports `Bootstrap totals:
+  copied=0 unchanged=33349 kept=43`. It stats 33k files and writes none. 4
+  `server_failed` in 24h, and all 4 land 1-2.5 min after a `deploy_ended
+  succeeded` (23:07:51, 23:51:22, 01:13:35, 20:41:44) — zero unpaired with a
+  deploy, over 22 deploys. ~1 boot in 5.
+- **The sync is NOT dead code and must not simply be disabled.**
+  `syndicate/app.py:99` attributes 1,114 of 8,016 stale hot artifacts (`#494`)
+  to this sync being killed before it completes, and `learnings.md` 1827 records
+  it as a real producer of checkout-mtime files. The fix is to make a
+  `copied=0` run cheap, not to stop running it.
+- Falsification test: if `/healthz` is answered inside 5s throughout a boot
+  whose sync is still running at full cost, slot starvation is not the
+  mechanism and the kill is something else (memory, disk io, Render eviction) —
+  check `server_failed.reason.evicted`, which read `false` on all 4.
+- Verification: **not elapsed-time-since-boot** — 2026-08-22 marks that
+  FORBIDDEN for exactly this shape of claim. Measure the health checks
+  themselves: every `GET /healthz` line in the boot window, from gunicorn start
+  to `Bootstrap totals`, with the max gap between consecutive 200s printed. Must
+  stay under 5s across the whole window, on a boot where the sync demonstrably
+  ran (assert the `Syncing ...` and `Bootstrap totals` markers are both
+  present — a skipped sync passing this test proves nothing). Then 5 deploys
+  with zero `server_failed`.
+- **2026-08-27 PROFILE — the original hypothesis above is FALSIFIED, and the
+  falsification test is what caught it.** "Starves `/healthz` of a request slot"
+  is wrong: the sync runs on a DAEMON THREAD (`syndicate/app.py:241`), so it
+  never holds one of the 8 slots, and with 2 gunicorn workers the non-syncing
+  worker is free the whole time. **Do not re-open that theory.**
+- **What actually happens, measured on Render.** `/healthz` is probed every
+  5.00s. The sync began 20:40:09Z and the first blackout begins 20:40:14Z —
+  5 seconds later. Gaps between consecutive `/healthz` 200s in the kill window:
+  **35.21s** (20:40:14 -> 20:40:49) and **34.74s** (20:41:09 -> 20:41:44), plus
+  two of ~10s. Baseline before the sync is a flat 5.00s. The instance was killed
+  at the end of the second 35s blackout. So health checks are not answered
+  LATE — they go unanswered entirely, in multi-probe blocks.
+- **Where the 72s goes.** Per-root elapsed from the log's own `Syncing ...`
+  timestamps: `mlb_source/source_artifacts` is **62.75s of the 72.20s (87%)**.
+  Everything else together is 9.45s.
+- **Cost model, fit against all 9 non-trivial roots (r ~ 1.2% error, and the two
+  largest roots match to 0.01s):** `t = 1.337 ms/file + 117 MB/s`. Over the tree
+  (33,392 files / 3,114 MB) that is **44.7s per-file + 26.6s per-byte = 71.3s
+  modelled vs 72.20s measured.**
+- **File counts must come from `git ls-files`, NOT an os.walk of the local
+  tree.** The walk gives 35,814 files / 4,471 MB and disagrees with production
+  per-root (nfl 1,486 vs 296). Render's checkout is a git clone; the local
+  `data/` carries untracked mirror output, exactly as CLAUDE.md warns. The
+  tracked tree gives 33,392, which matches the log's `unchanged+kept` on **all
+  17 roots** exactly.
+- **The work is I/O, not CPU:** deep compare measured at **8.2% CPU/wall**
+  locally. `filecmp.cmp(shallow=False)` opens and fully reads BOTH sides, so a
+  boot issues ~66,800 file opens and reads ~6.2 GB to copy zero files.
+- **Fix shape: two-tier compare.** `shallow=True` first (stat signature only);
+  fall through to the byte compare ONLY when the signature differs. `copy2`
+  preserves mtime and size, so a seeded file matches on stat — tested on 400
+  copy2-seeded pairs drawn from the real roots, shallow and deep agreed
+  **400/400**. This keeps the `copied`/`unchanged`/`kept` counters that this
+  file's own docstring defends (and that surfaced `#494`), because the ~43 files
+  that genuinely differ still take the deep path.
+- **What the fix is NOT yet measured to do.** It removes the 26.6s byte term in
+  full. Its effect on the 44.7s per-file term is NOT measured on Render — locally
+  the per-file path is 71x faster without the opens (300 files: 2.483s -> 0.035s),
+  but that host is OneDrive-backed and cannot stand in for Render's mount. **If
+  the per-file term does not also fall well below ~5s, this fix alone will not
+  close the lane** — the next lever is seed-only's own semantics: when the
+  destination exists the action is "do nothing" regardless of content, so a
+  per-DIRECTORY `scandir` diff would replace 2-5 per-file stats entirely.
+- **2026-08-27 SHIPPED in `d281995b` (21:23:59Z), NOT VERIFIED.** `188a89fa`
+  rode along inside another lane's deploy; full measurement in `deploys.md`.
+  Sync 72.20s -> **59.15s** (-18%), counters byte-identical
+  (`copied=0 unchanged=33349 kept=43`), so behaviour is preserved and the cost
+  fell. **That is all that is established.**
+- **THE VERIFICATION ABOVE DOES NOT DISCRIMINATE, and the failure is in the
+  criterion I wrote, not in the reading.** Post-fix boot: 25 `/healthz` probes,
+  max gap 5.10s, zero missed. Then I measured two PRE-FIX boots that SURVIVED
+  (94d6b6e6 @21:15:03Z, e12b5227 @20:22:53Z): max gaps 5.13s and 5.59s, zero
+  missed. **A clean health trace is what any surviving boot looks like.** The
+  only trace carrying 35s blackouts is the boot that was killed — so the
+  criterion was circular, measuring the kill rather than the exposure to it.
+  n=1 against a ~1-in-5 base rate was never going to be evidence.
+- **What would actually discriminate:** the criterion must be a RATE over >=5
+  deploys (`server_failed` per deploy), not a trace from one boot. Until then
+  this fix is unproven, and a clean boot must NOT be reported as it working.
+- **The cost model in this lane was WRONG and is corrected here.** The fit
+  `1.337 ms/file + 117 MB/s` predicted -26.6s from dropping the byte term; the
+  measured saving was **-13.05s**. A 2-parameter regression over 9 points
+  over-attributed to bytes — plausibly because the checkout is page-cache-hot
+  straight off the build, so those reads cost less than the fit assigned. The
+  per-file term is therefore LARGER than the 44.7s stated above and is now
+  essentially the entire remaining cost.
+- **Still 12x over budget.** 59.15s of sync against a 5s health-check budget
+  means the window in which a boot CAN be killed narrowed from ~72s to ~59s. It
+  did not close. The next lever is unchanged and now clearly necessary: on a
+  seed-only root the action is "do nothing when the destination exists"
+  regardless of content, so a per-directory `scandir` diff replaces the per-file
+  stats outright.
+- **2026-08-27 21:54:46Z — `48833112` LIVE. The boot sync is 0.65s; it was
+  72.20s.** Full measurement in `deploys.md`. `mlb_source/source_artifacts`
+  62.75s -> 53.01s -> **0.49s**. Counters prove nothing was skipped:
+  `present=33316` + overwrite root `unchanged=76` = **33,392** = `git ls-files`
+  over the bootstrap roots exactly. No `server_failed` on the deploy.
+- **The criterion in this lane was circular and is REPLACED.** "Zero
+  `server_failed` across 5 deploys" cannot be met quickly and, worse, the
+  per-boot `/healthz` trace it rested on does not discriminate — two PRE-fix
+  boots that survived were equally clean (max gaps 5.13s, 5.59s). The honest
+  criterion is the one the duration gives directly: **the window in which sync
+  I/O can starve a health check is 0.65s wide instead of 72s.** That is
+  measured, structural, and does not need a base rate. The kill RATE remains
+  unmeasured and should not be claimed either way.
+- **What the two-stage result taught, and it is the reusable part:** the first
+  fix (compare depth) removed the BYTE cost and bought 13.05s of 72s, because
+  the cost was never bytes — it was **5.34 syscalls per file**, measured by
+  counting them rather than fitting a curve. The regression that predicted
+  otherwise (`1.337 ms/file + 117 MB/s`) was confidently wrong by 2x. **Count
+  the operation; do not fit a model to its total.**
+- **Boundary that shaped the design:** `syndicate/blueprints/ops.py` reads the
+  `kept` count and is claimed by two other OPEN lanes, so it was NOT edited.
+  `classify_existing` therefore DEFAULTS to the expensive, exact behaviour and
+  only `main()` opts out — the cheap path is opt-in from files this lane owns.
+  Verified live: seed-only roots reported `present`, the overwrite root reported
+  `unchanged=76 kept=0`.
+- **Remaining, and explicitly NOT this lane's:** `GET /` is 8.1s (was 12.4s),
+  the other documented route to the same 5s budget (`home.py:3488`), in another
+  lane's file.
+- Blocked by: none.
+
+### portfolio-top-date-filter — OPEN — opened 2026-08-27 — session 39eeef04
+- Goal: `/portfolio` carries a date filter at the top of the page, in the shape
+  the paper page already uses (label, back/forward arrows, a `type=date` input,
+  a reset), driving the EXISTING opt-in `?on=` slate filter. `[user 2026-08-27]`
+- Files: `syndicate/templates/portfolio.html`,
+  `syndicate/blueprints/intelligence.py` (`_live_portfolio_payload` and its
+  helpers only), and their tests.
+- **CLAIM OVERLAP TAKEN DELIBERATELY, AND IT WAS ALREADY VIOLATED BEFORE THIS
+  LANE EXISTED.** `check_lane_invariants.py` reports both files contested;
+  TWO OPEN lanes already named them — `open-bet-live-status` (2026-08-26) and
+  `portfolio-decision-and-execution` (2026-08-22) — so the file was incoherent
+  on this point before today, which is what the session-start digest means by
+  LEDGER INCOHERENT. Neither is HELD: `grep -l` for either slug matches NONE of
+  the 42 `.current-lane.*` markers nor the retired ones, and the session whose
+  goal matches `open-bet-live-status` word for word ("Portfolio page
+  consolidation", `local_f08f0df5`) reads `isArchived: true, isRunning: false`,
+  last activity 2026-08-27T21:51Z via `list_sessions(include_archived=true)`;
+  `9324a3e5-364e-...` is absent from the roster entirely. Both RUNNING sessions
+  hold EMPTY markers, so neither claims a lane at all. Orphaned, not held — the
+  same shape the 2026-08-17 sweep confirmed for `live-gameline-eval`. **This
+  lane does NOT close either of them** (that is their owners' call, and closing
+  another lane to make a check pass is how a claim silently stops being
+  enforced); it yields to whichever comes back.
+- Hypothesis: n/a (feature work, not diagnostic).
+- Falsification test: n/a.
+- Verification: on a locally served `/portfolio` — (a) with no query string the
+  input is EMPTY and every order renders (the filter must never default to on,
+  which is the guarantee `?on=` was built to keep); (b) picking a date reloads
+  filtered to that slate and the "open positions on other dates are hidden"
+  note states a count; (c) clearing the input returns to all dates; (d) a slate
+  with no orders reads as "none on this date", NOT as "no live positions have
+  ever been placed" — the message that is live on the page today and is already
+  wrong under `?on=`.
+- Blocked by: none.
+
+
+### ncaaf-opener-regions-props (CONTINUATION) — **CLOSED 2026-08-27** — session de363735
+- Note: this work ran AFTER the lane above was closed, under the same slug. It
+  should have been a new lane. Recorded here so the slug's record is complete.
+  See `learnings.md`, "A lane can be CLOSED while a session keeps working".
+- Goal: NCAAF sim tuned to the new findings, line/ML/total projections
+  unblocked, and the NCAAF board brought to MLB/soccer parity.
+- Files: `syndicate/features/ncaaf/{live_lens,cards,smartsim2_projection}.py`,
+  `syndicate/features/football/sim_engine/smartsim2/**`,
+  `syndicate/templates/shared/{rank_board.html,_scoreboard_strip_ncaaf.html}`,
+  `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `data/calibration/ncaaf_profile.json`, `tests/test_ncaaf_*`,
+  `tests/test_rank_board_header_stats.py`
+- Verification: **RAN, PASSED.** Calibration artifact confirmed loaded on
+  refresh-worker (`source=artifact version=ncaaf-goal-line-refit-1`, three
+  discriminating fields). Live lens phase split rendering (109,780 bytes, was
+  108,486). **21 of 21 rank_board routes render slate stats, was 1.**
+  `tests.test_archives` identical failing set by name before and after.
+- Outcome: goal-line drive defect fixed and re-fit promoted (NCAAF 15.00% →
+  7.24%, NFL REFUSED — best as shipped); SP+ ratings now cached in the truth
+  loader; projections stamped with profile provenance; `header_stats` fixed at
+  the template for every sport rather than in 14 builders.
+- Deploys: web `94d6b6e6` (21:15:03Z, INSUFFICIENT — API only), web `d281995b`
+  (21:23:59Z), web `12928720` (22:03:52Z). All claims released.
+- NOT verified, carried forward: **projections cannot regenerate until CFBD
+  resets 2026-09-01, AFTER the openers** — the board serves the 08-19 artifact
+  through opening weekend and `profile_source` reads `unknown` until then. The
+  phase split has never been seen against a live slate (0/0/51 today). The 5
+  out-of-season rank_board routes render stats but only against empty slates.
+- Blocked by: none.

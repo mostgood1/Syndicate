@@ -2202,6 +2202,28 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   the resolve COUNT printed both sides so an inert fix cannot pass.
 - Blocked by: none.
 
+### boot-sync-healthcheck-kill — OPEN — opened 2026-08-27 — session 64625b4d
+- Goal: a web boot must not cost the container a long blocking file walk, so
+  sync I/O cannot starve `/healthz` inside Render's 5s budget.
+- Files: `scripts/bootstrap_data_root.py`, `syndicate/app.py`
+- Status: **both fixes LIVE.** `188a89fa` (compare depth follows root policy)
+  rode in on `d281995b`; `48833112` (boot sync decides from a name set) deployed
+  by this lane 21:54:46Z. Boot sync **72.20s -> 0.65s**, reproduced at 0.59s on
+  an unrelated lane's next deploy. `present=33316` + `unchanged=76` = 33,392 =
+  `git ls-files` over the roots, so nothing was skipped.
+- **Open ONLY on the rate.** 2 deploys since the fix, 0 `server_failed`. Against
+  a ~1-in-5 base rate that is not yet evidence. Close when >=5 deploys have
+  accumulated with no kill — they will arrive from other lanes' work; do not
+  manufacture deploys for this.
+- Verification: NOT a per-boot `/healthz` trace — that does not discriminate,
+  since two PRE-fix boots that survived were equally clean (5.13s, 5.59s). Count
+  `server_failed` per deploy over >=5 deploys.
+- Not this lane: `GET /` at 8.1s (`home.py`, claimed elsewhere) is the other
+  documented route to the same 5s budget.
+- Narrative + dead ends: `.syndicate/log/2026-08-27.md`; measurements:
+  `deploys.md`; full working block: `lanes_history.md`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
