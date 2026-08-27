@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#591` — **The board card SUBTITLE still read the per-ROW sport, so `#590`'s fix stopped at the rail — and the same field was being POSTed as a bet's sport.** — lane `board-card-league-label`, 2026-08-27, found by checking the other sports — **FIXED AND MEASURED ON THE PRODUCTION PAYLOAD; DEPLOY VERIFICATION OWED**
+### `#591` — **The board card SUBTITLE still read the per-ROW sport, so `#590`'s fix stopped at the rail — and the same field was being POSTed as a bet's sport.** — lane `board-card-league-label`, 2026-08-27, found by checking the other sports — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T20:39:54Z** (web `fb9261b8`)
 
 `#590` fixed the rail card's head by going to the chip. `board-card__subtitle`
 ([intelligence.html:1746]) still rendered `item.sport` per ROW, so on a slate
@@ -60,7 +60,7 @@ carry it, as production does.
 template; the 4 narrowness ones — league-less chip, unjoinable row, keyless row,
 mlb unchanged — pass in both states.
 
-**OWED:** the served board showing one label per soccer game's rows.
+**DISCHARGED 20:4xZ.** Served bytes vs the prior deploy on ONE payload: soccer subtitles `SOCCER=489 LA LIGA=7` -> ten leagues, bare-despite-league **489 -> 0**, joins **496 both sides** (so not inert), mlb/ncaaf/nfl/wnba identical. **The live DOM is BLIND for soccer** -- the Soccer tab reads `No opportunities match the current filters` because soccer publishes ~0 EV rows by decision, so it is NOT cited as confirmation; it does confirm `data-syndicate-sport` == slug on all 380 rendered cards. `open-bet-live-status` independently verified the ledger half: `{mlb: 167, wnba: 17, nfl: 7, soccer: 2}`, no league string on 193 rows, AND added that `settle_orders`/venue resolvers key on `sport`, so a `LA LIGA` bet would sit unresolvable forever rather than fail loudly. `.syndicate/deploys.md`.
 
 ### `#590` — **The Games rail's card-head label was a fact about which ROW arrived first, not about the game: `SOCCER` and `LA LIGA` side by side on one slate.** — lane `rail-league-label`, 2026-08-27, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T20:07:37Z** (web `0e964af8`)
 

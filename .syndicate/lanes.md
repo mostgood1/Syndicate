@@ -2172,7 +2172,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   labels byte-identical on both sides.
 - Blocked by: none.
 
-### board-card-league-label — OPEN — opened 2026-08-27 — session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d
+### board-card-league-label — **CLOSED 2026-08-27T20:4xZ.** Testable outcome MET on the SERVED bytes: soccer subtitles `SOCCER=489 LA LIGA=7` -> ten leagues, bare-despite-league **489 -> 0**, joins **496 both sides** so not inert, mlb/ncaaf/nfl/wnba identical. Web `fb9261b8` live `20:39:54Z`; claim taken from a live peer by ASKING, not forcing, and released. **The live DOM is BLIND for soccer** (0 rows pass the board filters) and is not cited as confirmation. Second defect (`data-syndicate-sport` -> bet slip -> ledger) independently verified by `open-bet-live-status`, who added that `settle_orders` keys on `sport` — a wrong value would sit unresolvable forever rather than fail loudly. `deploys.md`, `log/2026-08-27.md`. (was OPEN — opened 2026-08-27 — session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d)
 - Goal: the board CARD SUBTITLE names the same thing the rail card above it
   does. `#590` fixed the rail by going to the chip; the subtitle still reads the
   per-ROW `item.sport`, so on a slate carrying both soccer row families one

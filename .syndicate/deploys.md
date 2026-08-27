@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-08-27 — web `fb9261b8`: the board card subtitle names the league, and stops leaking it into the bet slip (`#591`)
+
+**Deployed:** `dep-da89vgfavr4c73esmuqg`, triggered `20:36:17Z`, live
+`20:39:54.779050Z` (web 502'd for ~2 min after, then served 200 at `20:42:05Z`).
+Claim `web` held by `board-card-league-label`, acquired `20:36:0xZ`, token
+`765162…`, released after this row. Preflight `CLEAR` for this exact SHA, on
+`origin/main`, only infrastructure processes.
+
+**THE CLAIM WAS HELD BY ANOTHER LIVE SESSION AND WAS NOT FORCED.**
+`open-bet-live-status` (`syndicate-27`) held it, 19 min in, having deployed
+`e12b5227` at `20:22:53Z`. Messaged rather than forced; they released it and
+confirmed they were mid-flight on live-odds-worker, not web. `fb9261b8` is a
+descendant of `e12b5227`, so their endpoint rode along unchanged — composition,
+not supersession.
+
+**verify: MET `20:4xZ`, A/B on ONE payload against the SERVED bytes.**
+
+```
+                                        soccer board-card subtitles
+SERVED  fb9261b8   EPL=127 LA LIGA=86 SERIE A=82 BUNDESLIGA=62 LIGUE 1=44 MLS=43
+                   CHAMPIONSHIP=18 EREDIVISIE=16 PRIMEIRA LIGA=9 BELGIAN PRO LEAGUE=9
+CONTROL 0e964af8   SOCCER=489  LA LIGA=7                              <-- MIXED
+
+rows joining a league-carrying chip   496 BOTH SIDES
+...of those, still labelled bare      489 -> 0
+mlb 322 / ncaaf 42 / nfl 103 / wnba 763   identical both sides
+```
+
+The 496 is the falsification guard, not decoration: the fix works by joining a
+ROW to a chip, so a 0 there would mean it is INERT while "0 bare labels" still
+read clean.
+
+**THE LIVE DOM CANNOT CONFIRM THE SOCCER HALF AND IS NOT BEING CITED AS IF IT
+COULD.** The Soccer tab renders `No opportunities match the current filters` —
+soccer publishes ~0 EV rows by decision (`state.md` decision 7), so zero soccer
+cards reach the board under the current min-edge filter. The DOM read is
+therefore BLIND for exactly the sport under test. What it DOES confirm, on 380
+rendered cards: `data-syndicate-sport` now equals the slug on every one
+(`MLB / slug=mlb`, `NFL / slug=nfl`, `WNBA / slug=wnba`) and non-soccer
+subtitles are unchanged (`MLB=290 NFL=20 WNBA=70`). The replay over the served
+bytes is the verification, because it runs the deployed function over all 496
+league-joining rows rather than only the handful that survive display filters.
+
+**THE SECOND DEFECT WAS INDEPENDENTLY VERIFIED BY THE LANE THAT OWNS THE
+SURFACE, AND IT IS WORSE THAN I SCOPED IT.** `data-syndicate-sport` was fed
+`item.sport` (the LEAGUE on soccer's steam/prop rows); `bet_slip.js:174` reads
+it and `:254,271` POST it as a bet's `sport`. `open-bet-live-status` measured
+`/portfolio` independently: `{mlb: 167, wnba: 17, nfl: 7, soccer: 2}`, **no
+league string on any of 193 rows** — hazard, not corruption, confirmed twice
+from two sessions. Their addition, which I did not know: `settle_orders` and the
+venue resolvers KEY ON `sport`, so a bet recorded as `LA LIGA` would never join
+a settlement source and would **sit unresolvable forever rather than fail
+loudly**. A silent-permanent failure, not a cosmetic one. Second time today a
+UI-side value proved load-bearing on the money path.
+
+**Adjacent check they asked for, done and CLEAN:** `bet_slip.js` posts `odds`
+(American; the route stores it verbatim via `_coerce_float`) and `stake`
+(dollars) — the receiving end expects both in those units, and
+`implied_probability` is a separate field the slip never populates. No unit
+crossing in this path. One observation passed to the owning lane rather than
+fixed here: `prediction_ledger._coerce_probability` maps `1 < x <= 100` to
+`x/100`, so a value arriving in the wrong vocabulary inside that band is
+silently rescaled instead of rejected (an American `+50` would become `0.50`).
+No current caller does that, and `prediction_ledger.py` is held by
+`portfolio-ledger-service-split`.
+
 ## 2026-08-27 — web `0e964af8`: the rail's card-head label is a fact about the GAME now, not about which row arrived first (`#590`)
 
 **Deployed:** `dep-da89f267bikc73c40cdg`, triggered `20:01:12Z`, live
