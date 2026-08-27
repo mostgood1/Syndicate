@@ -88,7 +88,26 @@ two-line player kept whichever arrived last. The single-book CONSUMER contract
 is preserved explicitly by `_best_price_player_props` (best price PER SIDE), so
 the ROI report's 64,007-bet denominator does not move.
 
-**OWED — the reading that closes this, and a zero before it proves nothing.**
+**OWED — PARTIALLY DISCHARGED 2026-08-27 13:3xZ.**
+
+- ✅ **Board attach VERIFIED IN PRODUCTION.** `/nfl/api/cards?week=1` went
+  **0 → 112 `shared_prop_rows` across 14 of 16 games** (web `e3c168f3`,
+  03:04:31Z), e.g. `NE | A.J. Brown | Anytime TD | 165`.
+- ✅ **Multi-book capture VERIFIED on BOTH sports**, on files written after the
+  fix — the reading that could not be taken last night because every file on
+  disk was written by the old code. NFL wk1 **294 rows/1 book → 556 rows/4
+  books**; soccer ligue_1 **2,720 rows/4 books with 647 of 1,529 selections
+  quoted by more than one book**. Full numbers in `deploys.md`, 13:1x-13:3xZ.
+- ❌ **STILL OPEN: `/nfl/api/props?week=1` serves `rows=0` and its empty state**,
+  while the CARDS read the same file successfully (112 rows). So this is
+  downstream of the read path — `build_nfl_props_page_context` /
+  `join_odds_to_sim` / the rank board — not `#441`. Found, not chased.
+- ❌ **STILL OPEN: nothing downstream consumes the extra books yet.** The
+  best-price seam deliberately hands consumers one row per selection to protect
+  the ROI report's 64,007-bet denominator; whether that ROI number MOVES now
+  that a best price exists to pick is an unmeasured question.
+
+**Original OWED text, kept for the record:**
 On web, after a deploy AND an NFL odds sweep:
 `sum(len(g["shared_prop_rows"]) for g in GET /nfl/api/cards?week=1)` **0 → >0**,
 and `GET /nfl/api/props?week=1` losing its empty state. Then, after the NEXT

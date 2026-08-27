@@ -33876,3 +33876,38 @@ Separate defect, not addressed here.
 
 **Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched by any of tonight's
 three deploys.
+
+## 2026-08-27 13:1x-13:3xZ — NO DEPLOY — `#587`'s OWED capture reading, DISCHARGED AND PASSED
+
+Not a deploy. This is the reading `#587` was left open for, and it could not be
+taken last night: the fix was live from 03:29:11Z but every props file on disk
+had been written by the OLD code, so a single-book reading then would have been
+the EXPECTED state rather than a failure. It needed the next real sweep.
+
+**NFL** `nfl_source/oddsapi_player_props_2026_wk1.csv`, mtime
+`2026-08-27T13:17:33.956Z` (after the fix, fractional -- a runtime write):
+
+    before   42,753 B   294 rows   {draftkings: 294}                  ONE book
+    after    81,439 B   556 rows   {draftkings: 295, betrivers: 127,
+                                    fanduel: 100, williamhill_us: 34}  FOUR
+
+**SOCCER** `soccer_source/ligue_1/props/2026-08-27.csv`, mtime `13:35:55.609Z`:
+
+    2,720 rows   {draftkings: 955, betrivers: 764, fanduel: 587, betmgm: 414}
+    647 of 1,529 selections quoted by MORE THAN ONE BOOK
+
+That last number is the one that matters: it is the count of selections where a
+best-price choice now EXISTS to be made. Price shopping measures +2.95 ROI pts
+on NFL props and +2.79 on MLB game lines, and it could not run against either
+file before today. MLS went 867,508 -> 1,967,132 B and ligue_1 178,761 ->
+467,391 B on the same sweep.
+
+Both sports captured multi-book from the SAME API call and the same credits, as
+NCAAF's equivalent fix did (60 rows/1 market -> 329/6 books).
+
+**STILL NOT VERIFIED, and not implied by the above:** that anything DOWNSTREAM
+consumes the extra books. `_best_price_player_props` collapses to the best price
+per side before `nfl_props_rows_for_week`, so consumers see one row per
+selection as they always did -- deliberately, to protect the ROI report's
+64,007-bet denominator. Whether the ROI number MOVES now that a best price
+exists to pick is a separate measurement nobody has taken.
