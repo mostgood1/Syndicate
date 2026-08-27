@@ -4435,3 +4435,46 @@ individual line looked normal, including the bad row unless you knew sibling
 `fill_price` values. It surfaced on the FIRST read of a new per-day per-venue
 ledger summary endpoint. A per-day total is a cheap invariant over a record
 that is otherwise only ever appended to one row at a time.
+
+## 2026-08-27 FORBIDDEN: an instrument built out of the thing it measures, or out of a symptom the slate can retire — FOUR instances in one session, every one reading HEALTHY
+
+- **The belief overturned.** "The measurement discriminates because the numbers
+  moved." They moved in three of four cases *and the instrument was still
+  incapable of reading unhealthy* — a clean bill of health manufactured by the
+  defect itself. Numbers moving is not discrimination; only a CONTROL run that
+  actually reads unhealthy is.
+- **The four, all in `#589`/`#590`/`#591`, all caught only by running the
+  pre-change bytes against the same payload:**
+  1. A duplicate detector that grouped cards by the chip `chipForGame`
+     resolved — the code under test, which returns null for exactly the
+     duplicated cards. Reported **0 duplicates in BOTH states.**
+  2. A metric ("a bare sport label beside a league") needing two labels present
+     at once. The league-labelled rows drained off the board twelve minutes
+     later; the same pre-change template then read a uniform `SOCCER=213`,
+     **flag 0, defect fully intact.**
+  3. A test harness with a hand-copied `chipForGame` stub that had neither the
+     canonical nor the normalized index and keyed on `group.sport` — the field
+     the defect is about. **The new assertions could not have failed against
+     it.**
+  4. A fixture (`celChip`) with no `league_display`, so the property under test
+     could not be expressed. This one FAILED loudly instead of passing
+     vacuously, because the assertion was an equality between two computed
+     labels rather than a check for a constant.
+- **The rule going forward.** Derive the instrument from a source the defect
+  CANNOT touch, and state that source. Concretely, all three fixes ended up
+  joining on the slug taken from `group.key` and on `chip.league_display` —
+  fields no code path under test writes. **And run the control on the SAME
+  payload, at the same instant, every time:** a fix verified only against
+  post-deploy data is verified against a slate that may have retired the test
+  case. This is the 2026-08-20 census rule (`A CENSUS THAT CANNOT READ UNHEALTHY
+  IS NOT A VERIFICATION`) generalised from "the slate moved" to "the instrument
+  was never able".
+- **The cheap test, worth applying before any verification is banked:** *if the
+  fix were reverted right now, would this reading change?* If it needs the
+  world to cooperate — a particular row family present, two labels coexisting —
+  it is not a verification, it is a coincidence. Pair every "0 bad" count with a
+  "N actually checked" count; `#591`'s `rows that JOIN a league-carrying chip:
+  496` is the shape, and it was the first guard this session built BEFORE
+  measuring rather than after being burned.
+- *(evidence: `.syndicate/log/2026-08-27.md`, the `#589`/`#590`/`#591` entries
+  and the 20:5xZ checkpoint)*
