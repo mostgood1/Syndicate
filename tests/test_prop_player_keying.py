@@ -221,3 +221,59 @@ def test_no_capture_in_the_window_is_named_too(capture):
 
     assert out.status == "no_rows"
     assert out.reason == "no_props_capture_within_window"
+
+
+# ---------------------------------------------------------------------------
+# 3. per-sport selection attribution
+# ---------------------------------------------------------------------------
+
+
+def test_selections_are_attributed_per_sport():
+    """`selected_by_source` is one global tally across every sport, so it cannot
+    answer "is kalshi matching soccer?" -- a source carrying one sport entirely
+    and contributing nothing to another reads identically. Measured 2026-08-27,
+    it showed `kalshi: 2533` across five sports at once."""
+    from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes
+
+    now = 1_787_000_000.0
+    quotes = {
+        "soccer|totals|over|2.5": Quote(
+            key="soccer|totals|over|2.5", source="polymarket_us", sport="soccer",
+            market="totals", side="over", probability=0.5, american=100,
+            line=2.5, fetched_at=now),
+        "nfl|totals|over|44.5": Quote(
+            key="nfl|totals|over|44.5", source="kalshi", sport="nfl",
+            market="totals", side="over", probability=0.5, american=100,
+            line=44.5, fetched_at=now),
+    }
+    collected = {
+        "soccer": {"quotes": quotes, "by_source": {}, "ceiling_seconds": 86400},
+        "nfl": {"quotes": quotes, "by_source": {}, "ceiling_seconds": 21600},
+    }
+    rows = [
+        {"sport": "soccer", "market": "totals", "side": "over", "line": 2.5},
+        {"sport": "nfl", "market": "totals", "side": "over", "line": 44.5},
+    ]
+
+    result = apply_venue_quotes(rows, "2026-08-27", collected_by_sport=collected, now=now)
+    by_sport = result["selected_by_source_by_sport"]
+
+    assert by_sport["soccer"] == {"polymarket_us": 1}
+    assert by_sport["nfl"] == {"kalshi": 1}
+    # And the global tally still says what it always said.
+    assert result["selected_by_source"] == {"polymarket_us": 1, "kalshi": 1}
+
+
+def test_a_sport_that_won_nothing_is_absent_rather_than_zero_filled():
+    """"produced no rows" and "every row lost" are different facts;
+    `unmatched_by_sport` beside this is what tells them apart."""
+    from syndicate.features.shared.venue_quote_fanin import apply_venue_quotes
+
+    now = 1_787_000_000.0
+    collected = {"soccer": {"quotes": {}, "by_source": {}, "ceiling_seconds": 86400}}
+    rows = [{"sport": "soccer", "market": "totals", "side": "over", "line": 2.5}]
+
+    result = apply_venue_quotes(rows, "2026-08-27", collected_by_sport=collected, now=now)
+
+    assert "soccer" not in result["selected_by_source_by_sport"]
+    assert result["unmatched_by_sport"]["soccer"] == 1

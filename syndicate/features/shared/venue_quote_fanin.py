@@ -441,6 +441,7 @@ def apply_venue_quotes(
     out: list[Mapping[str, Any]] = []
     stamped = 0
     per_source: dict[str, int] = {}
+    per_source_by_sport: dict[str, dict[str, int]] = {}
     ceilings: dict[str, int] = {}
     source_status: dict[str, Any] = {}
     unmatched_samples: list[str] = []
@@ -509,6 +510,15 @@ def apply_venue_quotes(
         out.append(stamp_candidate_freshness(dict(row), quote))
         stamped += 1
         per_source[quote.source] = per_source.get(quote.source, 0) + 1
+        # PER SPORT, because the global tally cannot answer the question people
+        # actually ask of it. "Is kalshi matching soccer?" was unanswerable from
+        # `selected_by_source` on 2026-08-27 -- it showed `kalshi: 2533` across
+        # five sports at once, so a source could be carrying one sport entirely
+        # and contributing nothing to another and the line would read the same.
+        # `by_source` already reports what each source OFFERED per sport; this
+        # is the other half, what it actually WON.
+        by_sport_bucket = per_source_by_sport.setdefault(sport, {})
+        by_sport_bucket[quote.source] = by_sport_bucket.get(quote.source, 0) + 1
 
     return {
         "rows": out,
@@ -520,6 +530,11 @@ def apply_venue_quotes(
         "sports": sorted(by_sport.keys()),
         "ceiling_seconds_by_sport": ceilings,
         "selected_by_source": per_source,
+        # {sport: {source: wins}}. Sports with zero selections are ABSENT rather
+        # than zero-filled -- a sport that produced no rows at all and a sport
+        # whose every row lost are different facts, and `unmatched_by_sport`
+        # beside this tells them apart.
+        "selected_by_source_by_sport": per_source_by_sport,
         "by_source": source_status,
         # THE TWO SIDES OF THE JOIN, SAMPLED, so a key-space mismatch is
         # readable rather than inferred. `unmatched_sample` is what the BOARD
