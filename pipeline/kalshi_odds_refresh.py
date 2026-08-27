@@ -605,8 +605,58 @@ def ensure_series_discovered(*, force: bool = False) -> dict[str, Any]:
         return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
 
 
+def _sport_slot_caps(
+    sports: list[str],
+    demand: Mapping[str, int] | None,
+) -> dict[str, int] | None:
+    """How many of `MAX_STORED_MARKETS` each sport may take, by BOARD DEMAND.
+
+    A FLAT FLOOR IS THE WRONG SHAPE, and this is the failure the flat one could
+    not see. Measured 2026-08-27 during NCAAF opening week, with the floor
+    already live:
+
+        kept_by_sport={mlb: 648, nba: 6, ncaaf: 1896, nfl: 2083, soccer: 1067, wnba: 300}
+        board demand  ={mlb: 400, soccer: 400, wnba: 400, nfl: 88, ncaaf: 42}
+
+    ~4,000 of 6,000 slots held markets for 130 board rows while 1,200 rows
+    shared the rest, because Kalshi's far-dated football catalogue is FRESH and
+    staleness ordering rewards that. `BOARD_JOIN matched` fell 210 -> 5 under
+    the pure-staleness trim that preceded the floor, and the floor recovered it
+    only to 13-24. Freshness is not relevance: a market for a game three weeks
+    out is perfectly fresh and cannot be joined to today's board.
+
+    THE FLOOR SURVIVES AS A MINIMUM, deliberately. Demand is measured from the
+    LAST join, so a sport whose slate opens between cycles has demand 0 and
+    would otherwise be locked out of the working set that would let it be
+    joined at all -- a self-fulfilling zero. The floor is what stops that.
+
+    Returns None when there is no demand signal, which keeps the caller on the
+    flat-floor path rather than inventing a distribution from nothing.
+    """
+    totals = {
+        sport: int(count)
+        for sport, count in (demand or {}).items()
+        if isinstance(count, (int, float)) and int(count) > 0
+    }
+    if not totals or not sports:
+        return None
+
+    floor_total = min(len(sports) * PER_SPORT_FLOOR_MARKETS, MAX_STORED_MARKETS)
+    remaining = max(0, MAX_STORED_MARKETS - floor_total)
+    demand_total = sum(totals.get(sport, 0) for sport in sports)
+
+    caps: dict[str, int] = {}
+    for sport in sports:
+        share = 0
+        if demand_total > 0:
+            share = int(remaining * (totals.get(sport, 0) / demand_total))
+        caps[sport] = min(PER_SPORT_FLOOR_MARKETS, MAX_STORED_MARKETS) + share
+    return caps
+
+
 def _trim_to_storage_bounds(
     per_series_markets: list[tuple[float, str, list[dict[str, Any]]]],
+    demand: Mapping[str, int] | None = None,
 ) -> tuple[list[dict[str, Any]], int, dict[str, int]]:
     """Fit the working set into `MAX_STORED_MARKETS`, guaranteeing each sport a floor.
 
@@ -641,11 +691,21 @@ def _trim_to_storage_bounds(
     trimmed = 0
     remainder: list[tuple[str, list[dict[str, Any]]]] = []
 
+    sport_of = {
+        series: (str(sport_for_series(series) or "").strip().lower() or "unmapped")
+        for _age, series, _m in ordered
+    }
+    caps = _sport_slot_caps(sorted(set(sport_of.values())), demand)
+
     for _age, series, markets in ordered:
-        sport = str(sport_for_series(series) or "").strip().lower() or "unmapped"
+        sport = sport_of[series]
         held = kept_by_sport.get(sport, 0)
+        # DEMAND-WEIGHTED when the last join told us what the board asks for,
+        # flat floor when it did not. Either way the FLOOR is the minimum, so a
+        # sport whose slate opens between cycles is never locked out.
+        allowance = caps.get(sport, PER_SPORT_FLOOR_MARKETS) if caps else PER_SPORT_FLOOR_MARKETS
         room = min(
-            max(0, PER_SPORT_FLOOR_MARKETS - held),
+            max(0, allowance - held),
             max(0, MAX_STORED_MARKETS - len(all_markets)),
         )
         take = markets[:room] if room else []
@@ -904,12 +964,17 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     #
     # Freshest series are kept: a stale series' prices are the least useful
     # thing in the working set, which is the claim the docstring was making.
-    all_markets, trimmed_now, kept_by_sport = _trim_to_storage_bounds(per_series_markets)
+    all_markets, trimmed_now, kept_by_sport = _trim_to_storage_bounds(
+        per_series_markets,
+        demand=state.get("board_demand") if isinstance(state.get("board_demand"), Mapping) else None,
+    )
     trimmed += trimmed_now
     if trimmed_now:
         print(
             f"[kalshi_odds] TRIM_BY_SPORT kept={len(all_markets)} trimmed={trimmed_now}"
-            f" floor={PER_SPORT_FLOOR_MARKETS} kept_by_sport={dict(sorted(kept_by_sport.items()))}",
+            f" floor={PER_SPORT_FLOOR_MARKETS}"
+            f" demand={dict(sorted((state.get('board_demand') or {}).items())) or None}"
+            f" kept_by_sport={dict(sorted(kept_by_sport.items()))}",
             flush=True,
         )
 
@@ -1369,4 +1434,45 @@ def join_to_board(
             f" board={report.get('board_event_sample')}",
             flush=True,
         )
+    _record_board_demand(rows)
     return report
+
+
+def _record_board_demand(rows: list[dict[str, Any]]) -> None:
+    """Persist how many board rows each sport asked for, for the NEXT trim.
+
+    THE WORKING SET HAD NO NOTION OF WHICH SPORTS HAVE GAMES TODAY, and that is
+    what `_sport_slot_caps` needs to fix it. The demand lives here rather than
+    being passed in because this is the only place that sees the board and the
+    catalogue in the same breath -- the trim runs during the REFRESH, before any
+    join, so it cannot ask the question itself.
+
+    ONE CYCLE OF LAG, ACCEPTED. The trim reads the previous join's demand. Board
+    composition changes across hours, not minutes, and the flat floor underneath
+    covers the one case where lag bites: a sport whose slate opens between
+    cycles has no demand yet and still gets its floor.
+
+    NEVER RAISES, and never on the write either. A demand signal is an
+    optimisation; losing it costs a flat-floor cycle, while an exception here
+    would cost the join that produced it.
+    """
+    try:
+        counts: dict[str, int] = {}
+        for row in rows or []:
+            sport = str((row or {}).get("sport") or "").strip().lower()
+            if sport:
+                counts[sport] = counts.get(sport, 0) + 1
+        if not counts:
+            return
+        from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+
+        path = markets_artifact_path()
+        state = read_json_file(path) or {}
+        if not isinstance(state, dict):
+            return
+        state["board_demand"] = counts
+        state["board_demand_at"] = _now_stamp()
+        write_json_file(path, state)
+        print(f"[kalshi_odds] BOARD_DEMAND {dict(sorted(counts.items()))}", flush=True)
+    except Exception as exc:  # noqa: BLE001 -- an optimisation must not cost the join
+        print(f"[kalshi_odds] BOARD_DEMAND_FAILED {type(exc).__name__}: {exc}", flush=True)

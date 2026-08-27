@@ -156,3 +156,86 @@ def test_the_remainder_pass_is_attributed_to_the_right_sport():
     # soccer: 300 by floor + 600 in the remainder = 900. wnba: 50.
     assert by_sport == {"soccer": 900, "wnba": 50}, by_sport
     assert sum(by_sport.values()) == len(kept) == 950
+
+
+# ---------------------------------------------------------------------------
+# demand-weighted allocation -- the failure a FLAT floor cannot see
+# ---------------------------------------------------------------------------
+
+
+def test_the_flat_floor_cannot_see_a_42_row_sport_hoarding_slots(monkeypatch):
+    """THE MEASURED FAILURE, 2026-08-27 NCAAF opening week, floor already live:
+
+        kept_by_sport={mlb: 648, nba: 6, ncaaf: 1896, nfl: 2083, soccer: 1067, wnba: 300}
+        board demand  ={mlb: 400, soccer: 400, wnba: 400, nfl: 88, ncaaf: 42}
+
+    ~4,000 of 6,000 slots held markets for 130 rows while 1,200 rows shared the
+    rest. Kalshi's far-dated football catalogue is FRESH, and staleness ordering
+    rewards that -- but freshness is not relevance: a market for a game three
+    weeks out cannot be joined to today's board. `BOARD_JOIN matched` fell
+    210 -> 5, and the flat floor recovered it only to 13-24.
+    """
+    # PRODUCTION constants deliberately, not the small-budget fixture: this
+    # test is about a failure measured at 6,000/300, and at 1,000/300 five
+    # floors already exceed the whole budget so there is nothing left to
+    # weight. A fixture that cannot reproduce the condition cannot test it.
+    monkeypatch.setattr(mod, "MAX_STORED_MARKETS", 6000)
+    monkeypatch.setattr(mod, "PER_SPORT_FLOOR_MARKETS", 300)
+
+    caps = mod._sport_slot_caps(
+        ["mlb", "soccer", "wnba", "nfl", "ncaaf"],
+        {"mlb": 400, "soccer": 400, "wnba": 400, "nfl": 88, "ncaaf": 42},
+    )
+
+    # The sports actually playing outrank the ones merely listed.
+    assert caps["mlb"] > caps["nfl"] * 2
+    assert caps["soccer"] > caps["ncaaf"] * 2
+    # And football is not starved either -- it keeps well above the floor.
+    assert caps["ncaaf"] > mod.PER_SPORT_FLOOR_MARKETS
+    assert sum(caps.values()) <= mod.MAX_STORED_MARKETS
+
+
+def test_a_sport_with_no_demand_still_gets_the_floor(monkeypatch):
+    """Demand is measured from the LAST join, so a sport whose slate opens
+    between cycles has demand 0. Without the floor underneath, it would be
+    locked out of the working set that would let it be joined at all -- a
+    self-fulfilling zero."""
+    monkeypatch.setattr(mod, "MAX_STORED_MARKETS", 6000)
+    monkeypatch.setattr(mod, "PER_SPORT_FLOOR_MARKETS", 300)
+
+    caps = mod._sport_slot_caps(["mlb", "soccer"], {"mlb": 400})
+
+    assert caps["soccer"] >= mod.PER_SPORT_FLOOR_MARKETS
+
+
+def test_no_demand_signal_keeps_the_flat_floor_path():
+    """Returns None rather than inventing a distribution from nothing."""
+    assert mod._sport_slot_caps(["mlb"], None) is None
+    assert mod._sport_slot_caps(["mlb"], {}) is None
+    assert mod._sport_slot_caps([], {"mlb": 400}) is None
+    assert mod._sport_slot_caps(["mlb"], {"mlb": 0}) is None
+
+
+def test_demand_actually_changes_what_is_kept(small_budget, sport_map):
+    """End to end through the trim: same input, demand flips who wins."""
+    series = [
+        (1.0, "KXNCAAF", _markets("KXNCAAF", 900)),   # fresher, far-dated
+        (9.0, "KXSOCCER", _markets("KXSOCCER", 900)),  # staler, playing today
+    ]
+    from syndicate.features.shared import kalshi_catalogue
+    import pytest as _p
+    mapping = {"KXNCAAF": "ncaaf", "KXSOCCER": "soccer"}
+    orig = kalshi_catalogue.sport_for_series
+    kalshi_catalogue.sport_for_series = lambda s: mapping.get(str(s))
+    try:
+        flat, _t1, by_flat = mod._trim_to_storage_bounds(series)
+        weighted, _t2, by_weighted = mod._trim_to_storage_bounds(
+            series, demand={"soccer": 400, "ncaaf": 20})
+    finally:
+        kalshi_catalogue.sport_for_series = orig
+
+    # Flat: the FRESHER far-dated sport takes the surplus.
+    assert by_flat["ncaaf"] > by_flat["soccer"], by_flat
+    # Weighted: the sport the board actually asks for does.
+    assert by_weighted["soccer"] > by_weighted["ncaaf"], by_weighted
+    assert len(flat) == len(weighted) == 1000, "budget was not filled either way"
