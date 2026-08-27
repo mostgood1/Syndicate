@@ -52,8 +52,16 @@ and it was staleness rather than the bug. **Both times the raw value settled it
 and the summary did not.**
 
 **OWED — TWO THINGS.**
-1. **refresh-worker.** It builds the published chip artifact and is on
-   `f8d8b05f`, which does NOT carry this. While a fresh worker artifact is
+1. **refresh-worker — HALF DISCHARGED, and the remaining half is a MISSING
+   SUBJECT rather than a missing deploy.** It reached `070f452a` at
+   `00:55:43Z`, which DOES carry this fix (`merge-base --is-ancestor 07a7124e
+   070f452a` passes). A `source == "worker_artifact"` serve was read at
+   `01:16:17Z` and discharged `#581` there — but it carried **`WNBA live=0`**,
+   because GSV @ CON finished during the worker's 18-minute cold build. **Zero
+   live WNBA chips is not zero bare WNBA chips**, and the watcher was built to
+   say so rather than pass. **TOR @ SEA at `02:00Z` on a now-warm worker is the
+   next window.** Original text, for the record: it builds the published chip
+   artifact and was on `f8d8b05f`, which did NOT carry this. While a fresh worker artifact is
    served, WNBA chips stay bare — confirmed at 00:32:49Z,
    `src=worker_artifact`, `tok='LIVE'`. Its claim was held by
    `ncaaf-opener-regions-props` for an NCAAF capture and was NOT taken from them.
@@ -317,8 +325,11 @@ after first pitch reading `LIVE` before `TOP 1`, resolving within ~90s). Full
 read and the pre-deploy control: `.syndicate/deploys.md`, 2026-08-26 web
 `58be8c0d`.
 
-**OWED — DISCHARGED 2026-08-27T00:08:34Z, on the cell that had never been
-measured.** refresh-worker on `f8d8b05f` (carries `58be8c0d`), serving a FRESH
+**OWED — FULLY DISCHARGED `2026-08-27T01:16:17Z` on refresh-worker `070f452a`:
+`source=worker_artifact`, `published_at 01:14:32Z`, **scored 15, live 9, BLANK 0,
+inning token present 9/9**. Five scores lag by an inning, which is `#585` and not
+this — a blanked game has NO INNING AT ALL, a stale one has a real inning merely
+behind. First discharged partially at `00:08:34Z`:** refresh-worker on `f8d8b05f` (carries `58be8c0d`), serving a FRESH
 artifact against a SLIM web lens:
 
     source = worker_artifact   published_at = 00:07:44Z   age = 78.9s   lens = SLIM

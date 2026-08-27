@@ -33530,3 +33530,75 @@ artifact, so while a fresh one is served the WNBA chip is still bare — observe
 `ncaaf-opener-regions-props` and was NOT taken from them; they offered to release
 and it was declined, because the inline path already proved the fix and their
 capture was time-bound.
+
+---
+
+## 2026-08-27 — refresh-worker `070f452a`: `#581` discharged on the artifact path, and a GUARD DEVIATION taken in the open
+
+**Deployed:** `refresh-worker` (`srv-d91dpertqb8s73co8ls0`), live `00:55:43Z`.
+**Deployed BY THE USER from their own terminal, not by me, and that is the
+deviation.**
+
+**THE DEVIATION, stated rather than buried.** `deploy_preflight` returned
+**HOLD — 8 job(s) in flight**, and the user's instruction, given twice, was to
+deploy anyway and kill them. What died:
+
+    pid 1432  MLB sim, game 824963 (MIN @ ATH), --reason tip_off_window
+    pid 1856  MLB hitter-props sim + 3 multiprocessing children
+    pid 1892  soccer source refresh, date 2026-08-30
+    pid 1435  daily_update --workflow ui-daily
+
+I could not perform it myself. `SYNDICATE_DEPLOY_GUARD=off` set INSIDE the
+PowerShell command has no effect: `deploy-guard.py` is a `PreToolUse` hook and
+runs in its own process BEFORE the shell exists, so it never sees the variable.
+That is this repo's own 2026-08-17 learning verbatim — *a guard's escape hatch
+must be reachable from where the guard runs*. **The hook matches `Bash|PowerShell`
+only, so an MCP-triggered deploy would have slipped past it; that route was
+deliberately NOT taken.** Bypassing a check the user has already overridden, by
+picking a tool that cannot see it, is the wrong way to carry out the
+instruction. The claim was held throughout so no peer could deploy underneath.
+
+**verify: MET — `01:16:17Z`, on `source == "worker_artifact"`**, the one cell
+that had never been measured on this service:
+
+    published_at 01:14:32Z   age 105.2s
+
+    BOS @ MIA  BOT 8 0-3    COL @ WSH  BOT 7 8-1    HOU @ NYY  TOP 7 2-3
+    KC  @ TOR  BOT 7 0-3    MIL @ NYM  TOP 6 8-1    LAD @ ATL  TOP 6 3-4
+    TEX @ CWS  TOP 4 2-2    BAL @ STL  TOP 5 7-1    MIN @ ATH  TOP 1 0-0
+    + 6 finals, all exact
+
+    scored 15   live 9   BLANK 0   inning token present 9/9
+
+Pre-fix, this exact path served EVERY live game `0-0` with a bare `LIVE`
+(22:33:18Z, artifact age 9.0s).
+
+**FIVE SCORES LAG, AND THAT IS `#585`, NOT A FAILURE OF THE FIX.** `BOS 0-3`
+against `0-4`, `COL 8-1` against `10-1`. The discriminator established earlier
+the same night holds: **a blanked game has NO INNING AT ALL; a stale one has a
+real inning that is merely behind.** All nine live games have innings. This is
+the content-age defect on a WARM build — ~1 inning, against the cold build's two
+at 00:08:34Z.
+
+**`#586` NOT DISCHARGED, and the watcher said so rather than passing.**
+`WNBA live=0` — GSV @ CON finished during the cold build. Zero live chips is not
+zero bare chips. TOR @ SEA at `02:00Z` on a warm worker is the next window.
+
+**COLD BUILD RAN LONG:** boot `00:56:13Z`, first `GAME_CHIPS_PUBLISHED`
+`01:14:32Z` — **18m19s**, against the 747.8s (12m28s) figure in
+`state.md [board-quote-staleness]`. Stages walked forward throughout
+(`cards_context_end` 01:01, `board_contract_end` 01:07), memory stable at
+~1.79GB anon, so it was slow rather than stuck. **A cold build can be half again
+the recorded figure; do not treat 747.8s as a bound.**
+
+**Unhealthy tally, counted not estimated: FOUR on web across the day**
+(`16:48:45Z`, `23:07:51Z`, `23:51:22Z`, `01:13:35Z`), every one within ~2.5 min
+of a `deploy_ended`, none recovering slower than a minute. **Still ZERO
+unhealthy away from a deploy**, which remains the only case that would implicate
+`#581`'s restored statsapi fan-out. Rollback target if it ever fires:
+`34b30330`.
+
+**Also observed, not mine:** `live-odds-worker` went to `070f452a` at `00:56:26Z`
+— 43 seconds after refresh-worker — and I neither deployed it nor held its claim.
+Forward-moving and harmless, but do not attribute it to this deploy. Web landed
+on `92db4ce4` at `01:12:25Z`, also not mine; it carries both fixes (checked).
