@@ -31,8 +31,15 @@ case (an id in neither file) would go unnoticed again.
 
 EXIT CODES
   0  clean
-  1  at least one id is in NEITHER file, or is duplicated within `todo.md`
+  1  a CURRENT-ERA id is in neither file, or an id is duplicated within `todo.md`
   2  could not read one of the files
+
+Pre-#275 ids in neither file are reported on ONE line and do NOT gate: their
+archive records predate the header format and cannot be matched here, so
+gating on them would fail every run and train the reader to skim -- which is
+exactly what happened on 2026-08-26, when two sessions each read a correct
+duplicate warning delivered alongside twelve of them and dismissed it.
+`--show-legacy` expands that line.
 
     python scripts/todo_id_reconcile.py
     python scripts/todo_id_reconcile.py --json
@@ -56,6 +63,31 @@ CLOSED = REPO_ROOT / "docs" / "ai_context" / "todo_closed.md"
 # declaration of it, and counting those would report every updated item as a
 # duplicate.
 OPEN_ITEM = re.compile(r"^### `#(\d+)`", re.M)
+
+# THE ERA BOUNDARY, and it is the difference between a finding and noise.
+#
+# This module's own docstring records that the id conventions changed partway
+# through the project: ids ~0-168 are TABLE ROWS in the original format, ids
+# ~275+ are HEADERS in the current one, and the ARCHIVE is not machine-checkable
+# for the older era -- it carries table rows, `- **#N` bullets, `#### `#N``
+# sub-headers, and prose sections titled by DATE rather than by id. So a
+# legacy id whose only archive record sits inside prose reads as MISSING when
+# it is merely filed in a shape no pattern here can match.
+#
+# MEASURED 2026-08-26: an unfiltered run reports twelve such ids (#65-#81) and
+# exits 1 EVERY TIME. That is the state this file's docstring set out to avoid
+# -- "a gate that cried wolf on archive formatting would be turned off within a
+# day" -- reached anyway, because the crying-wolf moved from the exit code into
+# the output. Both of the sessions that declared `#581` twice that evening read
+# the resulting warning and skimmed it, independently, and each said so.
+#
+# So legacy misses are still COUNTED and still reportable, but they are
+# collapsed to one line and do not gate the exit code. A miss in the CURRENT
+# era -- where every item is a header and the tool can genuinely see it -- is
+# reported in full and does gate. Nothing is suppressed; the two populations are
+# separated so a real finding is not delivered in the same breath as twelve
+# known-unmatchable ones.
+_HEADER_ERA_FIRST_ID = 275
 
 # ...but `todo.md` ALSO carries 51 legacy table rows (`| **125** | 🟢 ...`), the
 # pre-header convention where a CLOSED item stayed in the working file under a
@@ -141,6 +173,9 @@ def main() -> int:
                     help="only reconcile ids >= this (e.g. 275 for the header era)")
     ap.add_argument("--no-history", action="store_true",
                     help="skip the git-history pass; check only ids present today")
+    ap.add_argument("--show-legacy", action="store_true",
+                    help=f"list pre-#{_HEADER_ERA_FIRST_ID} misses individually, with the "
+                         "commit that last held each (slow: one git log -S per id)")
     args = ap.parse_args()
 
     todo_text, closed_text = _read(TODO), _read(CLOSED)
@@ -172,20 +207,28 @@ def main() -> int:
         elif recorded_in_todo and is_closed:
             both.append(item_id)
 
+    # SPLIT BY ERA. See `_HEADER_ERA_FIRST_ID`: only the current era is
+    # machine-checkable on both sides, so only it can gate.
+    missing_current = [i for i in missing if i >= _HEADER_ERA_FIRST_ID]
+    missing_legacy = [i for i in missing if i < _HEADER_ERA_FIRST_ID]
+
     report = {
         "ids_reconciled": len(universe),
         "open": sum(1 for i in universe if open_counts.get(i, 0) >= 1),
         "closed": len(closed_ids & universe),
         "missing_from_both": missing,
+        "missing_current_era": missing_current,
+        "missing_legacy": missing_legacy,
         "duplicated_in_todo": duplicated,
         "in_both_files": both,
     }
 
     if args.json:
-        if missing:
-            report["missing_detail"] = {str(i): last_commit_holding(i) for i in missing}
+        detail_for = missing if args.show_legacy else missing_current
+        if detail_for:
+            report["missing_detail"] = {str(i): last_commit_holding(i) for i in detail_for}
         print(json.dumps(report, indent=2, sort_keys=True))
-        return 1 if (missing or duplicated) else 0
+        return 1 if (missing_current or duplicated) else 0
 
     print(f"reconciled {report['ids_reconciled']} ids "
           f"({report['open']} open, {report['closed']} closed)"
@@ -201,15 +244,30 @@ def main() -> int:
         for item_id in both:
             print(f"  #{item_id}")
 
-    if missing:
-        print(f"\nREVIEW -- {len(missing)} id(s) in NEITHER file. Each is either a lost")
-        print("item or an archive entry filed in a shape this tool cannot match:")
-        for item_id in missing:
+    if missing_current:
+        print(f"\nREVIEW -- {len(missing_current)} CURRENT-ERA id(s) in NEITHER file.")
+        print("Every item in this era is a header the tool can see on both sides, so")
+        print("this is a lost item rather than an archive-formatting artifact:")
+        for item_id in missing_current:
             print(f"  #{item_id:<5} last seen: {last_commit_holding(item_id) or '(unknown)'}")
 
-    if not (missing or duplicated or both):
-        print("\nclean -- every id lives in exactly one file")
-    return 1 if (missing or duplicated) else 0
+    if missing_legacy:
+        # ONE LINE, NOT TWELVE. Counted, not hidden -- and the count is the
+        # thing that changes if one is ever genuinely lost.
+        if args.show_legacy:
+            print(f"\nLEGACY -- {len(missing_legacy)} pre-#{_HEADER_ERA_FIRST_ID} id(s) "
+                  "in neither file, archive not machine-checkable for that era:")
+            for item_id in missing_legacy:
+                print(f"  #{item_id:<5} last seen: {last_commit_holding(item_id) or '(unknown)'}")
+        else:
+            ids = ", ".join(f"#{i}" for i in missing_legacy)
+            print(f"\nlegacy (not gating): {len(missing_legacy)} pre-#{_HEADER_ERA_FIRST_ID} "
+                  f"id(s) unmatched -- {ids}")
+            print("  their archive records predate the header format; --show-legacy to expand")
+
+    if not (missing_current or duplicated or both):
+        print("\nclean -- every current-era id lives in exactly one file")
+    return 1 if (missing_current or duplicated) else 0
 
 
 if __name__ == "__main__":
