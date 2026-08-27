@@ -34980,3 +34980,43 @@ template reverted.
 Boot clean, no `server_failed` -- second consecutive clean web boot after
 `48833112` (lane boot-sync-healthcheck-kill), which cut boot sync 72.20s ->
 0.65s. That lane is counting a rate over >=5 deploys; this is sample 2.
+
+## 2026-08-27 21:26:46Z — refresh-worker `05c799a9` — `f4beb1bc` demand MAX-window — **PREDICATE VERIFIED**
+
+Deployed by `venue-quote-line-join`, not by me. Verified here at my user's
+request, on the PREDICATE rather than the deploy state — their own distinction,
+pressed on me earlier the same day and applied back to them.
+
+**`demand` now names mlb, and HOLDS ACROSS THE BUILDS THAT USED TO WIPE IT.**
+
+```
+21:28:03 BUILD date=2026-08-27
+21:40:25 TRIM  demand={'mlb': 400, 'ncaaf': 42, 'nfl': 102, 'soccer': 400, 'wnba': 400}
+21:42:27 BUILD date=2026-08-28   <- future-date
+21:52:17 TRIM  demand={'mlb': 400, ...}          mlb SURVIVED
+21:53:47 BUILD date=2026-08-29   <- future-date
+22:04:26 TRIM  demand={'mlb': 400, ...}          mlb SURVIVED
+22:04:31 BUILD rows=438          <- future-date
+22:15:54 TRIM  demand={'mlb': 400, ...}          mlb SURVIVED
+```
+
+Four consecutive trims naming all five sports, across THREE future-date builds.
+Pre-fix, a 442/842-row board dropped mlb via last-write-wins and the next trim
+read `{'ncaaf': 42, 'soccer': 400}` — observed at 20:25, 20:38, 20:51.
+
+**WHY THIS NEEDED MORE THAN ONE READING.** The vector ALREADY named mlb on
+several pre-deploy cycles (20:03, 20:14, 21:02, 21:11, 21:18) because the
+defect was intermittent — it corrupted only on the cycle following a
+future-date build. So a single good post-deploy sample was consistent with the
+fix AND with catching a good cycle. The discriminating test is a trim that
+FOLLOWS a future-date build, which is what was waited for.
+
+### STILL NOT ESTABLISHED, and it cannot be tonight
+
+Whether demand weighting PREVENTS THE COLLAPSE. Verified at 17:15 CT, inside
+the window where staleness alone already hands MLB the slots — `matched` 221 /
+246 / 222 is consistent with the fix AND with MLB simply being fresh. **The
+discriminating observation is tomorrow 09:00-14:00 CT**, the window that
+produced matched 5-27 today. Sustained 200+ through that window confirms it; a
+spike does not (today's morning carried isolated 146/210/99 inside a 5-27
+band).
