@@ -34119,3 +34119,66 @@ engine path is UNREACHABLE in production while 2026 is active, so a green read
 off this deploy would have confirmed the standalone path twice. It is verified
 at UNIT level only (5 tests) and becomes production-observable when an active
 season has engine rows.
+## 2026-08-27 15:48:20Z — refresh-worker `277062cd` — lane `venue-quote-line-join`
+
+    refresh-worker  277062cd  dep-da85ltqfngtc73bfsj10  live 15:48:20.506Z
+
+Claim `venue-quote-line-join`. Preflight HELD for ~10 min on an in-flight
+`run_mlb_daily_sim_job.py`; the sim FINISHED ON ITS OWN at 15:42:32Z and the
+deploy went out inside the fresh CLEAR window. Nothing killed. The job count
+bounced 5 -> 7 -> 10 -> 2 while waiting, which is worker spawn/reap churn and
+says nothing about progress -- worth knowing before reading it as a trend.
+
+**what:** `offered_overlap_by_sport` -- per sport and source, how many keys it
+offered and how many of those the board ASKED FOR. Shipped INSTEAD of a fix,
+because the question "why does kalshi win no soccer" had two answers needing
+opposite work and no way to choose between them.
+
+**verify: THE DIAGNOSTIC ANSWERED, AND THE ANSWER WAS NOT WHAT IT WAS BUILT FOR.**
+
+1. **KALSHI HAS NO SOCCER QUOTES AT ALL THIS BUILD**, so there was never an
+   overlap to measure:
+
+       'kalshi': {'status': 'no_rows',
+                  'reason': 'no_kalshi_market_classified_to_this_sport',
+                  'quotes': 0, 'age_seconds': 1250}
+
+   It had **173** at the 15:0xZ build (`h2h_keyed_by_team:149`, age 165s). So
+   its soccer presence is INTERMITTENT, not mis-keyed. A keying fix here would
+   have been a fix against a source that published nothing -- which is exactly
+   what building the counter first was for.
+
+   CANDIDATE ROOT CAUSE, not asserted: `kalshi-line-aware-rungs` has an open,
+   blocked item recording that the outer `MAX_STORED_MARKETS` trim is DATE-BLIND
+   and cuts ~4,800 markets (`cut_total=3940` vs `TICK trimmed=8744`). Soccer
+   being evicted by that fits the intermittency. Needs its own measurement.
+
+2. **THE COUNTER FOUND A DIFFERENT AND LARGER DEFECT: A TOTALS KEY NAMES NO
+   GAME.** Adapter-reported quotes against DISTINCT keys, soccer:
+
+       oddsapi_props   15,378 quotes -> 15,378 keys    1:1
+       oddsapi             88 quotes ->     17 keys    5:1
+       polymarket_us      672 quotes ->      6 keys  112:1
+
+   `mlb|totals|over|8.5` and `soccer|totals|under|1.5` are shared by EVERY game
+   at that number, so 672 polymarket soccer quotes collapse into six and one
+   game's price can stamp another game's row. This is the SAME class as the
+   player-blind prop keys fixed in `ee10093f`, on a different axis, and the same
+   damage: `stamp_candidate_freshness` writes age and source, so a row is
+   stamped fresh on an observation of a different fixture.
+
+   Moneylines and spreads are NOT exposed -- they carry the club
+   (`soccer|h2h|oh leuven`, `soccer|spreads|ca osasuna|0.5`). Totals are, on
+   every sport.
+
+   The props side shows what the fixed shape looks like: 1:1, no collapse.
+
+**Grid:** rows_in=21884 stamped=14550 unstamped=7334.
+**soccer overlap:** `oddsapi_props` 11,777 of 15,378 offered keys are bets the
+board actually holds -- 77%, which is why that source won 12,047 selections.
+
+**NOT FIXED HERE, and named so it is not mistaken for done:** kalshi soccer
+(upstream coverage, not keying) and the totals game-blindness (real, live, and
+larger than the thing this deploy set out to answer).
+
+**Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.
