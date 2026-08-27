@@ -80,11 +80,13 @@ YARDAGE_MARKETS = {
 }
 BINARY_MARKET = ("Anytime TD", "anytime_td")
 
-#: A player with fewer prior games than this is not projected. Two games of
-#: history is a rate with no denominator worth the name, and the live capture
-#: shows 6 of 68 quoted players have no 2025 history at all -- so refusing is
-#: a real branch, not a theoretical one.
-MIN_PRIOR_GAMES = 3
+# THE GRADED CODE IS THE SHIPPED CODE. These constants and the Poisson form
+# below are imported from the module the BOARD uses, not restated here.
+# `learnings.md` records the cost of the alternative: a fixture that took a
+# cheaper path than production failed 80x too fast and read as a good result.
+# If the two ever diverge, the Brier reported here stops describing the number
+# on the board, silently.
+from syndicate.features.ncaaf.prop_model import MIN_PRIOR_GAMES, SHRINK_GAMES
 
 
 def _f(value: Any) -> float:
@@ -188,7 +190,7 @@ def backtest(rows: list[dict[str, str]], *, min_week: int) -> dict[str, Any]:
             # Empirical-Bayes shrink toward the league rate. Weight is the
             # player's own sample: a 3-game rate of 1.00 is not a 100% scorer,
             # and an unshrunk rate would say it is.
-            k = 4.0
+            k = SHRINK_GAMES
             shrunk = (td_by_player[pid] + k * league_td) / (g + k)
             p_model = 1.0 - math.exp(-max(0.0, shrunk))  # Poisson P(>=1)
             p_mean = min(0.99, max(0.01, raw))
@@ -204,7 +206,7 @@ def backtest(rows: list[dict[str, str]], *, min_week: int) -> dict[str, Any]:
                     continue
                 actual = _f(r.get(col))
                 pm = sums[(pid, market)] / g
-                sm = (sums[(pid, market)] + k * league_yard[market]) / (g + k)
+                sm = (sums[(pid, market)] + SHRINK_GAMES * league_yard[market]) / (g + SHRINK_GAMES)
                 yard[market]["model"].append(abs(sm - actual))
                 yard[market]["player_mean"].append(abs(pm - actual))
                 yard[market]["base_rate"].append(abs(league_yard[market] - actual))

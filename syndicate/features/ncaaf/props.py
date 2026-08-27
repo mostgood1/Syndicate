@@ -399,6 +399,28 @@ def build_game_props(
             pick = market
             detail = f"{market} {over_text}".strip()
         book_count = len([book for book in record["books"] if book])
+
+        # THE ONLY MODELLED MARKET, and the restriction is the finding.
+        # Backtested out-of-sample on 2025 (weeks 5-16, fitted on weeks < w):
+        # Anytime TD beats both the player's own mean (Brier 0.18168 vs
+        # 0.21919) and the league base rate (0.19400). Every continuous market
+        # LOSES to the player's own mean, so none of them is projected --
+        # a projection worse than "his average" is worse than a blank column,
+        # because it looks like knowledge.
+        #
+        # `projected` is a PROBABILITY here, not a stat line. `pick_gate.py`
+        # suppresses NCAAF picks default-DENY and states that it "does NOT stop
+        # projections being generated, published, or displayed" -- so a
+        # probability may be shown, and an edge, tier, stake or recommendation
+        # may not, until its LIFT_CONDITION is met on real graded bets.
+        projection = None
+        implied = None
+        if market == "Anytime TD":
+            from syndicate.features.ncaaf import prop_model
+
+            projection = prop_model.anytime_td_probability(record["player"], int(season or 0))
+            implied = prop_model.american_to_probability(record["over_price"])
+
         sides[side].append(
             {
                 "player": record["player"],
@@ -422,6 +444,16 @@ def build_game_props(
                 "book": record["over_book"] or record["under_book"],
                 "detail": detail,
                 "book_count": book_count,
+                # Contract mapping: `_build_prop_rows` reads `projected` via
+                # `_first_present(projected, projection, model_mean)`. A row
+                # with no model leaves it absent rather than 0.0 -- zero is a
+                # probability and would render as one.
+                "projected": (projection or {}).get("probability"),
+                "model_prior_games": (projection or {}).get("prior_games"),
+                # Implied, NOT fair: a one-sided anytime-TD price carries the
+                # book's margin and has no opposing side quoted to de-vig
+                # against, so every comparison here is model-vs-price-with-vig.
+                "market_implied": implied,
             }
         )
 
