@@ -27,11 +27,18 @@
     exact defect that put `.cards-market-sub` on the main card at inherited
     16px. Every class below was checked against that file first.
 
-    TEAM ABBREVIATION LEADS, NOT THE SCHOOL NAME. The generic strip renders
-    `game.away.name` into a narrow box, so the board showed "Sacram ento
-    State", "Easte Michi n" and "North Dakot State". The abbreviation is the
-    scannable token at this size; the full name stays as the secondary line
-    where it can wrap harmlessly. -#}
+    ABBREVIATION ONLY. NO SCHOOL NAME. The generic strip rendered
+    `game.away.name` into a narrow box and the board showed "Sacram ento
+    State", "Easte Michi n" and "North Dakot State".
+
+    My first fix kept the name as a secondary `cards-mini-copy` line, which was
+    WORSE: `dense_cards.css` sets `overflow-wrap: anywhere` on that class, and
+    the team box is 39px wide, so "North Carolina" rendered **1px wide and
+    226px tall** -- one character per line. That alone took the strip card from
+    435px to 633px.
+
+    The strip is for scanning a slate; the full school name is on the card
+    directly below it. -#}
 <section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
   {% if games %}
     <div class="cards-scoreboard-strip">
@@ -50,7 +57,6 @@
               <div class="cards-strip-logo">{{ game.away.abbr }}</div>
               <div>
                 <div class="cards-head-team-name">{{ game.away.abbr }}</div>
-                <div class="cards-mini-copy">{{ game.away.name }}</div>
               </div>
             </div>
             <span class="cards-score-divider">@</span>
@@ -58,7 +64,6 @@
               <div class="cards-strip-logo">{{ game.home.abbr }}</div>
               <div>
                 <div class="cards-head-team-name">{{ game.home.abbr }}</div>
-                <div class="cards-mini-copy">{{ game.home.name }}</div>
               </div>
             </div>
           </div>

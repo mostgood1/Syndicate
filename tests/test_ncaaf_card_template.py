@@ -201,12 +201,23 @@ def test_the_strip_drops_the_prose_that_made_it_435px():
     assert "Projection contract" not in html
 
 
-def test_the_abbreviation_leads_so_long_school_names_stop_wrapping():
-    """Production showed "Sacram ento State" and "Easte Michi n" in a narrow box."""
+def test_the_strip_shows_ABBREVIATIONS_ONLY_never_the_school_name():
+    """MEASURED TWICE, and my first fix made it worse.
+
+    The generic strip put `game.away.name` in a 39px box and the board showed
+    "Sacram ento State" and "Easte Michi n". My first fix kept the name as a
+    secondary `cards-mini-copy` line -- and `dense_cards.css` sets
+    `overflow-wrap: anywhere` on that class, so "North Carolina" rendered
+    **1px wide and 226px tall**, one character per line. The strip card went
+    435px -> 633px.
+
+    A long string has no safe home in this box. The full name is on the card
+    directly below.
+    """
     html = _strip([_strip_game()])
     assert '<div class="cards-head-team-name">SS</div>' in html
-    assert '<div class="cards-head-team-name">Sacramento State</div>' not in html
-    assert "Sacramento State" in html, "the full name should survive as the secondary line"
+    assert "Sacramento State" not in html
+    assert "Eastern Michigan" not in html
 
 
 def test_the_strip_shows_market_and_model_side_by_side():
