@@ -230,3 +230,84 @@ def test_predictions_is_a_TOP_LEVEL_key_of_every_builder_s_returned_game():
                 )
                 checked.add(node.name)
     assert checked == builders, f"never verified the returned dict for: {sorted(builders - checked)}"
+
+
+# ---------------------------------------------------------------------------
+# THE ENGINE PATH. Found by session syndicate-27 while fixing a NameError I
+# introduced in 16673341: two of three builders passed a bare `projection` that
+# they never bind. Their fix (`row.get("projection")`) was right; their question
+# was whether `{}` is the intended end state for those paths.
+#
+# BET ROW: yes. A wager is not a game projection.
+# ENGINE ROW: no. It carries the projection in COLUMNS -- predicted_home_points,
+# predicted_away_points, predicted_total_points, predicted_win_margin,
+# home_win_prob -- just not in the shape the helper reads. It was never a data
+# gap.
+# ---------------------------------------------------------------------------
+
+def _engine_row(**overrides):
+    row = {
+        "predicted_home_points": "31.4",
+        "predicted_away_points": "24.1",
+        "predicted_total_points": "55.5",
+        "predicted_win_margin": "7.3",
+        "home_win_prob": "0.63",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_an_engine_row_publishes_a_real_projection():
+    block = _ncaaf_cards._ncaaf_shared_predictions_block(
+        _ncaaf_cards._engine_row_projection(_engine_row())
+    )
+    assert block["home_mean"] == pytest.approx(31.4)
+    assert block["away_mean"] == pytest.approx(24.1)
+    assert block["margin_mean"] == pytest.approx(7.3)
+    assert block["total_mean"] == pytest.approx(55.5)
+    assert block["probabilities"]["home_win"] == pytest.approx(0.63)
+
+
+def test_the_margin_is_derived_when_the_column_is_absent():
+    row = _engine_row()
+    row.pop("predicted_win_margin")
+    block = _ncaaf_cards._ncaaf_shared_predictions_block(_ncaaf_cards._engine_row_projection(row))
+    assert block["margin_mean"] == pytest.approx(7.3)
+
+
+def test_engine_rows_have_no_dispersion_so_cover_probabilities_stay_none():
+    """A cover probability needs a stdev. Computing one from a fabricated
+    spread would put a number on the board that no model produced."""
+    block = _ncaaf_cards._ncaaf_shared_predictions_block(
+        _ncaaf_cards._engine_row_projection(_engine_row()),
+        market_margin=5.5, market_total=52.5,
+    )
+    assert block["probabilities"]["home_cover"] is None
+    assert block["probabilities"]["total_over"] is None
+
+
+def test_a_row_with_no_prediction_columns_yields_no_projection():
+    assert _ncaaf_cards._engine_row_projection({}) is None
+    assert _ncaaf_cards._ncaaf_shared_predictions_block(None) == {}
+
+
+def test_no_builder_passes_a_name_it_does_not_bind():
+    """THE NameError, pinned. Two of three builders passed a bare `projection`
+    that neither binds, so every call raised. It survived review because all
+    three call sites read identically and one of them really is correct."""
+    import ast as _a
+    tree = _a.parse(Path(_ncaaf_cards.__file__).read_text(encoding="utf-8"))
+    for node in _a.walk(tree):
+        if not (isinstance(node, _a.FunctionDef) and node.name.startswith("_build_")):
+            continue
+        bound = {a.arg for a in node.args.args} | {
+            t.id for n in _a.walk(node) for t in _a.walk(n)
+            if isinstance(t, _a.Name) and isinstance(t.ctx, _a.Store)
+        }
+        for call in (n for n in _a.walk(node) if isinstance(n, _a.Call)):
+            if isinstance(call.func, _a.Name) and call.func.id == "_ncaaf_shared_predictions_block":
+                for arg in call.args:
+                    if isinstance(arg, _a.Name):
+                        assert arg.id in bound, (
+                            f"{node.name} passes unbound name {arg.id!r} -- NameError at runtime"
+                        )

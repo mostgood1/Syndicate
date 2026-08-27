@@ -600,6 +600,57 @@ def _smartsim2_standalone_betting(row: dict[str, Any], projection: Any) -> dict[
     }
 
 
+class _EngineRowProjection:
+    """Duck-typed projection built from a LEGACY ENGINE ROW's own columns.
+
+    WHY THIS EXISTS. `_ncaaf_shared_predictions_block` reads a projection
+    OBJECT, and only `_smartsim2_standalone_rows` puts one on a row (:395).
+    The engine path has no such object -- so after the NameError fix it
+    published `{}` and served a board with no projected spread or total, which
+    is the exact defect the shared-predictions work set out to remove.
+
+    It was never a DATA gap. Legacy engine rows carry
+    `predicted_home_points`, `predicted_away_points`, `predicted_total_points`,
+    `predicted_win_margin` and `home_win_prob` -- the projection was there in
+    columns the whole time, just not in the shape the helper reads.
+
+    Found by session syndicate-27 while fixing a NameError I introduced in
+    16673341. They fixed the crash correctly with `row.get("projection")` and
+    asked whether `{}` was the intended end state for these paths. For the BET
+    row it is -- a wager is not a game projection. For the ENGINE row it was
+    not, and this closes it.
+
+    NO STDEVS, deliberately. Engine rows carry no dispersion, so the cover and
+    over probabilities stay None rather than being computed from a fabricated
+    spread. Absent stays absent.
+    """
+
+    __slots__ = ("home_score_mean", "away_score_mean", "margin_mean", "total_mean",
+                 "margin_stdev", "total_stdev", "home_win_rate")
+
+    def __init__(self, row: dict[str, Any]) -> None:
+        self.home_score_mean = _safe_float(row.get("predicted_home_points"))
+        self.away_score_mean = _safe_float(row.get("predicted_away_points"))
+        self.total_mean = _safe_float(row.get("predicted_total_points"))
+        margin = _safe_float(row.get("predicted_win_margin"))
+        if margin is None and self.home_score_mean is not None and self.away_score_mean is not None:
+            margin = round(self.home_score_mean - self.away_score_mean, 3)
+        self.margin_mean = margin
+        self.margin_stdev = None
+        self.total_stdev = None
+        self.home_win_rate = _safe_float(row.get("home_win_prob") or row.get("home_win_probability"))
+
+
+def _engine_row_projection(row: dict[str, Any]) -> Any:
+    """`None` when the row has no projection at all, so `{}` still results."""
+    if not isinstance(row, dict):
+        return None
+    projection = _EngineRowProjection(row)
+    if projection.home_score_mean is None and projection.total_mean is None:
+        return None
+    return projection
+
+
 def _ncaaf_shared_predictions_block(
     projection: Any,
     *,
@@ -1910,6 +1961,8 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
         # scope. The bare name was a NameError on every call -- see the
         # commit message. Absent yields `{}` from the helper, which is the
         # contract its own docstring states: absent stays absent.
+        # BET ROWS HAVE NO PROJECTION AND SHOULD NOT INVENT ONE -- a wager is
+        # not a game projection, so `{}` is the correct outcome here.
         "predictions": _ncaaf_shared_predictions_block(row.get("projection")),
         "scoreboard_header": scoreboard_header,
         "smartsim_reasons": smartsim_reasons,
@@ -2302,7 +2355,12 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
         # scope. The bare name was a NameError on every call -- see the
         # commit message. Absent yields `{}` from the helper, which is the
         # contract its own docstring states: absent stays absent.
-        "predictions": _ncaaf_shared_predictions_block(row.get("projection")),
+        # ENGINE ROWS CARRY THE PROJECTION IN COLUMNS, not as an object.
+        "predictions": _ncaaf_shared_predictions_block(
+            row.get("projection") or _engine_row_projection(row),
+            market_margin=row.get("market_margin"),
+            market_total=row.get("market_total"),
+        ),
         "ncaaf_card": {
             "version": _NCAAF_CARD_CONTRACT_VERSION,
             "summary": {
