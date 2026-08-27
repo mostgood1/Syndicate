@@ -4436,6 +4436,182 @@ individual line looked normal, including the bad row unless you knew sibling
 ledger summary endpoint. A per-day total is a cheap invariant over a record
 that is otherwise only ever appended to one row at a time.
 
+## 2026-08-27 FORBIDDEN: an instrument built out of the thing it measures, or out of a symptom the slate can retire — FOUR instances in one session, every one reading HEALTHY
+
+- **The belief overturned.** "The measurement discriminates because the numbers
+  moved." They moved in three of four cases *and the instrument was still
+  incapable of reading unhealthy* — a clean bill of health manufactured by the
+  defect itself. Numbers moving is not discrimination; only a CONTROL run that
+  actually reads unhealthy is.
+- **The four, all in `#589`/`#590`/`#591`, all caught only by running the
+  pre-change bytes against the same payload:**
+  1. A duplicate detector that grouped cards by the chip `chipForGame`
+     resolved — the code under test, which returns null for exactly the
+     duplicated cards. Reported **0 duplicates in BOTH states.**
+  2. A metric ("a bare sport label beside a league") needing two labels present
+     at once. The league-labelled rows drained off the board twelve minutes
+     later; the same pre-change template then read a uniform `SOCCER=213`,
+     **flag 0, defect fully intact.**
+  3. A test harness with a hand-copied `chipForGame` stub that had neither the
+     canonical nor the normalized index and keyed on `group.sport` — the field
+     the defect is about. **The new assertions could not have failed against
+     it.**
+  4. A fixture (`celChip`) with no `league_display`, so the property under test
+     could not be expressed. This one FAILED loudly instead of passing
+     vacuously, because the assertion was an equality between two computed
+     labels rather than a check for a constant.
+- **The rule going forward.** Derive the instrument from a source the defect
+  CANNOT touch, and state that source. Concretely, all three fixes ended up
+  joining on the slug taken from `group.key` and on `chip.league_display` —
+  fields no code path under test writes. **And run the control on the SAME
+  payload, at the same instant, every time:** a fix verified only against
+  post-deploy data is verified against a slate that may have retired the test
+  case. This is the 2026-08-20 census rule (`A CENSUS THAT CANNOT READ UNHEALTHY
+  IS NOT A VERIFICATION`) generalised from "the slate moved" to "the instrument
+  was never able".
+- **The cheap test, worth applying before any verification is banked:** *if the
+  fix were reverted right now, would this reading change?* If it needs the
+  world to cooperate — a particular row family present, two labels coexisting —
+  it is not a verification, it is a coincidence. Pair every "0 bad" count with a
+  "N actually checked" count; `#591`'s `rows that JOIN a league-carrying chip:
+  496` is the shape, and it was the first guard this session built BEFORE
+  measuring rather than after being burned.
+- *(evidence: `.syndicate/log/2026-08-27.md`, the `#589`/`#590`/`#591` entries
+  and the 20:5xZ checkpoint)*
+
+## 2026-08-27 — A SINGLE OBSERVATION READ AS A BOUND `[lane venue-quote-line-join]`
+
+**FORBIDDEN: concluding "supply-limited" from one reading where a quantity sat
+below its cap.** I saw mlb take 1,512 slots against a cap of 1,550, concluded
+its Kalshi listings were the constraint, and wrote it into `deploys.md` as the
+finding. mlb went **794 -> 1,741 across the same evening** — its available
+markets GREW as its slate approached first pitch. 1,512 was a moment, not a
+ceiling.
+
+`matched` tracks mlb's slot count almost exactly (794/27, 1620/208, 1741/218,
+1706/221), so ALLOCATION was the binding constraint all along — the opposite of
+what I recorded.
+
+**THE TELL I HAD AND IGNORED:** two hours earlier in the same file I refused to
+read one build's `matched` as a trend. I applied that discipline to the number
+I was suspicious of and not to the one that supported a conclusion I had
+already reached. A bound needs a series; one point below a cap is consistent
+with supply, with timing, and with the cap simply not binding yet.
+
+**WHAT STILL HELD, and why the correction is not a full retraction:** the demand
+PATH did not execute for the recovery (`demand=None` in the trim's own line),
+so the change was still not what fixed it. Deployed is not executed — that half
+survived because it was checked against a predicate rather than a deploy
+timestamp.
+## 2026-08-27 — A CONTROL THAT IS BROKEN IN THE SAME WAY AS THE TREATMENT DISTINGUISHES NOTHING. I ran one and reported the result as positive.
+
+I reported 5 failing tests in `tests/test_polymarket_board_join.py` as
+"pre-existing, not mine". **There were none — 53 passed in the primary tree.**
+
+They failed only in my session worktree, which excludes `data/` by design, and
+those tests resolve soccer clubs through an alias map BUILT FROM `data/`
+artifacts. Already a standing rule (2026-08-21, `978963b5`).
+
+**THE METHOD ERROR IS THE POINT, NOT THE STALE RULE.** I "verified" by
+stashing my diff and re-running. **Stashing does not restore `data/`.** Both
+arms of the comparison were missing the same thing, so the experiment could
+only ever return "same either way". That proved the failures were not caused
+by MY DIFF; it could not prove they were REAL. I collapsed two different
+claims and reported the weaker result as the stronger one.
+
+**THE GENERAL FORM:** before trusting an A/B, ask what the control still
+shares with the treatment. If the suspected cause is present in BOTH arms, a
+null result is not evidence of anything. Same family as the `sports=8` board
+that "passed" while the guard never fired — which I DID catch, two hours
+earlier, in the same session. Recognising a shape once does not install it.
+
+**AND: I ATTRIBUTED THE FAILURES TO A COMMIT ON TOPIC ADJACENCY.** `git log -8
+--format='%an'` returns `github-actions[bot]` eight times — authorship
+distinguishes NOTHING in this repo — so I had no basis whatever. When the
+attribution was challenged I removed it rather than reassigning it to another
+guess.
+
+## 2026-08-27 — I CHECKED ANCESTRY AND CALLED IT CAUSATION. The fix's own log line said the path never ran.
+
+`[kalshi_odds] BOARD_JOIN matched` recovered from 5-24 to 208-221. I verified
+`bd81ba3c` (demand-weighted trim) was an ancestor of the live SHA and reported
+that the trim had fixed it — to my user, to the ledger, and to the lane that
+wrote it.
+
+**The trim's own line, at the moment of the recovery, reads:**
+
+```
+19:49:44  TRIM_BY_SPORT ... demand=None  mlb_slots=1620     <- matched=208
+```
+
+`_sport_slot_caps` returns None with no demand signal and the trim falls back
+to the FLAT-FLOOR branch. The code was DEPLOYED AND NOT EXECUTED. Caught by
+`venue-quote-line-join`, whose fix it was — they declined credit for it.
+
+**"IS THE COMMIT IN THE LIVE SHA" AND "DID THE CODE RUN" ARE DIFFERENT
+QUESTIONS, AND ONLY THE SECOND IS EVIDENCE.** Ancestry is necessary and never
+sufficient. This repo already has the rule — *"test the fix's predicate, not
+its deploy state"* — and a discriminating field was being PRINTED on the same
+line as the outcome I was reading. I read `kept_by_sport` off that line and
+did not read `demand=` two fields earlier.
+
+**THE REAL CAUSE MATTERED, WHICH IS WHY THIS WAS NOT A HARMLESS
+MIS-CREDIT.** MLB's slate approaching first pitch made its markets the
+freshest in the catalogue, and the staleness-ordered remainder pass handed
+them the slots — staleness accidentally doing what demand weighting does
+deliberately. That mechanism is DIURNAL, so **the collapse is expected to
+RECUR TOMORROW MORNING** — corrected from "afternoon", which was wrong.
+MAPPED TO CENTRAL, today's collapse was MORNING/MIDDAY and the recovery came
+in the AFTERNOON: 09:19-13:57 CT matched 5-27 (spiking 146/210/99), then
+14:49 CT matched=208, 15:25 218, 15:51 221. So the bad window is roughly
+09:00-14:00 CT, when far-dated football is fresh and MLB is not.
+Believing it was already fixed would have meant not deploying the thing that
+actually prevents recurrence.
+
+**A "verified fixed" that names the wrong cause predicts the wrong future.**
+
+Third instance in one session of the same family: a `sports=8` board that
+passed while the guard never fired (caught), a stash control that could not
+restore `data/` (missed), and this (missed). Recognising the shape once does
+not install it.
+## 2026-08-27 — A WATCHER IS AN INSTRUMENT AND IT LIES IN FOUR SPECIFIC WAYS
+
+Five verification failures in one session, each producing output that looked
+like a result. None was caught by the watcher; all four were caught by reading
+the payload instead of the exit code.
+
+1. **Floored on `createdAt`, not `finishedAt`.** A join tick 69s after the
+   deploy was CREATED ran the OLD commit and returned the baseline. I nearly
+   reported my own change dead on evidence that never touched it. **A deploy
+   timestamp marks when you ASKED; only `finishedAt` marks when the code ran.**
+
+2. **Matched a shared word.** `"calibration" in message.lower()` fired on
+   `[INTEL_TRACE] {"event": "evaluation_reliability_profile"}` — a different
+   subsystem. The watcher exited 0 claiming success. **Match on the tokens the
+   EMITTER writes, not on the topic.**
+
+3. **The re-arm silently didn't apply.** A patch script opened a POSIX path
+   under Windows Python, raised `FileNotFoundError`, and the next line in the
+   same chain ran the UNPATCHED watcher — reproducing the identical bad reading.
+   **A failed edit followed by a successful run of old code is indistinguishable
+   from a successful re-arm.**
+
+4. **Sampled with the function under test.** Measuring recovery from the `lal`
+   bucket returned 0% BY CONSTRUCTION, because that bucket holds exactly the
+   rows the function failed to fold. **If the grouping is produced by the thing
+   you are testing, the sample is already biased.**
+
+5. **A null with no denominator.** `matched 55 -> 59` read as a fix working;
+   the metric swings 48-59 on its own and `58` predated the deploy. **Establish
+   variance before attributing a delta.**
+
+**The general rule:** an absence proves something only once you have shown the
+emitter RAN. Every watcher should count something adjacent that must be non-zero
+— `POLYMARKET_CATALOGUE 0` means nothing until `US_AUTH 1` proves the boot
+happened, and `no calibration line` means nothing until you count the
+projections-process lines. Build the discriminator into the watcher, not into
+the interpretation afterwards.
+
 ## 2026-08-27 FORBIDDEN: calling a fix verified when the READING came from a different surface than the one that was broken
 
 Session de363735, lane `ncaaf-opener-regions-props`. Shipped `94d6b6e6` to put

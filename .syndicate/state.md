@@ -2417,6 +2417,10 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
 
 ## [ui-board-cards] UI / BOARD CARDS
 
+- **THE GAMES RAIL AND THE BOARD CARD JOIN ON `sport_slug`, NEVER ON `sport` — and the LABEL comes from the chip's league `[verified in production 2026-08-27, web `78a95c7f` / `0e964af8` / `fb9261b8`, `#589`/`#590`/`#591`]`.** Two fields, and they are not interchangeable: `sport_slug` is the SLUG, `sport` is a DISPLAY string that for soccer's steam, prop and `#162` game-candidate paths is the **LEAGUE** (`"la liga"`). Every chip index in `loadGameChips` is keyed on `chip.sport` == the slug, so keying a lookup on `sport` returns null for a chip that is present — which is how one La Liga game seated two rail cards. `gameKey` had always read `sport_slug || sport`; `chipForGame` and `group.sport` read the same two fields with the OPPOSITE precedence, ten lines apart. **`chip.league_display` is the authoritative label: populated 213/213 on soccer chips across 10 leagues, and NULL on every mlb/nfl/wnba chip** (`game_chip_scoreboard.py:467` says so), so reading it cannot relabel another sport. Measured A/B, control = pre-change served bytes, one payload: 250→248 cards / 2→0 duplicate chips; head labels `SOCCER=213`→ten leagues; subtitles `SOCCER=489 LA LIGA=7`→ten leagues with 496 rows joining a league-carrying chip on both sides.
+- **NO OTHER SPORT CAN HAVE THAT LABEL SPLIT `[code, 2026-08-27 — NOT a production reading for nba/nhl/ncaab]`.** The registry sets `name` to exactly `slug.upper()` for mlb/nba/wnba/nfl/ncaaf/ncaab/nhl (`intelligence.py:113-120`) and soccer's `"Soccer"` matches too, so `sport.get("name")` never diverges; the only override reads `league_display`, and every producer of that field imports `league_display_name` from `features/soccer/sources.py`. Measured 0 divergent rows for mlb/nfl/ncaaf/wnba on two payloads. **NBA, NHL and NCAAB had zero games and zero chips that day — covered by the code argument only.**
+- **`data-syndicate-sport` IS AN IDENTIFIER ON THE MONEY PATH, NOT A CAPTION `[2026-08-27, `#591`; ledger half verified independently by lane `open-bet-live-status`]`.** `bet_slip.js:174` and `watchlist.js:129` read that attribute and `bet_slip.js:254,271` POST it as a bet's `sport` into `prediction_ledger`; **`settle_orders` and the venue resolvers KEY ON `sport`**, so a bet written as `"LA LIGA"` never joins a settlement source and **sits unresolvable forever rather than failing loudly**. It was being fed `item.sport`. Both sites now write the slug uppercased, matching `market_board.js:463,587`. **HAZARD, NOT CORRUPTION — measured twice, two sessions:** `/portfolio` holds `{mlb: 167, wnba: 17, nfl: 7, soccer: 2}` over 193 rows and no league string anywhere. Second time in one day that a UI-side display value turned out to be load-bearing on the execution ledger.
+- **`bet_slip.js`'s POSTed units are CLEAN `[checked 2026-08-27]`:** `odds` is AMERICAN and `/api/portfolio/bets` stores it verbatim via `_coerce_float`; `stake` is dollars; `implied_probability` is a separate ledger field the slip never populates, so there is no odds→probability crossing. **Latent shape, not a live bug, in a file this lane did not own:** `prediction_ledger._coerce_probability` maps `1 < x <= 100` to `x/100`, so a value arriving in the wrong vocabulary INSIDE that band is silently rescaled (American `+50` → `0.50`) while `+150`/`-110` correctly become `None` — loud at the extremes, silent in the middle.
 - **Lane E is CLOSED-VERIFIED in production** (web `aadcde77`, live 21:42:56Z):
   horizontal overflow 28px desktop / 20–40px mobile → **0 at both widths** on
   nfl, ncaaf, soccer, ncaab; NCAAF default tab 0 panels/187px → 1 panel/556px;
@@ -6021,7 +6025,42 @@ Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
   version reached 13.3MB and STOPPED WRITING THE ARTIFACT AT ALL, and
   `venue_daily_odds` keeps the complete record. 6000 is a bounded WORKING SET
   the join prices against, not the record. Nothing is lost by the bound.
-- **THE REAL DEFECT IS THE ALLOCATION, AND IT IS LIVE: the BOARD's Kalshi join
+- **ALLOCATION IS CONFIRMED AS THE BINDING CONSTRAINT, AND TODAY'S RECOVERY WAS
+  NOT THE FIX FOR IT `[2026-08-27 ~21:0xZ, corrected]`.**
+  `[kalshi_odds] BOARD_JOIN matched` went from 5-24 back to **208 / 218 / 221**
+  against a complete-set 235 / 242 — the 6,000 working set now captures ~91% of
+  what the full ~10,560-market catalogue matches, up from ~6%. `matched` tracks
+  MLB's slot count almost exactly (`mlb_slots` 794 -> matched 27; 1620 -> 208;
+  1741 -> 218; 1706 -> 221), which is what establishes allocation as the
+  mechanism.
+  **I FIRST ATTRIBUTED THIS TO `venue-quote-line-join`'s DEMAND-WEIGHTED TRIM
+  (`bd81ba3c`). THAT WAS WRONG AND THEY CORRECTED IT.** The trim's own log line
+  at the moment of recovery reads `TRIM_BY_SPORT ... demand=None mlb_slots=1620`
+  — `_sport_slot_caps` returns None with no demand signal and the trim falls
+  back to the FLAT-FLOOR branch. So the demand code was DEPLOYED AND NOT
+  EXECUTED. I checked ancestry (deploy state) and inferred causation
+  (predicate); the emitted field disproves it. Standing rule "test the fix's
+  predicate, not its deploy state" — I had it available and did not apply it.
+  **WHAT ACTUALLY RECOVERED IT: MLB's slate approaching first pitch.** Its
+  markets churn, become the freshest in the catalogue, and the staleness-ordered
+  remainder pass hands them the slots. Staleness ACCIDENTALLY doing what demand
+  weighting does deliberately.
+  **SO THE COLLAPSE IS EXPECTED TO RECUR TOMORROW MORNING** — corrected from
+  "afternoon", which was wrong. In CENTRAL time today's collapse ran roughly
+  09:00-14:00 CT (matched 5-27, spiking 146/210/99) and the recovery landed at
+  14:49 CT (208 -> 218 -> 221). The bad window is the MORNING.
+  **AND OBSERVING THE RECURRENCE IS NOT A PRECONDITION FOR ANYTHING.** I framed
+  it as one. It would only confirm a prediction; the mechanism is understood
+  (`matched` tracks mlb slot count) and `f4beb1bc` is landed. Turning "I could
+  measure this" into "this must be measured first" is not a reason to carry a
+  known-fixed defect through the window. Demand weighting is what stops the
+  RECURRENCE; it is not what fixed today. Their `f4beb1bc` (per-sport MAX over a
+  6h/12-sample window) additionally fixes `_record_board_demand` overwriting on
+  every join — the alternating 442/842-row future-date builds were dropping mlb
+  from the vector entirely, last-write-wins reading "not mentioned" as "no
+  demand". Landed, undeployed as of this writing.
+  HISTORICAL RECORD OF THE DEFECT FOLLOWS:
+- ~~THE REAL DEFECT IS THE ALLOCATION, AND IT IS LIVE~~: the BOARD's Kalshi join
   lost ~93% of its matches today.** Same ticks, refresh-worker:
   `[kalshi_odds] BOARD_JOIN set=6000 rows=1329 matched=210` at 16:01:42Z, then
   `matched=5` from 16:13:19Z and 13-24 since — while
@@ -6170,6 +6209,28 @@ per-line DISPLAY that truncates. Fetch and slice the field rather than
 concluding the detail is unavailable — the counts and samples that answered
 all of the above were in a line that looked cut off.
 
+## [board-overview-fix-verified] — VERIFIED 2026-08-27, refresh-worker
+
+**A memory refusal now skips MLB alone instead of discarding all eight sports.**
+`6421bf7f`, live since `b8163ef0` 17:02:59Z, still in on `fb9261b8`. Four paired
+readings 18:01-18:58Z: guard fires `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb
+sports_done=0` at headroom 2775-3020MB and the build returns `sports=7` with MLB
+ABSENT and the other seven present. Pre-fix the identical guard line returned
+`sports=0` EIGHTEEN times running. Control: the four non-firing iterations read
+`sports=8` with `mlb:g=7` present, so the gate in front of MLB is not relaxed.
+
+Today's board went from rebuilt every ~7 min at `sports=0` — never actually
+built — to every ~25 min at `sports=7`/`sports=8`. Slower and real.
+
+**THE THROTTLE HALF BOUGHT NOTHING and is recorded as such.** Default 300 ->
+1800s does throttle (future-date builds ~7min -> ~30min) but today's SHARE of
+iterations did not move (5/4/1 over 127 min vs a 9/9 baseline — 50% both ways).
+The `>=4:1` bar I wrote was unreachable: the board window is THREE dates, and
+the overview fix slowed each build 150s -> 534s, so there are fewer builds to
+redistribute. The two changes interact; I did not predict it.
+
+**REMAINING LEVER, no lane:** the 534s overview itself — MLB's
+`build_cards_page_context` running hydrated on the worker — not the throttle.
 ### CFBD IS OUT OF QUOTA UNTIL 1 SEPTEMBER — A MONTH, NOT A WINDOW
 
 Measured 2026-08-27 from the 429 itself: `X-CallLimit-Remaining: 0`,

@@ -119,3 +119,175 @@ def test_no_live_score_is_invented():
     )
     blob = " ".join(str(v) for v in card.values())
     assert "Score:" not in blob
+
+
+# ---------------------------------------------------------------------------
+# THE SERVED BUILDER. Everything above pins the helper and the card. None of it
+# could catch the gap found on production 2026-08-27: the Live/Final/Pregame
+# header split was added to `build_live_lens_page_context` -- the LEGACY
+# FALLBACK -- while `/ncaaf/live-lens` routes to
+# `build_smartsim_live_lens_page_context`. Production served
+# `Games 51 | Season 2026 | Week 1 | Source ...` with no split at all.
+#
+# A module-level test ("does live_lens.py compute phases?") passes in that
+# state. These drive the builder the ROUTE calls, which is the only thing that
+# discriminates.
+# ---------------------------------------------------------------------------
+
+import pytest
+
+
+def _cards_context(games, *, source_kind="smartsim_runtime"):
+    return {
+        "board_contract": {"source_kind": source_kind},
+        "control_value": 1,
+        "date": "2026 Week 1",
+        "games": games,
+        "source_path": "/data/ncaaf_source/smartsim2_projections_2026_wk1.csv",
+        "available_weeks": [1],
+    }
+
+
+def _mixed_slate():
+    return [
+        _game(),
+        _game(),
+        _game(shared_game_state={"live": True, "period": 1, "clock": "10:00"}),
+        _game(shared_game_state={"live": True, "period": 3, "clock": "4:05"}),
+        _game(shared_game_state={"final": True}),
+    ]
+
+
+def _stats(context):
+    return {s["label"]: s["value"] for s in context["header_stats"]}
+
+
+def test_THE_SERVED_BUILDER_CARRIES_THE_PHASE_SPLIT(monkeypatch):
+    """THE REGRESSION. This is the builder `/ncaaf/live-lens` actually calls."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    stats = _stats(ll.build_smartsim_live_lens_page_context(1))
+    assert stats["Live"] == "2"
+    assert stats["Final"] == "1"
+    assert stats["Pregame"] == "2"
+    assert stats["Games"] == "5"
+
+
+def test_the_split_sits_beside_games_not_after_source(monkeypatch):
+    """Order is the point of a header: what is happening now reads before
+    provenance. MLB leads Games | Live | Final | Pregame."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    labels = [s["label"] for s in ll.build_smartsim_live_lens_page_context(1)["header_stats"]]
+    assert labels.index("Live") == labels.index("Games") + 1
+    assert labels.index("Live") < labels.index("Source")
+
+
+def test_the_counts_track_the_slate_they_are_given(monkeypatch):
+    """A constant would satisfy the test above. Change the slate, change the
+    numbers -- otherwise this pins a hardcoded string."""
+    monkeypatch.setattr(
+        ll, "build_smartsim_cards_page_context",
+        lambda w: _cards_context([_game(shared_game_state={"final": True}) for _ in range(3)]),
+    )
+    stats = _stats(ll.build_smartsim_live_lens_page_context(1))
+    assert (stats["Live"], stats["Final"], stats["Pregame"]) == ("0", "3", "0")
+
+
+def test_an_all_pregame_slate_reads_zero_not_blank(monkeypatch):
+    """Today's real state, 2 days out. "0" is a reading; "" is a broken stat."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context([_game(), _game()]))
+    stats = _stats(ll.build_smartsim_live_lens_page_context(1))
+    assert (stats["Live"], stats["Final"], stats["Pregame"]) == ("0", "0", "2")
+
+
+def test_the_legacy_fallback_keeps_its_split_too(monkeypatch):
+    """The fallback still serves when the runtime path is unavailable, so the
+    split must not have MOVED from one builder to the other."""
+    monkeypatch.setattr(ll, "build_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    stats = _stats(ll.build_live_lens_page_context(1))
+    assert (stats["Live"], stats["Final"], stats["Pregame"]) == ("2", "1", "2")
+
+
+def test_a_non_runtime_board_still_falls_back(monkeypatch):
+    """Guard the dispatch this whole gap turned on: a non-smartsim board must
+    still reach the legacy builder, split and all."""
+    monkeypatch.setattr(
+        ll, "build_smartsim_cards_page_context",
+        lambda w: _cards_context(_mixed_slate(), source_kind="artifact"),
+    )
+    monkeypatch.setattr(ll, "build_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    context = ll.build_smartsim_live_lens_page_context(1)
+    assert "Cards-backed lens" in str(context.get("warning_panel", {}).get("eyebrow", "")), "did not fall back"
+    assert _stats(context)["Live"] == "2"
+
+
+# ---------------------------------------------------------------------------
+# WHAT THE PAGE ACTUALLY RENDERS. The block above shipped and was verified on
+# /ncaaf/api/live-lens -- correctly. It changed the PAGE not at all.
+#
+#   shared/rank_board.html renders `summary_panel.summary_stats`.
+#   It never references `header_stats`, which reaches the API payload only.
+#   This route passed NO summary_panel, so the split had nowhere to render.
+#
+# Measured 2026-08-27: after the deploy the API carried
+# Games 51 | Live 0 | Final 0 | Pregame 51, while GET /ncaaf/live-lens came
+# back byte-identical to the pre-deploy fetch -- 108,486 bytes both times.
+# An API-shaped assertion cannot see that. These pin the render path.
+# ---------------------------------------------------------------------------
+
+
+def _panel_stats(context):
+    return {s["label"]: s["value"] for s in context["summary_panel"]["summary_stats"]}
+
+
+def test_THE_RENDERED_PANEL_CARRIES_THE_SPLIT(monkeypatch):
+    """THE SECOND REGRESSION. summary_panel is what reaches the template."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    context = ll.build_smartsim_live_lens_page_context(1)
+    assert context.get("summary_panel"), "no summary_panel -- the template renders nothing"
+    stats = _panel_stats(context)
+    assert (stats["Live"], stats["Final"], stats["Pregame"]) == ("2", "1", "2")
+
+
+def test_the_panel_and_the_api_cannot_disagree(monkeypatch):
+    """One list feeds both, so the page and the payload can never drift."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    context = ll.build_smartsim_live_lens_page_context(1)
+    assert context["summary_panel"]["summary_stats"] == context["header_stats"]
+
+
+def test_the_fallback_renders_the_split_too(monkeypatch):
+    monkeypatch.setattr(ll, "build_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    stats = _panel_stats(ll.build_live_lens_page_context(1))
+    assert (stats["Live"], stats["Final"], stats["Pregame"]) == ("2", "1", "2")
+
+
+def test_the_panel_body_states_the_split_in_words(monkeypatch):
+    """The pills are the reading; the body is what survives a narrow viewport."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    body = ll.build_smartsim_live_lens_page_context(1)["summary_panel"]["body"]
+    assert "2 live" in body and "1 final" in body and "2 pregame" in body
+
+
+def test_the_warning_panel_no_longer_repeats_the_counts(monkeypatch):
+    """Season/Week/Games moved into the pills. Leaving them in both places
+    renders the same three numbers twice, stacked."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    wp = ll.build_smartsim_live_lens_page_context(1).get("warning_panel") or {}
+    assert not wp.get("list_items"), f"warning panel still lists {wp.get('list_items')}"
+
+
+def test_the_template_prefers_summary_stats_over_header_stats():
+    """REVISITED, as the previous version of this test said it should be.
+
+    It used to assert `header_stats` appeared NOWHERE in rank_board.html --
+    true when written, and the reason 14 other routes rendered no slate stats
+    at all. The template now falls back to `header_stats` when a builder
+    supplies no summary_panel (see tests/test_rank_board_header_stats.py).
+
+    What still matters HERE is the precedence: this route supplies BOTH, and
+    must render the panel once, not both branches. The fallback lives behind
+    `elif`, so this is a structural check that it stays there."""
+    tpl = (REPO_ROOT / "syndicate" / "templates" / "shared" / "rank_board.html").read_text(encoding="utf-8")
+    assert "summary_panel.summary_stats" in tpl
+    assert "elif header_stats" in tpl, "the fallback must remain an elif, or both branches render"
+    assert tpl.index("summary_panel.summary_stats") < tpl.index("elif header_stats")

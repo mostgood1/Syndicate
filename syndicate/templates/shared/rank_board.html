@@ -22,6 +22,30 @@
     {% with eyebrow=summary_panel.eyebrow, title=summary_panel.title, body=summary_panel.body, list_items=summary_panel.list_items, summary_stats=summary_panel.summary_stats, table_groups=summary_panel.table_groups %}
       {% include 'shared/_content_panel.html' %}
     {% endwith %}
+  {%- elif header_stats %}
+    {#- `header_stats` is a REQUIRED argument of build_rank_page_context: all 31
+        call sites must compute it, and until 2026-08-27 this template read it
+        nowhere, so on every route rendered here it was computed and discarded.
+        Measured that day across the 21 reachable rank_board routes: 14 had a
+        full board of cards and rendered no slate stats at all, while 11
+        sport-specific templates DID loop over header_stats -- which is why a
+        mandatory-but-ignored argument never looked wrong.
+
+        A builder that supplies its own summary_panel keeps full control and is
+        untouched by this branch; this is the fallback for the ones that do not.
+        Rendered as a bare strip rather than through _content_panel.html on
+        purpose: that partial emits <h3> and <p> unconditionally, and these
+        routes have no title or body to put in them. -#}
+    <div class="hub-content-panel mlb-surface-panel">
+      <div class="feature-summary-strip">
+        {% for stat in header_stats %}
+          <div class="feature-summary-pill">
+            <div class="feature-summary-pill__label">{{ stat.label }}</div>
+            <div class="feature-summary-pill__value">{{ stat.value }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
   {% endif %}
 
   {% if focus_panel %}

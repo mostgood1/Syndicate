@@ -119,3 +119,51 @@ def test_the_repair_is_idempotent(ledger):
     ledger(orders)
     assert EL.repair_odds_unit_stakes()["repaired"] == 1
     assert EL.repair_odds_unit_stakes()["repaired"] == 0
+
+
+# ---------------------------------------------------------------------------
+# The repair must never touch the paper book
+# ---------------------------------------------------------------------------
+
+
+def test_a_paper_row_is_never_repaired_even_with_contracts(ledger):
+    """The hazard this bound closes, and it is about the FUTURE not today.
+
+    `place_order` stamps a paper fill as `fill_price=requested_price` (AMERICAN
+    ODDS) and `fill_stake_dollars=requested_stake_dollars` (real dollars). The
+    stake is correct and was never derived from the price, so there is nothing
+    to fix.
+
+    Today such rows are skipped anyway because `complete_order` takes no
+    `contracts` argument and paper rows carry none -- an ACCIDENT of the current
+    signature, not a guarantee. This test fixes the guarantee: a paper row that
+    somehow HAS contracts must still be left alone, because repairing it would
+    replace a correct requested stake with a derived one and rewrite the paper
+    book that exists to be evidence about the live one.
+    """
+    orders = [{"mode": "paper", "venue": "kalshi", "status": "filled",
+               "fill_price": 104.0, "contracts": 3.34, "fill_stake_dollars": 1.64}]
+    ledger(orders)
+    out = EL.repair_odds_unit_stakes()
+    assert out["repaired"] == 0
+    assert out["skipped_not_live"] == 1
+    assert orders[0]["fill_stake_dollars"] == 1.64
+    assert orders[0]["fill_price"] == 104.0
+    assert "fill_stake_dollars_before_repair" not in orders[0]
+
+
+def test_paper_rows_do_not_inflate_the_ambiguous_counter(ledger):
+    """`skipped_ambiguous` must mean "could not convert", not "was paper".
+
+    832 paper rows landed in that counter on the first production run, which
+    made a benign number look like a diagnostic finding.
+    """
+    ledger([
+        {"mode": "paper", "venue": "kalshi", "status": "filled",
+         "fill_price": 104.0, "contracts": None, "fill_stake_dollars": 1.64},
+        {"mode": "live", "venue": "kalshi", "status": "filled",
+         "fill_price": 42.0, "contracts": 2.0, "fill_stake_dollars": 84.0},
+    ])
+    out = EL.repair_odds_unit_stakes()
+    assert out["skipped_not_live"] == 1
+    assert out["skipped_ambiguous"] == 1

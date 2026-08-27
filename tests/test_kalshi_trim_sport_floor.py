@@ -239,3 +239,80 @@ def test_demand_actually_changes_what_is_kept(small_budget, sport_map):
     # Weighted: the sport the board actually asks for does.
     assert by_weighted["soccer"] > by_weighted["ncaaf"], by_weighted
     assert len(flat) == len(weighted) == 1000, "budget was not filled either way"
+
+
+# ---------------------------------------------------------------------------
+# demand STABILITY -- the defect the first cut shipped
+# ---------------------------------------------------------------------------
+
+
+def _demand_state(monkeypatch, tmp_path):
+    """Capture what `_record_board_demand` persists, without a real store."""
+    store = {}
+
+    def _read(_path):
+        return dict(store)
+
+    def _write(_path, payload):
+        store.clear()
+        store.update(payload)
+
+    import syndicate.features.shared.refresh_state_store as rss
+    monkeypatch.setattr(rss, "read_json_file", _read, raising=False)
+    monkeypatch.setattr(rss, "write_json_file", _write, raising=False)
+    monkeypatch.setattr(mod, "markets_artifact_path", lambda: tmp_path / "kalshi_markets.json")
+    return store
+
+
+def test_a_partial_board_does_NOT_erase_a_sport_it_never_mentioned(monkeypatch, tmp_path):
+    """THE DEFECT, measured in production within two cycles of shipping:
+
+        20:14:31Z demand={mlb: 400, ncaaf: 42, nfl: 102, soccer: 400, wnba: 400}
+        20:25:54Z demand={ncaaf: 42, soccer: 400}      <- 442-row future-date build
+                  kept_by_sport={... wnba: 300}        <- back to the bare floor
+
+    A board that does not MENTION a sport is not evidence the sport has no
+    demand. Last-write-wins read it as exactly that, and WNBA lost 234 slots on
+    a build that was never about WNBA.
+    """
+    store = _demand_state(monkeypatch, tmp_path)
+
+    mod._record_board_demand([{"sport": "mlb"}] * 400 + [{"sport": "wnba"}] * 400)
+    mod._record_board_demand([{"sport": "soccer"}] * 400)  # the partial build
+
+    assert store["board_demand"]["wnba"] == 400, store["board_demand"]
+    assert store["board_demand"]["soccer"] == 400
+    assert store["board_demand"]["mlb"] == 400
+
+
+def test_demand_takes_the_MAX_not_the_latest(monkeypatch, tmp_path):
+    store = _demand_state(monkeypatch, tmp_path)
+
+    mod._record_board_demand([{"sport": "mlb"}] * 400)
+    mod._record_board_demand([{"sport": "mlb"}] * 12)
+
+    assert store["board_demand"]["mlb"] == 400
+
+
+def test_demand_DECAYS_out_of_the_window(monkeypatch, tmp_path):
+    """Max-over-window must not become hold-forever: a sport whose slate ends
+    has to lose its slots, or the fix trades one starvation for another."""
+    store = _demand_state(monkeypatch, tmp_path)
+
+    mod._record_board_demand([{"sport": "ncaab"}] * 400)
+    # Age that sample past the window, then record a board without it.
+    for sample in store["board_demand_samples"]:
+        sample["at"] -= mod._DEMAND_WINDOW_SECONDS + 60
+    mod._record_board_demand([{"sport": "mlb"}] * 400)
+
+    assert "ncaab" not in store["board_demand"], store["board_demand"]
+    assert store["board_demand"]["mlb"] == 400
+
+
+def test_samples_are_bounded(monkeypatch, tmp_path):
+    store = _demand_state(monkeypatch, tmp_path)
+
+    for _ in range(mod._DEMAND_SAMPLE_LIMIT + 8):
+        mod._record_board_demand([{"sport": "mlb"}] * 5)
+
+    assert len(store["board_demand_samples"]) == mod._DEMAND_SAMPLE_LIMIT

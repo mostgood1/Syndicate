@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import datetime
 import os
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,6 +56,267 @@ class BootstrapDataRootTests(unittest.TestCase):
     # compares equal and is skipped, while a file the PIPELINE has since
     # rewritten has a new size and mtime, compares unequal, and gets clobbered --
     # precisely the file that must not be.)
+
+    # --- compare DEPTH follows the policy (2026-08-27) -------------------
+    #
+    # These three are one set and must be read together. The first proves the
+    # byte read is GONE on a seed-only root, the second proves it is still
+    # REACHABLE there when the stat signature differs, and the third proves it
+    # is still EXACT on an overwrite root -- the only place the shallow
+    # signature can diverge from the bytes and change what happens to a file.
+    #
+    # Without the first, the fix could be inert and every other test would still
+    # pass: `shallow=False` -> `shallow=True` produces identical RESULTS on a
+    # seed-only root by construction, because the outcome there is "leave the
+    # file alone" either way. Only the cost changes, so only a test that
+    # observes the cost can fail if the change is reverted.
+
+    @staticmethod
+    def _counting_do_cmp():
+        """Wrap `filecmp._do_cmp` so a test can count actual byte reads.
+
+        `filecmp.cmp` memoizes on (path, path, sig, sig), so the cache must be
+        cleared or a second call returns the first call's answer WITHOUT
+        reaching `_do_cmp` -- which would make any of these tests pass for the
+        wrong reason.
+        """
+        import filecmp as _fc
+
+        calls: list[tuple[str, str]] = []
+        real = _fc._do_cmp
+
+        def counting(f1, f2):
+            calls.append((str(f1), str(f2)))
+            return real(f1, f2)
+
+        _fc.clear_cache()
+        return _fc, real, counting, calls
+
+    def test_seed_only_sync_reads_no_file_bytes(self) -> None:
+        # THE REACHABILITY TEST. 33,349 of 33,392 files took this path on the
+        # measured production boot; each one cost two opens and a full read of
+        # both sides purely to choose a counter label.
+        module = _load_module()
+        fc, real, counting, calls = self._counting_do_cmp()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src_root, dst_root = Path(src_dir), Path(dst_dir)
+            (src_root / "mlb_source").mkdir(parents=True)
+            (dst_root / "mlb_source").mkdir(parents=True)
+            for i in range(12):
+                f = src_root / "mlb_source" / f"a{i}.json"
+                f.write_text(f"payload-{i} " * 50, encoding="utf-8")
+                # Seed the destination exactly as a previous boot would have.
+                shutil.copy2(f, dst_root / "mlb_source" / f"a{i}.json")
+
+            counters: dict = {}
+            with patch.object(fc, "_do_cmp", counting):
+                module._sync_tree(
+                    src_root / "mlb_source", dst_root / "mlb_source",
+                    counters, "mlb_source", overwrite_existing=False,
+                )
+
+            self.assertEqual(counters["mlb_source"].get("unchanged"), 12)
+            self.assertEqual(counters["mlb_source"].get("copied"), None)
+            self.assertEqual(
+                calls, [],
+                f"seed-only sync read file bytes {len(calls)} time(s); the "
+                f"compare decides only a counter label on this policy",
+            )
+
+    def test_seed_only_still_byte_compares_when_signature_differs(self) -> None:
+        # The deep path must remain REACHABLE, or `kept` silently becomes
+        # `unchanged` and the "NEWER-OR-DIFFERENT" summary line stops meaning
+        # anything. Same size, different mtime, different bytes -> the stat
+        # signature cannot settle it, so the bytes must be read.
+        module = _load_module()
+        fc, real, counting, calls = self._counting_do_cmp()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src_root, dst_root = Path(src_dir), Path(dst_dir)
+            src_root.mkdir(exist_ok=True)
+            src = src_root / "live.json"
+            dst = dst_root / "live.json"
+            src.write_text("AAAA", encoding="utf-8")
+            dst.write_text("BBBB", encoding="utf-8")          # same SIZE
+            os.utime(src, (1_700_000_000, 1_700_000_000))
+            os.utime(dst, (1_700_000_500, 1_700_000_500))     # different mtime
+
+            with patch.object(fc, "_do_cmp", counting):
+                outcome = module._copy_file_if_needed(src, dst, overwrite_existing=False)
+
+            self.assertEqual(outcome, "kept")
+            self.assertEqual(len(calls), 1, "the byte compare was not reached")
+            self.assertEqual(dst.read_text(encoding="utf-8"), "BBBB")
+
+    def test_overwrite_root_still_deep_compares_identical_signatures(self) -> None:
+        # THE FIXTURE THAT CAN VIOLATE THE RULE. Same size AND same mtime but
+        # DIFFERENT bytes is the one case where the shallow signature disagrees
+        # with the content. On a seed-only root that cannot change what happens
+        # to the file; on an OVERWRITE root it decides whether a stale vendored
+        # copy stays on the disk. If someone "simplifies" the compare depth to a
+        # constant `shallow=True`, this is the test that fails.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src = Path(src_dir) / "vendored.py"
+            dst = Path(dst_dir) / "vendored.py"
+            src.write_text("NEW!", encoding="utf-8")
+            dst.write_text("OLD!", encoding="utf-8")          # same size
+            stamp = 1_700_000_000
+            os.utime(src, (stamp, stamp))
+            os.utime(dst, (stamp, stamp))                     # same mtime
+
+            import filecmp as _fc
+            _fc.clear_cache()
+            self.assertTrue(
+                _fc.cmp(src, dst, shallow=True),
+                "fixture is not exercising the divergence: shallow must call "
+                "these identical for this test to mean anything",
+            )
+            _fc.clear_cache()
+
+            outcome = module._copy_file_if_needed(src, dst, overwrite_existing=True)
+
+            self.assertEqual(outcome, "copied")
+            self.assertEqual(dst.read_text(encoding="utf-8"), "NEW!")
+
+    # --- the cheap boot path (2026-08-27) --------------------------------
+    #
+    # `classify_existing=False` skips the per-file stat entirely and decides
+    # from the destination directory's NAME SET. The risk it introduces is not
+    # a wrong counter -- it is a MISSED SEED: a checkout file that never
+    # reaches the disk, silently, because a name diff got it wrong. The first
+    # test below is that guarantee and it is the one that matters.
+
+    def test_cheap_sync_still_seeds_every_missing_file(self) -> None:
+        # THE CORRECTNESS GUARANTEE. Nested dirs, a dir that does not exist at
+        # the destination at all, and a sibling that is already seeded -- the
+        # cheap path must still place every source file.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src, dst = Path(src_dir), Path(dst_dir)
+            (src / "a" / "deep").mkdir(parents=True)
+            (src / "b").mkdir()
+            (src / "a" / "deep" / "one.json").write_text("1", encoding="utf-8")
+            (src / "a" / "two.json").write_text("2", encoding="utf-8")
+            (src / "b" / "three.json").write_text("3", encoding="utf-8")
+            (src / "top.json").write_text("4", encoding="utf-8")
+            # One already seeded; the rest absent, including a whole directory.
+            (dst / "b").mkdir()
+            shutil.copy2(src / "b" / "three.json", dst / "b" / "three.json")
+
+            counters: dict = {}
+            module._sync_tree(src, dst, counters, "k", overwrite_existing=False,
+                              classify_existing=False)
+
+            for rel, body in (("a/deep/one.json", "1"), ("a/two.json", "2"),
+                              ("b/three.json", "3"), ("top.json", "4")):
+                target = dst / rel
+                self.assertTrue(target.exists(), f"{rel} was never seeded")
+                self.assertEqual(target.read_text(encoding="utf-8"), body)
+            self.assertEqual(counters["k"].get("copied"), 3)
+            self.assertEqual(counters["k"].get(module.PRESENT), 1)
+
+    def test_cheap_sync_never_reports_unchanged_or_kept(self) -> None:
+        # It inspected no bytes, so it must not use a word that claims it did.
+        # `kept=0` from a run that looked at nothing would assert zero
+        # divergence on evidence never gathered.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src, dst = Path(src_dir), Path(dst_dir)
+            f = src / "live.json"
+            f.write_text("FROM-CHECKOUT", encoding="utf-8")
+            (dst / "live.json").write_text("NEWER-PIPELINE-OUTPUT", encoding="utf-8")
+
+            counters: dict = {}
+            module._sync_tree(src, dst, counters, "k", overwrite_existing=False,
+                              classify_existing=False)
+
+            self.assertEqual(counters["k"], {module.PRESENT: 1})
+            self.assertNotIn("unchanged", counters["k"])
+            self.assertNotIn("kept", counters["k"])
+            # and the live file is still untouched, which is the actual contract
+            self.assertEqual((dst / "live.json").read_text(encoding="utf-8"),
+                             "NEWER-PIPELINE-OUTPUT")
+
+    def test_cheap_sync_costs_no_syscalls_per_existing_file(self) -> None:
+        # THE REACHABILITY TEST, and the reason the change exists. Measured on
+        # Render 2026-08-27: the boot sync ran 59.15s against a 5s health-check
+        # budget, and the cost is per-FILE syscalls, not bytes. If someone
+        # reverts the name-diff to a per-file stat, this fails.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src, dst = Path(src_dir), Path(dst_dir)
+            for i in range(60):
+                (src / f"f{i}.json").write_text(f"body-{i}", encoding="utf-8")
+                shutil.copy2(src / f"f{i}.json", dst / f"f{i}.json")
+
+            calls = {"n": 0}
+            real = os.stat
+
+            def counting(*a, **k):
+                calls["n"] += 1
+                return real(*a, **k)
+
+            counters: dict = {}
+            with patch.object(os, "stat", counting):
+                module._sync_tree(src, dst, counters, "k", overwrite_existing=False,
+                                  classify_existing=False)
+
+            self.assertEqual(counters["k"].get(module.PRESENT), 60)
+            self.assertLess(
+                calls["n"], 10,
+                f"cheap sync made {calls['n']} os.stat calls for 60 already-present "
+                f"files; the destination NAME SET is supposed to answer this",
+            )
+
+    def test_ops_default_still_classifies_and_reports_kept(self) -> None:
+        # `syndicate/blueprints/ops.py` calls `_sync_bootstrap_roots` with the
+        # DEFAULT and reads `kept`. That call site is held by another lane and
+        # was deliberately not edited, so the default must keep working.
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src, dst = Path(src_dir), Path(dst_dir)
+            (src / "same.json").write_text("AAAA", encoding="utf-8")
+            (src / "diverged.json").write_text("AAAA", encoding="utf-8")
+            shutil.copy2(src / "same.json", dst / "same.json")
+            (dst / "diverged.json").write_text("BBBB", encoding="utf-8")
+            os.utime(dst / "diverged.json", (1_700_000_500, 1_700_000_500))
+
+            counters: dict = {}
+            module._sync_tree(src, dst, counters, "k", overwrite_existing=False)
+
+            self.assertEqual(counters["k"].get("unchanged"), 1)
+            self.assertEqual(counters["k"].get("kept"), 1)
+            self.assertNotIn(module.PRESENT, counters["k"])
+
+    def test_boot_entrypoint_actually_reaches_the_cheap_path(self) -> None:
+        # REACHABILITY, not presence. `_sync_tree` supporting a cheap mode is
+        # worth nothing if `main()` -- the boot caller, and the only one that
+        # holds the container -- does not ask for it. Asserts the kwarg arrives
+        # at `_sync_tree` through the real call chain, not that main() calls
+        # some intermediate with the right argument.
+        module = _load_module()
+        seen: list = []
+
+        def _recording_sync_tree(source, destination, counters, key, **kwargs):
+            seen.append(kwargs)
+            counters.setdefault(key, {})
+
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src_root, dst_root = Path(src_dir), Path(dst_dir)
+            (src_root / "mlb_source").mkdir()
+            with patch.object(
+                module, "_bootstrap_root_pairs",
+                return_value=[(src_root / "mlb_source", dst_root / "mlb_source",
+                               "mlb_source", module.SEED_ONLY)],
+            ), patch.object(module, "_sync_tree", side_effect=_recording_sync_tree),                     patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(dst_root)}, clear=False):
+                module.main()
+
+        self.assertTrue(seen, "main() never reached _sync_tree at all")
+        self.assertEqual(
+            [k.get("classify_existing") for k in seen], [False],
+            "main() reached _sync_tree WITHOUT the cheap path -- the boot sync "
+            "would still pay a per-file stat for a counter it only logs",
+        )
 
     def test_seed_only_root_does_not_overwrite_live_pipeline_output(self) -> None:
         # The real path and the real shape of the 2026-08-20 incident.
@@ -176,10 +438,13 @@ class BootstrapDataRootTests(unittest.TestCase):
 
             real_sync_tree = module._sync_tree
 
-            def _flaky_sync_tree(source, destination, counters, key, *, overwrite_existing):
+            def _flaky_sync_tree(source, destination, counters, key, **kwargs):
+                # **kwargs, not a fixed signature: this double stands in for the
+                # real `_sync_tree`, and pinning its parameter list here made an
+                # unrelated signature change look like a root-isolation failure.
                 if key == "mlb_source":
                     raise OSError("simulated disk failure syncing mlb_source")
-                return real_sync_tree(source, destination, counters, key, overwrite_existing=overwrite_existing)
+                return real_sync_tree(source, destination, counters, key, **kwargs)
 
             with patch.object(
                 module,

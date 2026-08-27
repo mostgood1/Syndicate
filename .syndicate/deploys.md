@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-08-27 — web `fb9261b8`: the board card subtitle names the league, and stops leaking it into the bet slip (`#591`)
+
+**Deployed:** `dep-da89vgfavr4c73esmuqg`, triggered `20:36:17Z`, live
+`20:39:54.779050Z` (web 502'd for ~2 min after, then served 200 at `20:42:05Z`).
+Claim `web` held by `board-card-league-label`, acquired `20:36:0xZ`, token
+`765162…`, released after this row. Preflight `CLEAR` for this exact SHA, on
+`origin/main`, only infrastructure processes.
+
+**THE CLAIM WAS HELD BY ANOTHER LIVE SESSION AND WAS NOT FORCED.**
+`open-bet-live-status` (`syndicate-27`) held it, 19 min in, having deployed
+`e12b5227` at `20:22:53Z`. Messaged rather than forced; they released it and
+confirmed they were mid-flight on live-odds-worker, not web. `fb9261b8` is a
+descendant of `e12b5227`, so their endpoint rode along unchanged — composition,
+not supersession.
+
+**verify: MET `20:4xZ`, A/B on ONE payload against the SERVED bytes.**
+
+```
+                                        soccer board-card subtitles
+SERVED  fb9261b8   EPL=127 LA LIGA=86 SERIE A=82 BUNDESLIGA=62 LIGUE 1=44 MLS=43
+                   CHAMPIONSHIP=18 EREDIVISIE=16 PRIMEIRA LIGA=9 BELGIAN PRO LEAGUE=9
+CONTROL 0e964af8   SOCCER=489  LA LIGA=7                              <-- MIXED
+
+rows joining a league-carrying chip   496 BOTH SIDES
+...of those, still labelled bare      489 -> 0
+mlb 322 / ncaaf 42 / nfl 103 / wnba 763   identical both sides
+```
+
+The 496 is the falsification guard, not decoration: the fix works by joining a
+ROW to a chip, so a 0 there would mean it is INERT while "0 bare labels" still
+read clean.
+
+**THE LIVE DOM CANNOT CONFIRM THE SOCCER HALF AND IS NOT BEING CITED AS IF IT
+COULD.** The Soccer tab renders `No opportunities match the current filters` —
+soccer publishes ~0 EV rows by decision (`state.md` decision 7), so zero soccer
+cards reach the board under the current min-edge filter. The DOM read is
+therefore BLIND for exactly the sport under test. What it DOES confirm, on 380
+rendered cards: `data-syndicate-sport` now equals the slug on every one
+(`MLB / slug=mlb`, `NFL / slug=nfl`, `WNBA / slug=wnba`) and non-soccer
+subtitles are unchanged (`MLB=290 NFL=20 WNBA=70`). The replay over the served
+bytes is the verification, because it runs the deployed function over all 496
+league-joining rows rather than only the handful that survive display filters.
+
+**THE SECOND DEFECT WAS INDEPENDENTLY VERIFIED BY THE LANE THAT OWNS THE
+SURFACE, AND IT IS WORSE THAN I SCOPED IT.** `data-syndicate-sport` was fed
+`item.sport` (the LEAGUE on soccer's steam/prop rows); `bet_slip.js:174` reads
+it and `:254,271` POST it as a bet's `sport`. `open-bet-live-status` measured
+`/portfolio` independently: `{mlb: 167, wnba: 17, nfl: 7, soccer: 2}`, **no
+league string on any of 193 rows** — hazard, not corruption, confirmed twice
+from two sessions. Their addition, which I did not know: `settle_orders` and the
+venue resolvers KEY ON `sport`, so a bet recorded as `LA LIGA` would never join
+a settlement source and would **sit unresolvable forever rather than fail
+loudly**. A silent-permanent failure, not a cosmetic one. Second time today a
+UI-side value proved load-bearing on the money path.
+
+**Adjacent check they asked for, done and CLEAN:** `bet_slip.js` posts `odds`
+(American; the route stores it verbatim via `_coerce_float`) and `stake`
+(dollars) — the receiving end expects both in those units, and
+`implied_probability` is a separate field the slip never populates. No unit
+crossing in this path. One observation passed to the owning lane rather than
+fixed here: `prediction_ledger._coerce_probability` maps `1 < x <= 100` to
+`x/100`, so a value arriving in the wrong vocabulary inside that band is
+silently rescaled instead of rejected (an American `+50` would become `0.50`).
+No current caller does that, and `prediction_ledger.py` is held by
+`portfolio-ledger-service-split`.
+
 ## 2026-08-27 — web `0e964af8`: the rail's card-head label is a fact about the GAME now, not about which row arrived first (`#590`)
 
 **Deployed:** `dep-da89f267bikc73c40cdg`, triggered `20:01:12Z`, live
@@ -34518,6 +34584,176 @@ correctness-per-build, the lever is the 534s overview itself (MLB's
 `build_cards_page_context` running hydrated on the worker), not the throttle.
 `todo.md` territory, no lane.
 
+## 2026-08-27 20:2xZ — refresh-worker `7dd4ce07` — demand-weighted trim: **VERIFIED WORKING, AND VERIFIED NOT TO BE THE FIX**
+
+    refresh-worker  7dd4ce07  dep-da892gvavr4c73eqk1tg  live 19:37:16Z
+
+**THE CHAIN WORKS.** Producer and consumer both confirmed:
+
+    19:49:58Z BOARD_DEMAND {'mlb': 400, 'ncaaf': 42, 'nfl': 102, 'soccer': 400, 'wnba': 400}
+    19:49:44Z TRIM_BY_SPORT ... demand=None      <- first trim, flat-floor BY CONSTRUCTION
+    20:03:30Z TRIM_BY_SPORT ... demand={...}     <- consuming it, one cycle later as predicted
+
+The recorded vector independently reproduces what lane
+`board-cycle-overview-throughput` measured separately (they had nfl 88 / ncaaf
+42 against mlb 400 / soccer 400 / wnba 400).
+
+**AND IT IS NOT WHAT FIXED THE COLLAPSE. The bulk of the recovery happened
+BEFORE it ran:**
+
+    19:33:14Z board_rows=1344 matched=27
+    19:49:58Z board_rows=1344 matched=208   <- trim behind it read demand=None
+    20:25:59Z board_rows=1344 matched=218   <- first demand-weighted comparable build
+
+27 -> 208 happened under a FLAT-FLOOR trim -- the same algorithm that ran
+before this deploy. Reading `matched=208` next to my own deploy timestamp would
+have been a clean false attribution; the `demand=None` in my own log line is
+the only thing that prevented it. My change is worth at most the last **+10
+(~5%), on a single observation each**, and even that ran on a DEGRADED demand
+vector (see below). I am not claiming it.
+
+**THE REAL CONSTRAINT IS SUPPLY, NOT ALLOCATION**, and the prediction failing is
+what showed it. Predicted vs actual on the first weighted trim:
+
+    sport   before  predicted  actual
+    ncaaf      800        431    1441
+    nfl       2222        618    1411
+    wnba       402       1550     534
+    soccer     950       1550    1096
+
+Football moved 3,022 -> 2,852. A 170-market shift, not the ~2,000 predicted.
+Cause: the remainder pass fills leftover budget by staleness IGNORING caps, and
+mlb/soccer/wnba could not fill their caps because they only HAVE 1,512/1,096/534
+Kalshi markets. So the cap is not a cap -- it is a first-serve preference, and
+~1,800 slots fell through to exactly the sports the caps existed to limit.
+
+The premise everyone was working from -- mine and the peer's -- was that the
+demanded sports were being STARVED OF SLOTS. They were not. They were taking
+everything they had. The football surplus fills capacity that would otherwise
+sit empty, and displaces nothing. **6,000 slots are not scarce for mlb/soccer/
+wnba on Kalshi; their listings are.**
+
+**Net: the change is NEUTRAL-to-slightly-positive and correctly keyed, and it is
+not the fix for the 93% collapse.** Recorded here so a landed commit does not
+imply a fix it did not deliver. The working set now matches 218 against a
+complete-set ceiling of 210-217, i.e. parity with the entire catalogue -- there
+is no headroom left in allocation to win.
+
+**ONE DEFECT OF MINE FOUND BY THIS VERIFICATION AND FIXED.**
+`_record_board_demand` overwrote on every join, including the alternating
+442/842-row future-date builds:
+
+    20:14:31Z demand={mlb: 400, ncaaf: 42, nfl: 102, soccer: 400, wnba: 400}
+    20:25:54Z demand={ncaaf: 42, soccer: 400}   <- 442-row build
+              kept_by_sport={... wnba: 300}     <- bare floor
+
+A board that does not MENTION a sport is not evidence that the sport has no
+demand. WNBA lost 234 slots on a build that was never about WNBA. Now per-sport
+MAX over a 6h/12-sample window: stable against partial boards, and still decays
+so a finished slate releases its slots. 4 tests, falsified against
+last-write-wins.
+
+**STILL OPEN, unchanged by any of this:** the alternating `board_rows=842/442`
+builds match 0 on the COMPLETE set too, refusals dominated by
+`market_is_for_another_date`. Probably a future-date board and benign, but
+"matched=0" and "no slate yet" read identically from that line and nobody has
+confirmed which.
+
+**Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.
+## 2026-08-27 20:42:05Z — refresh-worker `fb9261b8` — WNBA city-code aliases — **PARTIAL PASS, and the shortfall is named**
+
+Deployed by lane `refresh-worker-deploy-2026-08-27` at the user's instruction, to
+get `31575179` (WNBA NBA-colliding city codes, `open-bet-live-status`) onto the
+service that runs the Polymarket board join. `dep-da8a0vugekts73cl57dg`.
+Carried 13 commits `7dd4ce07..fb9261b8` across four lanes — enumerated in the
+lane block BEFORE deploying, not discovered afterwards.
+
+**PREFLIGHT HELD FIRST, AND THAT IS THE POINT.** First run returned
+`HOLD: 2 job(s) in flight; a deploy kills them` — `refresh_odds_sources.py`
+(322MB) and `run_refresh_odds_job.py`. Re-ran 24s later: `CLEAR`. The deploy
+went out against a CLEAR preflight for the exact SHA, 16s after it cleared.
+
+### verify: PARTIAL — h2h recovered in full, totals did not
+
+Same slate (`board_rows=1344`), `[portfolio_commit] POLYMARKET_BOARD_JOIN`:
+
+```
+before  19:33:20  rows=1344  matched=52
+before  19:50:07  rows=1344  matched=51
+before  20:26:05  rows=1344  matched=52
+AFTER   20:51:27  rows=1344  matched=60      <- +8
+```
+
+`POLYMARKET_UNMATCHED` wnba buckets:
+
+```
+before  'no_match|wnba|h2h': 7   'no_match|wnba|totals': 15  'no_match|wnba|spreads': 1
+after   (h2h ABSENT)             'no_match|wnba|totals': 14  'no_match|wnba|spreads': 1
+```
+
+**`no_match|wnba|h2h` went 7 -> 0 and `matched` rose by 8 on an identical
+board.** The alias class-fix works and is confirmed in production.
+
+**MY ~22-ROW ESTIMATE WAS OPTIMISTIC. The real recovery is ~8.** I sized it as
+`h2h 7 + totals 15` on the assumption that a team-alias fix unlocks both.
+It does not: `totals` additionally requires the LINE to match
+(`abs(candidate.line - board_line) > 1e-9` in the join's candidate loop), so a
+resolved club name is necessary but not sufficient. INFERRED, not measured —
+the remaining 14 are consistent with Polymarket listing different total lines
+than our board, but I have not confirmed that against their listed lines.
+
+Not a reason to undo anything: +8 on a venue matching ~52 is a ~15% lift, and
+the h2h half is unambiguous.
+
+**live-odds-worker was ALREADY on `cdcda671`** (20:36:29Z) — the
+fill-stake-not-American-odds fix for the $368.97 inflation I reported. That is
+the service that runs live execution, so that defect is fixed where it counts,
+independently of this deploy.
+
+### CORRECTION 2026-08-27 21:0xZ to the entry above — **"SUPPLY, NOT ALLOCATION" WAS WRONG**
+
+Challenged by lane `board-cycle-overview-throughput` with a number I had not
+plotted. mlb's slot count against `matched`, comparable 1344-row builds:
+
+    19:33  mlb_slots=794   matched=27
+    19:49  mlb_slots=1620  matched=208
+    20:25  mlb_slots=1741  matched=218
+    20:51  mlb_slots=1706  matched=221     (complete set 242 -> working set at 91%)
+
+**`matched` tracks mlb's slot count almost exactly. ALLOCATION IS THE BINDING
+CONSTRAINT.** The entry above says the opposite.
+
+**HOW I GOT IT WRONG.** I saw mlb take 1512 against a cap of 1550 on ONE trim,
+concluded it was supply-limited, and generalised. mlb went 794 -> 1741 across
+the evening: its available markets GREW as its slate approached, so 1512 was a
+moment, not a ceiling. I read a single observation as a bound — the same error
+shape as reading one build's `matched` as a trend, which I had refused to do
+two hours earlier in this same file.
+
+**WHAT SURVIVES, and it is the part I would defend.** The demand PATH still did
+not execute for the recovery: the trim behind `matched=208` logged
+`demand=None`, and `_sport_slot_caps` returns None into the flat-floor branch.
+Code deployed is not code executed. I checked the other 15 commits my 19:37:16Z
+deploy carried and none touches the Kalshi board join.
+
+**SO WHAT DID RECOVER IT: MLB's slate approaching first pitch.** Its markets
+churn, become the freshest in the catalogue, and a staleness-ordered remainder
+pass hands them the slots. Staleness ACCIDENTALLY did what demand weighting
+does deliberately.
+
+**WHICH CHANGES THE CHANGE'S VALUE RATHER THAN REMOVING IT.** If the mechanism
+is diurnal, the collapse RECURS tomorrow afternoon, when far-dated football is
+fresh and MLB is hours from first pitch. Demand weighting is what stops the
+recurrence; it is not what fixed today. "Neutral" in the entry above is too
+strong in the other direction, and this is the honest middle: **structurally
+right, unproven today, and its test is tomorrow's afternoon board.**
+
+**THE PREDICTION THIS MAKES, so it can be checked rather than believed:** on a
+2026-08-28 afternoon build, with the demand fix deployed, mlb's slots should
+NOT collapse toward the 300 floor the way they did at 16:13-19:33 today, and
+`matched` should not fall to the 5-27 range. If it does both, demand weighting
+is not doing the work either and the cause is somewhere neither of us has
+looked.
 ### 2026-08-27 21:15:03Z + 21:23:59Z — web — ncaaf-opener-regions-props
 
 Two deploys, because the first was verified against the wrong surface.
