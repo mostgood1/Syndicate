@@ -1906,7 +1906,11 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
             "away": away_context,
         },
         "scoreboard": scoreboard,
-        "predictions": _ncaaf_shared_predictions_block(projection),
+        # `row.get`, not a bare name: this builder has no `projection` in
+        # scope. The bare name was a NameError on every call -- see the
+        # commit message. Absent yields `{}` from the helper, which is the
+        # contract its own docstring states: absent stays absent.
+        "predictions": _ncaaf_shared_predictions_block(row.get("projection")),
         "scoreboard_header": scoreboard_header,
         "smartsim_reasons": smartsim_reasons,
         "team_context": team_context,
@@ -2294,7 +2298,11 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
         # production deployed clean and still served 0/51 non-null means.
         # The structural test asserted the builders CALL the helper and never
         # WHERE the result lands, so it passed on a payload that did nothing.
-        "predictions": _ncaaf_shared_predictions_block(projection),
+        # `row.get`, not a bare name: this builder has no `projection` in
+        # scope. The bare name was a NameError on every call -- see the
+        # commit message. Absent yields `{}` from the helper, which is the
+        # contract its own docstring states: absent stays absent.
+        "predictions": _ncaaf_shared_predictions_block(row.get("projection")),
         "ncaaf_card": {
             "version": _NCAAF_CARD_CONTRACT_VERSION,
             "summary": {
