@@ -6907,12 +6907,25 @@ repeated the false claim to the user and to two peer sessions before checking.
   broken all four.
 
 - **The rule going forward.** **A checker that emits known-false warnings beside
-  true ones is not a checker, it is noise with a exit code.** Two things follow.
+  true ones is not a checker, it is noise with an exit code.** Two things follow.
   (1) When a checker fires, READ ITS FULL OUTPUT before deciding it is the usual
-  thing — "I recognise this warning" is a memory of a DIFFERENT run. (2) When you
-  own a checker, separate the classes: a duplicate declaration should BLOCK, while
-  historical unmatched ids stay advisory. The check that cannot be trained out is
-  the one that only fires when something is wrong. Corollary for id assignment
+  thing — "I recognise this warning" is a memory of a DIFFERENT run. (2) Separate
+  the classes at the point that ACTS on the finding: a duplicate declaration should
+  BLOCK, while historical unmatched ids stay advisory. The check that cannot be
+  trained out is the one that only fires when something is wrong.
+
+  **CORRECTED `[2026-08-27, same night]` — this bullet first said the RECONCILER
+  needed the blocking split, and sent the reader to the wrong file.**
+  `scripts/todo_id_reconcile.py` was already correct and already exited 1 on a
+  duplicate; `syndicate-27` proved it by introducing one. The gap was one layer
+  up, in `session_worktree.py`'s `_run_checkers`/`cmd_land`, which printed
+  `PROBLEMS` and pushed anyway — so the entire consequence of a correct finding
+  was a line of text. **Both of us mis-attributed a correct tool's finding to the
+  tool**, which is the same error as the rest of this entry one level out. Fixed
+  in `98d4e119`: `land` now REFUSES on a duplicate id, with
+  `--allow-duplicate-ids` for whoever is fixing it; `missing` and `in both files`
+  still only report, so a pre-existing `#469` does not take everyone's pushes
+  down. Corollary for id assignment
   specifically: "check both files before taking a number" cannot prevent a
   simultaneous take, because both sessions check and both see the same maximum.
   **The check has to be at LAND, not at write.**
@@ -6920,7 +6933,8 @@ repeated the false claim to the user and to two peer sessions before checking.
 - **Cost.** One duplicated id across two lanes, four pushes past a correct
   warning, and a renumber touching four files after the fact. Nothing shipped
   wrong and no code was affected — the cost is entirely in the ledger, which is
-  the thing this repo says its context window is not. `scripts/todo_id_reconcile.py`
-  is claimed by lane `repo-coordination` (flagged POSSIBLY ORPHANED, not
-  reassigned), so the blocking-vs-advisory split is RECOMMENDED here and
-  deliberately not implemented.
+  the thing this repo says its context window is not. **Still open, and named
+  because routing around it is not fixing it:** the reconciler prints twelve
+  lines of ancient `#65`–`#81` noise in its unfiltered form, which is what
+  trained both sessions to skim it. Blocking the push stops the damage; it does
+  not make the output readable.
