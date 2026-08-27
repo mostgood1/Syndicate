@@ -557,6 +557,82 @@ def _smartsim2_standalone_betting(row: dict[str, Any], projection: Any) -> dict[
     }
 
 
+def _ncaaf_shared_predictions_block(
+    projection: Any,
+    *,
+    market_margin: Any = None,
+    market_total: Any = None,
+) -> dict[str, Any]:
+    """The SHARED contract's `predictions` block, which NCAAF never populated.
+
+    MEASURED ON PRODUCTION 2026-08-27, all 51 week-1 cards -- the numbers were
+    on the card the whole time, in the wrong place:
+
+        shared_predictions.home_mean    null  |  metrics["Home mean"]        30.3
+        shared_predictions.away_mean    null  |  metrics["Away mean"]        20.0
+        shared_predictions.margin_mean  null  |  metrics["Projected spread"] TCU by 10.3
+        shared_predictions.total_mean   null  |  metrics["Projected total"]  50.3
+        shared_predictions...home_win    0.8  |  the ONLY field that was set
+
+    `metrics` is a DISPLAY list of label/value pairs. `shared_predictions` is
+    what Layer 1, Layer 2, the compact cards and the market board read, so every
+    cross-sport consumer saw a projected score of nothing and no projected
+    spread or total -- on a betting product, the two numbers a line is actually
+    compared against. `publication_adapter._shared_predictions` reads
+    `predictions`, `sim.score`, `score` and `sim.periods.full`; NCAAF set none.
+
+    ONE HELPER, THREE CALLERS. There are three NCAAF card-contract builders
+    (`_build_ncaaf_card_contract`, `_build_smartsim_ncaaf_card_contract`,
+    `_build_smartsim2_standalone_ncaaf_card_contract`) and a per-site copy is
+    how one of them silently keeps the old behaviour. Market lines are optional
+    because only the standalone builder has them in scope -- without them the
+    means still publish and only the cover probabilities stay None, which is
+    honest: absent must stay absent, never a neutral 0.5.
+
+    Cover/over probabilities use `_ncaaf_cover_probability`, the same function
+    the market board rows use, so the board and the contract cannot disagree
+    about the same game.
+    """
+    if projection is None:
+        return {}
+    margin_mean = _safe_float(getattr(projection, "margin_mean", None))
+    total_mean = _safe_float(getattr(projection, "total_mean", None))
+    margin_stdev = _safe_float(getattr(projection, "margin_stdev", None))
+    total_stdev = _safe_float(getattr(projection, "total_stdev", None))
+    home_mean = _safe_float(getattr(projection, "home_score_mean", None))
+    away_mean = _safe_float(getattr(projection, "away_score_mean", None))
+    home_win = _safe_float(getattr(projection, "home_win_rate", None))
+
+    home_cover = away_cover = total_over = total_under = None
+    margin_line = _safe_float(market_margin)
+    total_line = _safe_float(market_total)
+    if margin_line is not None:
+        home_cover = _ncaaf_cover_probability(line=margin_line, mean=margin_mean, stdev=margin_stdev)
+        if home_cover is not None:
+            away_cover = round(1.0 - home_cover, 6)
+    if total_line is not None:
+        total_over = _ncaaf_cover_probability(line=total_line, mean=total_mean, stdev=total_stdev)
+        if total_over is not None:
+            total_under = round(1.0 - total_over, 6)
+
+    return {
+        "home_mean": home_mean,
+        "away_mean": away_mean,
+        "margin_mean": margin_mean,
+        "total_mean": total_mean,
+        "margin_stdev": margin_stdev,
+        "total_stdev": total_stdev,
+        "probabilities": {
+            "home_win": home_win,
+            "away_win": (round(1.0 - home_win, 6) if home_win is not None else None),
+            "home_cover": home_cover,
+            "away_cover": away_cover,
+            "total_over": total_over,
+            "total_under": total_under,
+        },
+    }
+
+
 def _ncaaf_market_board_rows_for_game(
     *,
     game_id: Any,
@@ -1787,6 +1863,7 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
             "away": away_context,
         },
         "scoreboard": scoreboard,
+        "predictions": _ncaaf_shared_predictions_block(projection),
         "scoreboard_header": scoreboard_header,
         "smartsim_reasons": smartsim_reasons,
         "team_context": team_context,
@@ -2184,6 +2261,7 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
                 "away": away_context,
             },
             "scoreboard": scoreboard,
+            "predictions": _ncaaf_shared_predictions_block(projection),
             "scoreboard_header": {
                 "away": {
                     "abbr": away_context["abbreviation"],
@@ -2442,6 +2520,9 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
                 "away": away_context,
             },
             "scoreboard": scoreboard,
+            "predictions": _ncaaf_shared_predictions_block(
+                projection, market_margin=row_market_margin, market_total=row_market_total
+            ),
             "scoreboard_header": {
                 "away": {
                     "abbr": away_context["abbreviation"],
