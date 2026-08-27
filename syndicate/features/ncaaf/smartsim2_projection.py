@@ -55,6 +55,19 @@ PROJECTION_CSV_COLUMNS: tuple[str, ...] = (
     "profile_name",
     "rating_source",
     "generated_at",
+    # WHICH CALIBRATION PRODUCED THIS PROJECTION. `profile_name` is a constant
+    # ("ncaaf_v2") and cannot distinguish the shipped default from a promoted
+    # artifact -- so before these, a projections file could not say whether the
+    # re-fitted profile had actually been used to produce it.
+    #
+    # The diagnostic this replaces was a print at module import, which is weakly
+    # reachable for the purpose: nothing in the worker's boot path imports the
+    # profile (run_refresh_worker runs the generator as a SUBPROCESS), so a
+    # boot-time log search reads zero forever. Provenance belongs on the OUTPUT,
+    # beside `rating_source` and `generated_at`, which already record exactly
+    # this kind of fact.
+    "profile_source",
+    "profile_version",
 )
 
 
@@ -76,6 +89,12 @@ class SmartSimNcaafProjection:
     profile_name: str
     rating_source: str
     generated_at: str
+    # DEFAULTED, so the 17 committed CSVs written before these existed still
+    # load. "unknown" and not "default": an older file genuinely does not record
+    # which profile produced it, and claiming "default" would assert a fact the
+    # artifact never carried.
+    profile_source: str = "unknown"
+    profile_version: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -103,6 +122,9 @@ class SmartSimNcaafProjection:
             profile_name=str(row["profile_name"]),
             rating_source=str(row["rating_source"]),
             generated_at=str(row["generated_at"]),
+            # `.get`, not `[...]` -- a pre-provenance artifact must keep loading.
+            profile_source=str(row.get("profile_source") or "unknown"),
+            profile_version=str(row.get("profile_version") or ""),
         )
 
 

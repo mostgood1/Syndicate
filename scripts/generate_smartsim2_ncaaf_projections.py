@@ -36,6 +36,7 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2SimulationInput
 from syndicate.features.football.sim_engine.smartsim2.game_simulator import simulate_game
 from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import NCAAF_CALIBRATION_PROFILE
+from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import NCAAF_CALIBRATION_PROFILE_METADATA
 from syndicate.features.ncaaf.smartsim2_projection import SmartSimNcaafProjection
 from syndicate.features.ncaaf.smartsim2_projection import write_projection_artifact
 from syndicate.features.ncaaf.sources import default_ncaaf_source_root
@@ -495,6 +496,10 @@ def build_projection(
         profile_name=PROFILE_NAME,
         rating_source=rating_source,
         generated_at=datetime.now(timezone.utc).isoformat(),
+        # Read from the LOADED profile's metadata, not from a constant -- the
+        # point is to record which calibration actually produced this row.
+        profile_source=str(NCAAF_CALIBRATION_PROFILE_METADATA.get("source") or "unknown"),
+        profile_version=str(NCAAF_CALIBRATION_PROFILE_METADATA.get("version") or ""),
     )
 
 
