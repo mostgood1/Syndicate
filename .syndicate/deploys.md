@@ -33911,3 +33911,54 @@ per side before `nfl_props_rows_for_week`, so consumers see one row per
 selection as they always did -- deliberately, to protect the ROI report's
 64,007-bet denominator. Whether the ROI number MOVES now that a best price
 exists to pick is a separate measurement nobody has taken.
+
+---
+
+## 2026-08-27 — web `16673341` then `07642f19` — NCAAF projections into the shared contract
+
+**lane:** `ncaaf-opener-regions-props` · claim held, preflight CLEAR both times.
+
+### THE FIRST DEPLOY WAS A NO-OP, AND IT DEPLOYED CLEANLY
+
+`16673341`, fired 14:20:37Z, live 14:24:49Z. Build succeeded, health returned,
+nothing errored. **And the board served exactly what it served before:**
+
+    shared_predictions.home_mean      0/51   (unchanged)
+    shared_predictions.away_mean      0/51   (unchanged)
+    shared_predictions.margin_mean    0/51   (unchanged)
+    shared_predictions.total_mean     0/51   (unchanged)
+    probabilities.home_win           51/51   (unchanged -- was already set)
+
+**verify:** the reading is a RATE over the whole slate against a measured
+baseline, and that is the only reason this was caught. A single spot-check on a
+card that happened to use the third builder would have read as success. The
+"was 0/51" baseline printed next to every line is what made "no change"
+legible instead of looking like a pass.
+
+**Cause:** two of the three NCAAF card-contract builders put `predictions`
+INSIDE the `ncaaf_card` sub-dict. `publication_adapter._shared_predictions`
+reads `game["predictions"]` at the TOP level, and the served 2026 path
+(`_build_smartsim2_standalone_ncaaf_card_contract`) is one of the nested two.
+
+**Why the tests passed:** the structural guard asserted every builder CALLS the
+helper. It never asserted WHERE the result lands. That predicate was true of
+code that did nothing. `presence is not reachability`, again, one level deeper
+than the last time — the call was reachable, the VALUE was not.
+
+The placement test added afterwards is NEGATIVE-CONTROLLED: re-nesting one key
+makes it fail, restoring makes it pass. A guard that has never been seen to
+fail is not known to discriminate.
+
+### THE SECOND DEPLOY
+
+`07642f19`, fired 14:36:03Z. Carries the placement fix plus the compact card
+(score ribbon, market row, tab rail lifted above the panels) and market tiles
+that show model against market rather than "Source: SmartSim 2.0".
+
+**verify:** the SAME rate, and it must move off 0/51 on all four fields. That
+is the whole measurement; a live deploy and a green build already proved
+nothing once today.
+
+**NOT VERIFIED EITHER TIME:** the rendered page. Every reading here is an API
+payload. No browser, no width, no visual check — the compact card is a template
+change and template changes are exactly what a payload check cannot see.
