@@ -494,3 +494,45 @@ def test_the_backfill_never_touches_an_inferred_row(ledger):
     result = vs.repair_multi_side_grades()
     assert result.get("pnl_backfilled", 0) == 0
     assert ledger["orders"][0].get("pnl_dollars") is None
+
+
+def test_the_guard_sees_a_sibling_that_is_ALREADY_graded(ledger, monkeypatch):
+    """The sequencing that walked around the first fix, measured in production
+    2026-08-27: the repair cleared both rows, the `away` row aged past the 24h
+    grace and INFERENCE graded it, leaving ONE ungraded order -- so the
+    ungraded-only guard slept and the venue graded `home` the same way. Both
+    teams won again.
+
+    Worse than a missed case: the repair clears the venue grade and the grader
+    re-applies it, so the two fight on every tick forever."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="away", outcome="won"),   # already inferred
+        _order(idempotency_key="b", side="home"),                  # lone ungraded
+    ]
+    _kalshi_rows(monkeypatch, [_k()])
+    result = vs.settle_from_venue()
+    assert result["settled"] == 0
+    assert result["refused"]["ambiguous_multi_side"] == 1
+    assert "outcome" not in ledger["orders"][1]
+
+
+def test_a_lone_order_on_a_single_side_market_still_grades(ledger, monkeypatch):
+    """The guard must not refuse the ordinary case it shares a code path with."""
+    ledger["orders"] = [_order(idempotency_key="a", side="away")]
+    _kalshi_rows(monkeypatch, [_k()])
+    assert vs.settle_from_venue()["settled"] == 1
+
+
+def test_repair_and_grader_cannot_oscillate(ledger, monkeypatch):
+    """Repair clears, grader must NOT re-apply -- otherwise the ledger is
+    rewritten on every tick indefinitely."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="home", outcome="won", settled_by="venue"),
+        _order(idempotency_key="b", side="away", outcome="won"),
+    ]
+    _kalshi_rows(monkeypatch, [_k()])
+    first = vs.settle_from_venue()          # repairs, then must refuse
+    assert "outcome" not in ledger["orders"][0]
+    second = vs.settle_from_venue()         # nothing left to repair or grade
+    assert second["settled"] == 0
+    assert "outcome" not in ledger["orders"][0]

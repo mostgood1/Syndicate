@@ -519,6 +519,32 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
     # UNGRADED, FILLED orders only. An order that never filled has no position
     # to settle, and one already carrying an outcome is never touched again.
     open_by_key: dict[tuple[str, str], list[dict]] = {}
+    # EVERY side we hold on a market, GRADED OR NOT.
+    #
+    # The opposite-side guard below used to read only the UNGRADED orders, and
+    # sequencing walked straight around it. MEASURED 2026-08-27 on
+    # `aec-mlb-cle-laa-2026-08-26`, after the first fix had shipped:
+    #
+    #   1. the repair cleared both rows              -> both ungraded
+    #   2. the `away` row aged past the 24h grace    -> INFERENCE graded it won
+    #   3. one ungraded order now remained, so       -> venue graded `home` won
+    #      `len(targets) == 1` and the guard slept
+    #
+    # and the board asserted both teams won again. Worse than a missed case:
+    # the repair clears the venue grade and the grader immediately re-applies
+    # it, so the two would have fought each other on every tick forever.
+    #
+    # The question the guard has to ask is "does this MARKET carry more than
+    # one of our sides", which has nothing to do with which rows happen to be
+    # graded right now.
+    sides_by_key: dict[tuple[str, str], set[str]] = {}
+    for order in orders:
+        venue_all = str(order.get("venue") or "").strip().lower()
+        key_all = _join_key(order.get("venue_ticker"))
+        side_all = str(order.get("side") or "").strip().lower()
+        if venue_all and key_all and side_all:
+            sides_by_key.setdefault((venue_all, key_all), set()).add(side_all)
+
     for order in orders:
         if order.get("outcome"):
             counters["already"] += 1
@@ -592,8 +618,13 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
             # the PUBLIC gateway's `GET /markets/{slug}/settlement` names the
             # winning outcome, which would let each order be graded against its
             # own side instead of against the position's net.
-            sides = {str(o.get("side") or "").strip().lower() for o in targets}
-            if len(targets) > 1 and len(sides) > 1:
+            # ALL our sides on this market, not just the ungraded ones -- see
+            # `sides_by_key` above for the sequencing that defeated the
+            # ungraded-only version.
+            sides = sides_by_key.get(key) or {
+                str(o.get("side") or "").strip().lower() for o in targets
+            }
+            if len(sides) > 1:
                 counters["refused"]["ambiguous_multi_side"] = (
                     counters["refused"].get("ambiguous_multi_side", 0) + 1
                 )
