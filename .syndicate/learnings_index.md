@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 578 rules `[generated]`
+## Index — 581 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 116**
+**FORBIDDEN — 117**
 
 - [2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-…](#2026-08-22-forbidden-never-read-a-service_updated-deploy-as-shipping-code-an-env-var-change-restarts-the-service-on-the-commit-it-is-already-running)
 - [2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the sam…](#2026-08-22-forbidden-never-name-a-datastore-setting-and-a-service-env-var-by-the-same-store-without-saying-which-surface-a-4-minute-refresh-worker-outage-came-from-that-ambiguity)
@@ -56,8 +56,6 @@
 - [2026-08-20 — FORBIDDEN: never repair, rebuild or optimise a scheduled job without first…](#2026-08-20-forbidden-never-repair-rebuild-or-optimise-a-scheduled-job-without-first-establishing-that-anything-still-consumes-it-fixing-a-dead-job-can-be-worse-than-leaving-it-broken)
 - [2026-08-20 — CORRECTED BELOW. FORBIDDEN: buying data before probing it exists — and NEV…](#2026-08-20-corrected-below-forbidden-buying-data-before-probing-it-exists-and-never-diagnose-a-vendor-from-your-own-broken-query)
 - [2026-08-20 — FORBIDDEN: an assertion whose subject is a TEMPLATE must not take the ambi…](#2026-08-20-forbidden-an-assertion-whose-subject-is-a-template-must-not-take-the-ambient-data-mirror-as-its-input-pin-the-fixture-then-prove-the-pin-is-load-bearing)
-- [2026-08-20 — FORBIDDEN: never read a ledger file with `git show <rev>:<path>` from Git…](#2026-08-20-forbidden-never-read-a-ledger-file-with-git-show-revpath-from-git-bash-it-returns-empty-and-empty-reads-as-another-session-deleted-it)
-- [2026-08-20 — FORBIDDEN: never re-apply a ledger edit with `git checkout <sha> -- <ledge…](#2026-08-20-forbidden-never-re-apply-a-ledger-edit-with-git-checkout-sha----ledger-file-it-is-a-revert-of-everyone-elses-entries-wearing-the-clothes-of-an-append)
 - [2026-08-20 — FORBIDDEN: concluding a producer was REPLACED because a module says it rep…](#2026-08-20-forbidden-concluding-a-producer-was-replaced-because-a-module-says-it-replaced-it)
 - [2026-08-20 — FORBIDDEN: fixing a guard bug ONLY in the guard you found it in](#2026-08-20-forbidden-fixing-a-guard-bug-only-in-the-guard-you-found-it-in)
 - [2026-08-20 — FORBIDDEN: a guard test that asserts against the live ledger](#2026-08-20-forbidden-a-guard-test-that-asserts-against-the-live-ledger)
@@ -75,27 +73,19 @@
 - [2026-08-21 — FORBIDDEN: asserting a trend from one sample, especially a scary one](#2026-08-21-forbidden-asserting-a-trend-from-one-sample-especially-a-scary-one)
 - [2026-08-22 — FORBIDDEN: never join on an id minted from a content hash of a payload tha…](#2026-08-22-forbidden-never-join-on-an-id-minted-from-a-content-hash-of-a-payload-that-carries-live-prices)
 - [2026-08-22 — FORBIDDEN: verifying a REORDERING by elapsed-time-since-boot](#2026-08-22-forbidden-verifying-a-reordering-by-elapsed-time-since-boot)
-- [2026-08-22 — FORBIDDEN: never allowlist an artifact without reading the CONSUMER that w…](#2026-08-22-forbidden-never-allowlist-an-artifact-without-reading-the-consumer-that-will-start-finding-it)
 - [08-22 FORBIDDEN: `git add -A` in this repo. THE TEST SUITE MUTATES TRACKED FILES](#08-22-forbidden-git-add--a-in-this-repo-the-test-suite-mutates-tracked-files)
 - [08-22 FORBIDDEN: calling a test failure "pre-existing on main" from a clean WORKTREE. A…](#08-22-forbidden-calling-a-test-failure-pre-existing-on-main-from-a-clean-worktree-a-worktree-shares-site-packages)
 - [08-22 FORBIDDEN: treating a todo id as RESERVED because you checked it was free. Checki…](#08-22-forbidden-treating-a-todo-id-as-reserved-because-you-checked-it-was-free-checking-is-not-reserving)
-- [2026-08-25 — FORBIDDEN: never deploy one side of a permission check and call the fix sh…](#2026-08-25-forbidden-never-deploy-one-side-of-a-permission-check-and-call-the-fix-shipped-a-403-is-not-a-404-and-the-difference-names-which-end-is-wrong)
-- [2026-08-25 — FORBIDDEN: never accept "the artifact I WRITE is allowlisted" as evidence…](#2026-08-25-forbidden-never-accept-the-artifact-i-write-is-allowlisted-as-evidence-the-feature-works-check-what-it-reads-and-check-it-on-the-service-that-will-run-it)
-- [2026-08-25 — FORBIDDEN: never accept a backtest's "0 rows graded" as a result. An analy…](#2026-08-25-forbidden-never-accept-a-backtests-0-rows-graded-as-a-result-an-analysis-script-that-cannot-find-its-inputs-must-exit-non-zero-not-report-a-clean-zero)
-- [2026-08-25 — FORBIDDEN: never state an allowlist/config gap as "0 entries for X" when t…](#2026-08-25-forbidden-never-state-an-allowlistconfig-gap-as-0-entries-for-x-when-the-entries-are-wildcards-count-what-matches-not-what-mentions-x)
-- [2026-08-25 — FORBIDDEN: a reachability test must assert a COUNT over the whole surface,…](#2026-08-25-forbidden-a-reachability-test-must-assert-a-count-over-the-whole-surface-and-be-run-before-the-correctness-tests-two-silent-breaks-in-one-feature-neither-visible-to-a-value-assertion)
-- [2026-08-25 — FORBIDDEN: never pin a position in an ordered chain with an ABSOLUTE index…](#2026-08-25-forbidden-never-pin-a-position-in-an-ordered-chain-with-an-absolute-index-in-a-comment-or-an-assertion-both-go-stale-silently-and-two-of-them-can-become-mutually-unsatisfiable)
-- [2026-08-25 — FORBIDDEN: never assert `mock.assert_not_called()` on a shared primitive l…](#2026-08-25-forbidden-never-assert-mockassert_not_called-on-a-shared-primitive-like-subprocesspopen-it-asserts-about-the-whole-process-not-your-code-and-the-answer-is-platform--and-order-dependent)
 - [2026-08-25 — FORBIDDEN: report a real-money code-default change as "done" without readi…](#2026-08-25-forbidden-report-a-real-money-code-default-change-as-done-without-reading-the-live-services-actual-env-vars-a-contradicting-override-wins-silently)
 - [2026-08-25 — FORBIDDEN: rename a lane's header status away from the literal word "OPEN"…](#2026-08-25-forbidden-rename-a-lanes-header-status-away-from-the-literal-word-open-without-checking-what-that-silently-releases)
 - [2026-08-26 — FORBIDDEN: treating ARITHMETIC ON A DERIVED FIELD as a measurement](#2026-08-26-forbidden-treating-arithmetic-on-a-derived-field-as-a-measurement)
 - [2026-08-26 — FORBIDDEN: concluding a VENUE must act because its error names your account](#2026-08-26-forbidden-concluding-a-venue-must-act-because-its-error-names-your-account)
 - [2026-08-26 — FORBIDDEN: TWO HOSTS ARE NOT ONE VENDOR, and "X can reach ESPN" is not a f…](#2026-08-26-forbidden-two-hosts-are-not-one-vendor-and-x-can-reach-espn-is-not-a-fact-about-x)
 - [2026-08-26 — FORBIDDEN: assuming an artifact "published to production" is where its CON…](#2026-08-26-forbidden-assuming-an-artifact-published-to-production-is-where-its-consumer-reads)
-- [2026-08-26 — FORBIDDEN: verifying a consumer against a fixture drawn from ONE producer,…](#2026-08-26-forbidden-verifying-a-consumer-against-a-fixture-drawn-from-one-producer-when-the-artifact-has-more-than-one-producer-two-producers-two-shapes-enumerate-the-shapes-from-production-do-not-assume-there-is-one)
 - [2026-08-26 — FORBIDDEN: reporting a test as failing on `main` from a session worktree,…](#2026-08-26-forbidden-reporting-a-test-as-failing-on-main-from-a-session-worktree-when-its-fixture-is-derived-from-data-and-a-stash-and-rerun-does-not-isolate-it)
 - [2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "loo…](#2026-08-27-forbidden-pushing-past-a-ledger-checkers-warning-because-its-output-looks-like-the-usual-noise-a-warning-that-is-usually-wrong-gets-trained-out-and-two-sessions-proved-it-independently-on-the-same-night)
 - [2026-08-27 — FORBIDDEN: REFUSING A BAD VALUE UPSTREAM OF A COALESCING FALLBACK and call…](#2026-08-27-forbidden-refusing-a-bad-value-upstream-of-a-coalescing-fallback-and-calling-it-fixed-the-fallback-picks-it-back-up-one-candidate-later-and-the-fix-ships-inert)
+- [2026-08-27 — FORBIDDEN: running `deploy_claim.py` from a session worktree. The claim fi…](#2026-08-27-forbidden-running-deploy_claimpy-from-a-session-worktree-the-claim-file-is-per-tree-so-nobody-else-can-see-it)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -126,6 +116,17 @@
 - [2026-08-16 — FORBIDDEN: bundling a file write or a `git reset` into the same command as…](learnings_evidence.md#2026-08-16-forbidden-bundling-a-file-write-or-a-git-reset-into-the-same-command-as-git-commit) `[evidence]`
 - [2026-08-16 — FORBIDDEN: never add an instrument without first checking who captures the…](learnings_evidence.md#2026-08-16-forbidden-never-add-an-instrument-without-first-checking-who-captures-the-channel-it-writes-to) `[evidence]`
 - [2026-08-16 — FORBIDDEN: trusting a commit you verified only BEFORE `git commit`. Guards…](learnings_evidence.md#2026-08-16-forbidden-trusting-a-commit-you-verified-only-before-git-commit-guards-cannot-see-corruption-that-happens-during-it) `[evidence]`
+- [2026-08-20 — FORBIDDEN: never read a ledger file with `git show <rev>:<path>` from Git…](learnings_evidence.md#2026-08-20-forbidden-never-read-a-ledger-file-with-git-show-revpath-from-git-bash-it-returns-empty-and-empty-reads-as-another-session-deleted-it) `[evidence]`
+- [2026-08-20 — FORBIDDEN: never re-apply a ledger edit with `git checkout <sha> -- <ledge…](learnings_evidence.md#2026-08-20-forbidden-never-re-apply-a-ledger-edit-with-git-checkout-sha----ledger-file-it-is-a-revert-of-everyone-elses-entries-wearing-the-clothes-of-an-append) `[evidence]`
+- [2026-08-22 — FORBIDDEN: never allowlist an artifact without reading the CONSUMER that w…](learnings_evidence.md#2026-08-22-forbidden-never-allowlist-an-artifact-without-reading-the-consumer-that-will-start-finding-it) `[evidence]`
+- [2026-08-25 — FORBIDDEN: never deploy one side of a permission check and call the fix sh…](learnings_evidence.md#2026-08-25-forbidden-never-deploy-one-side-of-a-permission-check-and-call-the-fix-shipped-a-403-is-not-a-404-and-the-difference-names-which-end-is-wrong) `[evidence]`
+- [2026-08-25 — FORBIDDEN: never accept "the artifact I WRITE is allowlisted" as evidence…](learnings_evidence.md#2026-08-25-forbidden-never-accept-the-artifact-i-write-is-allowlisted-as-evidence-the-feature-works-check-what-it-reads-and-check-it-on-the-service-that-will-run-it) `[evidence]`
+- [2026-08-25 — FORBIDDEN: never accept a backtest's "0 rows graded" as a result. An analy…](learnings_evidence.md#2026-08-25-forbidden-never-accept-a-backtests-0-rows-graded-as-a-result-an-analysis-script-that-cannot-find-its-inputs-must-exit-non-zero-not-report-a-clean-zero) `[evidence]`
+- [2026-08-25 — FORBIDDEN: never state an allowlist/config gap as "0 entries for X" when t…](learnings_evidence.md#2026-08-25-forbidden-never-state-an-allowlistconfig-gap-as-0-entries-for-x-when-the-entries-are-wildcards-count-what-matches-not-what-mentions-x) `[evidence]`
+- [2026-08-25 — FORBIDDEN: a reachability test must assert a COUNT over the whole surface,…](learnings_evidence.md#2026-08-25-forbidden-a-reachability-test-must-assert-a-count-over-the-whole-surface-and-be-run-before-the-correctness-tests-two-silent-breaks-in-one-feature-neither-visible-to-a-value-assertion) `[evidence]`
+- [2026-08-25 — FORBIDDEN: never pin a position in an ordered chain with an ABSOLUTE index…](learnings_evidence.md#2026-08-25-forbidden-never-pin-a-position-in-an-ordered-chain-with-an-absolute-index-in-a-comment-or-an-assertion-both-go-stale-silently-and-two-of-them-can-become-mutually-unsatisfiable) `[evidence]`
+- [2026-08-25 — FORBIDDEN: never assert `mock.assert_not_called()` on a shared primitive l…](learnings_evidence.md#2026-08-25-forbidden-never-assert-mockassert_not_called-on-a-shared-primitive-like-subprocesspopen-it-asserts-about-the-whole-process-not-your-code-and-the-answer-is-platform--and-order-dependent) `[evidence]`
+- [2026-08-26 — FORBIDDEN: verifying a consumer against a fixture drawn from ONE producer,…](learnings_evidence.md#2026-08-26-forbidden-verifying-a-consumer-against-a-fixture-drawn-from-one-producer-when-the-artifact-has-more-than-one-producer-two-producers-two-shapes-enumerate-the-shapes-from-production-do-not-assume-there-is-one) `[evidence]`
 
 **EXONERATED — 5**
 
@@ -135,7 +136,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 457**
+**Rules and corrections — 459**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -307,7 +308,6 @@
 - [2026-08-19 — VERIFY WHAT THE THING YOU CHANGED *DEPENDS ON*](#2026-08-19-verify-what-the-thing-you-changed-depends-on)
 - [2026-08-19 — RULE: to find where variance is CREATED, decompose the outcome. Correlatin…](#2026-08-19-rule-to-find-where-variance-is-created-decompose-the-outcome-correlating-its-inputs-finds-what-moves-with-it-which-is-a-different-question)
 - [2026-08-19 — CORRECTION: `git commit -- <paths>` fixes the shared INDEX. It is the DELI…](#2026-08-19-correction-git-commit----paths-fixes-the-shared-index-it-is-the-delivery-mechanism-for-a-shared-file-i-applied-it-to-both-and-caused-two-more-incidents)
-- [2026-08-19 — OVERTURNED: `SYNDICATE_DEPLOY_GUARD=off` works as an inline Bash prefix](#2026-08-19-overturned-syndicate_deploy_guardoff-works-as-an-inline-bash-prefix)
 - [2026-08-19 — a disclaimer marker must PRECEDE the path it disclaims, not follow it](#2026-08-19-a-disclaimer-marker-must-precede-the-path-it-disclaims-not-follow-it)
 - [2026-08-19 — NEAR-MISS: an object-database merge updates the REF, not the working tree,…](#2026-08-19-near-miss-an-object-database-merge-updates-the-ref-not-the-working-tree-and-a-later-working-tree-write-can-silently-revert-real-content)
 - [2026-08-19 — I declared a deploy FAILED 60 seconds after it went live, and it had not](#2026-08-19-i-declared-a-deploy-failed-60-seconds-after-it-went-live-and-it-had-not)
@@ -323,7 +323,6 @@
 - [2026-08-20 — "Everything upstream is correct" is a REASON TO LOOK FURTHER DOWN, not a r…](#2026-08-20-everything-upstream-is-correct-is-a-reason-to-look-further-down-not-a-reason-to-doubt-the-symptom)
 - [2026-08-20 — I NAMED A VERIFICATION CHECK WITHOUT CONFIRMING THE INSTRUMENT COULD SEE](#2026-08-20-i-named-a-verification-check-without-confirming-the-instrument-could-see)
 - [2026-08-20 — OVERTURNED (pre-registered): soccer is not under-dispersed anymore, and fi…](#2026-08-20-overturned-pre-registered-soccer-is-not-under-dispersed-anymore-and-fixing-dispersion-missing-inputs-did-not-close-the-gap-to-the-market)
-- [CORRECTION, same day, after the user asked "are you sure you're looking correctly"](#correction-same-day-after-the-user-asked-are-you-sure-youre-looking-correctly)
 - [2026-08-20 — "strictly dominated" is a different diagnosis from "broken", and it change…](#2026-08-20-strictly-dominated-is-a-different-diagnosis-from-broken-and-it-changes-the-fix)
 - [2026-08-20 — ONE ERROR IN FIVE GUISES: validating against a PROXY, not the objective](#2026-08-20-one-error-in-five-guises-validating-against-a-proxy-not-the-objective)
 - [2026-08-20 — A NULL HAS A SAMPLE SIZE. I called a lever dead, revived it, then buried i…](#2026-08-20-a-null-has-a-sample-size-i-called-a-lever-dead-revived-it-then-buried-it-properly)
@@ -334,7 +333,6 @@
 - [2026-08-20 — A STALE-BASE PUSH DOES NOT LOSE WORK ONCE; IT POISONS THE BASE](#2026-08-20-a-stale-base-push-does-not-lose-work-once-it-poisons-the-base)
 - [2026-08-20 — A MUTATION TEST THAT MUTATES A COMMENT PROVES THE OPPOSITE OF WHAT IT LOOK…](#2026-08-20-a-mutation-test-that-mutates-a-comment-proves-the-opposite-of-what-it-looks-like)
 - [2026-08-20 — AN EDIT THAT REPORTS SUCCESS IS NOT EVIDENCE THE EDIT LANDED](#2026-08-20-an-edit-that-reports-success-is-not-evidence-the-edit-landed)
-- [2026-08-20 -- a fix's data can be correct while its raw diagnostic API still shows noth…](#2026-08-20----a-fixs-data-can-be-correct-while-its-raw-diagnostic-api-still-shows-nothing-verify-against-the-served-surface-not-the-one-that-found-the-bug)
 - [2026-08-20 -- A READING OF SHARED MUTABLE STATE EXPIRES AT THE INSTANT IT IS TAKEN](#2026-08-20----a-reading-of-shared-mutable-state-expires-at-the-instant-it-is-taken)
 - [2026-08-20 — A MUTATION TEST THAT MUTATES THE WRONG MODULE READS AS "VACUOUS SUITE"](#2026-08-20-a-mutation-test-that-mutates-the-wrong-module-reads-as-vacuous-suite)
 - [2026-08-20 A SAMPLE THAT CONTAINS ONLY ONE STATE CANNOT DIAGNOSE A STATE MACHINE](#2026-08-20-a-sample-that-contains-only-one-state-cannot-diagnose-a-state-machine)
@@ -343,11 +341,7 @@
 - [2026-08-20 THE EDIT TOOL REPORTED SUCCESS ON A WRITE THAT NEVER REACHED DISK](#2026-08-20-the-edit-tool-reported-success-on-a-write-that-never-reached-disk)
 - [2026-08-20 A POST-DEPLOY VERIFICATION READ ONCE CAN BE AN ARTIFACT OF TIMING, NOT A PRO…](#2026-08-20-a-post-deploy-verification-read-once-can-be-an-artifact-of-timing-not-a-property-of-the-system)
 - [2026-08-20 A CORRECT REFUSAL ON STALE INPUT IS INDISTINGUISHABLE FROM A BROKEN FEATURE](#2026-08-20-a-correct-refusal-on-stale-input-is-indistinguishable-from-a-broken-feature)
-- [CORRECTION, same session — collection was NOT the cause, and the fix I gave was backwar…](#correction-same-session-collection-was-not-the-cause-and-the-fix-i-gave-was-backwards)
 - [2026-08-20 — A TIMEOUT WROTE `none` AND I DIVIDED BY IT. Four false diagnoses, one root…](#2026-08-20-a-timeout-wrote-none-and-i-divided-by-it-four-false-diagnoses-one-root-habit)
-- [2026-08-20 — an mtime that PREDATES the write it describes is `copy2` from the checkout…](#2026-08-20-an-mtime-that-predates-the-write-it-describes-is-copy2-from-the-checkout-not-a-publish-it-is-the-only-signal-that-a-boot-time-sync-clobbered-a-live-artifact)
-- [2026-08-20 — taking the blame is not the same as finding the cause, and a self-critical…](#2026-08-20-taking-the-blame-is-not-the-same-as-finding-the-cause-and-a-self-critical-wrong-answer-stops-the-search-just-as-dead-as-a-self-serving-one)
-- [2026-08-20 — a lock's STORAGE must not outlive its SCOPE. An age-based "stale lock" che…](#2026-08-20-a-locks-storage-must-not-outlive-its-scope-an-age-based-stale-lock-check-does-not-make-one-self-healing)
 - [2026-08-20 A CENSUS THAT CANNOT READ UNHEALTHY IS NOT A VERIFICATION — the slate can re…](#2026-08-20-a-census-that-cannot-read-unhealthy-is-not-a-verification-the-slate-can-retire-your-test-case-between-diagnosis-and-deploy)
 - [2026-08-20 — A PLATEAU IS NOT A FREEZE. A monotonic counter read ONCE cannot tell "stop…](#2026-08-20-a-plateau-is-not-a-freeze-a-monotonic-counter-read-once-cannot-tell-stopped-from-between-events)
 - [2026-08-20 — A ONE-REVISION PRESENCE CHECK CANNOT TELL "ALREADY UPSTREAM" FROM "ONLY IN…](#2026-08-20-a-one-revision-presence-check-cannot-tell-already-upstream-from-only-in-my-own-abandoned-commit)
@@ -378,7 +372,6 @@
 - [2026-08-21 — A tooltip is not a reading surface, and the data was already there](#2026-08-21-a-tooltip-is-not-a-reading-surface-and-the-data-was-already-there)
 - [2026-08-22 — An absent LOG LINE is not an absent EVENT, and a stale ledger figure will…](#2026-08-22-an-absent-log-line-is-not-an-absent-event-and-a-stale-ledger-figure-will-out-argue-a-fresh-measurement)
 - [2026-08-22 — the retraction was as wrong as the claim. "It ran once" is not "it runs"](#2026-08-22-the-retraction-was-as-wrong-as-the-claim-it-ran-once-is-not-it-runs)
-- [2026-08-22 — RULE: `| tail -N` on a backgrounded command truncates the OUTPUT FILE, not…](#2026-08-22-rule-tail--n-on-a-backgrounded-command-truncates-the-output-file-not-just-the-display)
 - [2026-08-22 (later) — A rule written from one sport's vocabulary is a rule about that sp…](#2026-08-22-later-a-rule-written-from-one-sports-vocabulary-is-a-rule-about-that-sport-and-a-safety-net-that-skips-the-biggest-cases-is-not-a-safety-net)
 - [2026-08-23 — a measurement that matches your CHANGE instead of the COMPLAINT is not ver…](#2026-08-23-a-measurement-that-matches-your-change-instead-of-the-complaint-is-not-verification-lane-layer2-sim-view-and-live-projection)
 - [2026-08-23 — a counter's POSITION relative to its gate decides which question it answers](#2026-08-23-a-counters-position-relative-to-its-gate-decides-which-question-it-answers)
@@ -388,8 +381,6 @@
 - [2026-08-23 — a counter whose inputs are absent reports CONSTANTS that look like findings](#2026-08-23-a-counter-whose-inputs-are-absent-reports-constants-that-look-like-findings)
 - [2026-08-23 — `git merge-base --is-ancestor` on an unfetched object exits 128, and `2>/d…](#2026-08-23-git-merge-base---is-ancestor-on-an-unfetched-object-exits-128-and-2devnull-turns-that-into-a-clean-no)
 - [2026-08-24 — A PRE-FLIGHT CHECK DOES NOT SURVIVE A TURN BOUNDARY. Three times in one se…](#2026-08-24-a-pre-flight-check-does-not-survive-a-turn-boundary-three-times-in-one-session)
-- [2026-08-25 — METHOD: a log line that prints only on the bad path cannot verify the good…](#2026-08-25-method-a-log-line-that-prints-only-on-the-bad-path-cannot-verify-the-good-path-silence-is-not-a-reading)
-- [2026-08-25 — METHOD: to prove a conditional gate still fires, find it firing for a SIBL…](#2026-08-25-method-to-prove-a-conditional-gate-still-fires-find-it-firing-for-a-sibling-that-meets-the-condition-today-do-not-reason-from-the-code)
 - [2026-08-25 — GitHub Actions CI results are not this repo's source of truth](#2026-08-25-github-actions-ci-results-are-not-this-repos-source-of-truth)
 - [2026-08-26 — An empty log query is not evidence of absence until the query shape is kno…](#2026-08-26-an-empty-log-query-is-not-evidence-of-absence-until-the-query-shape-is-known-to-match)
 - [2026-08-26 — A before/after comparison where both sides are the same tree always agrees](#2026-08-26-a-beforeafter-comparison-where-both-sides-are-the-same-tree-always-agrees)
@@ -400,6 +391,8 @@
 - [2026-08-23 — RULE: editing a fast-appended shared ledger from a stale local copy manufa…](#2026-08-23-rule-editing-a-fast-appended-shared-ledger-from-a-stale-local-copy-manufactures-a-fake-conflict)
 - [2026-08-23 — RULE: an empty tmp dir for `SYNDICATE_NFL_SOURCE_ROOT` can still resolve t…](#2026-08-23-rule-an-empty-tmp-dir-for-syndicate_nfl_source_root-can-still-resolve-to-the-real-checkout-and-a-test-can-write-into-it)
 - [2026-08-26 — RULE: a measurement can be REAL and still describe the WRONG POPULATION. S…](#2026-08-26-rule-a-measurement-can-be-real-and-still-describe-the-wrong-population-state-the-denominator-before-you-generalise-a-rate)
+- [2026-08-27 — RULE: a deploy claim serialises SESSIONS. It does not reserve a service ag…](#2026-08-27-rule-a-deploy-claim-serialises-sessions-it-does-not-reserve-a-service-against-a-human-and-an-assistant-cannot-lift-the-guard-from-inside-a-command)
+- [2026-08-27 — MEASURED NEGATIVE: the NCAAF advanced-data payload does not close the gap…](#2026-08-27-measured-negative-the-ncaaf-advanced-data-payload-does-not-close-the-gap-to-market)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
@@ -594,5 +587,15 @@
 - [2026-08-18 — A BACKGROUND POLL'S EXIT CONDITION MUST MATCH THE ACTUAL SIGNAL, NOT ONE W…](learnings_evidence.md#2026-08-18-a-background-polls-exit-condition-must-match-the-actual-signal-not-one-wording-of-it) `[evidence]`
 - [2026-08-19 — "LIVE BY COMMIT SHA" AND "REACHABLE FROM THE CALL PATH THAT ACTUALLY RUNS"…](learnings_evidence.md#2026-08-19-live-by-commit-sha-and-reachable-from-the-call-path-that-actually-runs-are-two-different-claims-i-reported-the-first-as-if-it-were-the-second-for-461-in-front-of-the-user-before-checking) `[evidence]`
 - [2026-08-19 — `lane-guard.py`'s PATHISH_RE flags a BARE FILENAME in PROSE as a real file…](learnings_evidence.md#2026-08-19-lane-guardpys-pathish_re-flags-a-bare-filename-in-prose-as-a-real-file-claim-blocking-an-unrelated-lane-twice-in-one-session) `[evidence]`
+- [2026-08-19 — OVERTURNED: `SYNDICATE_DEPLOY_GUARD=off` works as an inline Bash prefix](learnings_evidence.md#2026-08-19-overturned-syndicate_deploy_guardoff-works-as-an-inline-bash-prefix) `[evidence]`
+- [CORRECTION, same day, after the user asked "are you sure you're looking correctly"](learnings_evidence.md#correction-same-day-after-the-user-asked-are-you-sure-youre-looking-correctly) `[evidence]`
+- [2026-08-20 -- a fix's data can be correct while its raw diagnostic API still shows noth…](learnings_evidence.md#2026-08-20----a-fixs-data-can-be-correct-while-its-raw-diagnostic-api-still-shows-nothing-verify-against-the-served-surface-not-the-one-that-found-the-bug) `[evidence]`
+- [CORRECTION, same session — collection was NOT the cause, and the fix I gave was backwar…](learnings_evidence.md#correction-same-session-collection-was-not-the-cause-and-the-fix-i-gave-was-backwards) `[evidence]`
+- [2026-08-20 — an mtime that PREDATES the write it describes is `copy2` from the checkout…](learnings_evidence.md#2026-08-20-an-mtime-that-predates-the-write-it-describes-is-copy2-from-the-checkout-not-a-publish-it-is-the-only-signal-that-a-boot-time-sync-clobbered-a-live-artifact) `[evidence]`
+- [2026-08-20 — taking the blame is not the same as finding the cause, and a self-critical…](learnings_evidence.md#2026-08-20-taking-the-blame-is-not-the-same-as-finding-the-cause-and-a-self-critical-wrong-answer-stops-the-search-just-as-dead-as-a-self-serving-one) `[evidence]`
+- [2026-08-20 — a lock's STORAGE must not outlive its SCOPE. An age-based "stale lock" che…](learnings_evidence.md#2026-08-20-a-locks-storage-must-not-outlive-its-scope-an-age-based-stale-lock-check-does-not-make-one-self-healing) `[evidence]`
+- [2026-08-22 — RULE: `| tail -N` on a backgrounded command truncates the OUTPUT FILE, not…](learnings_evidence.md#2026-08-22-rule-tail--n-on-a-backgrounded-command-truncates-the-output-file-not-just-the-display) `[evidence]`
+- [2026-08-25 — METHOD: a log line that prints only on the bad path cannot verify the good…](learnings_evidence.md#2026-08-25-method-a-log-line-that-prints-only-on-the-bad-path-cannot-verify-the-good-path-silence-is-not-a-reading) `[evidence]`
+- [2026-08-25 — METHOD: to prove a conditional gate still fires, find it firing for a SIBL…](learnings_evidence.md#2026-08-25-method-to-prove-a-conditional-gate-still-fires-find-it-firing-for-a-sibling-that-meets-the-condition-today-do-not-reason-from-the-code) `[evidence]`
 
 <!-- LEARNINGS-INDEX:END -->
