@@ -132,6 +132,24 @@ NCAAF_CALIBRATION_PROFILE, NCAAF_CALIBRATION_PROFILE_METADATA = load_versioned_p
     artifact_path=calibration_profile_path("ncaaf"),
 )
 
+# WHICH PROFILE IS LIVE MUST BE OBSERVABLE. Measured 2026-08-27: the promoted
+# artifact was deployed to refresh-worker and NOTHING on the service could say
+# whether it had been loaded — `render_logs --text calibration` matched nothing,
+# so "the file is in the checkout" was the strongest available claim. A silent
+# load is indistinguishable from a silent fallback to the default, which is
+# exactly the failure `load_versioned_profile` is designed to make safe: it
+# degrades to the default and never raises.
+#
+# `print(..., flush=True)` and not `logger.info` — `todo.md` records that
+# logger.info never reaches Render's log collector.
+print(
+    f"[calibration] ncaaf profile source={NCAAF_CALIBRATION_PROFILE_METADATA.get('source')}"
+    f" version={NCAAF_CALIBRATION_PROFILE_METADATA.get('version', '-')}"
+    f" goal_line_touchdown={NCAAF_CALIBRATION_PROFILE.goal_line_touchdown}"
+    f" drive_yardage_multiplier={NCAAF_CALIBRATION_PROFILE.drive_yardage_multiplier}",
+    flush=True,
+)
+
 __all__ = [
     "NCAAF_CALIBRATION_PROFILE",
     "NCAAF_CALIBRATION_PROFILE_DEFAULT",
