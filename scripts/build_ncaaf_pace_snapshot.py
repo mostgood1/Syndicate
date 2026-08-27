@@ -70,19 +70,77 @@ SEASON_TYPE = "regular"
 MAX_WEEK = 16
 
 
-def _elapsed_seconds(elapsed: object) -> int:
-    if not isinstance(elapsed, dict):
-        return 0
+PERIOD_SECONDS = 15 * 60
+
+
+def _clock(value: object) -> int | None:
+    """Game clock -> seconds remaining, or None when the clock is ABSENT.
+
+    ABSENT MUST NOT READ AS 0:00. The first version returned 0 for an empty or
+    partial dict, so a drive with a missing `endTime` derived
+    `start - 0 = start` and inflated to as much as a full period -- fabricating
+    precisely the outliers this derivation exists to remove. A missing value
+    that lands on a legal-looking number is worse than a crash.
+    """
+    if not isinstance(value, dict):
+        return None
+    if value.get("minutes") is None and value.get("seconds") is None:
+        return None
     try:
-        return int(elapsed.get("minutes") or 0) * 60 + int(elapsed.get("seconds") or 0)
+        return int(value.get("minutes") or 0) * 60 + int(value.get("seconds") or 0)
     except (TypeError, ValueError):
-        return 0
+        return None
+
+
+def _drive_seconds(drive: dict) -> int | None:
+    """Elapsed DERIVED from the game clock, because CFBD's `elapsed` is corrupt.
+
+    THE FIELD CANNOT BE TRUSTED, and it fails in the direction that hurts most.
+    Measured on 2024, `elapsed` is internally inconsistent with the drive's own
+    start/end clock on 302 of 36,620 drives (0.82%):
+
+        start 8:10 -> end 6:27, period 1->1   true 1:43   `elapsed` 51:00
+        start 10:51 -> end 8:29, period 2->2  true 2:22   `elapsed` 30:00
+        start 3:39 -> end 1:52, period 2->2   true 1:47   `elapsed` 47:00
+
+    0.82% sounds ignorable and is not: each bad row carries ~50x the weight of
+    a real drive, so trusting the field put Texas State at 74,464 seconds of
+    offence for a season (20.7 HOURS, against a ~3,600s game clock shared by
+    both teams) and 84.43 s/play. 34 of 264 teams landed over 40 s/play and
+    13.3% of the league clamped in the engine. A RATE that looks negligible can
+    still dominate a MEAN -- the magnitude is what matters, not the count.
+
+    The clock is self-consistent, so it is derived instead: within a period the
+    clock counts DOWN, so elapsed = start - end, plus a full period for each
+    boundary crossed. Anything still implausible (negative, or a single drive
+    over one full period) is DROPPED and counted, never silently kept.
+    """
+    start_period, end_period = drive.get("startPeriod"), drive.get("endPeriod")
+    start, end = _clock(drive.get("startTime")), _clock(drive.get("endTime"))
+    if start is None or end is None or start_period is None or end_period is None:
+        return None
+    try:
+        periods = int(end_period) - int(start_period)
+    except (TypeError, ValueError):
+        return None
+    if periods < 0:
+        return None
+    if int(start_period) > 4 or int(end_period) > 4:
+        # College overtime has NO game clock, so a period-4 -> period-5 drive
+        # would derive `start + 900` and read as a very slow drive. OT is a
+        # different clock regime, not a slow one.
+        return None
+    seconds = start - end + periods * PERIOD_SECONDS
+    if seconds <= 0 or seconds > PERIOD_SECONDS:
+        return None
+    return seconds
 
 
 def build_pace_rows(client: CfbdClient, *, season: int) -> tuple[list[dict[str, object]], dict[str, object]]:
     """Aggregate `/drives` into per-team seconds-per-play. Returns (rows, report)."""
     agg: dict[str, list[int]] = {}
     drives_seen = 0
+    drives_dropped = 0
     weeks_ok = 0
     weeks_failed: list[int] = []
     for week in range(1, MAX_WEEK + 1):
@@ -102,8 +160,11 @@ def build_pace_rows(client: CfbdClient, *, season: int) -> tuple[list[dict[str, 
         for drive in payload or []:
             offense = drive.get("offense")
             plays = drive.get("plays")
-            seconds = _elapsed_seconds(drive.get("elapsed"))
-            if not offense or not plays or plays <= 0 or seconds <= 0:
+            seconds = _drive_seconds(drive)
+            if seconds is None:
+                drives_dropped += 1
+                continue
+            if not offense or not plays or plays <= 0:
                 continue
             bucket = agg.setdefault(str(offense), [0, 0, 0])
             bucket[0] += seconds
@@ -133,6 +194,11 @@ def build_pace_rows(client: CfbdClient, *, season: int) -> tuple[list[dict[str, 
         "weeks_fetched": weeks_ok,
         "weeks_failed": weeks_failed,
         "drives_aggregated": drives_seen,
+        "drives_dropped_bad_clock": drives_dropped,
+        "drives_dropped_pct": (
+            round(100.0 * drives_dropped / (drives_seen + drives_dropped), 2)
+            if (drives_seen + drives_dropped) else None
+        ),
         "teams_seen": len(agg),
         "teams_kept": len(rows),
         "teams_below_min_plays_pct": (
