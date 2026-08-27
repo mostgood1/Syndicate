@@ -3984,3 +3984,83 @@ and NO font-size rule in the NCAAF sheet, so it inherited 16px body text and
 rendered LARGER than the 15px value it annotates. MLB's `cards-linescore*` have
 zero rules there. Soccer's `cards-strip-pregame-*` ARE global — which is why
 they were safe to reuse, checked rather than assumed.
+
+## 2026-08-27 — FORBIDDEN: deferring work around a ledger BLOCKER without re-measuring it. A blocker is a measurement and it expires.
+
+Lane `live-game-line-projection` carried, in bold: *"AND IT CANNOT BE READ
+OFF-WORKER. `/api/ops/artifacts/stream` returns 403 `path is not an allowed hot
+artifact` for the ledger `.jsonl`; re-verified 2026-08-18 — no entry in
+`HOT_ARTIFACT_PATTERNS` matches. Whoever takes this lane needs the artifact
+route, or the allowlist entry first."*
+
+**It was true on 2026-08-18 and false from 2026-08-20**, when `d7dbdbd2`
+("allowlist: make the live-gameline ledger readable off-worker (#440)") added
+both patterns. Content-verified 2026-08-27 on all three DEPLOYED SHAs — web
+`e3568422`, refresh-worker `ad3f116c`, live-odds-worker `34b4d4b4`.
+
+**The damage is that a blocker does not just sit there — it PROPAGATES.** For
+seven days it was the stated reason the ledger route was "deliberately OUT of
+scope and handed on", and a SECOND lane
+(`layer2-rail-duplicate-nfl-cards`) wrote its own scope note around the same
+file. Two lanes shaped their work around a fact that had already been fixed by
+a third. Nobody re-read it because it was bold, dated, and specific — the three
+properties that make a stale fact most convincing.
+
+Compounding it, the claim that would have enforced the detour was held by
+session `e8d83eb5-…`, absent from the roster even with `include_archived=true`.
+So the file was guarded by a dead holder against an edit that was already made.
+
+**Rules:**
+1. **Re-measure a blocker before you scope around it.** The cost of re-running
+   one grep is always lower than the cost of routing work around a phantom. If
+   the blocker names a file:line or a pattern, check that file:line.
+2. **Date-stamp blockers with what was measured, not just when.** "no entry in
+   `HOT_ARTIFACT_PATTERNS` matches" is checkable in seconds; "cannot be read
+   off-worker" is a conclusion that outlives its evidence.
+3. **A blocker inherited from another lane is second-hand.** Same rule as
+   [[feedback_rederive_load_bearing_cross_lane_numbers]] — if it changes what
+   you build, you measure it yourself.
+4. **Check the holder is alive before honouring a claim** — `include_archived=true`,
+   because "ended" and "never existed" look identical without it.
+
+Same family as the other half of this session: the lane ALSO believed its
+accuracy collector was "accumulating nightly" when the scheduled task had been
+`enabled: false` for six days, because one task delegated its own re-enable to
+another and nothing verified the handoff. Both are the same failure — **a
+written status standing in for a reading.**
+
+## 2026-08-27 — FORBIDDEN: trusting a test whose FIXTURE cannot violate the property it asserts. It is not weak coverage; it is zero coverage that reads as strong.
+
+`tests/test_live_gameline_score.py::test_model_and_market_are_scored_on_identical_rows`
+existed, was named for exactly the right invariant, and carried the docstring
+*"The load-bearing assertion. If the market were scored on a different population
+the comparison would be meaningless, and it would still LOOK like a number."*
+
+It passed for weeks while production computed **model n 94 vs market n 90**.
+
+**Why it could never fail:** every record in its fixture carries BOTH
+`model_home_win_prob` and `market_fair_prob`. The populations diverge only when a
+record has a model probability and NO market price — a row the fixture does not
+contain. So `assert model.n == market.n == 2` was re-measuring the fixture, not the
+code. Any implementation, including the broken one, passes it.
+
+The defect it missed had ALREADY been observed, too: `all_records` was recorded in
+`state.md` as "UNSOUND (model n 1526 vs market 1449)" — **written down as a caveat
+and never fixed**, so the same bug shipped in three cuts. A known-unsound number
+that stays in the ledger as a warning is a bug with a comment on it.
+
+**Rules:**
+1. **Before trusting a test, ask what input would make it fail — then check the
+   fixture contains that input.** If no fixture row can violate the property, the
+   test asserts nothing. Name the negative case in the fixture or the test is
+   decoration.
+2. **A property about MISSING data needs a fixture row with data missing.** Null,
+   absent, one-sided. This is the whole class: every "scored on identical rows",
+   "handles absent X", "unknown defaults safely" test needs the absence present.
+3. **When you record a number as UNSOUND, open the fix or say why not.** "UNSOUND"
+   in a ledger is not containment — three cuts and several weeks of quoting say so.
+   Same failure shape as [[a blocker is a measurement and it expires]] from earlier
+   today: writing the caveat felt like handling it.
+
+Both fixes this session were caught the same way and neither by a test: by PRINTING
+BOTH n VALUES side by side instead of the difference. The difference looked fine.

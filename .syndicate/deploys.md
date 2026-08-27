@@ -34182,3 +34182,107 @@ board actually holds -- 77%, which is why that source won 12,047 selections.
 larger than the thing this deploy set out to answer).
 
 **Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.
+
+## 2026-08-27 — web `a293bf14` — live-gameline draw handling — LIVE AND VERIFIED INERT (lane `live-game-line-projection`)
+
+**what:** `build_finals_index` becomes sport-aware — a draw is `home did not win`
+rather than a dropped row. Landed on main as `a293bf14`; web only (single pending
+commit, nothing else rode along).
+
+**locks:** claim acquired 15:58:39Z by `live-game-line-projection`; preflight
+re-run **pinned to the target SHA** after `deploy-guard` correctly refused a
+preflight that vouched for no particular commit — `CLEAR: only infrastructure
+processes`. `check_deploy_safety.py` **CLEAR**: MLB sim not running, odds refresh
+idle, **no live games**, board build idle.
+
+**deploy:** `dep-da85u6ks728c73aqebh0`, trigger `api`, created 16:00:26Z.
+**live commit `a293bf14` read back at 16:04:18Z.**
+
+**verify: THE FIX IS LIVE ON WEB AND HAS NO EFFECT THERE. Named reading —
+`live_gameline_score.finals_index` is ABSENT** on all three boards fetched after
+the deploy went live:
+
+    soccer 2026-08-22  generated_at 2026-08-24T03:56:32Z  games=19  finals_index ABSENT
+    soccer 2026-08-26  generated_at 2026-08-27T15:49:47Z  games=1   finals_index ABSENT
+    mlb    2026-08-26  generated_at 2026-08-27T15:49:40Z  games=15  finals_index ABSENT
+
+**WHY, and this is the point:** `generated_at` on the two current boards is
+**15:49Z — BEFORE this 16:04Z deploy**, and matches refresh-worker's own restart
+after IT deployed at 15:48:20Z. So web is serving a STORED ARTIFACT and the score
+block is computed at artifact-BUILD time on refresh-worker. **Deploying web cannot
+move this number.** Recorded as inert rather than as a success: the deploy
+succeeded, the change did not take effect, and those are different claims.
+
+**Consequence, unpaid:** the fix needs (a) refresh-worker on `a293bf14` AND (b) a
+book_grid artifact REBUILD for the dates concerned. A deploy alone will not
+re-score history — the six retained soccer nights need a backfill, which is not
+done and is not scheduled.
+
+**refresh-worker: NOT DEPLOYED THIS PASS.** Claim held by `venue-quote-line-join`
+(acquired 15:35:11Z, expires 16:20:11Z). **Not forced.** The claim's `pid` is dead,
+but that is NOT a liveness signal — my own live web claim's pid is dead too
+(checked as a control before drawing any conclusion). The holder's session is
+absent from the registry (lookup validated against a known-running session first),
+so a force would have been defensible — but their commit `277062cd` went live at
+15:48:20Z, so there was no in-flight build to protect and nothing to gain over
+waiting ~15 min.
+
+## 2026-08-27 — web + refresh-worker `0365f802` — draw handling AND paired model-vs-market difference (lane `live-game-line-projection`)
+
+**what:** two fixes to `live_gameline_score.py`, landed separately and deployed
+together to save a second refresh-worker restart.
+- `a293bf14` — `build_finals_index` is sport-aware; a draw is `home did not win`
+  instead of a dropped row.
+- `0365f802` — the model-vs-market difference is PAIRED. `market_fair_prob` can be
+  absent where `model_home_win_prob` is not, so every cut was subtracting Briers
+  across two different row sets (measured: MLB `last_per_game` n **94 vs 90**).
+
+**locks:** both services claimed by `live-game-line-projection`. refresh-worker
+preflight HELD for ~11 min on 3 in-flight jobs (incl. `build_soccer_artifacts.py
+--league ligue_1`) and was **waited out, not forced**; CLEAR at 16:24:32Z. Preflight
+re-run pinned to `0365f802` for each service. `check_deploy_safety` reported an odds
+refresh RUNNING — **not a blocker for this deploy**: it carried `lane=live-odds-worker`
+and refresh-worker's own process list showed only infra. Service-scoped preflight is
+the discriminator; the global gate is not.
+
+**land:** first push REJECTED (origin/main moved mid-push, several sessions active);
+rebase is idempotent, retry landed `709fc0c3..0365f802`. Target content-verified to
+carry BOTH fixes plus the `sport=sport` call site — by content, not ancestry.
+
+**deploys:** refresh-worker `dep-da86aa942hec73c06ct0` finished **16:28:59Z**;
+web `dep-da86aonavr4c73ejh2h0` finished **16:30:23Z**.
+
+**verify: THE DRAW FIX IS LIVE AND REACHABLE. Named reading — the soccer board
+REBUILT at 16:30:58Z (AFTER the 16:28:59Z deploy, so not a stored artifact) and
+carries:**
+
+    finals_index = {"sport": "soccer", "sport_known": true,
+                    "draws_scored_as_not_a_home_win": true,
+                    "finals_seen": 0, "finals_level": 0,
+                    "finals_skipped_level": 0,
+                    "finals_skipped_level_sport_unknown": 0}
+
+The freshness cut is the whole point: web's earlier `a293bf14` deploy served a
+15:49Z artifact and was INERT, and presence of a field on a stored artifact would
+have proved nothing.
+
+**NOT YET PROVEN, AND NOT CLAIMED:**
+1. **No draw has actually been SCORED in production.** `finals_seen: 0` — at 16:33Z
+   (11:33 CT) no sport has a final game: mlb/wnba/soccer/nfl all read
+   `games_with_outcome: 0`. The path is proven REACHABLE and correctly configured;
+   it has not yet met a draw.
+2. **The pairing fix is deployed but UNEXERCISED.** `populations_matched` /
+   `rows_without_market_prob` appear only when the cuts are computed, and
+   `score_ledger_records` is only called with a non-empty finals index. No board has
+   finals yet, so the fields are absent everywhere — expected, not a fault.
+3. mlb/wnba/nfl boards still read `generated_at 16:20Z` (pre-deploy) and will pick
+   the new code up on their own cadence.
+
+**Both discharge tonight on their own:** the re-enabled
+`live-gameline-accuracy-snapshot` fires 23:33 CT against a slate with finals, and
+that row is the first measurement this platform will have taken with both fixes in
+place. If `populations_matched` is absent or false in it, item 2 reopens.
+
+**known, CHOSEN skew:** `live-odds-worker` stays on `34b4d4b4`. It does not build the
+board and deploying it would carry three unrelated commits. Deliberate, not an
+oversight.
