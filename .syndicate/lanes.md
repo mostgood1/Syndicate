@@ -2358,7 +2358,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `scripts/run_refresh_worker.py`, held by `exchange-markets-api-integration`
   and `portfolio-ledger-service-split`. Pre-existing, not this lane's.
 
-### wnba-chip-live-token — OPEN — opened 2026-08-27 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 — **CLOCK FIXED AND VERIFIED IN PRODUCTION (web `e3dceb68`): `LIVE` -> `Q3 20.5`, control and after on the same game against ESPN. TWO THINGS OWED — refresh-worker is not deployed, and the projection guard is UNIT-TESTED ONLY. `todo.md #586`.**
+### wnba-chip-live-token — OPEN — opened 2026-08-27 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 — **CLOCK FIXED AND VERIFIED IN PRODUCTION (web `e3dceb68`): `LIVE` -> `Q3 20.5`, control and after on the same game against ESPN. TWO THINGS OWED — refresh-worker is not deployed, and the projection guard is UNIT-TESTED ONLY. `todo.md #586`.** **CHECKPOINT 2026-08-27T01:2xZ: refresh-worker reached `070f452a` and DOES carry the fix; the WNBA half is owed on a MISSING SUBJECT, not a missing deploy — `WNBA live=0` when the artifact landed. Next window TOR @ SEA `02:00Z`. Session archived; lane UNOWNED.**
 - Goal: a live WNBA game chip carries its QUARTER AND CLOCK (`Q3 5:23`) instead
   of a bare `LIVE`, and never renders a SmartSim projection as an observed score.
 - Files: `syndicate/blueprints/home.py`,

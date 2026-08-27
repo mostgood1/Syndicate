@@ -5715,7 +5715,7 @@ Reproduced independently by lane `board-staleness-visibility`.
 ## [board-quote-staleness] Board freshness vs QUOTE staleness — verified 2026-08-26 (lane `board-staleness-visibility`)
 
 **THE BOARD BUILD IS ~108s IN STEADY STATE.** n=40 unattended builds, median
-107.8s, p90 145.5s. **A COLD build (first after restart) is 747.8s — 6.9x.**
+107.8s, p90 145.5s. **A COLD build (first after restart) is 747.8s — 6.9x — but that is a FLOOR, not a bound: measured again 2026-08-27, boot `00:56:13Z` to first `GAME_CHIPS_PUBLISHED` `01:14:32Z` = **18m19s**, half again the recorded figure, on a 15-game slate. Slow rather than stuck — stages walked forward (`cards_context_end` 01:01, `board_contract_end` 01:07) and memory was flat at ~1.79GB anon. Do not size a wait against 747.8s.**
 Every figure in older entries (19m43s, 12m44s, 11m22s) is a COLD build
 generalised; they were measured in a window with 15 deploys in 6h15m where the
 worker never reached a warm build. **Quote a board-build duration only with
