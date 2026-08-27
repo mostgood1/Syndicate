@@ -442,6 +442,7 @@ def apply_venue_quotes(
     stamped = 0
     per_source: dict[str, int] = {}
     per_source_by_sport: dict[str, dict[str, int]] = {}
+    wanted_by_sport: dict[str, set[str]] = {}
     ceilings: dict[str, int] = {}
     source_status: dict[str, Any] = {}
     unmatched_samples: list[str] = []
@@ -469,6 +470,8 @@ def apply_venue_quotes(
         # reported a confident `stamped=0` -- the "zero that looks like a
         # working feed" failure this module documents three times over.
         keys = _candidate_keys(row, sport)
+        # Every key this sport ASKED FOR, for the overlap counter below.
+        wanted_by_sport.setdefault(sport, set()).update(str(k) for k in keys)
         quotes_for_sport = payload.get("quotes") or {}
         quote = None
         key = keys[0]
@@ -535,6 +538,19 @@ def apply_venue_quotes(
         # whose every row lost are different facts, and `unmatched_by_sport`
         # beside this tells them apart.
         "selected_by_source_by_sport": per_source_by_sport,
+        # {sport: {source: {offered, wanted_overlap}}}. THE QUESTION THIS
+        # ANSWERS, which nothing else here could: a source with quotes and zero
+        # selections is either offering bets the board never asks for, or
+        # offering the right bets and losing on freshness. Those need opposite
+        # fixes and looked identical.
+        #
+        # Measured 2026-08-27: kalshi offered 173 SOCCER quotes at 165s -- the
+        # freshest feed of the four -- and won ZERO. The four sampled keys were
+        # Belgian clubs (`oh leuven`, `kaa gent`, `anderlecht`, `kv kortrijk`)
+        # and NONE of them appears among the 161 clubs the board carried that
+        # day, which suggests different FIXTURES rather than a key-shape
+        # mismatch. A sample of four cannot settle that; this counter can.
+        "offered_overlap_by_sport": _offered_overlap(by_sport, wanted_by_sport),
         "by_source": source_status,
         # THE TWO SIDES OF THE JOIN, SAMPLED, so a key-space mismatch is
         # readable rather than inferred. `unmatched_sample` is what the BOARD
@@ -651,6 +667,36 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
             if candidate not in keys:
                 keys.append(candidate)
     return keys
+
+
+def _offered_overlap(
+    by_sport: Mapping[str, Mapping[str, Any]],
+    wanted_by_sport: Mapping[str, set[str]],
+) -> dict[str, dict[str, dict[str, int]]]:
+    """Per sport and source: how many keys it offered, and how many of those the
+    board actually asked for.
+
+    `wanted_overlap: 0` alongside a healthy `offered` is a COVERAGE statement --
+    this source is quoting bets nobody on the board is holding. A non-zero
+    overlap with zero selections is the opposite: the right bets, lost on
+    freshness or to a rival source. `by_source` reports what was offered and
+    `selected_by_source_by_sport` what was won; without this, the gap between
+    them had two explanations and no way to choose.
+    """
+    out: dict[str, dict[str, dict[str, int]]] = {}
+    for sport, payload in (by_sport or {}).items():
+        wanted = wanted_by_sport.get(sport) or set()
+        per_source: dict[str, set[str]] = {}
+        for key, quote in ((payload or {}).get("quotes") or {}).items():
+            source = getattr(quote, "source", None)
+            if source:
+                per_source.setdefault(str(source), set()).add(str(key))
+        if per_source:
+            out[sport] = {
+                source: {"offered": len(keys), "wanted_overlap": len(keys & wanted)}
+                for source, keys in sorted(per_source.items())
+            }
+    return out
 
 
 def _offered_sample(by_sport: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:

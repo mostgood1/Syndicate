@@ -277,3 +277,37 @@ def test_a_sport_that_won_nothing_is_absent_rather_than_zero_filled():
 
     assert "soccer" not in result["selected_by_source_by_sport"]
     assert result["unmatched_by_sport"]["soccer"] == 1
+
+
+def test_offered_overlap_separates_a_coverage_gap_from_a_freshness_loss():
+    """A source with quotes and ZERO selections has two possible causes that
+    looked identical: it is quoting bets the board never asks for, or the right
+    bets lost to a fresher rival. They need opposite fixes.
+
+    Measured 2026-08-27: kalshi offered 173 soccer quotes at 165s -- the
+    freshest of four feeds -- and won none.
+    """
+    from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes
+
+    now = 1_787_000_000.0
+
+    def q(key, source):
+        return Quote(key=key, source=source, sport="soccer", market="h2h",
+                     side="x", probability=0.5, american=100, line=None, fetched_at=now)
+
+    quotes = {
+        # Offers a club the board is not holding at all -- a COVERAGE gap.
+        "soccer|h2h|oh leuven": q("soccer|h2h|oh leuven", "kalshi"),
+        # Offers exactly what the board asks -- overlap, and it wins.
+        "soccer|h2h|club brugge": q("soccer|h2h|club brugge", "polymarket_us"),
+    }
+    collected = {"soccer": {"quotes": quotes, "by_source": {}, "ceiling_seconds": 86400}}
+    rows = [{"sport": "soccer", "market": "h2h", "side": "home", "line": None,
+             "home_team": "Club Brugge", "away_team": "Cercle Brugge KSV"}]
+
+    result = apply_venue_quotes(rows, "2026-08-27", collected_by_sport=collected, now=now)
+    overlap = result["offered_overlap_by_sport"]["soccer"]
+
+    assert overlap["kalshi"] == {"offered": 1, "wanted_overlap": 0}, overlap
+    assert overlap["polymarket_us"]["wanted_overlap"] == 1, overlap
+    assert result["selected_by_source_by_sport"]["soccer"] == {"polymarket_us": 1}
