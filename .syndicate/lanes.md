@@ -2101,8 +2101,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   parameter; a picker at the top of the page makes it routine, so it is fixed
   here rather than deferred. `book_count` is new on the payload so the message
   can say how many orders the book actually holds.
-- Blocked by: none. NOT deployed and no claim taken -- web-only template and
-  route code, and `render.yaml` is untouched.
+- **DEPLOYED AND VERIFIED `[2026-08-27]`** -- web `e06fa72d`, deploy
+  `dep-da8bhg67bikc739qv5jg`, live `22:26:05Z`. Cumulative over the live SHA
+  `12928720` (ancestor check run BEFORE triggering, not assumed), and the only
+  code in the range is this lane's three files. **The reading that proves it:**
+  served production `/portfolio` renders the input `value=""` with 83 positions
+  and 47 venue tickers, `?on=2026-08-25` renders `value="2026-08-25"` with both
+  arrows live (08-24 / 08-26) and 10 positions / 3 tickers, and `?on=2026-07-04`
+  reads "The book is not empty" with "No live positions have ever been placed"
+  ABSENT. Full row + the false-positive that nearly banked a wrong result:
+  `.syndicate/deploys.md`. Claim released.
+- Blocked by: none. `render.yaml` untouched, so no `blueprint_sync`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

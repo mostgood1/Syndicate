@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-08-27 — web `e06fa72d`: a date filter at the top of `/portfolio`, driving the opt-in `?on=`
+
+**Deployed:** `dep-da8bhg67bikc739qv5jg`, triggered `22:22:56.813813Z`, live
+`22:26:05.367909Z`. Web 502'd across 5 polls (~100s) then served the new bytes
+on the 6th. Claim `web` held by `portfolio-top-date-filter`, acquired
+`22:22:01Z`, token `c5b3ce50…`, released after this row. Preflight `CLEAR` for
+this exact SHA, on `origin/main`, only infrastructure processes running.
+
+**CUMULATIVE, CHECKED BEFORE TRIGGERING RATHER THAN ASSUMED.** Live SHA was
+`12928720` and `git merge-base --is-ancestor 12928720 e06fa72d` passed, so this
+composes rather than reverts — the trap that cost a verified refresh-worker fix
+on 2026-08-15. `12928720` also happened to BE an ancestor of `origin/main` this
+time, which is not the usual shape for web and is why it was read rather than
+presumed. The whole `12928720..e06fa72d` range touches exactly three code files,
+all mine; the other four commits are ledger/docs. No `render.yaml`, so no
+`blueprint_sync`.
+
+**verify: MET `22:27Z`, on the SERVED PRODUCTION BYTES in three states.**
+
+```
+                              band note                      input   arrows(markup)  reset  tickers  Positions
+UNFILTERED  /portfolio        "...across all dates."         value=""   fwd DEAD      -         47        83
+FILTERED    ?on=2026-08-25    "...filtered to the            value=     both LIVE     yes        3        10
+                               2026-08-25 slate."            2026-08-25 08-24 / 08-26
+EMPTY SLATE ?on=2026-07-04    "...filtered to the            2026-07-04 fwd DEAD      yes        0         —
+                               2026-07-04 slate."
+```
+
+The two that matter and why:
+
+- **`value=""` unfiltered is the whole safety property.** This book is
+  all-dates by construction because a page that hides yesterday's open bet
+  behind a date picker will one day let one expire unwatched. 83 positions and
+  47 venue tickers on the unfiltered page vs 10 and 3 on the filtered one is the
+  falsification guard in both directions: the filter is genuinely OFF by default
+  AND genuinely filters when asked. Either number alone reads clean while the
+  control is inert.
+- **The empty slate is a PRE-EXISTING defect this fixes.**
+  `2026-07-04` returns `No live positions on` + `The book is not empty`, and
+  `No live positions have ever been placed` is **absent** — that sentence is a
+  claim about every live order ever placed and it was being printed over
+  filtered views. Reachable before today only by hand-typing `?on=`.
+
+**THE FIRST VERIFICATION ATTEMPT WAS A FALSE POSITIVE AND IS RECORDED BECAUSE
+IT NEARLY BANKED A WRONG RESULT.** I polled `pending_deploys.py --json` for the
+target SHA and it matched, so I said web was live on `e06fa72d`. That script
+lists what is committed and **NOT yet running** — matching the SHA anywhere in
+its output is evidence of the opposite of what I read it as. The served page
+still had no control, and `deploy_preflight` confirmed `live commit 12928720 /
+target not yet live`. Caught only because the served bytes were checked instead
+of the deploy-status field. **Poll the predicate, not a status field that
+mentions your SHA.**
+
+**INCIDENTAL, AND `state.md` IS WRONG ABOUT IT.** Line 3236 says production HTTP
+from a Claude session is UNREACHABLE (`connect_rejected`, 403 to CONNECT). It is
+reachable: `https://syndicate-an21.onrender.com/portfolio` returned `http=200` in
+`0.46s`, and every reading above is a direct fetch. Not corrected in `state.md`
+here — that line belongs to another subject and this is not that lane's row.
+
 ## 2026-08-27 — web `fb9261b8`: the board card subtitle names the league, and stops leaking it into the bet slip (`#591`)
 
 **Deployed:** `dep-da89vgfavr4c73esmuqg`, triggered `20:36:17Z`, live
