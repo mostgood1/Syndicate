@@ -816,10 +816,10 @@ def _kalshi_auth_probe_at_boot() -> None:
 def _polymarket_us_auth_probe_at_boot() -> None:
     """Does the Polymarket US credential work, and what shape does a read take?
 
-    A DIFFERENT EXCHANGE from `_polymarket_catalogue_at_boot` below, which pulls
-    the global on-chain venue's public catalogue. This one is `api.polymarket.us`
-    -- different host, different auth, and different MONEY. They are separate
-    functions for that reason.
+    THE ONLY EXCHANGE WE TRADE ON -- `api.polymarket.us`. A boot hook that pulled
+    the GLOBAL on-chain venue for contrast was RETIRED 2026-08-27 (see the note
+    above its former definition): nothing read it. The distinction still holds
+    -- different host, different auth, different MONEY.
 
     Read-only: it asks for one market. Nothing here can place an order, and the
     probe reports the SHAPE that came back rather than parsing it -- the choice
@@ -1067,7 +1067,7 @@ _POLYMARKET_SLATE_LAST_RUN: float = 0.0
 def _polymarket_us_slate_probe_at_boot() -> None:
     """What the US venue actually lists for sport, by SHAPE.
 
-    WHY THIS IS NOT `_polymarket_catalogue_at_boot`. That one pulls
+    WHY THIS IS NOT THE RETIRED GLOBAL CATALOGUE PULL. That one pulled
     `gamma-api.polymarket.com` -- the GLOBAL, on-chain exchange. The funded
     account and the working credential are on `api.polymarket.us`. Pricing an
     edge on one book and filling it on the other is the "different money" error
@@ -1372,49 +1372,45 @@ def _game_line_grade_audit_at_boot() -> None:
         )
 
 
-def _polymarket_catalogue_at_boot() -> None:
-    """What does Polymarket actually list, and can any of it be joined?
-
-    HERE RATHER THAN BESIDE THE KALSHI REFRESH, and that is a compromise worth
-    stating. The natural home is `intelligence_state`'s refresh block, next to
-    `run_kalshi_odds_refresh` -- but that file is claimed by an open lane
-    (`layer2-sim-view-and-live-projection`) and the lane guard refused the
-    edit, correctly. This worker is this lane's own, so the pull lands here and
-    the move can happen when that lane closes.
-
-    THE POINT IS THE SAMPLE. `paper:polymarket` reports +21.41% on 14 settled
-    bets priced from the ODDS FEED's view of the venue -- roughly 1.5% of a
-    slate -- so that edge is claimed at a price nothing has checked against
-    Polymarket's own book. Fixing it needs a join, and Polymarket has no
-    tickers at all: free-text questions against ERC-1155 token ids. The
-    QUESTION lines this prints are what that join gets written from.
-
-    Kalshi is the argument for doing it this way round. Its grammar was
-    guessed twice -- "Will the X win by over N runs?" against a real "Texas
-    wins by over 3.5 runs?", and `close_time` against a game date encoded in
-    the event ticker -- and cost a day of `unreadable_title: 302` and
-    `matched=0` before anyone read a real one.
-
-    Read-only: Gamma and the CLOB price endpoint need no key, no wallet and no
-    signature. Nothing reachable from here can place an order.
-    """
-    try:
-        from pipeline.polymarket_odds_refresh import run_polymarket_odds_refresh
-
-        result = run_polymarket_odds_refresh(force=True)
-        print(
-            f"[live_odds_worker] POLYMARKET_CATALOGUE status={result.get('status')}"
-            f" count={result.get('count')} sporting={result.get('sporting')}"
-            f" truncated={result.get('truncated')} reason={result.get('reason')}",
-            flush=True,
-        )
-    except Exception as exc:
-        # Named and contained, like every other optional boot diagnostic in
-        # this file. A venue we cannot reach must not stop the worker booting.
-        print(
-            f"[live_odds_worker] POLYMARKET_CATALOGUE_FAILED {type(exc).__name__}: {exc}",
-            flush=True,
-        )
+# `_polymarket_catalogue_at_boot()` REMOVED 2026-08-27. It fetched the GLOBAL
+# on-chain exchange (`gamma-api.polymarket.com`) on every boot, and nothing read
+# the result.
+#
+# MEASURED, twice and independently: every boot logged
+# `POLYMARKET_CATALOGUE status=ok count=100 sporting=0` -- 12 of 12 boots over
+# 2026-08-26..27, zero sporting markets on any of them. `polymarket_us_markets`'
+# own header records the same `count=100 sporting=0` from 2026-08-24 and states
+# why it could never have fed an order: the global rows carry no
+# `orderPriceMinTickSize` / `minimumTradeQty`.
+#
+# IT WAS THE WRONG EXCHANGE. The funded account and the working credential are
+# on `api.polymarket.us`, which `portfolio_commit` already reads at ~17,300
+# markets. Different exchange, different book, different money.
+#
+# ITS PURPOSE IS ALREADY SERVED. The docstring said the value was the QUESTION
+# sample, to write a join from. That join exists -- `polymarket_board_join`,
+# against the US slate -- and `_polymarket_us_slate_probe_at_boot()` below
+# reports its shape at boot.
+#
+# THE LOG LINE WAS THE ACTIVE HARM, not the wasted fetch. `status=ok count=100`
+# is what anyone grepping for Polymarket coverage finds first, and it describes
+# an exchange we do not trade on. `6d520b03` fixed the pagination bug that
+# capped it at 100, so it would have started reporting hundreds of rows per boot
+# at 20 requests instead of 1 -- a bigger number, equally unusable, and more
+# convincing.
+#
+# `scripts/probe_polymarket.py` remains for a manual look at the global
+# exchange, so nothing diagnostic is lost.
+#
+# Found by lane `polymarket-catalogue-pagination` (session syndicate-f8), who
+# correctly did not edit this file because this lane claims it. Verified here
+# before removal: the boot hook was the only caller of
+# `run_polymarket_odds_refresh`, and the 12 boot lines were re-read from the
+# Render logs API rather than taken on report.
+#
+# `pipeline/polymarket_odds_refresh.py` still exists and still has tests, but
+# now has NO production caller -- left in place deliberately rather than deleted
+# on one lane's judgement.
 
 
 def _kalshi_series_catalogue_at_boot() -> None:
@@ -2064,11 +2060,9 @@ def main() -> int:
         # a probe after another probe's `return` is how the auth check went
         # three restarts without running.
         _live_ledger_at_boot()
-        # Same reasoning, one line later: this sits AFTER the calls that own
-        # early returns, so nothing above it can prevent it running. The whole
-        # value is the QUESTION sample, and a diagnostic that silently never
-        # executes is the failure mode this file has already had twice.
-        _polymarket_catalogue_at_boot()
+        # `_polymarket_catalogue_at_boot()` WAS HERE and is retired -- see the
+        # note above its former definition. The two US probes below do the job
+        # it was written for, against the exchange our money is actually on.
         _polymarket_us_auth_probe_at_boot()
         _polymarket_us_slate_probe_at_boot()
         # The WRITER, not the probe: the probe reports shape once at boot, this
