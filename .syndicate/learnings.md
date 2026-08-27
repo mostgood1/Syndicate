@@ -4239,3 +4239,36 @@ one level further out than usual: the emitter is not merely quiet, it is in a
 process that has not started. The durable form is a field on the OUTPUT artifact
 (the projections CSV already carries `profile_name`, `rating_source`,
 `generated_at`), not a line in a job's stdout.
+
+## 2026-08-27 — A CARRIED-FORWARD FACT DECAYS EACH TIME IT IS RESTATED WITHOUT RE-READING THE SOURCE. And a clean kill census proves nothing until you prove the feature was RUNNING in that window.
+
+The lane's OOM debt read: *"an `oomKilled` fired at 04:46:44Z, 22 min after my deploy."*
+I restated that four times across one session — in the lane, twice in reports, in a
+scheduled task — and it was wrong every time. The event is **2026-08-16**T04:46:44Z, not
+08-17. Nobody introduced the error; it degraded by repetition, because each restatement
+was copied from the previous one rather than from the events API.
+
+Re-reading the source did not just fix a date. It dissolved the debt: the kill sits
+inside a storm of **56 oomKilled** whose first is 2026-08-15T00:04:47Z — **28 hours
+BEFORE the ledger deploy**. The deploy landed mid-incident. The attribution had never
+been supported by anything, and a whole session had been treating it as a live liability.
+
+**THE SECOND HALF, which is the part most likely to be skipped.** "Zero kills in 10d13h"
+is worthless on its own — it is equally consistent with the feature being switched off.
+The reading only counts because the ledger was PROVEN to be running in that same window:
+20 ledger files / 47.7 MB with fresh mtimes, and `MLB_LIVE_GAMELINE_LEDGER_ENABLED`
+absent (= enabled). Pair every null with proof the thing could have fired.
+
+**Rules:**
+1. **Re-read the SOURCE before restating a carried fact, not your own last summary.**
+   If a fact has a timestamp, an id, or a count, it has a source — go to it.
+2. **Exonerate on three legs, not one:** the timeline (does it predate the suspect?), the
+   rate (with its window stated, fully paged), and the mechanism (measured, not
+   estimated — 36.3 MB against a 4,096 MB limit ends the argument).
+3. **A null result requires a liveness proof.** No kills / no errors / no hits means
+   nothing until you show the code was executing during the window you read.
+4. Kills are EVENTS. `render_events.py`, never a log search — a killed process emits
+   nothing, so a 0-match log result is evidence about the emitter.
+
+Same family as [[a blocker is a measurement and it expires]] and [[a test whose fixture
+cannot violate its property]]: a stale or incapable reference standing in for a live one.
