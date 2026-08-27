@@ -2000,7 +2000,25 @@
 
   function chipForGame(group) {
     if (gameChipsById.has(group.key)) return gameChipsById.get(group.key);
-    const sport = String(group.sport || "").toLowerCase();
+    // THE SLUG, NEVER THE DISPLAY LABEL. Every chip index in `loadGameChips`
+    // is keyed on `chip.sport`, which is the SLUG ("soccer"); `group.sport` is
+    // built `item.sport || item.sport_slug` and is a DISPLAY string, which for
+    // some pipelines is the LEAGUE. Measured on production 2026-08-27: the
+    // steam candidates (`source: la_liga/api/odds/game_odds_current.csv`) and
+    // the La Liga prop rows carry `sport: "la liga"` alongside
+    // `sport_slug: "soccer"`, so all three text lookups below asked for
+    // `la liga|ath @ bar` against an index that only ever holds
+    // `soccer|ath @ bar`, and returned null for a chip that was sitting right
+    // there. Only the id lookup above could hit, and only when the row happened
+    // to carry the ESPN id the chip is keyed on.
+    //
+    // The two fields were already both on the row and `gameKey` above ALREADY
+    // reads them in the right order (`sport_slug || sport`) -- this function
+    // and the group's own `sport` read the SAME two fields with the opposite
+    // precedence, one line apart. `group.sport` stays as it is because it is
+    // what the card HEAD prints, and "LA LIGA" is a better label than "SOCCER";
+    // only the join moves to the slug.
+    const sport = String(group.sportSlug || group.sport || "").toLowerCase();
     const matchup = String(group.matchup || "").trim().toLowerCase();
     const exact = gameChipsByMatchup.get(`${sport}|${matchup}`);
     if (exact) return exact;
@@ -2096,6 +2114,9 @@
         groups.set(key, {
           key,
           sport: String(item.sport || item.sport_slug || "").trim().toUpperCase(),
+          // The JOIN key, kept separate from the DISPLAY label above -- see
+          // `chipForGame`. Same precedence as `gameKey`, deliberately.
+          sportSlug: String(item.sport_slug || item.sport || "").trim().toLowerCase(),
           matchup: displayMatchup(item) || "Matchup",
           count: 0,
           hasLive: false,
@@ -2254,7 +2275,11 @@
       const matchupIndex = new Map();
       for (const key of chiplessKeys) {
         const group = groups.get(key);
-        const matchupIndexKey = `${group.sport.toLowerCase()}|${group.matchup.trim().toLowerCase()}`;
+        // Slug, not display label, for the same reason `chipForGame` uses it:
+        // two chipless groups for ONE game can carry two different `sport`
+        // strings ("la liga" and "soccer") and would never land in the same
+        // bucket to be compared at all.
+        const matchupIndexKey = `${(group.sportSlug || group.sport).toLowerCase()}|${group.matchup.trim().toLowerCase()}`;
         if (!matchupIndex.has(matchupIndexKey)) matchupIndex.set(matchupIndexKey, []);
         matchupIndex.get(matchupIndexKey).push(key);
       }
@@ -2386,6 +2411,10 @@
       groups.set(key, {
         key,
         sport: sport.toUpperCase(),
+        // Already the slug here (it comes straight off `chip.sport`), but set
+        // explicitly so no group in this map is missing the field `chipForGame`
+        // now joins on.
+        sportSlug: sport,
         matchup: `${away} @ ${home}`,
         count: 0,
         hasLive: chip.state === "live",

@@ -27,7 +27,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const html = fs.readFileSync(path.join(here, '..', '..', 'syndicate', 'templates', 'intelligence.html'), 'utf8');
+// NORMALISED TO LF, WHATEVER THE CHECKOUT USES. `core.autocrlf` is true on the
+// Windows dev machine, so this template checks out with CRLF -- and every
+// `extract` pattern below anchors on a two-space-indented closing brace
+// followed by a NEWLINE, which CRLF cannot match. Both harnesses in this
+// directory therefore threw `could not extract normalizeClubName` and exited
+// non-zero on every Windows run: the guards on the chip join were DEAD there
+// while still looking like tests. Found 2026-08-27 while changing that join,
+// by running them rather than by reading them.
+const html = fs.readFileSync(path.join(here, '..', '..', 'syndicate', 'templates', 'intelligence.html'), 'utf8')
+  .split('\r\n').join('\n');
 
 function extract(pattern, label) {
   const m = html.match(pattern);

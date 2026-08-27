@@ -1,5 +1,80 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#589` — **Soccer games were duplicated on the Games rail: the chip join keyed on the DISPLAY sport, and La Liga rows carry `sport: "la liga"`.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-27, user report — **FIXED AND MEASURED ON THE PRODUCTION PAYLOAD; DEPLOY VERIFICATION OWED**
+
+Every chip index in `loadGameChips` is keyed on `chip.sport`, the SLUG
+(`"soccer"`). `chipForGame` keyed its three TEXT lookups on `group.sport`, which
+`deriveGameCards` builds as `item.sport || item.sport_slug` — a DISPLAY string,
+and for the steam and prop pipelines it is the LEAGUE. Measured on
+`/api/intelligence/query` 2026-08-27: 4 rows carry `sport: "la liga"` next to
+`sport_slug: "soccer"` (`source: la_liga/api/odds/game_odds_current.csv`). So
+the lookup asked for `la liga|ath @ bar` against an index that only ever holds
+`soccer|ath @ bar`.
+
+**`gameKey`, ten lines above, already reads the same two fields in the right
+order** (`sport_slug || sport`). The two functions disagreed on precedence over
+one row, and only the id lookup could still hit — which is why the defect looks
+like *some* soccer games duplicating and not all: it survives wherever the row
+happens to carry the ESPN id the chip is keyed on.
+
+**Two different duplicate shapes, one per screenshot pair.** The unresolved
+group leaves its chip UNCLAIMED, so the count-0 seeding loop seats a second card
+(`ATH @ BAR`); or it sits beside the ESPN-id group that did resolve
+(`OSA @ CEL` + `Osasuna @ Celta Vigo`).
+
+**A/B ON ONE PRODUCTION PAYLOAD** (238 chips, 1,679 rows, replayed through the
+real extracted functions — `tests/js/game_rail_production_replay.mjs`):
+
+| | control (`origin/main`) | fixed |
+|---|---|---|
+| cards | 250 | **248** |
+| chips seating >1 card | **2** | **0** |
+| chip-less cards | 12 | **10** |
+| `la liga` bucket | 3 cards, 2 chip-less | **gone** |
+| mlb / nfl / ncaaf / wnba | 7 / 16 / 8 / 4 | **identical** |
+
+The two it removes are exactly the reported pairs:
+`[SOCCER "ATH @ BAR" n=0] + [LA LIGA "ATH @ BAR" n=26]` and
+`[LA LIGA "OSA @ CEL" n=3] + [LA LIGA "Osasuna @ Celta Vigo" n=2]`.
+
+`group.sport` is deliberately UNCHANGED — it is what the card head prints, and
+`LA LIGA` is a better label than `SOCCER`. Only the join moved.
+
+**THE INSTRUMENT WAS WRONG FIRST, AND IT READ HEALTHY.** The replay's duplicate
+detector originally grouped cards by the chip `chipForGame` resolved — the code
+under test. In the control that returns null for precisely the duplicated cards,
+so it reported **0 duplicates in BOTH states**: a clean bill of health produced
+by the defect. It now joins on the slug taken from `group.key`, a field the
+defect cannot touch.
+
+**THIS DISCHARGES THE BEHAVIOURAL READ `#565`/the lane has owed since
+2026-08-20** — a LIVE board carrying BOTH row families for one game. The NFL
+slate retired that test case before it could be observed (`candidate_type=game`
+rows 2 → 0 between 18:20 and 18:59 CT); today's La Liga slate is the same shape
+and was still live when read.
+
+**Also revived two dead guards.** `tests/js/game_chip_canonical_join.test.mjs`
+and `game_chip_soccer_join.test.mjs` extract from the template with patterns
+anchored on `\n  }\n`; `core.autocrlf` is true here, so both threw
+`could not extract normalizeClubName` and exited non-zero on **every** Windows
+run — the guards on this exact join were dead while still looking like tests.
+Both now pass, 15 and 13 assertions, against control AND fixed: reviving them
+proved the change safe on those axes, it did not find a hidden bug.
+
+`game_rail_derive.test.mjs` now **extracts the real `chipForGame`** instead of
+restating it as a two-line stub. The stub had no canonical or normalized index
+and keyed on `group.sport` — the field this defect is about — so the six new
+assertions could not have failed against it. 25 assertions pass; 5 fail against
+the pre-change template, reproducing `"ATH @ BAR | ATH @ BAR"` exactly.
+
+**NOT fixed, deliberately:** a chip-seeded soccer card still labels itself
+`SOCCER` while a row-backed one beside it reads `LA LIGA` (the chip carries
+`league_display`). Cosmetic, pre-existing, and not what was reported. Also
+still chip-less and unrelated: 8 NCAAF cards (that sport publishes **0** chips)
+and 2 WNBA games absent from the chip feed — neither duplicates anything.
+
+**OWED:** the served rail on production showing one card per La Liga game.
+
 ### `#588` — **Every lined OddsAPI venue quote was published without its line, so spreads and totals could never match the board.** — lane `venue-quote-line-join`, 2026-08-27 — **FIXED; PRODUCTION VERIFICATION OWED**
 
 `oddsapi_outcome` read `american` from the entry VALUE (`last_odds`) and the

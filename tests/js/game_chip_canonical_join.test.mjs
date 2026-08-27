@@ -26,7 +26,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const html = fs.readFileSync(path.join(here, '..', '..', 'syndicate', 'templates', 'intelligence.html'), 'utf8');
+// NORMALISED TO LF, WHATEVER THE CHECKOUT USES -- see the same note in
+// `game_chip_soccer_join.test.mjs`. `core.autocrlf` is true on the Windows dev
+// machine, the `extract` patterns anchor on a newline after a two-space-
+// indented closing brace, and CRLF cannot match that. Both harnesses threw
+// `could not extract normalizeClubName` on every Windows run.
+const html = fs.readFileSync(path.join(here, '..', '..', 'syndicate', 'templates', 'intelligence.html'), 'utf8')
+  .split('\r\n').join('\n');
 
 let failures = 0;
 function check(label, actual, expected) {

@@ -868,12 +868,12 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   converts a degraded path into an outage.
 
 
-### layer2-rail-duplicate-nfl-cards — OPEN, **ADOPTED 2026-08-26 by session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272, which ARCHIVED 2026-08-27 — so this lane is UNOWNED again. `#583` is FIXED, DEPLOYED and VERIFIED (web `b0ef00b8`, Today NFL 0 / All NFL 16). The INHERITED behavioural read is still owed and was never discharged.** (was UNOWNED; opening session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT, nothing held, all deploy claims released) — **`#583` NOW ALSO IN SCOPE: the rail's date filter never applied to candidate-backed games. THE ORIGINAL BEHAVIOURAL READ IS STILL OWED AND IS NOT DISCHARGED BY THE ADOPTION.** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
+### layer2-rail-duplicate-nfl-cards — OPEN, **RE-ADOPTED 2026-08-27 by session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d — `#589` IS THE SAME DEFECT IN SOCCER, AND IT DISCHARGES THE BEHAVIOURAL READ THIS LANE HAS OWED SINCE 2026-08-20.** Previously **ADOPTED 2026-08-26 by session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272, which ARCHIVED 2026-08-27 — so this lane is UNOWNED again. `#583` is FIXED, DEPLOYED and VERIFIED (web `b0ef00b8`, Today NFL 0 / All NFL 16). The INHERITED behavioural read is still owed and was never discharged.** (was UNOWNED; opening session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT, nothing held, all deploy claims released) — **`#583` NOW ALSO IN SCOPE: the rail's date filter never applied to candidate-backed games. THE ORIGINAL BEHAVIOURAL READ IS STILL OWED AND IS NOT DISCHARGED BY THE ADOPTION.** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
 - Goal: today's NFL preseason games appear ONCE each on the Layer 2 compact
   game-card rail, not twice. **Testable outcome:** each game seats exactly one
   mini card, and clicking it filters the board to ALL that game's rows (both
   row families), not one family's.
-- Files: `tests/js/game_rail_derive.test.mjs`.
+- Files: `tests/js/game_rail_derive.test.mjs`, `syndicate/templates/intelligence.html` (the `deriveGameCards` / `chipForGame` region only), `tests/js/game_chip_canonical_join.test.mjs`, `tests/js/game_chip_soccer_join.test.mjs`, `tests/js/game_rail_production_replay.mjs` (new).
 - **The board-template claim (the `deriveGameCards` merge pass) was RELEASED
   2026-08-21 to `layer2-sim-view-and-live-projection`.** Released on this
   block's OWN evidence, not an assumption: it declares the owning session
@@ -934,6 +934,59 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   ESPN-id `candidate_type=game` watchlist row co-existing with `layer2_shortlist`
   rows. Everything behind the original fix is REPLAY. A census on the current
   payload reads 0 either way; that is not confirmation.
+- **`#589`, 2026-08-27 user report: "we have soccer duplicating compact game
+  cards on the main page."** Same root shape as the NFL case, one layer earlier.
+  `chipForGame` keyed its three TEXT lookups on `group.sport` — the DISPLAY
+  string, built `item.sport || item.sport_slug` — while every chip index is
+  keyed on `chip.sport`, the SLUG. La Liga steam and prop rows carry
+  `sport: "la liga"` beside `sport_slug: "soccer"`, so the lookup asked for
+  `la liga|ath @ bar` against an index holding only `soccer|ath @ bar`.
+  `gameKey`, ten lines above, already read the same two fields in the RIGHT
+  order. Fix: `group.sportSlug`, carried alongside `group.sport`, used for the
+  join only. Four code lines.
+- **Testable outcome for `#589`, and it is MET on the payload:** each La Liga
+  game seats exactly one card. A/B over ONE production payload (238 chips /
+  1,679 rows) through the real extracted functions: **250 cards → 248, chips
+  seating more than one card 2 → 0, chip-less 12 → 10, the `la liga` bucket
+  gone; mlb 7 / nfl 16 / ncaaf 8 / wnba 4 identical on both sides.** The two
+  removed are the two in the screenshot.
+- **THE INHERITED BEHAVIOURAL READ IS NOW DISCHARGED.** It asked for a LIVE
+  board carrying BOTH row families for one game; the NFL slate retired that case
+  before anyone could see it. Today's La Liga slate is exactly it —
+  `4e67f40b…` (OddsAPI, shortlist) and `401882924` (ESPN, props) for games that
+  were live when read — and it was captured, not replayed.
+- **Falsification test for `#589`, stated before the fix and NOT falsified:** if
+  the unresolved groups had failed to reach the chip for any reason OTHER than
+  the sport key, forcing the slug would have changed nothing. Checked by running
+  the same derivation with only that one substitution: unresolved 12 → 10, and
+  the 2 recovered are the 2 duplicated games.
+- **THE INSTRUMENT WAS WRONG FIRST AND IT READ HEALTHY.** The replay's duplicate
+  detector originally grouped cards by the chip `chipForGame` resolved — the
+  code under test — which returns null in the control for exactly the duplicated
+  cards. It reported **0 duplicates in BOTH states**: a clean bill of health
+  produced by the defect. Corrected to join on the slug taken from `group.key`,
+  a field the defect cannot touch. This is the `2026-08-20` census rule again,
+  and it caught itself only because the control was run.
+- **`game_rail_derive.test.mjs` now EXTRACTS the real `chipForGame`** rather
+  than restating it as a two-line stub. The stub had no canonical or normalized
+  index and keyed on `group.sport` — the field the defect is about — so the new
+  assertions could not have failed against it. All 14 pre-existing assertions
+  still pass against the real function, so the stub was not masking those. 25
+  pass with the fix; 5 fail without it, printing `"ATH @ BAR | ATH @ BAR"`.
+- **Two dead guards revived, found by RUNNING them.**
+  `game_chip_canonical_join.test.mjs` and `game_chip_soccer_join.test.mjs`
+  extract with patterns anchored on `\n  }\n`; `core.autocrlf` is true here, so
+  both threw `could not extract normalizeClubName` and exited non-zero on every
+  Windows run — dead guards on this exact join. Both now pass (15 and 13
+  assertions) against control AND fixed: reviving them proved the change safe,
+  it did NOT find a hidden bug.
+- **Deliberately NOT fixed:** a chip-seeded soccer card still reads `SOCCER`
+  while a row-backed one beside it reads `LA LIGA` (the chip carries
+  `league_display`) — cosmetic, pre-existing, not reported. Still chip-less and
+  unrelated to duplication: 8 NCAAF cards (that sport publishes **0** chips) and
+  2 WNBA games absent from the chip feed.
+- **OWED for `#589`:** the served rail on production showing one card per
+  La Liga game.
 ### wnba-halftime-elapsed — **OPEN, UNOWNED** `[session 1f76348c ARCHIVED 2026-08-21 ~16:1xZ]` — **ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) and on the workers (`3b41696d` is an ancestor of refresh-worker's SHA). Unit-verified both directions: 3 break tests FAIL pre-fix, 2 narrowness tests PASS in both states. **THE BREAK BEHAVIOUR ITSELF IS UNOBSERVED IN PRODUCTION** — a 20-minute watcher caught no blank-clock state, and the one suggestive reading (a board row at 'End of 1st' keeping a live lane at model 0.2155 vs its 0.27 pregame baseline) was INDIRECT, via the board. Next WNBA break discharges it. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: the live win/cover probability must keep using the live margin during a
   BETWEEN-PERIODS break, instead of silently reverting to the pregame number.
