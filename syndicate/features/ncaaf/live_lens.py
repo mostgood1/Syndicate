@@ -53,6 +53,49 @@ def _rank_card(game: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _game_state_label(game: dict[str, Any]) -> tuple[str, str]:
+    """(eyebrow, phase) from the shared contract's live state.
+
+    THE LIVE LENS WAS NOT LIVE-AWARE. Every rank card's eyebrow was the
+    constant `LEGACY_ENGINE_SOURCE_LABEL` -- the same string on all 51 cards,
+    carrying no information -- and the header counted only Games/Season/Week.
+    MLB's live lens leads with `Games 7 | Live 0 | Final 0 | Pregame 7`, which
+    is the number you open a live board to see.
+
+    The data was already on every game: `shared_game_state` carries `live`,
+    `final`, `period` and `clock`, and nothing read them.
+
+    NO LIVE SCORE, deliberately. `publication_adapter._shared_game_state`
+    carries no score field, and the only `score` in the contract is the
+    PROJECTED one. Rendering that next to a live clock would read as the
+    current score. Absent stays absent.
+    """
+    state = game.get("shared_game_state") if isinstance(game.get("shared_game_state"), dict) else {}
+    if bool(state.get("live")) or bool(game.get("shared_is_live")):
+        period = state.get("period")
+        clock = _safe_text(state.get("clock"), "")
+        parts = [f"Q{int(period)}" if isinstance(period, (int, float)) and period else None,
+                 clock if clock and clock != "-" else None]
+        label = " · ".join(p for p in parts if p) or _safe_text(state.get("status"), "Live")
+        return label, "live"
+    if bool(state.get("final")):
+        return "Final", "final"
+    kickoff = ""
+    ncaaf_card = game.get("ncaaf_card") if isinstance(game.get("ncaaf_card"), dict) else {}
+    scoreboard = ncaaf_card.get("scoreboard") if isinstance(ncaaf_card.get("scoreboard"), dict) else {}
+    kickoff = _safe_text(scoreboard.get("kickoff_label"), "")
+    return (kickoff or _safe_text(state.get("status"), "Pregame")), "pregame"
+
+
+def _phase_counts(games: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {"live": 0, "final": 0, "pregame": 0}
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        counts[_game_state_label(game)[1]] += 1
+    return counts
+
+
 def _runtime_rank_card(game: dict[str, Any]) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
@@ -73,7 +116,8 @@ def _runtime_rank_card(game: dict[str, Any]) -> dict[str, Any]:
     ]
     return {
         "title": f"{_safe_text(away.get('abbr'), 'AWY')} @ {_safe_text(home.get('abbr'), 'HOM')}",
-        "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
+        # The GAME STATE, not a constant source label repeated 51 times.
+        "eyebrow": _game_state_label(game)[0],
         "badge": _safe_text(scoreboard.get("win_probability"), "Watch"),
         "meta": _safe_text(scoreboard.get("source_label"), LEGACY_ENGINE_SOURCE_LABEL),
         "metrics": metrics,
@@ -117,6 +161,11 @@ def build_live_lens_page_context(selected_week: int) -> dict[str, object]:
         using_sample_data=False,
         header_stats=[
             {"label": "Games", "value": str(len(games))},
+            # LIVE / FINAL / PREGAME, which is what a live board is opened for.
+            # MLB leads with exactly this split; NCAAF counted only the total.
+            {"label": "Live", "value": str(_phase_counts(games)["live"])},
+            {"label": "Final", "value": str(_phase_counts(games)["final"])},
+            {"label": "Pregame", "value": str(_phase_counts(games)["pregame"])},
             {"label": "Season", "value": str(season)},
             {"label": "Week", "value": str(resolved_week)},
             {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else "Summary"},
