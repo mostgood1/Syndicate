@@ -4176,3 +4176,66 @@ sections — and two blocks in my copy belonged to other lanes and were left out
 Related: [[a blocker is a measurement and it expires]] and
 [[a test whose fixture cannot violate its property]] — all three are the same failure,
 a stale or incapable reference standing in for a live measurement.
+
+---
+
+## 2026-08-27 — RE-FITTING A MODEL CAN BE THE WRONG ANSWER. Measure the do-nothing arm.
+
+Asked to re-fit both football calibration profiles after a mechanism fix, the
+result was ONE promotion and ONE REFUSAL. All four combinations, 120 games each:
+
+    sport  profile     mechanism   SCORED err
+    ncaaf  shipped     off           15.19%
+    ncaaf  candidate   ON             7.25%   <- promoted
+    nfl    shipped     off            3.87%   <- BEST for NFL: do nothing
+    nfl    candidate   ON             4.18%
+    nfl    candidate   off            7.42%
+
+**Rule: include the DO-NOTHING arm in the grid, and let it win if it wins.** NFL
+was already at its best; the fix plus a careful re-fit made it worse. Had the
+grid only compared "candidate ON" against "candidate OFF", NFL's candidate would
+have looked like a 3.24-point win and shipped a regression.
+
+**Corollary — a mechanism and its calibration are ONE change.** The bottom row
+is the proof: a re-fitted profile with the mechanism OFF is worse than the
+profile it replaces, for both sports. Ship them together or not at all.
+
+**Corollary — do not let one global switch make two engines share a decision.**
+The mechanism was an env flag, so NCAAF's 7.94-point gain would have cost NFL
+0.31. Moving it onto the PROFILE removed the trade-off entirely; the object that
+should decide was already in scope at the call site. A single knob spanning two
+calibrated systems is a modelling error, not a config choice.
+
+---
+
+## 2026-08-27 — PROMOTING AN ARTIFACT IS A CHAIN. THREE LINKS FAILED SILENTLY.
+
+Promoting a re-fitted calibration profile is "write the file", and it is not:
+
+  1. **NCAAF's profile was a HARDCODED CONSTANT.** `calibration_profile_path("ncaaf")`
+     resolved, the file wrote, and NOTHING read it. NFL had used
+     `load_versioned_profile` since `#440` Phase 5; NCAAF was never wired.
+  2. **The new field was missing from `to_dict()`.** `save_versioned_profile`
+     serialises `to_dict()`, so the artifact round-tripped `goal_line_touchdown`
+     to its DEFAULT — the whole re-fit inert while appearing to apply.
+  3. **`git add` skipped it.** `data/calibration/` is outside this worktree's
+     sparse checkout, so a plain `git add` staged the wiring and not the artifact.
+
+**Rule: test the CHAIN — write, read back, and confirm the consumer holds the new
+value — never the individual link.** Each of these passes an "is the field there"
+check. Only a round-trip catches (2), and only reading the staging output catches (3).
+
+**And make the loaded value OBSERVABLE.** `load_versioned_profile` degrades
+silently by design — absent, corrupt or partially-invalid all fall back to the
+default and never raise — so a silent load and a silent fallback are
+indistinguishable from outside. That is a good property for a sim and a terrible
+one for an operator, unless something states which one happened.
+
+The line added for it is itself weakly placed and worth knowing: it prints at
+module IMPORT, and nothing in the worker's boot path imports the profile —
+`run_refresh_worker.py` runs the projections generator as a SUBPROCESS. A
+boot-time log search reads zero forever. `absent signal is about the emitter`,
+one level further out than usual: the emitter is not merely quiet, it is in a
+process that has not started. The durable form is a field on the OUTPUT artifact
+(the projections CSV already carries `profile_name`, `rating_source`,
+`generated_at`), not a line in a job's stdout.

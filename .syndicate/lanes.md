@@ -1957,7 +1957,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 
 
-### ncaaf-pace-block — OPEN — board surfaces LIVE (projections 51/51, strip 181px, lens state-aware); goal-line fix DEFAULT-OFF, both profiles owe a re-fit — opened 2026-08-27 — session de363735
+### ncaaf-pace-block — OPEN — NCAAF calibration re-fitted and PROMOTED (15.00% -> 7.24%, impossible drives 159 -> 0); NFL deliberately NOT re-fitted (best as shipped); production read of the profile still owed — opened 2026-08-27 — session de363735
 - Goal: the NCAAF `pace` block carries a REAL per-team seconds-per-play, so the
   engine stops running every game on the hardcoded 24.0 (`pace_index +0.400`).
 - Files: `scripts/build_ncaaf_pace_snapshot.py`,
