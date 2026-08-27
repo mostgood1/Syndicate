@@ -2358,6 +2358,46 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `scripts/run_refresh_worker.py`, held by `exchange-markets-api-integration`
   and `portfolio-ledger-service-split`. Pre-existing, not this lane's.
 
+### wnba-chip-live-token — OPEN — opened 2026-08-27 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272
+- Goal: a live WNBA game chip carries its QUARTER AND CLOCK (`Q3 5:23`) instead
+  of a bare `LIVE`, and never renders a SmartSim projection as an observed score.
+- Files: `syndicate/blueprints/home.py`,
+  `syndicate/features/shared/game_chip_scoreboard.py`,
+  `tests/test_home_wnba_live_state.py`
+  — `game_chip_scoreboard.py` ADDED after the first test run: refusing to
+  SET a fractional score in `home.py` is not enough, because `_side_score`
+  falls through to `live_state.<side>_pts` and picks the projection back up.
+  Unclaimed by any OPEN lane, checked before adding.
+- Hypothesis — **CONFIRMED FROM PRODUCTION BEFORE WRITING ANY CODE**, via
+  `/api/ops/wnba/status-trace?date=2026-08-26`. `local_live_state_payload` (what
+  `build_live_state_payload` returns, i.e. `live_row`) carries everything needed:
+
+      {"away_pts": 65.0, "home_pts": 38.0, "in_progress": true,
+       "period": 3, "clock": "5:23", "status": "5:23 - 3rd"}
+
+  `_apply_wnba_live_scores` builds `live_state` from FIVE keys — `away_pts`,
+  `home_pts`, `in_progress`, `final`, `status` — and **drops `period` and
+  `clock` on the floor**. `_live_status_token`'s generic branch reads exactly
+  `live_state.period` / `live_state.clock`, finds nothing, returns None, and the
+  chip falls back to the bare `LIVE` string. Nothing is missing upstream.
+- Second defect, same function, same class: **`#160`'s guard is insufficient.**
+  `cards.py`'s live-state row falls back to the SmartSim PROJECTED point total
+  when no real ESPN boxscore row has matched. The guard gates on
+  `in_progress or final` — i.e. on the GAME's state, not on whether the number
+  is an OBSERVATION. A live game with no matched boxscore therefore passes the
+  gate carrying a projection. That is the user's reported `GSV 85.43 / CON 68.94`
+  rendered where a score goes. A real basketball score is a whole number.
+- Falsification test: if `local_live_state_payload` rows carried no `period`, the
+  data would be missing upstream and this fix would be inert. Checked on
+  production: `period: 3`, `clock: "5:23"`, both present on the live game.
+- Verification: on a live WNBA slate, `/api/board/game-chips?sports=wnba` returns
+  `status_token` matching `^Q\d+ \d+:\d\d$` rather than `LIVE`, and no chip
+  carries a non-integral score. Plus a unit test built on the production row
+  above that FAILS pre-change.
+- Blocked by: none. `wnba/cards.py` is claimed by `wnba-halftime-elapsed` and is
+  NOT touched — the whole fix is in `home.py`, which this lane claims and which
+  `mlb-chip-live-state` released on closing.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

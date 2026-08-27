@@ -4374,6 +4374,25 @@ def _apply_wnba_live_scores(games: list[dict[str, Any]], selected_date: str) -> 
             "in_progress": bool(live_row.get("in_progress")),
             "final": bool(live_row.get("final")),
             "status": str(live_row.get("status") or "").strip(),
+            # PERIOD AND CLOCK, which this dict used to drop on the floor.
+            #
+            # `_live_status_token` (game_chip_scoreboard.py) reads exactly
+            # `live_state.period` and `live_state.clock` for the basketball
+            # branch, finds neither, returns None, and the chip renders the bare
+            # string `LIVE` -- while every MLB chip beside it reads `TOP 5`.
+            # Reported by the user 2026-08-26.
+            #
+            # NOTHING WAS MISSING UPSTREAM, which is why this is five lines.
+            # Read off production before writing any code, via
+            # `/api/ops/wnba/status-trace`, `local_live_state_payload` -- the
+            # exact rows `build_live_state_payload` hands this function:
+            #
+            #     {"away_pts": 65.0, "home_pts": 38.0, "in_progress": true,
+            #      "period": 3, "clock": "5:23", "status": "5:23 - 3rd"}
+            #
+            # The data was one dict literal away the whole time.
+            "period": live_row.get("period"),
+            "clock": str(live_row.get("clock") or "").strip(),
         }
 
         # cards.py's live-state row falls back to the SmartSim *projected*
@@ -4384,9 +4403,39 @@ def _apply_wnba_live_scores(games: list[dict[str, Any]], selected_date: str) -> 
         # Without this in_progress/final gate, a pregame WNBA game showed a
         # fabricated decimal "score" like 91.81-91.17 on the board's
         # game-chip strip (#160).
+        #
+        # `#160`'S GATE WAS NECESSARY AND NOT SUFFICIENT, and the user caught
+        # the gap: `GSV 85.43 / CON 68.94`, rendered LIVE, on 2026-08-26.
+        #
+        # The gate asks whether the GAME is underway. It does not ask whether
+        # the NUMBER is an observation. A game that has tipped off but whose
+        # ESPN boxscore row has not matched yet is `in_progress: true` with
+        # `away_pts` still holding the projection -- so it passes the gate and
+        # the projection reaches the strip wearing a live badge. The measured
+        # good case is integral (`away_pts: 65.0`, `home_pts: 38.0`); the
+        # measured bad case is not (`85.43`).
+        #
+        # A BASKETBALL SCORE IS A WHOLE NUMBER. That is a property of the sport,
+        # not of this pipeline, so it holds for any future source that starts
+        # handing us an estimate -- which is the same failure `#581` had, a
+        # value that is not an observation being used as one. A fractional
+        # value is refused outright rather than rounded: rounding would turn a
+        # fabricated 85.43 into a plausible 85 and destroy the only evidence
+        # that it was never real.
+        def _observed_points(value: Any) -> Any:
+            if value is None:
+                return None
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                return None
+            if numeric != int(numeric):
+                return None
+            return int(numeric)
+
         is_game_underway = bool(live_state.get("in_progress")) or bool(live_state.get("final"))
-        live_away_pts = live_state.get("away_pts") if is_game_underway else None
-        live_home_pts = live_state.get("home_pts") if is_game_underway else None
+        live_away_pts = _observed_points(live_state.get("away_pts")) if is_game_underway else None
+        live_home_pts = _observed_points(live_state.get("home_pts")) if is_game_underway else None
         if live_away_pts is not None:
             away["score"] = live_away_pts
         if live_home_pts is not None:

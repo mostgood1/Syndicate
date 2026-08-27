@@ -43,11 +43,32 @@ def _score_value(value: Any) -> str | None:
     # Handled here rather than in `_text`, whose other callers are labels and
     # names where the falsy-collapse is harmless and widening it is risk with
     # no benefit.
+    # A FRACTIONAL VALUE IS NOT A SCORE IN ANY SPORT THIS PLATFORM CARRIES.
+    # Runs, points and goals are whole numbers, so a `85.43` arriving here is
+    # necessarily an ESTIMATE that leaked into an observation's slot -- and this
+    # function is the one choke point every sport's chip passes through.
+    #
+    # MEASURED 2026-08-26, user-reported: the Layer 2 strip showed
+    # `GSV 85.43 / CON 68.94` under a LIVE badge. `cards.py`'s WNBA live-state
+    # row falls back to the SmartSim PROJECTED point total until a real ESPN
+    # boxscore row matches, and `#160`'s guard in `_apply_wnba_live_scores` gates
+    # on whether the GAME is underway rather than on whether the NUMBER is an
+    # observation -- so a tipped-off game with no matched boxscore sails through.
+    #
+    # FIXING ONLY THAT GUARD IS INERT, which a test caught before this shipped:
+    # `_side_score` falls through to `live_state.<side>_pts`, so refusing to SET
+    # `away["score"]` upstream just means the projection is picked up one
+    # candidate later. Both halves are needed; this is the half that holds for a
+    # source nobody has written yet.
+    #
+    # REFUSED, NOT ROUNDED. Rounding 85.43 to 85 produces a plausible score and
+    # destroys the only evidence that it was never real. None renders as "-",
+    # which is honestly "unknown".
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
         number = float(value)
-        return str(int(number)) if number.is_integer() else str(value)
+        return str(int(number)) if number.is_integer() else None
     text = _text(value)
     if not text or text in {"-", "None"}:
         return None
@@ -57,7 +78,7 @@ def _score_value(value: Any) -> str | None:
         return None
     if number.is_integer():
         return str(int(number))
-    return text
+    return None
 
 
 def _side_label(game: dict[str, Any], side: str) -> str:
