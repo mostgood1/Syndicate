@@ -5968,9 +5968,25 @@ Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
   Polymarket path sees `markets=17299 indexed=9106`.
 - **Execution fires ~16 min, places almost nothing**: 9 cycles 13:49-15:52Z ->
   4 orders (Kalshi 3, Polymarket 1); otherwise `placed=0 duplicates=3-9`.
-- **The live day cap is NOT the env var.** Env
-  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI=50`, `LIMITS` logs
-  `max_day_dollars: 75.01`; `execution_guard._stored_live_limit` overrides env.
+- **The live caps come from the SAVED STORE, not the env vars — BY DESIGN, and
+  the current numbers are DELIBERATE `[USER CONFIRMED 2026-08-27]`.** Env
+  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI=50` while `LIMITS` logs
+  `max_day_dollars: 75.01`, because `_stored_live_limit` reads the `/portfolio`
+  form store and that store WINS. `/api/portfolio/limits` reports every field as
+  `source: stored`, `store_error: null`, `updated_at 2026-08-27T08:56:10-05:00`.
+  In force: order $10.01 · kalshi $75.01/25 orders · polymarket $100.01/50 ·
+  all-venues $200.01/75. The order caps exceed the `[USER DECISION 2026-08-25]`
+  code defaults (15/15/25); **the user set them personally and they are
+  intended.**
+  **DO NOT "fix" this by reverting the caps to the env values — that would
+  LOWER live money limits the user chose.** The env vars are fallback-only and
+  are what is actually stale. Comparisons are strict `>`
+  (`used + stake > cap`), so the trailing `.01` is not needed to admit an
+  exactly-at-cap order; it only absorbs sub-cent overage such as Kalshi taker
+  fees.
+  STILL OPEN, not a defect: `update_limits` records only field values plus
+  `updated_at` — no actor and no prior value — and `POST /api/portfolio/limits`
+  is reachable by any agent session. No audit trail on a money surface.
 - **Staleness dominates cadence.** `QUOTE_AGE_SERVED seen_p50=4285s` (71 min),
   p90 7776s, max 37837s; Polymarket join `slate_age_s=579.5`. A faster board
   loop cannot make a 71-minute-old quote fresh.
