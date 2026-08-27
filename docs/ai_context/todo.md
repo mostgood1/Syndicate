@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#590` — **The Games rail's card-head label was a fact about which ROW arrived first, not about the game: `SOCCER` and `LA LIGA` side by side on one slate.** — lane `rail-league-label`, 2026-08-27, user report — **FIXED AND MEASURED ON THE PRODUCTION PAYLOAD; DEPLOY VERIFICATION OWED**
+### `#590` — **The Games rail's card-head label was a fact about which ROW arrived first, not about the game: `SOCCER` and `LA LIGA` side by side on one slate.** — lane `rail-league-label`, 2026-08-27, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T20:07:37Z** (web `0e964af8`)
 
 The tail of `#589`. Three sources fed one label and which you got was an
 ordering accident:
@@ -49,7 +49,7 @@ narrowness ones (league-less chip, no chip at all, blank `league_display`) pass
 in both states. The blank case is pinned precisely because it is 0 of 213 today:
 the day it is not, a card must fall back, not go blank.
 
-**OWED:** the served rail on production showing a league on every soccer card.
+**DISCHARGED 20:1xZ, and the first metric went BLIND between the two payloads.** Served bytes: soccer reads 10 league labels, 0 bare; live DOM `{La Liga: 2, MLB: 7, NFL: 4, WNBA: 2}`. The original "bare sport beside a league" flag needed TWO labels at once -- by 20:0xZ the league-labelled rows had drained and the pre-change template read a uniform `SOCCER=213`, flag **0, defect intact**. Replaced with a SOURCE-anchored invariant (chip carries a league -> card must not render the bare sport): served **213/0** on both payloads, control **213/213** and **213/211**. `.syndicate/deploys.md`.
 
 ### `#589` — **Soccer games were duplicated on the Games rail: the chip join keyed on the DISPLAY sport, and La Liga rows carry `sport: "la liga"`.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-27, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T19:41:04Z** (web `78a95c7f`)
 

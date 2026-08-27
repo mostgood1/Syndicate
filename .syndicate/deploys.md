@@ -5,6 +5,60 @@
 
 ---
 
+## 2026-08-27 — web `0e964af8`: the rail's card-head label is a fact about the GAME now, not about which row arrived first (`#590`)
+
+**Deployed:** `dep-da89f267bikc73c40cdg`, triggered `20:01:12Z`, live
+`20:07:37.347785Z`. Claim `web` held by `rail-league-label`, acquired
+`20:01:03Z`, token `cac416dc…`, released after this row. Preflight `CLEAR` at
+`20:01:03Z` for this exact SHA, on `origin/main`, only infrastructure processes.
+Web `78a95c7f → 0e964af8`; workers untouched (they do not serve this template).
+
+**verify: MET `20:1xZ`, on the served bytes, on TWO payloads, both directions.**
+
+```
+                                  soccer head labels
+SERVED  0e964af8  Championship=36 MLS=32 La Liga=24 Serie A=21 EPL=20 Ligue 1=20
+                  Belgian Pro League=18 Eredivisie=16 Primeira Liga=16 Bundesliga=10
+CONTROL 78a95c7f  SOCCER=213      (19:5xZ payload: SOCCER=211 LA LIGA=2)
+```
+
+mlb 7 / ncaaf 8 / nfl 16 / wnba 4 identical on both sides, and card counts are
+untouched at 248 with 0 duplicates. Live DOM on the date-filtered rail:
+`LA LIGA · 80' OSA 1 CEL 1`, `LA LIGA · 45'+5' ATH 0 BAR 1`, `MLB · TOP 7`,
+`NFL · 6:00P CT` — labels `{La Liga: 2, MLB: 7, NFL: 4, WNBA: 2}`, no bare
+`SOCCER`.
+
+**THE FIRST METRIC WENT BLIND BETWEEN THE TWO PAYLOADS, AND THAT IS THE ENTRY
+WORTH READING.** The census originally flagged "a sport showing a BARE SPORT
+label beside a league". On the 19:5xZ payload the pre-change template read
+`SOCCER=211 LA LIGA=2` and it fired. By 20:0xZ the league-labelled steam/prop
+rows had drained off the board, the SAME pre-change template read a uniform
+`SOCCER=213`, and the flag read **0 — with the defect fully intact**. Had I only
+run the post-deploy payload, the control would have looked clean and I would
+have banked a pass that proved nothing.
+
+Replaced with an invariant anchored on the SOURCE rather than on the spread of
+rendered labels: *if a card's chip carries a league, the card must not render
+the bare sport.* It reads unhealthy on any payload where a league-carrying chip
+exists at all:
+
+```
+                    cards whose chip CARRIES a league / of those, still BARE
+SERVED  0e964af8    213 / 0      (both payloads)
+CONTROL 78a95c7f    213 / 213    (20:0x payload)   213 / 211  (19:5x payload)
+```
+
+**This is the THIRD instrument defect in this session's two fixes** — after a
+duplicate detector that reused the code under test, and a test harness that
+hand-copied the function it was testing. All three read HEALTHY while broken.
+The common shape: the instrument was derived from the thing being measured, or
+from a symptom the slate can retire, instead of from a source that holds
+regardless.
+
+**Measured, not fixed, and unrelated:** only **2 of 213** soccer cards carried a
+league before this — the report read as one odd card while the other 211 were
+mislabelled the other way.
+
 ## 2026-08-27 — web `78a95c7f`: the rail's chip join read the LEAGUE, so La Liga games seated twice (`#589`)
 
 **Deployed:** `dep-da8942gn74is739tler0`, triggered `19:37:46Z`, live

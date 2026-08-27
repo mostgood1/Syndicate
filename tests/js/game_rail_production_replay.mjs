@@ -153,6 +153,30 @@ for (const [sport, list] of [...bySport].sort()) {
 }
 console.log(`  sports showing a bare sport label beside a league: ${mixedLabelSports}`);
 
+// THE ABOVE FLAG CANNOT READ UNHEALTHY ON EVERY PAYLOAD, AND THAT IS MEASURED,
+// NOT FEARED. It needs TWO labels present at once. On the 19:5xZ payload the
+// pre-change template read `SOCCER=211 LA LIGA=2` and the flag fired; by 20:0xZ
+// the league-labelled steam/prop rows had drained off the board and the SAME
+// pre-change template read a uniform `SOCCER=213` -- flag 0, defect untouched.
+// That is `learnings.md` 2026-08-20 exactly: a census whose test case the slate
+// can retire.
+//
+// So the invariant that actually holds is anchored on the SOURCE, not on the
+// spread of rendered labels: if a card's chip CARRIES a league, the card must
+// not be rendering the bare sport. That reads unhealthy on any payload where a
+// league-carrying chip exists at all, whatever the rows happen to be doing.
+let leagueAvailableButUnused = 0;
+let leagueCarryingChips = 0;
+for (const c of cards) {
+  const chip = resolveChip(c);
+  const league = chip ? String(chip.league_display || '').trim() : '';
+  if (!league) continue;
+  leagueCarryingChips += 1;
+  if ((labelOf(c) || '').toLowerCase() === slugOfCard(c)) leagueAvailableButUnused += 1;
+}
+console.log(`  cards whose chip CARRIES a league: ${leagueCarryingChips}`);
+console.log(`  ...of those, still showing the BARE SPORT: ${leagueAvailableButUnused}`);
+
 // A duplicate is two cards naming one real game.
 //
 // THE DETECTOR MUST NOT REUSE `chipForGame`, and the first version of this

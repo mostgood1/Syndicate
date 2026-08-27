@@ -2145,7 +2145,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `venue-quote-line-join` (syndicate-82), confirmed by me.
 - Claims: NONE held. Deploy claims: none taken — this needs no deploy of its own.
 
-### rail-league-label — OPEN — opened 2026-08-27 — session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d
+### rail-league-label — **CLOSED 2026-08-27T20:1xZ.** Testable outcome MET and verified on the SERVED bytes: every soccer card carries its league, 0 render the bare sport, mlb/ncaaf/nfl/wnba labels and all 248 card counts identical. Web `0e964af8` live `20:07:37Z`; claim released. **The first metric went BLIND between two payloads 12 min apart and the control still read 0 with the defect intact** — replaced with a source-anchored invariant. `deploys.md`, `log/2026-08-27.md`. (was OPEN — opened 2026-08-27 — session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d)
 - Goal: every soccer card in the Games rail names the same THING in its head.
   Today a card reads `SOCCER` or `LA LIGA` depending on which pipeline happened
   to seat its first row, and both appear side by side on one slate.
