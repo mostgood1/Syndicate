@@ -4121,3 +4121,23 @@ the tools rather than by me.
 
 The general rule: ledger files are INPUTS to guards, not just prose for humans.
 Text written into them is executed-as-pattern by something.
+
+## 2026-08-27 — A CLAIM HOLDER IS NOT A DEPLOY AUTHOR. The API cannot tell you who fired it.
+
+**Overturned by `ncaaf-opener-regions-props`, self-caught.** They thanked me for
+deploying `600a753a` to refresh-worker. I had not — my deploys that day were all
+live-odds-worker.
+
+The inference was: *X held the claim near the deploy timestamp, therefore X
+deployed it.* Render's deploys API records `trigger=api` and **no session
+identity**. Nothing in it supports that step.
+
+- **Misdirected credit is harmless. Misdirected blame is not**, and it is the
+  same inference — a bad deploy pinned on whoever held the lock.
+- It makes sessions **block on the wrong party**: the same message asked me to
+  release a claim I did not hold while the real holder was a third lane.
+
+**How to apply.** `deploy_claim.py status` answers who holds a claim NOW. For who
+DEPLOYED something, the only record is what that session wrote to
+`.syndicate/deploys.md`; absent that, authorship is unknown and must be stated as
+unknown. Never reconstruct it from timestamps.
