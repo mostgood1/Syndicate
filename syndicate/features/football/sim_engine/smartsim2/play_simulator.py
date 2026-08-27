@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from dataclasses import dataclass
 from dataclasses import replace
 from random import Random
@@ -243,6 +245,83 @@ class PlayResult:
         }
 
 
+def _goal_line_touchdown_enabled() -> bool:
+    """DEFAULT OFF. The fix is correct; the CALIBRATION PROFILES ARE NOT READY.
+
+    `_goal_line_touchdown` removes a real defect -- 6.60% of NCAAF drives gained
+    more yards than the field is long, one reached 249 -- but BOTH football
+    profiles were fitted with that defect present, so correcting the mechanism
+    invalidates the estimators that were absorbing it. Measured, 150 games each:
+
+        NFL   mean |err| vs truth   4.8% BEFORE  ->  5.9% AFTER
+        NCAAF drive-structure err  13.0% BEFORE  ->  3.9% AFTER (re-fitted),
+              but yards/drive regresses +1.5% -> -21.7%
+
+    NFL is production and gets WORSE, and a one-parameter re-fit does not
+    recover it (`drive_yardage_multiplier` 1.00 -> 0.92 trades touchdowns and
+    game total for possessions and punt rate, landing back at 5.9%). The NFL
+    profile's own docstring records SEVEN calibration iterations; that is the
+    scale of work this owes, not a parameter tweak.
+
+    So this lands OFF, exactly the dark-launch posture `feature_payload.py` and
+    `_fixture_aware_cadence_enabled` use: the mechanism is in the tree, tested
+    and measurable, and turning it on is a separate decision that owes a re-fit
+    of BOTH profiles against `ncaaf_historical_truth_report.md`.
+
+    `scripts/calibrate_ncaaf_drive_structure.py` is the harness for that work.
+    """
+    return os.environ.get("SYNDICATE_FOOTBALL_GOAL_LINE_TOUCHDOWN", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _goal_line_touchdown(
+    play_state: PlayState,
+    possession_state: PossessionState,
+    *,
+    clock_consumed: int,
+) -> PlayResult:
+    """A gain that reaches the end zone IS a touchdown.
+
+    WHY THIS EXISTS. `PlayOutcome.TOUCHDOWN` is SAMPLED from a weight
+    distribution, and it was the only way a drive could score six. An ordinary
+    GAIN or EXPLOSIVE_GAIN carried its full yardage regardless of how much field
+    was left: `advance_field_position` clamps the yardline to [1, 100], so the
+    ball pinned itself ON the goal line and the drive kept running plays that
+    gained yards going nowhere.
+
+    Measured on 2,409 NCAAF drives before this fix:
+
+        yards_gained > 100 (physically impossible)   6.60% of drives
+        yards_gained > 75                           17.73%
+        gained > 75 yards and scored NOTHING         3.82%
+        longest single drive                        249 yards
+
+    That inflated `play_count` (drives did not end where they should), burned
+    clock, and cost possessions -- the drive-structure gap measured against the
+    truth report was largely this.
+
+    Shared Football Core code, so this was NFL's bug too, not only NCAAF's.
+    """
+    yards_gained = max(1, 100 - play_state.yardline)
+    end_possession_state = _touchdown_result(possession_state, clock_consumed)
+    end_play_state = _refresh_situation(
+        advance_play_state(play_state, yards_gained=yards_gained, clock_consumed=clock_consumed)
+    )
+    end_play_state = replace(end_play_state, score_differential=play_state.score_differential + 7)
+    end_play_state = _refresh_situation(end_play_state)
+    return PlayResult(
+        step_index=play_state.play_index + 1,
+        start_state=play_state,
+        end_state=end_play_state,
+        end_possession_state=end_possession_state,
+        outcome=PlayOutcome.TOUCHDOWN,
+        yards_gained=yards_gained,
+        clock_consumed=clock_consumed,
+        points_scored=7,
+        terminal_drive_outcome=PossessionOutcome.TOUCHDOWN,
+        summary=f"{_offense_team_name(possession_state)} scored a touchdown",
+    )
+
+
 def simulate_play(
     play_state: PlayState,
     possession_state: PossessionState,
@@ -356,6 +435,8 @@ def simulate_play(
                      - defense_rating * profile.rating_defense_weight) * profile.drive_yardage_multiplier
         yard_multiplier = 0.6 if play_state.down >= 3 else 0.0
         yards_gained = max(0, int(round(rng.normalvariate(base_gain + yard_multiplier, 3.2))))
+        if _goal_line_touchdown_enabled() and yards_gained >= max(0, 100 - play_state.yardline):
+            return _goal_line_touchdown(play_state, possession_state, clock_consumed=clock_consumed)
         end_play_state = _refresh_situation(advance_play_state(play_state, yards_gained=yards_gained, clock_consumed=clock_consumed))
         summary = (
             f"{_offense_team_name(possession_state)} converted a first down"
@@ -385,6 +466,8 @@ def simulate_play(
                      + offense_rating * profile.explosive_rating_offense_weight
                      - defense_rating * profile.explosive_rating_defense_weight) * profile.explosive_yardage_multiplier
         yards_gained = max(6, min(55, int(round(rng.normalvariate(base_gain, 7.0)))))
+        if _goal_line_touchdown_enabled() and yards_gained >= max(0, 100 - play_state.yardline):
+            return _goal_line_touchdown(play_state, possession_state, clock_consumed=clock_consumed)
         end_play_state = _refresh_situation(advance_play_state(play_state, yards_gained=yards_gained, clock_consumed=clock_consumed))
         end_possession_state = replace(
             possession_state,
