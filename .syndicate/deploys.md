@@ -34517,3 +34517,80 @@ FOLLOW-UP, not taken here: if today's absolute cadence matters more than
 correctness-per-build, the lever is the 534s overview itself (MLB's
 `build_cards_page_context` running hydrated on the worker), not the throttle.
 `todo.md` territory, no lane.
+
+## 2026-08-27 20:2xZ — refresh-worker `7dd4ce07` — demand-weighted trim: **VERIFIED WORKING, AND VERIFIED NOT TO BE THE FIX**
+
+    refresh-worker  7dd4ce07  dep-da892gvavr4c73eqk1tg  live 19:37:16Z
+
+**THE CHAIN WORKS.** Producer and consumer both confirmed:
+
+    19:49:58Z BOARD_DEMAND {'mlb': 400, 'ncaaf': 42, 'nfl': 102, 'soccer': 400, 'wnba': 400}
+    19:49:44Z TRIM_BY_SPORT ... demand=None      <- first trim, flat-floor BY CONSTRUCTION
+    20:03:30Z TRIM_BY_SPORT ... demand={...}     <- consuming it, one cycle later as predicted
+
+The recorded vector independently reproduces what lane
+`board-cycle-overview-throughput` measured separately (they had nfl 88 / ncaaf
+42 against mlb 400 / soccer 400 / wnba 400).
+
+**AND IT IS NOT WHAT FIXED THE COLLAPSE. The bulk of the recovery happened
+BEFORE it ran:**
+
+    19:33:14Z board_rows=1344 matched=27
+    19:49:58Z board_rows=1344 matched=208   <- trim behind it read demand=None
+    20:25:59Z board_rows=1344 matched=218   <- first demand-weighted comparable build
+
+27 -> 208 happened under a FLAT-FLOOR trim -- the same algorithm that ran
+before this deploy. Reading `matched=208` next to my own deploy timestamp would
+have been a clean false attribution; the `demand=None` in my own log line is
+the only thing that prevented it. My change is worth at most the last **+10
+(~5%), on a single observation each**, and even that ran on a DEGRADED demand
+vector (see below). I am not claiming it.
+
+**THE REAL CONSTRAINT IS SUPPLY, NOT ALLOCATION**, and the prediction failing is
+what showed it. Predicted vs actual on the first weighted trim:
+
+    sport   before  predicted  actual
+    ncaaf      800        431    1441
+    nfl       2222        618    1411
+    wnba       402       1550     534
+    soccer     950       1550    1096
+
+Football moved 3,022 -> 2,852. A 170-market shift, not the ~2,000 predicted.
+Cause: the remainder pass fills leftover budget by staleness IGNORING caps, and
+mlb/soccer/wnba could not fill their caps because they only HAVE 1,512/1,096/534
+Kalshi markets. So the cap is not a cap -- it is a first-serve preference, and
+~1,800 slots fell through to exactly the sports the caps existed to limit.
+
+The premise everyone was working from -- mine and the peer's -- was that the
+demanded sports were being STARVED OF SLOTS. They were not. They were taking
+everything they had. The football surplus fills capacity that would otherwise
+sit empty, and displaces nothing. **6,000 slots are not scarce for mlb/soccer/
+wnba on Kalshi; their listings are.**
+
+**Net: the change is NEUTRAL-to-slightly-positive and correctly keyed, and it is
+not the fix for the 93% collapse.** Recorded here so a landed commit does not
+imply a fix it did not deliver. The working set now matches 218 against a
+complete-set ceiling of 210-217, i.e. parity with the entire catalogue -- there
+is no headroom left in allocation to win.
+
+**ONE DEFECT OF MINE FOUND BY THIS VERIFICATION AND FIXED.**
+`_record_board_demand` overwrote on every join, including the alternating
+442/842-row future-date builds:
+
+    20:14:31Z demand={mlb: 400, ncaaf: 42, nfl: 102, soccer: 400, wnba: 400}
+    20:25:54Z demand={ncaaf: 42, soccer: 400}   <- 442-row build
+              kept_by_sport={... wnba: 300}     <- bare floor
+
+A board that does not MENTION a sport is not evidence that the sport has no
+demand. WNBA lost 234 slots on a build that was never about WNBA. Now per-sport
+MAX over a 6h/12-sample window: stable against partial boards, and still decays
+so a finished slate releases its slots. 4 tests, falsified against
+last-write-wins.
+
+**STILL OPEN, unchanged by any of this:** the alternating `board_rows=842/442`
+builds match 0 on the COMPLETE set too, refusals dominated by
+`market_is_for_another_date`. Probably a future-date board and benign, but
+"matched=0" and "no slate yet" read identically from that line and nobody has
+confirmed which.
+
+**Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.

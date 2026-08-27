@@ -265,6 +265,12 @@ MAX_STORED_MARKETS = 6000
 # carries, so the floor can never oversubscribe the budget.
 PER_SPORT_FLOOR_MARKETS = 300
 
+# Board-demand samples kept, and how far back they count. Sized so a full slate
+# observed within the window survives a run of smaller future-date builds
+# between it and the next trim -- which is exactly what overwrote it once.
+_DEMAND_SAMPLE_LIMIT = 12
+_DEMAND_WINDOW_SECONDS = 6 * 3600
+
 # Markets kept per series in the JOIN'S WORKING SET.
 #
 # MEASURED 2026-08-25T17:53:48Z, the tick after the queue started rotating:
@@ -1470,9 +1476,50 @@ def _record_board_demand(rows: list[dict[str, Any]]) -> None:
         state = read_json_file(path) or {}
         if not isinstance(state, dict):
             return
-        state["board_demand"] = counts
+        # PER-SPORT MAX OVER A WINDOW, NOT LAST-WRITE-WINS.
+        #
+        # Overwriting was wrong and production showed it within two cycles.
+        # `join_to_board` runs on EVERY build, and the builds alternate between
+        # the full slate and a smaller future-date board:
+        #
+        #   20:14:31Z demand={mlb: 400, ncaaf: 42, nfl: 102, soccer: 400, wnba: 400}
+        #   20:25:54Z demand={ncaaf: 42, soccer: 400}          <- 442-row build
+        #             kept_by_sport={... wnba: 300}            <- back to bare floor
+        #
+        # A board that simply does not MENTION a sport is not evidence that the
+        # sport has no demand, but last-write-wins reads it as exactly that, and
+        # WNBA fell 534 -> 300 on a build that was never about WNBA.
+        #
+        # Max-over-window is stable against that and still DECAYS: a sport whose
+        # slate ends stops appearing in new samples and ages out of the window,
+        # rather than holding slots forever the way a plain merge would.
+        now = time.time()
+        samples = [
+            sample
+            for sample in (state.get("board_demand_samples") or [])
+            if isinstance(sample, Mapping)
+            and isinstance(sample.get("at"), (int, float))
+            and (now - float(sample["at"])) <= _DEMAND_WINDOW_SECONDS
+        ]
+        samples.append({"at": now, "counts": counts})
+        samples = samples[-_DEMAND_SAMPLE_LIMIT:]
+
+        merged: dict[str, int] = {}
+        for sample in samples:
+            for sport, value in (sample.get("counts") or {}).items():
+                try:
+                    merged[sport] = max(merged.get(sport, 0), int(value))
+                except (TypeError, ValueError):
+                    continue
+
+        state["board_demand_samples"] = samples
+        state["board_demand"] = merged
         state["board_demand_at"] = _now_stamp()
         write_json_file(path, state)
-        print(f"[kalshi_odds] BOARD_DEMAND {dict(sorted(counts.items()))}", flush=True)
+        print(
+            f"[kalshi_odds] BOARD_DEMAND seen={dict(sorted(counts.items()))}"
+            f" merged={dict(sorted(merged.items()))} samples={len(samples)}",
+            flush=True,
+        )
     except Exception as exc:  # noqa: BLE001 -- an optimisation must not cost the join
         print(f"[kalshi_odds] BOARD_DEMAND_FAILED {type(exc).__name__}: {exc}", flush=True)
