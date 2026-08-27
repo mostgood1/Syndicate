@@ -2168,14 +2168,11 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
 
 # Redeploy trigger, 2026-08-20 13:2xZ: SYNDICATE_ENABLE_WNBA_LIVE_REFRESH_AUTORUN
 # was set on the live service dashboard; a restart alone does not re-inject env
 # vars on Render, so this comment-only change exists to produce a genuinely new,
 # non-redundant commit for the redeploy that actually picks it up.
-
 
 # ---------------------------------------------------------------------------
 # THE VENUE POLL LOOP -- exchange prices on their OWN clock
@@ -2297,3 +2294,7 @@ def start_venue_poll_loop() -> bool:
     )
     _VENUE_POLL_THREAD.start()
     return True
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

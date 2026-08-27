@@ -162,3 +162,60 @@ class _FakeThread:
 
     def is_alive(self):
         return self._alive
+
+
+# ---------------------------------------------------------------------------
+# the bug this file shipped, and the guard that makes it impossible again
+# ---------------------------------------------------------------------------
+
+
+def test_no_function_is_defined_AFTER_the_main_guard():
+    """I SHIPPED THIS BUG TO PRODUCTION AND IT CRASH-LOOPED THE WORKER.
+
+    The venue poll functions were appended to the END of the file -- after
+    `if __name__ == "__main__": raise SystemExit(main())`. Module bodies execute
+    top to bottom, so `main()` ran BEFORE those defs existed:
+
+        2026-08-27T16:41:04Z  NameError: name 'start_venue_poll_loop' is not defined
+        2026-08-27T16:42:29Z  NameError: name 'start_venue_poll_loop' is not defined
+
+    Once every ~85s, because the NameError escaped `main()`, killed the process
+    and Render restarted it. Every unit test passed the whole time: they import
+    the module and call the functions directly, which never executes the guard.
+    Nothing about "does this file still boot" was being asked.
+
+    So the check is structural, not behavioural -- a def below the guard is
+    unreachable to `main()` no matter what it contains.
+    """
+    import ast
+
+    src = (REPO_ROOT / "scripts" / "run_live_odds_refresh_worker.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    guard_lines = [n.lineno for n in ast.walk(tree)
+                   if isinstance(n, ast.If) and "__main__" in ast.dump(n.test)]
+    assert guard_lines, "the __main__ guard vanished"
+    guard = max(guard_lines)
+
+    stranded = sorted(n.name for n in tree.body
+                      if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.lineno > guard)
+
+    assert not stranded, (
+        f"defined after the __main__ guard and therefore unreachable to main(): {stranded}"
+    )
+
+
+def test_the_venue_poll_names_exist_before_the_guard():
+    """The positive half: the names `main()` actually calls are there to call."""
+    import ast
+
+    src = (REPO_ROOT / "scripts" / "run_live_odds_refresh_worker.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    guard = max(n.lineno for n in ast.walk(tree)
+                if isinstance(n, ast.If) and "__main__" in ast.dump(n.test))
+    before = {n.name for n in tree.body
+              if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.lineno < guard}
+
+    for name in ("start_venue_poll_loop", "venue_poll_interval_seconds",
+                 "_venue_poll_tick", "_venue_poll_background_loop"):
+        assert name in before, f"{name} is not defined before the guard"
