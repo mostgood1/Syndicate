@@ -2038,15 +2038,43 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `build_cards_page_context` hydrated on the worker), NOT the throttle.
 - Claims: NONE held. Deploy claims: released.
 
-### polymarket-catalogue-pagination — OPEN — opened 2026-08-27 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
-- Goal: `fetch_markets` must never report a server-capped first page as the complete catalogue.
-- Files: `syndicate/features/shared/polymarket_client.py` and its tests.
-- Hypothesis: Gamma hard-caps page size at 100 regardless of the `limit` asked. `fetch_markets` requests `limit=200` and breaks on `len(page_rows) < limit`, which is true on EVERY page, so it always stops after page one; `truncated` is set only when `max_pages` is exhausted, so the result reports `truncated=False`. A 100-row slice is presented as the whole catalogue.
-- Falsification test: wrong if the API honours `limit>100`, or if a short page reliably means end-of-catalogue.
-- MEASURED against the live API 2026-08-27: asked limit=100 -> 100 rows; limit=200 -> 100; limit=500 -> 100. Offset paging works — offset 0/100/200 return distinct ids — so the catalogue IS reachable; the loop just never asks for page two. Production evidence: `POLYMARKET_CATALOGUE count=100 sporting=0 truncated=False` on all 10 live-odds-worker boots in 17h.
-- Verification: a test that pins the short-page-is-not-end-of-catalogue behaviour and FAILS against current code, plus a live probe returning >100 markets across pages.
-- IMPACT IS LATENT, NOT LIVE: the only production caller is a boot diagnostic on a SUPERSEDED path (`polymarket_odds_refresh` reads the GLOBAL gamma exchange; the funded venue is `api.polymarket.us` via `polymarket_us_markets`, and `portfolio_commit` uses that at ~17,299 markets). Nothing is mispriced today. This is a shared client that lies about completeness to any future caller.
-- Blocked by: none for this lane. **SEPARATELY BLOCKED, NOT DEFERRED SILENTLY:** retiring the dead boot call needs `scripts/run_live_odds_refresh_worker.py`, claimed by OPEN lane `open-bet-live-status` (session syndicate-27), which shipped and verified work on it TODAY. Claim re-measured 2026-08-27, live not stale. Not edited across lanes.
+### polymarket-catalogue-pagination — **CLOSED 2026-08-27** — paginator fixed and verified against the LIVE API; the dead boot call is handed off, not dropped
+- OUTCOME: `fetch_markets` no longer presents a server-capped first page as the
+  whole catalogue. Gamma caps page size at 100 and ignores a larger `limit`
+  (measured live: asked 100/200/500 -> 100 rows each); the loop broke on
+  `len(page_rows) < limit` with a default limit of 200, so it always stopped
+  after page one and reported `truncated=False`. Production had
+  `POLYMARKET_CATALOGUE count=100 truncated=False` on all ten boots in 17h.
+- VERIFIED AGAINST THE LIVE API, not only mocks: 100 markets / 1 page /
+  `truncated=False` before; **600 markets / 6 pages / 0 duplicate ids /
+  `truncated=True`** after (`max_pages=6`). 3 of 4 new tests fail against the
+  prior loop, confirmed by reverting it. Shipped `6d520b03`.
+- THE TRAP, recorded because a naive fix is WORSE than the bug: advancing
+  `offset` by `limit` (200) against a 100-row cap steps 0/200/400 and never
+  reads rows 100-199 of each stride. The stride must be what came BACK. A test
+  asserts the exact offsets requested.
+- ALSO FOUND: Gamma has a hard offset ceiling — 1000 and 2000 return 100 rows,
+  3000+ returns HTTP 200 carrying `{"type":"validation error","error":"offset
+  too large, use /markets/keyset for deeper pagination"}`. Now raises a named
+  `gamma_refused`; deeper paging is a different ENDPOINT, not a bigger
+  `max_pages`. Documented there.
+- IMPACT WAS LATENT, NOT LIVE, and is stated that way deliberately: the only
+  production caller is a boot diagnostic on a SUPERSEDED path (global gamma
+  exchange; the funded venue is `api.polymarket.us` via `polymarket_us_markets`,
+  which `portfolio_commit` already uses at ~17,299 markets). Nothing was
+  mispriced. This was a shared client lying about completeness to future callers.
+- HANDED OFF, NOT DROPPED: retiring the dead `_polymarket_catalogue_at_boot()`
+  hook needs `scripts/run_live_odds_refresh_worker.py`, claimed by OPEN lane
+  `open-bet-live-status` (session syndicate-27), re-measured 2026-08-27 as LIVE
+  not stale. Messaged them with the evidence AND a warning that this fix changes
+  that hook's log shape — `count=100` becomes hundreds/thousands and it now costs
+  ~20 requests per boot instead of 1, which strengthens the case for removal. A
+  bigger number there does NOT mean the hook became useful; it is still the wrong
+  exchange and still cannot feed an order.
+- Pre-existing and NOT mine: `tests/test_polymarket_board_join.py` 5 failures,
+  identical with and without this change (verified by stashing). In
+  `venue-quote-line-join`'s soccer-competition area; messaged.
+- Claims: NONE held. Deploy claims: none taken — this needs no deploy of its own.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
