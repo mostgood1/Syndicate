@@ -5968,9 +5968,34 @@ Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
 - **Kalshi's 120s refresh interval is unreachable.** `run_kalshi_odds_refresh()`
   is called from ONE site — inside the board build — whose period is 3.4-13 min.
   The board loop sets the venue refresh rate, not the venue config.
-- **`MAX_STORED_MARKETS = 6000` drops ~42% of the catalogue.** `[kalshi_odds]
-  BOARD_JOIN` reads exactly 6000 while `portfolio_commit KALSHI_BOARD_JOIN`
-  reads `markets=10279` on the SAME tick.
+- **CORRECTED 2026-08-27 18:5xZ — my earlier line here ("`MAX_STORED_MARKETS =
+  6000` drops ~42% of the catalogue") WAS WRONG and is replaced.** The cap is
+  deliberate and safe: the keyvalue store hard-refuses at 8MB, an unbounded
+  version reached 13.3MB and STOPPED WRITING THE ARTIFACT AT ALL, and
+  `venue_daily_odds` keeps the complete record. 6000 is a bounded WORKING SET
+  the join prices against, not the record. Nothing is lost by the bound.
+- **THE REAL DEFECT IS THE ALLOCATION, AND IT IS LIVE: the BOARD's Kalshi join
+  lost ~93% of its matches today.** Same ticks, refresh-worker:
+  `[kalshi_odds] BOARD_JOIN set=6000 rows=1329 matched=210` at 16:01:42Z, then
+  `matched=5` from 16:13:19Z and 13-24 since — while
+  `[portfolio_commit] KALSHI_BOARD_JOIN markets=10650 rows=1335 matched=210..217`
+  on those same ticks. A SELECTION problem, not a catalogue one.
+  CAUSE: `_trim_to_storage_bounds` orders by series staleness with a flat
+  `PER_SPORT_FLOOR_MARKETS = 300` and has NO notion of which sports have games
+  on the date being built. NCAAF opening week floods the set —
+  `TRIM_BY_SPORT kept_by_sport={'mlb': 648, 'nba': 6, 'ncaaf': 1896,
+  'nfl': 2083, 'soccer': 1067, 'wnba': 300}` (MLB hit the bare 300 floor at
+  18:45Z) — against board demand of mlb 400 / soccer 400 / wnba 400 rows vs
+  nfl 88 / ncaaf 42. ~4,000 of 6,000 slots serve 130 rows.
+  **SCOPE, CHECKED NOT ASSUMED: EXECUTION IS UNAFFECTED.** `portfolio_commit`
+  reads the STORED artifact via `markets_from_state` (~10,650) and still
+  matches 210-217, so orders price off Kalshi's real book. The degradation is
+  `join_to_board`'s board ANNOTATION — display and edge detection, not order
+  placement. Not a money-at-risk incident.
+  The 300/sport floor shipped the same day and DID fix soccer starving to zero;
+  this is the adjacent failure a flat floor cannot see. Owned by lane
+  `venue-quote-line-join` (claims `pipeline/kalshi_odds_refresh.py`), messaged
+  with these measurements 18:5xZ. NOT edited by me — cross-lane file.
 - **`run_polymarket_odds_refresh` is boot-only and yields nothing.** Wired only
   into `_polymarket_catalogue_at_boot`, so its 300s interval never applies. All
   10 boots in 17h: `count=100 sporting=0 truncated=False` — one page, zero
