@@ -1953,6 +1953,25 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     REFUSES at 8MB and `layer2_shortlist` already holds 5.7MB. A 13.3MB write
     was once rejected outright and the artifact stopped being written at all.
     Polling faster is free; KEEPING MORE is not.
+- **`[2026-08-27, USER DECISION]` KALSHI AND POLYMARKET ARE THE FOUNDATION OF
+  LAYER 1 AND LAYER 2, NOT A SIDE INPUT.** Verbatim intent: they should be
+  artifacts continuously updated to track odds/line movement for pregame, live
+  AND props, and the boards should be built on them. OddsAPI stays because it
+  is where effective EV data comes from -- but it COSTS MONEY PER CALL and the
+  two exchanges do not, so cadence spent on the exchanges is close to free and
+  cadence spent on OddsAPI is rationed. That inverts the assumption the venue
+  path was built under, where OddsAPI was the spine and the venues were an
+  optional reprice.
+  - Set to a 120s cadence on that basis (not 60s): 60s was measured at ~95s
+    polymarket / ~122s kalshi actual, and the polymarket slate write is 5.15MB,
+    so 60s cost ~194MB/hour of keyvalue IO against ~21MB/hour before. 120s
+    keeps roughly a 5-7x freshness gain at half that IO, on a worker already
+    measured at 95.1% of its 2GB.
+  - NOT YET DONE, and it is the real work this decision implies: Layer 1/2 read
+    OddsAPI as the spine and treat venue quotes as a reprice applied afterwards
+    (`_reprice_grid_from_venues`). Making the exchanges the FOUNDATION is an
+    ordering change in the board build, not a cadence change, and it is not
+    something to slip in behind a diagnostics fix.
 - Blocked by: none. Nothing armed; `SYNDICATE_EXECUTION_*` untouched.
 
 

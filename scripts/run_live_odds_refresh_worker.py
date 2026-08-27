@@ -2233,8 +2233,20 @@ def _venue_poll_tick() -> None:
     except Exception as exc:  # noqa: BLE001 -- one venue must not cost the other
         print(f"[venue_poll] KALSHI_FAILED {type(exc).__name__}: {exc}", flush=True)
 
+    # PRINTED ON SUCCESS TOO, and the asymmetry it fixes is not cosmetic. This
+    # used to print only on FAILURE, so the `[venue_poll]` family showed a
+    # KALSHI line every tick and nothing for Polymarket -- and a Polymarket half
+    # that had silently stopped would have produced output identical to one
+    # working perfectly. The question "did BOTH venues refresh?" could only be
+    # answered by leaving this log family for `POLYMARKET_US_SLATE_WRITE`, which
+    # is the slate's own line and not guaranteed to exist on a tick the slate
+    # decides to skip.
+    #
+    # A diagnostic family that cannot report one of the two things it covers is
+    # the instrument-blindness this session hit four separate times.
     try:
         _polymarket_us_slate_refresh_tick()
+        print("[venue_poll] POLYMARKET ok", flush=True)
     except Exception as exc:  # noqa: BLE001
         print(f"[venue_poll] POLYMARKET_FAILED {type(exc).__name__}: {exc}", flush=True)
 

@@ -219,3 +219,23 @@ def test_the_venue_poll_names_exist_before_the_guard():
     for name in ("start_venue_poll_loop", "venue_poll_interval_seconds",
                  "_venue_poll_tick", "_venue_poll_background_loop"):
         assert name in before, f"{name} is not defined before the guard"
+
+
+def test_the_tick_reports_BOTH_venues_on_success_not_just_kalshi(worker, monkeypatch, capsys):
+    """The `[venue_poll]` family must be able to answer "did both refresh?".
+
+    It used to print KALSHI on success and Polymarket only on FAILURE, so a
+    Polymarket half that had silently stopped produced output identical to one
+    working perfectly -- and the question could only be answered by leaving this
+    log family entirely.
+    """
+    monkeypatch.setattr(worker, "_polymarket_us_slate_refresh_tick", lambda: None)
+    import pipeline.kalshi_odds_refresh as kor
+    monkeypatch.setattr(kor, "run_kalshi_odds_refresh",
+                        lambda **kw: {"status": "ok", "markets": []})
+
+    worker._venue_poll_tick()
+    out = capsys.readouterr().out
+
+    assert "[venue_poll] KALSHI" in out
+    assert "[venue_poll] POLYMARKET" in out, "a successful polymarket refresh left no trace"
