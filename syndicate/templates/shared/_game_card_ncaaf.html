@@ -397,13 +397,6 @@
       </div>
     </section>
 
-        <div class="cards-mini-metric">
-          <span>State</span>
-          <strong>{{ game.status }}</strong>
-        </div>
-      </div>
-    </div>
-
     <section class="cards-panel" data-panel-id="details" id="panel-{{ card_dom_id }}-details" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-details" tabindex="0">
       <div class="cards-box-grid{% if game.panels is defined and game.panels|length < 2 %} cards-box-grid--stack{% endif %}">
         {% for panel in game.panels %}
