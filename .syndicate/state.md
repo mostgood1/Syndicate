@@ -5924,3 +5924,55 @@ deployed three times on the evening of 2026-08-26. Same family as
 `[board-quote-staleness]` and `#563`'s deploy-cadence finding.
 
 **Open as `todo.md #585`, not fixed.**
+
+## [board-overview-skipped-for-memory] — VERIFIED 2026-08-27, refresh-worker `277062cd`
+
+**The 8-sport overview was skipped ENTIRELY on every board build in steady
+state.** 13:50-14:52Z: 18 consecutive `BOARD_OVERVIEW_READY sports=0`, both
+dates. Each preceded by `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb
+floor=expensive floor_mb=3000 sports_done=0 sports_total=8`.
+
+**`BUILD_SPAN_EXIT stage=build_intelligence_overview elapsed_s=0.0` DOES NOT
+MEAN FAST.** It means the guard refused at sport 0 and the loop `break`ed. Read
+it together with the `sports=` count or it inverts the diagnosis — a skipped
+build looks like a cheap one.
+
+**The expensive floor is unreachable at rest.** headroom = `max - anon`
+(4096 - 1297 = 2799, confirmed against the emitted snapshot). Steady-state anon
+is 1300-1550MB, so headroom is 2550-2800MB and never reaches the 3000MB floor.
+Only 5 of ~40 iterations over 3h08m produced `sports=8`.
+
+**Board cycle period** (`CALLING_COMPUTE` -> `RETURNED_FROM_COMPUTE`):
+**~214s** when the overview is skipped, **674-783s** when it runs. Layer 2 is
+NOT the cost — `LAYER2_SHORTLIST` publishes every iteration regardless (rows
+1323-1330 today) and its tail runs in ~1s. The 460s is
+`build_intelligence_overview` (305-366s) + `candidate_collection_with_fallback`
+(155-176s).
+
+FIX `6421bf7f` (`break` -> `continue`, plus today+1 throttle default 300 ->
+1800s) IS ON MAIN AND **NOT DEPLOYED** — refresh-worker live on `600a753a`.
+Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
+
+## [exchange-refresh-cadence] — VERIFIED 2026-08-27, live-odds-worker `34b4d4b4`
+
+- **Kalshi's 120s refresh interval is unreachable.** `run_kalshi_odds_refresh()`
+  is called from ONE site — inside the board build — whose period is 3.4-13 min.
+  The board loop sets the venue refresh rate, not the venue config.
+- **`MAX_STORED_MARKETS = 6000` drops ~42% of the catalogue.** `[kalshi_odds]
+  BOARD_JOIN` reads exactly 6000 while `portfolio_commit KALSHI_BOARD_JOIN`
+  reads `markets=10279` on the SAME tick.
+- **`run_polymarket_odds_refresh` is boot-only and yields nothing.** Wired only
+  into `_polymarket_catalogue_at_boot`, so its 300s interval never applies. All
+  10 boots in 17h: `count=100 sporting=0 truncated=False` — one page, zero
+  sporting, and it believes the catalogue complete. `portfolio_commit`'s own
+  Polymarket path sees `markets=17299 indexed=9106`.
+- **Execution fires ~16 min, places almost nothing**: 9 cycles 13:49-15:52Z ->
+  4 orders (Kalshi 3, Polymarket 1); otherwise `placed=0 duplicates=3-9`.
+- **The live day cap is NOT the env var.** Env
+  `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI=50`, `LIMITS` logs
+  `max_day_dollars: 75.01`; `execution_guard._stored_live_limit` overrides env.
+- **Staleness dominates cadence.** `QUOTE_AGE_SERVED seen_p50=4285s` (71 min),
+  p90 7776s, max 37837s; Polymarket join `slate_age_s=579.5`. A faster board
+  loop cannot make a 71-minute-old quote fresh.
+
+None of the above is fixed. No lane holds them.

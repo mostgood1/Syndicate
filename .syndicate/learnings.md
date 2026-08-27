@@ -4064,3 +4064,60 @@ that stays in the ledger as a warning is a bug with a comment on it.
 
 Both fixes this session were caught the same way and neither by a test: by PRINTING
 BOTH n VALUES side by side instead of the difference. The difference looked fine.
+
+## 2026-08-27 — FORBIDDEN: reading `pid` in a deploy claim as evidence the holder is alive
+
+Both claim PIDs read NOT RUNNING. I was one step from `acquire --force` against
+a LIVE session's lock on that basis.
+
+`deploy_claim.py` records `os.getpid()` — the PID of the short-lived *claim
+script*, which exits the instant it writes the file. **It reads "dead" for
+every healthy claim ever taken.** The field cannot distinguish a live holder
+from an abandoned one, which is the only question anyone consults it for.
+
+Liveness comes from finding the READER: search session transcripts for the lane
+slug or the session id. Here `local_38d39247…` had printed
+`SESSION=3515d143-…`, matching the lane owner, last active two minutes earlier.
+It released the claim voluntarily ~2 min after being messaged.
+
+Same family as *"find the READER before calling any id stale"*. A dead PID is
+"not proven alive", never "proven gone".
+
+## 2026-08-27 — `Path(__file__).parents[1]` MAKES THE PRIMARY TREE THE RENDEZVOUS, AND A WORKTREE INVISIBLE
+
+The session-worktree protocol and the deploy locks disagree about where `.syndicate/` is.
+
+- `deploy_claim.py` sets `CLAIM_DIR = REPO_ROOT / ".syndicate" / "deploy_claims"`
+  with `REPO_ROOT` from the **script's own** location. Run it from a session
+  worktree and the claim lands in that worktree — **no other session can see
+  it**, so the lock silently stops being a lock while still reporting ACQUIRED.
+- The deploy guard resolves the lane marker against `$CLAUDE_PROJECT_DIR`, the
+  primary tree. Writing `.current-lane.<session>` in the worktree (which is what
+  `/lane open` does if you run it there) makes the guard print
+  `your lane: <none>` while you hold the claim — it blocked a deploy whose
+  claim was already mine.
+
+**Run every deploy-lock command from the PRIMARY tree, and write the
+per-session lane marker there too.** Code edits stay in the worktree; the locks
+are shared state and must live where the other sessions read them.
+
+Same family as *"keyvalue/artifact split blinds guards"*: a guard reading a
+different store than the one that matters is blind in exactly the case it exists for.
+
+## 2026-08-27 — A COMMENTED-OUT PATH IS STILL A CLAIM; AND THE DEPLOY GUARD MATCHES LEDGER PROSE
+
+Two collisions between ledger text and the tools that parse it, both caught by
+the tools rather than by me.
+
+1. Striking a stale claim by wrapping it in an HTML comment inside a `- Files:`
+   block **created two new claims** — `check_lane_invariants.py` parses paths
+   positionally and does not know what a comment is, so both the path I was
+   removing and one I merely *named in my explanation* registered. The note has
+   to live outside the `- Files:` block entirely.
+2. Writing the literal deploy command into `lanes.md` tripped the deploy guard:
+   it pattern-matches command text and cannot tell a ledger write from a POST.
+   **A false positive here is correct behaviour** — the fix is to reword the
+   ledger, never to reach for a route the guard does not recognise.
+
+The general rule: ledger files are INPUTS to guards, not just prose for humans.
+Text written into them is executed-as-pattern by something.
