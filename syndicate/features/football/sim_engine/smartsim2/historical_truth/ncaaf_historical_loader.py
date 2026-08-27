@@ -138,6 +138,10 @@ def _plays_cache_path(season: int, week: int, cache_dir: Path) -> Path:
     return cache_dir / f"plays_{season}_wk{week:02d}.json.gz"
 
 
+def _ratings_cache_path(season: int, cache_dir: Path) -> Path:
+    return cache_dir / f"ratings_sp_{season}.json.gz"
+
+
 def ensure_games_cached(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR, api_key: str | None = None) -> Path:
     path = _games_cache_path(season, cache_dir)
     if path.exists():
@@ -162,6 +166,69 @@ def ensure_drives_cached(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR, ap
     )
     _write_json_gz(payload, path)
     return path
+
+
+def ensure_ratings_cached(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR, api_key: str | None = None) -> Path:
+    """SP+ team ratings for one season, cached like games/drives/plays.
+
+    WHY THIS BELONGS HERE AND DID NOT EXIST. This loader cached three datasets --
+    games, drives, plays -- all of them EVENT data, a record of what happened.
+    Ratings were the one input it never cached, and they are the one input that:
+
+      * CANNOT be derived from the events. SP+ is CFBD's own model output, not a
+        statistic computable from drives or plays.
+      * DOES NOT CHANGE for a completed season, so re-fetching buys nothing.
+      * IS THE PRIMARY MODEL INPUT. `generate_smartsim2_ncaaf_projections`
+        backtested SP+ against PPA over ~740 games per season and SP+ won on
+        both pairs (r 0.506 vs 0.372 for 2024->2025); PPA is only the fallback.
+
+    So the bulky, derivable datasets were retained and the small, irreplaceable
+    one was thrown away after every run.
+
+    WHAT THAT COST, measured 2026-08-27: a few full-season pulls exhausted the
+    CFBD quota, and it was still HTTP 429 THIRTEEN HOURS later -- a hard cap, not
+    a rolling window. Projection regeneration was blocked outright, which in turn
+    blocked the production confirmation that a promoted calibration artifact had
+    loaded. A run on 19 August HAD fetched SP+ 2026 successfully; the numbers went
+    into the simulation and were discarded. Nothing on disk held them, and they
+    cannot be recovered from the projections (51 games against ~204 unknowns,
+    through a 300-seed Monte Carlo).
+
+    Same contract as its three siblings: returns the path, fetches only when the
+    file is absent, and writes gzipped JSON verbatim.
+    """
+    path = _ratings_cache_path(season, cache_dir)
+    if path.exists():
+        return path
+    payload = _cfbd_get("/ratings/sp", {"year": season}, api_key=api_key)
+    # NEVER cache an empty payload. A rate-limited or malformed response written
+    # once would be served forever as though it were real, and the generator
+    # would silently produce projections with no ratings at all -- which looks
+    # like a completed run. An absent file is honest; an empty one is not.
+    if not payload:
+        raise RuntimeError(f"/ratings/sp returned no rows for {season}; refusing to cache an empty payload")
+    _write_json_gz(payload, path)
+    return path
+
+
+def load_cached_ratings(season: int, *, cache_dir: Path = DEFAULT_CACHE_DIR) -> list | None:
+    """The cached payload, or None when absent/unusable -- never a partial read.
+
+    None rather than [] on purpose: an empty list would read as "this season has
+    no ratings", which is indistinguishable from a failed fetch and would send a
+    caller down the no-ratings path instead of to the API.
+    """
+    path = _ratings_cache_path(season, cache_dir)
+    if not path.exists():
+        return None
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except Exception:
+        return None
+    if isinstance(payload, dict):
+        payload = payload.get("data")
+    return payload if isinstance(payload, list) and payload else None
 
 
 def ensure_plays_cached(

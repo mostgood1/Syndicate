@@ -393,6 +393,34 @@ def load_sp_ratings(season: int) -> dict[str, tuple[float, float]]:
     # season and `--refresh-sp-cache` forces a re-fetch; the file is only ever
     # written after a successful, NON-EMPTY fetch, so a rate-limited run can
     # never poison it with an empty index.
+    # THE LOADER'S CACHE FIRST. `ncaaf_historical_loader` now caches SP+ beside
+    # games/drives/plays (`ensure_ratings_cached`), which is where a CFBD payload
+    # belongs -- one owner, one refresh path. This script's own JSON cache stays
+    # as the second lookup so an existing one keeps working, but the loader's is
+    # authoritative and is what a scheduled refresh will populate.
+    if not _SP_CACHE_REFRESH:
+        try:
+            from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import (
+                load_cached_ratings,
+            )
+            raw = load_cached_ratings(season)
+        except Exception:
+            raw = None
+        if raw:
+            index: dict[str, tuple[float, float]] = {}
+            for row in raw:
+                team = row.get("team") if isinstance(row, dict) else None
+                if not team or team == "nationalAverages":
+                    continue
+                off = (row.get("offense") or {}).get("rating")
+                dfn = (row.get("defense") or {}).get("rating")
+                if off is None or dfn is None:
+                    continue
+                index[norm(team)] = (float(off), float(dfn))
+            if index:
+                print(f"[sp_ratings] season={season} source=loader_cache teams={len(index)}", flush=True)
+                return index
+
     cache_path = sp_ratings_cache_path(season)
     cached = {} if _SP_CACHE_REFRESH else _read_sp_cache(cache_path)
     if cached:
