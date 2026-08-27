@@ -1778,19 +1778,19 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
-### venue-quote-line-join — OPEN — session 3515d143 — **FOUR DEFECTS FIXED AND VERIFIED; TWO NAMED AND NOT FIXED; ONE CHANGE VERIFIED NEUTRAL AND SAID SO.** Soccer unmatched **15,348 -> 4,006 (-74%)**, grid stamped **13.1% -> 66%**, `oddsapi_props` winning 12,047. Prop keys now name their player (was a cross-sport wrong-player match); kalshi quotes now carry a PRICE at all (`yes_bid` was never persisted) and both legs of a threshold market; NFL nicknames resolve (`clubs_unresolved` 64 -> 0, quotes 2,048 -> 2,112 = exactly +64); per-sport trim floor stops one sport evicting another (`soccer: 300` on a tick that trimmed 3,262). Venue poll on its own thread: kalshi ~1,250s -> ~120s, polymarket 428-828s -> ~120s. **NOT FIXED:** kalshi wins ZERO soccer rows (coverage, not keying — `offered_overlap_by_sport` shipped to settle it and has not been read on a build where kalshi HAS soccer quotes); and a TOTALS key names no game, so 672 polymarket soccer quotes collapse to SIX and one fixture's price can stamp another's row — same class as the player-blind props, unfixed. Evidence: `log/2026-08-27.md`, `deploys.md` 14:5x/15:4x/16:3x/17:4xZ. **DEMAND-WEIGHTED TRIM IS LIVE, CORRECT, AND NOT THE FIX** — `matched` 27 -> 208 happened under the FLAT-FLOOR trim before it ran; weighted adds at most +10 (208 -> 218) on one observation, against a complete-set ceiling of 210-217. The real constraint is SUPPLY: mlb/soccer/wnba took every Kalshi market they have (1,512/1,096/534), so slots were never what starved them. Recorded in `deploys.md` 20:2xZ so a landed commit does not imply a fix it did not deliver.
+### venue-quote-line-join — OPEN, **UNOWNED** (session 3515d143 archived 2026-08-27 ~21:45Z; ALL CLAIMS RELEASED, worktree clean, nothing uncommitted) — **SIX DEFECTS FIXED AND VERIFIED IN PRODUCTION; ONE CHANGE RECORDED AS UNPROVEN; TWO NAMED AND UNFIXED.** Verified: soccer unmatched **15,348 -> 4,006**, grid stamped **13.1% -> 66%**, prop keys now name their player (was a cross-sport WRONG-PLAYER match), kalshi quotes carry a price at all (`yes_bid` was never persisted) and both legs of a threshold market, NFL nicknames resolve (`clubs_unresolved` 64 -> 0), per-sport trim floor, and the venue poll on its own thread (kalshi ~1,250s -> ~120s, polymarket 428-828s -> ~120s). **UNPROVEN: the demand-weighted trim.** Allocation IS the binding constraint (`matched` tracks mlb slots: 794/27, 1620/208, 1741/218, 1706/221) but today's recovery came from MLB's slate approaching first pitch, NOT from the change -- the trim behind `matched=208` logged `demand=None`. **Its test is tomorrow MORNING CT, sustained; the morning was noisy (146/210/99 against a 5-27 baseline) so one good reading is not evidence.** I recorded 'supply not allocation' and had to RETRACT it -- see `deploys.md` 21:0xZ correction. **UNFIXED: a TOTALS key names no GAME** (672 polymarket soccer quotes -> SIX distinct keys, same class as the player-blind props); and the `842`-row builds match 0 on the COMPLETE set, never confirmed as a benign future-date board. Full narrative: `log/2026-08-27.md`.
 - Goal: reduce `VENUE_REPRICE_KEYS unmatched_by_sport` for nfl/soccer/ncaaf by
   fixing key-shape mismatches that are PROVEN, and instrumenting the rest.
   Explicitly NOT "make the number go down" -- a wrong match on this path prices
   a real bet against the wrong contract.
-- Files: `syndicate/features/shared/venue_quote_adapters.py`,
-  `syndicate/features/shared/venue_quote_fanin.py`,
-  `pipeline/layer2_shortlist.py`, `tests/test_venue_quote_line_join.py` (new),
-  `syndicate/features/shared/team_aliases.py`,
-  `tests/test_team_nickname_aliases.py` (new),
-  `tests/test_polymarket_side_vocabulary.py` (fixture rested on the gap closed),
-  `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_trim_sport_floor.py` (new),
-  `tests/test_venue_poll_loop.py` (new).
+- **CLAIMS RELEASED 2026-08-27 at session archive.** Every file this lane held
+  is FREE to take — the work in all of them is landed and deployed, so holding
+  them would only contest files with live lanes, which is what
+  `kalshi-line-aware-rungs` released to me this morning for the same reason.
+  Paths deliberately NOT written here: `check_lane_invariants.py` parses any
+  backticked path inside a `- Files:` block as a live CLAIM. Former set is in
+  the git history of this block and in `log/2026-08-27.md`.
+  Whoever resumes this lane should re-claim what they actually need.
 - **RELEASED 2026-08-27 at checkpoint: the live-odds worker entrypoint.** My work
   in it (the venue poll thread) is LANDED and DEPLOYED, so holding the claim only
   contested it with OPEN lane `open-bet-live-status`, which is live and holds the
