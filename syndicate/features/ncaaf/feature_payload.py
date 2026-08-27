@@ -68,6 +68,29 @@ def _norm(value: Any) -> str:
     return _SPACE_RE.sub(" ", text).strip()
 
 
+#: Optional override for WHERE the snapshots are read from.
+#:
+#: EXISTS BECAUSE THE SHARED FILES CANNOT HOLD TWO SEASONS. Measured
+#: 2026-08-27: `build_ncaaf_coach_continuity_snapshot.py`,
+#: `..._transfer_portal_...` and `..._returning_production_...` REPLACE the
+#: file rather than merging by season -- rebuilding for 2025 took coach
+#: 138 (2026) -> 136 (2025 only) and transfers 3,305 -> 3,319, destroying the
+#: rows the live board reads. Only the ROSTER builder merges (44,395 rows
+#: across 2025 and 2026).
+#:
+#: So a multi-season job -- a re-fit, a backtest -- must build the other season
+#: somewhere else and point here, rather than rebuilding in place. Doing it in
+#: place blanks the card context on the served board.
+_SNAPSHOT_ROOT_OVERRIDE: Path | None = None
+
+
+def set_snapshot_root(path: Path | str | None) -> None:
+    """Point snapshot reads at an alternate processed/ directory, or None."""
+    global _SNAPSHOT_ROOT_OVERRIDE
+    _SNAPSHOT_ROOT_OVERRIDE = Path(path) if path else None
+    reset_caches()
+
+
 def _processed(*parts: str) -> Path:
     return (
         Path(__file__).resolve().parents[3]
@@ -78,7 +101,16 @@ def _processed(*parts: str) -> Path:
 def _read(*parts: str) -> list[dict[str, str]]:
     from syndicate.features.ncaaf.sources import ncaaf_source_artifacts_data_path
 
-    for path in (ncaaf_source_artifacts_data_path("processed", *parts), _processed(*parts)):
+    candidates: list[Path] = []
+    if _SNAPSHOT_ROOT_OVERRIDE is not None:
+        # EXCLUSIVE when set: falling back to the default root would silently
+        # mix a 2025 override with the board's 2026 files and produce a payload
+        # from two seasons at once, which is worse than an empty one because it
+        # looks complete.
+        candidates.append(_SNAPSHOT_ROOT_OVERRIDE / Path(*parts))
+    else:
+        candidates.extend([ncaaf_source_artifacts_data_path("processed", *parts), _processed(*parts)])
+    for path in candidates:
         try:
             if path.exists():
                 with path.open("r", encoding="utf-8", newline="") as handle:
