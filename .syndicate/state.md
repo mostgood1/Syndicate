@@ -217,6 +217,53 @@ it appears in `AUTO_SERIES sample` on six reads on 2026-08-25. The principle
 is right and should stand -- the EXAMPLE is falsified and misleads anyone who
 checks it.
 
+## [portfolio-live-surface] `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 2026-08-27T00:0xZ, lanes portfolio-live-primary / portfolio-venue-caps-editable / venue-balances-on-portfolio / venue-settlement / venue-first-refusal / open-bet-live-status]`
+
+**`/portfolio/live` NO LONGER EXISTS as a page** — it is a 302 to
+`/portfolio#live` carrying the query string; `portfolio_live.html` is deleted.
+`/portfolio` renders the execution ledger's real orders AND the prediction
+ledger's user-logged bets, labelled, never summed. `/portfolio/paper` untouched.
+
+**THE VENUE CAPS ARE USER-EDITABLE AND THEY BIND.** Seven fields
+(`max_day_dollars_kalshi|_polymarket`, `max_day_orders_kalshi|_polymarket`,
+`max_order_dollars`, and both `_all_venues` ceilings) in
+`execution_limits_settings.py`; `execution_guard.limits()` reads the store ON
+THE WORKER on the same call `check_order` refuses with. Proven end to end by a
+real user save 2026-08-26T20:27:26Z. **Orders now resolve PER VENUE** — they
+were flat, so a per-venue orders field would have been stored and unenforced.
+**Stored caps bind LIVE only**; paper stays uncapped by design.
+
+**BOTH VENUE BALANCES READ, from the documented shapes** (`venue_balances.py`,
+stamped by live-odds-worker, read by web — web holds no credential and must not):
+kalshi `GET /portfolio/balance` (`balance_dollars` preferred, cents
+cross-checked), polymarket **`GET /v1/account/balances`** — PLURAL, a list keyed
+by `currency`, and `buyingPower` is the cap-comparable figure, NOT
+`currentBalance`. Reading 21:07:32Z: kalshi **$11.55** cash / $40.54 with
+positions; polymarket **$65.30** buying power / $123.89 cash. **NEITHER VENUE
+CAN REACH ITS OWN DAY CAP** (4.2x and 1.5x over).
+
+**THE VENUE SETTLES LIVE ORDERS** (`venue_settlement.py`, live-odds-worker, runs
+BEFORE placing so the day's spend is freed first). Kalshi
+`GET /portfolio/settlements`, Polymarket
+`activities?types=ACTIVITY_TYPE_POSITION_RESOLUTION`. Won/lost from WHICH SIDE
+WE HELD, never from our `side`/`line`. First run 21:36Z: `settled=3` with the
+venues' exact P&L; **`settled_count` 12 -> 15**, the first outcomes on this board
+scored from a venue record. Idempotent (3 -> `already` next tick).
+
+**INFERENCE IS NOW THE FALLBACK, NOT A RACE.** `paper_settlement.settle_orders`
+(refresh-worker) and venue settlement (live-odds-worker) both skip a graded
+order, so whichever ticked first OWNED the row. A live order now waits
+`SYNDICATE_VENUE_SETTLEMENT_GRACE_HOURS` (default 24) before inference touches
+it — a DELAY, not a refusal, so a market the venue never settles still reaches
+the ledger. Verified `awaiting_venue: 28`, the exact pre-deploy count of
+filled-and-ungraded live orders.
+
+**UNVERIFIED AND LOAD-BEARING:** the venue/inferred split is **venue 3 bets
+-11.88% vs inferred 12 bets +51.07%**, and the page shows the blend **+32.60%**.
+n=3, and those 12 were graded before first-refusal existed. **This is not yet a
+controlled comparison.** `settled_by: "venue"` is the field that keeps them
+separable; `settlement_summary` does not yet split on it.
+
 ## [portfolio-settlement] PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[verified 2026-08-22, lane portfolio-ledger-service-split]`
 
 **SETTLEMENT BY SPORT `[verified 2026-08-26, lane kalshi-spread-join-sign]`:**
