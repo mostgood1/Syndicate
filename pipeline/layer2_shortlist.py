@@ -1334,6 +1334,7 @@ def build_layer2_shortlist(
             "[layer2_shortlist] VENUE_REPRICE_KEYS "
             f"unmatched_by_sport={repriced.get('unmatched_by_sport')} "
             f"board_wanted={repriced.get('unmatched_sample')} "
+            f"board_wanted_by_sport={repriced.get('unmatched_sample_by_sport')} "
             f"sources_offered={repriced.get('offered_sample')}",
             flush=True,
         )

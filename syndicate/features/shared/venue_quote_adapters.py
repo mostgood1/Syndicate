@@ -731,6 +731,7 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
     quotes: list[Quote] = []
     no_side = 0
     no_price = 0
+    no_line = 0
     for market_key, entry in markets.items():
         if not isinstance(entry, Mapping):
             continue
@@ -776,16 +777,19 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         if american is None:
             no_price += 1
             continue
+        line = _oddsapi_quote_line(market, parsed_key, entry)
+        if line is None and not str(market).strip().lower().startswith("h2h"):
+            no_line += 1
         quotes.append(
             Quote(
-                key=quote_key(sport, market, side, parsed_key.get("line")),
+                key=quote_key(sport, market, side, line),
                 source="oddsapi",
                 sport=str(sport or ""),
                 market=str(market),
                 side=str(side),
                 probability=None,
                 american=int(american),
-                line=parsed_key.get("line"),
+                line=line,
                 fetched_at=fetched_at,
             )
         )
@@ -794,6 +798,14 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         dropped.append(f"no_side_in_key:{no_side}")
     if no_price:
         dropped.append(f"no_last_odds:{no_price}")
+    if no_line:
+        # NOT dropped -- these quotes are still emitted, exactly as before.
+        # Reported because a lined market with no line ANYWHERE (neither the
+        # key's `line=` nor the value's `last_line`) publishes a key that
+        # cannot meet a board row, and this module's header is about counts
+        # that look like coverage while carrying nothing. Naming it is what
+        # separates "the shard has no line for these" from "the join is broken".
+        dropped.append(f"lined_market_without_line:{no_line}")
     detail = " ".join(dropped)
     return SourceOutcome(
         source="oddsapi",
@@ -805,6 +817,54 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )
+
+
+def _oddsapi_quote_line(market: Any, parsed_key: Mapping[str, Any], entry: Mapping[str, Any]) -> float | None:
+    """The line this quote is at -- from the KEY when it says, else the VALUE.
+
+    THE COMMENT ABOVE THIS FUNCTION'S CALLER USED TO SAY "THE MARKET, SIDE AND
+    LINE ARE IN THE KEY, NOT THE VALUE." Two thirds of that is right and the
+    third is what made every lined OddsAPI quote unmatchable.
+
+    Measured against the real shard shape recorded in that same comment:
+
+        KEY   event_id=..|home_team=..|away_team=..|market=h2h|bookmaker=fanduel
+        VALUE delta, delta_line, history, last_line, last_odds, ... previous_line
+
+    There is no `line=` in the key. `american` was already read from the VALUE
+    (`last_odds`); the line was not, so `parsed_key.get("line")` returned None
+    for every spreads/totals row and `quote_key` built a LINELESS key. Observed
+    on production 2026-08-27, `VENUE_REPRICE_KEYS sources_offered`:
+
+        oddsapi: ['soccer|h2h|draw', 'soccer|spreads|real madrid',
+                  'soccer|spreads|celta vigo', 'soccer|totals|over']
+
+    `soccer|totals|over` is not a bet -- a total without a number cannot be one
+    -- and it can never meet the board's `soccer|totals|over|2.5`. So OddsAPI
+    published spreads and totals that were structurally incapable of matching,
+    while its h2h quotes (legitimately lineless) matched fine and made the
+    source look healthy.
+
+    THIS CANNOT CREATE A WRONG-LINE MATCH, which is the property that matters
+    on a money path. `quote_key`'s own docstring is the rule -- "a spread at
+    -1.5 and the same spread at -2.5 are different bets, and collapsing them
+    prices one at the other's number" -- and adding the real line ENFORCES it.
+    Today these keys match nothing; afterwards they match only a board row at
+    the SAME number. Strictly additive, and never a match at a different line.
+
+    H2H IS LEFT ALONE, DELIBERATELY. A moneyline has no line, but these shards
+    still carry `last_line` on some h2h entries (it is a movement field, not a
+    market term). Reading it there would turn `soccer|h2h|draw` into
+    `soccer|h2h|draw|0` and BREAK the one market family that currently matches
+    -- a regression bought with a fix. The key's own `line=` still wins when a
+    shard does carry one, so a sport whose keys are line-bearing is unchanged.
+    """
+    key_line = parsed_key.get("line")
+    if key_line is not None:
+        return key_line
+    if str(market or "").strip().lower().startswith("h2h"):
+        return None
+    return _as_float(entry.get("last_line"))
 
 
 def _parse_odds_history_key(market_key: Any) -> dict[str, Any]:

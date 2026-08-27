@@ -440,6 +440,7 @@ def apply_venue_quotes(
     source_status: dict[str, Any] = {}
     unmatched_samples: list[str] = []
     unmatched_by_sport: dict[str, int] = {}
+    unmatched_by_sport_sample: dict[str, list[str]] = {}
 
     for row in rows:
         sport = str(row.get("sport") or "").strip().lower()
@@ -487,6 +488,16 @@ def apply_venue_quotes(
             # actually offered, and let the log settle it instead of an argument.
             if len(unmatched_samples) < _UNMATCHED_SAMPLE_LIMIT:
                 unmatched_samples.append(str(key))
+            # PER SPORT, because the global list above answers the wrong
+            # question. It is one pool of 8 filled in row order, so whichever
+            # sport has the most rows takes every slot: read on production
+            # 2026-08-27 it was eight `mlb|spreads|...` keys while the counts
+            # beside it said `nfl: 1244, soccer: 11365`. The two sports with
+            # the largest gaps were the two the sample could not show, so the
+            # diagnostic could name the size of the problem and never its shape.
+            bucket = unmatched_by_sport_sample.setdefault(sport, [])
+            if len(bucket) < _UNMATCHED_SAMPLE_LIMIT and str(key) not in bucket:
+                bucket.append(str(key))
             unmatched_by_sport[sport] = unmatched_by_sport.get(sport, 0) + 1
             out.append(row)
             continue
@@ -512,6 +523,10 @@ def apply_venue_quotes(
         # -- these two lines say so at a glance.
         "unmatched_by_sport": unmatched_by_sport,
         "unmatched_sample": unmatched_samples,
+        # Distinct keys only, per sport: 1,244 unmatched nfl rows are not 1,244
+        # distinct shapes, and a sample that repeats one key eight times is a
+        # sample of one.
+        "unmatched_sample_by_sport": unmatched_by_sport_sample,
         "offered_sample": _offered_sample(by_sport),
     }
 
