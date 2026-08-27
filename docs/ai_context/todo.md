@@ -1,5 +1,54 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#585` — **The chip artifact's `written_at` is FRESH while its content is ~15 minutes old, and `#564`'s threshold bounds the wrong quantity.** — lane `mlb-chip-live-state`, 2026-08-27, measured — **NOT FIXED**
+
+Found while discharging `#581`'s last owed reading, not looked for.
+
+**MEASURED 2026-08-27T00:09:03Z**, refresh-worker on `f8d8b05f`:
+
+    source = worker_artifact   published_at = 00:07:44Z   age = 78.9s   lens = SLIM
+
+    CIN @ SF    BOT 9 10-9    | Final Bottom 9 10-9
+    BOS @ MIA   TOP 3 0-2     | In Progress Bottom 5 0-2
+    COL @ WSH   TOP 3 0-1     | In Progress Top 5    4-1
+    MIL @ NYM   BOT 1 0-0     | In Progress Bottom 3 4-0
+    BAL @ STL   TOP 1 0-0     | In Progress Bottom 1 5-0
+
+    games with a BARE live token (the blank signature): 0
+
+`published_at` is **79 seconds** old. The content is **two innings** — about
+fifteen minutes — behind. `BOS` reads `TOP 3` against `Bottom 5`; `MIL` reads
+`BOT 1 0-0` against `Bottom 3 4-0`.
+
+**`#564`'S THRESHOLD CANNOT SEE THIS.** It bounds how old the ARTIFACT is
+(120s). Nothing bounds how old its CONTENT is. A worker whose board build takes
+~750s cold stamps `written_at` at the end and publishes live state gathered much
+earlier — so the handler serves it as fresh, and the page's stale badge
+(`CHIP_STALE_AFTER_SECONDS`, keyed on `published_at`) correctly stays silent.
+Every publication-time instrument reads healthy. This is the same shape as
+`state.md [board-quote-staleness]`: "every publication-time instrument reads
+FRESH on a board carrying 14-minute-old quotes."
+
+**HYPOTHESIS, NOT TESTED.** `_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60`
+(`home.py`) admits a live-lens report up to fifteen minutes old, and
+refresh-worker's copy sits near that bound — which matches the observed
+two-inning gap almost exactly. The inline path does not show it because web's
+lens copy refreshes on a ~60s cadence. **Falsification:** if the worker's lens
+copy is young and the chips are still two innings behind, the bound is not the
+cause and the staleness is inside the build instead.
+
+**WHY IT MATTERS TO A USER:** whenever the handler serves a fresh worker
+artifact rather than building inline, the board can be quietly a quarter of an
+hour behind, with no badge and no log line saying so.
+
+**CANDIDATE FIX:** stamp the chip payload with a CONTENT age — the oldest live
+state that went into it — beside `written_at`, and let the `#564` threshold and
+the stale badge key on that instead. That makes the quantity visible before
+anyone argues about the bound.
+
+**ID NOTE:** `#584` deliberately skipped. `#581` was declared twice (this lane
+and `open-bet-live-status`); `#584` was offered to that lane for its renumber.
+
 ### `#583` — **The Games rail's date filter never applied to candidate-backed games. `railDate` appeared ONCE in the template, in the branch that seats cards from unclaimed chips.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-26, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T00:0xZ** (web `b0ef00b8`)
 
 `[user report]` "all NFL games that are not today are also showing up" — on the
@@ -172,10 +221,28 @@ after first pitch reading `LIVE` before `TOP 1`, resolving within ~90s). Full
 read and the pre-deploy control: `.syndicate/deploys.md`, 2026-08-26 web
 `58be8c0d`.
 
-**OWED:** refresh-worker runs the same code (`pipeline/layer2_shortlist.py:511`
-calls `build_game_chips`, which imports `home.py`) and was NOT deployed — its
-claim was held by `ncaaf-opener-regions-props`. Confirm the worker artifact
-stops going blank once it carries `58be8c0d` or later. Note
+**OWED — DISCHARGED 2026-08-27T00:08:34Z, on the cell that had never been
+measured.** refresh-worker on `f8d8b05f` (carries `58be8c0d`), serving a FRESH
+artifact against a SLIM web lens:
+
+    source = worker_artifact   published_at = 00:07:44Z   age = 78.9s   lens = SLIM
+
+    CIN @ SF    BOT 9 10-9    | Final Bottom 9 10-9
+    BOS @ MIA   TOP 3 0-2     | In Progress Bottom 5 0-2
+    COL @ WSH   TOP 3 0-1     | In Progress Top 5    4-1
+    MIL @ NYM   BOT 1 0-0     | In Progress Bottom 3 4-0
+    BAL @ STL   TOP 1 0-0     | In Progress Bottom 1 5-0
+
+    games with a BARE live token (the blank signature): 0
+
+**Zero bare tokens.** Every live game carries a real inning. Before the fix this
+exact cell served every live game `0-0` with a bare `LIVE`.
+
+**AND THE SAME READING FOUND A DIFFERENT DEFECT — see `#585`.** The innings are
+two behind. Those four "wrong" scores have the SHAPE of the blank bug and are
+not it: **the discriminator is the TOKEN, not the score.** A blanked game has no
+inning at all; a stale one has a real inning that is simply behind. I nearly
+called this a regression off the watcher line alone. Note
 `scripts/pending_deploys.py` listed this commit as web-only; its
 service-to-file map is wrong for `home.py`.
 

@@ -5749,3 +5749,28 @@ before/after on this must name the service AND the serve path (`source` on
 only. `pipeline/layer2_shortlist.py:511` calls `build_game_chips`, which imports
 `home.py` to register the sport providers. Do not use that tool as a coverage
 answer for this file.
+
+
+## [chip-artifact-content-age] A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-live-state`)
+
+**`/api/board/game-chips` `published_at` bounds when the artifact was WRITTEN,
+not how old the live state inside it is.** Measured 00:09:03Z, refresh-worker on
+`f8d8b05f`: `published_at` 79 seconds old, content two innings — roughly fifteen
+minutes — behind StatsAPI. `BOS` read `TOP 3` against `Bottom 5`; `MIL` read
+`BOT 1 0-0` against `Bottom 3 4-0`.
+
+**`#564`'s 120s freshness threshold and the page's stale badge both key on
+`published_at`, so BOTH read healthy through this.** Same shape as
+`[board-quote-staleness]`. A board build that takes ~750s cold stamps its
+artifact at the END.
+
+**THE DISCRIMINATOR BETWEEN A STALE CHIP AND A BLANKED ONE IS THE TOKEN, NOT
+THE SCORE.** A blanked game (`#581`) carries `0-0` AND a bare `LIVE`/`FINAL`
+with no inning. A stale game carries a real inning that is merely behind. Both
+present as "the score is wrong", and reading the score alone gets it backwards
+— this was nearly called a `#581` regression off a watcher line that reported
+only score mismatches.
+
+**Open as `todo.md #585`, not fixed.** Hypothesis on record: the
+`_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60` bound admits a lens old enough to
+explain the gap exactly.
