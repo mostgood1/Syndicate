@@ -871,7 +871,7 @@ def repair_odds_unit_stakes(*, dry_run: bool = False) -> dict[str, Any]:
         change is auditable and never silently overwrites the record.
     """
     counters: dict[str, Any] = {"scanned": 0, "repaired": 0, "skipped_ambiguous": 0,
-                                "before": 0.0, "after": 0.0}
+                                "skipped_not_live": 0, "before": 0.0, "after": 0.0}
     try:
         state = _load()
     except Exception as exc:
@@ -879,6 +879,23 @@ def repair_odds_unit_stakes(*, dry_run: bool = False) -> dict[str, Any]:
 
     changed = False
     for order in (state.get("orders") or []):
+        # LIVE ONLY, and this is a correctness bound rather than a scope
+        # preference. A PAPER fill is stamped by `place_order` as
+        # `fill_price=requested_price, fill_stake_dollars=requested_stake_dollars`
+        # -- the dollars come straight from the request and are never computed
+        # from a price, so there is nothing here to correct. Its `fill_price`
+        # is legitimately American odds and its stake is legitimately right.
+        #
+        # Today those rows are skipped anyway because `complete_order` takes no
+        # `contracts` argument, so paper rows carry none. That is an ACCIDENT of
+        # the current signature, not a guarantee: the moment anything stamps
+        # `contracts` on a paper row, this function would replace a correct
+        # `requested_stake_dollars` with `contracts * price` and quietly rewrite
+        # the paper book. Measured 2026-08-27: 832 rows reached the old
+        # `skipped_ambiguous` branch, and every one was paper.
+        if str(order.get("mode") or "") != LIVE:
+            counters["skipped_not_live"] += 1
+            continue
         raw_price = order.get("fill_price")
         if raw_price is None:
             continue
