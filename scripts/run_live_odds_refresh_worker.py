@@ -1635,7 +1635,31 @@ def _live_ledger_at_boot() -> None:
     # after we stopped watching it. Runs on this worker because this is where
     # the Kalshi credentials live and where the ledger is already being read.
     try:
-        from syndicate.features.shared.execution_ledger import reconcile_live_orders
+        from syndicate.features.shared.execution_ledger import (
+            reconcile_live_orders,
+            repair_odds_unit_stakes,
+        )
+
+        # REPAIR BEFORE RECONCILING, so a stake stamped from AMERICAN ODDS is
+        # corrected before `spent_today` feeds it to the guard on this tick.
+        # Never raises -- a repair that could stop the reconcile pass would be
+        # worse than the defect it cleans up.
+        try:
+            repaired = repair_odds_unit_stakes()
+            if repaired.get("repaired"):
+                print(
+                    f"[live_odds_worker] LEDGER_ODDS_UNIT_REPAIR"
+                    f" repaired={repaired.get('repaired')}"
+                    f" before=${repaired.get('before')} after=${repaired.get('after')}"
+                    f" skipped_ambiguous={repaired.get('skipped_ambiguous')}",
+                    flush=True,
+                )
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"[live_odds_worker] LEDGER_ODDS_UNIT_REPAIR_FAILED"
+                f" {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
         # BOTH VENUES. This called `reconcile_live_orders()` bare, and its
         # `venue` defaults to `"kalshi"` -- the same defect `execute_portfolio`

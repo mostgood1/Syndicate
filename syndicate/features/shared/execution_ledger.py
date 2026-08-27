@@ -840,6 +840,89 @@ def _is_our_key(client_order_id: Any) -> bool:
     return len(text) == _OUR_KEY_LENGTH and all(ch in _HEX for ch in text)
 
 
+def repair_odds_unit_stakes(*, dry_run: bool = False) -> dict[str, Any]:
+    """Re-derive stakes stamped from a price that was AMERICAN ODDS.
+
+    THE DEFECT THIS CLEANS UP AFTER is fixed above, in the reconciler's price
+    fallback. This exists because the bad value PERSISTS: the affected order is
+    already `filled`, so no later reconciliation re-stamps it, and
+    `spent_today` keeps feeding the wrong number to `check_order`.
+
+    MEASURED 2026-08-27: one Polymarket order carried
+    `fill_price=104.0, contracts=3.34, fill_stake_dollars=347.36` against a
+    `requested_stake_dollars` of 1.64, and the guard consequently believed
+    $368.97 of a $100.01 day cap was spent when ~$23 actually was.
+
+    THE PREDICATE IS PROVABLE, NOT HEURISTIC. A fill price is a price per
+    contract on a binary market, so it is strictly inside (0, 1) BY
+    CONSTRUCTION -- a contract settling at $1 cannot trade at $104. Any stored
+    `fill_price >= 1` is therefore not a price at all, and the stake computed
+    from it is wrong with certainty rather than by suspicion. Nothing here
+    inspects magnitude to decide whether a number "looks too big".
+
+    NARROW, because this writes to a money record:
+
+      * only rows whose `fill_price` is outside (0, 1) -- the impossible ones;
+      * only where `_price_as_probability` can convert it, so an ambiguous unit
+        is left alone rather than guessed;
+      * only `contracts * converted_price`, the same arithmetic the reconciler
+        would have done with the right unit;
+      * the ORIGINAL value is kept in `fill_stake_dollars_before_repair`, so the
+        change is auditable and never silently overwrites the record.
+    """
+    counters: dict[str, Any] = {"scanned": 0, "repaired": 0, "skipped_ambiguous": 0,
+                                "before": 0.0, "after": 0.0}
+    try:
+        state = _load()
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}", **counters}
+
+    changed = False
+    for order in (state.get("orders") or []):
+        raw_price = order.get("fill_price")
+        if raw_price is None:
+            continue
+        try:
+            price = float(raw_price)
+        except (TypeError, ValueError):
+            continue
+        if 0.0 < price < 1.0:
+            continue  # a real probability price -- nothing to do
+        counters["scanned"] += 1
+
+        converted = _price_as_probability(price)
+        contracts = order.get("contracts")
+        if converted is None or contracts is None:
+            counters["skipped_ambiguous"] += 1
+            continue
+        try:
+            stake = round(float(contracts) * float(converted), 2)
+        except (TypeError, ValueError):
+            counters["skipped_ambiguous"] += 1
+            continue
+
+        before = order.get("fill_stake_dollars")
+        try:
+            counters["before"] += float(before or 0.0)
+        except (TypeError, ValueError):
+            pass
+        counters["after"] += stake
+        order["fill_stake_dollars_before_repair"] = before
+        order["fill_stake_dollars"] = stake
+        order["fill_price"] = converted
+        counters["repaired"] += 1
+        changed = True
+
+    counters["before"] = round(counters["before"], 2)
+    counters["after"] = round(counters["after"], 2)
+    if changed and not dry_run:
+        try:
+            _persist(state)
+        except Exception as exc:
+            return {"status": "error", "reason": f"{type(exc).__name__}: {exc}", **counters}
+    return {"status": "ok", **counters}
+
+
 def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[str, Any]:
     """Correct the live ledger from what the VENUE says, not from what we sent.
 
@@ -1112,11 +1195,41 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
             # The venue's own fill price where it gave one, ours where it did
             # not. Never the requested price when the venue disagrees with it:
             # a fill at a better price is money we would otherwise not book.
-            price = seen.get("fill_price")
+            # THROUGH `_price_as_probability`, EVERY TERM. The board stores
+            # AMERICAN ODDS and the venues quote probability dollars, so a
+            # fallback that reads `requested_price` raw is multiplying contracts
+            # by a number like 104 instead of 0.49.
+            #
+            # MEASURED IN PRODUCTION 2026-08-27, and it took a venue outage to
+            # expose it. Polymarket US began returning `http_500` on
+            # `/v1/order/{id}`, so `seen.get("fill_price")` was None; the order
+            # had no prior fill, so the second term was None; and the third
+            # returned `requested_price=104.0`. The stamp became
+            # `3.34 contracts * 104.0 = $347.36` for an order whose
+            # `requested_stake_dollars` was **$1.64**.
+            #
+            # Converted, the same row is `3.34 * american_to_probability(104)`
+            # = `3.34 * 0.4902` = $1.64 -- the requested stake exactly, which is
+            # what makes this a units bug rather than a pricing one.
+            #
+            # WHY IT IS NOT MERELY A REPORTING ERROR. `spent_today` feeds
+            # `check_order`, so the guard believed $368.97 of a $100.01
+            # Polymarket day cap was spent when the real figure was ~$23. The
+            # next genuinely new Polymarket position would have been refused on
+            # a budget that was never spent, and the venue would have looked
+            # quiet for a reason that was not real. The sibling branch above
+            # already converts (see `fill_price = _price_as_probability(...)`);
+            # this one did not, and only the fallback path reaches it -- so it
+            # stayed latent until the venue stopped answering.
+            #
+            # A price whose unit is AMBIGUOUS still returns None and leaves the
+            # stake unstamped, which is the safe direction: an absent number is
+            # visible, a confidently wrong one is not.
+            price = _price_as_probability(seen.get("fill_price"))
             if price is None:
-                price = order.get("fill_price")
+                price = _price_as_probability(order.get("fill_price"))
             if price is None:
-                price = order.get("requested_price")
+                price = _price_as_probability(order.get("requested_price"))
 
             # WHAT KALSHI BILLED, in preference to what we can reconstruct.
             # `count * price` was always arithmetic over two numbers we parsed;
