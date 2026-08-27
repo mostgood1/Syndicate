@@ -5380,6 +5380,63 @@ play-level history this repo has held; a leakage-guarded projection substrate
 (0 of 12,429 probe comparisons leaked); a season backfill that does NBA/NCAAB
 identically; and five one-shot analysis gates.
 
+---
+
+## LANE CLOSED 2026-08-27. WHERE IT ACTUALLY LANDED, AND WHY IT STOPPED.
+
+**FOUR MEASURED ANSWERS, THREE OF THEM NEGATIVE:**
+
+| question | answer | strength |
+|---|---|---|
+| does momentum predict? | **NO** — largest of 120 correlations 0.0613 vs a PRE-REGISTERED floor of 0.082 | strong, 282 games |
+| does game-to-date pace help? | **NO** — -0.38 points | strong, held out |
+| is the (margin x time) grid a grid? | **NO** — margin moves pace 1.8%; only the final minute moves | strong, replicated across 4 margin bands |
+| does pricing the final minute apart help? | **YES** — +0.106 vs a MATCHED control, 5 of 5 buckets | **WEAK-TO-MODERATE**: a 3% median improvement, effective n = 86 GAMES not 6,536 probes, no interval computed |
+
+Best model on held-out dates is `league_late`: pure league constants with the
+final minute priced separately. Error curve 1.59 / 2.18 / 2.61 / 3.91 / 5.05
+points as the buzzer approaches. **Do not quote the first situational table** —
+it was a median-of-ratios artifact, superseded by the pooled run.
+
+**WHY IT STOPPED, AND IT IS NOT A MODELLING LIMIT.** The market join is capped
+by the CLOCK BRIDGE. Measured 2026-08-24, over 2026-08-12..24:
+
+    state (momentum_events)  11 dates
+    quotes (book_quotes)     13 dates, 6301 interval rows and 45 capture
+                             instants per event on 08-23 — NOT the blocker
+    bridge (live_momentum)    2 dates   <- the cap
+    USABLE_DATES              1         <- 2026-08-23
+
+That is the MLB trap in `CLAUDE.md` reproduced exactly: families that look like
+weeks, intersecting on a day. **The models are ahead of the evidence that can
+test them**, so more modelling had negative value and the lane was stopped
+rather than continued.
+
+**THE SINGLE HIGHEST-VALUE NEXT READING**, and it is free: `PLAY_FIELDS` /
+`PLAY_CLOCK_CANDIDATES` on `live-odds-worker`, one line per process on the first
+live game. It prints the key set of one ESPN play. **If plays carry a wall
+clock, the season backfill can REBUILD the bridge and the join goes from 1 date
+to 11 in a single backfill.** If they do not, the only cure is waiting for
+slates. It had not fired when this closed (the slate read `pre=2`), and the
+one-shot deliberately refuses to spend itself on a game with no plays.
+
+**IT IS NOW 2026-08-27 — THREE DAYS OF SLATES HAVE RUN SINCE THESE NUMBERS.**
+The bridge grows one date per slate captured, so re-running
+`SYNDICATE_WNBA_MARKET_JOIN_PROBE` is the cheapest first move for whoever picks
+this up, and the coverage numbers above are a floor rather than the current
+state.
+
+**WHAT IS BUILT AND WAITING:** `basketball_market_join.py` (clock bridge, line
+lookup, grading, summary) with 19 tests, deliberately NOT wired to a runner —
+the machinery being ready is not a reason to report a number computed on one
+date. Wire it when `USABLE_DATES` is worth reporting.
+
+**THE PROCESS LESSON, recorded in `learnings.md` 2026-08-24:** three deploys
+this lane fired on a stale pre-flight and/or an expired claim, the last on a
+check taken THIRTEEN HOURS earlier. All three were harmless by luck. Freshness
+is measured in TURNS, not intent, and a scheduled check-in cannot carry a
+pre-flight in its prompt because the gap opens between its own steps.
+
 ### `#514` — **Replicate soccer's live-lens attack momentum for basketball (NBA/WNBA/NCAAB), artifact-driven.** — scoped 2026-08-22; **PHASES A AND B LANDED AND DEPLOYED, CAPTURING ON A LIVE WNBA SLATE**; lane `basketball-live-momentum`
 
 **STATUS 2026-08-22 ~23:5xZ — the header above USED TO SAY "NOT DEPLOYED and
