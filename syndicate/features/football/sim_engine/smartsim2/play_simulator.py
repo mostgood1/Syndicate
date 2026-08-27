@@ -245,31 +245,26 @@ class PlayResult:
         }
 
 
-def _goal_line_touchdown_enabled() -> bool:
-    """DEFAULT OFF. The fix is correct; the CALIBRATION PROFILES ARE NOT READY.
+def _goal_line_touchdown_enabled(profile: CalibrationProfile | None = None) -> bool:
+    """PER-PROFILE, with an env override kept for shadow runs.
 
-    `_goal_line_touchdown` removes a real defect -- 6.60% of NCAAF drives gained
-    more yards than the field is long, one reached 249 -- but BOTH football
-    profiles were fitted with that defect present, so correcting the mechanism
-    invalidates the estimators that were absorbing it. Measured, 150 games each:
+    This was a single global env flag, which forced both football profiles to
+    make the same choice. Measured 2026-08-27, that is the wrong shape:
 
-        NFL   mean |err| vs truth   4.8% BEFORE  ->  5.9% AFTER
-        NCAAF drive-structure err  13.0% BEFORE  ->  3.9% AFTER (re-fitted),
-              but yards/drive regresses +1.5% -> -21.7%
+        ncaaf  shipped   off  15.19%      ncaaf  candidate  ON   7.25%
+        nfl    shipped   off   3.87%      nfl    candidate  ON   4.18%
 
-    NFL is production and gets WORSE, and a one-parameter re-fit does not
-    recover it (`drive_yardage_multiplier` 1.00 -> 0.92 trades touchdowns and
-    game total for possessions and punt rate, landing back at 5.9%). The NFL
-    profile's own docstring records SEVEN calibration iterations; that is the
-    scale of work this owes, not a parameter tweak.
+    NCAAF gains 7.94 points from the mechanism plus its re-fit. NFL is ALREADY
+    at its best and the same treatment costs it 0.31. One switch makes one
+    sport pay for the other; the profile is in scope here, so it decides.
 
-    So this lands OFF, exactly the dark-launch posture `feature_payload.py` and
-    `_fixture_aware_cadence_enabled` use: the mechanism is in the tree, tested
-    and measurable, and turning it on is a separate decision that owes a re-fit
-    of BOTH profiles against `ncaaf_historical_truth_report.md`.
-
-    `scripts/calibrate_ncaaf_drive_structure.py` is the harness for that work.
+    The env var still forces it ON everywhere, because a shadow run needs to
+    exercise the mechanism against a profile that has not opted in yet. It can
+    only turn the mechanism ON -- it can never turn a profile's own choice OFF,
+    so enabling it cannot silently disable a calibrated engine.
     """
+    if profile is not None and getattr(profile, "goal_line_touchdown", False):
+        return True
     return os.environ.get("SYNDICATE_FOOTBALL_GOAL_LINE_TOUCHDOWN", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -435,7 +430,7 @@ def simulate_play(
                      - defense_rating * profile.rating_defense_weight) * profile.drive_yardage_multiplier
         yard_multiplier = 0.6 if play_state.down >= 3 else 0.0
         yards_gained = max(0, int(round(rng.normalvariate(base_gain + yard_multiplier, 3.2))))
-        if _goal_line_touchdown_enabled() and yards_gained >= max(0, 100 - play_state.yardline):
+        if _goal_line_touchdown_enabled(profile) and yards_gained >= max(0, 100 - play_state.yardline):
             return _goal_line_touchdown(play_state, possession_state, clock_consumed=clock_consumed)
         end_play_state = _refresh_situation(advance_play_state(play_state, yards_gained=yards_gained, clock_consumed=clock_consumed))
         summary = (
@@ -466,7 +461,7 @@ def simulate_play(
                      + offense_rating * profile.explosive_rating_offense_weight
                      - defense_rating * profile.explosive_rating_defense_weight) * profile.explosive_yardage_multiplier
         yards_gained = max(6, min(55, int(round(rng.normalvariate(base_gain, 7.0)))))
-        if _goal_line_touchdown_enabled() and yards_gained >= max(0, 100 - play_state.yardline):
+        if _goal_line_touchdown_enabled(profile) and yards_gained >= max(0, 100 - play_state.yardline):
             return _goal_line_touchdown(play_state, possession_state, clock_consumed=clock_consumed)
         end_play_state = _refresh_situation(advance_play_state(play_state, yards_gained=yards_gained, clock_consumed=clock_consumed))
         end_possession_state = replace(

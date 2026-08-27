@@ -33,8 +33,10 @@ parameter sweep, not a multi-iteration calibration loop.
 from __future__ import annotations
 
 from syndicate.features.football.sim_engine.smartsim2.calibration_profile import CalibrationProfile
+from syndicate.features.shared.calibration_profile_paths import calibration_profile_path
+from syndicate.features.shared.calibration_profile_store import load_versioned_profile
 
-NCAAF_CALIBRATION_PROFILE = CalibrationProfile(
+NCAAF_CALIBRATION_PROFILE_DEFAULT = CalibrationProfile(
     name="ncaaf",
     # Yards/play is the largest measured divergence (+42.4% relative). Split
     # across three levers: more frequent explosive plays, bigger explosive
@@ -111,4 +113,27 @@ NCAAF_CALIBRATION_PROFILE = CalibrationProfile(
     red_zone_gain_stiffening=0.80,
 )
 
-__all__ = ["NCAAF_CALIBRATION_PROFILE"]
+# THE VERSIONED-PROFILE SEAM, mirroring NFL's exactly (calibration_profile.py).
+#
+# NCAAF's profile was a hardcoded constant, so a calibration artifact written to
+# `calibration_profile_path("ncaaf")` was READ BY NOTHING -- promoting a re-fit
+# would have appeared to work and changed no simulation at all. NFL has resolved
+# through this seam since `#440` Part 4 Phase 5; NCAAF simply never got wired.
+#
+# RESOLVED AT IMPORT because every consumer takes this constant as a DEFAULT
+# ARGUMENT and Python evaluates those once -- resolving the CONSTANT reaches
+# every call site with no churn.
+#
+# NO-OP WHILE NO ARTIFACT EXISTS: the loader returns `default_profile` ITSELF
+# when the file is absent, invalid or unreadable, and never raises. With no
+# artifact this file behaves exactly as it did before the seam.
+NCAAF_CALIBRATION_PROFILE, NCAAF_CALIBRATION_PROFILE_METADATA = load_versioned_profile(
+    default_profile=NCAAF_CALIBRATION_PROFILE_DEFAULT,
+    artifact_path=calibration_profile_path("ncaaf"),
+)
+
+__all__ = [
+    "NCAAF_CALIBRATION_PROFILE",
+    "NCAAF_CALIBRATION_PROFILE_DEFAULT",
+    "NCAAF_CALIBRATION_PROFILE_METADATA",
+]

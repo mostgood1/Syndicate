@@ -13,11 +13,22 @@ Measured over 2,409 NCAAF drives before the fix:
     gained > 75 yards and scored NOTHING         3.82%
     longest single drive                       249 yards
 
-WHY IT SHIPS OFF. Both football profiles were calibrated WITH the defect
-present, so correcting the mechanism invalidates the estimators absorbing it:
-NFL's mean error against truth goes 4.8% -> 5.9%, and a one-parameter re-fit
-does not recover it. This is `model_engine_standard.md`'s mechanism-vs-estimator
-rule, measured rather than cited.
+WHY IT SHIPPED OFF, AND WHAT CHANGED. Both profiles were calibrated WITH the
+defect present, so correcting the mechanism invalidated the estimators absorbing
+it. That is now resolved PER PROFILE rather than by a global switch:
+
+    ncaaf shipped off  15.00%      ncaaf re-fitted ON   7.24%   <- promoted
+    nfl   shipped off   4.22%      nfl   re-fitted ON   4.18%   <- NOT promoted
+
+NCAAF opts in through its calibration artifact. NFL measures BEST as it ships,
+so it stays off and its profile is untouched.
+
+THESE TESTS DRIVE THE DEFAULT PROFILE ON PURPOSE. They pin the ENV-OVERRIDE
+path — off vs on — which is the shadow-run seam for a profile that has not
+opted in. Using the live NCAAF profile here would make the "off" arm impossible,
+because that profile now enables the mechanism itself; the test would pass
+trivially and prove nothing. `test_football_calibration_artifacts.py` covers
+the profile-gated path.
 """
 from __future__ import annotations
 
@@ -34,7 +45,9 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.football.sim_engine.smartsim2 import play_simulator
 from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2SimulationInput
 from syndicate.features.football.sim_engine.smartsim2.game_simulator import simulate_game
-from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import NCAAF_CALIBRATION_PROFILE
+from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import (
+    NCAAF_CALIBRATION_PROFILE_DEFAULT as NCAAF_CALIBRATION_PROFILE,
+)
 
 FLAG = "SYNDICATE_FOOTBALL_GOAL_LINE_TOUCHDOWN"
 

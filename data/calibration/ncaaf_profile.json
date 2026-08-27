@@ -1,0 +1,51 @@
+{
+  "fields": {
+    "drive_yardage_multiplier": 0.95,
+    "explosive_play_multiplier": 1.45,
+    "explosive_yardage_multiplier": 1.35,
+    "field_goal_attempt_base_probability": 0.58,
+    "field_goal_attempt_distance_scale": 0.02,
+    "field_goal_attempt_fringe_probability": 0.5,
+    "field_goal_make_base": 0.9,
+    "field_goal_make_ceiling": 0.82,
+    "field_goal_make_distance_penalty": 0.022,
+    "field_goal_make_floor": 0.25,
+    "field_goal_weight_multiplier": 1.0,
+    "fourth_down_conversion_multiplier": 0.55,
+    "fourth_down_in_range_punt_base": 0.18,
+    "fourth_down_in_range_punt_scale": 0.3,
+    "fourth_down_mid_distance_punt_probability": 0.6,
+    "fourth_down_midfield_punt_probability": 0.97,
+    "fourth_down_range_approach_punt_base": 0.86,
+    "fourth_down_range_approach_punt_scale": 0.08,
+    "fourth_down_short_distance_punt_probability": 0.3,
+    "goal_line_touchdown": true,
+    "name": "ncaaf",
+    "red_zone_gain_stiffening": 0.8,
+    "red_zone_touchdown_weight_bonus": 0.58,
+    "touchdown_weight_multiplier": 0.55
+  },
+  "fit_from": {
+    "games_per_measure": 200,
+    "known_costs": {
+      "field_goal_rate_pct": 50.0,
+      "yards_per_drive_pct": -23.1
+    },
+    "nfl_deliberately_unchanged": "NFL measures BEST as shipped (4.22%); the same treatment costs it. Its profile is untouched.",
+    "reason": "goal-line touchdown mechanism enabled ON THIS PROFILE, plus a re-fit of the rates that were absorbing its absence",
+    "score_after_pct": 7.24,
+    "score_before_pct": 15.0,
+    "scored_metrics": [
+      "possessions_per_game",
+      "plays_per_drive",
+      "seconds_per_drive",
+      "yards_per_drive",
+      "touchdown_rate",
+      "punt_rate",
+      "game_total"
+    ],
+    "truth": "ncaaf_historical_truth_report.md -- 53,548 real NCAAF drives / 2,264 games, 2023-2025"
+  },
+  "generated_at": "2026-08-27T16:21:40Z",
+  "version": "ncaaf-goal-line-refit-1"
+}

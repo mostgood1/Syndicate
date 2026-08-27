@@ -131,6 +131,26 @@ class CalibrationProfile:
     # 1.0) keep more red-zone possessions alive long enough to score a
     # touchdown instead.
     red_zone_gain_stiffening: float = 0.80
+    # A DRIVE REACHING THE END ZONE SCORES. Per-PROFILE, not a global env flag.
+    #
+    # Measured 2026-08-27, all four combinations at 120 games:
+    #
+    #     sport  profile     goal-line   SCORED err
+    #     ncaaf  shipped     off            15.19%   <- production today
+    #     ncaaf  candidate   ON              7.25%   <- best
+    #     nfl    shipped     off             3.87%   <- production today, BEST
+    #     nfl    candidate   ON              4.18%
+    #     nfl    candidate   off             7.42%
+    #
+    # NCAAF gains 7.94 points from the fix plus its re-fit. NFL is ALREADY at
+    # its best and the same treatment costs it 0.31. A single global switch
+    # forces one sport to pay for the other; a profile field does not, and the
+    # profile is already in scope at every call site that needs it.
+    #
+    # Also note the last row: a re-fitted profile with the mechanism OFF is
+    # WORSE than the profile it replaces, for both sports. The profile and the
+    # mechanism are one change and can never ship apart.
+    goal_line_touchdown: bool = False
 
     def to_dict(self) -> dict[str, float | str]:
         return {
@@ -157,6 +177,12 @@ class CalibrationProfile:
             "field_goal_weight_multiplier": self.field_goal_weight_multiplier,
             "red_zone_touchdown_weight_bonus": self.red_zone_touchdown_weight_bonus,
             "red_zone_gain_stiffening": self.red_zone_gain_stiffening,
+            # MUST be here or the artifact cannot carry it: `save_versioned_profile`
+            # serialises `to_dict()` and `profile_with_overrides` reads the same
+            # keys back. A field absent here round-trips to its default, so a
+            # candidate that opts into the goal-line rule would load with it OFF
+            # and the whole re-fit would be inert while appearing to apply.
+            "goal_line_touchdown": self.goal_line_touchdown,
         }
 
 
