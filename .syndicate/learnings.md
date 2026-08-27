@@ -4272,3 +4272,78 @@ absent (= enabled). Pair every null with proof the thing could have fired.
 
 Same family as [[a blocker is a measurement and it expires]] and [[a test whose fixture
 cannot violate its property]]: a stale or incapable reference standing in for a live one.
+---
+
+## 2026-08-27 — A GREEN TEST SUITE OVER A FILE THAT CANNOT BOOT `[lane venue-quote-line-join]`
+
+**FORBIDDEN: appending a definition below `if __name__ == "__main__":` and
+treating a passing unit suite as evidence the file still runs.**
+
+I crash-looped `live-odds-worker` for 18 minutes (16:39-16:57Z, `NameError:
+start_venue_poll_loop`, restart every ~85s) by appending functions to the end of
+the entrypoint. `main()` executes at the guard, before the defs below it exist.
+
+**All 18 tests passed the entire time**, and would have passed forever:
+importing a module executes its whole body, so the names exist by the time a
+test asks for them, and the `__main__` guard never runs under pytest at all.
+The suite asked "does the loop behave once running" — true, and irrelevant.
+Nothing asked "does this file still BOOT".
+
+**The guard is STRUCTURAL, not behavioural**: walk the AST, find the `__main__`
+`If`, assert no `FunctionDef` follows it. A behavioural test only ever catches
+the instance someone thought to write; this catches the class.
+
+---
+
+## 2026-08-27 — CADENCE LIVES IN THE CALLER, NOT THE INTERVAL CONSTANT `[lane venue-quote-line-join]`
+
+**FORBIDDEN: reporting an interval env var as a cadence lever without reading
+its CALL SITE.** I told the user twice that raising venue cadence was "pure env,
+no code". Both times wrong, both caught only by reading callers:
+
+- `SYNDICATE_POLYMARKET_REFRESH_INTERVAL_SECONDS` governs
+  `_polymarket_catalogue_at_boot()` — **boot only**, `force=True`.
+- Kalshi's refresh is called **once per board build** (~748s measured), so its
+  120s interval could never fire faster than its caller asked.
+- Both slate/market ticks ride the live worker's **adaptive** loop, which returns
+  the ~900s IDLE interval whenever no game is live.
+
+A self-paced function reaches its own interval only if something asks it that
+often. **The binding constraint is `min(caller frequency, own interval)`**, and
+the interval is the half that is visible in config — which is exactly why it
+gets mistaken for the lever.
+
+---
+
+## 2026-08-27 — A KEY MUST NAME EVERY PARTY TO THE BET `[lane venue-quote-line-join]`
+
+**FORBIDDEN: a join key for a player prop that omits the player, or for a total
+that omits the game.** Both were live and both look identical to a working join
+from every counter.
+
+Props keyed `<sport>|<market>|<side>|<line>`, so every player's anytime-scorer
+row collapsed to ONE string and the first row took a quote describing a
+different human. Fixed. **Totals still do this by GAME** — 672 polymarket soccer
+quotes collapse into SIX distinct keys, so one fixture's price can stamp
+another's row.
+
+**The tell is a collapse ratio.** Adapter-reported quotes against DISTINCT keys:
+`oddsapi_props` 15,378 -> 15,378 (1:1, correctly keyed), `polymarket_us` 672 ->
+6 (112:1). **And instability is the second tell**: polymarket's soccer
+selections moved 212 -> 4 across two consecutive builds on an unchanged feed. A
+correctly keyed source does not move 50x on identical input.
+
+---
+
+## 2026-08-27 — A BREAKDOWN THAT DOES NOT RECONCILE IS NOT EVIDENCE `[lane venue-quote-line-join]`
+
+I shipped `TRIM_BY_SPORT kept=6000 ... kept_by_sport={...}` summing to **1,506**,
+because the tally was updated in one of two passes. The floor WAS working; the
+line written to PROVE it invited the reader to conclude 4,494 markets had
+vanished. **Assert `sum(breakdown) == total` in the test that covers the
+diagnostic**, not just that the diagnostic fires.
+
+Same session, same shape: `[venue_poll]` printed KALSHI on success and
+Polymarket only on FAILURE, so a Polymarket half that had silently stopped
+produced output identical to one working perfectly. Found only because the user
+asked a question the instrument could not answer.

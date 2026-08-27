@@ -147,6 +147,16 @@ from a non-proxied network. Venue facts:
 
 ## [kalshi-coverage-vs-oddsapi] KALSHI COVERAGE: capture is healthy, the JOIN is the bottleneck, and two prop vocabularies do not exist `[verified 2026-08-25, lane kalshi-oddsapi-coverage-audit]`
 
+**UPDATED 2026-08-27, lane `venue-quote-line-join`. "THE JOIN IS THE BOTTLENECK" WAS RIGHT AND UNDER-SPECIFIED — FOUR SEPARATE DEFECTS, ALL NOW FIXED AND MEASURED:**
+1. **No Kalshi quote carried a PRICE.** The adapter read `yes_bid`/`last_price`; `_LEAN_MARKET_FIELDS` persists neither. 400 nfl / 400 ncaaf / 121 wnba quotes had `probability=None` while `status` read `ok`. Now read from `*_probability` / `*_ask_dollars`; `leg_without_price` counts the residual.
+2. **A threshold market offered ONE leg.** Kalshi titles every total as an OVER, so only that side was published. Both legs now, each from its OWN quoted price — never `1-p`, which would erase the spread. nfl/ncaaf quotes 400 -> 800.
+3. **Prop keys named no PLAYER**, so every player's row in a market collapsed to one key and the first row took a quote describing someone else. Cross-sport, not soccer-only. Now keyed with `kalshi_board_join.normalize_person`. Cost, stated in advance: kalshi selections 2,533 -> 550, mlb unmatched 530 -> 1,437 — that fall IS the correction.
+4. **One sport could evict another** from the 6,000-market working set. `PER_SPORT_FLOOR_MARKETS=300`; measured `TRIM_BY_SPORT kept=6000 trimmed=3262 kept_by_sport={mlb:300, nba:6, ncaaf:300, nfl:300, soccer:300, wnba:300}`.
+
+**AND THE VENUES NOW HAVE THEIR OWN CLOCK.** Both refreshes rode the live worker's ADAPTIVE loop, which returns the ~900s IDLE interval whenever no game is live — so every cadence env var was a lever that did nothing. A dedicated thread (`start_venue_poll_loop`) took kalshi ~1,250s -> ~120s and polymarket 428-828s -> ~120s. `SYNDICATE_VENUE_POLL_INTERVAL_SECONDS` (default 60, floor 30) now set to 120.
+
+**STILL TRUE AND STILL UNFIXED:** kalshi wins ZERO soccer rows despite being the freshest feed — `offered_overlap_by_sport` shipped to tell coverage from freshness and has NOT been read on a build where kalshi has soccer quotes. And a TOTALS key names no GAME: 672 polymarket soccer quotes collapse to SIX, so one fixture's price can stamp another's row — the same class as defect 3, on a different axis.
+
 Full audit: `docs/ai_context/kalshi_oddsapi_coverage_audit.md` (branch
 `claude/kalshi-oddsapi-coverage-audit`, `4152111e2`). Evidence is production
 log lines with timestamps; regenerate with

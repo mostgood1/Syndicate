@@ -1799,7 +1799,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   the same night of a watcher summary disagreeing with what it was built to
   check — the other ran the opposite way at `00:08:34Z`.
 
-### nfl-soccer-props-board — OPEN — opened 2026-08-27 — session 3515d143-20a0-48e3-8538-59a9d6dc8e1c
+### nfl-soccer-props-board — **CLOSED 2026-08-27** — session 3515d143 — **GOAL MET AND VERIFIED ON THE SERVED SURFACE.** NFL cards 0 -> **112 `shared_prop_rows` across 14/16 games** (web `e3c168f3`). Both captures multi-book on post-fix files: NFL wk1 **294 rows/1 book -> 556/4 books**, soccer ligue_1 **2,720 rows/4 books, 647 of 1,529 selections multi-quoted**. Narrative + evidence: `log/2026-08-27.md`. STILL OPEN ELSEWHERE, not this lane: `/nfl/api/props` serves rows=0 while the CARDS read the same file fine (downstream of the read path, not `#441`); and nobody has measured whether the ROI number MOVES now that a best price exists to pick.
 - Goal: NFL cards serve non-zero `shared_prop_rows`, and BOTH sports' prop CSVs
   carry every book instead of one. Two defects, ported from what
   `ncaaf-opener-regions-props` measured, but only after checking each one
@@ -1849,7 +1849,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 
-### venue-quote-line-join — OPEN — opened 2026-08-27 — session 3515d143-20a0-48e3-8538-59a9d6dc8e1c
+### venue-quote-line-join — OPEN — session 3515d143 — **FOUR DEFECTS FIXED AND VERIFIED; TWO NAMED AND NOT FIXED.** Soccer unmatched **15,348 -> 4,006 (-74%)**, grid stamped **13.1% -> 66%**, `oddsapi_props` winning 12,047. Prop keys now name their player (was a cross-sport wrong-player match); kalshi quotes now carry a PRICE at all (`yes_bid` was never persisted) and both legs of a threshold market; NFL nicknames resolve (`clubs_unresolved` 64 -> 0, quotes 2,048 -> 2,112 = exactly +64); per-sport trim floor stops one sport evicting another (`soccer: 300` on a tick that trimmed 3,262). Venue poll on its own thread: kalshi ~1,250s -> ~120s, polymarket 428-828s -> ~120s. **NOT FIXED:** kalshi wins ZERO soccer rows (coverage, not keying — `offered_overlap_by_sport` shipped to settle it and has not been read on a build where kalshi HAS soccer quotes); and a TOTALS key names no game, so 672 polymarket soccer quotes collapse to SIX and one fixture's price can stamp another's row — same class as the player-blind props, unfixed. Evidence: `log/2026-08-27.md`, `deploys.md` 14:5x/15:4x/16:3x/17:4xZ.
 - Goal: reduce `VENUE_REPRICE_KEYS unmatched_by_sport` for nfl/soccer/ncaaf by
   fixing key-shape mismatches that are PROVEN, and instrumenting the rest.
   Explicitly NOT "make the number go down" -- a wrong match on this path prices
@@ -1861,7 +1861,14 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `tests/test_team_nickname_aliases.py` (new),
   `tests/test_polymarket_side_vocabulary.py` (fixture rested on the gap closed),
   `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_trim_sport_floor.py` (new),
-  `scripts/run_live_odds_refresh_worker.py`, `tests/test_venue_poll_loop.py` (new).
+  `tests/test_venue_poll_loop.py` (new).
+- **RELEASED 2026-08-27 at checkpoint: the live-odds worker entrypoint.** My work
+  in it (the venue poll thread) is LANDED and DEPLOYED, so holding the claim only
+  contested it with OPEN lane `open-bet-live-status`, which is live and holds the
+  refresh-worker deploy claim. Path deliberately not written on this line —
+  `check_lane_invariants.py` reads any backticked path inside a `- Files:` block
+  as a live claim, which is the convention `wnba-live-odds-capture-gap` used when
+  it released the same file to me.
   The live-odds worker was formerly referenced by `wnba-live-odds-capture-gap`,
   which RELEASED its claim and deliberately stopped writing the path so the
   invariant checker would stop reporting it contested. Taken here per that
