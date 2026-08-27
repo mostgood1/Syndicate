@@ -666,6 +666,31 @@ def main(argv: list[str] | None = None) -> int:
 
     atomic_write_csv(out_path, out_df)
     print(f"Wrote {out_path} with {len(out_df)} rows.")
+
+    # PUBLISH, or the capture stops on the worker's disk. Render will not share
+    # a disk between the worker and web, so an artifact the worker writes is
+    # invisible to the board until it is pushed across. `#208`: the allowlist
+    # PERMITS the transfer, it does not perform one.
+    #
+    # This lives HERE rather than in a caller because the caller is now a plain
+    # orchestrator step (`ncaaf_player_props_oddsapi`) that shells this script --
+    # there is no wrapper left to hang it on. Guarded on a non-empty write so an
+    # empty pregame capture does not spend egress.
+    #
+    # Best-effort by contract: `publish_hot_artifact` returns False and never
+    # raises on not-configured / not-allowlisted / missing / network error, so
+    # this cannot fail a capture that already succeeded.
+    if len(out_df):
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            published = bool(publish_hot_artifact(out_path))
+        except Exception as exc:
+            published = False
+            print(f"[ncaaf_props] PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
+        # `logger.info` never reaches Render's log collector -- print/flush is
+        # the only line that shows up in `render_logs.py`.
+        print(f"[ncaaf_props] rows={len(out_df)} published={published} path={out_path}", flush=True)
     return 0
 
 

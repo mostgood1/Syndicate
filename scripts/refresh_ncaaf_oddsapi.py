@@ -832,7 +832,7 @@ def main() -> int:
     parser.add_argument("--api-key", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
-    parser.add_argument("--skip-props", action="store_true", help="Refresh lines only; do not capture player props.")
+    parser.add_argument("--skip-props", action="store_true", default=True, help="Retained for compatibility; props moved to ncaaf_player_props_oddsapi.")
     args = parser.parse_args()
 
     artifact_root = Path(args.artifact_root).resolve()
@@ -883,11 +883,17 @@ def main() -> int:
     # Props only on a full pass, and only after the lines refresh has already
     # produced its own result -- `--mode fast` exists to keep the cheap tick
     # cheap, and props are the expensive half (per event, per market).
-    props_result = (
-        _refresh_player_props(data_root=data_root, season=prediction_season, week=int(week))
-        if is_full and not args.skip_props
-        else {"status": "skipped", "reason": "mode_fast" if not is_full else "skip_props_flag"}
-    )
+    # PROPS MOVED OUT OF THIS RUNNER, 2026-08-27. They now hang off
+    # `ncaaf_player_props_oddsapi` in `refresh_odds_sources._build_ncaaf_steps`,
+    # beside the game-lines capture that actually runs.
+    #
+    # This runner cannot execute for 2026 at all -- it requires a
+    # `college_football_schedule_<season>_predicted_totals_enhanced*.csv` and
+    # git holds 359 of them, every one season 2025. Props wired here were
+    # unreachable in the exact season they were built for. Kept behind
+    # `--skip-props` (default on) so there is exactly ONE producer and no
+    # double capture if the legacy path is ever revived.
+    props_result = {"status": "skipped", "reason": "moved_to_ncaaf_player_props_oddsapi"}
 
     copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root) if is_full else {}
     print(

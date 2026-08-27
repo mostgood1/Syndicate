@@ -216,17 +216,21 @@ def test_bundle_glob_is_sorted_so_the_input_hash_is_stable(tmp_path):
     assert found == sorted(found)
 
 
-@pytest.mark.parametrize("flag", ["--skip-props", "--mode"])
-def test_runner_can_opt_out_of_props(flag):
-    """`--mode fast` and `--skip-props` both have to exist for the cheap tick."""
-    import argparse
+def test_the_legacy_runners_opt_out_flag_is_retained_for_compatibility():
+    """`--skip-props` still parses, and now defaults ON.
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=("fast", "full"), default="full")
-    parser.add_argument("--skip-props", action="store_true")
+    REPLACES a test that asserted `args.skip_props` was READ in that runner.
+    That was true when props lived there and is not any more -- props moved to
+    `ncaaf_player_props_oddsapi` because the legacy runner cannot execute for
+    2026 at all. The flag stays so existing callers do not break; what it must
+    NOT do is gate a second capture, which
+    `test_the_legacy_runner_no_longer_captures_props` pins.
+    """
     source = (REPO_ROOT / "scripts" / "refresh_ncaaf_oddsapi.py").read_text(encoding="utf-8")
     assert '"--skip-props"' in source
-    assert 'args.skip_props' in source
+    assert "default=True" in source
+
+
 
 
 # ------------------------------------------------- the production path bug
@@ -281,3 +285,86 @@ def test_the_gate_and_its_consumer_use_one_rule(tmp_path):
     _seed_predictions(tmp_path / "source_artifacts")
     assert runner._prediction_files(tmp_path), "consumer cannot see the predictions"
     assert runner._resolve_data_root(source_root=None, artifact_root=tmp_path)
+
+
+# ------------------------------------- the capture hangs off the RIGHT step
+
+
+def _ncaaf_steps():
+    import argparse
+    import importlib
+    import sys
+
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    if str(REPO_ROOT / "scripts") not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    ros = importlib.import_module("refresh_odds_sources")
+    return ros, ros._build_ncaaf_steps(argparse.Namespace(season=2026, week=1, date="2026-08-26"))
+
+
+def test_props_are_captured_by_their_own_step_not_the_legacy_runner():
+    """The correction this file's earlier version got wrong.
+
+    Props were first wired inside `refresh_ncaaf_oddsapi.py`. That runner
+    CANNOT RUN FOR 2026: it requires a
+    `college_football_schedule_<season>_predicted_totals_enhanced*.csv`, git
+    holds 359 of them and every one is season 2025, and even were one found
+    `_should_skip_auto_refresh` returns True once
+    `prediction_season < current year`. Measured on production
+    2026-08-27T01:04:55Z: `STEP_FAIL name=ncaaf_lines_snapshot
+    runtime_seconds=0 return_code=1`. Props wired there were unreachable in
+    exactly the season they were built for.
+    """
+    _ros, steps = _ncaaf_steps()
+    names = [s.name for s in steps]
+    assert "ncaaf_player_props_oddsapi" in names
+    props = next(s for s in steps if s.name == "ncaaf_player_props_oddsapi")
+    joined = " ".join(str(c) for c in props.command)
+    assert "fetch_ncaaf_oddsapi_props_local.py" in joined
+    assert "refresh_ncaaf_oddsapi.py" not in joined, "props must not depend on the legacy runner"
+
+
+def test_props_land_on_the_allowlisted_week_keyed_path():
+    from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
+
+    _ros, steps = _ncaaf_steps()
+    props = next(s for s in steps if s.name == "ncaaf_player_props_oddsapi")
+    out = Path(str(props.command[props.command.index("--out") + 1]))
+    assert out.parent.name == "processed"
+    assert out.name == "oddsapi_player_props_2026_wk1.csv"
+    assert is_hot_artifact_relative_path(f"ncaaf_source/data/processed/{out.name}")
+
+
+def test_props_run_after_the_game_lines_capture():
+    """Lines are one call; props are billed per event per market.
+
+    If a sweep runs short of time or credits it should lose props and keep
+    prices, so ordering is load-bearing rather than cosmetic.
+    """
+    _ros, steps = _ncaaf_steps()
+    names = [s.name for s in steps]
+    assert names.index("ncaaf_game_lines_oddsapi") < names.index("ncaaf_player_props_oddsapi")
+
+
+def test_the_legacy_runner_no_longer_captures_props():
+    """Exactly one producer -- two would double-spend per event per market."""
+    source = (REPO_ROOT / "scripts" / "refresh_ncaaf_oddsapi.py").read_text(encoding="utf-8")
+    assert "moved_to_ncaaf_player_props_oddsapi" in source
+    assert "_refresh_player_props(data_root=" not in source
+
+
+def test_the_fetcher_publishes_what_it_writes():
+    """No wrapper left to hang the publish on -- the step shells the script."""
+    source = (REPO_ROOT / "scripts" / "fetch_ncaaf_oddsapi_props_local.py").read_text(encoding="utf-8")
+    assert "publish_hot_artifact(out_path)" in source
+    assert "if len(out_df):" in source
+
+
+def test_season_and_week_come_from_the_boards_own_resolver():
+    """A capture filed under a week the card never asks for is, from the
+    board, indistinguishable from no capture at all."""
+    ros, _steps = _ncaaf_steps()
+    assert ros._infer_ncaaf_context(2026, 3) == (2026, 3)
+    season, week = ros._infer_ncaaf_context(None, None)
+    assert season >= 2026 and week >= 1
