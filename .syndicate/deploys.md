@@ -25802,6 +25802,28 @@ verify: **CLEAR** — the probe answered its question and the answer is "one
 date". A market result on one date is not a backtest and will not be reported
 as one.
 
+### verify for `dep-da660urtqb8s739nkklg` — 15:22:48Z — the expansion map paid off on the date that matters
+
+    BEFORE  DATE 2026-08-23 state_games=2 quote_events=2 event_overlap=1
+            UNMAPPED 2026-08-23 ['Las Vegas Aces@Toronto Tempo',
+                                 'Washington Mystics@Portland Fire']
+    AFTER   DATE 2026-08-23 state_games=2 quote_events=4 event_overlap=2
+            (no UNMAPPED line)
+
+`quote_events` 2 -> 4 and `event_overlap` **1 -> 2** on the ONLY usable date, and
+the UNMAPPED line for it is gone. Toronto and Portland now resolve.
+
+`USABLE_DATES n=1` is unchanged and expected: the cap is the clock bridge, which
+the map cannot move. What changed is the DENSITY of the one date the join has —
+it now carries two joined games instead of one.
+
+verify: **CLEAR.** Both halves behaved as predicted before the run: the map fix
+raises games on the usable date, and does not raise the date count.
+
+`PLAY_FIELDS` has NOT fired. Today's slate reads `pre=2` and nothing has tipped,
+and the one-shot deliberately refuses to spend itself on a game with no plays.
+It answers on the next live tip, and it decides whether the other 10 state dates
+are recoverable or whether the join waits weeks for slates.
 ---
 
 ### 2026-08-24 ~14:32Z–15:12Z — live-odds-worker — venue reconciliation, field names, fees
