@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#585` — **The chip artifact's `written_at` is FRESH while its content is ~15 minutes old, and `#564`'s threshold bounds the wrong quantity.** — lane `mlb-chip-live-state`, 2026-08-27, measured — **NOT FIXED**
+### `#585` — **The chip artifact's `written_at` is FRESH while its content is ~15 minutes old, and `#564`'s threshold bounds the wrong quantity.** — lane `mlb-chip-live-state`, 2026-08-27, measured — **NOT FIXED; FIRST HYPOTHESIS FALSIFIED BY MEASUREMENT, ROOT CAUSE NOW NAMED**
 
 Found while discharging `#581`'s last owed reading, not looked for.
 
@@ -29,13 +29,47 @@ Every publication-time instrument reads healthy. This is the same shape as
 `state.md [board-quote-staleness]`: "every publication-time instrument reads
 FRESH on a board carrying 14-minute-old quotes."
 
-**HYPOTHESIS, NOT TESTED.** `_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60`
-(`home.py`) admits a live-lens report up to fifteen minutes old, and
-refresh-worker's copy sits near that bound — which matches the observed
-two-inning gap almost exactly. The inline path does not show it because web's
-lens copy refreshes on a ~60s cadence. **Falsification:** if the worker's lens
-copy is young and the chips are still two innings behind, the bound is not the
-cause and the staleness is inside the build instead.
+**HYPOTHESIS FALSIFIED 2026-08-27T00:16:51Z, BY THE TEST IT SHIPPED WITH.** The
+lens bound is NOT the binding constraint. Same worker, same code, same
+`_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60`, one build later — now WARM:
+
+    src=worker_artifact  pub=00:15:18Z  age=92.8s
+
+    BOS @ MIA   BOT 5 0-2   | Top 6    0-2     inning gap 1
+    COL @ WSH   TOP 5 4-1   | Bottom 5 4-1     inning gap 0
+    HOU @ NYY   TOP 4 1-2   | Middle 4 2-2     inning gap 0
+    KC  @ TOR   BOT 4 0-0   | Bottom 4 0-0     inning gap 0
+    MIL @ NYM   BOT 3 4-0   | End 3    4-0     inning gap 0
+    LAD @ ATL   BOT 3 3-1   | Top 4    3-1     inning gap 1
+    TEX @ CWS   TOP 2 0-0   | Top 2    0-0     inning gap 0
+    BAL @ STL   BOT 1 5-0   | End 1    5-0     inning gap 0
+
+    inning gap: n=8  max=1  mean=0.25
+
+If a 15-minute lens bound were admitting the staleness, a WARM build would be
+just as stale as a cold one — the bound does not know which build it is in. It
+is not.
+
+**THE ACTUAL DRIVER IS BOARD-BUILD DURATION.** `state.md [board-quote-staleness]`
+already measured it: **cold build 747.8s, warm 107.8s — 6.9x.** The chips are
+assembled from a cards context gathered as the build runs and stamped
+`written_at` when it publishes, so the content is about one build old. Cold:
+~15 minutes, which is exactly the two-inning gap measured at 00:08:34Z. Warm:
+~2 minutes, which is the reading above.
+
+**SO THE DEFECT IS NARROWER AND SHARPER THAN FIRST FILED.** It is not a
+permanent 15-minute lag; it is a ~12-minute window of badly stale chips
+**after every worker restart** — and a restart is what every deploy causes.
+refresh-worker was deployed at least three times on 2026-08-26 evening
+(`22:10Z`, `23:28:36Z`, `23:53:14Z`). That connects it directly to `#563`'s
+deploy-cadence finding rather than to any lens bound.
+
+**WHAT STILL STANDS, unchanged by the falsification:** `published_at` bounds when
+the artifact was WRITTEN, not how old its content is; `#564`'s 120s threshold and
+the page's stale badge both key on `published_at`; so during that window every
+publication-time instrument reads healthy on a board a quarter-hour behind. The
+candidate fix is the same and now better motivated — stamp a CONTENT age beside
+`written_at` and key the threshold and the badge on it.
 
 **WHY IT MATTERS TO A USER:** whenever the handler serves a fresh worker
 artifact rather than building inline, the board can be quietly a quarter of an

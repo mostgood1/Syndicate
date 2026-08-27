@@ -5771,6 +5771,17 @@ present as "the score is wrong", and reading the score alone gets it backwards
 — this was nearly called a `#581` regression off a watcher line that reported
 only score mismatches.
 
-**Open as `todo.md #585`, not fixed.** Hypothesis on record: the
-`_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60` bound admits a lens old enough to
-explain the gap exactly.
+**THE CAUSE IS BOARD-BUILD DURATION, NOT THE LENS BOUND.** A first hypothesis
+blaming `_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60` was FALSIFIED the same hour:
+one build later, WARM, the same worker with the same bound served an inning gap
+of **max 1, mean 0.25 over 8 live games** (`pub=00:15:18Z`). A bound does not
+know which build it is in — if it were admitting the staleness, a warm build
+would be just as stale. The content is about ONE BUILD old, and this file
+already carries the numbers: **cold 747.8s, warm 107.8s**.
+
+**So the exposure is a ~12-minute window after every worker RESTART, not a
+standing lag** — and a restart is what every deploy causes. refresh-worker was
+deployed three times on the evening of 2026-08-26. Same family as
+`[board-quote-staleness]` and `#563`'s deploy-cadence finding.
+
+**Open as `todo.md #585`, not fixed.**
