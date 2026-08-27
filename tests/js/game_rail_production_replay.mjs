@@ -48,6 +48,9 @@ function slice(a, b) {
 }
 const src = [
   slice('const CLUB_AFFIXES', '// `layer2-board-chip-race`. The FIRST call to `renderGameCards`'),
+  // One slice spanning chipForGame AND `cardSportLabel`, which sits between it
+  // and `chipTeamRow`. A separate slice would throw on a pre-change template,
+  // and running against one is the entire point of this script.
   slice('function chipForGame', 'function chipTeamRow'),
   slice('function displayMatchup', 'function gameKey'),
   slice('function gameKey', '// A whole-numbered line must keep its decimal'),
@@ -63,7 +66,7 @@ let gameKeyMergeMap = new Map();
 const recommendationState = () => 'pregame';
 
 const fn = new Function('state','gameChipsById','gameChipsByMatchup','gameChipsByCanonical','gameChipsByMatchupLoose','gameKeyMergeMap','recommendationState',
-  src + '; return { deriveGameCards, chipForGame, normalizeClubName };');
+  src + '; return { deriveGameCards, chipForGame, cardSportLabel: typeof cardSportLabel === "function" ? cardSportLabel : null, normalizeClubName };');
 const built = fn(state,gameChipsById,gameChipsByMatchup,gameChipsByCanonical,gameChipsByMatchupLoose,gameKeyMergeMap,recommendationState);
 
 // Index the chips exactly as loadGameChips() does, collision removal included.
@@ -118,6 +121,37 @@ for (const [sport, list] of [...bySport].sort()) {
   console.log(`  ${sport.padEnd(8)} cards=${String(list.length).padStart(3)}  chip-less=${noChip}`);
 }
 console.log(`  TOTAL chip-less cards: ${chipless}`);
+
+// THE CARD-HEAD LABEL, per sport. The reported symptom was not a count -- it
+// was two different labels on one slate -- so the reading has to be the SET of
+// labels, not a total. A sport showing more than one label is the defect;
+// `soccer` showing `SOCCER` alongside a league is the exact report.
+//
+// `cardSportLabel` may not exist on an older template (this is how the control
+// run is possible at all), so fall back to what that version rendered:
+// `game.sport`, verbatim from `renderGameCards`.
+const labelOf = built.cardSportLabel
+  ? (c) => built.cardSportLabel(c, resolveChip(c))
+  : (c) => String(c.sport || '');
+console.log();
+console.log(`head labels per sport (${built.cardSportLabel ? 'via cardSportLabel' : 'via game.sport -- PRE-CHANGE template'}):`);
+let mixedLabelSports = 0;
+for (const [sport, list] of [...bySport].sort()) {
+  const counts = new Map();
+  for (const c of list) {
+    const l = labelOf(c) || '(blank)';
+    counts.set(l, (counts.get(l) || 0) + 1);
+  }
+  const shown = [...counts].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${l}=${n}`).join(' ');
+  // "More than one label" is not by itself wrong -- soccer legitimately spans
+  // ten leagues. What is wrong is a BARE SPORT label sitting beside a league,
+  // which is the "SOCCER next to LA LIGA" report.
+  const bare = [...counts.keys()].filter((l) => l.toLowerCase() === sport);
+  const mixedHere = bare.length > 0 && counts.size > 1;
+  if (mixedHere) mixedLabelSports += 1;
+  console.log(`  ${sport.padEnd(8)} ${counts.size} label(s)${mixedHere ? '  <-- BARE SPORT beside a league' : ''}: ${shown}`);
+}
+console.log(`  sports showing a bare sport label beside a league: ${mixedLabelSports}`);
 
 // A duplicate is two cards naming one real game.
 //

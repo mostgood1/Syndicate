@@ -2041,6 +2041,34 @@
     return gameChipsByMatchupLoose.get(`${sport}|${normalizeClubName(sides[0])} @ ${normalizeClubName(sides[1])}`) || null;
   }
 
+  // The card head's left label. THE CHIP'S LEAGUE WINS, because it is a fact
+  // about the GAME; `group.sport` is a fact about whichever ROW happened to be
+  // seated first.
+  //
+  // Reported 2026-08-27, as the tail of `#589`: one La Liga slate rendered
+  // `LA LIGA` and `SOCCER` side by side. `group.sport` is
+  // `item.sport || item.sport_slug` from the FIRST row in the group, and the
+  // pipelines disagree -- the La Liga steam/prop rows carry `sport: "la liga"`
+  // while `layer2_shortlist` rows carry `"soccer"`. A card seeded from an
+  // unclaimed CHIP has no rows at all and took `chip.sport`, so it always read
+  // `SOCCER`. Three sources for one label, and which one you got was an
+  // ordering accident.
+  //
+  // `chip.league_display` is populated for 213 of 213 soccer chips across 10
+  // leagues (measured on the production feed 2026-08-27) and is NULL for every
+  // mlb/nfl/wnba chip -- so this reads as the league for soccer and cannot
+  // relabel a sport whose chips do not carry one. `game.sport` stays the
+  // fallback for a chip-less card, which is the only case with no better
+  // answer.
+  //
+  // Not upper-cased here: `.game-mini-card__head` is already
+  // `text-transform: uppercase`, so "La Liga" renders "LA LIGA" and the DOM
+  // keeps the readable value.
+  function cardSportLabel(game, chip) {
+    const league = chip ? String(chip.league_display || "").trim() : "";
+    return league || String((game && game.sport) || "");
+  }
+
   function chipTeamRow(side, chip) {
     const team = chip[side] || {};
     const isLeader = chip.leader === side;
@@ -2622,9 +2650,10 @@
             const stateLabel = isLive
               ? '<span class="live-dot">&#9679; LIVE</span>'
               : chip.state === "final" ? "FINAL" : "PREGAME";
+            const sportLabel = cardSportLabel(game, chip);
             const headLeft = chip.status_token && chip.state !== "final"
-              ? `${escapeHtml(game.sport)} · ${escapeHtml(chip.status_token)}`
-              : escapeHtml(game.sport);
+              ? `${escapeHtml(sportLabel)} · ${escapeHtml(chip.status_token)}`
+              : escapeHtml(sportLabel);
             // `game-mini-card--empty` marks a game that is ON the slate with
             // nothing to bet, which is now a real and common state rather
             // than an impossible one. Without it a count-0 card is
@@ -2639,7 +2668,11 @@
           }
           const stateLabel = game.hasLive ? '<span class="live-dot">&#9679; live</span>' : game.allFinal ? "final" : "pregame";
           const fallbackDateLabel = formatFallbackDateLabel(game.fallbackDate);
-          const headLeft = fallbackDateLabel ? `${escapeHtml(game.sport)} · ${escapeHtml(fallbackDateLabel)}` : escapeHtml(game.sport);
+          // No chip, so no league to read -- `cardSportLabel` returns
+          // `game.sport` here and this line is unchanged in effect. Routed
+          // through it anyway so ONE function decides this label.
+          const chiplessSportLabel = cardSportLabel(game, null);
+          const headLeft = fallbackDateLabel ? `${escapeHtml(chiplessSportLabel)} · ${escapeHtml(fallbackDateLabel)}` : escapeHtml(chiplessSportLabel);
           return `
             <button type="button" class="game-mini-card" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}">
               <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>

@@ -2145,6 +2145,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `venue-quote-line-join` (syndicate-82), confirmed by me.
 - Claims: NONE held. Deploy claims: none taken — this needs no deploy of its own.
 
+### rail-league-label — OPEN — opened 2026-08-27 — session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d
+- Goal: every soccer card in the Games rail names the same THING in its head.
+  Today a card reads `SOCCER` or `LA LIGA` depending on which pipeline happened
+  to seat its first row, and both appear side by side on one slate.
+  **Testable outcome:** on one payload, the set of head labels across soccer
+  cards contains no `SOCCER` while any league label is also present — i.e. the
+  label is a function of the GAME, not of which row arrived first.
+- Files: `syndicate/templates/intelligence.html` (the card-head label only),
+  `tests/js/game_rail_derive.test.mjs`,
+  `tests/js/game_rail_production_replay.mjs`.
+- Hypothesis: the authoritative league is already on the chip and needs no new
+  source. `chip.league_display` is populated for **213 of 213** soccer chips
+  across 10 leagues (MLS 32, Championship 36, La Liga 24, Serie A 21, EPL 20,
+  Ligue 1 20, Belgian Pro League 18, Eredivisie 16, Primeira Liga 16,
+  Bundesliga 10) and is **null for every mlb/nfl/wnba chip**, so reading it
+  cannot relabel a non-soccer card.
+- Falsification test: if any soccer chip carried a null/blank `league_display`,
+  the fix would reintroduce the exact inconsistency it removes — one card
+  falling back to `SOCCER` beside league-labelled neighbours. Measured on the
+  production chip feed before writing anything: 0 of 213 blank.
+- Verification: A/B on ONE production payload via
+  `game_rail_production_replay.mjs`, run against the SERVED page. Control must
+  show soccer cards labelled BOTH `SOCCER` and a league; after, every soccer
+  card carries a league and no soccer card reads `SOCCER`. Non-soccer head
+  labels byte-identical on both sides.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -51,6 +51,11 @@ function slice(fromMarker, toMarker) {
 // them.
 const src = [
   slice('const CLUB_AFFIXES', '// `layer2-board-chip-race`. The FIRST call to `renderGameCards`'),
+  // `function chipForGame` .. `function chipTeamRow` spans BOTH chipForGame and
+  // `cardSportLabel`, which sits between them. Deliberately ONE slice: a
+  // separate `cardSportLabel` slice would THROW on a pre-change template, and
+  // running this file against the pre-change template is how discrimination is
+  // checked at all.
   slice('function chipForGame', 'function chipTeamRow'),
   slice('function deriveGameCards', 'function renderGameCards'),
 ].join(String.fromCharCode(10));
@@ -72,7 +77,7 @@ const recommendationState = (i) => i.market_state || 'pregame';
 // populated. `getMergeMap` closes over the parameter binding, so it sees what
 // the function actually built.
 const fn = new Function('state','gameChipsById','gameChipsByMatchup','gameChipsByCanonical','gameChipsByMatchupLoose','gameKeyMergeMap','gameKey','displayMatchup','recommendationState',
-  src + '; return { deriveGameCards, chipForGame, getMergeMap: () => gameKeyMergeMap };');
+  src + '; return { deriveGameCards, chipForGame, cardSportLabel: typeof cardSportLabel === "function" ? cardSportLabel : null, getMergeMap: () => gameKeyMergeMap };');
 const built = fn(state,gameChipsById,gameChipsByMatchup,gameChipsByCanonical,gameChipsByMatchupLoose,gameKeyMergeMap,gameKey,displayMatchup,recommendationState);
 const deriveGameCards = built.deriveGameCards;
 const chipForGame = built.chipForGame;
@@ -442,3 +447,62 @@ const outI = deriveGameCards([
 console.log();
 console.log('two DIFFERENT La Liga games ->', outI.length, 'card(s):', outI.map(g=>g.matchup).join(' | '));
 console.log('ASSERT different games stay separate    :', outI.length === 2 ? 'PASS' : 'FAIL');
+
+// --------------------------------------------------------------------------
+// ONE CARD-HEAD LABEL PER GAME, NOT PER PIPELINE.
+//
+// Reported 2026-08-27 as the tail of `#589`: one La Liga slate rendered
+// `LA LIGA` and `SOCCER` side by side. Three sources fed that label and which
+// one you got was an ordering accident:
+//
+//   group.sport = item.sport || item.sport_slug, from the FIRST row seated
+//     steam / prop rows    sport: "la liga"   -> "LA LIGA"
+//     layer2_shortlist     sport: "soccer"    -> "SOCCER"
+//   a card seeded from an UNCLAIMED chip has no rows at all
+//                          chip.sport         -> "SOCCER"
+//
+// `cardSportLabel` makes it a fact about the GAME: the chip's league wins.
+// Measured on the production chip feed the same day, and this is why reading it
+// is safe rather than merely nicer: `league_display` is populated for **213 of
+// 213** soccer chips across 10 leagues, and is **null on every mlb/nfl/wnba
+// chip**, so it cannot relabel a sport whose chips do not carry one.
+//
+// THIS SECTION DISCRIMINATES: the first three fail against the pre-change
+// template (no `cardSportLabel` at all, and the label was `game.sport`). The
+// last two are the narrowness guards -- they must pass in both states, and they
+// are what stops this from becoming "print whatever the chip says".
+// --------------------------------------------------------------------------
+// null on a PRE-CHANGE template (the extraction is guarded so the control run
+// reaches these assertions instead of throwing at import). A stub returning
+// `game.sport` is what that version rendered, so the three league assertions
+// FAIL against it and the two narrowness ones pass -- which is the discrimination.
+const cardSportLabel = built.cardSportLabel || ((game) => String((game && game.sport) || ''));
+const laLigaChip = {sport:'soccer', game_key:'401882921', matchup:'ATH @ BAR',
+                    state:'live', league:'la_liga', league_display:'La Liga',
+                    start_time_utc:'2026-08-27T19:00:00Z',
+                    away:{abbr:'ATH',name:'Athletic Club',key:'athletic club'},
+                    home:{abbr:'BAR',name:'Barcelona',key:'barcelona'}};
+const mlbChipNoLeague = mkChip('mlb','824894','WSH','ATL','live','2026-08-27T23:00:00Z');
+
+console.log();
+// A row-seated card and a chip-seeded card for the SAME league must agree --
+// that is the whole report. Their `group.sport` values differ on purpose.
+console.log('ASSERT league beats a LEAGUE-ish row label:',
+  cardSportLabel({sport:'LA LIGA'}, laLigaChip) === 'La Liga' ? 'PASS' : 'FAIL');
+console.log('ASSERT league beats a SPORT-ish row label :',
+  cardSportLabel({sport:'SOCCER'}, laLigaChip) === 'La Liga' ? 'PASS' : 'FAIL');
+console.log('ASSERT both shapes agree with each other  :',
+  cardSportLabel({sport:'SOCCER'}, laLigaChip) === cardSportLabel({sport:'LA LIGA'}, laLigaChip) ? 'PASS' : 'FAIL');
+// NARROWNESS 1: a chip with no league must not blank the label. `mkChip` builds
+// no `league_display`, which is exactly the mlb/nfl/wnba shape.
+console.log('ASSERT a league-less chip keeps the sport :',
+  cardSportLabel({sport:'MLB'}, mlbChipNoLeague) === 'MLB' ? 'PASS' : 'FAIL');
+// NARROWNESS 2: no chip at all -- the chip-less card branch. There is no better
+// answer than the group's own sport here, and it must still be produced.
+console.log('ASSERT no chip falls back to the sport    :',
+  cardSportLabel({sport:'NCAAF'}, null) === 'NCAAF' ? 'PASS' : 'FAIL');
+// A blank/whitespace league_display is treated as ABSENT, not as a label. It
+// does not occur on today's feed (0 of 213) and that is precisely why it is
+// pinned: the day it does, a card must not go blank.
+console.log('ASSERT a blank league is treated as absent:',
+  cardSportLabel({sport:'SOCCER'}, {...laLigaChip, league_display:'   '}) === 'SOCCER' ? 'PASS' : 'FAIL');

@@ -1,5 +1,56 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#590` — **The Games rail's card-head label was a fact about which ROW arrived first, not about the game: `SOCCER` and `LA LIGA` side by side on one slate.** — lane `rail-league-label`, 2026-08-27, user report — **FIXED AND MEASURED ON THE PRODUCTION PAYLOAD; DEPLOY VERIFICATION OWED**
+
+The tail of `#589`. Three sources fed one label and which you got was an
+ordering accident:
+
+```
+group.sport = item.sport || item.sport_slug, from the FIRST row seated
+  steam / prop rows     sport: "la liga"   -> LA LIGA
+  layer2_shortlist      sport: "soccer"    -> SOCCER
+a card seeded from an UNCLAIMED chip has no rows at all
+                        chip.sport         -> SOCCER
+```
+
+`cardSportLabel(game, chip)` makes it a fact about the GAME: the chip's
+`league_display` wins, `game.sport` is the fallback. **Measured on the
+production chip feed before writing anything, and this is why reading it is
+safe rather than merely nicer:** `league_display` is populated for **213 of 213**
+soccer chips across 10 leagues (Championship 36, MLS 32, La Liga 24, Serie A 21,
+EPL 20, Ligue 1 20, Belgian Pro League 18, Eredivisie 16, Primeira Liga 16,
+Bundesliga 10) and is **null on every mlb / nfl / wnba chip** — so it cannot
+relabel a sport whose chips do not carry a league.
+
+**A/B on one production payload** (238 chips / 1,733 rows), and the control run
+is against the SERVED bytes of the currently-deployed `78a95c7f`:
+
+| sport | deployed `78a95c7f` | with the fix |
+|---|---|---|
+| soccer | **`SOCCER=211  LA LIGA=2`** | `Championship=36 MLS=32 La Liga=24 Serie A=21 EPL=20 Ligue 1=20 Belgian Pro League=18 Eredivisie=16 Primeira Liga=16 Bundesliga=10` |
+| mlb / ncaaf / nfl / wnba | `MLB=7 NCAAF=8 NFL=16 WNBA=4` | **identical** |
+| sports with a bare sport label beside a league | 1 | **0** |
+
+**Worse than the screenshot showed:** only **2 of 213** soccer cards carried a
+league. The report read as "one odd card"; it was the other 211 that were
+mislabelled.
+
+Not upper-cased in JS — `.game-mini-card__head` is already
+`text-transform: uppercase`, so `La Liga` renders `LA LIGA` and the DOM keeps
+the readable value.
+
+The census is the new reading, and it had to be a SET, not a count: the symptom
+was two labels on one slate, which no total can express. "More than one label"
+is not itself the defect — soccer legitimately spans ten leagues — so it flags
+only a BARE SPORT label sitting beside a league.
+
+6 new assertions; the 3 league ones fail against the pre-change template, the 3
+narrowness ones (league-less chip, no chip at all, blank `league_display`) pass
+in both states. The blank case is pinned precisely because it is 0 of 213 today:
+the day it is not, a card must fall back, not go blank.
+
+**OWED:** the served rail on production showing a league on every soccer card.
+
 ### `#589` — **Soccer games were duplicated on the Games rail: the chip join keyed on the DISPLAY sport, and La Liga rows carry `sport: "la liga"`.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-27, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T19:41:04Z** (web `78a95c7f`)
 
 Every chip index in `loadGameChips` is keyed on `chip.sport`, the SLUG
