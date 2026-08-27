@@ -7020,3 +7020,50 @@ own terminal instead, with the cost of the kill stated first.
 - After a user-run deploy, **re-read the live SHA on every service** rather than
   assuming your last deploy is still live. This session told a peer
   live-odds-worker was on `022583f6` when it had been on `ebfec2ed` for an hour.
+
+## 2026-08-27 — FORBIDDEN: running `deploy_claim.py` from a session worktree. The claim file is PER-TREE, so nobody else can see it.
+
+**MEASURED 2026-08-27T01:0xZ.** Two `web` claims existed at once, in two files,
+neither aware of the other:
+
+    C:\Users\...\Syndicate\.syndicate\deploy_claims\web.json
+        holder venue-settlement       token 0ddf5e4c...  01:06:32Z
+    C:\tmp\syndicate-sessions\<lane>\.syndicate\deploy_claims\web.json
+        holder open-bet-live-status   token 9d2542ac...  01:07:38Z
+
+`deploy_claim.py` resolves `.syndicate/deploy_claims/` **relative to the tree it
+is run from**, and `session_worktree.py open` gives every lane its own tree. So a
+claim taken from a worktree lands in a directory no other session reads, while
+`deploy-guard.py` and `deploy_preflight.py` — which run under
+`CLAUDE_PROJECT_DIR` — consult the PRIMARY tree's copy.
+
+**Both failure directions are live:**
+- **A claim you cannot see.** Take it from your worktree and every other session
+  reads `web free`. You believe the service is reserved; it is not. This is the
+  same class as the 2026-08-26 finding that a claim does not reserve a service
+  against a human at a terminal — a lock whose holder is the only one who knows
+  it exists.
+- **A claim you cannot release.** `release --token <t>` run from the wrong tree
+  answers `web: no claim to release` and exits 0, leaving the real claim held.
+  Measured here: three "successful" release/acquire cycles moved nothing,
+  because they were all operating on the worktree's copy.
+
+**The guard's `your lane:` line is resolved independently of any of this** — it
+did not match the marker file this session wrote, so aligning the marker did not
+help and the mismatch persisted until the holder name was matched to what the
+guard reported.
+
+**HOW TO APPLY.**
+- **Run every `deploy_claim.py` / `deploy_preflight.py` / `render_deploy.py`
+  from the PRIMARY tree**, with an explicit `cd`. The Bash tool's working
+  directory persists between calls and a `cd` several commands earlier is enough
+  to put you in the worktree without noticing.
+- The tell is `RENDER_API_KEY not set in the environment or .env` — the worktree
+  has no `.env`. Treat that message as "you are in the wrong tree", not as a
+  credentials problem.
+- Before deploying, confirm `deploy claim   held by YOU` in the PREFLIGHT output
+  from the primary tree. An `ACQUIRED` line proves only that some file was
+  written somewhere.
+- If the guard names a lane you do not recognise, acquire under THAT name rather
+  than editing markers to match — the guard's identity resolution is the one
+  that gates the push.
