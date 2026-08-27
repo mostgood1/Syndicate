@@ -87,7 +87,7 @@ __all__ = [
 # The sources, in TIE-BREAK order only. Freshness beats this ordering every
 # time (rule 1); this decides nothing unless two quotes are equally fresh.
 # Named here once so "which venues feed the board" is one list, not a grep.
-SOURCES: tuple[str, ...] = ("kalshi", "polymarket_us", "novig", "oddsapi")
+SOURCES: tuple[str, ...] = ("kalshi", "polymarket_us", "novig", "oddsapi", "oddsapi_props")
 
 # Each source can be switched off without a deploy. OddsAPI is deliberately in
 # this list: the user's requirement is that it be ONE INPUT AMONG VENUES that
@@ -102,6 +102,11 @@ _DEFAULT_ENABLED: dict[str, bool] = {
     "polymarket_us": True,
     "novig": False,      # see NOVIG_PUBLIC_TIER_REFUSAL
     "oddsapi": True,
+    # The captured player-prop CSVs. Default-ON because the artifact already
+    # exists in production and is written every pregame sweep -- the rule this
+    # map states. Soccer only today; it refuses other sports BY NAME rather
+    # than silently, so the line does not train readers to ignore it.
+    "oddsapi_props": True,
 }
 
 # Novig's public CSV mirror is anonymized at the game/player/team level --
@@ -556,6 +561,7 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     itself.
     """
     from syndicate.features.shared.venue_quote_adapters import (
+        prop_quote_key,
         quote_key,
         team_name_tokens,
     )
@@ -567,6 +573,27 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     market = str(row.get("market") or "").strip().lower()
     side = str(row.get("side") or "").strip().lower()
     line = _as_float_or_none(row.get("line"))
+
+    # A PROP'S KEY MUST NAME ITS PLAYER. `market_inventory`'s row contract says
+    # `entity` is "player name for props, None for game markets", and this
+    # function ignored it -- so every player's anytime-scorer row keyed to the
+    # single string `soccer|player_goal_scorer_anytime|yes`, and every
+    # 2.5-three-pointer row to `wnba|player_threes|over|2.5`. Rows that share a
+    # key are indistinguishable here: the first wins, and the quote it wins
+    # describes a different human. `kalshi_board_join` has always keyed props
+    # with `normalize_person(subject)`; this is the same shape.
+    #
+    # RETURNED ALONE, with no player-blind fallback. Falling back would keep
+    # exactly the wrong match this exists to remove -- the blind key would still
+    # be tried and would still hit someone else's quote.
+    entity = row.get("entity") or row.get("player") or row.get("player_name")
+    if entity:
+        keyed = prop_quote_key(sport, market, entity, side, line)
+        # An unnameable player yields NO key. The row goes unmatched and keeps
+        # its own age, which is the honest outcome; a blind key here would
+        # launder someone else's freshness onto it.
+        return [keyed] if keyed else []
+
     keys = [quote_key(sport, market, side, line)]
 
     if market == "h2h" and side in {"home", "away"}:
@@ -654,6 +681,7 @@ def _default_adapters() -> dict[str, Callable[[str, str], SourceOutcome]]:
         "polymarket_us": adapters.polymarket_us_outcome,
         "novig": adapters.novig_outcome,
         "oddsapi": adapters.oddsapi_outcome,
+        "oddsapi_props": adapters.oddsapi_props_outcome,
     }
 
 

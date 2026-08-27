@@ -13,8 +13,10 @@ another venue's. Each adapter states its own and converts once.
 
 from __future__ import annotations
 
+import csv
 import json
 import time
+from pathlib import Path
 from typing import Any, Mapping
 
 from syndicate.features.shared.venue_quote_fanin import (
@@ -39,6 +41,36 @@ def quote_key(sport: str, market: str, side: str, line: float | None) -> str:
     number."""
     line_part = "" if line is None else f"|{float(line):g}"
     return f"{str(sport or '').lower()}|{str(market or '').lower()}|{str(side or '').lower()}{line_part}"
+
+
+def prop_quote_key(sport: Any, market: Any, player: Any, side: Any, line: float | None) -> str | None:
+    """The join key for a PLAYER PROP, or None when the player cannot be named.
+
+    THE PLAYER IS PART OF THE BET AND WAS MISSING FROM THE KEY. `quote_key`
+    builds `<sport>|<market>|<side>|<line>`, which is complete for a game line
+    and dangerously incomplete for a prop: every player's anytime-scorer row
+    collapses to the single string `soccer|player_goal_scorer_anytime|yes`, and
+    every 2.5-three-pointer row to `wnba|player_threes|over|2.5`. Two rows with
+    the same key are indistinguishable to `apply_venue_quotes`, so the first
+    one wins and the quote it wins describes a DIFFERENT HUMAN.
+
+    `kalshi_board_join` -- the OTHER join over the same markets -- has always
+    keyed props as `market|normalize_person(subject)|line`. This brings the
+    venue fan-in onto that same shape, and reuses that module's own
+    `normalize_person` rather than adding a third normaliser, because two
+    normalisers disagreeing on one name is the silent mismatch this repo has
+    already paid for.
+
+    Returns None rather than a player-blind key when the name is unusable. A
+    key that matches the wrong player is worse than no key at all: it stamps a
+    row as freshly observed on the strength of an observation of someone else.
+    """
+    from syndicate.features.shared.kalshi_board_join import normalize_person
+
+    person = normalize_person(player)
+    if not person:
+        return None
+    return quote_key(sport, market, f"{person}|{side}", line)
 
 
 def team_quote_token(sport: Any, name: Any) -> str | None:
@@ -274,6 +306,7 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
     # prevent.
     spread_rows = 0
     no_price = 0
+    prop_unnamed = 0
     h2h_unresolved = 0
     h2h_keyed = 0
     try:
@@ -354,6 +387,20 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
             spread_rows += 1
             continue
 
+        # A PLAYER MARKET KEYS ON ITS PLAYER, the same shape the board now
+        # offers and the same one `kalshi_board_join` has always used. Game
+        # lines (h2h / spreads / totals) have no subject and are unchanged.
+        # Without this, Kalshi's prop quotes would stay player-blind while the
+        # board went player-aware, and every prop match would disappear
+        # SILENTLY rather than being corrected -- so this counts what it cannot
+        # name instead.
+        prop_player = None
+        if not (market.startswith("h2h") or market.startswith("spreads") or market.startswith("totals")):
+            prop_player = classified.get("subject")
+            if not prop_player:
+                prop_unnamed += 1
+                continue
+
         probability = _kalshi_leg_probability(row, "yes")
         if probability is None:
             no_price += 1
@@ -361,9 +408,17 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
             h2h_keyed += 1
         else:
             line = _as_float(classified.get("line"))
+        primary_key = (
+            prop_quote_key(sport, market, prop_player, side, line)
+            if prop_player
+            else quote_key(sport, market, side, line)
+        )
+        if primary_key is None:
+            prop_unnamed += 1
+            continue
         quotes.append(
             Quote(
-                key=quote_key(sport, market, side, line),
+                key=primary_key,
                 source="kalshi",
                 sport=str(sport or ""),
                 market=market,
@@ -408,9 +463,14 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
             if mirror_probability is None:
                 no_price += 1
             else:
+                mirror_key = (
+                    prop_quote_key(sport, market, prop_player, mirrored, line)
+                    if prop_player
+                    else quote_key(sport, market, mirrored, line)
+                )
                 quotes.append(
                     Quote(
-                        key=quote_key(sport, market, mirrored, line),
+                        key=mirror_key,
                         source="kalshi",
                         sport=str(sport or ""),
                         market=market,
@@ -430,14 +490,14 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         # moneylines and props price is the normal state until the sign
         # question is settled, and it must stay visible rather than vanish the
         # moment anything else succeeds.
-        reason=_kalshi_ok_reason(spread_rows, h2h_keyed, h2h_unresolved, no_price)
+        reason=_kalshi_ok_reason(spread_rows, h2h_keyed, h2h_unresolved, no_price, prop_unnamed)
         or (None if quotes else "no_kalshi_market_classified_to_this_sport"),
         quotes=quotes,
         age_seconds=max(0.0, time.time() - fetched_at),
     )
 
 
-def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int, no_price: int = 0) -> str | None:
+def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int, no_price: int = 0, prop_unnamed: int = 0) -> str | None:
     """What this adapter could not key, by name and count.
 
     `h2h_keyed` is reported alongside the refusals rather than only on failure:
@@ -452,6 +512,8 @@ def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int, no_
         parts.append(f"h2h_team_unresolved:{h2h_unresolved}")
     if h2h_keyed:
         parts.append(f"h2h_keyed_by_team:{h2h_keyed}")
+    if prop_unnamed:
+        parts.append(f"prop_without_player:{prop_unnamed}")
     if no_price:
         # THE COUNTER THAT WOULD HAVE CAUGHT THIS. Every Kalshi quote was
         # published priceless for as long as the adapter read `yes_bid`, and
@@ -995,3 +1057,215 @@ def _as_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+# --------------------------------------------------------------------------
+# ODDSAPI PLAYER PROPS -- the captured CSV, which nothing in the fan-in read
+# --------------------------------------------------------------------------
+#
+# SOCCER'S UNMATCHED COUNT IS ALMOST ENTIRELY PLAYER PROPS, and until this
+# adapter existed the honest conclusion was that they were unmatchable by
+# nature: no exchange lists a soccer player prop, so `kalshi` and
+# `polymarket_us` genuinely have nothing to offer. Measured 2026-08-27,
+# `board_wanted_by_sport['soccer']` is EVERY key a player prop:
+#
+#     soccer|player_last_goal_scorer|yes      soccer|player_shots|over|1.5
+#     soccer|player_first_goal_scorer|yes     soccer|player_shots_on_target|over|0.5
+#     soccer|player_goal_scorer_anytime|yes   soccer|player_shots|over|5.5
+#
+# THAT CONCLUSION WAS WRONG ABOUT ONE SOURCE. `oddsapi` is in `SOURCES` and its
+# adapter reads the `odds_history` shard -- game lines only, 44 soccer quotes at
+# 26,886 seconds old on the reading above. Meanwhile the SAME vendor's player
+# props are captured every pregame sweep to
+# `soccer_source/<league>/props/<date>.csv`, and nothing in the fan-in opened
+# them. Measured on the real 2026-08-27 ligue_1 capture: 2,720 rows, four books
+# (draftkings 955, betrivers 764, fanduel 587, betmgm 414), and 647 of 1,529
+# selections quoted by MORE THAN ONE BOOK.
+#
+# The vocabularies already agree exactly -- the CSV carries `market_key`, which
+# IS the board's market token (`player_goal_scorer_anytime`, `player_shots`).
+# Nothing needed translating; the file simply had no reader.
+
+
+_YES_PRICED_PROP_MARKETS = frozenset({
+    "player_goal_scorer_anytime",
+    "player_first_goal_scorer",
+    "player_last_goal_scorer",
+    "player_to_receive_card",
+    "player_to_receive_red_card",
+})
+
+
+def _prop_capture_probability(american: float | None) -> float | None:
+    """Implied probability from american odds, vig included.
+
+    NOT de-vigged, deliberately. Every other adapter here reports the price the
+    venue actually shows and lets the board's own math handle the overround; a
+    de-vigged number from one source and raw numbers from three others would be
+    compared against each other by `select_quote` as though they were the same
+    quantity.
+    """
+    if american is None:
+        return None
+    if american > 0:
+        return 100.0 / (american + 100.0)
+    if american < 0:
+        return -american / (-american + 100.0)
+    return None
+
+
+def _soccer_prop_files(selected_date: str) -> list[Path]:
+    """The freshest props capture per league, within the window.
+
+    LEAGUES ARE DISCOVERED BY GLOB, not from a list. The canonical slugs live in
+    `scripts/refresh_odds_sources._SOCCER_LEAGUE_SLUGS`, which is a script and
+    not importable from here; copying it would be a second list to drift, and
+    this module has already paid for that twice. Globbing also picks up a league
+    the moment it starts being captured.
+
+    ONE FILE PER LEAGUE -- the NEWEST inside the window, not every file in it.
+    `build_soccer_picks._props_rows_near_date` scans a +-3/+10 day window
+    because a capture is filed under the day it RAN, not the day the matches
+    are played. That is right for finding rows; it is wrong for FRESHNESS,
+    which is what this adapter exists to supply. Mixing a ten-day-old capture
+    into today's quotes would launder a stale price as a current one, and
+    `fetched_at` would then describe the newest file rather than the row.
+    """
+    from datetime import date as _date, timedelta as _timedelta
+
+    try:
+        base = _date.fromisoformat(str(selected_date or "")[:10])
+    except ValueError:
+        return []
+    window = {(base + _timedelta(days=offset)).isoformat() for offset in range(-3, 11)}
+
+    from syndicate.features.soccer.sources import _source_roots as _soccer_roots
+
+    # ORDERED BY THE FILE'S OWN CAPTURE DATE FIRST, mtime only as a tie-break.
+    # The stem IS the day the sweep ran, and it is the more trustworthy signal:
+    # `_fetched_at` in this module already documents that "an artifact
+    # republished unchanged gets a new mtime while its contents are hours old",
+    # and the artifact-pull sweep touches files exactly that way. Ordering on
+    # mtime alone also loses outright when two files land in the same
+    # filesystem tick -- which is how a test caught this picking the STALE
+    # capture over the fresh one.
+    newest_by_league: dict[str, tuple[str, float, Path]] = {}
+    for root in _soccer_roots():
+        try:
+            candidates = list(root.glob("*/props/*.csv"))
+        except OSError:
+            continue
+        for path in candidates:
+            if path.stem not in window:
+                continue
+            league = path.parent.parent.name
+            try:
+                mtime = float(path.stat().st_mtime)
+            except OSError:
+                continue
+            held = newest_by_league.get(league)
+            if held is None or (path.stem, mtime) > (held[0], held[1]):
+                newest_by_league[league] = (path.stem, mtime, path)
+    return [entry[2] for entry in sorted(newest_by_league.values(), key=lambda e: e[2].as_posix())]
+
+
+def oddsapi_props_outcome(sport: str, selected_date: str) -> SourceOutcome:
+    """Player-prop quotes from the captured OddsAPI CSVs.
+
+    Soccer only for now, and the refusal is stated rather than silent: NFL's
+    props live at a different path under a different schema
+    (`nfl_source/oddsapi_player_props_<season>_wk<week>.csv`, keyed by week not
+    date) and reach the board through `nfl/props.py` instead. Extending this to
+    NFL is real work, not a path tweak.
+
+    BEST PRICE PER SELECTION, ACROSS BOOKS. The capture is multi-book as of
+    2026-08-27, so a selection can be quoted four times; the board renders one
+    row, and the one it should get is the best available price. Higher american
+    odds pay more on the same stake on both sides of zero, so `>` is correct
+    without converting to decimal.
+    """
+    if str(sport or "").strip().lower() != "soccer":
+        return SourceOutcome(
+            source="oddsapi_props",
+            status="no_rows",
+            reason=f"player_prop_capture_not_wired_for_{sport}",
+        )
+
+    paths = _soccer_prop_files(selected_date)
+    if not paths:
+        return SourceOutcome(
+            source="oddsapi_props",
+            status="no_rows",
+            reason="no_props_capture_within_window",
+        )
+
+    best: dict[str, Quote] = {}
+    no_price = 0
+    unnamed = 0
+    unmapped: set[str] = set()
+    newest = 0.0
+    for path in paths:
+        try:
+            mtime = float(path.stat().st_mtime)
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+        except (OSError, UnicodeDecodeError):
+            continue
+        newest = max(newest, mtime)
+        for row in rows:
+            market_key = str(row.get("market_key") or "").strip()
+            player = str(row.get("player") or "").strip()
+            if not market_key or not player:
+                continue
+            line = _as_float(row.get("line"))
+            if market_key in _YES_PRICED_PROP_MARKETS:
+                legs = [("yes", _as_float(row.get("over_price")), None)]
+            else:
+                legs = [
+                    ("over", _as_float(row.get("over_price")), line),
+                    ("under", _as_float(row.get("under_price")), line),
+                ]
+                if line is None:
+                    # A threshold market with no number is not a bet, and
+                    # `quote_key` would build one that no board row asks for.
+                    unmapped.add(market_key)
+                    continue
+            for side, american, leg_line in legs:
+                if american is None:
+                    no_price += 1
+                    continue
+                key = prop_quote_key(sport, market_key, player, side, leg_line)
+                if key is None:
+                    unnamed += 1
+                    continue
+                held = best.get(key)
+                if held is not None and held.american is not None and int(american) <= held.american:
+                    continue
+                best[key] = Quote(
+                    key=key,
+                    source="oddsapi_props",
+                    sport="soccer",
+                    market=market_key,
+                    side=side,
+                    probability=_prop_capture_probability(american),
+                    american=int(american),
+                    line=leg_line,
+                    fetched_at=mtime,
+                    venue_ref=str(row.get("event_id") or "") or None,
+                )
+
+    parts = []
+    if no_price:
+        parts.append(f"leg_without_price:{no_price}")
+    if unmapped:
+        parts.append(f"threshold_market_without_line:{len(unmapped)}")
+    if unnamed:
+        parts.append(f"player_unnameable:{unnamed}")
+    quotes = list(best.values())
+    return SourceOutcome(
+        source="oddsapi_props",
+        status="ok" if quotes else "no_rows",
+        reason=" ".join(parts) or (None if quotes else "capture_had_no_priced_rows"),
+        quotes=quotes,
+        age_seconds=max(0.0, time.time() - newest) if newest else None,
+    )

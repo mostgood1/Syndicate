@@ -1822,6 +1822,31 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   full-game bet against a first-quarter contract. Kalshi also registers ONE
   series each for nfl/ncaaf (`KXNFLTOTAL`/`KXNCAAFTOTAL`) vs 14 mlb / 7 wnba --
   a registry boundary, not a key defect.
+- **THIRD AND LARGEST CAUSE, 2026-08-27: soccer's unmatched rows are ALL player
+  props, and the join key did not name the player.** `_candidate_keys` built
+  `<sport>|<market>|<side>|<line>` for every row -- complete for a game line,
+  and wrong for a prop: every player's anytime-scorer row collapsed to ONE
+  string. Rows sharing a key are indistinguishable to `apply_venue_quotes`, so
+  the first won and the quote it won described a DIFFERENT HUMAN. That is a
+  latent cross-sport defect (wnba `player_threes|over|2.5` had the same shape),
+  not a soccer one. `kalshi_board_join` has always keyed props as
+  `market|normalize_person(subject)|line`; the fan-in now uses that same
+  resolver. Fixed on BOTH sides plus the kalshi adapter, so its prop quotes move
+  with the board rather than silently ceasing to match.
+- **AND THE CAPTURE HAD NO READER.** `oddsapi` is in `SOURCES` but its adapter
+  reads the `odds_history` shard -- game lines only, 44 soccer quotes at 26,886s
+  old. The SAME vendor's player props are captured every pregame sweep to
+  `soccer_source/<league>/props/<date>.csv` (2,720 rows / 4 books on the real
+  2026-08-27 ligue_1 file, 647 of 1,529 selections multi-quoted) and nothing in
+  the fan-in opened them. New source `oddsapi_props`, default-on, soccer-only
+  with other sports refused BY NAME. Vocabularies already agreed: the CSV's
+  `market_key` IS the board's market token.
+- Verification OWED on production: soccer `unmatched_by_sport` off its 15,082
+  plateau AND `selected_by_source` gaining `oddsapi_props`. A drop without that
+  source appearing means rows vanished rather than matched. Also expect kalshi's
+  prop selections to CHANGE -- some of what it won before was the wrong player,
+  so a fall there is a correction, not a regression, and `prop_without_player`
+  names what it could not key.
 - Blocked by: none. Nothing armed; `SYNDICATE_EXECUTION_*` untouched.
 
 
