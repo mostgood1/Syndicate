@@ -1,5 +1,41 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#588` — **Every lined OddsAPI venue quote was published without its line, so spreads and totals could never match the board.** — lane `venue-quote-line-join`, 2026-08-27 — **FIXED; PRODUCTION VERIFICATION OWED**
+
+`oddsapi_outcome` read `american` from the entry VALUE (`last_odds`) and the
+line from the KEY. These shards have no `line=` in the key; the value carries
+`last_line`. So `quote_key` built a lineless key for every spread and total.
+Production 2026-08-27, `sources_offered oddsapi`:
+`['soccer|h2h|draw', 'soccer|spreads|real madrid', 'soccer|totals|over']` --
+`soccer|totals|over` is not a bet and cannot meet `soccer|totals|over|2.5`.
+
+The h2h quotes, legitimately lineless, matched fine and kept the source's
+counters healthy while its lined markets won nothing.
+
+**Cannot produce a wrong-line match** — these keys match nothing today and
+afterwards match only a board row at the SAME number, which is `quote_key`'s
+own rule. h2h deliberately untouched (`last_line` is a movement field and
+appears there too; reading it would break the family that already works).
+
+**Also fixed the instrument:** `unmatched_sample` was ONE pool of 8 filled in
+row order, so it printed eight `mlb|spreads|...` keys directly beside
+`unmatched_by_sport={nfl: 1244, soccer: 11365}` — it could name the size of the
+gap and never its shape. Now emits `board_wanted_by_sport`.
+
+**NOT fixed, deliberately:** Kalshi registers ONE series each for nfl/ncaaf
+(`KXNFLTOTAL`/`KXNCAAFTOTAL`) vs 14 mlb / 7 wnba, so those sports can only ever
+match game totals there — a registry boundary, not a key defect. And its offered
+nfl/ncaaf keys read `totals_q1`/`totals_h1`; if those are real period markets,
+matching them to a full-game row would price a full-game bet against a
+first-quarter contract. Not aliased on a sample of four — `board_wanted_by_sport`
+is what settles it.
+
+**OWED:** soccer `unmatched_by_sport` off its 11,365 plateau, `selected_by_source`
+gaining `oddsapi` on spreads/totals, and `lined_market_without_line:<n>` naming
+the residual. A drop with no oddsapi selections means rows vanished, not matched.
+
+Landed (not deployed). 9 new tests, falsified against the old behaviour.
+
 ### `#587` — **NFL props were captured, published, and read from the wrong root; and both NFL and soccer captures kept one book of N.** — lane `nfl-soccer-props-board`, 2026-08-27 — **FIXED AND PROVEN ON THE REAL CAPTURE; PRODUCTION VERIFICATION OWED**
 
 Scope was "do for soccer and NFL what the NCAAF lane just did". Checking each of

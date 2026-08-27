@@ -1921,9 +1921,12 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `tests/test_kalshi_precap_cut_by_date.py` (NEW),
   `syndicate/features/shared/kalshi_board.py`, `tests/test_kalshi_board.py`,
   `syndicate/features/shared/kalshi_catalogue.py`,
-  `syndicate/features/shared/venue_quote_adapters.py`,
-  `syndicate/features/shared/venue_quote_fanin.py`,
   `tests/test_kalshi_side_vocabulary.py`, `tests/test_kalshi_futures_eviction.py`.
+  **`venue_quote_adapters.py` and `venue_quote_fanin.py` RE-CLAIMED by lane
+  `venue-quote-line-join` 2026-08-27**, exactly as the released-claims note
+  above instructs. Removed from this list rather than left contested, because
+  `check_lane_invariants.py` reads it as a live claim and reported them as
+  two-holder violations.
 - **SHIPPED AND VERIFIED (evidence in `log/2026-08-26.md`, rows in `deploys.md`):**
   side vocabulary; futures eviction; `board_by_game_date` on the ticker's game
   date with `BY_CLOSE_DATE` alongside; ticker zone settled Eastern;
@@ -1931,7 +1934,11 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **FOUR HYPOTHESES KILLED, none by argument:** (1) "the working set holds
   nothing for the board's date" — refuted, 1958 markets on it; (2) NCAAF has no
   game on the board's date — true but NOT binding, the join's board side has no
-  NCAAF rows at all; (3) `market_is_for_another_date` is a defect — it is a
+  NCAAF rows at all **[NOW STALE, 2026-08-27: NCAAF reaches the board side.
+  The Layer 2 projection-window fix `5e6ef685` admitted it to the candidate set,
+  and `VENUE_REPRICE` read `sports=['ncaaf', 'soccer', 'wnba']` at 02:56:06Z with
+  `ncaaf` unmatched at only 62. A successor re-deriving this lane's numbers must
+  re-measure rather than inherit them]**; (3) `market_is_for_another_date` is a defect — it is a
   description; (4) eviction re-prioritisation recovers ~1,600 markets — measured
   **133**.
 - **BLOCKED ON, in order. Do NOT write an eviction change before both:**
@@ -2487,6 +2494,38 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   (player, line) after a real capture, with the row count and credit delta
   recorded. A local-fixture pass does not discharge either.
 - Blocked by: none.
+
+
+### venue-quote-line-join — OPEN — opened 2026-08-27 — session 3515d143-20a0-48e3-8538-59a9d6dc8e1c
+- Goal: reduce `VENUE_REPRICE_KEYS unmatched_by_sport` for nfl/soccer/ncaaf by
+  fixing key-shape mismatches that are PROVEN, and instrumenting the rest.
+  Explicitly NOT "make the number go down" -- a wrong match on this path prices
+  a real bet against the wrong contract.
+- Files: `syndicate/features/shared/venue_quote_adapters.py`,
+  `syndicate/features/shared/venue_quote_fanin.py`,
+  `pipeline/layer2_shortlist.py`, `tests/test_venue_quote_line_join.py` (new).
+- Hypothesis: OddsAPI's spreads/totals quotes are published WITHOUT a line, so
+  they can never meet a board key that correctly carries one.
+- Falsification test: if the shard's key carried `line=`, the adapter was right
+  and the mismatch is elsewhere. NOT FALSIFIED -- the module's own measured
+  comment records the key shape and it has no `line=`, while the value carries
+  `last_line`; production `sources_offered` shows `soccer|totals|over`, a total
+  with no number, which is not a bet.
+- SAFETY: the fix cannot create a wrong-line match. These keys match NOTHING
+  today; afterwards they match only a board row at the SAME number. Pinned by a
+  test asserting a 3.5 quote still fails a 2.5 row, and by a parametrised h2h
+  guard (h2h/h2h_h1/h2h_h2) so the family that already matches cannot regress.
+- Verification OWED, on production after a deploy: `unmatched_by_sport` for
+  soccer falls from its 11,365 plateau, `selected_by_source` gains `oddsapi` on
+  spreads/totals, and `lined_market_without_line:<n>` names whatever residual
+  remains. A drop with no oddsapi selections would mean rows vanished rather
+  than matched, and would NOT count.
+- Deliberately NOT done: aliasing Kalshi's `totals_q1`/`totals_h1` onto
+  full-game board rows. If those are real period markets that match prices a
+  full-game bet against a first-quarter contract. Kalshi also registers ONE
+  series each for nfl/ncaaf (`KXNFLTOTAL`/`KXNCAAFTOTAL`) vs 14 mlb / 7 wnba --
+  a registry boundary, not a key defect.
+- Blocked by: none. Nothing armed; `SYNDICATE_EXECUTION_*` untouched.
 
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
