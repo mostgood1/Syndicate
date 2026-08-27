@@ -47,6 +47,30 @@ from typing import Any
 _UNSCORED_NO_OUTCOME = "no_final_outcome_for_game"
 _UNSCORED_NO_MODEL_PROB = "record_carries_no_model_probability"
 
+# WHAT A LEVEL FINAL MEANS, PER SPORT. Two EXPLICIT tables rather than one table
+# and a relaxed default, for the reason `live_gameline_join.lens_sources_for_sport`
+# is also explicit: a sport that appears in NEITHER must be visible as unknown,
+# not quietly absorbed into whichever branch happens to be the fallthrough.
+#
+# Draw-bearing. A level final is a real result and the home side did not win.
+DRAW_IS_A_REAL_OUTCOME: frozenset[str] = frozenset({
+    "soccer",
+    # Regulation ties survive overtime in both, rare but legitimate -- and a tie
+    # is genuinely "the home side did not win". Listed BEFORE either has a live
+    # game-line ledger, because the failure this table fixes is precisely a
+    # sport-blind rule meeting a sport nobody re-checked it against.
+    "nfl",
+    "ncaaf",
+})
+
+# Cannot draw: a level final is a corrupt row and must not be scored.
+LEVEL_FINAL_IS_A_BAD_ROW: frozenset[str] = frozenset({
+    "mlb", "nba", "wnba", "ncaab",
+    # Hockey resolves every game by overtime or shootout, so a FINAL is never
+    # level on the scoreline this grid carries.
+    "nhl",
+})
+
 
 def _finite_prob(value: Any) -> float | None:
     """A probability in (0, 1), or None. Bounds are EXCLUSIVE on purpose.
@@ -64,14 +88,64 @@ def _finite_prob(value: Any) -> float | None:
     return p
 
 
-def build_finals_index(grid: Any) -> dict[str, bool]:
+def build_finals_index(
+    grid: Any,
+    *,
+    sport: Any = None,
+    diagnostics: dict[str, Any] | None = None,
+) -> dict[str, bool]:
     """`game_pk` -> did HOME win, for games that are FINAL on this grid.
 
     Keyed on `game_pk` because that is what the ledger stores as its join key.
-    A tie is EXCLUDED rather than coerced: baseball does not tie, so a final
-    with equal scores is a bad row, and guessing a winner from it would inject a
-    fabricated outcome into the score.
+
+    **A LEVEL FINAL MEANS DIFFERENT THINGS IN DIFFERENT SPORTS, AND TREATING IT
+    ONE WAY FOR ALL OF THEM SILENTLY DELETED A THIRD OF SOCCER.** This used to
+    skip every `h == a` row unconditionally, reasoning that "baseball does not
+    tie, so a final with equal scores is a bad row". That is correct FOR MLB and
+    wrong for any sport that can draw -- and this function is sport-agnostic and
+    serves all of them.
+
+    Measured 2026-08-27 over the retained soccer ledger: **08-22 42 finals of
+    which 16 were draws (38%), 08-23 30/5 (17%), 08-24 6/2 (33%)**, and on
+    08-24 and 08-26 `games_with_outcome` came out at EXACTLY finals-minus-draws
+    (4 and 1). So soccer's model-vs-market Brier was being computed on a
+    population **conditioned on the outcome variable itself** -- draws removed
+    after the fact, while both the model's and the market's home-win
+    probabilities were formed unconditionally. Neither number meant what it
+    looked like.
+
+    THE FIX IS NOT "COERCE A WINNER". A draw is not a missing outcome needing a
+    guess; for the binary event this scorer measures -- *did the home side win*
+    -- a draw is a perfectly well-defined **False**. That is the unbiased
+    treatment and the only one that keeps the scoring rule proper. Excluding
+    draws is what injected the bias; including them as False removes it without
+    inventing anything.
+
+    Where a level final really IS a bad row (baseball), it is still skipped --
+    but now it is COUNTED under `finals_skipped_level` instead of vanishing.
+    That counter is the whole reason this went unnoticed for as long as it did.
+
+    **AN UNKNOWN SPORT DOES NOT GET THE PERMISSIVE BRANCH.** `sport=None` or a
+    sport not in either table is skipped and counted under
+    `finals_skipped_level_sport_unknown`, never folded into the draw-bearing
+    branch -- calling a level final "not a home win" for a sport that cannot
+    draw would fabricate outcomes exactly the way the original comment feared.
     """
+    diag = diagnostics if isinstance(diagnostics, dict) else None
+    key_sport = str(sport or "").strip().lower()
+    draws_are_real = key_sport in DRAW_IS_A_REAL_OUTCOME
+    sport_known = key_sport in DRAW_IS_A_REAL_OUTCOME or key_sport in LEVEL_FINAL_IS_A_BAD_ROW
+    if diag is not None:
+        diag.update({
+            "sport": key_sport or None,
+            "sport_known": sport_known,
+            "draws_scored_as_not_a_home_win": draws_are_real,
+            "finals_seen": 0,
+            "finals_level": 0,
+            "finals_skipped_level": 0,
+            "finals_skipped_level_sport_unknown": 0,
+        })
+
     out: dict[str, bool] = {}
     if not isinstance(grid, (list, tuple)):
         return out
@@ -86,8 +160,17 @@ def build_finals_index(grid: Any) -> dict[str, bool]:
             h, a = float(home), float(away)
         except (TypeError, ValueError):
             continue
+        if diag is not None:
+            diag["finals_seen"] = int(diag["finals_seen"]) + 1
         if h == a:
-            continue
+            if diag is not None:
+                diag["finals_level"] = int(diag["finals_level"]) + 1
+            if not draws_are_real:
+                if diag is not None:
+                    reason = ("finals_skipped_level" if sport_known
+                              else "finals_skipped_level_sport_unknown")
+                    diag[reason] = int(diag[reason]) + 1
+                continue
         # INDEX UNDER EVERY IDENTIFIER THE ROW CARRIES, because the ledger and
         # the grid do not agree on one.
         #

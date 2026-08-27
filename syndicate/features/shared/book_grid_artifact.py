@@ -286,16 +286,23 @@ def build_book_grid_artifact(
             score_ledger_records,
         )
 
-        finals = build_finals_index(grid)
+        # `sport` IS LOAD-BEARING HERE, not decoration: it decides whether a
+        # level final is a draw (a real "home did not win") or a corrupt row.
+        # Passing nothing is what made soccer's score exclude 17-38% of its
+        # matches -- see `build_finals_index`. `finals_diag` rides along on the
+        # payload so that exclusion can never again be invisible.
+        finals_diag: dict[str, Any] = {}
+        finals = build_finals_index(grid, sport=sport, diagnostics=finals_diag)
         if not finals:
             # No final game on this grid is the NORMAL state mid-slate, and it
             # is not a failure. Saying so keeps it distinct from a scorer that
             # ran and found the model worthless.
             live_gameline_score = {"enabled": True, "reason": "no_final_games_on_this_grid",
-                                   "games_with_outcome": 0}
+                                   "games_with_outcome": 0, "finals_index": finals_diag}
         else:
             records = read_records(ledger_path(sport, date_str))
-            live_gameline_score = {"enabled": True, **score_ledger_records(records, finals)}
+            live_gameline_score = {"enabled": True, **score_ledger_records(records, finals),
+                                   "finals_index": finals_diag}
     except Exception as exc:  # pragma: no cover - instrumentation must not break the board
         live_gameline_score = {"enabled": True, "error": f"{type(exc).__name__}: {exc}"[:200]}
 

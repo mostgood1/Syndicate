@@ -45,16 +45,56 @@ def test_finals_index_takes_only_decided_final_games():
         _grid_row("g1", "final", 5, 3),   # home won
         _grid_row("g2", "final", 2, 7),   # home lost
         _grid_row("g3", "live", 1, 1),    # not final
-        _grid_row("g4", "final", 4, 4),   # TIE -- excluded, not coerced
+        _grid_row("g4", "final", 4, 4),   # level -- a BAD ROW in baseball
         _grid_row("g5", "final", None, 2),
     ]
-    assert build_finals_index(grid) == {"g1": True, "g2": False}
+    assert build_finals_index(grid, sport="mlb") == {"g1": True, "g2": False}
 
 
 def test_a_tie_is_never_coerced_into_a_winner():
     """Baseball does not tie, so an equal-score final is a BAD ROW. Guessing a
     winner from it would inject a fabricated outcome into the score."""
-    assert build_finals_index([_grid_row("g", "final", 3, 3)]) == {}
+    assert build_finals_index([_grid_row("g", "final", 3, 3)], sport="mlb") == {}
+
+
+def test_a_soccer_draw_is_a_real_outcome_and_is_scored_as_not_a_home_win():
+    """THE REGRESSION THIS FILE EXISTS TO HOLD. Dropping draws conditioned the
+    soccer population on the OUTCOME VARIABLE ITSELF -- measured 2026-08-27,
+    17-38% of matches per date silently removed. A draw is not a missing
+    outcome; for "did the home side win" it is a well-defined False."""
+    assert build_finals_index([_grid_row("g", "final", 1, 1)], sport="soccer") == {"g": False}
+
+
+def test_the_same_grid_scores_differently_for_mlb_and_soccer():
+    """OFF != ON. Without this, a sport-blind implementation still passes every
+    other test in this file."""
+    grid = [_grid_row("g1", "final", 2, 1), _grid_row("g2", "final", 1, 1)]
+    assert build_finals_index(grid, sport="mlb") == {"g1": True}
+    assert build_finals_index(grid, sport="soccer") == {"g1": True, "g2": False}
+
+
+def test_an_unknown_sport_does_not_get_the_permissive_branch():
+    """A sport in neither table must be SKIPPED and COUNTED, never folded into
+    the draw-bearing branch -- calling a level final "not a home win" for a
+    sport that cannot draw would fabricate the outcome the original rule feared.
+    """
+    diag = {}
+    assert build_finals_index([_grid_row("g", "final", 1, 1)], diagnostics=diag) == {}
+    assert diag["sport_known"] is False
+    assert diag["draws_scored_as_not_a_home_win"] is False
+    assert diag["finals_skipped_level_sport_unknown"] == 1
+    assert diag["finals_skipped_level"] == 0
+
+
+def test_the_level_final_counters_make_an_exclusion_visible():
+    """The exclusion went unnoticed for weeks because nothing counted it."""
+    grid = [_grid_row("g1", "final", 3, 1), _grid_row("g2", "final", 2, 2)]
+    diag = {}
+    build_finals_index(grid, sport="mlb", diagnostics=diag)
+    assert (diag["finals_seen"], diag["finals_level"], diag["finals_skipped_level"]) == (2, 1, 1)
+    diag2 = {}
+    build_finals_index(grid, sport="soccer", diagnostics=diag2)
+    assert (diag2["finals_seen"], diag2["finals_level"], diag2["finals_skipped_level"]) == (2, 1, 0)
 
 
 def test_model_and_market_are_scored_on_identical_rows():
