@@ -1074,6 +1074,14 @@
                   {% elif st == 'live_behind' %}<span class="neg">BEHIND</span>
                   {% elif st == 'live_tied' %}<span class="warn">TIED</span>
                   {% elif st == 'not_started' %}<span class="sub">not started</span>
+                  {% elif st in ('won', 'lost', 'push') %}
+                    {# DECIDED BUT NOT YET GRADED. Uppercase like a settled row,
+                       because it IS the same fact -- what it lacks is the
+                       venue's confirmation, which the sub-line says. Rendering
+                       it lowercase put `lost` beside `LOST` in one column and
+                       made the board look like two different vocabularies. #}
+                    <span class="{{ 'pos' if st == 'won' else ('neg' if st == 'lost' else '') }}">{{ st|upper }}</span>
+                    <span class="sub">awaiting venue</span>
                   {% elif st %}<span class="sub">{{ st|replace('_', ' ') }}</span>
                   {% else %}<span class="sub">open</span>{% endif %}
                   {# THE CURRENT NUMBER AGAINST THE LINE -- the thing a person
@@ -1101,9 +1109,12 @@
                   {% if lm.get('clv_pct') is not none %}
                     <span class="sub {{ 'pos' if lm.get('clv_pct') > 0 else ('neg' if lm.get('clv_pct') < 0 else '') }}">
                       {{ "%+.1f"|format(lm.get('clv_pct')) }} pts vs taken</span>
-                  {% elif lm.get('reason') %}
-                    <span class="sub">{{ lm.get('reason')|replace('_', ' ') }}</span>
                   {% endif %}
+                  {# NO `reason` HERE. `market_not_on_board` is why we have no
+                     MARK, not a fact about profit and loss, and printing it in
+                     the P&L column put an explanation where a number belongs on
+                     98 of 126 open rows. The mark is a bonus; its absence is
+                     not news. #}
                 {% endif %}
               </td>
             </tr>

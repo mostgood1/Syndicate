@@ -226,17 +226,56 @@ def test_an_already_settled_order_is_never_regraded(ledger, monkeypatch):
     assert ledger["orders"][0]["outcome"] == "lost"
 
 
-def test_one_market_with_two_orders_shares_the_outcome_and_withholds_the_pnl(ledger, monkeypatch):
-    """The market resolved one way for everyone, so the outcome applies to
-    both. The row states the MARKET's P&L; splitting it across orders would be
-    an invented number wearing an exact one's clothes."""
-    ledger["orders"] = [_order(idempotency_key="a"), _order(idempotency_key="b")]
+def test_two_orders_on_ONE_SIDE_share_the_outcome_and_each_gets_its_own_pnl(ledger, monkeypatch):
+    """The market resolved one way for everyone on that side, so the outcome
+    applies to both. The venue's P&L is the MARKET's total and still does not
+    divide -- but each order's own fill does, exactly: a binary contract bought
+    at $p settles at $1. Leaving these with no P&L is what put `WON —` on the
+    board beside yesterday's fully-resolved lines."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", fill_stake_dollars=4.0, fill_price=0.40),
+        _order(idempotency_key="b", fill_stake_dollars=2.0, fill_price=0.50),
+    ]
     _kalshi_rows(monkeypatch, [_k()])
     result = vs.settle_from_venue()
     assert result["settled"] == 2
-    assert result["pnl_unattributed"] == 2
+    assert result["pnl_derived"] == 2
     assert all(o["outcome"] == "won" for o in ledger["orders"])
-    assert all("pnl_dollars" not in o for o in ledger["orders"])
+    # $4 at 40c returns (1-.4)/.4 = 1.5x -> +6.00; $2 at 50c returns 1.0x -> +2.00
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(6.0)
+    assert ledger["orders"][1]["pnl_dollars"] == pytest.approx(2.0)
+
+
+def test_OPPOSITE_sides_on_one_market_are_refused_not_both_marked_won(ledger, monkeypatch):
+    """MEASURED IN PRODUCTION 2026-08-27. `aec-mlb-cle-laa-2026-08-26` carried a
+    `side=home` and a `side=away` order, one verdict was applied to both, and
+    the board showed **Los Angeles Angels WON and Cleveland Guardians WON on
+    the same game**. At most one of those can be true.
+
+    Kalshi refuses this as `both_sides_held` from its own counts; Polymarket
+    cannot, because a PositionResolution carries ONE aggregate realized delta
+    that describes neither side. An ungraded row is a visible gap; a
+    confidently wrong outcome on a money record is not."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="home"),
+        _order(idempotency_key="b", side="away"),
+    ]
+    _kalshi_rows(monkeypatch, [_k()])
+    result = vs.settle_from_venue()
+    assert result["settled"] == 0
+    assert result["refused"]["ambiguous_multi_side"] == 1
+    assert all("outcome" not in o for o in ledger["orders"])
+
+
+def test_a_derived_loss_is_the_stake_and_a_derived_push_is_only_the_fee(ledger, monkeypatch):
+    ledger["orders"] = [
+        _order(idempotency_key="a", fill_stake_dollars=5.0, fill_price=0.40, fees_dollars=0.10),
+        _order(idempotency_key="b", fill_stake_dollars=3.0, fill_price=0.40),
+    ]
+    _kalshi_rows(monkeypatch, [_k(market_result="no", revenue=0)])
+    vs.settle_from_venue()
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-5.10)
+    assert ledger["orders"][1]["pnl_dollars"] == pytest.approx(-3.0)
 
 
 def test_a_settlement_matching_no_order_is_counted_not_dropped(ledger, monkeypatch):

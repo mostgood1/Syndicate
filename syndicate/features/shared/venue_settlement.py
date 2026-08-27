@@ -330,6 +330,47 @@ def grade_polymarket_resolution(row: Mapping[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _derived_pnl(order: Mapping[str, Any], outcome: str) -> float | None:
+    """This order's P&L from ITS OWN fill, for a venue-stated outcome.
+
+    Used when one market carries several of our orders, so the venue's
+    market-total P&L cannot be handed to any single row. Nothing is
+    apportioned: a binary contract bought at $p settles at $1, so the
+    arithmetic is per-order and exact. `profit_per_dollar` is the same function
+    the inferred path grades with, so the two sources cannot disagree about how
+    a fill converts into money -- only about the OUTCOME, which is the
+    distinction `settled_by` exists to preserve.
+
+    Fees are netted where the venue reported them, and an absent fee is charged
+    as zero rather than refused -- the same choice `grade_order` makes, for the
+    same reason: a bet whose fee we cannot read is still a bet with a real
+    result, and refusing would lose the outcome to save the rounding.
+    """
+    from syndicate.features.shared.paper_settlement import (
+        OUTCOME_LOST,
+        OUTCOME_PUSH,
+        OUTCOME_WON,
+        profit_per_dollar,
+    )
+
+    stake = _num(order.get("fill_stake_dollars"))
+    if stake is None or stake <= 0:
+        return None
+    fees = _num(order.get("fees_dollars")) or 0.0
+
+    if outcome == OUTCOME_PUSH:
+        return round(-fees, 4)
+    if outcome == OUTCOME_LOST:
+        return round(-stake - fees, 4)
+    if outcome != OUTCOME_WON:
+        return None
+
+    multiple = profit_per_dollar(order.get("fill_price"))
+    if multiple is None:
+        return None
+    return round(stake * multiple - fees, 4)
+
+
 def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
     """Grade every ungraded LIVE order that the venue has settled. Persists.
 
@@ -346,7 +387,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
         "already": 0,
         "awaiting": 0,
         "unjoinable": 0,
-        "pnl_unattributed": 0,
+        "pnl_derived": 0,
         "refused": {},
         "by_venue": {},
         "errors": {},
@@ -412,22 +453,69 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                 counters["refused"][reason] = counters["refused"].get(reason, 0) + 1
                 continue
 
+            # OPPOSITE SIDES ON ONE MARKET CANNOT SHARE AN OUTCOME.
+            #
+            # MEASURED IN PRODUCTION 2026-08-27, and it is the reason this
+            # branch exists rather than a hypothetical: `aec-mlb-cle-laa-
+            # 2026-08-26` carried one `side=home` and one `side=away` order,
+            # and the earlier version applied ONE verdict to both -- so the
+            # board showed **Los Angeles Angels WON and Cleveland Guardians
+            # WON on the same game**. At most one of those can be true.
+            #
+            # Kalshi's grader already refuses this as `both_sides_held`, from
+            # `yes_count_fp`/`no_count_fp`. Polymarket's cannot: a
+            # PositionResolution carries ONE aggregate realized delta for the
+            # position and never names the winning outcome, so opposite-side
+            # orders net out into a single number that describes neither.
+            #
+            # Refused and COUNTED rather than guessed. An ungraded row is a
+            # visible gap; a confidently wrong outcome on a money record is
+            # not, and it also poisons the venue-vs-inferred comparison this
+            # whole path exists to make possible.
+            #
+            # The real resolution is per-side and it is known, just not built:
+            # the PUBLIC gateway's `GET /markets/{slug}/settlement` names the
+            # winning outcome, which would let each order be graded against its
+            # own side instead of against the position's net.
+            sides = {str(o.get("side") or "").strip().lower() for o in targets}
+            if len(targets) > 1 and len(sides) > 1:
+                counters["refused"]["ambiguous_multi_side"] = (
+                    counters["refused"].get("ambiguous_multi_side", 0) + 1
+                )
+                continue
+
             matched_keys.add(key)
-            # ONE MARKET, POSSIBLY SEVERAL ORDERS. The outcome is shared and
-            # safe; the P&L is the MARKET's total and does not divide.
+            # ONE MARKET, POSSIBLY SEVERAL ORDERS ON THE SAME SIDE. The outcome
+            # is shared and now provably safe. The venue's P&L is the MARKET's
+            # total and still does not divide -- but each order's own fill does,
+            # and a binary contract's arithmetic is exact from it.
             attributable = len(targets) == 1
             for order in targets:
                 order["outcome"] = verdict["outcome"]
                 order["settled_by"] = "venue"
                 order["settled_at_venue"] = verdict.get("settled_at_venue")
                 order["graded_at"] = _utc_now()
-                if attributable:
-                    if verdict.get("pnl_dollars") is not None:
-                        order["pnl_dollars"] = verdict["pnl_dollars"]
+                if attributable and verdict.get("pnl_dollars") is not None:
+                    # ONE ORDER: take the venue's own arithmetic, which nets
+                    # fees the venue actually charged.
+                    order["pnl_dollars"] = verdict["pnl_dollars"]
                     if verdict.get("fees_dollars") is not None:
                         order["fees_dollars"] = verdict["fees_dollars"]
                 else:
-                    counters["pnl_unattributed"] += 1
+                    # SEVERAL ORDERS: derive each one from ITS OWN fill.
+                    #
+                    # This is not an apportionment and nothing is invented. A
+                    # binary contract bought at $p settles at $1, so a winner
+                    # returns (1-p)/p per dollar staked and a loser returns the
+                    # stake -- exactly what `profit_per_dollar` computes for the
+                    # inferred path. Leaving these rows with NO P&L is what put
+                    # `WON —` on the board beside yesterday's fully-resolved
+                    # lines, and an outcome without a number is not a settled
+                    # bet a person can read.
+                    derived = _derived_pnl(order, verdict["outcome"])
+                    if derived is not None:
+                        order["pnl_dollars"] = derived
+                    counters["pnl_derived"] += 1
                 counters["settled"] += 1
                 per_venue["settled"] += 1
                 graded_any = True
