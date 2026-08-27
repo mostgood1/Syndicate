@@ -1812,6 +1812,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none. Nothing armed; `SYNDICATE_EXECUTION_*` untouched.
 
 
+
+### ncaaf-pace-block — OPEN — opened 2026-08-27 — session de363735
+- Goal: the NCAAF `pace` block carries a REAL per-team seconds-per-play, so the
+  engine stops running every game on the hardcoded 24.0 (`pace_index +0.400`).
+- Files: `scripts/build_ncaaf_pace_snapshot.py`,
+  `syndicate/features/ncaaf/feature_payload.py`,
+  `syndicate/features/ncaaf/sources.py`,
+  `tests/test_ncaaf_pace_payload.py`
+- Hypothesis: the totals over-dispersion (`1.94x`, measured on the live slate)
+  is driven in part by pace. MEASURED, not assumed: with no pace block the
+  engine runs 151.6 s/drive while the league-average team is 179.5 — ~18% too
+  fast, so more drives fit in a game and totals inflate. `drive_success_
+  probability` is unchanged across the whole pace range (0.3270), so the effect
+  is cleanly isolated.
+- Falsification test: if a re-fit with the pace block ON does not reduce TOTAL
+  error against the market, pace is not the driver and the block stays off. The
+  correlation study already showed these payload features carry NO information
+  the market misses on margin (residual |r| <= 0.021, n=690) — pace is being
+  tried because it targets a surface the model is KNOWN to get wrong, not
+  because an edge is expected.
+- Verification: (a) reachability, off != on, already demonstrated across the
+  real range 21.0..33.4 s/play; (b) per-team coverage reported as a RATE over
+  FBS teams, not a count; (c) a re-fit reporting TOTAL error, not just margin.
+- Blocked by: none. Ships DEFAULT-OFF behind the existing payload flag — the
+  profile was calibrated with pace_index pinned at +0.4, so turning this on is
+  a mechanism added to a calibrated engine and owes a re-fit before any deploy.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

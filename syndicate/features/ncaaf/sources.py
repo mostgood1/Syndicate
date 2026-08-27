@@ -92,6 +92,19 @@ def returning_production_snapshot_path() -> Path:
     return ncaaf_source_artifacts_data_path("processed", "returning_production", "ncaaf_returning_production_snapshot.csv")
 
 
+def pace_snapshot_path() -> Path:
+    """Per-team offensive seconds-per-play, built from CFBD `/drives`.
+
+    `#457`/`state.md` recorded `pace` as NULL AT SOURCE. It was worse than null:
+    with no block, `drive_priors._pace_index` falls back to **24.0 s/play**, so
+    EVERY NCAAF game ran at `pace_index = +0.400` while the real 2025 league
+    mean is 26.56 (sd 2.08, range 21.0..33.4 over 266 teams / 37,263 drives).
+    A constant is not a neutral default here -- it pinned every game 18% faster
+    than the average team actually plays.
+    """
+    return ncaaf_source_artifacts_data_path("processed", "pace", "ncaaf_pace_snapshot.csv")
+
+
 def coach_continuity_snapshot_path() -> Path:
     return ncaaf_source_artifacts_data_path("processed", "coach_continuity", "ncaaf_coach_continuity_snapshot.csv")
 

@@ -180,6 +180,27 @@ def _index(season: int) -> dict[str, Any]:
         if orig:
             transfers_out[orig] = transfers_out.get(orig, 0) + 1
 
+    # PACE IS READ FROM THE PRIOR SEASON, AND THIS IS NOT A DETAIL.
+    # Every other block here is a PRESEASON fact -- returning production, coach
+    # continuity and the portal are all known before a snap is played, so
+    # reading season S for a game in season S is as-of by construction.
+    # Pace is not: it is an IN-SEASON performance aggregate, so season S
+    # contains the very game being predicted. `state.md` records exactly this
+    # shape costing 30% of apparent skill (`/ppa/teams?year=S`, r 0.663 vs
+    # 0.509 as-of over 558 games). Prior season, the same rule SP+ follows.
+    pace: dict[str, dict[str, Any]] = {}
+    pace_season_text = str(int(season) - 1)
+    for row in _read("pace", "ncaaf_pace_snapshot.csv"):
+        if str(row.get("season") or "") != pace_season_text:
+            continue
+        # The snapshot is keyed by CFBD team NAME (`/drives.offense`), not by
+        # team_id, so it resolves through the SAME name index every other
+        # lookup uses rather than a second, drifting one.
+        tid = id_by_name.get(_norm(row.get("team")))
+        spp = _f(row.get("seconds_per_play"))
+        if tid and spp is not None:
+            pace[tid] = {"seconds_per_play": spp, "plays_per_drive": _f(row.get("plays_per_drive"))}
+
     roster: dict[str, int] = {}
     for row in _read("roster", "ncaaf_roster_snapshot.csv"):
         if str(row.get("season") or "") != season_text:
@@ -195,6 +216,7 @@ def _index(season: int) -> dict[str, Any]:
         "transfers_in": transfers_in,
         "transfers_out": transfers_out,
         "roster": roster,
+        "pace": pace,
     }
 
 
@@ -257,6 +279,27 @@ def build_payload(*, home_team: str, away_team: str, season: int) -> dict[str, A
             "away_active_count": idx["roster"].get(away_id) or 0,
         }
 
+    # PACE. Unlike the blocks above, an absent pace block is NOT neutral:
+    # `drive_priors._pace_index` falls through to a hardcoded 24.0 s/play, i.e.
+    # `pace_index = +0.400` on EVERY game, while the real league mean is 26.56
+    # (`pace_index +0.144`). Measured through the engine: 151.6 s/drive against
+    # 179.5 for an average team -- ~18% too fast, which inflates drives per
+    # game and therefore TOTALS, the surface this engine is known to miss.
+    #
+    # The engine reads ONE game-level number, so it gets the mean of the two
+    # offences; each side also rides along under the alternative key names
+    # `_pace_index` already searches, for a future two-sided consumer.
+    home_pace = (idx["pace"].get(home_id) or {}).get("seconds_per_play")
+    away_pace = (idx["pace"].get(away_id) or {}).get("seconds_per_play")
+    if home_pace is not None:
+        combined = (home_pace + away_pace) / 2.0 if away_pace is not None else home_pace
+        payload["pace"] = {
+            "pace_seconds_per_play": round(combined, 4),
+            "home_pace_secs_play": home_pace,
+            "away_pace_secs_play": away_pace,
+            "plays_per_drive": (idx["pace"].get(home_id) or {}).get("plays_per_drive"),
+        }
+
     if payload:
         payload["adapter_metadata"] = {
             "source": f"ncaaf_snapshots_{int(season)}",
@@ -265,7 +308,13 @@ def build_payload(*, home_team: str, away_team: str, season: int) -> dict[str, A
             "blocks": sorted(k for k in payload if k != "adapter_metadata"),
             # NAMED, so a reader can see what is NOT here without diffing
             # against `drive_priors`. See this module's docstring.
-            "blocks_deliberately_absent": ["defensive_metrics", "pace", "player_usage"],
+            # COMPUTED, not a literal. This list previously hardcoded "pace"
+            # and would have gone on claiming pace was absent while it was
+            # being fed -- a stale self-description is exactly the failure the
+            # named list exists to prevent.
+            "blocks_deliberately_absent": [
+                b for b in ("defensive_metrics", "pace", "player_usage") if b not in payload
+            ],
         }
     return payload
 
