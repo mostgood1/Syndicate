@@ -67,32 +67,26 @@ death, never life — do not invert it.
 
 ## OPEN
 ### open-bet-live-status — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
-- **RESTORED 2026-08-27T17:1xZ after the primary tree was hard-reset to
-  origin/main.** This block, three log entries and one learnings entry were
-  UNCOMMITTED writes in the shared tree and did not survive. Committed this time
-  — an uncommitted ledger write is not a ledger write.
-- Goal: `/portfolio` is the live buying engine — merged live+paper book, editable
-  caps, venue balances, venue settlement, live status on open bets.
-  `[user 2026-08-26]`
-- Files: `syndicate/templates/portfolio.html`, `syndicate/blueprints/intelligence.py`,
-  `syndicate/blueprints/ops.py`, `syndicate/features/shared/execution_limits_settings.py`,
+- Goal: `/portfolio` is the live buying engine — merged book, editable caps,
+  venue balances, venue settlement, live status on open bets. `[user 2026-08-26]`
+- Files: `syndicate/templates/portfolio.html`, `blueprints/intelligence.py`,
+  `blueprints/ops.py`, `features/shared/execution_limits_settings.py`,
   `execution_guard.py`, `execution_ledger.py`, `venue_balances.py`,
   `venue_settlement.py`, `paper_settlement.py`, `polymarket_board_join.py`,
-  `scripts/run_live_odds_refresh_worker.py`, and their tests.
-- **SHIPPED AND VERIFIED TODAY** (all landed on origin/main, deployed):
-  `f5aa12ab` opposite-side settlement guard — impossible pairs 0, the
-  repair/grader oscillation (settled=1 every tick, `already` frozen at 45) stopped;
-  `3e27d1e0` paused-order retry; `34b4d4b4` venue balance gate;
-  `6040014b` `/api/ops/polymarket/slate`; `b8163ef0` soccer competition fold.
-- **OWED READINGS, all trigger-gated, none forceable:**
-  1. `cle-laa` home row at 21:44:25Z grace — predicted `lost / -2.76`.
-  2. paused-retry — needs an exchange pause to recur.
-  3. balance gate — needs the venue cash floor.
-  4. soccer fold — needs a `portfolio_commit` tick with soccer rows;
-     baseline `matched 55/1329 = 4.1%`, `no_candidates|soccer|h2h: 131`.
-- Cross-lane: fixed `ncaaf/cards.py` NameError on user instruction (`1abce3c4`),
-  handed the design question to `ncaaf-opener-regions-props`, who extended it.
-
+  `team_aliases.py`, `scripts/run_live_odds_refresh_worker.py`, + tests.
+- **STATUS 2026-08-27T21:45Z — 11 commits landed, 6 verified in production,
+  5 shipped-but-unfired. Narrative and all 7 self-corrections in
+  `log/2026-08-27.md`; measurements in `deploys.md`.**
+- **OWED, all trigger-gated, none forceable:**
+  1. `cle-laa` home row — grace expired 21:44:25Z, predict `lost / -2.76`.
+  2. WNBA city codes (`31575179`) + soccer pair (`fde862aa`) need a
+     refresh-worker deploy; live there is behind.
+  3. paused-retry and balance-gate need an exchange pause / a cash floor.
+- **DO NOT re-derive:** NCAAF projections cannot complete before **1 Sept**
+  (monthly CFBD quota exhausted, `X-CallLimit-Remaining: 0`); it relaunches
+  every ~38s and crashes on `429` until then. `source=artifact` IS confirmed —
+  the profile loads; the RUN fails downstream.
+- Claims: NONE held (web released 20:44Z, live-odds-worker expired).
 
 ### live-game-line-projection — OPEN, UNOWNED — **session f3586ebf ENDED 2026-08-27 ~18:0xZ; nothing is held and NO human owner is needed.** Remaining work is exactly three criteria and they are AUTOMATED: recurring task `live-gameline-fixes-first-real-reading` (cron `50 23 * * *`) checks nightly, closes this lane when (a)+(b)+(c) all pass, and disables itself on close. Deploy claims RELEASED, per-session marker emptied, everything committed to origin/main. If you are picking this up: read the 2026-08-27 log FIRST — the header below has been wrong twice. — **HEADER CORRECTED `[2026-08-20T21:0xZ]` (RE-APPLIED — a later push reverted it once): THE EVALUATION HAS BEEN RUNNING ALL ALONG.** `live_gameline_score` is computed every board build and served on `/api/board/book-grid?sport=mlb`; nothing RETAINED it. Reading 20:13Z, `priceable_only` (985/985, the sound cut): model brier 0.28706 vs market 0.24700 — **model TRAILS by +0.04006**. BOUND: `games_with_outcome: 3`; n=985/1449/2799 are repeated snapshots of those same 3 games, and MAE runs the OTHER way (0.447 vs 0.483). `all_records` is UNSOUND (n 1526 vs 1449). **v2 DISCRIMINATOR PROVEN** — written 38 > priceable 31, then 34 > 27, two live builds. Accumulating nightly via `live-gameline-accuracy-snapshot` (23:25 CT, before the slate roll); underpowered until pooled games ~100. — opened 2026-08-16
 

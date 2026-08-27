@@ -4574,3 +4574,40 @@ Third instance in one session of the same family: a `sports=8` board that
 passed while the guard never fired (caught), a stash control that could not
 restore `data/` (missed), and this (missed). Recognising the shape once does
 not install it.
+## 2026-08-27 — A WATCHER IS AN INSTRUMENT AND IT LIES IN FOUR SPECIFIC WAYS
+
+Five verification failures in one session, each producing output that looked
+like a result. None was caught by the watcher; all four were caught by reading
+the payload instead of the exit code.
+
+1. **Floored on `createdAt`, not `finishedAt`.** A join tick 69s after the
+   deploy was CREATED ran the OLD commit and returned the baseline. I nearly
+   reported my own change dead on evidence that never touched it. **A deploy
+   timestamp marks when you ASKED; only `finishedAt` marks when the code ran.**
+
+2. **Matched a shared word.** `"calibration" in message.lower()` fired on
+   `[INTEL_TRACE] {"event": "evaluation_reliability_profile"}` — a different
+   subsystem. The watcher exited 0 claiming success. **Match on the tokens the
+   EMITTER writes, not on the topic.**
+
+3. **The re-arm silently didn't apply.** A patch script opened a POSIX path
+   under Windows Python, raised `FileNotFoundError`, and the next line in the
+   same chain ran the UNPATCHED watcher — reproducing the identical bad reading.
+   **A failed edit followed by a successful run of old code is indistinguishable
+   from a successful re-arm.**
+
+4. **Sampled with the function under test.** Measuring recovery from the `lal`
+   bucket returned 0% BY CONSTRUCTION, because that bucket holds exactly the
+   rows the function failed to fold. **If the grouping is produced by the thing
+   you are testing, the sample is already biased.**
+
+5. **A null with no denominator.** `matched 55 -> 59` read as a fix working;
+   the metric swings 48-59 on its own and `58` predated the deploy. **Establish
+   variance before attributing a delta.**
+
+**The general rule:** an absence proves something only once you have shown the
+emitter RAN. Every watcher should count something adjacent that must be non-zero
+— `POLYMARKET_CATALOGUE 0` means nothing until `US_AUTH 1` proves the boot
+happened, and `no calibration line` means nothing until you count the
+projections-process lines. Build the discriminator into the watcher, not into
+the interpretation afterwards.
