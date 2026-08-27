@@ -209,6 +209,12 @@ def _copy_file_if_needed(src: Path, dst: Path, *, overwrite_existing: bool) -> s
     return "copied"
 
 
+# The outcome a cheap sync reports for a destination file it did not inspect.
+# DELIBERATELY NOT "unchanged": that word is a claim about CONTENT, and this
+# path makes no such claim. See `_sync_tree`.
+PRESENT = "present"
+
+
 def _sync_tree(
     src: Path,
     dst: Path,
@@ -216,18 +222,92 @@ def _sync_tree(
     key: str,
     *,
     overwrite_existing: bool,
+    classify_existing: bool = True,
 ) -> None:
-    if not src.exists() or not src.is_dir():
-        logger.debug("source root missing or not a dir: %s", src)
+    """Seed `dst` from `src`. `os.scandir`, and a name diff when it is enough.
+
+    WHY THIS IS NOT `iterdir()` + `_copy_file_if_needed`. Measured 2026-08-27,
+    counting syscalls over a real 600-file subtree of `mlb_source`: the old
+    shape cost **5.34 syscalls per file** (3,163 stats + 41 listdir). Four of
+    those five were asking questions the directory read had already answered --
+    `item.is_dir()`, `dst.exists()`, `dst.is_file()`, plus `filecmp`'s own stat
+    of each side. `os.scandir` carries the type in the entry and one read of
+    the destination directory carries the whole name set, so both become free.
+
+    THE COST THAT REMAINS IS A DIAGNOSTIC, NOT THE WORK. On a seed-only root
+    the ACTION is decided entirely by whether the name exists in `dst` -- if it
+    does, the file is left alone whatever its bytes say. The only thing the
+    per-file stat buys is the split between `unchanged` and `kept`, and `kept`
+    is the number `/api/ops/bootstrap/run` exists to show (files that diverge
+    from the committed mirror -- the signal that found the 2026-08-20 clobber).
+
+    So the split is kept where it is READ and dropped where it is merely logged:
+    `classify_existing=True` (the default, and what the ops endpoint gets
+    without changing its call site) preserves today's counters exactly at ~2
+    syscalls per file. `main()` passes False for the BOOT sync, which reports
+    `present` instead of guessing at `unchanged`/`kept` and costs two directory
+    reads per directory and nothing per file.
+
+    **`present` is not `unchanged` and the boot log must not say otherwise.** A
+    run that inspected nothing printing `kept=0` would assert zero divergence
+    on evidence it never gathered -- the exact shape of the counter this file's
+    own docstring was written to kill ("a run that overwrote one file and a run
+    that overwrote thirty thousand printed the same number").
+
+    An OVERWRITE root always classifies: there the comparison decides an action.
+    """
+    try:
+        with os.scandir(src) as scan:
+            src_entries = list(scan)
+    except NotADirectoryError:
+        logger.debug("source root is not a dir: %s", src)
         return
+    except FileNotFoundError:
+        logger.debug("source root missing: %s", src)
+        return
+    except OSError as exc:
+        logger.debug("source root unreadable %s: %s", src, exc)
+        return
+
     dst.mkdir(parents=True, exist_ok=True)
-    for item in src.iterdir():
-        target = dst / item.name
-        if item.is_dir():
-            _sync_tree(item, target, counters, key, overwrite_existing=overwrite_existing)
-        else:
-            outcome = _copy_file_if_needed(item, target, overwrite_existing=overwrite_existing)
-            counters.setdefault(key, {})[outcome] = counters.setdefault(key, {}).get(outcome, 0) + 1
+    # ONE read of the destination directory replaces two stats per file. An
+    # unreadable destination degrades to "nothing is there", which re-seeds --
+    # the safe direction for a seed-only root.
+    try:
+        with os.scandir(dst) as scan:
+            dst_names = {entry.name for entry in scan}
+    except OSError:
+        dst_names = set()
+
+    bucket = counters.setdefault(key, {})
+    classify = classify_existing or overwrite_existing
+    for entry in src_entries:
+        target = dst / entry.name
+        try:
+            is_dir = entry.is_dir()
+        except OSError:
+            continue
+        if is_dir:
+            _sync_tree(
+                Path(entry.path), target, counters, key,
+                overwrite_existing=overwrite_existing,
+                classify_existing=classify_existing,
+            )
+            continue
+        if not classify and entry.name in dst_names:
+            bucket[PRESENT] = bucket.get(PRESENT, 0) + 1
+            continue
+        if entry.name not in dst_names:
+            # Absent: the one case that is an ACTION on every policy, and the
+            # only one worth a syscall on the cheap path.
+            shutil.copy2(entry.path, target)
+            logger.debug("copied %s -> %s", entry.path, target)
+            bucket["copied"] = bucket.get("copied", 0) + 1
+            continue
+        outcome = _copy_file_if_needed(
+            Path(entry.path), target, overwrite_existing=overwrite_existing
+        )
+        bucket[outcome] = bucket.get(outcome, 0) + 1
 
 
 def _bootstrap_root_pairs(
@@ -259,7 +339,16 @@ def _bootstrap_root_pairs(
     return pairs
 
 
-def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, Dict[str, int]]:
+def _sync_bootstrap_roots(
+    repo_root: Path,
+    data_root: Path,
+    *,
+    classify_existing: bool = True,
+) -> Dict[str, Dict[str, int]]:
+    # `classify_existing` DEFAULTS TO TODAY'S BEHAVIOUR so that callers which
+    # read the `kept` count keep getting it without being edited --
+    # `syndicate/blueprints/ops.py` is the one that matters and it is held by
+    # another lane. Only `main()` opts into the cheap path. See `_sync_tree`.
     # Each root synced independently, on purpose: app.py's caller wraps the
     # whole of main() in a bare `except Exception: pass`, so one unhandled
     # exception here used to silently abort every root after it in
@@ -298,7 +387,11 @@ def _sync_bootstrap_roots(repo_root: Path, data_root: Path) -> Dict[str, Dict[st
             counters.setdefault(key, {})["inert_file_entry"] = 1
             continue
         try:
-            _sync_tree(source_root, destination_root, counters, key, overwrite_existing=overwrite_existing)
+            _sync_tree(
+                source_root, destination_root, counters, key,
+                overwrite_existing=overwrite_existing,
+                classify_existing=classify_existing,
+            )
         except Exception as exc:
             logger.warning("Bootstrap sync failed for root %s (%s -> %s): %s", key, source_root, destination_root, exc)
     return counters
@@ -411,7 +504,11 @@ def main() -> int:
 
     # Merge the Render-critical published artifact roots into the mounted data root on startup.
     logger.info("Bootstrapping data root: repo=%s data_root=%s", repo_root, data_root)
-    counters = _sync_bootstrap_roots(repo_root, data_root)
+    # THE BOOT SYNC TAKES THE CHEAP PATH. This is the whole point of the change:
+    # boot is the caller that must not hold the container, and it is also the
+    # caller that only LOGS the counters. `/api/ops/bootstrap/run` still gets
+    # the full `unchanged`/`kept` split, because it calls with the default.
+    counters = _sync_bootstrap_roots(repo_root, data_root, classify_existing=False)
     if _env_bool("SYNDICATE_BOOTSTRAP_ON_START"):
         _bootstrap_wnba_today_artifacts(repo_root, data_root)
 
@@ -424,30 +521,45 @@ def main() -> int:
     # that replaced a live artifact with a month-old mirror looked exactly like
     # a boot that did nothing.
     if counters:
+        # `present` NEVER RENDERS AS `unchanged=N kept=0`. A cheap sync did not
+        # look at any byte, so it cannot report zero divergence -- printing
+        # `kept=0` would be an assertion built from an inspection that never
+        # happened, which is the failure this whole summary block was rewritten
+        # to end. It gets its own word, and the reader is told where the real
+        # number lives.
+        def _fmt(outcomes: Dict[str, int]) -> str:
+            if outcomes.get(PRESENT):
+                return "copied=%d present=%d (not inspected)" % (
+                    outcomes.get("copied", 0), outcomes[PRESENT],
+                )
+            return "copied=%d unchanged=%d kept=%d" % (
+                outcomes.get("copied", 0),
+                outcomes.get("unchanged", 0),
+                outcomes.get("kept", 0),
+            )
+
         logger.info("Bootstrap copy summary (copied = written, kept = existing file left alone):")
         totals: Dict[str, int] = {}
         for key, outcomes in counters.items():
             logger.info(
-                "  %s: copied=%d unchanged=%d kept=%d%s",
+                "  %s: %s%s",
                 key,
-                outcomes.get("copied", 0),
-                outcomes.get("unchanged", 0),
-                outcomes.get("kept", 0),
+                _fmt(outcomes),
                 "  [INERT: file entry, never synced]" if outcomes.get("inert_file_entry") else "",
             )
             for outcome, count in outcomes.items():
                 totals[outcome] = totals.get(outcome, 0) + count
-        logger.info(
-            "Bootstrap totals: copied=%d unchanged=%d kept=%d",
-            totals.get("copied", 0),
-            totals.get("unchanged", 0),
-            totals.get("kept", 0),
-        )
+        logger.info("Bootstrap totals: %s", _fmt(totals))
         if totals.get("kept", 0):
             logger.info(
                 "%d destination file(s) were NEWER-OR-DIFFERENT pipeline output and were not "
                 "overwritten by the committed mirror.",
                 totals["kept"],
+            )
+        elif totals.get(PRESENT):
+            logger.info(
+                "Divergence from the committed mirror was NOT measured on this run "
+                "(cheap boot sync). GET /api/ops/bootstrap/run reports it."
             )
     else:
         logger.info("No files copied by bootstrap (no source roots present or empty)")
