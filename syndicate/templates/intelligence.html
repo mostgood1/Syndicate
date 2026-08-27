@@ -1716,7 +1716,25 @@
     if (itemState === "pregame") badges.push('<span class="board-badge board-badge--pregame">Pregame</span>');
     if (isSteamCandidate(item)) badges.push('<span class="board-badge board-badge--steam" title="Steam move: a sharp, fast line/price move detected by the odds tracker">⚡ Steam</span>');
     if (confidence !== null && confidence >= 0.7) badges.push('<span class="board-badge board-badge--confidence">High confidence</span>');
-    const sport = String(item.sport || item.sport_slug || "").trim().toUpperCase();
+    const sport = rowSportLabel(item);
+    // THE ATTRIBUTE IS NOT THE LABEL, AND IT MUST NOT BECOME ONE.
+    // `data-syndicate-sport` is read by `bet_slip.js:174` and
+    // `watchlist.js:129` and POSTed as a bet's `sport`
+    // (`bet_slip.js:254,271`) -- an identifier, not a caption. Every other
+    // producer already writes the SLUG uppercased (`market_board.js:463,587`).
+    //
+    // It was fed `item.sport` here, so a bet added from a La Liga steam or prop
+    // card would have been recorded as `sport: "LA LIGA"` -- a value no
+    // sport-keyed consumer matches. A LIVE HAZARD, NOT AN OBSERVED
+    // CORRUPTION: checked 2026-08-27, `/portfolio` contains MLB, NCAAF, NFL,
+    // SOCCER and WNBA and no league string at all, so nothing has been written
+    // that way yet. It needed someone to slip a card during the window those
+    // rows are on the board, which is minutes at a time.
+    //
+    // Split from the visible label rather than left alone, because
+    // `rowSportLabel` above would otherwise have widened the hazard from the
+    // handful of already-league-labelled rows to EVERY soccer row.
+    const sportAttr = String(item.sport_slug || item.sport || "").trim().toUpperCase();
     const market = String(item.market || item.market_label || "").trim();
     // A game-total/spread pick has no team side (the backend correctly
     // sends the placeholder "—" for `team`/`team_name`/`player_team"` on
@@ -1737,7 +1755,7 @@
     })();
 
     return `
-      <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(String(item.odds ?? item.odds_current ?? ""))}" data-syndicate-prop-line="${escapeHtml(prop || "")}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}">
+      <article class="board-card board-card--tier-${tier}" data-syndicate-question="${escapeHtml(item.question || "")}" data-syndicate-sport="${escapeHtml(sportAttr)}" data-syndicate-sport-slug="${escapeHtml(item.sport_slug || "")}" data-syndicate-market="${escapeHtml(market)}" data-syndicate-candidate-type="${escapeHtml(item.candidate_type || item.type || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-matchup="${escapeHtml(displayMatchup(item) || "")}" data-syndicate-player-name="${escapeHtml(item.player_name || "")}" data-syndicate-name="${escapeHtml(title)}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(String(item.odds ?? item.odds_current ?? ""))}" data-syndicate-prop-line="${escapeHtml(prop || "")}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}">
         <div class="board-card__head">
           <div class="board-card__head-id">
             ${playerHeadshotUrl(item) ? `<img class="board-card__headshot" src="${escapeHtml(playerHeadshotUrl(item))}" alt="" loading="lazy" />` : ""}
@@ -2067,6 +2085,50 @@
   function cardSportLabel(game, chip) {
     const league = chip ? String(chip.league_display || "").trim() : "";
     return league || String((game && game.sport) || "");
+  }
+
+  // THE SAME LABEL, ONE SURFACE DOWN. `#590` fixed the rail card's head; the
+  // board CARD SUBTITLE (`board-card__subtitle`) still read the per-ROW
+  // `item.sport`, so on a slate carrying both soccer row families one card read
+  // `LA LIGA` and the card beside it read `SOCCER` -- the same reported mix, in
+  // the opportunities list instead of the strip. Measured 2026-08-27: 7 rows
+  // `la liga` against 481 `soccer` at 19:5xZ, and 0 against 483 twenty minutes
+  // later once the steam/prop rows drained, which is why it reads clean at any
+  // given moment and is still wrong.
+  //
+  // A ROW IS JOINED WITH `chipForGame`, NOT WITH A SECOND LOOKUP. `gameKey`
+  // already builds a row's key and a row carries the same `sport_slug`, ids,
+  // matchup and `away_key`/`home_key` the rail's groups are built from -- so the
+  // row is shaped into the minimal group `chipForGame` expects rather than
+  // growing a parallel join that would be free to drift from it. That drift is
+  // exactly what `#589` was: two functions reading the same two fields with
+  // opposite precedence.
+  //
+  // UPPER-CASED HERE, unlike `cardSportLabel`. `.board-card__subtitle` has NO
+  // `text-transform` (`board_cards.css:403`), so this line is uppercased in JS
+  // today -- returning "La Liga" raw would put mixed case next to "MLB" and
+  // "WNBA". The rail's head IS css-uppercased, so both surfaces land on
+  // "LA LIGA" from different routes.
+  //
+  // Before chips load this returns the fallback and the subtitle flips once
+  // when `loadGameChips` calls `renderBoardBody`. Deliberately NOT skeletoned
+  // the way the rail is: that guard exists because a card's whole SHAPE changed
+  // (scores appearing), and a one-word text swap on soccer rows does not earn
+  // the same machinery.
+  function rowSportLabel(item) {
+    const fallback = String((item && (item.sport || item.sport_slug)) || "").trim().toUpperCase();
+    const key = gameKey(item);
+    if (!key) return fallback;
+    const chip = chipForGame({
+      key,
+      sportSlug: String((item.sport_slug || item.sport) || "").trim().toLowerCase(),
+      sport: fallback,
+      matchup: displayMatchup(item) || "",
+      awayKey: String(item.away_key || "").trim().toLowerCase() || null,
+      homeKey: String(item.home_key || "").trim().toLowerCase() || null,
+    });
+    const league = chip ? String(chip.league_display || "").trim() : "";
+    return league ? league.toUpperCase() : fallback;
   }
 
   function chipTeamRow(side, chip) {
@@ -3013,7 +3075,12 @@
               const movementHtml = renderMovement(item);
               const reasoning = pickReasoning(item);
               const matchup = displayMatchup(item);
-              const sport = String(item.sport || item.sport_slug || "").trim().toUpperCase();
+              // Blotter rows render no sport text -- this feeds ONLY
+              // `data-syndicate-sport` below, which `bet_slip.js` POSTs as a
+              // bet's `sport`. Slug-derived for the same reason as the board
+              // card's `sportAttr`: it is an identifier, not a caption, and
+              // `item.sport` is the league on soccer's steam and prop rows.
+              const sport = String(item.sport_slug || item.sport || "").trim().toUpperCase();
               const title = displayTitle(item);
               const propText = propLine(item) || "";
               const oddsText = String(item.odds ?? item.odds_current ?? "");

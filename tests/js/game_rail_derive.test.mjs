@@ -77,7 +77,7 @@ const recommendationState = (i) => i.market_state || 'pregame';
 // populated. `getMergeMap` closes over the parameter binding, so it sees what
 // the function actually built.
 const fn = new Function('state','gameChipsById','gameChipsByMatchup','gameChipsByCanonical','gameChipsByMatchupLoose','gameKeyMergeMap','gameKey','displayMatchup','recommendationState',
-  src + '; return { deriveGameCards, chipForGame, cardSportLabel: typeof cardSportLabel === "function" ? cardSportLabel : null, getMergeMap: () => gameKeyMergeMap };');
+  src + '; return { deriveGameCards, chipForGame, cardSportLabel: typeof cardSportLabel === "function" ? cardSportLabel : null, rowSportLabel: typeof rowSportLabel === "function" ? rowSportLabel : null, getMergeMap: () => gameKeyMergeMap };');
 const built = fn(state,gameChipsById,gameChipsByMatchup,gameChipsByCanonical,gameChipsByMatchupLoose,gameKeyMergeMap,gameKey,displayMatchup,recommendationState);
 const deriveGameCards = built.deriveGameCards;
 const chipForGame = built.chipForGame;
@@ -383,12 +383,12 @@ state.date = '2026-08-27';
 state.sport = 'all';
 
 // 401882921 ATH @ BAR, kickoff 19:00Z = 2:00P CT on the 27th.
-const barChip = {sport:'soccer', game_key:'401882921', matchup:'ATH @ BAR', state:'live',
+const barChip = {sport:'soccer', game_key:'401882921', matchup:'ATH @ BAR', state:'live', league:'la_liga', league_display:'La Liga',
                  start_time_utc:'2026-08-27T19:00:00Z',
                  away:{abbr:'ATH',name:'Athletic Club',key:'athletic club'},
                  home:{abbr:'BAR',name:'Barcelona',key:'barcelona'}};
 // 401882924 OSA @ CEL, kickoff 18:30Z = 1:30P CT on the 27th.
-const celChip = {sport:'soccer', game_key:'401882924', matchup:'OSA @ CEL', state:'live',
+const celChip = {sport:'soccer', game_key:'401882924', matchup:'OSA @ CEL', state:'live', league:'la_liga', league_display:'La Liga',
                  start_time_utc:'2026-08-27T18:30:00Z',
                  away:{abbr:'OSA',name:'Osasuna',key:'osasuna'},
                  home:{abbr:'CEL',name:'Celta Vigo',key:'celta vigo'}};
@@ -506,3 +506,59 @@ console.log('ASSERT no chip falls back to the sport    :',
 // pinned: the day it does, a card must not go blank.
 console.log('ASSERT a blank league is treated as absent:',
   cardSportLabel({sport:'SOCCER'}, {...laLigaChip, league_display:'   '}) === 'SOCCER' ? 'PASS' : 'FAIL');
+
+// --------------------------------------------------------------------------
+// THE BOARD CARD SUBTITLE, one surface below the rail.
+//
+// `#590` fixed the rail card's head. The card SUBTITLE still read the per-ROW
+// `item.sport`, so on a slate carrying both soccer row families one card read
+// `LA LIGA` and the card beside it read `SOCCER` -- the same reported mix, in
+// the opportunities list instead of the strip. Measured 2026-08-27: 7 rows
+// `la liga` against 481 `soccer` at 19:5xZ, and 0 against 483 twenty minutes
+// later once the steam/prop rows drained off the board.
+//
+// UPPER-CASED, unlike the rail's head. `.board-card__subtitle` carries no
+// `text-transform` (`board_cards.css:403`) and this line is uppercased in JS
+// today, so a raw "La Liga" would sit in mixed case beside "MLB" and "WNBA".
+//
+// THIS SECTION DISCRIMINATES: the first two fail against the pre-change
+// template. The rest are narrowness guards and pass in both states.
+// --------------------------------------------------------------------------
+const rowSportLabel = built.rowSportLabel
+  || ((item) => String((item && (item.sport || item.sport_slug)) || '').trim().toUpperCase());
+
+resetChips();
+seatSoccerChip(celChip, 'Osasuna', 'Celta Vigo', 'osasuna', 'celta vigo');
+const mlbRowChip = mkChip('mlb', '824894', 'WSH', 'ATL', 'live', '2026-08-27T23:00:00Z');
+seatChip(mlbRowChip, 'Washington Nationals', 'Atlanta Braves');
+
+// The two soccer row families for ONE game, exactly as production serves them.
+const SHORTLIST_ROW = {sport:'soccer', sport_slug:'soccer',
+                       event_id:'0b765da573acccbad3b07923f279c567',
+                       matchup:'CA Osasuna @ Celta Vigo', market_state:'live',
+                       away_key:'osasuna', home_key:'celta vigo'};
+const STEAM_ROW     = {sport:'la liga', sport_slug:'soccer', event_id:'401882924',
+                       matchup:'Osasuna @ Celta Vigo', market_state:'live'};
+const MLB_ROW       = {sport:'mlb', sport_slug:'mlb', event_id:'824894',
+                       matchup:'WSH @ ATL', market_state:'live'};
+
+console.log();
+console.log('row labels ->',
+  `shortlist=${rowSportLabel(SHORTLIST_ROW)} steam=${rowSportLabel(STEAM_ROW)} mlb=${rowSportLabel(MLB_ROW)}`);
+// The report, stated as an equality: two rows for one game must not disagree.
+console.log('ASSERT the two row families AGREE        :',
+  rowSportLabel(SHORTLIST_ROW) === rowSportLabel(STEAM_ROW) ? 'PASS' : 'FAIL');
+console.log('ASSERT ...and both name the LEAGUE       :',
+  rowSportLabel(SHORTLIST_ROW) === 'LA LIGA' ? 'PASS' : 'FAIL');
+// NARROWNESS 1: a sport whose chip carries no league is untouched.
+console.log('ASSERT an mlb row is unchanged           :',
+  rowSportLabel(MLB_ROW) === 'MLB' ? 'PASS' : 'FAIL');
+// NARROWNESS 2: a row that resolves NO chip keeps its own sport. This is the
+// inert-fix case -- if row->chip resolution silently failed, EVERY row would
+// take this branch and the fix would do nothing while still passing a
+// "no bare label" check, so the production replay prints a resolve COUNT.
+console.log('ASSERT an unjoinable row keeps its sport :',
+  rowSportLabel({sport:'ncaaf', sport_slug:'ncaaf', event_id:'nope', matchup:'AAA @ BBB'}) === 'NCAAF' ? 'PASS' : 'FAIL');
+// NARROWNESS 3: a row with no id AND no matchup has no key at all.
+console.log('ASSERT a keyless row does not throw      :',
+  rowSportLabel({sport:'nfl', sport_slug:'nfl'}) === 'NFL' ? 'PASS' : 'FAIL');

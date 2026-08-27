@@ -66,7 +66,7 @@ let gameKeyMergeMap = new Map();
 const recommendationState = () => 'pregame';
 
 const fn = new Function('state','gameChipsById','gameChipsByMatchup','gameChipsByCanonical','gameChipsByMatchupLoose','gameKeyMergeMap','recommendationState',
-  src + '; return { deriveGameCards, chipForGame, cardSportLabel: typeof cardSportLabel === "function" ? cardSportLabel : null, normalizeClubName };');
+  src + '; return { deriveGameCards, chipForGame, cardSportLabel: typeof cardSportLabel === "function" ? cardSportLabel : null, rowSportLabel: typeof rowSportLabel === "function" ? rowSportLabel : null, normalizeClubName };');
 const built = fn(state,gameChipsById,gameChipsByMatchup,gameChipsByCanonical,gameChipsByMatchupLoose,gameKeyMergeMap,recommendationState);
 
 // Index the chips exactly as loadGameChips() does, collision removal included.
@@ -176,6 +176,56 @@ for (const c of cards) {
 }
 console.log(`  cards whose chip CARRIES a league: ${leagueCarryingChips}`);
 console.log(`  ...of those, still showing the BARE SPORT: ${leagueAvailableButUnused}`);
+
+// THE BOARD CARD SUBTITLE, which is a per-ROW label, not a per-card one.
+// Same defect one surface down; see `rowSportLabel` in the template.
+//
+// THE RESOLVE COUNT IS THE FALSIFICATION GUARD, and it is not decoration. The
+// fix works by joining a ROW to a chip. If that join silently failed -- wrong id
+// space, missing `away_key`/`home_key` -- every row would fall back to
+// `item.sport` and the fix would be INERT, while a "no bare label" check still
+// read clean, because the league-labelled rows drain off the board within
+// minutes anyway. "0 bare labels" is only meaningful next to "and N rows
+// actually resolved a chip that carries a league".
+const rowLabelOf = built.rowSportLabel
+  ? (it) => built.rowSportLabel(it)
+  : (it) => String((it && (it.sport || it.sport_slug)) || '').trim().toUpperCase();
+const rowLabels = new Map();
+let rowsJoinedToLeague = 0;
+let rowsBareDespiteLeague = 0;
+for (const it of items) {
+  const slug = String((it.sport_slug || it.sport) || '').trim().toLowerCase();
+  if (!rowLabels.has(slug)) rowLabels.set(slug, new Map());
+  const l = rowLabelOf(it) || '(blank)';
+  const m = rowLabels.get(slug);
+  m.set(l, (m.get(l) || 0) + 1);
+  // Did THIS row reach a league-carrying chip? Uses the script's own join, not
+  // the template's, for the same reason the duplicate detector does.
+  const key = (() => {
+    for (const f of ['game_id', 'gamePk', 'event_id']) {
+      const v = it[f];
+      if (v !== undefined && v !== null && String(v).trim() && String(v).trim() !== '-') return `${slug}|${String(v).trim()}`;
+    }
+    const mu = String(it.matchup || it.event_matchup || '').trim();
+    return mu ? `${slug}|${mu}` : null;
+  })();
+  if (!key) continue;
+  const chip = resolveChip({key, sport: slug, matchup: String(it.matchup || it.event_matchup || ''),
+                            awayKey: it.away_key, homeKey: it.home_key});
+  const league = chip ? String(chip.league_display || '').trim() : '';
+  if (!league) continue;
+  rowsJoinedToLeague += 1;
+  if (l.toLowerCase() === slug) rowsBareDespiteLeague += 1;
+}
+console.log();
+console.log(`board-card SUBTITLE labels per sport (${built.rowSportLabel ? 'via rowSportLabel' : 'via item.sport -- PRE-CHANGE template'}):`);
+for (const [slug, m] of [...rowLabels].sort()) {
+  const shown = [...m].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${l}=${n}`).join(' ');
+  const bare = [...m.keys()].filter((l) => l.toLowerCase() === slug);
+  console.log(`  ${slug.padEnd(8)} ${m.size} label(s)${bare.length && m.size > 1 ? '  <-- MIXED' : ''}: ${shown}`);
+}
+console.log(`  rows that JOIN a league-carrying chip: ${rowsJoinedToLeague}   <-- 0 here means the fix is INERT, not that it worked`);
+console.log(`  ...of those, still labelled the BARE SPORT: ${rowsBareDespiteLeague}`);
 
 // A duplicate is two cards naming one real game.
 //

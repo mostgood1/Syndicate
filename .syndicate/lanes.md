@@ -2172,6 +2172,36 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   labels byte-identical on both sides.
 - Blocked by: none.
 
+### board-card-league-label — OPEN — opened 2026-08-27 — session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d
+- Goal: the board CARD SUBTITLE names the same thing the rail card above it
+  does. `#590` fixed the rail by going to the chip; the subtitle still reads the
+  per-ROW `item.sport`, so on a slate carrying both soccer row families one
+  card reads `LA LIGA` and its neighbour reads `SOCCER`.
+  **Testable outcome:** over one payload, the set of subtitle labels for a
+  sport contains no bare sport label while that sport's chips carry a league.
+- Files: `syndicate/templates/intelligence.html` (the card-subtitle label and
+  its row->chip lookup only), `tests/js/game_rail_derive.test.mjs`,
+  `tests/js/game_rail_production_replay.mjs`.
+- Hypothesis: this needs NO new data and NO backend change. The chip index is
+  already loaded on this page for the rail, and `gameKey`/`chipForGame` already
+  resolve a row to its chip — a row carries the same `sport_slug`, ids, matchup
+  and `away_key`/`home_key` the rail's groups are built from.
+- Falsification test: if board ROWS could not resolve a chip through
+  `chipForGame` — different id space, missing keys — the label would fall back
+  to `item.sport` and the fix would be inert, indistinguishable from doing
+  nothing. Must be shown as a COUNT of rows that resolve a chip, not as an
+  absence of the bare label (which is 0 right now for the unrelated reason that
+  the league-labelled rows drained off the board at 20:0xZ).
+- **Deliberately NOT claimed:** `pipeline/layer2_shortlist.py`. Stamping
+  `league_display` on shortlist rows is the root fix and it is held by OPEN lane
+  `venue-quote-line-join`. This does the join client-side instead, from data the
+  page already has.
+- Verification: A/B on one production payload via
+  `game_rail_production_replay.mjs`, against the SERVED page. Control must show
+  the bare sport label on rows whose chip carries a league; after, zero — with
+  the resolve COUNT printed both sides so an inert fix cannot pass.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

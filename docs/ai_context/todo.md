@@ -1,5 +1,67 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#591` — **The board card SUBTITLE still read the per-ROW sport, so `#590`'s fix stopped at the rail — and the same field was being POSTed as a bet's sport.** — lane `board-card-league-label`, 2026-08-27, found by checking the other sports — **FIXED AND MEASURED ON THE PRODUCTION PAYLOAD; DEPLOY VERIFICATION OWED**
+
+`#590` fixed the rail card's head by going to the chip. `board-card__subtitle`
+([intelligence.html:1746]) still rendered `item.sport` per ROW, so on a slate
+carrying both soccer row families one card read `LA LIGA` and its neighbour read
+`SOCCER` — the same reported mix, in the opportunities list instead of the strip.
+
+`rowSportLabel(item)` shapes the row into the minimal group `chipForGame`
+already expects (`gameKey` builds the key; a row carries the same `sport_slug`,
+ids, matchup and `away_key`/`home_key` the rail's groups do) rather than growing
+a second join — two functions reading the same fields with different rules is
+precisely what `#589` was. Upper-cased here, unlike the rail: the subtitle has
+no `text-transform`, so a raw "La Liga" would sit in mixed case beside "MLB".
+
+**A/B on one production payload, control = the SERVED bytes of `0e964af8`:**
+
+| | control | fixed |
+|---|---|---|
+| soccer subtitles (19:5x) | **`SOCCER=481  LA LIGA=7`** | `EPL=121 LA LIGA=91 SERIE A=80 BUNDESLIGA=60 LIGUE 1=41 MLS=41 CHAMPIONSHIP=20 EREDIVISIE=15 PRIMEIRA LIGA=10 BELGIAN PRO LEAGUE=9` |
+| soccer subtitles (20:0x) | `SOCCER=483` | 10 leagues |
+| rows joining a league-carrying chip | 488 / 483 | **same** |
+| ...of those, still bare | **481 / 483** | **0 / 0** |
+| mlb / ncaaf / nfl / wnba | `337 / 42 / 103 / 763` | **identical** |
+
+**THE RESOLVE COUNT IS THE FALSIFICATION GUARD AND IT ALREADY EARNED ITSELF.**
+The fix works by joining a ROW to a chip; if that join failed silently every row
+would fall back and the fix would be INERT while a "no bare label" check still
+read clean. And the mixed-label flag IS blind on the 20:0x payload — control
+reads a uniform `SOCCER=483`, flag 0, defect intact — exactly the way `#590`'s
+first metric went blind. `bare despite an available league` catches all 483.
+
+**SECOND DEFECT, FOUND WHILE FIXING THE FIRST, AND IT IS NOT COSMETIC.**
+`data-syndicate-sport` was fed the same `item.sport`. `bet_slip.js:174` and
+`watchlist.js:129` read that attribute and `bet_slip.js:254,271` POST it as a
+bet's `sport` — an identifier, not a caption; every other producer writes the
+slug uppercased (`market_board.js:463,587`). A bet slipped from a La Liga steam
+or prop card would have been recorded as `sport: "LA LIGA"`, which no
+sport-keyed consumer matches.
+
+**A LIVE HAZARD, NOT AN OBSERVED CORRUPTION** — measured: `/portfolio` contains
+MLB, NCAAF, NFL, SOCCER and WNBA and **no league string at all**, so nothing has
+been written that way. It needed someone to slip one of those rows during the
+minutes they are on the board. Both attribute sites now take a slug-derived
+`sportAttr`; the blotter's `sport` (line 3078) feeds only that attribute and
+moved with it. Left unsplit, `rowSportLabel` would have WIDENED the hazard from
+7 rows to every soccer row.
+
+**NOT taken:** `pipeline/layer2_shortlist.py`. Stamping `league_display` on
+shortlist rows is the root fix and the file is held by OPEN lane
+`venue-quote-line-join`; this joins client-side from data the page already has.
+
+**A fixture caught doing the thing this session keeps finding.** The first run of
+the new assertions failed because `celChip` carried no `league_display` — the
+fixture could not express the property under test. Both La Liga fixtures now
+carry it, as production does.
+
+6 new assertions (36 total): the 2 league ones fail against the pre-change
+template; the 4 narrowness ones — league-less chip, unjoinable row, keyless row,
+mlb unchanged — pass in both states.
+
+**OWED:** the served board showing one label per soccer game's rows.
+
 ### `#590` — **The Games rail's card-head label was a fact about which ROW arrived first, not about the game: `SOCCER` and `LA LIGA` side by side on one slate.** — lane `rail-league-label`, 2026-08-27, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T20:07:37Z** (web `0e964af8`)
 
 The tail of `#589`. Three sources fed one label and which you got was an
