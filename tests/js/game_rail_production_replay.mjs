@@ -27,9 +27,20 @@ import { fileURLToPath } from 'url';
 const dir = process.argv[2];
 if (!dir) { console.error('usage: node game_rail_production_replay.mjs <payload-dir>'); process.exit(2); }
 
+// SYNDICATE_TEMPLATE_HTML points this at the SERVED page instead of the local
+// checkout -- which is the only way to verify a deploy rather than a file:
+//
+//   curl -s https://<web>/intelligence -o served.html
+//   SYNDICATE_TEMPLATE_HTML=served.html node tests/js/game_rail_production_replay.mjs <dir>
+//
+// The rendered page carries these functions verbatim (they sit in a static
+// <script> block, no Jinja inside them), so the extraction below is identical.
 const here = path.dirname(fileURLToPath(import.meta.url));
-const template = path.resolve(here, '../../syndicate/templates/intelligence.html');
-const html = fs.readFileSync(template, 'utf8');
+const template = process.env.SYNDICATE_TEMPLATE_HTML
+  ? path.resolve(process.env.SYNDICATE_TEMPLATE_HTML)
+  : path.resolve(here, '../../syndicate/templates/intelligence.html');
+const html = fs.readFileSync(template, 'utf8').split('\r\n').join('\n');
+console.log(`template: ${template}`);
 function slice(a, b) {
   const i = html.indexOf(a), j = html.indexOf(b, i + 1);
   if (i < 0 || j < 0 || j <= i) throw new Error(`slice ${a} .. ${b} not found`);

@@ -868,7 +868,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   converts a degraded path into an outage.
 
 
-### layer2-rail-duplicate-nfl-cards — OPEN, **RE-ADOPTED 2026-08-27 by session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d — `#589` IS THE SAME DEFECT IN SOCCER, AND IT DISCHARGES THE BEHAVIOURAL READ THIS LANE HAS OWED SINCE 2026-08-20.** Previously **ADOPTED 2026-08-26 by session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272, which ARCHIVED 2026-08-27 — so this lane is UNOWNED again. `#583` is FIXED, DEPLOYED and VERIFIED (web `b0ef00b8`, Today NFL 0 / All NFL 16). The INHERITED behavioural read is still owed and was never discharged.** (was UNOWNED; opening session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT, nothing held, all deploy claims released) — **`#583` NOW ALSO IN SCOPE: the rail's date filter never applied to candidate-backed games. THE ORIGINAL BEHAVIOURAL READ IS STILL OWED AND IS NOT DISCHARGED BY THE ADOPTION.** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
+### layer2-rail-duplicate-nfl-cards — OPEN, **RE-ADOPTED 2026-08-27 by session 17decff4-a7f1-4372-8a7f-bcbbaa172d4d — `#589` IS THE SAME DEFECT IN SOCCER, FIXED AND VERIFIED IN PRODUCTION 2026-08-27T19:41:04Z (web `78a95c7f`), AND IT DISCHARGES THE BEHAVIOURAL READ THIS LANE HAS OWED SINCE 2026-08-20. Claim released; nothing owed on `#589`.** Previously **ADOPTED 2026-08-26 by session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272, which ARCHIVED 2026-08-27 — so this lane is UNOWNED again. `#583` is FIXED, DEPLOYED and VERIFIED (web `b0ef00b8`, Today NFL 0 / All NFL 16). The INHERITED behavioural read is still owed and was never discharged.** (was UNOWNED; opening session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT, nothing held, all deploy claims released) — **`#583` NOW ALSO IN SCOPE: the rail's date filter never applied to candidate-backed games. THE ORIGINAL BEHAVIOURAL READ IS STILL OWED AND IS NOT DISCHARGED BY THE ADOPTION.** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
 - Goal: today's NFL preseason games appear ONCE each on the Layer 2 compact
   game-card rail, not twice. **Testable outcome:** each game seats exactly one
   mini card, and clicking it filters the board to ALL that game's rows (both
@@ -985,8 +985,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `league_display`) — cosmetic, pre-existing, not reported. Still chip-less and
   unrelated to duplication: 8 NCAAF cards (that sport publishes **0** chips) and
   2 WNBA games absent from the chip feed.
-- **OWED for `#589`:** the served rail on production showing one card per
-  La Liga game.
+- **`#589` VERIFIED IN PRODUCTION 19:47Z, and the CONTROL is the reading.** Web
+  live `78a95c7f` at `19:41:04.159287Z`. A/B over ONE payload (238 chips / 1,733
+  rows) run BOTH ways: the SERVED page 248 cards / **0** chips seating more than
+  one card; the pre-fix bytes `7dd4ce07` **250 / 2** on that same payload, still
+  naming `ATH @ BAR` and `OSA @ CEL`. mlb 7 / nfl 16 / ncaaf 8 / wnba 4 identical
+  both sides. Verified against the SERVED template, not the checkout
+  (`SYNDICATE_TEMPLATE_HTML`), so it verifies the DEPLOY. `deploys.md`.
 ### wnba-halftime-elapsed — **OPEN, UNOWNED** `[session 1f76348c ARCHIVED 2026-08-21 ~16:1xZ]` — **ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) and on the workers (`3b41696d` is an ancestor of refresh-worker's SHA). Unit-verified both directions: 3 break tests FAIL pre-fix, 2 narrowness tests PASS in both states. **THE BREAK BEHAVIOUR ITSELF IS UNOBSERVED IN PRODUCTION** — a 20-minute watcher caught no blank-clock state, and the one suggestive reading (a board row at 'End of 1st' keeping a live lane at model 0.2155 vs its 0.27 pregame baseline) was INDIRECT, via the board. Next WNBA break discharges it. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: the live win/cover probability must keep using the live margin during a
   BETWEEN-PERIODS break, instead of silently reverting to the pregame number.

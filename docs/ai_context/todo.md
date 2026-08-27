@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#589` — **Soccer games were duplicated on the Games rail: the chip join keyed on the DISPLAY sport, and La Liga rows carry `sport: "la liga"`.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-27, user report — **FIXED AND MEASURED ON THE PRODUCTION PAYLOAD; DEPLOY VERIFICATION OWED**
+### `#589` — **Soccer games were duplicated on the Games rail: the chip join keyed on the DISPLAY sport, and La Liga rows carry `sport: "la liga"`.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-27, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T19:41:04Z** (web `78a95c7f`)
 
 Every chip index in `loadGameChips` is keyed on `chip.sport`, the SLUG
 (`"soccer"`). `chipForGame` keyed its three TEXT lookups on `group.sport`, which
@@ -73,7 +73,7 @@ the pre-change template, reproducing `"ATH @ BAR | ATH @ BAR"` exactly.
 still chip-less and unrelated: 8 NCAAF cards (that sport publishes **0** chips)
 and 2 WNBA games absent from the chip feed — neither duplicates anything.
 
-**OWED:** the served rail on production showing one card per La Liga game.
+**DISCHARGED 19:47Z.** A/B on ONE payload (238 chips / 1,733 rows), the SERVED page vs the pre-fix bytes: 248 cards / 0 chips seating more than one card, against 250 / 2. mlb 7 / nfl 16 / ncaaf 8 / wnba 4 identical both sides. The CONTROL run is the point -- it still reproduces the defect on that same payload, so the 0 is a fix and not a retired test case (`learnings.md` 2026-08-20). `.syndicate/deploys.md`.
 
 ### `#588` — **Every lined OddsAPI venue quote was published without its line, so spreads and totals could never match the board.** — lane `venue-quote-line-join`, 2026-08-27 — **FIXED; PRODUCTION VERIFICATION OWED**
 

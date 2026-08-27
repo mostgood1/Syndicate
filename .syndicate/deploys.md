@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-08-27 — web `78a95c7f`: the rail's chip join read the LEAGUE, so La Liga games seated twice (`#589`)
+
+**Deployed:** `dep-da8942gn74is739tler0`, triggered `19:37:46Z`, live
+`19:41:04.159287Z`. Claim `web` held by `layer2-rail-duplicate-nfl-cards`,
+acquired `19:37:19Z`, token `f1c5a517…`, released after this row. Preflight
+`CLEAR` at `19:37:30Z` for this exact SHA, on `origin/main`, only
+infrastructure processes. Web moved `0365f802 → 78a95c7f`, so it also picked up
+the intervening main commits from other lanes; refresh-worker was left on
+`7dd4ce07` and live-odds-worker on `a6f9d330` — neither serves this template.
+
+**verify: MET `19:47Z`. THE READING IS AN A/B ON ONE PAYLOAD, RUN BOTH
+DIRECTIONS, AND THE CONTROL STILL READS UNHEALTHY.**
+
+`tests/js/game_rail_production_replay.mjs` extracts the real `chipForGame` /
+`deriveGameCards` and runs them over `/api/board/game-chips` +
+`/api/intelligence/query`. Pointed at the **SERVED** page
+(`SYNDICATE_TEMPLATE_HTML=served.html`, `curl /intelligence`), not at the local
+checkout — so this verifies the deploy, not a file. One payload, 238 chips /
+1,733 rows, fetched once and used for both runs:
+
+```
+SERVED  78a95c7f   248 cards   chips seating >1 card: 0   chip-less 10   exit 0
+CONTROL 7dd4ce07   250 cards   chips seating >1 card: 2   chip-less 12   exit 1
+  soccer ATH @ BAR (401882921) -> [LA LIGA "ATH @ BAR" n=6] + [LA LIGA "Athletic Club @ Barcelona" n=2]
+  soccer OSA @ CEL (401882924) -> [LA LIGA "OSA @ CEL" n=4] + [LA LIGA "Osasuna @ Celta Vigo" n=1]
+```
+
+mlb 7 / nfl 16 / ncaaf 8 / wnba 4 identical on both sides. The `la liga` bucket
+(4 cards, 2 chip-less) exists only in the control. Served bytes confirmed
+independently: `sportSlug` appears 9× in the fetched `/intelligence`.
+
+**WHY THE CONTROL RUN IS THE ROW, NOT A FORMALITY.** `2026-08-20` in
+`learnings.md`: the NFL version of this defect was verified by a census that
+returned 0 — and would have returned 0 with the fix reverted, because the slate
+had retired the test case. A 0 here means "fixed" only because the pre-fix bytes
+reproduce it on the SAME payload at the SAME instant. They do.
+
+**THE INSTRUMENT WAS WRONG FIRST AND IT READ HEALTHY.** The detector originally
+grouped cards by the chip `chipForGame` resolved — the code under test, which in
+the control returns null for exactly the duplicated cards. It reported **0
+duplicates in BOTH states**: a clean bill of health manufactured by the defect.
+It now joins on the slug taken from `group.key`, which the defect cannot touch.
+The first version of this row would have been wrong and would have looked right.
+
+**Still owed on this lane:** nothing for `#589`. Unrelated and pre-existing: 8
+NCAAF chip-less cards (that sport publishes **0** chips) and 2 WNBA games absent
+from the chip feed — measured, neither duplicates anything.
+
 ## 2026-08-26 — refresh-worker `f9f7cb6e7`: the pre-cap histogram, which refuted the change it was built to justify
 
 **Deployed:** `dep-da74r49srm7s73fde360`, live `02:23:47Z`, superseded by
