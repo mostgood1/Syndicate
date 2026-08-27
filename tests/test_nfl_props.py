@@ -17,9 +17,21 @@ class NflPropsTests(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.nfl_root = os.path.join(self._tmp.name, "nfl_source")
         os.makedirs(self.nfl_root, exist_ok=True)
-        self._root_patch = patch.object(props, "default_nfl_source_root", return_value=Path(self.nfl_root))
-        self._root_patch.start()
-        self.addCleanup(self._root_patch.stop)
+        # `#441`: props no longer resolve their root through
+        # `default_nfl_source_root()` -- that probes for an UNRELATED artifact
+        # (`upcoming_recs_*.csv`) and on production selected the ephemeral
+        # checkout, where this CSV is tracked as a 5-byte header stub, over the
+        # mounted disk holding the real 42,753-byte capture. Point the REAL
+        # resolver at the temp root via its env var instead of patching a
+        # function the code has stopped calling: a mock of an uncalled function
+        # is green and proves nothing.
+        self._env_patch = patch.dict(
+            os.environ,
+            {"SYNDICATE_NFL_SOURCE_ROOT": self.nfl_root},
+        )
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
+        os.environ.pop("SYNDICATE_DATA_ROOT", None)
         # player_stats.resolve_player_id also resolves its own source root
         # (for the pbp file, a separate lookup from the props CSV above) --
         # must be patched too, or these tests would fall through to the

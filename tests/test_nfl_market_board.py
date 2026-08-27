@@ -339,10 +339,19 @@ class GameFromSmartsimProjectionBoardContractTests(unittest.TestCase):
         self.assertAlmostEqual(row["home_pct"], 61.2)
         self.assertAlmostEqual(row["away_pct"], 38.8)
 
-    def test_prop_recommendations_intentionally_left_unset(self) -> None:
-        # See the comment in _game_from_smartsim_projection: no real
-        # home/away team-side attribution exists for NFL player props here,
-        # so this must not be forced/fabricated.
+    def test_prop_recommendations_absent_when_no_capture_backs_them(self) -> None:
+        # RENAMED, and the reason changed with it. This used to pin "NFL cards
+        # never set prop_recommendations", because no real home/away team-side
+        # attribution existed for NFL player props. They are attached now --
+        # joined against the published roster snapshot, refusing any player
+        # whose team is not one of this game's two.
+        #
+        # What survives, and is what this test actually protects, is the
+        # card family's ABSENT-not-empty contract: with no props capture and no
+        # roster (this fixture has neither), the key must not appear at all. An
+        # empty dict would assert "considered, and there are none", which is a
+        # different and unsupported claim. The positive case is covered by
+        # tests/test_nfl_props_board.py.
         with patch("syndicate.features.nfl.cards._nfl_real_lines_for_matchup", return_value=None):
             game = _game_from_smartsim_projection(self._projection(), 2025, 10)
         self.assertNotIn("prop_recommendations", game)

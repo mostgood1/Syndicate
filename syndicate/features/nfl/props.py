@@ -27,7 +27,10 @@ from syndicate.features.nfl.game_context import favoured_by_delta, implied_total
 from syndicate.features.nfl.player_stats import anytime_td_rate, player_team_by_week
 from syndicate.features.nfl.player_stats import player_rate
 from syndicate.features.nfl.player_stats import resolve_player_id
-from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_source_roots
+from syndicate.features.nfl.sources import nfl_props_path
+from syndicate.features.nfl.sources import nfl_roster_snapshot_path
+from syndicate.features.football.features.team_identity import canonical_team_abbr
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.rank_board import build_rank_page_context
 
@@ -58,18 +61,30 @@ def nfl_props_available_weeks(season: int) -> list[int]:
     weeks are header-only stubs (see module docstring), so this is NOT
     the same as "every oddsapi_player_props_*.csv file that exists on
     disk"."""
-    import glob
     import re
 
-    pattern = str(default_nfl_source_root() / f"oddsapi_player_props_{season}_wk*.csv")
+    # `#441`: globbing ONE root -- and specifically the one
+    # `default_nfl_source_root()` picks by probing for `upcoming_recs_*.csv` --
+    # enumerated the ephemeral CHECKOUT. A week is only visible there if git
+    # happens to track a stub for it, so a week captured to the mounted disk
+    # after the last mirror refresh could never be listed, no matter how much
+    # real market it held. Union the candidate roots instead; the content check
+    # below is what decides, and `_nfl_raw_player_props` now resolves per file.
     weeks: list[int] = []
-    for path in glob.glob(pattern):
-        match = re.search(r"_wk(\d+)\.csv$", path)
-        if not match:
+    for root in nfl_source_roots():
+        try:
+            paths = list(root.glob(f"oddsapi_player_props_{season}_wk*.csv"))
+        except OSError:
             continue
-        week = int(match.group(1))
-        if _nfl_raw_player_props(season, week):
-            weeks.append(week)
+        for path in paths:
+            match = re.search(r"_wk(\d+)\.csv$", path.name)
+            if not match:
+                continue
+            week = int(match.group(1))
+            if week in weeks:
+                continue
+            if _nfl_raw_player_props(season, week):
+                weeks.append(week)
     return sorted(set(weeks))
 
 
@@ -78,7 +93,15 @@ def nfl_props_key(away_full_name: str, home_full_name: str) -> str:
 
 
 def _props_path(season: int, week: int) -> Path:
-    return default_nfl_source_root() / f"oddsapi_player_props_{season}_wk{week}.csv"
+    """`#441`, fourth call site -- see `nfl_props_path`'s docstring.
+
+    This used to be `default_nfl_source_root() / ...`, which resolves a root by
+    probing for the UNRELATED `upcoming_recs_*.csv` family. git ships 5 of those
+    and the mounted disk has none, so it always chose the ephemeral checkout --
+    where this same file is tracked as a 5-BYTE HEADER-ONLY STUB. The real
+    42,753-byte week-1 capture on the mounted disk was never read by anything.
+    """
+    return nfl_props_path(season, week)
 
 
 @lru_cache(maxsize=16)
@@ -92,6 +115,48 @@ def _nfl_raw_player_props(season: int, week: int) -> tuple[dict[str, Any], ...]:
     with path.open("r", encoding="utf-8", newline="") as handle:
         rows = tuple(row for row in csv.DictReader(handle) if row.get("player") and row.get("market"))
     return rows
+
+
+def _best_price_player_props(season: int, week: int) -> list[dict[str, Any]]:
+    """One row per selection, at the BEST price any book quoted.
+
+    THE COMPATIBILITY SEAM for the multi-book capture. The CSV now carries every
+    bookmaker (see `fetch_nfl_oddsapi_props_local.parse_events_to_rows`), which
+    is what price shopping needs -- but every consumer of
+    `nfl_props_rows_for_week` was written against a file that held exactly one
+    book, and would otherwise start counting the same bet once per book. The ROI
+    report's 64,007-bet denominator is the reading that would have moved most,
+    and a denominator that changes for a reason unrelated to the thing being
+    measured is how a model looks like it improved.
+
+    Best price is chosen PER SIDE independently: the book with the best `over`
+    is frequently not the book with the best `under`, and taking both from one
+    row would quietly re-impose the single-book choice this change removes.
+
+    Higher american odds pay more on the same stake on both sides of zero, so
+    `max` is correct without converting to decimal.
+    """
+    best: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in _nfl_raw_player_props(season, week):
+        player = str(row.get("player") or "").strip()
+        market = str(row.get("market") or "").strip()
+        if not player or not market:
+            continue
+        line = _safe_float(row.get("line"))
+        key = (player, market, "" if line is None else f"{line:g}")
+        current = best.get(key)
+        if current is None:
+            best[key] = dict(row)
+            continue
+        for side in ("over_price", "under_price"):
+            incoming = _safe_float(row.get(side))
+            if incoming is None:
+                continue
+            held = _safe_float(current.get(side))
+            if held is None or incoming > held:
+                current[side] = row.get(side)
+                current[f"{side}_book"] = row.get("book")
+    return list(best.values())
 
 
 def _safe_float(value: Any) -> float | None:
@@ -301,7 +366,7 @@ def nfl_props_rows_for_week(season: int, week: int) -> tuple[list[dict[str, Any]
     or a name the pbp data has no record of) -- never silently dropped."""
     odds_rows: list[dict[str, Any]] = []
     sim_rows: list[dict[str, Any]] = []
-    for row in _nfl_raw_player_props(season, week):
+    for row in _best_price_player_props(season, week):
         stat = _NFL_PROP_MARKET_TO_STAT.get(str(row.get("market") or "").strip())
         if stat is None:
             continue
@@ -425,3 +490,213 @@ def build_nfl_props_page_context(season: int, week: int) -> dict[str, Any]:
             "list_items": [f"Season: {season}", f"Week: {week}"],
         },
     )
+
+
+# --------------------------------------------------------------------------
+# Player -> team side attribution for the game cards.
+#
+# `nfl/cards.py` left `prop_recommendations` unset for as long as NFL cards
+# have existed, and its comment gave an honest reason: the prop feed carries a
+# player's NAME but not which of the two teams he plays for, while
+# `_build_prop_rows` needs rows already split into "away"/"home" lists. That
+# reason was true when written and is no longer true -- not because the feed
+# improved (measured 2026-08-27: `team` is empty in 0 of 294 real week-1 rows,
+# exactly as documented) but because a real per-player team artifact is now
+# built, published and present on the web service's disk.
+#
+# THE RULE THIS CODE IS BUILT AROUND, taken from `player_name_index`'s
+# docstring in player_stats.py: "An unresolvable name costs us one bet. A
+# wrongly resolved name prices a projection against a different human being,
+# which is worse than no bet at any stake." Every branch below refuses rather
+# than guesses, and the refusals are counted so a caller can report the
+# coverage it is losing instead of silently dropping rows.
+# --------------------------------------------------------------------------
+
+
+def _normalized_player_name(value: Any) -> str:
+    """Lowercased, punctuation-free player name for joining two real feeds.
+
+    OddsAPI writes "A.J. Brown" and the nflverse roster writes "A.J. Brown" but
+    also "Marquise Brown"/"Hollywood Brown" style variants elsewhere, and
+    suffixes drift ("Michael Pittman Jr." vs "Michael Pittman"). Periods and
+    the common generational suffixes are removed so the join does not fail on
+    typography alone -- but nothing FUZZY happens here: two different humans
+    never normalize together unless they genuinely share a name, and that case
+    is handled by dropping the name entirely (see `nfl_player_team_index`).
+    """
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    for char in (".", ",", "'", "`", "-"):
+        text = text.replace(char, " " if char == "-" else "")
+    parts = [part for part in text.split() if part]
+    while parts and parts[-1] in {"jr", "sr", "ii", "iii", "iv", "v"}:
+        parts.pop()
+    return " ".join(parts)
+
+
+@lru_cache(maxsize=4)
+def nfl_player_team_index(season: int) -> dict[str, str]:
+    """{normalized player name: canonical team abbr} from the roster snapshot.
+
+    AMBIGUOUS NAMES ARE OMITTED, not resolved by preference. If two players on
+    two different teams normalize to the same name, there is no evidence here
+    for choosing between them, and choosing wrong puts a real prop on the wrong
+    team's card. Omitting costs those rows; guessing corrupts them.
+
+    Returns {} when the artifact is absent -- an empty index makes every lookup
+    refuse, which degrades the card to the same honest "no props" state it has
+    shown all along, rather than failing the whole card build.
+    """
+    path = nfl_roster_snapshot_path(season)
+    try:
+        if not path.is_file():
+            return {}
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except (OSError, UnicodeDecodeError):
+        return {}
+
+    teams_by_name: dict[str, set[str]] = {}
+    for row in rows:
+        name = _normalized_player_name(row.get("player_name") or row.get("player_display_name"))
+        if not name:
+            continue
+        team = canonical_team_abbr(row.get("team_abbr") or row.get("team") or row.get("team_name") or "")
+        if not team:
+            continue
+        teams_by_name.setdefault(name, set()).add(team)
+    return {name: next(iter(teams)) for name, teams in teams_by_name.items() if len(teams) == 1}
+
+
+def nfl_player_team_collisions(season: int) -> dict[str, frozenset[str]]:
+    """Names the index above had to drop, so coverage loss can be REPORTED
+    rather than inferred from a smaller number than expected."""
+    path = nfl_roster_snapshot_path(season)
+    try:
+        if not path.is_file():
+            return {}
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except (OSError, UnicodeDecodeError):
+        return {}
+    teams_by_name: dict[str, set[str]] = {}
+    for row in rows:
+        name = _normalized_player_name(row.get("player_name") or row.get("player_display_name"))
+        team = canonical_team_abbr(row.get("team_abbr") or row.get("team") or row.get("team_name") or "")
+        if name and team:
+            teams_by_name.setdefault(name, set()).add(team)
+    return {name: frozenset(teams) for name, teams in teams_by_name.items() if len(teams) > 1}
+
+
+# Only markets a card can render as a one-line pick. `is_ladder` alternate
+# lines are excluded upstream by the capture; this is the display filter.
+_NFL_CARD_PROP_PRIORITY = (
+    "Anytime TD",
+    "Passing Yards",
+    "Passing TDs",
+    "Rushing Yards",
+    "Receiving Yards",
+    "Receptions",
+)
+
+
+def nfl_prop_recommendations_for_matchup(
+    season: int,
+    week: int,
+    *,
+    away_full_name: str,
+    home_full_name: str,
+) -> dict[str, list[dict[str, Any]]]:
+    """`prop_recommendations` for ONE game, split into away/home lists.
+
+    The shape `game_board_contract._build_prop_rows` consumes: a dict with
+    "away" and "home" keys, each a list of row dicts. It reads at most 8 rows
+    total across both sides, so this returns a bounded, priced, best-price
+    selection rather than every quote.
+
+    THE SIDE SPLIT IS A JOIN, NEVER A GUESS. Three independent refusals, each
+    of which drops the row instead of placing it somewhere plausible:
+
+      1. the player's name does not resolve to exactly one team in the roster
+         snapshot (unknown, or a genuine name collision), or
+      2. the player's team is neither of THIS game's two teams -- a stale
+         roster row, or a name that collided with a player elsewhere in the
+         league. Placing him would put a real prop on a card he has nothing to
+         do with, which is the failure the old comment refused to risk, and
+      3. the row carries no usable price.
+
+    Refusal 2 is what makes mis-attribution structurally impossible rather than
+    merely unlikely: a player can only ever land on a card whose own two teams
+    include the team the roster says he plays for.
+    """
+    away_abbr = canonical_team_abbr(away_full_name)
+    home_abbr = canonical_team_abbr(home_full_name)
+    if not away_abbr or not home_abbr or away_abbr == home_abbr:
+        return {"away": [], "home": []}
+
+    team_index = nfl_player_team_index(season)
+    game_key = nfl_props_key(away_full_name, home_full_name)
+
+    # Best price per (player, market, line, side): the capture may now carry
+    # several books for the same selection, and a card must show one row --
+    # the BEST one, which is the whole point of keeping every book.
+    best: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in _nfl_raw_player_props(season, week):
+        if str(row.get("is_ladder") or "").strip().lower() == "true":
+            continue
+        market = str(row.get("market") or "").strip()
+        if market not in _NFL_CARD_PROP_PRIORITY:
+            continue
+        if nfl_props_key(str(row.get("away_team") or ""), str(row.get("home_team") or "")) != game_key:
+            continue
+        player = str(row.get("player") or "").strip()
+        if not player:
+            continue
+        team = team_index.get(_normalized_player_name(player))
+        if team not in (away_abbr, home_abbr):
+            continue
+        price = _safe_float(row.get("over_price"))
+        if price is None:
+            continue
+        line = _safe_float(row.get("line"))
+        key = (player, market, "" if line is None else f"{line:g}")
+        current = best.get(key)
+        if current is None or _american_is_better(price, current["_price"]):
+            best[key] = {
+                "_price": price,
+                "_team": team,
+                "player": player,
+                "market": market,
+                "line": line,
+                "price": int(price),
+                "book": str(row.get("book") or "").strip(),
+                "selection": "over",
+                "display_pick": _nfl_card_prop_display_pick(market, line),
+            }
+
+    rows_by_side: dict[str, list[dict[str, Any]]] = {"away": [], "home": []}
+    priority = {market: index for index, market in enumerate(_NFL_CARD_PROP_PRIORITY)}
+    for entry in sorted(
+        best.values(),
+        key=lambda item: (priority.get(item["market"], 99), -item["_price"] if item["_price"] < 0 else item["_price"]),
+    ):
+        side = "away" if entry["_team"] == away_abbr else "home"
+        rows_by_side[side].append({key: value for key, value in entry.items() if not key.startswith("_")})
+    return rows_by_side
+
+
+def _american_is_better(candidate: float, incumbent: float) -> bool:
+    """Higher american odds pay more on the same stake, on both sides of zero
+    (+240 beats +180; -105 beats -130). A single `>` is correct here precisely
+    because american odds are already monotonic in payout -- no conversion to
+    decimal is needed, and adding one would be a place to introduce a bug."""
+    return candidate > incumbent
+
+
+def _nfl_card_prop_display_pick(market: str, line: float | None) -> str:
+    if market == "Anytime TD":
+        return "Anytime TD"
+    if line is None:
+        return market
+    return f"Over {line:g} {market}"

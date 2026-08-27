@@ -124,6 +124,108 @@ def nfl_depth_chart_snapshot_path(season: int) -> Path:
     return _resolve_nfl_tracking_path(Path("source_artifacts") / "data" / "processed" / "depth" / f"depth_{season}_snapshot.csv")
 
 
+def nfl_source_roots() -> list[Path]:
+    """The candidate NFL artifact roots, in preference order.
+
+    Public because a caller that must ENUMERATE a family (rather than resolve
+    one known file) has to search every root itself -- `nfl_props_available_
+    weeks` globs across all of them so a week present only on the mounted disk
+    is still found. Reaching into `_source_roots` from another module to do that
+    is the same coupling this wrapper exists to avoid.
+    """
+    return _source_roots()
+
+
+def _csv_has_data_rows(path: Path) -> bool:
+    """True when *path* holds at least one row BELOW its header.
+
+    A header-only CSV is 5 bytes here ("player" + newline is not it -- the real
+    stub is exactly the byte count git ships) and reads as a perfectly valid,
+    perfectly empty file. Existence cannot tell it from a real capture, which is
+    the whole reason `nfl_props_path` below cannot reuse
+    `_resolve_nfl_tracking_path`.
+    """
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            next(handle, None)  # header
+            for line in handle:
+                if line.strip():
+                    return True
+    except (OSError, UnicodeDecodeError):
+        return False
+    return False
+
+
+def nfl_props_path(season: int, week: int) -> Path:
+    """Where the real OddsAPI player-prop capture for *season*/*week* actually IS.
+
+    `#441` AGAIN -- fourth call site -- BUT WITH A TWIST THAT MAKES THE ESTABLISHED
+    FIX INSUFFICIENT, so this deliberately does NOT reuse
+    `_resolve_nfl_tracking_path`.
+
+    The shared resolver returns "the first candidate root that HAS the file". That
+    is correct for pbp, injuries and depth charts, because `data/nfl_source/
+    tracking/` is gitignored -- the checkout simply does not contain them, so
+    existence discriminates. **The props family is TRACKED IN GIT as header-only
+    stubs**, so the checkout does contain it, and existence discriminates nothing.
+
+    Measured on production 2026-08-27, which is what this function is for:
+
+        mounted disk  nfl_source/oddsapi_player_props_2026_wk1.csv  42,753 B
+                      mtime 2026-08-26T23:06:02.931697Z  <- FRACTIONAL, a real
+                      runtime write: 294 rows, 259 players, 16 events
+        git / checkout  same relative path                              5 B
+        `upcoming_recs_*.csv`, the file `_first_existing_root` PROBES:
+                      5 tracked in git, 0 on the mounted disk
+
+    So the selector picked the checkout, `_props_path` resolved to the 5-byte
+    stub, `_nfl_raw_player_props` filtered it to (), and `/nfl/api/props?week=1`
+    served its "no real player-prop lines available" empty state while a full
+    week-1 market sat on the same service's disk. Every downstream consumer --
+    the props page, the market board, and the card attach -- was reading an empty
+    file and reporting it as an empty market.
+
+    PREFERS CONTENT, THEN EXISTENCE, THEN A NAMED FALLBACK. The content probe is
+    what defeats the stub; the existence tier keeps behaviour unchanged for a
+    genuinely empty week (a real capture that found no markets is not an error,
+    and must still resolve to a concrete path); the fallback returns a path under
+    the WRITE root rather than None so a caller's diagnostic still names a
+    location -- the same contract `_resolve_nfl_tracking_path` documents.
+    """
+    relative = Path(f"oddsapi_player_props_{season}_wk{week}.csv")
+    roots = _source_roots()
+    first_existing: Path | None = None
+    for root in roots:
+        candidate = root / relative
+        try:
+            if not candidate.is_file():
+                continue
+        except OSError:
+            continue
+        if _csv_has_data_rows(candidate):
+            return candidate
+        if first_existing is None:
+            first_existing = candidate
+    if first_existing is not None:
+        return first_existing
+    return nfl_artifact_output_root() / relative
+
+
+def nfl_roster_snapshot_path(season: int) -> Path:
+    """Where the built roster snapshot for *season* actually is.
+
+    Uses the plain existence search, NOT `nfl_props_path`'s content probe, and
+    the difference is deliberate: this artifact is tracked in git with REAL
+    CONTENT (715,903 B at HEAD on 2026-08-27), not as a header stub, so
+    existence discriminates and the mounted disk -- which
+    `preferred_artifact_roots` orders ahead of the repo checkout -- wins on its
+    own. Production's copy was 654,176 B against git's 715,903 the day this was
+    written: a smaller, FRESHER post-cuts roster, which is exactly the one a
+    player-to-team lookup must prefer.
+    """
+    return _resolve_nfl_tracking_path(Path("source_artifacts") / "data" / "processed" / "rosters" / f"roster_{season}_snapshot.csv")
+
+
 def nfl_pbp_diagnostic(season: int) -> str:
     """Why `nfl_pbp_path` returned what it did. `#441` diagnostic, third pass.
 

@@ -110,9 +110,17 @@ class CollectRawIntegrationTests(unittest.TestCase):
         self._root_patch = patch.object(player_stats, "default_nfl_source_root", return_value=Path(self.nfl_root))
         self._root_patch.start()
         self.addCleanup(self._root_patch.stop)
-        self._props_root_patch = patch.object(nfl_props, "default_nfl_source_root", return_value=Path(self.nfl_root))
-        self._props_root_patch.start()
-        self.addCleanup(self._props_root_patch.stop)
+        # `#441`: props resolve their root per requested file now, not through
+        # `default_nfl_source_root()`. Drive the real resolver via its env var
+        # -- patching a function the code no longer calls would pass while
+        # testing nothing. `player_stats` above still uses it, so that one stays.
+        self._props_env_patch = patch.dict(
+            os.environ,
+            {"SYNDICATE_NFL_SOURCE_ROOT": self.nfl_root},
+        )
+        self._props_env_patch.start()
+        self.addCleanup(self._props_env_patch.stop)
+        os.environ.pop("SYNDICATE_DATA_ROOT", None)
         player_stats.load_player_plays.cache_clear()
         player_stats.player_name_index.cache_clear()
         nfl_props._nfl_raw_player_props.cache_clear()

@@ -236,7 +236,22 @@ def parse_event_to_rows(event: dict[str, Any], *, league: str) -> list[dict[str,
     event_desc = f"{away} @ {home}"
     game_time = _game_time(event)
 
-    seen_market_rows: set[tuple[str, str, float | None]] = set()
+    # Keyed BY BOOK. This set used to be keyed (market_key, player, line) with
+    # no book term, and it is shared across every bookmaker in the event -- so
+    # the first book in `_ordered_bookmakers` claimed each selection and every
+    # other book's quote for it was dropped on the floor. `_ordered_bookmakers`
+    # swept all of them; this set then threw all but one away, and the CSV came
+    # out one-book-per-selection despite the sweep.
+    #
+    # That is the same `#209` Class A loss NFL had by a different mechanism
+    # (NFL discarded the books at selection; soccer discarded them at dedupe),
+    # and it is why neither file could answer "who has the best price" while
+    # price shopping measured +2.79 ROI pts on MLB game lines and +2.95 on NFL
+    # props. Adding the book term keeps the guard doing its real job -- one row
+    # per (book, market, player, line), so a book that quotes the same selection
+    # twice in one payload still collapses -- while letting every DISTINCT book
+    # through.
+    seen_market_rows: set[tuple[str, str, str, float | None]] = set()
     for bookmaker in _ordered_bookmakers(event.get("bookmakers") or []):
         book_key = str(bookmaker.get("key") or "").strip() or "oddsapi"
         rows.extend(
@@ -265,7 +280,7 @@ def _parse_bookmaker_markets(
     game_time: str | None,
     home: str,
     away: str,
-    seen_market_rows: set[tuple[str, str, float | None]],
+    seen_market_rows: set[tuple[str, str, str, float | None]],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for market in bookmaker.get("markets") or []:
@@ -323,7 +338,7 @@ def _parse_bookmaker_markets(
             else:
                 record["over_price"] = price
         for (player, line_key), record in aggregated.items():
-            dedupe_key = (market_key, player, line_key)
+            dedupe_key = (book_key, market_key, player, line_key)
             if dedupe_key in seen_market_rows:
                 continue
             seen_market_rows.add(dedupe_key)
@@ -398,12 +413,17 @@ def _stable_props_df(df: pd.DataFrame) -> pd.DataFrame:
 def _append_soccer_prop_book_quotes(*, league: str, payloads: list[dict[str, Any]]) -> None:
     """Soccer player props into the shared quote log, one row per book.
 
-    `parse_event_to_rows` above AGGREGATES: it folds over/under into a single
-    record keyed by (player, line) and stamps whichever `book_key` it saw last,
-    so the CSV carries one book per player-line even though `_ordered_bookmakers`
-    swept them all. That is fine for the board, which wants one row to render,
-    but it means the CSV cannot answer "who has the best price" -- so the log
-    takes the raw payload rather than the parsed rows.
+    THIS USED TO BE THE ONLY PLACE THE OTHER BOOKS SURVIVED. `parse_event_to_
+    rows` swept every bookmaker via `_ordered_bookmakers` and then dropped all
+    but the first at the `seen_market_rows` dedupe, so the CSV carried one book
+    per player-line and could not answer "who has the best price" -- the log
+    took the raw payload precisely to work around that.
+
+    The CSV now carries every book too (see `seen_market_rows`, which is keyed
+    by book). This function is kept as-is and is NOT redundant: it records the
+    RAW payload, so it stays correct if the parsed shape ever changes, and it is
+    what CLV grading reads. Two independent records of the same capture is the
+    point, not duplication.
 
     Never raises: a logging side-effect must not fail an odds fetch.
     """

@@ -19,6 +19,7 @@ from syndicate.features.nfl.sources import default_nfl_source_root
 from syndicate.features.nfl.sources import default_week
 from syndicate.features.nfl.sources import latest_season
 from syndicate.features.nfl.sources import recommendation_path
+from syndicate.features.nfl.props import nfl_prop_recommendations_for_matchup
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.formatters import format_pct
@@ -257,6 +258,12 @@ def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -
     top_type = _safe_text(top_row.get("type"), "Recommendation").title()
     confidence = _safe_text(bundle.get("confidence"), "Snapshot").title()
     game_pk = f"{season}-{week}-{game_date}-{away_abbr}-{home_abbr}".replace(" ", "-")
+    snapshot_prop_recommendations = nfl_prop_recommendations_for_matchup(
+        season,
+        week,
+        away_full_name=away_team,
+        home_full_name=home_team,
+    )
     summary = (
         f"Stored weekly recommendation rows for {away_team} at {home_team}. "
         f"Top signal: {top_type} at {_format_ev_pct(top_ev)} EV."
@@ -293,6 +300,12 @@ def _game_from_snapshot_bundle(bundle: dict[str, Any], season: int, week: int) -
         "href_label": "Open NFL game detail",
         "status": f"Week {week}",
         "detail": game_date,
+        # Attached on BOTH card paths, not just the SmartSim2 one that serves
+        # 2026. A season with a stored recs snapshot never reaches the fallback,
+        # so attaching only there would have left every such week without props
+        # while looking, from the served payload, exactly like a week that had
+        # none to show. Omitted entirely when empty -- see the SmartSim path.
+        **({"prop_recommendations": snapshot_prop_recommendations} if any(snapshot_prop_recommendations.values()) else {}),
         "summary": summary,
         "metrics": [
             {"label": "Kickoff", "value": game_date},
@@ -378,16 +391,31 @@ def _game_from_smartsim_projection(projection: Any, season: int, week: int) -> d
             betting["home_spread"] = run_line.get("home")
         if total_runs.get("line") is not None:
             betting["total"] = total_runs.get("line")
-    # prop_recommendations is deliberately left unset here: nfl_props_rows_for_week's
-    # raw odds/sim rows carry the player's name but no home/away team-side
-    # attribution (unlike build_nfl_market_board, which only needs the two
-    # teams' full names to key the whole game, not each individual player's
-    # side) -- _build_prop_rows requires rows split into "away"/"home" lists,
-    # and there is no reliable real source here for that split without extra
-    # per-player team resolution against nflverse play-by-play. Forcing a
-    # guess would risk mis-attributing a real prop to the wrong team, so this
-    # is left for the generic template's honest "no props" empty state
-    # rather than forcing something fragile.
+    # prop_recommendations. This was deliberately left UNSET for as long as NFL
+    # cards existed, and the reason was sound: the prop feed carries a player's
+    # name but no home/away side, `_build_prop_rows` needs rows split into
+    # "away"/"home" lists, and there was "no reliable real source here for that
+    # split". Forcing a guess would mis-attribute a real prop to the wrong team.
+    #
+    # THAT REASON EXPIRED, and only the source changed -- not the standard.
+    # Measured on production 2026-08-27, the feed is still exactly as described:
+    # `team` is empty in 0 of 294 real week-1 rows. What is new is that the
+    # roster snapshot is now built, published and present on the web service's
+    # disk (654,176 B), so the split is a JOIN against a real artifact rather
+    # than an inference from the odds row. `nfl_prop_recommendations_for_matchup`
+    # refuses on an unresolved name, a name that collides across teams, and --
+    # the one that makes mis-attribution structurally impossible -- any player
+    # whose roster team is not one of THIS game's two teams.
+    #
+    # Empty is still a first-class outcome: no roster artifact, or no capture
+    # for this week, yields {} and the card falls back to the same honest "no
+    # props" empty state it has always shown.
+    prop_recommendations = nfl_prop_recommendations_for_matchup(
+        season,
+        week,
+        away_full_name=away_name,
+        home_full_name=home_name,
+    )
     return {
         "gamePk": game_pk,
         "card_variant": "shared_default",
@@ -409,6 +437,13 @@ def _game_from_smartsim_projection(projection: Any, season: int, week: int) -> d
         "href_label": "Open NFL game detail",
         "status": f"Week {week}",
         "detail": "SmartSim 2.0",
+        # Only when there is something real to show. `_build_prop_rows` treats a
+        # missing key and an empty one identically, and this card family's
+        # contract -- pinned by test_nfl_market_board -- is that a key is ABSENT
+        # rather than empty when no real source backs it. An empty dict here
+        # would read as "props were considered and there are none", which is a
+        # different claim from "this week has no capture".
+        **({"prop_recommendations": prop_recommendations} if any(prop_recommendations.values()) else {}),
         "summary": summary,
         "metrics": [
             {"label": "Home mean", "value": round(projection.home_score_mean, 1)},

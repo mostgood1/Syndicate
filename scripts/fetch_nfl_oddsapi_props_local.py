@@ -411,6 +411,34 @@ def fetch_player_props_chunked(
 
 
 def parse_events_to_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every book, every player, every distinct line -- one row each.
+
+    TWO DEFECTS FIXED HERE TOGETHER, both `#209` Class A, both measured against
+    the real production capture on 2026-08-27 rather than inferred.
+
+    1. ONE BOOK OUT OF N. This iterated `_choose_bookmaker(...)` alone and threw
+       away the rest of a response we had ALREADY PAID FOR. Production's
+       `oddsapi_player_props_2026_wk1.csv` was 294 rows, `{draftkings: 294}` --
+       a single book across the whole week-1 market. Price shopping is the
+       largest single lever measured on this platform (+2.95 ROI pts on NFL
+       props specifically, controlled, identical bets) and cannot be run against
+       a one-book file. Same API call, same credits, more rows.
+
+    2. THE AGGREGATION KEY IGNORED `line`. `aggregated` was keyed on `player`
+       alone, so when a market quoted a player at more than one line, every line
+       after the first OVERWROTE the previous one and the row kept whichever
+       arrived last -- silently, with no duplicate to notice. Keyed on
+       (player, line) now, so an alternate ladder survives as distinct rows.
+
+    `_choose_bookmaker` is deliberately left defined and unused so this fetcher
+    and the NCAAF one stay easy to diff.
+
+    WHAT THIS DOES NOT CHANGE: the one-row-per-selection contract downstream
+    consumers rely on. `nfl_props_rows_for_week` now collapses to the BEST price
+    per selection explicitly, so its callers (the market board, the props page,
+    the ROI report and its 64,007-bet denominator) see exactly what they saw
+    before. The books are gained by the file, not imposed on the consumers.
+    """
     rows: list[dict[str, Any]] = []
     for event in events:
         try:
@@ -433,73 +461,74 @@ def parse_events_to_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     game_time = None
             event_desc = f"{away} @ {home}"
 
-            bookmaker = _choose_bookmaker(event.get("bookmakers") or [])
-            if not bookmaker:
-                continue
-            book_key = str(bookmaker.get("key") or "").strip() or "oddsapi"
+            for bookmaker in event.get("bookmakers") or []:
+                book_key = str(bookmaker.get("key") or "").strip() or "oddsapi"
 
-            for market in bookmaker.get("markets") or []:
-                market_key = str(market.get("key") or "").strip()
-                std_market = MARKET_STD_MAP.get(market_key)
-                if not std_market:
-                    continue
-                aggregated: dict[str, dict[str, Any]] = {}
-                for outcome in market.get("outcomes") or []:
-                    side = _side_key(str(outcome.get("name") or outcome.get("description") or ""))
-                    if side is None:
-                        side = _side_key(str(outcome.get("description") or outcome.get("name") or ""))
-                    player = _pick_player_from_outcome(outcome)
-                    if not player:
+                for market in bookmaker.get("markets") or []:
+                    market_key = str(market.get("key") or "").strip()
+                    std_market = MARKET_STD_MAP.get(market_key)
+                    if not std_market:
                         continue
-                    try:
-                        line_value = float(outcome.get("point")) if outcome.get("point") is not None and str(outcome.get("point")) != "" else np.nan
-                    except Exception:
-                        line_value = np.nan
-                    try:
-                        american = int(str(outcome.get("price")).replace("+", "")) if outcome.get("price") is not None and str(outcome.get("price")) != "" else np.nan
-                    except Exception:
-                        american = np.nan
+                    aggregated: dict[tuple[str, str], dict[str, Any]] = {}
+                    for outcome in market.get("outcomes") or []:
+                        side = _side_key(str(outcome.get("name") or outcome.get("description") or ""))
+                        if side is None:
+                            side = _side_key(str(outcome.get("description") or outcome.get("name") or ""))
+                        player = _pick_player_from_outcome(outcome)
+                        if not player:
+                            continue
+                        try:
+                            line_value = float(outcome.get("point")) if outcome.get("point") is not None and str(outcome.get("point")) != "" else np.nan
+                        except Exception:
+                            line_value = np.nan
+                        try:
+                            american = int(str(outcome.get("price")).replace("+", "")) if outcome.get("price") is not None and str(outcome.get("price")) != "" else np.nan
+                        except Exception:
+                            american = np.nan
 
-                    record = aggregated.get(player)
-                    if record is None:
-                        record = {
-                            "player": player,
-                            "market": std_market,
-                            "line": np.nan,
-                            "over_price": np.nan,
-                            "under_price": np.nan,
-                        }
-                        aggregated[player] = record
+                        # Anytime TD has no line, so every outcome for a player
+                        # belongs to one record; every other market keys the
+                        # line in, which is what stops an alternate ladder from
+                        # collapsing onto its own last entry. Over and under of
+                        # the SAME line must still meet in one record -- that is
+                        # why the line, and not the side, is in the key.
+                        line_key = "" if std_market == "Anytime TD" or not pd.notna(line_value) else f"{float(line_value):g}"
+                        record = aggregated.get((player, line_key))
+                        if record is None:
+                            record = {
+                                "player": player,
+                                "market": std_market,
+                                "line": np.nan,
+                                "over_price": np.nan,
+                                "under_price": np.nan,
+                            }
+                            aggregated[(player, line_key)] = record
 
-                    if std_market != "Anytime TD":
-                        if not pd.notna(record.get("line")) and pd.notna(line_value):
+                        if std_market != "Anytime TD" and pd.notna(line_value) and pd.isna(record.get("line")):
                             record["line"] = float(line_value)
-                        elif pd.notna(line_value) and pd.isna(record.get("line")):
-                            record["line"] = float(line_value)
 
-                    if side == "over":
-                        record["over_price"] = american
-                    elif side == "under":
-                        record["under_price"] = american
-                    else:
-                        record["over_price"] = american
+                        if side == "over":
+                            record["over_price"] = american
+                        elif side == "under":
+                            record["under_price"] = american
+                        else:
+                            record["over_price"] = american
 
-                for record in aggregated.values():
-                    rows.append(
-                        {
-                            **record,
-                            "book": book_key,
-                            "event": event_desc,
-                            "game_time": game_time,
-                            "home_team": home,
-                            "away_team": away,
-                            "is_ladder": False,
-                        }
-                    )
+                    for record in aggregated.values():
+                        rows.append(
+                            {
+                                **record,
+                                "book": book_key,
+                                "event": event_desc,
+                                "game_time": game_time,
+                                "home_team": home,
+                                "away_team": away,
+                                "is_ladder": False,
+                            }
+                        )
         except Exception:
             continue
     return rows
-
 
 def _append_nfl_book_quotes(events: list[dict[str, Any]], *, season: int, week: int) -> None:
     """Every book's price for every tracked market, into the shared quote log.
@@ -606,11 +635,19 @@ def main(argv: list[str] | None = None) -> int:
     if not rows:
         print("WARNING: No player prop rows parsed from OddsAPI payload.")
 
-    # #209 Class A: parse_events_to_rows keeps ONE book per event
-    # (_choose_bookmaker) and discards the rest of a response we have already
-    # paid for. The CSV keeps its single-book shape -- every downstream consumer
-    # depends on it -- while the quote log keeps all of them, which is what CLV
-    # and best-price grading need.
+    # `#209` Class A, now fixed on BOTH sides rather than one.
+    # `parse_events_to_rows` used to keep ONE book per event
+    # (`_choose_bookmaker`) and discard the rest of a response we had already
+    # paid for; the quote log kept all of them, so CLV and best-price grading
+    # worked while the CSV -- the file the board, the props page and the ROI
+    # report actually read -- could not answer "who has the best price".
+    #
+    # The CSV now carries every book too. The claim that "every downstream
+    # consumer depends on" the single-book shape was true, and is honoured
+    # explicitly instead of by accident: `nfl_props_rows_for_week` collapses to
+    # the best price per selection, so consumers still see one row per
+    # selection. Throwing the data away at capture time was never what made
+    # that contract hold -- it just made it unfixable.
     _append_nfl_book_quotes(events, season=int(args.season), week=int(args.week))
 
     df = pd.DataFrame(rows)
