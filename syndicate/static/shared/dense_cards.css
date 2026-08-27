@@ -1416,6 +1416,27 @@ a.cards-head-team-name:focus-visible {
    matching the layout worked out for the card (the score fact runs long, so
    it alone is allowed to span both columns rather than force every cell to
    the width of the longest one). */
+/* NCAAF sizing on soccer's compact shape.
+
+   The pregame compact card is the RIGHT presentation -- crest, abbreviation,
+   that side's projected number, then a short facts footer -- but soccer's
+   scale (15px crest, 12px team label) reads small on a wider NCAAF card. These
+   bump it via a modifier so SOCCER'S OWN RENDERING IS UNTOUCHED; the base rules
+   above are global and shared, and editing them would have silently resized a
+   board belonging to another lane.
+
+   CROSS-LANE FILE, logged: `dense_cards.css` is claimed by the OPEN lane
+   `soccer-board-mlb-parity` (UNOWNED, checkpointed 2026-08-22). Additive only --
+   a new modifier scope, no existing declaration altered. */
+.cards-strip-card--ncaaf .cards-strip-pregame-head { font-size: 12px; }
+.cards-strip-card--ncaaf .cards-strip-pregame-rows { gap: 4px; }
+.cards-strip-card--ncaaf .cards-strip-pregame-row { gap: 8px; }
+.cards-strip-card--ncaaf .cards-strip-pregame-crest { width: 22px; height: 22px; }
+.cards-strip-card--ncaaf .cards-strip-pregame-crest--text { width: 22px; font-size: 11px; }
+.cards-strip-card--ncaaf .cards-strip-pregame-team { font-size: 15px; }
+.cards-strip-card--ncaaf .cards-strip-pregame-total { font-size: 18px; }
+.cards-strip-card--ncaaf .cards-strip-pregame-fact { font-size: 12px; }
+
 .cards-strip-pregame-facts {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 3px 10px; margin-top: 5px;

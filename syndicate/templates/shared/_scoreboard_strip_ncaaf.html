@@ -1,90 +1,106 @@
-{#- NCAAF compact scoreboard strip.
+{#- NCAAF compact scoreboard strip, modelled on SOCCER'S.
 
-    WHY THIS EXISTS. NCAAF fell through to `_scoreboard_strip_generic.html`,
-    which produced a 435px "compact" card -- against MLB's tight preview tile.
-    Measured on production 2026-08-27, one strip card:
+    SOCCER IS THE REFERENCE HERE, not MLB. Its pregame compact card presents
+    the right information in the right shape: a kickoff line, then one row per
+    team carrying crest + abbreviation + that side's projected number, then a
+    short facts footer. A reader's eye lands on the two teams and the two
+    numbers that separate them, and nothing else competes.
 
-        cards-strip-head                     28px
-        cards-head-matchup                   51px
-        cards-mini-metrics--strip           119px   (3 metrics, each full-width)
-        cards-strip-live                     87px   <- game.summary, PROSE
-        cards-strip-lens                     87px   <- projection contract, PROSE
-                                            -----
-                                            435px
+    WHAT THIS REPLACES, and both attempts were mine to fix:
 
-    The two prose blocks are 40% of the card and both repeat what the main card
-    says directly underneath. A strip is for SCANNING a slate; the sentence
-    "SmartSim 2.0 projects TCU 30.3 - 20.0 North Carolina with a total of 50.3
-    and a home win probability of 80.0%" is not scannable and is already on the
-    card below in structured form.
+      generic strip   435px -- two unconditional PROSE blocks (`game.summary`
+                      and the projection contract) made up 174px of it, both
+                      repeating the card directly below.
+      my first fix    633px -- WORSE. I kept the school name as a secondary
+                      `cards-mini-copy` line, and `dense_cards.css` sets
+                      `overflow-wrap: anywhere` on that class, so "North
+                      Carolina" rendered 1px wide and 226px tall in a 39px box:
+                      one character per line.
 
-    WHAT IT KEEPS FROM MLB: `_scoreboard_strip_mlb.html`'s shape -- a short
-    head, a dense two-row body, one short meta line, and NO unconditional
-    prose. What it does NOT copy is MLB's `cards-linescore*` markup:
-    `cards-linescore-head`, `cards-linescore-row`, `cards-linescore-team` and
-    `is-compact` have ZERO rules in `shared/dense_cards.css`, which is the
-    stylesheet this board loads. Copying them would render unstyled -- the
-    exact defect that put `.cards-market-sub` on the main card at inherited
-    16px. Every class below was checked against that file first.
+    NO TEAM CRESTS WAS THE OTHER DEFECT. `cards-strip-logo` was rendering the
+    ABBREVIATION AS TEXT while `game.away.logo_url` sat unread on every game --
+    the main card below has used it all along.
 
-    ABBREVIATION ONLY. NO SCHOOL NAME. The generic strip rendered
-    `game.away.name` into a narrow box and the board showed "Sacram ento
-    State", "Easte Michi n" and "North Dakot State".
+    CLASSES CHECKED BEFORE USE. `.cards-strip-pregame-*` are defined GLOBALLY in
+    `shared/dense_cards.css` (only `.cards-strip-card--soccer .cards-head-team-name`
+    is soccer-scoped), so they apply here. This matters: MLB's `cards-linescore*`
+    have zero rules in that sheet, and `.cards-market-sub` had a colour and no
+    size -- which is how it rendered at inherited 16px, larger than the value it
+    annotated.
 
-    My first fix kept the name as a secondary `cards-mini-copy` line, which was
-    WORSE: `dense_cards.css` sets `overflow-wrap: anywhere` on that class, and
-    the team box is 39px wide, so "North Carolina" rendered **1px wide and
-    226px tall** -- one character per line. That alone took the strip card from
-    435px to 633px.
-
-    The strip is for scanning a slate; the full school name is on the card
-    directly below it. -#}
+    SIZING. Soccer's crest is 15px and its team label 12px, which reads small on
+    a wider NCAAF card. `.cards-strip-card--ncaaf` bumps them without touching
+    soccer's own rendering. -#}
 <section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
   {% if games %}
     <div class="cards-scoreboard-strip">
       {% for game in games %}
-        {% set ncaaf = game.ncaaf_card if game.ncaaf_card is defined else none %}
-        {% set scoreboard = ncaaf.scoreboard if ncaaf and ncaaf.scoreboard is defined else {} %}
-        {% set kickoff = scoreboard.get('kickoff_label') if scoreboard else none %}
-        {% set metrics = game.metrics if game.metrics is defined and game.metrics else [] %}
-        <a class="cards-strip-card" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
-          <div class="cards-strip-head">
-            <span class="cards-status-badge">{{ game.status }}</span>
-            <span data-role="strip-detail">{{ kickoff or game.detail }}</span>
+        {%- set ncaaf = game.ncaaf_card if game.ncaaf_card is defined else none -%}
+        {%- set scoreboard = ncaaf.scoreboard if ncaaf and ncaaf.scoreboard is defined else {} -%}
+        {%- set kickoff = scoreboard.get('kickoff_label') if scoreboard else none -%}
+        {%- set state = game.shared_game_state if game.shared_game_state is defined and game.shared_game_state else {} -%}
+        {%- set is_live = game.shared_is_live or state.get('live') -%}
+        <a class="cards-strip-card cards-strip-card--ncaaf" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
+          {#- The head is the kickoff, or the live clock once there is one. A
+              status badge reading "Week 1" on all 51 cards told a scanning
+              reader nothing. -#}
+          <div class="cards-strip-pregame-head">
+            {%- if is_live -%}
+              {{ state.get('clock') or state.get('status') or 'Live' }}
+            {%- elif state.get('final') -%}
+              Final
+            {%- else -%}
+              {{ kickoff or game.detail or game.status }}
+            {%- endif -%}
           </div>
-          <div class="cards-head-left cards-head-matchup">
-            <div class="cards-head-team">
-              <div class="cards-strip-logo">{{ game.away.abbr }}</div>
-              <div>
-                <div class="cards-head-team-name">{{ game.away.abbr }}</div>
-              </div>
+          <div class="cards-strip-pregame-rows">
+            <div class="cards-strip-pregame-row">
+              {% if game.away.logo_url %}
+                <img class="cards-strip-pregame-crest" src="{{ game.away.logo_url }}" alt="" loading="lazy" />
+              {% else %}
+                <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text">{{ game.away.abbr }}</span>
+              {% endif %}
+              <span class="cards-strip-pregame-team">{{ game.away.abbr }}</span>
+              {% if scoreboard.get('away_points') is not none %}
+                <span class="cards-strip-pregame-total">{{ scoreboard.get('away_points') }}</span>
+              {% endif %}
             </div>
-            <span class="cards-score-divider">@</span>
-            <div class="cards-head-team">
-              <div class="cards-strip-logo">{{ game.home.abbr }}</div>
-              <div>
-                <div class="cards-head-team-name">{{ game.home.abbr }}</div>
-              </div>
+            <div class="cards-strip-pregame-row">
+              {% if game.home.logo_url %}
+                <img class="cards-strip-pregame-crest" src="{{ game.home.logo_url }}" alt="" loading="lazy" />
+              {% else %}
+                <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text">{{ game.home.abbr }}</span>
+              {% endif %}
+              <span class="cards-strip-pregame-team">{{ game.home.abbr }}</span>
+              {% if scoreboard.get('home_points') is not none %}
+                <span class="cards-strip-pregame-total">{{ scoreboard.get('home_points') }}</span>
+              {% endif %}
             </div>
           </div>
-          {#- Four numbers, market and model side by side, because comparing
-              them is the only reason to look at a betting slate at a glance.
-              `metrics` is built by `ncaaf/cards.py` in exactly this order:
-              Market spread, Market total, Projected total, Projected spread. -#}
-          <div class="cards-mini-metrics cards-mini-metrics--strip">
-            {% for metric in metrics[:4] %}
-              <div class="cards-mini-metric">
-                <span>{{ metric.label }}</span>
-                <strong>{{ metric.value }}</strong>
-              </div>
-            {% endfor %}
+          {#- The football equivalents of soccer's BTTS / Goals / Corners: the
+              spread and total, each shown as the MODEL's number against the
+              market's, because that comparison is the only reason to scan a
+              betting slate. Every fact is omitted when its number is absent --
+              never a dash, which reads as a broken card. -#}
+          {%- set market_spread = (game.markets or {}).get('spread') if game.markets is defined else none -%}
+          {%- set market_total = (game.markets or {}).get('total') if game.markets is defined else none -%}
+          <div class="cards-strip-pregame-facts">
+            {% if scoreboard.get('spread_label') %}
+              <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Spread</span> {{ scoreboard.get('spread_label') }}</span>
+            {% endif %}
+            {% if scoreboard.get('total_points') is not none %}
+              <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Total</span> {{ scoreboard.get('total_points') }} proj</span>
+            {% endif %}
+            {% if market_spread and market_spread.get('home') is not none %}
+              <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Market</span> {{ '%+.1f'|format(market_spread.get('home')|float) }}</span>
+            {% endif %}
+            {% if market_total and market_total.get('line') is not none %}
+              <span class="cards-strip-pregame-fact"><span class="cards-strip-pregame-fact-label">Mkt total</span> {{ '%.1f'|format(market_total.get('line')|float) }}</span>
+            {% endif %}
+            {% if scoreboard.get('win_probability') %}
+              <span class="cards-strip-pregame-fact cards-strip-pregame-fact--score"><span class="cards-strip-pregame-fact-label">Win prob</span> {{ scoreboard.get('win_probability') }}</span>
+            {% endif %}
           </div>
-          {#- ONE short line, and only when there is a real number in it. The
-              generic strip rendered `game.summary` unconditionally, which is a
-              full sentence. -#}
-          {% if scoreboard and scoreboard.get('win_probability') and scoreboard.get('spread_label') %}
-            <div class="cards-strip-meta">{{ scoreboard.get('spread_label') }} · {{ scoreboard.get('win_probability') }}</div>
-          {% endif %}
         </a>
       {% endfor %}
     </div>

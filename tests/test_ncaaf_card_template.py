@@ -157,8 +157,15 @@ def test_a_card_with_no_projection_still_renders_and_stays_balanced():
 
 
 # ---------------------------------------------------------------------------
-# THE SCOREBOARD STRIP. NCAAF fell through to the generic one and produced a
-# 435px "compact" card against MLB's tight preview tile.
+# THE SCOREBOARD STRIP, modelled on SOCCER'S pregame compact card.
+#
+# Two of my own attempts are pinned here because both shipped:
+#   generic  435px, two unconditional PROSE blocks repeating the card below
+#   mine     633px, WORSE -- the school name in a `cards-mini-copy` line, which
+#            `dense_cards.css` gives `overflow-wrap: anywhere`, rendered 1px
+#            wide and 226px tall in a 39px box
+# and the crests were never rendered at all: `cards-strip-logo` printed the
+# ABBREVIATION AS TEXT while `game.away.logo_url` sat unread.
 # ---------------------------------------------------------------------------
 
 def _strip(games):
@@ -169,69 +176,85 @@ def _strip(games):
 def _strip_game(**overrides):
     g = {
         "gamePk": "g1", "status": "Week 1", "detail": "Week 1", "card_variant": "ncaaf_main",
-        "away": {"abbr": "SS", "name": "Sacramento State"},
-        "home": {"abbr": "EM", "name": "Eastern Michigan"},
-        "metrics": [
-            {"label": "Market spread", "value": "-10.5"},
-            {"label": "Market total", "value": "53.1"},
-            {"label": "Projected total", "value": 42.2},
-            {"label": "Projected spread", "value": "EM by 16.3"},
-        ],
+        "away": {"abbr": "NC", "name": "North Carolina", "logo_url": "https://cdn/nc.png"},
+        "home": {"abbr": "TCU", "name": "TCU", "logo_url": "https://cdn/tcu.png"},
+        "markets": {"spread": {"home": -9.18}, "total": {"line": 46.86}},
         "ncaaf_card": {"scoreboard": {
-            "kickoff_label": "Sat Aug 29, 3:00 PM CDT",
-            "spread_label": "EM by 16.3", "win_probability": "77.7%",
+            "kickoff_label": "Sat Aug 29, 11:00 AM CDT", "spread_label": "TCU by 10.3",
+            "win_probability": "80.0%", "home_points": 30.3, "away_points": 20.0,
+            "total_points": 50.3,
         }},
     }
     g.update(overrides)
     return g
 
 
-def test_ncaaf_gets_its_own_strip_not_the_generic_one():
+def test_the_strip_renders_team_crests():
+    """THE REPORTED DEFECT. `logo_url` was on every game and never rendered."""
     html = _strip([_strip_game()])
-    assert "cards-strip-card" in html
-    # the generic strip's unconditional prose blocks must be gone
+    assert 'src="https://cdn/nc.png"' in html
+    assert 'src="https://cdn/tcu.png"' in html
+    assert html.count("cards-strip-pregame-crest") >= 2
+
+
+def test_a_missing_crest_falls_back_to_text_not_a_broken_image():
+    g = _strip_game()
+    g["home"]["logo_url"] = None
+    html = _strip([g])
+    assert "cards-strip-pregame-crest--text" in html
+
+
+def test_each_team_row_carries_that_side_s_projected_score():
+    """Soccer's shape: crest, abbreviation, that side's number."""
+    html = _strip([_strip_game()])
+    assert html.count("cards-strip-pregame-total") == 2
+    assert "30.3" in html and "20.0" in html
+
+
+def test_the_strip_shows_model_against_market():
+    html = _strip([_strip_game()])
+    for label in ("Spread", "Total", "Market", "Mkt total", "Win prob"):
+        assert label in html
+
+
+def test_the_strip_uses_the_ncaaf_sizing_modifier():
+    """Soccer's 15px crest reads small here; the bump must not touch soccer."""
+    html = _strip([_strip_game()])
+    assert "cards-strip-card--ncaaf" in html
+    assert "cards-strip-card--soccer" not in html
+
+
+def test_the_strip_shows_ABBREVIATIONS_ONLY_never_the_school_name():
+    """My 633px regression: a long name has no safe home in a 39px box."""
+    html = _strip([_strip_game()])
+    assert ">NC<" in html
+    assert "North Carolina" not in html
+
+
+def test_the_head_becomes_the_clock_when_a_game_is_live():
+    g = _strip_game(shared_is_live=True, shared_game_state={"live": True, "clock": "7:31"})
+    assert "7:31" in _strip([g])
+
+
+def test_a_final_game_says_final():
+    g = _strip_game(shared_game_state={"final": True})
+    assert "Final" in _strip([g])
+
+
+def test_the_generic_strips_prose_blocks_are_gone():
+    html = _strip([_strip_game()])
     assert "cards-strip-live" not in html
     assert "cards-strip-lens" not in html
 
 
-def test_the_strip_drops_the_prose_that_made_it_435px():
-    """Those two blocks were 174px of a 435px card and both repeat the main card."""
-    html = _strip([_strip_game()])
-    assert "SmartSim 2.0 projects" not in html
-    assert "Projection contract" not in html
-
-
-def test_the_strip_shows_ABBREVIATIONS_ONLY_never_the_school_name():
-    """MEASURED TWICE, and my first fix made it worse.
-
-    The generic strip put `game.away.name` in a 39px box and the board showed
-    "Sacram ento State" and "Easte Michi n". My first fix kept the name as a
-    secondary `cards-mini-copy` line -- and `dense_cards.css` sets
-    `overflow-wrap: anywhere` on that class, so "North Carolina" rendered
-    **1px wide and 226px tall**, one character per line. The strip card went
-    435px -> 633px.
-
-    A long string has no safe home in this box. The full name is on the card
-    directly below.
-    """
-    html = _strip([_strip_game()])
-    assert '<div class="cards-head-team-name">SS</div>' in html
-    assert "Sacramento State" not in html
-    assert "Eastern Michigan" not in html
-
-
-def test_the_strip_shows_market_and_model_side_by_side():
-    html = _strip([_strip_game()])
-    for label in ("Market spread", "Market total", "Projected total", "Projected spread"):
-        assert label in html
-
-
-def test_the_strip_meta_line_is_omitted_when_there_is_no_projection():
-    """One short line, and only with a real number in it -- never an empty bar."""
+def test_facts_are_omitted_when_their_number_is_absent():
+    """A dash reads as a broken card; an absent fact just closes the gap."""
     g = _strip_game()
     g["ncaaf_card"]["scoreboard"] = {"kickoff_label": "Sat"}
+    g["markets"] = {}
     html = _strip([g])
-    assert "cards-strip-meta" not in html
+    assert "cards-strip-pregame-total" not in html
+    assert "Win prob" not in html
 
 
 def test_the_strip_markup_is_balanced():
@@ -243,15 +266,11 @@ def test_the_strip_markup_is_balanced():
 def test_every_class_the_strip_uses_is_styled_by_the_sheet_this_board_loads():
     """THE `.cards-market-sub` LESSON, made structural.
 
-    That class had a colour rule and NO font-size rule in
-    `shared/dense_cards.css`, so it inherited 16px body text and rendered
-    LARGER than the value it annotates. MLB's linescore classes
-    (`cards-linescore-head`, `cards-linescore-row`, `cards-linescore-team`,
-    `is-compact`) have zero rules in that sheet, so copying MLB's strip markup
-    verbatim would have shipped unstyled markup for the same reason.
-
-    `game_cards_board.html` loads `shared/dense_cards.css`; this asserts every
-    class the NCAAF strip emits appears there.
+    That class had a colour rule and NO font-size rule, so it inherited 16px
+    body text. MLB's `cards-linescore*` have zero rules here. Soccer's
+    `cards-strip-pregame-*` ARE global (only
+    `.cards-strip-card--soccer .cards-head-team-name` is scoped), which is why
+    they are safe to reuse -- checked, not assumed.
     """
     css = (REPO_ROOT / "syndicate" / "static" / "shared" / "dense_cards.css").read_text(encoding="utf-8")
     html = _strip([_strip_game()])
