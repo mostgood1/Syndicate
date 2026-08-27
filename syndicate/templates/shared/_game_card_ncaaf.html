@@ -100,6 +100,102 @@
       </div>
     </div>
 
+    {#- COMPACT HEADER, modelled on `_game_card_mlb.html`.
+
+        The NCAAF card had NONE of this: no score ribbon, no market row, and the
+        tab rail sat BELOW the panels. `market_tiles` were built in
+        `ncaaf/cards.py` and never rendered on the main card, so a reader saw a
+        full projection and a full market line and neither of them together.
+
+        Ordering matters and is MLB's: identity -> the projection -> the market
+        -> navigation. The tabs come last in the header because they are how you
+        leave the summary, not part of it. -#}
+    {% set projected_total = scoreboard.get('total_points') if scoreboard else none %}
+    {% set projected_spread = scoreboard.get('spread_label') if scoreboard else none %}
+    {% set win_probability = scoreboard.get('win_probability') if scoreboard else none %}
+    {% if projected_total is not none or projected_spread %}
+      <div class="cards-score-ribbon">
+        <div class="cards-score-meta">
+          <div class="cards-sim-line">
+            {%- if projected_spread %}{{ projected_spread }}{% endif -%}
+            {%- if projected_total is not none %} · total {{ projected_total }}{% endif -%}
+            {%- if win_probability %} · {{ win_probability }} home win{% endif -%}
+          </div>
+          {% if scoreboard.get('home_points') is not none and scoreboard.get('away_points') is not none %}
+            <div class="cards-mini-copy">
+              Projected {{ game.home.abbr }} {{ scoreboard.get('home_points') }} — {{ scoreboard.get('away_points') }} {{ game.away.abbr }}
+            </div>
+          {% endif %}
+          {% if scoreboard.get('source_label') %}
+            <div class="cards-mini-copy">{{ scoreboard.get('source_label') }}</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    {#- The market row. Falls back to `metrics` exactly as MLB's does, so a card
+        whose tiles have not been built still shows the numbers it has rather
+        than an empty strip. -#}
+    {% if game.get('market_tiles') or metrics %}
+      <div class="cards-market-row">
+        {% if game.get('market_tiles') %}
+          {% for tile in game.get('market_tiles') %}
+            <div class="cards-market-tile">
+              <div class="cards-market-label">{{ tile.label }}</div>
+              <div class="cards-market-main">{{ tile.title }}</div>
+              <div class="cards-market-sub">{{ tile.sub }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          {% for metric in metrics[:4] %}
+            <div class="cards-market-tile">
+              <div class="cards-market-label">{{ metric.label }}</div>
+              <div class="cards-market-main">{{ metric.value }}</div>
+              <div class="cards-market-sub">{{ game.away.abbr }} @ {{ game.home.abbr }}</div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="cards-tabs-rail">
+      <div class="cards-tabs" role="tablist" aria-label="Game card sections">
+        {% for tab in card_tabs %}
+          <button class="cards-tab{% if loop.first %} is-active{% endif %}"
+                  type="button"
+                  role="tab"
+                  id="tab-{{ card_dom_id }}-{{ tab.id }}"
+                  data-tab-target="{{ tab.id }}"
+                  aria-controls="panel-{{ card_dom_id }}-{{ tab.id }}"
+                  aria-selected="{{ 'true' if loop.first else 'false' }}"
+                  tabindex="{{ '0' if loop.first else '-1' }}">{{ tab.label }}</button>
+        {% endfor %}
+      </div>
+      <div class="cards-mini-metrics cards-mini-metrics--rail">
+        {#- The first three `metrics` are the projection ones
+            (ncaaf/cards.py builds Market spread / Market total / Projected
+            total / Projected spread / Home mean / Away mean / Win probability),
+            so the rail now carries numbers instead of "Source: Runtime". -#}
+        {% if metrics %}
+          {% for metric in metrics[:4] %}
+            <div class="cards-mini-metric">
+              <span>{{ metric.label }}</span>
+              <strong>{{ metric.value }}</strong>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="cards-mini-metric">
+            <span>Source</span>
+            <strong>{{ scoreboard.source_label if scoreboard and scoreboard.source_label else 'Runtime' }}</strong>
+          </div>
+          <div class="cards-mini-metric">
+            <span>State</span>
+            <strong>{{ game.status }}</strong>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
     <section class="cards-panel is-active" data-panel-id="identity" id="panel-{{ card_dom_id }}-identity" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-identity" tabindex="0">
       <div class="cards-overview-grid">
         <div class="cards-panel-card cards-panel-card--overview-main">
@@ -301,24 +397,6 @@
       </div>
     </section>
 
-    <div class="cards-tabs-rail">
-      <div class="cards-tabs" role="tablist" aria-label="Game card sections">
-        {% for tab in card_tabs %}
-          <button class="cards-tab{% if loop.first %} is-active{% endif %}"
-                  type="button"
-                  role="tab"
-                  id="tab-{{ card_dom_id }}-{{ tab.id }}"
-                  data-tab-target="{{ tab.id }}"
-                  aria-controls="panel-{{ card_dom_id }}-{{ tab.id }}"
-                  aria-selected="{{ 'true' if loop.first else 'false' }}"
-                  tabindex="{{ '0' if loop.first else '-1' }}">{{ tab.label }}</button>
-        {% endfor %}
-      </div>
-      <div class="cards-mini-metrics cards-mini-metrics--rail">
-        <div class="cards-mini-metric">
-          <span>Source</span>
-          <strong>{{ scoreboard.source_label if scoreboard and scoreboard.source_label else 'Runtime' }}</strong>
-        </div>
         <div class="cards-mini-metric">
           <span>State</span>
           <strong>{{ game.status }}</strong>

@@ -457,7 +457,7 @@ def _market_metric_row(margin: float | None) -> dict[str, Any] | None:
     return {"label": "Market spread", "value": f"{-margin:+.1f}"}
 
 
-def _smartsim2_standalone_market_tiles(row: dict[str, Any]) -> list[dict[str, Any]]:
+def _smartsim2_standalone_market_tiles(row: dict[str, Any], projection: Any = None) -> list[dict[str, Any]]:
     """The four header tiles, showing the real line once one exists.
 
     These used to be four hardcoded placeholders ("Source / Tier / Status /
@@ -477,14 +477,57 @@ def _smartsim2_standalone_market_tiles(row: dict[str, Any]) -> list[dict[str, An
         spread_title = "Pick'em" if margin == 0 else f"{favourite} -{abs(margin):.1f}"
         spread_sub = f"Market spread - {books} book{'s' if books != 1 else ''}"
 
+    # MODEL AGAINST MARKET, which is what a compact card is FOR. Two of these
+    # four tiles used to be metadata -- "Source: SmartSim 2.0" and a book count
+    # -- so a card could carry a full projection and a full market line and
+    # show the reader neither of them side by side. MLB's card is the
+    # reference: `cards-market-row` puts the comparison above the fold.
+    #
+    # This is only possible now because the projection reaches the shared
+    # contract at all; before 2026-08-27 `shared_predictions.margin_mean` and
+    # `.total_mean` were null on 51/51 cards.
+    model_margin = _safe_float(getattr(projection, "margin_mean", None))
+    model_total = _safe_float(getattr(projection, "total_mean", None))
+    home_team = row.get("home_team")
+    away_team = row.get("away_team")
+
+    # SIGN CONVENTION, stated because `state.md` records a whole NFL analysis
+    # lost to it: BOTH margins are home-relative and positive means the home
+    # side is favoured. The edge is model minus market, so positive = the model
+    # likes the HOME side more than the book does.
+    if model_margin is None:
+        spread_model_sub = "No model spread"
+    else:
+        model_fav = home_team if model_margin > 0 else away_team
+        model_spread_text = "Pick'em" if model_margin == 0 else f"{model_fav} -{abs(model_margin):.1f}"
+        if margin is None:
+            spread_model_sub = f"Model {model_spread_text}"
+        else:
+            spread_model_sub = f"Model {model_spread_text} · {model_margin - margin:+.1f} vs market"
+
+    if model_total is None:
+        total_model_sub = "No model total"
+    elif total is None:
+        total_model_sub = f"Model {model_total:.1f}"
+    else:
+        total_model_sub = f"Model {model_total:.1f} · {model_total - total:+.1f} vs market"
+
+    home_win = _safe_float(getattr(projection, "home_win_rate", None))
+    if home_win is None:
+        win_title, win_sub = "No model", "Win probability unavailable"
+    else:
+        win_side = home_team if home_win >= 0.5 else away_team
+        win_title = f"{win_side} {max(home_win, 1.0 - home_win) * 100:.0f}%"
+        win_sub = "Model win probability"
+
     return [
-        {"label": "Spread", "title": spread_title, "sub": spread_sub},
+        {"label": "Spread", "title": spread_title, "sub": spread_model_sub if model_margin is not None else spread_sub},
         {
             "label": "Total",
             "title": f"{total:.1f}" if total is not None else "No line",
-            "sub": "Market total" if total is not None else "No book quoted yet",
+            "sub": total_model_sub if model_total is not None else ("Market total" if total is not None else "No book quoted yet"),
         },
-        {"label": "Source", "title": SMARTSIM2_PUBLIC_LABEL, "sub": "Projection engine"},
+        {"label": "Win probability", "title": win_title, "sub": win_sub},
         {
             "label": "Books",
             "title": str(books) if books else "-",
@@ -2245,6 +2288,13 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
             {"label": "Status", "title": str(publication_status or "-").title(), "sub": "Publication state"},
             {"label": "Priority", "title": str(publication_priority or "-"), "sub": "Board order"},
         ],
+        # TOP LEVEL, beside `ncaaf_card` and NOT inside it.
+        # `publication_adapter._shared_predictions` reads `game["predictions"]`.
+        # The first cut put this inside `ncaaf_card`, where nothing reads it:
+        # production deployed clean and still served 0/51 non-null means.
+        # The structural test asserted the builders CALL the helper and never
+        # WHERE the result lands, so it passed on a payload that did nothing.
+        "predictions": _ncaaf_shared_predictions_block(projection),
         "ncaaf_card": {
             "version": _NCAAF_CARD_CONTRACT_VERSION,
             "summary": {
@@ -2261,7 +2311,6 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
                 "away": away_context,
             },
             "scoreboard": scoreboard,
-            "predictions": _ncaaf_shared_predictions_block(projection),
             "scoreboard_header": {
                 "away": {
                     "abbr": away_context["abbreviation"],
@@ -2467,7 +2516,7 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
                 ],
             },
         ],
-        "market_tiles": _smartsim2_standalone_market_tiles(row),
+        "market_tiles": _smartsim2_standalone_market_tiles(row, projection),
         # `#557`. THE SHARED CONTRACT'S OWN BLOCK, and it is what was missing.
         #
         # `publication_adapter._shared_markets` builds the cross-sport
@@ -2504,6 +2553,13 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
         "prop_recommendations": ncaaf_props.prop_recommendations_for_game(
             season=season, week=week, home_team=home_team, away_team=away_team
         ),
+        # TOP LEVEL, beside `ncaaf_card` and NOT inside it.
+        # `publication_adapter._shared_predictions` reads `game["predictions"]`.
+        # The first cut put this inside `ncaaf_card`, where nothing reads it:
+        # production deployed clean and still served 0/51 non-null means.
+        # The structural test asserted the builders CALL the helper and never
+        # WHERE the result lands, so it passed on a payload that did nothing.
+        "predictions": _ncaaf_shared_predictions_block(projection, market_margin=row_market_margin, market_total=row_market_total),
         "ncaaf_card": {
             "version": _NCAAF_CARD_CONTRACT_VERSION,
             "summary": {
@@ -2520,9 +2576,6 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
                 "away": away_context,
             },
             "scoreboard": scoreboard,
-            "predictions": _ncaaf_shared_predictions_block(
-                projection, market_margin=row_market_margin, market_total=row_market_total
-            ),
             "scoreboard_header": {
                 "away": {
                     "abbr": away_context["abbreviation"],

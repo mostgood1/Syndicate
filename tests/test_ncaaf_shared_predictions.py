@@ -191,3 +191,42 @@ def test_every_ncaaf_card_contract_builder_calls_the_helper():
             if "_ncaaf_shared_predictions_block" in calls:
                 seen.add(node.name)
     assert seen == builders, f"builders NOT publishing shared predictions: {sorted(builders - seen)}"
+
+
+def test_predictions_is_a_TOP_LEVEL_key_of_every_builder_s_returned_game():
+    """PLACEMENT, not presence -- the gap that shipped a no-op to production.
+
+    The first cut put `predictions` inside the `ncaaf_card` sub-dict. Every
+    test above passed, the deploy went out clean, and production still served
+    `shared_predictions.margin_mean` null on 51/51 -- because
+    `publication_adapter._shared_predictions` reads `game["predictions"]` at the
+    TOP level and nothing reads `game["ncaaf_card"]["predictions"]`.
+
+    "The builder calls the helper" was true and useless. This asserts the key
+    lands where the reader looks.
+    """
+    source = Path(_ncaaf_cards.__file__).read_text(encoding="utf-8")
+    tree = _ast.parse(source)
+    builders = {
+        "_build_ncaaf_card_contract",
+        "_build_smartsim_ncaaf_card_contract",
+        "_build_smartsim2_standalone_ncaaf_card_contract",
+    }
+    checked = set()
+    for node in _ast.walk(tree):
+        if not (isinstance(node, _ast.FunctionDef) and node.name in builders):
+            continue
+        for ret in (n for n in _ast.walk(node) if isinstance(n, _ast.Return)):
+            if not isinstance(ret.value, _ast.Dict):
+                continue
+            top_keys = {
+                k.value for k in ret.value.keys
+                if isinstance(k, _ast.Constant) and isinstance(k.value, str)
+            }
+            if "ncaaf_card" in top_keys or "scoreboard" in top_keys:
+                assert "predictions" in top_keys, (
+                    f"{node.name} returns a game dict whose TOP-LEVEL keys do not include "
+                    f"'predictions'; the adapter will not see it. keys={sorted(top_keys)[:12]}"
+                )
+                checked.add(node.name)
+    assert checked == builders, f"never verified the returned dict for: {sorted(builders - checked)}"
