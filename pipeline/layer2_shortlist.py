@@ -829,7 +829,47 @@ def build_layer2_shortlist(
                     "venue_reprice",
                     lambda: _reprice_grid_from_venues(grid, sport, selected_date),
                 ),
-                ("projections", lambda: attach_projections(grid, sport=sport, selected_date=selected_date)),
+                # `#587`. JOINED ACROSS THE SAME DATES THE ROWS CAME FROM.
+                #
+                # This is `#569`'s defect exactly, one join later and unfixed:
+                # `quote_rows` EXTENDS across `window_dates` (see its own
+                # comment above -- "NFL accumulated five shards at once"), so
+                # the grid holds rows from every date in the window, while this
+                # join asked for `selected_date` ALONE. Rows from any other
+                # window date could not be projected, because the index built
+                # for one date does not contain the other dates' games.
+                #
+                # NCAAF is where it is total rather than partial, and the
+                # measurement is unambiguous:
+                #
+                #     PREGAME_PROJECTION_JOIN sport=ncaaf considered=None
+                #       projected=0 reason=no NCAAF SmartSim2 projections for
+                #       this date
+                #
+                #     /api/board/game-chips?date=2026-08-29
+                #       total=250  ncaaf=0  {nfl: 16, soccer: 234}
+                #
+                # Zero NCAAF chips on its own opening Saturday, while NFL --
+                # also out of season -- carries 16. NCAAF's slate window is 3
+                # days and its games are 2-3 days out, so every NCAAF row in
+                # the grid comes from a date that is NOT `selected_date`, and
+                # the join therefore matched nothing on every single build.
+                #
+                # NOT AN NCAAF-ONLY FIX, deliberately. The same shape applies to
+                # any sport whose window spans days -- nfl (5) and soccer -- and
+                # `#569` already established that the correct scope for a
+                # window-spanning grid is the window. Single-date sports
+                # (mlb/nba/wnba/nhl/ncaab) resolve to a one-element window, so
+                # this is a strict no-op for them.
+                #
+                # LAST DATE WINS ON A COLLISION, which cannot occur in practice:
+                # a row belongs to exactly one kickoff date, so two dates'
+                # indexes never claim the same row. Coverage counters are summed
+                # rather than overwritten so the diagnostic still reports the
+                # whole window.
+                ("projections", lambda: _attach_projections_over_window(
+                    grid, sport=sport, selected_date=selected_date, window_dates=window_dates
+                )),
                 ("margin_model", lambda: attach_margin_model(grid)),
                 # Same functions the serve-time endpoint calls
                 # (`_attach_book_grid_*` in `blueprints/intelligence.py`), for
@@ -1695,3 +1735,92 @@ def build_layer2_shortlist(
     except Exception as exc:
         shortlist["clv_openings_error"] = f"{type(exc).__name__}: {exc}"
     return shortlist
+
+
+# ---------------------------------------------------------------------------
+# DEFINED AT THE END OF THE MODULE ON PURPOSE.
+#
+# `tests/test_shortlist_enrichment_parity.py::test_the_state_correction_runs_
+# before_projections` pins `#413`'s ordering rule by finding the FIRST
+# `attach_projections(` CALL in this file and requiring it to come after
+# `attach_live_game_state_from_lens(`. `live_edge_policy` reads the state the
+# correction writes, so stamping projections first would leave a settled game's
+# edges standing.
+#
+# The enrichment tuple's order is unchanged and still correct -- but a helper
+# defined ABOVE that tuple puts an `attach_projections(` call earlier in the
+# source than the state correction, and the guard reads source order. It failed
+# exactly that way when this helper sat above `build_layer2_shortlist`. Keeping
+# the definition down here keeps the guard measuring what it means to measure
+# instead of being weakened to accommodate a helper.
+# ---------------------------------------------------------------------------
+def _attach_projections_over_window(
+    grid: list,
+    *,
+    sport: str,
+    selected_date: str,
+    window_dates: Iterable[str],
+) -> dict[str, Any]:
+    """`attach_projections` across every date the grid's rows came from.
+
+    See the call site for why. Summing rather than replacing matters: a caller
+    reading `rows_with_projection` off the last date alone would report a
+    fraction of the window and look like a partial join.
+
+    A per-date failure is recorded and skipped rather than raised -- the
+    enrichment loop already treats an exception as fatal to the step, and
+    losing six dates because one shard is unreadable is the failure mode
+    `#379` fixed on the quote side.
+    """
+    from syndicate.features.shared.board_enrichment import attach_projections
+
+    dates = [str(d)[:10] for d in (window_dates or []) if str(d or "").strip()]
+    if selected_date and selected_date[:10] not in dates:
+        dates.insert(0, selected_date[:10])
+    if not dates:
+        dates = [selected_date]
+
+    merged: dict[str, Any] = {}
+    per_date: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+    summable = ("rows_considered", "rows_with_projection", "rows_with_true_probability")
+
+    for date_key in dates:
+        try:
+            coverage = attach_projections(grid, sport=sport, selected_date=date_key)
+        except Exception as exc:  # noqa: BLE001 - one bad date must not lose the rest
+            errors[date_key] = f"{type(exc).__name__}: {exc}"
+            continue
+        if not isinstance(coverage, Mapping):
+            continue
+        # The per-date REASON is kept alongside the counts, not just the
+        # counts: "which dates were empty and why" is the whole diagnostic
+        # value of a windowed join, and a summed zero cannot express it.
+        per_date[date_key] = {k: coverage.get(k) for k in summable if coverage.get(k) is not None}
+        if coverage.get("reason"):
+            per_date[date_key]["reason"] = coverage.get("reason")
+        for key, value in coverage.items():
+            if key in summable and isinstance(value, (int, float)):
+                merged[key] = (merged.get(key) or 0) + value
+            elif key not in merged or merged.get(key) in (None, 0, False, ""):
+                merged[key] = value
+
+    if len(dates) > 1:
+        merged["window_dates"] = list(dates)
+        merged["per_date"] = per_date
+    if errors:
+        merged["date_errors"] = errors
+    # A window that produced nothing anywhere must not inherit the LAST date's
+    # reason as though it were the whole story -- that is how "no projections
+    # for this date" came to describe a seven-date window.
+    if len(dates) > 1 and not merged.get("rows_with_projection"):
+        reasons = {str(v.get("reason")) for v in per_date.values() if isinstance(v, Mapping) and v.get("reason")}
+        # OVERWRITE, not `or`. The per-date reason is inherited into `merged`
+        # by the copy loop above, and keeping it is precisely the bug: "no
+        # NCAAF SmartSim2 projections for this date" is what a seven-date
+        # window reported on production, naming a date when the question was
+        # about a window. The per-date reasons are preserved below.
+        merged["reason"] = f"no projections across {len(dates)} window dates"
+        if reasons:
+            merged["reasons_by_date"] = sorted(reasons)
+    return merged
