@@ -193,7 +193,37 @@ _NFL_ALIAS_TO_NAME: dict[str, str] = {
 # this is a live gap rather than a theoretical one. Supplemented rather than
 # replaced: the vendored map is the source of truth where it answers, and this
 # only fills what it leaves None.
+#
+# THE GAP IS SYSTEMATIC, not a list of one-offs, and the 2026-08-27 additions
+# below are the rest of it. `_basketball_alias_to_name` merges NBA and WNBA and
+# drops any key naming two clubs, so EVERY city fielding both loses its standard
+# three-letter code. `min` above is that rule's first casualty (Lynx vs
+# Timberwolves); `phx`, `atl`, `chi`, `dal` and `ind` are the others, and they
+# were absent for the same reason rather than by any separate accident.
+#
+# MEASURED IN PRODUCTION 2026-08-27T19:33Z, reported by lane
+# `polymarket-catalogue-pagination` and re-derived here before acting:
+#
+#     board:   'Washington Mystics @ Phoenix Mercury'   want 'h2h|home'
+#     offered: ['gsv-ny@None', 'wsh-phx@None']          -> refused no_match
+#
+# `wsh` resolved and `phx` did not, so a fixture the venue was plainly offering
+# went unjoined. Roughly 22 rows (`no_match|wnba|h2h: 7`, `|totals: 15`).
+#
+# SAFE BECAUSE THE SUPPLEMENT IS WNBA-ONLY. `_alias_map` applies it for
+# `slug == "wnba"` and the vendored map still wins where it answers, so NBA's
+# `phx -> Phoenix Suns` is untouched. Each key added here names exactly ONE
+# WNBA club -- verified against the live club list, where every one of these
+# cities fields a single WNBA team -- so nothing ambiguous is being resolved by
+# fiat. This is the opposite of the soccer `stl` case, where two leagues really
+# do both claim the token and the correct answer is to refuse.
 _WNBA_ALIAS_SUPPLEMENT: dict[str, str] = {
+    # Added 2026-08-27 -- the NBA-colliding city codes, see the note above.
+    "phx": "phoenix mercury",
+    "atl": "atlanta dream",
+    "chi": "chicago sky",
+    "dal": "dallas wings",
+    "ind": "indiana fever",
     "min": "minnesota lynx", "por": "portland fire", "gs": "golden state valkyries",
     "gsv": "golden state valkyries", "tor": "toronto tempo",
 }
