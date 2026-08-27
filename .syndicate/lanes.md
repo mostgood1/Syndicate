@@ -1631,8 +1631,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   to `lanes_history.md`. Work continued after that close, so this is a fresh
   block for what is still OWED — the history entry stays as the record.
 - Files: `syndicate/features/shared/{kalshi_board_join,kalshi_orders,bet_status_wnba,bet_status_soccer,polymarket_us_orders,board_enrichment}.py`,
-  `scripts/build_wnba_boxscores.py`, `pipeline/intelligence_state.py`,
+  `scripts/build_wnba_boxscores.py`,
   `syndicate/blueprints/wnba.py` and their tests. **ALL CLAIMS RELEASED.**
+- Claim reconciliation `[2026-08-27, USER DECISION]`: the intelligence-state
+  pipeline module was REMOVED from the `- Files:` line above by lane
+  `board-cycle-overview-throughput`. This lane already said ALL CLAIMS
+  RELEASED and its session (syndicate-43) has ENDED, but the invariant checker
+  parses that line literally and cannot read prose, so the path still
+  registered as a live claim and reported CONTESTED. Striking it makes the
+  machine-readable claim agree with what this lane already states. None of the
+  five OWED items below involve that module.
 - VERIFIED (evidence `log/2026-08-26.md`, measurements `deploys.md`): Kalshi
   shard 3 funded (3 MLB fills, `exchange_index=3`) · spreads join sign (15 of 30
   inverted -> 0) · spreads PLACE correctly (`AZ2` home -1.5 -> YES, filled
@@ -1918,6 +1926,14 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none. Ships DEFAULT-OFF behind the existing payload flag — the
   profile was calibrated with pace_index pinned at +0.4, so turning this on is
   a mechanism added to a calibrated engine and owes a re-fit before any deploy.
+
+### board-cycle-overview-throughput — OPEN — opened 2026-08-27 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
+- Goal: a board build refused for memory yields `sports=7`, not `sports=0`, and today's date wins a larger share of loop iterations.
+- Files: `syndicate/features/intelligence.py`, `pipeline/intelligence_state.py` and their tests.
+- Hypothesis: (a) `_overview_headroom_exhausted` fires at `sports_done=0` because MLB runs FIRST and the loop `break`s, so the seven CHEAP sports are refused on MLB's 3000MB floor instead of their own 1500MB one. (b) `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` defaults to 300s, which is SHORTER than the loop's own measured period (214s-783s), so the "slow trickle" throttle for today+1/+2 never throttles and next-day builds take ~half of all iterations.
+- Falsification test: (a) is wrong if production still logs `sports_done=0` with `floor=streamed` after the change, or if cheap sports fail their own 1500MB floor at the observed headroom (2550-2800MB). (b) is wrong if the today:tomorrow build ratio does not move after raising the default.
+- Verification: on refresh-worker after deploy — `BOARD_OVERVIEW_READY` reads `sports=7` (or 8) on iterations that ALSO log `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb`; and `BUILD_SPAN_ENTER stage=build_intelligence_overview date=<today>` outnumbers `date=<today+1>` by >=4:1 over 30 minutes. BASELINE MEASURED 2026-08-27 13:50-14:52Z on refresh-worker `277062cd`: 18 consecutive builds all `sports=0`, today:tomorrow ~1:1, cycle 214s cheap / 674-783s when the overview ran.
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

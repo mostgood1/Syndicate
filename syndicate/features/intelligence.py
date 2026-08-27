@@ -2795,7 +2795,45 @@ def build_intelligence_overview(
             sports_done=sports_done,
             sports_total=len([item for item in sports if isinstance(item, dict)]),
         ):
-            break
+            # `continue`, NOT `break`. A refusal is now about THIS SPORT, and
+            # skipping it must not also skip every sport behind it.
+            #
+            # `break` was correct under the premise the 3000MB floor was sized
+            # on -- "the loop holds every sport's hydrated overview
+            # simultaneously, so peak is the SUM" (see
+            # _OVERVIEW_MIN_SAFE_HEADROOM_BYTES). If peak is the SUM, one
+            # refusal condemns the rest and stopping is right. THE STREAMING
+            # CUTOVER DELETED THAT PREMISE: each sport is released before the
+            # next hydrates (that is what the `sport_row = None` below is for),
+            # and the two-floor split right above already encodes the
+            # consequence -- MLB is expensive at 3000MB, the other seven are
+            # cheap at 1500MB. `break` was the last line still acting as though
+            # there were one floor and one shared budget.
+            #
+            # MEASURED IN PRODUCTION, refresh-worker `277062cd`, 2026-08-27
+            # 13:50-14:52Z: EIGHTEEN CONSECUTIVE BUILDS read
+            # `BOARD_OVERVIEW_READY sports=0`, every one of them preceded by
+            #     OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb floor=expensive
+            #     floor_mb=3000 sports_done=0 sports_total=8
+            #     {headroom_mb: 2798.5, min_required_mb: 3000.0}
+            # MLB runs FIRST, so the guard fired at sports_done=0 and `break`
+            # threw away all eight. Headroom is `max - anon` and the worker's
+            # steady-state anon is 1300-1550MB in a 4096MB container, so
+            # headroom sits at 2550-2800MB and NEVER reaches 3000MB -- the
+            # expensive floor is unreachable at rest, which made this the
+            # steady state rather than an edge case.
+            #
+            # The seven behind MLB clear their own floor at that same headroom,
+            # and they are cheap: 2026-08-14 measured nfl/ncaaf/ncaab/nhl/soccer
+            # at +1.7MB in 171ms for all five. So this turns `sports=0` into
+            # `sports=7` at no measured memory cost.
+            #
+            # The protection is NOT weakened. The floor is re-read per sport,
+            # so a genuinely exhausted container refuses each sport in turn --
+            # and re-reading after each hydration catches a sport that grows
+            # unexpectedly, which a single `break` decided once and never
+            # revisited.
+            continue
         print(
             f"[intelligence] OVERVIEW_SPORT_BEGIN sport={sport_slug} "
             f"force_refresh={bool(force_refresh)} skip_game_hydration={bool(skip_game_hydration)}",

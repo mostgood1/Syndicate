@@ -5904,7 +5904,40 @@ class IntelligenceStateService:
         function.
         """
         today = central_today_iso()
-        slow_refresh_seconds = max(30, _env_int("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS", 300))
+        # DEFAULT 300 -> 1800. A THROTTLE FINER THAN ITS OWN CALLER'S PERIOD IS
+        # NOT A THROTTLE.
+        #
+        # The docstring above promises today+1/today+2 cost "a slow trickle",
+        # not "a flat 3x multiply". 300s could never deliver that, because this
+        # function is called once per iteration of `_background_loop` and that
+        # loop's period is LONGER than 300s in every regime measured.
+        #
+        # MEASURED, refresh-worker `277062cd`, 2026-08-27 12:55-16:03Z, pairing
+        # CALLING_COMPUTE -> RETURNED_FROM_COMPUTE:
+        #     cheap iteration   ~150s compute + ~64s wait  = ~214s
+        #     real iteration    674-783s (overview actually ran)
+        # So by the time the loop comes back around, the 300s window has always
+        # already expired and today+1 is re-queued essentially every pass. The
+        # observed BUILD_SPAN_ENTER sequence is a clean 1:1 alternation --
+        #     13:50 today · 13:54 today+1 · 13:58 today · 14:02 today+1 · ...
+        # -- so TODAY'S board, the one anything is actually priced off, was
+        # rebuilt at HALF the loop rate for the whole window.
+        #
+        # 1800s is chosen against the SLOWEST measured period, not the fastest:
+        # at 783s it still gates (1800 > 783), and at the 214s cheap cadence
+        # today+1 falls to roughly one pass in eight. Today's share of
+        # iterations goes ~50% -> ~88%.
+        #
+        # Next-day boards do not need better than half-hourly: their quotes are
+        # hours old by construction, and QUOTE_AGE_SERVED on the same worker
+        # read seen_p50=4285s (71 min) for TODAY. A next-day rebuild every 30
+        # minutes is still far finer than the data underneath it changes.
+        #
+        # Left env-overridable and NOT added to render.yaml on purpose -- a
+        # render.yaml push fires `blueprint_sync`, which applies to production
+        # regardless of autoDeploy and rewrites the whole env block (CLAUDE.md).
+        # A default change ships with an ordinary code deploy instead.
+        slow_refresh_seconds = max(30, _env_int("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS", 1800))
         now = time.time()
         for window_date in _default_board_window_dates(today):
             if window_date != today:

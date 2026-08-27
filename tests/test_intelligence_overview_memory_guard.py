@@ -217,9 +217,14 @@ def _run_overview(*, skip_game_hydration: bool, headroom_mb: float):
         )
 
 
-def test_hydrated_pass_stops_before_the_first_sport_that_would_not_fit():
-    # Headroom below the floor for every check, so it stops immediately and
-    # returns an empty-but-valid overview rather than being SIGKILLed.
+def test_hydrated_pass_skips_every_sport_when_nothing_fits():
+    # Headroom below the floor for every check, so every sport is refused in
+    # turn and the pass returns an empty-but-valid overview rather than being
+    # SIGKILLed. Renamed from "stops before the first sport that would not
+    # fit": the loop no longer STOPS, it SKIPS -- see
+    # test_the_production_band_skips_only_mlb for why that distinction is the
+    # whole point. The assertion is unchanged because 943MB is under BOTH
+    # floors, which is also why this test could never have caught the defect.
     assert _run_overview(skip_game_hydration=False, headroom_mb=943.0) == []
 
 
@@ -236,3 +241,71 @@ def test_fingerprint_pass_is_never_truncated():
     # stops-immediately test above; this one must still build everything.
     built = _run_overview(skip_game_hydration=True, headroom_mb=943.0)
     assert [row["slug"] for row in built] == ["mlb", "nba", "wnba", "nhl", "soccer"]
+
+
+def _run_overview_with_real_floors(*, headroom_mb: float):
+    """Like `_run_overview`, but `sufficient` is computed from the floor the
+    guard actually passed in, not pinned by the caller.
+
+    `_run_overview`'s mock returns ONE snapshot with a fixed
+    `min_required_mb=1000.0` for every call, so it answers the same for MLB's
+    3000MB floor and the cheap sports' 1500MB floor. That makes the two-floor
+    split -- the entire mechanism under test here -- INVISIBLE to it, and it is
+    why every test above passed throughout the eighteen consecutive
+    `sports=0` builds measured in production on 2026-08-27.
+    """
+    sports = [{"slug": slug} for slug in ("mlb", "nba", "wnba", "nhl", "soccer")]
+
+    def _floor_aware(floor_bytes, *args, **kwargs):
+        return _snapshot(
+            headroom_mb=headroom_mb,
+            min_required_mb=floor_bytes / BYTES_PER_MB,
+        )
+
+    with patch.object(intelligence_module, "_configured_syndicate_sports", return_value=sports), patch.object(
+        intelligence_module, "_effective_date", return_value="2026-08-27"
+    ), patch.object(
+        intelligence_module,
+        "_build_sport_overview",
+        side_effect=lambda sport, *a, **k: {"slug": sport["slug"]},
+    ), patch.object(
+        intelligence_module, "_intel_trace", lambda *a, **k: None
+    ), patch(
+        "syndicate.features.shared.memory_observability.memory_headroom_snapshot",
+        side_effect=_floor_aware,
+    ):
+        return intelligence_module.build_intelligence_overview(
+            selected_date="2026-08-27",
+            force_refresh=True,
+            skip_game_hydration=False,
+        )
+
+
+def test_the_production_band_skips_only_mlb():
+    """The band between the two floors is where production actually sits.
+
+    MEASURED, refresh-worker `277062cd`, 2026-08-27 13:50-14:52Z: headroom
+    2550-2800MB on every cycle, which is UNDER MLB's 3000MB floor and OVER the
+    cheap sports' 1500MB one. The loop used to `break` there, so all eight
+    sports were thrown away on MLB's floor and `BOARD_OVERVIEW_READY` read
+    `sports=0` eighteen times running.
+
+    Headroom is `max - anon` and the worker's steady-state anon is 1300-1550MB
+    in a 4096MB container, so this band is the STEADY STATE, not an edge case.
+    """
+    built = _run_overview_with_real_floors(headroom_mb=2798.5)
+    assert [row["slug"] for row in built] == ["nba", "wnba", "nhl", "soccer"]
+
+
+def test_mlb_still_builds_when_its_own_floor_clears():
+    # The gate in front of MLB is not relaxed by the skip -- it still has to
+    # clear 3000MB on its own, it just no longer condemns the other seven.
+    built = _run_overview_with_real_floors(headroom_mb=3001.0)
+    assert [row["slug"] for row in built] == ["mlb", "nba", "wnba", "nhl", "soccer"]
+
+
+def test_a_late_sport_is_still_refused_after_an_earlier_one_is_skipped():
+    # Skipping must not disarm the guard for what follows. Under both floors,
+    # every sport is refused individually -- the protection is per-sport now,
+    # not all-or-nothing.
+    assert _run_overview_with_real_floors(headroom_mb=1499.0) == []

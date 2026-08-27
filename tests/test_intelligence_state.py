@@ -5224,6 +5224,47 @@ class EnsureDefaultBoardWindowWatchedTests(unittest.TestCase):
         queued_dates = [call.args[0]["date"] for call in service.queue_refresh.call_args_list]
         self.assertEqual(queued_dates, ["2026-07-27", "2026-07-28"])
 
+    def test_slow_refresh_default_outlasts_the_background_loop_period(self) -> None:
+        """The default must be LONGER than one loop iteration, or it gates nothing.
+
+        This throttle is consulted once per `_background_loop` pass. If the
+        window is shorter than the loop's own period it has always expired by
+        the time it is next read, so today+1 is re-queued every pass and the
+        docstring's "slow trickle" silently becomes the "flat 3x multiply" it
+        promises to avoid.
+
+        MEASURED on refresh-worker `277062cd`, 2026-08-27 12:55-16:03Z, pairing
+        CALLING_COMPUTE -> RETURNED_FROM_COMPUTE: 214s for a cheap iteration and
+        674-783s when the overview actually ran. The old 300s default sat
+        between those, which is why production logged a clean 1:1 today /
+        today+1 alternation instead of a trickle.
+
+        Pinned against the SLOWEST measured period so the default cannot drift
+        back under it. This asserts the DEFAULT, so it must run with the env var
+        absent.
+        """
+        os.environ.pop("SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS", None)
+        service = self._service_with_window(["2026-07-27", "2026-07-28"])
+        with patch.object(intelligence_state_module.time, "time", return_value=1000.0):
+            service._ensure_default_board_window_watched()
+        service.queue_refresh.reset_mock()
+
+        slowest_measured_loop_period_s = 783.0
+        with patch.object(
+            intelligence_state_module.time,
+            "time",
+            return_value=1000.0 + slowest_measured_loop_period_s,
+        ):
+            service._ensure_default_board_window_watched()
+
+        queued_dates = [call.args[0]["date"] for call in service.queue_refresh.call_args_list]
+        self.assertEqual(
+            queued_dates,
+            ["2026-07-27"],
+            "today+1 was re-queued one slow loop iteration later, so the throttle "
+            "is finer than the loop period and does not actually throttle",
+        )
+
 
 class ReadCombinedIntelligenceResponseTests(unittest.TestCase):
     """#93 follow-up. read_combined_intelligence_response is the read-side
