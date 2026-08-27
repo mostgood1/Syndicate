@@ -399,3 +399,65 @@ def test_the_whole_book_total_is_unchanged_by_the_split():
     assert summary["total"]["settled"] == 2
     assert summary["total"]["pnl_dollars"] == pytest.approx(4.0)
     assert summary["total"]["roi_pct"] == pytest.approx(20.0)
+
+
+# ---------------------------------------------------------------------------
+# The repair. It writes to a money record, so its LIMITS are what get tested.
+# ---------------------------------------------------------------------------
+
+
+def test_the_repair_ungrades_an_impossible_opposite_side_pair(ledger, monkeypatch):
+    """MEASURED 2026-08-27: two rows on aec-mlb-cle-laa-2026-08-26 were both
+    graded WON, one side=home and one side=away. Both graders are idempotent,
+    so a wrong outcome is permanent unless something removes it."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="home", outcome="won", pnl_dollars=1.0,
+               settled_by="venue", graded_at="x"),
+        _order(idempotency_key="b", side="away", outcome="won", pnl_dollars=2.0,
+               settled_by="venue", graded_at="x"),
+    ]
+    result = vs.repair_multi_side_grades()
+    assert result["cleared"] == 2
+    assert result["markets"] == 1
+    for o in ledger["orders"]:
+        assert "outcome" not in o and "settled_by" not in o and "pnl_dollars" not in o
+
+
+def test_the_repair_is_self_limiting(ledger):
+    """After one pass the rows are ungraded, so a second pass finds nothing.
+    A repair that fired every tick would rewrite the ledger forever."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="home", outcome="won", settled_by="venue"),
+        _order(idempotency_key="b", side="away", outcome="won", settled_by="venue"),
+    ]
+    assert vs.repair_multi_side_grades()["cleared"] == 2
+    assert vs.repair_multi_side_grades()["cleared"] == 0
+
+
+def test_the_repair_never_touches_an_INFERRED_grade(ledger):
+    """An inferred outcome is another module's record. Even on an opposite-side
+    market it is not this repair's to remove."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="home", outcome="won", pnl_dollars=1.0),
+        _order(idempotency_key="b", side="away", outcome="lost", pnl_dollars=-2.0),
+    ]
+    assert vs.repair_multi_side_grades()["cleared"] == 0
+    assert ledger["orders"][0]["outcome"] == "won"
+
+
+def test_the_repair_leaves_a_SAME_side_market_alone(ledger):
+    """Two orders on one side share an outcome legitimately -- that is not the
+    defect, and clearing them would destroy correct settlements."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="away", outcome="lost", settled_by="venue"),
+        _order(idempotency_key="b", side="away", outcome="lost", settled_by="venue"),
+    ]
+    assert vs.repair_multi_side_grades()["cleared"] == 0
+
+
+def test_the_repair_never_touches_paper(ledger):
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="home", mode="paper", outcome="won", settled_by="venue"),
+        _order(idempotency_key="b", side="away", mode="paper", outcome="won", settled_by="venue"),
+    ]
+    assert vs.repair_multi_side_grades()["cleared"] == 0

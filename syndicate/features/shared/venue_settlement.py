@@ -371,6 +371,83 @@ def _derived_pnl(order: Mapping[str, Any], outcome: str) -> float | None:
     return round(stake * multiple - fees, 4)
 
 
+# Fields this module writes, and therefore the only fields a repair may clear.
+_VENUE_GRADE_FIELDS = ("outcome", "pnl_dollars", "settled_by", "settled_at_venue", "graded_at")
+
+
+def repair_multi_side_grades(*, dry_run: bool = False) -> dict[str, Any]:
+    """Un-grade rows this module wrongly settled by sharing one verdict across
+    OPPOSITE SIDES of a market. Runs before grading, on the worker.
+
+    WHY A REPAIR EXISTS AT ALL. Both graders are idempotent by design -- an
+    order carrying an `outcome` is skipped -- which is what makes a settled bet
+    quotable. The same property means a WRONG outcome is permanent unless
+    something deliberately removes it. On 2026-08-27 two rows on
+    `aec-mlb-cle-laa-2026-08-26` were graded WON simultaneously, one `side=home`
+    and one `side=away`, and the board asserted that both teams won the same
+    game.
+
+    NARROW BY CONSTRUCTION, because this writes to a money record:
+
+      * only `mode=live` rows;
+      * only rows THIS module graded (`settled_by == "venue"`) -- an inferred
+        grade is another module's record and is never touched;
+      * only markets where our own ungraded-plus-graded orders genuinely hold
+        MORE THAN ONE side, which is the exact condition that made the verdict
+        unsafe;
+      * only the fields this module writes.
+
+    SELF-LIMITING. After a repair those rows are ungraded, and `settle_from_venue`
+    now REFUSES an opposite-side market, so the next tick finds nothing to
+    repair and nothing to re-grade. The rows fall to the 24h inference fallback,
+    which grades each side against its own line and gets this case right.
+
+    Nothing here invents an outcome. It removes an assertion that could not have
+    been true, and lets the path that CAN resolve per side do it.
+    """
+    from syndicate.features.shared.execution_ledger import LIVE, _load, _persist
+
+    counters: dict[str, Any] = {"markets": 0, "cleared": 0, "tickers": []}
+    try:
+        state = _load()
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}", **counters}
+
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for order in (state.get("orders") or []):
+        if str(order.get("mode") or "") != LIVE:
+            continue
+        key = (str(order.get("venue") or "").strip().lower(), _join_key(order.get("venue_ticker")))
+        if not key[0] or not key[1]:
+            continue
+        groups.setdefault(key, []).append(order)
+
+    changed = False
+    for (_venue, ticker), rows in groups.items():
+        if len(rows) < 2:
+            continue
+        sides = {str(o.get("side") or "").strip().lower() for o in rows}
+        if len(sides) < 2:
+            continue
+        venue_graded = [o for o in rows if str(o.get("settled_by") or "") == "venue"]
+        if not venue_graded:
+            continue
+        counters["markets"] += 1
+        counters["tickers"].append(ticker)
+        for order in venue_graded:
+            for field in _VENUE_GRADE_FIELDS:
+                order.pop(field, None)
+            counters["cleared"] += 1
+            changed = True
+
+    if changed and not dry_run:
+        try:
+            _persist(state)
+        except Exception as exc:
+            return {"status": "error", "reason": f"{type(exc).__name__}: {exc}", **counters}
+    return {"status": "ok", **counters}
+
+
 def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
     """Grade every ungraded LIVE order that the venue has settled. Persists.
 
@@ -392,6 +469,16 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
         "by_venue": {},
         "errors": {},
     }
+
+    # REPAIR BEFORE GRADING, so a row this module previously got wrong is
+    # ungraded again before anything reads it as settled. Never raises -- a
+    # repair that could stop the tick would be worse than the defect.
+    try:
+        repaired = repair_multi_side_grades(dry_run=dry_run)
+        if repaired.get("cleared"):
+            counters["repaired"] = repaired
+    except Exception as exc:
+        counters["errors"]["repair"] = f"{type(exc).__name__}: {exc}"
 
     try:
         state = _load()
