@@ -310,6 +310,121 @@ def api_ops_wnba_refresh_decision() -> Any:
     return jsonify({"ok": True, "date": selected_date, **payload})
 
 
+# The ONLY fields this endpoint will ever emit per (date, venue). Declared as a
+# constant and asserted in tests, because "aggregates only" is a property that
+# decays silently: the natural way to answer the next question is to add one
+# more field, and three of those turn a counter into a money record over HTTP.
+_LEDGER_SUMMARY_FIELDS = ("orders", "filled", "staked_dollars", "by_status")
+
+
+@ops_bp.get("/api/ops/execution/ledger-summary")
+def api_ops_execution_ledger_summary() -> Any:
+    """Per-day, per-venue execution COUNTS. Never order rows.
+
+    WHY IT EXISTS. "Why so little Polymarket activity today" is a day-over-day
+    question and there was no way to ask it: the ledger is written by
+    `execution_ledger._ledger_path()` through `write_json_file`, which routes
+    everything outside `migration_runs/` to the KEYVALUE store and returns
+    before touching disk. `/api/ops/artifacts/export` is a DISK read, so it
+    returns empty for the ledger no matter what `HOT_ARTIFACT_PATTERNS` says --
+    allowlisting it would turn `403 not allowed` into an empty result, which is
+    worse, because the guard then passes and the data still never arrives. This
+    reads through the same keyvalue-aware `read_json_file` the writer used, the
+    way `api_ops_live_lens_snapshot_index` already does for the lens.
+
+    AGGREGATES, AND THE SHAPE IS THE SAFETY PROPERTY. This is the record of
+    MONEY. Order-level data over HTTP is a different risk class from sim inputs
+    even behind an admin token, and the question does not need it. The response
+    is built by INCREMENTING COUNTERS -- no order dict is ever placed in it, and
+    no ticker, price, client id or idempotency key is read at all. That is a
+    property of the construction rather than of remembering to strip fields:
+    there is nothing to strip.
+
+    `?days=` bounds the window (default 7, max 60). `?mode=` filters
+    live/paper; absent means both, split out rather than summed, since a paper
+    order and a live order are not the same event and adding them is how a
+    paper P&L gets quoted as real.
+    """
+    guard = _require_admin_token()
+    if guard is not None:
+        return guard
+
+    try:
+        days = int(str(request.args.get("days") or "7").strip())
+    except (TypeError, ValueError):
+        days = 7
+    days = max(1, min(days, 60))
+    want_mode = str(request.args.get("mode") or "").strip().lower()
+
+    try:
+        from syndicate.features.shared.execution_ledger import _ledger_path
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        payload = read_json_file(_ledger_path())
+    except Exception as exc:  # noqa: BLE001
+        # An ops read must not 500 -- it is the tool reached for when things are
+        # already broken.
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    if not payload:
+        # ABSENT IS A REAL ANSWER and must not read as "nothing was placed".
+        # `execution_ledger._load` refuses rather than degrades for exactly this
+        # reason: an unreadable ledger that looks empty invites a duplicate of
+        # the entire slate.
+        return jsonify({"ok": True, "days": days, "summary": {},
+                        "reason": "no_execution_ledger_recorded"})
+
+    orders = payload.get("orders") or []
+    dates = sorted({str(o.get("selected_date") or "") for o in orders if o.get("selected_date")})
+    keep = set(dates[-days:]) if dates else set()
+
+    summary: dict[str, Any] = {}
+    skipped_no_date = 0
+    for order in orders:
+        date = str(order.get("selected_date") or "")
+        if not date:
+            skipped_no_date += 1
+            continue
+        if date not in keep:
+            continue
+        mode = str(order.get("mode") or "unknown").strip().lower()
+        if want_mode and mode != want_mode:
+            continue
+        venue = str(order.get("venue") or "unknown").strip().lower() or "unknown"
+        status = str(order.get("status") or "unknown").strip().lower() or "unknown"
+
+        bucket = summary.setdefault(date, {}).setdefault(f"{mode}:{venue}", {
+            "orders": 0, "filled": 0, "staked_dollars": 0.0, "by_status": {},
+        })
+        bucket["orders"] += 1
+        bucket["by_status"][status] = bucket["by_status"].get(status, 0) + 1
+        if status == "filled":
+            bucket["filled"] += 1
+            try:
+                bucket["staked_dollars"] += float(order.get("fill_stake_dollars") or 0.0)
+            except (TypeError, ValueError):
+                # A stake we cannot read is counted as an ORDER but not as
+                # dollars. Silently coercing it to 0.0 would be the same number
+                # with a worse meaning.
+                pass
+
+    for day in summary.values():
+        for bucket in day.values():
+            bucket["staked_dollars"] = round(bucket["staked_dollars"], 2)
+            bucket["by_status"] = dict(sorted(bucket["by_status"].items()))
+
+    return jsonify({
+        "ok": True,
+        "days": days,
+        "mode": want_mode or "all",
+        "dates_in_ledger": len(dates),
+        # Counted, not dropped: a row with no date is invisible to every
+        # per-day cut and would otherwise make the totals quietly wrong.
+        "orders_without_date": skipped_no_date,
+        "summary": {d: summary[d] for d in sorted(summary)},
+    })
+
+
 @ops_bp.get("/api/ops/polymarket/slate")
 def api_ops_polymarket_slate() -> Any:
     """What the Polymarket slate artifact actually contains, summarised.
