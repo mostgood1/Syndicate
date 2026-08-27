@@ -2038,6 +2038,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `build_cards_page_context` hydrated on the worker), NOT the throttle.
 - Claims: NONE held. Deploy claims: released.
 
+### polymarket-catalogue-pagination — OPEN — opened 2026-08-27 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
+- Goal: `fetch_markets` must never report a server-capped first page as the complete catalogue.
+- Files: `syndicate/features/shared/polymarket_client.py` and its tests.
+- Hypothesis: Gamma hard-caps page size at 100 regardless of the `limit` asked. `fetch_markets` requests `limit=200` and breaks on `len(page_rows) < limit`, which is true on EVERY page, so it always stops after page one; `truncated` is set only when `max_pages` is exhausted, so the result reports `truncated=False`. A 100-row slice is presented as the whole catalogue.
+- Falsification test: wrong if the API honours `limit>100`, or if a short page reliably means end-of-catalogue.
+- MEASURED against the live API 2026-08-27: asked limit=100 -> 100 rows; limit=200 -> 100; limit=500 -> 100. Offset paging works — offset 0/100/200 return distinct ids — so the catalogue IS reachable; the loop just never asks for page two. Production evidence: `POLYMARKET_CATALOGUE count=100 sporting=0 truncated=False` on all 10 live-odds-worker boots in 17h.
+- Verification: a test that pins the short-page-is-not-end-of-catalogue behaviour and FAILS against current code, plus a live probe returning >100 markets across pages.
+- IMPACT IS LATENT, NOT LIVE: the only production caller is a boot diagnostic on a SUPERSEDED path (`polymarket_odds_refresh` reads the GLOBAL gamma exchange; the funded venue is `api.polymarket.us` via `polymarket_us_markets`, and `portfolio_commit` uses that at ~17,299 markets). Nothing is mispriced today. This is a shared client that lies about completeness to any future caller.
+- Blocked by: none for this lane. **SEPARATELY BLOCKED, NOT DEFERRED SILENTLY:** retiring the dead boot call needs `scripts/run_live_odds_refresh_worker.py`, claimed by OPEN lane `open-bet-live-status` (session syndicate-27), which shipped and verified work on it TODAY. Claim re-measured 2026-08-27, live not stale. Not edited across lanes.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

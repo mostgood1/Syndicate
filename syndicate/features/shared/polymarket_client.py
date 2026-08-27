@@ -271,6 +271,16 @@ def fetch_markets(
     more pages" would otherwise page forever, and the page count rides on the
     result so a truncated listing is visible rather than mistaken for the
     whole catalogue.
+
+    DO NOT RAISE `max_pages` EXPECTING MORE. Offset paging has a hard ceiling
+    on this API, measured 2026-08-27: offset 1000 and 2000 return 100 rows each,
+    offset 3000+ returns HTTP 200 carrying
+    `{"type": "validation error", "error": "offset too large, use
+    /markets/keyset for deeper pagination"}`. The server caps page size at 100
+    (see the loop), so 20 pages reaches offset 2000 and stops just inside the
+    ceiling. Going deeper is a DIFFERENT ENDPOINT (`/markets/keyset`), not a
+    bigger number here -- and this function now raises `gamma_refused` naming
+    that message rather than failing as an unexplained shape error.
     """
     markets: list[dict[str, Any]] = []
     offset = 0
@@ -281,6 +291,15 @@ def fetch_markets(
         query = f"limit={int(limit)}&offset={offset}&active={'true' if active else 'false'}&closed={'true' if closed else 'false'}"
         payload = _get(f"{_BASE_URL_GAMMA}{_MARKETS_PATH}?{query}")
         pages += 1
+        # Gamma answers a refused query with 200 + `{"type": ..., "error": ...}`,
+        # not an HTTP error. Named here so the reason reaches the caller instead
+        # of being flattened into `unexpected_shape: got dict`, which says
+        # nothing about WHY. The one that matters is the offset ceiling; see the
+        # measurement below.
+        if isinstance(payload, dict) and payload.get("error"):
+            raise PolymarketError(
+                f"gamma_refused: {payload.get('error')} at offset={offset}"
+            )
         if isinstance(payload, dict):
             page_rows = payload.get("data") if isinstance(payload.get("data"), list) else None
         else:
@@ -289,10 +308,29 @@ def fetch_markets(
             raise PolymarketError(
                 f"unexpected_shape: got {type(payload).__name__} at offset={offset}"
             )
-        markets.extend(normalize_market(m) for m in page_rows if isinstance(m, Mapping))
-        if len(page_rows) < limit:
+        # END OF CATALOGUE IS AN EMPTY PAGE, NOT A SHORT ONE.
+        #
+        # This used to `break` on `len(page_rows) < limit` and advance `offset`
+        # by `limit`. Both halves were wrong, because THE SERVER CAPS PAGE SIZE
+        # AND IGNORES A LARGER `limit`. Measured against the live API
+        # 2026-08-27:
+        #     asked limit=100 -> 100 rows
+        #     asked limit=200 -> 100 rows
+        #     asked limit=500 -> 100 rows
+        # The default `limit` is 200, so `len(page_rows) < limit` was true on
+        # EVERY page and the loop always stopped after the first one. `truncated`
+        # is set only when `max_pages` is exhausted, so the result reported
+        # `truncated=False` -- A 100-ROW SLICE PRESENTED AS THE WHOLE CATALOGUE.
+        # Production: `POLYMARKET_CATALOGUE count=100 truncated=False` on all ten
+        # live-odds-worker boots in 17h.
+        #
+        # Fixing only the break condition would have been WORSE than the bug:
+        # advancing `offset` by `limit` (200) while the server returns 100 skips
+        # rows 100-199 of every page. The stride must be what we RECEIVED.
+        if not page_rows:
             break
-        offset += limit
+        markets.extend(normalize_market(m) for m in page_rows if isinstance(m, Mapping))
+        offset += len(page_rows)
     else:
         truncated = True
 
