@@ -49,7 +49,7 @@ coverage is diagnosable instead of merely low.
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping, Sequence
+from typing import Any, Collection, Iterable, Mapping, Sequence
 
 __all__ = [
     "parse_slug",
@@ -211,7 +211,9 @@ _NON_SOCCER_LEAGUE_TOKENS = frozenset({
 })
 
 
-def _effective_league(parsed: Mapping[str, Any]) -> str:
+def _effective_league(
+    parsed: Mapping[str, Any], soccer_tokens: Collection[str] | None = None
+) -> str:
     """The slug's own league token, UNLESS both clubs resolve as soccer clubs.
 
     Measured 2026-08-25: Polymarket lists soccer per COMPETITION (a refused
@@ -270,6 +272,17 @@ def _effective_league(parsed: Mapping[str, Any]) -> str:
     if league in _NON_SOCCER_LEAGUE_TOKENS:
         return league
 
+    # THE COMPETITION WAS ALREADY PROVEN SOCCER BY ITS OWN SIBLING MARKETS.
+    #
+    # Checked BEFORE the per-row club test, because this is the case the row
+    # test cannot answer: an ambiguous tri-code (`fcb` -- Bayern or Barcelona)
+    # is deliberately dropped by `_soccer_alias_to_name`, so the row alone
+    # looks unidentifiable while its competition is not in doubt. Optional so
+    # every existing caller keeps its exact behaviour -- `None` means "no slate
+    # in hand", and then this is the same function it always was.
+    if soccer_tokens and league in soccer_tokens:
+        return "soccer"
+
     try:
         from syndicate.features.shared.team_aliases import canonical_team
     except Exception:
@@ -277,6 +290,69 @@ def _effective_league(parsed: Mapping[str, Any]) -> str:
     if canonical_team("soccer", parsed.get("home")) and canonical_team("soccer", parsed.get("away")):
         return "soccer"
     return league
+
+
+def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset[str]:
+    """League tokens PROVEN to be soccer competitions, from the slate itself.
+
+    THE GAP THIS CLOSES, measured in production 2026-08-27 through the new
+    `/api/ops/polymarket/slate` reader:
+
+        h2h markets in the slate      2,486 across 89 league tokens
+        reachable by a soccer board row   111   (keyed `soccer`)
+
+    `_effective_league` calls a row soccer only when BOTH clubs resolve via
+    `canonical_team`. Any row with one unresolved club keeps its raw
+    competition token -- `bun`, `arg2`, `bra`, `alsv` -- and the board, which
+    stamps every soccer row `sport="soccer"`, looks up `("soccer", date,
+    market)` and never sees it. Two rows on the SAME COMPETITION land in
+    different buckets purely because of which clubs are playing:
+
+        atc-lal-cel-osa-2026-08-16-cel   cel + osa resolve      -> "soccer"
+        atc-bun-fcb-stu-2026-08-28-fcb   fcb ambiguous, dropped -> "bun"
+
+    And `fcb` is ambiguous ON PURPOSE -- Bayern and Barcelona both claim it, so
+    `_soccer_alias_to_name` drops it rather than guess. That refusal is correct
+    per row and catastrophic per market: the safety behaviour silently removed
+    the market from the board's reach.
+
+    WHY THIS IS NOT THE TRANSLATION TABLE `_effective_league` REFUSED TO GUESS.
+    Its docstring declined to hand-write a token->sport map on one confirmed
+    example, and it was right to. Nothing here is hand-written. A token earns
+    membership only when one of ITS OWN markets has BOTH clubs resolve as
+    soccer clubs -- the same `canonical_team` test, the same evidence, just
+    asked once per COMPETITION instead of once per ROW. A competition nobody
+    can identify never joins the set, and a token invented by the venue
+    tomorrow is admitted the moment one of its fixtures is recognisable.
+
+    `_NON_SOCCER_LEAGUE_TOKENS` still short-circuits FIRST and is never
+    consulted here, so the measured MLB collision (`min`->Minnesota United,
+    `ath`->Athletic Club) cannot be reintroduced: `mlb` can never enter this
+    set, whatever its tri-codes look like.
+    """
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:  # noqa: BLE001 -- the join must survive a missing resolver
+        return frozenset()
+
+    proven: set[str] = set()
+    for row in markets or ():
+        parsed = parse_slug(row.get("slug") if isinstance(row, Mapping) else None)
+        if parsed is None:
+            continue
+        league = str(parsed.get("league") or "")
+        if not league or league == "soccer" or league in _NON_SOCCER_LEAGUE_TOKENS:
+            continue
+        if league in proven:
+            continue
+        try:
+            if canonical_team("soccer", parsed.get("home")) and canonical_team(
+                "soccer", parsed.get("away")
+            ):
+                proven.add(league)
+        except Exception:  # noqa: BLE001
+            continue
+    return frozenset(proven)
 
 
 def _has_segment(modifiers: Sequence[str]) -> bool:
@@ -475,6 +551,13 @@ def join_polymarket_to_board(
 
     # Index the venue side once, keyed on what a board row can be asked for.
     index: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    # ONE PASS OVER THE SLATE FIRST, so a competition proven soccer by any of
+    # its fixtures is keyed `soccer` for ALL of them -- including the rows whose
+    # own tri-codes are ambiguous and deliberately unresolvable. Derived once
+    # rather than per row: the test is per COMPETITION, and running it inside
+    # the loop would make it depend on iteration order.
+    soccer_tokens = soccer_competition_tokens(markets)
+
     for row in markets:
         parsed = parse_slug(row.get("slug"))
         if parsed is None:
@@ -525,7 +608,7 @@ def join_polymarket_to_board(
                     "prices": str(row.get("outcomePrices"))[:80],
                 })
             continue
-        key = (_effective_league(parsed), parsed["date"], board_market)
+        key = (_effective_league(parsed, soccer_tokens), parsed["date"], board_market)
         index.setdefault(key, []).append(
             {"parsed": parsed, "row": row, "outcomes": outcomes,
              "line": _line_from_modifiers(parsed["modifiers"])}
