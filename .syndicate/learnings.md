@@ -4141,3 +4141,38 @@ identity**. Nothing in it supports that step.
 DEPLOYED something, the only record is what that session wrote to
 `.syndicate/deploys.md`; absent that, authorship is unknown and must be stated as
 unknown. Never reconstruct it from timestamps.
+
+## 2026-08-27 — FORBIDDEN: measuring a dirty SHARED tree against `HEAD`. In a stale checkout `HEAD` is the thing that is wrong, and every diff built on it lies in the safe-looking direction.
+
+I was asked to commit this session's ledger edits from the primary tree. The obvious
+check — `git diff HEAD -- <my files>` — read **+159/-2437** on `deploys.md`,
+**+77/-1225** on `learnings.md`. Alarming, so I checked the real baseline. Against
+`origin/main` the same files read **+159/-12,933** and **+2,665/-2,271**: the primary
+tree was **791 commits behind**, so its ledger copies were missing everything landed
+since. Committing them — even path-scoped, even having audited the diff — would have
+deleted **~17,000 lines** of other sessions' work.
+
+**`HEAD` looked authoritative and was not.** It is the local branch tip; in a shared
+checkout nobody rebases, that tip is arbitrarily old. Diffing against it compares
+stale-to-stale and hides exactly the deletions that matter.
+
+The same trap fired again ten minutes later, one level down: `log/2026-08-27.md` was
+already tracked and 405 lines long on `origin/main`, written by other sessions.
+Copying my version over it read **+518/-405**. Restored, then appended only my own
+sections — and two blocks in my copy belonged to other lanes and were left out.
+
+**Rules:**
+1. **In a shared tree, diff against `origin/main`, never `HEAD`.** Fetch first.
+   `git rev-list --left-right --count HEAD...origin/main` before you trust any diff.
+2. **Read the DELETION column before staging.** Additions are what you wrote;
+   deletions are what you are about to destroy. `--numstat` per file, and account for
+   every deletion by name — I committed 674 insertions and exactly 2 deletions, both
+   intentional replacements I could name.
+3. **Never assume a file you are creating is new.** `git status` said `??` in the stale
+   tree; the file existed on `origin/main`. Untracked-here is not absent-there.
+4. **Re-apply onto current content rather than committing a stale copy.** Appends are
+   cheap to replay; a stale whole-file write is a revert wearing the shape of a save.
+
+Related: [[a blocker is a measurement and it expires]] and
+[[a test whose fixture cannot violate its property]] — all three are the same failure,
+a stale or incapable reference standing in for a live measurement.
