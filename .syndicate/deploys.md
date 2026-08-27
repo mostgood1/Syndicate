@@ -34021,3 +34021,64 @@ again.
 **Still not verified anywhere:** the NCAAF live lens, which does not exist --
 no template, and the sport falls back to the generic scoreboard strip while
 MLB and soccer each have a dedicated one.
+## 2026-08-27 14:55:41Z — refresh-worker `ad3f116c` — lane `venue-quote-line-join`
+
+    refresh-worker  ad3f116c  dep-da84uh1srm7s73fk63qg  live 14:55:41.003Z
+
+Claim `venue-quote-line-join`. Preflight CLEAR (`1 defunct child awaiting reap
+-- already dead, cannot be killed by a deploy`). The in-flight odds refresh was
+on live-odds-worker, a DIFFERENT service, so nothing was killed.
+
+**what:** (1) prop join keys now name their player, on the board side, the
+kalshi adapter and the new props adapter; (2) new source `oddsapi_props`
+reading the captured soccer player-prop CSVs, which nothing in the fan-in had
+ever opened; (3) `selected_by_sport` -- per-sport selection attribution.
+
+**verify: THE LARGEST SINGLE MOVEMENT THIS LANE HAS PRODUCED.**
+
+    before (12:5xZ)  rows_in=?      stamped=?       soccer unmatched 15,348
+                     selected_by_source={kalshi: 2533, polymarket_us: 596, oddsapi: 228}
+    after  (15:0xZ)  rows_in=21947  stamped=14494   soccer unmatched  4,006
+                     selected_by_source={kalshi: 550, polymarket_us: 1814,
+                                         oddsapi_props: 12047, oddsapi: 83}
+
+    selected_by_sport={'mlb':    {'kalshi': 451, 'polymarket_us': 38},
+                       'wnba':   {'kalshi': 75,  'polymarket_us': 34},
+                       'nfl':    {'polymarket_us': 1530},
+                       'ncaaf':  {'kalshi': 24},
+                       'soccer': {'oddsapi_props': 12047, 'polymarket_us': 212,
+                                  'oddsapi': 83}}
+
+- **soccer unmatched 15,348 -> 4,006 (-74%)**, and `oddsapi_props` appears in
+  `selected_by_sport['soccer']` with 12,047 wins. That second condition is the
+  one this entry was gated on: a fall WITHOUT the new source appearing would
+  have meant rows vanished rather than matched, and would not have counted.
+- **grid stamped 13.1% -> 66%** (1,890/14,443 -> 14,494/21,947).
+- **Player keying is visibly live on BOTH halves.** `sources_offered` now reads
+  `mlb|batter_home_runs|pete alonso|over|1.5` and
+  `wnba|player_threes|sonia citron|over|2.5` where both were player-blind.
+
+**THE PREDICTED FALL HAPPENED, AND IT IS THE CORRECTION.** `kalshi` went
+**2,533 -> 550** globally. This was stated in advance as the expected outcome:
+some of what it won before was the WRONG PLAYER's quote, because both halves of
+the join were player-blind and the first row with a matching (market, side,
+line) took the quote. 550 = 451 mlb + 75 wnba + 24 ncaaf, all now player-keyed.
+mlb's unmatched rose 530 -> 1,437 from the same cause seen from the other side:
+rows that were matching someone else now correctly match nothing.
+
+**KALSHI WINS ZERO SOCCER ROWS, and that is now a MEASURED fact rather than an
+inference.** It offers 173 soccer quotes (`h2h_keyed_by_team:149`, age 165s)
+and appears nowhere in `selected_by_sport['soccer']`. Its soccer moneylines are
+club-keyed (`soccer|h2h|oh leuven`) so they are either losing the freshness
+contest to polymarket or naming clubs the board does not carry. Next thing to
+pull on; NOT fixed here.
+
+**NOT GLOSSED:**
+- `oddsapi_props` reports `leg_without_price:9105`. Refused rather than
+  published, but a large residual -- mostly threshold markets a book quoted on
+  one side only. Understood in shape, not in size.
+- The capture's `age_seconds` is **21,279 (5.9 hours)**. Inside soccer's
+  86,400s ceiling so it passes the gate, but these are not fresh quotes and the
+  pregame sweep interval is 4h.
+
+**Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.
