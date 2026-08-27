@@ -3787,3 +3787,49 @@ model improvement is not supported. Three blocks remain broken and were never
 part of this test (`defensive_metrics` misrouted, `pace` null at source,
 `player_usage` wrong grain) — fixing those is the only route to a different
 answer, and it is a NEW measurement, not a re-run of this one.
+
+---
+
+## 2026-08-27 — NCAAF TOTALS ARE NOT OVER-DISPERSED. The deficit is ONE CONSTANT BIAS, and the residual spread already matches the market
+
+Measured offline on **711 completed 2025 games**, joining the committed
+`smartsim2_projections_2025_wk*.csv` (engine output, payload OFF) to
+`cfbd_lines_*.json` (market total + final score). Zero API calls.
+
+    MEAN BIAS      model  -5.211      market  +0.709    (actual - predicted)
+    RESIDUAL SD    model  15.324      market  15.304
+    sim's CLAIMED predictive SD              12.832
+    CALIBRATION RATIO 0.837   (<1 = OVER-CONFIDENT, not over-dispersed)
+    bias removed:  model total MAE 12.401   vs market 12.373
+
+**Rule: before attacking a model's DISPERSION, decompose its error into BIAS
+and SPREAD. They demand opposite fixes and only one of them was ever wrong
+here.** The model's residual SD is statistically indistinguishable from the
+market's — its errors are ALREADY as tight. The entire totals deficit is a
+single systematic over-prediction of 5.2 points.
+
+**WHAT THIS CORRECTS.** `state.md` carried "totals 1.94x over-dispersed",
+measured on the LIVE slate, and I used it to motivate the pace work. It does
+not reproduce on completed games and it points the OTHER WAY (0.837). The
+live-slate figure compared the sim's predictive SD against a MARKET SD with no
+outcomes available — a different quantity from realised residual spread. **A
+dispersion number computed without outcomes is not a calibration measurement.**
+
+**WHY THE PACE WORK SURVIVES THIS, with a better reason than it had.** A
+hardcoded 24.0 s/play runs 151.6 s/drive against a real 179.5 — ~18% more
+drives per game, hence more scoring. A CONSTANT over-prediction of totals is
+precisely the signature of a pace pinned too fast, and the magnitude fits.
+
+**PRE-REGISTERED, before the re-fit runs:** correcting pace should cut the mean
+total, but a naive full correction scales 58.11 x 0.845 = 49.1 against an actual
+52.90 — it should OVERSHOOT DOWNWARD. The profile was calibrated with pace
+pinned at +0.4, so this is a mechanism added to a calibrated engine and owes a
+re-fit of the rates that were absorbing it. Overshoot is the EXPECTED result,
+not a failure of the input.
+
+**BOUNDS, because these numbers will be quoted.** The projections carry
+`rating_source=cfbd_ppa_season_2025` — the LEAKED season aggregate that
+`state.md` records as inflating apparent skill 30%. Accuracy here is FLATTERED;
+the true gap is wider than +0.914 and "as good as the market" is NOT
+established. The bias removal is IN-SAMPLE. The rating source differs from the
+re-fit's SP+, so this is not the identical configuration.
