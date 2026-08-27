@@ -4478,3 +4478,28 @@ that is otherwise only ever appended to one row at a time.
   measuring rather than after being burned.
 - *(evidence: `.syndicate/log/2026-08-27.md`, the `#589`/`#590`/`#591` entries
   and the 20:5xZ checkpoint)*
+
+## 2026-08-27 — A SINGLE OBSERVATION READ AS A BOUND `[lane venue-quote-line-join]`
+
+**FORBIDDEN: concluding "supply-limited" from one reading where a quantity sat
+below its cap.** I saw mlb take 1,512 slots against a cap of 1,550, concluded
+its Kalshi listings were the constraint, and wrote it into `deploys.md` as the
+finding. mlb went **794 -> 1,741 across the same evening** — its available
+markets GREW as its slate approached first pitch. 1,512 was a moment, not a
+ceiling.
+
+`matched` tracks mlb's slot count almost exactly (794/27, 1620/208, 1741/218,
+1706/221), so ALLOCATION was the binding constraint all along — the opposite of
+what I recorded.
+
+**THE TELL I HAD AND IGNORED:** two hours earlier in the same file I refused to
+read one build's `matched` as a trend. I applied that discipline to the number
+I was suspicious of and not to the one that supported a conclusion I had
+already reached. A bound needs a series; one point below a cap is consistent
+with supply, with timing, and with the cap simply not binding yet.
+
+**WHAT STILL HELD, and why the correction is not a full retraction:** the demand
+PATH did not execute for the recovery (`demand=None` in the trim's own line),
+so the change was still not what fixed it. Deployed is not executed — that half
+survived because it was checked against a predicate rather than a deploy
+timestamp.

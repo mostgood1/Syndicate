@@ -34709,3 +34709,48 @@ the h2h half is unambiguous.
 fill-stake-not-American-odds fix for the $368.97 inflation I reported. That is
 the service that runs live execution, so that defect is fixed where it counts,
 independently of this deploy.
+
+### CORRECTION 2026-08-27 21:0xZ to the entry above — **"SUPPLY, NOT ALLOCATION" WAS WRONG**
+
+Challenged by lane `board-cycle-overview-throughput` with a number I had not
+plotted. mlb's slot count against `matched`, comparable 1344-row builds:
+
+    19:33  mlb_slots=794   matched=27
+    19:49  mlb_slots=1620  matched=208
+    20:25  mlb_slots=1741  matched=218
+    20:51  mlb_slots=1706  matched=221     (complete set 242 -> working set at 91%)
+
+**`matched` tracks mlb's slot count almost exactly. ALLOCATION IS THE BINDING
+CONSTRAINT.** The entry above says the opposite.
+
+**HOW I GOT IT WRONG.** I saw mlb take 1512 against a cap of 1550 on ONE trim,
+concluded it was supply-limited, and generalised. mlb went 794 -> 1741 across
+the evening: its available markets GREW as its slate approached, so 1512 was a
+moment, not a ceiling. I read a single observation as a bound — the same error
+shape as reading one build's `matched` as a trend, which I had refused to do
+two hours earlier in this same file.
+
+**WHAT SURVIVES, and it is the part I would defend.** The demand PATH still did
+not execute for the recovery: the trim behind `matched=208` logged
+`demand=None`, and `_sport_slot_caps` returns None into the flat-floor branch.
+Code deployed is not code executed. I checked the other 15 commits my 19:37:16Z
+deploy carried and none touches the Kalshi board join.
+
+**SO WHAT DID RECOVER IT: MLB's slate approaching first pitch.** Its markets
+churn, become the freshest in the catalogue, and a staleness-ordered remainder
+pass hands them the slots. Staleness ACCIDENTALLY did what demand weighting
+does deliberately.
+
+**WHICH CHANGES THE CHANGE'S VALUE RATHER THAN REMOVING IT.** If the mechanism
+is diurnal, the collapse RECURS tomorrow afternoon, when far-dated football is
+fresh and MLB is hours from first pitch. Demand weighting is what stops the
+recurrence; it is not what fixed today. "Neutral" in the entry above is too
+strong in the other direction, and this is the honest middle: **structurally
+right, unproven today, and its test is tomorrow's afternoon board.**
+
+**THE PREDICTION THIS MAKES, so it can be checked rather than believed:** on a
+2026-08-28 afternoon build, with the demand fix deployed, mlb's slots should
+NOT collapse toward the 300 floor the way they did at 16:13-19:33 today, and
+`matched` should not fall to the 5-27 range. If it does both, demand weighting
+is not doing the work either and the cause is somewhere neither of us has
+looked.
