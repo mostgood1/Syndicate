@@ -2013,17 +2013,30 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   profile was calibrated with pace_index pinned at +0.4, so turning this on is
   a mechanism added to a calibrated engine and owes a re-fit before any deploy.
 
-### board-cycle-overview-throughput — OPEN, **DEPLOYED, VERIFICATION PENDING ON THE MEMORY RATCHET** — opened 2026-08-27 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
-- STATUS `[17:5xZ]`: `6421bf7f` RODE ALONG on another lane's `b8163ef0`, live on refresh-worker 17:02:59Z. Both changes confirmed present BY CONTENT in the deployed SHA. **NOT verified.** In 53 min post-deploy: 4 builds, all `sports=8`, ZERO `OVERVIEW_STOPPED_FOR_MEMORY` — the guard never fired, so the `continue` branch was never reached. `sports=8` with no refusal is NOT evidence.
-- WHY IT CANNOT BE JUDGED YET: the guard fires only when `anon > 1096MB`, and the restart that shipped the fix dropped anon from ~1400MB to ~890MB. The reboot removed the very condition the fix handles. anon was climbing (891 -> 925 -> 1062) toward its 1300-1550MB steady state; it will cross without intervention. NO DEPLOY NEEDED to finish this.
-- ONE PAIRED READING DISCHARGES IT: an iteration logging `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb` AND a non-zero `BOARD_OVERVIEW_READY sports=` on the same pass. `sports=7` -> confirmed. `sports=0` -> the fix is INERT and this reopens. Full numbers, the throttle half (baseline 9:9 -> 3:1, below the >=4:1 bar) and the two-different-headroom trap: `deploys.md 2026-08-27 17:02:59Z` and `log/2026-08-27.md`.
-- STATUS `[16:4xZ]`: `6421bf7f` is on `origin/main`. refresh-worker is live on `600a753a` — the DIRECT PARENT — so the fix is NOT running. Preflight returned CLEAR for `6421bf7f` at 16:42:30Z; the deploy call was refused by the opening session's permission classifier, not by any guard. **DEPLOY CLAIM STILL HELD** by this lane, target `6421bf7f`, acquired 16:42:35Z, expires ~17:27Z — release it if nobody deploys.
-- Goal: a board build refused for memory yields `sports=7`, not `sports=0`, and today's date wins a larger share of loop iterations.
-- Files: `syndicate/features/intelligence.py`, `pipeline/intelligence_state.py` and their tests.
-- Hypothesis: (a) `_overview_headroom_exhausted` fires at `sports_done=0` because MLB runs FIRST and the loop `break`s, so the seven CHEAP sports are refused on MLB's 3000MB floor instead of their own 1500MB one. (b) `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` defaults to 300s, which is SHORTER than the loop's own measured period (214s-783s), so the "slow trickle" throttle for today+1/+2 never throttles and next-day builds take ~half of all iterations.
-- Falsification test: (a) is wrong if production still logs `sports_done=0` with `floor=streamed` after the change, or if cheap sports fail their own 1500MB floor at the observed headroom (2550-2800MB). (b) is wrong if the today:tomorrow build ratio does not move after raising the default.
-- Verification (UNDISCHARGED — tests prove off!=on, PRODUCTION IS UNOBSERVED): on refresh-worker after deploy — `BOARD_OVERVIEW_READY` reads `sports=7` (or 8) on iterations that ALSO log `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb`; and `BUILD_SPAN_ENTER stage=build_intelligence_overview date=<today>` outnumbers `date=<today+1>` by >=4:1 over 30 minutes. BASELINE MEASURED 2026-08-27 13:50-14:52Z on refresh-worker `277062cd`: 18 consecutive builds all `sports=0`, today:tomorrow ~1:1, cycle 214s cheap / 674-783s when the overview ran.
-- Blocked by: none
+### board-cycle-overview-throughput — **CLOSED 2026-08-27** — overview fix VERIFIED IN PRODUCTION; throttle half FAILED ITS BAR and bought nothing
+- OUTCOME: `sports=0` -> `sports=7` on every memory-refused build, confirmed on
+  refresh-worker `b8163ef0` (live 17:02:59Z) by four paired readings at
+  18:01/18:17/18:47/18:58Z — guard fires on MLB, the other seven build, MLB
+  absent from the list. Pre-fix the identical guard line gave `sports=0`
+  eighteen times running. Control holds: the four non-firing iterations read
+  `sports=8` with MLB present, so the gate in front of MLB is not relaxed.
+- **HALF THE GOAL WAS NOT MET.** The next-day throttle (300 -> 1800s) works as a
+  MECHANISM — future-date builds went ~7 min -> ~30 min apart — but today's
+  SHARE of iterations is unchanged at 50% (5 today / 4 on 08-28 / 1 on 08-29
+  over 127 min, vs a 9/9 baseline). The `>=4:1` bar was unreachable: the board
+  window is THREE dates, not two, and the overview fix slowed each build 150s ->
+  534s, so there are far fewer builds to redistribute. **The two changes
+  interact and I did not predict it.** The throttle bought nothing measurable.
+- NET: today's board went from rebuilt every ~7 min with `sports=0` (never
+  actually built) to every ~25 min with `sports=7`/`sports=8`. Slower and real,
+  instead of fast and empty. Entirely attributable to the overview change.
+- Shipped `6421bf7f`, which RODE ALONG on another lane's `b8163ef0` — not a
+  deploy of mine; my claim was released at 16:47Z, before it.
+- Measurements: `deploys.md 2026-08-27 19:1xZ`. Narrative: `log/2026-08-27.md`.
+- FOLLOW-UP left open, no lane: if today's absolute cadence matters more than
+  correctness-per-build, the lever is the 534s overview itself (MLB's
+  `build_cards_page_context` hydrated on the worker), NOT the throttle.
+- Claims: NONE held. Deploy claims: released.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

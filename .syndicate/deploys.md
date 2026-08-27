@@ -34353,3 +34353,65 @@ slowdown.
 `inactive_file` was 1.6GB). The GUARD uses `max - anon` (**3019MB** at the same
 instant). Read the wrong one and you conclude the guard should have fired and the
 fix is broken. It is not. Always compute the guard's view as `4096 - anon`.
+
+## 2026-08-27 19:1xZ — refresh-worker `b8163ef0` — **VERIFICATION DISCHARGED. ONE HALF PASSED, ONE HALF FAILED ITS BAR.**
+
+Supersedes the PENDING entry above. The memory ratchet recurred on its own, as
+predicted, and produced the discriminating condition four times.
+
+### verify (overview `continue`-not-`break`): **PASSED — off != on IN PRODUCTION**
+
+Every guard firing since the deploy, paired with its outcome:
+
+| guard fired (`next_sport=mlb sports_done=0`) | outcome | mlb in list? |
+|---|---|---|
+| 18:01:56Z headroom 3020.6 | 18:09:11Z `sports=7` | **absent** |
+| 18:17:13Z headroom 2901.2 | 18:25:46Z `sports=7` | **absent** |
+| 18:47:20Z headroom 2812.9 | 18:52:05Z `sports=7` | **absent** |
+| 18:58:43Z headroom 2775.1 | 19:03:42Z `sports=7` | **absent** |
+
+Each `sports=7` list begins at `nba` — MLB alone was skipped and the other seven
+built on their own 1500MB floor. **PRE-FIX, THE IDENTICAL GUARD LINE PRODUCED
+`sports=0`, EIGHTEEN TIMES RUNNING.**
+
+CONTROL HOLDS: the four iterations where the guard did NOT fire (17:13, 17:27,
+17:40, 17:49) all read `sports=8` with `mlb:g=7` present. The gate in front of
+MLB is not relaxed — MLB still builds whenever it clears 3000MB.
+
+### verify (next-day throttle 300 -> 1800): **MECHANISM CONFIRMED, STATED BAR FAILED**
+
+The bar was ">= 4:1 today vs today+1 over 30 minutes". **It was not met, and the
+bar itself was wrong.**
+
+- MECHANISM WORKS: future-date builds went from ~7 min apart to **~30 min**
+  (08-28 at 17:22, 18:01, 18:32, 18:58 — gaps 39/31/26 min). That is the
+  throttle doing exactly what it was changed to do.
+- OUTCOME DID NOT MOVE: 17:04-19:11Z (127 min) = **5 today / 4 on 08-28 / 1 on
+  08-29**. Today's share of iterations is **5/10 = 50%**, versus the 9/18 = 50%
+  baseline. **UNCHANGED.**
+
+TWO REASONS THE RATIO COULD NOT MOVE, both of which I failed to account for when
+writing the bar:
+1. **The board window is THREE dates, not two.** today+2 is throttled
+   independently, so the two future dates TOGETHER still consume ~1 build per
+   15 min between them.
+2. **The other fix slowed the cycle 3.5x.** A real 8-sport overview takes ~534s
+   versus ~150s when it was skipping everything, so there are far fewer total
+   builds to redistribute. At a ~12.7 min cycle and a 30 min per-date throttle,
+   4:1 is arithmetically unreachable.
+
+**THE TWO CHANGES INTERACT AND I DID NOT PREDICT IT.** Fixing the overview made
+each build honest and therefore slower, which cancelled the throttle's share
+gain. Stated plainly: the throttle bought nothing measurable here.
+
+### what actually improved, and it is the whole win
+
+Today's board went from **rebuilt every ~7 min with `sports=0`** — i.e. never
+actually built — to **rebuilt every ~25 min with `sports=7` or `sports=8`**.
+That is entirely attributable to the overview change. Slower, and real, instead
+of fast and empty.
+
+FOLLOW-UP, not taken here: if today's absolute cadence matters more than
+correctness-per-build, the lever is the 534s overview itself (MLB's
+`build_cards_page_context` running hydrated on the worker), not the throttle.
+`todo.md` territory, no lane.
