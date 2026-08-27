@@ -3859,3 +3859,59 @@ is real per-team signal and not a constant offset dressed up as a feature.
 BOUND: neutral ratings put absolute totals (50.20/43.18) below the engine's
 real 58.11, so the PERCENTAGE transfers more reliably than the point shift.
 Both framings are given above rather than the flattering one.
+
+---
+
+## 2026-08-27 — NCAAF drive structure is an ENGINE ACCOUNTING BUG, not a calibration gap. The sim's own numbers do not multiply out
+
+Measured with `scripts/calibrate_ncaaf_drive_structure.py` against
+`ncaaf_historical_truth_report.md` (53,548 real drives / 2,264 games):
+
+    metric                 truth      sim     err
+    yards per play (MEAS)  7.364    7.413   +0.7%   <- correct
+    yards per drive       42.490   43.143   +1.5%   <- correct
+    plays per drive        5.770    7.246  +25.6%   <- the defect
+    seconds per drive     165.400 182.977  +10.6%
+    possessions per game   23.650  20.033  -15.3%
+
+**Rule: before tuning a model to a target, check the model's own metrics are
+INTERNALLY CONSISTENT. If they do not multiply out, the defect is accounting,
+not calibration, and no parameter will reach it.** Truth multiplies:
+5.77 x 7.36 = 42.5. The sim does not: 7.246 x 7.413 = 53.7 against a credited
+43.1 yards/drive -- a ~10.5 yard/drive gap between gross play gains and net
+drive yardage that real football does not have. Divide the sim's OWN numbers
+and you get 43.14 / 7.413 = **5.82 effective plays/drive, essentially truth's
+5.77**. The football is right; the play COUNT is inflated ~25%.
+
+Everything downstream follows from that one gap: clock burn (+10.6%), lost
+possessions (-15.3%), and the outcome shares (field goals +76%, turnover-on-
+downs -51%, punts -27%) are all drives lasting longer than their yardage
+warrants.
+
+**ALL THREE PROFILE LEVER FAMILIES WERE SWEPT AND NONE REACHES IT** -- which is
+the evidence for "engine, not profile", not an assumption:
+  - yardage (`drive_yardage_multiplier` 1.15 -> 1.60): plays/drive asymptotes at
+    6.99 and then RISES; yards/play overshoots to 11.46, TD rate to 0.403
+  - explosiveness (`explosive_play_multiplier` 1.45 -> 6.0): same floor
+  - 4th-down policy (punt probabilities, conversion multiplier): 7.25 -> 7.21
+    across the entire range, and trades punt rate up for turnover-on-downs
+    DOWN, away from truth
+The profile's 26 parameters have no lever for it because there is nothing to
+tune -- the per-play yardage distribution is already right (32.4% of plays gain
+<= 0, realistic for college).
+
+**A METRIC I MANUFACTURED, AND THE CORRECTION.** The first pass DERIVED
+yards/play as drive_yards / drive_plays and reported **-18.9% vs truth**, which
+sent me sweeping yardage multipliers. Measured per play the way the truth report
+measures it, it is **+0.7%**. In real football the derived and measured values
+are identical by construction; comparing a derived quantity to a measured one
+invented a defect that was not there. The tool now reports BOTH, and their
+disagreement is the actual diagnostic.
+
+**ALSO CORRECTED: the pace story, twice.** `expected_clock_seconds` from
+`drive_priors` is a PRIOR (151.6s), not the realized simulation output (183.0s).
+I quoted the prior as the engine's behaviour and concluded the engine ran 18%
+too fast. It runs 10.6% too SLOW. Feeding the real-world pace measurement makes
+every truth metric worse (possessions 17.91, seconds/drive 209.1), so the
+`pace` block must stay OFF -- the engine's `pace_seconds_per_play` is not on the
+real-world scale its name implies.
