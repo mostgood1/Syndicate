@@ -1,0 +1,89 @@
+{#- NCAAF compact scoreboard strip.
+
+    WHY THIS EXISTS. NCAAF fell through to `_scoreboard_strip_generic.html`,
+    which produced a 435px "compact" card -- against MLB's tight preview tile.
+    Measured on production 2026-08-27, one strip card:
+
+        cards-strip-head                     28px
+        cards-head-matchup                   51px
+        cards-mini-metrics--strip           119px   (3 metrics, each full-width)
+        cards-strip-live                     87px   <- game.summary, PROSE
+        cards-strip-lens                     87px   <- projection contract, PROSE
+                                            -----
+                                            435px
+
+    The two prose blocks are 40% of the card and both repeat what the main card
+    says directly underneath. A strip is for SCANNING a slate; the sentence
+    "SmartSim 2.0 projects TCU 30.3 - 20.0 North Carolina with a total of 50.3
+    and a home win probability of 80.0%" is not scannable and is already on the
+    card below in structured form.
+
+    WHAT IT KEEPS FROM MLB: `_scoreboard_strip_mlb.html`'s shape -- a short
+    head, a dense two-row body, one short meta line, and NO unconditional
+    prose. What it does NOT copy is MLB's `cards-linescore*` markup:
+    `cards-linescore-head`, `cards-linescore-row`, `cards-linescore-team` and
+    `is-compact` have ZERO rules in `shared/dense_cards.css`, which is the
+    stylesheet this board loads. Copying them would render unstyled -- the
+    exact defect that put `.cards-market-sub` on the main card at inherited
+    16px. Every class below was checked against that file first.
+
+    TEAM ABBREVIATION LEADS, NOT THE SCHOOL NAME. The generic strip renders
+    `game.away.name` into a narrow box, so the board showed "Sacram ento
+    State", "Easte Michi n" and "North Dakot State". The abbreviation is the
+    scannable token at this size; the full name stays as the secondary line
+    where it can wrap harmlessly. -#}
+<section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
+  {% if games %}
+    <div class="cards-scoreboard-strip">
+      {% for game in games %}
+        {% set ncaaf = game.ncaaf_card if game.ncaaf_card is defined else none %}
+        {% set scoreboard = ncaaf.scoreboard if ncaaf and ncaaf.scoreboard is defined else {} %}
+        {% set kickoff = scoreboard.get('kickoff_label') if scoreboard else none %}
+        {% set metrics = game.metrics if game.metrics is defined and game.metrics else [] %}
+        <a class="cards-strip-card" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
+          <div class="cards-strip-head">
+            <span class="cards-status-badge">{{ game.status }}</span>
+            <span data-role="strip-detail">{{ kickoff or game.detail }}</span>
+          </div>
+          <div class="cards-head-left cards-head-matchup">
+            <div class="cards-head-team">
+              <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+              <div>
+                <div class="cards-head-team-name">{{ game.away.abbr }}</div>
+                <div class="cards-mini-copy">{{ game.away.name }}</div>
+              </div>
+            </div>
+            <span class="cards-score-divider">@</span>
+            <div class="cards-head-team">
+              <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+              <div>
+                <div class="cards-head-team-name">{{ game.home.abbr }}</div>
+                <div class="cards-mini-copy">{{ game.home.name }}</div>
+              </div>
+            </div>
+          </div>
+          {#- Four numbers, market and model side by side, because comparing
+              them is the only reason to look at a betting slate at a glance.
+              `metrics` is built by `ncaaf/cards.py` in exactly this order:
+              Market spread, Market total, Projected total, Projected spread. -#}
+          <div class="cards-mini-metrics cards-mini-metrics--strip">
+            {% for metric in metrics[:4] %}
+              <div class="cards-mini-metric">
+                <span>{{ metric.label }}</span>
+                <strong>{{ metric.value }}</strong>
+              </div>
+            {% endfor %}
+          </div>
+          {#- ONE short line, and only when there is a real number in it. The
+              generic strip rendered `game.summary` unconditionally, which is a
+              full sentence. -#}
+          {% if scoreboard and scoreboard.get('win_probability') and scoreboard.get('spread_label') %}
+            <div class="cards-strip-meta">{{ scoreboard.get('spread_label') }} · {{ scoreboard.get('win_probability') }}</div>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="cards-loading-strip">{{ empty_text }}</div>
+  {% endif %}
+</section>

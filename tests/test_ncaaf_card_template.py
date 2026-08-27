@@ -154,3 +154,98 @@ def test_a_card_with_no_projection_still_renders_and_stays_balanced():
     tabs = re.findall(r'data-tab-target="([^"]+)"', html)
     panels = re.findall(r'data-panel-id="([^"]+)"', html)
     assert [t for t in tabs if t not in panels] == []
+
+
+# ---------------------------------------------------------------------------
+# THE SCOREBOARD STRIP. NCAAF fell through to the generic one and produced a
+# 435px "compact" card against MLB's tight preview tile.
+# ---------------------------------------------------------------------------
+
+def _strip(games):
+    env = Environment(loader=FileSystemLoader(str(REPO_ROOT / "syndicate" / "templates")))
+    return env.get_template("shared/_scoreboard_strip.html").render(games=games, empty_text="No games")
+
+
+def _strip_game(**overrides):
+    g = {
+        "gamePk": "g1", "status": "Week 1", "detail": "Week 1", "card_variant": "ncaaf_main",
+        "away": {"abbr": "SS", "name": "Sacramento State"},
+        "home": {"abbr": "EM", "name": "Eastern Michigan"},
+        "metrics": [
+            {"label": "Market spread", "value": "-10.5"},
+            {"label": "Market total", "value": "53.1"},
+            {"label": "Projected total", "value": 42.2},
+            {"label": "Projected spread", "value": "EM by 16.3"},
+        ],
+        "ncaaf_card": {"scoreboard": {
+            "kickoff_label": "Sat Aug 29, 3:00 PM CDT",
+            "spread_label": "EM by 16.3", "win_probability": "77.7%",
+        }},
+    }
+    g.update(overrides)
+    return g
+
+
+def test_ncaaf_gets_its_own_strip_not_the_generic_one():
+    html = _strip([_strip_game()])
+    assert "cards-strip-card" in html
+    # the generic strip's unconditional prose blocks must be gone
+    assert "cards-strip-live" not in html
+    assert "cards-strip-lens" not in html
+
+
+def test_the_strip_drops_the_prose_that_made_it_435px():
+    """Those two blocks were 174px of a 435px card and both repeat the main card."""
+    html = _strip([_strip_game()])
+    assert "SmartSim 2.0 projects" not in html
+    assert "Projection contract" not in html
+
+
+def test_the_abbreviation_leads_so_long_school_names_stop_wrapping():
+    """Production showed "Sacram ento State" and "Easte Michi n" in a narrow box."""
+    html = _strip([_strip_game()])
+    assert '<div class="cards-head-team-name">SS</div>' in html
+    assert '<div class="cards-head-team-name">Sacramento State</div>' not in html
+    assert "Sacramento State" in html, "the full name should survive as the secondary line"
+
+
+def test_the_strip_shows_market_and_model_side_by_side():
+    html = _strip([_strip_game()])
+    for label in ("Market spread", "Market total", "Projected total", "Projected spread"):
+        assert label in html
+
+
+def test_the_strip_meta_line_is_omitted_when_there_is_no_projection():
+    """One short line, and only with a real number in it -- never an empty bar."""
+    g = _strip_game()
+    g["ncaaf_card"]["scoreboard"] = {"kickoff_label": "Sat"}
+    html = _strip([g])
+    assert "cards-strip-meta" not in html
+
+
+def test_the_strip_markup_is_balanced():
+    html = _strip([_strip_game(), _strip_game(gamePk="g2")])
+    assert len(re.findall(r"<div\b", html)) == len(re.findall(r"</div>", html))
+    assert len(re.findall(r"<a\b", html)) == len(re.findall(r"</a>", html))
+
+
+def test_every_class_the_strip_uses_is_styled_by_the_sheet_this_board_loads():
+    """THE `.cards-market-sub` LESSON, made structural.
+
+    That class had a colour rule and NO font-size rule in
+    `shared/dense_cards.css`, so it inherited 16px body text and rendered
+    LARGER than the value it annotates. MLB's linescore classes
+    (`cards-linescore-head`, `cards-linescore-row`, `cards-linescore-team`,
+    `is-compact`) have zero rules in that sheet, so copying MLB's strip markup
+    verbatim would have shipped unstyled markup for the same reason.
+
+    `game_cards_board.html` loads `shared/dense_cards.css`; this asserts every
+    class the NCAAF strip emits appears there.
+    """
+    css = (REPO_ROOT / "syndicate" / "static" / "shared" / "dense_cards.css").read_text(encoding="utf-8")
+    html = _strip([_strip_game()])
+    used = set()
+    for attr in re.findall(r'class="([^"]+)"', html):
+        used.update(c for c in attr.split() if c.startswith("cards-"))
+    missing = sorted(c for c in used if c not in css)
+    assert not missing, f"classes with no rule in dense_cards.css: {missing}"

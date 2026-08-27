@@ -309,8 +309,23 @@ a.cards-head-team-name:focus-visible {
   font-weight: 700;
 }
 
+/* `.cards-market-sub` ADDED 2026-08-27. It was in the COLOUR group above and
+   in NO font-size group, so it inherited the 16px body size -- rendering the
+   annotation LARGER than the 15px `.cards-market-main` value it annotates, and
+   forcing the market tiles to wrap and clip. Measured on production:
+   market-sub 16px here vs 10px on MLB's `cards_exact.css`.
+
+   Every sport on this stylesheet uses `.cards-market-sub` through
+   `_game_card_generic.html`, so this is a parity fix for all of them, not an
+   NCAAF-specific one -- the NCAAF market row simply made it visible.
+
+   CROSS-LANE EDIT, logged: this file is claimed by the OPEN lane
+   `soccer-board-mlb-parity` (UNOWNED, last checkpointed 2026-08-22). Additive
+   only -- one selector joins an existing rule; no existing declaration
+   changed. */
 .cards-sim-line,
 .cards-mini-copy,
+.cards-market-sub,
 .cards-strip-meta,
 .cards-strip-live,
 .cards-strip-lens,
