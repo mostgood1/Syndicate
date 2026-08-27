@@ -33955,9 +33955,23 @@ fail is not known to discriminate.
 (score ribbon, market row, tab rail lifted above the panels) and market tiles
 that show model against market rather than "Source: SmartSim 2.0".
 
-**verify:** the SAME rate, and it must move off 0/51 on all four fields. That
-is the whole measurement; a live deploy and a green build already proved
-nothing once today.
+**verify: CONFIRMED 14:39:32Z.** Every field moved, whole slate:
+
+    shared_predictions.home_mean     51/51   (was 0/51)
+    shared_predictions.away_mean     51/51   (was 0/51)
+    shared_predictions.margin_mean   51/51   (was 0/51)
+    shared_predictions.total_mean    51/51   (was 0/51)
+    probabilities.home_cover         51/51   (was 0/51)
+    probabilities.total_over         51/51   (was 0/51)
+
+    North Carolina @ TCU
+      model   home 30.3  away 20.04  margin 10.263  total 50.337
+      market  spread -9.18            total 46.86
+      p(home cover) 0.532   p(total over) 0.617
+
+The rate against a stated baseline is the only thing that separated this deploy
+from the one 15 minutes earlier, which built clean, went live, and moved
+nothing.
 
 **NOT VERIFIED EITHER TIME:** the rendered page. Every reading here is an API
 payload. No browser, no width, no visual check — the compact card is a template
