@@ -1847,6 +1847,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   prop selections to CHANGE -- some of what it won before was the wrong player,
   so a fall there is a correction, not a regression, and `prop_without_player`
   names what it could not key.
+- **VENUE ROBUSTNESS `[2026-08-27, user ask: kalshi/polymarket on a 30-60s
+  cadence with line-move tracking]`. TRIM FLOOR DONE; CADENCE IS NOT AN ENV
+  CHANGE AND I SAID TWICE THAT IT WAS.**
+  - Line-move tracking ALREADY EXISTS: `venue_daily_odds.record_daily_odds`
+    keeps ~10 days, per sport, with movement. The 6,000-market artifact is the
+    JOIN'S WORKING SET, not the record.
+  - **Corrected twice, both times before setting a variable that would have
+    done nothing.** `SYNDICATE_POLYMARKET_REFRESH_INTERVAL_SECONDS` governs
+    `_polymarket_catalogue_at_boot()` -- boot only, `force=True`. Kalshi's
+    refresh is called once per BOARD BUILD (~3min claimed, ~748s measured), so
+    its 120s interval can never fire faster than its caller asks. And the live
+    worker's loop is ADAPTIVE: `_live_refresh_loop_interval_for_meta` returns
+    the IDLE interval (~900s) whenever no game is live, and BOTH venue ticks
+    ride it -- so even `SYNDICATE_POLYMARKET_US_SLATE_INTERVAL_SECONDS=60` is
+    inert while idle.
+  - **What 30-60s actually needs:** a venue poll independent of the live-refresh
+    loop's adaptive interval. The idle interval exists to avoid expensive
+    per-sport work when nothing is live; exchange prices are free and move
+    continuously, so they do not belong behind that gate. NOT BUILT -- it is a
+    new loop and a design decision, not a tweak.
+  - **DONE: per-sport floor in the kalshi trim.** Freshest-first was the right
+    ORDER and the wrong BUDGET -- MLB's 14 series can fill all 6,000 slots and
+    evict soccer entirely, which is the intermittency measured today (173
+    quotes -> 0). `_trim_to_storage_bounds` extracted from a 200-line function
+    so it could be tested at all; the first test written against it had to
+    `skip`, which is the green-and-proves-nothing failure this lane keeps
+    naming. 7 tests, 4 fail without the floor.
+  - HARD CONSTRAINT, recorded so nobody designs past it: the keyvalue store
+    REFUSES at 8MB and `layer2_shortlist` already holds 5.7MB. A 13.3MB write
+    was once rejected outright and the artifact stopped being written at all.
+    Polling faster is free; KEEPING MORE is not.
 - Blocked by: none. Nothing armed; `SYNDICATE_EXECUTION_*` untouched.
 
 

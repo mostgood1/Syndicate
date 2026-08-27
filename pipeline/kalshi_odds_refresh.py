@@ -260,6 +260,11 @@ DEFAULT_DORMANT_INTERVAL_SECONDS = 3600
 # now. Trimmed OLDEST-SERIES-FIRST and reported, never silently.
 MAX_STORED_MARKETS = 6000
 
+# The slots each SPORT is guaranteed before the rest compete on staleness.
+# 6,000 / 300 supports 20 sports, comfortably above the eight this platform
+# carries, so the floor can never oversubscribe the budget.
+PER_SPORT_FLOOR_MARKETS = 300
+
 # Markets kept per series in the JOIN'S WORKING SET.
 #
 # MEASURED 2026-08-25T17:53:48Z, the tick after the queue started rotating:
@@ -600,6 +605,71 @@ def ensure_series_discovered(*, force: bool = False) -> dict[str, Any]:
         return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
 
 
+def _trim_to_storage_bounds(
+    per_series_markets: list[tuple[float, str, list[dict[str, Any]]]],
+) -> tuple[list[dict[str, Any]], int, dict[str, int]]:
+    """Fit the working set into `MAX_STORED_MARKETS`, guaranteeing each sport a floor.
+
+    EXTRACTED SO IT CAN BE TESTED. It was inline in a 200-line function, and the
+    first test written against it had to `skip` -- a green test that proves
+    nothing, which is the failure this module's own comments keep naming.
+
+    STALENESS IS THE RIGHT ORDER AND THE WRONG BUDGET. Freshest-first is what
+    the trim always claimed, and it is correct for choosing WITHIN a sport. It
+    is wrong ACROSS sports: MLB carries 14 registered series, so on volume alone
+    it can fill all 6,000 slots and every soccer market falls off -- not because
+    it is stale, but because it queued behind a bigger sport.
+
+    MEASURED 2026-08-27: kalshi served 173 soccer quotes at 15:0xZ
+    (`h2h_keyed_by_team:149`) and ZERO an hour later
+    (`no_kalshi_market_classified_to_this_sport`) while its MLB set was 2,189
+    keys. `selected_by_sport['soccer']` carried no kalshi entry at all, and a
+    board cannot price a venue that appears and disappears.
+
+    THE FLOOR IS A GUARANTEE, NEVER A RESERVATION. A sport with fewer markets
+    than the floor takes what it has and the unused slots go to whoever else
+    wants them -- holding them empty would trade one sport's starvation for
+    everyone's.
+
+    Returns `(markets, trimmed, kept_by_sport)`; the caller reports all three.
+    """
+    from syndicate.features.shared.kalshi_catalogue import sport_for_series
+
+    ordered = sorted(per_series_markets, key=lambda item: item[0])
+    all_markets: list[dict[str, Any]] = []
+    kept_by_sport: dict[str, int] = {}
+    trimmed = 0
+    remainder: list[tuple[float, str, list[dict[str, Any]]]] = []
+
+    for age, series, markets in ordered:
+        sport = str(sport_for_series(series) or "").strip().lower() or "unmapped"
+        held = kept_by_sport.get(sport, 0)
+        room = min(
+            max(0, PER_SPORT_FLOOR_MARKETS - held),
+            max(0, MAX_STORED_MARKETS - len(all_markets)),
+        )
+        take = markets[:room] if room else []
+        if take:
+            all_markets.extend(take)
+            kept_by_sport[sport] = held + len(take)
+        if len(take) < len(markets):
+            # Whatever the floor did not take is still eligible below, in the
+            # same staleness order -- never dropped here.
+            remainder.append((age, series, markets[len(take):]))
+
+    for _age, _series, markets in remainder:
+        if len(all_markets) >= MAX_STORED_MARKETS:
+            trimmed += len(markets)
+            continue
+        room = MAX_STORED_MARKETS - len(all_markets)
+        if len(markets) > room:
+            trimmed += len(markets) - room
+            markets = markets[:room]
+        all_markets.extend(markets)
+
+    return all_markets, trimmed, kept_by_sport
+
+
 def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     """Refresh whichever series are due, merge, record, write.
 
@@ -824,17 +894,14 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
     #
     # Freshest series are kept: a stale series' prices are the least useful
     # thing in the working set, which is the claim the docstring was making.
-    ordered = sorted(per_series_markets, key=lambda item: item[0])
-    all_markets: list[dict[str, Any]] = []
-    for _age, _series, markets in ordered:
-        if len(all_markets) >= MAX_STORED_MARKETS:
-            trimmed += len(markets)
-            continue
-        room = MAX_STORED_MARKETS - len(all_markets)
-        if len(markets) > room:
-            trimmed += len(markets) - room
-            markets = markets[:room]
-        all_markets.extend(markets)
+    all_markets, trimmed_now, kept_by_sport = _trim_to_storage_bounds(per_series_markets)
+    trimmed += trimmed_now
+    if trimmed_now:
+        print(
+            f"[kalshi_odds] TRIM_BY_SPORT kept={len(all_markets)} trimmed={trimmed_now}"
+            f" floor={PER_SPORT_FLOOR_MARKETS} kept_by_sport={dict(sorted(kept_by_sport.items()))}",
+            flush=True,
+        )
 
     # THE COMPLETE SET, NOT THE WORKING SET.
     #
