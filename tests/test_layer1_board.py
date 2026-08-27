@@ -287,8 +287,17 @@ def test_slate_window_is_forward_only_and_per_sport():
         "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14",
         "2026-08-15", "2026-08-16",
     ]
+    # ncaaf widened 3 -> 7 on 2026-08-27 (`#588`): at 3 the window ended one day
+    # short of the sport's own opening Saturday, `quote_rows` came back empty,
+    # and Layer 2 skipped the sport before its enrichment loop on every build.
     assert resolve_window_dates("ncaaf", "2026-08-10", window="slate") == [
-        "2026-08-10", "2026-08-11", "2026-08-12",
+        "2026-08-10",
+        "2026-08-11",
+        "2026-08-12",
+        "2026-08-13",
+        "2026-08-14",
+        "2026-08-15",
+        "2026-08-16",
     ]
     assert len(resolve_window_dates("soccer", "2026-08-10", window="slate")) == 7
     # Explicit day counts override, and an unknown sport gets the safe single day.

@@ -73,8 +73,13 @@ def test_multi_day_sports_match_their_layer1_windows():
     # by construction rather than by two constants agreeing today.
     assert _within_horizon(_row("nfl", days_out=6), NOW, 1)
     assert not _within_horizon(_row("nfl", days_out=7), NOW, 1)
-    assert _within_horizon(_row("ncaaf", days_out=2), NOW, 1)
-    assert not _within_horizon(_row("ncaaf", days_out=3), NOW, 1)
+    # ncaaf 3 -> 7 (`#588`). THE POINT OF THIS TEST STILL HOLDS AND IS THE
+    # REASON IT FAILED: these horizons derive from the shared
+    # `slate_window_days` table, so widening Layer 1 widened Layer 2 with
+    # no second edit -- "by construction rather than by two constants
+    # agreeing today", as the comment above says. Only the literals moved.
+    assert _within_horizon(_row("ncaaf", days_out=6), NOW, 1)
+    assert not _within_horizon(_row("ncaaf", days_out=7), NOW, 1)
 
 
 def test_an_explicit_wider_horizon_still_wins():

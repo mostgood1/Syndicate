@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import pytest
 
-from syndicate.features.shared.layer1_board import resolve_window_dates
+from syndicate.features.shared.layer1_board import resolve_window_dates, slate_window_days
 
 
 # `#435` RENAMED THE FUNCTION THESE TESTS PATCH, AND THEY WENT ON PASSING.
@@ -102,7 +102,10 @@ def test_multi_day_sports_match_their_layer1_windows():
     # `slate_window_days` table, which is the thing that keeps the two boards
     # from diverging. Three literal 5s were the cost of that guarantee.
     assert len(resolve_window_dates("nfl", "2026-08-12", window="slate")) == 7
-    assert len(resolve_window_dates("ncaaf", "2026-08-12", window="slate")) == 3
+    # 7 since `#588`; see `_SLATE_WINDOW_DAYS`. Asserted through
+    # `slate_window_days` rather than as a literal so this tracks the table
+    # instead of restating it.
+    assert len(resolve_window_dates("ncaaf", "2026-08-12", window="slate")) == slate_window_days("ncaaf")
 
 
 def test_the_shortlist_reads_every_window_date(monkeypatch):

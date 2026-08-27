@@ -136,7 +136,40 @@ _SLATE_WINDOW_DAYS = {
     # it is the half that needed no vendor answer.
     "nfl": 7,
     # Thu through Sat.
-    "ncaaf": 3,
+    # SEVEN, raised from 3 on 2026-08-27, and the old value was BELOW THE SPAN
+    # THIS TABLE'S OWN COMMENT ACKNOWLEDGES. `layer2_shortlist` already noted
+    # "additive for nfl (5) and ncaaf (3), whose fixtures also span days" --
+    # the span was known and the width did not cover it.
+    #
+    # WHAT 3 COST, measured on production 2026-08-27. NCAAF served ZERO Layer 2
+    # chips on every date, including its own opening Saturday:
+    #
+    #     /api/board/game-chips?date=2026-08-29
+    #       total=250  ncaaf=0  {nfl: 16, soccer: 234}
+    #
+    # The chain, and every step is silent:
+    #   resolve_window_dates("ncaaf", "2026-08-26", window="slate")
+    #     -> ['2026-08-26', '2026-08-27', '2026-08-28']
+    #   the NCAAF quote shards on disk START at 2026-08-29 -- the openers,
+    #     ONE DAY past the edge
+    #   -> quote_rows == 0 -> `if not quote_rows: continue`
+    #   -> the sport is skipped BEFORE the enrichment loop, so there is no
+    #      PREGAME_PROJECTION_JOIN line, no candidates, no chips, and no ncaaf
+    #      in VENUE_REPRICE either -- the missing Kalshi/Polymarket NCAAF
+    #      quotes were downstream of this same cut.
+    #
+    # This is EXACTLY the shape NFL's own entry above was raised for: a width
+    # correct for where fixtures cluster, and one day short of the slate that
+    # actually matters. NCAAF is the worse case -- its "week 1" spans 08-29 to
+    # 09-07, TEN days, so 3 was never going to reach it from any anchor.
+    #
+    # SEVEN rather than TEN, deliberately. It matches nfl and soccer, it clears
+    # the openers from any anchor in the week before, and over-inclusion is not
+    # free: `#329` records 1,244 NFL rows starting 34-156 days out reaching a
+    # today board once already. Ten would pull most of a second NCAAF week onto
+    # a today board. A wrong width shows the wrong days, which is visible and
+    # cheap, per this table's own rule.
+    "ncaaf": 7,
     "ncaab": 1,
     # Soccer's own board has been week-scoped since 2026-07-24 for a reason its
     # module records: the odds feed is a single rolling file covering every

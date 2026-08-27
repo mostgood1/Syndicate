@@ -69,7 +69,11 @@ class PerSportWindowTests(unittest.TestCase):
     def test_a_sport_is_not_built_past_its_own_window(self):
         # ncaab asks for 1 day and was being built across the widest sport's 7.
         self.assertFalse(worker._sport_covers_date("ncaab", ANCHOR, _plus(1)))
-        self.assertFalse(worker._sport_covers_date("ncaaf", ANCHOR, _plus(3)))
+        # ncaaf is 7 since `#588`, so +3 is now INSIDE its window and this
+        # assertion would test nothing. The invariant -- a sport is not built
+        # past its OWN width -- is kept by asserting it one day past 7.
+        self.assertTrue(worker._sport_covers_date("ncaaf", ANCHOR, _plus(3)))
+        self.assertFalse(worker._sport_covers_date("ncaaf", ANCHOR, _plus(7)))
 
     def test_the_weekly_sports_keep_their_seven_days(self):
         # The change that started this must not be undone by the fix to it.
