@@ -49,6 +49,7 @@ status the ledger sets without ever calling the venue.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 
 import os
 from collections.abc import Mapping
@@ -460,6 +461,149 @@ def spent_today(
     return {"dollars": round(dollars, 2), "orders": count}
 
 
+# How much this venue can actually fund right now, or "we do not know".
+#
+# UNKNOWN ALLOWS, WHICH INVERTS THE HOUSE RULE -- stated here rather than left
+# to look like an oversight. The rule is that a guard must not map "unknown"
+# onto its permissive branch, because a failed lookup then reads as permission.
+# It does not hold here, for a specific reason: a SECOND AND AUTHORITATIVE
+# check sits downstream. The venue itself refuses an unfunded order with a 4xx
+# -- no contract is created, no money moves, and `_is_venue_refusal` already
+# exempts it from the day budget. The cost of wrongly allowing is one wasted
+# request.
+#
+# The cost of wrongly REFUSING is not symmetric. A stale artifact or a broken
+# credential would stop every live order, silently, and a system placing
+# nothing looks exactly like a quiet day. Failing closed would trade a free,
+# self-correcting error for an expensive, invisible one.
+#
+# STALENESS IS A REAL BOUND, not a formality: the stamp is written once per
+# execution tick, so it is minutes old by construction and cannot see orders
+# placed since. Those are subtracted rather than ignored.
+_BALANCE_MAX_AGE_SECONDS = 3600.0
+
+
+def _venue_available_dollars(venue: str | None) -> dict[str, Any]:
+    """`{"known": bool, "available": float, ...}` for one venue.
+
+    `known` is False for every absence -- no stamp, no such venue, a non-`ok`
+    status, an unusable number, or a reading too old to trust -- and each one
+    carries a DISTINCT `reason`, because "the worker never reported" and "the
+    credentials are wrong" are different problems that would otherwise share a
+    silent branch.
+    """
+    if not venue:
+        return {"known": False, "reason": "no_venue_on_request"}
+    try:
+        from syndicate.features.shared.venue_balances import read_venue_balances
+
+        stamp = read_venue_balances()
+    except Exception as exc:
+        return {"known": False, "reason": f"read_error:{type(exc).__name__}"}
+    if not stamp:
+        return {"known": False, "reason": "never_recorded"}
+
+    row = ((stamp.get("venues") or {}).get(str(venue).strip().lower())) or {}
+    if not row:
+        return {"known": False, "reason": "venue_absent_from_stamp"}
+    if str(row.get("status") or "") != "ok":
+        return {"known": False, "reason": f"balance_{row.get('status') or 'unknown'}"}
+
+    raw = row.get("dollars")
+    try:
+        dollars = float(raw)
+    except (TypeError, ValueError):
+        return {"known": False, "reason": "unusable_balance_value"}
+
+    age = _age_seconds(stamp.get("recorded_at"))
+    if age is None:
+        return {"known": False, "reason": "unstamped_reading"}
+    if age > _BALANCE_MAX_AGE_SECONDS:
+        return {"known": False, "reason": "stale_reading", "age_seconds": round(age, 1)}
+
+    # ORDERS PLACED SINCE THE STAMP ARE NOT IN IT. Without this, several orders
+    # inside one tick each measure themselves against the same pre-tick cash
+    # and the gate passes all of them -- the exact overspend it exists to stop.
+    committed = _live_stake_since(stamp.get("recorded_at"), venue=venue)
+    available = dollars - committed
+    return {
+        "known": True,
+        "available": round(available if available > 0 else 0.0, 4),
+        "balance_dollars": round(dollars, 4),
+        "committed_since_reading": round(committed, 4),
+        "age_seconds": round(age, 1),
+        "venue": str(venue).strip().lower(),
+    }
+
+
+def _age_seconds(stamp: Any) -> float | None:
+    if not stamp:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - parsed).total_seconds()
+
+
+def _live_stake_since(stamp: Any, *, venue: str) -> float:
+    """Live dollars committed at `venue` since `stamp`. Never raises.
+
+    A balance gate that threw would stop the tick that places orders, which is
+    a far worse failure than the one it is preventing.
+    """
+    if not stamp:
+        return 0.0
+    try:
+        parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return 0.0
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+
+    try:
+        from syndicate.features.shared.execution_ledger import LIVE as _LIVE
+        from syndicate.features.shared.execution_ledger import _load
+    except Exception:
+        return 0.0
+    try:
+        orders = (_load() or {}).get("orders") or []
+    except Exception:
+        return 0.0
+
+    total = 0.0
+    want = str(venue).strip().lower()
+    for order in orders:
+        if str(order.get("mode") or "") != _LIVE:
+            continue
+        if str(order.get("venue") or "").strip().lower() != want:
+            continue
+        # Only statuses where money may actually be committed. A `rejected`
+        # order never reached the venue and a 4xx `failed` was refused -- the
+        # same distinction `_SPENT_STATUSES` and `_is_venue_refusal` draw.
+        status = str(order.get("status") or "")
+        if status not in _SPENT_STATUSES or _is_venue_refusal(order):
+            continue
+        try:
+            at = datetime.fromisoformat(str(order.get("submitted_at")).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            continue
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        if at <= parsed:
+            continue
+        amount = order.get("fill_stake_dollars")
+        if amount is None:
+            amount = order.get("requested_stake_dollars")
+        try:
+            total += float(amount or 0.0)
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
 def check_order(
     request: Any, *, mode: str | None = None, already: Mapping[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -536,6 +680,30 @@ def check_order(
         }
 
     if resolved_mode == LIVE:
+        # DO WE ACTUALLY HAVE THE MONEY AT THIS VENUE?
+        #
+        # MEASURED 2026-08-27: 7 live Kalshi orders died `http_400
+        # insufficient_balance`, all of them SMALL -- $1.09 to $3.39, 3 to 7
+        # contracts at implied prices of 0.28-0.49. Not a sizing bug and not an
+        # empty account: $32.46 was tied up in open positions against $53.89
+        # free, so venue cash runs to the floor and refills only as markets
+        # settle. The day caps ($50/$40) are larger than the cash behind them,
+        # so no cap could express this and the venue was the only thing that
+        # noticed.
+        #
+        # A NAMED REFUSAL RATHER THAN A DOOMED REQUEST. Being capital-bound is
+        # a fact about the strategy and belongs on the board beside the caps,
+        # not rediscovered one 400 at a time.
+        balance = _venue_available_dollars(request_venue)
+        if balance.get("known") and stake > float(balance["available"]):
+            return {
+                "allowed": False,
+                "reason": "insufficient_venue_balance",
+                "stake": stake,
+                "balance": balance,
+                "limits": caps,
+            }
+
         # Checked LAST among the live-only gates but before anything is placed,
         # and checked again immediately before submit by `guarded_submit`.
         switch = kill_switch_engaged()
