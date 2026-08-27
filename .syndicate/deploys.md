@@ -33802,3 +33802,77 @@ the one I fixed:**
    first-quarter contract while the correct contract was sitting right there.
 
 **Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.
+
+## 2026-08-27 04:26:29Z + 04:30:05Z — refresh-worker `29de8e7e` then `53d17690` — lane `venue-quote-line-join`
+
+    refresh-worker  29de8e7e  dep-da7rmaou01pc73bq2m50  live 04:26:29.789Z   NFL club nicknames
+    refresh-worker  53d17690  dep-da7rp795efls73edtij0  live 04:30:05Z       kalshi price + under leg
+
+Claim held by `venue-quote-line-join` throughout. Preflight CLEAR on each
+against its exact `--target-commit`; the second landed on a freshly restarted
+worker with only infrastructure processes. Nothing killed on either.
+
+**The first deploy was BLOCKED by `deploy-guard.py` and correctly so:** the
+per-session marker still read `nfl-soccer-props-board` while the claim was held
+by `venue-quote-line-join`. That is the cross-session misattribution `#497` is
+about. Marker corrected, not forced past.
+
+Deployed together deliberately -- their counters are INDEPENDENT
+(`clubs_unresolved` is polymarket's, `leg_without_price` and the `under` keys
+are kalshi's), so one board build attributes both.
+
+**BEFORE — 03:47:28Z, on `967ec4bf` (venue line fix only)**
+
+    rows_in=14871 stamped=1305 (8.8%)
+    selected_by_source={polymarket_us: 1192, kalshi: 26, oddsapi: 87}
+    nfl    kalshi quotes=400   polymarket quotes=2048  "spreads_refused:1504
+                                clubs_unresolved:64:['49ers','Bears','Bengals',
+                                'Bills','Broncos','Browns']"
+    ncaaf  kalshi quotes=400
+    wnba   kalshi quotes=121
+
+**AFTER — 04:39:40Z, on `53d17690`**
+
+    rows_in=14443 stamped=1890 (13.1%)
+    selected_by_source={polymarket_us: 1764, kalshi: 39, oddsapi: 87}
+    nfl    kalshi quotes=800   polymarket quotes=2112  "spreads_refused:1504"
+    ncaaf  kalshi quotes=800
+    wnba   kalshi quotes=207   "h2h_keyed_by_team:18 leg_without_price:32"
+
+**verify: BOTH FIXES CONFIRMED, EACH ON ITS OWN COUNTER.**
+
+1. **Nicknames — `clubs_unresolved` 64 -> GONE.** The string is absent from
+   nfl's reason line entirely, and polymarket's nfl quotes went **2048 -> 2112,
+   exactly +64** -- the same 64 clubs it was refusing, now placed. That
+   arithmetic is the attribution: no other change adds quotes to that source.
+
+2. **The under leg — kalshi quotes DOUBLED on every totals-carrying sport.**
+   nfl 400 -> 800, ncaaf 400 -> 800, both exactly 2x, which is what emitting the
+   mirrored side of every threshold market must produce. wnba 121 -> 207 rather
+   than 2x, correctly: its h2h markets have no mirror and are refused.
+
+3. **Prices are real now, and the counter proves the read rather than the
+   outcome.** `leg_without_price:32` FIRES on wnba, so the counter is live; it
+   is ABSENT on nfl and ncaaf, whose kalshi reason is `None` -- zero unpriceable
+   legs across 1,600 quotes. Before this, `yes_bid`/`last_price` were not in the
+   persisted schema at all and every quote carried `probability=None`.
+
+4. **`stamped` 1305 -> 1890 on FEWER rows** (14871 -> 14443): 8.8% -> 13.1% of
+   the grid repriced from a venue. `selected_by_source[polymarket_us]`
+   **1192 -> 1764, +572**.
+
+**WHAT DID NOT MOVE, said plainly.** `selected_by_source[kalshi]` went 26 -> 39
+while its quote count DOUBLED. Offering both legs is not the same as winning
+selections: kalshi's strike ladder still has to land on the board's own line,
+and it is the older feed here (925s vs polymarket's 856s) so it loses freshness
+contests. The under legs are now available to match; they are mostly not being
+chosen. That is a real remaining question and not a success.
+
+`oddsapi` 87 -> 87, unchanged, as it was for the previous deploy too.
+
+Soccer polymarket still reports `clubs_unresolved:222:['No','Yes']` -- those are
+outcome labels, not club names, so the nickname map is the wrong tool for it.
+Separate defect, not addressed here.
+
+**Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched by any of tonight's
+three deploys.
