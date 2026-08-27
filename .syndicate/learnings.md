@@ -4347,3 +4347,39 @@ Same session, same shape: `[venue_poll]` printed KALSHI on success and
 Polymarket only on FAILURE, so a Polymarket half that had silently stopped
 produced output identical to one working perfectly. Found only because the user
 asked a question the instrument could not answer.
+
+## 2026-08-27 — FORBIDDEN: allowlisting a KEYVALUE-backed path in `HOT_ARTIFACT_PATTERNS` and calling it readable. The guard will pass and the data will not arrive.
+
+I was one step from proposing exactly this. The ask was "make the execution
+ledger readable off-worker so we can compare Polymarket volume day over day",
+and the obvious move is an entry in `HOT_ARTIFACT_PATTERNS`.
+
+**It would have been inert, and inert in the worst way — it looks like a fix,
+it passes review, and it changes a 403 into an empty result.**
+
+`write_json_file` routes every path outside `migration_runs/` to the keyvalue
+store **and returns before touching disk**. `/api/ops/artifacts/export` is a
+DISK read. So for anything written that way there is no file behind the path:
+the allowlist gates a read of something that was never written there.
+`execution_ledger._ledger_path()` is one of these.
+
+**The repo already knew.** `ops.py:566` (`api_ops_live_lens_snapshot_index`)
+documents the same trap and records that FOUR hypotheses — broken pull, dead
+loop, headroom gate, stale builder — were each eliminated by measuring
+something ADJACENT to the artifact that actually decided the join, because the
+one file that mattered could not be read at all. That endpoint is the pattern:
+read through the keyvalue-aware `read_json_file`, not the disk export.
+
+**HOW TO TELL, BEFORE WRITING THE PATTERN:** find the WRITER. If it is
+`write_json_file` / `refresh_state_store`, the artifact is in keyvalue and
+`HOT_ARTIFACT_PATTERNS` is the wrong lever entirely. Only a real
+`open()`/`Path.write_*` on disk makes the allowlist meaningful.
+
+**SECOND ERROR IN THE SAME THREAD, worth its own line:** I first reported the
+ledger as unreadable after probing `reports/execution/live_ledger.jsonl`, a
+path that DOES NOT EXIST. The real path is
+`reports/intelligence/execution_ledger.json`. Re-tested, it is genuinely
+blocked — so my conclusion survived, but it survived by luck. A blocker
+reported off a guessed path is not a measurement, even when it happens to be
+right. Same family as "re-measure the blocker, it expires" (2026-08-27) and
+"read the field you already have".

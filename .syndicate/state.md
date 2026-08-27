@@ -6077,10 +6077,22 @@ picking positionally; there is no fixed over/YES constant in the board-join
 path. That note is about the ORDER path. I attached a real defect to the wrong
 module by topic adjacency instead of reading the function.
 
-**NOT ESTABLISHED:** whether today is lower than previous days. The execution
-ledger is not readable off-worker (`/api/ops/artifacts/export` ->
-`path is not an allowed hot artifact`) and `VENUE_SETTLEMENT` truncates before
-the per-venue counts. Stability WITHIN today is measured; day-over-day is not.
+**NOT ESTABLISHED:** whether today is lower than previous days. Stability
+WITHIN today is measured; day-over-day is not. The execution ledger is
+`reports/intelligence/execution_ledger.json` (NOT `reports/execution/
+live_ledger.jsonl` — I probed that first and it does not exist; the real path
+is blocked too, so the conclusion held by luck off a wrong measurement).
+**DO NOT "FIX" THIS BY ADDING IT TO `HOT_ARTIFACT_PATTERNS` — that is INERT.**
+`execution_ledger._ledger_path()` writes through `write_json_file`, which
+routes every path outside `migration_runs/` to the KEYVALUE store and returns
+BEFORE touching disk, so there is no file behind that path.
+`/api/ops/artifacts/export` is a DISK read; allowlisting turns
+`403 not allowed` into an empty result — the guard passes and the data still
+never arrives. Documented already at `ops.py:566`. The working shape is a
+keyvalue-aware read, exactly like `api_ops_live_lens_snapshot_index`. Asked
+`open-bet-live-status` (owns `ops.py` + `execution_ledger.py`) for a read-only
+AGGREGATES endpoint — counts per venue per day, deliberately not rows, because
+this is the money record.
 
 **READING TRUNCATED LOG LINES:** the Render logs API returns the full message
 in `logs[].message` (2,331 chars for `POLYMARKET_UNMATCHED`); it is the
