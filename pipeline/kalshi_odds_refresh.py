@@ -639,9 +639,9 @@ def _trim_to_storage_bounds(
     all_markets: list[dict[str, Any]] = []
     kept_by_sport: dict[str, int] = {}
     trimmed = 0
-    remainder: list[tuple[float, str, list[dict[str, Any]]]] = []
+    remainder: list[tuple[str, list[dict[str, Any]]]] = []
 
-    for age, series, markets in ordered:
+    for _age, series, markets in ordered:
         sport = str(sport_for_series(series) or "").strip().lower() or "unmapped"
         held = kept_by_sport.get(sport, 0)
         room = min(
@@ -654,10 +654,12 @@ def _trim_to_storage_bounds(
             kept_by_sport[sport] = held + len(take)
         if len(take) < len(markets):
             # Whatever the floor did not take is still eligible below, in the
-            # same staleness order -- never dropped here.
-            remainder.append((age, series, markets[len(take):]))
+            # same staleness order -- never dropped here. The SPORT is carried
+            # through rather than re-derived, so the second pass can keep the
+            # tally honest without calling `sport_for_series` twice per series.
+            remainder.append((sport, markets[len(take):]))
 
-    for _age, _series, markets in remainder:
+    for sport, markets in remainder:
         if len(all_markets) >= MAX_STORED_MARKETS:
             trimmed += len(markets)
             continue
@@ -666,6 +668,14 @@ def _trim_to_storage_bounds(
             trimmed += len(markets) - room
             markets = markets[:room]
         all_markets.extend(markets)
+        # COUNTED HERE TOO, and this is a bug fix rather than a nicety. The
+        # first cut updated the tally only in the FLOOR pass, so production
+        # printed `kept=6000 ... kept_by_sport={...}` summing to 1,506 -- a
+        # reader had every reason to think 4,494 markets had vanished. A
+        # breakdown that does not reconcile with its own total is the
+        # "count that looks like coverage" failure this file keeps naming,
+        # and it was in the line written to prove the floor worked.
+        kept_by_sport[sport] = kept_by_sport.get(sport, 0) + len(markets)
 
     return all_markets, trimmed, kept_by_sport
 

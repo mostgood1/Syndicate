@@ -125,3 +125,34 @@ def test_the_floor_constant_cannot_oversubscribe_the_budget(monkeypatch):
     import importlib
     real = importlib.reload(mod)
     assert real.MAX_STORED_MARKETS // real.PER_SPORT_FLOOR_MARKETS >= 10
+
+
+def test_the_breakdown_RECONCILES_with_its_own_total():
+    """A tally that does not add up to the number beside it is worse than no
+    tally: production printed `kept=6000 ... kept_by_sport={...}` summing to
+    1,506, because the count was updated in the FLOOR pass and not the
+    remainder pass. A reader had every reason to think 4,494 markets vanished.
+
+    This is the guard for the line written to PROVE the floor worked.
+    """
+    kept, trimmed, by_sport = mod._trim_to_storage_bounds([
+        (1.0, "KXMLBGAME", _markets("KXMLBGAME", 4000)),
+        (2.0, "KXSOCCER", _markets("KXSOCCER", 400)),
+        (3.0, "KXWNBA", _markets("KXWNBA", 50)),
+    ])
+
+    assert sum(by_sport.values()) == len(kept), (by_sport, len(kept))
+    assert len(kept) + trimmed == 4450, "markets were neither kept nor counted as trimmed"
+
+
+def test_the_remainder_pass_is_attributed_to_the_right_sport():
+    """Not just reconciling -- reconciling CORRECTLY. The overflow beyond a
+    sport's floor must be credited to that sport, not to whoever came first."""
+    kept, _trimmed, by_sport = mod._trim_to_storage_bounds([
+        (1.0, "KXSOCCER", _markets("KXSOCCER", 900)),
+        (2.0, "KXWNBA", _markets("KXWNBA", 50)),
+    ])
+
+    # soccer: 300 by floor + 600 in the remainder = 900. wnba: 50.
+    assert by_sport == {"soccer": 900, "wnba": 50}, by_sport
+    assert sum(by_sport.values()) == len(kept) == 950
