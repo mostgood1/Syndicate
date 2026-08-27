@@ -4383,3 +4383,55 @@ blocked — so my conclusion survived, but it survived by luck. A blocker
 reported off a guessed path is not a measurement, even when it happens to be
 right. Same family as "re-measure the blocker, it expires" (2026-08-27) and
 "read the field you already have".
+
+## 2026-08-27 — FORBIDDEN: validating a CONVERTED value while STORING the raw one. The guard clears a number that is not the number anything uses.
+
+`execution_ledger` reconcile computed its safety bound through
+`_price_as_probability(fill_price)` and then stamped `fill_price` RAW. One
+Polymarket fill arrived as American odds:
+
+```
+LIVE_LEDGER_ROW status=filled venue=polymarket
+  ticker=tsc-nfl-lar-lac-2026-08-27-total-38pt5
+  price=104.0  stake=1.64  fill_price=104.0        <- siblings all 0.445-0.49
+```
+
+`contracts x 104.0 = ~$349` against a `stake=1.64`. `spent_today` prefers
+`fill_stake_dollars`, so ONE order took the day's Polymarket spend from
+**$23.25 to $368.97** — against a `max_day_dollars_polymarket` of **100.01**.
+Real spend was ~$20.71. No money moved; the BOOKKEEPING was 15.9x wrong and
+the cap enforces on it.
+
+**THE GUARD DID NOT MISS IT. IT CHECKED A DIFFERENT QUANTITY.**
+`_FILL_DOLLAR_ABSURD = 10.0` compares `filled_dollars > stake * 10`. But
+`filled_dollars` is built from the CONVERTED price (3.36 x 0.4902 = $1.64) —
+entirely plausible against a $1.64 stake — while the value written to the
+ledger and summed by the budget is the RAW one. Two bands, careful
+thresholds, a documented rationale, and it cleared the defect it was written
+to catch, because the quantity it validated was not the quantity that was
+stored.
+
+**THE CONVERTER WAS INNOCENT AND I CHECKED BEFORE BLAMING IT.**
+`_price_as_probability(104.0)` hits `abs(parsed) >= 100.0` and returns
+`american_to_probability(104.0) = 0.4902`, matching the venue's own
+`avgPx='0.4900'`. The obvious suspect was correct code. The bug was the
+ASYMMETRY between the path that validates and the path that persists.
+
+**HOW TO APPLY.** Wherever a value is normalised before being checked, assert
+that the SAME normalised value is what gets written. If a guard reads
+`f(x)` and the store receives `x`, the guard is not guarding the store — and
+a passing guard on a stored raw value is worse than no guard, because it
+reads as verified. Search for the pattern: a converter called inside a bound
+computation, with the unconverted variable still in scope at the assignment.
+
+**COROLLARY, on unit errors and thresholds.** The two-band design assumed a
+unit error would be an ABSURD multiple (>=10x) and a real overspend would be
+small (<=1.25x). That is a reasonable prior and it did not save anything here,
+because the band was never applied to the wrong-unit number at all. A
+threshold cannot classify a value it never sees.
+
+**FOUND ONLY BECAUSE AN AGGREGATE EXISTED.** Invisible in logs — every
+individual line looked normal, including the bad row unless you knew sibling
+`fill_price` values. It surfaced on the FIRST read of a new per-day per-venue
+ledger summary endpoint. A per-day total is a cheap invariant over a record
+that is otherwise only ever appended to one row at a time.
