@@ -158,9 +158,45 @@ def _copy_file_if_needed(src: Path, dst: Path, *, overwrite_existing: bool) -> s
     copied", so a run that overwrote one file and a run that overwrote thirty
     thousand printed the same number. Nothing anywhere distinguished them.
     """
+    # WHY THE COMPARISON DEPTH FOLLOWS THE POLICY. `#284`-adjacent; measured
+    # 2026-08-27.
+    #
+    # On a SEED-ONLY root this comparison decides NOTHING. Look at the branch
+    # below: if the destination exists, the outcome is "unchanged" or "kept" and
+    # **either way the file is left alone**. The compare picks the counter LABEL,
+    # not the action. Paying a full byte read for a label is what killed the
+    # service:
+    #
+    #   `filecmp.cmp(..., shallow=False)` opens and fully reads BOTH sides, so a
+    #   boot issued ~66,800 opens and read ~6.2 GB to copy zero files. Measured
+    #   on Render from the per-root `Syncing ...` timestamps, the sync took
+    #   72.20s, of which `mlb_source/source_artifacts` alone was 62.75s (87%).
+    #   Fitting all 9 non-trivial roots gives `t = 1.337 ms/file + 117 MB/s`
+    #   (modelled 71.3s vs 72.20s measured) -- so 26.6s of it was pure byte
+    #   reading. During that window `/healthz` went unanswered for 35.21s and
+    #   34.74s against a 5s Render budget, the first blackout starting 5 seconds
+    #   after the sync began, and the instance was killed (`server_failed`,
+    #   20:41:44Z, 115s after boot). 4 such kills in 24h, every one within 2.5
+    #   min of a deploy.
+    #
+    # `shallow=True` is NOT "trust the stat and skip the compare" -- the stdlib
+    # falls through to the byte compare whenever the signatures differ. Verified
+    # against this interpreter, not assumed: same size + different mtime +
+    # different bytes still returns False, and same bytes + different mtime still
+    # returns True. The ONLY divergence from a deep compare is same-size AND
+    # same-mtime-float but different content, which on a seed-only root cannot
+    # change what happens to the file.
+    #
+    # An OVERWRITE root is the opposite case and keeps the deep compare: there
+    # the result DOES decide an action (copy or don't), and a false "unchanged"
+    # would pin a stale vendored copy on the disk -- the bug the seed-only policy
+    # exists to prevent, in the other direction. It costs nothing to be exact
+    # there: the only overwrite root is 76 files / 2.4 MB / 0.16s.
+    # `SYNDICATE_BOOTSTRAP_FORCE_OVERWRITE` re-arms overwrite on every root and
+    # therefore correctly re-arms the deep compare with it.
     if dst.exists() and dst.is_file():
         try:
-            if filecmp.cmp(src, dst, shallow=False):
+            if filecmp.cmp(src, dst, shallow=not overwrite_existing):
                 logger.debug("skipped unchanged file %s", src)
                 return "unchanged"
         except Exception:
