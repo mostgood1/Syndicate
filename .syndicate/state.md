@@ -6027,3 +6027,63 @@ Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
   loop cannot make a 71-minute-old quote fresh.
 
 None of the above is fixed. No lane holds them.
+
+## [polymarket-low-activity] — VERIFIED 2026-08-27, refresh-worker + live-odds-worker
+
+**WHY POLYMARKET PLACES ALMOST NOTHING. Three stacked structural facts, NOT a
+broken join.** Day totals $23.25 / 8 orders against a $100.01 / 50 cap — caps
+are nowhere near binding.
+
+Full refusals, `POLYMARKET_BOARD_JOIN`, 1,344-row board, matched=52:
+
+```
+market_type_not_a_game_line          6960   venue's non-sports catalogue, correct
+segment_market_not_full_game         1240   halves/quarters, correct
+board_market_not_a_game_line          935   OUR PROPS -- venue does not list them
+no_matching_polymarket_market         298   league listed, our GAME not listed
+outcomes_count_mismatch               296
+no_polymarket_market_for_league_date   42   NCAAF absent entirely
+side_not_an_outcome_of_this_market     17
+```
+
+1. **THE BOARD IS ~76% PLAYER PROPS AND POLYMARKET LISTS NONE.** Sampled live
+   MLB board, 300 rows: `batter_hits` 103, `batter_hits_runs_rbis` 58,
+   `batter_total_bases` 45, `strikeouts` 11, `outs` 10 = 227 props vs 73 game
+   lines. That is the 935 refusal AND the entire Kalshi-217 vs Polymarket-52
+   gap — Kalshi DOES list MLB props (`ORDER_PATH venue=kalshi` shows
+   `batter_rbis`/`strikeouts`/`batter_hits_runs_rbis`; Polymarket's shows
+   `{'totals': {'would_build': 3}}` and nothing else).
+2. **POLYMARKET LISTS A PARTIAL SLATE** of the remaining game lines.
+   `POLYMARKET_UNMATCHED` samples show the venue offering entirely different
+   fixtures — board wants `Baltimore Orioles @ St. Louis Cardinals`, venue
+   offered `mil-nym`/`col-wsh`. So `no_match` mostly means "this game is not
+   listed", not "listed under a name we do not know".
+3. What survives is **3 positions, all `totals`, all already held**
+   (`duplicates=3 placed=0`). Stable all day (matched 55/55/55/52 at
+   15:21/15:25/16:01/18:57) — NOT a regression.
+
+**ONE REAL BUG, ~22 rows, owned by `open-bet-live-status`:** a WNBA team-alias
+gap. `board: 'Washington Mystics @ Phoenix Mercury'` refused `no_match` while
+`offered: ['gsv-ny@None', 'wsh-phx@None']` — `wsh-phx` IS that fixture.
+Buckets `no_match|wnba|h2h: 7` + `no_match|wnba|totals: 15`. Messaged.
+
+**DISPROVEN — DO NOT RE-PROPOSE.** I hypothesised the totals-only output came
+from Polymarket SIDE RESOLUTION, citing `kalshi-spread-join-sign` item #4
+(`over->YES/under->NO` a fixed constant while outcome orientation varies).
+**Measured `side_not_an_outcome_of_this_market: 17` — the SMALLEST refusal in
+the set.** `_probability_for_side` translates `home`/`away` into the row's own
+team, matches literally then via `team_aliases`, and returns None rather than
+picking positionally; there is no fixed over/YES constant in the board-join
+path. That note is about the ORDER path. I attached a real defect to the wrong
+module by topic adjacency instead of reading the function.
+
+**NOT ESTABLISHED:** whether today is lower than previous days. The execution
+ledger is not readable off-worker (`/api/ops/artifacts/export` ->
+`path is not an allowed hot artifact`) and `VENUE_SETTLEMENT` truncates before
+the per-venue counts. Stability WITHIN today is measured; day-over-day is not.
+
+**READING TRUNCATED LOG LINES:** the Render logs API returns the full message
+in `logs[].message` (2,331 chars for `POLYMARKET_UNMATCHED`); it is the
+per-line DISPLAY that truncates. Fetch and slice the field rather than
+concluding the detail is unavailable — the counts and samples that answered
+all of the above were in a line that looked cut off.
