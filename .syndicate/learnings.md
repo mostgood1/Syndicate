@@ -7067,3 +7067,53 @@ guard reported.
 - If the guard names a lane you do not recognise, acquire under THAT name rather
   than editing markers to match — the guard's identity resolution is the one
   that gates the push.
+
+---
+
+## 2026-08-27 — MEASURED NEGATIVE: the NCAAF advanced-data payload does not close the gap to market
+
+**Do not re-litigate this without new evidence.** The re-fit ran; the answer is
+no. `scripts/refit_ncaaf_smartsim2_payload.py --season 2025 --sims 60`, 714
+games, both arms sharing seeds, ~60 min of compute:
+
+    paired_games            693  (21 skipped: no SP+ rating or no payload)
+    model MAE payload OFF   15.184
+    model MAE payload ON    15.144
+    market MAE, same games  11.854
+    delta ON - OFF          -0.040
+    gap_to_market_ON        +3.290     BAR WAS <= 0
+
+The payload closes **1.2% of the 3.33-point gap to the close.** It would need to
+be ~80x larger to earn a deploy. The bar was fixed BEFORE any results existed,
+deliberately: ON beating OFF is not the test, because a model can improve
+against itself and still lose to the market, and this one does.
+
+**THIS IS A VALID NULL, NOT AN UNFED PIPELINE — that is the load-bearing part.**
+Per-block coverage was 98.6% on the priors-moving blocks (coach_continuity
+714/714, returning_production 704/714, transfer_impact 708/714, roster_depth
+714/714). An EARLIER version of this same harness reported **"100% payload
+coverage"** while `returning_production` and `coach_continuity` were absent for
+EVERY game — the only block present was `roster_depth`, and the aggregate
+"any block" figure hid it at full confidence. Per-block reporting is what makes
+"the features don't help" distinguishable from "the features never arrived".
+Any future re-run MUST print per-block or its null means nothing.
+
+**DO NOT read the -0.040 as directional.** The harness emits no paired SE and
+no t-statistic, so significance is unstated in BOTH directions; at 1.2% of the
+gap this is where paired-seed noise lives. Calling it "a small improvement"
+would be inventing a result the instrument cannot resolve.
+
+**Two instrumentation gaps in this harness, to fix before any re-run:**
+- No progress output anywhere in the sim loop — only early-exit errors and the
+  final report. A 60-minute job whose completion can only be inferred from CPU
+  time. Needs a per-N-games heartbeat.
+- No paired SE / t-stat on `delta_on_minus_off`, which is precisely the number
+  the deploy decision hinges on.
+
+**What this does NOT say:** the wiring is fine. 16/22 fields move, the payload
+is reachable and disk-backed, and `set_snapshot_root` correctly kept the 2025
+re-fit off the 2026 board's snapshots. Building it was right; shipping it as a
+model improvement is not supported. Three blocks remain broken and were never
+part of this test (`defensive_metrics` misrouted, `pace` null at source,
+`player_usage` wrong grain) — fixing those is the only route to a different
+answer, and it is a NEW measurement, not a re-run of this one.

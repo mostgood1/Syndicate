@@ -33670,3 +33670,58 @@ here so it is not mistaken for fallout from this close.
 Three days of slates have run, so the clock-bridge coverage that capped the
 market join at one date has almost certainly grown. Re-run the coverage probe
 before trusting the `USABLE_DATES n=1` figure.
+
+---
+
+## 2026-08-27 — refresh-worker `e3c168f3` — NCAAF slate window 3 → 7 (`#588`)
+
+**lane:** `ncaaf-opener-regions-props` · claim held, preflight CLEAR for the
+exact SHA · deployed 03:04:41Z, live 03:07:44Z · `e3c168f3` == `origin/main`.
+
+**What shipped:** one number. `_SLATE_WINDOW_DAYS["ncaaf"]` 3 → 7 in
+`syndicate/features/shared/layer1_board.py`, matching nfl and soccer.
+
+**verify:** the READING is a log line APPEARING, not a value changing. NCAAF
+was skipped by `if not quote_rows: continue` in `layer2_shortlist` BEFORE its
+enrichment loop, so the join never emitted at all. A zero would have meant the
+loop ran and found nothing — a different bug with a different fix.
+
+    BEFORE   no PREGAME_PROJECTION_JOIN sport=ncaaf line in any build
+             VENUE_REPRICE sports=['mlb','nfl','soccer','wnba']
+
+    AFTER    03:18:27Z  PREGAME_PROJECTION_JOIN sport=ncaaf
+                        considered=94 projected=47   (50%; nfl 77%, soccer 33%,
+                        wnba 30% in the SAME build — mid-pack, not anomalous)
+             03:18:57Z  VENUE_REPRICE sports=['mlb','ncaaf','nfl','soccer','wnba']
+                        ncaaf unmatched_by_sport=73 (nfl 1624, soccer 11445)
+
+Three symptoms that presented as three independent bugs — the missing join
+line, zero Layer 2 chips, and absent NCAAF Kalshi/Polymarket quotes — were all
+downstream of this ONE cut. The window ended 2026-08-28 while the NCAAF quote
+shards start at the openers, 2026-08-29: **one day short.**
+
+**THE CHIP COUNT IS NOT EVIDENCE HERE, IN EITHER DIRECTION.** It is still
+`ncaaf: 0` on `/api/board/game-chips?date=2026-08-29` and that refutes nothing.
+Chips per projection in the same build: nfl 16/7280 = 0.0022, soccer
+234/36514 = 0.0064. Against NCAAF's 47 projections that predicts **0.1–0.3
+chips**, so zero is the MODAL outcome of a fully working pipeline. It was on my
+verification list as a co-equal reading and it should not have been — a count
+with an expected value below 1 cannot discriminate. Waiting on it would have
+read as "the fix half-worked" indefinitely. (`a rate, not a count`.)
+
+**A NEAR-MISS WORTH KEEPING.** I nearly retracted the join line as an
+instrument because `grep PREGAME_PROJECTION_JOIN` in the PRIMARY tree returned
+nothing. The primary tree was at `7721a653`, behind `origin/main` `e3c168f3`;
+the emitter is present twice on the deployed SHA. Sessions work in worktrees
+and land by rebase, so nobody pulls the primary tree and it goes stale
+silently. **Grep the deployed SHA (`git show <sha>:path`), not the checkout**,
+before reasoning about production — especially for an ABSENCE test, where a
+false "the code never emits this" discards a valid instrument.
+
+**NOT VERIFIED BY THIS DEPLOY, stated so it is not assumed:**
+- No NCAAF odds history exists yet — `odds_history_input entry_count=0
+  present=false shard_key=2026_wk1`. **No CLV is measurable for opening
+  weekend**; the shards only start accumulating now.
+- `ncaaf_source/tracking/book_quotes/2026-08-26.jsonl` is absent
+  (`PULL_REPAIR_MISSING ok=False`). Expected — the shards begin at the openers
+  — and harmless under a 7-day window, but it is not evidence of health.
