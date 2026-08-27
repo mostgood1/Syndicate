@@ -33725,3 +33725,80 @@ false "the code never emits this" discards a valid instrument.
 - `ncaaf_source/tracking/book_quotes/2026-08-26.jsonl` is absent
   (`PULL_REPAIR_MISSING ok=False`). Expected — the shards begin at the openers
   — and harmless under a 7-day window, but it is not evidence of health.
+
+## 2026-08-27 03:38:14Z — refresh-worker `967ec4bf` — lane `nfl-soccer-props-board` / `venue-quote-line-join`
+
+    refresh-worker  967ec4bf  dep-da7qvldg1s2s73f46o2g  live 03:38:14.919Z
+
+Claim acquired 03:32:19Z from the PRIMARY tree (`#497`: a claim taken in a
+worktree is invisible to every other session). Preflight CLEAR at 03:32:12Z
+against `--target-commit 967ec4bf`, "only infrastructure processes running".
+Deploy submitted as a SEPARATE command.
+
+**Nothing was killed.** `check_deploy_safety.py` was NOT CLEAR at 03:22Z (MLB
+sim pid=383 running, age 3m). Waited. The sim finished on its own, `exit=0`,
+before the deploy. The user had said "deploy it" twice by then; the wait was
+still right, because a scoped resim has no ETA and the cost of losing one is
+not recoverable.
+
+**what:** the OddsAPI venue adapter published every LINED quote without its
+line (`american` was read from the entry value, the line from the key, and
+these shards carry no `line=` in the key). Plus `unmatched_sample` was one
+global pool of 8 filled in row order, so it could name the size of the gap and
+never its shape.
+
+**verify: THE MECHANISM RAN AND THE OUTCOME DID NOT MOVE. Both, stated.**
+
+Code confirmed live by a field that only exists in this commit --
+`board_wanted_by_sport` present at 03:47:28Z -- rather than inferred from a
+number. And the offered key changed shape exactly as intended:
+
+    before  oddsapi: [... 'soccer|spreads|real madrid',  'soccer|totals|over']
+    after   oddsapi: [... 'soccer|spreads|real madrid|-2']
+
+**But it bought no measurable matches, and the baseline is why I can say so:**
+
+    pre-deploy   rows_in=14918 stamped=1323  selected_by_source={polymarket_us: 1198, kalshi: 38, oddsapi: 87}
+    post-deploy  rows_in=14871 stamped=1305  selected_by_source={polymarket_us: 1192, kalshi: 26, oddsapi: 87}
+
+`oddsapi` was ALREADY winning 85-87 before this shipped. I nearly reported
+87 as a 0 -> 87 win on the strength of the module's docstring saying OddsAPI
+"won ZERO selections"; that was true when written and stale by now. The
+baseline read is the only reason this entry is not wrong.
+
+`kalshi` 496/497 -> 38 happened in the LAST PRE-DEPLOY build, not this one.
+Not attributable here, and flagged rather than absorbed.
+
+**WHAT THE NEW DIAGNOSTIC ACTUALLY BOUGHT -- the real causes, none of which is
+the one I fixed:**
+
+1. **The board asks UNDER; the venues publish OVER.** Systematic on totals.
+
+       nfl   board_wanted  nfl|totals|under|36        offered  nfl|totals|over|58.5 (polymarket)
+       ncaaf board_wanted  ncaaf|totals|under|52.5    offered  ncaaf|totals|over|71.5 (kalshi)
+
+   A two-sided market emitted one-sided. The under is a REAL quoted side (the
+   NO leg), not a derived one -- so this is fixable, and it is the largest
+   clean lever visible.
+
+2. **NFL club resolution is failing on nicknames.** polymarket_us offered 2,048
+   nfl quotes and reported
+   `clubs_unresolved:64:['49ers','Bears','Bengals','Bills','Broncos','Browns']`
+   alongside `spreads_refused:1504`. The board carries full club names; the
+   venue names the nickname alone.
+
+3. **Soccer's 11,445 is mostly UNMATCHABLE BY NATURE, not by key shape.**
+   `board_wanted_by_sport['soccer']` is all player props --
+   `player_goal_scorer_anytime|yes`, `player_shots|over|2.5`,
+   `player_shots_on_target|over|0.5` -- and no venue lists soccer player props
+   (kalshi's soccer prop vocabulary is 9 entries). Chasing this number down is
+   not a matching problem.
+
+4. **AND THE ALIAS I REFUSED TO WRITE WAS RIGHT TO REFUSE.** The earlier sample
+   showed kalshi offering `ncaaf|totals_h1|...` and `nfl|totals_q1|...`, which
+   looked like the whole story on a sample of four. With full-game markets now
+   visible -- `ncaaf|totals|over|71.5` -- aliasing period markets onto
+   full-game board rows would have priced a full-game bet against a
+   first-quarter contract while the correct contract was sitting right there.
+
+**Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.
