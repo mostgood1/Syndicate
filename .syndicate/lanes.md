@@ -1681,7 +1681,25 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   the CCR server exposes no session-to-session send -- so this is recorded here
   and in `todo.md`, per this file's established fallback.
 
-### basketball-live-momentum — OPEN — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
+### basketball-live-momentum — CLOSED 2026-08-27 — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
+- **OUTCOME:** `#514` answered NO (momentum carries no signal, 120 correlations,
+  largest 0.0613 vs a pre-registered 0.082 floor, 282 games). `#535` replaced it
+  with an interval-final projection whose best form is `league_late`, validated
+  on HELD-OUT dates. Stopped deliberately: the market join is capped at ONE
+  usable date by the clock bridge, so further modelling had negative value.
+- **VERIFICATION RAN.** Not a claim — the readings:
+  - momentum null result, production log 2026-08-23, 282 games;
+  - held-out interval result, `dep-da5nj7uk1f9s73964udg` 22:57:20Z —
+    `PACE_SOURCE +0.108`, `LATE_SPLIT_VS_FLAT +0.106` against a MATCHED control;
+  - coverage verdict, `dep-da660urtqb8s739nkklg` 15:22:48Z —
+    `USABLE_DATES n=1 dates=['2026-08-23']`, `VERDICT JOINABLE on 1 date(s)`.
+  All three are in `.syndicate/deploys.md` with their deploy ids. 73 tests green
+  after merging main; PRs #21, #22, #23, #25, #28, #104 merged.
+- **NOT VERIFIED, and named as such:** nothing has been compared to a price on
+  more than one date, so there is NO evidence any of this is tradeable.
+  `PLAY_FIELDS` had not fired when this closed — it decides whether the bridge
+  can be rebuilt (1 date -> 11) or must be waited for.
+- **CARRIED FORWARD:** see `#535`'s closing block in `docs/ai_context/todo.md`.
 - Goal: Phase A of `#514` — a shared causal-decay core and a basketball pressure-event
   builder exist as PURE FUNCTIONS, keyed on elapsed seconds, with tests. **No producer,
   no reader, no card, no wiring.** Scope: `.syndicate/scope_2026-08-22_basketball_live_momentum.md`.
