@@ -1787,7 +1787,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   a real bet against the wrong contract.
 - Files: `syndicate/features/shared/venue_quote_adapters.py`,
   `syndicate/features/shared/venue_quote_fanin.py`,
-  `pipeline/layer2_shortlist.py`, `tests/test_venue_quote_line_join.py` (new).
+  `pipeline/layer2_shortlist.py`, `tests/test_venue_quote_line_join.py` (new),
+  `syndicate/features/shared/team_aliases.py`,
+  `tests/test_team_nickname_aliases.py` (new),
+  `tests/test_polymarket_side_vocabulary.py` (fixture rested on the gap closed).
+- **SECOND CAUSE FIXED 2026-08-27, found by the diagnostic this lane shipped.**
+  Polymarket sends BARE NFL NICKNAMES; `canonical_team` resolved tri-codes and
+  full names but not nicknames, so 2,048 nfl quotes carried
+  `clubs_unresolved:64:['49ers','Bears','Bengals','Bills','Broncos','Browns']`.
+  `venue_quote_adapters._polymarket_sides` predicted this in a comment -- "the
+  day it sends nicknames instead, this counter is the difference between a
+  visible alias-map gap and a feed that quietly halves". Nicknames are now
+  DERIVED from the alias map's own values (not a second hand-maintained list --
+  that is the drift this module exists to prevent) and ambiguous ones are
+  dropped: nfl +32/0 dropped, mlb +27/1 dropped ("Sox"), nba +26, wnba +0.
 - Hypothesis: OddsAPI's spreads/totals quotes are published WITHOUT a line, so
   they can never meet a board key that correctly carries one.
 - Falsification test: if the shard's key carried `line=`, the adapter was right

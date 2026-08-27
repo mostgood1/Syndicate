@@ -110,17 +110,27 @@ def test_an_unresolvable_club_adds_NO_second_key(monkeypatch):
 
 
 def test_an_unresolvable_club_at_the_VENUE_is_counted_by_name(_slate_of):
-    """`canonical_team` resolves a wnba nickname but NOT an mlb one -- "Padres"
-    returns None. Production sends mlb clubs in full today, so nothing is lost
-    right now; the counter is what makes the day that changes visible instead
-    of a feed that quietly halves."""
-    _slate_of(_moneyline("aec-mlb-pit-sd-2026-08-24", ["Pirates", "Padres"]))
+    """The counter is what makes a vocabulary gap visible instead of a feed
+    that quietly halves.
+
+    FIXTURE CHANGED 2026-08-27, and the reason is the point. This used to send
+    `["Pirates", "Padres"]`, because `canonical_team` resolved a WNBA nickname
+    and not an MLB one -- exactly as this docstring used to say. That gap is now
+    closed (nicknames are derived from the alias map's own values), so those two
+    RESOLVE and can no longer stand in for an unresolvable club.
+
+    "Sox" is the replacement and is a better one: it is ambiguous by nature --
+    it names both Chicago and Boston -- so it is refused BY DESIGN rather than
+    by omission, and no future alias work can quietly resolve it. Paired with a
+    nonsense token so the read still yields no quotes at all.
+    """
+    _slate_of(_moneyline("aec-mlb-sox-xxx-2026-08-24", ["Sox", "Not A Real Club"]))
 
     outcome = adapters.polymarket_us_outcome("mlb", "2026-08-24")
 
     assert outcome.quotes == []
     assert "clubs_unresolved" in (outcome.reason or ""), outcome.reason
-    assert "Padres" in outcome.reason
+    assert "Sox" in outcome.reason
 
 
 # ---------------------------------------------------------------------------

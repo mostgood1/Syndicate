@@ -394,6 +394,52 @@ def _alias_map(sport: str) -> dict[str, str]:
     return {}
 
 
+@lru_cache(maxsize=16)
+def _nickname_alias_map(sport: str) -> dict[str, str]:
+    """Bare nicknames -> canonical club, DERIVED from the sport's own map.
+
+    WHY DERIVED AND NOT WRITTEN OUT. A second hand-maintained list is the drift
+    this module exists to prevent -- `canonical_team`'s callers already learned
+    that two resolvers disagreeing is how the halves of a join end up on
+    different vocabularies. This reads the ONE map's values, so a club added
+    there gains its nickname automatically and cannot fall out of step.
+
+    THE GAP THIS CLOSES WAS PREDICTED IN PLACE, in
+    `venue_quote_adapters._polymarket_sides`: "`canonical_team` resolves a bare
+    WNBA nickname ("Sky" -> `chicago sky`) but NOT an MLB or NFL one --
+    "Padres" and "Chargers" both return None. Production sends MLB clubs in
+    full today, so nothing is lost right now; the day it sends nicknames
+    instead, this counter is the difference between a visible alias-map gap and
+    a feed that quietly halves."
+
+    That day arrived. Measured on production 2026-08-27, polymarket_us offered
+    2,048 NFL quotes and reported
+    `clubs_unresolved:64:['49ers','Bears','Bengals','Bills','Broncos','Browns']`.
+    Every one of those is a club we know perfectly well.
+
+    AMBIGUOUS NICKNAMES ARE DROPPED, never resolved by preference -- the same
+    refusal `player_name_index` and `_candidate_keys` already make. MLB's "Sox"
+    names both Chicago and Boston, so it resolves to neither. Counted here:
+    nfl 32 nicknames added and 0 dropped; mlb 27 added, 1 dropped; nba 26 added;
+    wnba 0 added, because its vendored supplement already carries them.
+    """
+    mapping = _alias_map(sport)
+    clubs = set(mapping.values())
+    by_last: dict[str, set[str]] = {}
+    for club in clubs:
+        parts = club.split()
+        if len(parts) < 2:
+            # A single-word club IS its own nickname and is already a value;
+            # deriving one would add a key identical to it.
+            continue
+        by_last.setdefault(parts[-1], set()).add(club)
+    return {
+        nickname: next(iter(owners))
+        for nickname, owners in by_last.items()
+        if len(owners) == 1 and nickname not in mapping
+    }
+
+
 def canonical_team(sport: Any, value: Any) -> str | None:
     """The canonical club name for a token, or None if unresolvable.
 
@@ -416,6 +462,14 @@ def canonical_team(sport: Any, value: Any) -> str | None:
     for reduced in (fold_accents(value), strip_club_tokens(value)):
         if reduced and reduced != token and reduced in mapping:
             return mapping[reduced]
+    # LAST, so every literal and reduced form above still wins. A bare
+    # nickname is the least specific thing a feed can send, and it is what
+    # Polymarket sends for NFL. Ambiguous ones are absent from this map by
+    # construction, so an unresolvable nickname still returns None rather than
+    # picking a club.
+    nicknames = _nickname_alias_map(normalize(sport))
+    if token in nicknames:
+        return nicknames[token]
     return None
 
 
