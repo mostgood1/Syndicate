@@ -1851,7 +1851,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 
 
-### ncaaf-pace-block — OPEN — engine goal-line fix landed DEFAULT-OFF; both profiles owe a re-fit — opened 2026-08-27 — session de363735
+### ncaaf-pace-block — OPEN — board surfaces LIVE (projections 51/51, strip 181px, lens state-aware); goal-line fix DEFAULT-OFF, both profiles owe a re-fit — opened 2026-08-27 — session de363735
 - Goal: the NCAAF `pace` block carries a REAL per-team seconds-per-play, so the
   engine stops running every game on the hardcoded 24.0 (`pace_index +0.400`).
 - Files: `scripts/build_ncaaf_pace_snapshot.py`,
@@ -1873,6 +1873,10 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Verification: (a) reachability, off != on, already demonstrated across the
   real range 21.0..33.4 s/play; (b) per-team coverage reported as a RATE over
   FBS teams, not a count; (c) a re-fit reporting TOTAL error, not just margin.
+  DONE separately and verified on production: projections 0/51 -> 51/51, strip
+  435px -> 181px uniform with crests, live lens state-aware. NOT verifiable in
+  production: `_EngineRowProjection` (cards route takes a WEEK only; 2026 has no
+  engine rows) and the live lens under real in-game data (no game until Sat).
 - Blocked by: none. Ships DEFAULT-OFF behind the existing payload flag — the
   profile was calibrated with pace_index pinned at +0.4, so turning this on is
   a mechanism added to a calibrated engine and owes a re-fit before any deploy.

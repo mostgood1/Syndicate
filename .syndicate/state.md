@@ -4320,6 +4320,38 @@ the collector reads, keeping the volume low: `MLB_INPUT_CHECKLIST`,
 `mlb_sim_engine_reference.md` were corrected on 2026-08-19 to say so.
 
 
+## [ncaaf-board-surfaces] NCAAF BOARD SURFACES — projections published, compact strip rebuilt, live lens state-aware `[measured 2026-08-27T15:47Z, web 87c36d05]`
+
+**Projections reach the SHARED contract: 0/51 -> 51/51** on `home_mean`,
+`away_mean`, `margin_mean`, `total_mean`, `home_cover`, `total_over`. They were
+on the card all along in `metrics` — a DISPLAY list of label/value pairs — while
+`shared_predictions`, which Layer 1, Layer 2, the compact cards and the market
+board read, was null on every field but `home_win`.
+
+**This was never the pick gate.** The gate governs PICKS and is correctly
+denying them (margins lose to the close by 3.56 MAE at t=17.2). Projections are
+a different surface that was never published.
+
+**Compact strip, measured in a browser (desktop + 375px mobile):**
+
+    generic fallback  435px   no crests, two PROSE blocks repeating the card below
+    soccer's shape    181px   uniform across ALL 51, crest <img> 22x22
+
+Uniform height is the load-bearing number — direct evidence nothing wraps.
+`logo_url` was on every game and never rendered.
+
+**Live lens is state-aware:** eyebrow is "Q2 · 7:31" / "Final" / kickoff instead
+of one constant string x51, plus a Live/Final/Pregame header split. NO LIVE
+SCORE — the contract carries none, and the only `score` in it is the PROJECTED
+one.
+
+**UNVERIFIABLE IN PRODUCTION, and say so rather than let a green read imply
+otherwise:** `_EngineRowProjection` is unit-level only.
+`build_smartsim_cards_page_context(selected_week)` takes a WEEK ONLY; 2026 has
+no engine rows, so the board always falls through to standalone and the engine
+path is UNREACHABLE while 2026 is active. The live lens's state PATH is tested;
+its DATA cannot be until a game is in progress.
+
 ## [ncaaf-props-live] NCAAF PLAYER PROPS ARE ON THE BOARD — first capture in this platform's history `[measured 2026-08-27T03:07:03Z, lane ncaaf-opener-regions-props]`
 
     prop_rows=38  status_rows=38  games_with_props=6  with_model_prob=33
@@ -4372,7 +4404,9 @@ Full assessment with every reading:
 > `PREGAME_PROJECTION_JOIN sport=ncaaf considered=94 projected=47`. What
 > remains TRUE from this block: `odds_history_input entry_count=0
 > present=false` — **there is still no NCAAF odds history, so no CLV is
-> measurable for opening weekend.** The readings below are the 08-25 state,
+> measurable for opening weekend.** ALSO SUPERSEDED `[2026-08-27T15:47Z]`: the
+> projections this block reports as absent now reach the shared contract on
+> 51/51 cards — see `[ncaaf-board-surfaces]`. The readings below are the 08-25 state,
 > kept because the diagnosis chain in them is still the right one.
 
 **51 games render with a projection on every one, in production and locally.

@@ -3915,3 +3915,72 @@ too fast. It runs 10.6% too SLOW. Feeding the real-world pace measurement makes
 every truth metric worse (possessions 17.91, seconds/drive 209.1), so the
 `pace` block must stay OFF -- the engine's `pace_seconds_per_play` is not on the
 real-world scale its name implies.
+
+---
+
+## 2026-08-27 — A GUARD THAT ASSERTS THE CALL, NOT THE RESULT, IS TRUE OF CODE THAT DOES NOTHING
+
+Three defects in one session, all shipped, all passing every check in place:
+
+    projections deploy   built clean, went live, board unchanged (0/51 -> 0/51).
+                         Two of three builders put `predictions` INSIDE the
+                         `ncaaf_card` sub-dict; the adapter reads it at the TOP
+                         level. My structural test asserted the builders CALL
+                         the helper and never WHERE the result lands.
+
+    NameError            two builders passed a bare `projection` neither binds.
+                         Every call raised. Found by session syndicate-27, not
+                         by me — the same structural test passed it, because a
+                         call site can be present and still be unexecutable.
+
+    orphaned tab         moving a tab rail left two surplus `</div>` behind,
+                         evicting the Details panel. Live ~20 minutes while
+                         jinja parsed, 67 payload tests passed, the API served
+                         correct JSON and shared_predictions confirmed 51/51.
+
+**Rule: a guard must assert the OUTCOME at the place that CONSUMES it, and must
+be seen to FAIL before it is trusted.** "The builder calls the helper" was true
+of a payload nothing read. "Jinja parses" was true of markup that collapsed a
+card in a browser. Both are statements about the thing built, not about the
+thing that reads it.
+
+Two practices came out of it and both earned their place the same day:
+- **Negative-control every new guard.** Reintroduce the exact defect, watch the
+  test fail, restore it. The placement test and the template-render suite were
+  both controlled this way, and the control identified WHICH assertion does the
+  work — for the orphaned tab it is the DIV-BALANCE test, not the orphan-tab
+  test, because in an isolated render the section is still in the output string
+  and only a browser's DOM parse evicts it.
+- **A payload check cannot see a template defect.** Rendering is a different
+  instrument, not a more thorough version of the same one.
+
+---
+
+## 2026-08-27 — MEASURE THE OUTCOME YOU PROMISED, NOT THE CHANGE YOU MADE
+
+The NCAAF compact strip, three times:
+
+    generic fallback  435px   the problem
+    my "fix"          633px   WORSE, and shipped — I verified that the prose
+                              blocks were gone (they were) and never measured
+                              the height, which is what I had promised
+    soccer's shape    181px   uniform across all 51
+
+The 633px version passed every check I ran: prose removed, abbreviation
+leading, jinja parsing, div balance. The defect was that moving a long school
+name into `cards-mini-copy` — which `dense_cards.css` gives
+`overflow-wrap: anywhere` — rendered it **1px wide and 226px tall** in a 39px
+box. I had moved a long string OUT of an element that handled it and INTO one
+that breaks anywhere.
+
+**Rule: state the outcome as a NUMBER before changing anything, then measure
+that number.** "Prose blocks: 0" is a fact about my edit. "Card height 181px vs
+435px, uniform across 51" is the thing the user asked for.
+
+Corollary, from the same session: **verify a class is STYLED by the stylesheet
+the page actually loads before using it.** MLB and NCAAF load different sheets
+(`cards_exact.css` vs `dense_cards.css`). `.cards-market-sub` had a colour rule
+and NO font-size rule in the NCAAF sheet, so it inherited 16px body text and
+rendered LARGER than the 15px value it annotates. MLB's `cards-linescore*` have
+zero rules there. Soccer's `cards-strip-pregame-*` ARE global — which is why
+they were safe to reuse, checked rather than assumed.
