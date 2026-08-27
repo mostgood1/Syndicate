@@ -4320,10 +4320,60 @@ the collector reads, keeping the volume low: `MLB_INPUT_CHECKLIST`,
 `mlb_sim_engine_reference.md` were corrected on 2026-08-19 to say so.
 
 
+## [ncaaf-props-live] NCAAF PLAYER PROPS ARE ON THE BOARD — first capture in this platform's history `[measured 2026-08-27T03:07:03Z, lane ncaaf-opener-regions-props]`
+
+    prop_rows=38  status_rows=38  games_with_props=6  with_model_prob=33
+    NC props   Jordan Shipp  Anytime TD - 4 books  +195  model 0.3602
+    NC props   Demon June    Over 35.5 Rush Yds    -114  model None
+
+**The proof is a 17-sample series, not a spot read.** 0 for 50 minutes straight
+(02:17:33Z..03:00:56Z) with the artifact ALREADY on disk, `-1` through a deploy,
+then 38 — which is what separates "web lacked the READER code" from "the data
+was missing". `fetch_ncaaf_oddsapi_props_local.py` had existed with NO CALLER;
+it now runs from `refresh_odds_sources.py` and publishes to an allowlisted path.
+Multi-book: the parser kept 1 of N books before, now aggregates all (60 → 329
+rows on capture).
+
+`model None` on the yardage line is CORRECT — the model covers **Anytime TD
+only**, because the 2025 backtest (Brier 0.18168) showed the player's own mean
+beats it on continuous markets. **No 2026 outcomes exist yet, so production
+calibration is UNVERIFIED.**
+
+Region policy is **`us` ONLY** (user, 2026-08-27) — narrowed from `us`+`us2`.
+
+## [ncaaf-payload-vs-market] THE ADVANCED-DATA PAYLOAD DOES NOT CLOSE THE GAP TO MARKET — a VALID null `[measured 2026-08-27, 693 paired games]`
+
+    model MAE payload OFF   15.184
+    model MAE payload ON    15.144
+    market MAE, same games  11.854
+    gap_to_market_ON        +3.290    BAR WAS <= 0
+
+Closes **1.2%** of the 3.33-point gap; would need to be ~80x larger to ship.
+**This is a null, not an unfed pipeline** — priors-moving block coverage 98.6%
+(coach_continuity 714/714, returning_production 704/714). An earlier version of
+the same harness reported "100% coverage" while both of those were absent for
+every game. **Do not read the -0.040 as directional**: the harness emits no
+paired SE or t-stat, so significance is unstated in both directions.
+
+The WIRING is fine and stays (16/22 fields move, disk-backed, allowlisted).
+Three blocks were never in this test and are the only route to a different
+answer: `defensive_metrics` misrouted, `pace` null at source, `player_usage`
+wrong grain. Full entry in `learnings.md`; do not re-litigate without new data.
+
 ## [ncaaf-readiness-2026] NCAAF SEASON READINESS — the model is ready, the MARKET is not connected to it `[measured 2026-08-25, four days before kickoff]`
 
 Full assessment with every reading:
 `docs/ai_context/ncaaf_readiness_assessment_2026_08_25.md`.
+
+> **SUPERSEDED IN PART `[2026-08-27T03:18Z]`.** The prices ARRIVED. Same
+> service, same endpoints: `candidate_generation sport=ncaaf generated=293
+> markets={game: 255, prop: 38}`, 38 prop rows served on the board across 6
+> games (33 carrying a model probability), and
+> `PREGAME_PROJECTION_JOIN sport=ncaaf considered=94 projected=47`. What
+> remains TRUE from this block: `odds_history_input entry_count=0
+> present=false` — **there is still no NCAAF odds history, so no CLV is
+> measurable for opening weekend.** The readings below are the 08-25 state,
+> kept because the diagnosis chain in them is still the right one.
 
 **51 games render with a projection on every one, in production and locally.
 Every surface that needs a PRICE is at exactly zero.**
@@ -4546,8 +4596,14 @@ live-odds-worker 23:07:25Z
 - `FIXTURE_CADENCE sport=ncaaf interval=86400 reason=far:88h_out` — in the loop, on a
   DISTANCE-based cadence that tightens as kickoff nears. Being claimed by the fast tick
   does not mean a fast cadence.
-- **Layer 2 does not cover NCAAF until 2026-08-26**, and that is correct:
-  `_SLATE_WINDOW_DAYS["ncaaf"] = 3` and the slate is 4 days out.
+- ~~**Layer 2 does not cover NCAAF until 2026-08-26**, and that is correct:
+  `_SLATE_WINDOW_DAYS["ncaaf"] = 3` and the slate is 4 days out.~~
+  **WRONG, AND THIS LINE CERTIFIED THE BUG AS CORRECT BEHAVIOUR `[2026-08-27,
+  `#588`]`.** 3 never reached the openers from ANY anchor in the preceding week
+  — the window ended 08-28 and the quote shards start 08-29, ONE DAY short — so
+  `quote_rows` was empty, `layer2_shortlist` hit `if not quote_rows: continue`,
+  and the sport was skipped BEFORE its enrichment loop on every build. Now
+  **`_SLATE_WINDOW_DAYS["ncaaf"] = 7`**, matching nfl and soccer.
 - `SWEEP_OWNERSHIP_EXCLUDED` prints only `if dropped:` — **its silence is not evidence
   of success.**
 

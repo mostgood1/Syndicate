@@ -2528,6 +2528,31 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none. Nothing armed; `SYNDICATE_EXECUTION_*` untouched.
 
 
+### ncaaf-opener-regions-props — **CLOSED 2026-08-27** — opened 2026-08-26 — session de363735
+- Goal: NCAAF priced and on the board before the 2026-08-29 openers — odds
+  capture, player props, rosters, and Layer 1/Layer 2 projection mapping.
+- Files: `scripts/fetch_ncaaf_oddsapi_props_local.py`,
+  `scripts/refresh_odds_sources.py`, `scripts/refit_ncaaf_smartsim2_payload.py`,
+  `scripts/backtest_ncaaf_player_props.py`,
+  `syndicate/features/ncaaf/{props,prop_model,feature_payload,cards}.py`,
+  `syndicate/features/shared/layer1_board.py`, `pipeline/layer2_shortlist.py`,
+  `tests/test_ncaaf_{props_odds_capture,props_board,slate_window}.py`,
+  `tests/test_layer2_projection_window.py`
+- Verification: **RAN, PASSED.** 38 prop rows served (33 with a model
+  probability); `PREGAME_PROJECTION_JOIN sport=ncaaf considered=94 projected=47`;
+  ncaaf present in `VENUE_REPRICE sports=[...]`. Evidence in
+  `log/2026-08-27.md` and `deploys.md`.
+- Outcome: props live (a first for this platform), Layer 2 unblocked via
+  `_SLATE_WINDOW_DAYS["ncaaf"]` 3 → 7 (`#588`), 102/102 rosters on production.
+  The advanced-data payload was measured and **does not beat the market**
+  (`gap_to_market_on` +3.29 vs a bar of ≤ 0) — a valid null at 98.6% coverage;
+  wiring kept, not shipped as a model improvement.
+- Deploys: refresh-worker `e3c168f3` (live 03:07:44Z), claim released.
+- NOT verified, carried forward: no NCAAF chip has ever been OBSERVED non-zero
+  (the count cannot discriminate at n=47 projections); prop-model calibration
+  has zero 2026 outcomes; `cfbd_lines_*.json` are untracked and single-machine.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
