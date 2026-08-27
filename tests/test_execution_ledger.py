@@ -1852,3 +1852,108 @@ def test_a_client_id_from_another_client_is_not_ours(monkeypatch, tmp_path, caps
     assert "ours=1" in printed
     assert "foreign_client=1" in printed
     assert "unclaimed=1" in printed
+
+
+# ---------------------------------------------------------------------------
+# Retrying an order the exchange refused because it was not trading
+# ---------------------------------------------------------------------------
+#
+# MEASURED 2026-08-27: 5 Kalshi orders in one day died on a 409 pause, were
+# recorded `failed`, and were never re-attempted. `failed` is terminal for a
+# good reason -- the venue may hold the order -- but a pause is the exchange
+# saying it accepted nothing, so that reason does not apply.
+
+
+def _paused_error(code: str = "trading_is_paused") -> str:
+    return (
+        "KalshiAuthError: http_409: "
+        "https://external-api.kalshi.com/trade-api/v2/portfolio/events/orders: "
+        '{"error":{"code":"%s","message":"paused"}}' % code
+    )
+
+
+def test_a_paused_order_is_freed_for_retry(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record, created = EL.record_order(request, mode=EL.LIVE)
+    assert created is True
+    EL.complete_order(record["idempotency_key"], status=EL.STATUS_FAILED, error=_paused_error())
+
+    # The next tick offers the SAME candidate. It must be placeable again.
+    _, created_again = EL.record_order(request, mode=EL.LIVE)
+    assert created_again is True, "a paused order was never retried"
+
+
+def test_exchange_is_paused_is_also_retryable(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record, _ = EL.record_order(request, mode=EL.LIVE)
+    EL.complete_order(record["idempotency_key"], status=EL.STATUS_FAILED, error=_paused_error("exchange_is_paused"))
+    _, created_again = EL.record_order(request, mode=EL.LIVE)
+    assert created_again is True
+
+
+# The narrowness tests. These are the ones that fail if the allowlist is
+# widened into "any 4xx", which is the tempting and wrong generalisation --
+# re-asking cannot make a market exist or make money appear, and a `failed`
+# whose cause is UNKNOWN may correspond to a real open position.
+
+
+def test_market_not_found_is_NOT_retried(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record, _ = EL.record_order(request, mode=EL.LIVE)
+    EL.complete_order(
+        record["idempotency_key"],
+        status=EL.STATUS_FAILED,
+        error='KalshiAuthError: http_404: ...: {"error":{"code":"market_not_found"}}',
+    )
+    _, created_again = EL.record_order(request, mode=EL.LIVE)
+    assert created_again is False
+
+
+def test_insufficient_balance_is_NOT_retried(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record, _ = EL.record_order(request, mode=EL.LIVE)
+    EL.complete_order(
+        record["idempotency_key"],
+        status=EL.STATUS_FAILED,
+        error='KalshiAuthError: http_400: ...: {"error":{"code":"insufficient_balance"}}',
+    )
+    _, created_again = EL.record_order(request, mode=EL.LIVE)
+    assert created_again is False
+
+
+def test_a_timeout_failure_is_NOT_retried(tmp_path, monkeypatch):
+    """The case the terminal rule exists for: the venue may hold this order."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record, _ = EL.record_order(request, mode=EL.LIVE)
+    EL.complete_order(record["idempotency_key"], status=EL.STATUS_FAILED, error="TimeoutError: read timed out")
+    _, created_again = EL.record_order(request, mode=EL.LIVE)
+    assert created_again is False, "a submit that may have landed was re-sent"
+
+
+def test_a_filled_order_is_never_retried_even_if_paused_text_appears(tmp_path, monkeypatch):
+    """Status gates the allowlist, not the error text."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record, _ = EL.record_order(request, mode=EL.LIVE)
+    EL.complete_order(record["idempotency_key"], status=EL.STATUS_FILLED, fill_price=0.5, fill_stake_dollars=1.0)
+    stored = EL.find_order(record["idempotency_key"])
+    stored["error"] = _paused_error()
+    _, created_again = EL.record_order(request, mode=EL.LIVE)
+    assert created_again is False

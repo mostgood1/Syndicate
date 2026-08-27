@@ -66,6 +66,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -318,6 +319,38 @@ def find_order(key: str) -> dict[str, Any] | None:
     return None
 
 
+# A `failed` order the venue refused BECAUSE IT WAS NOT TRADING AT ALL.
+#
+# `failed` is normally terminal, and the comment in `record_order` says exactly
+# why: the venue may hold the order, so re-sending is how one bet becomes two.
+# That reasoning is about UNCERTAINTY, and these two codes remove it. A 409
+# `exchange_is_paused` / `trading_is_paused` is the exchange stating it accepted
+# nothing from anyone -- no contract exists, no money moved, and the next tick
+# can safely ask again. It is the same epistemic position as `rejected`, which
+# is already freed for retry.
+#
+# MEASURED 2026-08-27: 5 live Kalshi orders died this way in one day, all
+# terminal, none retried. The market was fine, the price was fine and the
+# balance was fine -- the exchange was briefly paused and the candidate was
+# discarded permanently.
+#
+# DELIBERATELY NOT EVERY 4xx, though the budget path exempts all of them as
+# refusals. `market_not_found` and `insufficient_balance` are also answers the
+# venue gave, but re-asking cannot change either one, so retrying them would
+# just burn a tick forever. Only transient EXCHANGE STATE belongs here; a code
+# is added to this list when re-asking is capable of a different answer.
+_RETRYABLE_VENUE_STATE = re.compile(
+    r'"code"\s*:\s*"(exchange_is_paused|trading_is_paused)"', re.IGNORECASE
+)
+
+
+def _is_retryable_venue_pause(order: Mapping[str, Any]) -> bool:
+    """`failed` only because the exchange was not trading. Safe to re-send."""
+    if str(order.get("status") or "") != STATUS_FAILED:
+        return False
+    return bool(_RETRYABLE_VENUE_STATE.search(str(order.get("error") or "")))
+
+
 def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dict[str, Any], bool]:
     """WRITE-AHEAD. Persist the order as `submitted` BEFORE anything is sent.
 
@@ -331,7 +364,7 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
     for index, order in enumerate(orders):
         if order.get("idempotency_key") != key:
             continue
-        if str(order.get("status") or "") != STATUS_REJECTED:
+        if str(order.get("status") or "") != STATUS_REJECTED and not _is_retryable_venue_pause(order):
             return order, False
         # A REJECTED ORDER NEVER REACHED THE VENUE, so re-attempting it cannot
         # double anything -- and refusing to is how a transient refusal becomes
