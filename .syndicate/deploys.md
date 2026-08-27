@@ -33976,3 +33976,48 @@ nothing.
 **NOT VERIFIED EITHER TIME:** the rendered page. Every reading here is an API
 payload. No browser, no width, no visual check — the compact card is a template
 change and template changes are exactly what a payload check cannot see.
+
+---
+
+## 2026-08-27 — web `50734685` — the Details tab I broke, and the FIRST render check
+
+**lane:** `ncaaf-opener-regions-props` · claim held, preflight CLEAR · deployed
+14:56:29Z, live 14:59:55Z.
+
+**What this fixed was mine.** `07642f19` shipped a compact card AND an orphaned
+`details` tab: moving the rail above the panels left an unclosed
+`cards-mini-metric` and two surplus `</div>` behind, which ended the card early
+and evicted the `details` SECTION. Clicking Details blanked the card. It was
+live on production for ~20 minutes.
+
+**verify: RENDERED IN A BROWSER, every tab, whole board.**
+
+    tabTargets  identity, context, coverage, details
+    panelIds    identity, context, coverage, details
+    per tab     identity -> [identity]   context -> [context]
+                coverage -> [coverage]   details -> [details]
+    allTabsWork true
+    cards 51    cardsWithOrphanTab 0
+
+    desktop  market row grid 300.5px x4, 204 tiles / 51 cards, no h-overflow
+    mobile   375x812, row collapses to one 328px column, bodyScrollWidth 375,
+             0 tiles overflowing
+
+**THE POINT, and it is the reason this entry exists.** Every other check was
+green while the card was broken: jinja parsed, 67 payload tests passed, the API
+served correct JSON, the deploy went live clean, and `shared_predictions`
+confirmed 51/51. **A payload check cannot see a template defect.** Three
+separate times today a change passed every guard I had and did nothing or broke
+something -- the projections no-op, the goal-line calibration invalidation, and
+this -- and each was the same shape: the test asserted the thing I built
+EXISTED, not that it reached the place that reads it.
+
+The new suite RENDERS the template, and is negative-controlled. It also
+identifies which guard does the work: the DIV-BALANCE test, not the orphan-tab
+test. In an isolated render the section is still in the output string; only a
+browser's DOM parse evicts it. An orphan-only guard would have shipped this
+again.
+
+**Still not verified anywhere:** the NCAAF live lens, which does not exist --
+no template, and the sport falls back to the generic scoreboard strip while
+MLB and soccer each have a dedicated one.
