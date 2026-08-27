@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 577 rules `[generated]`
+## Index — 578 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6938,3 +6938,42 @@ repeated the false claim to the user and to two peer sessions before checking.
   lines of ancient `#65`–`#81` noise in its unfiltered form, which is what
   trained both sessions to skim it. Blocking the push stops the damage; it does
   not make the output readable.
+
+
+### 2026-08-27 — FORBIDDEN: REFUSING A BAD VALUE UPSTREAM OF A COALESCING FALLBACK and calling it fixed. The fallback picks it back up one candidate later, and the fix ships inert
+
+- **What we believed.** `_apply_wnba_live_scores` (`home.py`) was where a
+  SmartSim PROJECTION was leaking into a live score — `GSV 85.43 / CON 68.94` on
+  the Layer 2 chip strip, user-reported. Refuse a fractional value there, stop
+  setting `away["score"]`, done.
+
+- **What was actually true.** `_side_score` (`game_chip_scoreboard.py`) is a
+  COALESCING CHAIN — `container.score`, then `status.<side>_score`, then
+  `score.<side>`, then `<side>_score`, then **`live_state.<side>_pts`**. Not
+  setting `away["score"]` just means the chain falls through one more candidate
+  and finds the same projection in `live_state`, which the fix had not touched.
+  The refusal computed the right answer and changed nothing on screen.
+
+- **How we found out.** A test written against the real production row, before
+  deploying: `test_a_refused_score_does_not_reach_the_chip` failed on its first
+  run with `'85.43' is not None`. Nothing else would have caught it — the unit
+  under change behaved exactly as intended, every other assertion passed, and the
+  served page would have looked identical to the bug.
+
+- **The rule going forward.** Before refusing or sanitising a value, **find every
+  place the consumer can obtain it.** `grep` the field name, not the function you
+  are editing. If the read path is a coalescing chain (`a or b or c`, a `for
+  candidate in (...)` loop, `dict.get` with a fallback), the guard belongs at the
+  CHOKE POINT the chain converges on, not at one of its inputs — and preferably
+  stated as a property of the domain, so a source nobody has written yet is
+  covered too. Here: a fractional value is not a score in any sport this platform
+  carries, so `_score_value` refuses it for every sport and every future feed.
+  Distinct from the existing reachability rules (2026-08-13, 2026-08-25): those
+  ask whether your code RUNS. This one is about code that runs, is correct, and
+  is overtaken by a sibling branch.
+
+- **Cost.** None shipped — caught by a pre-deploy test. Recorded because it was
+  hit three times on one night across two sessions: this one, `#583`'s date
+  filter that built `dateFilteredGames` while the function still returned
+  `gamesList`, and twice more in `ncaaf-opener-regions-props`' own work. The
+  common shape is a correct computation that nothing downstream consumes.

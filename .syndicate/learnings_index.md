@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 577 rules `[generated]`
+## Index — 578 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 115**
+**FORBIDDEN — 116**
 
 - [2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-…](#2026-08-22-forbidden-never-read-a-service_updated-deploy-as-shipping-code-an-env-var-change-restarts-the-service-on-the-commit-it-is-already-running)
 - [2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the sam…](#2026-08-22-forbidden-never-name-a-datastore-setting-and-a-service-env-var-by-the-same-store-without-saying-which-surface-a-4-minute-refresh-worker-outage-came-from-that-ambiguity)
@@ -95,6 +95,7 @@
 - [2026-08-26 — FORBIDDEN: verifying a consumer against a fixture drawn from ONE producer,…](#2026-08-26-forbidden-verifying-a-consumer-against-a-fixture-drawn-from-one-producer-when-the-artifact-has-more-than-one-producer-two-producers-two-shapes-enumerate-the-shapes-from-production-do-not-assume-there-is-one)
 - [2026-08-26 — FORBIDDEN: reporting a test as failing on `main` from a session worktree,…](#2026-08-26-forbidden-reporting-a-test-as-failing-on-main-from-a-session-worktree-when-its-fixture-is-derived-from-data-and-a-stash-and-rerun-does-not-isolate-it)
 - [2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "loo…](#2026-08-27-forbidden-pushing-past-a-ledger-checkers-warning-because-its-output-looks-like-the-usual-noise-a-warning-that-is-usually-wrong-gets-trained-out-and-two-sessions-proved-it-independently-on-the-same-night)
+- [2026-08-27 — FORBIDDEN: REFUSING A BAD VALUE UPSTREAM OF A COALESCING FALLBACK and call…](#2026-08-27-forbidden-refusing-a-bad-value-upstream-of-a-coalescing-fallback-and-calling-it-fixed-the-fallback-picks-it-back-up-one-candidate-later-and-the-fix-ships-inert)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
