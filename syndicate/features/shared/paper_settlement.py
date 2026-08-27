@@ -874,6 +874,16 @@ def settlement_summary(
         # Same bucket shape as the other cuts, so the numbers are directly
         # comparable rather than three slightly different questions.
         "by_venue_family": _grouped(rows, _venue_family),
+        # WHO DECIDED THE OUTCOME. Portfolio rows only, for the same reason
+        # `by_market_family` and `by_sport` are: this key carries no venue, so
+        # over the full ledger it would pool the unrestricted book with its own
+        # venue-scoped copies.
+        #
+        # `total` deliberately still covers the whole book -- it is the honest
+        # answer to "how has this done" and removing it would be a different
+        # lie. What changes is that the blend is no longer the ONLY number
+        # available, so a reader can attribute it. See `_settlement_authority`.
+        "by_settled_by": _grouped(portfolio_rows, _settlement_authority),
     }
 
 
@@ -903,6 +913,30 @@ def _market_family(order: Mapping[str, Any]) -> str:
     if market.startswith("totals") or market in {"total", "team_totals"}:
         return "game_total"
     return "player_prop"
+
+
+def _settlement_authority(order: Mapping[str, Any]) -> str:
+    """Who decided this outcome: the VENUE, or our own inference.
+
+    `venue_settlement` stamps `settled_by: "venue"` on a row it grades from the
+    venue's own settlement record. `paper_settlement` stamps nothing, so an
+    absent field means this module graded it -- from a status WE resolved, via
+    the boxscore feed, the team aliases and the over/under vocabulary.
+
+    THESE ARE NOT THE SAME KIND OF NUMBER AND MUST NOT SHARE AN ROI.
+    Measured 2026-08-26, the first evening both existed:
+
+        venue      3 bets   -$1.45   ROI  -11.88%
+        inferred  12 bets  +$15.05   ROI  +51.07%
+        BLENDED   15 bets  +$13.60   ROI  +32.60%
+
+    and +32.60% is the figure the page showed. n=3 proves nothing about which
+    is right -- that is exactly why they have to be reported apart rather than
+    averaged into a headline nobody can attribute. An evaluation pass that
+    cannot tell an authoritative outcome from an inferred one is one that will
+    eventually average them, which is what this key exists to prevent.
+    """
+    return "venue" if str(order.get("settled_by") or "") == "venue" else "inferred"
 
 
 def _grouped(rows: Sequence[Mapping[str, Any]], key_fn) -> list[dict[str, Any]]:

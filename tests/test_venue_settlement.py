@@ -300,3 +300,63 @@ def test_dry_run_grades_in_memory_without_persisting(ledger, monkeypatch):
     result = vs.settle_from_venue(dry_run=True)
     assert result["settled"] == 1
     assert ledger["_persisted"]["count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# The ROI must stop blending an authoritative outcome with an inferred one.
+# ---------------------------------------------------------------------------
+
+
+def _settled(**over):
+    row = {"venue": "kalshi", "mode": "live", "status": "filled",
+           "outcome": "won", "fill_stake_dollars": 10.0, "pnl_dollars": 9.0}
+    row.update(over)
+    return row
+
+
+def test_settlement_summary_splits_venue_from_inferred():
+    """Measured 2026-08-26, the first evening both sources existed: venue
+    -11.88% on 3 bets against inferred +51.07% on 12, and the page showed only
+    the +32.60% blend. n=3 proves nothing about which is right -- which is
+    exactly why they must be reported apart rather than averaged."""
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    rows = [
+        _settled(settled_by="venue", outcome="lost", fill_stake_dollars=4.0, pnl_dollars=-4.0),
+        _settled(settled_by="venue", outcome="won", fill_stake_dollars=8.0, pnl_dollars=4.0),
+        _settled(outcome="won", fill_stake_dollars=10.0, pnl_dollars=9.0),
+    ]
+    summary = settlement_summary(None, orders=rows)
+    by = {b["key"]: b for b in summary["by_settled_by"]}
+
+    assert by["venue"]["settled"] == 2
+    assert by["venue"]["pnl_dollars"] == pytest.approx(0.0)
+    assert by["inferred"]["settled"] == 1
+    assert by["inferred"]["pnl_dollars"] == pytest.approx(9.0)
+    # The two ROIs differ, and neither equals the blend -- the whole point.
+    assert by["venue"]["roi_pct"] != by["inferred"]["roi_pct"]
+    assert summary["total"]["roi_pct"] not in (by["venue"]["roi_pct"], by["inferred"]["roi_pct"])
+
+
+def test_an_absent_settled_by_counts_as_inferred_not_unknown():
+    """`paper_settlement` stamps nothing when it grades, so absent means OUR
+    inference. Bucketing it as `unknown` would leave the blend un-attributable
+    in a different way."""
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    summary = settlement_summary(None, orders=[_settled()])
+    assert [b["key"] for b in summary["by_settled_by"]] == ["inferred"]
+
+
+def test_the_whole_book_total_is_unchanged_by_the_split():
+    """`total` still answers "how has this done" over the whole book. Removing
+    that would be a different lie; what changes is that it is no longer the
+    only number available."""
+    from syndicate.features.shared.paper_settlement import settlement_summary
+
+    rows = [_settled(settled_by="venue", pnl_dollars=1.0, fill_stake_dollars=10.0),
+            _settled(pnl_dollars=3.0, fill_stake_dollars=10.0)]
+    summary = settlement_summary(None, orders=rows)
+    assert summary["total"]["settled"] == 2
+    assert summary["total"]["pnl_dollars"] == pytest.approx(4.0)
+    assert summary["total"]["roi_pct"] == pytest.approx(20.0)

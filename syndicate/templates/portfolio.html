@@ -652,6 +652,26 @@
           {{ "%+.2f"|format(st.get('pnl_dollars') or 0) }}</div>
         <div class="live-tile__meta">
           {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% on {% endif %}${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled</div>
+        {# WHO DECIDED THESE OUTCOMES. The figure above is the whole book, which
+           is the honest answer to "how has this done" -- but it BLENDS outcomes
+           the venue stated with outcomes we inferred from our own boxscore
+           feed, and those are not the same kind of number. Measured
+           2026-08-26: venue -11.88% on 3 bets against inferred +51.07% on 12,
+           blended to +32.60%, and the blend was the only figure shown. Split
+           here so the headline can be attributed rather than merely quoted. #}
+        {% set auth = (L.settlement or {}).get('by_settled_by') or [] %}
+        {% if auth|length > 1 %}
+          {% for a in auth|sort(attribute='key') %}
+            {% if a.settled %}
+              <div class="live-tile__meta">
+                {{ 'venue' if a.key == 'venue' else 'inferred' }}
+                <span class="{{ 'pos' if (a.pnl_dollars or 0) > 0 else ('neg' if (a.pnl_dollars or 0) < 0 else '') }}">{{ "%+.2f"|format(a.pnl_dollars or 0) }}</span>
+                {% if a.roi_pct is not none %}({{ "%+.1f"|format(a.roi_pct) }}%){% endif %}
+                on {{ a.settled }}
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
       {% else %}
         <div class="live-tile__value">—</div>
         {# 0.00 on nothing settled and 0.00 on fifty are the same string. #}
