@@ -207,6 +207,7 @@ def build_smartsim_live_lens_page_context(selected_week: int) -> dict[str, objec
     season = int(str(cards_context.get("date") or "0").split()[0] or 0)
     games = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
     rank_cards = [_runtime_rank_card(game) for game in games if isinstance(game, dict)]
+    phases = _phase_counts(games)
     warning_panel = {
         "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
         "title": f"NCAAF live lens now uses runtime {LEGACY_ENGINE_SOURCE_LABEL} cards",
@@ -228,6 +229,13 @@ def build_smartsim_live_lens_page_context(selected_week: int) -> dict[str, objec
         using_sample_data=False,
         header_stats=[
             {"label": "Games", "value": str(len(games))},
+            # LIVE / FINAL / PREGAME. This is the RUNTIME builder -- the one that
+            # actually serves. The split was added to the legacy fallback only
+            # (#gap found 2026-08-27), so it was inert in production: the board
+            # a live lens exists for showed Games/Season/Week/Source all Saturday.
+            {"label": "Live", "value": str(phases["live"])},
+            {"label": "Final", "value": str(phases["final"])},
+            {"label": "Pregame", "value": str(phases["pregame"])},
             {"label": "Season", "value": str(season)},
             {"label": "Week", "value": str(resolved_week)},
             {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else LEGACY_ENGINE_SOURCE_LABEL},
