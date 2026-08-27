@@ -310,6 +310,133 @@ def api_ops_wnba_refresh_decision() -> Any:
     return jsonify({"ok": True, "date": selected_date, **payload})
 
 
+@ops_bp.get("/api/ops/polymarket/slate")
+def api_ops_polymarket_slate() -> Any:
+    """What the Polymarket slate artifact actually contains, summarised.
+
+    WHY THIS EXISTS. The slate decides EVERY Polymarket order -- the board join
+    reads it, and a position whose market is not in it refuses with
+    `market_unresolved_for_position`. It was invisible from outside the worker.
+
+    MEASURED 2026-08-27 while diagnosing 12 such refusals: three
+    `/api/ops/artifacts/export` patterns all returned `count=0`, and the
+    obvious conclusion -- "add it to `HOT_ARTIFACT_PATTERNS`" -- would have been
+    an INERT no-op. Both services run `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`
+    against one Redis namespace, so `persist_game_slate`'s `write_json_file`
+    puts the slate in the KEYVALUE STORE and never on disk, while the export
+    scans disk. Allowlisting a path that does not exist matches nothing. The
+    artifact was already reachable from web the whole time; what was missing was
+    a reader. Same shape as the live-gameline ledger one file over: producer
+    wired, reader not.
+
+    A SUMMARY, NOT THE BLOB. The payload is bounded to ~2.1MB and 17,000+
+    markets; serving it whole would make the answer as hard to read as the logs
+    were. The cuts are the ones the join actually keys on -- `(league, date,
+    board_market)` -- so a `no_candidates` refusal can be checked directly
+    against what the venue offered, which is what took log archaeology before.
+
+    `?league=` and `?market=` narrow to sample slugs when a count is not enough.
+    """
+    guard = _require_admin_token()
+    if guard is not None:
+        return guard
+
+    import time as _time
+    from collections import Counter
+
+    try:
+        from syndicate.features.shared.polymarket_us_markets import GAME_SLATE_ARTIFACT
+        from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
+        payload = read_json_file(reports_root().joinpath(*GAME_SLATE_ARTIFACT))
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+    if not payload:
+        # ABSENT IS A REAL ANSWER and must not read as "the venue lists
+        # nothing" -- it means no slate tick has written yet, which is the
+        # distinction `persist_game_slate` preserves by leaving a stale slate in
+        # place rather than clearing it.
+        return jsonify({"ok": True, "slate": None, "reason": "no_slate_artifact_recorded"})
+
+    markets = payload.get("markets") or []
+    fetched_at = payload.get("fetched_at")
+    age = None
+    try:
+        age = round(_time.time() - float(fetched_at), 1)
+    except (TypeError, ValueError):
+        age = None
+
+    want_league = str(request.args.get("league") or "").strip().lower()
+    want_market = str(request.args.get("market") or "").strip().lower()
+
+    by_type: Counter = Counter()
+    by_league_market: Counter = Counter()
+    samples: list[dict[str, Any]] = []
+
+    # Parsed with the join's OWN functions, not a local copy. A second parser
+    # here could disagree with the one that actually decides orders, and then
+    # this endpoint would describe a slate nobody joins against.
+    try:
+        from syndicate.features.shared.polymarket_board_join import (
+            MARKET_TYPE_TO_BOARD,
+            _effective_league,
+            parse_slug,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": f"join_import: {type(exc).__name__}: {exc}"})
+
+    unparseable = 0
+    for row in markets:
+        venue_type = str(row.get("sportsMarketTypeV2") or "").upper()
+        by_type[venue_type or "(none)"] += 1
+        parsed = parse_slug(row.get("slug"))
+        if parsed is None:
+            unparseable += 1
+            continue
+        board_market = MARKET_TYPE_TO_BOARD.get(venue_type)
+        if board_market is None:
+            # Out of scope for the game-line join (PROP and friends). Counted
+            # in `by_type` above; deliberately absent from the join cut so the
+            # two numbers are not confused for each other.
+            continue
+        try:
+            league = str(_effective_league(parsed) or "").lower()
+        except Exception:  # noqa: BLE001
+            league = "(unparsed)"
+        by_league_market[f"{league}|{board_market}"] += 1
+        if want_league and league != want_league:
+            continue
+        if want_market and board_market != want_market:
+            continue
+        if (want_league or want_market) and len(samples) < 25:
+            samples.append({
+                "slug": row.get("slug"),
+                "line": row.get("line"),
+                "outcomes": row.get("outcomes"),
+                "orderable": row.get("orderable"),
+            })
+
+    return jsonify({
+        "ok": True,
+        "fetched_at": fetched_at,
+        "age_seconds": age,
+        "count": payload.get("count"),
+        "fetched_count": payload.get("fetched_count"),
+        # BOTH truncation facts, kept apart on purpose: "the venue had more than
+        # we asked for" and "we chose not to store the far end" are different
+        # problems and only one of them is a bug.
+        "truncated": payload.get("truncated"),
+        "dropped_for_size": payload.get("dropped_for_size"),
+        "kept_through": payload.get("kept_through"),
+        "slug_unparseable": unparseable,
+        "by_venue_market_type": dict(by_type.most_common()),
+        "by_league_and_board_market": dict(by_league_market.most_common()),
+        "samples": samples,
+        "filter": {"league": want_league or None, "market": want_market or None},
+    })
+
+
 @ops_bp.get("/api/ops/odds-refresh/status")
 def api_ops_odds_refresh_status() -> Any:
     return jsonify({"ok": True, "status": normalize_timestamped_payload(load_latest_refresh_status())})
