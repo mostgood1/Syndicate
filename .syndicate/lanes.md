@@ -2439,6 +2439,56 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   the same night of a watcher summary disagreeing with what it was built to
   check — the other ran the opposite way at `00:08:34Z`.
 
+### nfl-soccer-props-board — OPEN — opened 2026-08-27 — session 3515d143-20a0-48e3-8538-59a9d6dc8e1c
+- Goal: NFL cards serve non-zero `shared_prop_rows`, and BOTH sports' prop CSVs
+  carry every book instead of one. Two defects, ported from what
+  `ncaaf-opener-regions-props` measured, but only after checking each one
+  against production rather than assuming the NCAAF shape transfers.
+- Files: `syndicate/features/nfl/cards.py`, `syndicate/features/nfl/props.py`,
+  `syndicate/features/nfl/sources.py`,
+  `scripts/fetch_nfl_oddsapi_props_local.py`,
+  `scripts/fetch_soccer_oddsapi_props_local.py`,
+  `tests/test_nfl_props_board.py` (new),
+  `tests/test_props_multi_book_capture.py` (new),
+  `tests/test_nfl_props.py`, `tests/test_backtest_nfl_props.py`,
+  `tests/test_nfl_market_board.py` (all three patched a function the code has
+  stopped calling, or pinned behaviour this lane deliberately changed).
+- Deliberately NOT claimed (stated outside `Files:` so the invariant checker
+  does not read an exclusion as a claim): the shared artifact publisher, held by
+  OPEN lane `nfl-fantasy-projections` — no allowlist edit is needed, because the
+  NFL props path is already ALLOWED and soccer's per-league props path tested
+  ALLOWED against `is_hot_artifact_relative_path` rather than against the
+  pattern text. Also not claimed: any NCAAF path (OPEN lane, another live
+  session), and the NFL roster/depth-chart builders (claimed) — that artifact is
+  READ, never rebuilt.
+- Hypothesis: NFL's `shared_prop_rows: 0` is the CARD ATTACH alone, not capture
+  and not delivery. `cards.py:381` leaves `prop_recommendations` unset because
+  prop rows carry no player→team side; that reason was true when written and is
+  now stale, because a real per-player team source is already on web's disk.
+- Falsification test: if the NFL wk1 props artifact on web were absent, empty,
+  or whole-second-mtime (a boot copy), the zero would be delivery and the attach
+  would be inert. MEASURED 2026-08-27 and the hypothesis SURVIVED:
+  `nfl_source/oddsapi_player_props_2026_wk1.csv` = **42,753 B**, mtime
+  `2026-08-26T23:06:02.931697Z` — FRACTIONAL, a runtime write. 294 rows,
+  259 distinct players, 16 distinct events. Also falsifiable and NOT falsified:
+  `team` is empty in **0/294** rows, so the split genuinely cannot come from the
+  feed; `roster_2026_snapshot.csv` (654,176 B) and `roster_2026.csv` (926,867 B)
+  ARE both present on web, so it can come from there.
+- Second defect, measured not inferred: the live NFL capture is
+  `{draftkings: 294}` — ONE book of N, via `_choose_bookmaker`. Soccer sweeps
+  every book in `_ordered_bookmakers` but `parse_event_to_rows` folds to one
+  `book_key` per (player, line), so its CSV is one-book too. Price shopping is
+  already measured at **+2.95 ROI pts on NFL props** and cannot run off either
+  file. NCAAF's same fix gave 5.5x the rows for identical credits.
+- Verification: (a) `sum(len(g["shared_prop_rows"]) for g in
+  GET /nfl/api/cards?week=1)` goes **0 → >0** on the SERVED board, with a
+  spot-checked player attributed to the team the roster says, not the team the
+  event string implies. (b) both CSVs carry >1 distinct `book` for at least one
+  (player, line) after a real capture, with the row count and credit delta
+  recorded. A local-fixture pass does not discharge either.
+- Blocked by: none.
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

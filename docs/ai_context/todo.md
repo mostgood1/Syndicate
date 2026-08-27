@@ -1,5 +1,69 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#587` — **NFL props were captured, published, and read from the wrong root; and both NFL and soccer captures kept one book of N.** — lane `nfl-soccer-props-board`, 2026-08-27 — **FIXED AND PROVEN ON THE REAL CAPTURE; PRODUCTION VERIFICATION OWED**
+
+Scope was "do for soccer and NFL what the NCAAF lane just did". Checking each of
+its findings against production BEFORE porting was the load-bearing decision:
+the two sports are in different places, most of the NCAAF shape did not apply,
+and NFL's real defect was one NCAAF never had.
+
+**Did NOT apply** (checked, not assumed): the Layer 2 window fix `5e6ef685` is
+already sport-agnostic; both fetchers already have callers; both output paths
+tested ALLOWED against `is_hot_artifact_relative_path` itself, so no allowlist
+edit and `artifact_publisher.py` (OPEN lane `nfl-fantasy-projections`) was not
+touched; soccer's card attach already served **49** `shared_prop_rows`.
+
+**1. `#441`, FOURTH CALL SITE — the first zero in the pipeline.**
+`_props_path` used `default_nfl_source_root()`, which picks a root by probing
+for the UNRELATED `upcoming_recs_*.csv` (**5 tracked in git, 0 on the mounted
+disk**), so it returned the ephemeral checkout — where this CSV is tracked as a
+**5-byte header stub**, while the mounted disk held the real **42,753 B /
+294-row** capture (mtime `2026-08-26T23:06:02.931697Z`, FRACTIONAL = a runtime
+write). `/nfl/api/props?week=1` served "no real player-prop lines available"
+over a full week-1 market on its own disk.
+
+**The established fix could not be reused, and reusing it would have shipped
+inert.** `_resolve_nfl_tracking_path` returns the first root that HAS the file;
+that discriminates for pbp/injuries/depth because those are gitignored, and
+discriminates NOTHING here because the stub exists. `nfl_props_path` prefers
+CONTENT, then existence, then a named fallback. `nfl_props_available_weeks` had
+the same bug one level up (single-root glob), so a week captured after the last
+mirror refresh could never be listed.
+
+**2. NFL cards never attached props** — 0 `shared_prop_rows` on all 16 served
+games. The old comment's reason was honest and had EXPIRED: the feed still
+carries no player→team side (`team` empty in **0 of 294** rows), but the roster
+snapshot is now published and on the web disk, so the split is a JOIN. Three
+refusals, no guesses — unresolvable name, cross-team collision, and any player
+whose roster team is not one of THIS game's two.
+
+**Measured end to end on the real production capture + real roster:** 258/294
+rows placed (87.8%), **128 `shared_prop_rows` across 16 games** through the real
+shared contract. Refused: 32 not in roster, 4 collisions. **ZERO refused as
+wrong-game — 100% agreement across 258 rows between the roster and the game the
+ODDS FEED independently placed each player in.**
+
+**3. `#209` Class A in both captures, two different disguises.** NFL discarded
+books at SELECTION (`_choose_bookmaker`); soccer swept them all and discarded at
+DEDUPE (`seen_market_rows` carried no book term). Production's real NFL capture
+was `{draftkings: 294}`. Price shopping is **+2.95 ROI pts on NFL props** and
+cannot run on a one-book file. NFL's aggregation key also ignored `line`, so a
+two-line player kept whichever arrived last. The single-book CONSUMER contract
+is preserved explicitly by `_best_price_player_props` (best price PER SIDE), so
+the ROI report's 64,007-bet denominator does not move.
+
+**OWED — the reading that closes this, and a zero before it proves nothing.**
+On web, after a deploy AND an NFL odds sweep:
+`sum(len(g["shared_prop_rows"]) for g in GET /nfl/api/cards?week=1)` **0 → >0**,
+and `GET /nfl/api/props?week=1` losing its empty state. Then, after the NEXT
+capture on each sport, both CSVs must show **>1 distinct `book`** for at least
+one (player, line) — the capture fix cannot be verified by reading the file
+that is already on disk, because that file was written by the old code.
+
+Landed `ea78de71` (not deployed). 18 new tests, every off/on claim falsified
+rather than asserted; 96 passed on targeted suites; nfl card+board selection at
+its HEAD baseline of 12 (all need `data/`), zero introduced.
+
 ### `#586` — **A live WNBA chip read a bare `LIVE` while every MLB chip beside it read `TOP 5`, and a SmartSim projection reached the strip as an observed score.** — lane `wnba-chip-live-token`, 2026-08-27, user report — **CLOCK FIXED AND VERIFIED IN PRODUCTION; PROJECTION GUARD UNIT-TESTED ONLY**
 
 `[user reports]` "WNBA is showing the sim score" (`GSV 85.43 / CON 68.94` under a
