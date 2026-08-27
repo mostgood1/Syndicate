@@ -2071,9 +2071,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   ~20 requests per boot instead of 1, which strengthens the case for removal. A
   bigger number there does NOT mean the hook became useful; it is still the wrong
   exchange and still cannot feed an order.
-- Pre-existing and NOT mine: `tests/test_polymarket_board_join.py` 5 failures,
-  identical with and without this change (verified by stashing). In
-  `venue-quote-line-join`'s soccer-competition area; messaged.
+- **RETRACTED — I reported 5 pre-existing failures in
+  `tests/test_polymarket_board_join.py`. THERE ARE NONE. `53 passed` in the
+  primary tree.** They were an artifact of a data-less session worktree: those
+  tests resolve soccer clubs through an alias map BUILT FROM `data/` artifacts,
+  which `session_worktree.py` excludes. Already a standing rule
+  (`learnings.md` 2026-08-21, `978963b5`) that I failed to apply.
+  THE METHOD ERROR IS THE LESSON: I "verified" by stashing my diff and
+  re-running. Stashing does not restore `data/`, so BOTH ARMS were missing the
+  same thing. That proved the failures were not caused by my diff; it could not
+  prove they were REAL, and I reported the weaker result as the stronger one.
+  I also wrongly attributed them to `b8163ef0` on topic adjacency alone — every
+  commit here is `github-actions[bot]`, so authorship distinguishes nothing and
+  I had no basis. Attribution removed, not reassigned. Caught by
+  `venue-quote-line-join` (syndicate-82), confirmed by me.
 - Claims: NONE held. Deploy claims: none taken — this needs no deploy of its own.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
