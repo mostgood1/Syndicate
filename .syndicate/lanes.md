@@ -2181,7 +2181,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   2026-08-26 22:07:31Z. Item: `todo.md #580`.
 - Blocked by: none
 
-### mlb-chip-live-state — OPEN — opened 2026-08-26 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 — **FIXED AND VERIFIED ON WEB (`58be8c0d`, live 23:05:38Z). ROOT CAUSE: `live_lens_report_<date>.json` has TWO writers over one path and the SLIM one was being read as an answer. TWO THINGS OWED — see below.**
+### mlb-chip-live-state — **CLOSED 2026-08-27** — opened 2026-08-26 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 — **GOAL MET AND VERIFIED ON EVERY SERVE PATH.** Live/final MLB chips carry a real score and a real inning on `worker_artifact` AND `inline_artifact_stale`, web and refresh-worker both carrying the fix. ROOT CAUSE: `live_lens_report_<date>.json` has TWO writers over one path and a SLIM row was being read as an ANSWER. **Both OWED items discharged. Residual work re-filed as its own items rather than left in this lane: `todo.md #582` (the writer race, deliberately unfixed) and `#585` (artifact content age).**
 - Goal: every LIVE/FINAL MLB game chip on the Layer 2 board strip carries its
   real score and its real inning token, on BOTH serve paths (`worker_artifact`
   and `inline_artifact_stale`), for as long as the game is live.
@@ -2200,6 +2200,49 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Verification: same-instant chip-vs-StatsAPI diff on production across at least
   one full FULL->SLIM->FULL lens cycle, with zero live games reading `0-0` or a
   bare `LIVE`/`FINAL` token during the SLIM window.
+- **CLOSING VERIFICATION, the cell that had never been measured** —
+  `(LENS=SLIM, src=worker_artifact)` at `00:08:34Z`, refresh-worker on
+  `f8d8b05f`, artifact age 78.9s:
+
+      games with a BARE live token (the blank signature): 0
+
+  Every live game carried a real inning. Pre-fix, that exact cell served every
+  live game `0-0` with a bare `LIVE`. **OWED 1 DISCHARGED.**
+- **OWED 2, the latency risk, RESOLVED AS FAR AS IT CAN BE TONIGHT and NOT
+  claimed as clean.** `#581` restores a statsapi fan-out that
+  `render-web-request-path` had removed. Evidence for: web ran `58be8c0d` from
+  `23:08:11Z` to `23:17:05Z` with ZERO unhealthy while the SLIM/inline path was
+  exercised on 9 samples, and `syndicate-27`'s next deploy produced none at all.
+  Evidence not obtained: an unhealthy AWAY from a deploy, which is the only
+  discriminating case. **Counted, not estimated — 3 unhealthy on web across
+  2026-08-26 against 13 `deploy_ended`**, at `16:48:45Z` (+70s), `23:07:51Z`
+  (+150s) and `23:51:22Z` (+118s); every one within ~2.5 min of a deploy and
+  recovering in ~20s. One of the three PREDATES the fix. **Rollback target if it
+  ever fires away from a deploy: `34b30330`.**
+- **A READING THAT NEARLY BECAME A FALSE REGRESSION REPORT.** The `00:08:34Z`
+  watcher line said `wrong=4` with three games at `0-0` — the signature of the
+  bug just fixed. It was staleness, not blanking. **The discriminator is the
+  TOKEN, not the SCORE**: a blanked game has no inning at all, a stale one has a
+  real inning that is merely behind. My watcher compared only scores and could
+  not tell them apart. In `state.md [chip-artifact-content-age]`.
+- **AND A HYPOTHESIS OF MINE FALSIFIED BY ITS OWN TEST, within the hour.**
+  `#585` first blamed `_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60`. One WARM build
+  later the same worker with the same bound served an inning gap of max 1, mean
+  0.25 over 8 games. The driver is BOARD-BUILD DURATION (cold 747.8s vs warm
+  107.8s), so the exposure is a ~12-minute window after every worker RESTART,
+  not a standing lag. Corrected in place in `todo.md` and `state.md`.
+- **Deploys:** web `58be8c0d` (`dep-da7mvg7avr4c73b6b1m0`, live 23:05:38Z), mine,
+  claim taken and released. Both workers reached `23f065d4`/`f8d8b05f` via the
+  user's own deploy and `syndicate-fd`'s — refresh-worker's claim was held by
+  `ncaaf-opener-regions-props` throughout and was NEVER forced.
+- **Ledger:** `deploys.md` 2026-08-26 web `58be8c0d`; `state.md`
+  `[mlb-live-lens-row-shape]` and `[chip-artifact-content-age]`; `learnings.md`
+  "two producers, two shapes" and "a warning that is usually wrong gets trained
+  out"; `todo.md` `#581`, `#582`, `#585`.
+- **Note for whoever takes `#582`:** `scripts/todo_id_reconcile.py`'s
+  blocking-vs-advisory split is RECOMMENDED and deliberately not implemented —
+  that file belongs to `repo-coordination`, which is flagged POSSIBLY ORPHANED
+  and says not to force-reassign on that evidence.
 ### open-bet-live-status — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
 - Goal: every OPEN bet on `/portfolio` shows where it stands, plus a date
   filter. `[user 2026-08-26: "can we append live game or prop status to the open
