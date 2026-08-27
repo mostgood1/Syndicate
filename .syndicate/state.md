@@ -3690,6 +3690,45 @@ a cache miss.
 ---
 
 
+## [web-boot-sync-healthz] THE BOOT SYNC WAS A SECOND `/healthz` STARVATION SOURCE — 72.20s, NOW 0.65s `[verified 2026-08-27, lane boot-sync-healthcheck-kill]`
+
+Distinct from `[web-request-path-latency]`, which fixed the REQUEST path against
+the same 5s budget. This one is BOOT, and it survived that fix.
+
+**4 `server_failed` in 24h, every one 1-2.5 min after a `deploy_ended
+succeeded`, 0 unpaired, over 22 deploys** (~1 boot in 5). Reason on all four:
+`HTTP health check failed (timed out after 5 seconds)`, `evicted: false`.
+
+**MECHANISM — not a request slot.** The sync runs on a DAEMON thread
+(`syndicate/app.py:241`), so it never holds one of the 8 slots. It starves the
+container: boot 20:39:49Z, sync began 20:40:09Z, first `/healthz` blackout
+20:40:14Z — 5 seconds later. Gaps **35.21s and 34.74s** against a 5.00s probe
+cadence; instance killed 115s after boot.
+
+**COST WAS SYSCALLS, NOT BYTES: 5.34 per file** (measured by counting, over a
+real 600-file subtree). A 2-parameter regression said bytes and was wrong by 2x.
+`filecmp.cmp(shallow=False)` opened and fully read both sides — ~66,800 opens,
+~6.2 GB — to copy zero files.
+
+**FIXED, live on `48833112`:** seed-only roots decide from the destination
+directory's NAME SET (`os.scandir`), 0.20 syscalls/file; overwrite roots keep the
+exact compare. Sync **72.20s -> 0.65s**, reproduced at **0.59s** on an unrelated
+lane's next deploy. `mlb_source/source_artifacts` 62.75s -> 0.49s.
+
+**NOTHING IS SKIPPED:** `present=33316` + overwrite `unchanged=76` = **33,392** =
+`git ls-files` over the bootstrap roots, exactly, on both boots.
+
+**THE KILL RATE IS NOT ESTABLISHED — 2 deploys, 0 kills, against ~1-in-5.** What
+is established is the DURATION, so the starvation window is 0.6s wide instead of
+72s. **A per-boot `/healthz` trace does NOT discriminate**: two PRE-fix boots
+that SURVIVED were equally clean (5.13s, 5.59s); only the KILLED boot shows
+blackouts, which is circular. Count `server_failed` per deploy over >=5 deploys.
+
+**`/api/ops/bootstrap/run` still reports the real `unchanged`/`kept` split** —
+`classify_existing` defaults to the exact path and only `main()` opts out. A
+boot now logs `present=N (not inspected)`, never `kept=0`, because a run that
+inspected nothing must not assert zero divergence.
+
 ## [web-preflight-dead-sample] WEB'S PREFLIGHT SAMPLE HAS BEEN DEAD SINCE 2026-08-14 — CAUSE STILL UNKNOWN AFTER FOUR WRONG ANSWERS `[2026-08-18, collapsed from 2 stacked sections]`
 
 **COLLAPSED 2026-08-18 by lane `ledger-coherence-sweep`, under an explicit
@@ -4504,10 +4543,18 @@ capture, no CLV baseline across the week, on a market trading for months.
 Live web `0e0017d7` carries `smartsim2_projections_2026_wk1.csv`, 51 rows,
 `generated_at 2026-08-19T22:11:51Z`, committed `46ca8445` on 08-24. The worker
 regenerates daily (`SEASON_PROJECTION_LAUNCHING sport=ncaaf … age_seconds=86552`,
-08-24T20:43:54Z) into a file web never reads. **That age sitting at one interval
-rather than growing is also the evidence the generator SUCCEEDS — `CFBD_API_KEY`
-is present on refresh-worker as a service env var (it is in no `render.yaml`),
-so `#458` looks resolved there.**
+08-24T20:43:54Z) into a file web never reads. `CFBD_API_KEY` is present on
+refresh-worker as a service env var (it is in no `render.yaml`), so `#458` is
+resolved there.
+
+**CORRECTED 2026-08-27: the inference that the generator SUCCEEDS was wrong.**
+An age sitting at one interval rather than growing shows the job FIRES on
+schedule; it says nothing about whether it completes. Measured from the Render
+logs API this evening, four runs 21:21:37–21:23:31Z each printed their
+calibration line at module import and then died ~1s later:
+`HTTP Error 429: Too Many Requests` in `load_ppa_ratings_asof`. A crashing job
+and a succeeding job produce the SAME age signal, because the age is stamped by
+the launcher.
 
 **Only week 1 exists** anywhere. Week 2 needs a manual commit + web deploy.
 
@@ -6184,3 +6231,48 @@ redistribute. The two changes interact; I did not predict it.
 
 **REMAINING LEVER, no lane:** the 534s overview itself — MLB's
 `build_cards_page_context` running hydrated on the worker — not the throttle.
+### CFBD IS OUT OF QUOTA UNTIL 1 SEPTEMBER — A MONTH, NOT A WINDOW
+
+Measured 2026-08-27 from the 429 itself: `X-CallLimit-Remaining: 0`,
+`{"message":"Monthly call quota exceeded."}`. **Monthly cap, so it resets
+2026-09-01 — AFTER the 08-29 openers.** Retrying cannot shorten it; polling
+sustains it. NCAAF projections therefore CANNOT be regenerated before the
+season starts, and the board will serve the 08-19 artifact through opening
+weekend.
+
+Consequence for provenance: `profile_source`/`profile_version` are stamped only
+by a SUCCESSFUL run, so the live CSV reads `unknown` until September. Until
+then the refresh-worker log line below is the only evidence that exists.
+
+Not blocked by this: OddsAPI props/lines (different provider, own budget), the
+team and pace snapshots (already built), and the board itself.
+
+### THE PROMOTED NCAAF CALIBRATION ARTIFACT LOADS IN PRODUCTION — CONFIRMED
+
+Read from the Render logs API on refresh-worker, 2026-08-27 21:21:37Z:
+
+    [calibration] ncaaf profile source=artifact version=ncaaf-goal-line-refit-1
+                  goal_line_touchdown=True drive_yardage_multiplier=0.95
+
+`source=artifact`, not `default`, with three discriminating fields agreeing —
+`goal_line_touchdown` defaults False, `drive_yardage_multiplier` defaults 1.15.
+This discharges the confirmation owed since the promotion.
+
+**Those four runs then CRASHED on the 429 and wrote nothing.** They failed
+safely: board intact at 51 cards, 0 missing projection values. A ratings-less
+artifact written over the good one would have looked exactly like success.
+
+### `header_stats` NOW RENDERS ON THE SHARED RANK BOARD — 21 of 21 ROUTES
+
+`header_stats` is a REQUIRED argument of `build_rank_page_context` (31 call
+sites, 23 files) that `shared/rank_board.html` read NOWHERE; it rendered the
+optional `summary_panel.summary_stats` instead. Production sweep 2026-08-27
+found **14 routes with a full board of cards rendering no slate stats**, and 1
+rendering them. It survived because 11 sport-specific templates DO loop over
+`header_stats` — load-bearing there, inert on the shared board.
+
+Fixed at the template (`12928720`, live 22:03:52Z) as an `elif`, so a builder
+supplying its own `summary_panel` is untouched. After: **21 of 21 rank_board
+routes render slate stats.** Verify by counting `feature-summary-pill`, NOT by
+grepping panel prose — "on the board" is body text that only appears on a
+populated slate and reads as a false negative on most routes out of season.

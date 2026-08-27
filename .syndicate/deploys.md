@@ -34754,3 +34754,170 @@ NOT collapse toward the 300 floor the way they did at 16:13-19:33 today, and
 `matched` should not fall to the 5-27 range. If it does both, demand weighting
 is not doing the work either and the cause is somewhere neither of us has
 looked.
+### 2026-08-27 21:15:03Z + 21:23:59Z — web — ncaaf-opener-regions-props
+
+Two deploys, because the first was verified against the wrong surface.
+
+**94d6b6e6** (live 21:15:03Z) — moved the NCAAF live-lens Live/Final/Pregame
+split onto `build_smartsim_live_lens_page_context`, the builder `/ncaaf/live-lens`
+actually calls. It had been added earlier the same day to
+`build_live_lens_page_context`, the legacy FALLBACK, which only runs when the
+runtime board is absent or empty. Production was on the runtime path, so it was
+inert.
+
+verify: `/ncaaf/api/live-lens?week=1` -> `Games 51 | Live 0 | Final 0 |
+Pregame 51 | Season 2026 | Week 1 | Source ...`. CORRECT, AND NOT SUFFICIENT --
+`GET /ncaaf/live-lens` came back **byte-identical to the pre-deploy fetch,
+108,486 bytes both times**. `shared/rank_board.html` renders
+`summary_panel.summary_stats` and never references `header_stats`, which reaches
+the API payload only; the route passed no summary_panel. Two hops, fixed one.
+
+**d281995b** (live 21:23:59Z) — both builders now build one `slate_stats` list
+and pass it as `header_stats` AND `summary_panel.summary_stats`, so page and
+payload cannot drift. Warning panel drops its now-duplicated Season/Week/Games.
+
+verify: `GET /ncaaf/live-lens?week=1` -> **109,780 bytes (was 108,486)**, pills
+rendered `Games 51 | Live 0 | Final 0 | Pregame 51 | Season 2026 | Week 1 |
+Source NCAAF SmartSim 2.0 predicted totals`, panel body "51 games on the board
+-- 0 live, 0 final, 51 pregame", 51 matchup cards, eyebrows carrying real
+kickoffs ("Sat Sep 5, 11:00 AM CDT"), not the constant they replaced.
+
+Every game reads pregame because the openers are 2026-08-29. The split's value
+is Saturday; the reading that proves it works today is that it is rendered and
+sums to 51.
+
+CARRIED ANOTHER LANE: d281995b contains `188a89fa` (boot-sync compare depth,
+lane boot-sync-healthcheck-kill) with bbeaf4fa between. Verified by ancestry AND
+by that lane reading the file at my SHA. One deploy instead of two serialised
+ones that would not have composed. Boot was clean -- deploy reached `live` with
+no `server_failed`, against a background rate of roughly one instance in five.
+
+## 2026-08-27 21:23:59Z — web d281995b — bootstrap compare depth (`188a89fa`, rode along)
+
+**Not my deploy.** `ncaaf-opener-regions-props` deployed `d281995b`, which contains
+my `188a89fa`. I verified before standing down that it would carry the change:
+`merge-base --is-ancestor 188a89fa d281995b` true, AND
+`git show d281995b:scripts/bootstrap_data_root.py` carries
+`shallow=not overwrite_existing` — ancestry alone does not survive a later revert.
+One deploy instead of two; deploying my SHA after theirs would have reverted their
+two commits (the 2026-08-15 shape: serialisation is not composition).
+
+**change:** seed-only roots compare on the stat signature; overwrite roots keep the
+deep byte compare. `scripts/bootstrap_data_root.py` only.
+
+**measured, boot of 21:24:12Z vs the 20:41:57Z baseline:**
+
+| | baseline | after | delta |
+|---|---|---|---|
+| sync total | 72.20s | **59.15s** | −13.05s (−18%) |
+| `mlb_source/source_artifacts` | 62.75s | 53.01s | −9.74s |
+| counters | copied=0 unchanged=33349 kept=43 | **identical** | behaviour preserved |
+
+**verify: FAILED TO DISCRIMINATE — do not read this as the fix working.**
+The criterion was `/healthz` gaps through the boot window. Post-fix: 25 probes,
+max gap 5.10s, zero missed. But I then measured two PRE-FIX boots that SURVIVED
+(94d6b6e6 @21:15:03Z, e12b5227 @20:22:53Z) and both are also clean — max gap
+5.13s and 5.59s, zero missed. **A clean trace is what any surviving boot looks
+like.** The only trace with 35s blackouts is the boot that was killed, which is
+circular: the blackout IS the kill. n=1 against a ~1-in-5 failure rate is no
+evidence at all, and `ncaaf-opener-regions-props` said so unprompted before I
+measured it.
+
+**what IS established:** the sync got 18% shorter with byte-identical counters.
+**what is NOT:** that the kills stop. 59.15s is still 12x the 5s budget, so the
+window in which a boot can be killed narrowed from ~72s to ~59s — it did not
+close.
+
+**my cost model was wrong.** The fit `1.337 ms/file + 117 MB/s` predicted −26.6s
+from dropping the byte term; the actual saving was −13.05s. A 2-parameter
+regression over 9 points over-attributed to bytes — plausibly because the
+checkout is page-cache-hot straight off the build, so those reads were cheaper
+than the fit assigned. The per-file term is therefore LARGER than 44.7s and is
+now the whole problem.
+
+**lane `boot-sync-healthcheck-kill` stays OPEN.** Next lever is the one already
+written into it: on a seed-only root the action is "do nothing when the
+destination exists", so a per-directory `scandir` diff replaces the per-file
+stats entirely. Verification needs 5 deploys, not 1.
+
+## 2026-08-27 21:54:46Z — web `48833112` — boot sync decides from a name set
+
+**deploy** dep-da8b2sss728c73b7eqp0, fired 21:51:47Z by lane
+`boot-sync-healthcheck-kill`. Claim held (token 03d425d00e4efdc9), preflight
+CLEAR **for the exact SHA** (`--target-commit 48833112`) — the previous attempt
+was correctly refused by the guard for running preflight without it, and for
+claiming service `syndicate` when the lock key is `web`. Cumulative over the
+live `d281995b` (ancestry checked, and the file content re-read at the landed
+SHA after rebase).
+
+**verify: the boot sync is 0.65s. It was 72.20s.**
+
+| root | pre-fix 20:41 | compare-depth 21:24 | scandir 21:54 |
+|---|---|---|---|
+| `mlb_source/source_artifacts` | 62.75s | 53.01s | **0.49s** |
+| `ncaaf_source` | 4.43s | 3.29s | 0.00s |
+| `vendor/wnba_betting_repo/src` | 0.16s | 0.09s | 0.13s |
+| **TOTAL** | **72.20s** | **59.15s** | **0.65s** |
+
+**no file was skipped, and the counter proves it:** `present=33316` across the
+seed-only roots plus `unchanged=76` on the overwrite root = **33,392**, which is
+exactly `git ls-files` over the bootstrap roots. `copied=0` — same as every
+prior boot.
+
+**the policy split works in production, not just in tests:** every seed-only
+root reported `present=N (not inspected)`; `vendor/wnba_betting_repo/src` — the
+one OVERWRITE root — reported `unchanged=76 kept=0`, i.e. it still classified.
+
+**the honest-reporting guard fired:** `Divergence from the committed mirror was
+NOT measured on this run (cheap boot sync). GET /api/ops/bootstrap/run reports
+it.` A run that inspected nothing did not print `kept=0`.
+
+**no `server_failed`.** Events for this deploy are deploy_started / build_started
+/ build_ended / deploy_ended and nothing else. Live commit confirmed `48833112`
+via `/versionz`; `/healthz` 0.21s, `/mlb` 0.40s.
+
+**WHAT IS AND IS NOT ESTABLISHED.** `/healthz` on this boot: 16 probes, max gap
+5.04s, zero missed — but that reading does NOT discriminate on its own, because
+two pre-fix boots that SURVIVED were equally clean (5.13s, 5.59s). n=1 against a
+~1-in-5 base rate is still not a rate. **What changed is structural rather than
+statistical:** the window in which a boot can be killed by sync I/O is now 0.65s
+wide instead of 72s. The mechanism is removed, not merely made less likely — and
+that is an argument from the duration, which IS measured, not from one clean
+boot.
+
+**still open, and NOT touched by this:** `GET /` takes 8.1s (was 12.4s). That is
+the other documented route to the same 5s budget (`home.py:3488`) and belongs to
+another lane's file.
+
+### 2026-08-27 22:03:52Z — web — 12928720 — ncaaf-opener-regions-props
+
+`shared/rank_board.html` now falls back to `header_stats` when a builder passes
+no `summary_panel`. `header_stats` is a REQUIRED argument of
+`build_rank_page_context` (31 call sites, 23 files) that this template read
+nowhere, so every builder supplying only the mandatory argument computed a slate
+summary that was discarded. It survived because 11 sport-specific templates DO
+loop over it -- load-bearing there, inert here.
+
+verify: same production sweep, before and after, all 21 reachable rank_board
+routes. **Previously defective 14 -> FIXED 14, still missing 0.** Examples:
+`/mlb/archive` now renders `Archive dates | Selected games | Official picks |
+Cards ready`; `/nfl/live-lens` `Games | Live matches | Season | Phase | Week`;
+`/soccer/epl/props` `Players | League | Source`; `/ncaab/results` `Archive dates
+| Selected games | ATS acc | Totals acc`.
+
+BEYOND THE 14: the 5 routes that could not be assessed pre-deploy (no data, out
+of season) now render stats too, as does `/nfl/picks`, whose conditional
+`summary_panel` is None while it has no stored snapshot. **21 of 21 rank_board
+routes now render slate stats; before this it was 1** (`/ncaaf/live-lens`,
+fixed earlier the same day).
+
+No double-render: the fallback is an `elif`, and `/ncaaf/live-lens` still shows
+its own 7-pill panel exactly once.
+
+tests.test_archives: 31 failures before and after, IDENTICAL SET by name --
+zero introduced. Negative control: 6 of 9 new template tests fail with the
+template reverted.
+
+Boot clean, no `server_failed` -- second consecutive clean web boot after
+`48833112` (lane boot-sync-healthcheck-kill), which cut boot sync 72.20s ->
+0.65s. That lane is counting a rate over >=5 deploys; this is sample 2.

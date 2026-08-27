@@ -4611,3 +4611,113 @@ emitter RAN. Every watcher should count something adjacent that must be non-zero
 happened, and `no calibration line` means nothing until you count the
 projections-process lines. Build the discriminator into the watcher, not into
 the interpretation afterwards.
+
+## 2026-08-27 FORBIDDEN: calling a fix verified when the READING came from a different surface than the one that was broken
+
+Session de363735, lane `ncaaf-opener-regions-props`. Shipped `94d6b6e6` to put
+the NCAAF live-lens phase split on the builder that serves, verified it on
+`/ncaaf/api/live-lens`, and it was CORRECT there:
+`Games 51 | Live 0 | Final 0 | Pregame 51`. I nearly reported it done.
+
+The PAGE was unchanged. `GET /ncaaf/live-lens` came back **byte-identical to the
+pre-deploy fetch — 108,486 bytes both times.** `shared/rank_board.html` renders
+`summary_panel.summary_stats` and never reads `header_stats`, which reaches the
+API payload only. Two hops; the fix landed on the first.
+
+**The rule:** when a value crosses more than one hop to reach the surface that
+was reported broken, a correct reading at hop 1 is not evidence about hop 2.
+Verify at the surface the complaint came from. **A byte-identical response
+across a deploy is a positive signal that nothing changed** — cheap, and it is
+what caught this. Fixed in `d281995b`; one list now feeds both, so payload and
+page cannot drift.
+
+Same session, same shape, one layer earlier: the split had first been added to
+`build_live_lens_page_context`, the legacy FALLBACK, while the route calls
+`build_smartsim_live_lens_page_context`. Present in the file, unreachable in the
+product. **Three surfaces — file, payload, page — and only the last one is the
+product.**
+
+## 2026-08-27 FORBIDDEN: inferring that a scheduled job SUCCEEDS from an age that sits at one interval
+
+`state.md` had recorded that an `age_seconds` sitting at one interval rather
+than growing "is also the evidence the generator SUCCEEDS". It is not. The age
+is stamped by the LAUNCHER, so a job that crashes one second in produces the
+same signal as one that completes. Measured this evening: four NCAAF projection
+runs 21:21:37–21:23:31Z each printed their calibration line at import and then
+died on `HTTP 429` in `load_ppa_ratings_asof`. Corrected in place.
+
+**Generalises to:** any liveness signal emitted BEFORE the work it is taken to
+vouch for. Ask what the signal is stamped by, not what it is near.
+
+## 2026-08-27 A lane can be CLOSED while a session keeps working under its name
+
+This session's lane was closed and moved to `lanes_history.md` earlier the same
+day, covering the props/odds/Layer 2 work. Everything after that — an engine
+calibration confirmation, two live-lens deploys, a cross-sport template fix —
+ran under the same slug, and **three deploy claims were acquired with a closed
+lane as `--holder`**. The claims serialised correctly and nothing was harmed,
+so nothing surfaced it; `deploy_claim.py` does not check that a holder is an
+OPEN lane, and the per-session marker still held the slug.
+
+**Not proposing a guard** — the claim's job is mutual exclusion and it did that.
+The point is narrower: **a lane name in a claim is not evidence the lane is
+open**, so "who holds this" can point at a closed lane indefinitely. When work
+continues past a close, open a new lane or reopen the old one before touching
+production.
+
+## 2026-08-27 A survey keyed by BARE FUNCTION NAME collapses same-named functions across sports
+
+Two static surveys of the rank_board routes were wrong and discarded before the
+production sweep produced the real number. The first keyed builders by function
+name, so five sports' identically-named `build_live_lens_page_context` collapsed
+onto whichever file parsed last (soccer) — every result misattributed. The
+second added a delegation check that matched `build_module_links` and
+`build_rank_page_context`, which nearly every builder calls, and reported **0
+defective** where the truth was 14.
+
+**Resolve by IMPORT, not by name** in a repo with per-sport parallel modules.
+And when a static result says "no problems anywhere", treat that as a suspected
+broken query before treating it as a finding.
+
+## 2026-08-27 — FORBIDDEN: fitting a model to a total when you can COUNT the operation
+
+- **The rule:** if the thing you are optimising is made of discrete operations —
+  syscalls, queries, requests — **count them**. Do not infer their cost by
+  regressing the total against plausible predictors.
+- **Evidence.** The boot sync's 72.20s was fitted as `1.337 ms/file + 117 MB/s`
+  over 9 roots: r ~1.2% error, and the two largest roots matched to **0.01s**.
+  It predicted −26.6s from removing the byte compare. The measured saving was
+  **−13.05s**, wrong by 2x, and the fix that rested on it was shipped and had to
+  be followed by a second one. Counting syscalls on a real subtree took one
+  script and gave the true answer immediately: **5.34 per file**, of which four
+  were re-asking what the directory read already knew. The regression was not
+  merely imprecise — it pointed at the WRONG TERM, so the first fix optimised
+  the part that was not the cost.
+- **The tell:** a beautiful fit over few points with more parameters than
+  mechanisms. 9 points, 2 parameters, and the residuals looked perfect because
+  one root (31,149 of 33,392 files) dominated both predictors at once.
+
+## 2026-08-27 — FORBIDDEN: a verification criterion that can only be met by the failure it is watching for
+
+- **The rule:** before adopting a criterion, ask what it reads on a HEALTHY
+  instance that was never going to fail. If the answer is "the same as on a
+  fixed one", it discriminates nothing.
+- **Evidence.** The lane's criterion was "`/healthz` answered inside 5s across
+  the boot window". Post-fix it read perfectly: 25 probes, max gap 5.10s, zero
+  missed — against pre-fix blackouts of 35.21s and 34.74s. It looked like proof.
+  Then two PRE-FIX boots that happened to SURVIVE were measured: max gaps
+  **5.13s and 5.59s, zero missed**. A clean trace is simply what a surviving
+  boot looks like; the only trace with blackouts is the boot that was killed, so
+  the criterion was measuring the kill rather than exposure to it. With a
+  ~1-in-5 base rate, n=1 was never going to be evidence either way.
+- **What to use instead:** a RATE over enough trials (`server_failed` per
+  deploy, >=5), or — better where available — a STRUCTURAL quantity that does
+  not need a base rate. Here the honest claim is the duration: the window in
+  which sync I/O can starve a health check is 0.6s wide instead of 72s. That is
+  measured directly and one boot establishes it.
+- **Related, same session:** grepping `"on the board"` to check whether a
+  `rank_board` route renders slate stats reads **0 on every route without a
+  populated slate**, which is most of them. It nearly produced a false
+  contradiction of another lane's completed sweep. Caught only by checking the
+  probe against a route known to be GOOD before trusting a negative. The real
+  marker is `feature-summary-pill`.
