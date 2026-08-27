@@ -6062,10 +6062,28 @@ side_not_an_outcome_of_this_market     17
    (`duplicates=3 placed=0`). Stable all day (matched 55/55/55/52 at
    15:21/15:25/16:01/18:57) — NOT a regression.
 
-**ONE REAL BUG, ~22 rows, owned by `open-bet-live-status`:** a WNBA team-alias
-gap. `board: 'Washington Mystics @ Phoenix Mercury'` refused `no_match` while
-`offered: ['gsv-ny@None', 'wsh-phx@None']` — `wsh-phx` IS that fixture.
-Buckets `no_match|wnba|h2h: 7` + `no_match|wnba|totals: 15`. Messaged.
+**ONE REAL BUG — FIXED by `open-bet-live-status` (`2589365c`), LANDED NOT LIVE
+on refresh-worker `[verified 2026-08-27 ~20:0xZ: live=7dd4ce07, does NOT
+contain it]`.** A WNBA team-alias gap: `board: 'Washington Mystics @ Phoenix
+Mercury'` refused `no_match` while `offered: [... 'wsh-phx@None']` — that IS
+the fixture. Buckets `no_match|wnba|h2h: 7` + `no_match|wnba|totals: 15`.
+MY REPORT WAS LESS PRECISE THAN THE FIX: I implied both tokens failed; they
+measured `wsh` -> 'washington mystics' fine and `phx` -> None as the whole
+failure. I had the sample and inferred from the pair instead of testing each
+half. The CAUSE is systematic — `_basketball_alias_to_name` merges NBA and
+WNBA and drops any key naming two clubs, so every city fielding both loses its
+three-letter code (`phx`, `atl`, `chi`, `dal`, `ind`; `min` was supplemented
+earlier for the same reason). Fixed as a class, NBA resolution verified
+unaffected. refresh-worker runs the join, so the ~22 rows are NOT recovered
+until that service deploys.
+
+**THE DEAD BOOT HOOK IS GONE** — `_polymarket_catalogue_at_boot()` removed
+(`fcdc5c57`), live-odds-worker live 19:43:37Z, verified here. Their control is
+worth copying: `POLYMARKET_CATALOGUE: 0` read alongside `POLYMARKET_US_AUTH: 1`
+and `POLYMARKET_US_SLATE: 2`, because all three at zero would have meant "no
+boot observed", not "hook removed". `pipeline/polymarket_odds_refresh.py`
+remains in the tree with a test suite and NO production caller — deleting a
+tested module is its owner's call.
 
 **DISPROVEN — DO NOT RE-PROPOSE.** I hypothesised the totals-only output came
 from Polymarket SIDE RESOLUTION, citing `kalshi-spread-join-sign` item #4
@@ -6092,7 +6110,12 @@ never arrives. Documented already at `ops.py:566`. The working shape is a
 keyvalue-aware read, exactly like `api_ops_live_lens_snapshot_index`. Asked
 `open-bet-live-status` (owns `ops.py` + `execution_ledger.py`) for a read-only
 AGGREGATES endpoint — counts per venue per day, deliberately not rows, because
-this is the money record.
+this is the money record. **THEY DECLINED TO BUILD IT ON A PEER REQUEST AND
+WERE RIGHT TO.** It is a new outward-facing surface on the money record, which
+is a SCOPE decision for the user, not something a peer can authorise — I named
+that risk class and then asked a peer for it anyway. Escalated to the user with
+the reasoning attached; still PENDING. So day-over-day Polymarket volume
+remains unanswerable, and the structural answer above does not depend on it.
 
 **READING TRUNCATED LOG LINES:** the Render logs API returns the full message
 in `logs[].message` (2,331 chars for `POLYMARKET_UNMATCHED`); it is the
