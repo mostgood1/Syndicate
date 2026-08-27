@@ -33624,3 +33624,49 @@ unhealthy away from a deploy**, which remains the only case that would implicate
 — 43 seconds after refresh-worker — and I neither deployed it nor held its claim.
 Forward-moving and harmless, but do not attribute it to this deploy. Web landed
 on `92db4ce4` at `01:12:25Z`, also not mine; it carries both fixes (checked).
+
+## 2026-08-27 01:4xZ — LANE CLOSED `basketball-live-momentum`, holds released
+
+**HOLDS RELEASED:**
+- `live-odds-worker` — released with its token earlier (`c7084c1bd96f90a0`).
+- `refresh-worker` — released with its token earlier (`c4682e1925e768ee`).
+- `syndicate` — **released with `--force`**, and stated as such: the claim had
+  been held by this lane for **4,957 minutes (3.4 days)**, predating this
+  session, and no token for it existed here. Nothing was deployed to `syndicate`
+  by this lane; the claim was stale, not active.
+- Scheduled trigger `trig_01MdEya71Rw1RHzptrBFAGEs` (my `send_later` deploy
+  check-in) — deleted. It had already fired and self-disabled.
+  **No other session's triggers were touched** — the ~14 listed all belong to
+  `session_01MfTBzn6UPUctJ917aeTJNy` and `session_01Sia2rPD72eFTriy28azzs2` and
+  had all fired.
+- Lane closed in `lanes.md` with the readings that verify it, not a claim that
+  it worked.
+
+**RECONCILED:** two commits were stranded on the branch and are now on `main`
+(PR #104, `5510dd62`), after merging 496 commits of `main` in and resolving the
+append-only `deploys.md` conflict by keeping both sides. 73 lane tests green
+after that merge. `todo.md` `#535` carries the closing block.
+
+**LEFT DELIBERATELY IN PLACE, and it is drift someone should know about:**
+- `live-odds-worker` still carries `SYNDICATE_WNBA_MARKET_JOIN_PROBE`,
+  `SYNDICATE_WNBA_SITUATIONAL_PACE` and `SYNDICATE_WNBA_INTERVAL_PROJECTION`.
+  All three are one-shots whose sentinels are written, so they are INERT — but
+  they are not in `render.yaml`, and the next `blueprint_sync` will drop them.
+  That is the correct outcome and should not read as a surprise.
+- `refresh-worker` carries `SYNDICATE_WNBA_SITUATIONAL_PACE=""` (empty), from
+  the wrong-service correction. The gate reads `if not spec`, so it is inert.
+- **Clearing any of these requires a deploy, and I did not take one to tidy
+  env vars.** A restart costs a live capture if a slate is up, and the reason
+  this lane exists is that captures are scarce.
+
+**A PRE-EXISTING INVARIANT VIOLATION, NOT MINE AND NOT FIXED:**
+`check_lane_invariants.py` reports `scripts/run_refresh_worker.py` claimed by
+TWO open lanes — `exchange-markets-api-integration` and
+`portfolio-ledger-service-split`. Neither is this lane, closing this lane did
+not cause it, and resolving another lane's claim is not mine to do. Flagged
+here so it is not mistaken for fallout from this close.
+
+**TIME NOTE:** it is 2026-08-27; the measurements above are from 08-23/24.
+Three days of slates have run, so the clock-bridge coverage that capped the
+market join at one date has almost certainly grown. Re-run the coverage probe
+before trusting the `USABLE_DATES n=1` figure.
