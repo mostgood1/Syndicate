@@ -276,10 +276,18 @@ def test_the_warning_panel_no_longer_repeats_the_counts(monkeypatch):
     assert not wp.get("list_items"), f"warning panel still lists {wp.get('list_items')}"
 
 
-def test_the_template_renders_summary_stats_and_not_header_stats():
-    """Pins the ASSUMPTION this whole block rests on. If rank_board.html ever
-    starts reading header_stats, this test should be revisited -- but until
-    then, a builder that only sets header_stats renders nothing."""
+def test_the_template_prefers_summary_stats_over_header_stats():
+    """REVISITED, as the previous version of this test said it should be.
+
+    It used to assert `header_stats` appeared NOWHERE in rank_board.html --
+    true when written, and the reason 14 other routes rendered no slate stats
+    at all. The template now falls back to `header_stats` when a builder
+    supplies no summary_panel (see tests/test_rank_board_header_stats.py).
+
+    What still matters HERE is the precedence: this route supplies BOTH, and
+    must render the panel once, not both branches. The fallback lives behind
+    `elif`, so this is a structural check that it stays there."""
     tpl = (REPO_ROOT / "syndicate" / "templates" / "shared" / "rank_board.html").read_text(encoding="utf-8")
     assert "summary_panel.summary_stats" in tpl
-    assert "header_stats" not in tpl
+    assert "elif header_stats" in tpl, "the fallback must remain an elif, or both branches render"
+    assert tpl.index("summary_panel.summary_stats") < tpl.index("elif header_stats")
