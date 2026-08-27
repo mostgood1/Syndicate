@@ -4503,3 +4503,70 @@ PATH did not execute for the recovery (`demand=None` in the trim's own line),
 so the change was still not what fixed it. Deployed is not executed — that half
 survived because it was checked against a predicate rather than a deploy
 timestamp.
+## 2026-08-27 — A CONTROL THAT IS BROKEN IN THE SAME WAY AS THE TREATMENT DISTINGUISHES NOTHING. I ran one and reported the result as positive.
+
+I reported 5 failing tests in `tests/test_polymarket_board_join.py` as
+"pre-existing, not mine". **There were none — 53 passed in the primary tree.**
+
+They failed only in my session worktree, which excludes `data/` by design, and
+those tests resolve soccer clubs through an alias map BUILT FROM `data/`
+artifacts. Already a standing rule (2026-08-21, `978963b5`).
+
+**THE METHOD ERROR IS THE POINT, NOT THE STALE RULE.** I "verified" by
+stashing my diff and re-running. **Stashing does not restore `data/`.** Both
+arms of the comparison were missing the same thing, so the experiment could
+only ever return "same either way". That proved the failures were not caused
+by MY DIFF; it could not prove they were REAL. I collapsed two different
+claims and reported the weaker result as the stronger one.
+
+**THE GENERAL FORM:** before trusting an A/B, ask what the control still
+shares with the treatment. If the suspected cause is present in BOTH arms, a
+null result is not evidence of anything. Same family as the `sports=8` board
+that "passed" while the guard never fired — which I DID catch, two hours
+earlier, in the same session. Recognising a shape once does not install it.
+
+**AND: I ATTRIBUTED THE FAILURES TO A COMMIT ON TOPIC ADJACENCY.** `git log -8
+--format='%an'` returns `github-actions[bot]` eight times — authorship
+distinguishes NOTHING in this repo — so I had no basis whatever. When the
+attribution was challenged I removed it rather than reassigning it to another
+guess.
+
+## 2026-08-27 — I CHECKED ANCESTRY AND CALLED IT CAUSATION. The fix's own log line said the path never ran.
+
+`[kalshi_odds] BOARD_JOIN matched` recovered from 5-24 to 208-221. I verified
+`bd81ba3c` (demand-weighted trim) was an ancestor of the live SHA and reported
+that the trim had fixed it — to my user, to the ledger, and to the lane that
+wrote it.
+
+**The trim's own line, at the moment of the recovery, reads:**
+
+```
+19:49:44  TRIM_BY_SPORT ... demand=None  mlb_slots=1620     <- matched=208
+```
+
+`_sport_slot_caps` returns None with no demand signal and the trim falls back
+to the FLAT-FLOOR branch. The code was DEPLOYED AND NOT EXECUTED. Caught by
+`venue-quote-line-join`, whose fix it was — they declined credit for it.
+
+**"IS THE COMMIT IN THE LIVE SHA" AND "DID THE CODE RUN" ARE DIFFERENT
+QUESTIONS, AND ONLY THE SECOND IS EVIDENCE.** Ancestry is necessary and never
+sufficient. This repo already has the rule — *"test the fix's predicate, not
+its deploy state"* — and a discriminating field was being PRINTED on the same
+line as the outcome I was reading. I read `kept_by_sport` off that line and
+did not read `demand=` two fields earlier.
+
+**THE REAL CAUSE MATTERED, WHICH IS WHY THIS WAS NOT A HARMLESS
+MIS-CREDIT.** MLB's slate approaching first pitch made its markets the
+freshest in the catalogue, and the staleness-ordered remainder pass handed
+them the slots — staleness accidentally doing what demand weighting does
+deliberately. That mechanism is DIURNAL, so **the collapse is expected to
+recur tomorrow afternoon** when far-dated football is fresh and MLB is not.
+Believing it was already fixed would have meant not deploying the thing that
+actually prevents recurrence.
+
+**A "verified fixed" that names the wrong cause predicts the wrong future.**
+
+Third instance in one session of the same family: a `sports=8` board that
+passed while the guard never fired (caught), a stash control that could not
+restore `data/` (missed), and this (missed). Recognising the shape once does
+not install it.

@@ -5978,7 +5978,35 @@ Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
   version reached 13.3MB and STOPPED WRITING THE ARTIFACT AT ALL, and
   `venue_daily_odds` keeps the complete record. 6000 is a bounded WORKING SET
   the join prices against, not the record. Nothing is lost by the bound.
-- **THE REAL DEFECT IS THE ALLOCATION, AND IT IS LIVE: the BOARD's Kalshi join
+- **ALLOCATION IS CONFIRMED AS THE BINDING CONSTRAINT, AND TODAY'S RECOVERY WAS
+  NOT THE FIX FOR IT `[2026-08-27 ~21:0xZ, corrected]`.**
+  `[kalshi_odds] BOARD_JOIN matched` went from 5-24 back to **208 / 218 / 221**
+  against a complete-set 235 / 242 — the 6,000 working set now captures ~91% of
+  what the full ~10,560-market catalogue matches, up from ~6%. `matched` tracks
+  MLB's slot count almost exactly (`mlb_slots` 794 -> matched 27; 1620 -> 208;
+  1741 -> 218; 1706 -> 221), which is what establishes allocation as the
+  mechanism.
+  **I FIRST ATTRIBUTED THIS TO `venue-quote-line-join`'s DEMAND-WEIGHTED TRIM
+  (`bd81ba3c`). THAT WAS WRONG AND THEY CORRECTED IT.** The trim's own log line
+  at the moment of recovery reads `TRIM_BY_SPORT ... demand=None mlb_slots=1620`
+  — `_sport_slot_caps` returns None with no demand signal and the trim falls
+  back to the FLAT-FLOOR branch. So the demand code was DEPLOYED AND NOT
+  EXECUTED. I checked ancestry (deploy state) and inferred causation
+  (predicate); the emitted field disproves it. Standing rule "test the fix's
+  predicate, not its deploy state" — I had it available and did not apply it.
+  **WHAT ACTUALLY RECOVERED IT: MLB's slate approaching first pitch.** Its
+  markets churn, become the freshest in the catalogue, and the staleness-ordered
+  remainder pass hands them the slots. Staleness ACCIDENTALLY doing what demand
+  weighting does deliberately.
+  **SO THE COLLAPSE IS EXPECTED TO RECUR** tomorrow afternoon, when far-dated
+  football is fresh and MLB is not. Demand weighting is what stops the
+  RECURRENCE; it is not what fixed today. Their `f4beb1bc` (per-sport MAX over a
+  6h/12-sample window) additionally fixes `_record_board_demand` overwriting on
+  every join — the alternating 442/842-row future-date builds were dropping mlb
+  from the vector entirely, last-write-wins reading "not mentioned" as "no
+  demand". Landed, undeployed as of this writing.
+  HISTORICAL RECORD OF THE DEFECT FOLLOWS:
+- ~~THE REAL DEFECT IS THE ALLOCATION, AND IT IS LIVE~~: the BOARD's Kalshi join
   lost ~93% of its matches today.** Same ticks, refresh-worker:
   `[kalshi_odds] BOARD_JOIN set=6000 rows=1329 matched=210` at 16:01:42Z, then
   `matched=5` from 16:13:19Z and 13-24 since — while
@@ -6126,3 +6154,26 @@ in `logs[].message` (2,331 chars for `POLYMARKET_UNMATCHED`); it is the
 per-line DISPLAY that truncates. Fetch and slice the field rather than
 concluding the detail is unavailable — the counts and samples that answered
 all of the above were in a line that looked cut off.
+
+## [board-overview-fix-verified] — VERIFIED 2026-08-27, refresh-worker
+
+**A memory refusal now skips MLB alone instead of discarding all eight sports.**
+`6421bf7f`, live since `b8163ef0` 17:02:59Z, still in on `fb9261b8`. Four paired
+readings 18:01-18:58Z: guard fires `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb
+sports_done=0` at headroom 2775-3020MB and the build returns `sports=7` with MLB
+ABSENT and the other seven present. Pre-fix the identical guard line returned
+`sports=0` EIGHTEEN times running. Control: the four non-firing iterations read
+`sports=8` with `mlb:g=7` present, so the gate in front of MLB is not relaxed.
+
+Today's board went from rebuilt every ~7 min at `sports=0` — never actually
+built — to every ~25 min at `sports=7`/`sports=8`. Slower and real.
+
+**THE THROTTLE HALF BOUGHT NOTHING and is recorded as such.** Default 300 ->
+1800s does throttle (future-date builds ~7min -> ~30min) but today's SHARE of
+iterations did not move (5/4/1 over 127 min vs a 9/9 baseline — 50% both ways).
+The `>=4:1` bar I wrote was unreachable: the board window is THREE dates, and
+the overview fix slowed each build 150s -> 534s, so there are fewer builds to
+redistribute. The two changes interact; I did not predict it.
+
+**REMAINING LEVER, no lane:** the 534s overview itself — MLB's
+`build_cards_page_context` running hydrated on the worker — not the throttle.
