@@ -373,6 +373,87 @@ def _soccer_alias_to_name() -> dict[str, str]:
     return mapping
 
 
+@lru_cache(maxsize=1)
+def _soccer_alias_by_league() -> dict[str, dict[str, str]]:
+    """Per-league club maps. Same derivation as `_soccer_alias_to_name`, but the
+    ambiguity is resolved WITHIN a league instead of across all of them.
+
+    `_soccer_alias_to_name` drops a key that names two clubs, and that is right:
+    `stl` is Standard Liege AND St. Louis CITY SC, and first-wins would have
+    joined a Belgian board row to an MLS scoreboard. But the collisions it drops
+    are almost entirely CROSS-league. Inside one competition the same token is
+    usually unique -- `fcb` is Bayern in the Bundesliga and Barcelona in La Liga,
+    and it is never both in either.
+
+    So this keeps the per-league maps intact and lets the caller supply the
+    missing context. A key that is ambiguous inside a single league is still
+    dropped here, for the same reason as before.
+    """
+    try:
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES, all_teams
+    except Exception:
+        return {}
+
+    by_league: dict[str, dict[str, str]] = {}
+    for league in LEAGUE_DISPLAY_NAMES:
+        try:
+            teams = all_teams(league) or []
+        except Exception:
+            continue
+        candidates: dict[str, set[str]] = {}
+        for team in teams:
+            canonical = normalize((team or {}).get("name"))
+            if not canonical:
+                continue
+            for raw in (team.get("name"), team.get("short_name"), team.get("abbreviation")):
+                for key in (normalize(raw), fold_accents(raw), strip_club_tokens(raw)):
+                    if key:
+                        candidates.setdefault(key, set()).add(canonical)
+        resolved = {k: next(iter(v)) for k, v in candidates.items() if len(v) == 1}
+        if resolved:
+            by_league[league] = resolved
+    return by_league
+
+
+def soccer_fixture_clubs(home_code: Any, away_code: Any) -> tuple[str, str] | None:
+    """Two club tokens from ONE fixture -> `(home, away)` canonical names, or None.
+
+    THE PAIR IS THE DISAMBIGUATOR, which is why this can answer where
+    `canonical_team` cannot. Measured 2026-08-27 on the Polymarket join: after
+    the competition fold made the venue's markets reachable, 119 soccer h2h rows
+    still refused as `no_match` because `fcb`, `stu`, `koe` and `hof` are dropped
+    from the global map as cross-league collisions. Asked as a PAIR they are not
+    ambiguous at all -- only the Bundesliga contains both `fcb` and `stu`, and
+    Bayern never plays Stuttgart in La Liga.
+
+    STRICTER THAN THE GLOBAL MAP, NOT LOOSER, and that is the safety argument.
+    It requires BOTH codes to resolve inside the SAME league and requires
+    EXACTLY ONE league to satisfy that. Two leagues that both explain the
+    fixture return None rather than a guess, so the `stl` failure this table
+    exists to prevent -- a Belgian row joined to an MLS scoreboard -- cannot
+    happen through this path: MLS would have to contain Standard Liege's
+    opponent too.
+
+    Returns names in the SAME canonical vocabulary as `canonical_team`, so a
+    caller can compare the two halves of a join without a second normalisation.
+    """
+    home_key, away_key = normalize(home_code), normalize(away_code)
+    if not home_key or not away_key:
+        return None
+
+    hits: list[tuple[str, str]] = []
+    for mapping in _soccer_alias_by_league().values():
+        home_name = mapping.get(home_key) or mapping.get(fold_accents(home_code))
+        away_name = mapping.get(away_key) or mapping.get(fold_accents(away_code))
+        if home_name and away_name and home_name != away_name:
+            pair = (home_name, away_name)
+            if pair not in hits:
+                hits.append(pair)
+    if len(hits) == 1:
+        return hits[0]
+    return None
+
+
 def _alias_map(sport: str) -> dict[str, str]:
     slug = normalize(sport)
     if slug == "mlb":

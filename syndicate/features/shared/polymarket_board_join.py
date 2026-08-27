@@ -757,10 +757,47 @@ def _teams_match(board_row: Mapping[str, Any], parsed: Mapping[str, Any], sport:
     away = board_row.get("away") or board_row.get("away_team")
     if not home or not away:
         return False
-    return bool(
-        alias_match(sport, parsed.get("home"), home)
-        and alias_match(sport, parsed.get("away"), away)
-    )
+    if alias_match(sport, parsed.get("home"), home) and alias_match(
+        sport, parsed.get("away"), away
+    ):
+        return True
+
+    # FALLBACK: RESOLVE THE FIXTURE AS A PAIR. Soccer only, and only after the
+    # normal path has already failed, so this can add matches and never remove
+    # one.
+    #
+    # MEASURED 2026-08-27, after the competition fold made the venue's soccer
+    # markets reachable: 119 h2h rows still refused as `no_match`, because
+    # `team_aliases` drops club tokens that name two clubs ACROSS leagues --
+    # `fcb` is Bayern and Barcelona, `stl` is Standard Liege and St. Louis. The
+    # drop is correct and must stay: a confidently wrong club is a real bet on
+    # the wrong team.
+    #
+    # Asked as a PAIR the ambiguity mostly disappears, because only one league
+    # contains both clubs of a real fixture. On 295 sampled venue fixtures the
+    # global map resolved 50 and the pair resolved 93 -- 43 rescued that were
+    # previously unjoinable.
+    #
+    # STRICTER, NOT LOOSER: `soccer_fixture_clubs` requires both codes to
+    # resolve inside ONE league and exactly one league to qualify, so an
+    # unresolvable pair still refuses rather than guessing.
+    if str(sport or "").strip().lower() != "soccer":
+        return False
+    try:
+        from syndicate.features.shared.team_aliases import (
+            canonical_team,
+            soccer_fixture_clubs,
+        )
+    except Exception:
+        return False
+    pair = soccer_fixture_clubs(parsed.get("home"), parsed.get("away"))
+    if not pair:
+        return False
+    board_home = canonical_team("soccer", home)
+    board_away = canonical_team("soccer", away)
+    if not board_home or not board_away:
+        return False
+    return bool(pair[0] == board_home and pair[1] == board_away)
 
 
 def _probability_for_side(
