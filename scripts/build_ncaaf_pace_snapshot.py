@@ -72,6 +72,11 @@ MAX_WEEK = 16
 
 PERIOD_SECONDS = 15 * 60
 
+# No real drive averages more than a minute of game clock per play. This is a
+# PHYSICAL bound, applied after either source wins, so a data artifact cannot
+# enter the aggregate through whichever field happened to be plausible.
+MAX_SECONDS_PER_PLAY = 60.0
+
 
 def _clock(value: object) -> int | None:
     """Game clock -> seconds remaining, or None when the clock is ABSENT.
@@ -92,58 +97,122 @@ def _clock(value: object) -> int | None:
         return None
 
 
-def _drive_seconds(drive: dict) -> int | None:
-    """Elapsed DERIVED from the game clock, because CFBD's `elapsed` is corrupt.
+def _reported_seconds(drive: dict) -> int | None:
+    elapsed = drive.get("elapsed")
+    if not isinstance(elapsed, dict):
+        return None
+    try:
+        return int(elapsed.get("minutes") or 0) * 60 + int(elapsed.get("seconds") or 0)
+    except (TypeError, ValueError):
+        return None
 
-    THE FIELD CANNOT BE TRUSTED, and it fails in the direction that hurts most.
-    Measured on 2024, `elapsed` is internally inconsistent with the drive's own
-    start/end clock on 302 of 36,620 drives (0.82%):
 
-        start 8:10 -> end 6:27, period 1->1   true 1:43   `elapsed` 51:00
-        start 10:51 -> end 8:29, period 2->2  true 2:22   `elapsed` 30:00
-        start 3:39 -> end 1:52, period 2->2   true 1:47   `elapsed` 47:00
-
-    0.82% sounds ignorable and is not: each bad row carries ~50x the weight of
-    a real drive, so trusting the field put Texas State at 74,464 seconds of
-    offence for a season (20.7 HOURS, against a ~3,600s game clock shared by
-    both teams) and 84.43 s/play. 34 of 264 teams landed over 40 s/play and
-    13.3% of the league clamped in the engine. A RATE that looks negligible can
-    still dominate a MEAN -- the magnitude is what matters, not the count.
-
-    The clock is self-consistent, so it is derived instead: within a period the
-    clock counts DOWN, so elapsed = start - end, plus a full period for each
-    boundary crossed. Anything still implausible (negative, or a single drive
-    over one full period) is DROPPED and counted, never silently kept.
-    """
+def _derived_seconds(drive: dict) -> int | None:
+    """Elapsed reconstructed from the game clock. Within a period the clock
+    counts DOWN, so elapsed = start - end, plus a full period per boundary."""
     start_period, end_period = drive.get("startPeriod"), drive.get("endPeriod")
     start, end = _clock(drive.get("startTime")), _clock(drive.get("endTime"))
     if start is None or end is None or start_period is None or end_period is None:
         return None
     try:
-        periods = int(end_period) - int(start_period)
+        sp, ep = int(start_period), int(end_period)
     except (TypeError, ValueError):
         return None
-    if periods < 0:
+    # Period 0 appears in the data and is not a real period; college overtime
+    # (5+) has no game clock at all, so a P4->P5 drive would derive `start+900`
+    # and read as very slow rather than as a different clock regime.
+    if not (1 <= sp <= 4) or not (1 <= ep <= 4) or ep < sp:
         return None
-    if int(start_period) > 4 or int(end_period) > 4:
-        # College overtime has NO game clock, so a period-4 -> period-5 drive
-        # would derive `start + 900` and read as a very slow drive. OT is a
-        # different clock regime, not a slow one.
-        return None
-    seconds = start - end + periods * PERIOD_SECONDS
+    seconds = start - end + (ep - sp) * PERIOD_SECONDS
     if seconds <= 0 or seconds > PERIOD_SECONDS:
         return None
     return seconds
 
 
-def build_pace_rows(client: CfbdClient, *, season: int) -> tuple[list[dict[str, object]], dict[str, object]]:
+def _drive_seconds(drive: dict) -> int | None:
+    """Drive duration in seconds, or None when neither source is plausible.
+
+    NEITHER FIELD IS TRUSTWORTHY ALONE, AND THEY FAIL IN OPPOSITE SEASONS.
+    Measured on the cached drives (20,672 in 2024 / 20,666 in 2025):
+
+      2024  reported `elapsed` is IMPOSSIBLE (>15 min) on 1.39% of drives, and
+            internally contradicts the drive's own clock:
+              start 8:10 -> end 6:27, period 1->1   true 1:43   reported 51:00
+            Each bad row carries ~50x a real drive's weight, which put Texas
+            State at 74,464 s of offence in a season (20.7 HOURS against a
+            ~3,600s shared clock) and clamped 13.3% of the league.
+
+      2025  reported is impossible on 0.00%, yet the two disagree on 16.5% --
+            and there the DERIVED value is the wrong one:
+              P1->1 start 15:00 end 0:00 plays=3  reported 86s  derived 900s
+            `endTime` 0:00 is a MISSING-DATA SENTINEL, not a real clock, so
+            deriving turns a 3-play drive into a 15-minute one.
+
+    So: prefer `elapsed` while it is plausible, fall back to the clock only
+    when it is not, and drop the drive when neither survives. A first version
+    of this derived ALWAYS and would have replaced good 2025 data with
+    fabricated slow drives -- the 2024 defect does not generalise.
+    """
+    reported = _reported_seconds(drive)
+    derived = _derived_seconds(drive)
+    plays = drive.get("plays")
+    try:
+        plays = int(plays) if plays is not None else None
+    except (TypeError, ValueError):
+        plays = None
+
+    chosen = None
+    if reported is not None and 0 < reported <= PERIOD_SECONDS:
+        chosen = reported
+    elif derived is not None:
+        chosen = derived
+    if chosen is None:
+        return None
+
+    # PHYSICAL GUARD, independent of which source won. No drive averages more
+    # than a minute of clock per play; a value that does is a data artifact
+    # whichever field produced it.
+    if plays and chosen / plays > MAX_SECONDS_PER_PLAY:
+        return None
+    return chosen
+
+
+def _load_cached_drives(cache_path: Path) -> list[dict]:
+    """Read a `drives_<season>.json.gz` cache instead of the live endpoint.
+
+    PREFERRED OVER THE API WHEREVER IT EXISTS. The live path is rate-limited --
+    CFBD returned HTTP 429 to every request after a few full-season pulls,
+    including the historical-truth loader's own `/games` call -- and a cache
+    makes the snapshot reproducible instead of dependent on a quota. The
+    `historical_truth` loader already maintains these files.
+    """
+    import gzip
+    import json
+
+    with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    return payload if isinstance(payload, list) else (payload.get("data") or [])
+
+
+def build_pace_rows(
+    client: CfbdClient | None,
+    *,
+    season: int,
+    drives_cache: Path | None = None,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
     """Aggregate `/drives` into per-team seconds-per-play. Returns (rows, report)."""
     agg: dict[str, list[int]] = {}
     drives_seen = 0
     drives_dropped = 0
     weeks_ok = 0
     weeks_failed: list[int] = []
-    for week in range(1, MAX_WEEK + 1):
+
+    if drives_cache is not None:
+        weeks = [(0, _load_cached_drives(drives_cache))]
+        weeks_ok = 1
+    else:
+        weeks = []
+    for week in ([] if drives_cache is not None else range(1, MAX_WEEK + 1)):
         try:
             payload = client._get_json(
                 "/drives", params={"year": season, "week": week, "seasonType": SEASON_TYPE}
@@ -157,6 +226,9 @@ def build_pace_rows(client: CfbdClient, *, season: int) -> tuple[list[dict[str, 
             print(f"[ncaaf_pace] week={week} FETCH_FAILED {type(exc).__name__}: {exc}", flush=True)
             continue
         weeks_ok += 1
+        weeks.append((week, payload or []))
+
+    for _week, payload in weeks:
         for drive in payload or []:
             offense = drive.get("offense")
             plays = drive.get("plays")
@@ -226,12 +298,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build the NCAAF pace snapshot from CFBD /drives.")
     parser.add_argument("--season", type=int, required=True, help="Season year to aggregate.")
     parser.add_argument("--output-path", type=Path, default=None, help="Optional pace CSV output path.")
+    parser.add_argument("--drives-cache", type=Path, default=None,
+                        help="Read drives from a `drives_<season>.json.gz` cache instead of the "
+                             "live endpoint. Preferred: the API is rate-limited and a cache makes "
+                             "the snapshot reproducible.")
     parser.add_argument("--base-url", type=str, default="https://api.collegefootballdata.com")
     parser.add_argument("--timeout", type=float, default=30.0)
     args = parser.parse_args()
 
-    client = CfbdClient.from_env(base_url=args.base_url, timeout=args.timeout)
-    rows, report = build_pace_rows(client, season=args.season)
+    client = None if args.drives_cache else CfbdClient.from_env(base_url=args.base_url, timeout=args.timeout)
+    rows, report = build_pace_rows(client, season=args.season, drives_cache=args.drives_cache)
 
     for key, value in report.items():
         print(f"  {key:<28} {value}")

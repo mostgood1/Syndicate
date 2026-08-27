@@ -85,11 +85,17 @@ def _load_market(season: int, lines_dir: Path | None = None) -> dict[tuple[str, 
             spreads = [l.get("spread") for l in (row.get("lines") or []) if l.get("spread") is not None]
             if not (home and away and spreads):
                 continue
+            # TOTALS, from the same rows. `overUnder` needs no sign flip -- it
+            # is already a total, unlike `spread`, which is home-relative and
+            # is negated above.
+            totals = [l.get("overUnder") for l in (row.get("lines") or []) if l.get("overUnder") is not None]
             out[(home, away)] = {
                 "market_margin": -statistics.mean(float(s) for s in spreads),
+                "market_total": statistics.mean(float(x) for x in totals) if totals else None,
                 "home_points": row.get("homeScore"),
                 "away_points": row.get("awayScore"),
                 "books": len(spreads),
+                "total_books": len(totals),
             }
     return out
 
@@ -99,6 +105,14 @@ def main() -> int:
     parser.add_argument("--season", type=int, default=2025)
     parser.add_argument("--sims", type=int, default=200)
     parser.add_argument("--limit", type=int, default=0, help="Cap games, for a fast smoke run.")
+    parser.add_argument("--sp-cache", type=Path, default=None,
+                        help="JSON cache of SP+ ratings for season-1. Written on first fetch; "
+                             "a completed season's ratings never change, so re-fetching only "
+                             "burns the CFBD quota that rate-limited this run.")
+    parser.add_argument("--isolate-pace", action="store_true",
+                        help="Baseline becomes the FULL payload MINUS the pace block, so the "
+                             "contrast measures pace's marginal effect instead of the whole "
+                             "payload's (already measured: delta -0.040 on 693 games, a null).")
     parser.add_argument("--snapshot-root", type=Path, default=None,
                         help="Alternate processed/ dir for the payload snapshots. REQUIRED for any "
                              "season other than the one the board carries: the coach/transfer/"
@@ -188,7 +202,27 @@ def main() -> int:
     from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2SimulationInput
     from syndicate.features.football.sim_engine.smartsim2.game_simulator import simulate_game
 
-    sp_index = gen.load_sp_ratings(int(args.season) - 1)
+    # SP+ VIA A CACHE, because a re-fit that cannot re-run is not a measurement.
+    # `load_sp_ratings` calls `/ratings/sp` live, and CFBD rate-limits hard: a
+    # few full-season `/drives` pulls put every endpoint -- including this one
+    # and the historical-truth `/games` loader -- behind HTTP 429 for an hour,
+    # which blocked this exact run. The ratings for a COMPLETED season never
+    # change, so fetching them repeatedly buys nothing and costs the quota.
+    sp_year = int(args.season) - 1
+    sp_cache = args.sp_cache or (REPO_ROOT / "data" / "ncaaf_source" / "historical_truth" / f"sp_ratings_{sp_year}.json")
+    sp_index: dict[str, tuple[float, float]] = {}
+    if sp_cache.exists():
+        raw = json.loads(sp_cache.read_text(encoding="utf-8"))
+        sp_index = {k: (float(v[0]), float(v[1])) for k, v in raw.items()}
+        print(f"[refit] SP+ {sp_year} from cache: {len(sp_index)} teams ({sp_cache})", flush=True)
+    else:
+        sp_index = gen.load_sp_ratings(sp_year)
+        sp_cache.parent.mkdir(parents=True, exist_ok=True)
+        sp_cache.write_text(json.dumps({k: list(v) for k, v in sp_index.items()}, indent=1), encoding="utf-8")
+        print(f"[refit] SP+ {sp_year} fetched and cached: {len(sp_index)} teams", flush=True)
+    if not sp_index:
+        print("ERROR: SP+ ratings empty -- cannot run the arms.")
+        return 1
     sp_means = gen.sp_league_means(sp_index)
     profile = gen.NCAAF_CALIBRATION_PROFILE
 
@@ -208,6 +242,7 @@ def main() -> int:
         h_off, h_def = home_sp
         a_off, a_def = away_sp
         margins: list[float] = []
+        totals: list[float] = []
         for i in range(args.sims):
             kwargs: dict[str, Any] = dict(
                 home_team=home, away_team=away, seed=1337 + i,
@@ -217,30 +252,79 @@ def main() -> int:
             if payload:
                 kwargs["feature_generation_payload"] = payload
             out = simulate_game(SmartSim2SimulationInput(**kwargs), profile=profile)
-            margins.append(float(out.final_score["home"]) - float(out.final_score["away"]))
-        return statistics.mean(margins)
+            h, a = float(out.final_score["home"]), float(out.final_score["away"])
+            margins.append(h - a)
+            totals.append(h + a)
+        # The SD of the simulated total is reported too, because the defect
+        # being chased is DISPERSION (1.94x over-dispersed on the live slate),
+        # and a mean-only comparison cannot see it.
+        return {
+            "margin": statistics.mean(margins),
+            "total": statistics.mean(totals),
+            "total_sd": statistics.pstdev(totals),
+        }
 
     off_err: list[float] = []
     on_err: list[float] = []
     mkt_err: list[float] = []
+    # Totals carry their own denominator: a game can have a spread and no
+    # over/under, so the totals subset is a SUBSET of the margin subset and is
+    # counted separately rather than assumed equal.
+    t_off_err: list[float] = []
+    t_on_err: list[float] = []
+    t_mkt_err: list[float] = []
+    t_actual: list[float] = []
+    t_sim_sd: list[float] = []
     skipped = 0
+    no_market_total = 0
+    _progress = {"n": 0}
     for game, act in zip(games, actual):
         payload = feature_payload.build_payload(
             home_team=str(game.get("homeTeam")), away_team=str(game.get("awayTeam")), season=args.season
         )
-        m_off = _margin(game, None)
-        m_on = _margin(game, payload) if payload else None
-        if m_off is None or m_on is None:
+        # BASELINE DEPENDS ON THE QUESTION. `--isolate-pace` makes the baseline
+        # the FULL payload minus the pace block, so the contrast is pace's
+        # marginal effect rather than the whole payload's -- which was already
+        # measured and is a null (delta -0.040 on 693 games). Comparing
+        # "no payload" against "payload with pace" would credit pace with the
+        # other four blocks' contribution.
+        baseline_payload = None
+        if args.isolate_pace:
+            if not payload or "pace" not in payload:
+                skipped += 1
+                continue
+            baseline_payload = {k: v for k, v in payload.items() if k != "pace"}
+        if _progress["n"] % 50 == 0:
+            # A 60-MINUTE JOB WITH NO PROGRESS OUTPUT. The first run printed
+            # only early errors and the final report, so "how far along" could
+            # be answered only by reading the process's CPU time.
+            print(f"[refit] {_progress['n']}/{len(games)} games", flush=True)
+        _progress["n"] += 1
+        r_off = _margin(game, baseline_payload)
+        r_on = _margin(game, payload) if payload else None
+        if r_off is None or r_on is None:
             skipped += 1
             continue
         key = (str(game.get("homeTeam")), str(game.get("awayTeam")))
-        off_err.append(abs(m_off - act))
-        on_err.append(abs(m_on - act))
+        off_err.append(abs(r_off["margin"] - act))
+        on_err.append(abs(r_on["margin"] - act))
         # PAIRED: the market error is recomputed on the SAME subset the arms
         # ran on, not taken from the full 714. An unpaired comparison against a
         # different denominator is how a model gets credited for games it never
         # simulated.
         mkt_err.append(abs(market[key]["market_margin"] - act))
+
+        mt = market[key].get("market_total")
+        hp, ap = market[key].get("home_points"), market[key].get("away_points")
+        if mt is None or hp is None or ap is None:
+            no_market_total += 1
+            continue
+        actual_total = float(hp) + float(ap)
+        t_actual.append(actual_total)
+        t_off_err.append(abs(r_off["total"] - actual_total))
+        t_on_err.append(abs(r_on["total"] - actual_total))
+        t_mkt_err.append(abs(float(mt) - actual_total))
+        t_sim_sd.append(r_on["total_sd"])
 
     paired = len(off_err)
     result_arms = {
@@ -250,6 +334,25 @@ def main() -> int:
         "model_mae_payload_on": round(statistics.mean(on_err), 3) if on_err else None,
         "market_mae_same_subset": round(statistics.mean(mkt_err), 3) if mkt_err else None,
     }
+    result_arms["totals_paired_games"] = len(t_off_err)
+    result_arms["totals_missing_market_line"] = no_market_total
+    if t_off_err:
+        result_arms["total_mae_off"] = round(statistics.mean(t_off_err), 3)
+        result_arms["total_mae_on"] = round(statistics.mean(t_on_err), 3)
+        result_arms["total_mae_market"] = round(statistics.mean(t_mkt_err), 3)
+        result_arms["total_delta_on_minus_off"] = round(
+            result_arms["total_mae_on"] - result_arms["total_mae_off"], 3)
+        result_arms["total_gap_to_market_on"] = round(
+            result_arms["total_mae_on"] - result_arms["total_mae_market"], 3)
+        # DISPERSION, the actual defect. `state.md`: margins calibrated, totals
+        # NOT; 1.94x over-dispersed on the live slate. A MAE that improves while
+        # the simulated spread stays 2x the real one has not fixed totals.
+        result_arms["total_sim_sd_mean"] = round(statistics.mean(t_sim_sd), 3)
+        result_arms["total_actual_sd"] = round(statistics.pstdev(t_actual), 3)
+        result_arms["total_dispersion_ratio"] = (
+            round(statistics.mean(t_sim_sd) / statistics.pstdev(t_actual), 3)
+            if statistics.pstdev(t_actual) else None
+        )
     if off_err:
         result_arms["delta_on_minus_off"] = round(result_arms["model_mae_payload_on"] - result_arms["model_mae_payload_off"], 3)
         result_arms["gap_to_market_off"] = round(result_arms["model_mae_payload_off"] - result_arms["market_mae_same_subset"], 3)
@@ -300,6 +403,17 @@ def main() -> int:
         print(f"    delta ON - OFF        : {result.get('delta_on_minus_off')}  (negative = payload helps)")
         print(f"    gap to market OFF     : {result.get('gap_to_market_off')}")
         print(f"    gap to market ON      : {result.get('gap_to_market_on')}  (must reach <= 0 to earn a deploy)")
+        print()
+        print(f"  TOTALS -- {result.get('totals_paired_games')} games "
+              f"({result.get('totals_missing_market_line')} had no over/under)")
+        print(f"    total MAE OFF         : {result.get('total_mae_off')}")
+        print(f"    total MAE ON          : {result.get('total_mae_on')}")
+        print(f"    total MAE market      : {result.get('total_mae_market')}")
+        print(f"    total delta ON - OFF  : {result.get('total_delta_on_minus_off')}  (negative = helps)")
+        print(f"    total gap to market   : {result.get('total_gap_to_market_on')}")
+        print(f"    sim total SD          : {result.get('total_sim_sd_mean')}")
+        print(f"    actual total SD       : {result.get('total_actual_sd')}")
+        print(f"    DISPERSION RATIO      : {result.get('total_dispersion_ratio')}  (1.0 = calibrated)")
         print()
         print("  The bar is the MARKET, not payload-off. `state.md` records this")
         print("  model at margin MAE 15.775 vs market 12.212 (n=2233, t=+17.20).")
