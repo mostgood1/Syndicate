@@ -227,3 +227,57 @@ def test_runner_can_opt_out_of_props(flag):
     source = (REPO_ROOT / "scripts" / "refresh_ncaaf_oddsapi.py").read_text(encoding="utf-8")
     assert '"--skip-props"' in source
     assert 'args.skip_props' in source
+
+
+# ------------------------------------------------- the production path bug
+
+
+def _seed_predictions(directory):
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "college_football_schedule_2026_predicted_totals_enhanced.csv").write_text(
+        "season,week\n2026,1\n", encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize(
+    "relative,label",
+    [("", "local: csv directly in --artifact-root"),
+     ("source_artifacts", "render: csv one level down"),
+     ("data", "csv under data/")],
+)
+def test_data_root_resolves_in_every_layout_that_actually_occurs(tmp_path, relative, label):
+    """`_local_source_artifact_root` names two different layouts.
+
+    LOCALLY it appends `source_artifacts` and the CSVs sit in the root it
+    passes; ON RENDER it does NOT append it, so the same CSVs are one level
+    down. Only the local layout was searched, so the NCAAF step could not run
+    in production at all -- measured 2026-08-27, failing in 0 seconds with a
+    FileNotFoundError that surfaced only inside ODDS_REFRESH_FAILURE_SUMMARY.
+    """
+    _seed_predictions(tmp_path / relative if relative else tmp_path)
+    assert runner._resolve_data_root(source_root=None, artifact_root=tmp_path) == tmp_path.resolve()
+
+
+def test_data_root_is_the_source_root_not_the_predictions_directory(tmp_path):
+    """Writes go to `<data_root>/data/`, so returning the deeper directory
+    would scatter artifacts into `source_artifacts/data/` on production."""
+    _seed_predictions(tmp_path / "source_artifacts")
+    assert runner._resolve_data_root(source_root=None, artifact_root=tmp_path) == tmp_path.resolve()
+
+
+def test_a_root_with_no_predictions_is_still_refused_and_says_where_it_looked(tmp_path):
+    """Widening the search must not turn the gate into a rubber stamp."""
+    with pytest.raises(FileNotFoundError) as excinfo:
+        runner._resolve_data_root(source_root=None, artifact_root=tmp_path)
+    assert "Searched:" in str(excinfo.value)
+
+
+def test_the_gate_and_its_consumer_use_one_rule(tmp_path):
+    """The defect class: a gate strictly narrower than the thing it guards.
+
+    `_prediction_context` always searched `data/` as well, so the gate could
+    refuse a root the consumer would have read happily.
+    """
+    _seed_predictions(tmp_path / "source_artifacts")
+    assert runner._prediction_files(tmp_path), "consumer cannot see the predictions"
+    assert runner._resolve_data_root(source_root=None, artifact_root=tmp_path)

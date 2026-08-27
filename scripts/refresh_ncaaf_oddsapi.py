@@ -294,12 +294,48 @@ def _base_norm(name: str) -> str:
 
 
 def _resolve_data_root(*, source_root: Path | None, artifact_root: Path) -> Path:
+    """The root everything else reads from and writes under.
+
+    USES `_prediction_files`, THE SAME FUNCTION THE CONSUMER USES, and that is
+    the fix rather than an implementation detail. This gate used to glob
+    `artifact_root` ALONE while `_prediction_context` searched
+    `artifact_root/data` as well -- a gate strictly narrower than the thing it
+    guards, which is a shape that can only ever produce false refusals.
+
+    Measured on production 2026-08-27, and it had been failing silently since
+    the sport came into season:
+
+        STEP_START name=ncaaf_lines_snapshot command=[... refresh_ncaaf_oddsapi.py
+          --artifact-root /opt/render/project/data/ncaaf_source]
+        FileNotFoundError: NCAAF runner needs --source-root or an
+          --artifact-root containing the predicted schedule CSV.
+        STEP_FAIL name=ncaaf_lines_snapshot return_code=1 runtime_seconds=0
+
+    It fails in ZERO SECONDS and costs nothing, so it never showed up as a
+    timeout, a memory spike or a cost line -- only as an entry in
+    `ODDS_REFRESH_FAILURE_SUMMARY` that nothing alerts on. NCAAF odds and
+    props could not refresh in production at all.
+
+    Cause: `refresh_odds_sources._local_source_artifact_root` appends
+    `source_artifacts` on a LOCAL path and does NOT on a hosted one, so the
+    same argument names two different layouts. Rather than change that shared
+    helper -- four other sports pass through it -- this searches the layouts
+    that actually occur.
+
+    Returns the SOURCE ROOT, not the directory the predictions were found in:
+    `_merge_and_write` and the props capture both write under
+    `<data_root>/data/`, so returning the deeper directory would scatter
+    artifacts into `source_artifacts/data/` on production.
+    """
     if source_root is not None:
         return source_root.resolve()
-    pattern_matches = list(artifact_root.glob(PRED_FILES_GLOB))
-    if pattern_matches:
+    if _prediction_files(artifact_root):
         return artifact_root.resolve()
-    raise FileNotFoundError("NCAAF runner needs --source-root or an --artifact-root containing the predicted schedule CSV.")
+    searched = ", ".join(str(artifact_root / rel) if rel else str(artifact_root) for rel in _PREDICTION_SEARCH_DIRS)
+    raise FileNotFoundError(
+        "NCAAF runner needs --source-root or an --artifact-root containing the predicted schedule CSV. "
+        f"Searched: {searched}"
+    )
 
 
 def _norm_team(name: str) -> str:
@@ -364,9 +400,25 @@ def _parse_utc_datetime(value: object) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+#: Where the predicted-totals CSV can live, relative to a candidate root.
+#:
+#: `source_artifacts` is the one that matters in production and was missing.
+#: LOCALLY the orchestrator passes `data/ncaaf_source/source_artifacts` as
+#: `--artifact-root` and the CSVs sit directly in it; ON RENDER
+#: `_local_source_artifact_root` drops that segment and passes
+#: `/opt/render/project/data/ncaaf_source`, where the same files are one level
+#: down under `source_artifacts/`. So the layout differs by environment and
+#: only the hosted one was unsearched.
+_PREDICTION_SEARCH_DIRS = ("data", "", "source_artifacts")
+
+
 def _prediction_files(source_root: Path) -> list[Path]:
-    for data_root in (source_root / "data", source_root):
-        matches = sorted(data_root.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
+    for relative in _PREDICTION_SEARCH_DIRS:
+        candidate = source_root / relative if relative else source_root
+        try:
+            matches = sorted(candidate.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
+        except OSError:
+            continue
         if matches:
             return matches
     return []
