@@ -218,3 +218,68 @@ def test_a_non_runtime_board_still_falls_back(monkeypatch):
     context = ll.build_smartsim_live_lens_page_context(1)
     assert "Cards-backed lens" in str(context.get("warning_panel", {}).get("eyebrow", "")), "did not fall back"
     assert _stats(context)["Live"] == "2"
+
+
+# ---------------------------------------------------------------------------
+# WHAT THE PAGE ACTUALLY RENDERS. The block above shipped and was verified on
+# /ncaaf/api/live-lens -- correctly. It changed the PAGE not at all.
+#
+#   shared/rank_board.html renders `summary_panel.summary_stats`.
+#   It never references `header_stats`, which reaches the API payload only.
+#   This route passed NO summary_panel, so the split had nowhere to render.
+#
+# Measured 2026-08-27: after the deploy the API carried
+# Games 51 | Live 0 | Final 0 | Pregame 51, while GET /ncaaf/live-lens came
+# back byte-identical to the pre-deploy fetch -- 108,486 bytes both times.
+# An API-shaped assertion cannot see that. These pin the render path.
+# ---------------------------------------------------------------------------
+
+
+def _panel_stats(context):
+    return {s["label"]: s["value"] for s in context["summary_panel"]["summary_stats"]}
+
+
+def test_THE_RENDERED_PANEL_CARRIES_THE_SPLIT(monkeypatch):
+    """THE SECOND REGRESSION. summary_panel is what reaches the template."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    context = ll.build_smartsim_live_lens_page_context(1)
+    assert context.get("summary_panel"), "no summary_panel -- the template renders nothing"
+    stats = _panel_stats(context)
+    assert (stats["Live"], stats["Final"], stats["Pregame"]) == ("2", "1", "2")
+
+
+def test_the_panel_and_the_api_cannot_disagree(monkeypatch):
+    """One list feeds both, so the page and the payload can never drift."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    context = ll.build_smartsim_live_lens_page_context(1)
+    assert context["summary_panel"]["summary_stats"] == context["header_stats"]
+
+
+def test_the_fallback_renders_the_split_too(monkeypatch):
+    monkeypatch.setattr(ll, "build_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    stats = _panel_stats(ll.build_live_lens_page_context(1))
+    assert (stats["Live"], stats["Final"], stats["Pregame"]) == ("2", "1", "2")
+
+
+def test_the_panel_body_states_the_split_in_words(monkeypatch):
+    """The pills are the reading; the body is what survives a narrow viewport."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    body = ll.build_smartsim_live_lens_page_context(1)["summary_panel"]["body"]
+    assert "2 live" in body and "1 final" in body and "2 pregame" in body
+
+
+def test_the_warning_panel_no_longer_repeats_the_counts(monkeypatch):
+    """Season/Week/Games moved into the pills. Leaving them in both places
+    renders the same three numbers twice, stacked."""
+    monkeypatch.setattr(ll, "build_smartsim_cards_page_context", lambda w: _cards_context(_mixed_slate()))
+    wp = ll.build_smartsim_live_lens_page_context(1).get("warning_panel") or {}
+    assert not wp.get("list_items"), f"warning panel still lists {wp.get('list_items')}"
+
+
+def test_the_template_renders_summary_stats_and_not_header_stats():
+    """Pins the ASSUMPTION this whole block rests on. If rank_board.html ever
+    starts reading header_stats, this test should be revisited -- but until
+    then, a builder that only sets header_stats renders nothing."""
+    tpl = (REPO_ROOT / "syndicate" / "templates" / "shared" / "rank_board.html").read_text(encoding="utf-8")
+    assert "summary_panel.summary_stats" in tpl
+    assert "header_stats" not in tpl

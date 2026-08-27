@@ -135,6 +135,22 @@ def build_live_lens_page_context(selected_week: int) -> dict[str, object]:
     season = int(str(cards_context.get("date") or "0").split()[0] or 0)
     games = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
     rank_cards = [_rank_card(game) for game in games if isinstance(game, dict)]
+    phases = _phase_counts(games)
+    slate_stats = [
+        {"label": "Games", "value": str(len(games))},
+        {"label": "Live", "value": str(phases["live"])},
+        {"label": "Final", "value": str(phases["final"])},
+        {"label": "Pregame", "value": str(phases["pregame"])},
+        {"label": "Season", "value": str(season)},
+        {"label": "Week", "value": str(resolved_week)},
+        {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else "Summary"},
+    ]
+    summary_panel = {
+        "eyebrow": "Slate state",
+        "title": f"{season} Week {resolved_week}",
+        "body": f"{len(games)} games on the board -- {phases['live']} live, {phases['final']} final, {phases['pregame']} pregame.",
+        "summary_stats": slate_stats,
+    }
     warning_panel = {
         "eyebrow": "Cards-backed lens",
         "title": "NCAAF live lens now uses the shared game-card contract",
@@ -159,19 +175,10 @@ def build_live_lens_page_context(selected_week: int) -> dict[str, object]:
         source_title="NCAAF live game lens" if rank_cards else "NCAAF live lens unavailable",
         rank_cards=rank_cards,
         using_sample_data=False,
-        header_stats=[
-            {"label": "Games", "value": str(len(games))},
-            # LIVE / FINAL / PREGAME, which is what a live board is opened for.
-            # MLB leads with exactly this split; NCAAF counted only the total.
-            {"label": "Live", "value": str(_phase_counts(games)["live"])},
-            {"label": "Final", "value": str(_phase_counts(games)["final"])},
-            {"label": "Pregame", "value": str(_phase_counts(games)["pregame"])},
-            {"label": "Season", "value": str(season)},
-            {"label": "Week", "value": str(resolved_week)},
-            {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else "Summary"},
-        ],
+        header_stats=slate_stats,
         module_links=build_module_links(resolved_week, "Live Lens", season=season),
         warning_panel=warning_panel,
+        summary_panel=summary_panel,
         source_date_display=f"{season} Week {resolved_week}",
         control_label="Week",
         control_type="number",
@@ -208,11 +215,30 @@ def build_smartsim_live_lens_page_context(selected_week: int) -> dict[str, objec
     games = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
     rank_cards = [_runtime_rank_card(game) for game in games if isinstance(game, dict)]
     phases = _phase_counts(games)
+    # ONE list, used as BOTH header_stats and the panel's summary_stats.
+    # `header_stats` reaches the API payload only -- shared/rank_board.html
+    # renders `summary_panel.summary_stats` and nothing else, and this route
+    # passed no summary_panel at all. Measured 2026-08-27: the phase split went
+    # live in /ncaaf/api/live-lens while the PAGE stayed byte-identical.
+    slate_stats = [
+        {"label": "Games", "value": str(len(games))},
+        {"label": "Live", "value": str(phases["live"])},
+        {"label": "Final", "value": str(phases["final"])},
+        {"label": "Pregame", "value": str(phases["pregame"])},
+        {"label": "Season", "value": str(season)},
+        {"label": "Week", "value": str(resolved_week)},
+        {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else LEGACY_ENGINE_SOURCE_LABEL},
+    ]
+    summary_panel = {
+        "eyebrow": "Slate state",
+        "title": f"{season} Week {resolved_week}",
+        "body": f"{len(games)} games on the board -- {phases['live']} live, {phases['final']} final, {phases['pregame']} pregame.",
+        "summary_stats": slate_stats,
+    }
     warning_panel = {
         "eyebrow": LEGACY_ENGINE_SOURCE_LABEL,
         "title": f"NCAAF live lens now uses runtime {LEGACY_ENGINE_SOURCE_LABEL} cards",
         "body": f"This live-lens board reads the {LEGACY_ENGINE_SOURCE_LABEL} cards runtime first so matchup signals stay aligned with projected score, spread, total, and win probability.",
-        "list_items": [f"Season: {season}", f"Week: {resolved_week}", f"Games surfaced: {len(games)}"],
     }
     if not rank_cards:
         return build_live_lens_page_context(selected_week)
@@ -227,21 +253,10 @@ def build_smartsim_live_lens_page_context(selected_week: int) -> dict[str, objec
         source_title=f"NCAAF {LEGACY_ENGINE_SOURCE_LABEL} live lens runtime",
         rank_cards=rank_cards,
         using_sample_data=False,
-        header_stats=[
-            {"label": "Games", "value": str(len(games))},
-            # LIVE / FINAL / PREGAME. This is the RUNTIME builder -- the one that
-            # actually serves. The split was added to the legacy fallback only
-            # (#gap found 2026-08-27), so it was inert in production: the board
-            # a live lens exists for showed Games/Season/Week/Source all Saturday.
-            {"label": "Live", "value": str(phases["live"])},
-            {"label": "Final", "value": str(phases["final"])},
-            {"label": "Pregame", "value": str(phases["pregame"])},
-            {"label": "Season", "value": str(season)},
-            {"label": "Week", "value": str(resolved_week)},
-            {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else LEGACY_ENGINE_SOURCE_LABEL},
-        ],
+        header_stats=slate_stats,
         module_links=build_module_links(resolved_week, "Live Lens", season=season),
         warning_panel=warning_panel,
+        summary_panel=summary_panel,
         source_date_display=f"{season} Week {resolved_week}",
         control_label="Week",
         control_type="number",
