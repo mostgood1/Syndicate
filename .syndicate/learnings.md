@@ -3833,3 +3833,29 @@ not a failure of the input.
 the true gap is wider than +0.914 and "as good as the market" is NOT
 established. The bias removal is IN-SAMPLE. The rating source differs from the
 re-fit's SP+, so this is not the identical configuration.
+
+### 2026-08-27 — PRE-REGISTERED PREDICTION CONFIRMED: raw pace OVER-CORRECTS the totals bias by ~35-56%
+
+The prediction was written into the entry above BEFORE this ran. Measured with
+ratings HELD NEUTRAL (n=300, 40 sims, paired seeds) so the contrast is pace and
+nothing else, and needing no CFBD call:
+
+    mean total, pace OFF (hardcoded 24.0s)  50.20
+    mean total, pace ON  (real, mean 26.25) 43.18
+    MEAN SHIFT   -7.02 pts (-14.0%)   sd 4.41   min -22.33  max +7.00
+    17/300 games where pace RAISED the total
+
+**Rule: a mechanism that is the RIGHT SIGN and the RIGHT ORDER OF MAGNITUDE is
+still not shippable alone -- check whether it OVERSHOOTS.** Pace covers 135% of
+the -5.21 point bias by raw comparison, or ~156% scaling the 14.0% shift onto
+the engine's real 58.11 mean. Enabling it by itself would flip NCAAF totals
+from ~5.2 too HIGH to ~2-3 too LOW. The calibration profile was fitted with
+`pace_index` pinned at +0.4, so the scoring rates absorbed the pace error;
+correcting one without re-fitting the other just moves the bias across zero.
+
+That the shift is NOT uniform (17/300 games get faster) is the check that this
+is real per-team signal and not a constant offset dressed up as a feature.
+
+BOUND: neutral ratings put absolute totals (50.20/43.18) below the engine's
+real 58.11, so the PERCENTAGE transfers more reliably than the point shift.
+Both framings are given above rather than the flattering one.
