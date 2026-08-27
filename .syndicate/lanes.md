@@ -2046,6 +2046,64 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `deploys.md`; full working block: `lanes_history.md`.
 - Blocked by: none.
 
+### portfolio-top-date-filter — OPEN — opened 2026-08-27 — session 39eeef04
+- Goal: `/portfolio` carries a date filter at the top of the page, in the shape
+  the paper page's date control already has (label, back/forward arrows, a
+  `type=date` input, a reset), driving the EXISTING opt-in `?on=` slate filter.
+  `[user 2026-08-27]`
+- Files: `syndicate/templates/portfolio.html`,
+  `syndicate/blueprints/intelligence.py` (`_live_portfolio_payload` and its
+  helpers only), `tests/test_portfolio_live_page.py`.
+- **CLAIM OVERLAP TAKEN DELIBERATELY, AND IT WAS ALREADY VIOLATED BEFORE THIS
+  LANE EXISTED.** `check_lane_invariants.py` reports both files contested; TWO
+  OPEN lanes already named them -- `open-bet-live-status` (2026-08-26) and
+  `portfolio-decision-and-execution` (2026-08-22) -- so the file was incoherent
+  on this point before today, which is what the session-start digest means by
+  LEDGER INCOHERENT. Neither is HELD: `grep -l` for either slug matches NONE of
+  the 42 `.current-lane.*` markers nor the retired ones, and the session whose
+  goal matches `open-bet-live-status` word for word ("Portfolio page
+  consolidation", `local_f08f0df5`) reads `isArchived: true, isRunning: false`,
+  last activity 2026-08-27T21:51Z via `list_sessions(include_archived=true)`;
+  `9324a3e5-364e-...` is absent from the roster entirely. Both RUNNING sessions
+  hold EMPTY markers, so neither claims a lane at all. Orphaned, not held -- the
+  same shape the 2026-08-17 sweep confirmed for `live-gameline-eval`. **This
+  lane does NOT close either of them** (that is their owners' call, and closing
+  another lane to make a check pass is how a claim silently stops being
+  enforced); it yields to whichever comes back.
+- **THIS BLOCK WAS LOST ONCE AND IS A RE-APPLICATION.** It was written at
+  ~22:1xZ and was gone by ~22:4xZ: `5a2c3666` ("checkpoint: session de363735")
+  landed in the SHARED primary tree mid-session and `lanes.md` came back with
+  no diff and no status entry at all. The code changes, being in files that
+  commit did not carry, survived untouched. Same lesson as this file's own
+  2026-08-27T17:1xZ entry for `open-bet-live-status` -- an uncommitted ledger
+  write is not a ledger write -- so this one is committed on sight.
+- Hypothesis: n/a (feature work, not diagnostic).
+- Falsification test: n/a.
+- Verification: **DONE, measured against a SERVED page, not the test client
+  alone.** A dev server on 127.0.0.1:5059 with four live orders injected across
+  three slate dates (2026-08-27 x2, 08-25, 08-24), screenshotted in three
+  states: (a) `/portfolio` -- input renders EMPTY, forward arrow dead, all four
+  orders present, header still reads "across all dates"; (b) `?on=2026-08-25` --
+  input shows 08/25/2026, BOTH arrows are real links (`on=2026-08-24` older,
+  `on=2026-08-27` newer), an "all dates" reset appears, header reads "filtered
+  to the 2026-08-25 slate"; (c) `?on=2026-08-14` -- a slate with no rows reads
+  "No live positions on 2026-08-14. The book is not empty", NOT the all-dates
+  sentence. 81 passed across `test_portfolio_live_page.py` +
+  `test_open_bet_live_status.py`, 209 across four adjacent execution suites.
+- **`off != on` PROVEN MECHANICALLY, not assumed:** none of the strings the 13
+  new tests assert on exist at HEAD -- `git show HEAD:` for both files reports
+  `live-datefilter` absent, `The book is not empty` absent, `_live_date_nav`
+  absent, `book_count` absent -- and `venue, across all dates` was
+  UNCONDITIONAL, so the filtered leg of the header test could not have passed.
+- **ONE PRE-EXISTING DEFECT FIXED IN PASSING.** The empty state printed "No live
+  positions have ever been placed" -- a claim about every live order ever --
+  over a `?on=` filtered view. It was already reachable by hand-typing the
+  parameter; a picker at the top of the page makes it routine, so it is fixed
+  here rather than deferred. `book_count` is new on the payload so the message
+  can say how many orders the book actually holds.
+- Blocked by: none. NOT deployed and no claim taken -- web-only template and
+  route code, and `render.yaml` is untouched.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

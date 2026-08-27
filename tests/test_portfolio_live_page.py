@@ -205,6 +205,167 @@ def test_yesterdays_open_position_is_still_shown(live_env):
 
 
 # --------------------------------------------------------------------------
+# THE SLATE FILTER AT THE TOP OF THE PAGE. [user 2026-08-27] "Add a date filter
+# to the top of the portfolio page similar to the one on the paper page."
+#
+# The control is new; `?on=` is not. Everything below is about the property
+# that made `?on=` opt-in in the first place -- this book is all-dates by
+# construction, and moving the picker to the top of the page must not turn it
+# into a page that defaults to hiding yesterday's open bet.
+# --------------------------------------------------------------------------
+
+
+def test_the_date_control_is_on_the_page(app_client, live_env):
+    """REACHABILITY BEFORE CORRECTNESS, per this repo's own standard."""
+    live_env["orders"] = [_order()]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'class="live-datefilter__input"' in body
+    assert 'aria-label="Filter to one slate date"' in body
+
+
+def test_the_control_writes_on_not_date(app_client, live_env):
+    """The two parameters are not interchangeable and only one of them filters.
+
+    `?date=` defaults to today and merely builds links; `?on=` is the opt-in
+    filter. An input bound to `?date=` would look like a filter and do nothing,
+    which is worse than having no control at all.
+    """
+    live_env["orders"] = [_order()]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    control = body[body.index('class="live-datefilter__input"'):][:400]
+    assert 'name="on"' in control
+
+
+def test_the_control_opens_empty_and_hides_nothing(app_client, live_env):
+    """THE GUARANTEE. With no query string the input must carry no value and
+    every date's orders must render -- a date control that defaulted to today
+    is exactly the page `?on=` was made opt-in to avoid."""
+    live_env["orders"] = [
+        _order(selected_date=DATE, player_name="Today Guard"),
+        _order(idempotency_key="k-live-2", position_key="pos-2",
+               selected_date="2026-08-21", player_name="Older Guard"),
+    ]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    control = body[body.index('class="live-datefilter__input"'):][:400]
+    assert 'value=""' in control
+    assert "Today Guard" in body and "Older Guard" in body
+
+
+def test_picking_a_date_filters_and_says_what_it_is_holding_back(app_client, live_env):
+    live_env["orders"] = [
+        _order(selected_date=DATE, player_name="Today Guard"),
+        _order(idempotency_key="k-live-2", position_key="pos-2",
+               selected_date="2026-08-21", player_name="Older Guard"),
+    ]
+    body = app_client.get(f"/portfolio?on={DATE}").get_data(as_text=True)
+    assert "Today Guard" in body
+    assert "Older Guard" not in body
+    # The count is the guarantee: you cannot lose sight of a live bet without
+    # the page telling you it is holding one back.
+    assert "1 open position(s) on other dates are hidden" in body
+
+
+def test_the_filter_offers_a_way_back_to_all_dates(app_client, live_env):
+    live_env["orders"] = [_order()]
+    body = app_client.get(f"/portfolio?on={DATE}").get_data(as_text=True)
+    assert 'class="live-datefilter__all"' in body
+
+
+def test_the_control_does_not_drop_the_show_all_toggle(app_client, live_env):
+    """A GET form REPLACES the query string rather than merging into it, so the
+    other parameters have to be carried as hidden fields. Without them, picking
+    a date would silently undo the reader's `?show=all`."""
+    live_env["orders"] = [_order()]
+    body = app_client.get("/portfolio?show=all").get_data(as_text=True)
+    form = body[body.index('class="live-datefilter__form"'):][:600]
+    assert '<input type="hidden" name="show" value="all">' in form
+
+
+def test_the_arrows_step_between_slates_that_exist(live_env):
+    """Not plus/minus one calendar day. This book is sparse -- a live order
+    exists only on a day somebody traded -- so a calendar arrow would spend
+    most of its clicks on empty slates and read as a broken control."""
+    live_env["orders"] = [
+        _order(selected_date="2026-08-23"),
+        _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-19"),
+        _order(idempotency_key="k-3", position_key="p-3", selected_date="2026-08-12"),
+    ]
+    payload = intelligence_bp._live_portfolio_payload(DATE, on_date="2026-08-19")
+    assert payload["on_prev_date"] == "2026-08-12"   # older
+    assert payload["on_next_date"] == "2026-08-23"   # newer
+
+
+def test_the_ends_of_the_sequence_have_no_arrow(live_env):
+    live_env["orders"] = [
+        _order(selected_date="2026-08-23"),
+        _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-19"),
+    ]
+    newest = intelligence_bp._live_portfolio_payload(DATE, on_date="2026-08-23")
+    assert newest["on_next_date"] is None
+    oldest = intelligence_bp._live_portfolio_payload(DATE, on_date="2026-08-19")
+    assert oldest["on_prev_date"] is None
+
+
+def test_unfiltered_has_no_forward_arrow_and_enters_at_the_newest_slate(live_env):
+    """Unfiltered is not a position in the sequence, so there is nothing to
+    step forward to."""
+    live_env["orders"] = [
+        _order(selected_date="2026-08-23"),
+        _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-19"),
+    ]
+    payload = _payload(live_env)
+    assert payload["on_next_date"] is None
+    assert payload["on_prev_date"] == "2026-08-23"
+
+
+def test_the_back_arrow_does_not_call_the_newest_slate_an_older_one(app_client, live_env):
+    """The arrow does two different things and must not claim to do one.
+
+    From all dates it ENTERS the filter at the newest slate; from a slate it
+    steps one older. A single "Older slate" tooltip was live briefly and named
+    today's date as older than nothing.
+    """
+    live_env["orders"] = [_order(selected_date="2026-08-23"),
+                          _order(idempotency_key="k-2", position_key="p-2",
+                                 selected_date="2026-08-19")]
+    unfiltered = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'title="Filter to the newest slate (2026-08-23)"' in unfiltered
+    filtered = app_client.get("/portfolio?on=2026-08-23").get_data(as_text=True)
+    assert 'title="Older slate (2026-08-19)"' in filtered
+
+
+def test_an_empty_slate_is_not_reported_as_an_empty_book(app_client, live_env):
+    """The defect the control makes one click away.
+
+    "No live positions have ever been placed" is a claim about every live order
+    ever placed. Rendered over a one-slate view it is the page telling the
+    reader the book is empty while it holds orders. Reachable before this change
+    by hand-typing `?on=`; a picker at the top of the page makes it routine.
+    """
+    live_env["orders"] = [_order(selected_date="2026-08-21")]
+    body = app_client.get("/portfolio?on=2026-08-14").get_data(as_text=True)
+    assert "No live positions have ever been placed" not in body
+    assert "No live positions on" in body
+    assert "The book is not empty" in body
+
+
+def test_a_genuinely_empty_book_still_says_so_under_a_filter(app_client, live_env):
+    """The opposite error: the softer sentence must not paper over a book that
+    really has nothing in it."""
+    body = app_client.get("/portfolio?on=2026-08-14").get_data(as_text=True)
+    assert "No live positions have ever been placed" in body
+
+
+def test_the_header_stops_claiming_all_dates_while_filtered(app_client, live_env):
+    live_env["orders"] = [_order()]
+    unfiltered = app_client.get("/portfolio").get_data(as_text=True)
+    assert "across all dates" in unfiltered
+    filtered = app_client.get(f"/portfolio?on={DATE}").get_data(as_text=True)
+    assert "across all dates" not in filtered
+    assert f"filtered to the {DATE} slate" in filtered
+
+
+# --------------------------------------------------------------------------
 # The arming badge is DERIVED, never a label
 # --------------------------------------------------------------------------
 

@@ -118,6 +118,23 @@
   .live-banner__links { margin-left: auto; font-size: 11px; }
   .live-banner__links a { color: var(--cards-accent); text-decoration: none; }
 
+  /* The slate filter, sitting in the banner where the paper page puts its own
+     date control [user 2026-08-27]. Same shape on purpose: these two pages are
+     read one after the other and a control that moves between them costs a
+     second of hunting every time. */
+  .live-datefilter { margin-left: auto; }
+  .live-datefilter__form { display: inline; margin: 0; }
+  .live-datefilter__input {
+    font: inherit; font-size: 11px; padding: 1px 4px; border-radius: 4px;
+    border: 1px solid var(--cards-line); color-scheme: dark;
+    background: var(--cards-surface); color: var(--cards-text);
+  }
+  .live-datefilter__arrow { color: var(--cards-accent); text-decoration: none; font-size: 10px; padding: 0 2px; }
+  /* Dead arrows stay in the layout rather than disappearing: a control whose
+     buttons come and go makes the reader re-find it on every reload. */
+  .live-datefilter__arrow--off { color: var(--cards-text-dim); opacity: .35; }
+  .live-datefilter__all { font-size: 10px; color: var(--cards-accent); text-decoration: none; }
+
   .live-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
   .live-tile { border: 1px solid var(--cards-line); border-radius: 10px; padding: 8px 10px; background: var(--cards-surface); }
   .live-tile__label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--cards-text-dim); }
@@ -521,6 +538,10 @@
    empty value -- which is the URL a user pasted back on 2026-08-26 asking for
    this merge. An undefined in Jinja renders as nothing and raises nothing. #}
 {% set qs_date = L.date or '' %}
+{# Everything the slate filter must NOT reset when it navigates. `?date=` only
+   builds links and `?show=` is the hidden-orders toggle; a date control that
+   dropped either would silently undo the reader's other choices. #}
+{% set qs_keep = 'date=' ~ qs_date ~ ('&show=all' if L.show_all else '') %}
 
 <main class="portfolio-page">
 
@@ -531,7 +552,8 @@
 
   <div class="portfolio-band">
     <h2 id="live">Live book</h2>
-    <span class="portfolio-band__note">Real submissions to a real venue, across all dates.</span>
+    <span class="portfolio-band__note">Real submissions to a real venue,
+      {% if L.on_date %}filtered to the {{ L.on_date }} slate{% else %}across all dates{% endif %}.</span>
     <span class="portfolio-band__links">
       <a href="/portfolio/paper">Paper portfolio</a> ·
       <a href="/api/portfolio/live">Live JSON</a>
@@ -581,6 +603,55 @@
       {% else %}
         <span class="live-flag__value bad" title="The worker has not reported. These are the WEB service's own settings, which are not what places orders.">web env (worker silent)</span>
       {% endif %}</span>
+    {# ---------------------------------------------------------------
+       THE SLATE FILTER, AT THE TOP OF THE PAGE [user 2026-08-27], in the
+       shape the paper page's date control already has.
+
+       IT WRITES `?on=`, NOT `?date=`. Those are two different parameters and
+       the difference is the whole safety property of this page: `?date=`
+       defaults to today and only builds links, while `?on=` is opt-in and is
+       the only thing that actually hides rows. A date input bound to `?date=`
+       would look like it filtered and quietly do nothing.
+
+       AND IT IS EMPTY UNLESS THE READER FILLED IT. The book is all-dates by
+       construction because "a page that hides yesterday's open bet behind a
+       date picker is a page that will one day let one expire unwatched" --
+       putting the picker at the top does not change that, so the input opens
+       blank, clearing it returns to every date, and the count of OPEN
+       positions being held back is still stated below whenever it is on.
+       --------------------------------------------------------------- #}
+    <span class="live-flag live-datefilter">
+      <span class="live-flag__label">Date</span>
+      {% if L.on_prev_date %}
+        {# UNFILTERED IS NOT "THE NEWEST SLATE", so the back arrow does not
+           mean the same thing in both states and must not claim to. From all
+           dates it ENTERS the filter; from a slate it steps one older. #}
+        {% set back_label = 'Older slate' if L.on_date else 'Filter to the newest slate' %}
+        <a class="live-datefilter__arrow" href="?{{ qs_keep }}&on={{ L.on_prev_date }}#live"
+           title="{{ back_label }} ({{ L.on_prev_date }})" aria-label="{{ back_label }}">&#9664;</a>
+      {% else %}
+        <span class="live-datefilter__arrow live-datefilter__arrow--off" aria-hidden="true">&#9664;</span>
+      {% endif %}
+      <form class="live-datefilter__form" method="get" action="/portfolio">
+        {# Carried as hidden fields because a GET form REPLACES the query
+           string rather than merging into it -- without these, picking a date
+           would silently drop the reader's `?show=all`. #}
+        <input type="hidden" name="date" value="{{ qs_date }}">
+        {% if L.show_all %}<input type="hidden" name="show" value="all">{% endif %}
+        <input class="live-datefilter__input" type="date" name="on" value="{{ L.on_date or '' }}"
+               max="{{ L.today_date }}" onchange="this.form.submit()"
+               aria-label="Filter to one slate date">
+      </form>
+      {% if L.on_next_date %}
+        <a class="live-datefilter__arrow" href="?{{ qs_keep }}&on={{ L.on_next_date }}#live"
+           title="Newer slate ({{ L.on_next_date }})" aria-label="Newer slate">&#9654;</a>
+      {% else %}
+        <span class="live-datefilter__arrow live-datefilter__arrow--off" aria-hidden="true">&#9654;</span>
+      {% endif %}
+      {% if L.on_date %}
+        <a class="live-datefilter__all" href="?{{ qs_keep }}#live">all dates</a>
+      {% endif %}
+    </span>
   </div>
 
   {% if L.state_source != 'worker' %}
@@ -956,7 +1027,7 @@
     <div class="live-dates">
       <span class="live-dates__label">Slate</span>
       {% if L.on_date %}
-        <a href="?date={{ qs_date }}{% if L.show_all %}&amp;show=all{% endif %}#live">All dates</a>
+        <a href="?{{ qs_keep }}#live">All dates</a>
       {% else %}
         <span class="is-active">All dates</span>
       {% endif %}
@@ -964,7 +1035,7 @@
         {% if d == L.on_date %}
           <span class="is-active">{{ d }}</span>
         {% else %}
-          <a href="?date={{ qs_date }}{% if L.show_all %}&amp;show=all{% endif %}&amp;on={{ d }}#live">{{ d }}</a>
+          <a href="?{{ qs_keep }}&on={{ d }}#live">{{ d }}</a>
         {% endif %}
       {% endfor %}
     </div>
@@ -980,6 +1051,16 @@
     <div class="live-empty">
       {% if L.ledger_error %}
         Cannot read the ledger — see above. This page is not claiming there are no positions.
+      {% elif L.on_date and L.book_count %}
+        {# THE FILTER'S EMPTY IS NOT THE BOOK'S EMPTY. This branch is new
+           because the sentence below is a claim about every live order ever
+           placed, and rendering it over a one-slate view would have the page
+           telling the reader the book is empty while it holds {{ L.book_count }}
+           orders. It was already reachable by hand-typing `?on=`; a date
+           control at the top of the page makes it one click. #}
+        No live positions on <strong>{{ L.on_date }}</strong>. The book is not empty —
+        it holds {{ L.book_count }} order(s) on other dates.
+        <a href="?{{ qs_keep }}#live">Show all dates</a>.
       {% else %}
         No live positions have ever been placed.
       {% endif %}

@@ -4145,6 +4145,17 @@ def _live_portfolio_payload(
         "on_date": on_date or None,
         "hidden_open_dated": len(hidden_open_dated),
         "date_options": date_options,
+        # HOW BIG THE BOOK IS BEFORE ANY DISPLAY FILTER TOUCHES IT. The empty
+        # state needs it: "no live positions on this slate" and "no live
+        # position has ever been placed" are different sentences, and with a
+        # date control at the top of the page the first one is now reachable
+        # in one click. Printing the second over a filtered view would be the
+        # page telling the reader the book is empty when it is not.
+        "book_count": len(whole_book),
+        # The arrows and the reset for that control. Computed here, not in
+        # Jinja, for the reason `_paper_date_nav` gives: date arithmetic in a
+        # template is where off-by-one-day bugs live.
+        **_live_date_nav(date_options, on_date),
         "periods": periods,
         "health": _live_health(payload_state),
         "stale_after_seconds": _STATE_STALE_SECONDS,
@@ -4156,6 +4167,37 @@ def _live_portfolio_payload(
         "resting": resting,
         **payload_state,
     }
+
+
+def _live_date_nav(date_options: list, on_date: str | None) -> dict[str, Any]:
+    """Arrows that step between slates THAT EXIST, not between calendar days.
+
+    `_paper_date_nav` walks the calendar because the paper page's plan artifact
+    is written every day whether or not anything was committed, so `date - 1`
+    always names a real page. This book is SPARSE -- a live order exists only on
+    a day somebody actually traded -- so a plus/minus-one-day arrow would spend
+    most of its clicks landing on empty slates, which reads as a broken control.
+    Stepping through `date_options` means every arrow goes somewhere with rows.
+
+    UNFILTERED IS NOT A POSITION IN THE SEQUENCE, so there is nothing to step
+    from: back enters the filter at the newest slate, forward is dead. The
+    filter stays opt-in either way -- an arrow is a click, not a default, and
+    "never filtered unless asked" is the guarantee `?on=` exists to keep.
+    """
+    options = [str(d) for d in (date_options or []) if d]
+    nav = {"on_prev_date": options[0] if options else None, "on_next_date": None, "today_date": central_today_iso()}
+    if not on_date:
+        return nav
+    try:
+        # `date_options` is built newest-first, so "older" is the HIGHER index.
+        index = options.index(str(on_date))
+    except ValueError:
+        # A date the book has no rows on -- reachable by typing one into the
+        # input. It is not in the sequence, so it gets the unfiltered arrows.
+        return nav
+    nav["on_prev_date"] = options[index + 1] if index + 1 < len(options) else None
+    nav["on_next_date"] = options[index - 1] if index > 0 else None
+    return nav
 
 
 def _seconds_since(stamp: Any) -> int | None:
