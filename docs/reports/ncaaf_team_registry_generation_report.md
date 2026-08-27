@@ -4,7 +4,7 @@
 
 Season: 2026
 Generated: yes
-Snapshot output: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\ncaaf_source\source_artifacts\data\processed\team_registry\ncaaf_team_registry_snapshot.csv
+Snapshot output: C:\tmp\syndicate-sessions\ncaaf-opener-regions-props\data\ncaaf_source\source_artifacts\data\processed\team_registry\ncaaf_team_registry_snapshot.csv
 Source system: cfbd
 Source snapshot date: 
 

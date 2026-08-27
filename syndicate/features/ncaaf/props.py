@@ -15,7 +15,7 @@ WHY THE ROWS GO WHERE THEY GO.
 `{"away": [...], "home": [...]}` and derives each row's heading from the LIST
 IT IS IN, not from anything on the row. So a misattributed player renders under
 the wrong team's heading with no way for the reader to tell. That is why
-`attribute_players` drops what it cannot resolve rather than guessing a side.
+`_side_for_player` drops what it cannot resolve rather than guessing a side.
 
 THE ATTRIBUTION PROBLEM, measured.
 OddsAPI's per-event prop payload carries NO team on a player outcome -- the
@@ -24,19 +24,29 @@ snapshot joined through the team registry. Measured on the real 2026 wk1
 openers, 2026-08-26: **68 of 68 distinct players resolved to exactly one
 side, 0 misses, 0 ambiguous**.
 
-That number will fall during the season and the reason is worth stating: the
-committed roster snapshot is stamped **season 2025** (the 2026 build produced
-"Publishable rows: 0" -- see
-`.syndicate/findings_2026-08-26_ncaaf_opener_readiness.md` §3), so true
-freshmen and 2026 transfers are not in it. 100% today is a fact about week 1
-rosters overlapping last year's, not a guarantee. `build_game_props` returns
-its own miss count so a caller can log the erosion instead of discovering it
-as a quietly shrinking props panel.
+**CORRECTED 2026-08-27.** An earlier version of this note said the roster
+snapshot was stuck on season 2025 because the 2026 build "produced Publishable
+rows: 0". That was a misreading of a STALE REPORT dated 2026-08-01. Re-run
+against live CFBD: **15,496 rows across 138 teams, 0 validation issues**. The
+2026 roster, coach-continuity (138) and transfer (3,305) snapshots are now
+built and committed, and `_team_context` populates **102 of 102 team slots**
+on the served board. The builder was never broken; the report simply predated
+CFBD publishing 2026 rosters and was never regenerated.
+
+The roster file is season-ACCUMULATING (`_merge_season_aware_rows` keeps prior
+seasons), so it now holds 44,395 rows across 2025 and 2026. That is why
+`_team_ids_by_player` prefers the requested season: without the preference a
+transfer looks like a player on two teams, and this module drops ambiguity
+rather than guessing a side -- which would silently delete transfers from the
+panel, the population most likely to be quoted in week 1.
+`build_game_props` still returns its own drop counts so erosion is visible as a
+number rather than as a quietly shrinking panel.
 """
 from __future__ import annotations
 
 import csv
 import re
+import unicodedata
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -56,7 +66,21 @@ _NON_ALNUM_RE = re.compile(r"[^a-z0-9 ]+")
 
 
 def _norm(value: Any) -> str:
-    text = str(value or "").strip().lower().replace("&", " and ")
+    """Normalise a team or player name for joining.
+
+    ACCENTS ARE FOLDED, NOT STRIPPED, and that is the whole point of the
+    `unicodedata` line. Measured on the 2026 week 1 slate: the team registry
+    stores `San José State`, the board sends `San Jose State`, and OddsAPI
+    sends `San José State Spartans`. Deleting the accented character as
+    non-alphanumeric turns the registry form into `san jos state` while the
+    board form stays `san jose state` -- they stop matching, and San José
+    State's entire props panel disappears with no error anywhere. Decomposing
+    to `e` + combining acute and dropping the mark maps all three to
+    `san jose state`.
+    """
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.strip().lower().replace("&", " and ")
     text = _NON_ALNUM_RE.sub(" ", text)
     return _SPACE_RE.sub(" ", text).strip()
 
@@ -71,6 +95,33 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         return []
 
 
+def _checkout_processed_path(*parts: str) -> Path:
+    """The REPO CHECKOUT copy, which is what `cards.py` reads.
+
+    `cards.py::_processed_artifact_path` resolves these four snapshots from
+    `parents[3]/data/ncaaf_source/...` -- the checkout -- while
+    `sources.*_snapshot_path()` resolves them from
+    `SYNDICATE_NCAAF_SOURCE_ROOT`, the mounted disk. On Render those are
+    DIFFERENT FILES with different vintages: the checkout is replaced by every
+    web deploy, but the boot sync onto the mounted disk is SEED-ONLY, so a disk
+    copy that already exists is never overwritten.
+
+    That split is why this is tried as a fallback. If props attribution read
+    only the mounted disk it could resolve players against a roster years older
+    than the one the card beside it is displaying, and the symptom would be a
+    thinning props panel with no error anywhere.
+    """
+    return Path(__file__).resolve().parents[3] / "data" / "ncaaf_source" / "source_artifacts" / "data" / "processed" / Path(*parts)
+
+
+def _read_snapshot(primary: Path, *checkout_parts: str) -> list[dict[str, str]]:
+    """Mounted-disk copy first, then the checkout copy, then empty."""
+    rows = _read_csv(primary)
+    if rows:
+        return rows
+    return _read_csv(_checkout_processed_path(*checkout_parts))
+
+
 def _team_registry_rows() -> list[dict[str, str]]:
     """The team registry, under EITHER of the two names it ships under.
 
@@ -82,10 +133,16 @@ def _team_registry_rows() -> list[dict[str, str]]:
     carries only the other -- and an empty registry produces an empty props
     panel, not an error. Cost of tolerating both: one extra `exists()`.
     """
-    rows = _read_csv(team_registry_snapshot_path())
-    if rows:
-        return rows
-    return _read_csv(team_registry_snapshot_path().with_name("ncaaf_team_registry.csv"))
+    for candidate in (
+        team_registry_snapshot_path(),
+        team_registry_snapshot_path().with_name("ncaaf_team_registry.csv"),
+        _checkout_processed_path("team_registry", "ncaaf_team_registry_snapshot.csv"),
+        _checkout_processed_path("team_registry", "ncaaf_team_registry.csv"),
+    ):
+        rows = _read_csv(candidate)
+        if rows:
+            return rows
+    return []
 
 
 @lru_cache(maxsize=1)
@@ -161,18 +218,40 @@ def _resolve_team_id(name: str) -> str | None:
     return None
 
 
-@lru_cache(maxsize=1)
-def _team_ids_by_player() -> dict[str, frozenset[str]]:
-    index: dict[str, set[str]] = defaultdict(set)
-    for row in _read_csv(roster_snapshot_path()):
+@lru_cache(maxsize=8)
+def _team_ids_by_player(season: int) -> dict[str, frozenset[str]]:
+    """player -> the team ids they are rostered on, CURRENT SEASON PREFERRED.
+
+    The roster snapshot is season-accumulating: `_merge_season_aware_rows`
+    keeps every prior season in the same file, so after the 2026 build it
+    holds 44,395 rows across 2025 AND 2026. Indexing all of them without
+    preference makes a transfer look like a player on two teams, and this
+    module drops ambiguity rather than guessing a side -- so a naive index
+    would silently delete transfers from the props panel, which is precisely
+    the population most likely to be quoted in week 1.
+
+    So: if a player has any row for the requested season, ONLY those rows
+    count. Players with no current-season row fall back to whatever seasons
+    exist, which keeps a late-arriving roster from blanking the panel.
+    """
+    current: dict[str, set[str]] = defaultdict(set)
+    fallback: dict[str, set[str]] = defaultdict(set)
+    for row in _read_snapshot(roster_snapshot_path(), "roster", "ncaaf_roster_snapshot.csv"):
         player = _norm(row.get("player_name"))
         team_id = str(row.get("team_id") or "").strip()
-        if player and team_id:
-            index[player].add(team_id)
-    return {player: frozenset(team_ids) for player, team_ids in index.items()}
+        if not player or not team_id:
+            continue
+        if str(row.get("season") or "").strip() == str(int(season)):
+            current[player].add(team_id)
+        else:
+            fallback[player].add(team_id)
+    merged = {player: frozenset(ids) for player, ids in current.items()}
+    for player, ids in fallback.items():
+        merged.setdefault(player, frozenset(ids))
+    return merged
 
 
-def _side_for_player(player: str, *, home: str, away: str) -> str | None:
+def _side_for_player(player: str, *, home: str, away: str, season: int) -> str | None:
     """"home", "away", or None when the roster cannot place this player.
 
     None on BOTH no-match and ambiguous-match. An ambiguous player (on the
@@ -180,7 +259,7 @@ def _side_for_player(player: str, *, home: str, away: str) -> str | None:
     case where a guess renders under the wrong heading, so it is dropped for
     the same reason a miss is.
     """
-    team_ids = _team_ids_by_player().get(_norm(player))
+    team_ids = _team_ids_by_player(int(season)).get(_norm(player))
     if not team_ids:
         return None
     # Compare TEAM IDS, never names. Name comparison is what put an NC State
@@ -252,6 +331,7 @@ def build_game_props(
     *,
     home_team: str,
     away_team: str,
+    season: int = 0,
     bettable_only: bool = True,
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, int]]:
     """One game's captured rows -> the contract's away/home prop lists.
@@ -304,7 +384,7 @@ def build_game_props(
     sides: dict[str, list[dict[str, Any]]] = {"away": [], "home": []}
     dropped_unattributed: set[str] = set()
     for record in by_selection.values():
-        side = _side_for_player(record["player"], home=home_team, away=away_team)
+        side = _side_for_player(record["player"], home=home_team, away=away_team, season=season)
         if side is None:
             dropped_unattributed.add(record["player"])
             continue
@@ -427,7 +507,7 @@ def prop_recommendations_for_game(*, season: int, week: int, home_team: str, awa
     rows = _find_captured_game(_rows_by_game(int(season), int(week)), home_team=home_team, away_team=away_team)
     if not rows:
         return {}
-    sides, _diagnostics = build_game_props(rows, home_team=home_team, away_team=away_team)
+    sides, _diagnostics = build_game_props(rows, home_team=home_team, away_team=away_team, season=int(season))
     if not sides["away"] and not sides["home"]:
         return {}
     return sides
