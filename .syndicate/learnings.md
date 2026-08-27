@@ -4560,7 +4560,11 @@ MIS-CREDIT.** MLB's slate approaching first pitch made its markets the
 freshest in the catalogue, and the staleness-ordered remainder pass handed
 them the slots — staleness accidentally doing what demand weighting does
 deliberately. That mechanism is DIURNAL, so **the collapse is expected to
-recur tomorrow afternoon** when far-dated football is fresh and MLB is not.
+RECUR TOMORROW MORNING** — corrected from "afternoon", which was wrong.
+MAPPED TO CENTRAL, today's collapse was MORNING/MIDDAY and the recovery came
+in the AFTERNOON: 09:19-13:57 CT matched 5-27 (spiking 146/210/99), then
+14:49 CT matched=208, 15:25 218, 15:51 221. So the bad window is roughly
+09:00-14:00 CT, when far-dated football is fresh and MLB is not.
 Believing it was already fixed would have meant not deploying the thing that
 actually prevents recurrence.
 

@@ -5998,8 +5998,15 @@ Production effect is UNOBSERVED. Lane `board-cycle-overview-throughput`.
   markets churn, become the freshest in the catalogue, and the staleness-ordered
   remainder pass hands them the slots. Staleness ACCIDENTALLY doing what demand
   weighting does deliberately.
-  **SO THE COLLAPSE IS EXPECTED TO RECUR** tomorrow afternoon, when far-dated
-  football is fresh and MLB is not. Demand weighting is what stops the
+  **SO THE COLLAPSE IS EXPECTED TO RECUR TOMORROW MORNING** — corrected from
+  "afternoon", which was wrong. In CENTRAL time today's collapse ran roughly
+  09:00-14:00 CT (matched 5-27, spiking 146/210/99) and the recovery landed at
+  14:49 CT (208 -> 218 -> 221). The bad window is the MORNING.
+  **AND OBSERVING THE RECURRENCE IS NOT A PRECONDITION FOR ANYTHING.** I framed
+  it as one. It would only confirm a prediction; the mechanism is understood
+  (`matched` tracks mlb slot count) and `f4beb1bc` is landed. Turning "I could
+  measure this" into "this must be measured first" is not a reason to carry a
+  known-fixed defect through the window. Demand weighting is what stops the
   RECURRENCE; it is not what fixed today. Their `f4beb1bc` (per-sport MAX over a
   6h/12-sample window) additionally fixes `_record_board_demand` overwriting on
   every join — the alternating 442/842-row future-date builds were dropping mlb
