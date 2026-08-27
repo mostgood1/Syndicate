@@ -440,6 +440,34 @@ def repair_multi_side_grades(*, dry_run: bool = False) -> dict[str, Any]:
             counters["cleared"] += 1
             changed = True
 
+    # BACKFILL A MISSING P&L, WITHOUT TOUCHING ANY OUTCOME.
+    #
+    # Rows graded before `_derived_pnl` existed kept an outcome and no number --
+    # `LOST —` on the board beside yesterday's fully-resolved lines, which is
+    # the inconsistency the user actually reported. Idempotency means the
+    # grading path will never revisit them, so the number has to be added here.
+    #
+    # This is STRICTLY ADDITIVE and cannot change a settled result: it only
+    # fills `pnl_dollars` where the field is absent, only on rows this module
+    # graded, and it derives the figure from the order's OWN fill -- a binary
+    # contract bought at $p settles at $1. An outcome is never read as anything
+    # but input.
+    for order in (state.get("orders") or []):
+        if str(order.get("mode") or "") != LIVE:
+            continue
+        if str(order.get("settled_by") or "") != "venue":
+            continue
+        outcome = str(order.get("outcome") or "")
+        if not outcome or order.get("pnl_dollars") is not None:
+            continue
+        derived = _derived_pnl(order, outcome)
+        if derived is None:
+            counters["pnl_backfill_refused"] = counters.get("pnl_backfill_refused", 0) + 1
+            continue
+        order["pnl_dollars"] = derived
+        counters["pnl_backfilled"] = counters.get("pnl_backfilled", 0) + 1
+        changed = True
+
     if changed and not dry_run:
         try:
             _persist(state)

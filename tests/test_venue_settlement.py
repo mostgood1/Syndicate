@@ -461,3 +461,36 @@ def test_the_repair_never_touches_paper(ledger):
         _order(idempotency_key="b", side="away", mode="paper", outcome="won", settled_by="venue"),
     ]
     assert vs.repair_multi_side_grades()["cleared"] == 0
+
+
+def test_a_missing_pnl_is_backfilled_without_touching_the_outcome(ledger):
+    """Rows graded before `_derived_pnl` existed kept an outcome and no number
+    -- `LOST —` on the board. Idempotency means the grading path will never
+    revisit them, so the repair adds the figure. Strictly additive: derived
+    from the order's OWN fill, and an outcome is only ever read."""
+    ledger["orders"] = [
+        _order(idempotency_key="a", side="away", outcome="lost", settled_by="venue",
+               fill_stake_dollars=3.41),
+        _order(idempotency_key="b", side="away", outcome="won", settled_by="venue",
+               fill_stake_dollars=4.0, fill_price=0.40),
+    ]
+    result = vs.repair_multi_side_grades()
+    assert result["pnl_backfilled"] == 2
+    assert ledger["orders"][0]["outcome"] == "lost"
+    assert ledger["orders"][0]["pnl_dollars"] == pytest.approx(-3.41)
+    assert ledger["orders"][1]["outcome"] == "won"
+    assert ledger["orders"][1]["pnl_dollars"] == pytest.approx(6.0)
+
+
+def test_the_backfill_never_overwrites_an_existing_pnl(ledger):
+    ledger["orders"] = [_order(side="away", outcome="lost", settled_by="venue",
+                               pnl_dollars=-99.0, fill_stake_dollars=3.41)]
+    vs.repair_multi_side_grades()
+    assert ledger["orders"][0]["pnl_dollars"] == -99.0
+
+
+def test_the_backfill_never_touches_an_inferred_row(ledger):
+    ledger["orders"] = [_order(side="away", outcome="lost", fill_stake_dollars=3.41)]
+    result = vs.repair_multi_side_grades()
+    assert result.get("pnl_backfilled", 0) == 0
+    assert ledger["orders"][0].get("pnl_dollars") is None
