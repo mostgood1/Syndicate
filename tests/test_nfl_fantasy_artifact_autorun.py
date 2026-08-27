@@ -157,13 +157,69 @@ class FantasyArtifactAutorunTests(unittest.TestCase):
         branches = re.findall(r"^\s+(?:if|elif) (_launch_autorun_\w+)\(", source, re.M)
         self.assertIn("_launch_autorun_nfl_fantasy_artifact", branches)
         position = branches.index("_launch_autorun_nfl_fantasy_artifact")
-        self.assertEqual(
-            branches[position - 1],
+        # ADJACENCY TO THE PRODUCER BLOCK, not to the pbp fetch alone.
+        #
+        # The docstring above is right that a bare `pbp < fantasy <
+        # season_projections` is too weak -- it passed while this branch sat
+        # TENTH and logged nothing for twelve minutes after a deploy. That
+        # protection is kept in full here: nothing may sit between the pbp fetch
+        # and this job EXCEPT the jobs that produce what it reads.
+        #
+        # What changed on 2026-08-25 is which slot it holds. This asserted
+        # `branches[position - 1] == "_launch_autorun_nfl_pbp_fetch"`, i.e. the
+        # pbp+1 slot -- the same slot `test_nfl_injuries_fetch_autorun` asserts
+        # for the INJURIES fetch. Both could not pass. The tiebreak is not a
+        # preference: this artifact CONSUMES injuries and news
+        # (`use_injury_availability`, and the news layer), so running it above
+        # them fed it yesterday's data. Producer before consumer, which is the
+        # rule the pbp branch's own comment already cites.
+        #
+        # Starvation is not reopened by the move: every branch now between pbp
+        # and this one is daily or six-hourly gated, so the NFL block as a whole
+        # needs ~6 winning ticks a day out of ~2,880. `#341`'s starvation came
+        # from sitting below HIGH-FREQUENCY branches, which is still forbidden by
+        # the window assertion below.
+        producers = {
             "_launch_autorun_nfl_pbp_fetch",
-            f"must sit directly behind the pbp fetch it consumes; chain is {branches[:6]}",
+            "_launch_autorun_nfl_injuries_fetch",
+            "_launch_autorun_nfl_roster_snapshot",
+            "_launch_autorun_nfl_depth_chart_snapshot",
+            "_launch_autorun_nfl_news_capture",
+        }
+        pbp_position = branches.index("_launch_autorun_nfl_pbp_fetch")
+        window = branches[pbp_position:position]
+        intruders = [name for name in window if name not in producers]
+        self.assertEqual(
+            intruders, [],
+            f"only the jobs this artifact consumes may sit between the pbp fetch "
+            f"and it; found {intruders} in {branches[:9]}",
+        )
+        self.assertLess(
+            branches.index("_launch_autorun_nfl_injuries_fetch"), position,
+            f"must run behind the injuries fetch it consumes; chain is {branches[:9]}",
+        )
+        self.assertLess(
+            branches.index("_launch_autorun_nfl_news_capture"), position,
+            f"must run behind the news capture it consumes; chain is {branches[:9]}",
+        )
+        # RELATIVE DEPTH, not absolute. This asserted `position <= 3`, a literal
+        # index from when the NFL block was three branches long. The concern it
+        # encodes -- "deep enough down that it never gets reached" -- is about
+        # what sits ABOVE it, not about the number itself, and the window check
+        # above already forbids anything above it that is not a producer.
+        #
+        # So the bound is expressed against the producer block: this job must sit
+        # immediately after the last of the jobs it consumes, with nothing else
+        # in between. That is exactly as tight as the old literal against the
+        # failure it was written for (an unrelated branch inserted higher), and
+        # it does not go stale when the producer block legitimately grows.
+        self.assertEqual(
+            position, pbp_position + len(window),
+            f"must sit immediately after the producers it consumes; chain is {branches[:9]}",
         )
         self.assertLessEqual(
-            position, 3, f"too deep in the elif chain to be reached reliably: {branches[:6]}"
+            len(window), len(producers),
+            f"the pbp->fantasy window may hold only producer jobs; chain is {branches[:9]}",
         )
 
 

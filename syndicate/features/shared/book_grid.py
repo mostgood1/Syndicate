@@ -37,6 +37,10 @@ from syndicate.features.shared.odds_book_quotes import (
     _line_value,
     market_sides_for_quote,
 )
+from syndicate.features.shared.book_shortlist import (
+    DIRECT_FEED_BOOKS,
+    is_direct_feed_book,
+)
 from syndicate.features.shared.opportunity_signals import consensus_vigged_price
 
 # The market instance, i.e. everything except which book quoted it and which
@@ -209,11 +213,48 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
     """
     freshest: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
     anchors: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
+    dropped_direct_feed = 0
+    # `#546`. WHICH SPELLINGS DID NOT MATCH. `is_direct_feed_book` compares
+    # `str(book).strip().lower()` against the frozenset EXACTLY -- no prefix, no
+    # separator folding -- so `polymarket_us`, `kalshi_us` or `Polymarket US`
+    # would sail straight through the filter that exists to stop them.
+    #
+    # Whether the aggregator ever uses such a spelling could not be answered
+    # from this repo: the git-tracked shards are a May/June MLB mirror carrying
+    # five books (draftkings, fanduel, betmgm, fanatics, williamhill_us) and
+    # neither venue at all, and no log line anywhere prints a book key. So this
+    # counts the NEAR MISSES instead of guessing -- a book whose name contains
+    # "kalshi" or "polymarket" that `is_direct_feed_book` nonetheless refused.
+    #
+    # DELIBERATELY A COUNTER, NOT A WIDER MATCH. Making the filter itself
+    # substring-based would silently swallow any future book whose name merely
+    # contains these strings, which is a worse failure than the one it fixes:
+    # it drops real prices with no way to notice. Measure first; widen the
+    # frozenset by NAME once a real spelling is observed.
+    direct_feed_near_misses: dict[str, int] = {}
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
             continue
         if _price(row.get("price")) is None:
             continue
+        # THE AGGREGATOR'S COPY OF A VENUE WE READ DIRECTLY (`[USER DECISION
+        # 2026-08-25]`). One venue must have ONE price source: the direct feed
+        # writes `bookmaker="kalshi"/"polymarket"` into `best` (and, on a live
+        # row, into `cells` and `consensus`), and an OddsAPI row under the same
+        # name puts a second, different number for the same venue into the same
+        # de-vig. Dropped HERE because this is the single point every shard row
+        # passes through on its way to becoming a grid cell.
+        #
+        # Counted, not silent: whether OddsAPI supplies these two at all was an
+        # open question when this was written, and a zero here answers it.
+        if is_direct_feed_book(row.get("bookmaker")):
+            dropped_direct_feed += 1
+            continue
+        _book_name = str(row.get("bookmaker") or "").strip().lower()
+        if _book_name and ("kalshi" in _book_name or "polymarket" in _book_name):
+            # Reached only when the exact match above already refused, so every
+            # key counted here is a spelling the filter is missing TODAY.
+            direct_feed_near_misses[_book_name] = direct_feed_near_misses.get(_book_name, 0) + 1
         instance = tuple(str(row.get(field) or "") for field in _INSTANCE_FIELDS)
         materialised = row if isinstance(row, dict) else dict(row)
         key = instance + (
@@ -227,6 +268,21 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
         anchor_key = instance + (str(_canonical_line(row)),)
         if anchor_key not in anchors:
             anchors[anchor_key] = (index, materialised)
+
+    if dropped_direct_feed or direct_feed_near_misses:
+        # print, not logger.info -- CLAUDE.md: logger.info does not reach
+        # Render's collector from this process.
+        #
+        # `near_misses` prints even when empty (whenever the line prints at all),
+        # because "the filter matches every spelling" and "this build never ran"
+        # must not look alike -- the same reason `#541`'s coverage line reports
+        # its zeroes.
+        print(
+            f"[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows={dropped_direct_feed} "
+            f"books={sorted(DIRECT_FEED_BOOKS)} "
+            f"near_misses={dict(sorted(direct_feed_near_misses.items()))}",
+            flush=True,
+        )
 
     # Union by original position: a row that is both an anchor and a freshest
     # cell must appear once, not twice, or the grid sees a duplicate quote.
@@ -662,15 +718,74 @@ def drop_superseded_lines(
         if current is None or float(seen) < current:
             freshest[key] = float(seen)
 
+    # `#569`: WHY a stale row SURVIVED, counted per reason. Log-only.
+    #
+    # Measured on the served board 2026-08-26: three rows classified
+    # `orphaned_line` by `layer2_shortlist._classify_stale_row` -- a fresher
+    # sibling line demonstrably existed -- and this guard did not drop them.
+    # It drops plenty (`count=1560 kept=946` on one MLB build), so the rule
+    # works; something about those three is different.
+    #
+    # NOT FIXED BY LOOSENING THE RULE ON A GUESS. This guard decides what the
+    # board SHOWS, the surviving cases number three, and the rows it correctly
+    # keeps number ~946 per build. A wrong loosening empties a board to fix a
+    # rounding error, which is the failure this module's own docstring warns
+    # about ("pruning on absence is how a capture hiccup would silently empty
+    # the board"). The counter names the gap first.
+    #
+    # The candidate gaps, and the counter distinguishes them:
+    #   no_seen_age          this row has no clock, so the rule cannot apply
+    #   no_group_sibling     nothing else in the GRID shares its market
+    #   sibling_no_seen_age  siblings exist, none carries a clock
+    #   within_lag           siblings are fresher but by less than the lag
+    # The classifier that found these reads the STATE FILE, which holds every
+    # key ever observed; this guard sees only rows present in THIS grid. If
+    # `no_group_sibling` dominates, that difference IS the hole.
+    survivor_reasons: dict[str, int] = {}
+    group_members: dict[tuple[str, ...], int] = {}
+    group_has_seen: dict[tuple[str, ...], int] = {}
+    for row in grid:
+        key = _line_group_key(row)
+        group_members[key] = group_members.get(key, 0) + 1
+        if row.get("seen_age_seconds") is not None:
+            group_has_seen[key] = group_has_seen.get(key, 0) + 1
+
     kept: list[dict[str, Any]] = []
     dropped = 0
     for row in grid:
         seen = row.get("seen_age_seconds")
-        best = freshest.get(_line_group_key(row))
+        key = _line_group_key(row)
+        best = freshest.get(key)
         if seen is not None and best is not None and (float(seen) - best) > lag_seconds:
             dropped += 1
             continue
+        # Only rows a reader would call stale are worth attributing; a fresh row
+        # surviving is the rule working, not a gap in it.
+        try:
+            if seen is None:
+                if row.get("line") not in (None, ""):
+                    survivor_reasons["no_seen_age"] = survivor_reasons.get("no_seen_age", 0) + 1
+            elif float(seen) > lag_seconds:
+                if group_members.get(key, 0) <= 1:
+                    reason = "no_group_sibling"
+                elif group_has_seen.get(key, 0) <= 1:
+                    reason = "sibling_no_seen_age"
+                else:
+                    reason = "within_lag"
+                survivor_reasons[reason] = survivor_reasons.get(reason, 0) + 1
+        except Exception:
+            pass
         kept.append(row)
+
+    if survivor_reasons:
+        try:
+            print(
+                "[book_grid] SUPERSEDED_SURVIVORS "
+                + " ".join(f"{k}={v}" for k, v in sorted(survivor_reasons.items())),
+                flush=True,
+            )
+        except Exception:
+            pass
     return kept, dropped
 
 

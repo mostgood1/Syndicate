@@ -1025,9 +1025,43 @@ def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
     ]
 
 
+def _infer_ncaaf_context(season: int | None, week: int | None) -> tuple[int, int]:
+    """(season, week) for the week-keyed NCAAF props capture.
+
+    Explicit args win. Otherwise `ncaaf_target_week` is the same resolver the
+    board uses, so the capture and the reader agree on which week they are
+    talking about -- a capture filed under a week the card never asks for is
+    indistinguishable, from the board, from no capture at all.
+
+    Falls back to the calendar year and week 1 rather than raising: this runs
+    inside a sweep that must not be taken down by a props-side lookup, and an
+    over-eager week 1 capture is a wasted call, not a wrong number.
+    """
+    resolved_season = int(season) if season else datetime.now(timezone.utc).year
+    if week:
+        return resolved_season, int(week)
+    try:
+        from syndicate.features.ncaaf.sources import ncaaf_target_week
+
+        return resolved_season, int(ncaaf_target_week(resolved_season) or 1)
+    except Exception:
+        return resolved_season, 1
+
+
 def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("ncaaf")
+    # Props are week-keyed and land under the source BUNDLE root, not the
+    # artifact root -- `_local_source_artifact_root` appends `source_artifacts`
+    # locally and does not on Render, so it names two different layouts and is
+    # the wrong helper for a path that has to be identical in both.
+    ncaaf_season, ncaaf_week = _infer_ncaaf_context(args.season, args.week)
+    props_out = (
+        _local_source_bundle_root("ncaaf")
+        / "data"
+        / "processed"
+        / f"oddsapi_player_props_{int(ncaaf_season)}_wk{int(ncaaf_week)}.csv"
+    )
     command = [
         python_exe,
         "scripts/refresh_ncaaf_oddsapi.py",
@@ -1037,13 +1071,105 @@ def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
     if args.week is not None:
         command.extend(["--week", str(args.week)])
     return [
+        # `#552`. THE MARKET CAPTURE GOES FIRST, and it is the step that gives
+        # the NCAAF board a price at all.
+        #
+        # Until this existed the board had a projection on all 51 week-1 games
+        # and a line on none: `ncaaf/cards.py` read its lines from
+        # `cfbd_lines_{season}_wk{week}.json`, whose only two writers
+        # (`fetch_ncaaf_market_lines.py`, `fetch_cfbd_lines.py`) have ZERO
+        # callers on any service and which exists in git at no SHA. The step
+        # below refreshes the LEGACY recommendation bundle and never wrote a
+        # book line.
+        #
+        # NO --season/--week ON PURPOSE. The fetch takes whatever OddsAPI is
+        # quoting and shards each event by its OWN commence date, because NCAAF
+        # weeks are not calendar windows -- 2026 week 1 spans 08-29 to 09-07, so
+        # a week-keyed capture would file ten days of games under one key and
+        # the board (which reads per kickoff date) would find none of them.
+        #
+        # ORDER MATTERS ONLY ONE WAY: if the legacy bundle step below fails, the
+        # book lines are already captured. The reverse is not true, and the
+        # lines are the load-bearing half.
+        #
+        # RUNNING THIS OUT OF SEASON IS SAFE AND NOT SEPARATELY GATED. An empty
+        # OddsAPI response costs one credit and appends nothing. A second gate
+        # here would double-gate the sport against
+        # `live_refresh_loop._weekly_sport_claimed_by_fast_tick`, which already
+        # decides whether NCAAF belongs on this sweep at all -- and `#520`
+        # records that re-applying an upstream gate at the launch site is
+        # exactly how NFL lost 24 hours of capture.
+        #
+        # The fetcher prints its team-name resolution report on every run, so
+        # `UNRESOLVED_TEAMS` lands in the sweep log without a separate pass.
+        # That matters: an unresolved school is a game that silently shows no
+        # line, and the board cannot tell that apart from "no book quoted it".
+        RefreshStep(
+            name="ncaaf_game_lines_oddsapi",
+            phases=("pregame", "live"),
+            cwd=REPO_ROOT,
+            command=(python_exe, "scripts/fetch_ncaaf_oddsapi_game_lines.py"),
+            description="Capture NCAAF moneyline/spread/total from OddsAPI into the shared book-quote log.",
+        ),
+        # `#557`. PLAYER PROPS, AND THEY HANG OFF THE GAME-LINES STEP RATHER
+        # THAN THE LEGACY BUNDLE BELOW -- which is a correction, not a
+        # preference.
+        #
+        # The capture was first wired inside `refresh_ncaaf_oddsapi.py`, on the
+        # reasoning that NFL's props hang off NFL's odds runner. That runner
+        # CANNOT RUN FOR 2026 and never will: `_resolve_data_root` requires a
+        # `college_football_schedule_<season>_predicted_totals_enhanced*.csv`,
+        # git holds 359 of them and **every one is season 2025**, and even were
+        # one found `_should_skip_auto_refresh` returns True the moment
+        # `prediction_season < current year`. Measured on production
+        # 2026-08-27T01:04:55Z, after the path fix that made its error legible:
+        #
+        #     STEP_FAIL name=ncaaf_lines_snapshot runtime_seconds=0 return_code=1
+        #     FileNotFoundError: ... Searched: <root>/data, <root>,
+        #       <root>/source_artifacts
+        #
+        # So props wired there were unreachable in exactly the season they were
+        # built for. This step is independent of that one and of its data.
+        #
+        # WEEK-KEYED, unlike the game-lines step directly above, and the
+        # asymmetry is deliberate. Game lines shard by each event's OWN
+        # commence date because NCAAF weeks are not calendar windows. Props are
+        # read back by `(season, week)` -- `ncaaf/props.py` indexes the CSV that
+        # way and the card asks for `week=1` -- so the file has to be
+        # week-keyed to be found at all.
+        #
+        # `data/processed/` IS LOAD-BEARING: the hot-artifact allowlist already
+        # carries `*_source/data/processed/oddsapi_player_props_*.csv`, so the
+        # capture crosses worker -> web with no allowlist change. One directory
+        # shallower and it can never reach the board, and it fails as an empty
+        # props panel rather than an error.
+        #
+        # LAST, because it is the expensive half: props are billed per event
+        # per market, against one call for the lines. If the sweep is going to
+        # run out of time or credits, it should lose props and keep prices.
+        RefreshStep(
+            name="ncaaf_player_props_oddsapi",
+            phases=("pregame", "live"),
+            cwd=REPO_ROOT,
+            command=(
+                python_exe,
+                "scripts/fetch_ncaaf_oddsapi_props_local.py",
+                "--season",
+                str(ncaaf_season),
+                "--week",
+                str(ncaaf_week),
+                "--out",
+                str(props_out),
+            ),
+            description="Capture NCAAF player props from OddsAPI into the allowlisted week-keyed CSV.",
+        ),
         RefreshStep(
             name="ncaaf_lines_snapshot",
             phases=("pregame", "live"),
             cwd=REPO_ROOT,
             command=tuple(command),
             description="Refresh NCAAF lines and bundle source recommendation artifacts through a Syndicate-owned runner.",
-        )
+        ),
     ]
 
 

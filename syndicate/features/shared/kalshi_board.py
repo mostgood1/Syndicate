@@ -268,21 +268,75 @@ def movement_report(*, top: int = 10) -> dict[str, Any]:
 
 
 def board_by_game_date(markets: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Kalshi's markets grouped by the DAY they close -- i.e. by game date.
+    """Kalshi's markets grouped by GAME DATE, and separately by CLOSE DATE.
 
-    Grouped on the date part only. A night game closes after midnight UTC, so an
-    exact timestamp would scatter one slate across two days -- `#370`'s bug in a
-    new place.
+    THIS FUNCTION USED TO GROUP ON `close_time` AND CALL THAT THE GAME DATE.
+    Its docstring said "the DAY they close -- i.e. by game date", and the two
+    are not the same thing by up to four days. `game_date_from_ticker` records
+    the measurement that settles it:
+
+        ticker      KXMLBHR-26AUG242140MINATH-MINBBUXTON25-2
+        close_time  2026-08-28T01:40:00Z      <- FOUR DAYS after the game
+
+    Kalshi closes a market days after the event so late settlement data can
+    land. So a close-time histogram of tonight's slate reports NEXT WEEK.
+
+    WHAT THAT COST, and it is why this is fixed rather than annotated. On
+    2026-08-25 a reader took three `BY_GAME_DATE` readings whose earliest key
+    was `2026-08-27`, concluded "the working set holds nothing for the board's
+    date", and started designing a date-aware bound on it. The refutation was
+    in the same second of log -- `KXMLBKS-26AUG251945BALSTL` and
+    `KXWNBA1QSPREAD-26AUG25WSHPHX` were both in that very set. This is
+    `#370`/`market_closes_on_another_date` recurring as a DIAGNOSTIC rather
+    than as a join: the same wrong field and the same wrong conclusion, one
+    layer up, where nothing refuses and so nothing catches it.
+
+    BOTH GROUPINGS ARE RETURNED, under names that say which is which. Keeping
+    only the game date would answer this reader and strand the next one asking
+    a real settlement question -- and printing them side by side is what makes
+    a four-day gap visible instead of inferable.
+
+    `by_date` / `by_date_series` are now the GAME date, because that is what
+    every caller's name already claims and the only production caller logs the
+    line as `BY_GAME_DATE`.
+
+    A market that cannot be dated is COUNTED UNDER A NAMED KEY, never dropped:
+    a total that silently disagrees with the fetch is how a diagnostic starts
+    lying, which is the whole subject of this docstring.
     """
+    from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
+
     by_date: dict[str, int] = {}
     by_date_series: dict[str, dict[str, int]] = {}
+    by_close_date: dict[str, int] = {}
+    by_close_date_series: dict[str, dict[str, int]] = {}
+
     for market in markets:
-        close_date = str(market.get("close_time") or "")[:10] or "<no_close_time>"
-        by_date[close_date] = by_date.get(close_date, 0) + 1
         series = str(market.get("series") or "") or "<absent>"
-        by_date_series.setdefault(close_date, {})
-        by_date_series[close_date][series] = by_date_series[close_date].get(series, 0) + 1
+
+        # THE GAME DATE, from the ticker's event segment. None is a real answer
+        # and gets its own bucket -- see `game_date_from_ticker`, which refuses
+        # to fall back to `close_time` for exactly the reason above.
+        game_date = game_date_from_ticker(market.get("ticker")) or "<undatable_ticker>"
+        by_date[game_date] = by_date.get(game_date, 0) + 1
+        by_date_series.setdefault(game_date, {})
+        by_date_series[game_date][series] = by_date_series[game_date].get(series, 0) + 1
+
+        # THE CLOSE DATE, kept and named. Grouped on the date part only: a night
+        # game closes after midnight UTC, so an exact timestamp would scatter
+        # one slate across two days -- `#370`'s bug in a new place.
+        close_date = str(market.get("close_time") or "")[:10] or "<no_close_time>"
+        by_close_date[close_date] = by_close_date.get(close_date, 0) + 1
+        by_close_date_series.setdefault(close_date, {})
+        by_close_date_series[close_date][series] = (
+            by_close_date_series[close_date].get(series, 0) + 1
+        )
+
     return {
         "by_date": dict(sorted(by_date.items())),
         "by_date_series": {k: dict(sorted(v.items())) for k, v in sorted(by_date_series.items())},
+        "by_close_date": dict(sorted(by_close_date.items())),
+        "by_close_date_series": {
+            k: dict(sorted(v.items())) for k, v in sorted(by_close_date_series.items())
+        },
     }

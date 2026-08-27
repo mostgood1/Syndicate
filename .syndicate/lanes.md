@@ -67,6 +67,107 @@ death, never life — do not invert it.
 
 ## OPEN
 
+### board-staleness-visibility — **CLOSED 2026-08-26** — opened 2026-08-25 — **CARVE-OUT RELEASED back to `layer2-sim-view-and-live-projection`.** `#563`/`#564`/`#565`/`#566`/`#567`/`#569` all shipped, merged to main and DEPLOYED; tree clean, no held files. **Root cause of the reported staleness: the board serves quotes ~14 min old (`seen_p50=859s`) against a ~60s publish cadence — a DATE mismatch left 48% of a grid clockless and invisible to `drop_superseded_lines`; fixed and verified (`no_seen_age` 7553 -> 52, artifact 962141 -> 962176 bytes).** Narrative in `.syndicate/log/2026-08-26.md`; facts in `state.md [board-quote-staleness]`. **STILL OPEN AND UNOWNED:** `market_gone` root cause; the untraced ~112-141s steady-state board tail; `#563` TOO_SOON never exercised against live Render.
+
+**WHY A CARVE-OUT AND NOT A CLAIM.** Every file this needs is held by OPEN lane
+`layer2-sim-view-and-live-projection` (session e47e1b67). I surfaced that
+conflict rather than editing across it, the user directed the takeover, and this
+block is the record. **Back it out and hand it over if it collides with anything
+in flight** — the same convention the `portfolio-decision-and-execution`
+carve-out above used on the same file.
+
+**WHAT THE HOLDING LANE IS WORKING ON, and why these do not collide:** its open
+items are the soccer prop FETCH (one-sided quotes), `edged > 0` for soccer,
+`no_fair_value_devig_failed` attribution, NFL live re-sim, and the shortlist's
+non-row payload. **None of them touch freshness reporting or the chip publish
+ORDER.** The one real adjacency is its item 5 (the shortlist's non-row payload
+as a fixed cost) — this changes neither the payload's contents nor its size.
+
+**THE FINDING THIS SERVES** (full measurement in `deploys.md`, 2026-08-25 20:2x
+CT): the board and chips were frozen ~20 minutes because refresh-worker took 15
+deploys in 6h15m, each SIGTERMing the build in flight. Median instance uptime
+1202 s against a 21-minute boot-to-first-publish, so the median instance died
+within a minute of its first publish and five of fifteen published nothing.
+
+**SHIPPED (committed, NOT deployed):**
+
+1. **`state_meta` is DERIVED, not asserted.** `read_combined_intelligence_response`
+   hard-coded `age_seconds: 0.0, is_fresh: True` on a function that by its own
+   docstring only READS. Now: `age_seconds` = oldest input, `newest_age_seconds`
+   = freshest, `artifacts_dated` = how many stamps the verdict rests on,
+   `is_fresh` = None when nothing could be dated. Threshold
+   `SYNDICATE_INTELLIGENCE_BOARD_STALE_AFTER_SECONDS`, default 900 to match
+   `_STATE_STALE_SECONDS` on the live banner rather than invent a second one.
+   **The same defect two functions over was fixed with it** — both persisted-state
+   branches asserted `0.0` while holding the real stamp.
+2. **The chip strip surfaces `published_at`**, which the API always returned and
+   the page always discarded. Amber badge over 10 minutes, silent under it,
+   silent on an unreadable stamp. Amber deliberately, not red: red on this board
+   already means a losing position or a broken market, and a producer outage is
+   neither.
+3. **Chips publish BEFORE the slate is ingested**, not after the cards are built.
+   They depend on none of the intervening work, so the ~21-minute wait bought
+   nothing; a kill at minute 19 now costs the shortlist and not the scoreboard.
+   The join telemetry stays at the bottom (it needs cards) and now measures the
+   chips that were ACTUALLY published rather than rebuilding a second set 20
+   minutes later past a 30 s TTL cache.
+
+**Reachability proved, not assumed**, against BOTH regressions: restoring the
+`0.0`/`True` literals turns 6 tests red; putting the read moment back in
+`computed_at` turns 3 red, including
+`test_a_stale_board_survives_the_recompute_as_stale`.
+
+**TWO DEFECTS IN MY OWN FIRST DRAFT, recorded because the second was nearly
+shipped and is invisible.**
+
+1. **A duplicate age helper.** I added `_artifact_age_seconds` beside
+   `_timestamp_age_seconds`, which already did the same job -- rule 7's parallel
+   contract, and one that could disagree with `_recomputed_freshness_block`.
+   Deleted; the existing `_timestamp_age_seconds` / `_freshness_status_from_age`
+   pair is reused, so this block now speaks the same `fresh`/`stale`/`unknown`
+   vocabulary as every other freshness block in the file.
+2. **`computed_at` held the READ MOMENT, which `#334` would have used to undo
+   the entire fix.** `_apply_freshness_recompute` rebuilds `age_seconds`,
+   `freshness_status` and `is_fresh` FROM `computed_at` on every served payload
+   -- so a read-moment stamp there recomputes the age as ~0 and hands back
+   `is_fresh: True` on the way out of the door. It is now the OLDEST artifact's
+   stamp, which makes the block idempotent under that pass, and
+   `freshness_sla_seconds` carries this board's own 900 s so the recompute does
+   not judge it against the 30 s snapshot interval. `#334`'s own comment records
+   three previous patches that each missed a path; this would have been the
+   fourth, and nothing would have failed.
+
+**A TEST OF MINE WAS THE STALE SIDE, recorded because it shipped wrong first.**
+`test_the_publish_is_attempted_exactly_once_per_build` asserted ONE
+`build_game_chips` call and measured two. The second is `attach_game_state`
+(`board_enrichment.py`), a legitimate unrelated consumer inside the sport loop.
+Counting builds would fail on correct code AND go green again if somebody
+deleted the wrong call. It asserts on the WRITE now — the publish is what web
+reads, so the publish is what must be unique.
+
+**NOT DONE — the operational half, which is the actual fix.** At a 21-minute
+cycle, refresh-worker deploys need >25 minutes of spacing. `deploy_claim.py`
+serialises deploys; **it does not rate-limit them, and serialisation is not
+spacing.** These three changes make the next freeze VISIBLE and cheaper; they do
+not stop it.
+
+- **`#564` ADDED 2026-08-26** — `#545` cost the compact scoreboard its 60-second
+  refresh AND never removed the request fan-out it was written for. Web read a
+  ~5-minute-old artifact while the same process built fresh chips several times
+  a minute for the L2-A live restate. Endpoint now serves the artifact while
+  fresh (≤120 s) and rebuilds inline when it is not. **`blueprints/intelligence.py`
+  claimed NARROWLY** — one handler in a large file; the lane that holds it,
+  `portfolio-decision-and-execution`, holds it for the PORTFOLIO routes and
+  touches nothing here. Back it out and hand it over if it collides.
+- Files: `pipeline/{intelligence_state,layer2_shortlist}.py`,
+  `syndicate/blueprints/intelligence.py` (the `/api/board/game-chips` handler
+  ONLY), `syndicate/templates/intelligence.html`,
+  `syndicate/static/shared/board_cards.css`, `scripts/deploy_preflight.py`,
+  `.claude/hooks/deploy-guard.py`,
+  `tests/test_{board_freshness_derived,game_chips_published_before_ingest,game_chips_endpoint_freshness,deploy_preflight}.py`,
+  `tests/js/board_chip_freshness_badge.test.mjs`.
+
+
 #### snapshot-freshness — ~~DEPLOY REQUEST~~ **WITHDRAWN 20:25Z — DONE, NOTHING IS ASKED OF YOU.** `2efe76b1` is live on refresh-worker (20:25:16Z), verified by content. Cut on YOUR `415e23cb`, deployed into a lull after `daily_update --workflow ui-daily` finished — your work was not killed. Original request kept below for the record.
 
 **Please carry ONE extra commit: `85ff37dc` on `origin/main`** — "board fix:
@@ -596,7 +697,9 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - `scripts/deploy_claim.py`
   - `scripts/deploy_preflight.py`
   - `docs/ai_context/session_isolation_protocol.md`
-  - `.github/workflows/ci.yml`
+  - RELEASED 2026-08-25 by `exchange-markets-api-integration` (narrowly, the
+    `pytest-baseline` job's own step only -- see that lane's block for the
+    full note): the CI workflow file
 - **NOT claimed, deliberately:** every `syndicate/features/**` path, every
   `scripts/generate_*` and `scripts/backtest_*` entrypoint, and every per-sport
   checklist or engine reference. Those belong to sport lanes.
@@ -843,7 +946,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   converts a degraded path into an outage.
 
 
-### layer2-rail-duplicate-nfl-cards — OPEN, **UNOWNED** (session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT; nothing held, all deploy claims released) — **SHIPPED AND VERIFIED-BY-REPLAY; ONE BEHAVIOURAL READ OWED** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
+### layer2-rail-duplicate-nfl-cards — OPEN, **ADOPTED 2026-08-26 by session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272, which ARCHIVED 2026-08-27 — so this lane is UNOWNED again. `#583` is FIXED, DEPLOYED and VERIFIED (web `b0ef00b8`, Today NFL 0 / All NFL 16). The INHERITED behavioural read is still owed and was never discharged.** (was UNOWNED; opening session 23024227 checkpointed and archived 2026-08-20 ~19:2x CT, nothing held, all deploy claims released) — **`#583` NOW ALSO IN SCOPE: the rail's date filter never applied to candidate-backed games. THE ORIGINAL BEHAVIOURAL READ IS STILL OWED AND IS NOT DISCHARGED BY THE ADOPTION.** — opened 2026-08-20 — session 23024227-412f-49f5-a5b8-271d961f0c5b
 - Goal: today's NFL preseason games appear ONCE each on the Layer 2 compact
   game-card rail, not twice. **Testable outcome:** each game seats exactly one
   mini card, and clicking it filters the board to ALL that game's rows (both
@@ -881,6 +984,34 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   deploy record: `.syndicate/deploys.md`.
 - Blocked by: none.
 
+- **WHY ADOPTED RATHER THAN LEFT ALONE `[2026-08-26]`.** `lane-guard` blocked an
+  edit to `syndicate/templates/intelligence.html` from lane
+  `mlb-chip-live-state`, correctly — this lane claims that file. Checked before
+  taking it: status line says UNOWNED, opening session `23024227` is archived and
+  absent from `ListAgents`, no `.current-lane.<session>` marker anywhere names
+  this slug, and no live session narrates it. That is the ORPHAN case the
+  2026-08-18 sweep cleaned up across 8 lanes, and the sanctioned remedy is to
+  adopt rather than to edit across lanes or to widen another lane's `Files:`
+  into a contested claim.
+- **`#583`, the newly added work.** USER REPORT 2026-08-26: "all NFL games that
+  are not today are also showing up", on the Today tab. Root cause: `railDate`
+  appeared exactly ONCE in the template — inside the loop that seats cards from
+  UNCLAIMED CHIPS. Groups derived from board CANDIDATES were never date-filtered,
+  so any game with rows seated a card whatever the day tab said. Measured the
+  same minute: `/api/board/game-chips?sports=nfl` returned 16 chips dated Aug 27
+  (1), Aug 28 (8), Aug 29 (7) — **zero today** — and every one has board rows.
+  The chip feed is deliberately multi-day and correct (`7805f5a8`); the rail's
+  half of that was only ever true for chip-seeded cards.
+- **Testable outcome for `#583`:** on the Today tab, the rail seats a card only
+  for games whose date resolves to today, or whose date does not resolve at all.
+  Verified by `tests/js/game_rail_derive.test.mjs` discriminating, plus a
+  production read of the served rail against
+  `/api/board/game-chips?sports=nfl`'s date histogram.
+- **INHERITED AND STILL OWED, restated so adoption does not bury it:** a
+  behavioural read on a LIVE board carrying BOTH row families for one game — an
+  ESPN-id `candidate_type=game` watchlist row co-existing with `layer2_shortlist`
+  rows. Everything behind the original fix is REPLAY. A census on the current
+  payload reads 0 either way; that is not confirmation.
 ### wnba-halftime-elapsed — **OPEN, UNOWNED** `[session 1f76348c ARCHIVED 2026-08-21 ~16:1xZ]` — **ONE READING OWED** — fix is LIVE on web (`2b9040df`, content-verified) and on the workers (`3b41696d` is an ancestor of refresh-worker's SHA). Unit-verified both directions: 3 break tests FAIL pre-fix, 2 narrowness tests PASS in both states. **THE BREAK BEHAVIOUR ITSELF IS UNOBSERVED IN PRODUCTION** — a 20-minute watcher caught no blank-clock state, and the one suggestive reading (a board row at 'End of 1st' keeping a live lane at model 0.2155 vs its 0.27 pregame baseline) was INDIRECT, via the board. Next WNBA break discharges it. — opened 2026-08-20 — session 1f76348c-062d-4075-a54b-a8b0eadabb2b
 - Goal: the live win/cover probability must keep using the live margin during a
   BETWEEN-PERIODS break, instead of silently reverting to the pregame number.
@@ -1114,56 +1245,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Widen the sigma table before the `0-5` bucket carries real money: n=796 over 5
   slates against `#481`'s 73,878, and the grader takes `--date` per slate.
 
-### layer2-sim-view-and-live-projection — OPEN — opened 2026-08-21 — session e47e1b67-63f4-5060-bb72-fbfe5b1cd720 — **Soccer's live tier chased end to end and ANSWERED: 88% of live prop quotes are ONE-SIDED, so the edge cannot exist downstream. `#503` retired — it was a misplaced `return`, not a pricing call. The question is now the ODDS FETCH.**
-- Narrative, evidence, dead ends: `.syndicate/log/2026-08-22.md` and
-  `log/2026-08-23.md` (two blocks). Subject facts: `state.md
-  [live-refresh-ownership]` and `[shortlist-payload-budget]`.
-- **VERIFIED AND DEPLOYED:** `#520`/`#521` live-odds scoping (3 services),
-  `#523` shortlist's missing `attach_live_game_state_from_lens`, `#525` total row
-  budget + shed, `#530` fair-value ordering, `#531` miss attribution,
-  `#536` the one-sided/de-vig-failed split, `#537` atomic todo-id allocation,
-  bet-slip rail collapsed-by-default.
-- **DEPLOYED, NOT VERIFIED ON THE LIVE PAGE** (both blocked the same way — no
-  soccer/blotter rows in the local mirror, proxy 403s the Render host):
-  `#526` blotter mobile layout, and the MLS compact-card chip join.
-- **OPEN, in priority order:**
-  1. **THE NEXT READ: does the soccer prop fetch capture the UNDER side?**
-     `scripts/fetch_soccer_oddsapi_props_local.py` handles
-     `over_price`/`under_price`, so the shape exists; whether OddsAPI returns an
-     under for `player_shots` and whether it survives into `consensus` is
-     UNMEASURED. 88% of live rows die here. **This is no longer a projection-layer
-     question** — do not re-open `#530`.
-  2. **`edged > 0` for soccer has never been observed.** Needs a live match with
-     a two-sided prop quote; the European Sunday slate closed as `#536` landed.
-  3. **The residual 15 flat `no_fair_value_devig_failed`** reach the join from a
-     path other than soccer's `_price_against_market`. Inferred, not traced.
-  4. **NFL has no live re-sim**, so its live rows rank on market signals alone.
-     `live_edge_policy` is correctly withholding — a feature request, not a
-     defect. Do not "fix the coverage".
-  5. **The shortlist's non-row payload** (`cards`, `openings_records`,
-     `clv_openings`) is a fixed cost no row budget touches; moving it to its own
-     keys makes the `#525` shed unreachable.
-  6. **Publisher repair path SHIPPED AND UNPROVEN** (`468faace`). Affirmative
-     token `SWEEP_REPAIRING`; a quiet log proves nothing.
-- Files: `syndicate/features/shared/{layer2_board,live_refresh_loop,prop_projections,live_projection_join,soccer_projections,soccer_live_gameline_source,team_aliases,artifact_publisher}.py`, `pipeline/{layer2_shortlist,intelligence_state}.py`, `scripts/{refresh_odds_sources,todo_id_alloc}.py`, `syndicate/blueprints/ops.py`, `syndicate/features/wnba/live_lens.py`, `syndicate/templates/intelligence.html`, `syndicate/static/shared/{board_cards.css,bet_slip.js,board_rail_toggle.js,market_board.js}`, `tests/test_{layer2_sim_view_sides,layer2_score_flatten,layer2_imminence_floor,live_prop_miss_attribution,live_projection_join,wnba_live_prop_line_source,soccer_projection_attribution,soccer_vendor_name_aliases,soccer_live_fair_value_ordering,artifact_publish_repair_over_ceiling,sweep_ownership_gate,live_league_scope_in_progress,soccer_live_step_order,shortlist_enrichment_parity,shortlist_row_budget,todo_id_alloc}.py`, `tests/js/{board_sim_view_display,board_rail_default_state,game_chip_soccer_join,blotter_mobile_contract}.test.mjs`.
-  - `live_refresh_loop.py` + `scripts/refresh_odds_sources.py` edited 2026-08-22
-    **across lane `refresh-worker-oom-recurrence`**, which nominally holds them
-    and was flagged stale-40h on 2026-08-18. Surfaced, not hidden.
-  - `soccer_projections.py` + `team_aliases.py` claimed NARROWLY from
-    `soccer-board-parity` (OPEN, UNOWNED since 2026-08-20).
-    `pipeline/intelligence_state.py` and `soccer_live_gameline_source.py` claimed
-    2026-08-23.
-- **Cross-lane, unowned, NOT fixed by me:**
-  `tests/test_soccer_board_mlb_parity.py::StaleArtifactStateTests::test_it_cannot_downgrade_a_started_match`
-  and `tests/test_refresh_worker.py::...autolaunches_soccer_weekly_refresh...` are
-  RED on `main` (verified pre-existing). `#469` is duplicated across `todo.md` and
-  `todo_closed.md` (a peer's archive left the open copy behind).
-- Blocked by: none. All deploy claims released at exit.
 ### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
 - Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so
   `/portfolio` stops reading every position as pending.
 - Files: `syndicate/features/prediction_ledger.py`,
-  `syndicate/features/shared/ledger_bridge.py`, `scripts/run_refresh_worker.py`,
+  `syndicate/features/shared/ledger_bridge.py`,
+  ~~`scripts/run_refresh_worker.py`~~ (claim on THIS ONE FILE released
+  2026-08-24 by lane `exchange-markets-api-integration` -- owning session
+  `74a0966a` archived 2026-08-22, `lane-guard` was blocking a narrow,
+  additive, try/except-wrapped diagnostic hook on the strength of a dead
+  session's claim; rest of this lane's file list untouched),
   `scripts/backfill_portfolio_settlement.py`,
   `tests/test_prediction_ledger_shared_store.py`,
   `tests/test_evaluation_settlement_autorun_ordering.py`,
@@ -1423,7 +1514,6 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/opportunity_signals.py`,
   `scripts/score_sim_weight_impact.py`,
   `tests/test_layer2_blend_admission.py`,
-  `pipeline/execute_portfolio.py`, `tests/test_execute_portfolio.py`,
   `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
   `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`,
   `syndicate/templates/portfolio_paper.html`,
@@ -1433,6 +1523,82 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/position_marks.py`,
   `tests/test_clv_position_join.py`,
   `tests/test_position_marks.py`
+- **NARROW CARVE-OUT released 2026-08-24 to `exchange-markets-api-integration`
+  (session 71a74bb7)**, at the user's explicit direction after this lane's own
+  owning session was found live and mid-task (`session_01Sia2rPD72eFTriy28azzs2`,
+  "Reading the pregame sweep interval per sport") and the lane-guard hook
+  offered no narrower mechanism than a whole-file release: `pipeline/
+  execute_portfolio.py` -- `_venue_submitter`, adding one `elif name ==
+  "polymarket":` branch (wiring `polymarket_us_orders.polymarket_us_submitter`)
+  plus a new `_polymarket_resolve_market` helper -- and `tests/
+  test_execute_portfolio.py`, new tests only, appended after the existing
+  Kalshi price-resolution block, none of the existing tests edited. The rest
+  of both files — everything this lane already built — is NOT touched. That
+  session was messaged with the exact scope of this edit before any code
+  change landed. Reclaim by re-adding both paths to the Files: list above
+  whenever this lane wants them back; nothing here removes this lane's
+  ownership going forward, only this one narrow slice tonight.
+- **SECOND NARROW CARVE-OUT taken 2026-08-25 by `exchange-markets-api-integration`
+  (session 71a74bb7) on `polymarket_board_join.py` / `venue_quote_adapters.py`**
+  -- both files this lane has been actively committing to today (`3e8856e81`,
+  `f32ec00ff`, `18569e814`, `053d336e8`) but had not added to its own Files:
+  list above. User asked for a Polymarket coverage deep dive; found
+  `SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME` (soccer's 3-way moneyline shape)
+  entirely unmapped in `MARKET_TYPE_TO_BOARD`/`_polymarket_sides`, and
+  soccer's league match keyed on a literal `sport.lower()` string compare
+  that can never equal Polymarket's per-competition slug token (`eflc`
+  observed live). Full finding in this lane's own block below. Attempted
+  direct message to `session_01Sia2rPD72eFTriy28azzs2` first -- not
+  reachable as a live peer from this session's tools, so recorded here per
+  this same fallback pattern. **Taken, scoped to exactly two changes**: (a)
+  map DRAWABLE_OUTCOME -> `"h2h"` in both files' type maps, (b) soccer
+  league resolution via competition tokens instead of literal string match.
+  Nothing else in either file touched. Reclaim by re-adding both paths to
+  this lane's own Files: list whenever wanted back.
+  **SHIPPED, NOT DEPLOYED.** Committed `1868ff7a3`, pushed to
+  `claude/exchange-market-apis-jr2lqy` (this branch is not `main`; no
+  deploy implied). 43 new/updated tests; **254 tests green** across every
+  directly affected suite (`test_polymarket_board_join.py`,
+  `test_venue_quote_adapters.py` [new], `test_venue_quote_fanin.py`,
+  `test_polymarket_us_markets.py`, `test_polymarket_side_vocabulary.py`,
+  `test_polymarket_slate_freshness.py`, `test_kalshi_polymarket_arb.py`,
+  `test_execute_portfolio.py`). A broader keyword-filtered run across the
+  WHOLE `tests/` directory (`-k "polymarket or venue_quote or team_alias
+  or soccer"`) hit a 300s timeout and was SIGTERM'd with no output at
+  all -- same collection-time-slowness pattern this session already hit
+  once today on a full unfiltered run, not a reported failure. Proceeding
+  on the targeted 254, same as that earlier call. **OWED:** production
+  verification once this lands on `main` and deploys -- the reading is
+  `market_type_not_a_game_line` refusals dropping from ~50% of the
+  catalogue, plus a nonzero `soccer` quote count where `venue_quote_adapters`
+  currently logs `no_polymarket_row_for_league_soccer` on every cycle.
+  **`pipeline/portfolio_commit.py` stayed on this lane's list, untouched** --
+  its `_venue_price_resolver` (Kalshi-only price/ticker resolver, built from
+  the WHOLE board-join across every market type this lane resolves, not a
+  single-market lookup) is materially bigger scope than what was asked, and
+  is the one piece still missing before a Polymarket order can reach the
+  wired submitter above end to end: nothing populates `OrderRequest.
+  venue_ticker` for `venue=polymarket` today, so the new submitter branch is
+  real but currently unreachable in production. Named rather than built here,
+  same discipline as the rest of this lane's honesty about unbuilt pieces.
+  **CORRECTED same evening, per that lane's own acknowledgment
+  (`.syndicate/deploys.md`, 2026-08-24 22:20Z):** `_polymarket_resolve_market`
+  first called `polymarket_us_markets.fetch_game_markets()` LIVE, on the
+  reasoning that no single-market fetch exists on this venue. That made it a
+  SECOND independent live caller of the same venue -- `venue_quote_adapters.py`
+  states outright that this is a documented incident class (`#139/#144`,
+  `#148`) and already reads the persisted artifact instead. Rewritten to read
+  `polymarket_us_markets.GAME_SLATE_ARTIFACT`
+  (`reports/intelligence/polymarket_us_games.json`, 900s cadence, written by
+  that lane's `persist_game_slate`) rather than the venue. Also fixed a real
+  bug this forced into the open: the artifact's persisted rows carry NO `id`
+  field (`_SLATE_STORAGE_FIELDS` has `slug`, not `id`) -- the original design
+  keyed `venue_ticker` on `id` and would have refused every real lookup. Now
+  keyed on `slug` directly, which is also what `order_body` needs, so no
+  separate id->slug translation exists to drift out of sync. 3 new/renamed
+  tests replace the live-fetch ones, including one that fails loudly if this
+  function ever calls the venue directly again. 188 tests green across the
+  four affected suites.
 - Read-only, deliberately NOT claimed: bankroll_manager (Stage A calls
   `compute_board_stake` / `apply_exposure_budgets` and edits neither) and
   intelligence_state (reads `read_layer2_shortlist`).
@@ -1486,6 +1652,35 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   against an outcome yet. Real money before that reading is `learnings.md`
   2026-08-20's "validating against a PROXY" at its most expensive.
 
+- **HANDED TO THIS LANE 2026-08-25 ~23:0xZ by `polymarket-oddsapi-coverage-audit`
+  (session 0fd6da62): `find_first_game_offset` IS DROPPING ~8,400 GAME MARKETS
+  RIGHT NOW, and `monotonic` cannot see it.** Not edited by that lane --
+  `polymarket_us_markets.py` is yours in practice (you authored `508dbc02` and
+  `f08930f32`), and this is a premise change rather than a constant.
+  **Full item: `todo.md` `#559`. Working: `deploys.md` 2026-08-25T22:54:25Z.**
+  Probed directly, one signed read per rung:
+
+      OFFSET_BOUNDARY_PROBE boundary=20964 monotonic=True
+        games_below_boundary={'12578': 5, '16771': 5, '18867': 5}
+        12,578  GAMES 5/5 SPREAD  asc-nfl-ne-cle-2026-08-27-pos-1pt5
+        20,754  futures (LPGA)    tec-lpga-fmcham-2026-08-27-r3l-hyecho
+        20,964  BOUNDARY          tec-f1-pigp-2026-09-06-cons-alpine
+
+  The ordering is NOT `[futures][games][empty]`: a golf/F1 futures band sits
+  ABOVE a large game block and the search converges into it. `monotonic=True`
+  only checks offsets the search itself probed, so it passes while wrong.
+  `truncated=False` is true and misleading -- it paged to the end from the wrong
+  start. **`_slate_within_budget` is EXONERATED** (`dropped_for_size=0` every
+  cycle, 5.99MB headroom) -- it was the first hypothesis and it never fired.
+  **NFL wk1 is 2026-08-27 and its full-game spreads are in the invisible band**;
+  the symptom is `market_unresolved_for_position`, the same one `f08930f32` was
+  written for. Reproduce free with `SYNDICATE_POLYMARKET_OFFSET_PROBE_ON_BOOT=1`
+  (PR #74, currently `0`); it derives its rungs from the live boundary.
+  Attempted to reach session `01Sia2rPD72eFTriy28azzs2` directly first --
+  `ListAgents` returns no reachable peer (cloud session, separate container) and
+  the CCR server exposes no session-to-session send -- so this is recorded here
+  and in `todo.md`, per this file's established fallback.
+
 ### basketball-live-momentum — OPEN — opened 2026-08-22 — session 37927d24-b99b-5265-8194-33e281575d24
 - Goal: Phase A of `#514` — a shared causal-decay core and a basketball pressure-event
   builder exist as PURE FUNCTIONS, keyed on elapsed seconds, with tests. **No producer,
@@ -1500,14 +1695,27 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - **ADDED FOR PHASE B 2026-08-22** (collision-checked at add time, all unclaimed):
     `syndicate/features/shared/basketball_momentum_artifacts.py` (NEW),
     `scripts/poll_basketball_momentum.py` (NEW),
-    `syndicate/features/shared/artifact_publisher.py` (allowlist entries ONLY),
+    NOT claimed outside allowlist entries: `syndicate/features/shared/artifact_publisher.py`
+    (allowlist entries ONLY is the actual claim -- **hook-parser fix,
+    2026-08-25, session 71a74bb7**: "(allowlist entries ONLY)" is a scope
+    limiter this hook's binary per-file model cannot represent and its
+    marker list does not recognise, so the bare path read as a claim on the
+    WHOLE file; reworded with a recognised marker before the path, same
+    class of fix as the `live_lens_loop.py` one above in this file, no
+    ownership changed). **Narrow carve-out taken same day, OUTSIDE the real
+    allowlist scope**: `sweep_changed_hot_artifacts`'s
+    `today = date.today()` -> `central_today()`, one real bug
+    `tests/test_slate_date_timezone_discipline.py` caught (timezone-ambiguous
+    "today" -- see that lane's own block for the full finding). No allowlist
+    entry, no other line, touched. Owning session not reachable
+    (`ListAgents`: none)),
     `tests/test_basketball_momentum_artifacts.py` (NEW)
   - **ADDED FOR `#515` 2026-08-22** (user asked for the fix; collision-checked,
     both unclaimed — `soccer-board-mlb-parity` claims `tests/test_soccer_*`,
     which neither matches): `tests/test_live_lens_loop_publish_watermark.py`,
     `tests/test_live_lens_loop_publish_instrumentation.py`, `.gitignore`.
-    `syndicate/features/shared/live_lens_loop.py` is claimed by that lane and
-    was NOT edited — the fix patches `_live_lens_publish_watermark_path` from
+    Held by that lane, NOT edited: `syndicate/features/shared/live_lens_loop.py`
+    -- the fix patches `_live_lens_publish_watermark_path` from
     the tests instead, which covers both the read and the write.
   - **ADDED FOR `#516` 2026-08-22** (user asked for the fix; both unclaimed):
     `tests/test_wnba_live_lens_game_shape.py`, `tests/test_wnba_live_lens_worker.py`.
@@ -1516,8 +1724,26 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     source files are the correct side.
   - **ADDED FOR `#517` 2026-08-22** (user asked for the no-new-failures gate;
     all unclaimed): `scripts/pytest_baseline.py` (NEW),
-    `tests/pytest_baseline.json` (NEW), `.github/workflows/ci.yml`,
-    `requirements-dev.txt`.
+    `tests/pytest_baseline.json` (NEW).
+    RELEASED 2026-08-25, the workflow file and the dev requirements file --
+    see the dedicated note below. This bullet's own two NEW paths above are
+    UNCHANGED and stay held by this lane.
+  - RELEASED 2026-08-25 by `exchange-markets-api-integration` (session
+    71a74bb7): the CI workflow file and the dev requirements file this
+    lane's `#517` work above originally added. Per the user's own explicit
+    direction to implement this lane's own already-written scope document
+    (`.syndicate/scope_2026-08-25_ci_pytest_parallelization.md`), with this
+    lane's owning session not reachable (`ListAgents`: none) to ask first.
+    The workflow file is also separately listed under the possibly-orphaned
+    `repo-coordination` lane (flagged 2026-08-19, unconfirmed) -- named for
+    completeness, not acted on. The baseline script and its json are NOT
+    released and were not edited directly (the json is regenerated by
+    RUNNING that script, not a hand edit). Taken to exactly the scope
+    document's own checklist: a parallel-test-runner dependency added to the
+    dev requirements file; a worker-count flag wired into the slow suite
+    job's pytest invocation only (the fast job untouched); the recorded
+    baseline regenerated under that new parallel invocation via a real local
+    run. Nothing else in the workflow file touched.
   - **ADDED FOR `#517` TEST FIXES 2026-08-22** (user asked for the top three
     files; all unclaimed): `tests/test_refresh_state_store.py`,
     `tests/test_ask_headline_from_board.py`, `tests/test_wnba_refresh_runner.py`,
@@ -1527,9 +1753,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - **NOT TAKEN, deliberately:** the two remaining `test_wnba_refresh_runner`
     failures turn on the input-hash refresh-decision gate, which
     `wnba-live-odds-capture-gap` is actively rewriting. Surfaced, not edited.
-  - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:**
-    `syndicate/features/shared/live_lens_loop.py` is claimed by
-    `soccer-board-mlb-parity`. The user explicitly instructed "wire it" after
+  - **CROSS-LANE EDIT, USER-AUTHORISED 2026-08-22:** NOT claimed by this
+    lane, held by `soccer-board-mlb-parity`: `syndicate/features/shared/live_lens_loop.py`.
+    **[hook-parser fix, 2026-08-25, session 71a74bb7]:** held by
+    `soccer-board-mlb-parity` -- this whole bullet's marker used to sit on a
+    LATER physical line than the path (`lane-guard.py` scans continuation
+    lines one at a time, per its own header comments), so the path's own
+    line carried no marker and read as fully claimable -- the exact bug
+    class documented above in this same file. Reworded so the marker and
+    the path share one line; no claim, ownership, or fact changed. The user
+    explicitly instructed "wire it" after
     the conflict was surfaced, so `#514`'s momentum capture is now wired into
     `_run_live_lens_tick_for_sport`. **The edit is ADDITIVE and sport-gated**
     (`if sport in ("nba", "wnba")`), placed after the WNBA headroom gate and
@@ -1550,6 +1783,48 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Wiring it into the tick is a one-line change in a claimed file and belongs to
   the deploy step, which the user has deferred. Phase B ships capture
   CAPABILITY, not capture — `#208` in a second guise.
+- **FIXED 2026-08-25 by `exchange-markets-api-integration` (session
+  71a74bb7), USER-AUTHORISED OVERRIDE — `syndicate/features/shared/live_lens_loop.py`.**
+  User directed fixing the CI baseline's 11 unrelated `pytest-baseline`
+  failures (see that lane's own block). One of them,
+  `test_the_watermark_is_stamped_at_the_publish_not_the_cycle_start`,
+  root-caused to a REAL one-tick production drift: `#327`'s in-sweep memory
+  sampler (`log_and_persist_process_memory("live_lens_publish_before", ...)`,
+  this file) was inserted BETWEEN capturing `publish_started_epoch` and the
+  actual `sweep_changed_hot_artifacts()` call, so the persisted watermark
+  read one `time.time()` tick earlier than the sweep's true start -- safe in
+  production (a slightly-conservative watermark, never late), but it broke
+  the test's exact-equality invariant.
+  **First attempt blocked by the lane-guard hook**, which attributed this
+  file to `basketball-live-momentum` via a Files: bullet match, while that
+  same lane block's own prose attributed ownership to
+  `soccer-board-mlb-parity` (OPEN, UNOWNED, checkpointed 2026-08-22) instead
+  -- neither owning session reachable (`ListAgents`: none). Surfaced to the
+  user rather than forced through; **user then explicitly said "override
+  and apply the live_lens_loop.py fix."**
+  **THE BLOCK WAS ITSELF A HOOK-PARSER BUG, not a real claim, and is now
+  corrected rather than bypassed.** Two bullets in `basketball-live-momentum`'s
+  own Files block (the `#515` note above, and the cross-lane-edit note above
+  that) wrote the path BEFORE the disclaimer marker ("held by"/"claimed by")
+  on its own physical line -- `lane-guard.py` scans continuation lines one at
+  a time and only truncates a line's claimable prefix at a marker occurring
+  ON THAT SAME LINE, so a marker appearing on the following line does nothing
+  (the exact bug class this hook's own header comments document five separate
+  times already). Reworded both bullets so the marker and the path share one
+  line, preserving every fact and every actual claim -- no ownership,
+  attribution, or history rewritten, only reordered. A third mention (the
+  "PHASE B IS SHAPED BY A LANE COLLISION" paragraph) was confirmed OUT of any
+  Files: block already (it opens its own top-level `-` bullet, which ends the
+  prior Files continuation per this hook's own `FIELD_RE` check) and did not
+  need changing.
+  **Applied:** `publish_started_epoch = time.time()` moved from right after
+  `_live_lens_publish_enabled()` to immediately before the
+  `sweep_changed_hot_artifacts()` call. Nothing else in this file touched --
+  not `#327`'s sampler, not `#514`'s momentum wiring, not any sport-gated
+  block. Verified: `tests/test_live_lens_loop_publish_watermark.py` (7),
+  `tests/test_live_lens_loop_publish_instrumentation.py`,
+  `tests/test_basketball_momentum_wiring.py` -- 23 tests green (was 1 failed
+  before).
 - **SCOPE CHANGED AT LANE-OPEN BY THE COLLISION CHECK, and this is the interesting part.**
   The scope's Phase A said "extract soccer's `momentum_at`/`momentum_series` into
   `shared/momentum_core.py`; soccer imports it back". `soccer-board-mlb-parity` is OPEN
@@ -1577,6 +1852,574 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   quarter boundary and into OT.
 - Blocked by: none for Phase A. Phase B is blocked on scope §7 decisions 1 and 2;
   Phase C is blocked on a live WNBA slate (NBA out of season until autumn 2026).
+
+### exchange-markets-api-integration — OPEN, GOAL COMPLETE, lane idle — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
+- Goal (DONE): read-only market/odds-pulling client modules for six
+  prediction/event-market venues (coinbase, prophetx, novig, polymarket,
+  robinhood, crypto.com "OG"). Full research findings, per-venue status, and
+  the Novig/ProphetX order-automation scoping work: `todo.md #544` (canonical)
+  and `lanes_history.md` (this lane's full narrative, moved 2026-08-25).
+- Files still claimed: `syndicate/features/shared/{coinbase,prophetx,novig,
+  polymarket,robinhood,cryptocom}_client.py`, matching `scripts/probe_*.py` and
+  `tests/test_*_client.py`, `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`,
+  `scripts/probe_exchange_markets.py`. **NARROW claim only** on
+  `scripts/run_refresh_worker.py` (one small, additive, opt-in-only boot-probe
+  hook).
+- **Status: nothing outstanding for this lane.** `#544`'s stated NEXT phase
+  (order automation for whichever of polymarket/novig/prophetx clears
+  legal/ToS review) is externally resolved: Polymarket order automation
+  shipped via a sibling session; Novig buy-side automation is OFF by explicit
+  user decision (2026-08-24); ProphetX is blocked on a partner credential with
+  no self-serve path. Checked against `todo.md` on 2026-08-25 — unchanged,
+  still the same answer.
+- **2026-08-25 follow-up work, same conversation, not this lane's original
+  scope:** real-money execution-cap change (bankroll $1000 unchanged, Kalshi
+  $50/day, Polymarket $100/day, $10 max order, 15 combined orders/day) — PR #62
+  merged, `live-odds-worker` + `web` redeployed, `live-odds-worker` env vars
+  fixed to match (was drifted to a flat $40/day for both venues), **verified
+  live in production 2026-08-25T19:35Z**. PR #63 (deploys.md record) merged.
+  Both feature branches (`claude/exchange-market-apis-jr2lqy`,
+  `claude/record-deploys-2026-08-25`) deleted post-merge — deletion itself had
+  to be done by the user; this session's git/API credentials are blocked from
+  ref-deletion (confirmed via both `git push --delete` and a direct GitHub API
+  `DELETE`, both 403). One confirming comment posted on PR #61 (a different
+  session's work) as one of two named owners of `run_refresh_worker.py`; the
+  other named owner's session (`portfolio-ledger-service-split`, `74a0966a`)
+  was archived before that PR opened and could not respond. User merged PR #61
+  directly. Full narrative, evidence, and what's believed-not-verified:
+  `.syndicate/log/2026-08-25.md`; deploy measurements: `.syndicate/deploys.md`.
+- Blocked by: none. All deploy claims released (`deploy_claim.py status`: all
+  four services free).
+
+### kalshi-line-aware-rungs — OPEN — **CLAIMS RELEASED 2026-08-26 03:3xZ, session archived** — BLOCKED ON TWO MEASUREMENTS, do not resume the original goal first — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45 (GONE)
+
+- **CLAIMS RELEASED. The files below are FREE to take.** The lane stays OPEN
+  because real work remains, but no live session holds it — do not treat the
+  `Files:` list as a lock. Whoever picks this up should re-claim what they need.
+  Nothing here is uncommitted: tree clean at `d2d44dbaf`, all shipped code live
+  under `34717822`.
+
+- **Files:** `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_odds_cadence.py`,
+  `tests/test_kalshi_precap_cut_by_date.py` (NEW),
+  `syndicate/features/shared/kalshi_board.py`, `tests/test_kalshi_board.py`,
+  `syndicate/features/shared/kalshi_catalogue.py`,
+  `syndicate/features/shared/venue_quote_adapters.py`,
+  `syndicate/features/shared/venue_quote_fanin.py`,
+  `tests/test_kalshi_side_vocabulary.py`, `tests/test_kalshi_futures_eviction.py`.
+- **SHIPPED AND VERIFIED (evidence in `log/2026-08-26.md`, rows in `deploys.md`):**
+  side vocabulary; futures eviction; `board_by_game_date` on the ticker's game
+  date with `BY_CLOSE_DATE` alongside; ticker zone settled Eastern;
+  `PRECAP_CUT_BY_DATE`. All live under `34717822`.
+- **FOUR HYPOTHESES KILLED, none by argument:** (1) "the working set holds
+  nothing for the board's date" — refuted, 1958 markets on it; (2) NCAAF has no
+  game on the board's date — true but NOT binding, the join's board side has no
+  NCAAF rows at all; (3) `market_is_for_another_date` is a defect — it is a
+  description; (4) eviction re-prioritisation recovers ~1,600 markets — measured
+  **133**.
+- **BLOCKED ON, in order. Do NOT write an eviction change before both:**
+  1. `PRECAP_CUT_BY_DATE` taken **during a live slate**. The `03:11Z` reading is
+     post-slate and systematically understates it (`KXMLBHRR` cut 747 at 01:49Z,
+     132 at 03:11Z). Code is already live; this needs only a reading.
+  2. The **outer `MAX_STORED_MARKETS` trim dated the same way**. `cut_total=3940`
+     vs `TICK trimmed=8744` — ~4,800 markets are cut by a second date-blind bound
+     that nothing dates.
+- **THEN, and only if those numbers support it:** line-aware rungs, the lane's
+  original goal. Currently unjustified.
+- **Largest addressable bucket is now `no_matching_board_row=1838`**, not the
+  date bucket. Any successor should start there.
+
+### venue-balances-on-portfolio — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: the Kalshi and Polymarket account balances are visible on `/portfolio`,
+  beside the caps that spend them. `[user decision 2026-08-26: "are we able to
+  display kalshi and polymarket balances on the portfolio page?"]`
+- **THE PAGE MUST NOT CALL THE VENUE, and there are two independent reasons.**
+  (1) Web holds no credential and must not: `KALSHI_PRIVATE_KEY` /
+  `POLYMARKET_US_*` are dashboard-set on live-odds-worker and deliberately
+  absent from `render.yaml` (`#284`). (2) A second independent live caller of a
+  venue is a NAMED incident class here (`#139`/`#144`/`#148`) — it is why
+  `_polymarket_resolve_market` was rewritten in August to read the persisted
+  artifact. A widget calling per page load would be that, with N viewers.
+  **So: worker fetches on the execution tick, stamps
+  `reports/intelligence/venue_balances.json`, page reads with an age** — the
+  same hop `execution_state.json` already uses.
+- **THE ONE DANGEROUS BUG IS A ZERO.** "The account is empty" and "we could not
+  read the account" are opposite facts — one says stop, the other says
+  something is broken — and both render as `$0.00`. Every failure carries a
+  NAMED status and NO dollar figure: `credentials_absent`, `auth_error`,
+  `path_unknown`, `shape_unrecognised`. A total is not printed at all unless
+  BOTH venues read, because a sum over a partial read is a lie with a dollar
+  sign on it.
+- **KALSHI IS VERIFIED, POLYMARKET IS NOT, AND THE CODE DOES NOT PRETEND.**
+  `GET /trade-api/v2/portfolio/balance` is exercised (200 from a signed call
+  2026-08-23T22:53Z while unauthenticated reads were 429ing —
+  `kalshi_client.py:252`). `api.polymarket.us` has NO balance path documented
+  anywhere in this repo; `polymarket_us_auth.probe_auth()` asks `/markets`.
+  So the path is DISCOVERED once from a short read-only candidate list, the
+  winner recorded and reused, and `path_unknown` is a real state rather than a
+  guess that 404s forever. **The UNIT is likewise an assumption**: Kalshi
+  documents cents and it is divided and labelled; Polymarket documents nothing
+  we have read, so its raw value is carried undivided and labelled
+  `dollars_unverified`. Same discipline that caught the 100x price error.
+- Files:
+  `syndicate/features/shared/venue_balances.py` (new),
+  `scripts/run_live_odds_refresh_worker.py` (the stamp call only),
+  `syndicate/blueprints/intelligence.py` (`_live_portfolio_payload` only),
+  `syndicate/templates/portfolio.html`,
+  `tests/test_venue_balances.py` (new)
+- **CARVE-OUT EXTENDED** from `portfolio-decision-and-execution` (session
+  `01Sia2rPD72eFTriy28azzs2`, still not a reachable peer) on
+  `blueprints/intelligence.py` + `templates/portfolio.html`, at explicit user
+  direction, same terms as the two portfolio lanes earlier today.
+  `run_live_odds_refresh_worker.py` and both auth modules are held by no OPEN
+  lane; the auth modules are READ ONLY here and unedited.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: 19 tests green covering every named absence state; production
+  reading OWED and it is the point of the lane — `VENUE_BALANCES kalshi=… ` on
+  live-odds-worker, and a real figure (or a NAMED absence) rendered on
+  `/portfolio`. **Polymarket's discovery result is the finding**: which path
+  answered, or `path_unknown` against all four candidates.
+- **CLOSED 2026-08-26 — BOTH VENUES READ IN PRODUCTION**, worker + web
+  `4f3d3fe6`, stamp 7s old at 21:07:32Z: kalshi **$11.55** cash ($40.54 with
+  positions, `unit_disagreement null`), polymarket **$65.30** buying power
+  ($123.89 cash, open_orders 0.00, unsettled 0.00) via `/account/balances`.
+  Both `unit_assumption: documented` — no assumption left in the module.
+- **THE FIRST DEPLOY ANSWERED `path_unknown` AND THAT WAS THE POINT.**
+  `6fece2cd` shipped a guessed path; production returned
+  `kalshi=ok:13.84 polymarket=path_unknown` with all four candidates 404ing on
+  an identical gRPC `{"code":5}` envelope. A version that rendered `$0.00`
+  would have been indistinguishable from an empty account. The user supplied
+  the real path and both API references; `4f3d3fe6` replaced every guess with
+  a documented fact — plural path, list-by-currency shape, `buyingPower` over
+  `currentBalance`, and Kalshi's `balance_dollars` turning the cents division
+  into a cross-check.
+- **A TRAP THE DOCS CAUGHT THAT THE CODE WOULD NOT HAVE:** each Polymarket
+  balance row carries `pendingWithdrawals[].balance`, so the generic
+  balance-shaped-field scan would have reported money LEAVING the account as
+  the money in it.
+- **NEITHER VENUE CAN REACH ITS OWN DAY CAP** — kalshi $49.01 vs $11.55
+  (4.2x), polymarket $100.01 vs $65.30 (1.5x) — which the page now states
+  under the caps form. Full block: `deploys.md` 2026-08-26 21:0xZ.
+  Item: `todo.md #578`.
+- Blocked by: none
+
+### venue-settlement — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: live orders are settled from **the venue's own settlement record**, so
+  `settled > 0` stops being the gate the whole feedback loop is stuck behind.
+  `[user decision 2026-08-26: "do the settlement work next"]`
+- **WHY THIS IS DIFFERENT FROM THE SETTLEMENT WE ALREADY HAVE.**
+  `paper_settlement.settle_orders` grades an order against a status WE resolve —
+  our boxscore pipeline, our alias joins, our line handling. Every one of those
+  is a place to be wrong, and `#502`/the sim-weight argument both trace back to
+  a settled sample of zero. Both venues will simply state the outcome of a market
+  we hold. **This is not a better estimator; it removes the estimator.**
+- **DOCUMENTED SHAPES, READ BEFORE ANY CODE** (docs.kalshi.com /
+  docs.polymarket.us, 2026-08-26 — the balances lane earlier today proves the
+  cost of the opposite order):
+    - Kalshi `GET /portfolio/settlements` — `ticker`, `market_result`
+      (`yes|no|scalar`), `yes_count_fp`/`no_count_fp` (contracts HELD at
+      settlement), `yes_total_cost_dollars`/`no_total_cost_dollars`,
+      **`revenue` in CENTS**, `fee_cost` fixed-point dollars, `settled_time`.
+      Paged by `cursor`, filterable by `ticker`.
+    - Polymarket `GET /v1/portfolio/activities?types=ACTIVITY_TYPE_POSITION_RESOLUTION`
+      — `positionResolution.marketSlug`, `beforePosition`/`afterPosition`
+      (`UserPosition.realized` is an `Amount` decimal string), `side`
+      (`LONG|SHORT|NEUTRAL`), `updateTime`. Filterable by `marketSlug`.
+- **THE OUTCOME COMES FROM THE VENUE'S OWN ARITHMETIC, NOT FROM OUR SIDE
+  LOGIC.** Kalshi: P&L = `revenue/100 - (yes_cost + no_cost) - fee_cost`, and
+  won/lost from `market_result` against which side we actually HELD
+  (`yes_count_fp`/`no_count_fp`) — never from our `side`/`line` fields, which
+  are exactly what the alias joins get wrong. Polymarket: the realized delta
+  `afterPosition.realized - beforePosition.realized` IS the settlement P&L.
+- **IDEMPOTENCY IS THE LOAD-BEARING PROPERTY, same as the ledger's.** An order
+  already carrying an `outcome` is never re-graded or overwritten — this writes
+  into a money record that `paper_settlement` also writes. Rows are stamped
+  `settled_by: "venue"` so an AUTHORITATIVE outcome is distinguishable from an
+  INFERRED one; a later evaluation pass must be able to tell them apart.
+- **A SETTLEMENT WE CANNOT JOIN IS COUNTED, NOT DROPPED.** Two different
+  absences, both reported: settlement rows matching no order (`unjoinable`), and
+  open orders with no settlement row yet (`awaiting`). Collapsing them would make
+  "nothing has settled" and "we cannot see what settled" identical — the
+  distinction this system keeps paying to preserve.
+- Files:
+  `syndicate/features/shared/venue_settlement.py` (new),
+  `scripts/run_live_odds_refresh_worker.py` (the call site only),
+  `tests/test_venue_settlement.py` (new)
+- **Read-only, deliberately NOT claimed:** `execution_ledger.py` (uses `_load`
+  and `_persist`, edits neither — it is `portfolio-decision-and-execution`'s
+  file), `paper_settlement.py`, both auth modules.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: `off != on` through the ledger — an order with a matching venue
+  settlement gains `outcome` + `pnl_dollars` + `settled_by: "venue"`, and one
+  without gains nothing. Production reading OWED and it is the point:
+  `VENUE_SETTLEMENT settled=N unjoinable=N awaiting=N` on live-odds-worker, and
+  `settled_count > 0` on the live book for the first time.
+- **CLOSED 2026-08-26 — VERIFIED IN PRODUCTION**, live-odds-worker `022583f6`.
+  `VENUE_SETTLEMENT settled=3 already=12 awaiting=73 unjoinable=36
+  pnl_unattributed=0 refused={} errors={}`; three real orders graded with the
+  venues' exact P&L (polymarket −2.4017 lost, kalshi −4.4924 lost, polymarket
+  +5.44 won). `settled_count` 12 -> 15. Counters reconcile.
+- **THE SPLIT IS THE FINDING, not the count.** venue 3 bets −$1.45 (ROI
+  −11.88%) against inferred 12 bets +$15.05 (+51.07%); the page shows the blend
+  (+32.60%). **n=3 proves nothing** — what it establishes is that the headline
+  ROI mixes a venue record with our own inference and says so nowhere.
+- **RACE CONDITION, found AFTER deploying:** `settle_orders` runs from
+  `intelligence_state.py` on refresh-worker, venue settlement on
+  live-odds-worker, both idempotent on `outcome` — so whichever ticks first
+  after a game ends owns the row. Which source grades a live order is decided by
+  TIMING, not policy, and the comparison above can never become controlled while
+  that stands. Recommended and NOT taken (money-grading on a shared module, and
+  the choice of authority is the user's): venue gets first refusal on live
+  orders, `settle_orders` stays the fallback.
+- **DEPLOY NOTE:** preflight was HOLD and the guard correctly blocked me. The
+  documented off switch is an env var the hook reads from its OWN process, which
+  an inline prefix does not reach; I declined to forge a preflight receipt or
+  POST the API directly to dodge the hook. The user deployed from their own
+  terminal. Full block: `deploys.md` 2026-08-26 21:36Z. Item: `todo.md #579`.
+- Blocked by: none
+
+### kalshi-spread-join-sign — **OPEN (reopened 2026-08-26)** — session syndicate-43 (ENDED) — UNOWNED — six things verified; WNBA settlement is BUILT, LANDED and NOT DEPLOYED
+- Note: this lane was CLOSED earlier on 2026-08-26 and its block correctly moved
+  to `lanes_history.md`. Work continued after that close, so this is a fresh
+  block for what is still OWED — the history entry stays as the record.
+- Files: `syndicate/features/shared/{kalshi_board_join,kalshi_orders,bet_status_wnba,bet_status_soccer,polymarket_us_orders,board_enrichment}.py`,
+  `scripts/build_wnba_boxscores.py`, `pipeline/intelligence_state.py`,
+  `syndicate/blueprints/wnba.py` and their tests. **ALL CLAIMS RELEASED.**
+- VERIFIED (evidence `log/2026-08-26.md`, measurements `deploys.md`): Kalshi
+  shard 3 funded (3 MLB fills, `exchange_index=3`) · spreads join sign (15 of 30
+  inverted -> 0) · spreads PLACE correctly (`AZ2` home -1.5 -> YES, filled
+  3 @ 0.33, venue title matches the row) · WNBA id barrier
+  (`game_not_in_live_box` 9 -> absent, graded 0 -> 3) · soccer per-league read
+  (`no_soccer_live_state_for_date` -> `match_not_in_soccer_live_state`) · ESPN
+  host split (`{"ok":true,"games":3}` after the swap; 403 minutes before).
+- **OWED, in priority order:**
+  1. **DEPLOY refresh-worker, THEN read `SETTLED date=2026-08-25`.** All code is
+     on `origin/main`; the worker was NOT deployed (preflight HOLD, jobs
+     climbing 1 -> 10). `not_decided_yet: 6` is UNCHANGED and still reflects the
+     ESPN 403. PASSES only if it falls below 6 and Citron (1 reb vs over 3.5) /
+     Amoore (3 ast vs over 3.5) grade **LOST**. **DO NOT REPORT WNBA SETTLEMENT
+     AS FIXED BEFORE THAT READING** — and treat its all-time `win 100%` as
+     wins-only by construction until a loss can settle.
+  2. **Re-do the 2026-05-25..08-26 backfill through the KEYVALUE store.** The 84
+     files published via `/api/ops/artifacts/publish` sit on WEB'S FILESYSTEM
+     while the consumer reads keyvalue on refresh-worker — in production and
+     invisible to settlement. `build_wnba_boxscores.py --via-web --start --end`
+     run ON a worker lands in the right place.
+  3. **Soccer: still 0 settled all-time.** The read is fixed; needs an order
+     whose match finished with finals captured after 2026-08-26T16:11Z.
+  4. **Polymarket side resolution UNRESOLVED.** `over`->YES/`under`->NO is a
+     fixed constant while the price comes from the name-matched index, and the
+     `outcomes` array orientation VARIES per market. A cross-check guard was
+     built and REVERTED — it silently enthroned the positional reading, the
+     disputed question, and contradicted three deliberate tests. Needs venue
+     ground truth (Polymarket US credentials, on Render; the env read was
+     blocked by the permission classifier). `FILL_ABOVE_LIMIT` ships as
+     detection only.
+  5. **33 pre-existing test failures** in the soccer/board selection, confirmed
+     NOT caused by this lane (identical counts with and without the change).
+     `test_team_aliases.py` is 9 of them and the soccer join leans on it.
+- Blocked by: none
+
+### venue-first-refusal — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: on a LIVE order, the VENUE's settlement record grades it and our own
+  inference is the FALLBACK — not a race decided by which worker ticks first.
+  `[user decision 2026-08-26: "give the venue first refusal on live orders"]`
+- **THE DEFECT THIS CLOSES, measured 2026-08-26T21:36Z.**
+  `paper_settlement.settle_orders` runs from `intelligence_state.py` on
+  **refresh-worker**; `venue_settlement.settle_from_venue` runs on
+  **live-odds-worker**. Both skip an order that already carries an `outcome`, so
+  **whichever service ticks first after a game ends owns that row permanently.**
+  Which grader wins is decided by TIMING, not policy — and the venue-vs-inferred
+  comparison (venue 3 bets ROI −11.88%, inferred 12 bets +51.07%) can never
+  become controlled while that stands.
+- **THE RULE: a LIVE order is not graded by inference until the venue has had a
+  stated window to settle it.** `SYNDICATE_VENUE_SETTLEMENT_GRACE_HOURS`,
+  default 24 — long enough that the venue always wins in practice (both settle
+  within minutes to hours), short enough that a market the venue never settles
+  still reaches the ledger rather than sitting open forever.
+- **PAPER IS UNTOUCHED.** Only `mode == live` defers. The paper book has no
+  venue record to wait for, and delaying it would be delay for nothing.
+- **AGE COMES FROM `submitted_at`, FALLING BACK TO `selected_date`.** Both
+  unreadable is the only deferring-forever case, and it is COUNTED by name
+  (`awaiting_venue_no_age`) rather than silent — otherwise "the venue has not
+  settled it" and "we cannot tell how old it is" become the same never-graded
+  row.
+- Files:
+  `syndicate/features/shared/paper_settlement.py`,
+  `tests/test_venue_first_refusal.py` (new)
+- Read-only, NOT claimed: `pipeline/intelligence_state.py` (the call site is
+  unchanged), `venue_settlement.py`, `execution_ledger.py`.
+- Hypothesis: n/a (build).
+- Falsification test: n/a.
+- Verification: `off != on` — a freshly-submitted LIVE order is REFUSED by
+  `settle_orders` with `awaiting_venue`, the same order past the window IS
+  graded, and a PAPER order is graded either way. Production reading owed:
+  `awaiting_venue` appearing in `[paper_settlement] SETTLED ... reasons=` on
+  refresh-worker, and new live grades carrying `settled_by: "venue"`.
+- **CLOSED 2026-08-26 — VERIFIED IN PRODUCTION**, refresh-worker `ebfec2ed`:
+  `ungraded={... 'awaiting_venue': 28, 'order_not_filled': 74 ...}`.
+  **28 is the EXACT pre-deploy count** of filled-and-ungraded live orders on
+  2026-08-26, measured off the served ledger before deploying — every one would
+  otherwise have been graded by inference tonight before the venue was asked.
+  `order_not_filled: 74` proves it discriminates rather than deferring
+  everything; paper and 2026-08-25 are untouched.
+- **A BUG AN EXISTING TEST CAUGHT:** the first version ran the deferral BEFORE
+  the filled check, so an unfilled live order would have waited forever for a
+  settlement on a position never opened.
+  `test_an_unfilled_order_is_not_counted_as_a_loss` failed and said so.
+- **A READING I NEARLY GOT WRONG:** the first watcher had no `startTime` floor
+  and returned `SETTLED` lines from 21:28–21:42Z — all BEFORE the 22:07:31Z
+  deploy. `awaiting_venue` was absent from them and I was one step from
+  reporting the deferral dead; I had also cited that batch's `08-25 graded=6` as
+  proof the fallback worked when it was the OLD code with no window at all.
+  Caught by timestamping against the deploy. `SETTLEMENT_FAILED: 0` was the
+  discriminator that ruled out the raise which looks identical to silence.
+- **DEPLOY NOTE:** preflight was HOLD with an MLB daily sim mid-run and the
+  guard blocked me; the user deployed from their own terminal after being told
+  the cost, and the sim was killed as directed. Full block: `deploys.md`
+  2026-08-26 22:07:31Z. Item: `todo.md #580`.
+- Blocked by: none
+
+### mlb-chip-live-state — **CLOSED 2026-08-27** — opened 2026-08-26 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 — **GOAL MET AND VERIFIED ON EVERY SERVE PATH.** Live/final MLB chips carry a real score and a real inning on `worker_artifact` AND `inline_artifact_stale`, web and refresh-worker both carrying the fix. ROOT CAUSE: `live_lens_report_<date>.json` has TWO writers over one path and a SLIM row was being read as an ANSWER. **Both OWED items discharged. Residual work re-filed as its own items rather than left in this lane: `todo.md #582` (the writer race, deliberately unfixed) and `#585` (artifact content age).**
+- Goal: every LIVE/FINAL MLB game chip on the Layer 2 board strip carries its
+  real score and its real inning token, on BOTH serve paths (`worker_artifact`
+  and `inline_artifact_stale`), for as long as the game is live.
+- Files: `syndicate/blueprints/home.py`, `tests/test_home_mlb_live_lens_states.py`
+- Hypothesis: `live_lens_report_<date>.json` has TWO writers alternating over one
+  path — the live-lens loop writes the FULL row shape, and
+  `scripts/refresh_mlb_oddsapi.py` writes the SLIM shape (`{gamePk, startTime,
+  status}` only, by its own docstring). `_mlb_live_lens_state_from_row` accepts a
+  SLIM row as a COVERED game (non-None, `in_progress` True, `away_pts`/`home_pts`
+  None, no inning), so `_apply_mlb_live_scores` never reaches its statsapi
+  fallback and coerces both scores to 0.
+- Falsification test: if the chips blanked while the on-disk lens still carried
+  `matchup.score` / `gameLens[0].progress`, the lens shape is NOT the cause.
+  Checked on production 2026-08-26 22:27-22:38Z: the two states track the shape
+  exactly, both directions.
+- Verification: same-instant chip-vs-StatsAPI diff on production across at least
+  one full FULL->SLIM->FULL lens cycle, with zero live games reading `0-0` or a
+  bare `LIVE`/`FINAL` token during the SLIM window.
+- **CLOSING VERIFICATION, the cell that had never been measured** —
+  `(LENS=SLIM, src=worker_artifact)` at `00:08:34Z`, refresh-worker on
+  `f8d8b05f`, artifact age 78.9s:
+
+      games with a BARE live token (the blank signature): 0
+
+  Every live game carried a real inning. Pre-fix, that exact cell served every
+  live game `0-0` with a bare `LIVE`. **OWED 1 DISCHARGED.**
+- **OWED 2, the latency risk, RESOLVED AS FAR AS IT CAN BE TONIGHT and NOT
+  claimed as clean.** `#581` restores a statsapi fan-out that
+  `render-web-request-path` had removed. Evidence for: web ran `58be8c0d` from
+  `23:08:11Z` to `23:17:05Z` with ZERO unhealthy while the SLIM/inline path was
+  exercised on 9 samples, and `syndicate-27`'s next deploy produced none at all.
+  Evidence not obtained: an unhealthy AWAY from a deploy, which is the only
+  discriminating case. **Counted, not estimated — 3 unhealthy on web across
+  2026-08-26 against 13 `deploy_ended`**, at `16:48:45Z` (+70s), `23:07:51Z`
+  (+150s) and `23:51:22Z` (+118s); every one within ~2.5 min of a deploy and
+  recovering in ~20s. One of the three PREDATES the fix. **Rollback target if it
+  ever fires away from a deploy: `34b30330`.**
+- **A READING THAT NEARLY BECAME A FALSE REGRESSION REPORT.** The `00:08:34Z`
+  watcher line said `wrong=4` with three games at `0-0` — the signature of the
+  bug just fixed. It was staleness, not blanking. **The discriminator is the
+  TOKEN, not the SCORE**: a blanked game has no inning at all, a stale one has a
+  real inning that is merely behind. My watcher compared only scores and could
+  not tell them apart. In `state.md [chip-artifact-content-age]`.
+- **AND A HYPOTHESIS OF MINE FALSIFIED BY ITS OWN TEST, within the hour.**
+  `#585` first blamed `_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60`. One WARM build
+  later the same worker with the same bound served an inning gap of max 1, mean
+  0.25 over 8 games. The driver is BOARD-BUILD DURATION (cold 747.8s vs warm
+  107.8s), so the exposure is a ~12-minute window after every worker RESTART,
+  not a standing lag. Corrected in place in `todo.md` and `state.md`.
+- **Deploys:** web `58be8c0d` (`dep-da7mvg7avr4c73b6b1m0`, live 23:05:38Z), mine,
+  claim taken and released. Both workers reached `23f065d4`/`f8d8b05f` via the
+  user's own deploy and `syndicate-fd`'s — refresh-worker's claim was held by
+  `ncaaf-opener-regions-props` throughout and was NEVER forced.
+- **Ledger:** `deploys.md` 2026-08-26 web `58be8c0d`; `state.md`
+  `[mlb-live-lens-row-shape]` and `[chip-artifact-content-age]`; `learnings.md`
+  "two producers, two shapes" and "a warning that is usually wrong gets trained
+  out"; `todo.md` `#581`, `#582`, `#585`.
+- **Note for whoever takes `#582`:** `scripts/todo_id_reconcile.py`'s
+  blocking-vs-advisory split is RECOMMENDED and deliberately not implemented —
+  that file belongs to `repo-coordination`, which is flagged POSSIBLY ORPHANED
+  and says not to force-reassign on that evidence.
+### open-bet-live-status — **CLOSED 2026-08-26** — opened 2026-08-26 — session syndicate-27 (749848)
+- Goal: every OPEN bet on `/portfolio` shows where it stands, plus a date
+  filter. `[user 2026-08-26: "can we append live game or prop status to the open
+  bets" -> "ship both"; "portfolio needs a date filter"]`
+- **THIS LANE BLOCK WAS WRITTEN, THEN LOST, THEN REWRITTEN.** It was inserted
+  when the lane opened and was absent from `lanes.md` by commit time — the code
+  changes survived, only the ledger edit did not. The one unusual thing done in
+  between was a `git stash --include-untracked` / `stash pop` cycle (used to
+  prove three `test_venue_quote_adapters` failures were pre-existing rather than
+  mine). **Cause not definitively established; recorded because a silently
+  vanishing ledger edit is worse than the bug it was describing.** Stashes are
+  REPO-GLOBAL, not per-worktree — `git stash list` here shows other sessions'
+  entries at the top — so a stash in a shared-repo worktree is a cross-session
+  object and should be avoided in favour of a scratch copy.
+- **NOTHING IS COMPUTED FOR THIS.** `portfolio_commit` already writes
+  `plan["bet_status"]` and `plan["live_marks"]` into
+  `portfolio_plan_<date>.json`, and that artifact already crosses to web. A
+  join and a rendering, never compute in a request path.
+- **COVERAGE MEASURED BEFORE BUILDING** (`/api/portfolio/plan`, 22:5xZ):
+  `live_marks` **82 of 442** (`moved_toward 42 / moved_against 22`), no
+  per-sport resolver needed; `bet_status` **3 of 442**, `no_live_feed: 419`
+  because only MLB has a live resolver. Shipping the second anyway is the
+  point — it never once worked (an `UnboundLocalError` every cycle) and hid as
+  "a page column that renders an honest-looking blank". Reasons now render BY
+  NAME.
+- **A REAL BUG FOUND WRITING ITS TEST:** `settlement_summary` ran on the
+  DISPLAY list, so the pre-existing `?show=` toggle already moved the headline
+  W/L and P&L, and the date filter would have moved them far more. `periods`
+  had it right; settlement now reads the whole book too.
+- **THE DATE FILTER KEEPS THE ALL-DATES GUARANTEE.** `?on=` is opt-in and
+  never the default, because this book is all-dates precisely so a page cannot
+  "let one expire unwatched". Whenever it is on, the page states how many OPEN
+  positions it is holding back — that count IS the guarantee.
+- **NAME THE TEAM `[user-reported, real order]`.** A row read `home` beside
+  `aec-mlb-cle-laa-2026-08-26` and the natural reading of that slug is that we
+  bought CLE. **We had not, and the order was correct**: the venue's outcomes
+  array is `['Los Angeles Angels', 'Cleveland Guardians']` — REVERSED against
+  its own slug — so `home` matched the Angels by NAME at index 0 and the submit
+  went `OUTCOME_SIDE_YES` on index 0 (`SUBMIT ... our_side=home outcome_index=0
+  yes_index=0`, 21:44:25Z). The 2026-08-25 side-inversion fix is working. The
+  ROW was unreadable, which on a real-money page is its own defect. Game-line
+  rows now lead with the team name.
+  **`outcome_index: null` in the ledger is NOT evidence** — it is not a field
+  on `OrderRequest`, only a local in `execute_portfolio`. Reading that null as
+  "no index was resolved" would have produced a false side-inversion report.
+- Files: `syndicate/blueprints/intelligence.py`,
+  `syndicate/templates/portfolio.html`, `tests/test_open_bet_live_status.py`,
+  `tests/test_venue_balances.py` (stub signatures only)
+- **CARVE-OUT** from `portfolio-decision-and-execution` on
+  `blueprints/intelligence.py` + `templates/portfolio.html`, at explicit user
+  direction, same terms as the portfolio lanes earlier today.
+  `pipeline/portfolio_commit.py` read only, not edited.
+- **FLAGGED, NOT MINE:** `tests/test_venue_quote_adapters.py` has 3 failures on
+  `main` (soccer h2h / DRAWABLE_OUTCOME / league token, from `e2781211`).
+  Confirmed pre-existing by stashing this lane's work and re-running. Belongs to
+  `exchange-markets-api-integration`.
+- **DEPLOYED AND VERIFIED 2026-08-26T23:23:11Z**, web `61405c99`. Served row for
+  the user's reported order now reads `Los Angeles Angels / h2h · home ·
+  Cleveland Guardians @ Los Angeles Angels`. 126 open orders, 123 decorated,
+  date chips render, AHEAD/BEHIND and "pts vs taken" both showing. Deploy
+  succeeded with NO `server_failed` after the swap.
+- **MY PRE-BUILD COVERAGE ESTIMATE WAS BACKWARDS.** Measured off the whole plan
+  (`bet_status` 3/442, `live_marks` 82/442) I predicted status would be ~5%
+  useful. On the open LIVE book it is **status 81/126, marks 18/126** — the
+  inverse. The plan is dominated by paper soccer rows with no resolver; the live
+  book is MLB/WNBA where the resolver works. A true number against the wrong
+  denominator.
+- **CROSS-CHECK:** 14 won + 14 lost = 28 open-but-decided bets, exactly the
+  `awaiting_venue: 28` from `#580`'s deferral, computed independently.
+- **CLAIM COORDINATED, NOT FORCED:** `web` was held by `mlb-chip-live-state`
+  (`syndicate-f6`); messaged both interactive peers, they released, and I
+  verified `merge-base --is-ancestor 58be8c0d 61405c99` before deploying so
+  their `home.py` fix was carried forward rather than reverted.
+  Full block: `deploys.md` 2026-08-26 23:23:11Z. Item: `todo.md #584`.
+- Verification: 21 tests; 671 green across portfolio/settlement/execution/venue
+  suites. Local render confirms AHEAD/BEHIND with the number, `no live feed`
+  by name, `+2.4 pts vs taken`, the hidden-open-bets banner, and the team name.
+  **Production reading OWED — NOT DEPLOYED.**
+- Blocked by: none
+- **VERIFIED IN PRODUCTION, on the falsifying cell.** `(LENS=SLIM,
+  src=inline_artifact_stale)` is the only state that can disprove the fix — web
+  building chips itself against its own slim lens. CONTROL (pre-deploy SLIM
+  windows 22:32:42Z-22:35:46Z, 22:39:44Z-22:41:25Z): **6 of 8 non-pregame games
+  `0-0` with a bare `LIVE`/`FINAL` token, on BOTH serve paths.** AFTER
+  (23:08:36Z-23:12:45Z, inline path): **32+ scored-game readings, 0 score
+  mismatches**; 4 inning-token misses, all the same transition artifact (a game
+  seconds after first pitch reading `LIVE` before `TOP 1`, resolving in ~90s).
+  Full read: `deploys.md` 2026-08-26 web `58be8c0d`.
+- **A READING THAT LOOKS LIKE A PASS AND IS NOT:** `LENS=SLIM
+  src=worker_artifact ALL MATCH`. The lens shape sampled is WEB's copy; each
+  service holds its own, so a worker artifact built while the WORKER's lens was
+  FULL matches regardless of what web runs. Do not bank it.
+- **OWED 1 — refresh-worker is NOT deployed.** It runs the same code
+  (`pipeline/layer2_shortlist.py:511` -> `build_game_chips` -> imports
+  `home.py`), so its published artifact still goes blank in a slim window. Its
+  claim was held by `ncaaf-opener-regions-props` from 22:57:41Z and was NOT
+  forced; that session was asked to carry `9be130e0` (a descendant of this
+  commit). Discharge by reading `(LENS=SLIM, src=worker_artifact)` once the
+  worker carries `58be8c0d` or later.
+- **OWED 2 — the latency risk is unresolved, not cleared.** This restores the
+  statsapi fan-out for slim rows, and `render-web-request-path` fixed web's
+  SIGTERMs by removing exactly that. One `unhealthy` at 23:07:51Z (recovered
+  23:08:11Z) against a baseline of **2 unhealthy in the previous 9h/10 deploys**,
+  one of which was 70s after an unrelated deploy with the same message and the
+  same ~20s recovery. Mine matches that shape; n cannot separate them. **The
+  discriminator is a SECOND unhealthy with no deploy behind it.** Rollback
+  target `34b30330`.
+- **NOT FIXED, deliberately:** the two-writer race itself — `todo.md #582`, with
+  both candidate fixes and why neither is a ten-line guard.
+- Note: `scripts/pending_deploys.py` listed this commit as pending for web ONLY.
+  Its service-to-file map does not know refresh-worker executes `home.py`.
+- Note: `check_lane_invariants.py` reports one contested file,
+  `scripts/run_refresh_worker.py`, held by `exchange-markets-api-integration`
+  and `portfolio-ledger-service-split`. Pre-existing, not this lane's.
+
+### wnba-chip-live-token — OPEN, **UNOWNED** (session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 checkpointed and ARCHIVED 2026-08-27) — opened 2026-08-27 — **CLOCK FIXED AND VERIFIED IN PRODUCTION (web `e3dceb68`): `LIVE` -> `Q3 20.5`, control and after on the same game against ESPN. TWO THINGS OWED — refresh-worker is not deployed, and the projection guard is UNIT-TESTED ONLY. `todo.md #586`.** **CHECKPOINT 2026-08-27T01:2xZ: refresh-worker reached `070f452a` and DOES carry the fix; the WNBA half is owed on a MISSING SUBJECT, not a missing deploy — `WNBA live=0` when the artifact landed. Next window TOR @ SEA `02:00Z`. Session archived; lane UNOWNED.**
+- Goal: a live WNBA game chip carries its QUARTER AND CLOCK (`Q3 5:23`) instead
+  of a bare `LIVE`, and never renders a SmartSim projection as an observed score.
+- Files: `syndicate/blueprints/home.py`,
+  `syndicate/features/shared/game_chip_scoreboard.py`,
+  `tests/test_home_wnba_live_state.py`
+  — `game_chip_scoreboard.py` ADDED after the first test run: refusing to
+  SET a fractional score in `home.py` is not enough, because `_side_score`
+  falls through to `live_state.<side>_pts` and picks the projection back up.
+  Unclaimed by any OPEN lane, checked before adding.
+- Hypothesis — **CONFIRMED FROM PRODUCTION BEFORE WRITING ANY CODE**, via
+  `/api/ops/wnba/status-trace?date=2026-08-26`. `local_live_state_payload` (what
+  `build_live_state_payload` returns, i.e. `live_row`) carries everything needed:
+
+      {"away_pts": 65.0, "home_pts": 38.0, "in_progress": true,
+       "period": 3, "clock": "5:23", "status": "5:23 - 3rd"}
+
+  `_apply_wnba_live_scores` builds `live_state` from FIVE keys — `away_pts`,
+  `home_pts`, `in_progress`, `final`, `status` — and **drops `period` and
+  `clock` on the floor**. `_live_status_token`'s generic branch reads exactly
+  `live_state.period` / `live_state.clock`, finds nothing, returns None, and the
+  chip falls back to the bare `LIVE` string. Nothing is missing upstream.
+- Second defect, same function, same class: **`#160`'s guard is insufficient.**
+  `cards.py`'s live-state row falls back to the SmartSim PROJECTED point total
+  when no real ESPN boxscore row has matched. The guard gates on
+  `in_progress or final` — i.e. on the GAME's state, not on whether the number
+  is an OBSERVATION. A live game with no matched boxscore therefore passes the
+  gate carrying a projection. That is the user's reported `GSV 85.43 / CON 68.94`
+  rendered where a score goes. A real basketball score is a whole number.
+- Falsification test: if `local_live_state_payload` rows carried no `period`, the
+  data would be missing upstream and this fix would be inert. Checked on
+  production: `period: 3`, `clock: "5:23"`, both present on the live game.
+- Verification: on a live WNBA slate, `/api/board/game-chips?sports=wnba` returns
+  `status_token` matching `^Q\d+ \d+:\d\d$` rather than `LIVE`, and no chip
+  carries a non-integral score. Plus a unit test built on the production row
+  above that FAILS pre-change.
+- Blocked by: none. `wnba/cards.py` is claimed by `wnba-halftime-elapsed` and is
+  NOT touched — the whole fix is in `home.py`, which this lane claims and which
+  `mlb-chip-live-state` released on closing.
+
+- **VERIFIED** `00:34:02Z` on `inline_artifact_stale`, the path `e3dceb68` is
+  deployed to:
+
+      CONTROL  00:29:37Z  GSV @ CON  token='LIVE'     76-48  ESPN P3 1:13  76-48
+      AFTER    00:34:02Z  GSV @ CON  token='Q3 20.5'  80-52  ESPN P3       80-52
+
+- **OWED 1 — refresh-worker is on `f8d8b05f` and does NOT carry this.** It builds
+  the published chip artifact, so while a fresh one is served the WNBA chip is
+  still bare: observed `00:32:49Z`, `src=worker_artifact`, `tok='LIVE'`. Claim
+  held by `ncaaf-opener-regions-props`; they offered to release and it was
+  DECLINED, because the inline path already proved the fix and their NCAAF
+  capture was time-bound. Discharge by reading a WNBA chip on
+  `src=worker_artifact` once that service carries `07a7124e` or later.
+- **OWED 2 — the projection guard is UNIT-TESTED ONLY and must not be recorded as
+  production-verified.** GSV @ CON had a matched ESPN boxscore all evening, so the
+  fractional `85.43` path never fired. It needs a game that has tipped off before
+  its boxscore row matches.
+- **MY OWN VERIFIER RETURNED A FALSE NEGATIVE ON THE PASSING RUN.** The assertion
+  assumed a `M:SS` clock; ESPN's `displayClock` under a minute is `20.5`, so a
+  CORRECT token printed `STILL BARE`. The raw value settled it. Second instance
+  the same night of a watcher summary disagreeing with what it was built to
+  check — the other ran the opposite way at `00:08:34Z`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

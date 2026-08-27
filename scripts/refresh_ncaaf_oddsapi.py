@@ -5,6 +5,7 @@ import contextlib
 import csv
 import errno
 import filecmp
+import importlib
 import json
 import os
 import re
@@ -33,6 +34,116 @@ _SPACE_RE = re.compile(r"\s+")
 DIRECTORIES = (
     "recommendations_summary",
 )
+
+# Week-scoped capture files, relative to `<source_root>/data/`.
+#
+# NOT copied into the artifact bundle, and that is a reversal of this file's
+# first version. The bundle copy is FLAT (`artifact_root / path.name`), so a
+# props file landing there becomes
+# `ncaaf_source/source_artifacts/oddsapi_player_props_*.csv` -- a path the hot
+# artifact allowlist does NOT match, checked against the real matcher. The
+# result would be a second, stale, undeliverable copy sitting next to the live
+# one. Delivery to web is `publish_hot_artifact` on the canonical
+# `data/processed/` path instead; this tuple exists so the input hash notices a
+# fresh capture.
+GLOB_PATTERNS = (
+    "processed/oddsapi_player_props_*.csv",
+)
+
+
+def _props_file_name(season: int, week: int) -> str:
+    return f"oddsapi_player_props_{int(season)}_wk{int(week)}.csv"
+
+
+def _load_props_fetcher():
+    """`scripts/fetch_ncaaf_oddsapi_props_local.py`, imported not shelled.
+
+    Same shape as `refresh_nfl_oddsapi.py::_load_local_fetchers`. Importing
+    rather than spawning keeps the props fetch inside this process's own
+    `ODDS_API_*` environment, which is the whole point -- the region and
+    market knobs are read from `os.environ` at call time.
+    """
+    scripts_root = str(Path(__file__).resolve().parent)
+    if scripts_root not in sys.path:
+        sys.path.insert(0, scripts_root)
+    importlib.invalidate_caches()
+    return importlib.import_module("fetch_ncaaf_oddsapi_props_local")
+
+
+def _refresh_player_props(*, data_root: Path, season: int, week: int) -> dict[str, Any]:
+    """Capture NCAAF player props for `week` next to the lines file.
+
+    WHY THIS EXISTS, stated because its absence was invisible for a season:
+    `fetch_ncaaf_oddsapi_props_local.py` has been complete and correct since
+    2026-08-20 and **had no caller of any kind** -- not this runner, not the
+    orchestrator, not a worker autorun. NFL's identical fetcher is invoked
+    from `refresh_nfl_oddsapi.py:275`; NCAAF's was not, so NCAAF props were
+    never captured once. Measured 2026-08-26 on production: every one of the
+    51 served wk1 cards carried `shared_prop_rows: []`.
+
+    NEVER FAILS THE LINES REFRESH. Props are a strictly additive capture and
+    a books-have-not-posted-yet response is a 200 with no markets, not an
+    error. The lines snapshot is what the board actually reads today, so a
+    prop-side failure must degrade to a recorded reason rather than a
+    non-zero exit -- the opposite of NFL's runner, which returns the props
+    exit code and would take the whole NCAAF refresh down with it.
+    """
+    # UNDER `data/processed/`. The hot-artifact allowlist already carries
+    # `*_source/data/processed/oddsapi_player_props_*.csv`, so this path
+    # crosses to web with no edit to `artifact_publisher.py` -- which matters
+    # beyond tidiness: that file is claimed by another OPEN lane. Verified
+    # against `is_hot_artifact_relative_path`, not by reading the pattern.
+    out_path = data_root / "data" / "processed" / _props_file_name(season, week)
+    try:
+        props_module = _load_props_fetcher()
+        rc = props_module.main(
+            [
+                "--season",
+                str(int(season)),
+                "--week",
+                str(int(week)),
+                "--out",
+                str(out_path),
+            ]
+        )
+    except Exception as exc:
+        print(f"[ncaaf_props] SKIPPED {type(exc).__name__}: {exc}", flush=True)
+        return {"status": "error", "error": f"{type(exc).__name__}: {exc}", "path": str(out_path)}
+
+    rows = 0
+    if out_path.exists():
+        try:
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                rows = max(0, sum(1 for _ in handle) - 1)
+        except Exception:
+            rows = 0
+    status = "ok" if int(rc or 0) == 0 else "failed"
+
+    # PUBLISH, or the capture stops on the worker's disk. Render will not share
+    # a disk between the worker and web, so an artifact the worker writes is
+    # invisible to the board until it is pushed across. `#208`'s lesson runs the
+    # other way too: the allowlist PERMITS the transfer, it does not perform one.
+    #
+    # Best-effort by contract -- `publish_hot_artifact` returns False and never
+    # raises on "not configured", "not allowlisted", "file missing" or a network
+    # error, so this cannot fail the refresh either.
+    published = False
+    if rows > 0:
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            published = bool(publish_hot_artifact(out_path))
+        except Exception as exc:
+            print(f"[ncaaf_props] PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+    # `logger.info` never reaches Render's log collector -- print/flush is the
+    # only line that shows up in `render_logs.py`.
+    print(
+        f"[ncaaf_props] {status} season={season} week={week} rows={rows} rc={rc} "
+        f"published={published} path={out_path}",
+        flush=True,
+    )
+    return {"status": status, "rc": int(rc or 0), "rows": rows, "published": published, "path": str(out_path)}
 
 ALIASES = {
     "miami oh": "miami ohio",
@@ -183,12 +294,48 @@ def _base_norm(name: str) -> str:
 
 
 def _resolve_data_root(*, source_root: Path | None, artifact_root: Path) -> Path:
+    """The root everything else reads from and writes under.
+
+    USES `_prediction_files`, THE SAME FUNCTION THE CONSUMER USES, and that is
+    the fix rather than an implementation detail. This gate used to glob
+    `artifact_root` ALONE while `_prediction_context` searched
+    `artifact_root/data` as well -- a gate strictly narrower than the thing it
+    guards, which is a shape that can only ever produce false refusals.
+
+    Measured on production 2026-08-27, and it had been failing silently since
+    the sport came into season:
+
+        STEP_START name=ncaaf_lines_snapshot command=[... refresh_ncaaf_oddsapi.py
+          --artifact-root /opt/render/project/data/ncaaf_source]
+        FileNotFoundError: NCAAF runner needs --source-root or an
+          --artifact-root containing the predicted schedule CSV.
+        STEP_FAIL name=ncaaf_lines_snapshot return_code=1 runtime_seconds=0
+
+    It fails in ZERO SECONDS and costs nothing, so it never showed up as a
+    timeout, a memory spike or a cost line -- only as an entry in
+    `ODDS_REFRESH_FAILURE_SUMMARY` that nothing alerts on. NCAAF odds and
+    props could not refresh in production at all.
+
+    Cause: `refresh_odds_sources._local_source_artifact_root` appends
+    `source_artifacts` on a LOCAL path and does NOT on a hosted one, so the
+    same argument names two different layouts. Rather than change that shared
+    helper -- four other sports pass through it -- this searches the layouts
+    that actually occur.
+
+    Returns the SOURCE ROOT, not the directory the predictions were found in:
+    `_merge_and_write` and the props capture both write under
+    `<data_root>/data/`, so returning the deeper directory would scatter
+    artifacts into `source_artifacts/data/` on production.
+    """
     if source_root is not None:
         return source_root.resolve()
-    pattern_matches = list(artifact_root.glob(PRED_FILES_GLOB))
-    if pattern_matches:
+    if _prediction_files(artifact_root):
         return artifact_root.resolve()
-    raise FileNotFoundError("NCAAF runner needs --source-root or an --artifact-root containing the predicted schedule CSV.")
+    searched = ", ".join(str(artifact_root / rel) if rel else str(artifact_root) for rel in _PREDICTION_SEARCH_DIRS)
+    raise FileNotFoundError(
+        "NCAAF runner needs --source-root or an --artifact-root containing the predicted schedule CSV. "
+        f"Searched: {searched}"
+    )
 
 
 def _norm_team(name: str) -> str:
@@ -253,9 +400,25 @@ def _parse_utc_datetime(value: object) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+#: Where the predicted-totals CSV can live, relative to a candidate root.
+#:
+#: `source_artifacts` is the one that matters in production and was missing.
+#: LOCALLY the orchestrator passes `data/ncaaf_source/source_artifacts` as
+#: `--artifact-root` and the CSVs sit directly in it; ON RENDER
+#: `_local_source_artifact_root` drops that segment and passes
+#: `/opt/render/project/data/ncaaf_source`, where the same files are one level
+#: down under `source_artifacts/`. So the layout differs by environment and
+#: only the hosted one was unsearched.
+_PREDICTION_SEARCH_DIRS = ("data", "", "source_artifacts")
+
+
 def _prediction_files(source_root: Path) -> list[Path]:
-    for data_root in (source_root / "data", source_root):
-        matches = sorted(data_root.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
+    for relative in _PREDICTION_SEARCH_DIRS:
+        candidate = source_root / relative if relative else source_root
+        try:
+            matches = sorted(candidate.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
+        except OSError:
+            continue
         if matches:
             return matches
     return []
@@ -294,6 +457,14 @@ def _prediction_context(source_root: Path) -> dict[str, Any]:
 
 def _lines_file_name(season: int) -> str:
     return f"college_football_betting_lines_{int(season)}.csv"
+
+
+def _glob_data_files(source_root: Path) -> list[Path]:
+    """Week-scoped bundle files, sorted so the input hash is order-stable."""
+    matches: list[Path] = []
+    for pattern in GLOB_PATTERNS:
+        matches.extend(path for path in (source_root / "data").glob(pattern) if path.is_file())
+    return sorted(matches)
 
 
 def _root_files_for_season(season: int) -> tuple[str, ...]:
@@ -597,6 +768,10 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
                 *[path_fingerprint(source_root / "data" / name) for name in _root_files_for_season(season)],
                 path_fingerprint(Path(prediction_context["path"])),
                 *[path_fingerprint(source_root / "data" / name) for name in DIRECTORIES],
+                # Week-scoped props files are fingerprinted too, or a fresh
+                # capture would leave the hash unchanged and `should_recompute`
+                # would short-circuit the copy that carries it into the bundle.
+                *[path_fingerprint(path) for path in _glob_data_files(source_root)],
             ],
         }
     )
@@ -657,6 +832,7 @@ def main() -> int:
     parser.add_argument("--api-key", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
+    parser.add_argument("--skip-props", action="store_true", default=True, help="Retained for compatibility; props moved to ncaaf_player_props_oddsapi.")
     args = parser.parse_args()
 
     artifact_root = Path(args.artifact_root).resolve()
@@ -703,7 +879,23 @@ def main() -> int:
     else:
         print(json.dumps(result, indent=2))
 
-    copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root) if str(args.mode or "full").strip().lower() == "full" else {}
+    is_full = str(args.mode or "full").strip().lower() == "full"
+    # Props only on a full pass, and only after the lines refresh has already
+    # produced its own result -- `--mode fast` exists to keep the cheap tick
+    # cheap, and props are the expensive half (per event, per market).
+    # PROPS MOVED OUT OF THIS RUNNER, 2026-08-27. They now hang off
+    # `ncaaf_player_props_oddsapi` in `refresh_odds_sources._build_ncaaf_steps`,
+    # beside the game-lines capture that actually runs.
+    #
+    # This runner cannot execute for 2026 at all -- it requires a
+    # `college_football_schedule_<season>_predicted_totals_enhanced*.csv` and
+    # git holds 359 of them, every one season 2025. Props wired here were
+    # unreachable in the exact season they were built for. Kept behind
+    # `--skip-props` (default on) so there is exactly ONE producer and no
+    # double capture if the legacy path is ever revived.
+    props_result = {"status": "skipped", "reason": "moved_to_ncaaf_player_props_oddsapi"}
+
+    copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root) if is_full else {}
     print(
         json.dumps(
             {
@@ -712,6 +904,7 @@ def main() -> int:
                 "week": week,
                 "artifact_bundle_root": str(artifact_root),
                 "refresh_result": result,
+                "props_result": props_result,
                 "artifact_bundle_files": copied,
             },
             indent=2,

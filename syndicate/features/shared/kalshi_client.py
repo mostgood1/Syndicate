@@ -126,6 +126,17 @@ _MARKET_FIELDS = (
     "custom_strike",
     "result",
     "rules_primary",
+    # THE EXCHANGE SHARD THIS MARKET LIVES ON, and the field that explains two
+    # days of failed MLB orders. Public, no credential needed -- and it was
+    # being DROPPED here, so `SUBMIT_FAILED_MARKET` printed `exchange_index=None`
+    # for a market whose raw payload carried `3`.
+    #
+    # `normalize_market` is an allowlist, which is right: it is why a venue
+    # rename shows up as a missing field instead of a silent None. The cost is
+    # that a field nobody listed is invisible even when the raw response has it,
+    # and the whole diagnosis had to come from a session with unproxied network
+    # access reading the payload directly.
+    "exchange_index",
 )
 
 
@@ -400,6 +411,72 @@ def fetch_market(ticker: str) -> dict[str, Any]:
             errors.append(f"unexpected_shape:{sorted(payload)[:6]}")
             continue
         return {"status": "ok", "market": normalize_market(raw), "base": base}
+    return {"status": "error", "reason": "; ".join(errors) or "no_base_responded"}
+
+
+def fetch_event_markets(event_ticker: str) -> dict[str, Any]:
+    """The market tickers KALSHI ITSELF lists under one event.
+
+    THE ONE QUESTION LEFT ON `market_not_found`. Measured 2026-08-26T01:18:47Z:
+    `GET /markets/KXMLBTOTAL-26AUG251907KCTOR-8` returns 200 with live quotes,
+    and `POST /portfolio/events/orders` with that exact ticker, on the SAME
+    host, in the same second, returns `market_not_found`. Four hypotheses have
+    been measured and killed -- side, market shape, event field, and host.
+
+    What has never been checked is whether the ticker the MARKET endpoint
+    answers to is the ticker the ORDER endpoint expects. A market listing can
+    resolve an alias; an order book cannot. If this returns tickers that differ
+    from ours, that is the whole bug, and it is not a guess -- it is the
+    venue's own spelling of its own markets.
+
+    Read-only and unauthenticated, like every other fetch here. Returns a NAMED
+    failure rather than raising: this runs inside an exception handler and must
+    never replace the real error with its own.
+    """
+    key = str(event_ticker or "").strip()
+    if not key:
+        return {"status": "error", "reason": "no_event_ticker"}
+
+    errors: list[str] = []
+    for base in _BASE_URLS:
+        url = f"{base}/events/{key}?with_nested_markets=true"
+        try:
+            payload = _get(url)
+        except Exception as exc:
+            errors.append(f"{type(exc).__name__}: {exc}")
+            continue
+        event = payload.get("event")
+        markets = payload.get("markets")
+        if not isinstance(markets, list) and isinstance(event, Mapping):
+            markets = event.get("markets")
+        if not isinstance(markets, list):
+            errors.append(f"unexpected_shape:{sorted(payload)[:6]}")
+            continue
+        if not markets:
+            # AN EMPTY LIST IS NOT AN ANSWER, and accepting one as `status=ok`
+            # is what made this probe useless on the run it was built for.
+            #
+            # Measured 2026-08-26T09:34-11:44Z: `count=0 ours_listed=False` on
+            # EIGHT different events whose markets we had just fetched prices
+            # for. Read as data, that says Kalshi lists nothing. It actually
+            # said the query was wrong -- the same "a null from a query you got
+            # wrong is indistinguishable from a null from a quiet system"
+            # failure this repo logged hours earlier.
+            #
+            # So an empty result now REFUSES and carries the payload's own keys
+            # and the URL, which is what a reader needs to fix the query rather
+            # than mis-trust the venue.
+            errors.append(f"empty_markets url={url} keys={sorted(payload)[:8]}")
+            continue
+        return {
+            "status": "ok",
+            "base": base,
+            "tickers": [
+                str(m.get("ticker") or "")
+                for m in markets
+                if isinstance(m, Mapping)
+            ],
+        }
     return {"status": "error", "reason": "; ".join(errors) or "no_base_responded"}
 
 

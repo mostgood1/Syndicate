@@ -8,6 +8,10 @@ rather than an obvious failure.
 
 from __future__ import annotations
 
+import contextlib
+
+from syndicate.features.shared import kalshi_board_join as mod_join
+
 import pytest
 
 from syndicate.features.shared.kalshi_board_join import (
@@ -144,7 +148,16 @@ def test_the_price_resolver_is_keyed_as_tightly_as_the_join():
     from syndicate.features.shared.kalshi_board_join import kalshi_price_resolver
 
     resolve = kalshi_price_resolver([{
-        "market": "pitcher_strikeouts", "player_name": "Andrew Abbott",
+        # `board_event_id` IS PART OF THE KEY. The join copies it off the board
+        # row, and without it every row of one market/line/side on the slate
+        # shares a bucket -- the defect that stamped a BAL@STL slug on a CIN@SF
+        # position on Polymarket, which copied this module's shape.
+        "board_event_id": "evt-1",
+        # CANONICAL, because that is what the join emits (`verdict["market"]`).
+        # `_row_key` canonicalises the ROW's market and `_match_key` takes the
+        # match's verbatim -- see `_match_key`'s docstring. A fixture using the
+        # board's raw spelling is testing a match shape the join never builds.
+        "market": "strikeouts", "player_name": "Andrew Abbott",
         "line": 6.5, "board_side": "over", "kalshi_american": -120,
     }])
     assert resolve(_row(side="Over", line=6.5)) == -120
@@ -153,6 +166,11 @@ def test_the_price_resolver_is_keyed_as_tightly_as_the_join():
     assert resolve(_row(side="Over", line=7.5)) is None
     assert resolve(_row(side="Over", line=6.5, player="Shane Baz")) is None
     assert resolve(_row(side="Over", line=6.5, market="pitcher_outs")) is None
+    # AND THE DIMENSION THIS TEST'S NAME CLAIMED AND DID NOT COVER: a different
+    # GAME. Everything else identical, which is exactly the collision the old
+    # key could not see. Cross-game coverage for both venues lives in
+    # `test_polymarket_resolver_wrong_game.py`.
+    assert resolve(_row(side="Over", line=6.5, event_id="evt-2")) is None
 
 
 # --- the join must stay inside one slate -----------------------------------
@@ -517,17 +535,43 @@ def test_an_unresolvable_club_on_our_side_is_skipped_not_matched_loosely():
 # --------------------------------------------------------------------------
 
 
+@contextlib.contextmanager
+def _series_registered(mapping):
+    """Add series to `SERIES_SPORT` for one test, then put the table BACK.
+
+    The distinction that matters is between a key the test INVENTED and a key
+    the test merely re-asserted. Popping both treats them alike and silently
+    unregisters the second: `KXMLBSPREAD` is hand-registered in production
+    code, and a helper that popped it left the rest of the pytest process
+    running against a table missing the most valuable market on the venue.
+    Passing in isolation and failing in the suite is the signature.
+    """
+    from syndicate.features.shared import kalshi_catalogue as cat
+
+    absent = object()
+    before = {key: cat.SERIES_SPORT.get(key, absent) for key in mapping}
+    cat.SERIES_SPORT.update(mapping)
+    try:
+        yield
+    finally:
+        for key, prior in before.items():
+            if prior is absent:
+                cat.SERIES_SPORT.pop(key, None)
+            else:
+                cat.SERIES_SPORT[key] = prior
+
+
 def _priced(markets, rows, monkeypatch, date="2026-08-24"):
     from syndicate.features.shared import kalshi_catalogue as cat
 
     monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "1")
-    cat.SERIES_SPORT["KXMLBSPREAD"] = "mlb"
-    cat.SERIES_SPORT["KXMLBF5TOTAL"] = "mlb"
-    try:
+    # RESTORE, never pop. Both of these are now hand-registered in
+    # `SERIES_SPORT`, so an unconditional pop DELETES production state for the
+    # rest of the pytest process -- which is exactly what happened: this helper
+    # ran, popped `KXMLBSPREAD`, and a registration test 200 lines away in
+    # another file failed while passing in isolation.
+    with _series_registered({"KXMLBSPREAD": "mlb", "KXMLBF5TOTAL": "mlb"}):
         return join_kalshi_to_board(markets, rows, selected_date=date)
-    finally:
-        cat.SERIES_SPORT.pop("KXMLBSPREAD", None)
-        cat.SERIES_SPORT.pop("KXMLBF5TOTAL", None)
 
 
 def _spread_market(**kw):
@@ -543,12 +587,24 @@ def _spread_market(**kw):
 
 
 def _tex_cws_rows(market="spreads", line=3.5, sides=("away", "home")):
+    """Board rows for TEX @ CHW.
+
+    A SPREAD IS WRITTEN WITH OPPOSITE SIGNS PER SIDE, and this helper used to
+    give both sides the same positive line -- which no board does. Measured on
+    the served book 2026-08-26, TEX @ CWS: `away line=+1.5 price=-185`,
+    `home line=-1.5 price=+155`. The flat fixture is what let the join's
+    magnitude-only lookup look correct in tests while pairing every spread with
+    the opposite bet in production. A total is NOT signed: it has one line and
+    two directions, which is why the signing keys off the market.
+    """
+    signed = str(market).startswith("spreads")
     return [
         {
             "sport": "mlb",
             "event_id": "e1",
             "market": market,
-            "line": line,
+            # away favoured by `line`, home taking the points.
+            "line": (-line if side == "away" else line) if signed else line,
             "side": side,
             "away_team": "TEX",
             "home_team": "CHW",
@@ -640,3 +696,302 @@ def test_a_period_market_is_not_priced_off_the_full_game_row(monkeypatch):
     rows = _tex_cws_rows(market="totals", line=6.5, sides=("Over",))
     report = _priced([market], rows, monkeypatch)
     assert report["matched"] == 0
+
+
+# --------------------------------------------------------------------------
+# A stale game line is refused BY DATE, not as an unrecognised club code
+# --------------------------------------------------------------------------
+
+
+def test_a_stale_game_line_is_refused_by_DATE_not_as_a_bad_club_code():
+    """The two failures must not share a counter.
+
+    `_resolve_event` matches Kalshi's club blob against TODAY'S board, so a
+    game line from another date cannot resolve no matter how well we read its
+    codes. While the date check sat below the resolver, that made every stale
+    game line indistinguishable from an alias we had never written.
+
+    Measured 2026-08-25T16:14:40Z: all 8 sampled "unrecognised" MLB events were
+    `ATLMIL` on `26AUG23`, a blob the resolver handles correctly -- the game
+    was simply two days over. This asserts the reason is the DATE, and the
+    control below proves a genuine alias gap still reports as one.
+    """
+    from syndicate.features.shared.kalshi_board_join import (
+        REASON_EVENT_UNMATCHED,
+        REASON_WRONG_DATE,
+    )
+
+    # ATLMIL is on the board -- but for a different day than the ticker.
+    report = _with_total_series(
+        lambda: join_kalshi_to_board(
+            [_total(ticker="KXTESTTOTAL-26AUG231910ATLMIL-8")],
+            [_game_row(away_team="ATL", home_team="MIL")],
+            selected_date="2026-08-25",
+        )
+    )
+    assert report["matched"] == 0
+    assert report["reasons"].get(REASON_WRONG_DATE) == 1
+    # The whole point: it is NOT counted as a club code we failed to read...
+    assert REASON_EVENT_UNMATCHED not in report["reasons"]
+    # ...and it does not consume a slot in the alias work list.
+    assert report["unmatched_events"] == []
+
+
+def test_an_alias_gap_ON_TODAYS_DATE_still_reports_as_an_alias_gap():
+    """The control for the test above. Refusing stale markets earlier must not
+    silence the counter it was crowding out -- an unreadable club code on the
+    RIGHT date is still `event_not_on_our_board`, and still samples."""
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_UNMATCHED
+
+    report = _with_total_series(
+        lambda: join_kalshi_to_board(
+            [_total(ticker="KXTESTTOTAL-26AUG242140ZZZYYY-8")],
+            [_game_row()],
+            selected_date="2026-08-24",
+        )
+    )
+    assert report["matched"] == 0
+    assert report["reasons"].get(REASON_EVENT_UNMATCHED) == 1
+    assert [s["kalshi"] for s in report["unmatched_events"]] == ["ZZZYYY"]
+
+
+def test_the_event_sample_spends_its_budget_on_DISTINCT_club_codes():
+    """One game must not consume the whole alias work list.
+
+    The bound was `len(unmatched_samples) < 8`, which counts MARKETS. A single
+    event offers far more than eight (six spreads and two team totals of
+    `ATLMIL` took every slot in the 2026-08-25 reading), so a sample built to
+    enumerate missing aliases named exactly one code. An alias is written
+    against a blob, so the blob is the unit that gets deduplicated.
+    """
+    from syndicate.features.shared.kalshi_board_join import REASON_EVENT_UNMATCHED
+
+    # Twelve markets: ten off ONE unreadable event, then two others. Under the
+    # old market-counted bound the two distinct codes fall off the end.
+    markets = [
+        _total(ticker=f"KXTESTTOTAL-26AUG242140ZZZYYY-{n}") for n in range(10)
+    ]
+    markets.append(_total(ticker="KXTESTTOTAL-26AUG242140QQQWWW-8"))
+    markets.append(_total(ticker="KXTESTTOTAL-26AUG242140RRRVVV-8"))
+
+    report = _with_total_series(
+        lambda: join_kalshi_to_board(markets, [_game_row()], selected_date="2026-08-24")
+    )
+    # Every market is still COUNTED -- deduplication is of the sample only.
+    assert report["reasons"].get(REASON_EVENT_UNMATCHED) == 12
+    blobs = [s["kalshi"] for s in report["unmatched_events"]]
+    assert blobs == ["ZZZYYY", "QQQWWW", "RRRVVV"]
+    assert len(blobs) == len(set(blobs))
+
+
+def _with_series(mapping, fn):
+    """Register series the way production's AUTO_SERIES discovery does.
+
+    Some of these are added at runtime by discovery rather than written into
+    the static table (`game_added=171`, 2026-08-25). A test that omits them
+    measures `unmapped_series` -- a refusal production does not have -- instead
+    of the title grammar it means to test.
+    """
+    with _series_registered(mapping):
+        return fn()
+
+
+
+# --------------------------------------------------------------------------
+# The grammar work list: which title we could not read, not how many
+# --------------------------------------------------------------------------
+
+
+def test_an_unreadable_title_is_SAMPLED_not_merely_counted():
+    """`unreadable_title` names the problem and withholds the fix.
+
+    216 of 883 markets refused this way on 2026-08-25 with the string never
+    printed. Guessing at Kalshi's wording is precisely what failed before --
+    three grammars written against imagined phrasing matched none of production
+    and 302 markets came back unreadable on the first build. The title is in
+    the payload the join already holds.
+    """
+    market = _kalshi(title="Who knows what this says", series="KXMLBGAME")
+    report = _with_series(
+        {"KXMLBGAME": "mlb"}, lambda: join_kalshi_to_board([market], [_row()])
+    )
+    assert report["matched"] == 0
+    assert report["unreadable_titles"] == [
+        {
+            "series": "KXMLBGAME",
+            "title": "Who knows what this says",
+            "ticker": market["ticker"],
+        }
+    ]
+
+
+def test_the_title_sample_is_ONE_PER_SERIES():
+    """A series shares a grammar, so a second title from it teaches nothing --
+    while a first title from a new series is a whole market family. Without
+    this, the largest series buries every other, which is how `KXMLBGAME` (the
+    moneyline, and the market the rejected live order wanted) stays invisible.
+    """
+    markets = [
+        _kalshi(title=f"unreadable {n}", series="KXMLBSPREAD", ticker=f"KXMLBSPREAD-{n}")
+        for n in range(6)
+    ]
+    markets.append(_kalshi(title="Boston Red Sox?", series="KXMLBGAME"))
+
+    report = _with_series(
+        {"KXMLBGAME": "mlb", "KXMLBSPREAD": "mlb"},
+        lambda: join_kalshi_to_board(markets, [_row()]),
+    )
+    # Every market is still counted -- the deduplication is of the sample only.
+    assert report["reasons"]["unreadable_title"] == 7
+    series = [t["series"] for t in report["unreadable_titles"]]
+    assert series == ["KXMLBSPREAD", "KXMLBGAME"]
+    # And the moneyline title survived rather than being crowded out.
+    assert report["unreadable_titles"][1]["title"] == "Boston Red Sox?"
+
+
+def test_a_title_the_catalogue_CAN_read_is_not_sampled():
+    """The control. A sample that fills up on readable titles is noise."""
+    report = join_kalshi_to_board([_kalshi()], [_row(side="Over")])
+    assert report["matched"] == 1
+    assert report["unreadable_titles"] == []
+
+
+def test_the_per_series_count_is_COMPLETE_where_the_sample_is_bounded():
+    """The sample names the grammar; the count answers "is this family here".
+
+    Measured 2026-08-25T16:56:46Z, JOIN_TITLES returned 10 series and
+    `KXMLBGAME` -- the moneyline, the market a rejected live order wanted --
+    was not among them. With more than 10 series refusing, that is not evidence
+    either way, and the difference between "absent" and "past the cap" decides
+    whether there is a grammar to write at all.
+    """
+    from syndicate.features.shared.kalshi_board_join import REASON_UNREADABLE_TITLE
+
+    markets = []
+    for n in range(12):
+        markets.append(
+            _kalshi(title=f"unreadable {n}", series=f"KXS{n}", ticker=f"KXS{n}-26AUG22X-1")
+        )
+    # ...and a second refusal for one of them, so the count is not just a set.
+    markets.append(_kalshi(title="also unreadable", series="KXS0", ticker="KXS0-26AUG22X-2"))
+
+    report = _with_series(
+        {f"KXS{n}": "mlb" for n in range(12)},
+        lambda: join_kalshi_to_board(markets, [_row()]),
+    )
+    assert report["reasons"][REASON_UNREADABLE_TITLE] == 13
+    # ONE SAMPLE PER SERIES, not per market: 12 series, 13 refusals.
+    assert len(report["unreadable_titles"]) == 12
+    assert len({s["series"] for s in report["unreadable_titles"]}) == 12
+    # ...the COUNT is not, so a series past the cap is still visible.
+    assert len(report["unreadable_by_series"]) == 12
+    assert report["unreadable_by_series"]["KXS0"] == 2
+    # Sorted by count, so the family that dominates is readable at a glance.
+    assert list(report["unreadable_by_series"])[0] == "KXS0"
+
+
+
+def test_the_unreadable_sample_is_bounded_and_the_count_still_is_not(monkeypatch):
+    """THE CAP, exercised where it actually binds.
+
+    The sibling test above has 12 series against a bound of 40, so it no longer
+    reaches the cap and cannot say whether one exists. That matters because the
+    bound was RAISED for a reason: at 10 the noisiest families reached it before
+    the quiet ones were named, and on 2026-08-25 eight soccer series were
+    reported `unreadable_title` (413 markets) while not one soccer TITLE
+    appeared in the sample. The gap could be counted and not read.
+
+    Both halves are the point: the sample is bounded so a log line stays
+    readable, and the per-series COUNT is not, so a series past the bound is
+    still visible by name.
+    """
+    from syndicate.features.shared.kalshi_board_join import REASON_UNREADABLE_TITLE
+
+    monkeypatch.setattr(mod_join, "MAX_UNREADABLE_SAMPLES", 3)
+    markets = [
+        _kalshi(title=f"unreadable {n}", series=f"KXQ{n}", ticker=f"KXQ{n}-26AUG22X-1")
+        for n in range(9)
+    ]
+    report = _with_series(
+        {f"KXQ{n}": "mlb" for n in range(9)},
+        lambda: join_kalshi_to_board(markets, [_row()]),
+    )
+
+    assert len(report["unreadable_titles"]) == 3, "the sample must stay bounded"
+    assert len(report["unreadable_by_series"]) == 9, "every series must still be NAMED"
+    assert report["reasons"][REASON_UNREADABLE_TITLE] == 9
+
+
+def _tex_dog_rows(line=1.5):
+    """The production shape that produced the inversion: TEX is the UNDERDOG.
+
+    Copied from the served board 2026-08-26 (TEX @ CWS): away +1.5, home -1.5.
+    """
+    return [
+        {
+            "sport": "mlb",
+            "event_id": "e1",
+            "market": "spreads",
+            "line": line if side == "away" else -line,
+            "side": side,
+            "away_team": "TEX",
+            "home_team": "CHW",
+        }
+        for side in ("away", "home")
+    ]
+
+
+def test_a_spread_never_pairs_with_the_opposite_handicap(monkeypatch):
+    """THE INVERSION THIS FIX EXISTS TO STOP, pinned as a refusal.
+
+    "Texas wins by over 1.5 runs" is TEX -1.5. When the board has TEX at +1.5
+    -- Texas taking the points, the OPPOSITE bet -- this market describes a
+    margin our board never wrote a row for, so it must pair with NOTHING.
+
+    Before the sign fix the join keyed on the bare magnitude, found the +1.5
+    row because 1.5 == 1.5, saw its side (`away`) match the named club, and
+    priced it as YES. Measured on the live book: 11 of 11 spread orders were
+    stamped with a ticker naming the team they were FADING. Only
+    `_side_to_kalshi`'s refusal of `home`/`away` on spreads kept them off the
+    venue -- this test is what makes that refusal unnecessary rather than
+    load-bearing.
+    """
+    from syndicate.features.shared.kalshi_board_join import REASON_SPREAD_ORIENTATION
+
+    market = _spread_market(
+        title="Texas wins by over 1.5 runs?",
+        ticker="KXMLBSPREAD-26AUG241940TEXCWS-TEX2",
+    )
+    report = _priced([market], _tex_dog_rows(), monkeypatch)
+
+    assert report["matched"] == 0, report["matches"]
+    assert report["reasons"][REASON_SPREAD_ORIENTATION] == 2
+    # Stated as its own assertion because this is the money question, and a
+    # count of zero could be reached by an unrelated refusal.
+    assert not [
+        m
+        for m in report["matches"]
+        if m["board_side"] == "away" and m["kalshi_side"] == "yes"
+    ]
+
+
+def test_the_favourites_market_pairs_both_rows_the_right_way_round(monkeypatch):
+    """Same slate, the market that DOES describe a bet the board wrote.
+
+    CHW is the home favourite at -1.5, so "Chicago White Sox wins by over 1.5"
+    is YES on the home row, and its NO is the away row taking +1.5. One ticker,
+    both rows, opposite sides -- and the line carried on each match is the
+    BOARD's signed line, so the ticker resolver's index cannot rebuild the
+    same +X/-X collision one layer later.
+    """
+    market = _spread_market(
+        title="Chicago White Sox wins by over 1.5 runs?",
+        ticker="KXMLBSPREAD-26AUG241940TEXCWS-CHW2",
+    )
+    report = _priced([market], _tex_dog_rows(), monkeypatch)
+
+    by_side = {m["board_side"]: m for m in report["matches"]}
+    assert by_side["home"]["kalshi_side"] == "yes"
+    assert by_side["home"]["line"] == -1.5
+    assert by_side["away"]["kalshi_side"] == "no"
+    assert by_side["away"]["line"] == 1.5

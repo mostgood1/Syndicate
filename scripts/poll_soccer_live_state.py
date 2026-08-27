@@ -464,8 +464,78 @@ def poll_active_leagues_for_tick(
         "leagues_with_games": leagues_with_games,
         "count": len(games),
         "games": games,
+        # FINISHED MATCHES, CARRIED ACROSS THE SERVICE BOUNDARY (`#547`).
+        #
+        # `games` is IN-PLAY ONLY -- `board_enrichment._soccer_live_state_games`
+        # states the asymmetry: the aggregate "carries `games` -- matches IN
+        # PLAY -- and NOT `match_box`", and only the per-league `match_box`
+        # spans `in` AND `post`. That per-league tree is a FILESYSTEM write on
+        # live-odds-worker, while `settle_orders` runs on refresh-worker
+        # (`pipeline/intelligence_state.py`). So a finished match was
+        # structurally unreachable from the one process that grades bets, and a
+        # soccer resolver reading only `match_box` would have graded nothing in
+        # production while passing every test on a dev box.
+        #
+        # This dict goes to `live/soccer_live_lens.json` through
+        # `refresh_state_store`, i.e. the KEYVALUE backend, which is the one
+        # soccer path that crosses services.
+        #
+        # SETTLEMENT FIELDS ONLY, not the whole box. A `match_box` record carries
+        # per-player shot/card/corner detail and there are up to ten leagues of
+        # them; the aggregate already trips `KEYVALUE_WRITE_LARGE` at 1MB. Six
+        # scalars per finished match is what grading needs and nothing here
+        # grows with squad size.
+        "finals": _finished_matches(leagues_checked, iso_date, source_root=out_root),
         "errors": errors,
     }
+
+
+def _finished_matches(leagues, iso_date, *, source_root) -> list[dict[str, Any]]:
+    """Every FINISHED match across the polled leagues, flattened and trimmed.
+
+    Read back off the per-league artifacts this tick just wrote rather than
+    accumulated in the loop above: `poll_league` skips rebuilding a box it has
+    already marked final (`final_cached`), so a league with nothing live this
+    tick contributes no in-memory record while its file still holds this
+    morning's completed matches. Reading the files is what makes a finished
+    match survive the rest of the day.
+
+    Never raises: a malformed league file must cost that league's finals, not
+    the whole tick.
+    """
+    out: list[dict[str, Any]] = []
+    for league in leagues:
+        try:
+            path = Path(source_root) / league / "api" / "live_state" / f"live_state_{iso_date}.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        match_box = payload.get("match_box")
+        if not isinstance(match_box, dict):
+            continue
+        for event_id, record in match_box.items():
+            if not isinstance(record, dict):
+                continue
+            # BOTH signals, either sufficient. The poller sets `final` from
+            # `status_state == "post"` and carries the token through verbatim;
+            # a match that has ended must not be dropped because one of the two
+            # fields is absent.
+            state = str(record.get("status_state") or "").strip().lower()
+            if state != "post" and not bool(record.get("final")):
+                continue
+            out.append({
+                "league": league,
+                "event_id": event_id,
+                "home_team": record.get("home_team"),
+                "away_team": record.get("away_team"),
+                "score_home": record.get("score_home"),
+                "score_away": record.get("score_away"),
+                "status_state": record.get("status_state") or "post",
+                "final": True,
+            })
+    return out
 
 
 def main() -> int:

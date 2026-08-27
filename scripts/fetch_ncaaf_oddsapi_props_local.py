@@ -440,69 +440,96 @@ def parse_events_to_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     game_time = None
             event_desc = f"{away} @ {home}"
 
-            bookmaker = _choose_bookmaker(event.get("bookmakers") or [])
-            if not bookmaker:
-                continue
-            book_key = str(bookmaker.get("key") or "").strip() or "oddsapi"
+            # EVERY bookmaker, not one. `_choose_bookmaker` used to keep a
+            # single book out of a response that already contained several --
+            # the same #209 Class A defect `_append_ncaaf_book_quotes` was
+            # written to work around, except the quote log fixed the LOG and
+            # left the CSV lossy.
+            #
+            # Measured on the real 2026 wk1 openers, 2026-08-26: one API sweep
+            # returned 409 quotes across 6 books and 6 markets, and this
+            # function emitted 60 rows -- one market (Anytime TD), effectively
+            # one book (draftkings 55, betonlineag 5). 85% of what the call had
+            # already been billed for was discarded at parse time.
+            #
+            # Price shopping across books is the largest single lever measured
+            # on this platform (+2.79 ROI pts on MLB game lines, +2.95 on NFL
+            # props, both on controlled identical-bet sets), and it is
+            # impossible to run against a one-book file.
+            #
+            # Safe to widen here: `book` is already a column, already in the
+            # dedupe key and already in the sort key, so multi-book rows are
+            # schema-compatible with what this file has always written. NCAAF
+            # has no props consumer yet, so nothing downstream can break --
+            # `_choose_bookmaker` is deliberately LEFT IN PLACE and unused
+            # rather than deleted, because the NFL analog still calls its own
+            # copy and the two files are kept easy to diff.
+            for bookmaker in event.get("bookmakers") or []:
+                book_key = str(bookmaker.get("key") or "").strip() or "oddsapi"
 
-            for market in bookmaker.get("markets") or []:
-                market_key = str(market.get("key") or "").strip()
-                std_market = MARKET_STD_MAP.get(market_key)
-                if not std_market:
-                    continue
-                aggregated: dict[str, dict[str, Any]] = {}
-                for outcome in market.get("outcomes") or []:
-                    side = _side_key(str(outcome.get("name") or outcome.get("description") or ""))
-                    if side is None:
-                        side = _side_key(str(outcome.get("description") or outcome.get("name") or ""))
-                    player = _pick_player_from_outcome(outcome)
-                    if not player:
+                for market in bookmaker.get("markets") or []:
+                    market_key = str(market.get("key") or "").strip()
+                    std_market = MARKET_STD_MAP.get(market_key)
+                    if not std_market:
                         continue
-                    try:
-                        line_value = float(outcome.get("point")) if outcome.get("point") is not None and str(outcome.get("point")) != "" else np.nan
-                    except Exception:
-                        line_value = np.nan
-                    try:
-                        american = int(str(outcome.get("price")).replace("+", "")) if outcome.get("price") is not None and str(outcome.get("price")) != "" else np.nan
-                    except Exception:
-                        american = np.nan
+                    aggregated: dict[str, dict[str, Any]] = {}
+                    for outcome in market.get("outcomes") or []:
+                        side = _side_key(str(outcome.get("name") or outcome.get("description") or ""))
+                        if side is None:
+                            side = _side_key(str(outcome.get("description") or outcome.get("name") or ""))
+                        player = _pick_player_from_outcome(outcome)
+                        if not player:
+                            continue
+                        try:
+                            line_value = float(outcome.get("point")) if outcome.get("point") is not None and str(outcome.get("point")) != "" else np.nan
+                        except Exception:
+                            line_value = np.nan
+                        try:
+                            american = int(str(outcome.get("price")).replace("+", "")) if outcome.get("price") is not None and str(outcome.get("price")) != "" else np.nan
+                        except Exception:
+                            american = np.nan
 
-                    record = aggregated.get(player)
-                    if record is None:
-                        record = {
-                            "player": player,
-                            "market": std_market,
-                            "line": np.nan,
-                            "over_price": np.nan,
-                            "under_price": np.nan,
-                        }
-                        aggregated[player] = record
+                        # Keyed by (player, line) rather than player alone: an
+                        # alternate ladder returns the same player at several
+                        # lines within one market, and a player-only key made
+                        # the last line win and silently dropped the rest.
+                        record_key = (player, "" if pd.isna(line_value) else f"{float(line_value):.2f}")
+                        record = aggregated.get(record_key)
+                        if record is None:
+                            record = {
+                                "player": player,
+                                "market": std_market,
+                                "line": np.nan,
+                                "over_price": np.nan,
+                                "under_price": np.nan,
+                            }
+                            aggregated[record_key] = record
 
-                    if std_market != "Anytime TD":
-                        if not pd.notna(record.get("line")) and pd.notna(line_value):
-                            record["line"] = float(line_value)
-                        elif pd.notna(line_value) and pd.isna(record.get("line")):
-                            record["line"] = float(line_value)
+                        if std_market != "Anytime TD":
+                            if not pd.notna(record.get("line")) and pd.notna(line_value):
+                                record["line"] = float(line_value)
+                            elif pd.notna(line_value) and pd.isna(record.get("line")):
+                                record["line"] = float(line_value)
 
-                    if side == "over":
-                        record["over_price"] = american
-                    elif side == "under":
-                        record["under_price"] = american
-                    else:
-                        record["over_price"] = american
+                        if side == "over":
+                            record["over_price"] = american
+                        elif side == "under":
+                            record["under_price"] = american
+                        else:
+                            record["over_price"] = american
 
-                for record in aggregated.values():
-                    rows.append(
-                        {
-                            **record,
-                            "book": book_key,
-                            "event": event_desc,
-                            "game_time": game_time,
-                            "home_team": home,
-                            "away_team": away,
-                            "is_ladder": False,
-                        }
-                    )
+                    for record in aggregated.values():
+                        rows.append(
+                            {
+                                **record,
+                                "book": book_key,
+                                "event": event_desc,
+                                "game_time": game_time,
+                                "home_team": home,
+                                "away_team": away,
+                                "is_ladder": False,
+                            }
+                        )
         except Exception:
             continue
     return rows
@@ -639,6 +666,31 @@ def main(argv: list[str] | None = None) -> int:
 
     atomic_write_csv(out_path, out_df)
     print(f"Wrote {out_path} with {len(out_df)} rows.")
+
+    # PUBLISH, or the capture stops on the worker's disk. Render will not share
+    # a disk between the worker and web, so an artifact the worker writes is
+    # invisible to the board until it is pushed across. `#208`: the allowlist
+    # PERMITS the transfer, it does not perform one.
+    #
+    # This lives HERE rather than in a caller because the caller is now a plain
+    # orchestrator step (`ncaaf_player_props_oddsapi`) that shells this script --
+    # there is no wrapper left to hang it on. Guarded on a non-empty write so an
+    # empty pregame capture does not spend egress.
+    #
+    # Best-effort by contract: `publish_hot_artifact` returns False and never
+    # raises on not-configured / not-allowlisted / missing / network error, so
+    # this cannot fail a capture that already succeeded.
+    if len(out_df):
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            published = bool(publish_hot_artifact(out_path))
+        except Exception as exc:
+            published = False
+            print(f"[ncaaf_props] PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
+        # `logger.info` never reaches Render's log collector -- print/flush is
+        # the only line that shows up in `render_logs.py`.
+        print(f"[ncaaf_props] rows={len(out_df)} published={published} path={out_path}", flush=True)
     return 0
 
 

@@ -1562,7 +1562,11 @@ def board_l2a_fallback_enabled() -> bool:
     return _env_bool(SYNDICATE_BOARD_L2A_ENABLED_FLAG, default=False)
 
 
-def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dict[str, Any]]:
+def _layer2_fallback_recommendations(
+    requested_dates: Sequence[str],
+    *,
+    vintages: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Persisted L2-A cards for these dates, shaped like a merged candidate.
 
     Reads the artifact the WORKER already wrote (`layer2_rows_to_board_cards`
@@ -1576,6 +1580,14 @@ def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dic
 
     Returns [] on any failure. A fallback that raises is worse than one that
     declines, because it would take down the board it exists to fill.
+
+    `vintages`, when given, collects each shortlist's own `written_at` -- an OUT
+    PARAMETER rather than a second return value on purpose (`#563`). The
+    alternative was a second read of these artifacts to date them, and the
+    shortlist measured 5,166,721 bytes on 2026-08-26; re-reading five megabytes
+    per request to answer "how old is this" would cost more than the staleness
+    it reports. The signature stays keyword-only and defaulted so every existing
+    caller and test is untouched.
     """
     cards: list[dict[str, Any]] = []
     for requested_date in requested_dates or ():
@@ -1585,6 +1597,10 @@ def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dic
             continue
         if not isinstance(shortlist, Mapping):
             continue
+        if vintages is not None:
+            stamp = str(shortlist.get("written_at") or "").strip()
+            if stamp:
+                vintages.append(stamp)
         for card in shortlist.get("cards") or []:
             if not isinstance(card, Mapping):
                 continue
@@ -2117,6 +2133,53 @@ def read_layer2_shortlist(selected_date: str | None) -> dict[str, Any] | None:
     if not normalized_date:
         return None
     payload = read_json_file(_layer2_shortlist_path(normalized_date))
+    return payload if isinstance(payload, dict) else None
+
+
+def _game_chips_path(selected_date: str) -> Path:
+    suffix = str(selected_date or "").strip().replace("-", "_") or _intelligence_state_daily_suffix()
+    return reports_root() / "intelligence" / f"game_chips_{suffix}.json"
+
+
+def write_game_chips(selected_date: str, chips: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Publish the live-scoreboard chips the WORKER built, for the WEB to read.
+
+    `#545`. THE CHIP BUILD IS NOT LIGHT AND IT WAS RUNNING IN A REQUEST.
+    `build_game_chips` fans out over every sport, and for soccer over every
+    league, calling `build_cards_page_context` per league -- and `#545` widened
+    that to two matchdays per league to cover the board's forward horizon, so it
+    is now twenty card-context builds for soccer alone. The architecture rule is
+    explicit that the web service reads precomputed artifacts and does not
+    compute; a per-request fan-out of that size is exactly what it forbids, and
+    the widening is what made it untenable rather than merely wrong.
+
+    Same transport as the shortlist beside it (`write_json_file`, keyvalue
+    backed) and for the same reason: refresh-worker writes, web reads, and
+    Render gives each service its own disk so a file cannot be shared.
+
+    Small enough not to need the shortlist's shedding guard -- 210 soccer chips
+    measured at ~90 KB against an 8 MB ceiling -- but the count is stamped so a
+    reader can tell a thin build from a stale one WITHOUT having to diff two
+    payloads.
+    """
+    normalized_date = str(selected_date or "").strip()
+    if not normalized_date:
+        return None
+    payload = {
+        "selected_date": normalized_date,
+        "written_at": _utc_now(),
+        "chips": list(chips or []),
+        "chip_count": len(chips or []),
+    }
+    write_json_file(_game_chips_path(normalized_date), payload)
+    return payload
+
+
+def read_game_chips(selected_date: str | None) -> dict[str, Any] | None:
+    normalized_date = str(selected_date or "").strip()
+    if not normalized_date:
+        return None
+    payload = read_json_file(_game_chips_path(normalized_date))
     return payload if isinstance(payload, dict) else None
 
 
@@ -2989,6 +3052,139 @@ def _state_payload_timestamp(payload: Any) -> str:
     return ""
 
 
+def _build_span_enter(label: str, selected_date: str | None) -> float | None:
+    """Open a BUILD_SPAN and return a start mark for `_build_span_exit`. `#567`.
+
+    WHY A SECOND SPAN HELPER EXISTS BESIDE `_build_candidate_pool`'s own
+    `_span`: that one wraps a CALLABLE, which is the right shape for the three
+    calls it already covers and the wrong shape for an inline block. Wrapping
+    the manifest/odds-history loop in a callable (or a `with`) would reindent
+    it, and a reindent of a loop nobody has measured is exactly the diff that
+    hides a real change inside whitespace. ENTER/EXIT as two statements
+    measures the same span with no reindent at all.
+
+    ENTER/EXIT PAIRS, not a completion line, for the reason `_span`'s own
+    docstring gives: a hang leaves the ENTER with no EXIT, and that is what
+    NAMES the call. A completion-only log goes silent for the whole span
+    exactly as the code does today.
+
+    `print`, not `logger.info`: logger.info does not reach Render's collector
+    (CLAUDE.md), which is why `_log_stage_timing("candidate_building", ...)`
+    has been running for months and appears in zero production log lines.
+    That silent stage is one of the two this helper exists to open up.
+
+    NEVER RAISES, and returns None rather than a time on a broken clock. An
+    instrument must not be able to kill the build it measures -- the same rule
+    `_timed_candidate_pool` states, and it is stated again here because the
+    first draft of that function got it wrong in exactly this way (clocks read
+    outside the guard) and shipped a test documenting the flaw.
+    """
+    try:
+        print(f"[intelligence_state] BUILD_SPAN_ENTER stage={label} date={selected_date}", flush=True)
+    except Exception:
+        pass
+    try:
+        return time.monotonic()
+    except Exception:
+        return None
+
+
+def _build_span_exit(label: str, started: float | None) -> None:
+    """Close a BUILD_SPAN opened by `_build_span_enter`. Never raises. `#567`.
+
+    `time.monotonic`, not `time.time` as the older `_span` uses: this measures
+    a DURATION, and a wall clock adjusted mid-span reports a duration that
+    never happened. Reported as `elapsed_s=unknown` rather than as a plausible
+    number when the clock was unreadable at ENTER -- an absent reading is
+    recoverable, an invented one is not.
+
+    A span that ends via `return` (the memory-abort guards inside the manifest
+    loop each return early) leaves its ENTER unclosed. That is deliberate and
+    reads correctly: those guards print their own reason first, so a dangling
+    ENTER beneath a `MEMORY_GUARD_ABORT` line is the abort, not a hang.
+    """
+    try:
+        if started is None:
+            print(f"[intelligence_state] BUILD_SPAN_EXIT stage={label} elapsed_s=unknown", flush=True)
+            return
+        print(
+            f"[intelligence_state] BUILD_SPAN_EXIT stage={label} "
+            f"elapsed_s={round(time.monotonic() - started, 2)}",
+            flush=True,
+        )
+    except Exception:
+        pass
+
+
+def _timed_candidate_pool(build, *args) -> Any:
+    """Run the candidate-pool build and report WALL vs CPU. `#567`.
+
+    THE ONE QUESTION THIS ANSWERS: is the board build SLOW, or is it WAITING?
+    Those have opposite fixes and nothing on this service currently separates
+    them.
+
+    WHY THIS EXISTS RATHER THAN ANOTHER READING OF THE LOGS. Every estimate of
+    where the board build's time goes has been taken from the GAP BETWEEN two
+    log lines, and on 2026-08-25 that method produced three wrong answers in one
+    session: "12.5 s per soccer league-week" (really 0.17 s -- the gap was
+    everything happening between two builds, not the build), "the per-sport
+    window will change nothing" (it took seven minutes off), and a memory
+    emergency read off a page-cache-inclusive percentage. A gap measures
+    ELAPSED WALL TIME ON A SHARED WORKER, which is not the same quantity as the
+    cost of the thing that happens to bracket it.
+
+    WALL MINUS CPU IS THE WHOLE POINT. Measured on `-427jr` 2026-08-26, the
+    9m34s "candidate pool" window contained per-sport `live_lens_tick_*` cycles,
+    NFL `board_contract_*` cycles, `artifact_publisher` pull traffic, and a
+    ~350 MB `refresh_odds_sources.py --soccer-leagues <one league>` CHILD
+    PROCESS -- while the board's own identifiable work in the same window was
+    ~55 s of MLB card contexts plus soccer contexts that are now 89.5% memoised.
+    If `cpu_s` is a small fraction of `wall_s`, the board is not slow, it is
+    queued behind the rest of the worker, and every fix aimed at making the
+    board cheaper is aimed at the wrong thing.
+
+    `time.process_time()` is CPU time for THIS process only. A child process
+    (the odds refresh) burning a core does NOT appear in it -- which is exactly
+    what makes the wall/CPU gap readable as contention rather than hidden work.
+
+    Never changes the result and never raises: on any failure the build's own
+    value is returned and the line is skipped. A timer that can break a board
+    build is worse than no timer.
+    """
+    # READ THE CLOCKS DEFENSIVELY. A first draft read them bare, before the
+    # try -- so a clock that raised would have killed the board build to
+    # protect a log line, which is the exact inversion this function's last
+    # paragraph forbids. Caught here rather than pinned by a test.
+    try:
+        started_wall: float | None = time.monotonic()
+        started_cpu: float | None = time.process_time()
+    except Exception:  # noqa: BLE001 - telemetry must never cost the build
+        started_wall = started_cpu = None
+    ok = True
+    try:
+        return build(*args)
+    except BaseException:
+        ok = False
+        raise
+    finally:
+        try:
+            if started_wall is None or started_cpu is None:
+                raise RuntimeError("clock unavailable at start")
+            wall = time.monotonic() - started_wall
+            cpu = time.process_time() - started_cpu
+            # `off_cpu_pct` is the fraction of the build spent NOT executing
+            # Python in this process -- IO, GIL contention, child processes,
+            # the scheduler. High means "waiting", low means "computing".
+            off_cpu_pct = round(100.0 * (1.0 - (cpu / wall)), 1) if wall > 0 else None
+            print(
+                f"[intelligence_state] BOARD_BUILD_TIMING wall_s={wall:.1f} "
+                f"cpu_s={cpu:.1f} off_cpu_pct={off_cpu_pct} ok={ok}",
+                flush=True,
+            )
+        except Exception:  # noqa: BLE001 - telemetry must never cost the build
+            pass
+
+
 def _read_state_payload(path: Path) -> dict[str, Any] | None:
     """Read the board state from the keyvalue store or the published artifact.
 
@@ -3469,6 +3665,100 @@ def _abort_if_memory_critical(stage: str, floor_bytes: int, *, token: str = "MEM
 
 def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
     return _abort_if_memory_critical(stage, _MIN_SAFE_MEMORY_HEADROOM_BYTES)
+
+
+
+def _refresh_wnba_boxscores(selected_date: str) -> None:
+    """Produce the WNBA final boxscore artifact for `selected_date`, if needed.
+
+    PLACED BESIDE `settle_orders` DELIBERATELY. `wnba_source/data/processed/
+    boxscores_<date>.csv` is the only source that can tell WNBA settlement a
+    game is OVER, and it had NO PRODUCER AT ALL -- every caller of the vendor's
+    fetcher lives inside `vendor/*_betting_repo/`, while
+    `scripts/artifact_freshness.py:67` monitored the family for three months
+    with nothing behind it. Coverage stopped 2026-05-24. A producer that lives
+    somewhere else from its consumer is exactly how that happens, so this one
+    does not.
+
+    WHY SETTLEMENT NEEDS IT: `bet_status_wnba` hardcodes `is_final=False`
+    because the LIVE box carries no game status, so an over that never crosses
+    its line can never decide and ONLY WINNING OVERS SETTLE. Measured
+    2026-08-25: Sonia Citron 1 rebound against over 3.5 and Georgia Amoore 3
+    assists against over 3.5 are losses that can never be recorded, while
+    Natasha Mack's over 7.5 graded within minutes.
+
+    REBUILDS ONLY WHEN THE SLATE HAS MOVED. One scoreboard call says how many
+    games are final; if the artifact already covers that many, nothing is
+    fetched. That matters because this runs on every settlement pass (~3 min):
+    a slate that finishes through the evening is picked up as each game ends,
+    and a finished slate costs one cheap call thereafter rather than a full
+    refetch forever.
+
+    NEVER RAISES. Settlement failing because a producer failed would be a worse
+    outcome than the gap this closes.
+    """
+    try:
+        from scripts.build_wnba_boxscores import (
+            artifact_relative_path,
+            build_date,
+            fetch_via_web,
+            web_base_url,
+        )
+        from syndicate.features.shared.refresh_state_store import (
+            data_root,
+            read_text_file,
+        )
+
+        # THROUGH WEB, NOT ESPN. This ran here against ESPN directly first and
+        # every attempt came back the same way:
+        #
+        #   WNBA_BOXSCORES_SCOREBOARD_FAILED date=2026-08-25
+        #     HTTPError: HTTP Error 403: Forbidden
+        #
+        # ESPN refuses Render's egress; the identical call from a laptop
+        # returned 3 games and 66 rows. Web is NOT refused --
+        # `WNBA_LIVE_BOX_CAPTURED date=2026-08-25 games=3 players=66` is the
+        # live capture making this hop successfully -- which is why
+        # `capture_wnba_live_player_box.py` calls web rather than ESPN, and why
+        # this does too.
+        #
+        # `count_only` is one scoreboard call and no per-event fetches, so the
+        # every-3-minute gate stays cheap.
+        base_url = web_base_url()
+        try:
+            final_games = int(
+                (fetch_via_web(base_url, selected_date, count_only=True) or {}).get("games") or 0
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"[intelligence_state] WNBA_BOXSCORES_COUNT_FAILED"
+                f" date={selected_date} base={base_url} {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return
+        if not final_games:
+            return
+
+        covered = 0
+        existing = read_text_file(data_root() / artifact_relative_path(selected_date))
+        if existing:
+            rows = [line for line in str(existing).splitlines()[1:] if line.strip()]
+            covered = len({line.split(",", 1)[0].strip() for line in rows})
+        if covered >= final_games:
+            return
+
+        print(
+            f"[intelligence_state] WNBA_BOXSCORES_REBUILD date={selected_date}"
+            f" final_games={final_games} covered={covered}",
+            flush=True,
+        )
+        build_date(selected_date, base_url=base_url)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[intelligence_state] WNBA_BOXSCORES_FAILED date={selected_date}"
+            f" {type(exc).__name__}: {exc}",
+            flush=True,
+        )
 
 
 def _profile_stage(stage_name: str, callback, *args, **kwargs):
@@ -4650,6 +4940,27 @@ class IntelligenceStateService:
         # have been updated. Costs nothing on the streamed path, where the
         # returned list is empty by construction.
         returned = None
+        # `#567`. THE BIGGEST SINGLE BLOCK IN THE BUILD, AND IT HAD NO LOG LINE.
+        # Measured 2026-08-26 on the first build after boot: 313 SECONDS between
+        # the last sport exiting the loop below and `post_build_overview`, out of
+        # a 747.8s build. It was invisible because the only timing on it goes
+        # through `_profile_stage` -> logger.info, which does not reach Render's
+        # collector -- so this stage has been timed all along and read by nobody.
+        # For scale: all eight sports' candidate GENERATION is 47s of that same
+        # build. Anyone optimising generation is optimising 6% of the function.
+        #
+        # THE SPAN MUST ENCLOSE **BOTH** BRANCHES BELOW, and the first version of
+        # it did not. It wrapped only the `self._app is not None` branch and
+        # closed before the `if not summary_parts:` fallback -- which is the
+        # branch that actually runs here, as the comment on it has said all
+        # along: "refresh-worker never has self._app set ... so this branch runs
+        # on every worker cycle." Deployed 05:09:45Z and it read
+        # `elapsed_s=0.0` while the sport loop ran 17 seconds LATER, outside the
+        # span. An instrument reporting 0.0 for the most expensive stage in the
+        # function is worse than no instrument, because 0.0 looks like an answer.
+        # Closing after both branches is what makes the reading independent of
+        # which service is running it.
+        _overview_mark = _build_span_enter("build_intelligence_overview", selected_date)
         if self._app is not None:
             try:
                 with self._app.app_context():
@@ -4687,6 +4998,10 @@ class IntelligenceStateService:
                     if isinstance(_row, Mapping):
                         _consume_sport(dict(_row))
             returned = None
+        # Closed only HERE, after every branch that can build the overview. The
+        # list-fallbacks are inside the span on purpose: they re-consume rows
+        # this stage produced, so their cost is the overview's cost.
+        _build_span_exit("build_intelligence_overview", _overview_mark)
         # `overview` is deliberately NOT rebound to the rows. Anything below
         # that still needs the whole list is a bug this cutover must surface,
         # not paper over.
@@ -4872,6 +5187,12 @@ class IntelligenceStateService:
                     f"date={selected_date} -- keeping candidates unfiltered",
                     flush=True,
                 )
+        # `#567`: `_log_stage_timing` below is logger.info and reaches Render's
+        # collector zero times, so this loop -- which serialises, scores and
+        # market-id-stamps EVERY candidate -- has never appeared in a production
+        # log. Opened here so the 181s between the collection span and
+        # `CANDIDATE_POOL_READY` can be split between this and the manifest join.
+        _candidate_build_mark = _build_span_enter("candidate_building", selected_date)
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
@@ -4902,17 +5223,37 @@ class IntelligenceStateService:
             )
             candidate_entries.append(candidate_entry)
         _log_stage_timing("candidate_building", (time.perf_counter() - candidate_build_started_at) * 1000.0)
+        _build_span_exit("candidate_building", _candidate_build_mark)
         _diag_log_all_process_memory("post_candidate_building")
         if _abort_build_candidate_pool_if_memory_critical("post_candidate_building"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
 
+        # `#567`, the other half of the unattributed 181s. This loop reloads a
+        # per-sport odds-history payload and joins it against every candidate.
+        # `_load_odds_history_payload_for_sport` is the specific suspect and it
+        # is timed PER SPORT below, because the shards are wildly uneven: the
+        # 2026-08-26 build read soccer shards of 7.4MB (2,547 entries), 3.97MB
+        # and 2.16MB while nba/nhl/ncaab read nothing at all. A single total for
+        # the loop would average that away and need a second deploy to recover,
+        # which is the round trip this instrumentation exists to avoid.
+        _manifest_mark = _build_span_enter("manifest_odds_history_join", selected_date)
+        _history_load_seconds: dict[str, float] = {}
         manifests = self._available_sport_manifests(selected_date)
         candidate_pools: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
         manifest_shard_keys = {sport_slug: resolve_current_shard_key(sport_slug, selected_date) for sport_slug in manifests}
         for sport_slug, manifest in manifests.items():
             if _abort_build_candidate_pool_if_memory_critical(f"manifest_loop_sport={sport_slug}"):
                 return self._empty_candidate_pool(selected_date, source_fingerprint)
+            try:
+                _history_mark: float | None = time.monotonic()
+            except Exception:
+                _history_mark = None
             odds_history_payload = self._load_odds_history_payload_for_sport(sport_slug, manifest_shard_keys[sport_slug])
+            if _history_mark is not None:
+                try:
+                    _history_load_seconds[sport_slug] = time.monotonic() - _history_mark
+                except Exception:
+                    pass
             odds_history_markets = self._odds_history_market_states(odds_history_payload)
             sport_candidates: list[dict[str, Any]] = []
             for candidate in candidate_entries:
@@ -4948,6 +5289,21 @@ class IntelligenceStateService:
         global_pool = self._merge_candidate_pools(candidate_pools)
         if not candidate_pools:
             global_pool = []
+        # Per-sport, sorted by cost, so the worst shard NAMES ITSELF instead of
+        # being inferred from the total. Wrapped whole: a reporting line must
+        # never be able to take down the build it reports on.
+        try:
+            _slowest = sorted(_history_load_seconds.items(), key=lambda kv: kv[1], reverse=True)
+            print(
+                "[intelligence_state] ODDS_HISTORY_LOAD_SECONDS "
+                f"total_s={round(sum(_history_load_seconds.values()), 2)} "
+                f"sports={len(_history_load_seconds)} "
+                + " ".join(f"{slug}={round(seconds, 2)}" for slug, seconds in _slowest),
+                flush=True,
+            )
+        except Exception:
+            pass
+        _build_span_exit("manifest_odds_history_join", _manifest_mark)
 
         # Effectively-decided live props get one last pass here, on the final
         # merged pool, because this is the only point where every field is
@@ -5058,6 +5414,32 @@ class IntelligenceStateService:
                 # one hop earlier, and it cost three investigations there.
                 f"below_floor={layer2_shortlist.get('rows_below_value_floor')} "
                 f"admitted_by_blend={layer2_shortlist.get('rows_admitted_by_blend')} "
+                # EVERY OTHER DROP COUNTER, because `rows=0 considered=8694
+                # below_floor=0` was unreadable without them. MEASURED
+                # 2026-08-24 23:02Z: 8,694 opportunities became zero rows while
+                # the only two counters on this line both said zero, so the
+                # board looked broken when the rows may simply have aged out of
+                # a finished slate.
+                #
+                # `select_shortlist` ALREADY computes and returns all of these
+                # -- `rows_beyond_horizon`, `rows_stale_kickoff`,
+                # `rows_beyond_quote_age`, `rows_implausible_book`,
+                # `rows_excluded_market`, `rows_uninformative_ev`,
+                # `rows_beyond_game_cap`. Nothing new is counted here; they were
+                # simply never printed, so eight rules trimmed silently.
+                #
+                # That is the exact failure `layer2_board.py`'s own comments
+                # name three separate times (`#373`, `#391`, `#397`): "a rule
+                # that trims silently is a rule nobody can tell apart from a
+                # thin slate". The counters shipped with their rules as that
+                # discipline requires; the LOG LINE never caught up.
+                f"beyond_horizon={layer2_shortlist.get('rows_beyond_horizon')} "
+                f"stale_kickoff={layer2_shortlist.get('rows_stale_kickoff')} "
+                f"beyond_quote_age={layer2_shortlist.get('rows_beyond_quote_age')} "
+                f"implausible_book={layer2_shortlist.get('rows_implausible_book')} "
+                f"excluded_market={layer2_shortlist.get('rows_excluded_market')} "
+                f"uninformative_ev={layer2_shortlist.get('rows_uninformative_ev')} "
+                f"beyond_game_cap={layer2_shortlist.get('rows_beyond_game_cap')} "
                 f"sports={layer2_shortlist.get('active_sports')}",
                 flush=True,
             )
@@ -5253,6 +5635,7 @@ class IntelligenceStateService:
                     pass
                 for _settle_date in _dates:
                     if _settle_date:
+                        _refresh_wnba_boxscores(_settle_date)
                         settle_orders(_settle_date)
             except Exception as exc:
                 print(f"[intelligence_state] SETTLEMENT_FAILED error={exc}", flush=True)
@@ -6053,7 +6436,7 @@ class IntelligenceStateService:
         cache_key = _payload_key(request_payload)
         logger.info("BETTING_BOARD_PUBLISH_START", extra={"selected_date": selected_date, "question": question})
 
-        candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+        candidate_pool = _timed_candidate_pool(self._build_candidate_pool, selected_date, source_fingerprint)
         candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
         # 2026-07-25: everything below this point (through the final return)
         # was only ever traced via logger.info/_log_stage_timing -- confirmed
@@ -6399,7 +6782,7 @@ class IntelligenceStateService:
                 self._last_run_key = cache_key
                 self._last_run_started_at = time.time()
 
-            candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+            candidate_pool = _timed_candidate_pool(self._build_candidate_pool, selected_date, source_fingerprint)
             candidate_pool_count = int(candidate_pool.get("candidate_count") or 0)
             if candidate_pool_count <= 0 and selected_date == central_today_iso() and not payload_had_explicit_date:
                 rollover_date = _next_supported_intelligence_date(selected_date)
@@ -6906,6 +7289,22 @@ def _combined_board_response_cache_ttl_seconds() -> float:
     return max(1.0, float(_env_int("SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS", 15)))
 
 
+def _combined_board_stale_after_seconds() -> float:
+    """How old the oldest input may be before the board is not fresh. `#563`.
+
+    Default 900 s, matching `_STATE_STALE_SECONDS` on the live-portfolio banner
+    rather than inventing a second threshold -- two surfaces disagreeing about
+    what "stale" means is how a page and a health check start telling different
+    stories about one system.
+
+    Chosen against the measured cadence, not picked round: boot-to-first-publish
+    is ~21 minutes under a restart, but a HEALTHY worker republishes inside ~10,
+    so 15 minutes clears normal operation and catches the 20-54 minute freezes
+    of 2026-08-25 without flapping in between.
+    """
+    return max(1.0, float(_env_int("SYNDICATE_INTELLIGENCE_BOARD_STALE_AFTER_SECONDS", 900)))
+
+
 def _read_single_date_response_for_combining(selected_date: str) -> dict[str, Any] | None:
     """One date's already-computed response, read-only. Consults both the
     in-memory snapshot the background loop already holds (cheapest -- exactly
@@ -7001,12 +7400,20 @@ def read_combined_intelligence_response(
     by_date_summary: dict[str, dict[str, Any]] = {}
     covered_sports: set[str] = set()
 
+    # `#563`. Every artifact this board is assembled from, dated. See the
+    # `state_meta` block at the bottom of this function for why an ASSERTED
+    # freshness was the defect.
+    artifact_vintages: list[str] = []
+
     for requested_date in requested_dates:
         date_response = _read_single_date_response_for_combining(requested_date)
         if date_response is None:
             by_date_summary[requested_date] = {"candidate_count": 0, "covered_sports": []}
             print(f"[intelligence_state] COMBINED_BOARD_STATE_DATE_MISS date={requested_date}", flush=True)
             continue
+        date_stamp = _state_payload_timestamp(date_response)
+        if date_stamp:
+            artifact_vintages.append(date_stamp)
         date_by_sport = date_response.get("by_sport") if isinstance(date_response.get("by_sport"), dict) else {}
         date_candidate_count = 0
         date_covered_sports: set[str] = set()
@@ -7093,7 +7500,7 @@ def read_combined_intelligence_response(
     # `#308`'s own monitor fell into. This keeps the pool independently readable.
     legacy_candidate_count = len(merged_recommendations)
     if board_l2a_fallback_enabled():
-        fallback_cards = _layer2_fallback_recommendations(requested_dates)
+        fallback_cards = _layer2_fallback_recommendations(requested_dates, vintages=artifact_vintages)
         if fallback_cards:
             # Re-promote through the SAME contract rather than appending to the
             # output: the normaliser owns ranking, dedupe and the card shape, so
@@ -7112,11 +7519,89 @@ def read_combined_intelligence_response(
     combined["by_date"] = by_date_summary
     combined["covered_sports"] = sorted(covered_sports)
     combined["candidate_count"] = len(merged_recommendations)
+    # `#563`. DERIVED FROM THE ARTIFACTS, NOT ASSERTED.
+    #
+    # This block used to read `"age_seconds": 0.0, "is_fresh": True` -- flat
+    # literals, on a function whose own docstring says it "NEVER calls
+    # _build_candidate_pool ... It only reads what ... has already built". So
+    # `computed_at` was the moment of the READ and the age was of nothing at
+    # all: a board assembled entirely from hour-old artifacts reported itself
+    # perfectly fresh, every time, by construction.
+    #
+    # WHAT THAT COST, measured 2026-08-25/26. refresh-worker took 15 deploys in
+    # 6h15m, each SIGTERMing the build in flight; median instance uptime was
+    # 1202 s against a 21-minute boot-to-first-publish, so the artifacts under
+    # this board went 20-54 minutes without moving. The board rendered them the
+    # whole time with `is_fresh: True`, and the only thing that noticed was a
+    # person watching the odds-refresh timestamps not change. **A board that
+    # cannot go stale in its own telemetry is a board whose staleness only a
+    # user can find.**
+    #
+    # TWO NUMBERS, BECAUSE EITHER ALONE IS UNATTRIBUTABLE -- the same reason
+    # `layer2_shortlist` publishes `openings_records` beside `openings_loaded`:
+    #
+    #   `age_seconds`        the OLDEST input. How stale the worst row on this
+    #                        board could be. This is what gates `is_fresh`,
+    #                        because a board is only as current as its most
+    #                        stale part.
+    #   `newest_age_seconds` the FRESHEST input. When this board last changed
+    #                        at all -- the number that goes flat when the
+    #                        producer dies, which is the failure above.
+    #
+    # A single figure cannot separate "one lagging sport" from "the whole
+    # pipeline stopped", and those need different people.
+    #
+    # `is_fresh` IS None, NOT False, WHEN NOTHING COULD BE DATED. "We could not
+    # tell" and "we checked and it is stale" are different facts, and collapsing
+    # them into False would make an unreadable stamp indistinguishable from a
+    # measured outage -- the same collapse `read_json_file_result` exists to
+    # undo. `artifacts_dated` says how many stamps the verdict actually rests
+    # on, so a thin sample is visible rather than implied. `freshness_status`
+    # carries the repo's existing `fresh`/`stale`/`unknown` vocabulary beside
+    # it, and with `computed_at` None the recompute pass skips this block
+    # entirely -- so the None survives to the client rather than being
+    # flattened to False.
+    dated = sorted(
+        (stamp, age)
+        for stamp, age in ((stamp, _timestamp_age_seconds(stamp)) for stamp in artifact_vintages)
+        if age is not None
+    )
+    stale_after = _combined_board_stale_after_seconds()
+    oldest_stamp = max(dated, key=lambda pair: pair[1])[0] if dated else None
+    oldest_age = max(age for _stamp, age in dated) if dated else None
+    newest_age = min(age for _stamp, age in dated) if dated else None
+    status = _freshness_status_from_age(oldest_age, stale_after)
     combined["state_meta"] = {
         "source": "combined_board_window",
-        "computed_at": _utc_now(),
-        "age_seconds": 0.0,
-        "is_fresh": True,
+        # `computed_at` IS THE OLDEST ARTIFACT'S STAMP, NOT THE MOMENT OF THE
+        # READ, AND THAT IS LOAD-BEARING RATHER THAN COSMETIC.
+        #
+        # `_apply_freshness_recompute` (`#334`) rebuilds `age_seconds`,
+        # `freshness_status` and `is_fresh` FROM `computed_at` on every served
+        # payload, precisely so a verdict computed at write time cannot lie at
+        # read time. With the read moment here, that pass would recompute this
+        # board's age as ~0 and hand back `is_fresh: True` -- silently undoing
+        # this fix on the way out of the door, which is the fourth time `#334`'s
+        # own comment says a plausible-looking patch missed a path.
+        #
+        # Anchoring it to the oldest input makes the block IDEMPOTENT under that
+        # recompute: it recovers the same age, against the same SLA, and lands
+        # on the same verdict. It also makes `computed_at` mean here what it
+        # means in `_snapshot_state_meta` -- when the DATA was computed.
+        "computed_at": oldest_stamp,
+        # The read moment is not lost, just renamed to what it actually is. On
+        # its own it was routinely mistaken for when the board was built.
+        "read_at": _utc_now(),
+        "age_seconds": oldest_age,
+        # Consumed BY the recompute above, so this board is judged on its own
+        # threshold rather than the 30 s intelligence-refresh interval that is
+        # the default everywhere else. A board assembled from artifacts is not
+        # a snapshot and does not turn over that fast.
+        "freshness_sla_seconds": stale_after,
+        "freshness_status": status,
+        "is_fresh": None if oldest_age is None else status == "fresh",
+        "newest_age_seconds": newest_age,
+        "artifacts_dated": len(dated),
     }
     # `#363`: the legacy pool's own size, independent of what the board shows.
     # Always emitted, so "is `#308` still live" stays a one-field question now
@@ -7171,13 +7656,24 @@ def _decorate_intelligence_board_snapshot_response(
         if not state_meta:
             freshness_sla_seconds = _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30)
             normalized_updated_at = _utc_timestamp_string(updated_at or decorated.get("state_last_updated") or decorated.get("last_updated") or decorated.get("updated_at"))
+            # `#563`: DERIVED FROM `computed_at`, WHICH WAS ALREADY IN HAND.
+            # This read `age_seconds: 0.0, freshness_status: "fresh",
+            # is_fresh: True` while holding `normalized_updated_at` two lines
+            # up -- the stamp that answers the question was already computed and
+            # then ignored. Uses the SAME `_timestamp_age_seconds` /
+            # `_freshness_status_from_age` pair every other freshness block in
+            # this file uses -- a second age helper here would be a parallel
+            # contract that can disagree with `_recomputed_freshness_block`,
+            # which rebuilds exactly these three fields on the served payload.
+            _age = _timestamp_age_seconds(normalized_updated_at)
+            _status = _freshness_status_from_age(_age, freshness_sla_seconds)
             state_meta = {
                 "source": source_label,
                 "computed_at": normalized_updated_at,
-                "age_seconds": 0.0,
+                "age_seconds": _age,
                 "freshness_sla_seconds": freshness_sla_seconds,
-                "freshness_status": "fresh",
-                "is_fresh": True,
+                "freshness_status": _status,
+                "is_fresh": _status == "fresh",
                 "source_fingerprint": decorated.get("source_fingerprint"),
                 "run_key": snapshot.get("latest_key"),
                 "last_run_started_at": None,
@@ -7200,13 +7696,18 @@ def _decorate_intelligence_board_snapshot_response(
         state_meta = decorated.get("state_meta") if isinstance(decorated.get("state_meta"), dict) else {}
         candidate_count = _intelligence_state_candidate_count(decorated)
         if not state_meta:
+            # `#563`: same defect, same fix as the branch above -- the stamp
+            # was in hand and the age was asserted anyway.
+            _computed_at = _utc_timestamp_string(updated_at)
+            _age = _timestamp_age_seconds(_computed_at)
+            _status = _freshness_status_from_age(_age, freshness_sla_seconds)
             state_meta = {
                 "source": source_label,
-                "computed_at": _utc_timestamp_string(updated_at),
-                "age_seconds": 0.0,
+                "computed_at": _computed_at,
+                "age_seconds": _age,
                 "freshness_sla_seconds": freshness_sla_seconds,
-                "freshness_status": "fresh",
-                "is_fresh": True,
+                "freshness_status": _status,
+                "is_fresh": _status == "fresh",
                 "source_fingerprint": decorated.get("source_fingerprint"),
                 "run_key": snapshot.get("latest_key"),
                 "last_run_started_at": None,

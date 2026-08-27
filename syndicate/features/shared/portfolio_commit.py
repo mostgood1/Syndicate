@@ -295,6 +295,7 @@ def commit_portfolio(
     selected_date: str,
     settings: PortfolioSettings | None = None,
     settled_sample_size_by_sport: Mapping[str, int] | None = None,
+    prefer_placeable: bool = False,
 ) -> dict[str, Any]:
     """Rank -> size -> budget -> cut. Returns the committed plan.
 
@@ -309,25 +310,44 @@ def commit_portfolio(
     resolved = settings or resolve_settings()
     samples = dict(settled_sample_size_by_sport or {})
     refusals: dict[str, int] = {}
+    # WHICH MARKETS DIE WHERE. The bare `refusals` counter says 98 rows had no
+    # model edge and 78 missed the EV floor; it cannot say whether those were
+    # props or game lines, so "why are no prop positions being taken" is
+    # unanswerable from it. Kalshi's inventory is prop-heavy -- its
+    # `sources_offered` sample is batter_home_runs, strikeouts, player_threes --
+    # which makes that exactly the question its refusals need to answer.
+    #
+    # Same defect twice fixed elsewhere tonight: a counter that names a problem
+    # while withholding the data needed to act on it.
+    refusals_by_market: dict[str, dict[str, int]] = {}
     rows_in = 0
 
-    def refuse(reason: str) -> None:
+    def refuse(reason: str, row: Any = None) -> None:
         refusals[reason] = refusals.get(reason, 0) + 1
+        market = ""
+        if isinstance(row, Mapping):
+            market = str(row.get("market") or "").strip().lower()
+        # `unkeyed` rather than dropping the count: a refusal whose row carries
+        # no market is still a refusal, and silently omitting it would make the
+        # per-market totals disagree with `refusals` for no visible reason.
+        bucket = refusals_by_market.setdefault(reason, {})
+        key = market or "unkeyed"
+        bucket[key] = bucket.get(key, 0) + 1
 
     priced: list[dict[str, Any]] = []
     for row in rows or ():
         rows_in += 1
         if not isinstance(row, Mapping):
-            refuse("row_not_a_mapping")
+            refuse("row_not_a_mapping", None)
             continue
         inputs, reason = sizing_inputs_from_row(row)
         if inputs is None:
-            refuse(reason or "unknown")
+            refuse(reason or "unknown", row)
             continue
 
         ev_pct = _as_float(row.get("ev_pct"))
         if ev_pct is None or ev_pct < resolved.min_ev_pct:
-            refuse("below_min_ev_pct")
+            refuse("below_min_ev_pct", row)
             continue
 
         sport = str(row.get("sport") or "").strip().lower()
@@ -337,10 +357,10 @@ def commit_portfolio(
                 candidate, settled_sample_size=samples.get(sport, 0)
             )
         except Exception:
-            refuse("sizing_failed")
+            refuse("sizing_failed", row)
             continue
         if (_as_float(candidate["stake"].get("stake_fraction")) or 0.0) <= 0.0:
-            refuse("zero_kelly_stake")
+            refuse("zero_kelly_stake", row)
             continue
         apply_price_reliability(candidate, inputs)
         attribution = stake_attribution(
@@ -355,10 +375,40 @@ def commit_portfolio(
     # trimming first would let two legs of a three-leg group look independent.
     exposure = apply_exposure_budgets([item["candidate"] for item in priced])
 
-    priced.sort(key=lambda item: _score_value(item["row"]) or float("-inf"), reverse=True)
+    # THE CUT IS BY SCORE, AND IN A VENUE PLAN THAT IS NOT ENOUGH.
+    #
+    # A venue-scoped row priced from the AGGREGATOR carries no venue contract
+    # id and can never be bought at that venue -- `scope_rows_to_venue` records
+    # which book priced it in `price_source`. Ranking those against placeable
+    # rows lets a bet we cannot make consume one of `max_positions` (12) slots
+    # and push out one we can.
+    #
+    # Measured 2026-08-25 5:17:58 PM Central, the first Kalshi plan that ever
+    # priced off Kalshi's own book: 161 of 233 rows were venue-priced, 40 were
+    # cut here, and the single position that survived was
+    # `price_source=aggregator` -- unplaceable, and holding the only slot that
+    # mattered. `ORDER_PATH venue=kalshi` refused it `no_venue_ticker`.
+    #
+    # PLACEABILITY IS PRIMARY, NOT A TIEBREAK, and that is the whole decision:
+    # an unplaceable row's score is a statement about a bet we cannot hold, so
+    # ranking it above one we can optimises a book nobody can own. Nothing is
+    # DROPPED -- aggregator rows still fill whatever slots remain, and the
+    # restricted-vs-unrestricted comparison still has its full population.
+    #
+    # OFF BY DEFAULT so the main plan is provably unchanged: its rows carry no
+    # `price_source` at all, and an implicit "is the field present" test would
+    # make that guarantee depend on a field nobody set. The venue loop opts in.
+    def _rank(item: Mapping[str, Any]) -> tuple[int, float]:
+        score = _score_value(item["row"]) or float("-inf")
+        if not prefer_placeable:
+            return (0, score)
+        placeable = str(item["row"].get("price_source") or "") == "venue_feed"
+        return (1 if placeable else 0, score)
+
+    priced.sort(key=_rank, reverse=True)
     if len(priced) > resolved.max_positions:
-        for _ in priced[resolved.max_positions :]:
-            refuse("beyond_max_positions")
+        for dropped in priced[resolved.max_positions :]:
+            refuse("beyond_max_positions", dropped["row"])
         priced = priced[: resolved.max_positions]
 
     # The slate ceiling. Scaled proportionally rather than truncated: Kelly
@@ -387,7 +437,7 @@ def commit_portfolio(
             # Not rounded up. A position too small to place is not a position,
             # and inflating it to the minimum would silently overbet the row
             # the sizer just said to bet least on.
-            refuse("below_min_stake")
+            refuse("below_min_stake", row)
             continue
         # Scale the EV-only counterfactual by whatever the budgeting and the
         # slate ceiling did to the real stake, so the two are comparable at the
@@ -566,6 +616,10 @@ def commit_portfolio(
         # Sums to `rows_in` together with `len(positions)`. A plan that cannot
         # account for every row it was given is not a plan.
         "refusals": dict(sorted(refusals.items())),
+        "refusals_by_market": {
+            reason: dict(sorted(markets.items(), key=lambda kv: (-kv[1], kv[0])))
+            for reason, markets in sorted(refusals_by_market.items())
+        },
         "exposure": exposure,
     }
 

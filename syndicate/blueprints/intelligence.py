@@ -19,6 +19,12 @@ from pipeline.intelligence_state import queue_board_state_refresh
 from pipeline.intelligence_state import canonical_board_state_enabled
 from pipeline.intelligence_state import canonical_board_state_shadow_compare_enabled
 from pipeline.intelligence_state import read_intelligence_board_state
+# `#564`. THE REPO'S EXISTING AGE HELPER, not a second one. Adding a
+# parallel implementation is the mistake this session already made once
+# tonight (`#563`) and had to back out: two age functions can disagree, and
+# `_recomputed_freshness_block` rebuilds freshness verdicts from the same
+# kind of stamp elsewhere in this payload.
+from pipeline.intelligence_state import _timestamp_age_seconds
 from pipeline.intelligence_state import read_latest_intelligence_board_state
 from pipeline.intelligence_state import slice_intelligence_board_state_for_request
 from pipeline.intelligence_state import read_combined_intelligence_response
@@ -30,7 +36,10 @@ from syndicate.features.intelligence_board import build_intelligence_board_contr
 from syndicate.features.shared.json_safety import json_safe_value
 from syndicate.features.intelligence_board import _recommendation_lane
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
-from syndicate.features.shared.game_chip_scoreboard import build_game_chips
+from syndicate.features.shared.game_chip_scoreboard import (
+    GAME_CHIP_DEFAULT_SPORTS,
+    build_game_chips,
+)
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -2174,7 +2183,30 @@ def intelligence_status_api():
     return _no_cache_response(jsonify(response_payload))
 
 
-_GAME_CHIP_DEFAULT_SPORTS = ["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"]
+# Re-exported from the shared module so the worker that BUILDS the chips and
+# the endpoint that SERVES them cannot drift apart on which sports exist.
+_GAME_CHIP_DEFAULT_SPORTS = list(GAME_CHIP_DEFAULT_SPORTS)
+
+
+def _game_chip_artifact_max_age_seconds() -> float:
+    """How old the worker's chip artifact may be before this handler rebuilds. `#564`.
+
+    120 s, chosen against the page's own poll rather than picked round: the
+    board polls `/api/board/game-chips` every 60 seconds, so a two-poll
+    allowance keeps the artifact authoritative through ordinary publish jitter
+    and gives way the moment the worker actually falls behind.
+
+    Raise it toward the publish cadence to favour the worker and accept a
+    staler scoreboard; set it very high to restore `#545`'s
+    always-read-the-artifact behaviour exactly.
+    """
+    raw = str(os.environ.get("SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS") or "").strip()
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            pass
+    return 120.0
 
 
 @intelligence_bp.get("/api/board/game-chips")
@@ -2186,12 +2218,134 @@ def board_game_chips_api():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     sports_raw = str(request.args.get("sports") or "").strip()
     sports = [part.strip().lower() for part in sports_raw.split(",") if part.strip()] or list(_GAME_CHIP_DEFAULT_SPORTS)
+    # `#545`. READ THE WORKER'S ARTIFACT. This handler used to call
+    # `build_game_chips` inline, which fans out over every sport and -- for
+    # soccer -- over every league, two matchdays each. That is computation in a
+    # request handler, which the worker-split rule forbids outright, and the
+    # widening that fixed the coverage gap is what made it indefensible rather
+    # than merely against the rules.
+    #
+    # `source` is on the RESPONSE, not just in a log, because the two paths
+    # produce chips that look identical and are not: one is what the worker
+    # published, the other is this service recomputing. Without it, a permanent
+    # publish failure is invisible -- the board keeps working and the request
+    # fan-out `#545` set out to remove is quietly still running.
+    # `#564`. SERVE THE FRESHER OF THE TWO, rather than always preferring the
+    # artifact.
+    #
+    # THE REGRESSION THIS FIXES, reported by the user: "the compact cards used
+    # to be updated every 60s". They did. Before `#545` this handler called
+    # `build_game_chips` inline, and that call holds its own 30-second TTL
+    # cache -- so the page's 60-second poll always got a scoreboard at most 30
+    # seconds old. `#545` replaced it with an unconditional read of the worker's
+    # artifact, which is written once per `build_layer2_shortlist`.
+    #
+    # MEASURED 2026-08-25, in a window with NO DEPLOYS AT ALL (22:36:13Z ->
+    # 23:48:19Z), consecutive `GAME_CHIPS_PUBLISHED` gaps were:
+    #
+    #     4m58s  3m23s  5m19s  18m55s  7m20s  5m02s  3m30s
+    #
+    # So a 60-second scoreboard became a ~5-minute one on a quiet evening, and a
+    # 20-54 minute one while refresh-worker was being redeployed. The deploy
+    # storm made it acute; this made it chronic.
+    #
+    # AND `#545` DID NOT ACTUALLY REMOVE THE FAN-OUT IT WAS WRITTEN FOR. Web
+    # still builds chips inline several times a minute -- `_refresh_layer2_live_state`
+    # (`intelligence_state.py`) calls the same `build_game_chips` for the L2-A
+    # live restate on the board path, which logs `LAYER2_LIVE_RESTATED` at
+    # 02:39:34, 02:40:23, 02:40:45, 02:42:20, 02:42:24, 02:44:56Z on one
+    # instance. So the cost `#545` moved to the worker was never actually taken
+    # off web; only the BENEFIT was. This handler was reading a five-minute-old
+    # artifact while the same process built fresh chips one function away.
+    #
+    # WHY A THRESHOLD RATHER THAN "ALWAYS BUILD INLINE": an inline build is
+    # always newer by construction, so a plain "fresher wins" would never read
+    # the artifact again and would reinstate the full per-request fan-out
+    # unconditionally. The threshold keeps the worker's artifact authoritative
+    # whenever it is actually keeping up -- which is the state `#545` wanted and
+    # the state a faster publish cadence would restore -- and only pays for a
+    # build when it is not.
+    #
+    # THE INLINE BUILD IS BOUNDED, not per-request: `build_game_chips` caches on
+    # (date, sports) for 30 seconds, so a hot endpoint costs one real build per
+    # 30 seconds regardless of traffic.
+    artifact_max_age = _game_chip_artifact_max_age_seconds()
+    chips: list = []
+    source = "worker_artifact"
+    published = None
+    artifact_age: float | None = None
     try:
-        chips = build_game_chips(selected_date, sports)
+        from pipeline.intelligence_state import read_game_chips
+
+        published = read_game_chips(selected_date)
     except Exception:
-        _LOGGER.exception("BOARD_GAME_CHIPS_FAILURE")
-        chips = []
-    return _no_cache_response(jsonify({"ok": True, "date": selected_date, "chips": chips}))
+        _LOGGER.exception("BOARD_GAME_CHIPS_ARTIFACT_READ_FAILURE")
+
+    has_artifact = isinstance(published, dict) and isinstance(published.get("chips"), list)
+    if has_artifact:
+        artifact_age = _timestamp_age_seconds(published.get("written_at"))
+
+    def _from_artifact() -> list:
+        wanted = {str(slug).strip().lower() for slug in sports}
+        return [
+            chip
+            for chip in published["chips"]
+            if isinstance(chip, dict) and str(chip.get("sport") or "").strip().lower() in wanted
+        ]
+
+    # An UNDATEABLE artifact counts as stale. It is the same rule the rest of
+    # this fix follows -- an unreadable stamp is not evidence of freshness -- and
+    # here the pessimistic branch is cheap and always correct, just slower.
+    artifact_is_fresh = (
+        has_artifact and artifact_age is not None and artifact_age <= artifact_max_age
+    )
+
+    if artifact_is_fresh:
+        chips = _from_artifact()
+    else:
+        source = (
+            "inline_artifact_stale" if has_artifact else "inline_artifact_missing"
+        )
+        _LOGGER.info(
+            "BOARD_GAME_CHIPS_INLINE date=%s reason=%s artifact_age=%s limit=%s",
+            selected_date,
+            source,
+            None if artifact_age is None else round(artifact_age, 1),
+            artifact_max_age,
+        )
+        try:
+            chips = build_game_chips(selected_date, sports)
+        except Exception:
+            _LOGGER.exception("BOARD_GAME_CHIPS_FAILURE")
+            # A STALE SCOREBOARD BEATS NO SCOREBOARD. Before this, a failed
+            # inline build returned [] and blanked every sport's strip. If an
+            # artifact exists at all, serving it degraded is strictly better
+            # than serving nothing -- and `source` says which happened, so it
+            # cannot pass for a healthy read.
+            if has_artifact:
+                chips = _from_artifact()
+                source = "stale_artifact_after_inline_failure"
+            else:
+                chips = []
+                source = "unavailable"
+    return _no_cache_response(
+        jsonify(
+            {
+                "ok": True,
+                "date": selected_date,
+                "chips": chips,
+                "source": source,
+                # ALWAYS THE ARTIFACT'S STAMP, even when chips were built
+                # inline, so a reader can see how far behind the worker is. The
+                # page keys its staleness badge on `source` being
+                # `worker_artifact`, so an inline serve correctly shows no badge
+                # -- the scoreboard is fresh, whatever the worker is doing.
+                "published_at": (published or {}).get("written_at") if isinstance(published, dict) else None,
+                "artifact_age_seconds": None if artifact_age is None else round(artifact_age, 1),
+                "artifact_max_age_seconds": artifact_max_age,
+            }
+        )
+    )
 
 
 def _attach_book_grid_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
@@ -3188,6 +3342,25 @@ def portfolio_settings_update_api():
     return _no_cache_response(response)
 
 
+@intelligence_bp.get("/portfolio/settings")
+def portfolio_settings_page():
+    """The form lives on `/portfolio`; this sends a browser there.
+
+    WHY THIS EXISTS. `/portfolio/settings` was POST-only -- it is the form's
+    ACTION, not a page -- so typing it in a browser returned 405 with no hint
+    where the form actually is. Measured 2026-08-26T01:21:20Z: a real 405 from
+    a real browser, on a URL this assistant had itself just told the user to
+    open, followed by three GETs of the JSON API looking for the same thing.
+    The name is the obvious guess for "where do I change settings", and a URL
+    that answers only one verb is a trap for whoever guesses it.
+
+    A redirect rather than a second copy of the form: two renderings of the
+    same five fields would drift, and the one nobody edits would be the one
+    somebody trusts.
+    """
+    return redirect("/portfolio#bankroll", code=303)
+
+
 @intelligence_bp.post("/portfolio/settings")
 def portfolio_settings_form():
     # Plain page-form action, matching /portfolio/bets/<id>/delete above:
@@ -3198,7 +3371,68 @@ def portfolio_settings_form():
     changes = {name: request.form.get(name) for name in EDITABLE_FIELDS if request.form.get(name) not in (None, "")}
     if changes:
         update_settings(changes)
-    return redirect("/portfolio", code=303)
+    return redirect("/portfolio#bankroll", code=303)
+
+
+@intelligence_bp.get("/api/portfolio/limits")
+def portfolio_limits_api():
+    """The venue caps in force, and where each number came from.
+
+    A pure read. `sources` matters more here than anywhere else on this page:
+    "$200 because you set it" and "$50 because the store lost your edit" are
+    the difference between a funded day and a truncated one, and they render
+    identically without it.
+    """
+    from syndicate.features.shared.execution_limits_settings import resolve_view
+
+    return _no_cache_response(jsonify({"ok": True, "limits": resolve_view()}))
+
+
+@intelligence_bp.post("/api/portfolio/limits")
+def portfolio_limits_update_api():
+    """Partial edit. Out-of-range or unknown fields are rejected BY NAME.
+
+    Same contract as `/api/portfolio/settings`: 400 when nothing was accepted,
+    200 with a populated `rejected` when some fields landed -- a partial
+    success is not a failure, and discarding the good half would be worse.
+    """
+    from syndicate.features.shared.execution_limits_settings import update_limits
+
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict) or not payload:
+        response = jsonify({"ok": False, "error": "a JSON object with at least one field is required."})
+        response.status_code = 400
+        return _no_cache_response(response)
+
+    view, rejected = update_limits(payload)
+    accepted = [key for key in payload if key not in rejected]
+    response = jsonify({"ok": bool(accepted), "limits": view, "accepted": accepted, "rejected": rejected})
+    if not accepted:
+        response.status_code = 400
+    return _no_cache_response(response)
+
+
+@intelligence_bp.get("/portfolio/limits")
+def portfolio_limits_page():
+    """The form lives on `/portfolio`; this sends a browser there.
+
+    Same trap `/portfolio/settings` was: a URL that answers only POST returns
+    405 to whoever guesses it, with no hint where the form actually is. A
+    redirect rather than a second copy of the fields, for the same reason.
+    """
+    return redirect("/portfolio#venue-limits", code=303)
+
+
+@intelligence_bp.post("/portfolio/limits")
+def portfolio_limits_form():
+    # Plain page-form action, matching `/portfolio/settings` -- the caps form
+    # sits beside the bankroll form and posts the same way.
+    from syndicate.features.shared.execution_limits_settings import EDITABLE_FIELDS, update_limits
+
+    changes = {name: request.form.get(name) for name in EDITABLE_FIELDS if request.form.get(name) not in (None, "")}
+    if changes:
+        update_limits(changes)
+    return redirect("/portfolio#venue-limits", code=303)
 
 
 @intelligence_bp.get("/api/portfolio/plan")
@@ -3285,7 +3519,10 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # is contacted, nothing here is a real wager." A live order rendered
         # under that sentence is a real position wearing a disclaimer that it is
         # not one -- the single most dangerous thing this surface could show.
-        # Live orders have their own page: `/portfolio/live`.
+        # Live orders render on `/portfolio` (merged there 2026-08-26; the old
+        # `/portfolio/live` redirects). This filter is what keeps them off THIS
+        # page, and the merge did not move it -- the wall is between live and
+        # SIMULATED, not between live and the user's own real logged bets.
         all_orders = [
             order
             for order in (_load().get("orders") or [])
@@ -3495,7 +3732,175 @@ def portfolio_paper_api():
     return _no_cache_response(jsonify({"ok": True, **_paper_portfolio_payload(selected_date)}))
 
 
-def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
+# Statuses that never became a position. Hidden by DEFAULT on the live page
+# [USER DECISION 2026-08-25] and never deleted -- a toggle shows them, because
+# they are the rows that say WHY a bet did not happen, which is the whole
+# diagnostic surface.
+# HOW OLD A WORKER STAMP CAN BE AND STILL BE "NOW". The worker restamps every
+# execution tick; fifteen minutes is several missed ticks, which is a worker
+# that has stopped rather than one that is between cycles. Named once because
+# the banner, the warning strip, and the health verdict must agree -- three
+# copies of `900` is three places to forget one.
+_STATE_STALE_SECONDS = 900
+
+_NON_POSITION_STATUSES = frozenset({"rejected", "failed"})
+
+
+def _is_non_position(order) -> bool:
+    """An order that never opened a position.
+
+    `rejected` never reached the venue at all. `failed` is the harder case: a
+    submit that TIMED OUT may well have landed, which is what the write-ahead
+    record exists for -- so only a failure the venue ANSWERED (a 4xx) is
+    certainly not a position. `execution_guard._is_venue_refusal` already draws
+    that line for the day's budget, and reusing it keeps the page and the cap
+    telling one story instead of two functions drifting apart.
+    """
+    from syndicate.features.shared.execution_guard import _is_venue_refusal
+
+    if str(order.get("status") or "") == "rejected":
+        return True
+    return _is_venue_refusal(order)
+
+
+def _live_health(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Per-field health for the banner, and one verdict over all of it.
+
+    [USER DECISION 2026-08-25] "green when everything is healthy and red when
+    anything is an issue."
+
+    COMPUTED HERE, NOT IN THE TEMPLATE. The banner is the one line a person
+    reads before deciding whether the system is placing bets, so what makes it
+    green has to be assertable -- and the API should answer the same question
+    the page does rather than leaving a caller to re-derive it from six fields.
+
+    THE COLOUR IS ABOUT HEALTH, NOT DANGER, and that is an inversion. These
+    values were painted RED when on: red meant "real money is live, pay
+    attention". But that made a fully working system render as a wall of red
+    and gave a reader no way to see, at a glance, that something had broken.
+    Under the new rule red means BROKEN, so `armed` -- the state that used to
+    justify red -- is exactly what makes it green.
+
+    ENGAGED IS THEREFORE RED, which reverses this file's previous note that
+    "engaged is the SAFE state, so it is not painted as an error". Both
+    readings are defensible; they cannot both colour one pixel. Engaged means
+    nothing can trade, and "nothing can trade" is the condition this banner
+    now exists to surface. Safe, and not working, are not in conflict.
+    """
+    switch = payload.get("kill_switch") or {}
+    age = payload.get("state_age_seconds")
+    fields = {
+        "job": bool(payload.get("execution_enabled")),
+        "mode": str(payload.get("execution_mode") or "") == "live",
+        "armed": bool(payload.get("live_armed")),
+        # Engaged is a working kill switch AND a stopped system. Red.
+        "kill_switch": not switch.get("engaged"),
+        # A stamp from the worker, recent enough to be about now. Web's own env
+        # is not a reading of the process that places orders, so it is never ok
+        # -- "the worker has not reported" and "execution is off" are different
+        # facts and this must not render them the same.
+        "source": (
+            payload.get("state_source") == "worker"
+            and age is not None
+            and age <= _STATE_STALE_SECONDS
+        ),
+    }
+    return {**fields, "ok": all(fields.values())}
+
+
+# How many dated plans an open book may pull to decorate itself. The live book
+# spans EVERY date; plans are per date. Two covers today and last night's
+# late finishes, which is the whole span over which "live" means anything -- a
+# three-day-old open order is not live, it is stuck, and giving it a status
+# would dress up a problem as a scoreboard.
+_LIVE_STATUS_MAX_PLAN_DATES = 2
+
+
+def _attach_open_bet_status(orders: list) -> list:
+    """Decorate OPEN orders with the worker's live status and CLV mark.
+
+    Returns new dicts rather than mutating: these came out of the execution
+    ledger, and a display concern must never be able to write into a money
+    record even by accident.
+
+    Never raises. An unreadable plan leaves the cells blank -- the page's job is
+    to render the book, and a decoration that can break it is worse than one
+    that is absent.
+    """
+    open_orders = [o for o in orders if not o.get("outcome")]
+    if not open_orders:
+        return orders
+
+    dates = sorted(
+        {str(o.get("selected_date") or "").strip() for o in open_orders if o.get("selected_date")},
+        reverse=True,
+    )[:_LIVE_STATUS_MAX_PLAN_DATES]
+    if not dates:
+        return orders
+
+    status_by_key: dict[str, dict] = {}
+    mark_by_key: dict[str, dict] = {}
+    try:
+        from pipeline.portfolio_commit import read_portfolio_plan
+
+        for date in dates:
+            try:
+                plan = read_portfolio_plan(date)
+            except Exception:
+                continue
+            if not isinstance(plan, dict):
+                continue
+            for row in ((plan.get("bet_status") or {}).get("rows") or []):
+                key = str(row.get("idempotency_key") or "")
+                if key:
+                    status_by_key.setdefault(key, row)
+            for row in ((plan.get("live_marks") or {}).get("marks") or []):
+                key = str(row.get("idempotency_key") or "")
+                if key:
+                    mark_by_key.setdefault(key, row)
+    except Exception:
+        _LOGGER.exception("OPEN_BET_STATUS_JOIN_FAILURE")
+        return orders
+
+    if not status_by_key and not mark_by_key:
+        return orders
+
+    decorated: list = []
+    for order in orders:
+        if order.get("outcome"):
+            # A settled row has an outcome and a P&L; a live status on it would
+            # be stale by definition and would compete with the real answer.
+            decorated.append(order)
+            continue
+        key = str(order.get("idempotency_key") or "")
+        status = status_by_key.get(key)
+        mark = mark_by_key.get(key)
+        if not status and not mark:
+            decorated.append(order)
+            continue
+        row = dict(order)
+        if status:
+            row["live_status"] = {
+                "status": status.get("status"),
+                "current_value": status.get("current_value"),
+                "line": status.get("line"),
+                "margin": status.get("margin"),
+                "unavailable_reason": status.get("unavailable_reason"),
+            }
+        if mark:
+            row["live_mark"] = {
+                "clv_pct": mark.get("clv_pct"),
+                "current_price": mark.get("current_price"),
+                "taken_price": mark.get("taken_price"),
+                "reason": mark.get("reason"),
+            }
+        decorated.append(row)
+    return decorated
+
+
+def _live_portfolio_payload(
+    selected_date: str, *, show_all: bool = False, on_date: str | None = None
+) -> dict[str, Any]:
     """Real money only. The mirror image of `_paper_portfolio_payload`.
 
     A SEPARATE PAGE RATHER THAN A FILTER ON THE PAPER ONE. The two answer the
@@ -3519,9 +3924,15 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
     )
     from syndicate.features.shared.execution_guard import kill_switch_engaged, limits
     from syndicate.features.shared.paper_settlement import settlement_summary
+    from syndicate.features.shared.portfolio_periods import period_rollup
     from pipeline.execute_portfolio import execution_enabled
 
     orders: list = []
+    whole_book: list = []
+    hidden_orders: list = []
+    hidden_open_dated: list = []
+    date_options: list = []
+    periods: dict[str, Any] = {}
     ledger_error = None
     try:
         orders = [
@@ -3530,6 +3941,57 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
             if str(order.get("mode") or "") == LIVE
         ]
         orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
+        # FROM THE WHOLE BOOK, BEFORE THE VIEW FILTER. The pivots answer "how
+        # has this done", which is a question about every live order ever
+        # placed -- not about whichever subset the `?show=` toggle is
+        # displaying. A rollup that moved when a display toggle flipped would
+        # be a rollup nobody could quote.
+        periods = period_rollup(orders)
+        # THE WHOLE BOOK, CAPTURED BEFORE ANY DISPLAY FILTER TOUCHES IT.
+        # `periods` above already had this right; the settlement summary below
+        # did not -- it ran on whatever `orders` had been narrowed to, so the
+        # `?show=` toggle already moved the headline W/L and P&L, and the date
+        # filter would have moved them a great deal more. A rollup that changes
+        # when a display control flips is a rollup nobody can quote.
+        whole_book = list(orders)
+        # HIDDEN, NOT DROPPED, and COUNTED either way. A page that silently
+        # omitted these would make "we placed nothing" and "we tried and were
+        # refused" look identical -- the distinction this whole system keeps
+        # paying to preserve.
+        hidden_orders = [o for o in orders if _is_non_position(o)]
+        if not show_all:
+            orders = [o for o in orders if not _is_non_position(o)]
+
+        # THE DATE FILTER, AND WHY IT IS OPT-IN AND NEVER THE DEFAULT.
+        #
+        # This book is all-dates by construction, because "a real position is
+        # not interesting only on the day it was opened, and a page that hides
+        # yesterday's open bet behind a date picker is a page that will one day
+        # let one expire unwatched". A filter that DEFAULTED to today would be
+        # exactly that page.
+        #
+        # So `?on=` is a separate parameter from `?date=` (which only builds
+        # links and defaults to today). Absent, nothing is filtered. Present,
+        # the page counts how many OPEN positions it is hiding and says so --
+        # the number is what keeps the guarantee: you cannot lose track of a
+        # live bet without the page telling you it is holding one back.
+        if on_date:
+            date_options = sorted(
+                {str(o.get("selected_date") or "") for o in orders if o.get("selected_date")},
+                reverse=True,
+            )
+            hidden_open_dated = [
+                o
+                for o in orders
+                if str(o.get("selected_date") or "") != on_date and not o.get("outcome")
+            ]
+            orders = [o for o in orders if str(o.get("selected_date") or "") == on_date]
+        else:
+            date_options = sorted(
+                {str(o.get("selected_date") or "") for o in orders if o.get("selected_date")},
+                reverse=True,
+            )
+            hidden_open_dated = []
     except Exception as exc:
         # An unreadable ledger must never render as "no live positions". That
         # is the one absence this page cannot afford to get wrong.
@@ -3539,15 +4001,58 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
     settlement = None
     settlement_error = None
     try:
-        settlement = settlement_summary(None, orders=orders)
+        settlement = settlement_summary(None, orders=whole_book)
     except Exception as exc:
         settlement_error = f"{type(exc).__name__}: {exc}"
         _LOGGER.exception("LIVE_SETTLEMENT_SUMMARY_FAILURE")
 
-    # SENT, OR POSSIBLY SENT, WITH AN UNKNOWN RESULT. A restart between submit
-    # and record produces exactly these, and they are the rows a person needs to
-    # see first -- they must be checked against the venue rather than retried.
-    unreconciled = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
+    # ------------------------------------------------------------------
+    # A RESTING ORDER IS NOT AN UNKNOWN RESULT.
+    # ------------------------------------------------------------------
+    #
+    # This was every `submitted` row, under the banner "sent with an unknown
+    # result -- check them against the venue". REPORTED BY THE USER
+    # 2026-08-26, who did check them against the venue: four Polymarket orders
+    # the page called unknown were sitting at Polymarket as ordinary
+    # good-till-cancelled limit orders, exactly as placed.
+    #
+    # They are different facts and they need different words:
+    #
+    #   UNKNOWN   we sent it and never read it back. A restart between submit
+    #             and record leaves exactly this, and it is the case the
+    #             write-ahead record exists for. Genuinely alarming.
+    #   RESTING   the venue was asked, answered, and said the order is live and
+    #             unfilled (`ORDER_STATE_NEW`). Completely healthy -- it is
+    #             what a limit order does.
+    #
+    # `reconciled_at` is the discriminator and it already exists: it was added
+    # 2026-08-24 precisely because "nothing changed" and "nothing was learned"
+    # are different facts. A row carrying it HAS been read back.
+    #
+    # THE COLLAPSE POINTED THE ALARMING WAY, which is why it had to go. A
+    # warning that fires on the system working correctly teaches the reader to
+    # ignore the warning, and this one is the last line of defence against a
+    # double-spend.
+    submitted_rows = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
+    unreconciled = [o for o in submitted_rows if not o.get("reconciled_at")]
+
+    # OPEN AT THE VENUE, from the venue's own answer -- NOT from our status.
+    #
+    # Counting `submitted` rows missed the partially filled ones. The user's
+    # Polymarket Orders tab 2026-08-26 listed FIVE open orders (four Pending,
+    # one Semi-filled at 7.11 of 9.60) against four here, because the
+    # semi-filled row books as `filled` and left every count of what is still
+    # working. It is both things at once, and `venue_open` is the field that
+    # says so.
+    #
+    # `reconciled_at` is still required: an order we never read back is an
+    # unknown, not a resting one, and it belongs in the banner above.
+    resting = [
+        o
+        for o in orders
+        if o.get("reconciled_at")
+        and (o.get("venue_open") or str(o.get("status") or "") == STATUS_SUBMITTED)
+    ]
 
     # THE WORKER'S STATE, NOT THIS PROCESS'S. The switches and caps are env
     # vars on live-odds-worker; the web service has none of them, so reading
@@ -3595,13 +4100,60 @@ def _live_portfolio_payload(selected_date: str) -> dict[str, Any]:
             "state_age_seconds": None,
         }
 
+    # WHERE EACH OPEN BET STANDS. A JOIN, NOT A COMPUTATION.
+    #
+    # `portfolio_commit` already writes both of these into
+    # `portfolio_plan_<date>.json` on the worker every cycle, and that artifact
+    # already crosses to web. Recomputing either here would be compute in a
+    # request path, which is the one thing this service must not do.
+    #
+    #   live_marks  every order re-priced against the current board -- "has the
+    #               market moved toward me". No per-sport resolver, so it
+    #               populates broadly (82 of 442 marked, 2026-08-26T22:5xZ).
+    #   bet_status  where the bet stands against the GAME -- "is it winning".
+    #               Only MLB has a live resolver, so most rows carry a NAMED
+    #               reason instead. That is deliberate and visible: this feature
+    #               spent months raising `UnboundLocalError` every cycle and
+    #               nobody saw it, because an unresolved status and a missing
+    #               one both render as a blank.
+    orders = _attach_open_bet_status(orders)
+
+    # WHAT IS ACTUALLY IN THE ACCOUNTS, from the worker's stamp -- never from a
+    # call here. Web holds no venue credential and must not; a page that hit
+    # the venue per request would also be a second independent live caller,
+    # which is a named incident class in this repo (`#139`/`#144`/`#148`).
+    # `None` means the worker has not reported, and the page renders that as
+    # unknown rather than as no money.
+    balances = None
+    try:
+        from syndicate.features.shared.venue_balances import read_venue_balances
+
+        balances = read_venue_balances()
+    except Exception:
+        _LOGGER.exception("VENUE_BALANCES_READ_FAILURE")
+    if isinstance(balances, dict):
+        balances = {**balances, "age_seconds": _seconds_since(balances.get("recorded_at"))}
+
     return {
         "date": selected_date,
         "orders": orders,
+        "balances": balances,
+        "hidden_count": len(hidden_orders),
+        "show_all": bool(show_all),
+        # THE FILTER'S OWN STATE, and the count that keeps its guarantee: a page
+        # holding back an OPEN position must say how many.
+        "on_date": on_date or None,
+        "hidden_open_dated": len(hidden_open_dated),
+        "date_options": date_options,
+        "periods": periods,
+        "health": _live_health(payload_state),
+        "stale_after_seconds": _STATE_STALE_SECONDS,
         "ledger_error": ledger_error,
         "settlement": settlement,
         "settlement_error": settlement_error,
         "unreconciled": unreconciled,
+        # Shown as information, not as an error. See the note above.
+        "resting": resting,
         **payload_state,
     }
 
@@ -3630,14 +4182,35 @@ def _seconds_since(stamp: Any) -> int | None:
 @intelligence_bp.get("/api/portfolio/live")
 def api_portfolio_live():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    return _no_cache_response(jsonify(_live_portfolio_payload(selected_date)))
+    show_all = str(request.args.get("show") or "").strip().lower() == "all"
+    on_date = str(request.args.get("on") or "").strip() or None
+    return _no_cache_response(
+        jsonify(_live_portfolio_payload(selected_date, show_all=show_all, on_date=on_date))
+    )
 
 
 @intelligence_bp.get("/portfolio/live")
 def portfolio_live_page():
-    """Real positions. Deliberately its own page, not a tab on the paper one."""
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    return render_template("portfolio_live.html", live=_live_portfolio_payload(selected_date))
+    """MERGED INTO `/portfolio`. This is now a redirect, not a page.
+
+    [user decision 2026-08-26] "I want our live buying engine anchored to the
+    primary portfolio page." The live book used to live here, one click off the
+    nav, which meant the single surface that spends real money was the one
+    nobody had open. Its whole body is now the first half of `portfolio.html`.
+
+    A REDIRECT RATHER THAN A SECOND RENDER of the same payload, for the reason
+    `portfolio_settings_page` gives immediately above: two renderings of the
+    same fields drift, and the one nobody edits is the one somebody trusts. The
+    URL is kept because it is bookmarked and linked from the paper page's
+    history, and a 404 on a real-money book is a bad way to learn about a
+    rename.
+
+    The query string is carried through verbatim -- `?show=all`, `?period=` and
+    `?date=` all belong to the merged page and dropping them would silently
+    reset the reader's view.
+    """
+    query = request.query_string.decode("utf-8", "replace")
+    return redirect(f"/portfolio?{query}#live" if query else "/portfolio#live", code=302)
 
 
 @intelligence_bp.get("/portfolio/paper")
@@ -3656,13 +4229,47 @@ def portfolio_paper_home():
 
 @intelligence_bp.get("/portfolio")
 def portfolio_home():
+    """The primary portfolio page, and the live buying engine is anchored here.
+
+    TWO LEDGERS ON ONE PAGE, LABELLED AND NEVER SUMMED: the execution ledger's
+    real orders (what `/portfolio/live` used to render on its own) above, and
+    the prediction ledger's user-logged bets below. `portfolio_summary.
+    _is_user_placed_bet` exists because auto-tracked model rows once flooded
+    this page with 1000+ "tracked plays" nobody had bet -- that wall stays up,
+    which is why the two halves carry their own headings, their own totals and
+    their own JSON links rather than a merged tile row.
+
+    PAPER STAYS ON ITS OWN PAGE. The old argument for splitting live off was
+    that simulated positions beside real ones get mistaken for wagers somebody
+    placed; that argument is about SIMULATION, and `/portfolio/paper` is
+    untouched and still linked. Real money and real logged bets are both real.
+
+    STILL A PURE READ. Both payloads read artifacts the workers wrote -- no
+    simulation, no order placement, nothing recomputed in a request handler.
+    """
+    from syndicate.features.shared.execution_limits_settings import resolve_view
     from syndicate.features.shared.portfolio_settings import resolve_settings
 
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    show_all = str(request.args.get("show") or "").strip().lower() == "all"
+    on_date = str(request.args.get("on") or "").strip() or None
     summary = build_portfolio_summary(limit=100)
+    # THE CAPS AS *THIS* PROCESS RESOLVES THEM, which is not the same object as
+    # the worker's stamped `limits` in the live payload. The form must edit the
+    # values it will actually write, and the banner must keep reporting what the
+    # worker last had in force -- if those two disagree, the page has to be able
+    # to show both rather than pick one.
+    try:
+        execution_limits = resolve_view()
+    except Exception as exc:
+        _LOGGER.exception("EXECUTION_LIMITS_VIEW_FAILURE")
+        execution_limits = {"store_error": f"{type(exc).__name__}: {exc}", "sources": {}, "ceiling_notes": []}
     return render_template(
         "portfolio.html",
         portfolio_summary=summary,
         portfolio_settings=resolve_settings().as_dict(),
+        execution_limits=execution_limits,
+        live=_live_portfolio_payload(selected_date, show_all=show_all, on_date=on_date),
     )
 
 

@@ -12,10 +12,12 @@ single, artifact-backed source instead of each re-deriving game state.
 
 from __future__ import annotations
 
+import inspect
 import re
 import threading
 import time
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any
 
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE, central_today_iso
@@ -41,11 +43,32 @@ def _score_value(value: Any) -> str | None:
     # Handled here rather than in `_text`, whose other callers are labels and
     # names where the falsy-collapse is harmless and widening it is risk with
     # no benefit.
+    # A FRACTIONAL VALUE IS NOT A SCORE IN ANY SPORT THIS PLATFORM CARRIES.
+    # Runs, points and goals are whole numbers, so a `85.43` arriving here is
+    # necessarily an ESTIMATE that leaked into an observation's slot -- and this
+    # function is the one choke point every sport's chip passes through.
+    #
+    # MEASURED 2026-08-26, user-reported: the Layer 2 strip showed
+    # `GSV 85.43 / CON 68.94` under a LIVE badge. `cards.py`'s WNBA live-state
+    # row falls back to the SmartSim PROJECTED point total until a real ESPN
+    # boxscore row matches, and `#160`'s guard in `_apply_wnba_live_scores` gates
+    # on whether the GAME is underway rather than on whether the NUMBER is an
+    # observation -- so a tipped-off game with no matched boxscore sails through.
+    #
+    # FIXING ONLY THAT GUARD IS INERT, which a test caught before this shipped:
+    # `_side_score` falls through to `live_state.<side>_pts`, so refusing to SET
+    # `away["score"]` upstream just means the projection is picked up one
+    # candidate later. Both halves are needed; this is the half that holds for a
+    # source nobody has written yet.
+    #
+    # REFUSED, NOT ROUNDED. Rounding 85.43 to 85 produces a plausible score and
+    # destroys the only evidence that it was never real. None renders as "-",
+    # which is honestly "unknown".
     if isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
         number = float(value)
-        return str(int(number)) if number.is_integer() else str(value)
+        return str(int(number)) if number.is_integer() else None
     text = _text(value)
     if not text or text in {"-", "None"}:
         return None
@@ -55,7 +78,7 @@ def _score_value(value: Any) -> str | None:
         return None
     if number.is_integer():
         return str(int(number))
-    return text
+    return None
 
 
 def _side_label(game: dict[str, Any], side: str) -> str:
@@ -511,6 +534,38 @@ def _ensure_sport_data_providers() -> None:
         print(f"[game_chips] SPORT_PROVIDER_REGISTRATION_FAILED error={exc}", flush=True)
 
 
+# `#545`. ONE LIST, because the WORKER now builds the chips and the WEB reads
+# them, and the two must agree on which sports exist. If the worker publishes
+# seven sports and the endpoint defaults to eight, the eighth silently loses its
+# scoreboard -- a chip-less strip that looks exactly like a sport with no games.
+GAME_CHIP_DEFAULT_SPORTS: tuple[str, ...] = (
+    "mlb",
+    "nba",
+    "wnba",
+    "nhl",
+    "nfl",
+    "ncaaf",
+    "ncaab",
+    "soccer",
+)
+
+
+@lru_cache(maxsize=32)
+def _games_accepts_include_upcoming_by_type(provider_type: type) -> bool:
+    try:
+        return "include_upcoming" in inspect.signature(provider_type.games).parameters
+    except (TypeError, ValueError):
+        # Unintrospectable: assume the OLD signature. False costs the wider
+        # horizon; True would raise and blank every sport's strip.
+        return False
+
+
+def _games_accepts_include_upcoming(provider: Any) -> bool:
+    """Cached per provider TYPE, not per call -- this runs once per sport per
+    build and `signature()` is not free."""
+    return _games_accepts_include_upcoming_by_type(type(provider))
+
+
 def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, Any]]:
     from syndicate.features.shared.sport_data_provider import get_sport_data_provider
 
@@ -533,7 +588,20 @@ def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, An
         try:
             context = provider.resolve_context(requested_date=date_value)
             is_active_today = provider.is_active(today_value=today_value, context_label=context.context_label)
-            games = provider.games(context, is_active_today=is_active_today)
+            # `#575`. ASK FOR THE BOARD'S HORIZON, not just today.
+            #
+            # PROBED, NOT ASSUMED. `home.py` and this file are separate blobs
+            # and either can be a deploy behind the other -- the exact hazard
+            # `layer2_board._blended_score_accepts` exists for. An unguarded
+            # kwarg would raise TypeError against an older provider and take out
+            # the WHOLE scoreboard strip for every sport, which is strictly
+            # worse than the narrow chips it replaces.
+            if _games_accepts_include_upcoming(provider):
+                games = provider.games(
+                    context, is_active_today=is_active_today, include_upcoming=True
+                )
+            else:
+                games = provider.games(context, is_active_today=is_active_today)
         except Exception:
             continue
         for game in games or []:

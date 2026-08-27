@@ -54,6 +54,56 @@ _MLB: dict[str, str] = {
     "batter_runs_scored": "batter_runs_scored",
     "hits_runs_rbis": "batter_hits_runs_rbis",
     "batter_hits_runs_rbis": "batter_hits_runs_rbis",
+    # HOW KALSHI ACTUALLY WRITES IT, and the two underscored forms above did
+    # not cover it. MEASURED 2026-08-25T20:33:06Z, on the deploy that had
+    # registered `KXMLBHRR` twelve minutes earlier:
+    #
+    #   GAP series=KXMLBHRR count=136 reason=stat_not_in_market_vocabulary
+    #       detail='hits + runs + RBIs'
+    #       sample='William Contreras: 5+ hits + runs + RBIs?'
+    #
+    # 136 markets -- the LARGEST single MLB prop family on the venue -- and
+    # every one of them refused. This is exactly the failure the `player_threes`
+    # block below already documents: the series title ("Player Hits + Runs +
+    # RBIs") is not what the MARKET titles say, so a registered series whose
+    # markets all refuse is indistinguishable from a series Kalshi does not
+    # list. Registering a series and reading its markets are two different
+    # gates and this one has now cost us twice.
+    #
+    # `_normalize` lowercases and collapses whitespace but does NOT strip `+`,
+    # so the spaced and unspaced forms are different keys and both are listed.
+    # WIDENING CANNOT MISMAP: no other baseball market means hits+runs+RBIs.
+    # Guessing at Kalshi's exact wording and adding only that is what left
+    # `player_threes` refusing, so the near spellings go in together.
+    "hits + runs + rbis": "batter_hits_runs_rbis",
+    "hits + runs + rbi": "batter_hits_runs_rbis",
+    "hits+runs+rbis": "batter_hits_runs_rbis",
+    "hits+runs+rbi": "batter_hits_runs_rbis",
+    "hits runs rbis": "batter_hits_runs_rbis",
+    "hits runs and rbis": "batter_hits_runs_rbis",
+    "hits, runs and rbis": "batter_hits_runs_rbis",
+    "hits, runs + rbis": "batter_hits_runs_rbis",
+    "h+r+rbi": "batter_hits_runs_rbis",
+    "hrr": "batter_hits_runs_rbis",
+    # ------------------------------------------------------------------
+    # STOLEN BASES. `KXMLBSB` is registered in `kalshi_catalogue` alongside
+    # this entry; without the entry the series would register and then refuse
+    # every market, which is the KXMLBHRR failure directly above.
+    #
+    #   GAP series=KXMLBSB count=44 reason=unmapped_series
+    #       sample='William Contreras: 1+ stolen bases?'
+    #                                   [2026-08-25T20:33:06Z]
+    #
+    # `batter_stolen_bases` is NOT invented here -- it is the key this repo
+    # already uses (`tests/test_bet_status_mlb_gamepk.py` resolves an order on
+    # it). `tests/test_mlb_ladders_build.py` lists it in `known_unfed`: the MLB
+    # sim carries the market and nothing feeds it a price. This gives it one.
+    # ------------------------------------------------------------------
+    "stolen_bases": "batter_stolen_bases",
+    "stolen bases": "batter_stolen_bases",
+    "stolen base": "batter_stolen_bases",
+    "sb": "batter_stolen_bases",
+    "batter_stolen_bases": "batter_stolen_bases",
     "strikeouts": "strikeouts",
     "pitcher_strikeouts": "strikeouts",
     "outs": "outs",
@@ -111,6 +161,34 @@ _BASKETBALL: dict[str, str] = {
     "triple double": "player_triple_double",
     "fg3m": "player_threes",
     "3s": "player_threes",
+    # EVERY WAY A MARKET TITLE SPELLS A MADE THREE. `KXWNBA3PT` is
+    # hand-registered in `kalshi_catalogue` and its comment says "market_keys
+    # resolves all three for wnba" -- true of the series title ("Player
+    # Threes") and NOT of the market titles, which are worded per market and
+    # were refusing `stat_not_in_market_vocabulary` on anything but the bare
+    # word. A registered series whose markets all refuse is indistinguishable
+    # from a series Kalshi does not list, which is the absence/failure
+    # confusion this integration keeps paying for.
+    #
+    # Widening a vocabulary that already resolves the stat cannot mismap
+    # anything: no other basketball market means "three pointer". The reverse
+    # -- guessing at Kalshi's exact wording and adding only that -- is what
+    # left this refusing in the first place.
+    "three pointers": "player_threes",
+    "three pointers made": "player_threes",
+    "three-pointers": "player_threes",
+    "three-pointers made": "player_threes",
+    "3 pointers": "player_threes",
+    "3 pointers made": "player_threes",
+    "3-pointers": "player_threes",
+    "3-pointers made": "player_threes",
+    "3pt": "player_threes",
+    "3pt made": "player_threes",
+    "3pts": "player_threes",
+    "threes made": "player_threes",
+    "made threes": "player_threes",
+    "three point field goals": "player_threes",
+    "three point field goals made": "player_threes",
 }
 
 # --------------------------------------------------------------------------
@@ -136,7 +214,95 @@ _PERIOD_SUFFIX: dict[str, str] = {
     "1st period": "p1", "first period": "p1", "p1": "p1",
     "2nd period": "p2", "second period": "p2", "p2": "p2",
     "3rd period": "p3", "third period": "p3", "p3": "p3",
+    # "FULL GAME" IS THE ABSENCE OF A PERIOD, mapped to the empty suffix so
+    # `total_market_from_stat` returns a bare `totals`. Kalshi words its NFL
+    # game total "Full Game: over 58.5 points scored?", which names the whole
+    # game the way every other entry here names a part of one.
+    #
+    # Measured 2026-08-26T01:49:32Z, the tick that first read these titles:
+    #
+    #   GAP series=KXNFLTOTAL count=304 reason=stat_not_in_market_vocabulary
+    #       detail='Full Game points scored'
+    #
+    # 304 markets, parsed and then refused one gate later for want of this
+    # line -- which is exactly the shape the coverage audit records for
+    # KXMLBHRR ("the series registered, was fetched, and then every market
+    # refused one gate later"). The refusal was correct: `totals_full game` is
+    # not a board key and inventing one would have been worse.
+    "full game": "", "fullgame": "", "full-game": "",
 }
+
+# What a GAME TOTAL counts, per sport. The unit and nothing else.
+#
+# THIS EXISTS BECAUSE THE TOTALS GRAMMAR THREW ITS STAT AWAY. Kalshi words a
+# game total "Over 7.5 runs scored?", and `kalshi_catalogue._TEAM_TOTAL`
+# matched `Over <line> <anything>?` and then hardcoded the market as `totals`
+# -- so the stat was parsed and discarded. Every one of these became a
+# full-game points/runs total:
+#
+#     "Over 4.5 corners?"                  -> totals 4.5
+#     "Over 77.5 1st half points scored?"  -> totals 77.5
+#     "Over 2.5 1H goals scored"           -> totals 2.5   (real, KXUCL1HTOTAL)
+#
+# The first is a WRONG BET, not a miscount: soccer boards carry a goals total
+# at 4.5, so our goals model would have priced a corners market and the join
+# would have looked clean. The second is the same shape one period over -- an
+# NBA 1st-half total at 110.5 against a full-game line at 110.5 matches on
+# (market, line) and is a bet on a different thing.
+#
+# A game total is the only market where the unit is implicit, which is why it
+# was easy to drop: nobody writes "goals" on a totals board row. So the unit is
+# checked HERE and the period is kept, rather than the tail being trusted.
+_TOTAL_UNIT: dict[str, frozenset[str]] = {
+    "mlb": frozenset({"run", "runs"}),
+    "nba": frozenset({"point", "points"}),
+    "wnba": frozenset({"point", "points"}),
+    "ncaab": frozenset({"point", "points"}),
+    "nfl": frozenset({"point", "points"}),
+    "ncaaf": frozenset({"point", "points"}),
+    "nhl": frozenset({"goal", "goals"}),
+    "soccer": frozenset({"goal", "goals"}),
+}
+
+# Words Kalshi appends that carry no meaning for the key. "scored" is the only
+# one seen so far and it is stripped rather than enumerated into every unit.
+_TOTAL_FILLER = ("scored", "in total", "total")
+
+
+def total_market_from_stat(sport: Any, stat_text: Any) -> str | None:
+    """"1st half points scored" -> `totals_h1`. A corners line -> None.
+
+    Returns None for ANY unit that is not this sport's scoring unit, and that
+    refusal is the point: `classify_market` turns it into
+    `stat_not_in_market_vocabulary` with the stat text verbatim, so a real
+    market we cannot yet price lands in the work queue by name instead of
+    being priced as something else.
+    """
+    units = _TOTAL_UNIT.get(str(sport or "").strip().lower())
+    if not units:
+        return None
+    token = " ".join(str(stat_text or "").strip().lower().split())
+    if not token:
+        return None
+
+    period = ""
+    for phrase, suffix in sorted(_PERIOD_SUFFIX.items(), key=lambda kv: -len(kv[0])):
+        if token == phrase:
+            return None
+        if token.startswith(phrase + " "):
+            period, token = suffix, token[len(phrase) :].strip()
+            break
+
+    for filler in _TOTAL_FILLER:
+        if token.endswith(" " + filler):
+            token = token[: -len(filler)].strip()
+        if token.startswith(filler + " "):
+            token = token[len(filler) :].strip()
+
+    if token not in units:
+        return None
+    return f"totals_{period}" if period else "totals"
+
 
 # The market word, once the period has been stripped off the front.
 _GAME_CORE: dict[str, str] = {
@@ -145,6 +311,19 @@ _GAME_CORE: dict[str, str] = {
     "money line": "h2h",
     "ml": "h2h",
     "h2h": "h2h",
+    # "Game" is Kalshi's OWN word for the straight moneyline series, not a
+    # synonym anyone here invented. Measured 2026-08-24: KXMLBGAME's real
+    # series-level title is exactly "Professional Baseball Game" (confirmed
+    # against a live $6.7M-volume market the user found on kalshi.com that
+    # this vocabulary gap was silently dropping) -- no "moneyline"/"winner"
+    # word at all, so `canonical_game_market` returned None and the series
+    # was never registered, never fetched, never priced. The same "<Sport>
+    # Game" pattern is Kalshi's title for the moneyline series on EVERY
+    # sport carried here (KXNFLGAME "Professional Football Game", KXNBAGAME
+    # "Pro Basketball Game", KXNHLGAME "NHL Game", KXNCAAFGAME "College
+    # Football Game", KXMLSGAME "Major League Soccer Game", ...) -- this was
+    # not an MLB-only gap.
+    "game": "h2h",
     "spread": "spreads",
     "spreads": "spreads",
     "ats": "spreads",
@@ -288,6 +467,76 @@ _SOCCER: dict[str, str] = {
     "shots on goal": "player_shots_on_goal",
 }
 
+# --------------------------------------------------------------------------
+# HOCKEY, added 2026-08-25.
+#
+# WHY THIS FILE HAD NO `nhl` KEY AND WHY THAT WAS NOT COSMETIC.
+# `auto_series_from_catalogue` registers a prop series only if
+# `canonical_market_key(sport, stat)` resolves first, so a sport ABSENT from
+# `_BY_SPORT` can never discover a player prop however many the venue lists --
+# it is the exact mechanism that held football at `KALSHI_SPORT NFL
+# ticker_substring_n=317 classified_n=0` until `_FOOTBALL` was written.
+#
+# `_TOTAL_UNIT` already carried `nhl`, so GAME TOTALS resolved while every prop
+# refused. That asymmetry is what made it read as coverage rather than as an
+# absence, and it is why the gap survived a whole audit pass.
+#
+# Kalshi lists these today -- observed in the signed catalogue
+# 2026-08-25T20:21:24Z, `[refresh_worker] KALSHI_SPORT NHL n=52`:
+#
+#     KXNHLSAVES   KXNHLPTS   KXNHLANYGOAL   KXNHLPLAYOFFGOALS
+#
+# The NHL season had not started on that date, so this map cannot be verified
+# end to end against a live market until it does. Registering the vocabulary
+# now is still right: without it those series cannot even reach the work queue
+# by name on opening night -- they would present as "Kalshi lists no NHL
+# props", which is false.
+#
+# THE VALUES ARE NOT INVENTED HERE. They are the keys this repo's own vendored
+# NHL module already requests and recognises
+# (`vendor/nhl_betting_repo/nhl_betting/data/player_props.py`), whose comment
+# says they are "confirmed by provider docs and our live probes" and warns that
+# an unsupported key 422s the request. `player_points` / `player_assists` /
+# `player_goals` / `player_shots_on_goal` are the four it requests;
+# `player_saves` and `player_blocked_shots` are in the map it parses arrivals
+# with.
+#
+# DELIBERATELY ABSENT: the anytime-goal-scorer market, which `KXNHLANYGOAL`
+# may or may not be. Its SERIES TITLE has never been observed -- only the
+# ticker -- so whether it is a player prop or a team market ("will any goal be
+# scored") is unknown, and this repo already carries TWO different spellings of
+# that key (`player_goal_scorer_anytime` in `_SOCCER` below,
+# `player_anytime_goal_scorer` in `tests/test_layer2_excluded_markets.py`).
+# Guessing between them on an unread title is how a bet gets priced as a
+# different bet. Left out so the series surfaces in the COVERAGE_GAPS queue BY
+# NAME with its real title, which is the answer this file wants anyway.
+_HOCKEY: dict[str, str] = {
+    "points": "player_points",
+    "pts": "player_points",
+    "player_points": "player_points",
+    "assists": "player_assists",
+    "ast": "player_assists",
+    "player_assists": "player_assists",
+    "goals": "player_goals",
+    "goal": "player_goals",
+    "player_goals": "player_goals",
+    # SOG is the box-score abbreviation and the vendored module's own canonical
+    # name for this market, so both spellings resolve.
+    "shots on goal": "player_shots_on_goal",
+    "shots_on_goal": "player_shots_on_goal",
+    "sog": "player_shots_on_goal",
+    "shots": "player_shots_on_goal",
+    "player_shots_on_goal": "player_shots_on_goal",
+    "saves": "player_saves",
+    "save": "player_saves",
+    "goalie saves": "player_saves",
+    "player_saves": "player_saves",
+    "blocked shots": "player_blocked_shots",
+    "blocks": "player_blocked_shots",
+    "blk": "player_blocked_shots",
+    "player_blocked_shots": "player_blocked_shots",
+}
+
 _BY_SPORT: dict[str, dict[str, str]] = {
     "mlb": _MLB,
     "nba": _BASKETBALL,
@@ -296,6 +545,21 @@ _BY_SPORT: dict[str, dict[str, str]] = {
     # rosters differ, and rosters are not this table's concern.
     "nfl": _FOOTBALL,
     "ncaaf": _FOOTBALL,
+    # NCAAB shares the basketball vocabulary for exactly the reason NCAAF
+    # shares football's, and its absence had exactly the consequence described
+    # on `_HOCKEY` above: `_TOTAL_UNIT` carries `ncaab`, so a college game
+    # total resolved while every college player prop refused.
+    #
+    # SAFE AGAINST THE ONE REAL COLLISION IN THIS TABLE. `sport_for_ticker`
+    # matches `NCAAB` as a SUBSTRING, and `KXNCAABASEBALL` -- NCAA *baseball*,
+    # observed in the catalogue 2026-08-25T20:21:24Z -- contains it. That
+    # series now resolves to sport `ncaab` and reaches this map, where baseball
+    # stats (hits, home runs, RBIs, strikeouts) appear nowhere, so it still
+    # refuses rather than pricing a baseball prop off a basketball model. A
+    # test pins that, because it is the kind of thing that only stays true
+    # while somebody is watching.
+    "ncaab": _BASKETBALL,
+    "nhl": _HOCKEY,
     "soccer": _SOCCER,
 }
 

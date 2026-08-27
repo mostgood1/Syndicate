@@ -69,6 +69,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any, Callable, Mapping
 
 from syndicate.features.shared.refresh_state_store import (
@@ -134,8 +135,8 @@ _LEAN_FIELDS = (
     # thing we buy could differ with nothing recording that they did.
     "venue_ticker",
     # HOW THE BET ACTUALLY WENT. Distinct from `status` (what the ORDER did at
-    # the venue) and from `settled_at` (when the ORDER reached a terminal state,
-    # stamped seconds after a paper fill and hours before the game ends).
+    # the venue) and from `venue_resolved_at` (when the SUBMIT resolved --
+    # stamped ~400ms after submitting, hours before the game ends).
     # Conflating those two is the reason `settled_count` read 0 while orders
     # were filling normally: nothing had ever graded a WAGER.
     "outcome",
@@ -148,6 +149,25 @@ _LEAN_FIELDS = (
     "status",
     "fill_price",
     "fill_stake_dollars",
+    "fees_dollars",
+    # WHEN THE SUBMIT RESOLVED -- the write-ahead record being closed with a
+    # venue response. NOT when the bet was decided. Grading is `outcome` +
+    # `graded_at`, and `paper_settlement` exists because that distinction was
+    # lost once already ("`settled_count` has been 0 for as long as it has been
+    # reported ... Nobody had written the grader").
+    "venue_resolved_at",
+    # DEPRECATED MIRROR of `venue_resolved_at`, kept only so stored rows and any
+    # outside reader keep working. NOTHING IN THIS REPO READS IT -- verified by
+    # grep 2026-08-26 -- and its sole measurable effect has been to mislead: a
+    # peer session reading `settled_at` populated 400ms after `submitted_at` on
+    # four OPEN orders reasonably concluded settlement was being faked, and
+    # proposed it as the root cause of positions not reconciling. It was not; a
+    # settlement sweep cannot be fooled by a field it never reads
+    # (`settle_orders` keys on `outcome` and `status == "filled"`).
+    #
+    # A name that needs a warning in two module docstrings to defuse, and still
+    # catches a careful reader with the source open, is not a documentation
+    # problem. Write both, read neither, retire the liar.
     "settled_at",
     "venue_order_id",
     "error",
@@ -361,6 +381,11 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "status": STATUS_SUBMITTED,
         "fill_price": None,
         "fill_stake_dollars": None,
+        # Present from creation so a summary cannot mistake "no such key" for
+        # "no fee" -- the same reason `outcome` is None rather than absent.
+        # Filled in by reconciliation from the venue's own charge.
+        "fees_dollars": None,
+        "venue_resolved_at": None,
         "settled_at": None,
         "venue_order_id": None,
         "error": None,
@@ -390,7 +415,11 @@ def complete_order(
         order["fill_stake_dollars"] = fill_stake_dollars
         order["venue_order_id"] = venue_order_id
         order["error"] = error
-        order["settled_at"] = _utc_now()
+        # BOTH, for now. The new name is the true one; the old is a mirror so
+        # no stored row or outside consumer changes shape under them.
+        resolved_at = _utc_now()
+        order["venue_resolved_at"] = resolved_at
+        order["settled_at"] = resolved_at
         updated = dict(order)
         break
     if updated is not None:
@@ -622,13 +651,160 @@ def reclassify_presend_failures() -> dict[str, Any]:
     return {"status": "ok", "reclassified": len(changed), "orders": changed}
 
 
-def _venue_reader(venue: str):
-    """The read side of a venue adapter. Only Kalshi has one."""
-    if str(venue or "").strip().lower().startswith("kalshi"):
-        from syndicate.features.shared.kalshi_orders import fetch_orders, venue_order_view
+def _requested_contracts(order: Mapping[str, Any]) -> float | None:
+    """How many contracts the stake could have bought, at the price we asked.
 
-        return fetch_orders, venue_order_view
-    return None, None
+    The upper bound on any honest fill. Derived rather than stored because the
+    ledger records dollars and a price, not a count -- `contracts_for_stake`
+    does this same floor at order-build time, and this must agree with it.
+    """
+    try:
+        stake = float(order.get("requested_stake_dollars") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if stake <= 0:
+        return None
+
+    # THE PRICE MAY BE AMERICAN ODDS, AND USUALLY IS.
+    #
+    # This required `0 < price < 1` and returned None otherwise, with the
+    # comment "no bound is better than a wrong one". That reasoning is right
+    # and its effect was that the bound was NEVER COMPUTED for Polymarket --
+    # every order there carries American odds (`requested_price=-108.0`), so
+    # the guard returned None on the venue we actually trade. "A fill cannot be
+    # larger than the order" was present, documented, and inert.
+    #
+    # Same shape as the slippage guard, which compared American odds against
+    # probabilities and so refused on negative odds and passed silently on
+    # positive ones. A guard that cannot read its input is not a guard.
+    price = _price_as_probability(order.get("requested_price"))
+    if price is None:
+        return None
+
+    # UNFLOORED, and deliberately not `contracts_for_stake`. That helper floors
+    # to WHOLE contracts, which is right for Kalshi and wrong here: a real
+    # 2.65-contract Polymarket fill against a floor of 2 would be refused as
+    # `implausible` and left unbooked -- turning a guard against phantom
+    # positions into a cause of missing real ones. `stake / price` is the true
+    # upper bound at either venue, since a whole-contract fill is never more
+    # than the fractional one.
+    return stake / price
+
+
+def _price_as_probability(value: Any) -> float | None:
+    """A price as a probability, whether it arrived as odds or a probability.
+
+    Both forms genuinely occur: the board stores American odds, the venues
+    quote probability dollars. Magnitude decides -- a probability is strictly
+    inside (0, 1) and American odds are conventionally at least 100 from zero.
+    Anything between is AMBIGUOUS and returns None rather than being guessed,
+    because a guessed unit here is a guessed bound.
+    """
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    if 0.0 < parsed < 1.0:
+        return parsed
+    if abs(parsed) >= 100.0:
+        from syndicate.features.shared.prophetx_client import american_to_probability
+
+        return american_to_probability(parsed)
+    return None
+
+
+def _venue_reader(venue: str):
+    """The read side of a venue adapter.
+
+    POLYMARKET WAS MISSING AND THAT TOOK THE LIVE PATH DOWN. This said "Only
+    Kalshi has one", so a Polymarket order recorded `submitted` could never be
+    corrected -- and an unreconciled order blocks live mode on EVERY venue, not
+    only its own. Measured 2026-08-25T16:40:00Z, from one resting Polymarket
+    order:
+
+        BLOCKED_ON_UNRECONCILED count=1 keys=['1984a57ed28e1cd5ccad8b16']
+        EXECUTION status=blocked reason=unreconciled_orders scope=kalshi
+        EXECUTION status=blocked reason=unreconciled_orders scope=polymarket
+
+    A gap in the read side is not a missing feature; it is a latch. Nothing in
+    the system could clear that state, because the only thing that clears it is
+    a venue read that did not exist.
+    """
+    name = str(venue or "").strip().lower()
+    if name.startswith("kalshi"):
+        from syndicate.features.shared import kalshi_orders as adapter
+    elif name.startswith("polymarket"):
+        from syndicate.features.shared import polymarket_us_orders as adapter
+    else:
+        return None, None, "unknown"
+    # THE COVERAGE COMES WITH THE READER, not from its result. A zero-candidate
+    # pass has to decide whether an orphan scan is possible BEFORE it makes the
+    # call -- asking a per-order reader for a list it does not have would 501
+    # every cycle and turn "nothing to do" into a recurring error.
+    return (
+        adapter.fetch_orders,
+        adapter.venue_order_view,
+        getattr(adapter, "ORDER_READ_COVERAGE", "unknown"),
+    )
+
+
+# How far past the requested stake a fill may land before it is refused as a
+# parse error. Generous on purpose: fees and rounding ride along in the venue's
+# numbers, and the failure this bound exists to catch is a fixed-point scale
+# error -- off by 100x or 1000x, never by 5%.
+_FILL_DOLLAR_TOLERANCE = 1.25
+
+# VENUE ROUNDING, not a real overfill. Kalshi sells whole contracts and
+# Polymarket sells hundredths (`minimumTradeQty: 0.01`), so a venue count is
+# reported to two decimals while ours is a raw quotient. One cent of a
+# contract of slack costs nothing against a guard whose target is a 100x
+# fixed-point scale error.
+_FILL_COUNT_TOLERANCE = 0.01
+
+# ABOVE THIS MULTIPLE OF THE STAKE, THE NUMBER IS A UNIT ERROR, NOT A FILL.
+#
+# The `_fp` scale worry this guard exists for is 100x or 1e6x. An overspend of
+# 33% is a BAD FILL -- real, confirmed by the venue, and money that has already
+# moved. Refusing to record it does not unwind it; it strands the order at
+# `submitted` forever, understates exposure, and stops reconcile converging.
+#
+# Measured 2026-08-26T03:43:08Z, the fill that forced this split:
+#
+#   venue_count=30.46 fill_price=0.345 filled_dollars=10.5087
+#   stake_ceiling=9.9 requested_stake=7.92
+#
+# The venue held it as ORDER_STATE_FILLED while our ledger showed $0.00 --
+# `venue_orders=7 stamped=6 implausible=1`. The venue was right and the ledger
+# was hiding a live position, which is the opposite of what a safety guard
+# should do.
+_FILL_DOLLAR_ABSURD = 10.0
+
+
+# OUR IDEMPOTENCY KEYS, BY SHAPE. `idempotency_key` is
+# `sha1(...).hexdigest()[:24]` -- 24 lowercase hex characters, no dashes.
+#
+# THIS EXISTS BECAUSE `bool(client_order_id)` WAS USED AS "IS THIS OURS", and it
+# reported `orphans_ours=6` at 2026-08-26T15:21Z -- six positions of real money
+# supposedly opened by this system and lost from the ledger. All six were
+# `KXMVECROSSCATEGORY` PARLAYS, a series `kalshi_client._COMBINATORIAL_SERIES_PREFIXES`
+# explicitly excludes because "the board does not bet parlays". This system has
+# no code path that can place one. Their ids are UUID-shaped
+# (`64643034-3834-3635-...`); ours are 24 bare hex characters.
+#
+# A field the venue lets ANY client set is not an identity claim on its own --
+# the Kalshi app stamps one too. Six phantom missing positions, produced by the
+# counter written to stop exactly that class of false alarm.
+_OUR_KEY_LENGTH = 24
+_HEX = frozenset("0123456789abcdef")
+
+
+def _is_our_key(client_order_id: Any) -> bool:
+    text = str(client_order_id or "").strip()
+    return len(text) == _OUR_KEY_LENGTH and all(ch in _HEX for ch in text)
 
 
 def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[str, Any]:
@@ -671,7 +847,7 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
 
     Idempotent: a second pass over unchanged orders reports zero changes.
     """
-    fetch, view = _venue_reader(venue)
+    fetch, view, declared_coverage = _venue_reader(venue)
     if fetch is None:
         return {"status": "skipped", "reason": f"no_reader_for_venue:{venue}"}
 
@@ -685,10 +861,51 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         and o.get("outcome") is None
         and str(o.get("venue") or "").strip().lower().startswith(str(venue).strip().lower())
     ]
+    if not candidates and declared_coverage != "book":
+        # NOTHING TO CORRECT AND NOTHING TO DISCOVER. A per-order reader can
+        # only see the ids it is handed, and with no candidates there are none
+        # -- the call would fall through to a list route this venue does not
+        # implement and error every cycle.
+        return {
+            "status": "ok",
+            "candidates": 0,
+            "changed": 0,
+            "orders": [],
+            "coverage": declared_coverage,
+            "orphans": None,
+        }
     if not candidates:
-        return {"status": "ok", "candidates": 0, "changed": 0, "orders": []}
+        # A BOOK READER STILL READS. An empty ledger is the state where an
+        # orphan is MOST dangerous, not least: nothing here is open, so nothing
+        # would ever prompt a look, while the venue may be holding a live
+        # position from a submit whose response we lost. Falling through to the
+        # scan below costs one read and is the only thing that can find it.
+        print(
+            f"[execution_ledger] RECONCILE_ORPHAN_SCAN_ONLY venue={venue}"
+            " candidates=0 -- reading the book anyway",
+            flush=True,
+        )
 
-    read = fetch(limit=limit)
+    # THE IDS WE HOLD, handed to the reader. Kalshi lists the whole book in one
+    # call and ignores these; Polymarket publishes no list route at all --
+    # `GET /v1/orders` answers `code: 12` UNIMPLEMENTED -- and reads one order
+    # at a time via `GET /v1/order/{orderId}`. A reader that cannot be told
+    # WHICH orders matter can only be a list reader, so the contract carries
+    # them and each venue uses what it needs.
+    #
+    # A CANDIDATE WITH NO VENUE ID IS STILL A CANDIDATE. The submit response
+    # can be lost -- that is the case the write-ahead record exists for -- and
+    # such an order has no id to fetch by. It is simply absent from a per-order
+    # read and counts `not_found`, which changes nothing. That is the correct
+    # outcome and not a silent one: `not_found` is reported.
+    read = fetch(
+        limit=limit,
+        order_ids=[
+            str(o.get("venue_order_id") or "").strip()
+            for o in candidates
+            if str(o.get("venue_order_id") or "").strip()
+        ],
+    )
     if read.get("status") != "ok":
         # Reported, not raised, and NOTHING WRITTEN. The caller is a periodic
         # loop; a venue that is briefly unreachable must leave the ledger
@@ -719,6 +936,9 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     changed: list[dict[str, Any]] = []
     not_found = 0
     unknown = 0
+    implausible = 0
+    stamped = 0
+    resting: list[dict[str, Any]] = []
 
     for order in candidates:
         key = str(order.get("idempotency_key") or "")
@@ -743,8 +963,119 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
 
         before = str(order.get("status") or "")
         if venue_state == "filled":
-            after = STATUS_FILLED
             contracts = seen.get("filled_count")
+
+            # A FILL CANNOT BE LARGER THAN THE ORDER -- IN DOLLARS. `fill_count_fp`
+            # carries an undocumented `_fp` suffix, and if that is a fixed-point
+            # scale rather than a plain count, a 2-contract fill arrives as some
+            # large number and booking it claims a position orders of magnitude
+            # beyond anything the stake could buy. The guard against that is
+            # worth keeping.
+            #
+            # BUT IT WAS BOUNDED IN CONTRACTS, AND CONTRACTS ARE NOT THE
+            # INVARIANT. A better fill price buys MORE contracts for the same
+            # money, which is price improvement -- the good outcome -- and this
+            # read it as a parse failure. Measured 2026-08-25 6:50:34 PM
+            # Central, and it halted all trading on BOTH venues:
+            #
+            #   RECONCILE_COUNT_IMPLAUSIBLE venue_count=5.82 requested=5.221
+            #   BLOCKED_ON_UNRECONCILED count=1
+            #   EXECUTION status=blocked reason=unreconciled_orders  (x2 venues)
+            #
+            # `over 6.5 TB@DET`, +127, $2.30. +127 is 0.4405, so $2.30 sized
+            # 5.221 contracts. The venue filled at 0.395 -- $2.30 / 0.395 = 5.82.
+            # Every number is correct and the order was refused for being
+            # cheaper than planned.
+            #
+            # The DOLLAR bound catches the `_fp` scale error just as well (a
+            # fixed-point count times any sane price blows past the stake by
+            # orders of magnitude) without punishing a good fill. Tolerance is
+            # generous because fees and rounding ride along; the failure this
+            # guards against is 100x, not 2%.
+            requested_contracts = _requested_contracts(order)
+            fill_price = _price_as_probability(seen.get("fill_price"))
+            filled_dollars = (
+                None if (contracts is None or fill_price is None)
+                else float(contracts) * float(fill_price)
+            )
+            stake_ceiling = None
+            try:
+                stake = float(order.get("requested_stake_dollars") or 0.0)
+                if stake > 0:
+                    stake_ceiling = stake * _FILL_DOLLAR_TOLERANCE
+            except (TypeError, ValueError):
+                stake_ceiling = None
+
+            over_budget = False
+            if filled_dollars is not None and stake_ceiling is not None:
+                # TWO BANDS, NOT ONE. Over the tolerance is an OVERSPEND -- a
+                # real fill that cost more than planned, which gets recorded
+                # and flagged. Only an absurd multiple is a unit error, and
+                # only that is refused.
+                #
+                # One band meant a 33% overspend was treated exactly like a
+                # 1,000,000x parse failure: both stranded. A confirmed fill
+                # must reach the ledger, because the money moved whether we
+                # write it down or not, and the day budget cannot charge for
+                # what it cannot see.
+                bound = "dollars"
+                implausible_count = filled_dollars > stake * _FILL_DOLLAR_ABSURD
+                over_budget = (not implausible_count) and filled_dollars > stake_ceiling
+            else:
+                # No readable fill price: fall back to the contract bound rather
+                # than to no bound at all.
+                #
+                # WITH A ROUNDING TOLERANCE, because the venues round and we do
+                # not. Measured 2026-08-26 00:27:38Z: `venue_count=2.39
+                # requested=2.3920000000000003` -- the venue reported two
+                # decimals against our raw float, and an exact `>` on that pair
+                # is a coin flip on the third digit. The failure this guards
+                # against is a fixed-point scale error, which is 100x; two
+                # thousandths of a contract is not it.
+                bound = "contracts"
+                implausible_count = (
+                    contracts is not None
+                    and requested_contracts is not None
+                    and float(contracts) > float(requested_contracts) + _FILL_COUNT_TOLERANCE
+                )
+            if implausible_count:
+                implausible += 1
+                # THE NUMBERS THE BRANCH ACTUALLY COMPARED, not a pair that
+                # merely describes the order. The previous line printed
+                # `venue_count` and `requested` for BOTH bounds -- but on the
+                # dollar branch neither of those is what was compared, so a
+                # reader (this one, twice) works backwards from two numbers
+                # that cannot produce the verdict. A counter that names a
+                # problem while withholding its data is a recurring defect in
+                # this repo; this is that defect, in the code that halts
+                # trading.
+                print(
+                    f"[execution_ledger] RECONCILE_COUNT_IMPLAUSIBLE key={key}"
+                    f" bound={bound}"
+                    f" venue_count={contracts} requested={requested_contracts}"
+                    f" fill_price={fill_price} raw_fill_price={seen.get('fill_price')!r}"
+                    f" filled_dollars={filled_dollars} stake_ceiling={stake_ceiling}"
+                    f" requested_stake={order.get('requested_stake_dollars')!r}"
+                    f" requested_price={order.get('requested_price')!r}"
+                    " -- left untouched; check the `_fp` unit",
+                    flush=True,
+                )
+                continue
+
+            if over_budget:
+                # RECORDED AND NAMED, not refused. The fill is real; this line
+                # is what makes the overspend findable instead of inferred from
+                # a stake that quietly does not match.
+                print(
+                    f"[execution_ledger] RECONCILE_FILL_OVER_BUDGET key={key}"
+                    f" filled_dollars={filled_dollars} stake_ceiling={stake_ceiling}"
+                    f" requested_stake={order.get('requested_stake_dollars')!r}"
+                    f" venue_count={contracts} fill_price={fill_price}"
+                    " -- BOOKED; the money moved, the ledger follows",
+                    flush=True,
+                )
+
+            after = STATUS_FILLED
             # The venue's own fill price where it gave one, ours where it did
             # not. Never the requested price when the venue disagrees with it:
             # a fill at a better price is money we would otherwise not book.
@@ -753,10 +1084,30 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 price = order.get("fill_price")
             if price is None:
                 price = order.get("requested_price")
-            stake = None
-            if contracts is not None and price is not None:
+
+            # WHAT KALSHI BILLED, in preference to what we can reconstruct.
+            # `count * price` was always arithmetic over two numbers we parsed;
+            # `taker_fill_cost_dollars + maker_fill_cost_dollars` is the charge
+            # itself.
+            stake = seen.get("fill_cost_dollars")
+            if stake is None and contracts is not None and price is not None:
                 try:
-                    stake = round(int(contracts) * float(price), 2)
+                    # FLOAT, NOT INT. Kalshi sells WHOLE contracts, so `int()`
+                    # was harmless there and wrong the moment a second venue
+                    # arrived: Polymarket sells fractional ones
+                    # (`minimumTradeQty: 0.01`).
+                    #
+                    # MEASURED 2026-08-25T18:21:25Z, the first real Polymarket
+                    # fill: 2.65 contracts at $0.52 is $1.38, and the run
+                    # reported `spent={'dollars': 1.04}` -- because
+                    # `int(2.65) * 0.52` is `2 * 0.52`. A 25% under-count of
+                    # real money against a daily cap, silently, on every
+                    # fractional fill.
+                    #
+                    # Under-counting spend is the dangerous direction: the cap
+                    # exists to bound what the account can lose, and a cap fed
+                    # a number smaller than reality lets the account exceed it.
+                    stake = round(float(contracts) * float(price), 2)
                 except (TypeError, ValueError):
                     stake = None
             new_fields = {
@@ -764,17 +1115,39 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "fill_price": price,
                 "fill_stake_dollars": stake,
                 "contracts": contracts,
+                # FEES ARE REAL MONEY AND WERE MODELLED AS ZERO EVERYWHERE.
+                # Kalshi took $0.02 on a $1.08 fill -- ~1.9%, against edges
+                # this system will happily act on at 3%. They arrive on every
+                # order read (`taker_fees_dollars`, `maker_fees_dollars`), so
+                # the only reason they were absent from the ledger is that
+                # nothing carried them across.
+                "fees_dollars": seen.get("fees_dollars"),
                 "error": None,
             }
         elif venue_state == "resting":
             # THE PHANTOM-FILL REPAIR. The order exists and has traded nothing,
             # so every fill field on it is a number nobody should believe.
+            resting.append(
+                {
+                    "idempotency_key": key,
+                    "order_id": seen.get("order_id"),
+                    "ticker": order.get("venue_ticker") or seen.get("ticker"),
+                    "side": order.get("side"),
+                    "yes_price": seen.get("yes_price"),
+                    "no_price": seen.get("no_price"),
+                    "submitted_at": order.get("submitted_at"),
+                }
+            )
             after = STATUS_SUBMITTED
             new_fields = {
                 "status": after,
                 "fill_price": None,
                 "fill_stake_dollars": None,
                 "contracts": 0,
+                # Nothing traded, so nothing was charged. Left as None rather
+                # than 0.0: "no fee because no fill" and "a fill that cost
+                # nothing" are different claims.
+                "fees_dollars": None,
             }
         else:  # dead
             # Cancelled or expired with nothing filled: no exposure, no
@@ -787,20 +1160,40 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "fill_price": None,
                 "fill_stake_dollars": None,
                 "contracts": 0,
+                "fees_dollars": None,
                 "error": f"venue_{seen.get('venue_status') or 'dead'}",
             }
 
         stamp = {
             **new_fields,
+            # OPEN-NESS IS ORTHOGONAL TO STATUS, and stamping it here is what
+            # lets the page count what is actually working at the venue. A
+            # partially filled row is `filled` AND open; a resting row is
+            # `submitted` AND open; a completely filled row is neither.
+            "venue_open": bool(seen.get("open_at_venue")),
+            "venue_remaining_count": seen.get("remaining_count"),
             "venue_status": seen.get("venue_status"),
             "venue_order_id": seen.get("order_id") or order.get("venue_order_id"),
             "reconciled_at": _utc_now(),
         }
-        # Only a REAL difference counts as a change. Re-stamping an unchanged
+        # Only a REAL difference counts as a CHANGE. Re-stamping an unchanged
         # row every tick would make the log say work happened on every pass and
         # make "did anything move" unanswerable.
+        #
+        # BUT THE STAMP IS STILL WRITTEN. Measured 2026-08-24T15:04:08Z: the
+        # first version persisted only when something moved, so `reconciled_at`
+        # was discarded in exactly the steady state it exists for -- a resting
+        # order read successfully, agreeing with the ledger, and therefore never
+        # marked as read. `RECONCILE ... changed=0` and
+        # `BLOCKED_ON_UNRECONCILED count=1` fired in the same second, on the
+        # same order, and live execution stayed jammed.
+        #
+        # "Nothing changed" and "nothing was learned" are different facts. The
+        # freshness stamp records the second one, and it is the whole basis on
+        # which a known-resting order stops blocking.
         moved = any(order.get(field) != value for field, value in new_fields.items())
         order.update(stamp)
+        stamped += 1
         if not moved:
             continue
         if before != after:
@@ -814,23 +1207,146 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 "venue_status": seen.get("venue_status"),
                 "contracts": order.get("contracts"),
                 "fill_price": order.get("fill_price"),
+                "fees_dollars": order.get("fees_dollars"),
             }
         )
 
-    if changed:
+    if stamped:
         _persist(state)
+    if changed:
         for row in changed:
             print(
                 f"[execution_ledger] RECONCILED key={row['idempotency_key']}"
                 f" ticker={row['ticker']} {row['from']}->{row['to']}"
                 f" venue_status={row['venue_status']!r}"
-                f" contracts={row['contracts']} fill_price={row['fill_price']}",
+                f" contracts={row['contracts']} fill_price={row['fill_price']}"
+                f" fees={row['fees_dollars']}",
                 flush=True,
             )
+    # ------------------------------------------------------------------
+    # THE OTHER DIRECTION: A POSITION THE VENUE HOLDS AND WE DO NOT.
+    # ------------------------------------------------------------------
+    #
+    # Everything above walks OUR rows and asks the venue about each. That can
+    # only ever correct a row we already have. The mirror failure -- an order
+    # live at the venue with no row here at all -- is invisible to it, and it
+    # is real money: a submit whose response was lost leaves a write-ahead row
+    # with no venue id, and a submit that never got written at all leaves
+    # nothing.
+    #
+    # MEASURED 2026-08-26T12:57Z, which is why this exists: Kalshi returned
+    # `venue_orders=33` while we asked about `candidates=4`. Twenty-nine orders
+    # on our own account were read into memory every cycle and never compared
+    # to anything.
+    #
+    # ONLY MEANINGFUL ON A BOOK READ. Polymarket publishes no list route
+    # (`GET /v1/orders` answers `code: 12` UNIMPLEMENTED) so its reader fetches
+    # exactly the ids we hand it -- `venue_orders == candidates` is a tautology
+    # there, not a reconciliation, and an orphan count of 0 from it would be a
+    # false assurance rather than a finding. The coverage is asked for, not
+    # inferred from the counts, because the counts are exactly what a
+    # per-order read makes uninformative.
+    #
+    # NOTHING IS WRITTEN. This reports; it does not invent ledger rows from
+    # venue data. What it buys is that the gap becomes a number somebody can
+    # see, instead of a silence.
+    coverage = str(read.get("coverage") or "unknown")
+    orphans: list[dict[str, Any]] = []
+    if coverage == "book":
+        # THE WHOLE LIVE LEDGER, not just the candidates. A filled or settled
+        # order is legitimately in the venue's book and is not an orphan; only
+        # a venue order matching NO row we hold is.
+        known_keys = {
+            str(o.get("idempotency_key") or "").strip()
+            for o in orders
+            if str(o.get("mode") or "") == LIVE
+        }
+        known_keys.discard("")
+        known_ids = {
+            str(o.get("venue_order_id") or "").strip()
+            for o in orders
+            if str(o.get("mode") or "") == LIVE
+        }
+        known_ids.discard("")
+        for raw in read.get("orders") or []:
+            seen = view(raw)
+            client = str(seen.get("client_order_id") or "").strip()
+            venue_id = str(seen.get("order_id") or "").strip()
+            if client and client in known_keys:
+                continue
+            if venue_id and venue_id in known_ids:
+                continue
+            orphans.append(
+                {
+                    "order_id": venue_id,
+                    "client_order_id": client,
+                    "ticker": seen.get("ticker"),
+                    "venue_status": seen.get("venue_status"),
+                    "filled_count": seen.get("filled_count"),
+                    # WHICH KIND OF ORPHAN, and the whole point of the split.
+                    #
+                    # Every order this system places stamps the idempotency key
+                    # as `client_order_id`. So:
+                    #
+                    #   no client id     -> not ours. Placed by hand in the
+                    #                       venue's UI, or predating the
+                    #                       stamp. Account history, not a
+                    #                       tracking failure.
+                    #   client id we do  -> OURS, and the ledger row is gone.
+                    #   not hold            That is real money this system
+                    #                       opened and cannot see.
+                    #
+                    # Measured 2026-08-26T13:18Z: `orphans=26`, every sampled
+                    # row with `client_order_id: ''` and dated 08-07 or 08-23,
+                    # across NFL/WNBA/MLB. Reported as one number it reads as
+                    # "26 positions we do not know about", which is alarming
+                    # and probably wrong. A count that cannot distinguish the
+                    # benign case from the serious one is not actionable in
+                    # either direction.
+                    "ours": _is_our_key(client),
+                }
+            )
+        if orphans:
+            ours = [o for o in orphans if o["ours"]]
+            # THREE BUCKETS, because two could not tell these apart. A venue
+            # order carrying SOMEONE ELSE'S client id is not the same fact as
+            # one carrying none: the first says another client of this account
+            # placed it, the second says the venue's own UI did. Neither is
+            # money we lost. Only `ours` is.
+            foreign = [o for o in orphans if not o["ours"] and o["client_order_id"]]
+            unclaimed = len(orphans) - len(ours) - len(foreign)
+            # THE ROWS, NOT JUST THE COUNT. A counter that names a problem
+            # while withholding its data is the defect this repo keeps
+            # relearning; an orphan is only actionable if you can see which
+            # ticker it is.
+            print(
+                f"[execution_ledger] RECONCILE_ORPHANS venue={venue}"
+                f" n={len(orphans)} ours={len(ours)}"
+                f" foreign_client={len(foreign)} unclaimed={unclaimed}"
+                # OURS FIRST IN THE SAMPLE. With a flat cap at 5 the serious
+                # rows can be crowded out by benign history and never printed.
+                f" sample_ours={ours[:5]} sample_foreign={foreign[:2]}"
+                f" sample_unclaimed={[o for o in orphans if not o['ours'] and not o['client_order_id']][:2]}"
+                " -- at the venue, absent from our ledger; NOTHING WRITTEN"
+                " (ours=OUR KEY SHAPE, ledger row LOST -- the only alarming one;"
+                " foreign_client=another client of this account;"
+                " unclaimed=no client id, placed in the venue UI)",
+                flush=True,
+            )
+
     print(
         f"[execution_ledger] RECONCILE venue={venue} candidates={len(candidates)}"
         f" venue_orders={len(read.get('orders') or [])} changed={len(changed)}"
-        f" not_found={not_found} unknown={unknown}",
+        f" not_found={not_found} unknown={unknown} implausible={implausible}"
+        f" stamped={stamped}"
+        # COVERAGE ON THE SAME LINE AS THE COUNTS IT QUALIFIES. Read without
+        # it, `not_found=0 venue_orders=15` on a per-order venue looks exactly
+        # like a clean full-book reconciliation and is not one.
+        f" coverage={coverage}"
+        f" orphans={len(orphans) if coverage == 'book' else 'n/a'}"
+        # THE ONE THAT MATTERS, ON THE SUMMARY LINE. `orphans=26` alone cannot
+        # say whether anything is wrong; `orphans_ours` can.
+        f" orphans_ours={len([o for o in orphans if o['ours']]) if coverage == 'book' else 'n/a'}",
         flush=True,
     )
     return {
@@ -839,6 +1355,16 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         "changed": len(changed),
         "not_found": not_found,
         "unknown": unknown,
+        "implausible": implausible,
+        "stamped": stamped,
+        "coverage": coverage,
+        # `None`, not `[]`, when the read cannot see orphans at all. An empty
+        # list would say "we looked and there were none".
+        "orphans": orphans if coverage == "book" else None,
+        # Handed out rather than acted on here: reconciliation READS the venue
+        # and must stay something safe to run anywhere. Cancelling is a WRITE,
+        # and it gets its own call and its own log line.
+        "resting": resting,
         "orders": changed,
     }
 
@@ -868,6 +1394,186 @@ def _reconciled_recently(order: Mapping[str, Any], *, within_seconds: float) -> 
     if seen.tzinfo is None:
         seen = seen.replace(tzinfo=timezone.utc)
     return (datetime.now(timezone.utc) - seen).total_seconds() <= within_seconds
+
+
+def _age_seconds(stamp: Any) -> float | None:
+    text = str(stamp or "").strip()
+    if not text:
+        return None
+    try:
+        seen = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - seen).total_seconds()
+
+
+def _market_price_for_side(ticker: Any, side: Any) -> float | None:
+    """What we would PAY, right now, on our leg of this market."""
+    from syndicate.features.shared.kalshi_client import fetch_market
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    try:
+        contract_side = _side_to_kalshi(side)
+    except Exception:
+        return None
+    read = fetch_market(str(ticker or ""))
+    if read.get("status") != "ok":
+        return None
+    market = read.get("market") or {}
+    field = "yes_ask_dollars" if contract_side == "yes" else "no_ask_dollars"
+    try:
+        value = float(market.get(field))
+    except (TypeError, ValueError):
+        return None
+    return value if 0.0 < value < 1.0 else None
+
+
+def _resting_price_for_side(row: Mapping[str, Any]) -> float | None:
+    """What we are resting at, on our leg. Kalshi hands over both legs."""
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    try:
+        contract_side = _side_to_kalshi(row.get("side"))
+    except Exception:
+        return None
+    price = row.get("yes_price") if contract_side == "yes" else row.get("no_price")
+    try:
+        value = float(price)
+    except (TypeError, ValueError):
+        return None
+    return value if 0.0 < value < 1.0 else None
+
+
+def cancel_stale_resting_orders(resting: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Pull resting orders off the book once their price has stopped existing.
+
+    ------------------------------------------------------------------
+    WHY AGE AND PRICE, AND WHY BOTH
+    ------------------------------------------------------------------
+
+    A limit order that has not filled is not automatically wrong -- that is
+    what a limit is for, and cancelling one the moment the market ticks would
+    churn the book and never let a good price come to us. What makes one dead
+    is that it has sat there long enough to have had its chance AND the market
+    has left the price behind. Either alone is a bad rule; together they name
+    exactly the order nobody would leave standing.
+
+    MEASURED 2026-08-24: the Zebby Matthews order rested from ~12:58Z at $0.54
+    for NO while the market moved to $0.56. It could not fill at that price and
+    was never going to, and it held its own idempotency key hostage -- so the
+    marketable-limit path could not re-place it either, because the ledger
+    correctly saw a live order at the venue.
+
+    ------------------------------------------------------------------
+    WHAT MAKES A VENUE WRITE SAFE TO RUN ON A LOOP
+    ------------------------------------------------------------------
+
+    - NO PRICE, NO CANCEL. If the live market cannot be read, the order stays.
+      Cancelling on an unreadable price is acting on the absence of
+      information, which is the failure this whole layer keeps refusing.
+    - A FAILED CANCEL CHANGES NOTHING. The order is still resting and can
+      still fill; marking it dead would free a key the venue still holds, and
+      that is how one bet becomes two. Only a successful DELETE moves the row.
+    - BOUNDED PER PASS. `SYNDICATE_EXECUTION_MAX_CANCELS` (default 3) caps it,
+      so a bad rule cannot empty the book before anyone reads a log.
+    - Every cancel is logged by name, including the refusals.
+
+    Cancelling costs nothing at Kalshi -- an unfilled order carries no fee --
+    so the asymmetry runs the right way: a cancel we should not have made costs
+    a re-place, a fill we should not have taken costs the stake.
+    """
+    from syndicate.features.shared.kalshi_orders import cancel_order
+
+    max_age = _float_env("SYNDICATE_EXECUTION_RESTING_MAX_AGE_SECONDS", 900.0)
+    band = _float_env("SYNDICATE_EXECUTION_RESTING_PRICE_BAND", 0.01)
+    limit = int(_float_env("SYNDICATE_EXECUTION_MAX_CANCELS", 3.0))
+
+    cancelled: list[dict[str, Any]] = []
+    too_young = 0
+    at_market = 0
+    unreadable = 0
+    failed = 0
+
+    for row in resting:
+        if len(cancelled) >= limit:
+            print(
+                f"[execution_ledger] CANCEL_CAPPED limit={limit}"
+                " -- remaining resting orders left for the next pass",
+                flush=True,
+            )
+            break
+
+        age = _age_seconds(row.get("submitted_at"))
+        if age is None or age < max_age:
+            too_young += 1
+            continue
+
+        resting_price = _resting_price_for_side(row)
+        market_price = _market_price_for_side(row.get("ticker"), row.get("side"))
+        if resting_price is None or market_price is None:
+            unreadable += 1
+            print(
+                f"[execution_ledger] CANCEL_SKIPPED_NO_PRICE key={row.get('idempotency_key')}"
+                f" ticker={row.get('ticker')} resting={resting_price} market={market_price}",
+                flush=True,
+            )
+            continue
+
+        drift = round(market_price - resting_price, 4)
+        if abs(drift) < band:
+            at_market += 1
+            continue
+
+        print(
+            f"[execution_ledger] CANCEL_STALE key={row.get('idempotency_key')}"
+            f" ticker={row.get('ticker')} side={row.get('side')}"
+            f" resting={resting_price} market={market_price} drift={drift:+}"
+            f" age_s={age:.0f}",
+            flush=True,
+        )
+        result = cancel_order(row.get("order_id"))
+        if result.get("status") != "ok":
+            failed += 1
+            print(
+                f"[execution_ledger] CANCEL_FAILED key={row.get('idempotency_key')}"
+                f" reason={result.get('reason')} -- order left resting",
+                flush=True,
+            )
+            continue
+        cancelled.append(
+            {
+                "idempotency_key": row.get("idempotency_key"),
+                "ticker": row.get("ticker"),
+                "resting_price": resting_price,
+                "market_price": market_price,
+                "drift": drift,
+                "age_seconds": round(age, 0),
+            }
+        )
+
+    # THE LEDGER IS NOT UPDATED HERE. The next reconciliation pass reads the
+    # venue, sees `canceled`, and moves the row to `rejected` through the one
+    # path that is allowed to change a status -- the venue's own word. Writing
+    # it here would be this module believing its own API call over the book,
+    # which is the habit that produced the phantom fill.
+    if cancelled or failed or unreadable:
+        print(
+            f"[execution_ledger] CANCEL_PASS resting={len(resting)}"
+            f" cancelled={len(cancelled)} failed={failed} unreadable={unreadable}"
+            f" too_young={too_young} at_market={at_market}",
+            flush=True,
+        )
+    return {
+        "status": "ok",
+        "cancelled": len(cancelled),
+        "failed": failed,
+        "unreadable": unreadable,
+        "too_young": too_young,
+        "at_market": at_market,
+        "orders": cancelled,
+    }
 
 
 def unreconciled_orders() -> list[dict[str, Any]]:

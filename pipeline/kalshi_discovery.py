@@ -26,6 +26,25 @@ from __future__ import annotations
 import os
 from typing import Any
 
+# THE THREE NAMES THIS MODULE CALLS AT TOP LEVEL. They were used and never
+# imported, so `probe()` raised `NameError: name 'probe' is not defined` on
+# EVERY boot -- measured on refresh-worker at 21:32, 21:41, 21:50, 21:57,
+# 22:10, 22:48, 23:02, 23:23 and 23:45Z on 2026-08-24, nine consecutive
+# discovery runs, one per deploy.
+#
+# The failure was silent in the way that matters: the probe is inside a
+# `try/except Exception` that logs the exception and RETURNS, so a missing
+# import read exactly like a venue that would not answer. Everything after it
+# -- AUTO_SERIES registration, the LISTED catalogue, COVERAGE_GAPS, the
+# per-series true counts -- never ran once. `kalshi_polymarket_arb` reported
+# `kalshi_moneylines_resolved: 0` on every scan all evening for this reason
+# and no other.
+#
+# Imported at MODULE level rather than inside the try, so an import that
+# breaks again fails at import time where a test sees it, instead of being
+# swallowed as a runtime "the venue did not answer".
+from syndicate.features.shared.kalshi_client import KalshiError, discover, probe
+
 _ALREADY_RAN = False
 
 
@@ -91,6 +110,7 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
     # doing it does not help refresh-worker price anything.
     try:
         from syndicate.features.shared.kalshi_catalogue import (
+            auto_game_series_from_catalogue,
             auto_series_from_catalogue,
             register_discovered,
         )
@@ -98,12 +118,28 @@ def run_kalshi_discovery(*, force: bool = False) -> dict[str, Any]:
 
         catalogue = discover_series()
         if catalogue.get("status") == "ok":
-            result = register_discovered(auto_series_from_catalogue(catalogue.get("titles") or {}))
+            titles = catalogue.get("titles") or {}
+            props = auto_series_from_catalogue(titles)
+            # GAME SERIES TOO, on the process that BUILDS THE BOARD. Discovery
+            # is per-process state, so `kalshi_odds_refresh._ensure_discovery`
+            # registering game lines in the odds-refresh process does nothing
+            # for this one. Registering a series is not agreeing to bet it --
+            # `kalshi_board_join` still keeps game lines behind
+            # SYNDICATE_KALSHI_GAME_LINES and refuses an unresolved event by
+            # name. It only makes them legible enough to be COUNTED, which is
+            # what `kalshi_moneylines_resolved: 0` needed and never had.
+            games = auto_game_series_from_catalogue(titles)
+            result = register_discovered(props)
+            game_result = register_discovered(games)
             print(
                 "[kalshi_discovery] AUTO_SERIES"
                 f" added={len(result.get('added') or {})}"
-                f" total_discovered={result.get('total_discovered')}"
-                f" sample={list((result.get('added') or {}).items())[:8]}",
+                f" prop_series={len(props)}"
+                f" game_series={len(games)}"
+                f" game_added={len(game_result.get('added') or {})}"
+                f" total_discovered={game_result.get('total_discovered')}"
+                f" sample={list((result.get('added') or {}).items())[:8]}"
+                f" game_sample={list((game_result.get('added') or {}).items())[:8]}",
                 flush=True,
             )
         else:

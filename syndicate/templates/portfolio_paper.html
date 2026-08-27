@@ -333,14 +333,15 @@
     </span>
     <span class="paper-flag">
       <span class="paper-flag__label">Plan built</span>
-      <span class="paper-flag__value" id="paper-generated-at">{{ p.generated_at or '—' }}</span>
+      <span class="paper-flag__value" id="paper-generated-at">{{ p.generated_at|central(with_date=True) or '—' }} CT</span>
     </span>
     <span class="paper-links">
-      <a href="/portfolio">Your tracked bets</a> ·
-      {# The real book is a SEPARATE page, and it has to be reachable from here:
-         a live position nobody can navigate to is a live position nobody
-         watches. #}
-      <a href="/portfolio/live">Live book</a> ·
+      {# The real book is on `/portfolio` as of 2026-08-26 -- it used to be a
+         separate page at `/portfolio/live`, which still redirects there. It
+         has to be reachable from here either way: a live position nobody can
+         navigate to is a live position nobody watches. #}
+      <a href="/portfolio#live">Live book</a> ·
+      <a href="/portfolio#tracked">Your tracked bets</a> ·
       <a href="/api/portfolio/paper?date={{ p.date }}">JSON</a>
     </span>
   </div>
@@ -718,7 +719,7 @@
         <tbody id="paper-orphans">
           {% for order in (p.orphan_orders or []) %}
             <tr>
-              <td>{{ order.submitted_at or '—' }}</td>
+              <td>{{ order.submitted_at|central(with_date=True) or '—' }}<span class="sub"> CT</span></td>
               <td class="primary">{{ (order.sport or '—')|upper }}</td>
               <td class="primary">
                 {{ order.player_name or order.side or '—' }}

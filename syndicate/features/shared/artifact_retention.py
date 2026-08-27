@@ -37,6 +37,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Iterable
 
+from syndicate.features.shared.timezone import central_today
+
 from syndicate.features.shared.artifact_publisher import _artifact_date, _data_root
 
 
@@ -303,7 +305,7 @@ def sweep_expired_artifacts(*, today: date | None = None, root: Path | None = No
     Never raises: a retention job that can take down the worker it is tidying up
     for is a worse problem than the disk it is managing.
     """
-    today = today or date.today()
+    today = today or central_today()
     root = root or _data_root()
     cutoffs = _cutoffs(today)
     enabled = retention_enabled()

@@ -48,6 +48,8 @@ status the ledger sets without ever calling the venue.
 
 from __future__ import annotations
 
+import re
+
 import os
 from collections.abc import Mapping
 from typing import Any
@@ -63,12 +65,102 @@ __all__ = [
 
 KILL_SWITCH_PATH_NAME = "execution_kill_switch.json"
 
-# LIVE defaults, deliberately small. These are the numbers a first funded week
-# should survive being wrong about, not the numbers a confident system would
-# choose.
-_DEFAULT_MAX_ORDER_DOLLARS = 25.0
+# LIVE defaults. `#544`-adjacent, user decision 2026-08-25: the real funded
+# accounts are $50 (Kalshi) / $100 (Polymarket), max order size is $10, and the
+# day-count budget is 10 per exchange or 15 across both. These are no longer
+# "small numbers a first funded week should survive being wrong about" --
+# they are the stated real policy, so they are the code default rather than an
+# env override layered on top of a different one (one source of truth; see
+# `#284`'s lesson about a render.yaml env block drifting from what the code
+# actually assumes).
+_DEFAULT_MAX_ORDER_DOLLARS = 10.0
 _DEFAULT_MAX_DAY_DOLLARS = 100.0
-_DEFAULT_MAX_DAY_ORDERS = 10
+# 15 PER BOOK [USER DECISION 2026-08-25], raised from 10.
+_DEFAULT_MAX_DAY_ORDERS = 15
+# THE ACCOUNT-WIDE ORDER-COUNT CEILING, the count equivalent of
+# `max_day_dollars_all_venues` below -- 25 across both venues [USER DECISION
+# 2026-08-25], deliberately LESS than 15+15=30, so simply enabling a second
+# venue cannot silently double the account's daily order budget the way it
+# could not for dollars either.
+_DEFAULT_MAX_DAY_ORDERS_ALL_VENUES = 25
+
+# PER-VENUE DOLLAR CAPS. `max_day_dollars` above is the FALLBACK for a venue
+# with no entry here (a future venue, or a test that does not pass one) --
+# Kalshi and Polymarket get their own numbers because that is what is actually
+# funded on each account. THIS IS A DAY-SPEND CAP, THE SAME MECHANISM AS EVERY
+# OTHER NUMBER IN THIS FILE -- it is not a running "capital currently
+# available" ledger (nothing here subtracts an open, unsettled position's
+# stake from tomorrow's budget), so it is a conservative proxy for "how much is
+# funded", not an exact one. Keyed lowercase to match `OrderRequest.venue` as
+# already normalised by every caller in this file.
+_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE: dict[str, float] = {
+    "kalshi": 50.0,
+    "polymarket": 100.0,
+}
+
+# PER-VENUE ORDER-COUNT CAPS, the count twin of the dollar map above.
+#
+# WHY THIS DID NOT EXIST AND WHY IT HAD TO. `max_day_orders` was FLAT -- one
+# number for whichever venue was asking -- while `max_day_dollars` had been
+# per-venue since 2026-08-25. So `spent_today` filtered orders per venue and
+# then compared that count against an account-shaped number. Both venues
+# happening to default to 15 hid it. The moment a user sets "Kalshi 5 orders a
+# day" the two readings diverge, and the flat field would have accepted the
+# edit and enforced nothing -- a field that displays a policy it does not
+# apply. Both entries are the previous flat default, so nothing already
+# configured changes meaning.
+_DEFAULT_MAX_DAY_ORDERS_BY_VENUE: dict[str, int] = {
+    "kalshi": _DEFAULT_MAX_DAY_ORDERS,
+    "polymarket": _DEFAULT_MAX_DAY_ORDERS,
+}
+
+# THE NAME OF THE ENV VAR BEHIND EACH USER-EDITABLE CAP.
+#
+# Exported because `execution_limits_settings.resolve_view` needs to tell "you
+# set this" from "an operator set the env var" from "nobody set anything", and
+# a second hand-written copy of these names in that file is a mapping that
+# drifts. One table, two readers.
+LIVE_LIMIT_FIELDS: dict[str, str] = {
+    "max_order_dollars": "SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS",
+    "max_day_dollars_kalshi": "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI",
+    "max_day_dollars_polymarket": "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_POLYMARKET",
+    "max_day_orders_kalshi": "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_KALSHI",
+    "max_day_orders_polymarket": "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_POLYMARKET",
+    "max_day_dollars_all_venues": "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES",
+    "max_day_orders_all_venues": "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_ALL_VENUES",
+}
+
+
+def _stored_live_limit(name: str, paper: bool) -> float | None:
+    """A cap the USER saved on `/portfolio`, or None.
+
+    THIS IS THE HOP THAT MAKES THE FORM REAL. Everything else in this file
+    reads `os.environ`, and this module runs on **live-odds-worker** -- the web
+    service that renders the form has none of those variables. Without this
+    read the settings page would accept a number, show it back, and place
+    orders against the old one.
+
+    Read FRESH on every call rather than cached. A cached cap is a cap that
+    does not respond to the edit that lowered it, and this is a ≤25-orders-a-day
+    path where `spent_today` already reads the same store per check.
+
+    PAPER IS EXEMPT BY DESIGN -- see the module docstring on why the paper
+    numbers stay inert. A user's live cap must not quietly truncate the tail of
+    every paper slate and turn that ledger into evidence about the cap.
+
+    Never raises. A store that cannot answer sends the caller to its env-then-
+    default chain, which is safe here only because `kill_switch_engaged()`
+    fails CLOSED on the same store and `check_order` consults it before any
+    live order is placed.
+    """
+    if paper:
+        return None
+    try:
+        from syndicate.features.shared.execution_limits_settings import stored_limit
+
+        return stored_limit(name)
+    except Exception:
+        return None
 
 # PAPER defaults, deliberately INERT. The mechanism must run on paper -- a cap
 # whose first exercise is with money on it has not been tested -- but the
@@ -81,7 +173,32 @@ _DEFAULT_PAPER_MAX_DAY_DOLLARS = 1_000_000.0
 _DEFAULT_PAPER_MAX_DAY_ORDERS = 10_000
 
 # Statuses that mean the venue may have seen this order. See the module note.
+#
+# `rejected` is absent because those never reached the venue at all
+# (`OrderBuildError.venue_contacted = False`). `failed` IS here because the
+# general case is genuinely unknown -- a submit that timed out may have landed,
+# and the write-ahead record exists precisely for that gap.
 _SPENT_STATUSES = {"submitted", "filled", "failed"}
+
+# ...but a 4xx IS AN ANSWER. The venue replied and refused; no contract exists,
+# no money moved, and nothing is pending reconciliation.
+#
+# Measured 2026-08-25: three Kalshi orders failed `http_404 market_not_found`
+# and charged $5.01 and three orders against a $50 / 15-order budget for
+# positions that were never opened. A cap that counts refusals is a cap that
+# shrinks every time the venue says no.
+#
+# 5xx and timeouts deliberately still count: "the venue broke" and "the venue
+# refused" are opposite facts about whether a position might exist, and only
+# one of them is safe to treat as free.
+_VENUE_REFUSED_ERROR = re.compile(r"http_4\d\d", re.IGNORECASE)
+
+
+def _is_venue_refusal(order: Mapping[str, Any]) -> bool:
+    """A `failed` order the venue ANSWERED and refused -- so not spend."""
+    if str(order.get("status") or "") != "failed":
+        return False
+    return bool(_VENUE_REFUSED_ERROR.search(str(order.get("error") or "")))
 
 
 def _float_env(name: str, default: float) -> float:
@@ -102,29 +219,148 @@ def _int_env(name: str, default: int) -> int:
     return int(value)
 
 
-def limits(mode: str | None = None) -> dict[str, Any]:
+_UNSET = object()
+
+
+def _float_env_or_none(name: str) -> float | None:
+    """Like `_float_env`, but tells "nobody set this" apart from any default."""
+    value = _float_env(name, _UNSET)  # type: ignore[arg-type]
+    return None if value is _UNSET else value
+
+
+def limits(mode: str | None = None, venue: str | None = None) -> dict[str, Any]:
     """The caps in force, as data, so a log line can state them.
 
     The same env vars govern both modes -- one place to configure -- but the
     DEFAULTS differ, because "untested" and "unlimited" are not the same worry.
+
+    `venue` resolves the PER-VENUE `max_day_dollars` (Kalshi and Polymarket are
+    funded at different amounts) -- omitted entirely, it falls back to the
+    flat `max_day_dollars` default rather than guessing at a venue.
     """
     from syndicate.features.shared.execution_ledger import LIVE, execution_mode
 
     resolved = mode or execution_mode()
     paper = resolved != LIVE
+    normalized_venue = str(venue or "").strip().lower() or None
+
+    # ------------------------------------------------------------------
+    # PER-VENUE DOLLARS: stored (the user's edit) > per-venue env > flat env >
+    # default. The store layer is new; the rest is the existing chain, kept in
+    # the same order, because the more specific knob has always won here.
+    # ------------------------------------------------------------------
+    def _venue_day_dollars(name: str | None) -> float:
+        default = _DEFAULT_PAPER_MAX_DAY_DOLLARS if paper else _DEFAULT_MAX_DAY_DOLLARS
+        if not paper and name in _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE:
+            default = _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE[name]
+        if name:
+            saved = _stored_live_limit(f"max_day_dollars_{name}", paper)
+            if saved is not None:
+                return float(saved)
+        env_name = (
+            f"SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_{name.upper()}"
+            if name
+            else "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS"
+        )
+        return _float_env(env_name, _float_env("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS", default))
+
+    def _venue_day_orders(name: str | None) -> int:
+        default = _DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS
+        if not paper and name in _DEFAULT_MAX_DAY_ORDERS_BY_VENUE:
+            default = _DEFAULT_MAX_DAY_ORDERS_BY_VENUE[name]
+        if name:
+            saved = _stored_live_limit(f"max_day_orders_{name}", paper)
+            if saved is not None:
+                return int(saved)
+        env_name = (
+            f"SYNDICATE_EXECUTION_MAX_DAY_ORDERS_{name.upper()}"
+            if name
+            else "SYNDICATE_EXECUTION_MAX_DAY_ORDERS"
+        )
+        return _int_env(env_name, _int_env("SYNDICATE_EXECUTION_MAX_DAY_ORDERS", default))
+
+    def _stored_or_env_float(field: str, env_name: str, default: float) -> float:
+        saved = _stored_live_limit(field, paper)
+        return float(saved) if saved is not None else _float_env(env_name, default)
+
+    max_day_dollars = _venue_day_dollars(normalized_venue)
+
     return {
         "mode": resolved,
-        "max_order_dollars": _float_env(
+        "venue": normalized_venue,
+        "max_order_dollars": _stored_or_env_float(
+            "max_order_dollars",
             "SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS",
             _DEFAULT_PAPER_MAX_ORDER_DOLLARS if paper else _DEFAULT_MAX_ORDER_DOLLARS,
         ),
-        "max_day_dollars": _float_env(
-            "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS",
-            _DEFAULT_PAPER_MAX_DAY_DOLLARS if paper else _DEFAULT_MAX_DAY_DOLLARS,
+        "max_day_dollars": max_day_dollars,
+        # THE PER-VENUE CAPS, ALWAYS BOTH, whatever venue this call asked
+        # about. `max_day_dollars` above is whichever ONE venue was resolved,
+        # and a page rendering that single figure as "the" daily cap reads as
+        # an account limit while the two books are funded differently -- the
+        # live portfolio banner showed exactly one number for months.
+        #
+        # THESE ARE NOW RESOLVED, NOT THE RAW DEFAULT MAP. They used to be
+        # `_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE[...]` read straight out -- so a
+        # `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI` twenty-five lines above
+        # moved ENFORCEMENT while the banner kept printing $50. The page and
+        # the guard disagreeing about a money cap is the exact failure this
+        # file's comments keep repairing elsewhere; it was true here too.
+        "max_day_dollars_by_venue": {
+            name: _venue_day_dollars(name) for name in _DEFAULT_MAX_DAY_DOLLARS_BY_VENUE
+        },
+        "max_day_dollars_kalshi": _venue_day_dollars("kalshi"),
+        "max_day_dollars_polymarket": _venue_day_dollars("polymarket"),
+        "max_day_orders": _venue_day_orders(normalized_venue),
+        "max_day_orders_by_venue": {
+            name: _venue_day_orders(name) for name in _DEFAULT_MAX_DAY_ORDERS_BY_VENUE
+        },
+        "max_day_orders_kalshi": _venue_day_orders("kalshi"),
+        "max_day_orders_polymarket": _venue_day_orders("polymarket"),
+        # THE ACCOUNT-WIDE CEILINGS, ACROSS EVERY VENUE AT ONCE.
+        #
+        # `max_day_dollars` is enforced PER VENUE -- `spent_today` filters on
+        # `order.venue`, deliberately, so one venue's budget is not consumed by
+        # another's. That is right for comparing books and WRONG as a statement
+        # about the account: two funded venues must not silently add up to more
+        # risk than either alone, just because nobody set a combined number.
+        #
+        # DOLLARS default to the SUM of the known per-venue defaults ($50 + $100
+        # = $150) rather than to the flat `max_day_dollars` -- now that venues
+        # carry DIFFERENT numbers, "default to max_day_dollars" would silently
+        # mean "default to whichever venue happens to be asking", which is not
+        # a combined cap at all. An explicit
+        # `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES` still overrides it.
+        #
+        # EXCEPT: if someone set the flat `SYNDICATE_EXECUTION_MAX_DAY_DOLLARS`
+        # env var directly (the pre-per-venue-cap way of configuring one shared
+        # number), that edit must still move the combined ceiling -- "nobody
+        # edits a cap and total exposure doubles" applies to the flat knob too,
+        # and it is the more specific signal than the two venues' code defaults.
+        #
+        # EDITABLE TOO, and that is not scope creep -- it is what stops the two
+        # per-venue fields above from being an inert form. This ceiling is
+        # checked BEFORE them and defaults to $150, so raising Kalshi to $200
+        # on the settings page changes nothing at all while it stands. The page
+        # says so out loud when the two venue budgets sum above it.
+        "max_day_dollars_all_venues": _stored_or_env_float(
+            "max_day_dollars_all_venues",
+            "SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_ALL_VENUES",
+            (
+                _DEFAULT_PAPER_MAX_DAY_DOLLARS
+                if paper
+                else (
+                    _float_env_or_none("SYNDICATE_EXECUTION_MAX_DAY_DOLLARS")
+                    or sum(_DEFAULT_MAX_DAY_DOLLARS_BY_VENUE.values())
+                )
+            ),
         ),
-        "max_day_orders": _int_env(
-            "SYNDICATE_EXECUTION_MAX_DAY_ORDERS",
-            _DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS,
+        "max_day_orders_all_venues": int(
+            _stored_or_env_float(
+                "max_day_orders_all_venues",
+                "SYNDICATE_EXECUTION_MAX_DAY_ORDERS_ALL_VENUES",
+                float(_DEFAULT_PAPER_MAX_DAY_ORDERS if paper else _DEFAULT_MAX_DAY_ORDERS_ALL_VENUES),
+            )
         ),
     }
 
@@ -199,12 +435,22 @@ def spent_today(
             continue
         if str(order.get("status") or "") not in _SPENT_STATUSES:
             continue
+        if _is_venue_refusal(order):
+            # The venue answered and refused. No contract, no money, nothing
+            # to reconcile -- see `_VENUE_REFUSED_ERROR`.
+            continue
         try:
             dollars += float(
                 order.get("fill_stake_dollars")
                 if order.get("fill_stake_dollars") is not None
                 else order.get("requested_stake_dollars") or 0.0
             )
+            # FEES COME OUT OF THE SAME BALANCE. A daily cap that counts only
+            # stake is a cap the account can exceed -- ~1.9% on the first real
+            # Kalshi fill, which compounds across a slate. Absent means the
+            # venue reported none, which is true of every venue but Kalshi and
+            # of any Kalshi order not yet reconciled.
+            dollars += float(order.get("fees_dollars") or 0.0)
         except (TypeError, ValueError):
             # An unparseable stake is counted as an ORDER but not as dollars,
             # and that asymmetry is stated rather than silent: dropping it from
@@ -226,7 +472,8 @@ def check_order(
     from syndicate.features.shared.execution_ledger import LIVE, execution_mode
 
     resolved_mode = mode or execution_mode()
-    caps = limits(resolved_mode)
+    request_venue = str(getattr(request, "venue", "") or "") or None
+    caps = limits(resolved_mode, venue=request_venue)
     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
 
     if stake <= 0:
@@ -244,11 +491,7 @@ def check_order(
     used = (
         dict(already)
         if already is not None
-        else spent_today(
-            selected_date,
-            venue=str(getattr(request, "venue", "") or "") or None,
-            mode=resolved_mode,
-        )
+        else spent_today(selected_date, venue=request_venue, mode=resolved_mode)
     )
     if float(used.get("dollars") or 0.0) + stake > caps["max_day_dollars"]:
         return {
@@ -266,6 +509,32 @@ def check_order(
             "limits": caps,
         }
 
+    # ACROSS EVERY VENUE. Read separately and NEVER from `already`, which the
+    # caller computes per venue -- passing it here would make the account-wide
+    # cap read one venue's spend and agree with itself.
+    #
+    # A distinct reason string, because "this venue is done for the day" and
+    # "the account is done for the day" call for different responses and a
+    # shared name would hide which one stopped the slate.
+    all_venues = spent_today(selected_date, venue=None, mode=resolved_mode)
+    if float(all_venues.get("dollars") or 0.0) + stake > caps["max_day_dollars_all_venues"]:
+        return {
+            "allowed": False,
+            "reason": "over_max_day_dollars_all_venues",
+            "stake": stake,
+            "already": used,
+            "already_all_venues": all_venues,
+            "limits": caps,
+        }
+    if int(all_venues.get("orders") or 0) + 1 > caps["max_day_orders_all_venues"]:
+        return {
+            "allowed": False,
+            "reason": "over_max_day_orders_all_venues",
+            "already": used,
+            "already_all_venues": all_venues,
+            "limits": caps,
+        }
+
     if resolved_mode == LIVE:
         # Checked LAST among the live-only gates but before anything is placed,
         # and checked again immediately before submit by `guarded_submit`.
@@ -273,7 +542,13 @@ def check_order(
         if switch.get("engaged"):
             return {"allowed": False, "reason": "kill_switch", "switch": switch, "limits": caps}
 
-    return {"allowed": True, "reason": None, "limits": caps, "already": used}
+    return {
+        "allowed": True,
+        "reason": None,
+        "limits": caps,
+        "already": used,
+        "already_all_venues": all_venues,
+    }
 
 
 class KillSwitchEngaged(RuntimeError):

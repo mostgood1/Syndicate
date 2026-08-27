@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from syndicate.features.shared.execution_ledger import ledger_summary
@@ -754,3 +756,644 @@ def test_no_price_anywhere_returns_none_so_the_order_refuses(monkeypatch):
 
     _price_env(monkeypatch, live_status="down", artifact=None)
     assert runner._kalshi_price_for(_Req()) is None
+
+
+# --------------------------------------------------------------------------
+# Polymarket wired into _venue_submitter
+# --------------------------------------------------------------------------
+
+
+def test_venue_submitter_polymarket_returns_an_adapter(monkeypatch):
+    """The one thing this test guards: `polymarket` used to fall through to
+    `None`, same as any other unmapped venue name. It must not any more."""
+    import pipeline.execute_portfolio as runner
+
+    submitter = runner._venue_submitter("polymarket")
+    assert submitter is not None
+    assert callable(submitter)
+
+
+def _polymarket_row(*, slug="aec-mlb-tex-chw-2026-08-24", teams=("White Sox", "Rangers"),
+                     prices=("0.55", "0.45"), tick="0.001", min_qty="1",
+                     orderable=True):
+    # The PERSISTED shape -- `polymarket_us_markets._SLATE_STORAGE_FIELDS`.
+    # No `id` field: the artifact never carried one, so this fixture does not
+    # either, on purpose (a fixture that includes a field the real artifact
+    # never has would hide exactly the bug this rewrite fixed).
+    return {
+        "slug": slug,
+        "outcomes": list(teams),
+        "outcomePrices": list(prices),
+        "orderPriceMinTickSize": tick,
+        "minimumTradeQty": min_qty,
+        "orderable": orderable,
+    }
+
+
+class _PolyReq:
+    """CHW is home, TEX is away -- same alias pair
+    `tests/test_kalshi_polymarket_arb.py` already relies on. `venue_ticker`
+    holds the Polymarket SLUG (see `_polymarket_resolve_market`'s own
+    docstring on why -- the artifact carries no `id`)."""
+
+    venue_ticker = "aec-mlb-tex-chw-2026-08-24"
+    side = "home"
+    home_team = "CHW"
+    away_team = "TEX"
+    sport = "mlb"
+    requested_price = 0.55
+
+
+def _artifact_env(monkeypatch, *, markets=None, raises=None, fetched_at=None):
+    # FRESH BY DEFAULT, relative to now rather than a fixed epoch. These tests
+    # are about side resolution, slippage and not calling the venue directly;
+    # the artifact's AGE is incidental to every one of them. It stopped being
+    # incidental on 2026-08-25, when `_polymarket_resolve_market` gained a
+    # staleness ceiling -- the fixed 1787600000.0 was ~17,774s old, so every
+    # one of them began refusing before it reached the behaviour under test.
+    # A fixture whose default silently trips a real guard tests the guard, not
+    # its subject. The ceiling itself is covered in
+    # tests/test_polymarket_slate_freshness.py, including an explicitly stale
+    # artifact.
+    if fetched_at is None:
+        fetched_at = time.time()
+    from syndicate.features.shared import refresh_state_store
+    import pipeline.execute_portfolio as runner
+
+    def fake_read(path):
+        if raises is not None:
+            raise raises
+        rows = markets if markets is not None else [_polymarket_row()]
+        return {"fetched_at": fetched_at, "markets": rows, "count": len(rows)}
+
+    monkeypatch.setattr(refresh_state_store, "read_json_file", fake_read)
+    return runner
+
+
+def test_resolves_the_artifact_price_for_our_named_team(monkeypatch):
+    runner = _artifact_env(monkeypatch)
+    resolved = runner._polymarket_resolve_market(_PolyReq())
+    # CHW (home, requested) is "White Sox" in outcomes[0] at 0.55. The INDEX
+    # comes back too: it is what `order_body` uses to pick `outcomeSide`, so
+    # the side cannot disagree with the price it was resolved beside.
+    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1", 0)
+
+
+def test_the_away_side_gets_the_away_price_not_positional(monkeypatch):
+    """Outcomes listed in the OPPOSITE order from home/away still resolve by
+    team identity, not array position -- same discipline
+    `kalshi_polymarket_arb.join_kalshi_polymarket_moneylines` already proves."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(teams=("Rangers", "White Sox"), prices=("0.42", "0.58"))
+    ])
+
+    class _AwayReq(_PolyReq):
+        side = "away"
+
+    resolved = runner._polymarket_resolve_market(_AwayReq())
+    # Rangers (away, requested) sit at outcomes[0] here, so the index is 0 for
+    # an AWAY side -- which is exactly the point: the index tracks our team,
+    # never the home/away role.
+    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.42, "0.001", "1", 0)
+
+
+def test_no_venue_ticker_refuses_without_reading_the_artifact(monkeypatch):
+    from syndicate.features.shared import refresh_state_store
+    import pipeline.execute_portfolio as runner
+
+    def explode(path):
+        raise AssertionError("read the artifact with no slug to look for")
+
+    monkeypatch.setattr(refresh_state_store, "read_json_file", explode)
+
+    class _NoTicker(_PolyReq):
+        venue_ticker = None
+
+    assert runner._polymarket_resolve_market(_NoTicker()) is None
+
+
+def test_never_calls_the_venue_directly(monkeypatch):
+    """The whole point of the artifact rewrite: this function must not become
+    a second independent caller of `polymarket_us_markets` (a documented
+    incident class per `venue_quote_adapters.py`'s own header)."""
+    from syndicate.features.shared import polymarket_us_markets
+
+    def explode(**kwargs):
+        raise AssertionError("called the venue directly instead of reading the artifact")
+
+    monkeypatch.setattr(polymarket_us_markets, "fetch_game_markets", explode)
+    monkeypatch.setattr(polymarket_us_markets, "fetch_markets", explode)
+    runner = _artifact_env(monkeypatch)
+    assert runner._polymarket_resolve_market(_PolyReq()) == (
+        "aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1", 0
+    )
+
+
+def test_artifact_read_failure_refuses_cleanly(monkeypatch):
+    runner = _artifact_env(monkeypatch, raises=RuntimeError("keyvalue unreachable"))
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_empty_artifact_refuses_cleanly(monkeypatch):
+    from syndicate.features.shared import refresh_state_store
+    import pipeline.execute_portfolio as runner
+
+    monkeypatch.setattr(refresh_state_store, "read_json_file", lambda path: {})
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_market_not_found_refuses(monkeypatch):
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(slug="other-slug")])
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_not_orderable_refuses(monkeypatch):
+    """`orderable` is `trimmed_row`'s own signal that tick size and minimum
+    quantity are BOTH present -- never inferred, per `polymarket_us_orders`'s
+    own header."""
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(orderable=False)])
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_unreadable_outcomes_refuses(monkeypatch):
+    runner = _artifact_env(monkeypatch, markets=[_polymarket_row(teams=("Only One",), prices=("0.5",))])
+    assert runner._polymarket_resolve_market(_PolyReq()) is None
+
+
+def test_a_polymarket_price_that_moved_too_far_REFUSES(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(teams=("White Sox", "Rangers"), prices=("0.90", "0.10"))
+    ])
+
+    class _MovedReq(_PolyReq):
+        requested_price = 0.55  # artifact 0.90, +0.35 drift, past 0.03
+
+    with pytest.raises(Exception) as excinfo:
+        runner._polymarket_resolve_market(_MovedReq())
+    assert "polymarket_slippage" in str(excinfo.value)
+
+
+def test_a_polymarket_price_that_moved_in_our_favour_is_taken(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_SLIPPAGE_DOLLARS", "0.03")
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(teams=("White Sox", "Rangers"), prices=("0.40", "0.60"))
+    ])
+
+    class _CheaperReq(_PolyReq):
+        requested_price = 0.55
+
+    resolved = runner._polymarket_resolve_market(_CheaperReq())
+    assert resolved[1] == 0.40
+
+
+def test_venue_submitter_polymarket_end_to_end(monkeypatch):
+    """The full seam: `_venue_submitter("polymarket")` returns an adapter that
+    actually calls `polymarket_us_orders.submit_order` with the resolved
+    market, not a stub that never reaches it."""
+    from syndicate.features.shared import polymarket_us_orders
+    import pipeline.execute_portfolio as runner
+
+    _artifact_env(monkeypatch)
+
+    calls = []
+
+    def fake_submit_order(request, **kwargs):
+        calls.append(kwargs)
+        return {"status": "submitted", "venue_order_id": "o1", "venue_status": None,
+                "fill_price": None, "fill_stake_dollars": None, "contracts": 0,
+                "requested_contracts": 1.0}
+
+    monkeypatch.setattr(polymarket_us_orders, "submit_order", fake_submit_order)
+
+    submitter = runner._venue_submitter("polymarket")
+    result = submitter(_PolyReq())
+    assert result["status"] == "submitted"
+    assert calls == [{
+        "price_dollars": 0.55,
+        "market_slug": "aec-mlb-tex-chw-2026-08-24",
+        "tick_size": "0.001",
+        "minimum_trade_qty": "1",
+        # THE INDEX REACHES `submit_order`. Without it the side is picked
+        # positionally and can contradict the price -- the 2026-08-25 inverted
+        # order. This seam is where that thread would silently break again.
+        "outcome_index": 0,
+    }]
+
+
+def _record(status, **extra):
+    row = {"status": status, "idempotency_key": "k", "venue_ticker": "KX-T",
+           "sport": "mlb", "market": "strikeouts", "player_name": "X",
+           "side": "over", "line": 4.5, "requested_price": 0.5,
+           "requested_stake_dollars": 1.53, "fill_price": None, "error": None}
+    row.update(extra)
+    return row
+
+
+def test_a_resting_order_counts_as_PLACED_not_as_nothing(monkeypatch):
+    """MEASURED 2026-08-24T15:38:23Z. A real order went to Kalshi -- Sandy
+    Alcantara over 4.5 Ks, 3 contracts at $0.50 -- and the run reported
+    `placed=0 duplicates=0 retried=0 skipped=0 refused={}`. Every counter zero,
+    an order sitting at the venue.
+
+    The phantom-fill fix caused it. Before that fix a submit response defaulted
+    to `filled`, so counting fills happened to count placements too; once a
+    resting order correctly recorded `submitted`, the count went silent.
+    Making the STATUS honest made the COUNT dishonest, because the count was
+    using the status as a proxy for a different question. A correct fix that
+    breaks its neighbour is still a break.
+
+    Placed means the venue took it. Filled means it traded. A limit order that
+    rests all afternoon is the first and not the second, and both facts have to
+    be readable off one line."""
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    monkeypatch.setattr(runner, "place_order",
+                        lambda request, submit=None: _record("submitted"))
+    result = runner.run_execution("2026-08-22")
+
+    assert result["placed"] == 1, result
+    assert result["filled"] == 0
+    assert result["failed"] == 0
+
+
+def test_a_fill_counts_as_both_placed_and_filled(monkeypatch):
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    monkeypatch.setattr(runner, "place_order",
+                        lambda request, submit=None: _record("filled"))
+    result = runner.run_execution("2026-08-22")
+    assert result["placed"] == 1
+    assert result["filled"] == 1
+
+
+def test_a_failed_order_is_neither_placed_nor_invisible(monkeypatch):
+    """`failed` means the venue may hold it, so it charges the budget -- and it
+    is not a placement. Reported by name rather than left to be inferred from
+    a `spent` that moved while every other counter stayed at zero, which is
+    the pair of numbers that took reading the source to interpret."""
+    _write_plan(monkeypatch, [_row()])
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    from pipeline import execute_portfolio as runner
+
+    monkeypatch.setattr(runner, "place_order",
+                        lambda request, submit=None: _record("failed", error="boom"))
+    result = runner.run_execution("2026-08-22")
+    assert result["placed"] == 0
+    assert result["failed"] == 1
+
+
+# --------------------------------------------------------------------------
+# Polymarket side resolution depends on what KIND of market it is
+# --------------------------------------------------------------------------
+
+
+def _poly_market(slug, outcomes, prices, market_type="SPORTS_MARKET_TYPE_TOTAL"):
+    import json as _json
+    return {
+        "slug": slug, "sportsMarketTypeV2": market_type,
+        "outcomes": _json.dumps(outcomes), "outcomePrices": _json.dumps(prices),
+        "orderPriceMinTickSize": "0.005", "minimumTradeQty": "0.01",
+        "orderable": True,
+    }
+
+
+def test_a_TOTALS_market_resolves_on_over_under_not_on_team_names(monkeypatch):
+    """MEASURED 2026-08-25T17:45:13Z. The slug was RIGHT -- right game, right
+    number -- and the order still failed:
+
+      totals over 7.5 Tampa Bay Rays @ Detroit Tigers
+      slug=tsc-mlb-tb-det-2026-08-25-7pt5
+      OrderBuildError: market_unresolved_for_position
+
+    The resolver matched every outcome with `_side_for_team`, which resolves
+    TEAM names. A totals market's outcomes are `["Over","Under"]`, so both were
+    skipped and the price stayed None. Every totals order on this venue had
+    failed this way since it went live; only moneylines ever resolved.
+    """
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("tsc-mlb-tb-det-2026-08-25-7pt5", ["Over", "Under"], ["0.52", "0.50"]),
+    ])
+
+    class _TotalReq(_PolyReq):
+        market = "totals"
+        side = "over"
+        line = 7.5
+        venue_ticker = "tsc-mlb-tb-det-2026-08-25-7pt5"
+        home_team = "Detroit Tigers"
+        away_team = "Tampa Bay Rays"
+        requested_price = 0.52
+
+    resolved = runner._polymarket_resolve_market(_TotalReq())
+    assert resolved is not None, "a totals market still refuses"
+    assert resolved[1] == 0.52
+    # The INDEX is what `order_body` turns into `outcomeSide`, so it must be
+    # the Over slot, not merely "some priced slot".
+    assert resolved[4] == 0
+
+
+def test_the_under_side_takes_the_UNDER_price(monkeypatch):
+    """The control. Getting the price right for the wrong side is the failure
+    that bought the wrong team on 2026-08-25."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("tsc-mlb-tb-det-2026-08-25-7pt5", ["Over", "Under"], ["0.52", "0.50"]),
+    ])
+
+    class _UnderReq(_PolyReq):
+        market = "totals"
+        side = "under"
+        venue_ticker = "tsc-mlb-tb-det-2026-08-25-7pt5"
+        requested_price = 0.50
+
+    resolved = runner._polymarket_resolve_market(_UnderReq())
+    assert resolved[1] == 0.50
+    assert resolved[4] == 1
+
+
+def test_a_SPREAD_is_refused_by_name_rather_than_guessed(monkeypatch):
+    """A spread's outcomes are SIGNED NUMBERS -- `["+2.50","-2.50"]` -- and
+    nothing in them says which TEAM is getting the points. Our side is
+    home/away, so pairing them means assuming an ordering, and an assumed
+    ordering on this venue already bought the wrong team once today."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _poly_market("asc-mlb-cle-laa-2026-08-25-pos-1pt5",
+                     ["+1.50", "-1.50"], ["0.55", "0.47"],
+                     market_type="SPORTS_MARKET_TYPE_SPREAD"),
+    ])
+
+    class _SpreadReq(_PolyReq):
+        market = "spreads"
+        side = "home"
+        line = 1.5
+        venue_ticker = "asc-mlb-cle-laa-2026-08-25-pos-1pt5"
+
+    assert runner._polymarket_resolve_market(_SpreadReq()) is None
+
+
+def test_a_moneyline_still_resolves_on_team_names(monkeypatch):
+    """The path that already worked must not regress."""
+    runner = _artifact_env(monkeypatch)
+    resolved = runner._polymarket_resolve_market(_PolyReq())
+    assert resolved is not None
+    assert resolved[1] == 0.55
+
+
+# --------------------------------------------------------------------------
+# The slippage guard compared two different units, on both venues
+# --------------------------------------------------------------------------
+
+
+def test_american_odds_become_a_probability_before_the_slippage_compare():
+    """MEASURED 2026-08-25T17:59:06Z, the first totals order to resolve a side:
+
+      _SlippageExceeded: planned=-108.0 price=0.52 drift=+108.5200 max=0.03
+
+    `planned` is AMERICAN ODDS off our board; `price` is a probability from the
+    venue. Subtracting them is meaningless, and asymmetrically so -- which is
+    why it survived: negative odds refuse everything, positive odds produce a
+    huge NEGATIVE drift that is never `> max` and sail through unchecked.
+    """
+    import pipeline.execute_portfolio as runner
+
+    assert runner.planned_probability(-108.0) == pytest.approx(0.5192, abs=1e-4)
+    assert runner.planned_probability(104.0) == pytest.approx(0.4902, abs=1e-4)
+    # Already a probability -- passed through, because both forms occur.
+    assert runner.planned_probability(0.52) == 0.52
+
+
+def test_an_ambiguous_planned_price_is_refused_rather_than_guessed():
+    """A guessed unit here is a guessed guard. American odds are conventionally
+    at least 100 from zero and a probability is inside (0,1); anything between
+    is not readable as either."""
+    import pipeline.execute_portfolio as runner
+
+    for ambiguous in (5.0, -3.0, 99.0, 1.0, 0.0, None, "x"):
+        assert runner.planned_probability(ambiguous) is None, ambiguous
+
+
+def test_a_positive_odds_order_is_now_actually_CHECKED(monkeypatch):
+    """The order that reached a venue today was `planned=104.0` against
+    `price=0.495` -- drift -103.5, silently passed. In real units 104.0 is
+    0.4902, so a 0.495 fill is a 0.0048 drift: inside the cap, and now
+    genuinely measured rather than accidentally ignored."""
+    runner = _artifact_env(monkeypatch)
+    resolved = runner._polymarket_resolve_market(_PolyReq())
+    assert resolved is not None
+
+
+def test_a_real_adverse_move_on_positive_odds_is_now_REFUSED(monkeypatch):
+    """The half of the guard that never fired. Planned +104 (0.4902) against a
+    0.75 ask is a 0.26 drift -- far outside the cap, and previously passed
+    because -103.5 is not greater than 0.03."""
+    runner = _artifact_env(monkeypatch, markets=[
+        _polymarket_row(prices=("0.75", "0.25")),
+    ])
+
+    class _Moved(_PolyReq):
+        requested_price = 104.0
+
+    with pytest.raises(Exception) as excinfo:
+        runner._polymarket_resolve_market(_Moved())
+    assert "slippage" in str(excinfo.value)
+
+
+def test_a_polymarket_build_error_does_not_charge_the_daily_budget():
+    """MEASURED 2026-08-25T17:59:06Z:
+
+      LIVE_ORDER status=failed venue=polymarket market=spreads
+        error='OrderBuildError: market_unresolved_for_position'
+      EXECUTION placed=0 spent={'dollars': 2.39, 'orders': 1}
+
+    $2.39 and one order charged against a $40 daily cap for something that
+    never left the process. `execution_ledger` reads `venue_contacted`,
+    defaulting to True for unknown exceptions -- Kalshi's OrderBuildError
+    carries the attribute, Polymarket's did not.
+    """
+    from syndicate.features.shared.polymarket_us_orders import OrderBuildError
+
+    assert OrderBuildError.venue_contacted is False
+
+
+# --------------------------------------------------------------------------
+# The order-path verifier: confirmation on demand, without spending anything
+# --------------------------------------------------------------------------
+
+
+def test_the_verifier_reports_which_market_families_would_build(monkeypatch):
+    """The interesting question is never "did one order fail" but "which whole
+    market family cannot transact". `totals` failing on every row while `h2h`
+    succeeds is a different fact from a scattering of misses, and a per-order
+    log cannot show it."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch)
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 0.55,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]} if venue == "polymarket" else {"positions": []})
+
+    report = runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+    markets = report["venues"]["polymarket"]["markets"]
+    assert markets["h2h"]["would_build"] == 1
+
+
+def test_the_verifier_cannot_place_an_order(monkeypatch):
+    """A verifier that could spend money is not a verifier. Nothing in it
+    constructs a submitter, so an adapter that would send must never be
+    reached even when the resolve succeeds."""
+    import pipeline.execute_portfolio as runner
+    from syndicate.features.shared import polymarket_us_orders
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch)
+
+    def explode(*a, **kw):
+        raise AssertionError("the verifier submitted an order")
+
+    monkeypatch.setattr(polymarket_us_orders, "submit_order", explode)
+    monkeypatch.setattr(runner, "_venue_submitter", explode)
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 0.55,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]})
+
+    runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+
+
+def test_the_verifier_names_the_exception_rather_than_saying_failed(monkeypatch):
+    """A verifier that reported "failed" would reproduce the counter this whole
+    session has been prying data out of."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    _artifact_env(monkeypatch, markets=[_polymarket_row(prices=("0.95", "0.05"))])
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": [
+                            {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "h2h", "side": "home", "price": 104.0,
+                             "stake_dollars": 2.0,
+                             "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
+                             "home_team": "CHW", "away_team": "TEX"},
+                        ]})
+
+    report = runner.verify_order_paths("2026-08-24", venues=("polymarket",))
+    verdicts = report["venues"]["polymarket"]["markets"]["h2h"]
+    assert "_SlippageExceeded" in verdicts, verdicts
+
+
+def test_an_empty_plan_is_reported_as_such_not_as_success(monkeypatch):
+    """"Nothing to place" and "everything would build" must not read alike."""
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
+                        lambda date, venue: {"positions": []})
+    report = runner.verify_order_paths("2026-08-24", venues=("kalshi",))
+    assert report["venues"]["kalshi"]["status"] == "no_positions"
+
+
+def test_verify_order_paths_separates_no_ticker_from_unresolvable(monkeypatch, tmp_path):
+    """TWO FAILURES THAT NEED OPPOSITE FIXES, counted as one until now.
+
+    Kalshi has had a distinct `no_venue_ticker` verdict since this verifier was
+    written. Polymarket's was folded into `market_unresolved`, which asserts
+    "we found the market and could not price it" about a position that never
+    had a market identified at all.
+
+    Measured 2026-08-25 4:36:05 PM Central: an h2h on Cleveland Guardians @ LA
+    Angels rejected with `OrderBuildError: market_unresolved_for_position`, and
+    `ORDER_PATH` had reported `{'h2h': {'market_unresolved': 1}}` one second
+    earlier with an EMPTY example map -- while the resolver's own log line said
+    `POLYMARKET_NO_SLUG -- venue_ticker unset or carries no slug
+    (type=NoneType)`. The board join had not stamped a slug; the slate and the
+    price were never reached. Those are different fixes and the verdict has to
+    say which.
+    """
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    def _position(key, ticker):
+        row = {
+            "position_key": key, "event_id": "e-1", "market": "h2h",
+            "side": "home", "sport": "mlb", "price": 0.5, "stake_dollars": 1.0,
+            "home_team": "Los Angeles Angels", "away_team": "Cleveland Guardians",
+        }
+        if ticker is not None:
+            row["venue_ticker"] = ticker
+        return row
+
+    monkeypatch.setattr(
+        portfolio_commit, "read_portfolio_plan_for_venue",
+        lambda _d, venue: {"positions": [_position("p-none", None),
+                                         _position("p-slug", "aec-mlb-cle-laa-2026-08-25")]}
+        if venue == "polymarket" else {"positions": []},
+    )
+    # The slug-carrying one still fails to resolve (no slate here), which is
+    # exactly the other verdict.
+    monkeypatch.setattr(runner, "_polymarket_resolve_market", lambda _r: None)
+
+    result = runner.verify_order_paths("2026-08-25", venues=("polymarket",))
+    detail = result["venues"]["polymarket"]
+
+    assert detail["markets"]["h2h"] == {"no_venue_ticker": 1, "market_unresolved": 1}, detail
+    # AND EACH CARRIES ITS DATA. A verdict with an empty example map is the
+    # counter this verifier exists to replace.
+    assert detail["examples"].get("h2h|no_venue_ticker"), detail
+    assert detail["examples"].get("h2h|market_unresolved"), detail
+
+
+def test_a_kalshi_row_with_no_ticker_says_WHICH_book_priced_it(monkeypatch):
+    """IDENTICAL OUTCOMES, OPPOSITE FIXES, and the verdict has to separate them.
+
+    A row priced from the AGGREGATOR has no Kalshi match by definition, so it
+    has no contract id and is correctly unplaceable -- the paper book still
+    records what the strategy would have done. A row priced from the VENUE and
+    still missing a ticker is a real defect: we matched it, priced it, and lost
+    the id between the join and the plan.
+
+    Measured 2026-08-25 5:01:58 PM Central, the first Kalshi position ever
+    committed:
+
+        ORDER_PATH venue=kalshi status=ok positions=1
+          markets={'totals_alt': {'no_venue_ticker': 1}} examples={}
+
+    Nothing on that line says which of the two it was -- and in the same cycle
+    only 161 of 233 rows were venue-priced, so both readings were live.
+    """
+    import pipeline.execute_portfolio as runner
+    from pipeline import portfolio_commit
+
+    def _position(key, source):
+        return {
+            "position_key": key, "event_id": "e-9", "market": "totals_alt",
+            "side": "over", "sport": "mlb", "price": 0.5, "stake_dollars": 1.0,
+            "line": 8.5, "price_source": source,
+        }
+
+    monkeypatch.setattr(
+        portfolio_commit, "read_portfolio_plan_for_venue",
+        lambda _d, venue: {"positions": [_position("p-agg", "aggregator"),
+                                         _position("p-venue", "venue_feed")]}
+        if venue == "kalshi" else {"positions": []},
+    )
+
+    result = runner.verify_order_paths("2026-08-25", venues=("kalshi",))
+    detail = result["venues"]["kalshi"]
+
+    assert detail["markets"]["totals_alt"] == {"no_venue_ticker": 2}, detail
+    example = detail["examples"].get("totals_alt|no_venue_ticker")
+    assert example, detail
+    assert "price_source=" in example, example

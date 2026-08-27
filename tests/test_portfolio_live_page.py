@@ -1,4 +1,11 @@
-"""`/portfolio/live` -- the real-money book, and the wall between it and paper.
+"""The real-money book, and the wall between it and paper.
+
+MERGED 2026-08-26: this book renders on `/portfolio`, the primary page, and
+`/portfolio/live` is now a redirect there. The page assertions below therefore
+GET `/portfolio`; `/api/portfolio/live` is unchanged and still the payload
+under test. The wall this file exists to guard is unmoved -- it was never
+between live and the user's own logged bets, both of which are real. It is
+between live and PAPER, and paper is still its own page.
 
 Two things are worth testing here and they are both about CONFUSION, not
 arithmetic:
@@ -166,19 +173,19 @@ def test_an_unreadable_ledger_is_never_rendered_as_no_positions(app_client, live
     payload = _payload(live_env)
     assert "keyvalue unreachable" in payload["ledger_error"]
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "not claiming there are no positions" in body
     assert "No live positions have ever been placed" not in body
 
 
 def test_no_positions_says_so_plainly(app_client, live_env):
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "No live positions have ever been placed" in body
 
 
 def test_nothing_settled_is_not_a_zero_pnl(app_client, live_env):
     live_env["orders"] = [_order(outcome=None, pnl_dollars=None)]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     # "+0.00" on nothing decided and "+0.00" on fifty decided are the same
     # string, and only one of them means the book is flat.
     assert "nothing settled yet" in body
@@ -216,13 +223,13 @@ def test_any_one_switch_off_means_the_badge_is_not_real_money(app_client, live_e
     else:
         live_env["kill_switch"] = {"engaged": True, "source": "env"}
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "LIVE MODE OFF" in body
     assert "LIVE — REAL MONEY" not in body
 
 
 def test_all_four_on_is_the_only_state_that_says_real_money(app_client, live_env):
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "LIVE — REAL MONEY" in body
     assert "real submissions to a real venue" in body
 
@@ -253,7 +260,7 @@ def test_a_submitted_order_is_flagged_as_unreconciled(app_client, live_env):
     payload = _payload(live_env)
     assert len(payload["unreconciled"]) == 1
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "unknown result" in body
     assert "do not re-submit" in body
 
@@ -265,7 +272,7 @@ def test_a_filled_order_is_not_flagged_as_unreconciled(live_env):
 
 def test_the_page_shows_the_venue_ticker_and_the_slippage(app_client, live_env):
     live_env["orders"] = [_order()]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "KXWNBAPTS-25AUG23-TG-17.5" in body
     # Requested -110, filled -115: the gap is what a person checks first after
     # a real submit, so both numbers have to be on the row.
@@ -275,7 +282,7 @@ def test_the_page_shows_the_venue_ticker_and_the_slippage(app_client, live_env):
 
 def test_the_caps_in_force_are_on_the_page(app_client, live_env, monkeypatch):
     monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_ORDER_DOLLARS", "5")
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "$5" in body
 
 
@@ -286,7 +293,78 @@ def test_the_caps_in_force_are_on_the_page(app_client, live_env, monkeypatch):
 
 def test_the_paper_page_links_to_the_live_book(app_client, live_env):
     body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
-    assert 'href="/portfolio/live"' in body
+    assert 'href="/portfolio#live"' in body
+
+
+# --------------------------------------------------------------------------
+# THE MERGE. [user decision 2026-08-26] The live book is anchored to
+# `/portfolio`; `/portfolio/live` is a redirect and not a second render.
+# --------------------------------------------------------------------------
+
+
+def test_the_old_live_url_redirects_to_the_primary_page(app_client, live_env):
+    """Bookmarked, and linked from months of history. A 404 on a real-money
+    book is a bad way to learn about a rename."""
+    r = app_client.get("/portfolio/live")
+    assert r.status_code == 302
+    assert r.headers["Location"] == "/portfolio#live"
+
+
+def test_the_redirect_carries_the_query_string(app_client, live_env):
+    """`?show=all`, `?period=` and `?date=` all belong to the merged page.
+    Dropping them silently resets the reader's view."""
+    r = app_client.get("/portfolio/live?date=2026-08-23&show=all&period=month")
+    assert r.status_code == 302
+    assert r.headers["Location"] == "/portfolio?date=2026-08-23&show=all&period=month#live"
+
+
+def test_only_one_template_renders_the_live_book(app_client, live_env):
+    """The reason `/portfolio/live` redirects instead of rendering.
+
+    Two copies of a real-money surface drift, and the one nobody edits is the
+    one somebody trusts -- the same argument `/portfolio/settings` already
+    made about the bankroll form.
+    """
+    from pathlib import Path
+
+    import syndicate
+
+    templates = Path(syndicate.__file__).resolve().parent / "templates"
+    assert not (templates / "portfolio_live.html").exists()
+
+
+def test_the_editable_inputs_survived_the_merge(app_client, live_env):
+    """[user decision 2026-08-26] "all the editable inputs remain editable on
+    the page". Every field `portfolio_settings` will accept has to be on the
+    merged page, or an edit to it silently becomes impossible."""
+    from syndicate.features.shared.portfolio_settings import EDITABLE_FIELDS
+
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    for name in EDITABLE_FIELDS:
+        assert f'name="{name}"' in body, name
+    assert 'action="/portfolio/settings"' in body
+
+
+def test_the_live_and_logged_books_are_both_on_the_page_and_labelled(app_client, live_env):
+    """Two ledgers, one page. They are never summed, so they must never read
+    as one table -- each half carries its own heading."""
+    live_env["orders"] = [_order()]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'id="live"' in body
+    assert 'id="tracked"' in body
+    # The live half's own row, and the logged half's own container.
+    assert "KXWNBAPTS-25AUG23-TG-17.5" in body
+    assert 'id="portfolio-positions"' in body
+
+
+def test_the_live_links_carry_a_real_date(app_client, live_env):
+    """`L.selected_date` was never a key of this payload -- the key is `date`.
+    Jinja renders an undefined as nothing and raises nothing, so every link the
+    page built came out as `?date=`, which is the URL a user pasted back."""
+    live_env["orders"] = [_order(), _order(idempotency_key="k-2", status="rejected", error="refused")]
+    body = app_client.get(f"/portfolio?date={DATE}").get_data(as_text=True)
+    assert "?date=" in body
+    assert f"?date={DATE}" in body
 
 
 def test_the_api_and_the_page_read_the_same_payload(app_client, live_env):
@@ -340,7 +418,7 @@ def test_the_page_shows_the_workers_switches_not_the_webs(app_client, live_env, 
     assert payload["state_source"] == "worker"
     assert payload["limits"]["max_order_dollars"] == 10.0
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "LIVE — REAL MONEY" in body
     assert "$10" in body
     assert "live-odds-worker" in body
@@ -355,7 +433,7 @@ def test_no_worker_stamp_is_reported_as_unknown_not_as_off(app_client, live_env,
     payload = intelligence_bp._live_portfolio_payload(DATE)
     assert payload["state_source"] == "web_env"
 
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "worker has not reported" in body
     assert "Treat them as unknown, not as off" in body
 
@@ -377,7 +455,7 @@ def test_a_stale_stamp_says_so(app_client, live_env, monkeypatch):
             "limits": {"max_order_dollars": 10.0, "max_day_dollars": 40.0, "max_day_orders": 10},
         },
     )
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "may be stale" in body
 
 
@@ -390,7 +468,7 @@ def test_a_kalshi_dollar_price_renders_as_cents_not_american_odds(app_client, li
     board. Two units in one table with nothing to tell them apart.
     """
     live_env["orders"] = [_order(fill_price=0.54, requested_price=0.46)]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "54&cent;" in body or "54¢" in body
     assert "+0" not in body
 
@@ -398,6 +476,295 @@ def test_a_kalshi_dollar_price_renders_as_cents_not_american_odds(app_client, li
 def test_an_american_price_still_renders_as_american(app_client, live_env):
     """The other venues quote American odds and must not become cents."""
     live_env["orders"] = [_order(fill_price=-117.0, requested_price=163.0)]
-    body = app_client.get("/portfolio/live").get_data(as_text=True)
+    body = app_client.get("/portfolio").get_data(as_text=True)
     assert "-117" in body
     assert "+163" in body
+
+
+def _live_order(status, error="", key="k1"):
+    return {
+        "mode": "live", "selected_date": "2026-08-25", "venue": "kalshi",
+        "status": status, "error": error, "position_key": key,
+        "submitted_at": "2026-08-25T23:00:00Z", "requested_stake_dollars": 1.0,
+    }
+
+
+def test_orders_that_never_opened_a_position_are_hidden_by_default(monkeypatch):
+    """[USER DECISION 2026-08-25] Default to hiding them, with a toggle.
+
+    HIDDEN, NOT DROPPED, and counted either way: a page that silently omitted
+    them would make "we placed nothing" and "we tried and were refused" look
+    identical, which is the distinction this whole system keeps paying to
+    preserve. They are also the rows that say WHY a bet did not happen.
+    """
+    from syndicate.blueprints import intelligence as mod
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    orders = [
+        _live_order("filled", key="a"),
+        _live_order("rejected", "OrderBuildError: no_venue_ticker", key="b"),
+        _live_order("failed", "KalshiAuthError: http_404: market_not_found", key="c"),
+    ]
+    monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": orders})
+
+    default = mod._live_portfolio_payload("2026-08-25")
+    assert [o["position_key"] for o in default["orders"]] == ["a"]
+    assert default["hidden_count"] == 2
+    assert default["show_all"] is False
+
+    shown = mod._live_portfolio_payload("2026-08-25", show_all=True)
+    assert len(shown["orders"]) == 3
+    assert shown["hidden_count"] == 2
+    assert shown["show_all"] is True
+
+
+def test_a_failed_order_of_UNKNOWN_outcome_stays_visible(monkeypatch):
+    """The row a person must see FIRST.
+
+    A submit that timed out may well have landed -- that gap is why the
+    write-ahead record exists. Hiding it would bury the one order that needs
+    checking against the venue before anything else is placed, which is what
+    the page's own banner says. Only a failure the venue ANSWERED (a 4xx) is
+    certainly not a position.
+    """
+    from syndicate.blueprints import intelligence as mod
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    orders = [
+        _live_order("failed", "ReadTimeout", key="unknown"),
+        _live_order("failed", "http_500: internal", key="broke"),
+        _live_order("failed", "http_404: market_not_found", key="refused"),
+    ]
+    monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": orders})
+
+    payload = mod._live_portfolio_payload("2026-08-25")
+    visible = {o["position_key"] for o in payload["orders"]}
+    assert visible == {"unknown", "broke"}, visible
+    assert payload["hidden_count"] == 1
+
+
+def test_the_page_and_the_cap_agree_on_what_is_not_a_position(monkeypatch):
+    """One rule, two readers. The page's filter and the day-budget's spend
+    accounting both come from `_is_venue_refusal`, so a row that is hidden is
+    exactly a row that did not consume an order slot -- rather than two
+    functions that agree today and drift apart later."""
+    from syndicate.blueprints.intelligence import _is_non_position
+    from syndicate.features.shared.execution_guard import _is_venue_refusal
+
+    refused = _live_order("failed", "http_404: market_not_found")
+    assert _is_non_position(refused) is True
+    assert _is_venue_refusal(refused) is True
+
+    timed_out = _live_order("failed", "ReadTimeout")
+    assert _is_non_position(timed_out) is False
+    assert _is_venue_refusal(timed_out) is False
+
+
+# ---------------------------------------------------------------------------
+# THE PIVOTS. [USER DECISION 2026-08-25] daily, monthly, yearly views.
+#
+# REACHABILITY FIRST, per this repo's own standard: a rollup that computes
+# correctly and never reaches the page is indistinguishable from one that was
+# never built, at every level except looking at it.
+# ---------------------------------------------------------------------------
+
+
+def test_the_period_pivot_reaches_the_page(app_client, live_env):
+    live_env["orders"] = [
+        _order(idempotency_key="k1", selected_date="2026-08-25", status="filled",
+               fill_stake_dollars=2.0, outcome="won", pnl_dollars=1.5),
+        _order(idempotency_key="k2", selected_date="2026-07-04", status="filled",
+               fill_stake_dollars=2.0, outcome="lost", pnl_dollars=-2.0),
+    ]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert "Performance" in body
+    assert "2026-08-25" in body
+    # The day view is the default, so July's own DAY row is present too.
+    assert "2026-07-04" in body
+
+
+def test_the_month_and_year_views_are_selectable(app_client, live_env):
+    live_env["orders"] = [
+        _order(idempotency_key="k1", selected_date="2026-08-25", status="filled",
+               fill_stake_dollars=2.0, outcome="won", pnl_dollars=1.5),
+        _order(idempotency_key="k2", selected_date="2026-07-04", status="filled",
+               fill_stake_dollars=2.0, outcome="lost", pnl_dollars=-2.0),
+    ]
+    month = app_client.get("/portfolio?period=month").get_data(as_text=True)
+    assert "2026-08<" in month or ">2026-08<" in month
+    year = app_client.get("/portfolio?period=year").get_data(as_text=True)
+    # One row for 2026 -- both orders, collapsed.
+    assert ">2026<" in year
+
+
+def test_the_pivot_does_not_move_when_the_show_toggle_flips(app_client, live_env):
+    """The `?show=` toggle changes what is DISPLAYED, never what is counted.
+    A rollup that moved with a display toggle would not be quotable."""
+    live_env["orders"] = [
+        _order(idempotency_key="k1", selected_date="2026-08-25", status="filled",
+               fill_stake_dollars=2.0),
+        _order(idempotency_key="k2", selected_date="2026-08-25", status="rejected",
+               error="zero_kelly_stake"),
+    ]
+    hidden = intelligence_bp._live_portfolio_payload("2026-08-25")
+    shown = intelligence_bp._live_portfolio_payload("2026-08-25", show_all=True)
+    assert hidden["periods"] == shown["periods"]
+    # And the refused order is not in the count either way.
+    assert hidden["periods"]["by_day"][0]["orders"] == 1
+
+
+# ---------------------------------------------------------------------------
+# THE BANNER COLOUR. [USER DECISION 2026-08-25] green when healthy, red when
+# anything is an issue.
+#
+# This INVERTED the previous scheme, where `on` was red because red meant
+# "real money is live, pay attention". A working system rendered as a wall of
+# red and a broken one looked the same. These tests pin the new direction so
+# it cannot quietly drift back.
+# ---------------------------------------------------------------------------
+
+
+def test_a_healthy_live_book_is_green(app_client, live_env, monkeypatch):
+    """A WORKER STAMP IS PART OF HEALTHY. The fixture's default leaves
+    `read_execution_state` returning None, which is `web env (worker silent)`
+    -- correctly not green, however the switches read."""
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    live_env["orders"] = [_order()]
+    monkeypatch.setattr(ledger_mod, "read_execution_state", lambda: {
+        "execution_mode": "live", "live_armed": True, "execution_enabled": True,
+        "kill_switch": {"engaged": False}, "limits": {},
+        "recorded_by": "live-odds-worker",
+        "recorded_at": _now_iso(),
+    })
+    payload = intelligence_bp._live_portfolio_payload(DATE)
+    assert payload["health"]["ok"] is True
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    # ANCHORED ON THE MARKUP. Both class names appear in the stylesheet, so a
+    # bare substring test passes whatever the badge actually renders.
+    assert 'class="live-badge live-badge--ok"' in body
+    assert 'class="live-badge live-badge--bad"' not in body
+    assert "LIVE — REAL MONEY" in body
+    assert 'class="live-banner is-ok"' in body
+
+
+def test_each_broken_switch_turns_the_line_red(app_client, live_env, monkeypatch):
+    """One field is enough. The verdict is `all()`, not a majority.
+
+    Given a healthy worker stamp first, so each case fails on the field under
+    test rather than on a silent worker -- a test that is red for the wrong
+    reason proves nothing about the reason it names."""
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    def stamp(**over):
+        base = {
+            "execution_mode": "live", "live_armed": True, "execution_enabled": True,
+            "kill_switch": {"engaged": False}, "limits": {},
+            "recorded_by": "live-odds-worker", "recorded_at": _now_iso(),
+        }
+        base.update(over)
+        monkeypatch.setattr(ledger_mod, "read_execution_state", lambda: base)
+
+    for field, break_it in (
+        ("job", lambda: stamp(execution_enabled=False)),
+        ("mode", lambda: stamp(execution_mode="paper")),
+        ("armed", lambda: stamp(live_armed=False)),
+        ("kill_switch", lambda: stamp(kill_switch={"engaged": True, "source": "env"})),
+    ):
+        stamp()
+        assert intelligence_bp._live_portfolio_payload(DATE)["health"]["ok"] is True
+        break_it()
+        health = intelligence_bp._live_portfolio_payload(DATE)["health"]
+        assert health[field] is False, field
+        assert health["ok"] is False, field
+        body = app_client.get("/portfolio").get_data(as_text=True)
+        assert 'class="live-badge live-badge--bad"' in body, field
+        assert 'class="live-banner is-bad"' in body, field
+
+
+def _now_iso():
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def test_an_engaged_kill_switch_is_red(app_client, live_env):
+    """DELIBERATE REVERSAL. Engaged used to be painted as fine ("the SAFE
+    state"). It is still safe, and it is also a system that cannot trade --
+    which is exactly what this banner reports."""
+    live_env["kill_switch"] = {"engaged": True, "source": "env"}
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert "ENGAGED" in body
+    assert intelligence_bp._live_portfolio_payload(DATE)["health"]["kill_switch"] is False
+
+
+def test_a_silent_worker_is_red_even_with_every_switch_on(app_client, live_env):
+    """"The worker has not reported" and "execution is off" are different
+    facts. Neither is healthy, and web's own env is not a reading of the
+    process that places orders."""
+    health = intelligence_bp._live_portfolio_payload(DATE)["health"]
+    # The fixture leaves `read_execution_state` returning None -> web_env.
+    payload = intelligence_bp._live_portfolio_payload(DATE)
+    if payload["state_source"] != "worker":
+        assert health["source"] is False
+        assert health["ok"] is False
+
+
+def test_a_stale_worker_stamp_is_red(monkeypatch):
+    """A stamp from forty minutes ago is not current state. A stopped worker's
+    last known settings look identical to its live ones."""
+    from syndicate.blueprints.intelligence import _live_health, _STATE_STALE_SECONDS
+
+    healthy = {
+        "execution_enabled": True, "execution_mode": "live", "live_armed": True,
+        "kill_switch": {"engaged": False}, "state_source": "worker",
+        "state_age_seconds": 60,
+    }
+    assert _live_health(healthy)["ok"] is True
+    stale = {**healthy, "state_age_seconds": _STATE_STALE_SECONDS + 1}
+    assert _live_health(stale)["source"] is False
+    assert _live_health(stale)["ok"] is False
+    # The boundary belongs to fresh.
+    assert _live_health({**healthy, "state_age_seconds": _STATE_STALE_SECONDS})["source"] is True
+
+
+def test_the_api_answers_the_same_health_question_as_the_page(app_client, live_env):
+    """A caller must not have to re-derive green from six fields."""
+    api = app_client.get("/api/portfolio/live").get_json()
+    assert "health" in api
+    assert set(api["health"]) == {"job", "mode", "armed", "kill_switch", "source", "ok"}
+
+
+# ---------------------------------------------------------------------------
+# `/portfolio/settings` WAS A TRAP. It is the form's POST action, not a page,
+# so a browser typing it got 405 with no hint where the form lives. Measured
+# 2026-08-26T01:21:20Z on production, from a URL this assistant had just told
+# the user to open.
+# ---------------------------------------------------------------------------
+
+
+def test_the_settings_url_a_browser_would_guess_reaches_the_form(app_client):
+    r = app_client.get("/portfolio/settings")
+    assert r.status_code == 303
+    assert r.headers["Location"].endswith("/portfolio#bankroll")
+
+
+def test_the_form_anchor_exists_on_the_page_it_points_at(app_client):
+    """A redirect to a fragment that no element carries scrolls to the top and
+    looks like the redirect failed."""
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'id="bankroll"' in body
+    # And the form it anchors is really there, with the two fields that matter.
+    assert 'name="bankroll_units"' in body
+    assert 'name="max_positions"' in body
+
+
+def test_saving_returns_to_the_form_not_the_top_of_the_page(app_client, monkeypatch):
+    from syndicate.features.shared import portfolio_settings as ps
+
+    seen = {}
+    monkeypatch.setattr(ps, "update_settings", lambda changes: seen.update(changes) or (None, {}))
+    r = app_client.post("/portfolio/settings", data={"bankroll_units": "1000", "max_positions": "25"})
+    assert r.status_code == 303
+    assert r.headers["Location"].endswith("/portfolio#bankroll")
+    assert seen == {"bankroll_units": "1000", "max_positions": "25"}

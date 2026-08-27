@@ -48,6 +48,7 @@ out of every hour would be a strictly worse board in exchange for nothing.
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
 from collections.abc import Mapping
 from typing import Any
@@ -118,6 +119,31 @@ def refresh_interval_seconds() -> int:
     return parsed if parsed >= 0 else DEFAULT_REFRESH_INTERVAL_SECONDS
 
 
+def markets_from_state(payload: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """Every stored market, merged from the per-series entries.
+
+    The artifact stores markets ONCE, under `series[<ticker>]["markets"]`.
+    It used to also store the concatenation under `markets`, which doubled a
+    document that has a hard 8MB ceiling and took it to 13.3MB -- at which
+    point the store refused and the artifact stopped being written entirely.
+
+    Falls back to a legacy top-level `markets` key so a payload written before
+    this change still reads, rather than a deploy silently emptying the board.
+    """
+    if not payload:
+        return []
+    series = payload.get("series")
+    if isinstance(series, Mapping):
+        out: list[dict[str, Any]] = []
+        for entry in series.values():
+            if isinstance(entry, Mapping):
+                out.extend(entry.get("markets") or [])
+        if out:
+            return out
+    legacy = payload.get("markets")
+    return list(legacy) if isinstance(legacy, list) else []
+
+
 def markets_artifact_path():
     from syndicate.features.shared.refresh_state_store import reports_root
 
@@ -170,13 +196,118 @@ def fetch_series_markets(series: str) -> dict[str, Any]:
     }
 
 
-DEFAULT_SERIES_PER_TICK = 12
+# RAISED FROM 12, because the cap was doing a job that now has its own tool.
+#
+# 12 was never a rate limit -- it was the ONLY burst control, chosen so thirty
+# HTTP calls could not leave in one second (the 2026-08-23 http_429s). With
+# explicit spacing below, the burst is bounded by time rather than by count,
+# so the cap can be what it should always have been: how much of the book we
+# refresh per tick.
+#
+# THESE CALLS ARE FREE. Kalshi and Polymarket are direct APIs, unlike OddsAPI
+# whose per-call cost is what paces the rest of the board build. So the right
+# cadence here is "as often as the venue tolerates", and fresher exchange
+# prices are also what lets us lean less on the metered feed over time.
+#
+# 60 x 150ms = 9 seconds of wall clock per tick, which a worker can absorb.
+#
+# RAISED TO 150 on 2026-08-25, because the registry grew and the cap became the
+# binding constraint on freshness rather than the rate limit. Measured that
+# evening: `AUTO_SERIES game_series=204 total_discovered=212` after the soccer
+# competitions registered, against 60 slots per 120s tick -- a full sweep took
+# roughly SEVEN MINUTES, so a live line could be seven minutes old before it
+# was even looked at.
+#
+# The bound that matters is the RATE, not the count: 150 x 150ms = 22.5s of
+# wall clock per tick inside a 120s cadence, still ~6.7 requests/second
+# sustained, an order of magnitude under the burst that drew the 429. Dormant
+# series cost nothing here -- they are backed off to hourly by
+# `DEFAULT_DORMANT_INTERVAL_SECONDS` -- so in practice this is "every live
+# series, every tick", which is what the user asked for and what free calls
+# make affordable.
+DEFAULT_SERIES_PER_TICK = 150
+
+# Minimum gap between two series fetches, in milliseconds.
+#
+# THE THING THE CAP WAS STANDING IN FOR. `#` 2026-08-23: an unpaced loop put
+# thirty requests out in about a second and Kalshi answered http_429. A cap
+# fixes that only by accident -- it bounds the COUNT, not the RATE, so raising
+# it for freshness would have reintroduced the burst exactly.
+#
+# 150ms is ~6.7 requests/second sustained, an order of magnitude below the
+# burst that drew the 429 and slow enough that a much larger cap stays safe.
+DEFAULT_REQUEST_SPACING_MS = 150
+
+# How often a DORMANT series may be re-fetched -- one whose last successful
+# read returned zero markets.
+#
+# THIS IS WHERE THE BUDGET WAS GOING. Measured 2026-08-25T16:41:09Z, all twelve
+# slots in a tick went to `KXATTENDMLB`, `KXMLBASGAME`, `KXMVENBASINGLEGAME`,
+# `KXNBA1HSPREAD` and friends -- attendance markets, the All-Star game, parlays
+# and NBA quarter lines in AUGUST, every one returning zero -- while live
+# series sat 39.6 hours stale.
+#
+# `d58cb0b8c` stopped them monopolising the queue. This stops them CONSUMING it
+# at all on most ticks: an out-of-season series is worth checking hourly, not
+# every two minutes, and the budget it frees goes to series that have markets.
+# The effective per-tick load becomes "the series that are actually live",
+# which is what makes a high cadence affordable.
+DEFAULT_DORMANT_INTERVAL_SECONDS = 3600
 
 # Total markets kept in the artifact. The keyvalue store refuses at 8MB and
 # `layer2_shortlist` already sits at 5.7MB of that budget, so an unbounded
 # multi-sport catalogue is a write that starts failing silently one sport from
 # now. Trimmed OLDEST-SERIES-FIRST and reported, never silently.
 MAX_STORED_MARKETS = 6000
+
+# Markets kept per series in the JOIN'S WORKING SET.
+#
+# MEASURED 2026-08-25T17:53:48Z, the tick after the queue started rotating:
+#
+#   KEYVALUE_WRITE_REJECTED size_bytes=13315551 max_bytes=8388608
+#   WRITE_FAILED ... Shrink the payload rather than raising the ceiling
+#   COMPOSITION under=series KXNCAAFSPREAD=2306569 KXNCAAFWINS=645981
+#                            KXNCAAFGAME=635691 KXNCAAFAWARD=506778
+#
+# The artifact stopped being written AT ALL, so the board fell back to the
+# last good write. One series -- `KXNCAAFSPREAD`, a spread ladder with every
+# rung of every game -- was 2.3MB on its own.
+#
+# THIS BOUND IS SAFE ONLY BECAUSE CAPTURE MOVED. `venue_daily_odds` records
+# every market the venue lists, dated and split per sport, and wrote fine on
+# the same tick (`files=23`). So this artifact no longer has to be the record
+# of what Kalshi offers -- it is the working set the JOIN prices against, and a
+# working set may be bounded where a record may not. That separation is what
+# the capture-first layer bought.
+MAX_MARKETS_PER_SERIES = 400
+# How many capped series `PRECAP_CUT_BY_DATE` names. The count of capped series
+# and the total cut are ALWAYS printed, so this bounds the log without letting a
+# partial list impersonate a complete one.
+MAX_CAP_COST_SERIES = 12
+
+
+def request_spacing_seconds() -> float:
+    """Seconds to wait between two series fetches. Never negative."""
+    raw = os.environ.get("SYNDICATE_KALSHI_REQUEST_SPACING_MS")
+    try:
+        parsed = float(str(raw).strip())
+    except (TypeError, ValueError):
+        parsed = float(DEFAULT_REQUEST_SPACING_MS)
+    if parsed != parsed or parsed < 0:
+        # A bad value must not become an UNPACED loop -- that is the failure
+        # this exists to prevent, so it falls back rather than to zero.
+        parsed = float(DEFAULT_REQUEST_SPACING_MS)
+    return parsed / 1000.0
+
+
+def dormant_interval_seconds() -> int:
+    """How often a series whose last read returned nothing may be re-checked."""
+    raw = os.environ.get("SYNDICATE_KALSHI_DORMANT_INTERVAL_SECONDS")
+    try:
+        parsed = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return DEFAULT_DORMANT_INTERVAL_SECONDS
+    return parsed if parsed >= 0 else DEFAULT_DORMANT_INTERVAL_SECONDS
 
 
 def series_per_tick() -> int:
@@ -263,7 +394,26 @@ def hot_series() -> set[str]:
     return found
 
 
-def _due_series(state: dict[str, Any], wanted: tuple[str, ...], interval: int) -> list[str]:
+def _is_dormant(entry: Mapping[str, Any]) -> bool:
+    """Did this series' last successful read return nothing?
+
+    `count` is stamped on every successful read, including an empty one, so
+    `count == 0` is a POSITIVE statement ("we asked and there was nothing")
+    rather than an absence. A series never fetched has no `count` and is NOT
+    dormant -- it is unknown, and unknown must be asked at the normal cadence
+    or a new series would wait an hour to be seen for the first time.
+    """
+    count = entry.get("count")
+    return isinstance(count, int) and count == 0
+
+
+def _due_series(
+    state: dict[str, Any],
+    wanted: tuple[str, ...],
+    interval: int,
+    *,
+    dormant_interval: int | None = None,
+) -> list[str]:
     """Which series have not been fetched within `interval`, oldest first.
 
     PER SERIES, which is the whole economy of this design. A single whole-fetch
@@ -280,11 +430,19 @@ def _due_series(state: dict[str, Any], wanted: tuple[str, ...], interval: int) -
     for series in wanted:
         entry = per_series.get(series) or {}
         age = _seconds_since(entry.get("fetched_at"))
+        # A DORMANT SERIES WAITS LONGER. Its last successful read returned
+        # nothing, so re-asking every two minutes spends the tick budget to
+        # confirm that August still has no NBA quarter lines. Hourly is enough,
+        # and the budget it frees goes to series that have markets -- which is
+        # what makes a high cadence affordable on a free API.
+        due_after = interval
+        if dormant_interval is not None and _is_dormant(entry):
+            due_after = max(interval, dormant_interval)
         if age is None:
             # Never fetched. Sorts ahead of everything -- a series with no
             # prices at all is worth more than a refresh of one that has them.
             due.append((float("inf"), series))
-        elif age >= interval:
+        elif age >= due_after:
             due.append((age, series))
     due.sort(key=lambda item: -item[0])
     return [series for _age, series in due]
@@ -314,6 +472,36 @@ def _backing_off(entry: Mapping[str, Any], interval: int) -> bool:
 # module-level: registration does not cross the process boundary, and that is
 # exactly the bug this exists to fix.
 _DISCOVERY_DONE = False
+
+
+def _unregistered_sport_series(
+    titles: Mapping[str, Any],
+    props: Mapping[str, Any],
+    games: Mapping[str, Any],
+) -> list[dict[str, str]]:
+    """Series whose ticker names a sport we model but which nothing registered.
+
+    The work list for coverage we do not even ATTEMPT. Bounded and sorted so
+    the line stays readable; the count rides on the result so a truncated
+    sample cannot read as the whole gap.
+    """
+    from syndicate.features.shared.kalshi_catalogue import (
+        SERIES_OUT_OF_SCOPE,
+        sport_for_ticker,
+    )
+
+    registered = {str(k).upper() for k in props} | {str(k).upper() for k in games}
+    out: list[dict[str, str]] = []
+    for ticker, title in (titles or {}).items():
+        key = str(ticker or "").strip().upper()
+        if not key or key in registered or key in SERIES_OUT_OF_SCOPE:
+            continue
+        sport = sport_for_ticker(key)
+        if not sport:
+            continue
+        out.append({"series": key, "sport": sport, "title": str(title or "")[:60]})
+    out.sort(key=lambda row: (row["sport"], row["series"]))
+    return out
 
 
 def ensure_series_discovered(*, force: bool = False) -> dict[str, Any]:
@@ -366,12 +554,47 @@ def ensure_series_discovered(*, force: bool = False) -> dict[str, Any]:
         added_props = register_discovered(props)
         added_games = register_discovered(games)
         _DISCOVERY_DONE = True
+
+        # WHAT THE CATALOGUE LISTS AND WE NEVER FETCH.
+        #
+        # Registration is the FIRST gate: a series that does not register is
+        # never added to `sports_series()`, never fetched, and therefore
+        # invisible to every counter downstream -- it cannot appear in
+        # `unreadable_title`, in `BOARD_JOIN` reasons, or anywhere else. The
+        # only symptom is a board row that never gets a price, which reads as
+        # "Kalshi does not offer this".
+        #
+        # That is exactly how `KXMLBGAME` hid: its title is "Professional
+        # Baseball Game", `_GAME_CORE` had no entry for the bare word "game",
+        # and the moneyline -- the single most valuable market on the venue --
+        # was unreachable across every sport until a user found a live market
+        # the diagnostics said did not exist.
+        #
+        # MEASURED 2026-08-25: `KXMLBTOTAL` appears NOWHERE in the logs, while
+        # `KXWNBATOTAL` fetches 45 markets. A board row for `totals over 7.5`
+        # on an MLB game therefore has no Kalshi market to join to, and the
+        # order fails `no_live_price` -- which is what every Kalshi order today
+        # did.
+        #
+        # So: name the sport-token series the catalogue carries that we did NOT
+        # register, with their titles, so the next grammar is written from
+        # Kalshi's own words rather than from a guess about them.
+        unregistered = _unregistered_sport_series(titles, props, games)
+        if unregistered:
+            print(
+                "[kalshi_odds] SERIES_UNREGISTERED"
+                f" n={len(unregistered)}"
+                f" sample={unregistered[:14]}",
+                flush=True,
+            )
+
         return {
             "status": "ok",
             "catalogue": int(report.get("count") or 0),
             "prop_series": len(props),
             "game_series": len(games),
             "added": len(added_props.get("added") or {}) + len(added_games.get("added") or {}),
+            "unregistered": len(unregistered),
         }
     except Exception as exc:
         return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
@@ -408,6 +631,7 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
             flush=True,
         )
 
+    from syndicate.features.shared.kalshi_catalogue import game_date_from_ticker
     from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
 
     path = markets_artifact_path()
@@ -429,7 +653,11 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         if force
         else _due_series(state, tuple(sorted(hot)), hot_refresh_interval_seconds())
     )
-    due = wanted if force else _due_series(state, wanted, interval)
+    due = (
+        wanted
+        if force
+        else _due_series(state, wanted, interval, dormant_interval=dormant_interval_seconds())
+    )
 
     # A failed series backs off on its OWN shorter clock. Without this a venue
     # that is 403ing or rate-limiting us is retried every board build -- every
@@ -455,38 +683,216 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         )
 
     fetched: dict[str, Any] = {}
-    for series in fetching:
+    spacing = request_spacing_seconds()
+    for index, series in enumerate(fetching):
+        # SPACING, NOT A SMALLER CAP. The cap bounds how many; only this bounds
+        # how FAST, and the 2026-08-23 http_429s came from rate, not count.
+        # Skipped before the first call so a one-series tick pays nothing.
+        if index and spacing:
+            time.sleep(spacing)
         result = fetch_series_markets(series)
         markets = result.get("markets") or []
         entry = dict(per_series.get(series) or {})
         entry["attempted_at"] = _now_stamp()
         entry["strategy"] = result.get("strategy")
         entry["reason"] = result.get("reason")
+        # AN EMPTY SERIES IS A SUCCESSFUL READ OF AN EMPTY BOOK, and telling
+        # that apart from a FAILED read is what keeps this queue moving.
+        #
+        # `fetched_at` used to move only when markets came back. The intent was
+        # right -- a failure that stamped it would blank the series for an
+        # interval AND start its clock. But a series that genuinely has no open
+        # markets never got stamped either, so `_due_series` saw `age=None`,
+        # sorted it at `inf` ahead of everything, and it returned to the front
+        # of the queue on EVERY tick, forever. Backoff cannot absorb that: it
+        # lasts `min(interval, FAILED_RETRY_SECONDS)` and ticks are ~15 minutes
+        # apart, so it has always expired.
+        #
+        # MEASURED 2026-08-25T16:41:09Z and again at 16:56:45Z, identical:
+        #
+        #   TICK series_wanted=191 due=191 fetched=12 cap=12 markets=883
+        #     this_tick={'KXATTENDMLB': (0,'series_filter'),
+        #                'KXMLBASGAME': (0,'series_filter'),
+        #                'KXMVENBASINGLEGAME': (0,'series_filter'),
+        #                'KXNBA1HSPREAD': (0,'series_filter'), ...}  ALL ZERO
+        #     oldest_s=142655
+        #
+        # Twelve of twelve slots spent on attendance markets, the All-Star
+        # game, parlay series and NBA quarter lines in AUGUST -- while the
+        # oldest live series sat 39.6 HOURS stale. The whole per-tick budget,
+        # every tick, on series that can never return anything this month.
+        #
+        # It also inverts the economy of auto-discovery: every newly registered
+        # out-of-season series joins the permanent front of the queue, so
+        # REGISTERING MORE SERIES MAKES COVERAGE WORSE. That is the mechanism
+        # behind "whack-a-mole" -- not a missing grammar, a starved queue.
+        #
+        # So the stamp follows the READ, not the payload: a strategy that ran
+        # and returned an empty list is fetched. `filter_ignored` and `failed`
+        # still leave the stamps disagreeing, which is what `_backing_off`
+        # reads, so a real failure behaves exactly as before.
+        read_succeeded = result.get("strategy") == "series_filter"
         if markets:
             entry["markets"] = markets
             entry["count"] = len(markets)
-            # `fetched_at` moves ONLY on a fetch that returned something. A
-            # failure that stamped it would blank this series for an interval
-            # AND start its clock, so the next hour would serve zero markets
-            # from an artifact that looks fresh.
+        elif read_succeeded:
+            # Keep the last known markets rather than blanking: an empty read
+            # is "nothing open right now", not "the previous prices were
+            # wrong". `_seconds_since(fetched_at)` still ages them, and the
+            # merge reports `oldest_s`, so staleness stays visible.
+            entry["count"] = 0
+        if markets or read_succeeded:
             entry["fetched_at"] = entry["attempted_at"]
         per_series[series] = entry
         fetched[series] = {"count": len(markets), "strategy": result.get("strategy")}
 
     # MERGE. Every series' last good markets, whether or not it was fetched now.
-    all_markets: list[dict[str, Any]] = []
+    #
+    # PER-SERIES BOUND FIRST, so one ladder cannot crowd out a whole sport.
     staleness: dict[str, int] = {}
+    per_series_markets: list[tuple[float, str, list[dict[str, Any]]]] = []
+    # EVERY MARKET, BEFORE ANY BOUND. This is what the daily book records, and
+    # keeping it separate is the whole justification for bounding the working
+    # set at all -- see `_record_daily_book`.
+    full_markets: list[dict[str, Any]] = []
+    trimmed = 0
+    # WHAT THE PER-SERIES CAP COSTS, BY DATE, MEASURED ON THE MARKETS IT CUTS.
+    #
+    # `BY_GAME_DATE` is built from the WORKING SET, so it can only ever show
+    # SURVIVORS. Reading the cut markets' dates off the kept markets' dates is
+    # the same inference that produced `#370` and its diagnostic sequel: a
+    # number that describes one population being read as if it described
+    # another. This counts the cut ones directly, which is the only way the
+    # question is answerable.
+    #
+    # It exists to gate a change rather than to decorate the log. Measured
+    # 2026-08-26T01:49:32Z, `trimmed=8744` of 14,744 fetched -- 59% discarded
+    # before the join runs -- with `KXMLBHRR` 1147 -> 400, `KXMLBTB` 879 -> 400
+    # and `KXMLBHIT` 744 -> 400, all three series dated entirely to the board's
+    # own slate. IF those cuts are mostly the board's date, re-prioritising
+    # eviction recovers ~1,600 joinable markets; if they are mostly lookahead,
+    # it recovers close to nothing. Same code either way, opposite verdicts, and
+    # nothing already logged separates them.
+    cap_cost: list[tuple[int, str, int, dict[str, int]]] = []
     for series in wanted:
         entry = per_series.get(series) or {}
-        all_markets.extend(entry.get("markets") or [])
+        markets = list(entry.get("markets") or [])
+        full_markets.extend(markets)
+        if len(markets) > MAX_MARKETS_PER_SERIES:
+            trimmed += len(markets) - MAX_MARKETS_PER_SERIES
+            # THE CUT SLICE, before it stops existing. Dated with the SAME
+            # function the join uses, so the two numbers are comparable; an
+            # undatable ticker is named rather than dropped, for the reason
+            # `board_by_game_date` gives at length.
+            cut_dates: dict[str, int] = {}
+            for cut_market in markets[MAX_MARKETS_PER_SERIES:]:
+                cut_date = game_date_from_ticker(cut_market.get("ticker")) or "<undatable_ticker>"
+                cut_dates[cut_date] = cut_dates.get(cut_date, 0) + 1
+            cap_cost.append(
+                (len(markets) - MAX_MARKETS_PER_SERIES, series, len(markets), cut_dates)
+            )
+            markets = markets[:MAX_MARKETS_PER_SERIES]
         age = _seconds_since(entry.get("fetched_at"))
         if age is not None:
             staleness[series] = int(age)
+        per_series_markets.append((age if age is not None else float("inf"), series, markets))
 
-    trimmed = 0
-    if len(all_markets) > MAX_STORED_MARKETS:
-        trimmed = len(all_markets) - MAX_STORED_MARKETS
-        all_markets = all_markets[:MAX_STORED_MARKETS]
+    # BIGGEST LOSSES FIRST, and BOUNDED -- a per-tick line naming every capped
+    # series would be the `MAX_UNREADABLE_SAMPLES` mistake again, where the
+    # noisiest families reached the cap first and the interesting ones were
+    # counted but never sampled. The TOTAL is always reported, so a bounded list
+    # cannot read as a complete one.
+    if cap_cost:
+        cap_cost.sort(reverse=True)
+        shown = cap_cost[:MAX_CAP_COST_SERIES]
+        print(
+            f"[kalshi_odds] PRECAP_CUT_BY_DATE capped_series={len(cap_cost)}"
+            f" cut_total={sum(item[0] for item in cap_cost)}"
+            f" shown={len(shown)}"
+            f" detail={ {series: {'fetched': fetched, 'cut': cut_n, 'cut_by_date': dates} for cut_n, series, fetched, dates in shown} }",
+            flush=True,
+        )
+
+    # THE TRIM IS BY STALENESS, WHICH IS WHAT THIS ALWAYS CLAIMED TO DO.
+    #
+    # It said "Trimmed OLDEST-SERIES-FIRST and reported, never silently" and
+    # the code was `all_markets[:MAX_STORED_MARKETS]` -- the alphabetically
+    # FIRST N, because `sports_series()` returns `sorted(...)`. `KXWNBA*` sorts
+    # last, so the first thing a trim deleted was every WNBA market, silently,
+    # while the comment said otherwise. Measured 2026-08-25T17:53:47Z:
+    # `markets=6000 trimmed=605` with NCAAF alone contributing thousands.
+    #
+    # Freshest series are kept: a stale series' prices are the least useful
+    # thing in the working set, which is the claim the docstring was making.
+    ordered = sorted(per_series_markets, key=lambda item: item[0])
+    all_markets: list[dict[str, Any]] = []
+    for _age, _series, markets in ordered:
+        if len(all_markets) >= MAX_STORED_MARKETS:
+            trimmed += len(markets)
+            continue
+        room = MAX_STORED_MARKETS - len(all_markets)
+        if len(markets) > room:
+            trimmed += len(markets) - room
+            markets = markets[:room]
+        all_markets.extend(markets)
+
+    # THE COMPLETE SET, NOT THE WORKING SET.
+    #
+    # This was called with `all_markets` -- AFTER the per-series cap and the
+    # staleness trim -- which quietly voided the argument that justified those
+    # bounds. `6145522ee` said the 400-per-series cap "is safe ONLY because
+    # capture moved: `venue_daily_odds` records every market the venue lists".
+    # It did not: measured 2026-08-25T18:33:55Z, `trimmed=2121` markets never
+    # reached the record, and `KXNCAAFSPREAD`'s ladder was truncated 1994 -> 400
+    # in the one place that is supposed to keep whole ladders.
+    #
+    # A record that inherits the working set's bounds is not a record, and the
+    # bound it was used to justify becomes real data loss. The two read from
+    # different lists, and this call is placed BEFORE the persistence bound
+    # below so that ordering is a fact rather than a comment.
+    _record_daily_book(full_markets)
+
+    # NOW SHRINK WHAT IS PERSISTED, having already recorded the whole book.
+    #
+    # The 400-per-series cap was applied only when BUILDING the working set;
+    # `per_series[<ticker>]["markets"]` still held every market with every
+    # field, and that dict is what gets written. MEASURED 2026-08-25T18:53:11Z:
+    #
+    #   KEYVALUE_WRITE_REJECTED size_bytes=8701075 max_bytes=8388608
+    #   COMPOSITION series=9196911
+    #     KXNCAAFSPREAD=2306201 KXNFLSPREAD=903759 KXNCAAFWINS=645977 ...
+    #
+    # So the artifact could not be written, `fetched_at` never persisted, and
+    # the queue re-fetched the SAME 60 series every tick -- 18:42:40 and
+    # 18:53:10 fetched byte-identical lists while `oldest_s` merely aged
+    # (146660 -> 147291). A rotation that cannot record its own progress does
+    # not rotate.
+    #
+    # A LEAN ROW, WHICH IS WHAT THE REFUSAL ITSELF PRESCRIBES: "Shrink the
+    # payload rather than raising the ceiling". `normalize_market` keeps ~29
+    # fields for diagnosis -- bids, volumes, open interest, liquidity, strike
+    # type, `missing_fields` -- and the join reads `yes_american`/`no_american`,
+    # the classifier reads ticker/series/title, the price lookup reads the ask
+    # dollars, and the snapshot reads `close_time`. Nothing downstream of here
+    # reads the rest, and the full row survives in the daily book.
+    #
+    # NOT FILTERED BY GAME DATE, and that was tried and reverted. Dropping
+    # undated markets looked attractive -- futures can never match a board row
+    # -- but PLAYER PROPS SKIP THE JOIN'S DATE CHECK ENTIRELY (it lives inside
+    # the `needs_event_identity` branch), so a prop whose ticker shape does not
+    # parse would have been silently dropped from the venue we actually trade.
+    # Six tests caught it. Size is a size problem; solve it by size.
+    #
+    # Safe only because `_record_daily_book(full_markets)` runs ABOVE, on the
+    # unbounded, unshrunk set.
+    for series in list(per_series):
+        entry = per_series.get(series) or {}
+        markets = entry.get("markets") or []
+        if not markets:
+            continue
+        if len(markets) > MAX_MARKETS_PER_SERIES:
+            markets = markets[:MAX_MARKETS_PER_SERIES]
+        entry["markets"] = [_lean_market(m) for m in markets]
 
     print(
         "[kalshi_odds] TICK"
@@ -542,7 +948,12 @@ def run_kalshi_odds_refresh(*, force: bool = False) -> dict[str, Any]:
         report_catalogue_gaps(all_markets)
 
     state["series"] = per_series
-    state["markets"] = all_markets
+    # THE MERGED LIST IS NOT PERSISTED. It is `per_series`' markets
+    # concatenated, so storing both wrote the same payload twice -- measured
+    # `series=7399941` plus `markets=6682458`, which is how a 13.3MB document
+    # exceeded an 8MB ceiling and stopped being written at all. Readers get it
+    # from `markets_from_state`.
+    state.pop("markets", None)
     state["count"] = len(all_markets)
     state["fetched_at"] = _now_stamp()
     state["staleness_seconds"] = staleness
@@ -587,6 +998,96 @@ def report_catalogue_gaps(markets: list[dict[str, Any]]) -> dict[str, Any]:
     return gaps
 
 
+# The fields anything downstream of the artifact actually reads. Everything
+# else `normalize_market` carries exists for DIAGNOSIS at fetch time and is
+# already in the daily book, which is the record.
+_LEAN_MARKET_FIELDS = (
+    "ticker",
+    "event_ticker",
+    "series",
+    "title",
+    "yes_sub_title",
+    "no_sub_title",
+    "status",
+    "yes_ask_dollars",
+    "no_ask_dollars",
+    "yes_american",
+    "no_american",
+    "yes_probability",
+    "no_probability",
+    "close_time",
+)
+
+
+def _lean_market(market: Mapping[str, Any]) -> dict[str, Any]:
+    """One market, reduced to what the join, the price lookup and the snapshot
+    read. See the size note at the persistence bound."""
+    return {field: market.get(field) for field in _LEAN_MARKET_FIELDS}
+
+
+def _record_daily_book(markets: list[dict[str, Any]]) -> None:
+    """Write the venue-native daily odds files. Never fatal.
+
+    CAPTURE-FIRST, and that is the whole point: this records EVERY market the
+    fetch returned, including the ones the board join refuses. Today an
+    unparsed family is invisible -- not refused, not counted, not stored -- so
+    the only way to find it is for a human to notice it on the venue's site.
+    Here it becomes a counted row carrying its raw title.
+
+    Non-fatal by construction. A history write failing must not cost the board
+    the prices it just fetched, and it is REPORTED rather than swallowed: a
+    silent failure here looks exactly like a venue that lists nothing.
+    """
+    try:
+        from syndicate.features.shared.venue_daily_odds import (
+            kalshi_daily_rows,
+            record_venue_book,
+        )
+
+        # Kalshi's markets come straight from the tick that just fetched them,
+        # so the source stamp is now. Passed anyway rather than omitted: the
+        # field exists to say whether the feed advanced, and a recorder that
+        # only sometimes receives it cannot answer that for every venue.
+        from syndicate.features.shared.venue_daily_odds import _utc_now
+
+        report = record_venue_book(
+            "kalshi", kalshi_daily_rows(markets), source_fetched_at=_utc_now()
+        )
+    except Exception as exc:
+        print(f"[kalshi_odds] DAILY_BOOK_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return
+    print(
+        "[kalshi_odds] DAILY_BOOK"
+        f" status={report.get('status')}"
+        f" files={report.get('files')}"
+        f" errors={report.get('file_errors')}"
+        f" listed={report.get('listed')}"
+        f" parsed={report.get('parsed')}"
+        f" opened={report.get('opened')}"
+        f" appended={report.get('appended')}"
+        # The counters that make `appended=0` readable -- no id, no price, and
+        # nothing moved are three different problems with three different
+        # fixes. Polymarket's book read `appended=0` for a whole day and this
+        # line could not have said which.
+        f" unchanged={report.get('unchanged')}"
+        f" unpriced={report.get('unpriced')}"
+        f" no_id={report.get('skipped_no_id')}"
+        # Rows with no readable sport or game date -- futures land here, which
+        # is correct: a season-long market has no game day to be filed under.
+        f" undated={report.get('undated')}"
+        # Sports we do not model, counted by name. Polymarket's soccer league
+        # codes surface here -- real markets in a sport we DO model, under
+        # names we have not yet read.
+        f" skipped={report.get('skipped_total')}"
+        f" skipped_by_sport={report.get('skipped_by_sport')}"
+        # THE COVERAGE GAP, BY FAMILY. Empty means every market Kalshi listed
+        # for these sports was named, which has never yet been true.
+        f" unparsed={report.get('unparsed_by_family')}"
+        f" detail={report.get('detail')}",
+        flush=True,
+    )
+
+
 def _now_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -623,16 +1124,26 @@ def record_and_report(markets: list[dict[str, Any]]) -> dict[str, Any]:
     )
 
     dates = board_by_game_date(markets)
+    # BOTH GROUPINGS, side by side, because the GAP between them is the finding.
+    # `BY_GAME_DATE` used to be grouped on `close_time` -- a settlement deadline
+    # up to four days after first pitch (`#370`). On 2026-08-25 a reader took
+    # three of these readings whose earliest key was `2026-08-27`, concluded the
+    # working set held nothing for the board's date, and started designing a
+    # bound on that; two of that date's markets were in the very same set. A
+    # name and a field disagreed and one printed number could not show it.
     print(f"[kalshi_odds] BY_GAME_DATE {dates.get('by_date_series')}", flush=True)
+    print(f"[kalshi_odds] BY_CLOSE_DATE {dates.get('by_close_date')}", flush=True)
 
-    # WHICH FIELD IS THE GAME DATE? Measured 2026-08-23: all 154 markets across
-    # two series reported the same `close_time` date, and 137 different pitchers
-    # do not all pitch on one day -- so `close_time` is very likely a settlement
-    # deadline rather than first pitch, and grouping by it is grouping by the
-    # wrong thing. Rather than guess which of `open_time`/`close_time`/
-    # `expiration_time`/the ticker carries it, print one market's date fields
-    # verbatim and let the next run say. This is the same choice `probe()` made
-    # for the price fields, which is what caught the 100x error.
+    # WHICH FIELD IS THE GAME DATE? ANSWERED: the TICKER's event segment does,
+    # and no time field does. This probe asked the question -- measured
+    # 2026-08-23, all 154 markets across two series reported the same
+    # `close_time` date and 137 different pitchers do not all pitch on one day
+    # -- and `game_date_from_ticker` is the answer it produced.
+    #
+    # It stays because the answer needs to keep being visible. One line per
+    # series carries the ticker and all three time fields together, so the
+    # four-day gap is READABLE per market rather than inferable from the two
+    # histograms above. The cost of it not being readable is recorded there.
     seen_series: set[str] = set()
     for market in markets:
         series = str(market.get("series") or "")
@@ -720,16 +1231,65 @@ def join_to_board(
             f" board_markets={report.get('board_market_vocabulary')}",
             flush=True,
         )
-        # The CLUB CODES, both sides. `event_not_on_our_board` is a count and
-        # cannot say which spelling is missing; printing Kalshi's blob beside
-        # our board's makes the alias readable instead of guessed at, and a
-        # club alias guessed rather than read is how a bet reaches the wrong
-        # game.
-        if report.get("unmatched_events"):
-            print(
-                "[kalshi_odds] JOIN_EVENTS"
-                f" unmatched={report.get('unmatched_events')}"
-                f" board={report.get('board_event_sample')}",
-                flush=True,
-            )
+    # THE CLUB CODES, WHENEVER THERE ARE ANY -- NOT ONLY ON A ZERO-MATCH JOIN.
+    #
+    # This sat inside the `if not matched` block above, and that is precisely
+    # why the Kalshi game-line gap stayed invisible. MEASURED 2026-08-25
+    # 15:56:35Z:
+    #
+    #   BOARD_JOIN kalshi_markets=883 board_rows=1290 matched=5
+    #     reasons={'event_not_on_our_board': 20, ...}
+    #
+    # Five player props matched, so `matched` was truthy and the samples never
+    # printed -- while all 20 GAME LINES failed event resolution and nothing
+    # said which club codes they were. A partial match is the normal state and
+    # it was the one state that suppressed the diagnostic.
+    #
+    # `game_lines_disabled` is ABSENT from those reasons, which is the reading
+    # that matters: that counter fires only for a game line whose event
+    # RESOLVED, so its absence means zero resolved. Turning
+    # `SYNDICATE_KALSHI_GAME_LINES` on would price nothing.
+    #
+    # WHAT THIS LINE THEN MEASURED, 2026-08-25T16:14:40Z -- and it was NOT the
+    # club-code alias gap predicted here:
+    #
+    #   JOIN_EVENTS unmatched=[{'kalshi': 'ATLMIL',
+    #       'ticker': 'KXMLBSPREAD-26AUG231910ATLMIL-MIL4', 'sport': 'mlb'}, ...]
+    #
+    # Every sample was `ATLMIL` on `26AUG23` -- Atlanta at Milwaukee, two days
+    # stale, and a blob the resolver reads correctly. The refusals were dated,
+    # not misspelled. Two separate defects made that look like an alias gap,
+    # both since fixed in `kalshi_board_join.py`: the date check sat BELOW the
+    # resolver, so a stale game could only fail as `event_not_on_our_board`;
+    # and the sample was bounded on markets rather than on distinct blobs, so
+    # one game consumed all eight slots.
+    #
+    # The prediction may still be right for the remaining refusals -- it is
+    # simply not yet evidence. With the date checked first, whatever
+    # `event_not_on_our_board` still counts is an alias gap, and THAT is when
+    # this line becomes the work list it was built to be.
+    # THE GRAMMAR WORK LIST. `unreadable_title` is the single largest refusal
+    # on an MLB slate (216 of 883, 2026-08-25T16:14:40Z) and the one that hides
+    # the h2h path: `KXMLBGAME` -- the moneyline series, and the market the
+    # rejected live Kalshi order wanted -- has no title grammar at all, so
+    # every one of its markets refuses here and no game line ever reaches the
+    # resolver. One title per series, so a new market family is visible rather
+    # than buried under whichever series is largest.
+    if report.get("unreadable_titles"):
+        print(
+            "[kalshi_odds] JOIN_TITLES"
+            f" unreadable={report.get('unreadable_titles')}"
+            # The COMPLETE per-series count, which the bounded sample cannot
+            # give: it answers "is this market family refusing here at all",
+            # where the sample can only answer "what does one of them say".
+            f" by_series={report.get('unreadable_by_series')}",
+            flush=True,
+        )
+    if report.get("unmatched_events"):
+        print(
+            "[kalshi_odds] JOIN_EVENTS"
+            f" unmatched={report.get('unmatched_events')}"
+            f" board={report.get('board_event_sample')}",
+            flush=True,
+        )
     return report

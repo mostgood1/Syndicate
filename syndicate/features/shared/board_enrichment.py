@@ -265,17 +265,80 @@ def _soccer_live_state_games(selected_date: str) -> tuple[list[dict], float | No
         age = _lens_generated_age_seconds(snapshot)
         if age is not None:
             oldest_age = age
+        # 1b. FINISHED, from the aggregate (`#547`). The block above this
+        # function says the aggregate "carries `games` -- matches IN PLAY --
+        # and NOT `match_box`", and that was true: only the per-league read
+        # below could move a chip to `final`, and that tree is a filesystem
+        # write on live-odds-worker. Every consumer that runs on refresh-worker
+        # -- the board build, and `settle_orders` -- therefore could not see a
+        # finished soccer match at all.
+        #
+        # `poll_active_leagues_for_tick` now publishes a trimmed `finals` list
+        # into this same aggregate, which crosses services through the keyvalue
+        # backend. Read here so the chip correction and the settlement resolver
+        # share ONE view of what has ended, rather than the second one growing
+        # its own reader.
+        #
+        # Absent on a snapshot written before that change, and an absent key
+        # reads as "no finals published" -- which degrades to exactly the
+        # previous behaviour rather than to a wrong answer.
+        finals = snapshot.get("finals")
+        if str(snapshot.get("date") or "") == str(selected_date) and isinstance(finals, list):
+            for record in finals:
+                if isinstance(record, dict):
+                    saw_source = True
+                    _add(record, "final")
 
-    # 2. FINISHED (and in-play) from the per-league `match_box`, where local.
+    # 2. FINISHED (and in-play) from the per-league `match_box`.
+    #
+    # DISCOVERY WAS FILESYSTEM WHILE THE READ IS KEYVALUE, AND THAT GAP IS WHY
+    # SOCCER HAD SETTLED ZERO ORDERS ALL-TIME.
+    #
+    # The block above says these files are "a filesystem write on
+    # live-odds-worker" and therefore unreachable from refresh-worker. THAT IS
+    # FALSE under the keyvalue backend: `_keyvalue_backed` excludes exactly one
+    # marker (`migration_runs/`), so
+    # `soccer_source/<league>/api/live_state/live_state_<date>.json` crosses
+    # services like everything else. Verified 2026-08-26.
+    #
+    # What actually failed is that the league names came from
+    # `source.iterdir()` -- a real directory listing. On refresh-worker, where
+    # `settle_orders` runs, that directory does not exist, so `league_dirs` was
+    # EMPTY and this entire branch was skipped. `read_json_file` can fetch any
+    # path it can NAME; it just had no names. The reader was never the problem.
+    #
+    # WHY IT MATTERS MORE THAN THE AGGREGATE: `match_box` spans `in` AND `post`,
+    # while the aggregate's `games` is in-play only and its `finals` list is
+    # published on a single rolling date. MEASURED 2026-08-26 -- la_liga logged
+    # `BOX_REUSED ... final_cached=1` for 2026-08-25 at 04:5xZ while settlement
+    # for that same date reported `no_soccer_live_state_for_date`. The final
+    # existed, in a file this service could have read by name, and nothing
+    # looked for it.
+    #
+    # UNION, NOT REPLACEMENT. The filesystem listing stays first: on
+    # live-odds-worker and on a dev box those directories are real, and a league
+    # present on disk but absent from the catalogue must not stop being read.
+    # The catalogue is 10 names, read once per resolver, and a name with no
+    # artifact costs one absent-key lookup.
     source = root / "soccer_source"
     try:
-        league_dirs = sorted(source.iterdir()) if source.exists() else []
+        league_names = [d.name for d in sorted(source.iterdir()) if d.is_dir()] if source.exists() else []
     except OSError:
-        league_dirs = []
+        league_names = []
+    try:
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+
+        for name in LEAGUE_DISPLAY_NAMES:
+            if name not in league_names:
+                league_names.append(name)
+    except Exception:  # pragma: no cover - deploy-skew guard
+        # A catalogue we cannot import degrades to the old filesystem-only
+        # behaviour rather than to an exception on the board build.
+        pass
+
     seen = {(g["home"].get("name"), g["away"].get("name")) for g in lens_games}
-    for league_dir in league_dirs:
-        if not league_dir.is_dir():
-            continue
+    for league_name in league_names:
+        league_dir = source / league_name
         payload = read_json_file(
             league_dir / "api" / "live_state" / f"live_state_{selected_date}.json"
         )
@@ -980,6 +1043,41 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=nfl date=%s", selected_date)
             return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
 
+    if sport == "ncaaf":
+        # `#555`. Layer 1 gained real NCAAF prices with `#552` and then reported
+        # `no_projection_source_for_sport`, so the Proj/Edge columns stayed dead
+        # -- prices with no model are an odds screen, not a betting board.
+        #
+        # NOT routed through the NFL module: it hardcodes `source:
+        # "nfl_smartsim2"`, and its caveat machinery is gated on
+        # `is_preseason_profile`, so an NCAAF profile would fall through it and
+        # arrive with NO caveat. That matters more here than for any other
+        # sport, because this model is MEASURED as losing to the closing line
+        # (margin MAE 15.775 vs 12.212, n=2233, t=+17.20) and its totals are
+        # 1.67x over-dispersed. Every projection it emits carries `model_skill`.
+        #
+        # Displaying is correct despite that: `football/pick_gate.py` suppresses
+        # PICKS and says in terms that it "does NOT stop projections being
+        # generated, published, or displayed", because a gate that blinds its
+        # own exit criterion never opens.
+        try:
+            from syndicate.features.ncaaf.game_projections import (
+                attach_ncaaf_game_projections,
+                load_ncaaf_game_projections,
+            )
+
+            index = load_ncaaf_game_projections(selected_date)
+            if not index.games:
+                return {
+                    "supported": True,
+                    "rows_with_projection": 0,
+                    "reason": "no NCAAF SmartSim2 projections for this date",
+                }
+            return attach_ncaaf_game_projections(grid, index)
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=ncaaf date=%s", selected_date)
+            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
     if sport != "mlb":
         return {"supported": False, "reason": f"no projection source wired for {sport}"}
     try:
@@ -1204,10 +1302,15 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                     "reason": "no published live-lens snapshot",
                     "rows_live_gameline_edged": 0,
                 }
+            # Filled by the index builder; folded into coverage so the shortlist
+            # can PRINT why an empty index is empty. `index=0` alone reads as
+            # "no producer" and on 2026-08-25 that reading was wrong for WNBA.
+            index_diag: dict = {}
             coverage = attach_live_gamelines(
                 grid,
                 build_live_gameline_index(
                     snapshot,
+                    diagnostics=index_diag,
                     sources=lens_sources_for_sport(sport),
                     # None for MLB, so its sims-derived interval stays in charge and
                     # its behaviour is unchanged. Set only for a sport whose live
@@ -1222,6 +1325,8 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 ),
             )
         coverage["supported"] = True
+        if sport != "soccer":
+            coverage["index_diagnostics"] = index_diag
         return coverage
     except Exception:
         _LOGGER.exception("BOOK_GRID_LIVE_GAMELINE_FAILURE sport=%s date=%s", sport, selected_date)

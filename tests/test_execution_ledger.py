@@ -539,12 +539,18 @@ def _reader(orders, *, ok: bool = True):
     """Stand in for the Kalshi read side, in the shape `_venue_reader` returns."""
     from syndicate.features.shared.kalshi_orders import venue_order_view
 
-    def fetch(*, limit=100):
+    def fetch(*, limit=100, order_ids=None):
+        # `order_ids` is part of the reader contract: Kalshi lists the whole
+        # book and ignores it, Polymarket has no list of settled orders and
+        # reads one at a time by id. Accepted here so this stand-in matches the
+        # real signature rather than the one it wishes existed.
         if not ok:
             return {"status": "error", "reason": "KalshiAuthError: http_503"}
-        return {"status": "ok", "orders": list(orders)}
+        return {"status": "ok", "orders": list(orders), "coverage": "book"}
 
-    return fetch, venue_order_view
+    # THREE, not two: the coverage travels with the reader so a zero-candidate
+    # pass can know whether an orphan scan is even possible before it calls.
+    return fetch, venue_order_view, "book"
 
 
 def test_a_phantom_fill_is_corrected_to_submitted(monkeypatch):
@@ -779,3 +785,1070 @@ def test_an_unreconciled_order_still_blocks(monkeypatch):
 
     key = _live_order(mod, monkeypatch, key="never-read", status=mod.STATUS_SUBMITTED)
     assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+
+# --------------------------------------------------------------------------
+# Fees, and the bound that makes an undocumented count unit safe
+# --------------------------------------------------------------------------
+
+
+def _kalshi_order(mod, monkeypatch, *, key: str, price: float, stake: float):
+    """A live order priced the way Kalshi prices -- probability dollars."""
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    request = _request(
+        position_key=key, venue="kalshi", venue_ticker="KX-TEST-1",
+        requested_price=price, requested_stake_dollars=stake,
+    )
+    record, _ = mod.record_order(request, mode=mod.LIVE)
+    return record["idempotency_key"]
+
+
+def test_fees_reach_the_ledger_from_the_venue(monkeypatch):
+    """Kalshi took $0.02 on a $1.08 fill -- ~1.9%, against edges this system
+    will act on at 3%. They arrive on every order read; the only reason they
+    were absent is that nothing carried them across."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _kalshi_order(mod, monkeypatch, key="fees", price=0.54, stake=1.58)
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-f", "client_order_id": key,
+                                "status": "executed", "fill_count_fp": 2,
+                                "taker_fill_cost_dollars": 1.08,
+                                "taker_fees_dollars": 0.02}]),
+    )
+
+    assert mod.reconcile_live_orders()["changed"] == 1
+    row = mod.find_order(key)
+    assert row["fees_dollars"] == 0.02
+    # The venue's own charge, not our count * price reconstruction.
+    assert row["fill_stake_dollars"] == 1.08
+
+
+def test_a_fill_larger_than_the_order_is_refused(monkeypatch):
+    """`fill_count_fp` carries an undocumented `_fp`. If it is a fixed-point
+    scale, a 2-contract fill arrives as some large number and booking it claims
+    a position orders of magnitude beyond what the stake could buy. No venue
+    can fill more than was asked, so this is a PARSE failure, never a trade."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _kalshi_order(mod, monkeypatch, key="scaled", price=0.54, stake=1.58)
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-s", "client_order_id": key,
+                                "status": "executed", "fill_count_fp": 2_000_000}]),
+    )
+
+    result = mod.reconcile_live_orders()
+    assert result["implausible"] == 1
+    assert result["changed"] == 0
+    # Left untouched -- not booked, and not silently zeroed either.
+    assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
+
+
+def test_a_fill_within_the_order_is_booked(monkeypatch):
+    """The bound must not refuse honest fills: $1.58 at $0.54 buys 2."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _kalshi_order(mod, monkeypatch, key="bounded", price=0.54, stake=1.58)
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-b", "client_order_id": key,
+                                "status": "executed", "fill_count_fp": 2,
+                                "taker_fill_cost_dollars": 1.08}]),
+    )
+
+    assert mod.reconcile_live_orders()["changed"] == 1
+    assert mod.find_order(key)["contracts"] == 2
+
+
+def test_fees_are_charged_against_the_daily_budget(monkeypatch):
+    """A cap that counts only stake is a cap the account can exceed."""
+    from syndicate.features.shared import execution_guard as guard
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _kalshi_order(mod, monkeypatch, key="budget", price=0.54, stake=1.58)
+    mod.complete_order(key, status=mod.STATUS_FILLED, fill_stake_dollars=1.08)
+    spent = guard.spent_today("2026-08-22", mode=mod.LIVE)
+    assert spent["dollars"] == 1.08
+
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-g", "client_order_id": key,
+                                "status": "executed", "fill_count_fp": 2,
+                                "taker_fill_cost_dollars": 1.08,
+                                "taker_fees_dollars": 0.02}]),
+    )
+    mod.reconcile_live_orders()
+    assert guard.spent_today("2026-08-22", mode=mod.LIVE)["dollars"] == 1.10
+
+
+def test_an_unchanged_order_is_still_marked_as_read(monkeypatch):
+    """MEASURED 2026-08-24T15:04:08Z. The first version persisted only when
+    something MOVED, so `reconciled_at` was discarded in exactly the steady
+    state it exists for: a resting order read successfully, agreeing with the
+    ledger, and therefore never marked as read. `RECONCILE ... changed=0` and
+    `BLOCKED_ON_UNRECONCILED count=1` fired in the same second on the same
+    order, and live execution stayed jammed.
+
+    'Nothing changed' and 'nothing was learned' are different facts."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="steady-stamp", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-11")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-11", "client_order_id": key,
+                                "status": "resting", "fill_count_fp": 0}]),
+    )
+
+    # First pass settles the row into the steady state. The SECOND is the one
+    # production was stuck in: read, agreed, and dropped on the floor.
+    mod.reconcile_live_orders()
+    monkeypatch.setenv("SYNDICATE_EXECUTION_RECONCILE_FRESH_SECONDS", "0.0001")
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+    monkeypatch.delenv("SYNDICATE_EXECUTION_RECONCILE_FRESH_SECONDS")
+    result = mod.reconcile_live_orders()
+    assert result["changed"] == 0
+    assert result["stamped"] == 1
+    # The stamp survived the write, which is the whole point.
+    assert mod.find_order(key)["reconciled_at"] is not None
+    assert mod.unreconciled_orders() == []
+
+
+def test_a_row_nothing_could_be_said_about_is_not_stamped(monkeypatch):
+    """`not_found` and `unknown` learn nothing, so they must not refresh the
+    freshness stamp -- that would turn 'we could not read it' into 'we read it
+    and it is fine', which is how a stranded order stops blocking without
+    anyone having checked it."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="silent", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-12")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "ord-12", "client_order_id": key,
+                                "status": "quantum_superposition"}]),
+    )
+
+    assert mod.reconcile_live_orders()["stamped"] == 0
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+
+# --------------------------------------------------------------------------
+# Cancelling a resting order the market has left behind
+# --------------------------------------------------------------------------
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _resting_row(**overrides):
+    row = {
+        "idempotency_key": "k1",
+        "order_id": "ord-x",
+        "ticker": "KXMLBKS-TEST",
+        "side": "under",
+        "yes_price": 0.46,
+        "no_price": 0.54,
+        "submitted_at": "2020-01-01T00:00:00Z",
+    }
+    row.update(overrides)
+    return row
+
+
+def _prices(monkeypatch, *, market: float | None, cancels: list):
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setattr(
+        mod, "_market_price_for_side",
+        lambda ticker, side: market,
+    )
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_orders.cancel_order",
+        lambda order_id: (cancels.append(order_id) or {"status": "ok", "order": {}}),
+    )
+
+
+def test_a_stale_resting_order_is_cancelled(monkeypatch):
+    """MEASURED 2026-08-24: the Zebby Matthews order rested from ~12:58Z at
+    $0.54 for NO while the market moved to $0.56. It could not fill and held
+    its own idempotency key hostage, so the marketable-limit path could not
+    re-place it either."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=0.56, cancels=cancels)
+
+    result = mod.cancel_stale_resting_orders([_resting_row()])
+    assert result["cancelled"] == 1
+    assert cancels == ["ord-x"]
+
+
+def test_a_young_order_is_left_to_work(monkeypatch):
+    """A limit that has not filled is not automatically wrong -- that is what a
+    limit is for. Cancelling on the first tick would churn the book and never
+    let a good price come to us."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=0.56, cancels=cancels)
+
+    result = mod.cancel_stale_resting_orders([_resting_row(submitted_at=_now_iso())])
+    assert result["cancelled"] == 0
+    assert result["too_young"] == 1
+    assert cancels == []
+
+
+def test_an_order_still_at_the_market_is_left_alone(monkeypatch):
+    """Age alone is not staleness. An old order at a price that still exists
+    can still fill."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=0.54, cancels=cancels)
+
+    result = mod.cancel_stale_resting_orders([_resting_row()])
+    assert result["at_market"] == 1
+    assert cancels == []
+
+
+def test_no_price_means_no_cancel(monkeypatch):
+    """Cancelling on an unreadable price is acting on the ABSENCE of
+    information, which is the failure this whole layer keeps refusing."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=None, cancels=cancels)
+
+    result = mod.cancel_stale_resting_orders([_resting_row()])
+    assert result["unreadable"] == 1
+    assert cancels == []
+
+
+def test_a_failed_cancel_leaves_the_order_alone(monkeypatch):
+    """The order is still resting and can still fill. Marking it dead would
+    free a key the venue still holds -- how one bet becomes two."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setattr(mod, "_market_price_for_side", lambda ticker, side: 0.56)
+    monkeypatch.setattr(
+        "syndicate.features.shared.kalshi_orders.cancel_order",
+        lambda order_id: {"status": "error", "reason": "KalshiAuthError: http_410"},
+    )
+
+    result = mod.cancel_stale_resting_orders([_resting_row()])
+    assert result["failed"] == 1
+    assert result["cancelled"] == 0
+
+
+def test_the_cancel_pass_is_bounded(monkeypatch):
+    """A bad rule must not empty the book before anyone reads a log."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    cancels = []
+    _prices(monkeypatch, market=0.56, cancels=cancels)
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MAX_CANCELS", "2")
+
+    rows = [_resting_row(idempotency_key=f"k{i}", order_id=f"ord-{i}") for i in range(5)]
+    assert mod.cancel_stale_resting_orders(rows)["cancelled"] == 2
+    assert len(cancels) == 2
+
+
+def test_the_side_decides_which_leg_is_ours():
+    """Kalshi hands over both legs; which one we are paying depends on our
+    side, and reading the wrong one compares a price to its own complement."""
+    from syndicate.features.shared.execution_ledger import _resting_price_for_side
+
+    assert _resting_price_for_side(_resting_row(side="under")) == 0.54
+    assert _resting_price_for_side(_resting_row(side="over")) == 0.46
+
+
+def test_the_ledger_is_not_written_by_the_cancel(monkeypatch):
+    """The next reconciliation pass reads the venue, sees `canceled`, and moves
+    the row through the one path allowed to change a status -- the venue's own
+    word. Writing it here would be believing our own API call over the book."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="uncancelled", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="ord-c")
+    cancels = []
+    _prices(monkeypatch, market=0.56, cancels=cancels)
+
+    mod.cancel_stale_resting_orders([_resting_row(idempotency_key=key, order_id="ord-c")])
+    assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
+
+
+# --------------------------------------------------------------------------
+# The reconciliation latch: a venue with no reader can never be cleared
+# --------------------------------------------------------------------------
+
+
+def test_polymarket_has_a_venue_reader():
+    """A venue that can PLACE but cannot be READ is a latch, not a gap.
+
+    `_venue_reader` said "Only Kalshi has one", so a Polymarket order recorded
+    `submitted` could never be corrected -- and an unreconciled order blocks
+    live mode on EVERY venue. Measured 2026-08-25T16:40:00Z, from one resting
+    Polymarket order:
+
+        BLOCKED_ON_UNRECONCILED count=1 keys=['1984a57ed28e1cd5ccad8b16']
+        EXECUTION status=blocked reason=unreconciled_orders scope=kalshi
+        EXECUTION status=blocked reason=unreconciled_orders scope=polymarket
+
+    Nothing in the system could lift that, because the only thing that lifts it
+    is the read that did not exist.
+    """
+    import syndicate.features.shared.execution_ledger as mod
+
+    # LIVE venues only -- paper orders never reconcile (the candidate filter
+    # requires mode == LIVE), so a paper book needs no reader.
+    for venue in ("polymarket", "kalshi"):
+        fetch, view, coverage = mod._venue_reader(venue)
+        assert fetch is not None, f"{venue} can be placed on but never reconciled"
+        assert view is not None
+        # A reader that will not say how much of the account it sees makes
+        # `not_found=0` unreadable -- that is the whole point of the field.
+        assert coverage in {"book", "per_order"}, f"{venue} declares no read coverage"
+
+
+def test_every_venue_we_can_place_on_can_also_be_read():
+    """The invariant behind the test above, stated once so a THIRD venue cannot
+    reintroduce the latch by being added to the submit side alone."""
+    import pipeline.execute_portfolio as runner
+    import syndicate.features.shared.execution_ledger as mod
+
+    for venue in ("kalshi", "polymarket"):
+        if runner._venue_submitter(venue) is None:
+            continue
+        fetch, _, _coverage = mod._venue_reader(venue)
+        assert fetch is not None, f"{venue} has a submitter but no reader"
+
+
+def test_a_cancelled_polymarket_order_reads_as_dead_not_unknown():
+    """The user cancels at the venue; the ledger must be able to see it.
+
+    Polymarket prefixes its enums (`ORDER_STATUS_CANCELED`), so a bare-string
+    match falls through to `unknown` -- and `unknown` deliberately changes
+    nothing, which would leave the order blocking live mode forever.
+    """
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    for status in ("CANCELED", "ORDER_STATUS_CANCELED", "cancelled", "ORDER_STATUS_REJECTED"):
+        assert venue_order_view({"status": status})["state"] == "dead", status
+
+
+def test_a_partially_filled_then_cancelled_order_is_a_FILL():
+    """The cancelled status describes the remainder; the contracts that traded
+    are a position we hold. Size outranks status, or a real position gets
+    reconciled away to zero."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view({"status": "ORDER_STATUS_CANCELED", "filledQuantity": "1.5"})
+    assert view["state"] == "filled"
+    assert view["filled_count"] == 1.5
+
+
+def test_a_resting_polymarket_order_is_resting_not_dead():
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    for status in ("ORDER_STATUS_OPEN", "pending", "ORDER_STATUS_LIVE"):
+        assert venue_order_view({"status": status})["state"] == "resting", status
+
+
+def test_an_unmapped_polymarket_status_is_unknown_not_guessed():
+    """`unknown` is a real answer. A status we have never seen must leave the
+    row untouched rather than be collapsed into traded or not-traded."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    assert venue_order_view({"status": "ORDER_STATUS_SOMETHING_NEW"})["state"] == "unknown"
+
+
+def test_a_failed_polymarket_read_is_an_error_never_an_empty_book(monkeypatch):
+    """An empty `orders` on a FAILED read says "the venue holds nothing", and
+    reconciliation would take that as licence to write off a live position."""
+    from syndicate.features.shared import polymarket_us_auth
+    from syndicate.features.shared.polymarket_us_orders import fetch_orders
+
+    def boom(*a, **kw):
+        raise RuntimeError("venue unreachable")
+
+    monkeypatch.setattr(polymarket_us_auth, "signed_request", boom)
+    result = fetch_orders()
+    assert result["status"] == "error"
+    assert "orders" not in result
+
+
+def test_an_unrecognised_polymarket_payload_is_named_not_empty(monkeypatch):
+    from syndicate.features.shared import polymarket_us_auth
+    from syndicate.features.shared.polymarket_us_orders import fetch_orders
+
+    monkeypatch.setattr(
+        polymarket_us_auth, "signed_request", lambda *a, **kw: {"unexpected": []}
+    )
+    result = fetch_orders()
+    assert result["status"] == "error"
+    assert result["reason"] == "no_orders_array"
+
+
+def test_the_state_field_is_what_carries_a_polymarket_order_status():
+    """MEASURED 2026-08-25T17:05:58Z on the first real per-order read: the
+    payload has no `status` key at all. It is `state`.
+
+      ORDERS_READ n=1 mode=per_order asked=1 statuses=['']
+        keys=[...,'cumQuantity','id','leavesQuantity','marketSlug',
+              'outcomeSide','price','quantity','side','state','tif','type']
+
+    Reading the wrong key gave `unknown`, which correctly changes nothing --
+    and so the order stayed blocking live execution on both venues.
+    """
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    assert venue_order_view({"state": "ORDER_STATE_CANCELED"})["state"] == "dead"
+    assert venue_order_view({"state": "ORDER_STATE_OPEN"})["state"] == "resting"
+    # `status` still works if the venue ever adds it -- kept, not replaced.
+    assert venue_order_view({"status": "ORDER_STATUS_CANCELED"})["state"] == "dead"
+
+
+def test_the_measured_polymarket_fill_fields_are_the_ones_read():
+    """`cumQuantity` is cumulative filled and `avgPx` the average price, both
+    from the measured key list. `leavesQuantity` is the UNFILLED remainder and
+    must never be read as a fill."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view({
+        "state": "ORDER_STATE_FILLED",
+        "cumQuantity": "2.86",
+        "leavesQuantity": "0",
+        "avgPx": "0.495",
+        # THE SIDE IS PART OF A REAL ROW. The measured `ORDERS_READ` key list
+        # carries both `outcomeSide` and `side`, and `avgPx` is quoted on the
+        # YES side -- a NO order's fill is its complement, which is what
+        # halted both venues on 2026-08-26T00:23Z. A fixture without it was
+        # claiming a shape the venue does not send.
+        "outcomeSide": "OUTCOME_SIDE_YES",
+        "marketSlug": "aec-mlb-tex-cws-2026-08-25",
+        "id": "o-1",
+    })
+    assert view["filled_count"] == 2.86
+    assert view["fill_price"] == 0.495
+    assert view["ticker"] == "aec-mlb-tex-cws-2026-08-25"
+    assert view["order_id"] == "o-1"
+
+
+def test_leaves_quantity_alone_is_not_a_fill():
+    """A wholly unfilled resting order carries leavesQuantity == quantity. If
+    that were read as a fill we would book a position we do not hold -- the
+    2026-08-24 phantom fill, in a new place."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view({
+        "state": "ORDER_STATE_OPEN", "cumQuantity": "0", "leavesQuantity": "2.86",
+    })
+    assert view["state"] == "resting"
+    assert not view["filled_count"]
+
+
+# --------------------------------------------------------------------------
+# Fractional contracts: Kalshi sells whole ones, Polymarket does not
+# --------------------------------------------------------------------------
+
+
+def test_a_fractional_fill_books_its_real_dollar_value(monkeypatch):
+    """MEASURED 2026-08-25T18:21:25Z, the first real Polymarket fill:
+
+      RECONCILED ... submitted->filled contracts=2.65 fill_price=0.52
+      EXECUTED ... spent={'dollars': 1.04}
+
+    2.65 x 0.52 is $1.38. The reconciler computed `int(contracts) * price`,
+    so `int(2.65) * 0.52` = `2 * 0.52` = 1.04 -- a 25% UNDER-count of real
+    money against a daily cap, silently, on every fractional fill.
+
+    Under-counting is the dangerous direction: the cap exists to bound what
+    the account can lose, and a cap fed a number smaller than reality lets the
+    account exceed it.
+    """
+    import syndicate.features.shared.execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    request = _request(position_key="frac", venue="polymarket",
+                       requested_price=-108.0, requested_stake_dollars=1.38)
+    record, _ = mod.record_order(request, mode=mod.LIVE)
+    key = record["idempotency_key"]
+    mod.complete_order(key, status=mod.STATUS_SUBMITTED, venue_order_id="o-frac")
+
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    def fetch(*, limit=100, order_ids=None):
+        return {"status": "ok", "orders": [{
+            "id": "o-frac", "state": "ORDER_STATE_FILLED",
+            "cumQuantity": "2.65", "avgPx": "0.52",
+            # `over` -> YES, so `avgPx` is already our side. This is the row
+            # the screenshot shows reading DIRECT: requested -108 = 0.5192,
+            # filled 0.52. An `under` on the same game would arrive as 0.48.
+            "outcomeSide": "OUTCOME_SIDE_YES",
+            "marketSlug": "tsc-mlb-tb-det-2026-08-25-7pt5",
+        }]}
+
+    monkeypatch.setattr(
+        mod, "_venue_reader", lambda venue: (fetch, venue_order_view, "book")
+    )
+    mod.reconcile_live_orders(venue="polymarket")
+
+    order = mod.find_order(key)
+    assert order["contracts"] == 2.65
+    assert order["fill_stake_dollars"] == pytest.approx(1.38, abs=0.01)
+
+
+def test_the_fill_size_bound_is_computed_for_AMERICAN_odds_too():
+    """"A fill cannot be larger than the order" required `0 < price < 1` and
+    returned None otherwise. Every Polymarket order carries American odds, so
+    the guard was never computed on the venue we actually trade -- present,
+    documented, and inert. Same shape as the slippage guard."""
+    import syndicate.features.shared.execution_ledger as mod
+
+    bound = mod._requested_contracts(
+        {"requested_stake_dollars": 1.38, "requested_price": -108.0}
+    )
+    assert bound is not None, "the bound is still inert on American odds"
+    # -108 is a 0.5192 probability, so $1.38 buys at most ~2.66 contracts --
+    # which must ADMIT the real 2.65 fill rather than refuse it.
+    assert bound == pytest.approx(2.66, abs=0.02)
+    assert bound >= 2.65
+
+
+def test_the_bound_is_unfloored_so_a_real_fractional_fill_is_not_refused():
+    """`contracts_for_stake` floors to WHOLE contracts -- right for Kalshi,
+    wrong here. A real 2.65 fill against a floor of 2 would be refused as
+    `implausible` and left unbooked, turning a guard against phantom positions
+    into a cause of missing real ones."""
+    import syndicate.features.shared.execution_ledger as mod
+
+    bound = mod._requested_contracts(
+        {"requested_stake_dollars": 1.38, "requested_price": 0.52}
+    )
+    assert bound > 2.65
+
+
+def test_an_unreadable_price_still_yields_no_bound():
+    """No bound is better than a wrong one -- that reasoning was always right,
+    it was the input reading that was too narrow."""
+    import syndicate.features.shared.execution_ledger as mod
+
+    for bad in (None, "", 5.0, -3.0, 0.0):
+        assert mod._requested_contracts(
+            {"requested_stake_dollars": 1.38, "requested_price": bad}
+        ) is None, bad
+
+
+def test_a_whole_contract_kalshi_fill_is_unchanged(monkeypatch):
+    """The control. Kalshi sells whole contracts, so float and int agree and
+    nothing about its accounting moves."""
+    import syndicate.features.shared.execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="whole", status=mod.STATUS_SUBMITTED,
+                      venue_order_id="o-whole")
+    monkeypatch.setattr(
+        mod, "_venue_reader",
+        lambda venue: _reader([{"order_id": "o-whole", "client_order_id": key,
+                                "status": "executed", "filled_count": 3,
+                                "average_fill_price": 0.50}]),
+    )
+    mod.reconcile_live_orders()
+    assert mod.find_order(key)["fill_stake_dollars"] == pytest.approx(1.50, abs=0.01)
+
+
+def test_price_improvement_is_not_an_implausible_fill(monkeypatch, tmp_path):
+    """A BETTER FILL PRICE BUYS MORE CONTRACTS, and this refused it.
+
+    Measured 2026-08-25 6:50:34 PM Central, and it halted ALL trading on BOTH
+    venues:
+
+        RECONCILE_COUNT_IMPLAUSIBLE venue_count=5.82 requested=5.221
+        BLOCKED_ON_UNRECONCILED count=1
+        EXECUTION status=blocked reason=unreconciled_orders   (both venues)
+
+    `over 6.5 TB@DET`, +127, $2.30. +127 is 0.4405, so the stake sized 5.221
+    contracts; the venue filled at 0.395 and $2.30 / 0.395 = 5.82. Every number
+    was correct and the order was refused for being CHEAPER than planned --
+    then one unreconciled row blocked the whole placer.
+
+    The invariant is DOLLARS, not contracts: a fill cannot cost more than the
+    order was sized for.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    stake, fill_price, venue_count = 2.30, 0.395, 5.82
+    assert venue_count * fill_price <= stake * mod._FILL_DOLLAR_TOLERANCE
+    # ...and the contract bound, which is what refused it, does NOT hold.
+    assert venue_count > stake / (100.0 / (127.0 + 100.0))
+
+
+def test_a_fixed_point_scale_error_is_STILL_refused():
+    """The bound the guard exists for. `fill_count_fp` carries an undocumented
+    `_fp` suffix; if it is a fixed-point scale, a 5.82-contract fill arrives as
+    5820 and booking it claims a position three orders of magnitude past
+    anything the stake could buy. The dollar bound catches that by 800x, which
+    is the margin this guard actually needs -- not 5%."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    stake, fill_price = 2.30, 0.395
+    assert 5820 * fill_price > stake * mod._FILL_DOLLAR_TOLERANCE
+    assert 58200 * fill_price > stake * mod._FILL_DOLLAR_TOLERANCE
+
+
+def test_the_tolerance_is_wide_enough_for_fees_and_narrow_enough_to_bound():
+    """Fees and rounding ride along in the venue's own numbers, so a bound at
+    exactly the stake would refuse real fills; a bound at 100x would catch
+    nothing. 1.25 sits where neither is true."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    assert 1.05 < mod._FILL_DOLLAR_TOLERANCE < 2.0
+
+
+# ---------------------------------------------------------------------------
+# THE RECONCILE BOUND. It has halted ALL trading on BOTH venues twice:
+#
+#   2026-08-25 18:50:34 CT  venue_count=5.82 requested=5.221   (price improvement)
+#   2026-08-26 00:27:38 CT  venue_count=2.39 requested=2.392   (venue rounding)
+#
+# Its target is a fixed-point scale error -- 100x -- and both misfires were
+# fractions of a contract. A guard that refuses good fills is a guard that
+# stops the system it protects.
+# ---------------------------------------------------------------------------
+
+
+def test_venue_rounding_is_not_an_implausible_fill():
+    """`2.39` against `2.3920000000000003` is the venue reporting two decimals
+    against our raw quotient, not an overfill."""
+    from syndicate.features.shared.execution_ledger import _FILL_COUNT_TOLERANCE
+
+    assert not (2.39 > 2.3920000000000003 + _FILL_COUNT_TOLERANCE)
+    # And the tolerance is nowhere near wide enough to admit the thing the
+    # bound exists for.
+    assert 2.392 * 100 > 2.392 + _FILL_COUNT_TOLERANCE
+
+
+def test_a_fixed_point_scale_error_is_still_caught_by_the_contract_bound():
+    from syndicate.features.shared.execution_ledger import _FILL_COUNT_TOLERANCE
+
+    # `_fp` as a 1e6 fixed-point scale: 2.392 contracts arrives as 2392000.
+    assert 2392000.0 > 2.392 + _FILL_COUNT_TOLERANCE
+
+
+# ---------------------------------------------------------------------------
+# A CONFIRMED FILL MUST REACH THE LEDGER. One band treated a 33% overspend
+# exactly like a 1,000,000x parse failure -- both stranded at `submitted`.
+#
+# Measured 2026-08-26T03:43:08Z: the venue held the order as
+# ORDER_STATE_FILLED (`venue_orders=7`) while the ledger showed $0.00
+# (`stamped=6 implausible=1`). The venue was right, and the ledger was hiding
+# a live position -- the opposite of what a safety guard should do.
+# ---------------------------------------------------------------------------
+
+
+def test_an_overspend_is_booked_and_an_absurd_multiple_is_still_refused():
+    from syndicate.features.shared.execution_ledger import (
+        _FILL_DOLLAR_ABSURD,
+        _FILL_DOLLAR_TOLERANCE,
+    )
+
+    stake = 7.92
+    ceiling = stake * _FILL_DOLLAR_TOLERANCE          # 9.90
+    absurd = stake * _FILL_DOLLAR_ABSURD              # 79.20
+
+    real_overspend = 10.5087                          # the measured fill
+    assert real_overspend > ceiling, "it IS over budget"
+    assert real_overspend <= absurd, "but it is a fill, not a unit error"
+
+    # The `_fp` scale error the guard exists for is still caught.
+    fp_scale_error = stake / 0.26 * 1e6
+    assert fp_scale_error > absurd
+
+
+def test_the_two_bands_do_not_overlap():
+    """A single number cannot be both booked and refused."""
+    from syndicate.features.shared.execution_ledger import (
+        _FILL_DOLLAR_ABSURD,
+        _FILL_DOLLAR_TOLERANCE,
+    )
+
+    assert _FILL_DOLLAR_TOLERANCE < _FILL_DOLLAR_ABSURD
+
+
+# ----------------------------------------------------------------------
+# ORPHANS: a position the venue holds and the ledger does not.
+# ----------------------------------------------------------------------
+
+
+def _orphan_env(monkeypatch, tmp_path, *, venue_rows, coverage, ledger_rows):
+    """One reconcile pass against a stubbed venue reader."""
+    import syndicate.features.shared.execution_ledger as el
+
+    monkeypatch.setattr(el, "_load", lambda: {"orders": list(ledger_rows)})
+    monkeypatch.setattr(el, "_persist", lambda state: None)
+
+    def _fetch(*, limit=100, order_ids=None):
+        return {"status": "ok", "orders": list(venue_rows), "coverage": coverage}
+
+    def _view(row):
+        return dict(row)
+
+    monkeypatch.setattr(el, "_venue_reader", lambda venue: (_fetch, _view, coverage))
+    return el
+
+
+def _ledger_row(key, **kw):
+    row = {
+        "idempotency_key": key,
+        "mode": "live",
+        "status": "submitted",
+        "outcome": None,
+        "venue": "kalshi",
+        "requested_stake_dollars": 5.0,
+    }
+    row.update(kw)
+    return row
+
+
+def test_a_venue_order_with_no_ledger_row_is_reported_as_an_orphan(monkeypatch, tmp_path, capsys):
+    """The mirror of `not_found`, and the one that is real money.
+
+    Everything the reconciler does walks OUR rows outward. An order live at the
+    venue with no row here is invisible to that direction -- and it is exactly
+    what a lost submit response leaves behind.
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="book",
+        venue_rows=[
+            {"client_order_id": "ours", "order_id": "v1", "state": "resting", "ticker": "T-OURS"},
+            {"client_order_id": "theirs", "order_id": "v2", "state": "resting", "ticker": "T-ORPHAN"},
+        ],
+        ledger_rows=[_ledger_row("ours", venue_order_id="v1")],
+    )
+    out = el.reconcile_live_orders(venue="kalshi")
+    assert out["coverage"] == "book"
+    assert [o["ticker"] for o in out["orphans"]] == ["T-ORPHAN"]
+    printed = capsys.readouterr().out
+    # THE TICKER, not just a count. An orphan you cannot name is not actionable.
+    assert "RECONCILE_ORPHANS" in printed and "T-ORPHAN" in printed
+
+
+def test_a_filled_ledger_row_is_not_an_orphan_just_because_it_stopped_being_a_candidate(
+    monkeypatch, tmp_path
+):
+    """Orphans are diffed against the WHOLE live ledger, not the candidates.
+
+    A settled order is legitimately still in the venue's book. Diffing against
+    the candidate list would report every graded bet as an unknown position and
+    bury the one row that matters.
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="book",
+        venue_rows=[{"client_order_id": "graded", "order_id": "v9", "state": "filled", "ticker": "T-DONE"}],
+        ledger_rows=[_ledger_row("graded", status="filled", outcome="won", venue_order_id="v9")],
+    )
+    out = el.reconcile_live_orders(venue="kalshi")
+    # Not a candidate (it has an outcome) and NOT an orphan either.
+    assert out["candidates"] == 0
+    assert out["orphans"] in (None, [])
+
+
+def test_a_per_order_read_reports_orphans_as_unknown_rather_than_zero(monkeypatch, tmp_path):
+    """`0` would be a lie. Polymarket's reader fetches only the ids we hand it.
+
+    `GET /v1/orders` answers `code: 12` UNIMPLEMENTED there, so `venue_orders ==
+    candidates` is a tautology and an orphan count from it would be a false
+    assurance -- the exact shape of "an empty result mistaken for an answer".
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="per_order",
+        venue_rows=[{"client_order_id": "ours", "order_id": "v1", "state": "resting"}],
+        ledger_rows=[_ledger_row("ours", venue="polymarket_us", venue_order_id="v1")],
+    )
+    out = el.reconcile_live_orders(venue="polymarket")
+    assert out["coverage"] == "per_order"
+    # None, NOT []. "We cannot see orphans" is not "we looked and found none".
+    assert out["orphans"] is None
+
+
+def test_a_resting_order_is_not_reported_as_an_unknown_result():
+    """REPORTED BY THE USER 2026-08-26, who checked the venue and found the page
+    wrong: four Polymarket orders the live page called "sent with an unknown
+    result" were resting at Polymarket as ordinary good-till-cancelled limit
+    orders, exactly as placed.
+
+    `reconciled_at` is the discriminator -- a row carrying it HAS been read back
+    from the venue, so its result is known. The collapse pointed the ALARMING
+    way, which is the direction that matters: a warning that fires on the system
+    working correctly teaches the reader to ignore the warning, and this one is
+    the last line of defence against a double-spend.
+    """
+    from syndicate.blueprints.intelligence import _live_portfolio_payload
+    from syndicate.features.shared import execution_ledger as el
+    from syndicate.features.shared.execution_ledger import STATUS_SUBMITTED
+
+    read_back = {
+        "idempotency_key": "resting",
+        "mode": "live",
+        "status": STATUS_SUBMITTED,
+        "venue": "polymarket_us",
+        "selected_date": "2026-08-26",
+        "reconciled_at": "2026-08-26T13:20:00Z",
+        "venue_status": "order_state_new",
+    }
+    never_read = {
+        "idempotency_key": "silent",
+        "mode": "live",
+        "status": STATUS_SUBMITTED,
+        "venue": "polymarket_us",
+        "selected_date": "2026-08-26",
+    }
+    original = el._load
+    el._load = lambda: {"orders": [read_back, never_read]}
+    try:
+        payload = _live_portfolio_payload("2026-08-26")
+    finally:
+        el._load = original
+
+    assert [o["idempotency_key"] for o in payload["resting"]] == ["resting"]
+    assert [o["idempotency_key"] for o in payload["unreconciled"]] == ["silent"]
+
+
+def test_an_orphan_we_placed_is_distinguished_from_one_we_did_not(monkeypatch, tmp_path, capsys):
+    """`orphans=26` is not actionable in either direction.
+
+    Every order this system places stamps the idempotency key as
+    `client_order_id`. An orphan with none was placed outside this system --
+    account history. An orphan carrying one we do not hold is OURS, and its
+    ledger row is gone: real money this system opened and cannot see.
+
+    Measured 2026-08-26T13:18Z: 26 orphans, every sampled row with an empty
+    client id and dated 08-07 or 08-23. Reported as one number it reads as "26
+    positions we do not know about" -- alarming, and probably wrong.
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="book",
+        venue_rows=[
+            {"client_order_id": "", "order_id": "hand", "state": "filled", "ticker": "T-MANUAL"},
+            {"client_order_id": "aaaabbbbccccddddeeeeffff", "order_id": "v7", "state": "filled", "ticker": "T-LOST"},
+            {"client_order_id": "ours", "order_id": "v1", "state": "resting", "ticker": "T-OURS"},
+        ],
+        ledger_rows=[_ledger_row("ours", venue_order_id="v1")],
+    )
+    out = el.reconcile_live_orders(venue="kalshi")
+    by_ticker = {o["ticker"]: o for o in out["orphans"]}
+    assert by_ticker["T-MANUAL"]["ours"] is False
+    assert by_ticker["T-LOST"]["ours"] is True
+
+    printed = capsys.readouterr().out
+    assert "ours=1" in printed and "unclaimed=1" in printed
+    # THE SERIOUS ROW MUST BE PRINTED. A flat sample cap lets benign history
+    # crowd out the one row that means money is missing.
+    assert "T-LOST" in printed
+
+
+def test_a_partially_filled_order_still_counts_as_working_at_the_venue():
+    """REPORTED BY THE USER 2026-08-26 from the Polymarket Orders tab.
+
+    Five open orders there -- four Pending and one Semi-filled at 7.11 of 9.60
+    -- against four on our page. A partial fill is BOTH a real position and a
+    live order for the remainder, but `state` has one slot and the fill
+    deliberately outranks the status (reading it the other way reconciles a
+    real position away to zero). So the row books `filled` and disappears from
+    every count of what is still working.
+
+    Not cosmetic: the remainder can still fill, `cancel_stale_resting_orders`
+    never sees it, and the page under-reports live orders by one.
+    """
+    from syndicate.blueprints.intelligence import _live_portfolio_payload
+    from syndicate.features.shared import execution_ledger as el
+
+    rows = [
+        {
+            "idempotency_key": "semi",
+            "mode": "live",
+            "status": "filled",
+            "venue": "polymarket_us",
+            "selected_date": "2026-08-26",
+            "reconciled_at": "2026-08-26T14:00:00Z",
+            "venue_open": True,
+            "venue_remaining_count": 2.49,
+        },
+        {
+            "idempotency_key": "done",
+            "mode": "live",
+            "status": "filled",
+            "venue": "polymarket_us",
+            "selected_date": "2026-08-26",
+            "reconciled_at": "2026-08-26T14:00:00Z",
+            "venue_open": False,
+        },
+        {
+            "idempotency_key": "pending",
+            "mode": "live",
+            "status": "submitted",
+            "venue": "polymarket_us",
+            "selected_date": "2026-08-26",
+            "reconciled_at": "2026-08-26T14:00:00Z",
+            "venue_open": True,
+        },
+    ]
+    original = el._load
+    el._load = lambda: {"orders": rows}
+    try:
+        payload = _live_portfolio_payload("2026-08-26")
+    finally:
+        el._load = original
+
+    keys = {o["idempotency_key"] for o in payload["resting"]}
+    # The semi-filled one is working; the completely filled one is not.
+    assert keys == {"semi", "pending"}
+
+
+def test_the_venue_view_reports_the_unfilled_remainder_on_both_venues():
+    """One contract, two adapters. A third venue must not reintroduce the gap
+    by shipping a view that answers `state` and nothing else."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view as kalshi_view
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view as poly_view
+
+    kalshi = kalshi_view(
+        {"status": "executed", "fill_count_fp": "7.00", "remaining_count_fp": "3.00"}
+    )
+    assert kalshi["state"] == "filled"
+    assert kalshi["open_at_venue"] is True and kalshi["remaining_count"] == 3.0
+
+    poly = poly_view(
+        {
+            "state": "ORDER_STATE_PARTIALLY_FILLED",
+            "cumQuantity": "7.11",
+            "leavesQuantity": "2.49",
+            "outcomeSide": "OUTCOME_SIDE_YES",
+        }
+    )
+    assert poly["state"] == "filled"
+    assert poly["open_at_venue"] is True and poly["remaining_count"] == 2.49
+
+    # A COMPLETE fill is not open. Otherwise every settled bet would read as a
+    # live order and the count would be useless in the other direction.
+    done = kalshi_view({"status": "executed", "fill_count_fp": "7.00", "remaining_count_fp": "0.00"})
+    assert done["open_at_venue"] is False
+
+
+def test_the_submit_resolution_stamp_is_not_named_settlement():
+    """A peer session read `settled_at` on four OPEN orders -- populated ~400ms
+    after `submitted_at`, outcome null, filled 0.00 -- and reasonably concluded
+    settlement was being faked, proposing it as the root cause of positions not
+    reconciling.
+
+    The behaviour was right and the name was wrong. `settled_at` meant "the
+    submit resolved": the write-ahead record closed with a venue response, and
+    400ms IS the round trip. Nothing keys settlement off it -- `settle_orders`
+    filters on `outcome` and `status == "filled"` and never reads the field --
+    so a sweep cannot be fooled by it.
+
+    But it has now caught a careful reader with the source open, after two
+    module docstrings were written specifically to defuse it. That is a naming
+    defect, not a documentation one.
+    """
+    import syndicate.features.shared.execution_ledger as el
+    import inspect
+
+    source = inspect.getsource(el)
+    assert '"venue_resolved_at"' in source
+
+    # THE MIRROR MUST STAY until a migration retires it: stored rows and any
+    # outside reader still carry the old key, and dropping it silently would
+    # trade a misleading field for a missing one.
+    assert '"settled_at"' in source
+
+    # AND NOTHING MAY START READING EITHER ONE. This is the property that made
+    # the peer's theory wrong, and the only thing keeping it wrong.
+    assert '.get("settled_at")' not in source
+    # The ONLY `["settled_at"]` may be the mirror WRITE. A read would mean some
+    # code path started trusting the deprecated name again.
+    uses = [
+        line.strip()
+        for line in source.splitlines()
+        if '["settled_at"]' in line and not line.lstrip().startswith("#")
+    ]
+    assert uses == ['order["settled_at"] = resolved_at'], uses
+
+    settle = inspect.getsource(
+        __import__(
+            "syndicate.features.shared.paper_settlement", fromlist=["settle_orders"]
+        ).settle_orders
+    )
+    # READING it, not MENTIONING it -- `settle_orders` carries a comment saying
+    # explicitly that it does NOT use this field, and a bare substring check
+    # would fail on the very comment that documents the correct behaviour.
+    for reader in ('.get("settled_at")', '["settled_at"]', '.get("venue_resolved_at")'):
+        assert reader not in settle, f"the grader began keying off {reader}"
+
+
+def test_a_client_id_from_another_client_is_not_ours(monkeypatch, tmp_path, capsys):
+    """MEASURED 2026-08-26T15:21Z, and it was a FALSE ALARM FROM THIS COUNTER.
+
+    `orphans_ours=6` reported six positions of real money supposedly opened by
+    this system and lost from the ledger. All six were `KXMVECROSSCATEGORY`
+    parlays -- a series `kalshi_client._COMBINATORIAL_SERIES_PREFIXES` excludes
+    outright because "the board does not bet parlays". There is no code path
+    here that can place one.
+
+    The predicate was `bool(client_order_id)`. But the venue lets ANY client set
+    that field -- the Kalshi app stamps one too -- so it was never the same
+    question as "is this ours". Ours are `sha1(...).hexdigest()[:24]`: 24 bare
+    hex characters. Theirs are UUID-shaped.
+
+    A counter written specifically to stop a scary-but-wrong number produced a
+    scary-but-wrong number.
+    """
+    el = _orphan_env(
+        monkeypatch,
+        tmp_path,
+        coverage="book",
+        venue_rows=[
+            # Real shape from production: a parlay, UUID-style client id.
+            {
+                "client_order_id": "64643034-3834-3635-3134-343632663032",
+                "order_id": "p1",
+                "state": "filled",
+                "ticker": "KXMVECROSSCATEGORY-S2026294A1D9EC9F-C7A8EA4A823",
+            },
+            # No client id at all -- placed in the venue's own UI.
+            {"client_order_id": "", "order_id": "u1", "state": "filled", "ticker": "T-UI"},
+            # OUR key shape, and NOT in the ledger. The one that matters.
+            {
+                "client_order_id": "aaaabbbbccccddddeeeeffff",
+                "order_id": "v7",
+                "state": "filled",
+                "ticker": "T-LOST",
+            },
+        ],
+        ledger_rows=[_ledger_row("3b60977b194ee39ef1aa3229", venue_order_id="v1")],
+    )
+    out = el.reconcile_live_orders(venue="kalshi")
+    by_ticker = {o["ticker"]: o["ours"] for o in out["orphans"]}
+    assert by_ticker["KXMVECROSSCATEGORY-S2026294A1D9EC9F-C7A8EA4A823"] is False
+    assert by_ticker["T-UI"] is False
+    assert by_ticker["T-LOST"] is True
+
+    printed = capsys.readouterr().out
+    # THREE BUCKETS. Two could not tell a parlay from a lost row.
+    assert "ours=1" in printed
+    assert "foreign_client=1" in printed
+    assert "unclaimed=1" in printed

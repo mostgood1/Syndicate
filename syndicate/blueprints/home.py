@@ -3730,6 +3730,13 @@ def _mlb_inning_ordinal(inning: Any) -> str:
     return f"{value}{suffix}"
 
 
+def _mlb_lens_score_present(value: Any) -> bool:
+    """Is this a score the lens actually reported? `0` is, `None`/`""` is not."""
+    if value is None:
+        return False
+    return bool(str(value).strip())
+
+
 def _mlb_live_lens_state_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
     status = row.get("status") if isinstance(row.get("status"), dict) else {}
     abstract = str(status.get("abstract") or "").strip()
@@ -3748,6 +3755,56 @@ def _mlb_live_lens_state_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
     inning = _mlb_inning_ordinal(progress.get("inning"))
     half = str(progress.get("half") or "").strip().lower()
     outs = progress.get("outs")
+
+    # A ROW THAT CANNOT ANSWER IS NOT A COVERED GAME. `#413`'s "{} MEANS ALL,
+    # NOT SOME" rule, applied per ROW instead of per FILE -- which is where it
+    # was always needed, because this file has TWO writers and they do not
+    # agree on the row shape:
+    #
+    #   * `live_lens_loop` writes the FULL shape -- 20 keys per row, including
+    #     `matchup.score` and `gameLens[0].progress`.
+    #   * `scripts/refresh_mlb_oddsapi.py` writes the SLIM shape and says so in
+    #     its own docstring: "{gamePk, startTime, status} only". It fetches with
+    #     `slim=on` deliberately (a full slate payload caused a prior incident)
+    #     and then publishes over the same path.
+    #
+    # MEASURED ON PRODUCTION 2026-08-26, sampling the served report every ~50s:
+    # 22:39:26 SLIM, 22:40:48 FULL, 22:38:10 SLIM -- the third sample is not a
+    # typo, the slim writer put a report generated 2m38s EARLIER over a newer
+    # full one. Whenever the slim copy was current, EVERY live MLB game chip on
+    # the Layer 2 strip read `0-0` with a bare `LIVE`/`FINAL` token instead of a
+    # score and an inning (6 of 8 non-pregame games, both serve paths); whenever
+    # the full copy was current, all 8 matched StatsAPI exactly.
+    #
+    # A SLIM ROW STILL SATISFIED THE GUARD ABOVE -- it carries `status`, so
+    # `abstract`/`detailed` are populated -- and this function returned a state
+    # that was non-None and empty of everything that matters. `#413`'s consumer
+    # contract reads a non-None state as "the lens covers this game", so
+    # `_apply_mlb_live_scores` skipped the statsapi fallback for every game on
+    # the slate and then turned two unknown scores into two zeroes. An unfed
+    # field is indistinguishable from a working one at every level except the
+    # data.
+    #
+    # `368c7ef0` was verified end to end on the real 2026-06-01 report restamped
+    # to now -- 9/9 games resolved, 0 statsapi calls. That report was FULL. The
+    # fixture picked the path production only takes half the time.
+    #
+    # THE COST OF FALLING THROUGH IS BOUNDED, so this does not undo
+    # `render-web-request-path`'s latency fix: `_mlb_feed_live_states` is
+    # single-flight behind a 20s TTL, so at most ONE request thread ever pays a
+    # fetch and every other thread takes the last good value immediately.
+    #
+    # GATED ON LIVE/FINAL, not applied to every row. A PREGAME row legitimately
+    # has no score and no inning, and the lens really does cover it -- there is
+    # nothing to report yet. Refusing those too would send all seven of a
+    # typical evening's pregame games to statsapi for an answer that is already
+    # correct, which is a cost with no reading behind it.
+    row_is_live = _mlb_status_is_live(abstract, detailed)
+    row_is_final = _mlb_status_is_final(abstract, detailed)
+    has_score = _mlb_lens_score_present(score.get("away")) or _mlb_lens_score_present(score.get("home"))
+    has_progress = bool(inning and half)
+    if (row_is_live or row_is_final) and not has_score and not has_progress:
+        return None
 
     # Same three bits, same order, same separator as `_mlb_feed_live_state`.
     status_bits = [
@@ -3882,16 +3939,29 @@ def _apply_mlb_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
         # the game state itself confirms live/final, treat a missing runs
         # value as 0 rather than leaving that side's score unset -- an
         # actually-unknown score only makes sense pregame.
+        #
+        # ONE SIDE MISSING IS THE CASE THAT WAS MEASURED; BOTH SIDES MISSING IS
+        # A DIFFERENT ANIMAL. The rule above reads a null as "this side has not
+        # scored", which is a sound inference only while the OTHER side proves
+        # the source actually reported this game. When neither side carries a
+        # number, nothing has been reported and `0-0` is a fabrication -- and it
+        # is the fabrication a slim live-lens row produced for every live MLB
+        # game on 2026-08-26 (see `_mlb_live_lens_state_from_row`). Leaving the
+        # scores unset renders "-", which is honestly "unknown" rather than
+        # confidently wrong. Belt-and-braces behind the row-level refusal: it
+        # closes the same hole for any FUTURE source that reports a live game
+        # with no scores at all.
         in_progress_or_final = bool(live_state.get("in_progress") or live_state.get("final"))
         away_pts = live_state.get("away_pts")
         home_pts = live_state.get("home_pts")
+        one_side_reported = away_pts is not None or home_pts is not None
         if away_pts is not None:
             away["score"] = away_pts
-        elif in_progress_or_final:
+        elif in_progress_or_final and one_side_reported:
             away["score"] = 0
         if home_pts is not None:
             home["score"] = home_pts
-        elif in_progress_or_final:
+        elif in_progress_or_final and one_side_reported:
             home["score"] = 0
         updated["away"] = away
         updated["home"] = home
@@ -4304,6 +4374,25 @@ def _apply_wnba_live_scores(games: list[dict[str, Any]], selected_date: str) -> 
             "in_progress": bool(live_row.get("in_progress")),
             "final": bool(live_row.get("final")),
             "status": str(live_row.get("status") or "").strip(),
+            # PERIOD AND CLOCK, which this dict used to drop on the floor.
+            #
+            # `_live_status_token` (game_chip_scoreboard.py) reads exactly
+            # `live_state.period` and `live_state.clock` for the basketball
+            # branch, finds neither, returns None, and the chip renders the bare
+            # string `LIVE` -- while every MLB chip beside it reads `TOP 5`.
+            # Reported by the user 2026-08-26.
+            #
+            # NOTHING WAS MISSING UPSTREAM, which is why this is five lines.
+            # Read off production before writing any code, via
+            # `/api/ops/wnba/status-trace`, `local_live_state_payload` -- the
+            # exact rows `build_live_state_payload` hands this function:
+            #
+            #     {"away_pts": 65.0, "home_pts": 38.0, "in_progress": true,
+            #      "period": 3, "clock": "5:23", "status": "5:23 - 3rd"}
+            #
+            # The data was one dict literal away the whole time.
+            "period": live_row.get("period"),
+            "clock": str(live_row.get("clock") or "").strip(),
         }
 
         # cards.py's live-state row falls back to the SmartSim *projected*
@@ -4314,9 +4403,39 @@ def _apply_wnba_live_scores(games: list[dict[str, Any]], selected_date: str) -> 
         # Without this in_progress/final gate, a pregame WNBA game showed a
         # fabricated decimal "score" like 91.81-91.17 on the board's
         # game-chip strip (#160).
+        #
+        # `#160`'S GATE WAS NECESSARY AND NOT SUFFICIENT, and the user caught
+        # the gap: `GSV 85.43 / CON 68.94`, rendered LIVE, on 2026-08-26.
+        #
+        # The gate asks whether the GAME is underway. It does not ask whether
+        # the NUMBER is an observation. A game that has tipped off but whose
+        # ESPN boxscore row has not matched yet is `in_progress: true` with
+        # `away_pts` still holding the projection -- so it passes the gate and
+        # the projection reaches the strip wearing a live badge. The measured
+        # good case is integral (`away_pts: 65.0`, `home_pts: 38.0`); the
+        # measured bad case is not (`85.43`).
+        #
+        # A BASKETBALL SCORE IS A WHOLE NUMBER. That is a property of the sport,
+        # not of this pipeline, so it holds for any future source that starts
+        # handing us an estimate -- which is the same failure `#581` had, a
+        # value that is not an observation being used as one. A fractional
+        # value is refused outright rather than rounded: rounding would turn a
+        # fabricated 85.43 into a plausible 85 and destroy the only evidence
+        # that it was never real.
+        def _observed_points(value: Any) -> Any:
+            if value is None:
+                return None
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                return None
+            if numeric != int(numeric):
+                return None
+            return int(numeric)
+
         is_game_underway = bool(live_state.get("in_progress")) or bool(live_state.get("final"))
-        live_away_pts = live_state.get("away_pts") if is_game_underway else None
-        live_home_pts = live_state.get("home_pts") if is_game_underway else None
+        live_away_pts = _observed_points(live_state.get("away_pts")) if is_game_underway else None
+        live_home_pts = _observed_points(live_state.get("home_pts")) if is_game_underway else None
         if live_away_pts is not None:
             away["score"] = live_away_pts
         if live_home_pts is not None:
@@ -5707,7 +5826,7 @@ class _MLBDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.mlb.cards import build_cards_page_context
         from syndicate.features.mlb.cards import _enrich_games_with_tracked_market_lines
 
@@ -5818,7 +5937,7 @@ class _NBADataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.nba.cards import build_cards_page_context
 
         payload = build_cards_page_context(context.context_label, allow_stored_date_fallback=_allow_stored_date_fallback())
@@ -5868,7 +5987,7 @@ class _WNBADataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.wnba.cards import build_cards_page_context
 
         payload = build_cards_page_context(context.context_label, allow_stored_date_fallback=False)
@@ -5934,7 +6053,7 @@ class _NHLDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.nhl.cards import build_cards_page_context
 
         payload = build_cards_page_context(context.context_label)
@@ -5985,7 +6104,7 @@ class _NCAABDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return context_label == today_value
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.ncaab.cards import build_cards_page_context
 
         payload = build_cards_page_context(context.context_label)
@@ -6114,7 +6233,7 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return _football_in_season(today_value)
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         # Regular season and preseason never overlap on the calendar, so
         # this gates on season phase and returns ONE or the other, never a
         # merge of both -- merging two different schedules' games into one
@@ -6208,6 +6327,11 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
                 except Exception:
                     regular_board = []
                 regular_games = _stamp_market_recommendations(regular_games, regular_board)
+                if include_upcoming:
+                    # `#575`. The whole week, for the chip strip. Narrowing to
+                    # the requested date is right for a rail meaning "today"
+                    # and wrong for the board, whose cards run a week ahead.
+                    return regular_games
                 return [
                     game
                     for game in regular_games
@@ -6222,6 +6346,25 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
         except Exception:
             board_games = []
         games = _stamp_market_recommendations(games, board_games)
+        if include_upcoming:
+            # `#575`. THE MEASURED DEFECT: `CHIP_JOIN_COVERAGE sport=nfl chips=0
+            # ... cards=106 no_chip_available=106` (2026-08-26T17:16:23Z). Every
+            # NFL compact card printed full club names and nothing reported it
+            # until `#541`'s telemetry existed.
+            #
+            # Root cause, traced rather than guessed: on 2026-08-26
+            # `preseason_week_for_date` is None (no preseason game that day) AND
+            # `regular_season_game_ids_for_date` is None (season not started), so
+            # this falls to `preseason_target_week` = 4 and then
+            # `_nfl_games_on_requested_date` filters week 4's games down to the
+            # ones played on 08-26 -- of which there are none. Correct for a
+            # "today" rail. Fatal for a strip serving a board carrying 106 cards
+            # for games up to two weeks out.
+            #
+            # Returning the resolved week UNFILTERED is what the board needs;
+            # the chip's own `status_token` already prefixes a date on anything
+            # that is not today, so a future fixture reads as one.
+            return games
         return _nfl_games_on_requested_date(games, context.context_label)
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
@@ -6247,7 +6390,7 @@ class _NCAAFDataProvider(_HomeSportDataProviderBase):
     def is_active(self, *, today_value: str, context_label: str) -> bool:
         return _football_in_season(today_value)
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         # Layer 2 fix, mirrors _NFLDataProvider.games(): switched from
         # build_cards_page_context (a stale/historical saved-summary
         # snapshot path) to build_smartsim_cards_page_context, the real
@@ -6399,7 +6542,7 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
 
         return bool(active_leagues_for_date(today_value))
 
-    def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
+    def games(self, context: SportContext, *, is_active_today: bool, include_upcoming: bool = False) -> list[dict[str, Any]]:
         from syndicate.features.soccer.cards import build_cards_page_context
 
         # THE DATE THE CALLER ASKED FOR, not the wall clock.
@@ -6427,12 +6570,80 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
             # must not empty the whole sport -- each league is best-effort.
             try:
                 season, week = self._league_season_week(league, context, today)
-                payload = build_cards_page_context(league, week, season)
             except Exception as exc:
                 print(f"[home] SOCCER_LEAGUE_GAMES_FAILED league={league} error={exc}", flush=True)
                 continue
-            for game in payload.get("games") or []:
-                if isinstance(game, dict):
+            # `#545`. THE RESOLVED WEEK IS THE ONE CONTAINING *NOW*, WHICH ON A
+            # MONDAY IS THE MATCHDAY THAT JUST FINISHED.
+            #
+            # `default_week(reference_date=today)` answers "which matchday are
+            # we in", and the board asks a different question entirely -- it
+            # carries a SEVEN-DAY forward odds horizon. Those two disagree for
+            # most of every week.
+            #
+            # Measured in production 2026-08-24T20:36:39Z:
+            # `CHIP_JOIN_COVERAGE sport=soccer chips=96 ... cards=342
+            #  no_chip_available=251` -- and `chip_dates` opened on 08-22/08-23,
+            # already played. 65 of 96 chips described finished fixtures while
+            # 72 of the 105 fixtures in the board's window had no chip at all.
+            # `primeira_liga` was the control: its resolved week happened to
+            # align and it was the ONLY league with zero uncovered fixtures.
+            #
+            # Worse, it DECAYS: `by_matchup` fell 94 -> 7 between 15:34Z and
+            # 20:36Z the same day, as the board rolled forward past the fixtures
+            # the chips described. Coverage was thinnest exactly when the next
+            # slate is the one being bet.
+            #
+            # So the span covers the CURRENT week and the NEXT. Current is kept
+            # rather than dropped because a match in progress or just finished
+            # is precisely what a live scoreboard chip is for. Duplicates across
+            # the two weeks are dropped by fixture id -- a league whose week
+            # boundary does not move (or whose `default_week` clamps at the end
+            # of a season) would otherwise emit every fixture twice, and two
+            # chips for one fixture is a collision the browser's canonical index
+            # resolves by DISCARDING BOTH.
+            # `#575`. THE NEXT WEEK IS FOR THE CHIP STRIP, NOT THE HOME RAIL.
+            #
+            # `#542` widened this unconditionally and that was half a fix: it
+            # closed the board's coverage (soccer `no_chip_available` 251 -> 0)
+            # and, unnoticed, DOUBLED the home rail from 98 games to 210,
+            # because `_load_home_game_items` falls through to
+            # `_compact_game_cards(home_games)` for soccer and renders every one
+            # -- with a count badge then claiming 210 games today. Measured here
+            # 2026-08-26 before this fix.
+            #
+            # The horizon is now the CALLER's to ask for, which is the only way
+            # one method can serve a rail that means "today" and a strip that
+            # means "the board's next seven days".
+            seen_ids: set[str] = set()
+            week_offsets = (0, 1) if include_upcoming else (0,)
+            for week_offset in week_offsets:
+                target_week = int(week) + week_offset
+                try:
+                    payload = build_cards_page_context(league, target_week, season)
+                except Exception as exc:
+                    # A missing NEXT week is normal at a season boundary and
+                    # must not cost us the current one, so this is per-week.
+                    print(
+                        f"[home] SOCCER_LEAGUE_GAMES_FAILED league={league} "
+                        f"week={target_week} error={exc}",
+                        flush=True,
+                    )
+                    continue
+                for game in payload.get("games") or []:
+                    if not isinstance(game, dict):
+                        continue
+                    identity = str(
+                        game.get("event_id")
+                        or game.get("game_id")
+                        or game.get("match_id")
+                        or game.get("gamePk")
+                        or ""
+                    ).strip()
+                    if identity:
+                        if identity in seen_ids:
+                            continue
+                        seen_ids.add(identity)
                     game.setdefault("league", league)
                     games.append(game)
         return games

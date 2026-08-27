@@ -126,6 +126,31 @@ body.syndicate-body .cards-shell {
   font-size: 1rem;
 }
 
+/* `#563`. The scoreboard-frozen badge on the "Games" heading.
+   AMBER, NOT RED, and the distinction is the point: red on this board already
+   means a bet went the wrong way (.board-sparkline--down) or a market is
+   broken. A frozen scoreboard is neither -- the data on screen was correct
+   when it was published and has simply stopped advancing. Amber is the
+   "trust this less than it looks" register, and reusing red would put a
+   producer outage in the same visual bucket as a losing position.
+   Rendered only when the artifact is over the threshold, so this selector
+   is absent from the DOM on a healthy board. */
+.board-stale-badge {
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: help;
+}
+
 .board-strip {
   display: flex;
   gap: 10px;

@@ -651,6 +651,70 @@ def api_live_state():
         return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
 
+@wnba_bp.get("/api/final_player_boxscore")
+def api_final_player_boxscore():
+    """The OFFICIAL box for a date's COMPLETED games. Served because WEB CAN
+    REACH ESPN AND THE WORKERS CANNOT.
+
+    MEASURED 2026-08-26: `scripts/build_wnba_boxscores.py` running inside
+    `intelligence_state` on refresh-worker got
+
+        WNBA_BOXSCORES_SCOREBOARD_FAILED date=2026-08-25 HTTPError: HTTP Error 403: Forbidden
+
+    on every attempt, while the identical call from a laptop returned 3 games
+    and 66 player rows. ESPN refuses Render's egress. Web is not refused --
+    `WNBA_LIVE_BOX_CAPTURED date=2026-08-25 games=3 players=66` is the live
+    capture doing exactly this hop and succeeding.
+
+    SAME SHAPE AS `capture_wnba_live_player_box.py`, deliberately: that script's
+    docstring already explains why the fetch belongs here rather than on a
+    worker tick, and this is the post-game half of the same problem. The parsing
+    is IMPORTED from the producer rather than restated, so one module owns the
+    ESPN vocabulary and the two cannot drift.
+
+    `count_only=1` answers "how many games are final" with ONE scoreboard call
+    and no per-event fetches. The worker polls that every settlement pass (~3
+    min) and only asks for rows when the slate has actually moved.
+    """
+    selected_date = _selected_date()
+    if not selected_date:
+        return jsonify({"ok": False, "error": "date is required", "games": 0, "rows": []}), 400
+
+    warn_if_compute_in_request_path("wnba_final_player_boxscore_fetch")
+    count_only = str(request.args.get("count_only") or "").strip() in {"1", "true", "yes"}
+    try:
+        from scripts.build_wnba_boxscores import completed_event_ids, rows_for_event
+
+        event_ids = completed_event_ids(selected_date)
+    except Exception as exc:  # noqa: BLE001
+        # NAMED, not swallowed into an empty success. A caller that cannot tell
+        # "no games" from "we could not ask" will write an empty artifact over a
+        # real one, which is the failure `capture_wnba_live_player_box` refuses.
+        return jsonify({
+            "ok": False, "date": selected_date, "games": 0, "rows": [],
+            "error": f"{type(exc).__name__}: {exc}",
+        }), 502
+
+    if count_only or not event_ids:
+        return jsonify({"ok": True, "date": selected_date, "games": len(event_ids), "rows": []})
+
+    rows: list = []
+    failed: list = []
+    for event_id in event_ids:
+        try:
+            rows.extend(rows_for_event(event_id, selected_date))
+        except Exception as exc:  # noqa: BLE001
+            # One event's failure must not cost the rest of the slate, but the
+            # caller has to know the answer is partial or it will treat a short
+            # slate as a complete one and stop rebuilding.
+            failed.append({"event_id": str(event_id), "error": f"{type(exc).__name__}: {exc}"})
+
+    return jsonify({
+        "ok": True, "date": selected_date, "games": len(event_ids),
+        "rows": rows, "failed_events": failed,
+    })
+
+
 @wnba_bp.get("/api/live_player_boxscore")
 def api_live_player_boxscore():
     selected_date = _selected_date()

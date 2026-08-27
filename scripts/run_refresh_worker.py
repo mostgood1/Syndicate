@@ -3830,6 +3830,62 @@ def _book_grid_refresh_interval_seconds() -> int:
 _BOOK_GRID_FORWARD_INTERVAL_MULTIPLE = 6
 
 
+def _book_grid_per_sport_window_enabled() -> bool:
+    """Prune (sport, date) pairs no board will ever read. `#565`.
+
+    Off switch without a deploy: `SYNDICATE_BOOK_GRID_PER_SPORT_WINDOW=0`
+    restores the previous behaviour of building every sport for every forward
+    date.
+    """
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_PER_SPORT_WINDOW") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _sport_covers_date(sport: str, anchor_date: str, build_date: str) -> bool:
+    """Is `build_date` inside THIS sport's own slate window? `#565`.
+
+    THE BUG THIS CLOSES. `_book_grid_forward_days` returns the MAXIMUM window
+    across all sports, and the tick below then builds every sport for every date
+    in that span -- so the widest sport's window silently became every sport's
+    cost. `_SLATE_WINDOW_DAYS` is `{nfl: 7, ncaaf: 3, ncaab: 1, soccer: 7, ...}`,
+    so ncaab was being built seven days out to serve a board that asks for one.
+    Reported by the user, who recognised the shape immediately: *"we flipped
+    weekly sports to 7 days out for nfl and ncaaf. this hammered us with soccer
+    that we didn't intend."*
+
+    MEASURED COST on refresh-worker `-fzb6v`, 2026-08-26: boot 00:45:38Z -> first
+    `[layer2_shortlist]` line 01:05:21Z is **19m43s** inside
+    `_build_candidate_pool`, against a shortlist that is itself 58 seconds. Of
+    that, 00:48:58 -> 01:02:23 is **13m25s of soccer per-league context builds**
+    -- five `board_contract_begin` lines in one 60-second window, 12-14 seconds
+    apart, `game_count` 8-11.
+
+    READS THE SAME TABLE `#329` INSISTED ON, just per sport instead of at the
+    max. That keeps the property `max_slate_window_days`' docstring was written
+    for -- the producer cannot build a narrower window than the consumer asks
+    for -- while dropping the coupling that made it every sport's window. The two
+    goals were never in tension; taking the max was simply the coarser way to
+    reach the first one.
+
+    UNKNOWN DATES ARE BUILT, not skipped. An unparseable anchor or build date
+    means we cannot tell whether a board wants it, and the permissive branch
+    costs one shard while the strict branch would silently stop publishing a
+    date some board is reading. That asymmetry is why this returns True on
+    failure rather than False.
+    """
+    if not _book_grid_per_sport_window_enabled():
+        return True
+    try:
+        from syndicate.features.shared.layer1_board import slate_window_days
+
+        offset = (date.fromisoformat(build_date) - date.fromisoformat(anchor_date)).days
+    except Exception:
+        return True
+    if offset <= 0:
+        return True
+    return offset <= max(0, int(slate_window_days(sport)) - 1)
+
+
 def _book_grid_forward_days() -> int:
     """How many days past today to build, covering the widest slate window.
 
@@ -3837,6 +3893,11 @@ def _book_grid_forward_days() -> int:
     the worker cannot build four days while the board asks for seven. A constant
     duplicated across a producer and a consumer is the drift `#329` exists to
     remove -- and this is exactly where it would reappear.
+
+    STILL THE MAXIMUM, deliberately: this sizes the DATE LIST, which has to span
+    the widest sport or that sport loses dates. `#565` fixed the coupling at the
+    per-sport level instead -- see `_sport_covers_date` -- because the union of
+    dates is not the problem; building every sport across it was.
     """
     raw = str(os.environ.get("SYNDICATE_BOOK_GRID_FORWARD_DAYS") or "").strip()
     if raw:
@@ -3938,8 +3999,15 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     written: list[str] = []
     skipped: list[str] = []
     any_live_today = False
+    out_of_window = 0
     for build_date in dates:
         for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
+            # `#565`. Skip the pairs no board will ever read, BEFORE the shard
+            # reconcile below -- which is the expensive half (an HTTP Range pull
+            # per sport per date, plus its `.state.json` sidecar).
+            if not _sport_covers_date(sport, selected_date, build_date):
+                out_of_window += 1
+                continue
             try:
                 # RECONCILE THE SHARD FIRST (`#331`). This worker is not the
                 # service that captures odds -- live-odds-worker is, and it
@@ -4062,6 +4130,13 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         "date": selected_date,
         "written": written,
         "skipped_no_shard": skipped,
+        # `#565`. How many (sport, date) pairs this tick did NOT build because
+        # the date is outside that sport's own slate window. Reported rather
+        # than silent, for the reason the whole item exists: the previous
+        # behaviour -- every sport across the widest sport's window -- was
+        # invisible at every level except the clock. A zero here means the
+        # pruning is doing nothing and the cost is somewhere else.
+        "out_of_window": out_of_window,
         "rebuilt_previous": previous_date if rebuild_previous else None,
         # Which cadence the NEXT tick will use, and why. A board rebuilding every
         # 10 minutes during a live slate looks identical to one rebuilding every
@@ -4200,6 +4275,144 @@ def main() -> int:
         print("[refresh_worker] SHUTDOWN_RECORDER_INSTALLED", flush=True)
     except Exception as exc:
         print(f"[refresh_worker] SHUTDOWN_RECORDER_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # ONE-TIME, OPT-IN schema probe for the exchange-market client modules
+    # built in lane `exchange-markets-api-integration` (`todo.md #542`) --
+    # narrow claim on this file, surfaced in `.syndicate/lanes.md`. A no-op
+    # unless SYNDICATE_EXCHANGE_MARKETS_PROBE_ON_BOOT=1 is set; this service is
+    # the one with real outbound access to verify schemas that were written
+    # against research rather than a live call. Never touches the refresh
+    # loop below. See `scripts/probe_exchange_markets.py`.
+    try:
+        from scripts.probe_exchange_markets import run_all_probes_if_enabled
+
+        run_all_probes_if_enabled()
+    except Exception as exc:
+        print(f"[refresh_worker] EXCHANGE_MARKETS_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # OPT-IN recurring refresh of Novig's public daily markets snapshot
+    # (docs.novig.com content supplied 2026-08-24). A daemon thread on its
+    # own hourly clock, started here and then self-contained -- never touches
+    # the refresh loop below. No-op unless
+    # SYNDICATE_NOVIG_ODDS_REFRESH_ON_BOOT=1. Same narrow claim as above.
+    # See `pipeline/novig_odds_refresh.py`.
+    try:
+        from pipeline.novig_odds_refresh import start_background_loop_if_enabled
+
+        start_background_loop_if_enabled()
+    except Exception as exc:
+        print(f"[refresh_worker] NOVIG_ODDS_REFRESH_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # ONE-SHOT diagnostic: run the Kalshi-vs-Polymarket US moneyline arb scan
+    # once against real production inputs (see
+    # syndicate/features/shared/kalshi_polymarket_arb.py -- detection only,
+    # never places an order). No-op unless
+    # SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT=1; unset again once the
+    # first real result is read, same pattern every other probe in this file
+    # uses -- this is not meant to become a standing boot hook.
+    try:
+        import os as _os
+
+        if str(_os.environ.get("SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_ON_BOOT") or "").strip().lower() in {
+            "1", "true", "yes", "on",
+        }:
+            from datetime import datetime, timezone
+
+            from syndicate.features.shared.kalshi_polymarket_arb import run_arb_scan
+
+            _arb_date = _os.environ.get("SYNDICATE_KALSHI_POLYMARKET_ARB_PROBE_DATE") or datetime.now(
+                timezone.utc
+            ).date().isoformat()
+            _arb_result = run_arb_scan(selected_date=_arb_date)
+            print(f"[kalshi_polymarket_arb] SCAN date={_arb_date} result={_arb_result}", flush=True)
+
+            # ONE-SHOT DIAGNOSTIC, same flag: kalshi_moneylines_resolved has
+            # been 0 with EMPTY refusals every run tonight, which the arb
+            # module's own silent-skip-on-non-moneyline design cannot explain
+            # by itself -- `unmapped_series` is the function built for exactly
+            # this ("what Kalshi lists that we cannot yet price, by series,
+            # with an example"), just never wired to this probe.
+            try:
+                from syndicate.features.shared.kalshi_catalogue import unmapped_series
+                from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
+                from pipeline.kalshi_odds_refresh import markets_from_state
+
+                _kalshi_payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
+                # Through the merge helper -- `markets` is no longer a persisted
+                # top-level key. A DIAGNOSTIC reading zero is worse than no
+                # diagnostic: it reports "Kalshi lists nothing we cannot map",
+                # which is the conclusion this line exists to test.
+                _kalshi_markets_diag = markets_from_state(_kalshi_payload)
+                _unmapped = unmapped_series(_kalshi_markets_diag)
+                print(
+                    f"[kalshi_polymarket_arb] UNMAPPED_DIAG total_markets={len(_kalshi_markets_diag)}"
+                    f" unmapped={_unmapped}",
+                    flush=True,
+                )
+
+                # SECOND DIAGNOSTIC: `unmapped_series` only reports NON-ok
+                # verdicts, so a market that classify_market marks `status=ok`
+                # but with the WRONG grammar (e.g. team_spread instead of
+                # moneyline) is invisible to it -- a live, real, two-team
+                # win-probability market was confirmed on kalshi.com directly
+                # (Red Sox @ Marlins, YES 72c/NO 29c, $6.7M volume) at the
+                # exact moment the first diagnostic reported zero moneylines,
+                # so this classifies EVERY market and tallies by (series,
+                # grammar-or-refusal-reason) to find where it actually landed.
+                from syndicate.features.shared.kalshi_catalogue import classify_market
+
+                _tally: dict[str, dict[str, int]] = {}
+                _samples: dict[str, str] = {}
+                for _m in _kalshi_markets_diag:
+                    _verdict = classify_market(_m)
+                    _series = str(_m.get("series") or "").strip().upper()
+                    _bucket = _verdict.get("grammar") if _verdict.get("status") == "ok" else f"REFUSED:{_verdict.get('reason')}"
+                    _tally.setdefault(_series, {}).setdefault(str(_bucket), 0)
+                    _tally[_series][str(_bucket)] += 1
+                    _samples.setdefault(_series, str(_m.get("title") or "")[:80])
+                print(f"[kalshi_polymarket_arb] CLASSIFY_TALLY {_tally}", flush=True)
+                print(f"[kalshi_polymarket_arb] CLASSIFY_SAMPLES {_samples}", flush=True)
+
+                # Direct search for the confirmed live market by team name, in
+                # case its series/ticker does not match anything expected.
+                _needles = ("boston", "miami", "red sox", "marlins")
+                _hits = [
+                    {"series": m.get("series"), "ticker": m.get("ticker"), "title": m.get("title")}
+                    for m in _kalshi_markets_diag
+                    if any(n in str(m.get("title") or "").lower() for n in _needles)
+                ][:20]
+                print(f"[kalshi_polymarket_arb] BOS_MIA_SEARCH hits={len(_hits)} sample={_hits}", flush=True)
+
+                # THIRD DIAGNOSTIC: is KXMLBGAME even a series Kalshi's own
+                # catalogue lists, and what does IT call it? BOS_MIA_SEARCH
+                # only sees markets already fetched into kalshi_markets.json --
+                # if the moneyline series is never discovered/registered, it
+                # is never fetched, and would be invisible to that search even
+                # though the market is real and live on the site. This asks
+                # Kalshi's /series catalogue directly, which is upstream of
+                # both discovery-registration and the per-series fetch.
+                try:
+                    from syndicate.features.shared.kalshi_client import discover_series
+
+                    _series_report = discover_series()
+                    _titles = (_series_report or {}).get("titles") or {}
+                    _game_titles = {t: v for t, v in _titles.items() if "GAME" in str(t).upper()}
+                    print(
+                        f"[kalshi_polymarket_arb] SERIES_CATALOGUE_DIAG status={_series_report.get('status')}"
+                        f" count={_series_report.get('count')} kxmlbgame_title={_titles.get('KXMLBGAME')!r}"
+                        f" game_series={_game_titles}",
+                        flush=True,
+                    )
+                except Exception as exc:
+                    print(f"[kalshi_polymarket_arb] SERIES_CATALOGUE_DIAG_FAILED {type(exc).__name__}: {exc}", flush=True)
+            except Exception as exc:
+                print(f"[kalshi_polymarket_arb] UNMAPPED_DIAG_FAILED {type(exc).__name__}: {exc}", flush=True)
+    except Exception as exc:
+        print(f"[refresh_worker] KALSHI_POLYMARKET_ARB_PROBE_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # NOTE: Polymarket's odds refresh (pipeline/polymarket_odds_refresh.py)
+    # deliberately gets NO hook here -- another session already built and
+    # wired it into scripts/run_live_odds_refresh_worker.py's own boot
+    # sequence (that service, not this one). A duplicate hook here would run
+    # the same fetch from two processes against the same artifact path for no
+    # gain.
     # #285. Cap glibc arenas BEFORE the loops spawn threads -- `mallopt` only
     # governs arenas created after it returns, so this is worthless if it moves
     # later in main(). The trim proved allocator retention is real (1109.6MB
@@ -4595,7 +4808,14 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_nfl_pbp_fetch(
-            # SECOND, DIRECTLY BEHIND RECONCILIATION, and `#341` is why.
+            # AHEAD OF EVERY NFL JOB THAT CONSUMES IT, and `#341` is why.
+            #
+            # Stated as a RELATIONSHIP, not an ordinal. This read "SECOND,
+            # DIRECTLY BEHIND RECONCILIATION" and had been false since
+            # `_launch_autorun_evaluation_settlement` was inserted above it. An
+            # ordinal is wrong the moment anyone inserts higher, and FOUR
+            # comments in this chain had gone stale exactly that way -- two of
+            # them claiming the same slot as each other.
             #
             # It sat 6th of 8 and emitted NOTHING for the 10 minutes after its
             # first deploy. Not broken -- starved. `#341`'s comment above
@@ -4621,8 +4841,67 @@ def main() -> int:
         ):
             if args.run_once:
                 return 0
+        elif _launch_autorun_nfl_injuries_fetch(
+            # DIRECTLY BEHIND THE PBP FETCH, AND AHEAD OF THE FANTASY ARTIFACT
+            # THAT CONSUMES IT -- same `#341` starvation
+            # reasoning as that branch's comment above: injuries data is
+            # exactly as time-sensitive for the same sport, so it gets the
+            # same priority tier rather than being appended at the end where
+            # it can go mute for weeks while still enabled and correctly
+            # configured. Also DAILY-ish gated (default 21600s interval, not
+            # literally daily), so it wins at most a handful of ticks per day.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_roster_snapshot(
+            # DIRECTLY BEHIND THE INJURIES FETCH -- same `#341`
+            # starvation reasoning as the branches above: equally
+            # time-sensitive for the same sport, same priority tier.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_depth_chart_snapshot(
+            # DIRECTLY BEHIND THE ROSTER SNAPSHOT -- same reasoning.
+            # No producer/consumer ordering is actually required between
+            # these two (see the module comment above), but keeping them
+            # adjacent keeps this chain's NFL block easy to reason about.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_news_capture(
+            # AHEAD OF the fantasy artifact it feeds, and for the same reason the
+            # artifact sits high: `#341` starvation. This one is six-hourly
+            # rather than daily, so it wins at most four ticks a day, and it is
+            # one HTTP GET.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
         elif _launch_autorun_nfl_fantasy_artifact(
-            # THIRD, directly behind the pbp fetch, and `#341` is why it is not
+            # BEHIND EVERY INPUT IT READS. injuries, roster, depth and news all
+            # produce what this consumes, so all four sit above it.
+            #
+            # This claimed "THIRD, directly behind the pbp fetch" -- the same
+            # slot the INJURIES fetch claims in its own comment. Both could not
+            # be true, and this was the one that was not: measured 2026-08-25,
+            # this branch ran AHEAD of its own producers, so on a busy slate it
+            # built projections from yesterday's injuries and news.
+            #
+            # Moving it down does NOT reopen `#341`. That starvation came from
+            # sitting BELOW high-frequency branches; everything now above it here
+            # is daily or six-hourly gated, so the whole NFL block needs about six
+            # winning ticks a day out of ~2,880. `#341` is why it is not
             # lower. IT WAS TENTH ON ITS FIRST DEPLOY: the patch that added it
             # anchored on `season_projections` and inserted above THAT, which
             # put it below evaluation_settlement while the comment here still
@@ -4639,52 +4918,6 @@ def main() -> int:
             # rather than running inline, so the poll loop is free again
             # immediately. It sits behind the pbp fetch specifically because it
             # CONSUMES what that job produces.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_news_capture(
-            # Beside the fantasy artifact it feeds, and for the same reason the
-            # artifact sits high: `#341` starvation. This one is six-hourly
-            # rather than daily, so it wins at most four ticks a day, and it is
-            # one HTTP GET.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_injuries_fetch(
-            # THIRD, DIRECTLY BEHIND THE PBP FETCH -- same `#341` starvation
-            # reasoning as that branch's comment above: injuries data is
-            # exactly as time-sensitive for the same sport, so it gets the
-            # same priority tier rather than being appended at the end where
-            # it can go mute for weeks while still enabled and correctly
-            # configured. Also DAILY-ish gated (default 21600s interval, not
-            # literally daily), so it wins at most a handful of ticks per day.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_roster_snapshot(
-            # FOURTH, DIRECTLY BEHIND THE INJURIES FETCH -- same `#341`
-            # starvation reasoning as the branches above: equally
-            # time-sensitive for the same sport, same priority tier.
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_depth_chart_snapshot(
-            # FIFTH, DIRECTLY BEHIND THE ROSTER SNAPSHOT -- same reasoning.
-            # No producer/consumer ordering is actually required between
-            # these two (see the module comment above), but keeping them
-            # adjacent keeps this chain's NFL block easy to reason about.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

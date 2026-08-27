@@ -305,8 +305,17 @@ def test_the_v2_body_matches_the_supplied_contract(monkeypatch):
     assert body["self_trade_prevention_type"] == "taker_at_cross"
     assert body["post_only"] is False
     assert body["reduce_only"] is False
+    # BACK TO 0. Omitting it was deployed and DISPROVEN -- a real order reached
+    # the venue 2026-08-26T15:04:08Z with the identical `user_not_found`. `0` is
+    # the configuration every known fill happened under, and on a money path
+    # "changed nothing for the bug" is not a reason to keep a change.
     assert body["subaccount"] == 0
-    assert body["exchange_index"] == 0
+    # NOT 0 -- and the sample body is not the authority on this one field.
+    # `exchange_index` is a SHARD SELECTOR: the venue's field reference says it
+    # auto-routes when omitted and that -1 REQUIRES routing by ticker, so a
+    # literal 0 pins every order to shard 0 and 404s `market_not_found` for
+    # any market that lives elsewhere. See `_V2_EXCHANGE_INDEX_AUTO`.
+    assert body["exchange_index"] == -1
     # The v1 fields are GONE, not merely unused — sending them alongside the
     # new ones is how a request gets rejected for a reason nobody can read.
     for dead in ("action", "type", "yes_price", "no_price", "yes_price_dollars"):
@@ -571,3 +580,620 @@ def test_prices_are_read_as_dollars_whichever_unit_they_arrive_in():
                              "average_fill_price": 46})["fill_price"] == 0.46
     assert venue_order_view({"status": "executed", "filled_count": 1,
                              "average_fill_price": 0.46})["fill_price"] == 0.46
+
+
+# --------------------------------------------------------------------------
+# The field names, corrected from a live response 2026-08-24T14:37:16Z
+# --------------------------------------------------------------------------
+
+
+def test_the_real_kalshi_field_names_are_read():
+    """Not one of the three count spellings guessed beforehand was right. The
+    live keys are `fill_count_fp`, `initial_count_fp`, `remaining_count_fp`,
+    `taker_fees_dollars`, `taker_fill_cost_dollars`."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({
+        "status": "executed",
+        "fill_count_fp": 2,
+        "taker_fill_cost_dollars": 1.08,
+        "taker_fees_dollars": 0.02,
+        "maker_fees_dollars": 0.0,
+    })
+    assert seen["state"] == "filled"
+    assert seen["filled_count"] == 2
+    assert seen["fill_cost_dollars"] == 1.08
+    assert seen["fees_dollars"] == 0.02
+    # The price becomes a DIVISION of what Kalshi billed, rather than a guess
+    # about which of yes_price_dollars / no_price_dollars is our leg.
+    assert seen["fill_price"] == 0.54
+
+
+def test_the_fp_count_fields_drive_the_derived_count():
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "canceled", "initial_count_fp": 5,
+                             "remaining_count_fp": 4})
+    assert seen["filled_count"] == 1
+
+
+def test_no_fee_leg_at_all_is_unknown_not_zero():
+    """A sum of the PRESENT legs is the total -- an order filled entirely as a
+    taker carries a real 0.0 on the maker leg. But an order carrying neither
+    has told us nothing, and $0.00 of fees is a fee we would never charge."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    assert venue_order_view({"status": "resting"})["fees_dollars"] is None
+    assert venue_order_view(
+        {"status": "executed", "fill_count_fp": 1, "maker_fees_dollars": 0.0}
+    )["fees_dollars"] == 0.0
+
+
+def test_the_venue_fill_cost_outranks_our_reconstruction():
+    """`count * price` was arithmetic over two numbers we parsed. The fill cost
+    is the charge itself."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({
+        "status": "executed", "fill_count_fp": 3,
+        "taker_fill_cost_dollars": 1.50, "maker_fill_cost_dollars": 0.30,
+    })
+    assert seen["fill_cost_dollars"] == 1.80
+    assert seen["fill_price"] == 0.6
+
+
+def test_the_cancel_route_hangs_off_the_write_path(monkeypatch):
+    """The asymmetry is real and cost a 410 to learn once already:
+
+        POST   /portfolio/events/orders          create
+        DELETE /portfolio/events/orders/{id}     cancel
+        GET    /portfolio/orders                 list
+        GET    /portfolio/orders/{id}            read one
+
+    Assuming DELETE followed the READS would 404 silently while the order kept
+    resting -- worse than the create 410, because nothing about the order
+    changes to say so."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    monkeypatch.setenv("KALSHI_API_BASE", "https://example.test/trade-api/v2")
+    assert mod._order_cancel_url("abc") == (
+        "https://example.test/trade-api/v2/portfolio/events/orders/abc"
+    )
+    assert mod._orders_url() == "https://example.test/trade-api/v2/portfolio/events/orders"
+    assert mod._order_read_url("abc") == (
+        "https://example.test/trade-api/v2/portfolio/orders/abc"
+    )
+
+
+def test_a_failed_cancel_is_named_not_raised(monkeypatch):
+    """A cancel that fails must leave the order alone: it is still resting, it
+    can still fill, and recording it dead frees a key the venue still holds."""
+    from syndicate.features.shared import kalshi_orders as mod
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("http_410")
+
+    monkeypatch.setattr("syndicate.features.shared.kalshi_auth.signed_request", boom)
+    result = mod.cancel_order("abc")
+    assert result["status"] == "error"
+    assert "http_410" in result["reason"]
+
+
+def test_cancelling_nothing_is_refused():
+    from syndicate.features.shared.kalshi_orders import cancel_order
+
+    assert cancel_order("")["reason"] == "no_order_id"
+
+
+def test_both_price_legs_are_carried_through():
+    """Which leg we are paying depends on our side, which the view does not
+    know -- and Kalshi hands over both, so guessing is unnecessary."""
+    from syndicate.features.shared.kalshi_orders import venue_order_view
+
+    seen = venue_order_view({"status": "resting", "fill_count_fp": "0.00",
+                             "yes_price_dollars": "0.4600",
+                             "no_price_dollars": "0.5400"})
+    assert seen["yes_price"] == 0.46
+    assert seen["no_price"] == 0.54
+
+
+def test_a_position_with_no_ticker_says_SO_instead_of_blaming_the_price():
+    """THREE REAL ORDERS WENT TO THE LEDGER UNDER THE WRONG CAUSE.
+
+    `_kalshi_price_for` returns None at its FIRST line when `venue_ticker` is
+    empty -- before it ever asks Kalshi for a price -- so an unstamped position
+    arrived here indistinguishable from a market the venue would not quote.
+    Every Kalshi row in the 2026-08-25 ledger read:
+
+        OrderBuildError: no_live_price: None
+
+    and the trailing `None` was the ticker saying so all along:
+
+        LIVE_ORDER status=rejected venue=kalshi ticker=None
+          market=totals_alt side=over line=5.5
+
+    `verify_order_paths` had the distinction right (`no_venue_ticker`) while
+    the path with money on it did not. They point at different fixes: a missing
+    id is the board join or the position cap; a missing price is the venue or
+    staleness.
+    """
+    import dataclasses
+
+    submit = orders.kalshi_submitter(lambda request: 0.55)
+    unstamped = dataclasses.replace(_request(), venue_ticker="")
+    with pytest.raises(orders.OrderBuildError) as excinfo:
+        submit(unstamped)
+    assert str(excinfo.value) == "no_venue_ticker", str(excinfo.value)
+
+
+def test_a_real_price_failure_still_names_the_TICKER_it_could_not_price():
+    """The other half stays reachable, and now carries the contract id instead
+    of the `None` that made the two look alike."""
+    submit = orders.kalshi_submitter(lambda request: None)
+    with pytest.raises(orders.OrderBuildError) as excinfo:
+        submit(_request())
+    message = str(excinfo.value)
+    assert message.startswith("no_live_price:"), message
+    assert "None" not in message, message
+
+
+def test_a_submit_failure_asks_the_venue_what_the_market_IS(monkeypatch, capsys):
+    """`market_not_found` ON A MARKET THE GET FINDS.
+
+    Measured 2026-08-25 6:00 PM Central, three real submissions in one minute:
+
+        KXWNBAAST-...-4          side=bid  price=0.5000  -> FILLED
+        KXMLBTOTAL-...MINATH-10  side=ask  price=0.5500  -> market_not_found
+        KXMLBTOTAL-...CINSF-8    side=ask  price=0.5100  -> market_not_found
+
+    ...while `fetch_market` on that same MINATH ticker returned a live price
+    TWICE in the same minute (`LIVE_PRICE ... live=0.45 drift=+0.0100`). The
+    ticker is real and tradeable; the GET finds it and the POST does not.
+
+    Two candidates remain and the error text distinguishes neither: an `ask`
+    (sell YES) this endpoint refuses, or a market whose order shape differs
+    (`market_type`, or an MVE collection). A 1-vs-2 sample is not enough to
+    flip order semantics -- this file's own `_DEFAULT_ORDER_PATH` comment
+    records inventing a route once already and earning a 410 for it. So the
+    failure asks the venue what the market IS.
+    """
+    from syndicate.features.shared import kalshi_auth, kalshi_client
+
+    def _boom(*_a, **_k):
+        raise orders.OrderBuildError("http_404: market_not_found")
+
+    monkeypatch.setattr(kalshi_auth, "signed_request", _boom)
+    monkeypatch.setattr(
+        kalshi_client, "fetch_market",
+        lambda ticker: {"status": "ok", "market": {
+            "market_type": "binary", "status": "active",
+            "mve_collection_ticker": None, "strike_type": "greater",
+            "yes_ask_dollars": 0.55, "no_ask_dollars": 0.45,
+            "can_close_early": True,
+        }},
+    )
+
+    with pytest.raises(orders.OrderBuildError):
+        orders.submit_order(_request(), price_dollars=0.55)
+
+    printed = capsys.readouterr().out
+    assert "SUBMIT_FAILED_MARKET" in printed, printed
+    # The fields that tell the two hypotheses apart.
+    for field in ("market_type=", "mve_collection=", "yes_ask=", "no_ask="):
+        assert field in printed, (field, printed)
+
+
+def test_the_diagnostic_never_masks_the_real_error(monkeypatch):
+    """A probe that raised would replace the venue's own rejection with our
+    own -- losing the only message that says why the order failed."""
+    from syndicate.features.shared import kalshi_auth, kalshi_client
+
+    monkeypatch.setattr(
+        kalshi_auth, "signed_request",
+        lambda *_a, **_k: (_ for _ in ()).throw(orders.OrderBuildError("http_404: real_reason")),
+    )
+    monkeypatch.setattr(
+        kalshi_client, "fetch_market",
+        lambda ticker: (_ for _ in ()).throw(RuntimeError("probe exploded")),
+    )
+
+    with pytest.raises(orders.OrderBuildError) as excinfo:
+        orders.submit_order(_request(), price_dollars=0.55)
+    assert "real_reason" in str(excinfo.value), str(excinfo.value)
+
+
+def test_a_moneyline_side_buys_YES_on_our_own_teams_contract():
+    """CONFIRMED BY THE USER 2026-08-25 from Kalshi's own order URLs. One market
+    PER TEAM, each offering a BUY on both legs:
+
+        KXMLBGAME-26AUG251840BOSMIA-BOS   op_order_side=yes  op_side=BUY
+        KXMLBGAME-26AUG251840BOSMIA-MIA   op_order_side=yes  op_side=BUY
+
+    So backing Miami is BUY YES on `-MIA`, not a NO or an ask on `-BOS`. The
+    join already keys a match on `board_side` and stamps the ticker of the team
+    that side names, so by order-build time the contract IS our team and the
+    leg is always YES.
+
+    Before this, `home`/`away` raised `unmappable_side` and no moneyline could
+    build an order at all -- untested because every h2h had already failed
+    upstream on a missing ticker.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    assert _side_to_kalshi("home", "h2h") == "yes"
+    assert _side_to_kalshi("away", "h2h") == "yes"
+    # The period moneylines are the same shape.
+    assert _side_to_kalshi("home", "h2h_h1") == "yes"
+
+
+def test_a_team_side_on_a_NON_team_ticker_still_refuses():
+    """THE GUARD THAT MAKES THE ABOVE SAFE, and the reason it is restricted to
+    the moneyline family.
+
+    A totals ticker encodes a STRIKE (`KXMLBTOTAL-...-10`), not a team. Reading
+    `home` as `yes` there would buy a market that has nothing to do with our
+    side -- so it must keep raising. `home` on a total is a defect upstream,
+    and a defect that refuses is worth far more than one that guesses.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    # `spreads` LEFT THIS LIST 2026-08-26 and gained its own path: a spread
+    # ticker names a club AND a strike, and the sign of the board line says
+    # which leg. It still refuses without one -- see the test below.
+    for market in ("totals", "totals_alt", "batter_hits", None, ""):
+        with pytest.raises(orders.OrderBuildError, match="unmappable_side"):
+            _side_to_kalshi("home", market)
+
+    # A spread with NO line is still a refusal, just a better-named one: the
+    # leg is genuinely unknowable rather than merely unmapped.
+    with pytest.raises(orders.OrderBuildError, match="spread_line_missing"):
+        _side_to_kalshi("home", "spreads")
+
+
+def test_the_direction_sides_are_untouched_by_the_moneyline_path():
+    """over/under must keep mapping exactly as before -- the moneyline rule is
+    additive, not a rewrite of the leg selection every other market uses."""
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    assert _side_to_kalshi("over", "totals") == "yes"
+    assert _side_to_kalshi("under", "totals") == "no"
+    assert _side_to_kalshi("over", "h2h") == "yes"
+    assert _side_to_kalshi("yes", None) == "yes"
+    assert _side_to_kalshi("no", None) == "no"
+
+
+def test_a_moneyline_order_body_is_a_BID_not_an_ask():
+    """END TO END: the whole point of the workaround. An `ask` is what every
+    failed Kalshi order today was (`market_not_found`, twice); a moneyline must
+    never take that path."""
+    import dataclasses
+
+    request = dataclasses.replace(
+        _request(), market="h2h", side="home", line=None,
+        venue_ticker="KXMLBGAME-26AUG251840BOSMIA-MIA",
+    )
+    body = orders.order_body_v2(request, price_dollars=0.55)
+    assert body["side"] == "bid", body
+    assert body["ticker"] == "KXMLBGAME-26AUG251840BOSMIA-MIA"
+
+
+# ---------------------------------------------------------------------------
+# THE ORDER HOST. `_BASE_URLS` is a fallback CHAIN for reads and a PIN for
+# writes, and that asymmetry is the leading explanation for the only failure
+# this endpoint produces: `market_not_found` on a POST to base[0] for a ticker
+# `fetch_market` resolved somewhere else. Measured 2026-08-25/26 -- four
+# KXMLBTOTAL orders, on BOTH sides, all 404, while the probe reported the
+# market active with both asks quoted.
+# ---------------------------------------------------------------------------
+
+
+def test_no_retry_when_the_order_host_already_served_the_read():
+    """THE SAFETY PROPERTY. If the hypothesis is wrong the two hosts agree and
+    nothing about the money path changes -- this stays pure measurement."""
+    from syndicate.features.shared.kalshi_client import _BASE_URLS
+
+    assert orders._retry_url_for(f"{_BASE_URLS[0]}/portfolio/events/orders", _BASE_URLS[0]) == ""
+
+
+def test_retry_targets_the_host_that_resolved_the_ticker():
+    from syndicate.features.shared.kalshi_client import _BASE_URLS
+
+    url = orders._retry_url_for(f"{_BASE_URLS[0]}/portfolio/events/orders", _BASE_URLS[1])
+    assert url == f"{_BASE_URLS[1]}/portfolio/events/orders"
+
+
+def test_never_retries_against_a_host_kalshi_has_not_served():
+    """Inventing a route is what earned this file an http_410."""
+    assert orders._retry_url_for(
+        "https://external-api.kalshi.com/trade-api/v2/portfolio/events/orders",
+        "https://orders.kalshi.example/trade-api/v2",
+    ) == ""
+
+
+def test_only_market_not_found_retries():
+    """A 404 from a mistyped PATH is a different failure, and retrying it
+    against a second host would just repeat it."""
+    assert orders._is_market_not_found(
+        RuntimeError('http_404: {"error":{"code":"market_not_found"}}')
+    )
+    assert not orders._is_market_not_found(
+        RuntimeError('http_404: {"error":{"code":"not_found","message":"path"}}')
+    )
+    assert not orders._is_market_not_found(RuntimeError("http_401: unauthorized"))
+
+
+def test_the_order_body_auto_routes_by_ticker_instead_of_pinning_shard_zero(monkeypatch):
+    """The regression that produced a week of `market_not_found`.
+
+    A GET on those tickers returned `status=active` with both legs quoted, from
+    the SAME host the POST 404'd on, 0.5s apart -- so the market existed and
+    only the ORDER could not see it. `exchange_index: 0` is why: it is a shard
+    selector, not furniture, and pinning shard 0 hides every market on another
+    shard behind the only error a matching engine has for that.
+    """
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    monkeypatch.delenv("KALSHI_ORDER_EXCHANGE_INDEX", raising=False)
+    body = build_order_body(_req(), price_dollars=0.56)
+    assert body["exchange_index"] == -1
+    # The ticker is what -1 routes BY, so it must be present and non-empty --
+    # -1 with no ticker is the one combination the venue rejects outright.
+    assert body["ticker"]
+
+
+def test_the_shard_index_is_overridable_without_a_deploy(monkeypatch):
+    """Rollback path. This field is the venue's to move, not ours to freeze."""
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    monkeypatch.setenv("KALSHI_ORDER_EXCHANGE_INDEX", "0")
+    assert build_order_body(_req(), price_dollars=0.56)["exchange_index"] == 0
+
+    # Garbage falls back to auto-routing rather than to 0. An unreadable
+    # override is not a request for the setting that broke this.
+    monkeypatch.setenv("KALSHI_ORDER_EXCHANGE_INDEX", "auto")
+    assert build_order_body(_req(), price_dollars=0.56)["exchange_index"] == -1
+
+
+def test_the_subaccount_is_the_known_good_zero_and_omittable_without_a_deploy(monkeypatch):
+    """The second field copied out of the sample as if it were furniture.
+
+    CONFIRMED 2026-08-26 that `exchange_index` was the first: flipping it 0 ->
+    -1 moved the venue's answer from `market_not_found` to `user_not_found`,
+    cleanly, with no exception on either side of the deploy. The order routed
+    to the right shard and then failed on the ACCOUNT.
+
+    `subaccount: 0` is the same shape of assumption, and the venue's reference
+    says so outright: a subaccount-restricted key must omit the field or send
+    its locked subaccount.
+    """
+    from syndicate.features.shared.kalshi_orders import build_order_body
+
+    monkeypatch.delenv("KALSHI_ORDER_CONTRACT", raising=False)
+    monkeypatch.delenv("KALSHI_ORDER_SUBACCOUNT", raising=False)
+    assert build_order_body(_req(), price_dollars=0.56)["subaccount"] == 0
+
+    # SET-BUT-EMPTY omits it. Distinguishable from unset only because
+    # `_v2_subaccount` reads the variable before stripping it, which is the
+    # whole reason it does.
+    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "")
+    assert "subaccount" not in build_order_body(_req(), price_dollars=0.56)
+
+    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "2")
+    assert build_order_body(_req(), price_dollars=0.56)["subaccount"] == 2
+
+    # Unreadable falls back to the KNOWN-GOOD value, not to omission: a garbled
+    # override must not silently select the unproven branch.
+    monkeypatch.setenv("KALSHI_ORDER_SUBACCOUNT", "primary")
+    assert build_order_body(_req(), price_dollars=0.56)["subaccount"] == 0
+
+
+def test_user_not_found_is_renamed_to_the_shard_problem_it_actually_is():
+    """CLOSED 2026-08-26 by syndicate-43, n=9, a perfect split with no exception:
+    every order that ever FILLED is on exchange shard 0, every order that fails
+    is on shard 3. The two MLB fills on 08-24 were shard 0 -- MLB MIGRATED to
+    shard 3, which is why this broke on 08-25 with no deploy in between.
+
+    Both rungs of the ladder were literally true and neither was ours:
+
+        exchange_index 0  -> market is not on shard 0 -> market_not_found
+        exchange_index -1 -> routes to shard 3, found -> user_not_found
+
+    So the raw 400 reads like a credential fault and is nothing of the kind. It
+    is renamed so the ledger row says what is actually wrong, and names the
+    env var that unblocks it once the venue provisions the account.
+    """
+    from syndicate.features.shared.kalshi_orders import _classified, OrderBuildError
+
+    raw = RuntimeError(
+        'KalshiAuthError: http_400: {"error":{"code":"user_not_found: '
+        '22c67b4f-2bbf-4692-b325-85d508b94dc7"}}'
+    )
+    out = _classified(raw, {"ticker": "KXMLBERA-26AUG261910MILNYM-MILDMAY3-2"}, 3)
+    assert isinstance(out, OrderBuildError)
+    text = str(out)
+    assert "venue_shard_unfunded" in text
+    assert "market_shard=3" in text and "funded_shards=[0]" in text
+    # POINTS AT THE ACTION, not at support. The first version said the venue
+    # had to enable the account; the account holder moves collateral.
+    assert "exchange-indexes" in text
+    assert "no code change fixes it" not in text
+    # NO ACCOUNT IDENTIFIER TRAVELS. The venue's text carries a user UUID and
+    # the ledger is rendered on a web page.
+    assert "22c67b4f" not in text
+
+    # ANY OTHER ERROR PASSES THROUGH UNTOUCHED, identity-equal. A classifier
+    # that rewrote unrelated failures would hide the next real one.
+    other = RuntimeError('http_404: {"code":"market_not_found"}')
+    assert _classified(other, {}, None) is other
+
+
+def test_the_known_good_shard_list_opens_without_a_deploy(monkeypatch):
+    """What unblocks this is the VENUE enabling the account on shard 3 -- a
+    support action, not a patch. The code's job is to stop lying about it and to
+    get out of the way the moment it is done."""
+    from syndicate.features.shared.kalshi_orders import _known_shards, _classified
+
+    monkeypatch.delenv("KALSHI_ORDER_KNOWN_SHARDS", raising=False)
+    assert _known_shards() == (0,)
+
+    monkeypatch.setenv("KALSHI_ORDER_KNOWN_SHARDS", "0,3")
+    assert _known_shards() == (0, 3)
+    assert "funded_shards=[0, 3]" in str(
+        _classified(RuntimeError("user_not_found: x"), {"ticker": "T"}, 3)
+    )
+
+    # Garbage falls back to the measured list rather than to an empty one --
+    # an empty allowlist would read as "no shard is known good".
+    monkeypatch.setenv("KALSHI_ORDER_KNOWN_SHARDS", "abc,,")
+    assert _known_shards() == (0,)
+
+
+def test_an_unread_shard_says_so_instead_of_printing_none():
+    """MEASURED 2026-08-26T15:32Z, and it was the pre-registered counter-verify.
+
+    The classifier printed `market_shard=None known_good_shards=[0]`, which
+    reads as "we compared and it did not match". Nothing was compared:
+    `exchange_index` was missing from `kalshi_client._MARKET_FIELDS`, so the
+    normalizer dropped it from a payload that carried `3`.
+
+    Same defect class as everything else that day -- a reading that looks like
+    an answer -- so the two cases must not share a string.
+    """
+    from syndicate.features.shared.kalshi_orders import _classified
+
+    raw = RuntimeError('http_400: {"code":"user_not_found: x"}')
+    assert "market_shard=UNREAD" in str(_classified(raw, {"ticker": "T"}, None))
+    assert "market_shard=3" in str(_classified(raw, {"ticker": "T"}, 3))
+    # Shard 0 must NOT be swallowed by the None branch -- it is a real shard and
+    # the one we are provisioned on.
+    assert "market_shard=0" in str(_classified(raw, {"ticker": "T"}, 0))
+
+
+def test_the_market_normalizer_carries_the_exchange_shard():
+    """The field that explains two days of failed MLB orders, and it was being
+    dropped by an allowlist that nobody had updated.
+
+    `normalize_market` is an allowlist on purpose -- it is why a venue rename
+    surfaces as a missing field rather than a silent None. The cost is that a
+    field nobody listed is invisible even when the raw response carries it, and
+    the whole diagnosis had to come from a session with unproxied network access
+    reading the payload directly.
+    """
+    from syndicate.features.shared.kalshi_client import normalize_market, _MARKET_FIELDS
+
+    assert "exchange_index" in _MARKET_FIELDS
+    out = normalize_market(
+        {"ticker": "KXMLBTOTAL-26AUG261940TEXCWS-8", "status": "active", "exchange_index": 3}
+    )
+    assert out["exchange_index"] == 3
+
+
+def test_the_shard_error_points_at_funding_not_at_venue_support():
+    """CORRECTED 2026-08-26, and the wrong version was live in production.
+
+    The message said the venue had to "enable this account on that exchange
+    shard" and that "no code change fixes it" -- sending whoever read the board
+    to Kalshi support for something the account holder does in about a minute.
+
+    `GET /exchange/status` lists PRODUCT shards, all trading_active: 0 Default,
+    1 Combos, 2 Crypto, 3 Tennis & Baseball. Kalshi's sharding doc: "Subaccount
+    balances are local to a specific exchange instance" and "Programmatic
+    traders must preallocate collateral on a given exchange shard before order
+    placement." So `user_not_found` there means NO FUNDS ON THAT SHARD.
+
+    A confident wrong remedy inside a correct diagnosis is worse than no remedy:
+    it inherits the diagnosis's credibility and nobody re-checks it.
+    """
+    from syndicate.features.shared.kalshi_orders import _classified
+
+    text = str(
+        _classified(
+            RuntimeError('http_400: {"code":"user_not_found: x"}'),
+            {"ticker": "KXMLBTOTAL-26AUG261940TEXCWS-8"},
+            3,
+        )
+    )
+    # The action, and where to take it.
+    assert "exchange-indexes" in text or "intra-account-transfer" in text
+    assert "PER-SHARD" in text
+    # The retired claims must not come back.
+    assert "no code change fixes it" not in text
+    assert "enable this account" not in text
+    assert "not_provisioned" not in text
+
+
+def test_a_spread_leg_comes_from_the_SIGN_of_the_line():
+    """THE PLUMBING THAT LETS SPREADS PLACE AT ALL.
+
+    `kalshi_board_join` pairs a spread market with exactly two board rows:
+    the NAMED club at -X takes YES, the OTHER club at +X takes NO. So the sign
+    of the line IS the leg, and it needs no tri-code table -- which matters,
+    because `team_aliases.canonical_team` refuses the codes shared across
+    leagues, exactly where a ticker comparison would have needed them.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    # The favourite laying the points: our club IS the ticker's club.
+    assert _side_to_kalshi("away", "spreads", -1.5) == "yes"
+    assert _side_to_kalshi("home", "spreads", -1.5) == "yes"
+    # Taking the points: the ticker names the OTHER club, so we want its NO.
+    assert _side_to_kalshi("away", "spreads", 1.5) == "no"
+    assert _side_to_kalshi("home", "spreads", 1.5) == "no"
+    # Period spreads are the same shape.
+    assert _side_to_kalshi("home", "spreads_1st_5_innings", -1.5) == "yes"
+
+
+def test_a_spread_with_no_usable_line_REFUSES_rather_than_picking_a_leg():
+    """A zero or absent line names no leg, and defaulting either way is a real
+    bet on a side nobody chose -- the most expensive silent default in this
+    file, and the one its own docstring is written against.
+    """
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    with pytest.raises(orders.OrderBuildError, match="spread_line_zero"):
+        _side_to_kalshi("home", "spreads", 0.0)
+    for bad in (None, "", "not-a-number"):
+        with pytest.raises(orders.OrderBuildError, match="spread_line_missing"):
+            _side_to_kalshi("home", "spreads", bad)
+
+
+def test_the_join_and_the_order_builder_agree(monkeypatch):
+    """THE COUPLING TEST. The sign rule above is only correct because the JOIN
+    guarantees it, and that guarantee lives in a different module.
+
+    This drives the real `join_kalshi_to_board` and asserts, for every spread
+    match it produces, that `kalshi_side` is exactly what `_side_to_kalshi`
+    would derive from the board line's sign. If the join's orientation ever
+    changes, this fails HERE -- rather than silently placing the opposite bet,
+    which is what happened for 11 of 11 orders before the join's sign fix.
+    """
+    from syndicate.features.shared import kalshi_board_join as J
+    from syndicate.features.shared.kalshi_orders import _side_to_kalshi
+
+    monkeypatch.setenv("SYNDICATE_KALSHI_GAME_LINES", "on")
+
+    # TEX @ CWS with CWS the home favourite: away +1.5, home -1.5 -- the shape
+    # the served board actually carries (measured 2026-08-26).
+    rows = [
+        {"sport": "mlb", "event_id": "e1", "market": "spreads", "line": 1.5,
+         "side": "away", "away_team": "TEX", "home_team": "CHW",
+         "quote": {"price": -110}},
+        {"sport": "mlb", "event_id": "e1", "market": "spreads", "line": -1.5,
+         "side": "home", "away_team": "TEX", "home_team": "CHW",
+         "quote": {"price": -110}},
+    ]
+    markets = [{
+        "ticker": "KXMLBSPREAD-26AUG241940TEXCWS-CHW2", "series": "KXMLBSPREAD",
+        "title": "Chicago White Sox wins by over 1.5 runs?",
+        "yes_american": -110, "no_american": -110,
+    }]
+
+    report = J.join_kalshi_to_board(markets, rows)
+    spreads = [m for m in report["matches"] if m["market"] == "spreads"]
+    assert spreads, report.get("refusals") or report.get("reasons")
+
+    for match in spreads:
+        derived = _side_to_kalshi(match["board_side"], "spreads", match["line"])
+        assert derived == match["kalshi_side"], match

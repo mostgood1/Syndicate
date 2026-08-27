@@ -75,9 +75,32 @@ class DispatchOrder(unittest.TestCase):
             if line.strip().startswith(("elif _launch_autorun", "if _launch_autorun"))
         ]
         index = order.index("_launch_autorun_nfl_injuries_fetch")
+        pbp_index = order.index("_launch_autorun_nfl_pbp_fetch")
+        fantasy_index = order.index("_launch_autorun_nfl_fantasy_artifact")
+        # RELATIVE, NOT ABSOLUTE. This asserted `index <= 2`, which encoded "pbp
+        # sits at 1" and had been unsatisfiable since
+        # `_launch_autorun_evaluation_settlement` was inserted above the pbp
+        # fetch -- at which point it contradicted this file's OTHER assertion
+        # (`injuries == pbp + 1`) outright. Two assertions that cannot both pass
+        # are not an alarm, they are noise, and this pair had been red for that
+        # reason rather than because anything was wrong that week.
+        #
+        # The intent -- "near the front, same tier as pbp" -- is carried entirely
+        # by the equality test above, which is strictly stronger AND cannot go
+        # stale when something is inserted higher.
+        #
+        # What is added instead is the constraint that actually has teeth and was
+        # never pinned: this must precede the fantasy artifact, which CONSUMES
+        # injury availability (`build_nfl_fantasy_projection_artifact.py`'s
+        # `use_injury_availability`). It was running behind its consumer until
+        # 2026-08-25.
+        self.assertLess(
+            index, fantasy_index,
+            f"injuries fetch must precede the fantasy artifact that consumes it; order={order}",
+        )
         self.assertLessEqual(
-            index, 2,
-            f"injuries fetch must stay near the front of the chain; found at {index} in {order}",
+            index, pbp_index + 1,
+            f"injuries fetch must stay in the pbp fetch's tier; found at {index} in {order}",
         )
 
 

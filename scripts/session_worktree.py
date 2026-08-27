@@ -47,6 +47,7 @@ see `_run_checkers`.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -237,6 +238,7 @@ def _run_checkers(cwd: Path) -> None:
     that blocks all work is removed within the afternoon. Report, name the tool,
     let the human decide.
     """
+    duplicated: list = []
     for script, label in ((("scripts/lane_identity_check.py",), "lanes"),
                           (("scripts/todo_id_reconcile.py", "--no-history"), "todo ids")):
         result = subprocess.run([sys.executable, *script], cwd=str(cwd),
@@ -244,6 +246,39 @@ def _run_checkers(cwd: Path) -> None:
         state = "clean" if result.returncode == 0 else "PROBLEMS"
         print(f"  ledger/{label:<9} {state}"
               + ("" if result.returncode == 0 else f"   (run {script[0]})"))
+
+        # A DUPLICATE TODO ID BLOCKS THE PUSH. Everything else here still only
+        # reports, deliberately -- see this function's own docstring.
+        #
+        # WHY THIS ONE IS DIFFERENT, measured 2026-08-26. `#581` was declared
+        # twice about half an hour apart by `mlb-chip-live-state` and
+        # `open-bet-live-status`. The reconciler CAUGHT it and exited 1, this
+        # function printed `PROBLEMS`, and land pushed anyway. **Both sessions
+        # then read that warning and dismissed it, independently**, because the
+        # unfiltered reconciler prints twelve lines of ancient `#65`-`#81` noise
+        # and a real finding arrives in the same format inside the same block.
+        # A warning that is usually nothing gets trained out -- the same
+        # argument the resting-orders banner won on. The list's own rule is
+        # that ids are stable and never reused, and nothing was enforcing it.
+        #
+        # ASKED VIA `--json`, NOT BY TRUSTING THE EXIT CODE. With
+        # `--no-history` the universe is built only from the two files, so
+        # `missing` is empty by construction and exit 1 does currently mean
+        # duplicates -- but that is a property of today's implementation, not a
+        # contract, and a future check that also exits 1 must not silently
+        # start blocking every session's push.
+        if label == "todo ids" and result.returncode != 0:
+            probe = subprocess.run(
+                [sys.executable, "scripts/todo_id_reconcile.py", "--no-history", "--json"],
+                cwd=str(cwd), capture_output=True, text=True, timeout=900,
+            )
+            try:
+                duplicated = json.loads(probe.stdout).get("duplicated_in_todo") or []
+            except Exception:
+                # Unreadable means UNKNOWN, and unknown does not block -- a
+                # broken probe must not become an outage for every session.
+                duplicated = []
+    return duplicated
 
 
 def cmd_land(args) -> int:
@@ -276,7 +311,22 @@ def cmd_land(args) -> int:
         print((rebase.stdout + rebase.stderr).strip()[:600])
         return 1
 
-    _run_checkers(path)
+    duplicated = _run_checkers(path)
+    if duplicated and not args.allow_duplicate_ids:
+        print("")
+        print("REFUSING: a todo id is declared twice in docs/ai_context/todo.md")
+        for item_id, n in duplicated:
+            print(f"  #{item_id}: {n} item headers")
+        print("")
+        print("Ids are stable and never reused, so two items under one number make")
+        print("every later reference ambiguous -- lane blocks and deploys.md entries")
+        print("included. Renumber YOURS to a free id (check todo.md AND")
+        print("todo_closed.md), update the lane block and any deploys.md reference,")
+        print("then re-run land. If the other declaration landed first, theirs keeps")
+        print("the number.")
+        print("")
+        print("  --allow-duplicate-ids   push anyway, if you are the one fixing it")
+        return 1
 
     if args.dry_run:
         print(f"\n--dry-run: would push {branch} -> main")
@@ -359,6 +409,8 @@ def main() -> int:
     p = sub.add_parser("land", help="rebase onto origin/main and push")
     p.add_argument("--lane", required=True)
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--allow-duplicate-ids", action="store_true",
+                   help="push even though a todo id is declared twice")
     p.set_defaults(func=cmd_land)
 
     p = sub.add_parser("close", help="remove the worktree and its branch")

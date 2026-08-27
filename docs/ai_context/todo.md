@@ -1,5 +1,2671 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#586` — **A live WNBA chip read a bare `LIVE` while every MLB chip beside it read `TOP 5`, and a SmartSim projection reached the strip as an observed score.** — lane `wnba-chip-live-token`, 2026-08-27, user report — **CLOCK FIXED AND VERIFIED IN PRODUCTION; PROJECTION GUARD UNIT-TESTED ONLY**
+
+`[user reports]` "WNBA is showing the sim score" (`GSV 85.43 / CON 68.94` under a
+LIVE badge) and "fix the WNBA clock".
+
+**NOTHING WAS MISSING UPSTREAM, which is why the clock half is five lines.** Read
+off production BEFORE writing any code —
+`/api/ops/wnba/status-trace?date=2026-08-26`, section `local_live_state_payload`,
+the exact rows `build_live_state_payload` hands `_apply_wnba_live_scores`:
+
+    {"away_pts": 65.0, "home_pts": 38.0, "in_progress": true,
+     "period": 3, "clock": "5:23", "status": "5:23 - 3rd"}
+
+That function built `live_state` from FIVE keys — `away_pts`, `home_pts`,
+`in_progress`, `final`, `status` — and dropped `period` and `clock` on the floor.
+`_live_status_token`'s basketball branch reads exactly those two, found neither,
+returned None, and the chip fell back to the literal string `LIVE`.
+
+**THE PROJECTION: `#160`'S GUARD WAS NECESSARY AND NOT SUFFICIENT.** It asks
+whether the GAME is underway, not whether the NUMBER is an observation. A
+tipped-off game whose ESPN boxscore row has not matched yet is
+`in_progress: true` with `away_pts` still holding the SmartSim projection, so it
+sails through. Measured good case is integral (`65.0`); measured bad case is not
+(`85.43`).
+
+**FIXING THAT GUARD ALONE SHIPS INERT, AND A TEST CAUGHT IT BEFORE IT LANDED.**
+`_side_score` is a coalescing chain ending in `live_state.<side>_pts`, so
+refusing to SET `away["score"]` upstream just means the projection is picked up
+one candidate later — `test_a_refused_score_does_not_reach_the_chip` failed on
+its first run with `'85.43' is not None`. The second half is in `_score_value`,
+the choke point every sport's chip passes through: **a fractional value is not a
+score in any sport this platform carries.** REFUSED, NOT ROUNDED — rounding
+85.43 to 85 produces a plausible score and destroys the only evidence it was
+never real. Own rule in `learnings.md`, 2026-08-27.
+
+**VERIFIED IN PRODUCTION, same game, same instrument, before and after:**
+
+    CONTROL  00:29:37Z   GSV @ CON  live  token='LIVE'     76-48   ESPN P3 1:13  76-48
+    AFTER    00:34:02Z   GSV @ CON  live  token='Q3 20.5'  80-52   ESPN P3       80-52
+
+on `inline_artifact_stale`, the path web `e3dceb68` is deployed to.
+
+**MY OWN VERIFIER REPORTED A FALSE NEGATIVE ON THAT PASS, and the shape is worth
+more than the fix.** The assertion was `^Q\d+\s+\d{1,2}:\d{2}$`, assuming
+`M:SS`. ESPN's `displayClock` under a minute is `20.5` — seconds and a tenth —
+so a CORRECT token failed the regex and the watcher printed `STILL BARE`. Trusting
+the summary line over the raw value would have meant debugging a working fix. The
+mirror image happened the same night at `00:08:34Z`, where a watcher said `wrong`
+and it was staleness rather than the bug. **Both times the raw value settled it
+and the summary did not.**
+
+**OWED — TWO THINGS.**
+1. **refresh-worker — HALF DISCHARGED, and the remaining half is a MISSING
+   SUBJECT rather than a missing deploy.** It reached `070f452a` at
+   `00:55:43Z`, which DOES carry this fix (`merge-base --is-ancestor 07a7124e
+   070f452a` passes). A `source == "worker_artifact"` serve was read at
+   `01:16:17Z` and discharged `#581` there — but it carried **`WNBA live=0`**,
+   because GSV @ CON finished during the worker's 18-minute cold build. **Zero
+   live WNBA chips is not zero bare WNBA chips**, and the watcher was built to
+   say so rather than pass. **TOR @ SEA at `02:00Z` on a now-warm worker is the
+   next window.** Original text, for the record: it builds the published chip
+   artifact and was on `f8d8b05f`, which did NOT carry this. While a fresh worker artifact is
+   served, WNBA chips stay bare — confirmed at 00:32:49Z,
+   `src=worker_artifact`, `tok='LIVE'`. Its claim was held by
+   `ncaaf-opener-regions-props` for an NCAAF capture and was NOT taken from them.
+2. **The projection guard is UNIT-TESTED ONLY.** GSV @ CON had a matched ESPN
+   boxscore all evening, so the fractional path never fired in production. It
+   needs a game that has tipped off before its boxscore row matches. **Do not
+   record it as production-verified until a chip is observed refusing one.**
+
+### `#585` — **The chip artifact's `written_at` is FRESH while its content is ~15 minutes old, and `#564`'s threshold bounds the wrong quantity.** — lane `mlb-chip-live-state`, 2026-08-27, measured — **NOT FIXED; FIRST HYPOTHESIS FALSIFIED BY MEASUREMENT, ROOT CAUSE NOW NAMED**
+
+Found while discharging `#581`'s last owed reading, not looked for.
+
+**MEASURED 2026-08-27T00:09:03Z**, refresh-worker on `f8d8b05f`:
+
+    source = worker_artifact   published_at = 00:07:44Z   age = 78.9s   lens = SLIM
+
+    CIN @ SF    BOT 9 10-9    | Final Bottom 9 10-9
+    BOS @ MIA   TOP 3 0-2     | In Progress Bottom 5 0-2
+    COL @ WSH   TOP 3 0-1     | In Progress Top 5    4-1
+    MIL @ NYM   BOT 1 0-0     | In Progress Bottom 3 4-0
+    BAL @ STL   TOP 1 0-0     | In Progress Bottom 1 5-0
+
+    games with a BARE live token (the blank signature): 0
+
+`published_at` is **79 seconds** old. The content is **two innings** — about
+fifteen minutes — behind. `BOS` reads `TOP 3` against `Bottom 5`; `MIL` reads
+`BOT 1 0-0` against `Bottom 3 4-0`.
+
+**`#564`'S THRESHOLD CANNOT SEE THIS.** It bounds how old the ARTIFACT is
+(120s). Nothing bounds how old its CONTENT is. A worker whose board build takes
+~750s cold stamps `written_at` at the end and publishes live state gathered much
+earlier — so the handler serves it as fresh, and the page's stale badge
+(`CHIP_STALE_AFTER_SECONDS`, keyed on `published_at`) correctly stays silent.
+Every publication-time instrument reads healthy. This is the same shape as
+`state.md [board-quote-staleness]`: "every publication-time instrument reads
+FRESH on a board carrying 14-minute-old quotes."
+
+**HYPOTHESIS FALSIFIED 2026-08-27T00:16:51Z, BY THE TEST IT SHIPPED WITH.** The
+lens bound is NOT the binding constraint. Same worker, same code, same
+`_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60`, one build later — now WARM:
+
+    src=worker_artifact  pub=00:15:18Z  age=92.8s
+
+    BOS @ MIA   BOT 5 0-2   | Top 6    0-2     inning gap 1
+    COL @ WSH   TOP 5 4-1   | Bottom 5 4-1     inning gap 0
+    HOU @ NYY   TOP 4 1-2   | Middle 4 2-2     inning gap 0
+    KC  @ TOR   BOT 4 0-0   | Bottom 4 0-0     inning gap 0
+    MIL @ NYM   BOT 3 4-0   | End 3    4-0     inning gap 0
+    LAD @ ATL   BOT 3 3-1   | Top 4    3-1     inning gap 1
+    TEX @ CWS   TOP 2 0-0   | Top 2    0-0     inning gap 0
+    BAL @ STL   BOT 1 5-0   | End 1    5-0     inning gap 0
+
+    inning gap: n=8  max=1  mean=0.25
+
+If a 15-minute lens bound were admitting the staleness, a WARM build would be
+just as stale as a cold one — the bound does not know which build it is in. It
+is not.
+
+**THE ACTUAL DRIVER IS BOARD-BUILD DURATION.** `state.md [board-quote-staleness]`
+already measured it: **cold build 747.8s, warm 107.8s — 6.9x.** The chips are
+assembled from a cards context gathered as the build runs and stamped
+`written_at` when it publishes, so the content is about one build old. Cold:
+~15 minutes, which is exactly the two-inning gap measured at 00:08:34Z. Warm:
+~2 minutes, which is the reading above.
+
+**SO THE DEFECT IS NARROWER AND SHARPER THAN FIRST FILED.** It is not a
+permanent 15-minute lag; it is a ~12-minute window of badly stale chips
+**after every worker restart** — and a restart is what every deploy causes.
+refresh-worker was deployed at least three times on 2026-08-26 evening
+(`22:10Z`, `23:28:36Z`, `23:53:14Z`). That connects it directly to `#563`'s
+deploy-cadence finding rather than to any lens bound.
+
+**WHAT STILL STANDS, unchanged by the falsification:** `published_at` bounds when
+the artifact was WRITTEN, not how old its content is; `#564`'s 120s threshold and
+the page's stale badge both key on `published_at`; so during that window every
+publication-time instrument reads healthy on a board a quarter-hour behind. The
+candidate fix is the same and now better motivated — stamp a CONTENT age beside
+`written_at` and key the threshold and the badge on it.
+
+**WHY IT MATTERS TO A USER:** whenever the handler serves a fresh worker
+artifact rather than building inline, the board can be quietly a quarter of an
+hour behind, with no badge and no log line saying so.
+
+**CANDIDATE FIX:** stamp the chip payload with a CONTENT age — the oldest live
+state that went into it — beside `written_at`, and let the `#564` threshold and
+the stale badge key on that instead. That makes the quantity visible before
+anyone argues about the bound.
+
+**ID NOTE:** `#584` deliberately skipped. `#581` was declared twice (this lane
+and `open-bet-live-status`); `#584` was offered to that lane for its renumber.
+
+### `#583` — **The Games rail's date filter never applied to candidate-backed games. `railDate` appeared ONCE in the template, in the branch that seats cards from unclaimed chips.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-26, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T00:0xZ** (web `b0ef00b8`)
+
+`[user report]` "all NFL games that are not today are also showing up" — on the
+Today tab.
+
+**ROOT CAUSE.** `railDate` occurred exactly once in
+`syndicate/templates/intelligence.html`, inside the loop that seats cards from
+UNCLAIMED CHIPS. Groups derived from board CANDIDATES were never date-filtered
+at all, so any game with rows on the board seated a mini card whatever the day
+tab said. Invisible only while the candidate pool is one day wide — and `#565`
+widened the board's forward window to the WIDEST sport's window.
+
+**MEASURED THE SAME MINUTE**, `/api/board/game-chips?sports=nfl`:
+
+    2026-08-27  1     2026-08-28  8     2026-08-29  7     today  0
+
+All 16 have board rows, so all 16 seated cards. **The chip feed is deliberately
+multi-day and CORRECT** (`7805f5a8`: "the strip asks for the board's horizon,
+the rail still asks for today"). The rail's half of that sentence was only ever
+true for chip-seeded cards.
+
+**THE CHIP'S DATE WINS OVER THE CANDIDATE'S**, and the order is load-bearing:
+`#165` follow-up #3 measured gamePk 824892 stamped `2026-07-31` while showing
+the same live score and inning as 824894, dated `2026-07-30`. **An undated group
+is KEPT** — the rule the chip loop already followed.
+
+**IT SHIPPED INERT FIRST AND WAS CAUGHT BEFORE LANDING.** The filter built
+`dateFilteredGames` while the function still returned `gamesList.sort(...)` — a
+correct answer nothing read, every card still seating. The return site now says
+so in a comment.
+
+**TESTS:** 4 assertions added to `tests/js/game_rail_derive.test.mjs`. The first
+DISCRIMINATES (FAIL pre-change, PASS post); three are boundaries passing in BOTH
+states — chip date beating a wrong row date, the today game kept, an undated
+group surviving. All 15 pre-existing assertions still pass.
+
+**VERIFIED, in two parts, because a client-side fix has two separate claims.**
+PRESENCE: `GET /intelligence` serves `dateFilteredGames` (2 occurrences) — a
+client-side change that failed to deploy leaves the page working on the old
+function and looking fine. BEHAVIOUR, driving the real board:
+
+    day tab = Today   18 cards   MLB 15  SOCCER 1   WNBA 2   ** NFL 0 **
+    day tab = All    246 cards   MLB 15  SOCCER 213 WNBA 2   ** NFL 16 **
+
+**The second row is the point.** A filter that DELETED NFL would also read
+`NFL 0` on Today; all 16 remain, correctly dated, one click away. That is the
+failure this rail already shipped once — `#160`'s reversal, where a seed filter
+took it from 108 cards to 18 and deleted SOCCER's 21 real games.
+
+**LANE NOTE:** `layer2-rail-duplicate-nfl-cards` was OPEN but UNOWNED (session
+`23024227` archived 2026-08-20, absent from `ListAgents`, no per-session marker
+naming the slug). `lane-guard` blocked the edit first, correctly; the lane was
+adopted rather than edited across. Its inherited behavioural read is restated in
+the lane block, not discharged by the adoption.
+
+### `#584` — **Live status on open bets — and my pre-build coverage estimate was BACKWARDS.** — lane `open-bet-live-status`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T23:23:11Z** (web `61405c99`)
+
+`[user 2026-08-26]` *"can we append live game or prop status to the open bets"*
+-> *"ship both"*; *"portfolio needs a date filter"*.
+
+**NOTHING NEW IS COMPUTED.** `portfolio_commit` already writes
+`plan["bet_status"]` and `plan["live_marks"]` into `portfolio_plan_<date>.json`
+and that artifact already crosses to web. A join and a rendering — recomputing
+either in a request handler is the one thing this service must not do.
+
+**THE ESTIMATE THAT WAS WRONG, AND WHY IT MATTERS MORE THAN THE FEATURE.**
+Measured off the WHOLE plan: `bet_status` 3/442, `live_marks` 82/442. I told the
+user status would be "~5% useful" and marks would populate broadly. On the
+actual open LIVE book:
+
+    live status   81 of 126 resolved  (18 ahead, 19 behind, 16 not started,
+                                       28 already decided)
+    live mark     18 of 126 priced    (98 market_not_on_board, 7 book_no_longer_quoting)
+
+**Exactly the inverse.** The 442-row plan is dominated by PAPER SOCCER rows with
+no resolver; the live book is MLB/WNBA-heavy where the resolver works, and a
+game in progress has usually left the board so marks thin out precisely where
+statuses arrive. The measurement was real; the POPULATION it was generalised to
+was wrong — the same shape as `#508`'s storage figure, a true number against the
+wrong denominator. **Before sizing any board feature off the plan artifact,
+check whether the plan's population is the one the feature serves.**
+
+**A CROSS-CHECK THAT LANDED UNPROMPTED:** 14 `won` + 14 `lost` = **28 open bets
+decided but ungraded**, exactly the `awaiting_venue: 28` that `#580`'s deferral
+reported from a completely independent computation. Two paths agreeing on the
+same 28.
+
+**A REAL BUG FOUND WRITING ITS TEST:** `settlement_summary` ran on the DISPLAY
+list, so the pre-existing `?show=` toggle already moved the headline W/L and
+P&L, and the date filter would have moved them far more. `periods` had it right;
+settlement now reads the whole book too.
+
+**THE DATE FILTER KEEPS THE ALL-DATES GUARANTEE.** `?on=` is opt-in and never
+the default — this book is all-dates precisely so a page cannot "let one expire
+unwatched" — and whenever it is on the page states how many OPEN positions it is
+holding back. That count IS the guarantee.
+
+**A USER-REPORTED SIDE INVERSION THAT WAS A DISPLAY DEFECT, NOT A MONEY ONE.**
+A row read `home` beside `aec-mlb-cle-laa-2026-08-26` and the natural reading is
+that we bought CLE. Submit log 21:44:25Z: `our_side=home outcome_index=0
+outcome='Los Angeles Angels' outcomes=['Los Angeles Angels','Cleveland
+Guardians']` — the array is REVERSED against its own slug, `home` matched the
+Angels BY NAME, and the submit went `OUTCOME_SIDE_YES` on index 0. Order
+correct; the 2026-08-25 fix works. Game-line rows now lead with the team name.
+**`outcome_index: null` in the ledger is NOT evidence** — not an `OrderRequest`
+field at all, so it reads null on correct orders too. Trusting it would have
+produced a false inverted-order report on real money.
+
+**FLAGGED, NOT MINE:** `tests/test_venue_quote_adapters.py` — 3 failures on main
+(soccer h2h / DRAWABLE_OUTCOME / league token, `e2781211`), confirmed
+pre-existing by stashing this lane's work. Belongs to
+`exchange-markets-api-integration`. Peer also reports
+`check_lane_invariants.py` shows `scripts/run_refresh_worker.py` contested
+between that lane and `portfolio-ledger-service-split`.
+
+**METHOD NOTE FOR ANY SESSION USING `pending_deploys.py`:** it listed a peer's
+`home.py` commit as web-only, but `pipeline/layer2_shortlist.py:511` calls
+`build_game_chips`, which imports `home.py`, so refresh-worker executes it too.
+**It is not a coverage answer.**
+
+
+### `#581` — **The MLB game chips read `0-0` with no inning for every live game, about half the time. A live-lens row that could not answer was being counted as an answer.** — lane `mlb-chip-live-state`, 2026-08-26, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-26T23:10Z** (web `58be8c0d`)
+
+`[user report]` "these game chips on main page (layer 2 board) are stale" ...
+"there are times the board is totally updated and then it blanks out again for a
+good 10 minutes". Both halves are one bug.
+
+**TWO WRITERS, ONE PATH.** `live_lens_report_<date>.json` is written by
+`live_lens_loop` in the FULL row shape (20 keys, `matchup.score`,
+`gameLens[0].progress`) and by `scripts/refresh_mlb_oddsapi.py` in the SLIM
+shape — `{gamePk, startTime, status}` only, which that module's own docstring
+states outright. Served report sampled every ~50s: `22:39:26Z` SLIM,
+`22:40:48Z` FULL, `22:41:57Z` SLIM carrying a `generatedAt` **2m38s earlier than
+the FULL it replaced**.
+
+**WHY A SLIM ROW WAS FATAL.** It carries `status`, so it satisfied the only
+guard `_mlb_live_lens_state_from_row` had, and the function returned a state
+that was non-None and empty of everything that matters. `#413`'s consumer
+contract reads non-None as "the lens covers this game", so
+`_apply_mlb_live_scores` never entered its statsapi fallback for ANY game on the
+slate — and its zero-fill then turned two unknown scores into two zeroes.
+Measured: SLIM current gives 6 of 8 non-pregame games `0-0` with a bare
+`LIVE`/`FINAL` token, on BOTH serve paths; FULL current gives 8 of 8 exact.
+
+**THE FIX** is `#413`'s own "{} means ALL, not SOME" rule applied per ROW rather
+than per FILE. A row claiming live/final with neither a score nor an inning is
+refused and falls through to statsapi; a PREGAME row is still coverage. Second,
+narrower fix: the zero-fill now requires the OTHER side to have reported a
+number, so an unreported game renders `-` rather than a fabricated `0-0`.
+
+**IT DOES NOT UNDO `render-web-request-path`.** That fixed `apply_live_scores`
+3318-8400ms to 0-93ms, and the part doing the work is `_mlb_feed_live_states`
+being single-flight behind a 20s TTL: at most ONE request thread pays a fetch,
+all others take the last good value immediately. A FULL report still answers
+every game with zero network — pinned by a test.
+
+**WHY THE ORIGINAL VERIFICATION MISSED IT.** `368c7ef0` was measured end to end
+on the real 2026-06-01 report restamped to now — 9/9 games resolved, 0 statsapi
+calls. **That report was FULL.** The fixture picked the path production only
+takes half the time.
+
+**A POST-DEPLOY READING THAT LOOKS LIKE A PASS AND IS NOT.** `LENS=SLIM
+src=worker_artifact mismatched=0 ALL MATCH` proves nothing while refresh-worker
+is unfixed: the lens shape sampled is **web's** copy, and each service holds its
+own. Only `(LENS=SLIM, src=inline_*)` can falsify.
+
+**VERIFIED:** 32+ scored-game readings on the inline path, 0 score mismatches,
+4 inning-token misses all from the same transition artifact (a game seconds
+after first pitch reading `LIVE` before `TOP 1`, resolving within ~90s). Full
+read and the pre-deploy control: `.syndicate/deploys.md`, 2026-08-26 web
+`58be8c0d`.
+
+**OWED — FULLY DISCHARGED `2026-08-27T01:16:17Z` on refresh-worker `070f452a`:
+`source=worker_artifact`, `published_at 01:14:32Z`, **scored 15, live 9, BLANK 0,
+inning token present 9/9**. Five scores lag by an inning, which is `#585` and not
+this — a blanked game has NO INNING AT ALL, a stale one has a real inning merely
+behind. First discharged partially at `00:08:34Z`:** refresh-worker on `f8d8b05f` (carries `58be8c0d`), serving a FRESH
+artifact against a SLIM web lens:
+
+    source = worker_artifact   published_at = 00:07:44Z   age = 78.9s   lens = SLIM
+
+    CIN @ SF    BOT 9 10-9    | Final Bottom 9 10-9
+    BOS @ MIA   TOP 3 0-2     | In Progress Bottom 5 0-2
+    COL @ WSH   TOP 3 0-1     | In Progress Top 5    4-1
+    MIL @ NYM   BOT 1 0-0     | In Progress Bottom 3 4-0
+    BAL @ STL   TOP 1 0-0     | In Progress Bottom 1 5-0
+
+    games with a BARE live token (the blank signature): 0
+
+**Zero bare tokens.** Every live game carries a real inning. Before the fix this
+exact cell served every live game `0-0` with a bare `LIVE`.
+
+**AND THE SAME READING FOUND A DIFFERENT DEFECT — see `#585`.** The innings are
+two behind. Those four "wrong" scores have the SHAPE of the blank bug and are
+not it: **the discriminator is the TOKEN, not the score.** A blanked game has no
+inning at all; a stale one has a real inning that is simply behind. I nearly
+called this a regression off the watcher line alone. Note
+`scripts/pending_deploys.py` listed this commit as web-only; its
+service-to-file map is wrong for `home.py`.
+
+### `#582` — **`refresh_mlb_oddsapi.py` publishes a SLIM live-lens report over the FULL one, sometimes one generated minutes EARLIER. Root cause of `#581`, still unfixed.** — lane `mlb-chip-live-state`, 2026-08-26, measured — **NOT FIXED, deliberately**
+
+`#581` makes the consumer correct whichever writer wins, so the reported symptom
+is closed. This is the cause underneath it and it is still live.
+
+**MEASURED** (served report, ~50s sampling, 2026-08-26 22:40Z-23:00Z): the shape
+flips FULL/SLIM continuously, and at `22:41:57Z` the slim copy carried a
+`generatedAt` of `17:38:10-05:00` against the `17:40:48-05:00` full copy it
+replaced. **An older report overwriting a newer one is a defect independent of
+the shape**, and it costs every consumer of `gameLens`, not only the chips.
+
+**WHY IT IS NOT A TEN-LINE GUARD.** The two writers live on DIFFERENT SERVICES
+with unshared disks — the loop's full report and `refresh_mlb_oddsapi.py`'s slim
+one only meet in the hot-artifact store. A local `generatedAt`/shape comparison
+inside `_write_live_lens_reports_payload` cannot see the other writer's copy, so
+the guard has to sit in the publish layer, or the slim writer has to stop
+sharing the path.
+
+**TWO CANDIDATE FIXES, neither taken:**
+
+1. **Guard the publish.** `publish_hot_artifact` refuses to replace a stored
+   report with one older by `generatedAt`, or poorer in shape at equal vintage.
+   Correct for every consumer, but it changes a shared publish path used by far
+   more than MLB.
+2. **Stop sharing the path.** The slim writer targets
+   `live_lens_report_slim_<date>.json`; its only real consumer is
+   `_mlb_live_lens_prop_candidates_from_artifact`, which reads `trackedProps`.
+   Narrower, but it moves a file two services and an allowlist know about.
+
+**DO NOT "just revert slim mode".** `refresh_mlb_oddsapi.py` records why it
+exists — commit `5c12acf2`, a full non-slim payload for the whole slate was the
+direct cause of a prior incident, and the OOM/disk risk is the same today.
+
+### `#580` — **The venue gets first refusal on live orders. `awaiting_venue: 28`, and 28 was the exact pre-deploy count.** — lane `venue-first-refusal`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T22:1xZ** (refresh-worker `ebfec2ed`)
+
+`[user decision 2026-08-26]` *"give the venue first refusal on live orders"*.
+
+**THE RACE THIS CLOSES, measured 21:36Z.** `paper_settlement.settle_orders`
+runs from `intelligence_state.py` on **refresh-worker**;
+`venue_settlement.settle_from_venue` runs on **live-odds-worker**. Both skip an
+order already carrying an `outcome`, so **whichever service ticked first after a
+game ended owned that row permanently** — which grader won was decided by TIMING
+rather than policy, and the venue/inferred comparison could never become
+controlled while that stood.
+
+**VERIFIED:**
+
+    [paper_settlement] SETTLED date=2026-08-26 orders=435 graded=0
+      already_graded=6
+      ungraded={'no_live_feed': 314, 'awaiting_venue': 28,
+                'order_not_filled': 74, 'unmapped_market': 3, ...}
+
+**28 is not approximately right, it is the number.** Counted from the served
+ledger before deploying: exactly 28 orders `status=filled` with no `outcome` on
+2026-08-26. Every one would otherwise have been graded by inference tonight,
+permanently, before the venue was asked. And the other counters prove it
+DISCRIMINATES rather than deferring everything — `order_not_filled: 74` still
+refuses on its own reason, paper is untouched, 2026-08-25 unchanged.
+
+**A BUG AN EXISTING TEST CAUGHT.** The first version ordered the deferral BEFORE
+the filled check, so an unfilled live order would have waited forever for a
+settlement on a position that was never opened.
+`test_an_unfilled_order_is_not_counted_as_a_loss` failed and said so.
+
+**AND A READING I NEARLY GOT WRONG — the method is the lesson.** The first
+watcher queried logs with no time floor and returned `SETTLED` lines from
+21:28–21:42Z, all BEFORE the 22:07:31Z deploy. `awaiting_venue` was absent and I
+was one step from reporting "the deferral is not firing"; I had also already
+cited that batch's `date=2026-08-25 graded=6` as proof the past-window fallback
+worked, when it was the OLD code with no window at all. Caught by timestamping
+the lines against the deploy. **The discriminator that kept it honest was
+`SETTLEMENT_FAILED: 0`** — ruling out the raise that would have looked identical
+to the silence. Watchers now floor on `startTime`.
+
+**DESIGN:** a DELAY, not a refusal — a market the venue never settles still
+reaches the ledger after the window, so a ticker we got wrong does not mean a
+position that is never scored. Paper is exempt (no venue record to wait for).
+Age from `submitted_at`, falling back to `selected_date` aged from the END of
+the slate day. Zero disables deliberately; a negative falls back to the default,
+because "never defer" is a policy change dressed as a typo.
+
+**OWED:** tonight's settlements should now arrive `settled_by: "venue"`. The
+reading is the venue/inferred split tomorrow — and unlike tonight's (venue 3
+bets ROI −11.88% vs inferred 12 bets +51.07%) it will be a controlled
+comparison rather than the outcome of a race.
+
+
+### `#579` — **The venue settles our bets now, and the first reading says our own grader and the venue disagree.** — lane `venue-settlement`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T21:36Z** (live-odds-worker `022583f6`)
+
+`[user decision 2026-08-26]` *"do the settlement work next"*.
+
+**THIS DELETES AN ESTIMATOR RATHER THAN IMPROVING ONE.**
+`paper_settlement.settle_orders` grades against a status WE resolve — boxscore
+feed, team aliases, line handling, an over/under vocabulary — and its own record
+says what that costs: 80 of 171 orders on 2026-08-23 refused `unmapped_market`
+and always would have, because a spread arrives as `side="Texas Rangers",
+line=-1.5`. Both venues simply state how a market we hold resolved.
+
+**FIRST PRODUCTION READING:**
+
+    VENUE_SETTLEMENT settled=3 already=12 awaiting=73 unjoinable=36
+      pnl_unattributed=0 refused={} errors={}
+
+Three real orders graded with the venues' exact P&L (kalshi 1, polymarket 2).
+`settled_count` on the live book went 12 -> 15.
+
+**THE SPLIT IS THE FINDING.** `settled_by` keeps authoritative and inferred
+separable, and on this sample they disagree sharply: venue **3 bets, −$1.45,
+ROI −11.88%**; inferred **12 bets, +$15.05, ROI +51.07%**; the page shows the
+blend, **+32.60%**. **n=3 proves nothing** — but the headline ROI is a mixture
+of a venue record and our own inference, and nothing on the page says so.
+
+**RACE CONDITION — FOUND AFTER DEPLOYING, WHICH IS THE HONEST ORDER TO RECORD
+IT IN.** `settle_orders` runs from `intelligence_state.py` on **refresh-worker**;
+venue settlement runs on **live-odds-worker**. Both skip an order that already
+carries an `outcome`, so **whichever service ticks first after a game ends owns
+that row permanently.** Two consequences: which source grades a live order is
+decided by worker timing rather than policy, and the venue/inferred comparison
+can never become controlled while that stands.
+**RECOMMENDED, NOT TAKEN** (changes money-grading on a shared module; which
+source wins is the user's call): give the venue FIRST REFUSAL on live orders and
+keep `settle_orders` as the fallback for what the venue cannot settle — e.g.
+grade a live order by inference only once it has been `awaiting` beyond a stated
+window.
+
+**Refusals are by name and absences are two counters, never one:** `unjoinable`
+(a settlement matching no ungraded order of ours) and `awaiting` (an open order
+with no settlement yet) are opposite problems. `scalar` markets and
+both-sides-held rows refuse rather than resolve by coin flip. A MARKET's P&L is
+never split across several of our orders on it — they share the outcome and get
+no P&L, counted as `pnl_unattributed`.
+
+**OWED:** `awaiting=73` must fall as tonight's games settle. If it does not, the
+join is losing settlements to a ticker mismatch and `unjoinable` is where they
+went. 22 tests; 849 green across settlement/execution/portfolio/ledger.
+
+
+### `#578` — **Both venue balances on `/portfolio`, and the first production run returned `path_unknown` — which is the whole reason it was built to say that.** — lane `venue-balances-on-portfolio`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T21:07:32Z** (worker + web `4f3d3fe6`)
+
+**MEASURED, both venues, stamp 7s old at 21:07:32Z:**
+
+    kalshi      $11.55 cash   ($40.54 including open positions)
+                raw_field balance_dollars, raw_value 1154.0,
+                unit_disagreement null -- the venue agrees with itself
+    polymarket  $65.30 buying power   ($123.89 cash)
+                open_orders 0.00, unsettled 0.00, currency USD
+                path /account/balances
+    both        unit_assumption "documented"
+
+**THE FIRST DEPLOY RETURNED `path_unknown`, AND THAT IS THE FEATURE WORKING.**
+`6fece2cd` shipped with a guessed path; production answered
+`VENUE_BALANCES kalshi=ok:13.84 polymarket=path_unknown`, all four candidates
+404 with an identical gRPC `{"code":5}` envelope. A version that had guessed
+harder, or rendered `$0.00`, would have been indistinguishable from an empty
+account. The user then supplied the real path and both API references.
+
+**WHAT THE DOCS REPLACED.** (1) The path is PLURAL -- `/v1/account/balances`;
+the guess list had the singular, one character out. (2) The response is a LIST
+keyed by `currency` and each row carries `pendingWithdrawals[].balance`, so a
+generic field scan would have reported money LEAVING the account as the money
+in it -- now parsed by name. (3) `buyingPower` is not `currentBalance` and is
+the right figure for a cap comparison. (4) **No unit is assumed anywhere any
+more**: Polymarket is `number<decimal>`, and Kalshi ships `balance_dollars` as
+a fixed-point string beside the int64 cents, so the division became a
+CROSS-CHECK.
+
+**THE READING EARNED ITS PLACE IMMEDIATELY.** Neither venue can reach its own
+day cap: kalshi $49.01 cap vs $11.55 spendable (4.2x), polymarket $100.01 vs
+$65.30 (1.5x). Polymarket's cash and buying power differ by $58.59 with open
+orders AND unsettled funds both zero -- collateral against open positions --
+which is precisely why a cap is checked against buying power and not cash.
+
+**FOLLOW-ON, from mapping both references (`deploys.md` 2026-08-26 21:0xZ):**
+`GET /portfolio/settlements` and `/markets/{id}/settlement` would let the venue
+settle our positions directly, which is the shortest path to `settled > 0` --
+the gate the whole feedback loop is stuck behind. `gateway.polymarket.us` serves
+markets/events/series/sports/books/BBO with NO key, while we sign every one of
+those reads against the private host. `GET /sports/leagues/{slug}/events`
+replaces `find_first_game_offset` (`#559`) with a mechanism instead of a
+heuristic. Kalshi order groups enforce a contract cap AT THE EXCHANGE, which
+survives our worker dying mid-slate as an in-process cap cannot. **None of
+these are verified -- documented only.**
+
+**CORRECTION OWED TO `kalshi_orders.py`:** its comment says the replacement
+order path is unknown because "the docs host is blocked from this environment".
+It is not -- both references were read from a Claude session today via the
+browser tool. That belief is why the V2 path had to be hand-supplied after a
+410. Also, the order READ path still defaults to legacy `/portfolio/orders`
+via `KALSHI_ORDER_READ_PATH`; the 410 was on the write path only, so reads are
+probably fine, but that is an assumption rather than a check.
+
+
+
+`[user 2026-08-26]` *"are we able to display kalshi and polymarket balances on
+the portfolio page?"* Yes, and the answer is shaped by two constraints that both
+point the same way.
+
+**THE PAGE MUST NOT CALL THE VENUE.** Web holds no credential and must not:
+`KALSHI_PRIVATE_KEY` / `POLYMARKET_US_*` are dashboard-set on live-odds-worker,
+deliberately absent from `render.yaml` (`#284`). And a second independent live
+caller of a venue is a NAMED incident class here (`#139`/`#144`/`#148`) — it is
+why `_polymarket_resolve_market` was rewritten in August to read the persisted
+artifact instead. A balance widget hitting the venue per page load is that
+mistake with a nicer UI: one handler, N viewers, no rate budget. So the worker
+fetches on its execution tick, stamps `venue_balances.json`, and the page reads
+it with an age — the same hop, and the same reasoning, as `execution_state.json`.
+Stamped in the same breath as the caps, because the two numbers a person
+compares are "what may I spend" and "what do I have".
+
+**THE ONLY DANGEROUS BUG IS A ZERO.** "The account is empty" and "we could not
+read the account" are opposite facts — one says stop trading, the other says
+something is broken — and the naive version renders both as `$0.00`. Every
+failure carries a named status and NO dollar figure (`credentials_absent`,
+`auth_error`, `path_unknown`, `shape_unrecognised`), and the two-venue total is
+withheld entirely unless BOTH read, because a sum over a partial read is a lie
+with a dollar sign on it.
+
+**KALSHI IS VERIFIED AND POLYMARKET IS NOT.** `GET
+/trade-api/v2/portfolio/balance` is exercised — 200 from a signed call
+2026-08-23T22:53Z while unauthenticated reads were 429ing
+(`kalshi_client.py:252`). `api.polymarket.us` has NO balance path documented
+anywhere in this repo (`polymarket_us_auth.probe_auth()` asks `/markets`), and
+the sandbox proxy denies CONNECT to venue hosts so it cannot be found from a
+session. The path is therefore DISCOVERED once from four read-only candidates,
+the winner recorded and reused, and `path_unknown` is a real reportable state
+rather than a guess that 404s forever. A 401 stops discovery — a bad credential
+cannot be fixed by another path.
+
+**THE UNIT IS AN ASSUMPTION AND IS LABELLED.** Kalshi documents cents: divided,
+stamped `unit_assumption: cents`, raw value beside it. Polymarket documents
+nothing we have read: carried UNDIVIDED and labelled `dollars_unverified`, because
+dividing there would be inventing a fact. Same discipline that caught the 100x
+price error before it shipped.
+
+Also: the caps panel now says when a day cap sits above its venue's balance
+("Kalshi's $50.00 day cap is above its $41.07 balance"), shown only for a venue
+whose balance actually read. 19 tests, including that a boolean `available: true`
+is not a $1.00 account, and that `record_venue_balances` cannot raise into the
+tick that places orders.
+
+**OWED, and it is the point of the item:** deploy web + live-odds-worker, then
+read `VENUE_BALANCES kalshi=… polymarket=…` on the worker. **Which Polymarket
+path answers — or `path_unknown` against all four — is the finding.** If it
+answers, the second reading owed is whether its raw value is dollars or cents;
+`raw_value` is stamped so the artifact alone settles it.
+
+
+### `#577` — **The venue day-caps are user-editable, they BIND on the worker, and the web half shipped first as a ridealong.** — lane `portfolio-venue-caps-editable`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T20:27:26Z** (all three services `1e9ec576`)
+
+`[user decision 2026-08-26]` *"we need to be able to enter Polymarket and Kalshi
+MAX per day and orders per day on this page like the other pieces like
+bankroll."*
+
+**THE WHOLE RISK WAS AN INERT FORM AND THERE WERE THREE WAYS TO BUILD ONE.**
+Each is closed and each has a test driving `check_order` — the function that
+actually refuses — not the settings module in isolation.
+
+1. `limits()` read `os.environ` and nothing else, and it runs on
+   live-odds-worker. A store only web could write would render, accept a
+   number, echo it back, and place against the old one.
+2. `max_day_orders` was FLAT while `max_day_dollars` had been per-venue since
+   2026-08-25 — `spent_today` filtered orders per venue and compared that count
+   against an account-shaped number. Both venues defaulting to 15 hid it.
+   "Kalshi 5 a day" would have been stored, displayed, and unenforced.
+3. `max_day_dollars_all_venues` is checked BEFORE the per-venue budgets and
+   defaults to $150, so raising Kalshi to $200 moves nothing on its own. Both
+   ceilings are editable for that reason, and the page says so out loud when
+   the venue caps sum above the ceiling.
+
+**AND THEN THE FOURTH WAY HAPPENED AT THE DEPLOY LAYER.** Another session's
+deploy of `1e9ec576` (20:18:42Z, `trigger=api`) carried this commit to **web**
+and **refresh-worker** while live-odds-worker stayed on `448dc87d`. The user
+asked *"check if your changes just went as a ridealong"* — they had. Web served
+all seven inputs at 20:21:46Z against a worker that could not read them.
+Measured before acting: every `source` read `default`, so **no edit was made
+inside the inert window**. Closed by deploying the worker at 20:25:29Z.
+**A change split across services is inert in exactly the same way a change split
+across layers is, and only the deploy check catches it.**
+
+**VERIFIED BY THE USER'S OWN SAVE**, 20:27:26Z, which is stronger evidence than
+the test: all seven fields `source: "stored"` (kalshi 49.01/20, polymarket
+100.01/20, account 150.01/40, 10.01 per order) AND the worker's stamp carrying
+`max_day_dollars_kalshi 49.01`, `max_day_dollars_polymarket 100.01`, plus the
+new per-venue order keys absent from the old stamp. A number typed in a browser
+reached `limits()` on the worker and is what `check_order` enforces.
+
+**A CORRECTION WORTH KEEPING.** The pre-deploy stamp read `max_day_dollars: 40`
+beside `max_day_dollars_kalshi: 50` — which looks exactly like the
+display-vs-enforcement split this fixes. **It was not.** The worker's env-vars
+set `_KALSHI=50` and `_POLYMARKET=100` explicitly; the `40` is the flat fallback
+for a venue with no per-venue entry, i.e. neither of ours. The code defect was
+real (`limits()` returned the per-venue figures from the DEFAULT map, ignoring
+the env override computed 25 lines above) but **masked in production because
+those env values happen to equal the code defaults**. Reading the env instead of
+inferring from the stamp is the only thing that separated a real finding from a
+confident wrong one.
+
+**Also fixed:** paper stays uncapped (a stored cap binds live only, or the paper
+ledger becomes evidence about the cap instead of the strategy), and the
+unreachable-ceiling note is `info` on the shipped defaults — 15+15 books against
+a 25 ceiling is the DESIGNED gap, and a permanent orange banner over a
+correctly-working system is what the resting-orders fix was written to stop.
+
+
+### `#576` — **The live buying engine is anchored to `/portfolio`, and the URL the user pasted asking for it was itself the bug.** — lane `portfolio-live-primary`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T19:5xZ** (web `752d83ba`)
+
+`[user decision 2026-08-26]` *"I want the main portfolio page merged with
+`/portfolio/live` ... our live buying engine anchored to the primary portfolio
+page ... and all the editable inputs to remain editable on the page."*
+
+**WHY THE SPLIT WAS WRONG, and it is not the argument that created it.** The
+reason `/portfolio/live` was its own page was that simulated positions shown
+beside real ones get mistaken for bets somebody placed. That argument is about
+SIMULATION, and `/portfolio/paper` is untouched, still running, still linked
+both ways. Real money and the user's own logged bets are both real. The cost of
+the split was that the one surface that spends money sat a click off the nav
+and nobody had it open — 37 live positions and 83 refused orders were on a page
+you had to know to visit.
+
+**THE `?date=` WAS A DEFECT, not a formatting quirk of the link they sent.**
+The template read `L.selected_date`; `_live_portfolio_payload` returns `date`.
+Jinja renders an undefined as nothing and raises nothing, so every `show=` and
+`period=` link that page built dropped the date **silently** — the class of
+failure this repo keeps paying for, where the broken thing and the working
+thing render identically. Measured post-deploy: `?date=2026-08-26&show=all`.
+
+**Shipped:** `/portfolio` renders both books, separately headed and never
+summed. `/portfolio/live` is a 302 to `/portfolio#live` carrying the query
+string verbatim — **a redirect, not a second render**, for the reason
+`/portfolio/settings` already gave about this same form: two copies of one
+surface drift, and the one nobody edits is the one somebody trusts.
+`portfolio_live.html` deleted; a test fails if it returns. The five editable
+settings move INTO the live half beside the book they govern, and a test now
+asserts every name in `portfolio_settings.EDITABLE_FIELDS` is on the page, so a
+field cannot become uneditable by being forgotten in a template edit.
+
+**Two silent-cosmetic defects fixed in passing:** the Performance pivots had NO
+CSS whatsoever (the section rendered as unstyled markup; `is-up`/`is-down`
+coloured nothing), and the live half referenced `--cards-border`, which
+`app.css` does not define — every such rule had been falling back to a
+hardcoded hex, so the real-money page was the one surface not on the design
+tokens.
+
+**Production reading** (`deploys.md` 2026-08-26 19:50:37Z has the full block):
+banner `is-ok`, Job on / Mode live / Armed yes / Kill switch clear / Source
+live-odds-worker 4m ago; 37 positions, 6W-4L, +$21.66 on $23.07 settled; all
+five inputs carrying the USER's stored edits (35 positions, 0.0 EV floor), not
+defaults; 83 hidden non-positions behind the toggle; `/portfolio/paper` 200 with
+16 committed positions.
+
+**CARVE-OUT, recorded rather than negotiated.** Every file here is
+`portfolio-decision-and-execution`'s (session `01Sia2rPD72eFTriy28azzs2`, which
+authored `bbfc3906` six hours earlier). It is not a reachable peer —
+`ListAgents` returns 12 sessions and it is not among them — so this follows the
+same fallback that lane itself recorded twice on 2026-08-24/25. Scope taken was
+exactly the two page routes, the two templates, one link on the paper page, and
+the live page's tests. **Nothing about the execution ledger, the commit job,
+the guard, sizing, or the payload's contents was touched.**
+
+
+### `#575` — **NFL had ZERO chips against 106 cards, and my own `#542` had doubled the soccer home rail. One root: `games()` served two callers needing different horizons.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26 — **VERIFIED IN PRODUCTION 2026-08-26T19:15:44Z**
+
+**MEASURED, both services live:** `CHIP_JOIN_COVERAGE sport=nfl chips=16
+chip_dates=['2026-08-27','2026-08-28','2026-08-29'] cards=106 by_matchup=106
+no_chip_available=0` — **106 -> 0**, matching the local reading exactly.
+`GAME_CHIPS_PUBLISHED chips=246 sports=8` (up from 230). Soccer held at
+`no_chip_available=0`; mlb and wnba unchanged at 0.
+
+**The soccer home-rail regression this also repaired was MINE**, introduced by
+`#542` widening a method the home page shares and never checking the caller:
+98 -> 210 games with a count badge claiming 210 today. Found only when this
+task forced a proper read of the call graph.
+
+**I called this done while the sweep was still running**, and it then failed
+four tests I had caused — three in my own `#542` file, which asserted the
+unconditional behaviour `#575` deliberately made opt-in. Re-run clean at 1340
+passed. The measurements were real; the completion claim was premature. Same
+shape as the `|`-alternation log query the same day: acting on a result before
+confirming the method behind it.
+
+
+**THE NFL DEFECT, measured 2026-08-26T17:16:23Z by `#541`'s telemetry on its
+first real run:**
+
+```
+CHIP_JOIN_COVERAGE sport=nfl chips=0 chip_dates=None cards=106
+  no_chip_available=106
+```
+
+Every NFL compact card printed full club names. Traced, not guessed: on 08-26
+`preseason_week_for_date` is None (no preseason game that day) AND
+`regular_season_game_ids_for_date` is None (season not started), so
+`games()` falls to `preseason_target_week`=4 and then
+`_nfl_games_on_requested_date` narrows week 4 to games played ON 08-26 — of
+which there are none. **Correct for a rail meaning "today". Fatal for a strip
+serving a board whose cards run weeks ahead.**
+
+**AND I FOUND A REGRESSION OF MY OWN WHILE LOOKING.** `#542` widened soccer to
+two matchdays UNCONDITIONALLY. `games()` is shared with `_load_home_games`, and
+soccer falls through `_load_home_game_items` to
+`_compact_game_cards(home_games)` which renders every one — so the home rail
+went **98 -> 210 games**, with a count badge claiming 210 games today. Measured
+here before the fix. I shipped `#542` without checking its other caller.
+
+**THE FIX: the horizon is the CALLER's to ask for.** `games()` takes
+`include_upcoming: bool = False`. The rail keeps today; `build_game_chips`
+passes True.
+
+  * soccer: `week_offsets = (0, 1) if include_upcoming else (0,)`
+  * NFL: `include_upcoming` returns the resolved week UNFILTERED, skipping
+    `_nfl_games_on_requested_date` (kept, and pinned by test, for the rail)
+
+**PROBED, NOT ASSUMED.** `home.py` and `game_chip_scoreboard.py` are separate
+blobs and either can be a deploy behind — an unguarded kwarg would raise
+TypeError against an older provider and blank EVERY sport's strip, strictly
+worse than the narrow chips it replaces. `_games_accepts_include_upcoming`
+inspects the signature, cached per provider TYPE, and an unintrospectable
+provider assumes the OLD signature (False costs the horizon; True would raise).
+Same pattern as `layer2_board._blended_score_accepts`.
+
+**MEASURED AFTER, all three at once:**
+
+```
+NFL chips              0  -> 16
+soccer chips         210 -> 210   (coverage preserved)
+soccer HOME rail     210 ->  98   (regression repaired)
+NFL    HOME rail       0 ->   0   (unchanged; no NFL game on 08-26)
+```
+
+And on the REAL board fixtures from the production log
+(`Houston Texans @ Carolina Panthers`, `New York Giants @ New York Jets`,
+`Washington Commanders @ Baltimore Ravens`,
+`Cincinnati Bengals @ Philadelphia Eagles`, `Atlanta Falcons @ Miami Dolphins`),
+driven through the real `layer2_rows_to_board_cards` and `chip_join_coverage`:
+**`no_chip_available` 106 -> 0, `by_matchup=5`.**
+
+**A WRONG READING I CORRECTED MID-TASK, worth recording.** I first concluded the
+106 NFL board cards were REGULAR-SEASON week 1 and started building a
+preseason+regular union. Checked instead of assuming: all five sampled board
+fixtures are in **preseason week 4**, and none is in regular week 1. The union
+was unnecessary and would have added a second week of chips for no reason.
+
+**Tests:** `tests/test_chip_horizon_opt_in.py` (6) — rail vs strip for soccer,
+the signature default, the probe against an old/new/unintrospectable provider,
+and NFL's rail filter surviving while the strip is not narrowed.
+
+**Verify after deploy:** `CHIP_JOIN_COVERAGE sport=nfl` with `chips>0` and
+`no_chip_available=0`, while `sport=soccer` keeps `no_chip_available=0`.
+
+### `#574` — **`DIRECT_FEED_BOOKS` matches EXACTLY, so an aggregator alias would slip through. The answer was not in this repo, so it is now measured on every build.** — lane `layer2-sim-view-and-live-projection`, 2026-08-26, asked by syndicate-43
+
+**THE EXPOSURE IS REAL AND EXACTLY ONE LINE.** `is_direct_feed_book` is
+`str(book).strip().lower() in DIRECT_FEED_BOOKS` (`book_shortlist.py:96`)
+against `frozenset({"kalshi", "polymarket"})` — exact equality, no prefix
+match, no separator folding. So `polymarket_us`, `kalshi_us`, `polymarket-us`
+and `Polymarket US` pass straight through the filter built to stop them, and a
+second price for one venue re-enters `_fair_by_side`'s de-vig.
+
+Not a hypothetical spelling: **`venue_quote_fanin.SOURCES` itself uses
+`polymarket_us`.** The two halves of this system already disagree on how to
+spell one venue.
+
+**I COULD NOT ANSWER IT FROM EVIDENCE, AND SAID SO RATHER THAN GUESSING:**
+
+  * git-tracked OddsAPI shards are a **May/June MLB mirror — 338 files, five
+    books** (`draftkings 755, fanduel 344, fanatics 122, betmgm 39,
+    williamhill_us 25`), **neither venue present at all**. The `data/**` trap
+    CLAUDE.md documents, hit exactly as described.
+  * **No log line anywhere prints a book key**, so production's key space is
+    invisible even with log access.
+  * No egress from a cloud session to curl production or OddsAPI.
+
+**SO THE CODE NOW REPORTS IT.** `book_grid` counts NEAR MISSES — a book whose
+name contains "kalshi" or "polymarket" that the exact match nonetheless refused
+— printed beside the existing count, empty dict included:
+
+```
+[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows=417 books=['kalshi','polymarket']
+            near_misses={}
+```
+
+Printed even when empty so "the filter matches every spelling" and "this build
+never ran" cannot look alike (`#541`'s rule).
+
+**DELIBERATELY A COUNTER, NOT A WIDER MATCH.** Substring matching would silently
+swallow any future book whose name merely CONTAINS these strings — dropping real
+prices with no way to notice, worse than the bug it fixes. Widen the frozenset
+BY NAME once a real spelling is observed.
+
+**Tests:** `tests/test_direct_feed_book_aliases.py` (5). Alias cases asserted as
+MISSES so the test states the exposure rather than hiding it; a later
+substring-based matcher fails them and is forced to read this entry.
+
+**ID COLLISION, THE SECOND MECHANISM.** `scripts/todo_id_alloc.py` handed me
+`#569`, already taken by `board-staleness-visibility` on `origin/main`. The
+allocator's `O_CREAT|O_EXCL` is atomic **within one filesystem** and these
+sessions are separate checkouts pushing to one remote — so it cannot see a peer's
+claim until that claim is fetched. `#537` fixed same-tree collisions and this
+class is untouched by it. The working fix is to compute the high-water against
+`origin/main` (`git show origin/main:docs/ai_context/todo.md`, `todo_closed.md`,
+and `git ls-tree origin/main .syndicate/todo_ids/`) AFTER a fetch, which is what
+was done here. Surfaced by a rebase conflict on the claim file — the claim file
+being tracked is what made the collision loud instead of silent.
+
+**Verify after deploy:** `near_misses={}` on a build with non-zero `rows=`
+closes the question. Any populated key names the exact string to add — a
+one-word fix, by name, with evidence.
+
+### `#572` — **CI silently drops runs under push load: 9 pushes to `main` in 40 minutes produced 6 runs, 3 of which never executed. `ci.yml` declares no `concurrency` group, so nothing is ever superseded — it just piles up until GitHub sheds it.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+**Measured 2026-08-26T15:10–15:50Z on `main`:**
+
+```
+pushes to main in the window        9
+workflow runs created               6      <- 3 pushes produced NO run at all
+  startup_failure                   3      <- created, never executed
+  queued (still, minutes later)     2
+  in_progress                       1
+runs that actually executed         1 of 9 pushes
+```
+
+`startup_failure` is **not a test result.** The run is created and never starts,
+so it reports neither pass nor fail. Over a 500-run / 4-day window there are
+only 3 of them and **all 3 are in this one 22-minute window on `main`** — so
+this is a load burst, not a chronic fault. That is precisely why it is worth
+filing rather than shrugging at: it appears exactly when the repo is busiest,
+which is when CI's answer matters most.
+
+**The mechanism.** `.github/workflows/ci.yml` has **no `concurrency:` block.**
+Every push therefore starts a full run — two jobs, `pytest-baseline` carrying
+`timeout-minutes: 60` — and nothing supersedes anything. With this many parallel
+sessions pushing to `main`, in-flight runs accumulate until dispatch sheds some.
+The `cancelled` runs already in the history (9 of 500) are the same pressure
+showing up at the 60-minute cap.
+
+**What it cost, concretely, this session.** PR #94 showed **zero check runs**
+several minutes after push, with `mergeable_state: clean`. I read that as "CI
+was not triggered" and merged on that basis. The run existed — it was created at
+**16:13:10Z**, roughly 18 minutes late, *after* the merge. So the observable
+signal for "CI has not started yet" and "CI will not run" are **identical for
+tens of minutes**, and a reviewer cannot distinguish a clean PR from an
+undispatched one. That is a merge-safety property, not a convenience one.
+
+**The fix is a `concurrency` block, and the obvious version is wrong.**
+
+```yaml
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+`cancel-in-progress: true` is right for **PR branches** — a superseded push
+should not keep a 60-minute runner. It is **wrong for `main`**, where each
+commit's result is the record: cancelling means the SHA that fixed something
+never gets a verdict, and `#569` just spent a session establishing that a gate
+nobody can read the result of is worse than no gate. Use a per-ref group with
+`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`, or split the
+workflow so `main` never cancels.
+
+**Cheaper lever worth considering first:** `pytest-baseline` is a 35–60 minute
+job on every push. It does not need to run on every commit to a feature branch
+to do its job — on PRs and on `main` is enough, and that alone would remove most
+of the contention without touching cancellation semantics at all.
+
+---
+
+### `#571` — **`test_polymarket_side_vocabulary` asserts a key set the source stopped producing. Recorded as baseline debt, NOT fixed — because the widened keys may be a mis-join risk, not just a stale expectation.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+Found while regenerating `tests/pytest_baseline.json` (`#569` work). Two tests
+fail and **reproduce standalone**, so they are real, not parallel-run flakes:
+
+```
+tests/test_polymarket_side_vocabulary.py::test_the_board_row_derives_the_SAME_key_from_its_own_teams
+  expected ["mlb|h2h|home", "mlb|h2h|arizona diamondbacks"]
+  got      ... + "mlb|h2h|arizona"            (2 extra keys)
+
+tests/test_polymarket_side_vocabulary.py::test_an_unresolvable_club_adds_NO_second_key
+  expected ["mlb|h2h|home"]
+  got      ... + "mlb|h2h|club", "mlb|h2h|real"   (4 extra keys)
+```
+
+**Attribution.** `_candidate_keys` lives in
+`syndicate/features/shared/venue_quote_fanin.py:523` and was last changed by
+`0acabd091` — *"Kalshi offered every game line under a side the board never asks
+for"* — at **2026-08-25 22:06:54Z**. The test file was last touched at
+**20:17:32Z**, an hour and a half EARLIER. So the source deliberately widened key
+derivation and the test was left asserting the narrow set. Same shape as `#564`
+(the freshness test): a fix shipped without updating the test that pinned the
+old behaviour.
+
+**WHY THIS IS NOT JUST "UPDATE THE EXPECTATIONS".** The second test's name is
+the argument: `test_an_unresolvable_club_adds_NO_second_key`. It exists to
+assert that an unresolvable club name does **not** manufacture extra join keys —
+and the source now emits `mlb|h2h|club` and `mlb|h2h|real` from the words of
+"Real Club ...". Widening keys to help **Kalshi** match may be correct for
+Kalshi and wrong here: `_candidate_keys` is SHARED across venues via
+`venue_quote_fanin`, and a bare token like `real` or `club` can collide with a
+different fixture's team. A wrong join is a quote attached to the wrong game,
+which is the `#559`-class defect this repo keeps paying for.
+
+So the test may be **right and the source wrong for the Polymarket path**, or
+the test may be stale. Rewriting the assertions to match current output would
+settle that by fiat, in the direction that makes CI quiet — the worst available
+tiebreaker. **Whoever owns `0acabd091` should say which behaviour was intended.**
+
+**Recorded, not hidden.** Both are now in `tests/pytest_baseline.json` as known
+failures. That is what the baseline is for — *"the existing debt stays visible as
+a number in a file rather than as a red check nobody reads"* — and it is
+explicitly NOT an endorsement. The gate will fail the moment either starts
+passing, which is the prompt to close this item.
+
+---
+
+### `#570` — **The pytest suite writes into git-tracked `data/`. Every full-suite run dirties the working tree, and the stray lines look like recorded production data.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+
+**Observed three times in one session**, each time after starting a full-suite
+run, always the same file:
+
+```
+ M data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_02.jsonl
+```
+
+One JSON record appended per run, e.g. `{"recordedAt": "2026-08-26T15:06:43+00:00",
+"date": "2026-06-02", "generatedAt": "2026-08-26T15:06:43+00:00", ...}` — three
+minutes into the run each time. I restored it with `git checkout --` on each
+occurrence rather than committing it.
+
+**The mechanism.** `syndicate/features/mlb/live_lens.py:1381` appends via
+`live_lens_log_path(selected_date)`
+(`syndicate/features/mlb/sources.py:364`), which resolves through
+`_resolve_data_path_with_reconcile` against the **repo's own `data/` root**
+unless `SYNDICATE_DATA_ROOT` is redirected. `tests/conftest.py` does **not**
+sandbox `SYNDICATE_DATA_ROOT` globally — 67 test files set it individually, so
+the convention exists but is opt-in per test, and anything that reaches this
+writer without opting in writes to the tracked mirror.
+
+**Why this is worth more than a tidy-up.** `CLAUDE.md` designates
+`data/<sport>_source/` a **cold-start safety net**, explicitly *not* a snapshot
+of what production computed, and warns that analysis drawing conclusions from it
+is reading a lossy mirror. A test-injected record is worse than lossy: it is
+**fabricated data wearing a production timestamp**. The line above says
+`recordedAt: 2026-08-26` for `date: 2026-06-02` — a future session backtesting
+2026-06-02 has no way to tell it from a real capture. This is the same failure
+class as `#502`/`#517`: a number that looks precise and is not real.
+
+The second-order risk is the commit. A dirty tree after every suite run trains
+people to `git add -A`, and `.syndicate/session_isolation_protocol.md` already
+records what that habit cost once (4,993 staged deletions, and the staged
+deletion of the only copy of a ledger archive).
+
+**NOT YET PINNED: which test.** The prime suspect is
+`tests/test_mlb_refresh_runner.py` — it is the only test file that references
+`2026-06-02` *and* `live_lens`, and it monkeypatches `_live_lens_log_path` at
+`:337` and `live_lens_log_path` at `:906`, i.e. it sandboxes the writer on some
+paths. Some path through the suite evidently still reaches the real root, and I
+did not isolate which; attributing it to that file on this evidence would be a
+guess. **To pin it:** run the suite with a watch on the file's mtime, or bisect
+by running candidate files individually against a clean tree.
+
+**The fix is probably one line, and should not be applied blind.** An autouse
+`conftest.py` fixture pointing `SYNDICATE_DATA_ROOT` at a tmpdir would stop the
+whole class. But 67 files set it themselves, and some tests read git-tracked
+mirror fixtures on purpose — a global redirect could turn "reads real fixture"
+into "reads empty dir" and convert this into a wave of silent empty-input
+passes, which is the failure mode `model_engine_standard.md` exists to prevent.
+Land it behind a full-suite before/after, not on reasoning.
+
+---
+
+### `#569` — **Is the BOARD stale, or is the QUOTE stale? Nothing in this repo could tell them apart, and the whole staleness investigation ran without noticing.** — lane `board-staleness-visibility`, 2026-08-26, asked by syndicate-43 — **CLOSED 2026-08-26: measured, root-caused, FIXED and verified in production**
+
+**THE BLIND SPOT, and it is mine.** Every measurement the staleness work
+produced — `#564`'s chip `written_at`, the board's derived `state_meta`, the
+stale badge — is on artifact **PUBLICATION** time. **None of it touches the age
+of the quote INSIDE the artifact.**
+
+    a board republished every 60s carrying 20-minute-old venue quotes reads:
+      written_at        seconds old      ✓ fresh
+      published_at      seconds old      ✓ fresh
+      state_meta        is_fresh: true   ✓ fresh
+      stale badge       not rendered     ✓ fresh
+
+**That failure mode was invisible to every instrument shipped in this lane**, and
+it is precisely the one a direct Kalshi/Polymarket feed would fix while a
+publication fix would not. syndicate-43 asked whether the two had been
+separated. They had not. **The direct-feed hypothesis is UNTESTED, not refuted.**
+
+**Why it was missed:** the reported symptom (frozen odds-refresh times, chips not
+updating ~20 min) pointed at publication, and publication turned out to be
+genuinely broken **twice** — `#545`'s cadence regression and the hard-coded
+`is_fresh: True`. Two true causes in a row is exactly what stops the search.
+
+**THE INSTRUMENT.** `QUOTE_AGE_SERVED at=publish rows= no_clock= seen_n/p50/p90/max
+book_n/p50/p90/max worst_seen_by_sport <slug>=<s> ...` in
+`pipeline/layer2_shortlist.py`, over the **SELECTED** rows (the quote-age gate
+has already dropped rows past `max_quote_age_seconds`, so this reports the ages
+that SURVIVED — what the board actually shows).
+
+**BOTH CLOCKS, SEPARATELY.** `_row_quote_age_seconds` (`layer2_board.py`, `#370`)
+establishes with production measurements that these answer different questions:
+
+    seen_age   how long since WE LOOKED       wnba 2026-08-11:  68.5m
+    book_age   how long since the PRICE MOVED wnba 2026-08-11: 376.2m
+
+A motionless market ages without limit on the book clock while our observation
+stays current. Collapsing them reports an outage that is not there; using only
+`seen` misses a feed that has genuinely stopped. **Mutation-checked: collapsing
+the two turns 3 tests red.**
+
+**HOW TO READ IT**, against the ~60s publish cadence:
+
+    seen_p50 small + board looks stale  -> PUBLICATION. This lane's ground.
+    seen_p50 large + board looks fresh  -> UPSTREAM. syndicate-43's case.
+
+**Absent, never zero,** on a missing clock — zero reads as "our observation is
+current", the opposite of "we have no clock". Same rule as `#566`.
+Mutation-checked. Bools rejected explicitly (`isinstance(True, int)` is True, so
+an unguarded check records `True` as a 1-second-old quote).
+
+**LANE BOUNDARY RESPECTED.** `layer2_board.py` is held by the OPEN lane
+`layer2-sim-view-and-live-projection`, so the fields are read from the row
+contract in `layer2_shortlist.py` rather than computed there. Nothing in that
+lane's file was touched.
+
+12 tests. **CLOSED. The full chain, each step measured rather than argued:**
+
+1. **`seen_p50=859`** on the first reading — the board republishes every ~60s and
+   ships quotes 14 minutes old at the median. syndicate-43's direct-feed case was
+   **untested, not refuted**, and every publication fix shipped that day was
+   treating a symptom.
+2. **The rows never repoll.** n=4 over 23 min: mlb and wnba worst rows aged at
+   **0.98x wall clock** — no refresh at all — while the median improved. Not a
+   cadence floor; specific rows are skipped by sweeps that happen.
+3. **Two causes, split by sport.** `market_gone`=3, `orphaned_line`=3 on the
+   sports whose sidecars were live. NFL was NOT broken — an 8-hour fixture-aware
+   interval by design (`#440` Phase 1b), and my "capture outage" call was a false
+   alarm corrected by `FIXTURE_CADENCE`.
+4. **The hole, from CODE:** `quote_rows` EXTENDS across `window_dates`
+   (`layer2_shortlist.py:616`) while `last_seen` was read for `selected_date`
+   ALONE (`:690`). Rows from other window dates had no clock, and a clockless row
+   is **invisible to `drop_superseded_lines`** — so a line the market had moved
+   off could never be dropped on a forward date. `no_seen_age=7553` against
+   `kept=15672`: 48% of a grid exempt from the guard.
+5. **Fixed and verified.** `last_seen` merged across `dates_with_rows`, newest
+   stamp winning. `no_seen_age` **7553 -> max 52**; drops rose to 824 and 2271
+   where they had been 16; and the same sport, same date, same artifact went
+   **962141 -> 962176 bytes** — the board did not empty. Those 7,553 rows gained
+   clocks and were KEPT, which is what a correct fix looks like.
+
+**FOUR CLASSIFIER REVISIONS, EVERY ONE CAUGHT BY THE NEXT PRODUCTION READING AND
+NOT BY REVIEW.** Each had the same shape: a label producible by more than one
+mechanism, reported as though it named one.
+
+    flat 900s threshold      -> called a working sport (nfl, 8h cadence) an outage
+    sibling-stamp comparison -> a staggered freeze read as supersession
+    compare to the interval  -> fixture-aware and computed on ANOTHER SERVICE
+    "3 rows survive wrongly" -> that was 3 of 9 SAMPLED, not 3 of the population
+
+**THE RULE THIS ITEM EARNED:** *a correct measurement of an unrepresentative
+case is still a wrong answer.* The instrument was right every time; the sampling
+and the naming were not.
+
+**STILL OPEN, and neither is `#569`:** the `market_gone` population (markets that
+stop being quoted while their sport sweeps normally), and wnba's own capture gap,
+which belongs to the OPEN lane `wnba-live-odds-capture-gap`.
+
+### `#567` — **Is the board build SLOW, or WAITING? Nothing on this service could tell them apart, and three wrong answers in one session came from guessing.** — lane `board-staleness-visibility`, 2026-08-26 — **ANSWERED, AND THE ANSWER IS TWO ANSWERS: cold build `off_cpu_pct=10.4`, warm build `52.6`**
+
+**THE PROBLEM WITH EVERY ESTIMATE SO FAR.** Where the board build's time goes
+has been read, every single time, from the **gap between two log lines**. On
+2026-08-25 that method produced three wrong answers:
+
+| claim | reality |
+|---|---|
+| "~12.5 s per soccer league-week" | **0.17 s** — the gap was everything happening BETWEEN two builds |
+| "the per-sport window will change nothing" | took **7 minutes** off |
+| "memory is at 96–99%, its own failure mode" | anon **28–43%**, zero OOM kills in two days |
+
+A gap measures **elapsed wall time on a shared worker**. That is not the same
+quantity as the cost of whatever happens to bracket it.
+
+**WHAT THE 9m34s WINDOW ACTUALLY CONTAINS** (instance `-427jr`, 2026-08-26,
+read directly): per-sport `live_lens_tick_*` cycles, NFL `board_contract_*`
+cycles, `artifact_publisher` PULL/repair traffic, and a **~350 MB
+`refresh_odds_sources.py --soccer-leagues <one league>` CHILD PROCESS**. The
+board's own identifiable work in the same window was **~55 s** of MLB card
+contexts (`MLB_GAMES_STAGE_MS`, measured) plus soccer contexts now 89.5%
+memoised.
+
+**So the leading hypothesis is that the board build is not slow, it is QUEUED** —
+and if that is right, every fix aimed at making the board cheaper is aimed at the
+wrong thing. `#565`'s soccer memo is the cautionary case: correct, verified,
+89.5% hit rate, and worth **82 seconds**.
+
+**THE INSTRUMENT.** `BOARD_BUILD_TIMING wall_s= cpu_s= off_cpu_pct= ok=`, wrapped
+around `_build_candidate_pool` at both call sites (no reindent of an 880-line
+method). `time.process_time()` counts CPU for **this process only**, so the odds-
+refresh child burning a core does NOT appear in it — which is exactly what makes
+the wall/CPU gap readable as contention rather than hidden work.
+`off_cpu_pct` high = waiting, low = computing.
+
+**Tests pin BOTH directions.** A sleeping build must read `off_cpu_pct > 80`, a
+busy one `< 40` — without the second, the first would pass on a timer that always
+said "waiting". It also reports on a build that RAISES, which is when the timing
+matters most.
+
+**A DEFECT IN MY OWN FIRST DRAFT, fixed rather than pinned.** Both clocks were
+read BEFORE the `try`, so a raising clock would have killed the board build to
+protect a log line — the exact inversion the function's own docstring forbids.
+Worse, I wrote a test that DOCUMENTED that flaw instead of fixing it. The build
+now survives a broken clock and skips the line; the test asserts it.
+
+**THE ANSWER**, deployed `e11639c4` live 04:37:16Z, first full build after boot:
+
+    [intelligence_state] BOARD_BUILD_TIMING wall_s=747.8 cpu_s=670.1 off_cpu_pct=10.4 ok=True
+    [intelligence_state] CANDIDATE_POOL_READY date=2026-08-25 count=23
+
+**`off_cpu_pct=10.4`. The pre-registered decision above resolves to the SECOND
+branch: the board is computing, not queued.** The leading hypothesis in this
+item — "the board build is not slow, it is QUEUED" — is **WRONG for the cold
+build, and is now retired for it.** Nobody should spend more time on the
+concurrent-children theory on the strength of that reading.
+
+**CORRECTION, from the SECOND build on the same instance — one reading does not
+describe both builds:**
+
+    cold (first build after boot)  wall_s=747.8  cpu_s=670.1  off_cpu_pct=10.4
+    warm (next build, same pid)    wall_s=167.0  cpu_s= 79.2  off_cpu_pct=52.6
+
+**The warm build is 4.5x faster AND spends half its time off-CPU.** So the board
+has two distinct shapes and I over-generalised the first one. Anyone quoting
+`off_cpu_pct=10.4` must say which build it came from. The queued hypothesis is
+retired for the COLD build only; for the warm build it is still live and
+unexamined.
+
+**THIS CLOSES THE LOOP ON THE ORIGINAL INCIDENT.** The report was a board frozen
+~20 minutes. A restart forces a COLD build, and the cold build is the 12-minute
+one. The refresh-worker took **15 deploys in 6h15m** that evening, median uptime
+1202s — shorter than a single cold build. So nearly every build in the window was
+cold, and several were killed before finishing. **Deploy churn and board
+staleness are the same fact, not two independent problems.**
+
+**A CAVEAT ON THIS INSTRUMENT THAT THE PARAGRAPH ABOVE GETS HALF-RIGHT.**
+`time.process_time()` excludes CHILD processes (so the `refresh_odds_sources.py`
+child genuinely does not appear — that part stands) but it SUMS ALL THREADS in
+this process. The live-lens loop logs continuously through the whole build
+window, so some of those 670 CPU-seconds are certainly its, not the board's.
+**What the reading proves is that the WORKER PROCESS is CPU-saturated for the
+full 12.5 minutes; it does not prove the board thread itself burned 670s.**
+Under the GIL that is one core's worth either way, so "not blocked on I/O"
+survives — but anyone needing the per-thread split must use `time.thread_time()`.
+Stated here because the whole point of `#567` was to stop inferring from numbers
+whose definition nobody checked.
+
+**WHERE THE 748 SECONDS GO** (existing log timestamps, build began 04:38:01.9Z):
+
+| block | window | elapsed |
+|---|---|---|
+| pulls + memory guards before the sport loop | 04:38:01.9 -> 04:38:58.3 | 56s |
+| **8-sport candidate generation, ALL of it** | 04:38:58.3 -> 04:39:44.9 | **47s** |
+| silent, inside `build_intelligence_overview` post-loop | 04:39:44.9 -> 04:44:58.3 | **313s** |
+| `candidate_collection_with_fallback` (a SECOND collection) | 04:44:58.9 -> 04:47:28.6 | **150s** |
+| unspanned remainder to `CANDIDATE_POOL_READY` | 04:47:28.6 -> 04:50:29.8 | **181s** |
+
+**CANDIDATE GENERATION IS 6% OF THE BUILD.** ncaaf: 255 candidates in **27ms**.
+soccer: 268 in 1.77s. nfl: 16 in 4ms. nba/nhl/ncaab: zero, instantly. Anyone
+optimising candidate generation is optimising 47 seconds out of 748.
+
+**THE THREE REAL TARGETS, in size order — all now named, none yet explained:**
+
+1. **313s silent block** after the last sport exits, inside
+   `build_intelligence_overview`. Biggest single item. No log line at all.
+2. **181s unspanned remainder** between `BUILD_SPAN_EXIT
+   candidate_collection_with_fallback` and `CANDIDATE_POOL_READY`. The `_span`
+   helper exists; these stages are simply not wrapped in it.
+3. **150s `candidate_collection_with_fallback`** — a SECOND full collection pass
+   after the sport loop already ran one. Understand WHY it runs before
+   optimising it; it may be redundant work rather than slow work.
+
+Smaller and already visible: a **35-second gap INSIDE the sport loop**
+(nfl exits 04:39:07.4, ncaaf enters 04:39:42.6) with nothing logged — per-sport
+artifact loading, not generation.
+
+**748s is WORSE than the 11m22s (682s) baseline in `deploys.md`.** This was the
+first build after a restart with cold caches, so it is not yet evidence of a
+regression — and nothing in `e11639c4` was meant to change the duration. Needs a
+warm-cycle sample before anyone reads it either way.
+
+**Whole build produced `count=23` candidates.** 748 seconds, 23 candidates.
+
+**FORWARD-SLATE COST IS STILL THERE AND `#565` DID NOT REMOVE IT:**
+
+    odds_history_candidate_date_supplement sport=soccer shards_merged=6 entry_count=4358
+      candidate_dates = 2026-08-26, 08-27, 08-28, 08-29, 08-30, 09-04
+
+2026-08-29 alone is 7.4MB / 2547 entries, 08-30 3.97MB, 08-28 2.16MB — ~15MB of
+JSON parsed per build, each shard probed at three separate paths. **`#565`'s
+per-sport window pruned the BOOK GRID pulls; it does not touch this supplement**,
+which still reaches 9 days forward for soccer. Same root cause the user named
+(weekly sports widened to 7 days, soccer collateral), second call site.
+
+**WHY IT WAS FASTER BEFORE — the step is findable and it is NOT a defect.**
+`BUILD_SPAN_EXIT stage=candidate_collection_with_fallback` predates tonight, so
+production carries its own history. Excluding cache hits (`0.0`):
+
+    16:38 76s  16:54 69s  17:04 76s  17:14 78s  17:30 85s  17:40 81s  17:51 96s
+    18:05 88s  18:19 144s 18:31 94s  18:40 77s  18:50 99s
+    19:09 79s  19:19 79s  19:33 67s  19:41 61s  19:47 48s  20:08 88s
+    -------------------------------- STEP --------------------------------
+    20:28 142s 20:44 183s 21:07 164s 21:37 149s 21:48 162s 21:58 150s
+    22:10 141s 22:52 364s          (04:47 today) 150s
+
+Median ~80s through 20:08Z, ~150-180s after. **The step brackets exactly one
+deploy:** `20:20:57Z 461ee74b "Register the MLB props and soccer the board was
+already asking for"`. Instance ids confirm the restart across it (`-dkfk6` ->
+`-8rf9h`); no other deploy landed in the gap.
+
+**The mechanism is in that commit and it is the change WORKING.** It registered
+six MLB player-prop series the board had been asking for by name and never
+fetching, and made soccer registrable by competition title. The board is slower
+because it now considers markets it previously could not see. **And it keeps
+growing with no further deploy** — the commit says so: *"Any of them registers
+the moment Kalshi lists it, with no deploy."* That is why the curve CLIMBS after
+the step rather than stepping once. Later work compounded it: `#559` took
+Polymarket 7,936 -> 17,413 markets, Kalshi grammars +1,040 then +1,958.
+
+**LIMITS ON THIS ATTRIBUTION, because it is a correlation and not a bisect:**
+18:19Z already read 144s BEFORE the step, so variance is real; and this span is
+150s of a 748s build while the 313s block has NO historical series. **"The whole
+build doubled because of 461ee74b" is NOT supported** — only that this one stage
+did.
+
+**SHIPPED (not yet deployed): spans on all three silent stages.**
+`_build_span_enter`/`_build_span_exit` wrap `build_intelligence_overview` (the
+313s block), `candidate_building`, and `manifest_odds_history_join`, plus a new
+`ODDS_HISTORY_LOAD_SECONDS` line timing `_load_odds_history_payload_for_sport`
+**per sport, sorted worst-first** — the shards are wildly uneven (soccer 7.4MB /
+2,547 entries against nba/nhl/ncaab reading nothing), so one total would average
+the culprit away and cost another deploy to recover.
+
+The first two were ALREADY TIMED and invisible: `_profile_stage` and
+`_log_stage_timing` both go to `logger.info`, which does not reach Render's
+collector. **Months of timing data on the biggest block in the build, written to
+a sink nobody reads.**
+
+ENTER/EXIT pairs with no reindent of the loops. Both helpers never raise and
+report `elapsed_s=unknown` on a broken clock rather than inventing a number.
+10 tests: both directions (busy span > idle span), broken clock, broken stdout,
+and a **mutation-checked** pairing invariant — deleting one `_build_span_exit`
+turns it red, verified rather than assumed.
+
+**NEXT:** deploy, then read one COLD build. If
+`BUILD_SPAN_EXIT stage=build_intelligence_overview` accounts for ~313s, the
+target is named. **If it comes back SMALL, this instrumentation was aimed wrong
+— say that, rather than reaching for the next hypothesis.**
+
+### `#566` — **There was no memory issue. `ALL_PROCESS_MEMORY` reports only the page-cache-inclusive figure, and I read it as an emergency four times in one session.** — lane `board-staleness-visibility`, 2026-08-26 — **FIXED (telemetry); NO PRODUCTION DEFECT FOUND**
+
+**THE ASK WAS "fix the memory issue". THE ANSWER IS THERE ISN'T ONE**, and that
+is the finding rather than a deflection.
+
+    oomKilled events, 2026-08-24 -> 2026-08-26        ZERO
+    anonymous memory across the same window           1135-1760 MB of 4096 = 28-43%
+    build gate predicate (`#417` step 3)              max_bytes - unreclaimable_bytes  ✓ correct
+
+**WHAT I ACTUALLY DID.** I quoted `container_memory_pct_of_max` at **93.2%,
+96.8% and 99.8%** off `ALL_PROCESS_MEMORY` during deploy preflights and reported
+a memory emergency to the user four times. That field counts clean page cache
+the kernel drops before it OOM-kills anything. `#79` and `#417` had already
+established this twice, in prose, in the same module — `#79` measured "real
+headroom was 3393.7MB, not 867.7MB", and `#417` measured 300 consecutive
+`MEMORY_GUARD_ABORT` cycles serving a **4h12m-stale board** on the same false
+reading, with anon flat at +18.9 MB across all 300 samples.
+
+**THE REAL DEFECT, and it is a telemetry one.** `log_container_memory`'s own
+docstring names it exactly: the breakdown *"was simply never wired into the line
+that gets logged, which is the one people actually read."* **That was fixed for
+`CONTAINER_MEMORY` and left undone for `ALL_PROCESS_MEMORY`** — which is the
+line a deploy preflight reads, because it is the one carrying the process list.
+Half a fix, and the unfixed half is the one on the deploy path.
+
+`ALL_PROCESS_MEMORY` now carries `container_memory_unreclaimable_mb` and
+`container_memory_unreclaimable_pct_of_max` beside the existing figure. Same
+procfs read the guard next to it already performs. **Absent, never fallback, on
+an unreadable `memory.stat`** — degrading to `container_memory_mb` under that
+name would be worse than the omission, because a reader who sees a number there
+is entitled to assume it is the anonymous one.
+
+**Reachability proved:** removing the fields turns 5 of 6 tests red, including
+`test_the_pathological_case_from_2026_08_25_reads_correctly_now`, which pins the
+exact 99.8%-with-28%-anon shape that fooled me.
+
+**THE GENERAL RULE, because this is the FOURTH time in one session the same
+mistake produced a wrong answer:** *a headline percentage is not a measurement
+until you know what it counts.* The other three were the identity-keyed
+`week_games` memo, the "per-sport window will change nothing" prediction
+(it took 7 minutes), and the 12.5 s-per-league-week figure (really 0.17 s —
+I had measured the GAP BETWEEN builds, not the build). Every one was an
+inference from a number whose definition I had not checked.
+
+**NOT DONE, and worth someone's time:** the worker's anon does drift within a
+cycle (1135 → 1760 MB). That is a real curve and nobody has attributed it. It is
+not urgent — it is 43% of a 4 GB container with no kills in two days — but it is
+the only genuinely open memory question here.
+
+### `#565` — **The board build's forward width is sized off `max_slate_window_days()`, so the WIDEST sport's window becomes EVERY sport's window. Widening the weekly sports hammered soccer, which nobody intended.** — lane `board-staleness-visibility`, 2026-08-26, user diagnosis — **ROOT CAUSE CONFIRMED, NOT YET FIXED**
+
+**THE USER FOUND THIS, not me:** *"we flipped weekly sports to 7 days out for
+nfl and ncaaf. this hammered us with soccer that we didn't intend."* Confirmed in
+code.
+
+`scripts/run_refresh_worker.py:3848`, `_book_grid_forward_days()`:
+
+```python
+from syndicate.features.shared.layer1_board import max_slate_window_days
+# -1 because a window of N days is today plus N-1 forward.
+return max(0, max_slate_window_days() - 1)
+```
+
+**`max_slate_window_days()` is the MAX ACROSS ALL SPORTS**, and the worker sizes
+its forward artifact builds from it. `_SLATE_WINDOW_DAYS` is
+`{nfl: 7, ncaaf: 3, ncaab: 1, soccer: 7, …}`. So the widest entry sets the
+forward width for **every** sport at once.
+
+**The irony is in its own docstring**, and it is the useful part: the helper was
+made public so *"the worker cannot build four days while the board asks for
+seven — a constant duplicated across a producer and a consumer is the drift
+`#329` exists to remove."* It removed a per-sport drift by introducing a **global
+maximum**, which is a different bug wearing the first one's clothes. One sport's
+width is now every sport's cost, and nothing in the call site says so.
+
+**THE COST, measured** (refresh-worker `-fzb6v`): boot 00:45:38Z → first
+`[layer2_shortlist]` line 01:05:21Z = **19m43s in `_build_candidate_pool`**,
+against a shortlist that is itself **58 seconds**. Inside that, 00:48:58 →
+01:02:23 is **13m25s of soccer per-league context builds**: five
+`board_contract_begin` lines in one 60-second window, **12–14 s apart**,
+`game_count` 8–11. **~12.5 s per league-week for 8–11 fixtures.**
+
+**KALSHI AND POLYMARKET ARE EXONERATED — DO NOT RE-OPEN.** `VENUE_REPRICE`,
+`GRID_REPRICE` and `BOARD_JOIN` all run inside `build_layer2_shortlist`, the
+58-second half. They are already cheap and already artifact-backed.
+
+**FIXED (`_sport_covers_date`, `run_refresh_worker.py`).** The date list still
+spans the widest sport — it has to, or that sport loses dates — but the tick now
+skips any `(sport, date)` pair outside **that sport's own** `slate_window_days`,
+before the expensive half (an HTTP Range pull per pair plus its `.state.json`
+sidecar). `#329`'s property survives: every sport still gets its own FULL window.
+Off switch: `SYNDICATE_BOOK_GRID_PER_SPORT_WINDOW=0`. Count reported per tick as
+`out_of_window`, so a no-op is visible.
+
+**MEASURED SAVING: 56 → 22 pairs per tick, 60% fewer.**
+
+    sport     own window   before   after   saved
+    mlb                1        7       1       6
+    nba                1        7       1       6
+    wnba               1        7       1       6
+    nhl                1        7       1       6
+    ncaaf              3        7       3       4
+    ncaab              1        7       1       6
+    nfl                7        7       7       0
+    soccer             7        7       7       0
+
+**AND THE HONEST LIMIT: SOCCER SAVES NOTHING HERE.** Its own window genuinely is
+7, so the coupling was never what widened soccer — five OTHER sports were being
+built six days out to serve one-day boards. This removes a large real waste and
+**may not be the 13m25s of soccer context builds.** Whether it is turns on
+something not yet distinguished: 7 forward dates × 10 leagues = 70 and
+3 board-window dates × 20 league-matchdays = 60 both fit the ~65 measured, and
+counts alone cannot separate them. **The next build's `out_of_window` plus its
+boot-to-`[layer2_shortlist]` span settles it. Do not claim the 19 minutes is
+fixed until that reading is in.**
+
+**A WRONG FIX I BUILT AND BACKED OUT, recorded so nobody rebuilds it.** Before
+the user named the cause I added a TTL memo on `week_games(league, week, season)`
+in `soccer/cards.py`, on the theory that three adjacent window dates resolve to
+the same matchweek. **Two existing tests failed against it and they were RIGHT:**
+`test_no_fixtures_returns_empty_list` and
+`test_it_cannot_downgrade_a_started_match` patch the underlying reader and got
+the previous call's cached answer. Keyed on identity alone, it serves stale data
+whenever the artifact changes without the key changing — **exactly what
+`scope_2026-08-21_home_request_path_compute.md` warns**: *"Any cache here needs a
+vintage key (artifact `generated_at`), not just `game_pk`."* I ignored that
+warning in the same session that cited it. A memo here is still viable, but only
+vintage-keyed, and it treats a symptom of the width problem rather than the
+width.
+
+**SOCCER'S OWN FAN-OUT IS NOW MEMOISED, VINTAGE-KEYED (2026-08-26, user
+direction "I need this fixed and shipped now").** `build_cards_page_context` is
+cached on `(league, week, season, live_vintage)` where the vintage is a
+fingerprint of the LIVE POLLER'S artifact for today -- event ids with their
+status, state, clock and scores. **If anything live moves, the key moves and the
+context rebuilds**, so a cached entry can only ever be served while nothing live
+has changed, which is exactly when it is indistinguishable from a fresh build.
+
+That is the rule `scope_2026-08-21_home_request_path_compute.md` states outright
+(*"needs a vintage key, not just `game_pk`"*) and that my first attempt tonight
+ignored. `live_state_payload` is uncached upstream by design and is ONE
+`read_json_file` per league, against the 12.5 s it guards -- that asymmetry is
+what makes this viable.
+
+TTL 600 s is a BACKSTOP for the non-live inputs (`recommendations_payload`, a
+once-per-date artifact), not the mechanism.
+`SYNDICATE_SOCCER_CARDS_CONTEXT_TTL_SECONDS=0` disables it without a deploy.
+`error`/`absent`/`quiet` are three DISTINCT vintages, so an unreadable live
+payload can never masquerade as "same as last time".
+
+**Reachability proved on the property that matters:** removing the vintage from
+the key turns all four live-invalidation tests red
+(`test_a_live_score_change_invalidates` and siblings).
+
+**Measured by the build itself:** `SOCCER_CONTEXT_CACHE hits= misses= calls=
+seconds_saved=`. `misses` is the floor -- the DISTINCT league-weeks a build
+genuinely had to construct. **A high miss count with near-zero hits is a real
+possible outcome on a busy match evening** (the live vintage churning every
+cycle), and it must be read off that line rather than inferred from the clock.
+
+**STILL OPEN.** (a) The per-sport sizing change itself. (b) MLB's ~3 minutes:
+14 `build_cards_page_context` calls totalling ~50 s, but **25,597 ms and
+14,257 ms in two of them**, on the uncached `[home]` path that scope blamed for a
+web outage. (c) Whether soccer's own `7` is still right on its merits — it
+predates the weekly-sport change (week-scoped since 2026-07-24) and may be
+correct for soccer alone even after the coupling is broken.
+
+### `#564` — **`#545` cost the compact scoreboard its 60-second refresh and did NOT remove the request fan-out it was written for. Web read a 5-minute-old artifact while the same process built fresh chips one function away.** — lane `board-staleness-visibility`, 2026-08-26, user report — **FIXED, web deploy**
+
+**THE REPORT** (user, after `#563` shipped): *"the compact cards used to be
+updated every 60s so something caused a regression."* Correct, and `#563`'s
+diagnosis was incomplete: it blamed deploy cadence, which made the freeze acute
+but not chronic.
+
+**THE MECHANISM.** Before `#545` this handler called `build_game_chips` inline,
+and that call holds a **30-second TTL cache** — so the page's 60-second poll
+always got a scoreboard at most 30 s old. `#545` replaced it with an
+unconditional read of the worker's artifact, written once per
+`build_layer2_shortlist`.
+
+**MEASURED IN A WINDOW WITH NO DEPLOYS AT ALL** (22:36:13Z → 23:48:19Z), so
+this is not the deploy storm:
+
+    consecutive GAME_CHIPS_PUBLISHED gaps
+    4m58s  3m23s  5m19s  18m55s  7m20s  5m02s  3m30s
+
+A 60-second scoreboard became a ~5-minute one on a quiet evening.
+
+**AND `#545` NEVER REMOVED THE FAN-OUT.** Web still builds chips inline several
+times a minute — `_refresh_layer2_live_state` calls the same `build_game_chips`
+for the L2-A live restate, logging `LAYER2_LIVE_RESTATED` at 02:39:34, 02:40:23,
+02:40:45, 02:42:20, 02:42:24 and 02:44:56Z on instance `-clq85`. **The cost
+`#545` moved to the worker was never actually taken off web; only the benefit
+was.** The handler read a five-minute-old artifact while the same process held
+fresh chips in a 30-second cache.
+
+**THE FIX.** Serve the artifact while it is **fresh** (≤120 s, two poll
+intervals), rebuild inline when it is not. Not "always build inline": an inline
+build is newer by construction, so a plain fresher-wins would never read the
+artifact again and would reinstate the fan-out unconditionally. The threshold
+keeps the worker authoritative exactly when it is keeping up — the state `#545`
+wanted, and the state a faster publish cadence would restore.
+
+Bounded, not per-request: `build_game_chips` caches on `(date, sports)` for 30 s,
+so a hot endpoint costs one real build per 30 s regardless of traffic.
+
+An **undateable** artifact counts as stale; a **failed** inline build falls back
+to the stale artifact rather than blanking the strip (`source` says which). Back
+it out without a deploy by setting
+`SYNDICATE_GAME_CHIP_ARTIFACT_MAX_AGE_SECONDS` very high, which restores
+`#545`'s behaviour exactly.
+
+**Reachability proved:** making the artifact unconditionally authoritative again
+turns 5 of 11 tests in `test_game_chips_endpoint_freshness.py` red.
+
+**STILL OPEN, AND IT IS THE BIGGER ONE — `#565`: the board build takes 19m43s.**
+Boot 00:45:38Z → first `[layer2_shortlist]` line 01:05:21Z → chips 01:06:19Z.
+`build_layer2_shortlist` itself is **58 seconds**; `_build_candidate_pool` ahead
+of it is **19m43s**. That is why a restart costs ~20 minutes of frozen board, and
+why `#563`'s fix 3 (publish chips at the top of the shortlist) recovered only
+~1 minute rather than the ~20 I claimed for it. **Nothing shipped so far touches
+the 19m43s.** Next question is where inside `collect_candidates` it goes — the
+per-stage `CANDIDATE_STAGE` lines are already emitted and timestamped, so this
+is a reading, not an instrumentation job.
+
+### `#573` — **Refuse a Kalshi order by READING the shard balance, not by consulting a hardcoded list.** — lane `kalshi-exchange-index`, 2026-08-26, NOT STARTED, handed over
+
+`GET /portfolio/balance` accepts an `exchange_index` parameter — *"both values
+include all exchange indexes unless exchange_index is provided"*. That makes the
+shard guard's premise **directly testable** instead of inferred.
+
+Today's guard compares the market's shard against `_KNOWN_GOOD_SHARDS = (0,)`,
+a list derived from where we have historically filled. It works, but it is a
+proxy for the real question, and it needs `KALSHI_ORDER_KNOWN_SHARDS` flipped by
+hand the moment the user funds a shard.
+
+Reading the balance instead:
+- refuses on `balance == 0` for the market's shard, with the balance IN the
+  message, so the row says `shard=3 balance=$0.00` rather than asserting a cause;
+- **self-heals** — the moment collateral lands on shard 3, orders resume with no
+  env var and no deploy;
+- turns the last inferred step in this chain into a measurement.
+
+Context:  2026-08-26, and the lesson in 
+("a diagnosis and its remedy are separate claims"). The remedy half of this
+chain was wrong once already and was live in a production error string.
+
+### `#568` — **Every Kalshi order for four days died on `market_not_found`. The field nobody questioned was the one copied out of the sample body.** — lane `kalshi-exchange-index`, 2026-08-26, FIXED + DEPLOYED, awaiting the confirming fill
+
+**Deployed `a46797d1b` → live-odds-worker `dep-da7e2v7avr4c73bq91vg`.**
+Ledger + full elimination table: `.syndicate/deploys.md`, 2026-08-26.
+
+`exchange_index` is a SHARD SELECTOR, not furniture. The venue's field
+reference: *"If omitted, auto-routes when ticker is provided; otherwise
+defaults to 0. Use -1 to require auto-routing by ticker."* We were sending a
+literal `0`, which **pins** the order to shard 0 — so any market on another
+shard 404s `market_not_found`. Now `-1`.
+
+**THE OPERATIONAL LESSON, and it is the reason this entry exists at all.**
+Four hypotheses were opened over four days and all four were *correctly closed
+by measurement* — host, side, market shape, event field. Each elimination was
+sound. **The search never terminated because the candidate set was drawn from
+"things we chose" and this field was filed under "things the contract gave
+us".** A value copied verbatim out of a working sample gets the same
+epistemic status as a constant, and nobody re-reads a constant.
+
+**The tell was in the data the whole time and read as exoneration.** `GET
+/markets/<ticker>` returned `status=active` with both legs quoted for every
+single failing ticker. That was recorded four times as *"nothing about the
+market differs from the one that filled"* — i.e. as evidence the market was
+innocent. **Reads are not sharded.** A GET that always succeeds while the POST
+never does is not the market being fine; it is the two paths disagreeing about
+*where* to look, which is the signature of a routing field.
+
+Same shape as `#567`'s `0.0`-second span: **a reading that looks like an answer
+is more dangerous than a missing one.** Generalised rule for next time — when
+every variable *you control* has been eliminated, the next candidate set is the
+constants you inherited, and the first place to look is any field whose name
+implies a LOCATION (shard, index, region, subaccount, exchange).
+
+It also explains the successes, which no code-regression theory could: the two
+`KXMLBKS` fills on 08-24 and the `KXWNBAAST` fill on 08-25 were simply markets
+that live on shard 0 — same family, same day, same body shape as the failures.
+I spent a full pass hunting a regression in `git log` between 08-24T18:18Z and
+08-25T23:00Z. **There was never a regression.** Intermittent success across an
+otherwise identical population is a per-item property, not a point-in-time
+change; treating it as a regression cost the detour.
+
+**NOT YET VERIFIED — this is the open half.** The reading that closes it is a
+`SUBMIT ... exchange_index=-1` followed by `LIVE_ORDER status=submitted|filled`
+on one of today's failing families (`KXMLBKS`/`KXMLBHIT`/`KXMLBRBI`/`KXMLBHRR`/
+`KXMLBOUTS`). A submit that merely stops erroring is NOT the reading — a
+non-shard-0 market clearing is, which is why `exchange_index` now prints on the
+SUBMIT line and not only on the failure. **Pre-registered counter-verify:** if
+`market_not_found` persists at `-1`, the shard hypothesis is dead too, and the
+next move is to ask the venue to spell its own markets — say that out loud
+before reaching for a fifth hypothesis.
+
+Rollback with no deploy: `KALSHI_ORDER_EXCHANGE_INDEX=0`.
+
+### `#562` — **The Kalshi working-set trim orders by STALENESS, not by date. Today survives by luck.** — lane `kalshi-line-aware-rungs` (its declared step 2), raised by `portfolio-decision-and-execution`, 2026-08-26, measured — **OWNING LANE ANSWERED IT: the DEPTH prize is 133, not ~1,600. STILL OPEN, but for the ORDERING half only.**
+
+**`[OWNING LANE, 2026-08-26 03:11:30Z, confirmed identical 03:17:03Z]` THE
+"REAL PRIZE IS DEPTH" CLAIM BELOW IS REFUTED AS MEASURED.** This lane shipped
+`[kalshi_odds] PRECAP_CUT_BY_DATE`, which dates the markets the per-series cap
+CUTS rather than the ones it keeps — the histogram below can only ever show
+survivors, so it could not answer this:
+
+    capped_series=8  cut_total=3940
+      KXMLBHRR 532 -> cut 132   {'2026-08-25': 132}
+      KXMLBTB  401 -> cut   1   {'2026-08-25': 1}
+      6 NCAAF/NFL series        cut 3807, ZERO on 2026-08-25
+
+**133 of 3,940 cut markets are date-eligible — 3.4%.** Freeing future-dated
+slots would recover 133 rungs, not the ~1,600 this item's depth argument
+implies, and each would still have to clear `no_matching_board_row`.
+
+**TWO LIMITS, both against that verdict, both still open:**
+1. Taken at 03:11Z with the slate OVER. `KXMLBHRR` cut 747 at 01:49Z and 132 at
+   03:11Z; `KXMLBHIT`/`KXMLBRBI` are no longer capped at all. **The mid-slate
+   number is unmeasured and likely several times higher.** Code is live; this
+   needs only a reading during a live slate.
+2. It measures the per-series cap ONLY — `cut_total=3940` vs `TICK
+   trimmed=8744`. The outer `MAX_STORED_MARKETS` staleness trim discards ~4,800
+   more and is equally date-blind. **Undated.**
+
+**WHAT SURVIVES UNTOUCHED: the ORDERING argument.** "Today survives by luck" is
+correct and is NOT what was refuted. Sorting by staleness alone means a stale
+MLB series can be evicted for a September future with no counter naming it, and
+that risk is real whatever the depth prize turns out to be. Fix the ordering on
+its own merits; do not justify it with the depth number until (1) and (2) exist.
+
+`[USER DECISION 2026-08-25: let the audit session ship it]` —
+`pipeline/kalshi_odds_refresh.py` is in that lane's `Files:` and "evict the
+futures that can never join" is its own next step. Recorded here rather than
+edited, per the cross-lane rule.
+
+**Summed from the `BY_GAME_DATE` histogram that lane shipped**
+(`[kalshi_odds] BY_GAME_DATE`, refresh-worker, 2026-08-26T01:49:32Z):
+
+    working set (capped)      6000
+      today     2026-08-25    1958   32.6%
+      tomorrow  2026-08-26      60    1.0%
+      beyond tomorrow         3982   66.4%
+
+    biggest non-today: 08-28 -> 1566 (NFL, 3 days out) · 08-29 -> 930 · 09-12 -> 311
+    furthest out:      2026-10-20 NBA, EIGHT WEEKS away, holding slots today
+
+**THE ORDERING IS THE DEFECT, NOT THE OCCUPANCY, and this is the part worth
+not misreading.** All 1,958 of today's markets currently FIT inside the 6,000,
+so date-priority would not add one of today's markets on this tick. What is
+wrong is that `ordered = sorted(per_series_markets, key=lambda item: item[0])`
+sorts by staleness ALONE. Today survives by luck. On a full NCAAF Saturday, or
+any tick where an MLB series is momentarily stale, today's markets are evicted
+in favour of a September future and no counter says which.
+
+That file already records this exact class of bug once: the trim claimed
+"oldest-series-first" while slicing alphabetically, silently deleting every
+WNBA market. Same failure, different key.
+
+**THE REAL PRIZE IS DEPTH, NOT PRESENCE.** Three of today's MLB prop series sit
+at exactly 400 — `KXMLBHRR`, `KXMLBRBI`, `KXMLBTB` — which is
+`MAX_MARKETS_PER_SERIES`. Those ladders are truncated TODAY, and the 3,982
+future-dated slots are what could hold their remaining rungs. So this converges
+with step 3 (line-aware rungs) rather than competing with it: freeing the slots
+is only worth it if the rungs kept are the ones near the board's line.
+
+**Corroborated by an independent count, same tick.** `BOARD_JOIN
+kalshi_markets=6000 matched=71 reasons={'market_is_for_another_date': 3282,
+...}` — 3,282 against the histogram's 3,982 non-today, agreeing to within the
+tomorrow bucket. Two different readers of the same fact.
+
+**Caveat this raiser owes.** I earlier called `market_is_for_another_date` "the
+largest lever, bigger than unreadable_title" off the join line alone. That was
+before this lane's own retraction showed `BY_CLOSE_DATE` and `BY_GAME_DATE`
+disagree — close_time is a settlement deadline up to four days out. The
+histogram above is the game-date one and does support the claim, but the
+earlier assertion was made from the wrong instrument and should not be cited.
+
+### `#563` — **"The Layer 2 board and the compact chips are stale" was DEPLOY CADENCE, not a board defect. The board could not report its own staleness, so only a user could find it.** — lane `board-staleness-visibility` (carve-out from `layer2-sim-view-and-live-projection`), 2026-08-25, user report — **CODE SHIPPED AND COMMITTED, NOT DEPLOYED. The operational half is OPEN and is the actual fix.**
+
+Full working: `.syndicate/deploys.md`, 2026-08-25 20:2x CT.
+
+**THE REPORT.** "It refreshed now but it was sitting with stale compact cards and
+even the odds refresh times were frozen for about 20 mins."
+
+**EVERY READER WAS HEALTHY.** Chips published and web read them
+(`GAME_CHIPS_PUBLISHED chips=232 sports=8 ok=True`, **zero**
+`BOARD_GAME_CHIPS_ARTIFACT_MISSING` on web all evening). `#525`'s frozen-board
+mode was not firing — the shortlist persisted at 66.7% of the keyvalue ceiling.
+**Not memory either**, despite `CONTAINER_MEMORY` reading 90.4% of 4096 MB:
+every restart was a `SIGTERM` on a deploy boundary.
+
+**THE PRODUCER WAS KILLED AT ALMOST EXACTLY THE MOMENT IT WOULD FIRST PUBLISH.**
+
+    15 deploys 19:26:55Z -> 01:13:38Z, all trigger=api
+    15 WORKER_SHUTDOWN, all SIGTERM
+    uptime_seconds: 232, 1361, 3134, 926, 2368, 450, 1268, 1202,
+                    438, 644, 145, 4235, 443, 2783, 1787
+    median 1202 s = 20.0 min      5 of 15 under 8 minutes
+    boot-to-first-publish (-fzb6v): 20 min 41 s
+
+Confirmed three ways: every chips-publish gap contains ≥1 deploy, and the
+54-minute gap contains **five**. `WORKER_SHUTDOWN_KILLED_BOARD_BUILD
+frame=collect_candidates — this build's work is lost and will restart from zero
+on the next boot` fired three times and nobody read it. `run_mlb_daily_sim_job.py`
+was a live child on 5 of 15 — `CLAUDE.md`'s "deploying kills an in-flight MLB
+sim", measured five times in one evening.
+
+**SHIPPED (committed on `claude/stale-layer2-board-chips-jh4ars`, NOT deployed):**
+
+1. **`state_meta` derived, not asserted.** `read_combined_intelligence_response`
+   hard-coded `age_seconds: 0.0, is_fresh: True` on a function that only READS.
+   Now dates every artifact it read: `age_seconds` = oldest (gates the verdict),
+   `newest_age_seconds` = freshest (goes flat when the producer dies),
+   `is_fresh` = None when nothing could be dated. Reuses the existing
+   `_timestamp_age_seconds` / `_freshness_status_from_age` pair. The same defect
+   at two sibling sites fixed with it.
+2. **The chip strip surfaces `published_at`**, which the API always returned and
+   the page always discarded. Amber badge past 10 minutes; silent when healthy
+   and silent on an unreadable stamp.
+3. **Chips publish before the slate is ingested**, not ~21 minutes in. They
+   depend on none of the intervening work, so a kill at minute 19 now costs the
+   shortlist and not the scoreboard.
+
+**TWO DEFECTS IN THE FIRST DRAFT, both caught before push, the second invisible:**
+a duplicate `_artifact_age_seconds` beside the existing helper (a parallel
+contract); and `computed_at` holding the READ MOMENT, which
+`_apply_freshness_recompute` (`#334`) would have used to recompute the age as ~0
+and hand back `is_fresh: True` on the way out — silently reverting the change.
+`#334`'s own comment records three previous patches that each missed a path.
+`computed_at` is now the oldest artifact's stamp, making the block idempotent
+under that pass.
+
+**THE OPERATIONAL HALF IS NOW BUILT (4).** `deploy_preflight.py` gained a third
+verdict, **`TOO_SOON` (exit 5)**, refusing a deploy inside the service's minimum
+spacing — 1500 s for refresh-worker, measured from its 20 min 41 s
+boot-to-first-publish. Read from **Render's deploy list**, not a local ledger:
+the 15 deploys came from parallel sessions and only the thing every session
+deploys through can see them all.
+
+**THREE INDEPENDENT PROPERTIES, and no two imply the third:**
+
+    CLAIMED    serialisation   two deploys must not overlap
+    OFF_MAIN   composition     the second must contain the first
+    TOO_SOON   spacing         the service must have time to produce something
+
+All fifteen deploys were serialised, composed and on main. The board was frozen
+anyway.
+
+**Replayed against the real timeline** (`WouldItHavePreventedTheIncidentTests`):
+**9 of the 14 intervals refused, 5 legitimate gaps allowed.** A floor, not an
+exact count — those are finish-to-finish gaps and preflight measures to *now*,
+which is earlier, so the true figure is at least 9.
+
+`--allow-rapid` is the escape hatch, because a rate limit with no override turns
+an outage into a longer one and a revert must always be able to go out. Only
+refresh-worker has a measured interval; **live-odds-worker and web are 0 because
+their cycles are UNMEASURED, not because they are known safe** — the preflight
+prints "not rate-limited" for a 0 so the absence is visible rather than implied.
+live-odds-worker has no `WORKER_SHUTDOWN` handler, so the uptime figure that made
+refresh-worker's case does not exist for it; measure its boot-to-first-publish
+before setting one.
+
+**NOT RUN LIVE.** This container has no `RENDER_API_KEY` and the proxy 403s
+`api.render.com`, so the verdict has been exercised end to end against a mocked
+API and against the real deploy timeline, but never against the live endpoint.
+First real use is the verification.
+
+**A SECOND ID COLLISION ON THE WAY IN, and it exposes a real hole in
+`todo_id_alloc.py` rather than just bad luck.** This item was `#562`, claimed
+through the allocator at 01:49:36Z. Lane `portfolio-decision-and-execution`
+claimed the SAME id at 02:01:32Z — twelve minutes later — and pushed first, so
+theirs is `#562` (the Kalshi trim) and this renumbered to `#563` on the merge.
+
+**`O_CREAT|O_EXCL` cannot serialise two separate git checkouts.** The tool's
+premise is that an atomic create makes the read-then-claim safe, and that is
+true *within one filesystem*. `.syndicate/todo_ids/` is tracked in git, so two
+containers each created `562.claim` locally and both `O_EXCL` calls succeeded —
+the conflict only surfaced as an add/add at `git merge`, which is exactly the
+failure mode the tool's docstring says it exists to prevent (*"the loser finds
+out at `git merge`, after the entry, the code comments and the tests are all
+written and have to be renamed together"* — that is precisely what happened,
+twice in one session). **The allocator makes collisions rarer, not impossible,
+and nothing in its output says so.** A real fix needs shared state the
+checkouts actually share (the keyvalue store, or an id reserved by pushing an
+empty claim commit before the work). Not taken here — recorded, not fixed.
+
+**verify:** one clean hour with no refresh-worker deploy should show
+`GAME_CHIPS_PUBLISHED` with no gap over ~10 minutes and zero
+`WORKER_SHUTDOWN_KILLED_BOARD_BUILD`. After deploying the code above, a board
+whose artifacts are >15 min old must serve `state_meta.is_fresh: false`, and the
+chip strip must render `.board-stale-badge`.
+
+### `#558` — **PR #61 is deployed and captures nothing: NCAAF is excluded from the sweep by `SYNDICATE_ACTIVE_SPORTS`, an env var, not by the season calendar.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, measured — **NEEDS A USER DECISION**
+
+State: `state.md` `[ncaaf-sweep-env-gate]`. Deploy: `deploys.md` 2026-08-25T20:31Z.
+
+Measured in production `2026-08-25T20:36:57Z`, both workers, every cycle:
+
+```
+[live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED date=2026-08-25
+  kept=mlb,wnba,soccer
+  dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+```
+
+`#557`'s blocker is fixed in code and the code is LIVE on all three services.
+`ncaaf_game_lines_oddsapi` will still never execute, because the sweep drops
+NCAAF before it builds any steps.
+
+**The trap, and I walked into it before the log corrected me.**
+`ops_refresh._active_sports_for_date` (`syndicate/features/shared/ops_refresh.py:1150`)
+is a CALENDAR window: `(month == 8 and day >= 15) or (9 <= month <= 12) or month == 1`.
+Read on its own it says NCAAF has been active for ten days. The env var is
+consulted first and overrides it. **A season window in code is not evidence a
+sport is being swept.** Same shape as `#547`: a value that is literally true
+about the code and false about production.
+
+**The change, if approved.** `SYNDICATE_ACTIVE_SPORTS` is NOT in `render.yaml`
+(grep returns nothing), so this is `update_environment_variables` per service,
+NOT a blueprint push — `#284`'s whole-env-block blast radius does not apply.
+
+    refresh-worker    srv-d91dpertqb8s73co8ls0
+    live-odds-worker  srv-d91dpertqb8s73co8lt0
+      SYNDICATE_ACTIVE_SPORTS: mlb,wnba,soccer -> mlb,wnba,soccer,ncaaf
+
+Note it restarts each service it is set on, which is a deploy-equivalent
+interruption — see `#324`, and see this same day's ledger for two MLB sims
+killed by exactly that.
+
+**Why it is not done here.** Turning it on starts spending OddsAPI credits on
+a sport that has never been fetched even once, and the first fetch is also the
+first live test of the team resolver — `UNRESOLVED_TEAMS` is the failure mode
+the design cannot distinguish from "no book quoted it". The right order is the
+`--report` run (one credit, no writes) BEFORE the env flip, not after.
+
+**NFL is dropped by the same gate**, four days from its own opener. Whoever
+decides NCAAF should decide NFL in the same breath.
+
+### `#546` — **Kalshi listed six MLB prop series the board was asking for BY NAME, and we never asked for them. Plus: the totals grammar priced a corners market as a goals total.** — lane `kalshi-registry`, 2026-08-25, user request ("fix kalshi")
+
+**The shape of all four findings is the same and it is worth naming once:
+REGISTRATION IS UPSTREAM OF EVERYTHING, and an unregistered series is
+indistinguishable from a venue that lists nothing.** `classify_market` refuses
+at `unmapped_series` before it ever reads a title, `sports_series()` never puts
+the series in the fetch list, and the board row reports "Kalshi has no market".
+Every layer below agrees, and every one of them is wrong.
+
+**1. Six MLB prop series, four of them already on the board's want list.**
+Measured 2026-08-25T16:13:44Z, `VENUE_REPRICE_KEYS board_wanted`:
+
+    mlb|batter_rbis|over|0.5  (x3)  -> KXMLBRBI
+    mlb|batter_total_bases|over|1.5 -> KXMLBTB
+    mlb|earned_runs|under|1.5       -> KXMLBERA
+    mlb|hits_allowed|over|4.5       -> KXMLBHA
+
+The stat vocabulary resolved all six already. The registry line was the only
+missing piece. Confirmed against live market pages the user sent, and verified
+end to end: `"Agustin Ramirez: 1+ hits?"` -> `batter_hits over 0.5`.
+
+**2. Soccer could never be seen at all, and `prop_candidates` had said so in
+its own docstring since it was written:** Kalshi names soccer series by
+COMPETITION (`KXLALIGAGAME`, `KXUCL1HTOTAL`), never by the word soccer, so
+`sport_for_ticker` had no token to scan for. Adding ticker prefixes is the
+wrong fix twice over — one prefix per competition per week is the whack-a-mole
+the user asked us to end, and a short competition code as a SUBSTRING is
+dangerous in exactly the way that made `KXWNBAREB` read as NBA: **`UCL` sits
+inside `KXNUCLEARTEST`.** So the competition now comes from Kalshi's own title,
+matched as a PREFIX against the ten names `LEAGUE_DISPLAY_NAMES` already holds.
+Any of the ten registers the moment Kalshi lists it, with no deploy.
+
+**3. `_TEAM_TOTAL` parsed its stat and threw it away.** The pattern is
+`Over <line> <anything>?` and the market was then hardcoded to the string
+`"totals"`:
+
+    "Over 4.5 corners?"                 -> totals 4.5
+    "Over 77.5 1st half points scored?" -> totals 77.5
+    "Over 2.5 1H goals scored"          -> totals 2.5   (real, KXUCL1HTOTAL)
+
+**The first is a wrong BET, not a miscount.** Soccer boards carry a goals total
+at 4.5, the join matches on (market, line, side), and our goals model would
+have priced a corners market with nothing anywhere reading wrong. Found only
+because registering soccer brought corners titles into range for the first
+time — the bug was already there for every sport. `total_market_from_stat` now
+checks the tail against the sport's scoring unit and KEEPS the period, so a
+half line stays `totals_h1` and corners refuses by name into the work queue.
+
+**4. A comment claiming a property the code did not have, again.**
+`KXWNBA3PT`'s hand-registration comment says "`market_keys` resolves all three
+for wnba" — true of the SERIES title ("Player Threes") and false of the MARKET
+titles, which refused `stat_not_in_market_vocabulary` on every wording but the
+bare word. That is the fourth instance of this pattern this week.
+
+**Operational note, cost me a real debugging detour:** two `test_kalshi_board_join`
+helpers registered series into `SERIES_SPORT` and then popped them
+unconditionally in a `finally`. Once those keys became hand-registered, the pop
+DELETED production state for the rest of the pytest process — `KXMLBSPREAD`
+went missing that way and a registration test in a DIFFERENT FILE failed while
+passing in isolation. **Passing alone and failing in the suite is the
+signature.** Both helpers now restore prior state instead of popping.
+
+**Deployed** `461ee74be` to refresh-worker + live-odds-worker 2026-08-25T20:16Z.
+Verification readings are in `.syndicate/deploys.md` under that SHA — the one
+that matters is not the registration count, it is whether those four
+`board_wanted` keys now match a Kalshi price.
+
+### `#557` — **NCAAF's board has a model on all 51 games and a price on none: `cfbd_lines_{season}_wk{week}.json` has NO PRODUCER on any service.** — lane `ncaaf-readiness-assessment`, 2026-08-25, measured
+
+> **Renumbered from `#546` on 2026-08-25.** Two lanes took 546 the same day in
+> parallel branches; `kalshi-registry`'s reached `main` first and is cited from
+> `.syndicate/deploys.md` under `461ee74be`, so it kept the number. PR #61's body
+> and commit messages still say `#546`–`#554` for this block; read them as
+> `#557` + `#547`–`#554`.
+
+Full assessment: `docs/ai_context/ncaaf_readiness_assessment_2026_08_25.md`.
+State: `state.md` `[ncaaf-readiness-2026]`.
+
+`_smartsim2_standalone_market_lines` (cards.py:237) reads exactly one path,
+`data/ncaaf_source/data/cfbd_lines_{season}_wk{week}.json`. It is written only
+by `fetch_ncaaf_market_lines.py` / `fetch_cfbd_lines.py`, and **both have ZERO
+callers** — not `refresh_odds_sources.py`, not either worker, not any `.ps1`.
+**Zero `cfbd_lines_*.json` exist in git at any SHA.** Consequence, measured
+`[local]` and matched by production: **markets non-null 0 of 51 games**, and so
+`GAME_CANDIDATES_EXIT sport=ncaaf rows=0` / `candidate_generation generated=0`
+`[prod 2026-08-25T14:21:27Z]`.
+
+**Do NOT conflate this with the sweep exclusion.** That one is the gate working
+(see `#547`) and self-clears 08-28. This one does not.
+
+**PREDICTION to be READ, not believed, on 08-28/29:** the sweep arms,
+`book_quotes`/`book_grid` fill, Layer 1 may populate, and the cards' `markets`
+block STAYS NULL. Tokens: `markets.total.line` on `/ncaaf/api/cards?week=1`,
+and `GAME_CANDIDATES_EXIT sport=ncaaf rows=`.
+
+Not fixed here — this was an assessment, and picking a producer (fold
+`cfbd_lines` into the odds sweep vs. rebase the cards board onto the same
+OddsAPI `book_grid` Layer 1 uses) is a design call with a deploy attached.
+
+### `#547` — **NCAAF's 155-pattern artifact allowlist contains ZERO NCAAF patterns. Fourth failed handoff, now load-bearing.** — lane `ncaaf-readiness-assessment`, 2026-08-25, measured
+
+`HOT_ARTIFACT_PATTERNS` holds **0 NCAAF patterns of 155**, checked with
+`fnmatch` in both directions. Unallowlisted: `smartsim2_projections_*.csv` AND
+`cfbd_lines_*.json`.
+
+Effect, measured: refresh-worker regenerates the projections daily
+(`SEASON_PROJECTION_LAUNCHING sport=ncaaf … age_seconds=86552`,
+`[prod 2026-08-24T20:43:54Z]`) **into a file web never reads.** Web's live SHA
+`0e0017d7` serves the git copy — `generated_at 2026-08-19T22:11:51Z`, committed
+`46ca8445` on 08-24. Since `32148cac` the bootstrap is SEED-ONLY, so a
+regenerated file for a week already on disk cannot overwrite; the allowlist is
+now the ONLY update path, which is why this stopped being tidy.
+
+**Only week 1 exists** anywhere in git or on disk. Week 2 requires a manual
+commit + web deploy.
+
+Silver lining, and worth not re-deriving: `age_seconds` sitting at one interval
+rather than growing unbounded is evidence the generator **succeeds** — so
+`CFBD_API_KEY` IS present on refresh-worker as a service env var (it is in no
+`render.yaml`), and `#458` looks resolved there.
+
+### `#548` — **The football backtests cannot be reproduced from this repo and report a clean `0 gradable games` on exit 0.** — lane `ncaaf-readiness-assessment`, 2026-08-25, measured
+
+`scripts/grade_football_playability.py:42` and
+`grade_football_model_weight.py:36` both hardcode
+`REPO = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")`. The pick-ledger
+CSVs they grade (`{sport}_source/data/pick_ledger/pick_ledger_*.csv`) are
+**untracked and absent** — `git ls-files | grep pick_ledger` returns the
+builder, the module and its test, no data.
+
+Run here with `PYTHONPATH` set: `0 gradable games` for both sports, **exit 0, no
+error**, full report rendered around nothing.
+
+The conclusions are almost certainly right (stated with n and CIs). What is lost
+is the ability to CHECK them: the entire evidence base for suppressing NCAAF
+picks lives on one laptop. Rule filed in `learnings.md` 2026-08-25 (FORBIDDEN).
+
+Fix shape: derive `REPO` from `__file__`; assert a minimum graded-row count and
+exit non-zero below it; print the resolved input path in the report. Whether the
+ledger CSVs should be tracked or rebuilt by `build_ncaaf_pick_ledger.py` in CI is
+the open design question.
+
+### `#549` — **NCAAF's compact card is inherited, not designed — and two fields are named for quantities they do not hold.** — lane `ncaaf-readiness-assessment`, 2026-08-25, measured
+
+`_scoreboard_strip.html` dispatches on `card_variant` and only `mlb_main` /
+`soccer_main` have their own, so NCAAF falls to `_scoreboard_strip_generic.html`.
+Against MLB's strip it has **no kickoff time** (badge reads `WEEK 1`, identical
+on all 51 games), no score, **no logo `<img>` although `logo_url` IS in the
+payload**, no market chips, no odds-freshness stamp. The `PROJECTED TOTAL` tile
+is **clipped at the card edge on every card**. Two of ~4 text blocks per card
+say a legacy engine has no prediction, the second repeating the first verbatim.
+
+**Two mislabels, the 2026-08-21 `learnings.md` rule recurring:**
+- header stat **`Candidates 51`** counts GAMES; production generated **0**
+  candidates from this board;
+- the main card's **Section 2 is titled `Enhanced Totals Engine`** while holding
+  SmartSim 2.0's numbers, beside a panel stating the Enhanced Totals Engine has
+  no prediction for that game.
+
+Also in the shared contract, and worse than cosmetic because cross-sport
+consumers read it rather than the NCAAF card: **`predictions` non-null 0 of 51**
+and **`shared_game_state.startTime` 0 of 51**, while the card's own
+`metrics`/`panels` carry both correctly.
+
+Coverage note for the same surface: "Week 1" spans **08-29 → 09-07** — 8 games
+this weekend, **43 on 09-03..09-07** — all under one undated badge; and the
+FBS-only filter drops **48 of 99** week-1 games.
+
+### `#550` — **NCAAF props: the join was deliberately deferred to a window that opened 08-23 and nobody built it — and week 1 has no rate basis anyway.** — lane `ncaaf-readiness-assessment`, 2026-08-25, measured
+
+`[prod] SPORT_PROPS_DONE sport=ncaaf pregame=0 live=0`.
+
+`fetch_ncaaf_oddsapi_props_local.py` is a faithful mirror of the NFL fetcher and
+its docstring states the join should be built "once real market coverage is
+confirmed closer to the season (**~2026-08-23 to 2026-08-30**)". That window
+opened 08-23. No caller anywhere (only tests), no
+`oddsapi_player_props_*.csv` on disk.
+
+**The deferral is more right than it looks, and that is the useful half:** the
+planned ladder was to be built on season-to-date player rates from
+`player_stats.py` over the `player_game_stats` snapshot, which has **never
+produced a file** — correctly, since no 2026 games have been played. So week 1
+has no rate basis regardless of odds coverage. Props are a week-3+ surface, not
+an opening-weekend one. Scope this against that, not against MLB's 10 props
+surfaces.
+
+### `#551` — **The football input checklist's NCAAF arm reads 0 games from a checkout where the board builder reads 51.** — lane `ncaaf-readiness-assessment`, 2026-08-25, measured
+
+`scripts/football_sim_input_checklist.py` reports
+`NCAAF season=2026 week=1 games=0 — UNMEASURED: loader returned 0 games (< 8)
+FROM THIS CHECKOUT`, while `build_smartsim_cards_page_context(1)` returns **51
+games** from the same checkout and the same data root. Different loaders; the
+checklist's NCAAF arm is measuring something the board does not use.
+
+Small, but it matters for the reason the checklist exists: NCAAF's Level-2
+population is currently UNMEASURABLE by the gate that is supposed to measure it,
+and "UNMEASURED" is one careless reading away from being taken as "unfed".
+
+(The gate's other 8 alarms are NFL's and are a correct report of a known truth —
+0 of 3 production entrypoints pass a payload. **Not a work order:** the
+domination result, b=+0.990 / w=−0.028 on 751 clean OOS games, says the payload
+path cannot supply what is missing.)
+
+### `#552` — **NCAAF game lines: OddsAPI capture built and proven off-line; `markets` 0 -> 51, Layer 1 grid rows 0 -> 32. NOT WIRED INTO THE SWEEP (cross-lane).** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, user request ("oddsAPI is back online - use this to build the odds out")
+
+Closes the `#557` blocker in code. **Nothing is deployed and no live fetch has
+run** -- this session had no egress to `api.the-odds-api.com` (proxy 403) and no
+`ODDS_API_KEY`, so every number below is from a replayed fixture built on the
+REAL 8-game 08-29/08-30 slate, not from OddsAPI.
+
+**What was built**
+- `scripts/fetch_ncaaf_oddsapi_game_lines.py` -- h2h/spreads/totals for
+  `americanfootball_ncaaf`, every book kept, appended to the SHARED quote log.
+  `--report` prints team-name resolution without writing; `--events-json`
+  replays a captured response with no credits spent.
+- `syndicate/features/ncaaf/oddsapi_lines.py` -- team resolver + line index.
+- `syndicate/features/ncaaf/cards.py` -- reads the index (CFBD kept as a
+  per-game fallback), emits the `betting` block the shared publication adapter
+  actually reads, and leads the compact card with the market.
+
+**Why the quote log and not a new file.** `HOT_ARTIFACT_PATTERNS` is written in
+sport-agnostic globs and two ALREADY match NCAAF --
+`*_source/tracking/book_quotes/*.jsonl` and
+`*_source/data/book_grid/book_grid_*.json`. So the capture crosses
+worker->web with **no allowlist edit** (which also avoids the `artifact_publisher.py`
+collision with `basketball-live-momentum`), and `run_refresh_worker.py`'s
+book-grid pass already loops over `ncaaf`, so Layer 1's
+`no_precomputed_grid_artifact` should clear on its own. **This corrects `#547`:
+"0 NCAAF patterns of 155" was true and materially misleading.** What is genuinely
+unallowlisted is `cfbd_lines_*` and `smartsim2_projections_*`.
+
+**Measured on the fixture**
+    markets non-null          0 of 51  ->  51 of 51   (8 carrying a real book line)
+    Layer 1 market-board rows 0        ->  32         (ML/ML/spread/total x 8)
+    team-name join            94 of 94 on the real week-1 slate, both directions
+    tests                     354 ncaaf + 411 shared-contract, all green
+
+**TWO BUGS THE REACHABILITY TEST CAUGHT, both silent:**
+1. The quote log normalises `selection` to `home`/`away`; the first version
+   matched it against the TEAM NAME, so every spread and moneyline vanished
+   while totals (outcome name literally "Over") kept working. Reads as thin book
+   coverage, not a bug.
+2. Even with a correct index, `markets` stayed null on all 51 because the card
+   never emitted the `betting` block `publication_adapter._shared_markets` reads.
+   The line existed and the board could not see it.
+Also caught by reading output, not by a test: `p_home_cover` came out **0.97**
+for a game the model has the home side losing to the spread by 4.6 -- the cover
+line was passed negated. Now pinned by a test asserting direction, not value.
+
+**WIRED INTO THE SWEEP 2026-08-25**, on user instruction:
+`ncaaf_game_lines_oddsapi` is now the first of two steps in
+`_build_ncaaf_steps`, phases `(pregame, live)`. Cross-lane take of
+`scripts/refresh_odds_sources.py` (held by `layer2-sim-view-and-live-projection`),
+scoped to one appended `RefreshStep`, recorded in `lanes.md`; revert = delete
+that one block.
+
+Verified by RUNNING the sweep against a local fake OddsAPI, not by reading the
+builder: **192 quote rows** written across the two kickoff shards, board then
+`priced=8 of 51`, `layer1_rows=32`. `return_code=0` was not treated as the
+acceptance reading.
+
+**STILL OWED — a LIVE run, and it is the only thing left:**
+- Nothing in this item has touched real OddsAPI. Egress was 403'd and no
+  `ODDS_API_KEY` was present.
+- **Run `--report` first on the worker.** OddsAPI's exact NCAAF spellings are
+  unverifiable from here; `UNRESOLVED_TEAMS` names every school that will
+  silently show no line, and `_ODDSAPI_NAME_SUPPLEMENT` is where they go.
+- Nothing is deployed. `autoDeploy` is off, so this ships only when someone
+  deploys live-odds-worker.
+
+### `#553` — **The compact-card metric tile clips EVERY value by ~1 character, all sports on the generic strip. Exact cause found.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, measured — **CROSS-LANE, NOT FIXED**
+
+`syndicate/static/shared/dense_cards.css:347`
+
+    .cards-mini-metrics--strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+Three equal columns of the strip card's width, `minmax(0, 1fr)` so a column may
+shrink below its content, a 15px value font, and **no `text-overflow`, no wrap**.
+About four characters survive. Rendered proof, all from the same board:
+`50.3` -> `50`, `43.8` -> `43.`, `-14.9` -> `-14.`.
+
+**PRE-EXISTING AND NOT NCAAF-ONLY** -- `_scoreboard_strip_generic.html` is the
+strip for nfl, nhl, ncaab and soccer too, and the model's own "Projected total"
+was already losing a character before this lane touched anything. It became
+visible here because `#552` promoted the market into `metrics[:3]`, where a
+clipped digit changes a PRICE rather than a projection.
+
+`dense_cards.css` is claimed by OPEN lane `layer2-sim-view-and-live-projection`,
+so this was NOT edited. The value format was adapted instead (a signed home
+spread, `-14.9`, the shortest correct notation) and
+`test_compact_metric_values_fit_the_strip_tile` pins the character budget so the
+next person cannot widen it back without noticing.
+
+Likely fix for whoever owns it: `min-width: 0` is already there, so this wants
+`overflow: hidden; text-overflow: ellipsis; white-space: nowrap` on the value, a
+smaller `font-size` at strip scale, or `auto-fit`/`minmax(72px, 1fr)` so tiles
+may wrap to a second row instead of truncating.
+
+### `#554` — **The NFL autorun `elif` chain ran the fantasy artifact ABOVE its own injury and news inputs. Reordered; 7 red tests green.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, user request ("fix those 6 too")
+
+Seven tests were red on `origin/main` (six reported, a seventh found while
+verifying). Three unrelated root causes; **one of them was a live defect, not a
+stale test.**
+
+**1. THE DEFECT — producer after consumer.** `build_nfl_fantasy_projection_artifact.py`
+reads injury availability (`use_injury_availability`) and the news layer, yet
+`_launch_autorun_nfl_fantasy_artifact` sat ABOVE `_launch_autorun_nfl_injuries_fetch`
+and `_launch_autorun_nfl_news_capture` in the chain. Only one branch fires per
+tick (`#341`), so on a busy slate the artifact was built from yesterday's
+injuries and news. Chain now:
+
+    pbp -> injuries -> roster -> depth -> news -> fantasy artifact
+
+Starvation is not reopened: everything now above the artifact is daily or
+six-hourly gated, so the whole NFL block needs ~6 winning ticks a day out of
+~2,880. `#341`'s starvation came from sitting below HIGH-FREQUENCY branches,
+which the window assertion still forbids.
+
+**Four position comments were stale, and TWO CLAIMED THE SAME SLOT** — the
+fantasy artifact and the injuries fetch both said "THIRD, directly behind the pbp
+fetch". All rewritten as relationships rather than ordinals.
+
+**2. Three tests still steered the pbp read with `DATA_ROOT`.** `#441`
+deliberately moved `_pbp_path` OFF `DATA_ROOT` (measured: zero plays, degenerate-run
+guard refused, artifact 2.36 days stale at ~107 relaunches/day), so patching it
+stopped working and the tests silently reached for the REAL repo path. Now set
+`SYNDICATE_NFL_SOURCE_ROOT`, which steers the real resolver to the tmp tree the
+fixtures already write — better coverage than the stub it replaces. One of them
+carried a "still hermetic … never the real pbp_2025.csv" comment that was FALSE.
+
+**3. `mocked_popen.assert_not_called()` was platform-dependent.** It asserts
+nothing in the PROCESS touched `subprocess.Popen`; on Linux
+`ctypes.util.find_library` shells out to `/sbin/ldconfig -p`. Green on the
+Windows dev box, red here. `find_library` caches, so 4 of the 5 identical sites
+passed on test ORDER alone. All five narrowed to "no Popen call referencing the
+repo's own scripts".
+
+**Absolute position assertions removed.** `injuries <= 2` had been
+UNSATISFIABLE alongside the same file's `injuries == pbp + 1` since
+`evaluation_settlement` was inserted — two assertions that cannot both pass are
+not an alarm. Replaced with relative bounds plus the constraint that was never
+pinned: injuries must precede the artifact that consumes it. Same for the
+artifact's `position <= 3`.
+
+**CROSS-LANE, AND THIS ONE IS A PRODUCTION BEHAVIOUR CHANGE.**
+`scripts/run_refresh_worker.py` is claimed by TWO OPEN lanes
+(`exchange-markets-api-integration`, `portfolio-ledger-service-split`) — it was
+already the repo's one contested file before this. The edit is confined to
+reordering existing `elif` blocks and correcting comments; no branch logic,
+gating or body was touched, and reverting is re-ordering the same blocks back.
+**The owners should confirm the priority call**: it decides which NFL job wins a
+tick first, and it was made on producer-before-consumer grounds rather than
+measured, because the effect cannot be measured from a checkout.
+
+Nothing is deployed. `autoDeploy` is off.
+
+### `#555` — **Layer 1 NCAAF now carries the model, WITH its measurement attached. `0 with a projection` -> 52.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, user decision
+
+`#552` gave Layer 1 real NCAAF prices; it then reported
+`no_projection_source_for_sport` because `_attach_projections_by_sport` had no
+`ncaaf` branch. Prices with no model are an odds screen, not a betting board.
+
+**PROVEN END TO END, not predicted.** `#552` claimed Layer 1 would clear on its
+own once quotes existed. That was an assertion from reading the code; it is now a
+measurement. Wrote quotes -> `build_book_grid_artifact('ncaaf', ...)` ->
+46 + 6 rows -> board renders 8 games / 52 markets, `no_precomputed_grid_artifact`
+gone. Then with projections wired: **52 with a projection**, 52 of 52 rows.
+
+**THE CAVEAT IS THE FEATURE.** `football/pick_gate.py` suppresses PICKS and says
+in terms that it "does NOT stop projections being generated, published, or
+displayed", because a gate that blinds its own exit criterion never opens. So
+displaying is correct — but this model is measured as losing to the closing line
+(margin MAE 15.775 vs 12.212, n=2233, t=+17.20) and its totals are 1.67x
+over-dispersed. User chose "wire it, with the skill caveat". Result:
+- h2h and spreads publish **no bare `projected`** — a number in a column headed
+  PROJECTED has nowhere to carry a caveat. Same resolution `#377` reached for NFL.
+- the h2h PROBABILITY survives: it has somewhere to carry the note, and the gate
+  needs the model visible for the measurement that would lift it.
+- totals keep the mean (not itself inflated) but publish **no percentage edge** —
+  pricing a line against a 1.67x over-dispersed distribution is what `state.md`
+  calls manufacturing an edge. `edge_vs_line` survives as a labelled diagnostic.
+
+**THE FIELD NAME WAS THE WHOLE FIX, AND THE FIRST ATTEMPT GOT IT WRONG.**
+`layer1_board.html` renders the EDGE cell with a hover title when
+`edge_unavailable_reason` is set. The PROJ cell (line ~1012) has NO tooltip
+channel, and `model_skill` is rendered nowhere. The caveat first went into
+`projection_unavailable_reason` — correct-looking, entirely invisible, the same
+shape as the frozen-chip corrector's "stated refusal nobody could read".
+Verified on the real DOM: **12 elements carry the tooltip**, text "margin model
+loses to the closing line by 3.563 points of MAE over 2233 games (t=17.2)".
+
+**NOT routed through `nfl_game_projections`**, and both reasons are rules:
+it hardcodes `source: "nfl_smartsim2"` in three places (stamping NFL provenance
+on NCAAF rows is the 2026-08-21 FORBIDDEN naming rule), and its caveat machinery
+is gated on `is_preseason_profile`, so an NCAAF profile falls straight through
+and would have arrived with NO caveat — the precise opposite of what was asked
+for. The genuinely generic part IS shared: `_no_vig_over_probability` is imported
+from `prop_projections`, exactly as the NFL module imports it.
+
+Files: `syndicate/features/ncaaf/game_projections.py` (NEW),
+`syndicate/features/shared/board_enrichment.py` (one `ncaaf` branch),
+`tests/test_ncaaf_game_projections.py` (NEW, 19 tests). 500 related tests pass.
+
+**Layer 2 is the next question, not answered here.** Candidate generation reads
+the cards board's market block, not Layer 1's grid; whether these projections
+reach it is unmeasured.
+
+### `#556` — **Layer 2 NCAAF candidate generation is ALIVE: `rows=0` -> 32. Spread rows blocked by a shared-contract key collision, NOT fixed.** — lane `ncaaf-oddsapi-game-lines`, 2026-08-25, measured
+
+Production measured `GAME_CANDIDATES_EXIT sport=ncaaf rows=0` with
+`game_candidate_inputs blocks={betting:0, gameMarkets:0,
+game_market_recommendations:0, ...}`. The `betting` block `#552` added is one of
+the four sources `_game_bet_candidates_from_game` reads, and it was the missing
+one.
+
+**Measured on the priced board: 32 candidates from 8 priced games** (Home ML,
+Away ML, Over, Under), where the same cards with the `betting` block removed
+yield **zero** — asserted both ways.
+
+**NO `*_ev` EDGE IS EMITTED, DELIBERATELY.** The builder takes
+`edge=betting.get("away_ml_ev")` etc. Computing an EV from a model measured at
+15.775 MAE against the market's 12.212 would be a manufactured number, and
+Layer 2 ranks on edge. The model PROBABILITY is carried instead — the same
+treatment `#555` gives it on Layer 1. `layer2_shortlist.py` refuses such rows
+downstream with `no_model_edge_pct` (`LAYER2_BOARD_HEALTH rows=14 edged=10` on
+MLB shows edge-less rows DO reach the board), so these appear and cannot be
+traded. That is the correct end state while picks are suppressed.
+
+**THE SPREAD GAP IS A KEY COLLISION AND IS NOT MINE TO RESOLVE.**
+`_game_bet_candidates_from_game` gates its Spread branch on
+`betting["home_puck_line"]`/`["away_puck_line"]` — the MARKET line — while
+reading `betting["home_spread"]` as the model's PROJECTED spread
+(`home_spread_projected = _numeric_value(betting.get("home_spread"))`,
+`home.py:2671`). But `publication_adapter._shared_markets` reads that SAME
+`home_spread` as the MARKET spread, and that is what makes the cards board's
+market block correct (verified: `markets.spread.home = -14.875`).
+
+One key, two meanings, two consumers. Setting `*_puck_line` would produce Spread
+rows whose `projected` is the market line wearing the model's label — the
+2026-08-21 FORBIDDEN naming rule. Resolving it properly means splitting the
+contract across every sport that emits `betting`, so the honest state is pinned
+by test instead: no Spread candidate rather than a mislabelled one.
+
+(`puck_line` is hockey vocabulary doing duty as the generic market-line key,
+which is likely how the two meanings drifted together in the first place.)
+
+### `#545` — **The soccer chip build moves to the WORKER and widens to the board's horizon: 72 uncovered fixtures -> 0.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
+
+`#541`'s telemetry found it and `#541`'s diagnosis named it: the chip set was a
+full matchday per league, for the matchday that had ALREADY BEEN PLAYED.
+Production 2026-08-24T20:36:39Z: `chips=96`, `chip_dates` opening on 08-22/08-23,
+`no_chip_available=251` of 342 cards, only 64 resolving a chip at all.
+
+**TWO CHANGES, and they are separable on purpose.**
+
+**1. Cover the horizon, not the current matchday.** `_SoccerDataProvider.games`
+now builds `week` AND `week+1` per league. `default_week(reference_date=today)`
+answers "which matchday are we in"; the board asks "the next seven days", and on
+a Monday those differ. Measured locally against the real schedules: window
+fixtures with no chip **72 -> 0**, all ten leagues at zero, chips 98 -> 210 with
+in-window chips 33 -> 105.
+
+De-duplicated by fixture id across the two weeks, and that guard is
+load-bearing rather than tidy: the browser's canonical index DISCARDS colliding
+keys, so a fixture emitted twice would lose its chip entirely — the widening
+would have caused the exact symptom it exists to fix.
+
+**2. The build moves off the request path.** `/api/board/game-chips` called
+`build_game_chips` inline; widening made that twenty `build_cards_page_context`
+calls for soccer alone, inside a Flask handler. The worker now publishes
+`reports/intelligence/game_chips_<date>.json` through `write_json_file`
+(keyvalue-backed, same transport as the shortlist beside it, because Render
+gives each service its own disk) and the endpoint reads it. Measured: 210 chips
+= **89 KB** against the 8 MB ceiling, so no shedding guard is needed.
+
+**THE FALLBACK IS KEPT, AGAINST THE LETTER OF THE RULE, AND SAYS SO.** The
+worker-split rule says a request must not backfill missing data. The honest
+reading is that this is a cache miss on a DISPLAY artifact, not missing board
+data — and refusing to serve would blank every sport's scoreboard strip for the
+whole window between a deploy and the worker's next shortlist build. That is a
+visible regression bought for a purity the user never sees. So the fallback
+stays and **names itself in the response** (`source=fallback_inline_build`),
+because the failure mode that actually matters is it becoming the silent status
+quo — the request fan-out still running while everyone believes it was removed.
+
+**ONE SPORT LIST, SHARED.** `GAME_CHIP_DEFAULT_SPORTS` now lives in
+`game_chip_scoreboard.py` and the blueprint re-exports it. The worker builds for
+that full list rather than only the sports on today's board: scoping to the
+board would mean a sport with no rows loses its scoreboard entirely, and a
+chip-less strip is indistinguishable from a sport with no games.
+
+**Tests:** `tests/test_game_chips_worker_artifact.py` (7 — including that the
+endpoint does NOT recompute when the artifact exists, asserted by making
+`build_game_chips` raise), `tests/test_soccer_chip_week_span.py` (5 — the two
+weeks, the de-duplication, a missing next week not costing the current one).
+Updated two stale assertions in `test_sport_data_provider.py` that pinned the
+single-week behaviour this change deliberately replaces.
+
+**Pre-existing reds: FIVE, not the two I first reported.** My `-k` selector
+covered `chip|scoreboard|game_card|shortlist|soccer_card|sport_data_provider`
+and I reported "only the two known WNBA reds" off it — but I had edited
+`pipeline/intelligence_state.py` and `syndicate/blueprints/home.py`, whose tests
+that selector never ran. A wider background sweep surfaced three more:
+`test_daily_update_smoke::test_home_dashboard_payload_exposes_live_lens_link`
+and two in `test_intelligence_state`. **All three fail identically at the parent
+commit `133eb536`, checked in a detached worktree — none are mine.**
+
+The first attempt to check that proved NOTHING and nearly passed as evidence:
+`git stash` with an already-clean tree stashed nothing, so the "before" run was
+the same commit as the "after" run and produced an identical result that looked
+like confirmation. Caught by `git stash pop` reporting "No stash entries found".
+**A before/after comparison where both sides are the same tree always agrees.**
+
+`tests/test_polymarket_us_auth.py` fails COLLECTION in this environment
+(`ModuleNotFoundError: _cffi_backend`) — another session's file, an env issue,
+not a result.
+
+**THE SELECTOR LESSON, which has now cost twice:** `#539` shipped with a guard
+test that a `-k` filter had skipped, and this run reported a clean surface that
+excluded two files the change edited. Choose `-k` from the FILES TOUCHED, not
+from the topic being worked on.
+
+**NOT YET DEPLOYED.** Needs both services: worker to publish, web to read.
+**Verify after deploy:** `GAME_CHIPS_PUBLISHED date=... chips=` in the worker
+log, then `CHIP_JOIN_COVERAGE sport=soccer` with `no_chip_available` far below
+251, and `/api/board/game-chips` returning `source=worker_artifact`.
+
+### `#542` — **We can now BET game lines that we cannot GRADE. 98 of 171 orders on one slate are permanently ungraded, and every performance number rests on the 73 that are left.** — lane `portfolio-decision-and-execution`, 2026-08-24
+
+MEASURED on refresh-worker, 15:43:19Z, the same line every cycle:
+
+    [paper_settlement] SETTLED date=2026-08-23 orders=171 graded=0
+      already_graded=71 outcomes={}
+      ungraded={'no_resolver_for_soccer': 5, 'unmapped_market': 80,
+                'game_not_in_live_box': 11, 'stat_not_in_feed': 2,
+                'order_not_filled': 2}
+    [paper_settlement] UNMAPPED_MARKETS date=2026-08-23
+      {'spreads': 41, 'h2h': 31, 'h2h_3_way': 6, 'spreads_alt': 2}
+
+**PLAYER PROPS GRADE. GAME LINES DO NOT.** The sport resolvers produce a
+player stat from the live feed; nothing produces a GAME-level `current_value`
+(final score, margin, winner), so `spreads`, `h2h`, `h2h_3_way` and
+`spreads_alt` refuse by name every cycle and always will.
+
+**This got worse today, by my own hand.** The Kalshi work in this lane added
+game lines — including period markets and alternates — to the pull and the
+join specifically so they could be bet. The betting half shipped and the
+scoring half does not exist, so the system's ability to take a position now
+extends strictly further than its ability to find out whether the position was
+right. That is the wrong direction for the asymmetry to run.
+
+**Why the counters do not show it as a problem.** `graded=0` reads as "nothing
+finished yet" and is indistinguishable at a glance from "nothing CAN finish".
+The `ungraded={...}` breakdown beside it is the only thing that separates them,
+and `already_graded=71` sitting next to `orders=171` looks like progress rather
+than a ceiling. The named refusals are doing their job — `UNMAPPED_MARKETS`
+prints the market NAMES, which is exactly the difference between "add four
+resolvers" and another round of guessing — but nothing treats the ratio as a
+health signal.
+
+**What is NOT established:** whether the 73 graded orders reach the evaluation
+layer at all. `[INTEL_TRACE] evaluation_reliability_profile` prints
+`sample_size: 0, settled_count: 0` on every cycle. That trace may be scoped
+(`sport: null`) rather than global, so it is a signal to check, not a proven
+second break. Check before assuming either reading.
+
+**The fix is four resolvers, not a redesign:** a game-level resolver per sport
+returning final score and margin, dispatched the same way the player-stat
+resolvers already are (`_default_resolver`). `bet_status` already knows
+`spreads` is non-monotone and refuses to grade it early, so the grading
+arithmetic is in place; only the VALUE is missing.
+
+---
+
+### `#543` — **`requested_price` holds American odds on Kalshi rows whose `fill_price` holds probability dollars. Two units, adjacent columns, same row.** — lane `portfolio-decision-and-execution`, 2026-08-24
+
+MEASURED 15:03:38Z:
+
+    LIVE_LEDGER_ROW ... venue=kalshi ticker=KXMLBKS-...-MINZMATTHEWS52-5
+      side=under line=4.5 price=-117.0 stake=1.5 fill_price=None
+
+`price=-117.0` is American; the order was actually placed at $0.54. The board
+prices in American odds and `requested_price` is copied straight from it, while
+`fill_price` now comes back from Kalshi in dollars.
+
+**This already made one guard inert.** `_requested_contracts` (the bound that
+refuses to book more contracts than an order could have bought) computes a
+count only when `0 < requested_price < 1`, so on every real Kalshi row it
+returns `None` and the bound never applies. It did not matter — `fill_count_fp`
+turned out to be a plain decimal — but the guard that was written to cover that
+unknown does not, in production, cover anything.
+
+`profit_per_dollar` (`#542`'s neighbour) now disambiguates the two units by
+range at grading time, which is correct as far as it goes and is still a
+workaround for one column meaning two things.
+
+**Not yet decided:** whether to carry `requested_price_dollars` alongside, or
+to store the venue's own unit per row with an explicit `price_unit` field. The
+second is the honest shape; the first is cheaper and does not touch the paper
+book.
+
+### `#544` — **Market/odds pull built for the other five exchange venues; the sixth (Coinbase) doesn't need one -- it IS Kalshi.** — lane `exchange-markets-api-integration`, 2026-08-24
+
+User asked for read-only market/odds client modules -- coinbase, prophetx,
+novig, polymarket, robinhood, crypto.com ("OG") -- as the layer BEFORE the
+order-automation phase another session is building end to end for Kalshi.
+Same discipline `kalshi_client.py` established: single-place schema
+assumptions, `probe()` reports the raw shape rather than parsing blind, a
+failed fetch is a NAMED error, never a silent empty list. Every venue host
+403s CONNECT through this session's agent proxy (confirmed for all six,
+same denial recorded for Kalshi), so nothing here is verified against a live
+response -- that is `refresh-worker`'s job on the first production run, via
+`scripts/probe_<venue>.py`, one per venue.
+
+**RESEARCH CHANGED THE SHAPE OF THE WORK.** Six parallel research passes
+(WebSearch/WebFetch) found this is NOT six symmetric integrations:
+
+| venue | finding |
+|---|---|
+| **polymarket** | Genuinely public, documented, no-auth API (Gamma + CLOB). Built for real -- the strongest module in this batch. |
+| **novig** | Real docs (`docs.novig.com`), OAuth-gated official REST -- **founder-gated, not self-serve**. Built for real, refuses by name without a credential. A genuinely public no-auth EOD CSV mirror (`data.novig.com`) also exists and is implemented as a second tier. An undocumented internal GraphQL endpoint several third-party scrapers use was found and DELIBERATELY NOT implemented -- unpublished, ToS status unclear. |
+| **prophetx** | Real docs (`docs.prophetx.co`), a documented read-only "Affiliate API" -- **also partner-gated, no self-serve signup**. Built for real; the production base URL is UNCONFIRMED (only a sandbox host was verified), so it is a required env override, never a guessed default. |
+| **coinbase** | **"Coinbase Predict" has no Coinbase-branded API at all.** It is a broker layer (Coinbase Financial Markets) over KALSHI's own exchange -- Kalshi supplies every contract and all liquidity, and Coinbase's UI surfaces Kalshi's own `KX`-prefixed tickers directly. `coinbase_client.py` reports this finding and delegates to the other session's `kalshi_client.py` (read-only surface only) rather than fabricating a nonexistent endpoint. |
+| **robinhood** | **No public API, official or reverse-engineered, for event contracts** -- consistent with Robinhood's historical stance on equities/options. Contracts are resold from KalshiEX (primary), ForecastEx, and the newly acquired Rothera (ex-MIAXdx). `robinhood_client.py` reports the finding and offers the same Kalshi pass-through as a KNOWINGLY PARTIAL slice (ForecastEx/Rothera-sourced contracts have no known public path at all). |
+| **crypto.com "OG"** | Real, live platform -- **OG.com**, spun out 2026-02-03, regulated via CDNA (tied to the earlier Nadex acquisition). No public REST/WebSocket has shipped; Crypto.com's own Exchange API page reportedly lists Predictions REST/WebSocket as "coming soon" with only FIX (institutional) available now. `cryptocom_client.py` reports the finding and REJECTS one uncorroborated third-party-advertised endpoint by name rather than building against it. Its `probe()` is the one script in this batch worth re-running periodically, since "coming soon" is a moving target. |
+
+**VERIFICATION.** 53 new unit tests (pure-function conversions, normalization,
+credential-refusal paths) pass locally --
+`python -m pytest tests/test_coinbase_client.py tests/test_prophetx_client.py
+tests/test_novig_client.py tests/test_polymarket_client.py
+tests/test_robinhood_client.py tests/test_cryptocom_client.py`. Schema
+correctness for polymarket/novig/prophetx and the two probe-attempt paths
+(coinbase/robinhood's Kalshi pass-through, crypto.com's landing-page check)
+are UNVERIFIED against a live response -- same caveat every module in this
+batch inherits from `kalshi_client.py`. Full research + per-venue evidence:
+`.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`.
+
+**NEXT.** Once schemas are confirmed from a host with real outbound access,
+this lane's stated next phase is the order-automation layer for whichever of
+polymarket/novig/prophetx clears legal/ToS review -- converging on the other
+session's Kalshi build (`kalshi_auth.py`, `kalshi_board.py`,
+`venue_scope.py`) as the reference shape, not reinventing it.
+
+### `#541` — **The compact-card chip join is now MEASURED. It had been found twice by a person looking at the board and reported by nothing.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
+
+MLS `#365` (2026-08-22) and La Liga `#540` (2026-08-24) were the same defect:
+a card resolved no chip and fell through to printing `game.matchup` verbatim.
+Both times **every count on `LAYER2_BOARD_HEALTH` was healthy** while the board
+was visibly wrong, and the only detector was a human noticing that some cards
+showed tri-codes and others showed "Real Racing Club de Santander".
+
+Nothing server-side could see it: **the join runs in the BROWSER**
+(`chipForGame`). So the worker now builds the chips it would serve and reports
+whether each card can reach one — `CHIP_JOIN_COVERAGE`, beside the board-health
+line it already prints.
+
+**IT MEASURES COVERAGE, IT DOES NOT REIMPLEMENT THE JOIN.** Mirroring
+`chipForGame`'s fuzzy last resort here would be a second implementation of one
+number — the drift that retired `book_grid`. So only the DETERMINISTIC keys are
+evaluated (id → exact matchup → exact names → canonical), and the rest is
+reported honestly rather than predicted.
+
+**FOUR BUCKETS, EACH WITH A DIFFERENT OWNER** — the whole value is that a
+wrong label sends the next person to the wrong place:
+
+  * `by_id` / `by_matchup` / `by_canonical` — WHICH route resolved it. A single
+    `matched` total would hide a board that resolves entirely by the fuzzy
+    fallback and is one rename from the reported defect.
+  * `no_chip_available` — keys present, no chip for the fixture. This card WILL
+    print its matchup verbatim. Owner: the chip window.
+  * `needs_fallback` — a chip exists but no deterministic key reaches it (a
+    dropped canonical collision — two legs, a cup tie). Owner: the collision.
+  * `unknown_no_key` — the card carries no canonical keys, so we CANNOT tell.
+    Should read 0 forever now that `#540` shipped.
+
+**MY FIRST VERSION REPORTED `no_chip_available` FOR KEYLESS CARDS** — asserting
+a chip does not exist on the strength of not having looked. Caught by running
+it against a simulated pre-`#540` world, where it confidently made a claim it
+had no basis for. A diagnostic that guesses is worse than one that abstains,
+because the guess is what gets acted on. Now its own bucket, and pinned by
+`test_a_keyless_card_is_never_reported_as_having_no_chip`.
+
+**DROPPED `by_league` rather than ship a field that always says "unknown".** A
+board CARD carries `sport`/`sport_slug` and no league at all (checked). The
+`samples` name the fixtures instead, which identifies the league to a reader
+and — more importantly — gives the exact SPELLING each feed used, since every
+fix here has been an alias entry.
+
+**A `date_str` NAMEERROR ALMOST SHIPPED SILENTLY.** The enclosing parameter is
+`selected_date`. The whole block is `try/except` (telemetry must never cost the
+board), so it would have printed `CHIP_JOIN_COVERAGE_UNAVAILABLE` on every
+build forever — telemetry that never works, which is the exact failure this
+item exists to prevent. Caught by executing the REAL block out of the source
+file rather than testing the helper it calls.
+
+**Tests:** `tests/test_chip_join_coverage.py` (9 — every bucket exercised,
+including the collision path, which the first draft of that test silently
+missed because the exact-name index answered first).
+
+**DEPLOYED `ee9f8296`, first reading 2026-08-24T15:34:53Z — and it immediately
+found something far larger than the bug that prompted it.**
+
+```
+CHIP_JOIN_COVERAGE sport=mlb    cards=400 by_matchup=400 no_chip_available=0   unknown_no_key=0
+CHIP_JOIN_COVERAGE sport=wnba   cards=400 by_matchup=400 no_chip_available=0   unknown_no_key=0
+CHIP_JOIN_COVERAGE sport=soccer cards=400 by_matchup=94 by_canonical=78
+                                no_chip_available=222 unknown_no_key=6
+```
+
+**`#540` IS DOING REAL WORK: 78 soccer cards resolve ONLY via the canonical
+key** — a fifth of the board, invisible before today.
+
+**BUT 222 OF 400 SOCCER CARDS CAN REACH NO CHIP AT ALL** (55%). Those print
+their matchup verbatim. The reported La Liga complaint was 4 fixtures; this is
+the same symptom at fifty times the scale, and no count in the system had ever
+said so.
+
+**THE OBVIOUS EXPLANATION IS WRONG.** I assumed the board's 7-day horizon ran
+past a one-day chip window. Measured instead: `chip_dates` spans
+**2026-08-22 → 2026-08-30, nine dates**, covering the board's whole horizon.
+So these are genuine join failures, not fixtures too far out. The likelier
+cause is that `build_game_chips` returns only **98 chips for ten leagues over
+nine days** — La Liga alone had 13 — so the chip set is a thin slice of the
+board's fixtures. NOT YET DIAGNOSED; do not treat that as established.
+
+`unknown_no_key=6` names an alias gap directly: `ADO Den Haag @ Feyenoord` has
+`home_key=None` because `canonical_team` cannot resolve "Feyenoord" (the
+artifacts spell it "Feyenoord Rotterdam"). Exactly the class `#540` fixed, found
+by reading a log this time instead of by a user.
+
+**ADDED `chips=` AND `chip_dates=` AFTER THAT FIRST READING**, because the
+reading could not answer its own question: `no_chip_available=222` reads
+identically for "the horizon runs past the window" (cosmetic) and "the chip
+build returned almost nothing" (an outage). A number nobody can act on is not
+telemetry. Those two fields are what turned the hypothesis above from plausible
+to refuted, in one reading.
+
+**DIAGNOSED 2026-08-24, AND MY OWN STATED HYPOTHESIS WAS WRONG TWICE.**
+
+Wrong #1: "the chip build returned almost nothing." It did not. 98 chips is a
+FULL matchday for each of ten leagues (mls 16, epl 10, la_liga 13, bundesliga 1,
+serie_a 11, ligue_1 9, eredivisie 8, primeira_liga 9, championship 13,
+belgian 8 — summing to exactly 98). Nothing is missing from the build.
+
+Wrong #2: I then "sized the gap" by comparing chip COUNTS against fixture
+COUNTS in the board's window and got 98 vs 105, concluding only 7 were
+uncovered. That compared totals, not identities, and the reassurance was
+false. Redone by fixture identity: **only 33 of the 98 chips fall inside the
+board's window at all, and 72 of the 105 fixtures in that window have no
+chip.**
+
+**THE ACTUAL CAUSE IS A PHASE OFFSET, and one reading shows it whole:**
+
+```
+chip fixtures by date        board horizon = 2026-08-24 .. 08-30
+  2026-08-22   37     <- already played
+  2026-08-23   28     <- already played
+  2026-08-24    5   in window
+  2026-08-25    1   in window
+  ...
+  2026-08-30    9   in window
+```
+
+**65 of 98 chips are for fixtures that had already been played.**
+`_SoccerDataProvider.games` resolves ONE week per league via
+`default_week(league, season, reference_date=today)` and returns only that
+matchday. On a Monday, the matchday containing "now" is the one that finished
+over the WEEKEND. The board's odds horizon runs the other way — the next seven
+days, i.e. next weekend. The two barely intersect.
+
+`primeira_liga` is the control that proves it: 9 chips, 9 in window, **0**
+uncovered — the one league whose resolved week happens to align. Every other
+league is offset. `championship` is the extreme: 13 chips, 1 in window, 11
+window fixtures unchipped.
+
+Bundesliga's `1` is NOT a bug: week 1 of the 2026 schedule genuinely holds one
+fixture (the season opener, Stuttgart @ Bayern 08-28); weeks 2-6 hold 9, 9, 9,
+8, 9. `default_week` resolves bundesliga to week 1, so 8 of the 9 Bundesliga
+fixtures in the board's window sit in week 2 and get no chip.
+
+**This is a different and much larger cause than `#540`.** `#540` was real —
+4 La Liga fixtures INSIDE the chip window whose clubs the two feeds named
+differently, and 78 cards now resolve only via its canonical key. But it was
+never going to touch the 222, because those fixtures have no chip to join to.
+
+**CONFIRMED IN PRODUCTION 2026-08-24T20:36:39Z** — the enriched line
+piggybacked another session's deploy (`8b7c5f87`, live 20:29:32Z), no deploy of
+its own:
+
+```
+CHIP_JOIN_COVERAGE sport=soccer chips=96
+  chip_dates=['2026-08-22','2026-08-23','2026-08-24',...,'2026-08-29']
+  cards=342 by_matchup=7 by_canonical=57 no_chip_available=251 unknown_no_key=27
+```
+
+`chip_dates` still opens on **08-22 and 08-23**, the played matchday — the phase
+offset, in production, exactly as measured locally. Only **64 of 342** cards
+(19%) resolve a chip at all.
+
+And the offset is WORSENING WITHIN THE DAY, which the two readings show and
+neither alone could: `by_matchup` fell **94 -> 7** between 15:34Z and 20:36Z.
+Those 94 were the played matchday's fixtures still inside the board's window at
+midday; by evening the board has rolled forward and they are gone. So the
+board's chip coverage decays as the week moves away from the resolved matchday
+and is worst exactly when the next slate is what people are betting.
+
+`unknown_no_key` rose **6 -> 27**: a separate and much smaller alias-map
+population (`Feyenoord` -> artifacts say "Feyenoord Rotterdam"), fixable the way
+`#540` was, and NOT the main cause.
+
+**THE FIX (not yet made, and it has a cost worth deciding on):** the provider
+must cover the board's HORIZON, not the current matchday — `week` AND `week+1`
+at minimum. That doubles `build_cards_page_context` calls (10 -> 20) and
+`build_game_chips` runs on the WEB service, which the architecture rule says
+does no heavy computation. So the fix should probably be: widen the week span,
+and confirm the existing `_CACHE_TTL_SECONDS` absorbs the added cost, or move
+the chip build behind the worker's artifact like everything else.
+
 ### `#540` — **La Liga compact cards showed mismatched team names: two clubs the browser's normalisation can NEVER join, now joined on the server's own alias map.** — lane `layer2-sim-view-and-live-projection`, 2026-08-24
 
 Reported: "we have some la liga compact game card mismatched team names for
@@ -4094,87 +6760,6 @@ full PASS, re-confirmed after every addendum; 650 hockeysim/nhl tests passing (u
 session start). Nothing deployed -- offline producer/calibration/engine-wiring only, all commits on
 `origin/main`. Faceoff-zone track (`#463`) is now fully closed with this piece included, not
 deferred.
-
-### `#469` — **`#468`'s "no caller of boxscore-capture exists anywhere" was wrong — a real, ENABLED, ESPN-based caller runs every ~2h and silently reports success while adding zero rows** — DIAGNOSED AND FIXED 2026-08-19 (`1fa94eb8`), lane `basketball-model-owner`. Deploy to live-odds-worker pending a clear preflight window (job-in-flight HOLD as of first attempt).
-
-**Correction to `#468`'s bottom section, stated plainly**: that entry said
-"no caller of `update-boxscores-history`/`backfill-boxscores` exists
-anywhere" — TRUE only for those two specific vendor-CLI function names.
-A parallel, Syndicate-owned, ESPN-based mechanism does the same job under
-a different name and IS wired in: `run_live_odds_refresh_worker.py`'s
-`_launch_autorun_wnba_pregame_refresh` (confirmed live: `SYNDICATE_ENABLE_
-WNBA_PREGAME_REFRESH_AUTORUN=true`, interval 7200s, on `live-odds-worker`
-right now) launches `refresh_odds_sources.py --sports wnba --phase pregame`
-every ~2h, which subprocesses `refresh_wnba_oddsapi_props.py` → `main()` →
-`_run_refresh_via_cli` → `_ensure_player_logs_for_props_refresh` →
-`_bootstrap_local_boxscores_history_for_props` →
-`bootstrap_boxscores_history_local` (ESPN site API). Confirmed reachable
-by full call-chain trace, not inference.
-
-**The real bug, found and fixed**: `_bootstrap_local_boxscores_history_
-for_props`'s success check tested `result["history_rows"]` — the file's
-CUMULATIVE total, which is >0 forever once any history exists — instead
-of `result["rows"]`, the CURRENT pull's own contribution. A completely
-failed ESPN fetch (zero new rows across the whole lookback window) still
-writes `existing_history` back unchanged and reports success, because
-"the file has rows" was never false. Live production evidence, pulled
-fresh via `/api/ops/artifacts/export?path=wnba_source/data/processed/
-boxscores_history.csv` on 2026-08-19: mtime 11h old (bootstrap IS running,
-IS "succeeding," on schedule) but content's own max game date frozen at
-2026-06-30 (3889 rows, unchanged) — i.e. this has been silently failing on
-every ~2h tick for roughly seven weeks while reporting healthy.
-
-**Fix** (`syndicate/features/shared/basketball_boxscores_history.py`,
-`_bootstrap_local_boxscores_history_for_props` in `scripts/refresh_wnba_
-oddsapi_props.py`): now distinguishes a real fetch failure (`_espn_
-scoreboard_local` returning a falsy `{}`, only possible on an actual HTTP/
-exception failure — a genuinely gameless day returns a truthy dict with an
-empty `events` list) from a legitimate zero-games day, tracked as `days_
-checked`/`days_fetch_failed`. When new rows are genuinely zero, the
-function still returns success (leniency preserved on purpose —
-`_ensure_player_logs_for_props_refresh` treats `False` as fatal for the
-WHOLE predict-props phase, so flipping this to a hard failure risked
-stopping props/predictions generation entirely, a worse regression than
-stale boxscores) but now emits a loud `print(..., flush=True)`
-`BOXSCORE_BOOTSTRAP_STALLED` marker (reaches Render's log collector —
-`logger.info` does not) plus a proper log-file line, instead of a line
-indistinguishable from success.
-
-**Also changed**: ESPN's undocumented site API got a browser-shaped
-`User-Agent` (was the literal string `"syndicate/1.0"`) in `_http_get_
-json_local` — the standard, low-risk shape of fix for "public media API
-soft-blocks a custom bot UA from a datacenter/cloud egress IP, 200 OK with
-an empty body, works fine from a residential dev IP" — which is consistent
-with (not proven to be the sole cause of) what was measured. **Whether
-this alone un-sticks the data is UNVERIFIED** — it cannot be tested from a
-dev machine, since a dev machine's IP was never the failure mode being
-guarded against. The `days_fetch_failed` counter this same fix adds is
-what will make the next read decisive either way, once deployed and
-observed on a live tick.
-
-**Verified, not assumed**: live ESPN pull via the real, unmodified
-`bootstrap_boxscores_history_local` (before AND after the UA change) —
-674 real rows, 2026-08-09..08-18, `days_fetch_failed=0` — proves the
-mechanism itself works end-to-end when reachable. Two `_bootstrap_local_
-boxscores_history_for_props` behavior cases exercised directly: working
-bootstrap still returns `(True, None)` with a normal log line; a
-monkeypatched stalled case (`rows=0`, `history_rows=3889`, pre-existing
-`wrote` path) still returns `(True, None)` — leniency confirmed intact —
-but now prints `BOXSCORE_BOOTSTRAP_STALLED` and logs the STALLED line.
-`tests/test_wnba_refresh_runner.py`/`test_nba_refresh_runner.py`: 4
-pre-existing failures, confirmed via `git stash` to fail identically on
-`a67019cf` with none of these 3 files touched (unrelated `force_refresh`
-kwarg mismatch in an NBA test fixture) — not caused by this change, not
-fixed by this change, out of scope.
-
-**Still open after this fix**: whether the UA change (or anything else)
-actually resolves the zero-new-rows failure requires observing a live
-production tick post-deploy — `days_fetch_failed` on the next STALLED-or-
-silent tick answers it. If `days_fetch_failed` stays high after deploy,
-the UA was not the (or not the only) cause and this needs a further pass
-(candidates: Render's outbound IP specifically blocklisted rather than
-UA-gated, a proxy/TLS difference, or a different ESPN endpoint behavior
-under load). NBA not compared apples-to-apples for the identical defect.
 
 ### `#468` — **`#461`'s deployed fix has ZERO reach into production: `_ensure_team_advanced_stats_asof` lives in `wnba_betting.cli`, which the real pipeline never calls** — REACHABILITY FIX SHIPPED 2026-08-19 (`fd1930b2`), lane `basketball-model-owner`. Boxscore-capture half corrected and fixed — see `#469`.
 
@@ -37596,6 +40181,35 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ---
 
 ## Operational notes worth not rediscovering
+
+### A ledger defect stops being self-healing the moment the row settles (`#560`, 2026-08-26)
+
+The reconciler re-reads the venue and re-stamps `fill_price` on every cycle, so
+a fixed reader repairs history by itself on its first pass — for the rows it
+still visits. `reconcile_open_orders`' candidate filter requires
+`mode == LIVE`, a status of `submitted`/`filled`, **and `outcome is None`**
+(`execution_ledger.py:789-796`). A settled row is not a candidate, so a wrong
+value inside one is permanent: no deploy reaches it, and no counter will report
+it as unfixed.
+
+`#560` got the good half of that by luck. Three NO-side Polymarket fills had
+been recorded at the YES-side price; all three were still ungraded when
+`d92ab27b1` shipped, so the next cycle corrected them and the item closed with
+nothing to decide. Had the same defect been found a day later, the same three
+rows would have needed a manual restamp of settled money records — the option
+the item least wanted to take.
+
+**So on any venue-reader or fill-accounting defect, the first question is not
+"how many rows are wrong" but "how many of the wrong rows have already
+settled".** The second number is the one that costs something. The first
+usually fixes itself.
+
+Corollary for sizing: scope the count by the filter the repair path actually
+uses, not by the ledger's headline totals. `#560` estimated its exposure from
+`filled_stake_dollars: 123.62` across 82 orders and was wrong by two orders of
+magnitude — that figure sums `modes: ['live','paper']`, and paper rows never
+reconcile against a venue at all. The real population was 5 orders.
+
 
 ### A test can be stale and mirror-dependent at once — and fixing one instance is not sweeping the class (`#288`, 2026-08-13)
 

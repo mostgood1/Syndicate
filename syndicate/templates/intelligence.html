@@ -1829,6 +1829,20 @@
   // (success, empty response, or failure -- any settled fetch unblocks it).
   let gameChipsLoadedOnce = false;
 
+  // `#563`. WHEN THE WORKER LAST PUBLISHED THESE CHIPS -- not when we last
+  // fetched them. `/api/board/game-chips` has always returned `published_at`
+  // and this page has always thrown it away, which is exactly how a frozen
+  // scoreboard passed for a live one: the 60s poll keeps succeeding, the
+  // response keeps being byte-identical, and nothing on the page changes or
+  // says why.
+  //
+  // Measured 2026-08-25/26: refresh-worker took 15 deploys in 6h15m, each
+  // SIGTERMing the build in flight, median instance uptime 1202 s against a
+  // 21-minute boot-to-first-publish. The chip artifact went 20-54 minutes
+  // without moving and the strip rendered it the whole time as current. A user
+  // found it by noticing the odds-refresh timestamps had stopped.
+  let gameChipsPublishedAt = null;
+
   // #165: two candidates for the SAME real game can carry two different
   // ids -- confirmed live: 89 "WSH @ ATL" MLB candidates on 824894, one
   // stray "game" candidate on 824892 (a stale/mismatched gamePk from a
@@ -1855,6 +1869,14 @@
       }
       const json = await res.json();
       const chips = Array.isArray(json.chips) ? json.chips : [];
+      // `source` is on the response for the same reason (`#545`): a permanent
+      // publish failure and a healthy worker produce chips that look identical.
+      // A fallback build is BY DEFINITION current, so it is not stale -- it is a
+      // different problem, and conflating them would send the reader to the
+      // wrong place.
+      gameChipsPublishedAt = json.source === "worker_artifact"
+        ? (String(json.published_at || "").trim() || null)
+        : null;
       const byId = new Map();
       const byMatchup = new Map();
       const byMatchupLoose = new Map();
@@ -2387,6 +2409,44 @@
       const chip = chipForGame(group);
       group.startTimeUtc = chip && chip.start_time_utc ? chip.start_time_utc : null;
     }
+    // `#583`. THE RAIL'S DATE FILTER, APPLIED TO CANDIDATE-BACKED GAMES TOO.
+    //
+    // `railDate` used to appear exactly ONCE in this file -- in the loop above
+    // that seats cards from UNCLAIMED CHIPS. Groups derived from board
+    // CANDIDATES were never date-filtered at all, so any game with rows on the
+    // board seated a mini-card whatever the day tab said. That stays invisible
+    // only while the candidate pool is one day wide, and it is not: `#565`
+    // widened the board's forward window to the WIDEST sport's window.
+    //
+    // USER REPORT 2026-08-26: "all NFL games that are not today are also
+    // showing up", on the Today tab. Measured the same minute,
+    // `/api/board/game-chips?sports=nfl` returned 16 chips --
+    //
+    //     2026-08-27  1     2026-08-28  8     2026-08-29  7     today  0
+    //
+    // -- and every one of those games has board rows, so every one seated a
+    // card. The chip feed is deliberately multi-day and CORRECT (`7805f5a8`:
+    // "the strip asks for the board's horizon, the rail still asks for today");
+    // the rail's half of that sentence was only ever true for chip-seeded
+    // cards.
+    //
+    // THE CHIP'S DATE WINS OVER THE CANDIDATE'S, and that order is load-bearing
+    // rather than stylistic: `#165` follow-up #3 measured a candidate carrying
+    // its OWN resolvable but WRONG date -- gamePk 824892 stamped `2026-07-31`
+    // while showing the same live score and inning as 824894, dated
+    // `2026-07-30`. A candidate-level date cannot be trusted where a chip
+    // disagrees.
+    //
+    // AN UNDATED GROUP IS KEPT -- the same rule as the chip loop above, for the
+    // same reason. Absent evidence is not evidence of a different day, and
+    // dropping it would hide a game whose provider gave no timestamp, which is
+    // the case `game_chip_scoreboard.py`'s day-prefix fallback exists for.
+    const dateFilteredGames = gamesList.filter((group) => {
+      if (!railDate) return true;
+      const chip = chipForGame(group);
+      const groupDate = (chip ? chipCentralDate(chip) : null) || group.fallbackDate || null;
+      return !groupDate || groupDate === railDate;
+    });
     // Precise chip start time wins when available; a chip-less card (a
     // game outside today's /api/board/game-chips window, e.g. soccer's
     // week-keyed schedule) still sorts by its own date rather than falling
@@ -2422,7 +2482,10 @@
       if (chip && chip.state) return chip.state === "final";
       return Boolean(group.allFinal);
     };
-    return gamesList.sort((a, b) => {
+    // `#583`: the DATE-FILTERED list, not `gamesList`. Sorting and returning
+    // the unfiltered one is how the filter above ships inert -- it computes a
+    // correct answer that nothing reads, and every card still seats.
+    return dateFilteredGames.sort((a, b) => {
       const aFinal = isFinal(a);
       const bFinal = isFinal(b);
       // Ahead of the live test on purpose: these are disjoint (a game cannot
@@ -2450,6 +2513,46 @@
     const weekday = parsed.toLocaleDateString("en-US", { weekday: "short" });
     const month = parsed.toLocaleDateString("en-US", { month: "short" });
     return `${weekday} ${month} ${parsed.getDate()}`;
+  }
+
+  // `#563`. SAY SO WHEN THE SCOREBOARD HAS STOPPED MOVING.
+  //
+  // SILENT WHEN HEALTHY, and that is deliberate rather than lazy: a badge that
+  // is always on is furniture, and the reader stops seeing it well before it
+  // matters. This appears only once the artifact is older than a slate's
+  // scoreboard has any business being, so its presence IS the signal.
+  //
+  // THRESHOLD 10 MINUTES, chosen against the measured cadence and not picked
+  // round. A healthy worker republishes chips well inside that; the freezes of
+  // 2026-08-25 ran 20-54 minutes. Sitting between the two is what keeps this
+  // from flapping on a normal cycle while still catching a dead producer within
+  // one poll of it mattering.
+  //
+  // DEGRADES TO SILENCE, NEVER TO A GUESS. No stamp (an inline fallback build,
+  // a fetch that never landed, a server that stopped sending the field) renders
+  // nothing at all. Painting "stale" on missing evidence would be the same
+  // error as the asserted `is_fresh: True` this fixes, pointed the other way.
+  const CHIP_STALE_AFTER_SECONDS = 600;
+
+  function chipPublishedAgeSeconds() {
+    if (!gameChipsPublishedAt) return null;
+    const parsed = Date.parse(gameChipsPublishedAt);
+    if (!Number.isFinite(parsed)) return null;
+    // Clamped at 0: the worker and the browser are different clocks, so a
+    // stamp a few seconds ahead is skew on a fresh artifact, not a bad one.
+    return Math.max(0, (Date.now() - parsed) / 1000);
+  }
+
+  function renderChipFreshness() {
+    const age = chipPublishedAgeSeconds();
+    if (age === null || age < CHIP_STALE_AFTER_SECONDS) return "";
+    const label = formatAge(age);
+    if (!label) return "";
+    // TITLE NAMES THE PRODUCER, not just the symptom. "Scores may be out of
+    // date" tells a reader nothing they can act on; "the worker has not
+    // published since X" tells them which service to look at, which is the
+    // whole difference between a warning and a diagnosis.
+    return ` <span class="board-stale-badge" title="Scoreboard artifact last published ${escapeHtml(gameChipsPublishedAt)} — refresh-worker has not republished since. Scores and clocks below are frozen at that moment.">scoreboard ${escapeHtml(label)} old</span>`;
   }
 
   function renderGameCards(items) {
@@ -2480,7 +2583,7 @@
       return;
     }
     container.innerHTML = `
-      <h2 class="board-section-title">Games</h2>
+      <h2 class="board-section-title">Games${renderChipFreshness()}</h2>
       <div class="game-card-strip">
         ${games.map((game) => {
           const isSelected = state.game === game.key;

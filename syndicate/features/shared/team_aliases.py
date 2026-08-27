@@ -115,9 +115,46 @@ def _basketball_alias_to_name(league: str) -> dict[str, str]:
         import syndicate.features.shared.basketball_props_smart_sim as smart_sim
 
         mapping = getattr(smart_sim, attr, None) or {}
-        return {normalize(alias): normalize(name) for alias, name in mapping.items() if name}
+        resolved = {normalize(alias): normalize(name) for alias, name in mapping.items() if name}
+        if league == "wnba":
+            resolved.update(
+                {normalize(alias): normalize(name) for alias, name in _WNBA_EXTRA_ALIASES.items()}
+            )
+        return resolved
     except Exception:
         return {}
+
+
+# WNBA-ONLY, AND DELIBERATELY NOT IN `basketball_props_smart_sim`.
+#
+# MEASURED 2026-08-25T01:22:04Z, on the first live run of the unresolved-club
+# counter:
+#
+#   wnba polymarket_us reason="spreads_refused:40
+#                              clubs_unresolved:2:['Portland', 'Toronto']"
+#
+# Polymarket names these two clubs by CITY. `_WNBA_TEAM_ALIASES_LOCAL` carries
+# both franchises by NICKNAME only -- `fire` -> Portland Fire, `tempo` ->
+# Toronto Tempo -- while every other club in that map also carries its city
+# (`atlanta`/`dream`, `dallas`/`wings`, `seattle`/`storm`). The two newest
+# franchises went in nickname-only and nothing noticed, because nothing asked
+# by city until this venue did.
+#
+# THEY LIVE HERE RATHER THAN IN THAT MAP, and that is the whole point. That
+# module also exposes `_TEAM_ALIASES_LOCAL = {**_NBA..., **_WNBA...}`, where
+# WNBA WINS, and NBA already holds `por` -> Portland Trail Blazers and `tor` ->
+# Toronto Raptors. Adding these there would silently reassign both NBA clubs in
+# the merged map that `basketball_props_smart_sim` itself reads -- precisely the
+# collision `_basketball_alias_to_name`'s docstring documents, where a merged
+# map turned ("wnba", "min") against "Minnesota Lynx" into a WRONG answer,
+# arrived at from the other direction. An overlay applied only on the wnba
+# branch cannot reach the merged map at all.
+_WNBA_EXTRA_ALIASES: dict[str, str] = {
+    "portland": "Portland Fire",
+    "por": "Portland Fire",
+    "toronto": "Toronto Tempo",
+    "tor": "Toronto Tempo",
+}
 
 
 # NFL, static. The 32 franchises are stable, and unlike MLB/NBA there is no
@@ -246,6 +283,46 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     # `_soccer_alias_to_name` drops ambiguous DERIVED keys but cannot police a
     # hand-written one.
     "deportivo": "Deportivo La Coruña",
+    # `#576`. FIVE MORE, and unlike every batch above these were not found by
+    # hand or by reading a join log -- `#541`'s `CHIP_JOIN_COVERAGE` named them,
+    # with the exact spelling, on the line it prints every build:
+    #
+    #   sport=soccer ... unknown_no_key=7 samples=[
+    #     {'matchup': 'Ajax @ SC Telstar',        'away_key': None, ...},
+    #     {'matchup': 'ADO Den Haag @ Feyenoord', 'home_key': None, ...},
+    #     {'matchup': 'Charleroi @ KV Kortrijk',  'away_key': None, ...},
+    #     {'matchup': 'Standard Liege @ Leuven',  'home_key': None, ...},
+    #     {'matchup': 'SK Beveren @ Genk',        'home_key': None, ...}]
+    #
+    # `away_key`/`home_key` is `canonical_team`'s own answer, so a None names
+    # the UNRESOLVABLE side directly and the other side proves the fixture
+    # itself is fine. No bisecting a board, no guessing which half missed.
+    #
+    # Every one is the club's SHORT name where the artifacts carry the long one.
+    # Checked for ambiguity the way `deportivo` documents rather than assumed:
+    # across all ten configured leagues each token below appears in EXACTLY ONE
+    # canonical name (204 names in `_soccer_alias_to_name`), so none can collide.
+    "ajax": "Ajax Amsterdam",
+    "feyenoord": "Feyenoord Rotterdam",
+    "charleroi": "Royal Charleroi SC",
+    "leuven": "OH Leuven",
+    # `Genk` LOOKS REDUNDANT AND IS NOT, and the reason is the whole point of
+    # this block. `#503`'s note says "Genk matches fine" and it is RIGHT --
+    # about `teams_match`, which falls through to a shared-suffix heuristic when
+    # the map cannot answer, and which `test_the_pairs_that_already_agreed_are_
+    # not_in_the_map` pins for exactly this pair.
+    #
+    # `canonical_team` has NO heuristics; it is map-only. `teams_match` can
+    # afford a loose rule because it holds BOTH names and is only ever asked
+    # "are these the same club". The chip index holds ONE name and must mint a
+    # KEY that is globally unique, so a heuristic there would be minting
+    # collisions rather than comparing candidates. That asymmetry is why the
+    # answer is an exact map entry and NOT a looser `canonical_team`.
+    #
+    # So this entry is dead weight for the fixture join and load-bearing for the
+    # chip join. Measured 2026-08-26: `canonical_team("soccer", "Genk")` was
+    # None while `teams_match("soccer", "Genk", "Racing Genk")` was True.
+    "genk": "Racing Genk",
 }
 
 

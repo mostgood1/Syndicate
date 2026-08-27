@@ -18,6 +18,8 @@ deposited where nothing reads it.
 
 from __future__ import annotations
 
+import time
+
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -146,7 +148,106 @@ def read_portfolio_plan(selected_date: str | None) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _venue_price_resolver(venue: str):
+def _polymarket_price_resolver(selected_date: str | None):
+    """`(price_resolver, ticker_resolver)` for Polymarket US, or `(None, None)`.
+
+    Until this existed, `_venue_price_resolver` returned `(None, None)` for
+    every venue but Kalshi, so the `paper:polymarket` book was priced from the
+    AGGREGATOR -- a venue label on someone else's prices. Any
+    `paper:polymarket` P&L recorded before this is not a Polymarket result.
+
+    `(None, None)` on every failure path, never a partial resolver: falling back
+    to the aggregator is the documented, understood behaviour, while a resolver
+    built from half a slate would price some rows at the venue and some at the
+    aggregator with no way to tell which from the outside.
+    """
+    try:
+        from syndicate.features.shared.polymarket_board_join import (
+            join_polymarket_to_board,
+            load_polymarket_markets,
+            polymarket_price_resolver,
+            polymarket_ticker_resolver,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[portfolio_commit] POLYMARKET_RESOLVER_UNAVAILABLE {type(exc).__name__}: {exc}", flush=True)
+        return (None, None)
+
+    markets, fetched_at = load_polymarket_markets()
+    if not markets:
+        # The artifact is written by live-odds-worker's slate tick. Absent means
+        # that has not run here yet -- named, so it is not read as "Polymarket
+        # quotes nothing".
+        print("[portfolio_commit] POLYMARKET_RESOLVER status=no_slate_artifact", flush=True)
+        return (None, None)
+
+    try:
+        board_rows = _board_rows_for_join(selected_date)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[portfolio_commit] POLYMARKET_RESOLVER_BOARD_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return (None, None)
+
+    joined = join_polymarket_to_board(markets, board_rows, selected_date=str(selected_date or ""))
+    age = None if fetched_at is None else round(time.time() - float(fetched_at), 1)
+    print(
+        f"[portfolio_commit] POLYMARKET_BOARD_JOIN markets={joined.get('polymarket_markets')} "
+        f"indexed={joined.get('indexed')} board_rows={joined.get('board_rows')} "
+        f"matched={joined.get('matched')} slate_age_s={age} "
+        f"refusals={joined.get('refusals')} "
+        # The SHAPES behind the parse refusals, bounded to six. A count says
+        # how many; only this says what the venue actually sent.
+        f"shapes={joined.get('unreadable_shapes')}",
+        flush=True,
+    )
+    # WHAT WE FETCH AND THROW AWAY, on its own line because it is the largest
+    # single number in the refusals and has never been characterised. 6,838
+    # `market_type_not_a_game_line` plus 1,064 segment markets are paid for on
+    # every cycle and discarded. Counts are complete; the samples carry the
+    # QUESTION, which is the only field that says what the bet actually is --
+    # `SPORTS_MARKET_TYPE_PROP` turned out to include League of Legends map
+    # winners, so the family cannot be named from its type alone.
+    # BOARD ROWS THE VENUE COULD NOT BE PAIRED WITH. A `totals under 10.5` on
+    # Minnesota Twins @ Athletics reached the placer with `venue_ticker=None`
+    # on 2026-08-25T18:49:14Z because nothing was stamped here -- and the join
+    # reported it only as `no_matching_polymarket_market: 54`. This prints what
+    # the BOARD wanted beside what the VENUE offered for the same league, date
+    # and market, so "not listed" and "listed under a name we do not know" stop
+    # sharing a number.
+    if joined.get("unmatched_counts"):
+        print(
+            "[portfolio_commit] POLYMARKET_UNMATCHED"
+            f" counts={joined.get('unmatched_counts')}"
+            f" samples={joined.get('unmatched_samples')}",
+            flush=True,
+        )
+    if joined.get("out_of_scope_counts"):
+        print(
+            "[portfolio_commit] POLYMARKET_OUT_OF_SCOPE"
+            f" counts={joined.get('out_of_scope_counts')}"
+            f" samples={joined.get('out_of_scope_samples')}",
+            flush=True,
+        )
+    matches = joined.get("matches") or []
+    if not matches:
+        return (None, None)
+    return polymarket_price_resolver(matches), polymarket_ticker_resolver(matches)
+
+
+def _board_rows_for_join(selected_date: str | None) -> list[dict]:
+    """The same shortlist rows the commit is about to price.
+
+    Read here rather than threaded through, so the join is built against the
+    board actually being committed. A join made against a different read would
+    pair tonight's rows with a pairing computed from another board -- the
+    stale-pairing mistake `clv_join`'s arrow-of-time check exists to catch.
+    """
+    from pipeline.intelligence_state import read_layer2_shortlist
+
+    shortlist = read_layer2_shortlist(str(selected_date or ""))
+    rows = (shortlist or {}).get("rows") if isinstance(shortlist, dict) else None
+    return [r for r in (rows or []) if isinstance(r, dict)]
+
+
+def _venue_price_resolver(venue: str, selected_date: str | None = None):
     """`(price_resolver, ticker_resolver)` for a venue, or `(None, None)`.
 
     BOTH ARE BUILT FROM ONE SET OF MATCHES. Building them separately would let
@@ -157,24 +258,50 @@ def _venue_price_resolver(venue: str):
     Price rows from the VENUE's own feed, or `(None, None)` to fall back to
     OddsAPI.
 
-    Kalshi only for now, and deliberately quiet about it: a venue with no direct
-    feed keeps behaving exactly as before rather than erroring, and the
-    difference surfaces as `price_source` on the rows instead of as a special
-    case in the caller.
+    Kalshi and Polymarket US have direct feeds. A venue with none keeps behaving
+    exactly as before rather than erroring, and the difference surfaces as
+    `price_source` on the rows instead of as a special case in the caller.
+
+    NOVIG DELIBERATELY HAS NONE, and that is a capability gap rather than an
+    omission: its public CSV mirror is anonymized at the game/player/team level
+    (measured 2026-08-24), so `reportTicker` names a CATEGORY and can never
+    price a named bet. The credentialed REST tier could.
 
     The join is rebuilt from the freshest fetched markets on every call. Carrying
     a join made against an older board would pair tonight's rows with a pairing
     computed from a different board -- the stale-pairing mistake `clv_join`'s
     arrow-of-time check exists to catch, in a new costume.
     """
-    if str(venue or "").strip().lower() != "kalshi":
+    normalized_venue = str(venue or "").strip().lower()
+    if normalized_venue == "polymarket":
+        return _polymarket_price_resolver(selected_date)
+    if normalized_venue != "kalshi":
         return (None, None)
     try:
         payload = read_json_file(reports_root() / "intelligence" / "kalshi_markets.json")
-        markets = (payload or {}).get("markets") or []
+        # THROUGH THE MERGE HELPER, never `payload["markets"]`. That key is no
+        # longer persisted -- the markets live under `series[<ticker>]["markets"]`
+        # since the artifact was split to fit the store's 8MB ceiling.
+        #
+        # THIS READER FAILED WORSE THAN THE OTHER TWO, because it did not
+        # error. `.get("markets") or []` became `[]`, which returns
+        # `(None, None)` -- the value that means "this venue has no direct
+        # feed", indistinguishable from Novig, which genuinely has none.
+        # Measured 2026-08-25 3:55:49 PM Central:
+        #
+        #   PAPER2_PLAN_WRITTEN venue=kalshi rows_in=86 positions=0
+        #     venue_priced=0 sim_view_on=84/86
+        #
+        # ...while the fan-in was simultaneously producing 2,344 Kalshi quotes
+        # and winning 1,852 selections. Kalshi silently priced from the
+        # aggregator instead of its own book, so no Kalshi position was ever
+        # committed and `ORDER_PATH venue=kalshi` read `no_positions`.
+        from pipeline.kalshi_odds_refresh import markets_from_state
+
+        markets = markets_from_state(payload)
         if not markets:
             return (None, None)
-        return _resolvers_from_markets(markets)
+        return _resolvers_from_markets(markets, selected_date)
     except Exception as exc:
         # Named, and returns None so the venue silently reverts to the
         # aggregator rather than losing its book entirely.
@@ -182,44 +309,72 @@ def _venue_price_resolver(venue: str):
         return (None, None)
 
 
-def _resolvers_from_markets(markets):
+def _resolvers_from_markets(markets, selected_date: str | None = None):
     """Fetched Kalshi markets -> `(price_resolver, ticker_resolver)`.
 
-    Classified by the CATALOGUE, so every sport it knows is priced here without
-    this function naming any of them. One match list feeds both resolvers.
+    THROUGH THE BOARD JOIN, which this used to skip -- and skipping it made
+    every resolver it returned inert.
+
+    `_match_key` indexes on `board_event_id` and returns None without one, so a
+    match carrying no board event is NEVER INDEXED. This function built its
+    match dicts by hand from `classify_market` alone -- market, player, line,
+    side, price, ticker -- and a Kalshi market does not know which board row it
+    belongs to. So every key was None, the index was empty, and `resolve()`
+    returned None for every row it was ever asked about.
+
+    Measured 2026-08-25 4:40:11 PM Central, after three separate artifact-reader
+    fixes had already landed:
+
+        PAPER2_PLAN_WRITTEN venue=kalshi     rows_in=86  venue_priced=0
+        PAPER2_PLAN_WRITTEN venue=polymarket rows_in=89  venue_priced=30
+
+    ...while the fan-in was pricing 2,344 Kalshi quotes off the same artifact
+    on the same service. Two matchers, one venue, and only one of them said
+    anything. Kalshi silently took the AGGREGATOR's price on all 86 rows --
+    `venue_not_quoting` never fired, because a price was always found.
+
+    `_match_key`'s own docstring names this: "Adding the game to `_match_key`
+    moved the ticker resolver and left this behind." It also predicted the
+    silence -- "its board join currently supplies only player props, whose
+    `player_name` happens to identify a game" -- describing the join's matches,
+    not these hand-built ones, which never had an event id under any market.
+
+    `join_kalshi_to_board` stamps `board_event_id` off the row it paired with,
+    which is the only place that fact exists. So this now mirrors
+    `_polymarket_price_resolver` exactly: read the board being committed, join,
+    and build both resolvers from ONE match list -- which is also what keeps a
+    price and a contract id from coming out of two different pairings.
     """
     from syndicate.features.shared.kalshi_board_join import (
+        join_kalshi_to_board,
         kalshi_price_resolver,
         kalshi_ticker_resolver,
     )
-    from syndicate.features.shared.kalshi_catalogue import classify_market
 
-    matches = []
-    for market in markets:
-        verdict = classify_market(market)
-        # Unmapped series, unreadable titles and game lines with no event
-        # mapping are all skipped here rather than guessed -- the catalogue
-        # already refuses each of them by its own name, and `report_catalogue_gaps`
-        # is where those numbers are meant to be read.
-        if verdict.get("status") != "ok" or verdict.get("needs_event_identity"):
-            continue
-        # Each side takes its OWN quote: yes and no are separately priced and
-        # the gap between them is the spread.
-        for side, price_key in (("over", "yes_american"), ("under", "no_american")):
-            price = market.get(price_key)
-            if price is None:
-                continue
-            matches.append(
-                {
-                    "market": verdict["market"],
-                    "player_name": verdict["subject"],
-                    "line": verdict["line"],
-                    "board_side": side,
-                    "kalshi_american": price,
-                    # Carried so the ticker resolver keys off the SAME match.
-                    "ticker": verdict.get("ticker"),
-                }
-            )
+    try:
+        board_rows = _board_rows_for_join(selected_date)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[portfolio_commit] KALSHI_RESOLVER_BOARD_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return (None, None)
+
+    joined = join_kalshi_to_board(
+        markets, board_rows, selected_date=str(selected_date or "")
+    )
+    matches = joined.get("matches") or []
+    print(
+        f"[portfolio_commit] KALSHI_BOARD_JOIN markets={joined.get('kalshi_markets')}"
+        f" board_rows={len(board_rows)} matched={len(matches)}"
+        f" refusals={joined.get('refusals')}",
+        flush=True,
+    )
+    if not matches:
+        # Named, and `(None, None)` so the venue reverts to the aggregator
+        # rather than losing its book -- but the line above says it happened,
+        # which is what this whole failure lacked.
+        return (None, None)
     return kalshi_price_resolver(matches), kalshi_ticker_resolver(matches)
 
 
@@ -299,10 +454,15 @@ def run_portfolio_commit(
             "failures": failures,
         }
 
+    # RESOLVED ONCE. Read twice, this would be two answers whenever the stored
+    # settings change mid-run -- and the log line below would then describe a
+    # bankroll the plan was not sized with.
+    settings = resolve_settings()
+
     plan = commit_portfolio(
         rows,
         selected_date=normalized,
-        settings=resolve_settings(),
+        settings=settings,
         # S6 HOOK. Layer 2 rows carry no `historical_profile`, so this is empty
         # today and every market therefore sizes at `_MIN_SAMPLE_CREDIBILITY`
         # (0.25) -- which is correct while `settled_count` is 0 platform-wide.
@@ -446,13 +606,42 @@ def run_portfolio_commit(
         return {"status": "error", "reason": f"write_failed: {exc}", "date": normalized}
 
     totals = plan.get("totals") or {}
+
+    # WHERE THE BANKROLL CAME FROM, not just what it is.
+    #
+    # `resolve_settings` is stored > env > default per field, and the three are
+    # fixed in DIFFERENT PLACES: stored is the settings form, env is the Render
+    # dashboard, default is this repo. A line that prints `bankroll=$250.0`
+    # without the source sends a reader to change the wrong one -- and the two
+    # do not override symmetrically, so setting the env var while a stored
+    # value exists changes nothing at all and looks like it worked.
+    #
+    # Measured 2026-08-26 00:35:49Z: `bankroll=$250.0` against a stated policy
+    # of $1000, with no way to tell from any log which of the three won. Same
+    # defect as `RECONCILE_COUNT_IMPLAUSIBLE` printing one branch's numbers
+    # while another decided -- a value stated without its provenance.
+    bankroll_source = str((settings.sources or {}).get("bankroll_units") or "?")
+
+    # THE TOP MARKET UNDER EACH REFUSAL, because "98 rows had no model edge"
+    # cannot answer "why are no PROP positions being taken" and that is the
+    # question the counts get asked. Trimmed to the leader per reason: the full
+    # breakdown is in the artifact, and a log line that printed every market
+    # would be read by nobody.
+    by_market = plan.get("refusals_by_market") or {}
+    leaders = {
+        reason: f"{next(iter(markets))}:{next(iter(markets.values()))}"
+        for reason, markets in by_market.items()
+        if markets
+    }
+
     # print, not logger.info -- logger.info never reaches Render's collector.
     print(
         f"[portfolio_commit] PLAN_WRITTEN date={normalized} "
         f"rows_in={plan.get('rows_in')} sized={plan.get('sized')} "
         f"positions={totals.get('positions')} staked=${totals.get('staked_dollars')} "
-        f"bankroll=${plan.get('bankroll_units')} scale={totals.get('slate_scale_factor')} "
-        f"refusals={plan.get('refusals')}",
+        f"bankroll=${plan.get('bankroll_units')} bankroll_source={bankroll_source} "
+        f"scale={totals.get('slate_scale_factor')} "
+        f"refusals={plan.get('refusals')} top_market_per_refusal={leaders}",
         flush=True,
     )
     # ---- paper2: the same pipeline, restricted to one venue's prices --------
@@ -473,7 +662,7 @@ def run_portfolio_commit(
             # THE VENUE'S OWN PRICES, where we have them. Only Kalshi has a
             # direct feed today; every other venue falls back to the aggregator,
             # and `price_source` on each scoped row records which was used.
-            venue_price_resolver, venue_ticker_resolver = _venue_price_resolver(venue)
+            venue_price_resolver, venue_ticker_resolver = _venue_price_resolver(venue, normalized)
             scoped, scope_refusals = scope_rows_to_venue(
                 rows,
                 venue,
@@ -489,6 +678,9 @@ def run_portfolio_commit(
                 selected_date=normalized,
                 settings=resolve_settings(),
                 settled_sample_size_by_sport=settled_sample_size_by_sport,
+                # A row this venue cannot PLACE must not hold one of its
+                # `max_positions` slots. See the cut in `commit_portfolio`.
+                prefer_placeable=True,
             )
             venue_plan["venue"] = venue
             venue_plan["venue_scope_refusals"] = scope_refusals
@@ -509,6 +701,14 @@ def run_portfolio_commit(
                 # aggregator -- the difference between a real coverage number
                 # and OddsAPI's view of one.
                 f"venue_priced={sum(1 for r in scoped if r.get('price_source') == 'venue_feed')} "
+                # HOW MANY PLACEABLE ROWS THE POSITION CAP COST, which is the
+                # number that says whether `max_positions` is the binding
+                # constraint on this venue actually trading. A cut that reports
+                # only a total cannot distinguish "we ran out of slots for bets
+                # we could make" from "we ran out of slots for bets we could
+                # not".
+                f"placeable_committed={sum(1 for p in (venue_plan.get('positions') or []) if p.get('price_source') == 'venue_feed')}"
+                f"/{venue_totals.get('positions')} "
                 # Side by side on ONE line, because the comparison IS the
                 # deliverable and reading it off two lines invites pairing the
                 # wrong two runs.

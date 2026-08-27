@@ -69,7 +69,216 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
+## [espn-egress-and-wnba-boxscores] ESPN SERVES RENDER FROM ONE OF TWO HOSTS, and the WNBA boxscore had no producer `[verified 2026-08-26, lane kalshi-spread-join-sign]`
+
+**`site.api.espn.com` returns HTTP 403 to Render -- from WEB AND FROM BOTH
+WORKERS. `site.web.api.espn.com` does not.** Both serve the same paths. The
+403 is the HOST, not egress in general, and the two must never be conflated:
+`WNBA_LIVE_BOX_CAPTURED games=3 players=66` proves only the SUMMARY host.
+Measured both ways 2026-08-26; the swap produced `{"ok":true,"games":3}` on the
+first attempt where the other host had 403'd minutes earlier. Overridable via
+`SYNDICATE_WNBA_SCOREBOARD_URL`.
+
+**`wnba_source/data/processed/boxscores_<date>.csv` HAD NO PRODUCER IN
+SYNDICATE.** Every caller of the vendor fetcher lives in
+`vendor/*_betting_repo/`; `artifact_freshness.py:67` monitored the family with
+nothing behind it. Coverage 2026-05 **18**, 06 **0**, 07 **0**, 08 **1**.
+`scripts/build_wnba_boxscores.py` is the Syndicate-owned replacement (native
+ESPN, `--via-web` for Render), wired beside `settle_orders`.
+
+**WNBA SETTLEMENT WAS WINS-ONLY BY CONSTRUCTION.** `bet_status_wnba` hardcodes
+`is_final=False` (the LIVE box carries no game status) and `resolve_bet_status`
+decides only on `is_final` OR the value CROSSING -- so an over that fell short
+never decided. Production read `wnba 2 settled, roi 115.21, win 100%`: that is
+selection bias, not performance. The resolver now reads the final boxscore and
+returns `is_final=True`. **NOT YET VERIFIED IN PRODUCTION** -- refresh-worker
+was not deployed; `not_decided_yet: 6` is unchanged.
+
+**PUBLISHING IS NOT THE SAME STORE AS THE CONSUMER READS.**
+`/api/ops/artifacts/publish` writes `data_root()/path` on WEB'S FILESYSTEM;
+`bet_status_wnba` reads via `read_text_file`, i.e. KEYVALUE, on refresh-worker.
+84 backfilled files went to production and are invisible to settlement.
+
+## [kalshi-venue-execution] KALSHI ORDERS: the blocker was SHARD COLLATERAL, and spreads were inverting the bet `[verified 2026-08-26, lane kalshi-spread-join-sign]`
+
+**Kalshi splits markets across EXCHANGE SHARDS, and balances are PER-SHARD.**
+`GET /trade-api/v2/exchange/status`: `0 Default`, `1 Combos`, `2 Crypto`,
+**`3 Tennis & Baseball`** — all `trading_active`. `exchange_index` is on the
+PUBLIC market payload, so the shard of any ticker is readable WITHOUT
+credentials. MLB is shard 3; NFL, NBA and WNBA are shard 0.
+
+**The account had collateral only on shard 0, so every MLB order failed.** Split
+perfect at n=12: every fill ever is on a funded shard, every failure was shard 3
+before funding. `exchange_index: 0` (pinned) gave `market_not_found`; `-1`
+(auto-route) gave `user_not_found: <uuid>`. **Both errors were literally true and
+NEITHER was ours.** Discharged 2026-08-26 after the user moved $25 to shard 3 —
+three MLB fills, all `executed`, all `exchange_index=3`.
+
+**THIS IS THE ACCOUNT HOLDER'S ACTION, NOT THE VENUE'S.**
+docs.kalshi.com/getting_started/exchange_sharding.md: *"Subaccount balances are
+local to a specific exchange instance"*, *"Programmatic traders must preallocate
+collateral on a given exchange shard before order placement."* Fund at
+kalshi.com/account/exchange-indexes or via the intra-account-transfer API;
+`set-target-balance-allocation` auto-rebalances. `KALSHI_ORDER_KNOWN_SHARDS`
+(live-odds-worker) is `0,3`.
+
+**The order contract is CONFIRMED FROM THE DOCS, not inferred:**
+`POST /portfolio/events/orders`; `side` is `bid`/`ask` **quoted from the YES leg
+only** (no `action` field, no separate buy/sell); `exchange_index: -1` requires
+auto-routing by ticker.
+
+**SPREADS WERE PAIRING WITH THE OPPOSITE BET.** A Kalshi spread states a MARGIN
+(`"Texas wins by over 1.5 runs"` = `TEX -1.5`); the board writes a HANDICAP, so
+that game's rows are `TEX +1.5` / `CWS -1.5`. The join keyed on Kalshi's bare
+MAGNITUDE, so `1.5 == 1.5` paired the market with the `+1.5` row. Measured over
+the served board and 90 open KXMLBSPREAD markets: **15 of 30 matches put YES on
+`+1.5`**; on the live book all 11 spread orders carried the ticker of the club
+they were FADING. Only `_side_to_kalshi` refusing `home`/`away` kept it off the
+venue. FIXED both ends — the join names both reachable rows (NAMED club at `-X`
+-> YES, OTHER club at `+X` -> NO) and the order builder derives the leg from the
+SIGN of the line. AFTER: 0 violations. First spread order ever placed
+2026-08-26T17:26:18Z, `KXMLBSPREAD-26AUG261540CHCAZ-AZ2` home `-1.5` -> YES,
+filled 3 @ 0.33, venue title *"Arizona wins by over 1.5 runs?"* matching the row.
+
+**Cloud sessions cannot reach the venue or docs hosts** (`connect_rejected`),
+which is why several comments in this path recorded guesses. Both hosts answer
+from a non-proxied network. Venue facts:
+`.syndicate/findings_2026-08-26_venue_api_unblock.md`.
+
+## [kalshi-coverage-vs-oddsapi] KALSHI COVERAGE: capture is healthy, the JOIN is the bottleneck, and two prop vocabularies do not exist `[verified 2026-08-25, lane kalshi-oddsapi-coverage-audit]`
+
+Full audit: `docs/ai_context/kalshi_oddsapi_coverage_audit.md` (branch
+`claude/kalshi-oddsapi-coverage-audit`, `4152111e2`). Evidence is production
+log lines with timestamps; regenerate with
+`scripts/audit_kalshi_oddsapi_coverage.py`.
+
+**KALSHI LISTS 13,472 SERIES** `[KALSHI_SERIES_CATALOGUE status=ok, 20:21:24.977Z]`.
+By ticker token: MLB 174, NBA 351, WNBA 91, NHL 52, NFL 323, NCAAF 126,
+NCAAB 20. **NBA's 351 INCLUDES WNBA's 91** -- `series_matching` is a substring
+match and `NBA` sits inside `WNBA`. **Soccer has no line at all**, because
+`_KALSHI_SPORT_TOKENS` is the 7 sports and soccer is named by competition.
+That is "we cannot see it", NOT "Kalshi does not list it".
+
+**`[kalshi_discovery] LISTED` IS NOT THE CATALOGUE AND MUST NOT BE READ AS ONE.**
+`truncated=True` on 7 of 7 runs observed, `combinatorial` 39,350-39,976 of
+40,000. `singles` swung 24 -> 650 between consecutive runs on pagination luck.
+**Every per-series count derived from it is a floor.**
+
+**THE BOTTLENECK IS THE JOIN, NOT CAPTURE.** Latest `BOARD_JOIN` 2026-08-26
+`01:49:32Z`: `kalshi_markets=6000 board_rows=1291 matched=71`,
+`market_is_for_another_date=3282 no_matching_board_row=1838
+unreadable_title=493 stat_not_in_market_vocabulary=304`. `unreadable_title`
+fell 3703 -> 493 on the title-grammar work (`8efdf0ff7`, `1c6e10281`), and
+`no_matching_board_row` is now the largest addressable bucket.
+`market_is_for_another_date` is NOT addressable -- it is a DESCRIPTION:
+`BY_GAME_DATE` summed is 1958 today / 60 tomorrow / 3982 beyond, so a lookahead
+venue plus a date-blind cap must produce it `[verified 2026-08-26]`.
+`VENUE_REPRICE_KEYS` on ten consecutive readings 19:35-20:18Z lists Kalshi in
+**NO `sources_offered` bucket** for any sport. **So no OddsAPI market may be
+cancelled in favour of Kalshi yet** -- that turns a metered market into a
+missing one. Order: fix the join, measure `matched` per family, then cancel.
+
+**NO NHL AND NO NCAAB PLAYER PROP COULD EVER AUTO-REGISTER -- FIXED
+`b8a958fe6`, NOT YET DEPLOYED, and unobservable until those seasons start.**
+`market_keys._BY_SPORT` had no `nhl` and no `ncaab` key, and
+`auto_series_from_catalogue` gates registration on `canonical_market_key`
+resolving. `_TOTAL_UNIT` *does* carry both, so game totals work and props
+cannot -- which is why it reads as coverage. `KXNHLSAVES`, `KXNHLANYGOAL`,
+`KXNHLPTS` are already listed. Identical to the defect `market_keys`' own
+header records for NFL (`ticker_substring_n=317 classified_n=0`).
+
+**LADDERS: THE RECORD IS WHOLE, THE JOIN'S INPUT IS NOT.**
+`MAX_MARKETS_PER_SERIES=400` against `KXNCAAFSPREAD`'s **1994** real markets is
+one rung in five; `KXNFLSPREAD` **795** is one in two. Per-tick `trimmed=`
+862-2983. Surviving rungs are `markets[:400]` in API order, not the ones near
+the line. `_record_daily_book(full_markets)` runs before both bounds
+(`e4ae9ebec`, live 18:56Z), so the dated capture files ARE whole.
+
+**SOCCER REGISTERS AS OF `461ee74be` (live 20:20:57Z).** `AUTO_SERIES`
+20:32:19Z read `game_series=204` where every prior run read **173**, with
+`('KXMLSTOTAL','soccer')` in the sample. **Any reading before 20:20:57Z
+describes a system that no longer exists.** What remains is scoped:
+(a) only the 10 competitions in `LEAGUE_DISPLAY_NAMES` can register -- UCL,
+UEL, UECL and EFL Cup are absent BY DESIGN, a product call, not a defect
+(`KXEFLCUPSPREAD` still `unmapped_series` 20:33:06Z); (b) soccer PROP series
+still cannot, because Kalshi titles them "La Liga Goal" with no word "Player"
+(`KXLALIGAGOAL` 5, `unmapped_series`, 20:33:06Z).
+
+**TWO ONE-LINE FIXES, MEASURED, NOT APPLIED** (20:33:06Z, 180 live markets):
+`KXMLBHRR` **136** refuses `stat_not_in_market_vocabulary
+detail="hits + runs + RBIs"` -- registered 12 minutes earlier by `461ee74be`
+and still refusing, the largest MLB prop family on the venue, one
+`market_keys._MLB` line. `KXMLBSB` **44** refuses `unmapped_series`
+("1+ stolen bases"), one registry line plus one vocabulary line.
+
+**`KXNBAPTS` IS A REAL, LISTED, AUTO-DISCOVERED SERIES.**
+`kalshi_catalogue.py`'s header uses it as its example of an invented ticker;
+it appears in `AUTO_SERIES sample` on six reads on 2026-08-25. The principle
+is right and should stand -- the EXAMPLE is falsified and misleads anyone who
+checks it.
+
+## [portfolio-live-surface] `/portfolio` IS THE LIVE BUYING ENGINE, the venue caps BIND, and the VENUE now settles our bets `[verified 2026-08-27T00:0xZ, lanes portfolio-live-primary / portfolio-venue-caps-editable / venue-balances-on-portfolio / venue-settlement / venue-first-refusal / open-bet-live-status]`
+
+**`/portfolio/live` NO LONGER EXISTS as a page** — it is a 302 to
+`/portfolio#live` carrying the query string; `portfolio_live.html` is deleted.
+`/portfolio` renders the execution ledger's real orders AND the prediction
+ledger's user-logged bets, labelled, never summed. `/portfolio/paper` untouched.
+
+**THE VENUE CAPS ARE USER-EDITABLE AND THEY BIND.** Seven fields
+(`max_day_dollars_kalshi|_polymarket`, `max_day_orders_kalshi|_polymarket`,
+`max_order_dollars`, and both `_all_venues` ceilings) in
+`execution_limits_settings.py`; `execution_guard.limits()` reads the store ON
+THE WORKER on the same call `check_order` refuses with. Proven end to end by a
+real user save 2026-08-26T20:27:26Z. **Orders now resolve PER VENUE** — they
+were flat, so a per-venue orders field would have been stored and unenforced.
+**Stored caps bind LIVE only**; paper stays uncapped by design.
+
+**BOTH VENUE BALANCES READ, from the documented shapes** (`venue_balances.py`,
+stamped by live-odds-worker, read by web — web holds no credential and must not):
+kalshi `GET /portfolio/balance` (`balance_dollars` preferred, cents
+cross-checked), polymarket **`GET /v1/account/balances`** — PLURAL, a list keyed
+by `currency`, and `buyingPower` is the cap-comparable figure, NOT
+`currentBalance`. Reading 21:07:32Z: kalshi **$11.55** cash / $40.54 with
+positions; polymarket **$65.30** buying power / $123.89 cash. **NEITHER VENUE
+CAN REACH ITS OWN DAY CAP** (4.2x and 1.5x over).
+
+**THE VENUE SETTLES LIVE ORDERS** (`venue_settlement.py`, live-odds-worker, runs
+BEFORE placing so the day's spend is freed first). Kalshi
+`GET /portfolio/settlements`, Polymarket
+`activities?types=ACTIVITY_TYPE_POSITION_RESOLUTION`. Won/lost from WHICH SIDE
+WE HELD, never from our `side`/`line`. First run 21:36Z: `settled=3` with the
+venues' exact P&L; **`settled_count` 12 -> 15**, the first outcomes on this board
+scored from a venue record. Idempotent (3 -> `already` next tick).
+
+**INFERENCE IS NOW THE FALLBACK, NOT A RACE.** `paper_settlement.settle_orders`
+(refresh-worker) and venue settlement (live-odds-worker) both skip a graded
+order, so whichever ticked first OWNED the row. A live order now waits
+`SYNDICATE_VENUE_SETTLEMENT_GRACE_HOURS` (default 24) before inference touches
+it — a DELAY, not a refusal, so a market the venue never settles still reaches
+the ledger. Verified `awaiting_venue: 28`, the exact pre-deploy count of
+filled-and-ungraded live orders.
+
+**UNVERIFIED AND LOAD-BEARING:** the venue/inferred split is **venue 3 bets
+-11.88% vs inferred 12 bets +51.07%**, and the page shows the blend **+32.60%**.
+n=3, and those 12 were graded before first-refusal existed. **This is not yet a
+controlled comparison.** `settled_by: "venue"` is the field that keeps them
+separable; `settlement_summary` does not yet split on it.
+
 ## [portfolio-settlement] PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[verified 2026-08-22, lane portfolio-ledger-service-split]`
+
+**SETTLEMENT BY SPORT `[verified 2026-08-26, lane kalshi-spread-join-sign]`:**
+MLB settles (157 all-time). **WNBA settled ZERO until 2026-08-26** — the order
+carries the OddsAPI board hash while `live_player_box_<date>.json` carries ESPN
+ids, two namespaces that cannot meet, so every order refused
+`game_not_in_live_box`. FIXED by matchup recovery on the WNBA tri-code pair
+(`bet_status_wnba`), the same shape `bet_status_mlb` already used. Reading
+16:24:12Z: `game_not_in_live_box` **9 -> ABSENT**, `graded` **0 -> 3**
+(`outcomes={'won': 3}`), all-time wnba `0 -> 2`. **SOCCER IS STILL ZERO
+ALL-TIME.** Its cause is known and a fix is deployed but UNDEMONSTRATED:
+`live/soccer_live_lens.json` is a ROLLING SINGLE-DATE snapshot and both readers
+gate on `date == selected_date`, so once it rolls the yesterday pass (which
+`settle_orders` runs deliberately) can read nothing on refresh-worker. Dated
+finals retention added; it only accumulates FORWARD.
 
 **`/api/portfolio/summary` read `settled_count: 0, avg_clv: null` for weeks, and
 settlement was never the cause.** Three defects, stacked; the first two are FIXED
@@ -414,6 +623,27 @@ That story ended; do not re-open it from the archive.**
   should stop here rather than reopen it — that silence cost four wrong causes
   already. `deploy_preflight.py` no longer depends on the log line for web
   (it reads `/api/ops/memory`), so nothing is blocked by this being off.
+
+- **2026-08-25 — REAL EXECUTION CAPS: bankroll $1000, Kalshi $50/day,
+  Polymarket $100/day, $10 max order, 10 orders/day per exchange, 15 combined.**
+  Asked directly, with the numbers. Bankroll was already `$1000`
+  (`portfolio_settings.DEFAULT_BANKROLL_UNITS`, a 2026-08-22 decision, no code
+  change needed). Everything else is now the code default in
+  `execution_guard.py` (PR #62, `210844950`) AND the live `live-odds-worker`
+  env vars (`SYNDICATE_EXECUTION_MAX_DAY_DOLLARS_KALSHI=50`, `_POLYMARKET=100`,
+  `_ALL_VENUES=150`) — **verified live in production 2026-08-25T19:35Z**, both
+  venues' `caps={...}` lines match exactly.
+  Consequence to hold onto: **the env vars had drifted from the stated policy
+  before this fix** — production was running a flat `$40`/day cap identical
+  for both venues (`$80` combined), the leftover of an earlier
+  "small numbers a first funded week should survive being wrong about" phase.
+  The user caught this by asking "are you sure this is set correctly now?"
+  rather than accepting an earlier report that the code change alone was done —
+  a code-default change is NOT sufficient to fix a service with an explicit,
+  contradicting env-var override; verify against live logs, not the diff.
+  The per-venue day-dollar cap is a **day-SPEND cap standing in for real
+  funded balance**, not a running capital-availability ledger — nothing here
+  subtracts an open position's stake from tomorrow's budget.
 
 Product decisions, not engineering ones. Do not re-take them.
 
@@ -4090,6 +4320,362 @@ the collector reads, keeping the volume low: `MLB_INPUT_CHECKLIST`,
 `mlb_sim_engine_reference.md` were corrected on 2026-08-19 to say so.
 
 
+## [ncaaf-readiness-2026] NCAAF SEASON READINESS — the model is ready, the MARKET is not connected to it `[measured 2026-08-25, four days before kickoff]`
+
+Full assessment with every reading:
+`docs/ai_context/ncaaf_readiness_assessment_2026_08_25.md`.
+
+**51 games render with a projection on every one, in production and locally.
+Every surface that needs a PRICE is at exactly zero.**
+
+    [prod 2026-08-25T14:21:27Z]
+    overview_counts        dashboard_games_count=51 data_health=partial
+    game_candidate_inputs  gameMarkets=0 game_market_recommendations=0 markets=5
+    GAME_CANDIDATES_EXIT   sport=ncaaf rows=0
+    candidate_generation   generated=0 markets={}
+    SPORT_PROPS_DONE       sport=ncaaf pregame=0 live=0
+    odds_history_input     entry_count=0 present=false shard_key=2026_wk1
+
+`markets: 5` is a KEY count, not a value count. Measured on the same board
+`[local]`: **markets non-null 0 of 51, predictions non-null 0 of 51,
+shared_game_state.startTime 0 of 51** — the last two while the NCAAF card's own
+`metrics`/`panels` carry the numbers and the kickoff correctly. A cross-sport
+consumer reading the shared contract sees a sport with no model and no clock.
+
+**THIS WEEKEND IS COVERED. 8 games 08-28..08-30, all FBS-vs-FBS, all 8 simmed.**
+But "Week 1" as the board serves it spans **08-29 → 09-07**: 8 games this
+weekend, **43 on 09-03..09-07**, all under one undated `WEEK 1` badge. And the
+FBS-only filter drops **48 of 99** week-1 games (every FBS-vs-FCS matchup) —
+free this weekend, half the slate from 09-05.
+
+### THE BLOCKER IS ONE ARTIFACT FAMILY WITH NO PRODUCER `[the part that does not self-clear]`
+
+`_smartsim2_standalone_market_lines` (cards.py:237) reads exactly
+`data/ncaaf_source/data/cfbd_lines_{season}_wk{week}.json`.
+
+- Written ONLY by `fetch_ncaaf_market_lines.py` / `fetch_cfbd_lines.py`.
+  **Both have ZERO callers** — not `refresh_odds_sources.py`, not either
+  worker, not any `.ps1`. Manual scripts.
+- **Zero `cfbd_lines_*.json` in git at any SHA**, none on this checkout.
+- **Not allowlisted** — `cfbd_lines_*` and `smartsim2_projections_*.csv` match
+  nothing in `HOT_ARTIFACT_PATTERNS`. **CORRECTED 2026-08-25 (same day):** the
+  earlier wording here, "0 NCAAF patterns of 155", was literally true and
+  materially misleading. The patterns are SPORT-AGNOSTIC GLOBS, and two of them
+  already match NCAAF — `*_source/tracking/book_quotes/*.jsonl` and
+  `*_source/data/book_grid/book_grid_*.json` (fnmatch, verified). So NCAAF is
+  covered for the shared quote/grid transport and is NOT covered for those two
+  named files. `#552` routes the new OddsAPI capture through the covered path
+  precisely so no allowlist edit is needed.
+
+What the sweep DOES run for NCAAF is `refresh_ncaaf_oddsapi.py`, writing
+`recommendations_summary/` off the legacy 2025 predicted-totals CSVs — which
+production already reports absent for 2026 (`artifact_status data_health=missing
+artifact_exists=false`).
+
+**PREDICTION, to be READ on 08-28/29 and not believed:** the sweep arms,
+`book_quotes`/`book_grid` fill, Layer 1 may populate — and the cards' `markets`
+block STAYS NULL, so Layer 2 candidates stay at 0. Tokens: `markets.total.line`
+on `/ncaaf/api/cards?week=1`, and `GAME_CANDIDATES_EXIT sport=ncaaf rows=`.
+
+### TODAY'S SWEEP EXCLUSION IS THE GATE WORKING, NOT A DEFECT — VERIFIED, NOT ASSUMED
+
+    [prod 2026-08-25T14:23:45Z] SWEEP_OWNERSHIP_EXCLUDED date=2026-08-25
+      kept=mlb,wnba,soccer dropped=nfl:… ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+
+`SYNDICATE_ACTIVE_SPORTS` is **not in `render.yaml`** (0 matches) — a service
+env var, so editing it would NOT fire `blueprint_sync`. But it should not need
+editing: `#520`'s weekly carve-out keeps nfl/ncaaf/ncaab on the fast tick on
+game days regardless of that var, at `horizon_days=1` (today+tomorrow). No
+NCAAF game within 08-25..08-26 → correctly dropped; 7 games on 08-29 → should
+claim on **08-28**.
+
+**Confirmed the carve-out actually fires in production**, same file, same live
+SHA (`620734fb`, byte-identical to this checkout), on NFL:
+
+    [prod 2026-08-24T03:55:01Z..04:56:14Z, repeating]
+    SWEEP_OWNERSHIP_WEEKLY_CLAIM sport=nfl kept=true
+      reason=claimed_by_fast_tick_despite_SYNDICATE_ACTIVE_SPORTS
+
+**Caveat: horizon 1 means no line history before Friday** — no opening-line
+capture, no CLV baseline across the week, on a market trading for months.
+
+### WEB SERVES AN 08-19 ARTIFACT AND THE WORKER'S DAILY REBUILD NEVER REACHES IT
+
+Live web `0e0017d7` carries `smartsim2_projections_2026_wk1.csv`, 51 rows,
+`generated_at 2026-08-19T22:11:51Z`, committed `46ca8445` on 08-24. The worker
+regenerates daily (`SEASON_PROJECTION_LAUNCHING sport=ncaaf … age_seconds=86552`,
+08-24T20:43:54Z) into a file web never reads. **That age sitting at one interval
+rather than growing is also the evidence the generator SUCCEEDS — `CFBD_API_KEY`
+is present on refresh-worker as a service env var (it is in no `render.yaml`),
+so `#458` looks resolved there.**
+
+**Only week 1 exists** anywhere. Week 2 needs a manual commit + web deploy.
+
+### THE BACKTESTS CANNOT BE REPRODUCED FROM THIS REPO, AND FAIL SILENTLY
+
+    scripts/grade_football_playability.py:42   REPO = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+    scripts/grade_football_model_weight.py:36  REPO = Path(r"C:\Users\tempadmin\OneDrive\Coding\Syndicate")
+
+Run here with `PYTHONPATH` set: **`0 gradable games` for both sports, exit 0, no
+error.** Proximate cause is that the pick-ledger CSVs they grade
+(`{sport}_source/data/pick_ledger/pick_ledger_*.csv`) are **untracked and
+absent** — `git ls-files | grep pick_ledger` returns only the builder, the
+module and its test. The hardcoded path is a second, independent barrier.
+
+The conclusions are almost certainly right (stated with n and CIs). The problem
+is that **the entire evidence base for suppressing NCAAF picks lives on one
+laptop**, and re-running it anywhere else returns a clean, plausible zero rather
+than failing. That is `model_engine_standard.md`'s unfed-input signature applied
+to the EVIDENCE layer instead of the input layer.
+
+### UI — the compact card is inherited, not designed
+
+NCAAF falls to `_scoreboard_strip_generic.html`; only `mlb_main` and
+`soccer_main` have their own. Against MLB's strip, NCAAF's has **no kickoff
+time** (badge reads `WEEK 1`, identical on all 51), no score, **no logo `<img>`
+though `logo_url` IS in the payload**, no market chips, no odds-freshness stamp
+— and the `PROJECTED TOTAL` tile is **clipped at the card edge on every card**.
+Two of ~4 text blocks per card say a legacy engine has no prediction, the second
+repeating the first verbatim.
+
+**Two fields named for quantities they do not hold** (the 2026-08-21 rule,
+recurring): the header stat **`Candidates 51`** counts GAMES — production
+generated **0** candidates from this board; and the main card's **Section 2 is
+titled `Enhanced Totals Engine`** while holding SmartSim 2.0's numbers, beside a
+panel saying the Enhanced Totals Engine has no prediction.
+
+Props parity: MLB carries 10 props/ladder surfaces, NCAAF **zero**.
+
+### PROPS ARE UNWIRED BY DESIGN AND THE DESIGN'S OWN DEADLINE HAS PASSED
+
+`fetch_ncaaf_oddsapi_props_local.py`'s docstring says the join should be built
+"once real market coverage is confirmed closer to the season
+(**~2026-08-23 to 2026-08-30**)". That window opened two days ago; nobody built
+it. No caller anywhere, no `oddsapi_player_props_*.csv` on disk. And the planned
+rate basis — `player_stats.py` over the `player_game_stats` snapshot — has
+**never produced a file**, correctly, since no 2026 games have been played. So
+**week 1 has no rate basis for a props ladder regardless**; props are a week-3+
+surface, not an opening-weekend one.
+
+### SIM ENGINE — checklist FAILs, and that is a truth, not a work order
+
+`scripts/football_sim_input_checklist.py`: **FAIL, 9 alarms.** 9 blocks / 65
+keys consumed, **0 of 3 production entrypoints pass a payload**; every NCAAF
+game runs on four rating scalars plus a hardcoded `pace_seconds_per_play=24.0`.
+**Do NOT read this as "wire the payload"** — the domination result (b=+0.990,
+w=−0.028, 751 clean OOS games) says the payload path cannot supply what is
+missing, measured at 4.1% of margin SD against the ratings path's 17.2%.
+
+One loose end worth a look: the checklist's NCAAF arm reports
+**`UNMEASURED: loader returned 0 games`** from a checkout where the board
+builder returns **51**. Different loaders; the checklist is measuring something
+the board does not use.
+
+
+## [nfl-autorun-chain-order] THE NFL AUTORUN CHAIN RAN THE FANTASY ARTIFACT ABOVE ITS OWN INPUTS — FIXED IN CODE, NOT DEPLOYED `[measured 2026-08-25, lane ncaaf-oddsapi-game-lines]`
+
+Detail: `todo.md` `#554`. Two `learnings.md` rules filed the same day.
+
+**THE DEFECT.** `build_nfl_fantasy_projection_artifact.py` reads injury
+availability (`use_injury_availability`) and the news layer.
+`_launch_autorun_nfl_fantasy_artifact` sat ABOVE both
+`_launch_autorun_nfl_injuries_fetch` and `_launch_autorun_nfl_news_capture` in
+the autorun `elif` chain. **Only one branch fires per tick** (`#341`), so on a
+busy slate the artifact was built from yesterday's injuries and news. Order now:
+
+    reconciliation -> evaluation_settlement -> pbp -> injuries -> roster
+      -> depth -> news -> fantasy artifact -> mlb -> ...
+
+Starvation is NOT reopened: everything now above the artifact is daily or
+six-hourly gated, so the NFL block needs ~6 winning ticks/day out of ~2,880.
+`#341`'s starvation came from sitting below HIGH-FREQUENCY branches, still
+forbidden by the window assertion in `test_nfl_fantasy_artifact_autorun.py`.
+
+**FOUR POSITION COMMENTS WERE STALE AND TWO CLAIMED THE SAME SLOT** — the
+fantasy artifact and the injuries fetch both read "THIRD, directly behind the pbp
+fetch"; the pbp branch said "SECOND" while sitting third. All rewritten as
+RELATIONSHIPS. **Ordinals in an ordered chain are wrong the moment anyone inserts
+above them, and nothing reports it.**
+
+**THE TESTS WERE FIGHTING EACH OTHER, WHICH IS WHY THIS SURVIVED.**
+`test_nfl_injuries_fetch_autorun`'s `index <= 2` had been UNSATISFIABLE alongside
+the same file's `injuries == pbp + 1` ever since `evaluation_settlement` was
+inserted above the pbp fetch. Two assertions that cannot both pass are not an
+alarm; the pair read as pre-existing noise and the real inversion hid behind it.
+Absolute indices replaced with relative bounds throughout.
+
+**SEVEN TESTS WERE RED ON `origin/main`**, six reported plus one found while
+verifying. Three unrelated causes: this one, plus three tests still steering the
+pbp read with `DATA_ROOT` after `#441` deliberately moved `_pbp_path` off it, plus
+a platform-dependent `mocked_popen.assert_not_called()` (on Linux
+`ctypes.util.find_library` shells out to `/sbin/ldconfig -p`; green on the Windows
+dev box, red here — and `find_library` caches, so 4 of 5 identical sites were
+passing on test ORDER alone).
+
+**CROSS-LANE AND UNMEASURED.** `scripts/run_refresh_worker.py` is claimed by TWO
+OPEN lanes and was already this repo's one contested file. The edit reorders
+existing `elif` blocks and corrects comments — no branch logic, gating or body
+touched; reverting is re-ordering the same blocks back. The priority call
+(which NFL job wins a tick first) was made on PRODUCER-BEFORE-CONSUMER grounds,
+not measured, because the effect cannot be measured from a checkout. **The
+owners should confirm it.** Nothing is deployed; `autoDeploy` is off.
+
+## [ncaaf-capture-live] NCAAF captures from real OddsAPI: 184/184 teams, 432 rows on the 08-29 slate `[measured 2026-08-25T23:07:25Z, lane ncaaf-oddsapi-game-lines]`
+
+**Only VERIFIED facts here.** Narrative in `log/2026-08-25.md`; deploy readings in
+`deploys.md`.
+
+```
+live-odds-worker 23:07:25Z
+  EVENTS events=111 teams=184 resolved=184 unresolved=0
+  QUOTES date=2026-08-29 events=7 rows=432 appended=18
+  DONE   events=111 dates=14 rows_appended=74
+```
+
+- **`appended` is the reading, never `rows`.** 432/18 — the mirror already held NCAAF
+  quotes, so a row count reads as success whether or not anything was captured. The
+  190KB `book_grid` at 22:14 was refused as evidence for exactly this reason.
+- Grid moved after the capture: `book_grid_2026-08-29.json` 190,954 → **198,278 B**,
+  checksum changed; new `book_grid_2026-08-30.json` (28,892 B).
+- **`HOT_ARTIFACT_PATTERNS` gates BOTH ENDS.** The registry pull failed with **403, not
+  404** — the file was on web and web refused it, because web ran an older SHA with the
+  old 155-pattern tuple. Deploying only the puller is not deploying the fix.
+- **live-odds-worker never runs `bootstrap_data_root`** (zero lines in 7 days), so a
+  git-tracked file is present on web and absent on that worker. That asymmetry is
+  invisible from a checkout and is why every local test passed at `resolved=0`.
+- `FIXTURE_CADENCE sport=ncaaf interval=86400 reason=far:88h_out` — in the loop, on a
+  DISTANCE-based cadence that tightens as kickoff nears. Being claimed by the fast tick
+  does not mean a fast cadence.
+- **Layer 2 does not cover NCAAF until 2026-08-26**, and that is correct:
+  `_SLATE_WINDOW_DAYS["ncaaf"] = 3` and the slate is 4 days out.
+- `SWEEP_OWNERSHIP_EXCLUDED` prints only `if dropped:` — **its silence is not evidence
+  of success.**
+
+## [ncaaf-sweep-env-gate] RESOLVED — `SYNDICATE_ACTIVE_SPORTS` now carries `ncaaf,nfl`; the capture runs `[measured 2026-08-25T23:07:25Z, lane ncaaf-oddsapi-game-lines]`
+
+PR #61 is DEPLOYED and live on all three services (`.syndicate/deploys.md`,
+2026-08-25T20:31Z). It still captures nothing, and this is why:
+
+```
+[live_refresh_loop] SWEEP_OWNERSHIP_EXCLUDED date=2026-08-25
+  kept=mlb,wnba,soccer
+  dropped=nfl:not_in_SYNDICATE_ACTIVE_SPORTS ncaaf:not_in_SYNDICATE_ACTIVE_SPORTS
+```
+
+**Two gates, and reading the wrong one gives the wrong answer with total
+confidence.** `ops_refresh._active_sports_for_date` (line 1150) is a CALENDAR
+window and has NCAAF active since **Aug 15** — I read it first and would have
+concluded the sweep covers NCAAF today. It does not. The live services carry
+`SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer`, which is checked FIRST, so
+`ncaaf_game_lines_oddsapi` is unreachable in production no matter what SHA is
+deployed. NFL is excluded the same way, four days from its own season.
+
+`SYNDICATE_ACTIVE_SPORTS` is **not in `render.yaml`** — grep returns nothing —
+so it is set per-service in the Render dashboard/API. That means changing it
+does NOT need a `render.yaml` push and does NOT fire `blueprint_sync`; it is
+`update_environment_variables` on each worker. Cheaper and far narrower than
+`#284`'s blast radius, but still a production change: adding `ncaaf` starts
+spending OddsAPI credits on a sport that has never been fetched.
+
+**NOT DONE — needs a user decision.** Detail and the exact change: `todo.md`
+`#558`.
+
+## [ncaaf-oddsapi-lines] NCAAF GAME LINES — LIVE IN PRODUCTION, 432 rows captured on the 08-29 slate `[measured 2026-08-25T23:07:25Z, lane ncaaf-oddsapi-game-lines]`
+
+**Read `[ncaaf-readiness-2026]` first — this closes its stated blocker in CODE
+and changes nothing that is running.** Detail: `todo.md` `#552`, `#553`.
+
+**NO LIVE FETCH HAS HAPPENED.** This session had no egress to
+`api.the-odds-api.com` (agent proxy answers 403 to CONNECT) and no
+`ODDS_API_KEY`. Every number below comes from a REPLAYED FIXTURE built over the
+real 8-game 08-29/08-30 slate. The fetch itself is unproven and must be proven
+on the worker.
+
+    markets non-null           0 of 51  ->  51 of 51   (8 with a real book line)
+    Layer 1 market-board rows  0        ->  32         (ML/ML/spread/total x 8)
+    team-name join             94 of 94 on the real week-1 slate, both directions
+    tests                      354 ncaaf + 411 shared-contract green; CI archive 383 OK
+
+**THE DESIGN DECISION WORTH KEEPING.** Lines go into the SHARED QUOTE LOG, not a
+new file. `HOT_ARTIFACT_PATTERNS`' globs are sport-agnostic and already match
+`ncaaf_source/tracking/book_quotes/*.jsonl`, and `run_refresh_worker.py`'s
+book-grid pass already loops over `ncaaf` — so one capture feeds BOTH the cards
+board and Layer 1, crosses worker→web with **no allowlist edit**, and avoids the
+`artifact_publisher.py` collision with `basketball-live-momentum`. A bespoke
+`ncaaf_*_lines.json` would have needed a new allowlist entry and given the board
+a second line source free to disagree with Layer 1's.
+
+**TWO SILENT BUGS THE REACHABILITY TEST CAUGHT** — neither would have failed a
+correctness test that only checked "the number is right when present":
+1. The quote log normalises `selection` to `home`/`away`. Matching it against the
+   TEAM NAME dropped every spread and moneyline while TOTALS — whose outcome name
+   really is "Over" — kept working. That reads as thin book coverage, not a bug.
+2. With a correct index, `markets` STILL stayed null on all 51: the card never
+   emitted the `betting` block `publication_adapter._shared_markets` reads. The
+   line existed and the board could not see it.
+
+**AND ONE CAUGHT BY READING THE OUTPUT, NOT BY A TEST:** `p_home_cover` came out
+**0.97** for a game the model has the home side LOSING to the spread by 4.6
+points — the cover line was passed negated. Plausible-looking and exactly
+inverted, the same shape as the nflverse `spread_line` trap already in this file.
+Now pinned by a test asserting DIRECTION (`< 0.5` when the model trails the line)
+rather than a value.
+
+**TEAM NAMES ARE THE STANDING RISK.** OddsAPI sends "<School> <Mascot>"; the
+board joins on CFBD's canonical name; ~680 schools share mascots. The resolver is
+exact (school+mascot from the team registry, plus a validated supplement),
+REFUSES ambiguity rather than guessing, and never keys on a bare mascot.
+`fold()` transliterates diacritics before stripping punctuation — without that,
+CFBD "San José State" and OddsAPI "San Jose State" never meet, because the
+board's own `_normalize_text` DELETES non-ASCII instead of folding it.
+**OddsAPI's exact spellings remain unverified**; `--report` prints every
+unresolved name and `_ODDSAPI_NAME_SUPPLEMENT` is where they go.
+
+**WIRED INTO THE SWEEP 2026-08-25** — `ncaaf_game_lines_oddsapi`, first of the
+two NCAAF steps in `_build_ncaaf_steps`, phases `(pregame, live)`. A CROSS-LANE
+take of `scripts/refresh_odds_sources.py` (held by OPEN lane
+`layer2-sim-view-and-live-projection`) made under explicit user instruction,
+scoped to one appended `RefreshStep` and nothing else, recorded in `lanes.md`.
+
+**VERIFIED BY RUNNING THE SWEEP, not by reading the builder**: against a local
+fake OddsAPI, `refresh_odds_sources.py --date 2026-08-29 --phase pregame
+--sports ncaaf` wrote **192 quote rows** across the two kickoff shards and the
+board then read `priced=8 of 51`, `layer1_rows=32`. `return_code=0` was
+deliberately not taken as the acceptance reading — the step exits 0 whether or
+not it captured anything.
+
+**NO --season/--week, on purpose.** The capture shards each event by its OWN
+commence date, because NCAAF weeks are not calendar windows (2026 week 1 spans
+08-29→09-07) and the board reads quotes per kickoff date. Pinned by a test.
+
+**NOT separately season-gated, also on purpose.**
+`live_refresh_loop._weekly_sport_claimed_by_fast_tick` already decides whether
+NCAAF is on the sweep at all, and `#520` records that re-applying an upstream
+gate at the launch site is how NFL lost 24 hours of capture. Out of season the
+call costs one credit and appends nothing.
+
+**TWO STALE `test_ops.py` ASSERTIONS FIXED, one of them NOT MINE.** Both pinned a
+sport at exactly one refresh step and read it as `refresh_steps[0]`.
+`test_build_refresh_plan_uses_nfl_syndicate_runner_in_source_mode` had been **RED
+ON `origin/main`** (verified in a clean worktree) since `nfl_schedule_refresh`
+was added — that step is deliberate and load-bearing (`schedule_{season}.csv` is
+a MODEL INPUT, +1.18 ROI points paired on 16,906 held-out 2025 bets) so the TEST
+was stale, not the code. Both now assert the step NAMES IN ORDER and look each
+command up BY NAME, which is strictly stronger than the count they replaced and
+cannot be repointed by a third step appearing. `test_ops.py` is now **124 passed,
+0 failed** (baseline 1 failed / 123 passed).
+
+**A PRE-EXISTING NFL RED BAND EXISTS AND IS NOT MINE** `[surfaced 2026-08-25]`.
+Widening a `-k` filter to include `nfl` revealed **6 failures that reproduce
+identically on `origin/main`**: `test_generate_smartsim2_nfl_projections` (2),
+`test_generate_smartsim2_nfl_preseason_projections` (1),
+`test_nfl_injuries_fetch_autorun::DispatchOrder` (2),
+`test_nfl_roster_depth_autorun::DispatchOrder` (1). Untouched by this lane and
+left alone; recorded so the next session does not mistake them for new breakage.
+
+**STILL OWED: a LIVE run.** Nothing here has touched real OddsAPI.
+
+
 ## [ncaaf-margin-calibration] NCAAF MARGINS ARE CALIBRATED; TOTALS ARE NOT `[verified 2026-08-19]`
 
 **Margins fixed and measured** on the 2026 wk1 slate (51 games, 300 seeds):
@@ -4281,6 +4867,23 @@ on `share x games`) — correct, and it reads as "inert"; test the two separatel
 artifacts ON THE WORKER; set `SYNDICATE_NFL_FANTASY_USAGE_STRICT=1` on web so a
 request-path pbp parse fails loudly. A new usage FIELD needs
 `build_nfl_fantasy_usage.py --force`, not just a deploy.
+
+**BUZZ DUPLICATE-ACROSS-DAYS FIXED AND LIVE `[web 60ca2486, verified by Render
+deploy record 2026-08-23T23:53:42Z]`.** The `[measured 22:28.../23:29...]`
+line above proves the CAPTURE-time merge (`capture_nfl_news.py`, one day's
+file) deduped correctly by article id. It does NOT cover the separate READ-time
+aggregation `recent_news_by_player()` does across its 21-day window — that had
+NO dedup at all, so a story surviving several days on ESPN's feed was counted
+and DISPLAYED once per day it was captured, not once per distinct story,
+crowding out real coverage under the `[:6]` cap. Fixed: dedupe by article id
+(headline fallback) across the whole window, not just within one day's file.
+Also fixed `date.today()` → `datetime.now(timezone.utc).date()` in the same
+walk-back (`#518` timezone guard) and stale "Hover the badge" copy → "Click"
+(the badge has been a click-to-open dialog since `003a5866`, not a tooltip;
+the popup already rendered `description`, contrary to how the leftover copy
+read). PR #24 (fix) + PR #26/#27 (ledger). Full detail and the deploy's actual
+composition (73 commits rode along, unrelated to this fix) in
+`.syndicate/deploys.md`, 2026-08-23 23:42-23:53Z entry + correction.
 
 ## [nfl-player-props-model] NFL PLAYER-PROP MODEL: `#471` FULLY CLOSED, ALL 6 TUNED CONSTANTS STABILITY-VERIFIED, ALLOWLIST GAP FIXED+LIVE — WEB DEPLOY OF THE FIX SET IN FLIGHT, NOT YET CONFIRMED `[verified 2026-08-19]`
 
@@ -5011,3 +5614,221 @@ card — **never yet seen on a live card.**
 **`second_half_shot_multiplier = 1.22` IS NOT WRONG.** Measured 57.1% ± 3.7pp
 second-half goal share against its assumed 55–56% — inside one standard error.
 Do not change it without a larger sample.
+
+---
+
+## [kalshi-execution] Kalshi execution — session close 2026-08-26 (lane `kalshi-exchange-index`)
+
+**DONE 2026-08-26: shard 3 is FUNDED — $25 moved to exchange index 3**, and
+`KALSHI_ORDER_KNOWN_SHARDS=0,3` is set on live-odds-worker (set by
+syndicate-43, readback confirmed). Kalshi balances are PER-SHARD and must be
+preallocated; shard 3 is "Tennis & Baseball", which is why only MLB failed.
+
+**VERIFIED 16:19:13Z — MLB IS FILLING. Funding shard 3 was the whole blocker.**
+
+```
+RECONCILED KXMLBHRR-26AUG261310TBDET-DETHLEE50-2 submitted->filled
+  contracts=11 fill_price=0.4  fees=0.0924
+RECONCILED KXMLBTOTAL-26AUG261940TEXCWS-8        submitted->filled
+  contracts=5  fill_price=0.47 fees=0.0436
+```
+
+Those are the SAME two tickers that returned `market_shard=3` refusals an hour
+earlier. First MLB fills since 08-24. ~$6.75 of the $25 committed.
+
+**The next constraint is collateral, not correctness:** $25 on shard 3 against a
+$10/order cap is a couple of orders per cycle. Expect insufficient-collateral
+errors rather than shard errors from here.
+
+**Verified working today:** Kalshi fills on shard 0 (`KXWNBA3PT` filled
+16:03:06Z, 10 contracts @ 0.40 + 0.168 fees, ~1s round trip). Polymarket
+reconciling clean (15 orders, `not_found=0`). Bankroll $1000, caps $10/order,
+15/book, 25/day.
+
+**Kalshi order body — settled, do not re-litigate:**
+- `POST /portfolio/events/orders` on `external-api.kalshi.com` — CONFIRMED from
+  the venue's own docs, not inferred.
+- `exchange_index: -1` (auto-route by ticker). A literal `0` PINS shard 0 and
+  returns `market_not_found` for anything elsewhere.
+- `subaccount: 0` — omitting it was deployed, disproven, reverted. Every fill
+  the account has ever taken carries `0`.
+- `side` is `bid`/`ask` only, quoted from the YES leg. The UI's
+  `op_order_side`/`op_side` are UI params, not body fields.
+
+**Still open, none of it blocking:**
+- `#573` — refuse by READING `GET /portfolio/balance?exchange_index=N` instead
+  of a hardcoded `funded_shards` list. Self-heals the moment the shard is
+  funded; turns the last inferred step into a measurement.
+- Kalshi spreads/h2h side plumbing — **owned by syndicate-43**
+  `[USER DECISION 2026-08-26]`. `unmappable_side` is currently a GUARD, not a
+  gap: the join pairs a `+1.5` board row with the same team's `-1.5` market, so
+  clearing the refusal without fixing the join inverts ~10 bets a cycle.
+- `no_venue_ticker` on h2h — `price_source=aggregator`, so no Kalshi ticker is
+  ever stamped. Nobody holds this.
+- Polymarket per-order reads cannot detect orphans by construction (no list
+  route, `GET /v1/orders` -> `code: 12` UNIMPLEMENTED). `coverage=per_order`
+  says so on every RECONCILE line.
+
+## [board-chip-coverage] Layer 2 compact game cards — FULL chip coverage, verified 2026-08-26
+
+Every compact card on the board resolves a live-scoreboard chip, measured from
+refresh-worker logs the same evening:
+
+    mlb 400/400   wnba 400/400   nfl 106/106   soccer 400/400
+
+`CHIP_JOIN_COVERAGE` (`pipeline/layer2_shortlist.py`, per sport, every build) is
+the instrument. It reports `chips=`, `chip_dates=`, resolution by index
+(`by_id` / `by_matchup` / `by_canonical`), plus `needs_fallback`,
+`no_chip_available` and `unknown_no_key` with named samples. Before it existed
+this defect class was found ONLY by a person looking at the board — twice.
+
+Three causes were closed, all previously invisible:
+
+* **Phase offset.** The chip build resolved ONE matchday per league from
+  `default_week(reference_date=today)`; on a Monday that is the matchday just
+  played. 65 of 96 chips described finished fixtures. Soccer
+  `no_chip_available` 251 -> 0; NFL was the same defect via an exact-date
+  filter, 106 -> 0.
+* **Two different names for one club.** Normalisation cannot bridge
+  "Athletic Bilbao"/"Athletic Club"; both sides now carry `canonical_team`'s
+  answer as a join key.
+* **Alias gaps**, named by the telemetry itself: soccer `unknown_no_key`
+  7 -> 0.
+
+**The horizon is the CALLER's to ask for** (`include_upcoming`, default False).
+`provider.games()` serves the home rail (means "today") and the chip strip
+(means "the board's forward horizon"); overloading it silently doubled the
+soccer home rail 98 -> 210 while fixing the board.
+
+**The alias map has TWO CONSUMERS WITH DIFFERENT REACH.** `teams_match` falls
+through to a shared-suffix heuristic; `canonical_team` is map-only and the chip
+join calls it directly. A club can join fixtures fine and still return None for
+a chip key. The asymmetry is principled: `teams_match` holds BOTH names and
+answers "same club?", so a loose rule is safe; the chip index holds ONE name and
+must mint a globally unique KEY, where the same rule mints collisions.
+
+**`DIRECT_FEED_BOOKS` needs no widening.** `near_misses={}` across many builds,
+one at 27,070 rows — the aggregator uses no spelling the exact match misses.
+Reproduced independently by lane `board-staleness-visibility`.
+
+
+## [board-quote-staleness] Board freshness vs QUOTE staleness — verified 2026-08-26 (lane `board-staleness-visibility`)
+
+**THE BOARD BUILD IS ~108s IN STEADY STATE.** n=40 unattended builds, median
+107.8s, p90 145.5s. **A COLD build (first after restart) is 747.8s — 6.9x — but that is a FLOOR, not a bound: measured again 2026-08-27, boot `00:56:13Z` to first `GAME_CHIPS_PUBLISHED` `01:14:32Z` = **18m19s**, half again the recorded figure, on a 15-game slate. Slow rather than stuck — stages walked forward (`cards_context_end` 01:01, `board_contract_end` 01:07) and memory was flat at ~1.79GB anon. Do not size a wait against 747.8s.**
+Every figure in older entries (19m43s, 12m44s, 11m22s) is a COLD build
+generalised; they were measured in a window with 15 deploys in 6h15m where the
+worker never reached a warm build. **Quote a board-build duration only with
+cold/warm attached.**
+
+**Cold-build decomposition:** `build_intelligence_overview` 295.1s,
+`candidate_collection_with_fallback` 178.0s, `candidate_building` 0.01s,
+`manifest_odds_history_join` 0.32s. **All eight sports' candidate generation is
+47s — 6% of the build.** Optimising generation optimises nothing.
+
+**Per-sport odds-history load is CHEAP:** total 0.2s across 5 sports, mlb 0.19s,
+**soccer 0.01s**. Do not size work against an assumption that shard reads are
+expensive.
+
+**THE BOARD SERVES STALE QUOTES, and publication freshness cannot see it.**
+`seen_p50=859s` against a ~60s publish cadence. Every publication-time
+instrument (`written_at`, `state_meta`, the stale badge) reads FRESH on a board
+carrying 14-minute-old quotes. Use `QUOTE_AGE_SERVED`.
+
+**`last_seen` MUST be read across the same dates as `quote_rows`.** Fixed
+2026-08-26: `quote_rows` extends across `window_dates` while `last_seen` read
+`selected_date` alone, leaving rows clockless — and **a clockless row is
+invisible to `drop_superseded_lines`**, which requires a clock on both sides by
+design. Measured before the fix: `no_seen_age=7553` against `kept=15672`, 48% of
+a grid exempt from the guard. After: `no_seen_age` max 52, drops 16 -> 824/2271,
+artifact 962141 -> 962176 bytes.
+
+**NFL's sweep cadence is FIXTURE-AWARE AND CORRECT, not an outage.**
+`FIXTURE_CADENCE sport=nfl interval=28800 reason=mid:26h_out` — 8 hours by
+design (`#440` Phase 1b, which predicted nfl_preseason 12.00 -> 3.56 sweeps/day).
+ncaaf 86400s, wnba 7200s. **Judge a sport's sidecar against its OWN interval or
+against its rows' ages — never a flat threshold.**
+
+**`_pregame_sweep_interval_for_tick` DISAGREES ACROSS SERVICES.** It is
+fixture-aware; the decision is made on **live-odds-worker**. Recomputing it on
+refresh-worker returns 7200 for nfl against production's 28800, because the
+fixture lookup finds nothing there.
+
+**NO MEMORY PROBLEM EXISTS ON refresh-worker.** Peak unreclaimable 29.1% of
+4096MB, zero oomKilled over two days. `container_memory_pct_of_max` counts page
+cache; `ALL_PROCESS_MEMORY` now carries `container_memory_unreclaimable_*`
+beside it. **Quote the unreclaimable figure.**
+
+
+## [mlb-live-lens-row-shape] The live-lens report has TWO writers and TWO row shapes — verified 2026-08-26 (lane `mlb-chip-live-state`)
+
+**`live_lens_report_<date>.json` is written by two producers over one path, and
+they do not agree on the row shape.** `live_lens_loop` writes the FULL shape —
+20 keys per row, including `matchup.score` and `gameLens[0].progress`.
+`scripts/refresh_mlb_oddsapi.py` fetches `/api/cron/live-lens-reports?slim=on`
+and writes `{gamePk, startTime, status}` only; its own docstring says so, and
+`slim=on` is deliberate (commit `5c12acf2`, a full slate payload caused a prior
+incident).
+
+**The served copy flips continuously.** Sampled every ~50s on 2026-08-26:
+`22:39:26Z` SLIM, `22:40:48Z` FULL, `22:41:57Z` SLIM — and that last one carried
+a `generatedAt` **2m38s EARLIER** than the FULL it replaced. An older report
+overwriting a newer one, not merely a poorer one.
+
+**A SLIM ROW IS NOT AN ANSWER, AND IT USED TO PASS FOR ONE.** It carries
+`status`, so `abstract`/`detailed` are populated and any guard keyed on those is
+satisfied. `_mlb_live_lens_state_from_row` returned non-None with
+`away_pts`/`home_pts` None and no inning; `#413`'s consumer contract reads
+non-None as "covered", so `_apply_mlb_live_scores` skipped statsapi for the
+WHOLE slate and zero-filled. Measured: SLIM current gives 6 of 8 non-pregame MLB
+chips `0-0` with a bare `LIVE`/`FINAL` token on both serve paths; FULL current
+gives 8 of 8 exact against StatsAPI. Fixed in `58be8c0d` (`todo.md #581`); the
+writer race itself is `#582` and is NOT fixed.
+
+**HOW TO READ A LENS-SHAPE MEASUREMENT.** The shape sampled through
+`/api/ops/artifacts/export` is **web's** copy. Each service holds its own, so a
+SLIM reading on web says nothing about what refresh-worker's chip build saw. Any
+before/after on this must name the service AND the serve path (`source` on
+`/api/board/game-chips`), not just the shape.
+
+**`scripts/pending_deploys.py` does not know refresh-worker executes
+`syndicate/blueprints/home.py`.** It listed a `home.py` commit as pending for web
+only. `pipeline/layer2_shortlist.py:511` calls `build_game_chips`, which imports
+`home.py` to register the sport providers. Do not use that tool as a coverage
+answer for this file.
+
+
+## [chip-artifact-content-age] A chip artifact's TIMESTAMP and its CONTENT age are different numbers — verified 2026-08-27 (lane `mlb-chip-live-state`)
+
+**`/api/board/game-chips` `published_at` bounds when the artifact was WRITTEN,
+not how old the live state inside it is.** Measured 00:09:03Z, refresh-worker on
+`f8d8b05f`: `published_at` 79 seconds old, content two innings — roughly fifteen
+minutes — behind StatsAPI. `BOS` read `TOP 3` against `Bottom 5`; `MIL` read
+`BOT 1 0-0` against `Bottom 3 4-0`.
+
+**`#564`'s 120s freshness threshold and the page's stale badge both key on
+`published_at`, so BOTH read healthy through this.** Same shape as
+`[board-quote-staleness]`. A board build that takes ~750s cold stamps its
+artifact at the END.
+
+**THE DISCRIMINATOR BETWEEN A STALE CHIP AND A BLANKED ONE IS THE TOKEN, NOT
+THE SCORE.** A blanked game (`#581`) carries `0-0` AND a bare `LIVE`/`FINAL`
+with no inning. A stale game carries a real inning that is merely behind. Both
+present as "the score is wrong", and reading the score alone gets it backwards
+— this was nearly called a `#581` regression off a watcher line that reported
+only score mismatches.
+
+**THE CAUSE IS BOARD-BUILD DURATION, NOT THE LENS BOUND.** A first hypothesis
+blaming `_MLB_LIVE_LENS_MAX_AGE_SECONDS = 15 * 60` was FALSIFIED the same hour:
+one build later, WARM, the same worker with the same bound served an inning gap
+of **max 1, mean 0.25 over 8 live games** (`pub=00:15:18Z`). A bound does not
+know which build it is in — if it were admitting the staleness, a warm build
+would be just as stale. The content is about ONE BUILD old, and this file
+already carries the numbers: **cold 747.8s, warm 107.8s**.
+
+**So the exposure is a ~12-minute window after every worker RESTART, not a
+standing lag** — and a restart is what every deploy causes. refresh-worker was
+deployed three times on the evening of 2026-08-26. Same family as
+`[board-quote-staleness]` and `#563`'s deploy-cadence finding.
+
+**Open as `todo.md #585`, not fixed.**
