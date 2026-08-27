@@ -6,6 +6,7 @@ import gc
 import random
 import signal
 import sys
+import threading
 import time
 import json
 from pathlib import Path
@@ -2073,6 +2074,17 @@ def main() -> int:
         # The WRITER, not the probe: the probe reports shape once at boot, this
         # keeps the artifact fresh for the fan-in to read.
         _polymarket_us_slate_refresh_tick()
+        # THE VENUE POLL, on its own thread and its own clock. From here the
+        # main loop's ~900s idle interval no longer bounds how fresh an
+        # exchange price can be -- see `start_venue_poll_loop`'s docstring for
+        # why that gate is right for per-sport work and wrong for these two.
+        # Started AFTER the boot writers above so its first tick finds their
+        # state rather than racing them.
+        if start_venue_poll_loop():
+            print(
+                f"[live_odds_worker] VENUE_POLL_STARTED interval_seconds={venue_poll_interval_seconds()}",
+                flush=True,
+            )
         # AFTER the writer, deliberately: the audit reads the slate artifact,
         # so running it before the refresh tick would measure the previous
         # cycle's book. Inert unless SYNDICATE_POLYMARKET_SPREAD_AUDIT_ON_BOOT
@@ -2163,3 +2175,125 @@ if __name__ == "__main__":
 # was set on the live service dashboard; a restart alone does not re-inject env
 # vars on Render, so this comment-only change exists to produce a genuinely new,
 # non-redundant commit for the redeploy that actually picks it up.
+
+
+# ---------------------------------------------------------------------------
+# THE VENUE POLL LOOP -- exchange prices on their OWN clock
+# ---------------------------------------------------------------------------
+
+_VENUE_POLL_THREAD = None
+_VENUE_POLL_STOP = threading.Event()
+
+DEFAULT_VENUE_POLL_INTERVAL_SECONDS = 60
+MIN_VENUE_POLL_INTERVAL_SECONDS = 30
+
+
+def venue_poll_interval_seconds() -> int:
+    """How often the venue poll fetches. Floored, never zero.
+
+    The floor is not timidity: Kalshi has already answered this platform with
+    `http_429`s once, and an unpaced loop against a venue that rate-limits is
+    the failure `kalshi_odds_refresh.request_spacing_seconds` exists to
+    prevent. A bad value falls back to the default rather than to 0, the same
+    gate both venue refreshers already document.
+    """
+    raw = str(os.environ.get("SYNDICATE_VENUE_POLL_INTERVAL_SECONDS") or "").strip()
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_VENUE_POLL_INTERVAL_SECONDS
+    if parsed <= 0:
+        return DEFAULT_VENUE_POLL_INTERVAL_SECONDS
+    return max(MIN_VENUE_POLL_INTERVAL_SECONDS, parsed)
+
+
+def _venue_poll_tick() -> None:
+    """One pass: Kalshi's markets, then Polymarket's slate.
+
+    EACH VENUE IS ISOLATED. One venue being unreachable must cost that venue's
+    refresh and not the other's -- the two are independent feeds and a shared
+    `except` would let a Kalshi outage silently stop Polymarket updating, which
+    is indistinguishable from Polymarket having nothing to say.
+
+    NEITHER CALL IS FORCED. Both refreshers self-pace -- Kalshi per SERIES off
+    shared state (`_due_series`), Polymarket off its own interval -- so polling
+    more often than they refresh costs a state read and returns. That is what
+    makes this loop safe to run at 60s against refreshers whose own intervals
+    are longer, and it is why this does NOT pass `force=True`: forcing would
+    bypass exactly the per-series clock that keeps us inside the venue's rate
+    limits.
+    """
+    try:
+        from pipeline.kalshi_odds_refresh import run_kalshi_odds_refresh
+
+        result = run_kalshi_odds_refresh()
+        print(
+            f"[venue_poll] KALSHI status={result.get('status')}"
+            f" markets={len(result.get('markets') or [])}"
+            f" reason={result.get('reason')}",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 -- one venue must not cost the other
+        print(f"[venue_poll] KALSHI_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+    try:
+        _polymarket_us_slate_refresh_tick()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[venue_poll] POLYMARKET_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+def _venue_poll_background_loop() -> None:
+    interval = venue_poll_interval_seconds()
+    print(f"[venue_poll] STARTED interval_seconds={interval}", flush=True)
+    while not _VENUE_POLL_STOP.is_set():
+        started = time.monotonic()
+        try:
+            _venue_poll_tick()
+        except Exception as exc:  # noqa: BLE001 -- a tick must never kill the loop
+            print(f"[venue_poll] TICK_FAILED {type(exc).__name__}: {exc}", flush=True)
+        # Re-read each pass so the cadence can be changed without a restart
+        # taking the whole worker down with it.
+        interval = venue_poll_interval_seconds()
+        elapsed = time.monotonic() - started
+        _VENUE_POLL_STOP.wait(max(1.0, interval - elapsed))
+
+
+def start_venue_poll_loop() -> bool:
+    """Start the venue poll on its own thread. Returns whether it started.
+
+    WHY A THREAD AND NOT ANOTHER CALL IN THE MAIN LOOP -- the whole point.
+    Both venue refreshes already ride the main loop, and that loop is ADAPTIVE:
+    `_live_refresh_loop_interval_for_meta` returns the IDLE interval (~900s)
+    whenever no game is live. So a venue tick placed there can only run every
+    ~900s while idle no matter what its own interval says, and the interval
+    variables read as levers that do nothing. Measured 2026-08-27: polymarket
+    slate ages of 428s and 828s against a 180s self-pace, and kalshi at 1,250s.
+
+    That idle interval is CORRECT for what it guards -- expensive per-sport
+    work nobody needs when nothing is live. Exchange prices are the opposite
+    kind of thing: free to fetch, and moving continuously whether or not a game
+    is live, because tomorrow's lookahead lines are where a CLV grade's OPENING
+    prices come from. They do not belong behind that gate.
+
+    DEFAULT ON, and deliberately: a poll that ships switched off is a poll that
+    silently never runs, which is the failure this file has had twice by its
+    own comments. It runs in ONE process -- this script is the live-odds-worker
+    entrypoint and nothing else imports it -- so default-on cannot fan out
+    across services. `SYNDICATE_VENUE_POLL_ENABLED=0` stops it without a code
+    change.
+    """
+    global _VENUE_POLL_THREAD
+
+    if str(os.environ.get("SYNDICATE_VENUE_POLL_ENABLED") or "1").strip().lower() in {"0", "false", "no", "off"}:
+        print("[venue_poll] DISABLED by SYNDICATE_VENUE_POLL_ENABLED", flush=True)
+        return False
+    if _VENUE_POLL_THREAD is not None and _VENUE_POLL_THREAD.is_alive():
+        return False
+    _VENUE_POLL_STOP.clear()
+    _VENUE_POLL_THREAD = threading.Thread(
+        target=_venue_poll_background_loop,
+        name="syndicate-venue-poll",
+        daemon=True,
+    )
+    _VENUE_POLL_THREAD.start()
+    return True

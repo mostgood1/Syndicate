@@ -1589,13 +1589,14 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Nothing here is uncommitted: tree clean at `d2d44dbaf`, all shipped code live
   under `34717822`.
 
-- **Files:** `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_odds_cadence.py`,
+- **Files:** `tests/test_kalshi_odds_cadence.py`,
   `tests/test_kalshi_precap_cut_by_date.py` (NEW),
   `syndicate/features/shared/kalshi_board.py`, `tests/test_kalshi_board.py`,
   `syndicate/features/shared/kalshi_catalogue.py`,
   `tests/test_kalshi_side_vocabulary.py`, `tests/test_kalshi_futures_eviction.py`.
   **`venue_quote_adapters.py` and `venue_quote_fanin.py` RE-CLAIMED by lane
-  `venue-quote-line-join` 2026-08-27**, exactly as the released-claims note
+  `venue-quote-line-join` 2026-08-27** (and `kalshi_odds_refresh.py` likewise on
+  2026-08-27, for the per-sport trim floor), exactly as the released-claims note
   above instructs. Removed from this list rather than left contested, because
   `check_lane_invariants.py` reads it as a live claim and reported them as
   two-holder violations.
@@ -1790,7 +1791,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `pipeline/layer2_shortlist.py`, `tests/test_venue_quote_line_join.py` (new),
   `syndicate/features/shared/team_aliases.py`,
   `tests/test_team_nickname_aliases.py` (new),
-  `tests/test_polymarket_side_vocabulary.py` (fixture rested on the gap closed).
+  `tests/test_polymarket_side_vocabulary.py` (fixture rested on the gap closed),
+  `pipeline/kalshi_odds_refresh.py`, `tests/test_kalshi_trim_sport_floor.py` (new),
+  `scripts/run_live_odds_refresh_worker.py`, `tests/test_venue_poll_loop.py` (new).
+  The live-odds worker was formerly referenced by `wnba-live-odds-capture-gap`,
+  which RELEASED its claim and deliberately stopped writing the path so the
+  invariant checker would stop reporting it contested. Taken here per that
+  lane's own instruction.
 - **SECOND CAUSE FIXED 2026-08-27, found by the diagnostic this lane shipped.**
   Polymarket sends BARE NFL NICKNAMES; `canonical_team` resolved tri-codes and
   full names but not nicknames, so 2,048 nfl quotes carried
