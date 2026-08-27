@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#583` — **The Games rail's date filter never applied to candidate-backed games. `railDate` appeared ONCE in the template, in the branch that seats cards from unclaimed chips.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-26, user report — **FIXED AND TESTED, NOT YET DEPLOYED**
+### `#583` — **The Games rail's date filter never applied to candidate-backed games. `railDate` appeared ONCE in the template, in the branch that seats cards from unclaimed chips.** — lane `layer2-rail-duplicate-nfl-cards`, 2026-08-26, user report — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T00:0xZ** (web `b0ef00b8`)
 
 `[user report]` "all NFL games that are not today are also showing up" — on the
 Today tab.
@@ -36,9 +36,18 @@ DISCRIMINATES (FAIL pre-change, PASS post); three are boundaries passing in BOTH
 states — chip date beating a wrong row date, the today game kept, an undated
 group surviving. All 15 pre-existing assertions still pass.
 
-**OWED:** deploy to web, then read the served rail on the Today tab against
-`/api/board/game-chips?sports=nfl`'s date histogram. Landed on main as
-`2a36960c`.
+**VERIFIED, in two parts, because a client-side fix has two separate claims.**
+PRESENCE: `GET /intelligence` serves `dateFilteredGames` (2 occurrences) — a
+client-side change that failed to deploy leaves the page working on the old
+function and looking fine. BEHAVIOUR, driving the real board:
+
+    day tab = Today   18 cards   MLB 15  SOCCER 1   WNBA 2   ** NFL 0 **
+    day tab = All    246 cards   MLB 15  SOCCER 213 WNBA 2   ** NFL 16 **
+
+**The second row is the point.** A filter that DELETED NFL would also read
+`NFL 0` on Today; all 16 remain, correctly dated, one click away. That is the
+failure this rail already shipped once — `#160`'s reversal, where a seed filter
+took it from 108 cards to 18 and deleted SOCCER's 21 real games.
 
 **LANE NOTE:** `layer2-rail-duplicate-nfl-cards` was OPEN but UNOWNED (session
 `23024227` archived 2026-08-20, absent from `ListAgents`, no per-session marker

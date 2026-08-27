@@ -33441,3 +33441,57 @@ submit went `OUTCOME_SIDE_YES` on index 0. The order was right; the 2026-08-25
 fix works. **`outcome_index: null` in the ledger is NOT evidence** — it is not
 an `OrderRequest` field at all, so it reads null on correct orders too. Trusting
 it would have produced a false inverted-order report on real money.
+
+---
+
+## 2026-08-26 — web `b0ef00b8`: the Games rail stops seating non-today games (`#583`)
+
+**Deployed:** `web` (`srv-d88ahvrbc2fs73eodu30`), deploy
+`dep-da7nrt9srm7s739o9hpg`, triggered `23:59:49Z`, `deploy_ended
+2026-08-27T00:03:07Z`, live commit confirmed `b0ef00b8`. Claim held by
+`layer2-rail-duplicate-nfl-cards` (adopted this session); preflight `CLEAR`
+against the exact target, sample age 0s, only infrastructure processes.
+
+**THE DEFECT.** `railDate` occurred exactly ONCE in `intelligence.html` — in the
+loop that seats cards from UNCLAIMED CHIPS. Groups derived from board CANDIDATES
+were never date-filtered, so any game with rows seated a card whatever the day
+tab said. `/api/board/game-chips?sports=nfl` at the time: 16 chips, Aug 27 (1),
+Aug 28 (8), Aug 29 (7), **zero today**, all with board rows.
+
+**verify: MET, in TWO parts, because this is a CLIENT-SIDE change and the two
+claims are different.**
+
+(1) PRESENCE — the served bytes actually carry it. A client-side fix that failed
+to deploy leaves the page working on the old function and looking fine:
+
+    GET /intelligence  ->  `dateFilteredGames` occurrences = 2
+
+(2) BEHAVIOUR — the real board, driven in a browser, `deriveGameCards` being a
+page function no API can answer for:
+
+    day tab = Today   18 cards   MLB 15  SOCCER 1  WNBA 2   ** NFL 0 **
+    day tab = All    246 cards   MLB 15  SOCCER 213 WNBA 2  ** NFL 16 **
+                                 NFL labelled "Thu Aug 27", "Fri Aug 28", ...
+
+**THE SECOND ROW IS THE POINT.** A filter that DELETED NFL would also read
+`NFL 0` on Today. All 16 games are still present and correctly dated one click
+away, so the change filters rather than removes — which is the failure the rail
+already shipped once (`#160`'s reversal: an earlier seed filter took the rail
+from 108 cards to 18 and DELETED SOCCER, 21 real games that day).
+
+**IT SHIPPED INERT FIRST AND WAS CAUGHT BEFORE LANDING.** The filter built
+`dateFilteredGames` while the function still returned `gamesList.sort(...)`. Zero
+behaviour change, no test failure that a careless reading would have caught,
+because the 15 pre-existing assertions all still passed. Named in a comment at
+the return site.
+
+**Unhealthy, for the running tally:** three on web today (`16:48:45Z`,
+`23:07:51Z`, `23:51:22Z`), every one within ~2.5 min of a `deploy_ended`, every
+one recovering in ~20s. Still no instance of the discriminating case — an
+unhealthy AWAY from a deploy — which is what would implicate `#581`'s restored
+statsapi fan-out.
+
+**OBSERVED, NOT FIXED:** the WNBA card reads `WNBA · LIVE` where MLB reads
+`MLB · TOP 5` — no period or clock in `status_token`. Its score is integral and
+correct at this reading (`GSV 55 CON 27`), so the reported decimal/projected
+score (`85.43`) is NOT currently reproducing and is not explained.
