@@ -33495,3 +33495,38 @@ statsapi fan-out.
 `MLB · TOP 5` — no period or clock in `status_token`. Its score is integral and
 correct at this reading (`GSV 55 CON 27`), so the reported decimal/projected
 score (`85.43`) is NOT currently reproducing and is not explained.
+
+---
+
+## 2026-08-27 — web `e3dceb68`: the WNBA chip gets its quarter and clock (`#586`)
+
+**Deployed:** `web`, deploy `dep-da7o9mpsrm7s739podeg`, triggered `00:29:15Z`,
+live and serving by `00:33:30Z`. Claim held by `wnba-chip-live-token`; preflight
+CLEAR against the exact target. `syndicate-fd` RELEASED web early specifically
+because a live WNBA third quarter was the only state that could verify this, and
+their own window was not time-bound. Recorded because that is the behaviour the
+claim system is supposed to produce and rarely gets credited for.
+
+**verify: MET — same game, same instrument, before and after.**
+
+    CONTROL  00:29:37Z  GSV @ CON  live  token='LIVE'     76-48  ESPN P3 1:13  76-48
+    AFTER    00:34:02Z  GSV @ CON  live  token='Q3 20.5'  80-52  ESPN P3       80-52
+
+on `inline_artifact_stale`, the path this commit is deployed to.
+
+**A FALSE NEGATIVE FROM MY OWN VERIFIER, on the passing run.** The assertion was
+`^Q\d+\s+\d{1,2}:\d{2}$`. ESPN's `displayClock` under a minute is `20.5`, so
+the CORRECT token failed the regex and the watcher printed `STILL BARE`. Reading
+the raw value is what settled it. Second instance the same night of a watcher
+summary disagreeing with the truth it was built to check — the other ran the
+other way at `00:08:34Z`.
+
+**NOT VERIFIED, and not claimed:** the projection guard. GSV @ CON had a matched
+ESPN boxscore all evening, so `85.43` never reproduced. Unit tests only.
+
+**NOT DEPLOYED:** refresh-worker, on `f8d8b05f`. It builds the published chip
+artifact, so while a fresh one is served the WNBA chip is still bare — observed
+`00:32:49Z`, `src=worker_artifact`, `tok='LIVE'`. Its claim was held by
+`ncaaf-opener-regions-props` and was NOT taken from them; they offered to release
+and it was declined, because the inline path already proved the fix and their
+capture was time-bound.

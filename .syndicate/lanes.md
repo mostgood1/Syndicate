@@ -2358,7 +2358,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `scripts/run_refresh_worker.py`, held by `exchange-markets-api-integration`
   and `portfolio-ledger-service-split`. Pre-existing, not this lane's.
 
-### wnba-chip-live-token — OPEN — opened 2026-08-27 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272
+### wnba-chip-live-token — OPEN — opened 2026-08-27 — session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 — **CLOCK FIXED AND VERIFIED IN PRODUCTION (web `e3dceb68`): `LIVE` -> `Q3 20.5`, control and after on the same game against ESPN. TWO THINGS OWED — refresh-worker is not deployed, and the projection guard is UNIT-TESTED ONLY. `todo.md #586`.**
 - Goal: a live WNBA game chip carries its QUARTER AND CLOCK (`Q3 5:23`) instead
   of a bare `LIVE`, and never renders a SmartSim projection as an observed score.
 - Files: `syndicate/blueprints/home.py`,
@@ -2397,6 +2397,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none. `wnba/cards.py` is claimed by `wnba-halftime-elapsed` and is
   NOT touched — the whole fix is in `home.py`, which this lane claims and which
   `mlb-chip-live-state` released on closing.
+
+- **VERIFIED** `00:34:02Z` on `inline_artifact_stale`, the path `e3dceb68` is
+  deployed to:
+
+      CONTROL  00:29:37Z  GSV @ CON  token='LIVE'     76-48  ESPN P3 1:13  76-48
+      AFTER    00:34:02Z  GSV @ CON  token='Q3 20.5'  80-52  ESPN P3       80-52
+
+- **OWED 1 — refresh-worker is on `f8d8b05f` and does NOT carry this.** It builds
+  the published chip artifact, so while a fresh one is served the WNBA chip is
+  still bare: observed `00:32:49Z`, `src=worker_artifact`, `tok='LIVE'`. Claim
+  held by `ncaaf-opener-regions-props`; they offered to release and it was
+  DECLINED, because the inline path already proved the fix and their NCAAF
+  capture was time-bound. Discharge by reading a WNBA chip on
+  `src=worker_artifact` once that service carries `07a7124e` or later.
+- **OWED 2 — the projection guard is UNIT-TESTED ONLY and must not be recorded as
+  production-verified.** GSV @ CON had a matched ESPN boxscore all evening, so the
+  fractional `85.43` path never fired. It needs a game that has tipped off before
+  its boxscore row matches.
+- **MY OWN VERIFIER RETURNED A FALSE NEGATIVE ON THE PASSING RUN.** The assertion
+  assumed a `M:SS` clock; ESPN's `displayClock` under a minute is `20.5`, so a
+  CORRECT token printed `STILL BARE`. The raw value settled it. Second instance
+  the same night of a watcher summary disagreeing with what it was built to
+  check — the other ran the opposite way at `00:08:34Z`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

@@ -1,5 +1,67 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#586` — **A live WNBA chip read a bare `LIVE` while every MLB chip beside it read `TOP 5`, and a SmartSim projection reached the strip as an observed score.** — lane `wnba-chip-live-token`, 2026-08-27, user report — **CLOCK FIXED AND VERIFIED IN PRODUCTION; PROJECTION GUARD UNIT-TESTED ONLY**
+
+`[user reports]` "WNBA is showing the sim score" (`GSV 85.43 / CON 68.94` under a
+LIVE badge) and "fix the WNBA clock".
+
+**NOTHING WAS MISSING UPSTREAM, which is why the clock half is five lines.** Read
+off production BEFORE writing any code —
+`/api/ops/wnba/status-trace?date=2026-08-26`, section `local_live_state_payload`,
+the exact rows `build_live_state_payload` hands `_apply_wnba_live_scores`:
+
+    {"away_pts": 65.0, "home_pts": 38.0, "in_progress": true,
+     "period": 3, "clock": "5:23", "status": "5:23 - 3rd"}
+
+That function built `live_state` from FIVE keys — `away_pts`, `home_pts`,
+`in_progress`, `final`, `status` — and dropped `period` and `clock` on the floor.
+`_live_status_token`'s basketball branch reads exactly those two, found neither,
+returned None, and the chip fell back to the literal string `LIVE`.
+
+**THE PROJECTION: `#160`'S GUARD WAS NECESSARY AND NOT SUFFICIENT.** It asks
+whether the GAME is underway, not whether the NUMBER is an observation. A
+tipped-off game whose ESPN boxscore row has not matched yet is
+`in_progress: true` with `away_pts` still holding the SmartSim projection, so it
+sails through. Measured good case is integral (`65.0`); measured bad case is not
+(`85.43`).
+
+**FIXING THAT GUARD ALONE SHIPS INERT, AND A TEST CAUGHT IT BEFORE IT LANDED.**
+`_side_score` is a coalescing chain ending in `live_state.<side>_pts`, so
+refusing to SET `away["score"]` upstream just means the projection is picked up
+one candidate later — `test_a_refused_score_does_not_reach_the_chip` failed on
+its first run with `'85.43' is not None`. The second half is in `_score_value`,
+the choke point every sport's chip passes through: **a fractional value is not a
+score in any sport this platform carries.** REFUSED, NOT ROUNDED — rounding
+85.43 to 85 produces a plausible score and destroys the only evidence it was
+never real. Own rule in `learnings.md`, 2026-08-27.
+
+**VERIFIED IN PRODUCTION, same game, same instrument, before and after:**
+
+    CONTROL  00:29:37Z   GSV @ CON  live  token='LIVE'     76-48   ESPN P3 1:13  76-48
+    AFTER    00:34:02Z   GSV @ CON  live  token='Q3 20.5'  80-52   ESPN P3       80-52
+
+on `inline_artifact_stale`, the path web `e3dceb68` is deployed to.
+
+**MY OWN VERIFIER REPORTED A FALSE NEGATIVE ON THAT PASS, and the shape is worth
+more than the fix.** The assertion was `^Q\d+\s+\d{1,2}:\d{2}$`, assuming
+`M:SS`. ESPN's `displayClock` under a minute is `20.5` — seconds and a tenth —
+so a CORRECT token failed the regex and the watcher printed `STILL BARE`. Trusting
+the summary line over the raw value would have meant debugging a working fix. The
+mirror image happened the same night at `00:08:34Z`, where a watcher said `wrong`
+and it was staleness rather than the bug. **Both times the raw value settled it
+and the summary did not.**
+
+**OWED — TWO THINGS.**
+1. **refresh-worker.** It builds the published chip artifact and is on
+   `f8d8b05f`, which does NOT carry this. While a fresh worker artifact is
+   served, WNBA chips stay bare — confirmed at 00:32:49Z,
+   `src=worker_artifact`, `tok='LIVE'`. Its claim was held by
+   `ncaaf-opener-regions-props` for an NCAAF capture and was NOT taken from them.
+2. **The projection guard is UNIT-TESTED ONLY.** GSV @ CON had a matched ESPN
+   boxscore all evening, so the fractional path never fired in production. It
+   needs a game that has tipped off before its boxscore row matches. **Do not
+   record it as production-verified until a chip is observed refusing one.**
+
 ### `#585` — **The chip artifact's `written_at` is FRESH while its content is ~15 minutes old, and `#564`'s threshold bounds the wrong quantity.** — lane `mlb-chip-live-state`, 2026-08-27, measured — **NOT FIXED; FIRST HYPOTHESIS FALSIFIED BY MEASUREMENT, ROOT CAUSE NOW NAMED**
 
 Found while discharging `#581`'s last owed reading, not looked for.
