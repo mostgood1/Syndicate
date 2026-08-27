@@ -34082,3 +34082,40 @@ pull on; NOT fixed here.
   pregame sweep interval is 4h.
 
 **Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.
+
+---
+
+## 2026-08-27 — web `87c36d05` — the compact strip, on soccer's shape
+
+**lane:** `ncaaf-opener-regions-props` · claim re-acquired (the 14:56 one had
+expired on its 45-min TTL) · preflight CLEAR · deployed 15:43:57Z, live 15:47:35Z.
+
+**verify: MEASURED IN A BROWSER, whole board, both viewports.**
+
+    card height   181px   uniform across ALL 51 (min = median = max)
+                          vs 435px generic, 633px my own regression
+    crest         <IMG> 22x22   -- real logos, at the bumped size
+    fonts         team 15px, total 18px (soccer's 12/14 read small here)
+    structure     head 17 + rows 54 + facts 56
+    mobile 375px  181px, crest 22x22, ZERO narrow-tall elements
+
+58% shorter than the generic strip, 71% shorter than the regression I shipped.
+The UNIFORM height across all 51 cards is the load-bearing number: it is the
+evidence that nothing wraps anywhere, which is precisely what failed before.
+
+**A FALSE POSITIVE IN MY OWN PROBE, recorded because it nearly became a
+finding.** The HTML-string check reported `'Eastern Michigan' in strip = True`.
+The DOM says otherwise -- `longNameLocation: null`, no strip card contains a
+long name. My probe took the strip's boundary as the first `</section>` after
+`id="cardsScoreboard"` and captured past it into the main cards. The string
+check was measuring the wrong region; the DOM check is authoritative.
+
+**WHAT THIS DEPLOY DOES NOT CONFIRM, flagged by session syndicate-27 before I
+could walk into it.** `_EngineRowProjection` (87c36d05) is **not** exercised
+here. `build_smartsim_cards_page_context(selected_week)` takes a WEEK ONLY --
+the season comes from `_resolve_ncaaf_active_season_and_weeks()`, 2026 has no
+engine rows, so the board always falls through to the standalone path. The
+engine path is UNREACHABLE in production while 2026 is active, so a green read
+off this deploy would have confirmed the standalone path twice. It is verified
+at UNIT level only (5 tests) and becomes production-observable when an active
+season has engine rows.
