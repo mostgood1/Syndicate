@@ -255,6 +255,49 @@ def load_ppa_ratings_with_fallback(season: int) -> tuple[dict[str, dict], str]:
 # the market (SD ~14.5).
 SP_RATING_SCALE = 10.0
 
+# Set from --refresh-sp-cache. Module-level because `load_sp_ratings` is called
+# from other scripts (the re-fit harnesses import it directly) that have no
+# argparse of their own and should get the cached path by default.
+_SP_CACHE_REFRESH = False
+
+
+def sp_ratings_cache_path(season: int) -> Path:
+    """Beside the other CFBD caches this repo already keeps."""
+    override = str(os.environ.get("SYNDICATE_SP_RATINGS_CACHE_DIR") or "").strip()
+    base = Path(override) if override else (Path(__file__).resolve().parents[1] / "data" / "ncaaf_source" / "historical_truth")
+    return base / f"sp_ratings_{season}.json"
+
+
+def _read_sp_cache(path: Path) -> dict[str, tuple[float, float]]:
+    """Never raises: a corrupt cache behaves exactly as if it were absent."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    teams = raw.get("teams") if isinstance(raw, dict) else None
+    if not isinstance(teams, dict):
+        return {}
+    out: dict[str, tuple[float, float]] = {}
+    for team, pair in teams.items():
+        try:
+            out[str(team)] = (float(pair[0]), float(pair[1]))
+        except Exception:
+            continue
+    return out
+
+
+def _write_sp_cache(path: Path, season: int, index: dict[str, tuple[float, float]]) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "season": season,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "source": "cfbd /ratings/sp",
+            "teams": {k: [v[0], v[1]] for k, v in sorted(index.items())},
+        }, indent=1, sort_keys=True), encoding="utf-8")
+    except Exception as exc:
+        print(f"[sp_ratings] cache write failed ({type(exc).__name__}) -- continuing without it", flush=True)
+
 
 def load_sp_ratings(season: int) -> dict[str, tuple[float, float]]:
     """`{norm(team): (offense_rating, defense_rating)}` from SP+, in POINTS.
@@ -280,6 +323,33 @@ def load_sp_ratings(season: int) -> dict[str, tuple[float, float]]:
     `defense.rating` is POINTS ALLOWED -- lower is better -- so it is negated
     for the engine, whose `defense_rating` means "how good this defense is".
     """
+    # CACHED ON DISK, because this is the only CFBD call a projections run
+    # cannot get from an artifact we already hold — and it is the one that
+    # blocks everything when the quota goes.
+    #
+    # Of the four endpoints this script hits, `/games` is already covered by
+    # `historical_truth/games_<season>.json.gz` (888 rows, weeks 1-6 for 2026),
+    # and `/ppa/*` is only the FALLBACK rating source. SP+ is the primary.
+    #
+    # A COMPLETED SEASON'S SP+ NEVER CHANGES, so re-fetching it every run buys
+    # nothing and costs the quota. Measured 2026-08-27: a few full-season pulls
+    # put EVERY CFBD endpoint behind HTTP 429 for over two hours — 20 retries,
+    # all refused — which blocked the totals re-fit and the confirmation that a
+    # promoted calibration artifact had loaded. Both were gated on this one call.
+    #
+    # In-season a rating still moves week to week, so the cache is keyed by
+    # season and `--refresh-sp-cache` forces a re-fetch; the file is only ever
+    # written after a successful, NON-EMPTY fetch, so a rate-limited run can
+    # never poison it with an empty index.
+    cache_path = sp_ratings_cache_path(season)
+    cached = {} if _SP_CACHE_REFRESH else _read_sp_cache(cache_path)
+    if cached:
+        # `log` is defined INSIDE main(); this runs at module scope, so print.
+        # `flush=True` because todo.md records logger.info never reaching
+        # Render's log collector.
+        print(f"[sp_ratings] season={season} source=cache teams={len(cached)} path={cache_path}", flush=True)
+        return cached
+
     payload = _cfbd_get("/ratings/sp", {"year": season})
     index: dict[str, tuple[float, float]] = {}
     if isinstance(payload, list):
@@ -292,6 +362,13 @@ def load_sp_ratings(season: int) -> dict[str, tuple[float, float]]:
             if off is None or dfn is None:
                 continue
             index[norm(team)] = (float(off), float(dfn))
+    if index:
+        _write_sp_cache(cache_path, season, index)
+        print(f"[sp_ratings] season={season} source=api teams={len(index)} cached={cache_path}", flush=True)
+    else:
+        # NEVER cache an empty index. A rate-limited or malformed response would
+        # otherwise be written once and served forever as though it were real.
+        print(f"[sp_ratings] season={season} source=api teams=0 NOT CACHED (empty)", flush=True)
     return index
 
 
@@ -432,6 +509,8 @@ def _load_env() -> None:
 def main() -> None:
     _load_env()
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--refresh-sp-cache", action="store_true",
+                        help="Ignore any cached SP+ ratings and re-fetch. In-season a rating still moves week to week; a completed season's never does.")
     parser.add_argument("--season", type=int, required=True)
     parser.add_argument("--week", type=int, required=True)
     parser.add_argument("--seeds", type=int, default=SEEDS_PER_GAME)
@@ -448,6 +527,8 @@ def main() -> None:
                              "than merely disclaimed here.")
     parser.add_argument("--progress-log", type=Path, default=None)
     args = parser.parse_args()
+    global _SP_CACHE_REFRESH
+    _SP_CACHE_REFRESH = bool(getattr(args, 'refresh_sp_cache', False))
 
     def log(message: str) -> None:
         if args.progress_log:
