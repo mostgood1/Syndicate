@@ -39985,7 +39985,62 @@ above, same baseline, now 40.1h total:**
 > consecutive post-fix readings now: 54.9% → 45.1% → 44.2%. Nothing further
 > to do here.
 
-**#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
+⚠️ **Correction to the record: the 2026-08-25 quota-instrument finding below
+was described as "logged" in a prior turn but the commit was never actually
+made.** Backfilling it now, dated accurately.
+
+**2026-08-25: ODDS_API_KEY rotated to a new key (user-directed), and a
+real ~30h quota-instrument gap found and resolved while verifying it.**
+
+Live env var `ODDS_API_KEY` changed to a new key on all three services
+(user updated it directly; confirmed via the Render API, deploys showed
+`service_updated` -> `live` on all three at 14:19-14:20Z). Independently
+validated the new key against OddsAPI directly before trusting it: genuine
+key, **`x-requests-remaining: 5000000`, `x-requests-used: 0`** — a clean,
+correctly-provisioned 5M key, resolving the long-standing unexplained
+15M-vs-5M header discrepancy this ledger has carried since 2026-07-30 (the
+account's plan was evidently wrong before; this key is right).
+
+**While verifying, found `/api/ops/oddsapi/quota`'s `latest`/`baseline`
+fields frozen on a `soccer_belgium_first_div` observation from
+2026-08-24T08:03 — over 30 hours stale**, confirmed via multiple checks
+including a full 60s wait spanning at least one real refresh cycle.
+**The underlying write pipeline was NOT broken**: `by_sport`/
+`observation_count` show continuous healthy growth across the same
+window, and a direct test call (`GET /api/ops/oddsapi/sports`, free,
+read-only, exercises the same `record_oddsapi_quota` path) succeeded
+instantly and updated `latest` correctly. A further un-triggered 100s
+wait then showed a genuine fresh MLB fetcher write — **the instrument is
+healthy and self-sustaining again, confirmed, not just hoped.**
+
+Root cause not fully proven: best-supported theory is a stale per-process
+Redis client (`@lru_cache`'d in `_get_keyvalue_client()`) on whichever
+service serves reads, that cleared up coincidentally around when
+refresh-worker/live-odds-worker redeployed to an unrelated commit at
+roughly the same time. **Not reproducible now, so not chased further —
+no code changed.** Practical implication: any burn reading in this
+ledger with a `latest` timestamp between 2026-08-24T08:03 and
+2026-08-25T14:38 would have been reporting a stale snapshot, not true
+real-time state.
+
+> **First reading on the new key, 2026-08-27T01:45Z.** Baseline is an
+> exact, unambiguous zero-point — it's literally my own diagnostic call
+> (`ops_catalogue`, `used=0, remaining=5,000,000`) that broke the freeze
+> above, so there's no rollover ambiguity at all this time:
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 126,404s (35.1h, 331,943 obs) | 193,359 | 5,506.9 | **3.96M** | **79.3%** |
+>
+> Comfortably under the (now confirmed-real) 5M cap, though on the higher
+> side of the recent 44-55% range — consistent with this being an early
+> reading right after a full restart cycle (3 deploys) rather than a
+> steady-state read. `by_market_family` shape (props 34.9%, segment 38.7%,
+> alternate 20.2%, full_game 3.9%) matches the recent steady-state
+> composition, not a new shift. One more reading recommended before
+> trusting this percentage as the new normal.
+
+**#234****#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
 work `ba5d1e58`; renumbered to #221; #221 turned out to also be taken by that
