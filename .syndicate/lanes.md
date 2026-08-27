@@ -2202,6 +2202,12 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   the resolve COUNT printed both sides so an inert fix cannot pass.
 - Blocked by: none.
 
+### refresh-worker-deploy-2026-08-27 — **CLOSED 2026-08-27** — deployed, verified PARTIAL, claim released
+- OUTCOME: `fb9261b8` live on refresh-worker 20:42:05Z. `no_match|wnba|h2h` 7 -> 0 and `matched` 52 -> 60 on an identical `board_rows=1344`. The alias class-fix is CONFIRMED in production.
+- **MY ~22-ROW ESTIMATE WAS OPTIMISTIC; actual recovery ~8.** `totals` also requires the LINE to match, so an alias fix is necessary but not sufficient there — `no_match|wnba|totals` moved only 15 -> 14. Inferred cause, not measured.
+- Preflight HELD on first run (2 odds jobs in flight, a deploy kills them), CLEAR 24s later. Deployed against the CLEAR for the exact SHA.
+- Measurement: `deploys.md 2026-08-27 20:42:05Z`. Claims: released.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

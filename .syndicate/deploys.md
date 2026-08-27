@@ -34660,3 +34660,52 @@ builds match 0 on the COMPLETE set too, refusals dominated by
 confirmed which.
 
 **Nothing armed.** No `SYNDICATE_EXECUTION_*` key touched.
+## 2026-08-27 20:42:05Z — refresh-worker `fb9261b8` — WNBA city-code aliases — **PARTIAL PASS, and the shortfall is named**
+
+Deployed by lane `refresh-worker-deploy-2026-08-27` at the user's instruction, to
+get `31575179` (WNBA NBA-colliding city codes, `open-bet-live-status`) onto the
+service that runs the Polymarket board join. `dep-da8a0vugekts73cl57dg`.
+Carried 13 commits `7dd4ce07..fb9261b8` across four lanes — enumerated in the
+lane block BEFORE deploying, not discovered afterwards.
+
+**PREFLIGHT HELD FIRST, AND THAT IS THE POINT.** First run returned
+`HOLD: 2 job(s) in flight; a deploy kills them` — `refresh_odds_sources.py`
+(322MB) and `run_refresh_odds_job.py`. Re-ran 24s later: `CLEAR`. The deploy
+went out against a CLEAR preflight for the exact SHA, 16s after it cleared.
+
+### verify: PARTIAL — h2h recovered in full, totals did not
+
+Same slate (`board_rows=1344`), `[portfolio_commit] POLYMARKET_BOARD_JOIN`:
+
+```
+before  19:33:20  rows=1344  matched=52
+before  19:50:07  rows=1344  matched=51
+before  20:26:05  rows=1344  matched=52
+AFTER   20:51:27  rows=1344  matched=60      <- +8
+```
+
+`POLYMARKET_UNMATCHED` wnba buckets:
+
+```
+before  'no_match|wnba|h2h': 7   'no_match|wnba|totals': 15  'no_match|wnba|spreads': 1
+after   (h2h ABSENT)             'no_match|wnba|totals': 14  'no_match|wnba|spreads': 1
+```
+
+**`no_match|wnba|h2h` went 7 -> 0 and `matched` rose by 8 on an identical
+board.** The alias class-fix works and is confirmed in production.
+
+**MY ~22-ROW ESTIMATE WAS OPTIMISTIC. The real recovery is ~8.** I sized it as
+`h2h 7 + totals 15` on the assumption that a team-alias fix unlocks both.
+It does not: `totals` additionally requires the LINE to match
+(`abs(candidate.line - board_line) > 1e-9` in the join's candidate loop), so a
+resolved club name is necessary but not sufficient. INFERRED, not measured —
+the remaining 14 are consistent with Polymarket listing different total lines
+than our board, but I have not confirmed that against their listed lines.
+
+Not a reason to undo anything: +8 on a venue matching ~52 is a ~15% lift, and
+the h2h half is unambiguous.
+
+**live-odds-worker was ALREADY on `cdcda671`** (20:36:29Z) — the
+fill-stake-not-American-odds fix for the $368.97 inflation I reported. That is
+the service that runs live execution, so that defect is fixed where it counts,
+independently of this deploy.
