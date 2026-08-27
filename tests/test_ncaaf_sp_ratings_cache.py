@@ -123,3 +123,79 @@ def test_the_cache_defaults_to_the_other_cfbd_caches(monkeypatch):
     path = gen.sp_ratings_cache_path(2025)
     assert path.parent.name == "historical_truth"
     assert path.name == "sp_ratings_2025.json"
+
+
+# ---------------------------------------------------------------------------
+# THE SCHEDULE. The generator's OTHER unavoidable CFBD call — and unlike SP+,
+# this one has a local equivalent that the historical-truth loader already
+# maintains. Measured 2026-08-27: with the quota exhausted, BOTH /games and
+# /ratings/sp returned 429 and projections could not regenerate at all. Serving
+# the schedule from disk leaves exactly ONE hard dependency.
+# ---------------------------------------------------------------------------
+
+import gzip
+
+
+def _write_games_cache(root: Path, season: int, rows: list[dict]) -> Path:
+    d = root / "data" / "ncaaf_source" / "historical_truth"
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"games_{season}.json.gz"
+    with gzip.open(path, "wt", encoding="utf-8") as h:
+        json.dump(rows, h)
+    return path
+
+
+def test_the_schedule_is_served_from_cache_without_touching_cfbd(tmp_path, monkeypatch):
+    monkeypatch.setattr(gen, "__file__", str(tmp_path / "scripts" / "x.py"))
+    _write_games_cache(tmp_path, 2026, [
+        {"week": 1, "seasonType": "regular", "homeTeam": "TCU", "awayTeam": "North Carolina"},
+        {"week": 2, "seasonType": "regular", "homeTeam": "Ohio State", "awayTeam": "Michigan"},
+    ])
+    monkeypatch.setattr(gen, "_cfbd_get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("CFBD called")))
+    idx = gen.load_cfbd_games(2026, 1)
+    assert len(idx) == 1, "only week 1 should be returned"
+    assert (gen.norm("TCU"), gen.norm("North Carolina")) in idx
+
+
+def test_an_absent_cache_falls_through_to_the_api_not_to_zero_games(tmp_path, monkeypatch):
+    """None, not []. An empty schedule would silently produce zero projections
+    and look like a completed run."""
+    monkeypatch.setattr(gen, "__file__", str(tmp_path / "scripts" / "x.py"))
+    assert gen._cached_games(2026, 1) is None
+    called = {}
+    def fake(path, params):
+        called["path"] = path
+        return [{"homeTeam": "A", "awayTeam": "B"}]
+    monkeypatch.setattr(gen, "_cfbd_get", fake)
+    idx = gen.load_cfbd_games(2026, 1)
+    assert called["path"] == "/games", "an absent cache must fall through to the API"
+    assert len(idx) == 1
+
+
+def test_a_corrupt_games_cache_falls_through_rather_than_raising(tmp_path, monkeypatch):
+    monkeypatch.setattr(gen, "__file__", str(tmp_path / "scripts" / "x.py"))
+    d = tmp_path / "data" / "ncaaf_source" / "historical_truth"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "games_2026.json.gz").write_bytes(b"not gzip")
+    assert gen._cached_games(2026, 1) is None
+
+
+def test_a_week_with_no_cached_games_falls_through(tmp_path, monkeypatch):
+    """A week the cache does not cover must reach the API, not report an empty
+    slate — games_2026 holds weeks 1-6, so week 12 is a real case."""
+    monkeypatch.setattr(gen, "__file__", str(tmp_path / "scripts" / "x.py"))
+    _write_games_cache(tmp_path, 2026, [{"week": 1, "seasonType": "regular", "homeTeam": "A", "awayTeam": "B"}])
+    assert gen._cached_games(2026, 12) is None
+
+
+def test_postseason_rows_are_excluded(tmp_path, monkeypatch):
+    """The API call filters seasonType=regular; the cache path must match, or a
+    bowl game could enter a regular-season slate."""
+    monkeypatch.setattr(gen, "__file__", str(tmp_path / "scripts" / "x.py"))
+    _write_games_cache(tmp_path, 2026, [
+        {"week": 1, "seasonType": "regular", "homeTeam": "A", "awayTeam": "B"},
+        {"week": 1, "seasonType": "postseason", "homeTeam": "C", "awayTeam": "D"},
+    ])
+    rows = gen._cached_games(2026, 1)
+    assert len(rows) == 1
+    assert rows[0]["homeTeam"] == "A"

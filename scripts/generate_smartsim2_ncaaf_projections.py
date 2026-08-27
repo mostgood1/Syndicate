@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import json
 import os
 import re
@@ -115,8 +116,58 @@ def load_engine_schedule(season: int, week: int) -> list[dict[str, str]]:
     return rows
 
 
+def _cached_games(season: int, week: int) -> list[dict] | None:
+    """`/games` from the historical-truth cache the loader already maintains.
+
+    THE SECOND OF TWO CFBD CALLS THIS SCRIPT CANNOT AVOID -- and unlike SP+,
+    this one HAS a local equivalent. `historical_truth/games_<season>.json.gz`
+    is written and refreshed by `ncaaf_historical_loader.ensure_games_cached`;
+    for 2026 it holds 888 rows covering weeks 1-6.
+
+    Measured 2026-08-27: with the CFBD quota exhausted, BOTH `/games` and
+    `/ratings/sp` returned HTTP 429 and projections could not regenerate at all.
+    Serving the schedule from disk reduces the hard dependency to exactly ONE
+    endpoint, so a single successful SP+ fetch is all a regeneration needs.
+
+    Returns None (not an empty list) when the cache is absent or unusable, so
+    the caller falls through to the API rather than treating "no cache" as
+    "no games" -- an empty schedule would silently produce zero projections.
+    """
+    path = Path(__file__).resolve().parents[1] / "data" / "ncaaf_source" / "historical_truth" / f"games_{season}.json.gz"
+    if not path.exists():
+        return None
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except Exception:
+        return None
+    rows = payload if isinstance(payload, list) else (payload.get("data") if isinstance(payload, dict) else None)
+    if not isinstance(rows, list):
+        return None
+    out = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            if int(row.get("week") or 0) != int(week):
+                continue
+        except (TypeError, ValueError):
+            continue
+        # Regular season only, matching the API call's own params.
+        if str(row.get("seasonType") or "regular").lower() != "regular":
+            continue
+        out.append(row)
+    return out or None
+
+
 def load_cfbd_games(season: int, week: int) -> dict[tuple[str, str], dict]:
-    payload = _cfbd_get("/games", {"year": season, "week": week, "seasonType": "regular", "classification": "fbs"})
+    cached = _cached_games(season, week)
+    if cached is not None:
+        print(f"[games] season={season} week={week} source=cache rows={len(cached)}", flush=True)
+        payload: object = cached
+    else:
+        payload = _cfbd_get("/games", {"year": season, "week": week, "seasonType": "regular", "classification": "fbs"})
+        print(f"[games] season={season} week={week} source=api", flush=True)
     index: dict[tuple[str, str], dict] = {}
     if isinstance(payload, list):
         for game in payload:
