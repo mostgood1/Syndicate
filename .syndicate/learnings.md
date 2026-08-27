@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 574 rules `[generated]`
+## Index — 577 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6879,3 +6879,48 @@ repeated the false claim to the user and to two peer sessions before checking.
      past it — that is the 4,993-staged-deletions incident's exact shape.
 - "Same failures with my diff stashed" is a statement about your diff. It is
   not a statement about `main`. Say the first and do not imply the second.
+
+
+### 2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "looks like the usual noise". A WARNING THAT IS USUALLY WRONG GETS TRAINED OUT — and two sessions proved it independently on the same night
+
+- **What we believed.** `session_worktree.py land` prints `ledger/todo ids
+  PROBLEMS   (run scripts/todo_id_reconcile.py)` and pushes anyway. Both
+  sessions active on 2026-08-26 read that line as known background — the
+  reconciler's `REVIEW` section lists twelve ancient ids (`#65`–`#81`) that have
+  been unmatched for weeks, so the warning is *usually* about nothing.
+
+- **What was actually true.** The same output also said `DUPLICATED in todo.md
+  -- 1 id(s) declared more than once: #581: 2 item headers`. Lane
+  `mlb-chip-live-state` and lane `open-bet-live-status` had both taken `#581`
+  within about half an hour, and both had landed it. Four pushes went past the
+  warning before anyone read it. The list's own rule is that ids are stable and
+  never reused, so two items sharing one number breaks every cross-reference to
+  it.
+
+- **How we found out.** By finally running the tool the warning names, an hour
+  later, for an unrelated reason. Resolved by ancestry — `merge-base
+  --is-ancestor 23f065d4 f8d8b05f` passes, so the first-landed item keeps the
+  number and the second renumbered to `#584`. **Not by a blanket
+  find-and-replace:** eight files mention `#581`, four belonged to the renumbering
+  lane and four to the other, and one of those four is a correct reference by the
+  renumbering lane's own author to the OTHER lane's item. A `sed` would have
+  broken all four.
+
+- **The rule going forward.** **A checker that emits known-false warnings beside
+  true ones is not a checker, it is noise with a exit code.** Two things follow.
+  (1) When a checker fires, READ ITS FULL OUTPUT before deciding it is the usual
+  thing — "I recognise this warning" is a memory of a DIFFERENT run. (2) When you
+  own a checker, separate the classes: a duplicate declaration should BLOCK, while
+  historical unmatched ids stay advisory. The check that cannot be trained out is
+  the one that only fires when something is wrong. Corollary for id assignment
+  specifically: "check both files before taking a number" cannot prevent a
+  simultaneous take, because both sessions check and both see the same maximum.
+  **The check has to be at LAND, not at write.**
+
+- **Cost.** One duplicated id across two lanes, four pushes past a correct
+  warning, and a renumber touching four files after the fact. Nothing shipped
+  wrong and no code was affected — the cost is entirely in the ledger, which is
+  the thing this repo says its context window is not. `scripts/todo_id_reconcile.py`
+  is claimed by lane `repo-coordination` (flagged POSSIBLY ORPHANED, not
+  reassigned), so the blocking-vs-advisory split is RECOMMENDED here and
+  deliberately not implemented.

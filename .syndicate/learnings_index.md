@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 574 rules `[generated]`
+## Index — 577 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 113**
+**FORBIDDEN — 115**
 
 - [2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-…](#2026-08-22-forbidden-never-read-a-service_updated-deploy-as-shipping-code-an-env-var-change-restarts-the-service-on-the-commit-it-is-already-running)
 - [2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the sam…](#2026-08-22-forbidden-never-name-a-datastore-setting-and-a-service-env-var-by-the-same-store-without-saying-which-surface-a-4-minute-refresh-worker-outage-came-from-that-ambiguity)
@@ -93,6 +93,8 @@
 - [2026-08-26 — FORBIDDEN: TWO HOSTS ARE NOT ONE VENDOR, and "X can reach ESPN" is not a f…](#2026-08-26-forbidden-two-hosts-are-not-one-vendor-and-x-can-reach-espn-is-not-a-fact-about-x)
 - [2026-08-26 — FORBIDDEN: assuming an artifact "published to production" is where its CON…](#2026-08-26-forbidden-assuming-an-artifact-published-to-production-is-where-its-consumer-reads)
 - [2026-08-26 — FORBIDDEN: verifying a consumer against a fixture drawn from ONE producer,…](#2026-08-26-forbidden-verifying-a-consumer-against-a-fixture-drawn-from-one-producer-when-the-artifact-has-more-than-one-producer-two-producers-two-shapes-enumerate-the-shapes-from-production-do-not-assume-there-is-one)
+- [2026-08-26 — FORBIDDEN: reporting a test as failing on `main` from a session worktree,…](#2026-08-26-forbidden-reporting-a-test-as-failing-on-main-from-a-session-worktree-when-its-fixture-is-derived-from-data-and-a-stash-and-rerun-does-not-isolate-it)
+- [2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "loo…](#2026-08-27-forbidden-pushing-past-a-ledger-checkers-warning-because-its-output-looks-like-the-usual-noise-a-warning-that-is-usually-wrong-gets-trained-out-and-two-sessions-proved-it-independently-on-the-same-night)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -132,7 +134,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 456**
+**Rules and corrections — 457**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -396,6 +398,7 @@
 - [2026-08-26 — An estimated window is one sample until you measure the spans](#2026-08-26-an-estimated-window-is-one-sample-until-you-measure-the-spans)
 - [2026-08-23 — RULE: editing a fast-appended shared ledger from a stale local copy manufa…](#2026-08-23-rule-editing-a-fast-appended-shared-ledger-from-a-stale-local-copy-manufactures-a-fake-conflict)
 - [2026-08-23 — RULE: an empty tmp dir for `SYNDICATE_NFL_SOURCE_ROOT` can still resolve t…](#2026-08-23-rule-an-empty-tmp-dir-for-syndicate_nfl_source_root-can-still-resolve-to-the-real-checkout-and-a-test-can-write-into-it)
+- [2026-08-26 — RULE: a measurement can be REAL and still describe the WRONG POPULATION. S…](#2026-08-26-rule-a-measurement-can-be-real-and-still-describe-the-wrong-population-state-the-denominator-before-you-generalise-a-rate)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
