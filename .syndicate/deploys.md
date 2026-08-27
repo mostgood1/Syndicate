@@ -34286,3 +34286,70 @@ place. If `populations_matched` is absent or false in it, item 2 reopens.
 **known, CHOSEN skew:** `live-odds-worker` stays on `34b4d4b4`. It does not build the
 board and deploying it would carry three unrelated commits. Deliberate, not an
 oversight.
+
+## 2026-08-27 17:02:59Z — refresh-worker `b8163ef0` — board overview `continue`-not-`break` + next-day throttle — **VERIFICATION PENDING**
+
+**NOT MY DEPLOY.** `6421bf7f` (lane `board-cycle-overview-throughput`) RODE ALONG
+on another lane's push of `b8163ef0`, which is 3 commits ahead of it. This is the
+on-main property working as intended: preflight refuses off-main SHAs, so any
+refresh-worker deploy from `main` carries every ancestor. I held a claim + CLEAR
+preflight for `6421bf7f` at 16:42Z but the deploy call was refused by my session's
+permission classifier; the claim was released at 16:47Z, before this deploy.
+
+**Deployed code confirmed BY CONTENT**, not ancestry alone: `git show
+b8163ef0:pipeline/intelligence_state.py` carries the `1800` throttle default, and
+`b8163ef0:syndicate/features/intelligence.py` carries the `continue`-not-`break`
+marker. Both present.
+
+### verify: NOT DISCHARGED — the discriminating condition has not occurred
+
+The overview half **cannot** be judged yet, and the reason is structural, not a
+delay. The guard fires only when `anon > 1096MB` (its headroom is `max - anon`
+against a 3000MB floor). **The restart that shipped the fix removed the condition
+the fix exists to handle:**
+
+| time | anon MB | guard headroom | guard |
+|---|---|---|---|
+| pre-deploy steady state | 1300-1550 | 2550-2800 | FIRES |
+| 17:05 | 891.3 | 3204.7 | admits MLB |
+| 17:15 | 925.2 | 3170.8 | admits MLB |
+| 17:25 | 1061.9 | 3034.1 | admits MLB |
+| 17:35 | 997.0 | 3099.0 | admits MLB |
+
+Over 53 minutes post-deploy: **4 builds, all `sports=8`, ZERO
+`OVERVIEW_STOPPED_FOR_MEMORY`.** `sports=8` with no refusal is a healthy board and
+**is NOT evidence** — the `continue` branch was never reached. Do not bank it.
+This is `[worker-memory-is-boot-confounded]` arriving from the opposite side:
+the known trap is that a restart makes a memory fix look good; here the restart
+made it UNTESTABLE.
+
+**WHAT DISCHARGES IT — one paired reading, no deploy needed:** an iteration
+logging `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb` **and** a NON-ZERO
+`BOARD_OVERVIEW_READY sports=` on the same pass. `sports=7` -> fix confirmed.
+`sports=0` -> fix is INERT and the lane reopens. Wait for anon to ratchet back
+above 1096MB; it was climbing (891 -> 1062) and reaches 1300-1550 after hours of
+uptime, so it WILL recur without intervention.
+
+### throttle half: MOVED, below bar, n too small
+
+`BUILD_SPAN_ENTER stage=build_intelligence_overview` by date:
+- BASELINE 13:50-14:52Z (62 min, pre-fix): **9 today / 9 tomorrow — exactly 1:1.**
+- POST-DEPLOY 17:03-17:56Z (53 min): **3 today / 1 tomorrow.**
+
+Directionally right but SHORT of the >=4:1 bar, and n=4 builds. Note the first
+next-day build after a boot is expected regardless — `_board_window_last_queued_at`
+starts empty, so the throttle only binds from the second one. The real signal is
+whether the second today+1 build waits ~30 min rather than ~5.
+
+### incidental, measured, not a regression
+
+Full 8-sport `build_intelligence_overview` now takes **534.69s**, so the cycle is
+~9 min. That is the cost of actually doing the work it was skipping, not a
+slowdown.
+
+### TRAP FOR THE NEXT READER — two different "headroom" numbers in one service
+
+`CONTAINER_MEMORY` logs `headroom = max - current` (**1236MB** at 17:13, because
+`inactive_file` was 1.6GB). The GUARD uses `max - anon` (**3019MB** at the same
+instant). Read the wrong one and you conclude the guard should have fired and the
+fix is broken. It is not. Always compute the guard's view as `4096 - anon`.
