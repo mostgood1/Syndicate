@@ -69,7 +69,8 @@ death, never life — do not invert it.
 ### open-bet-live-status — OPEN — opened 2026-08-26 — session syndicate-27 (749848)
 - Goal: `/portfolio` is the live buying engine — merged book, editable caps,
   venue balances, venue settlement, live status on open bets. `[user 2026-08-26]`
-- Files: `syndicate/templates/portfolio.html`, `blueprints/intelligence.py`,
+- Files: `blueprints/intelligence.py`,
+  RELEASED `[2026-08-28, session 29794bbe]`: `syndicate/templates/portfolio.html`
   `features/shared/execution_limits_settings.py`,
   `execution_guard.py`, `venue_balances.py`,
   `venue_settlement.py`, `paper_settlement.py`,
@@ -1125,8 +1126,10 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `/portfolio` stops reading every position as pending.
 - Files: `syndicate/features/prediction_ledger.py`,
   `syndicate/features/shared/ledger_bridge.py`,
-  ~~`scripts/run_refresh_worker.py`~~ (claim on THIS ONE FILE released
-  2026-08-24 by lane `exchange-markets-api-integration` -- owning session
+  RELEASED `[2026-08-24 to exchange-markets-api-integration]`: `scripts/run_refresh_worker.py`
+  Reworded 2026-08-28 so the parser can SEE the release this lane already
+  recorded in prose; a marker governs what FOLLOWS it on ITS OWN LINE, and the
+  old wording put both the strikethrough and the word after the path. Session
   `74a0966a` archived 2026-08-22, `lane-guard` was blocking a narrow,
   additive, try/except-wrapped diagnostic hook on the strength of a dead
   session's claim; rest of this lane's file list untouched),
@@ -1398,8 +1401,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   (`9324a3e5`) does not appear in `list_sessions` at all. Take it back by
   striking this note.
   `scripts/portfolio_commit_input_checklist.py`,
-  `syndicate/blueprints/intelligence.py`,
-  `syndicate/templates/portfolio.html`,
+  RELEASED `[2026-08-28, session 29794bbe]`: `syndicate/blueprints/intelligence.py`
+  RELEASED `[2026-08-28, session 29794bbe]`: `syndicate/templates/portfolio.html`
   `syndicate/features/shared/opportunity_signals.py`,
   `scripts/score_sim_weight_impact.py`,
   `tests/test_layer2_blend_admission.py`,
@@ -2453,9 +2456,11 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Files: NEW `syndicate/features/shared/ncaaf_team_registry.py`, NEW
   `scripts/poll_ncaaf_live_state.py`, NEW
   `syndicate/features/shared/bet_status_ncaaf.py`, NEW
-  `tests/test_bet_status_ncaaf.py`, plus the same ONE-LINE carve-out on
-  `paper_settlement.py` (held by `open-bet-live-status`, session `syndicate-27`,
-  recorded NOT RUNNING) and the pinned-set assertion in
+  `tests/test_bet_status_ncaaf.py`, plus the same ONE-LINE carve-out on a file
+  held by `open-bet-live-status`: `syndicate/features/shared/paper_settlement.py`
+  Reordered 2026-08-28 so the parser reads this as the deference it always was:
+  the carve-out has landed and this lane was never a second owner. Plus the
+  pinned-set assertion in
   `tests/test_paper_settlement.py` that `nfl-settlement-resolver` added.
 - **NCAAF IS NOT NFL, AND THE DIFFERENCE IS THE WHOLE LANE.**
   `team_aliases._alias_map("ncaaf")` is `{}`, so `teams_match` falls through to
@@ -2557,6 +2562,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `settled_value 153.0`; the ledger stopped going backwards (`1,295,990 ->
   1,298,163` monotonic across services vs a `-8,031` step); `last_blind_write`
   readable and `None`; both banners carry working operator actions.
+- **CONTESTED: `syndicate/blueprints/ops.py` — TWO LIVE OPEN HOLDERS, NOT
+  RESOLVED** `[flagged 2026-08-28 ~15:0x CDT, session 29794bbe]`. Held by BOTH
+  `portfolio-venue-and-side-integrity` (session `12b2be57`) and
+  `venue-join-refusal-visibility` (session `d617eefd`). Four other contested
+  files were cleared in the same pass; this one was DELIBERATELY LEFT, because
+  both sessions are live and neither claim is stale: transcript last entries
+  **19:44:52Z** and **19:40:17Z**, i.e. minutes before this note. Neither lane
+  body says what it does to this file, so the ledger cannot decide it either.
+  **Whichever of the two finishes first: release it here in the single-line
+  form** — ``RELEASED `[date, session]`: `syndicate/blueprints/ops.py` `` — a
+  marker only governs its OWN line, so a path on a continuation line still
+  reads as a live claim (that mis-shape is what produced three of the four
+  contests cleared today). Until then `lane-guard` will block the second
+  editor, which is the system working, not a defect.
 - Blocked by: none.
 
 ### soccer-overview-cost — OPEN, **UNSOLVED — five hypotheses refuted; DO NOT propose a sixth without changing method** — opened 2026-08-28 — session 3e5a9659
@@ -2762,6 +2781,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   is on the OTHER side of the same race. Not fixing it: concurrency on the
   money path, and `execution_ledger.py` is claimed by
   `portfolio-ledger-service-split`.
+- **CONTESTED: `syndicate/blueprints/ops.py` — TWO LIVE OPEN HOLDERS, NOT
+  RESOLVED** `[flagged 2026-08-28 ~15:0x CDT, session 29794bbe]`. Held by BOTH
+  `portfolio-venue-and-side-integrity` (session `12b2be57`) and
+  `venue-join-refusal-visibility` (session `d617eefd`). Four other contested
+  files were cleared in the same pass; this one was DELIBERATELY LEFT, because
+  both sessions are live and neither claim is stale: transcript last entries
+  **19:44:52Z** and **19:40:17Z**, i.e. minutes before this note. Neither lane
+  body says what it does to this file, so the ledger cannot decide it either.
+  **Whichever of the two finishes first: release it here in the single-line
+  form** — ``RELEASED `[date, session]`: `syndicate/blueprints/ops.py` `` — a
+  marker only governs its OWN line, so a path on a continuation line still
+  reads as a live claim (that mis-shape is what produced three of the four
+  contests cleared today). Until then `lane-guard` will block the second
+  editor, which is the system working, not a defect.
 - Blocked by: none. Next refresh-worker deploy by ANY lane carries the counter.
 
 
