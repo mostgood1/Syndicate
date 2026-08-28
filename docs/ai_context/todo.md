@@ -1,5 +1,56 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#597` — **KALSHI LISTS ~665 SOCCER MARKETS WE CANNOT PARSE. It is a TITLE GRAMMAR gap, not a coverage gap.** — lane `venue-join-refusal-visibility`, 2026-08-28 — **DEPLOYED, work list now readable**
+
+Answering "why is soccer never executed by Kalshi". Not because Kalshi lists no
+soccer. Measured on refresh-worker 16:13:11Z, the first build where the join's
+refusal breakdown was readable at all (`#596`):
+
+    KXMLSTOTAL 90   KXLALIGATOTAL 66   KXLIGUE1TOTAL 60   KXSERIEATOTAL 60
+    KXBUNDESLIGATOTAL 54   KXEREDIVISIETOTAL 54   KXSERIEAGAME 40
+    KXLALIGAGAME 39   KXBUNDESLIGAGAME 36   KXLIGUE1GAME 34
+    KXBELGIANPLGAME 12   KXEREDIVISIEGAME 9    (+ segment/1H series)
+
+All refuse `unreadable_title` in `kalshi_catalogue`. `unreadable_by_series` is
+COMPLETE (not sampled) and `unreadable_titles` now prints one real title per
+series, so the grammar can be written from data rather than guessed — which is
+the mistake that cost a cycle before (three grammars written against an imagined
+phrasing matched NONE of production).
+
+**Do not guess the wording.** The titles are in the log; read them.
+
+### `#596` — **THE POLYMARKET SOCCER BLOCKER IS FIXTURE ORIENTATION, MEASURED AT n=1. Counter shipped, never run.** — lane `venue-join-refusal-visibility`, 2026-08-28 — **OPEN, needs one refresh-worker deploy**
+
+`no_match|soccer|h2h` is **93 of 93 board rows**, and `soccer|totals` 18 of 18.
+The league-bucketing fix that shipped this session (`soccer_competition_tokens`
+now unions the flat alias test with the PAIR test; 13 competitions proven incl.
+`mls`; ops reader 738 -> 1,809 markets) was a REAL defect and bought **zero**
+additional soccer matches. Those rows were already refusing `no_match`, not
+`no_candidates` — the name said the bucket was never the blocker.
+
+One confirmed instance of what is:
+
+    board  'Elche CF @ Real Racing Club de Santander'  totals under 2.5
+    venue  offered rrc-elc@0.5 @1.5 @2.5 @3.5
+
+Same clubs, same line, refused. `parse_slug` reads `<away>-<home>`, so `rrc-elc`
+gives home=`elc`/away=`rrc` against a board carrying the reverse:
+
+    teams_match('soccer','rrc','Real Racing Club de Santander') -> True
+    teams_match('soccer','elc','Real Racing Club de Santander') -> False
+
+**NEXT ACTION:** deploy refresh-worker at `432c5915` or later, wait ~21 min for
+the first board publish, read `POLYMARKET_ORIENTATION would_match_if_flipped=`.
+It counts per `<league>|<market>`, with **mlb/nfl as the control** — they pair
+correctly today. Soccer high + mlb/nfl near zero means the slug order differs by
+sport. Soccer high WITH mlb/nfl high means this reading is wrong.
+
+**DO NOT APPLY A FLIP ON ONE FIXTURE.** Same shape as the `pos`/`neg` trap,
+which fired twice in this session alone.
+
+Related, NOT soccer: `no_candidates|ncaaf|totals` 41 of 41 and `|h2h` 6 of 6 —
+Polymarket files college football under `cfb`, the board says `ncaaf`.
+
 ### `#595` — **POLYMARKET MONEYLINES BOUGHT THE WRONG TEAM ON 3 OF 8 SETTLED ORDERS. Refused, not re-guessed.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **LANDED (`c748a239`), NOT DEPLOYED**
 
 `polymarket_us_orders._resolve_outcome_side` sent `OUTCOME_SIDE_YES` iff our

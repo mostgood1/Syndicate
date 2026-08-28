@@ -5053,3 +5053,69 @@ hook (`echo '{"tool_name":"Edit","tool_input":{"file_path":"..."}}' | python
 .claude/hooks/lane-guard.py`), never by reading the ledger and believing the prose.
 Note the guard cannot express a per-branch claim: releasing for one concern releases
 the file for everyone, so say so where the next reader will see it.
+
+---
+
+## 2026-08-28 — FORBIDDEN: building a fix for a hypothesis the REFUSAL NAME has already ruled out `[lane venue-join-refusal-visibility]`
+
+- **What we believed:** soccer was absent from Polymarket execution because
+  whole competitions never entered the `soccer` bucket — `mls` was unprovable,
+  so its 30 h2h markets sat under a key no board row looks up. Measured and
+  true: 0 of 9 MLS fixtures resolve both clubs through the flat alias map.
+- **What was actually true:** that defect is real and was NOT the blocker for
+  the rows I pointed at. The board's 104 soccer h2h rows were already refusing
+  as **`no_match`**, never `no_candidates`. Those are different words for
+  different facts and the module documents the difference: `no_candidates`
+  means the bucket was empty, `no_match` means candidates were present and no
+  FIXTURE paired. The bucketing fix shipped, proved 13 competitions, moved the
+  ops reader from 738 to 1,809 markets — and left `no_match|soccer|h2h` at
+  **93 of 93 board rows**. Zero soccer matches gained.
+- **How we found out:** the denominator. `no_match|soccer|h2h` fell 104 -> 93
+  and I nearly reported it as the fix working. The board had shrunk 1326 ->
+  1308 rows and carried exactly 93 soccer h2h rows. 93 of 93 is 100%, same as
+  104 of 104.
+- **The rule:** before building a fix, read the refusal NAME that is already
+  being emitted and ask which hypothesis it eliminates. A refusal vocabulary
+  written to distinguish causes is worthless if the next person treats every
+  entry as "it didn't work". The name was in production logs for days.
+- **Corollary, and it is the cheaper half:** a count without its denominator
+  cannot tell a fix from a shrinking population. `no_match: 93` is not progress
+  from `104` until you know the board had 93 rows to offer.
+- Real blocker, one instance, UNVERIFIED: fixture home/away orientation
+  (`rrc-elc` vs board `Elche @ Racing`). Counter shipped, never run.
+
+---
+
+## 2026-08-28 — FORBIDDEN: reading ~0.5 as a weak signal from a comparison never shown to DISCRIMINATE `[lane venue-join-refusal-visibility]`
+
+- **What we believed:** the Polymarket spread sign test was under-powered.
+  Ten production runs returned `rate` 0.44-0.60 at n=9..22 against
+  `min_sample=30`, and the verdict said `UNDECIDED: n < min_sample` — which
+  reads as "collect more".
+- **What was actually true:** the test could never answer. Polymarket lists a
+  spread market per side per line, so a fixture's ladder spans BOTH signs —
+  measured, 12 of 12 sampled MLB fixture/magnitude pairs carry `pos` and `neg`.
+  Comparing "the sign of a rung" to the board's sign is a coin flip by
+  construction. Final reading after the guard: `fixtures=0 rate=None
+  both_signs=17` — **all 17** previously-scored fixtures were non-identifying.
+  Every one of those 17 votes was manufactured out of slate iteration order.
+- **The trap this was minutes from setting:** the verdict ladder mapped
+  anything other than ~1.0/~0.0 to **`FALSIFIED: the sign is not fixed per
+  fixture; do not ship a mapping on this`**. ~0.5 is exactly what a
+  non-identifying test returns. At n>=30 it would have written a property of
+  the INSTRUMENT into the ledger as a durable measurement about the VENUE, and
+  the next reader would have believed Polymarket spreads were unfixable.
+- **Three rounds of one mistake, and I shipped round two:** the module header
+  already recorded round zero (segment `f5` slugs producing 0.2857 that "looked
+  like evidence"). I fixed the rung selection to compare like-for-like, got
+  0.4706, and only then checked whether the comparison could discriminate at
+  all. The better comparison landed in the same place because the defect was
+  never in the sampling.
+- **The rule:** a rate near 0.5 is not weak evidence. It is what NO evidence
+  looks like, and it is indistinguishable from a real coin flip until you have
+  shown the comparison can separate the cases. Prove discrimination BEFORE
+  reading the rate, and never let a verdict ladder map "inconclusive" onto a
+  substantive conclusion.
+- `UNDECIDED` and `NON-IDENTIFYING` are different instructions to the reader:
+  "collect more" versus "collecting more cannot help". A test that cannot tell
+  them apart will keep being fed data forever.

@@ -98,6 +98,63 @@ on a quiet log.
 so adding a sport to the board without a resolver now FAILS instead of quietly
 demonstrating the bug. Pinned is not fixed.
 
+## [venue-join-refusal-visibility] WHY THE EXCHANGES DO NOT EXECUTE SOCCER OR PROPS, and the two instruments that were lying about it `[verified 2026-08-28T16:13Z, lane venue-join-refusal-visibility]`
+
+- **Kalshi's join refusal breakdown was discarded on EVERY build in that log
+  line's history.** `portfolio_commit` printed `joined.get('refusals')`;
+  `join_kalshi_to_board` returns it under `reasons`. Fixed in `26a5be42`. First
+  populated reading, 16:13:11Z: `matched=198/1308 reasons={'no_matching_board_row':
+  4500, 'market_is_for_another_date': 3203, 'unreadable_title': 2260,
+  'series_out_of_scope': 1334, 'stat_not_in_market_vocabulary': 255,
+  'event_not_on_our_board': 239, 'spread_line_orientation_mismatch': 24,
+  'team_side_unresolved': 13}`.
+- **KALSHI DOES LIST SOCCER; OUR CATALOGUE CANNOT READ ITS TITLES.** ~665
+  markets refuse `unreadable_title`: `KXMLSTOTAL` 90, `KXLALIGATOTAL` 66,
+  `KXLIGUE1TOTAL` 60, `KXSERIEATOTAL` 60, `KXBUNDESLIGATOTAL` 54,
+  `KXEREDIVISIETOTAL` 54, `KXSERIEAGAME` 40, `KXLALIGAGAME` 39,
+  `KXBUNDESLIGAGAME` 36, `KXLIGUE1GAME` 34, `KXBELGIANPLGAME` 12,
+  `KXEREDIVISIEGAME` 9, + segment/award series. This is a PARSER gap, not a
+  coverage gap, and it was unreadable for as long as the line printed `None`.
+- **THE POLYMARKET SPREAD SIGN TEST CANNOT ANSWER ITS QUESTION AT ANY SAMPLE
+  SIZE.** Polymarket publishes BOTH legs at every line — 12 of 12 sampled MLB
+  fixture/magnitude pairs carry `pos` AND `neg` — so the slug's sign names a
+  LEG, not a TEAM. Verdict now `NON-IDENTIFYING`, `rate=None`,
+  `both_signs=17` (16:06:53Z). **Its old ladder mapped ~0.5 to `FALSIFIED: do
+  not ship a mapping on this` and was at n=17 of 30** — it would have recorded
+  a property of the instrument as a measurement about the venue. Answering it
+  needs PRICE or SETTLEMENT. Spreads stay refused, unchanged.
+- **Polymarket props are structurally out of scope BOTH WAYS**: 8,029
+  `market_type_not_a_game_line` (the venue's PROP markets) and 922
+  `board_market_not_a_game_line` (70% of our board — `batter_*`,
+  `alternate_totals_corners`, `spreads_alt`, `player_*`). Polymarket carries no
+  player-prop resolution; Kalshi does and its 7 prop families place fine.
+- **Soccer competition bucketing FIXED, and it bought nothing yet.**
+  `soccer_competition_tokens` now unions the flat alias test with the PAIR test
+  (`soccer_fixture_clubs`), which `_teams_match` had already trusted since
+  08-27. `soccer_tokens_proven=['arg2','bun','eflch','epl','lal','lg1',
+  'ligpor','lng','lpa','mlp','mls','sea','swe2']`; ops reader soccer buckets
+  **738 -> 1,809**. But `no_match|soccer|h2h` is **93 of 93 board rows** and
+  totals **18 of 18** — still 100%. The 104 -> 93 drop was the BOARD SHRINKING
+  (1326 -> 1308 rows), not the fix.
+- **THE SOCCER BLOCKER IS FIXTURE PAIRING, AND THE REFUSAL NAME SAID SO BEFORE
+  THE FIX SHIPPED.** Those rows were already `no_match` (candidates present,
+  no fixture paired), never `no_candidates`. Bucketing was a real defect for
+  MLS markets and was never the binding constraint for these rows.
+- **UNVERIFIED, one instance only:** orientation. Board `Elche CF @ Real Racing
+  Club de Santander` vs venue `rrc-elc@2.5` — same clubs, same line, refused.
+  `parse_slug` reads `<away>-<home>`; `teams_match('soccer','rrc','Real Racing
+  Club de Santander')` is True and `'elc'` is False, so flipped it pairs.
+  `POLYMARKET_ORIENTATION` (counter only, per sport, MLB/NFL as control) ships
+  in `432c5915` and **has never run in production**. DO NOT APPLY A FLIP on
+  one fixture.
+- `/api/ops/polymarket/slate` now passes the join's `soccer_tokens`, so reader
+  and decider agree; and it emits `outcome_readability_by_reason_and_recency`
+  — `outcomes_count_mismatch` is `past 216 / upcoming 193`, i.e. NOT the stale
+  population a six-row sample suggested.
+- **NCAAF is invisible to Polymarket for an unrelated token mismatch**: the
+  venue files college football under `cfb`, the board says `ncaaf`.
+  `no_candidates|ncaaf|totals` 41 of 41, `|h2h` 6 of 6.
+
 ## [polymarket-h2h-buys-the-wrong-side] POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lanes portfolio-venue-and-side-integrity / venue-candidate-key-token-guard]`
 
 `outcome_side_for_index` assumes `OUTCOME_SIDE_YES` buys `outcomes[0]`. It does

@@ -2693,15 +2693,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   refresh-worker, which is the only choke point.
 
 ### venue-join-refusal-visibility — OPEN — opened 2026-08-28 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
-- Goal: the exchange-execution join must SAY why it refuses, and the refusals
-  that are ours must stop being ours. Four items `[user 2026-08-28]`, from a
-  production trace of "why is soccer/props/spreads not executing":
-  (1) `KALSHI_BOARD_JOIN` prints `refusals=None` on every tick because it reads
-  a key the function does not return — the breakdown is `reasons`;
-  (2) the Polymarket spread sign verdict, from the audit already printing;
-  (3) soccer: whole competitions never enter the `soccer` bucket;
-  (4) `/api/ops/polymarket/slate` and the join disagree about which league a row
-  is in, so the reader cannot be used to check the join.
+- Goal: make the exchange-execution joins SAY why they refuse, and fix the
+  refusals that are ours. Four items `[user 2026-08-28]`.
 - Files: `pipeline/portfolio_commit.py`, `syndicate/blueprints/ops.py`,
   `syndicate/features/shared/polymarket_board_join.py`,
   `syndicate/features/shared/team_aliases.py`,
@@ -2709,57 +2702,41 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `tests/test_polymarket_spread_audit_hook.py`,
   `tests/test_polymarket_spread_sign_rung.py`,
   `tests/test_polymarket_board_join.py`, `tests/test_team_aliases.py`.
-- Claim provenance: **RECLAIMED FROM THREE LANES WHOSE SESSIONS ARE GONE**, each
-  verified in THIS session via `list_sessions(include_archived=true)` rather
-  than taken on a peer lane's note: `open-bet-live-status` = "Portfolio page
-  consolidation" (`local_f08f0df5`), ARCHIVED, `isRunning: false`, last activity
-  2026-08-27T21:51:49Z; `portfolio-decision-and-execution` / `9324a3e5` appears
-  in NO roster entry, archived included; `kalshi-spread-join-sign` /
-  syndicate-43 states ALL CLAIMS RELEASED and session ENDED in its own block.
-  Any of them reclaims by striking this note.
+- Claim provenance: RECLAIMED from three lanes whose sessions were verified
+  gone in-session via `list_sessions(include_archived=true)` —
+  `open-bet-live-status` (`local_f08f0df5`, archived),
+  `portfolio-decision-and-execution` / `9324a3e5` (absent from the roster),
+  `kalshi-spread-join-sign` (states ALL CLAIMS RELEASED). Struck in each donor
+  block. Any of them reclaims by striking the note.
 - Deliberately NOT claimed: the Polymarket SIDE-resolution path and the
-  portfolio page. Those are live under `portfolio-venue-and-side-integrity`,
-  which shipped the Polymarket h2h `team_side_needs_verified_yes_leg` guard at
-  ~15:08Z today. Side resolution is THEIRS; this lane does not touch it. Paths
-  named in prose only, so they do not register as claims here.
-- Hypothesis (diagnostic, WRITTEN BEFORE THE FIX): soccer is absent from the
-  Polymarket execution join not because the venue lists no soccer, but because
-  whole COMPETITIONS fail to enter the `soccer` bucket — `_effective_league`
-  promotes a competition token only when BOTH clubs of some fixture resolve via
-  `canonical_team`, and Polymarket's club tri-codes are its OWN vocabulary, not
-  ESPN's abbreviations.
-- Falsification test: if the MLS tri-codes on today's slate DO resolve through
-  `_soccer_alias_to_name`, the bucketing story is wrong and the cause is
-  elsewhere (fixture coverage, or the date key).
-  **RESULT: HYPOTHESIS HELD, MEASURED.** 9 MLS fixtures sampled from the live
-  slate (`/api/ops/polymarket/slate?league=mls`), `both clubs resolve` in
-  **0 of 9**. `ner dcu sje nas fcc vwh aus sdg lag mim` are absent from the map
-  entirely; `tor` and `por` exist in the PER-LEAGUE map and are DROPPED from the
-  flat one as cross-league ambiguous. So `mls` can never be promoted and all 30
-  MLS h2h markets sit under key `("mls", date, "h2h")` while the board looks up
-  `("soccer", date, "h2h")`. Production: `no_match|soccer|h2h: 104`, every
-  soccer h2h row on the board.
-- **A PREMISE I ASSERTED AND THEN FALSIFIED, recorded so nobody re-derives it.**
-  I first named `outcomes_count_mismatch: 372` as a live soccer 3-way decode bug
-  worth fixing. It is probably not: all six sampled shapes are dated 2026-08-15
-  and 2026-08-16 at price `0.9900` — SETTLED markets — while all 25 live soccer
-  h2h and all 25 MLS samples carry well-formed 2-name `outcomes`. Six of 372 is
-  a sample, not a rate, so this is DOWNGRADED to "measure it", not "fixed": item
-  (4) adds the date cut that turns it into a number. Do not ship a decode change
-  on the strength of the six.
-- Verification: named per item, each a READING and not a belief —
-  (1) `KALSHI_BOARD_JOIN` prints a non-empty reason dict in production, and the
-      largest reason names why soccer is refused;
-  (2) `SPREAD_SIGN_AUDIT` `rate` is ~1.0 or ~0.0 at n>2, or spreads STAY refused
-      and this item closes as "not yet decidable" rather than as done;
-  (3) `POLYMARKET_UNMATCHED` `no_match|soccer|h2h` falls below 104, and
-      `POLYMARKET_BOARD_JOIN matched` rises above 98;
-  (4) `/api/ops/polymarket/slate` `by_league_and_board_market` reports the SAME
-      league for a row as the join's index does — checked on `mls`, which the
-      reader today files under `mls` and the join may file under `soccer`.
-- Blocked by: none. Deploy needs the refresh-worker claim (held by
-  `ncaaf-settlement-resolver` at lane open) and live-odds-worker (held by
-  `portfolio-venue-and-side-integrity`) — coordinate, do not force.
+  portfolio page — live under `portfolio-venue-and-side-integrity`.
+- STATUS: **3 of 4 items VERIFIED IN PRODUCTION. 1 measurement PENDING A DEPLOY.**
+  - item 1 Kalshi `reasons=` — **VERIFIED** 16:13:11Z
+  - item 2 spread sign audit — **VERIFIED as NON-IDENTIFYING** 16:06:53Z. Closed
+    as "not answerable by this instrument", NOT as fixed. Behaviour unchanged:
+    spreads were refused before and are refused now.
+  - item 3 soccer bucketing — **fix VERIFIED, outcome UNCHANGED.** 13
+    competitions proven incl. `mls`; ops reader 738 -> 1,809. But
+    `no_match|soccer|h2h` is 93 of 93 board rows. The hypothesis was half
+    wrong: those rows were already `no_match`, not `no_candidates`.
+  - item 4 ops reader/join agreement — **VERIFIED** (web `8b8a6579`)
+- **THE ONE OPEN THREAD, and the reason this lane is not closed:**
+  `POLYMARKET_ORIENTATION` (`432c5915`) counts, per `<league>|<market>`, rows
+  that would pair with the slug's sides swapped. MLB/NFL are the control. It
+  has **never run in production** — refresh-worker's live SHA `6078536b` does
+  not contain it (checked by `git merge-base --is-ancestor`, not timestamps).
+  Needs one refresh-worker deploy of `432c5915` or later, then the first board
+  publish (~21 min from boot).
+- Verification: `POLYMARKET_ORIENTATION would_match_if_flipped={...}` non-empty.
+  Soccer high with mlb/nfl near zero => the slug order differs by sport.
+  Soccer high WITH mlb/nfl high => the orientation reading is WRONG and the
+  cause is elsewhere. **DO NOT APPLY A FLIP on one fixture** — same shape as
+  the `pos`/`neg` trap, which fired twice today.
+- Deploy claims: ALL RELEASED. Deployed this lane: web + live-odds-worker +
+  refresh-worker, each recorded in `deploys.md` with its reading. The
+  refresh-worker claim was FORCED once on explicit user instruction (holder was
+  ACTIVE, not gone) — recorded there.
+- Blocked by: none. Next refresh-worker deploy by ANY lane carries the counter.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
