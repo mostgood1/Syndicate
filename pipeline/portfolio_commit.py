@@ -235,7 +235,11 @@ def _polymarket_price_resolver(selected_date: str | None):
         print(
             "[portfolio_commit] POLYMARKET_UNMATCHED"
             f" counts={joined.get('unmatched_counts')}"
-            f" samples={joined.get('unmatched_samples')}",
+            f" samples={joined.get('unmatched_samples')}"
+            # WHICH COMPONENT of the key disagreed. `no_candidates` alone
+            # cannot distinguish a league mismatch from a date or a market one,
+            # and BTTS is currently unexplained for exactly that reason.
+            f" key_misses={joined.get('key_miss_samples')}",
             flush=True,
         )
     # WHICH COMPETITIONS THE BOARD CAN REACH, AND WHICH IT CANNOT. Printed

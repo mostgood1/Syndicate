@@ -851,6 +851,9 @@ def join_polymarket_to_board(
     orientation_listed_by_flip_only: dict[str, int] = {}
     # `#595` step 2: does the price we ASSIGN to a side actually belong to it?
     alignment_counts: dict[str, int] = {}
+    # Why a `no_candidates` key missed -- see the block that fills it.
+    key_miss_samples: list[dict[str, Any]] = []
+    key_miss_seen: set[str] = set()
     alignment_samples: list[dict[str, Any]] = []
     orientation_flip_samples: list[dict[str, Any]] = []
 
@@ -1066,8 +1069,40 @@ def join_polymarket_to_board(
             or selected_date
             or ""
         ).strip()
-        candidates = index.get((league, date, board_market)) or []
+        wanted_key = (league, date, board_market)
+        candidates = index.get(wanted_key) or []
         if not candidates:
+            # WHY THE KEY MISSED, not just that it did.
+            #
+            # `no_candidates` says the bucket was empty and stops there, which
+            # is why BTTS is currently unexplainable: venue BTTS rows ARE
+            # indexed (+198 markets on 2026-08-28) and 34 board rows still find
+            # nothing, so the two halves are keyed DIFFERENTLY -- and neither
+            # key was ever printed. A refusal that cannot say which component
+            # disagreed sends the reader to guess between league, date and
+            # market.
+            #
+            # Bounded to six board markets so a slate-wide miss cannot turn the
+            # log line into the index. Nothing here changes what is matched.
+            if len(key_miss_samples) < 6 and board_market not in key_miss_seen:
+                key_miss_seen.add(board_market)
+                same_market = sorted(
+                    {(k[0], k[1]) for k in index if k[2] == board_market}
+                )[:4]
+                same_league_date = sorted(
+                    {k[2] for k in index if k[0] == league and k[1] == date}
+                )[:8]
+                key_miss_samples.append({
+                    "wanted": f"{league}|{date}|{board_market}",
+                    # Which (league, date) DO carry this market -- if this is
+                    # non-empty the market is indexed and the league or the
+                    # date is the disagreement.
+                    "market_indexed_under": [f"{a}|{b}" for a, b in same_market],
+                    # Which markets DO exist for our league and date -- if this
+                    # is non-empty the fixture bucket exists and the MARKET
+                    # name is the disagreement.
+                    "markets_for_our_league_date": same_league_date,
+                })
             _note_unmatched("no_candidates", board_row, board_market, league, date, [])
             refuse("no_polymarket_market_for_league_date_market")
             continue
@@ -1355,6 +1390,9 @@ def join_polymarket_to_board(
             sorted(unmatched_counts.items(), key=lambda kv: -kv[1])
         ),
         "unmatched_samples": unmatched_samples,
+        # One per board market that found an empty bucket, with the
+        # neighbouring index keys that say WHICH component disagreed.
+        "key_miss_samples": key_miss_samples,
         # Rows that refused on fixture pairing but WOULD pair with the
         # slug's two sides swapped. Per sport deliberately: MLB and NFL
         # pair correctly today and act as the control.
