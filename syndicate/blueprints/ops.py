@@ -413,6 +413,27 @@ def api_ops_execution_ledger_summary() -> Any:
             bucket["staked_dollars"] = round(bucket["staked_dollars"], 2)
             bucket["by_status"] = dict(sorted(bucket["by_status"].items()))
 
+    # DID A WRITE EVER GO IN BLIND? `#600`.
+    #
+    # `execution_ledger._persist` stamps `last_blind_write` when it could not
+    # re-read the current document and wrote the whole snapshot anyway, which is
+    # the one path that can still lose a concurrent edit. The stamp exists so
+    # the fact SURVIVES -- Render's log API is spotty and a 03:00 blind write
+    # nobody was watching for otherwise leaves no trace.
+    #
+    # SURFACED HERE BECAUSE THIS IS THE ONLY KEYVALUE-AWARE READER OF THE
+    # LEDGER. It was stamped into the document and readable from nowhere in
+    # production -- durable state with no reader is barely better than the log
+    # line it replaced, which is the same instrument-blindness this endpoint's
+    # own docstring exists to describe.
+    #
+    # `None` on a healthy ledger, and that null IS meaningful: `_persist` only
+    # writes the field, never clears it, so absence means no blind write has
+    # ever happened rather than "not checked".
+    # Straight off the document this endpoint ALREADY read above -- no second
+    # store round trip, and no new import.
+    blind_write = payload.get("last_blind_write") if isinstance(payload, dict) else None
+
     return jsonify({
         "ok": True,
         "days": days,
@@ -421,6 +442,7 @@ def api_ops_execution_ledger_summary() -> Any:
         # Counted, not dropped: a row with no date is invisible to every
         # per-day cut and would otherwise make the totals quietly wrong.
         "orders_without_date": skipped_no_date,
+        "last_blind_write": blind_write,
         "summary": {d: summary[d] for d in sorted(summary)},
     })
 

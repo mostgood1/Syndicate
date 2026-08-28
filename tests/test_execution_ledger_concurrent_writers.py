@@ -351,3 +351,32 @@ def test_a_healthy_ledger_reports_no_blind_write():
     ledger._persist(state)
     assert ledger._load()["last_blind_write"] is None
     assert ledger.ledger_summary()["last_blind_write"] is None
+
+
+def test_the_blind_write_stamp_is_READABLE_from_the_ops_endpoint(monkeypatch):
+    """Durable state with no reader is barely better than the log line it
+    replaced. The stamp was written into the document and surfaced NOWHERE in
+    production -- `/api/ops/execution/ledger-summary` builds its own per-date
+    structure and never calls `ledger_summary()`, so the field was write-only.
+
+    This is the same instrument-blindness that endpoint's own docstring exists
+    to describe: the ledger goes to the KEYVALUE store, so this is the only
+    reader that can see it at all.
+    """
+    import os
+
+    monkeypatch.setenv("ADMIN_TOKEN", "t0ken")
+    _seed("row")
+    state = ledger._load()
+    state["last_blind_write"] = {"at": "2026-08-28T03:00:00Z", "reason": "merge_read_failed_after_retries"}
+    ledger._persist(state)
+
+    from syndicate.app import app
+
+    with app.test_client() as client:
+        body = client.get(
+            "/api/ops/execution/ledger-summary", headers={"X-Admin-Token": "t0ken"}
+        ).get_json()
+
+    assert body["ok"] is True
+    assert body["last_blind_write"]["reason"] == "merge_read_failed_after_retries"
