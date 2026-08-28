@@ -476,3 +476,90 @@ class ScoreValueTests(unittest.TestCase):
         self.assertEqual(chip["state"], "pregame")
         self.assertIsNone(chip["away"]["score"])
         self.assertIsNone(chip["home"]["score"])
+        self.assertEqual(chip["score_suppressed"], "pregame_placeholder")
+
+
+class LevelFinalPlaceholderTests(unittest.TestCase):
+    """A 0-0 FINAL in a sport that cannot draw is the schedule placeholder.
+
+    Measured 2026-08-27 on MLB: `finals_seen=1462, finals_level=644` (44%) and
+    `games_with_outcome` 4 instead of ~15, because `is_final` advanced while the
+    score stayed at the placeholder. 08-26 read `finals_level=0` the same
+    instant. These tests pin the ASYMMETRY, which is the whole risk here:
+    suppressing is destructive for a sport that CAN draw.
+    """
+
+    @staticmethod
+    def _final_zero_zero(sport: str) -> dict:
+        return build_game_chip(
+            sport,
+            {
+                "gamePk": "1",
+                "away": {"abbr": "AAA", "score": 0},
+                "home": {"abbr": "BBB", "score": 0},
+                "status": {"is_final": True},
+            },
+        )
+
+    def test_mlb_final_zero_zero_is_suppressed_with_a_named_reason(self) -> None:
+        chip = self._final_zero_zero("mlb")
+        self.assertEqual(chip["state"], "final")
+        self.assertIsNone(chip["away"]["score"], "baseball has no 0-0 final")
+        self.assertIsNone(chip["home"]["score"])
+        # A silent None would just move the ambiguity somewhere nobody audits.
+        self.assertEqual(chip["score_suppressed"], "level_final_impossible_for_sport")
+
+    def test_soccer_final_zero_zero_is_preserved(self) -> None:
+        # THE REGRESSION THIS GUARDS. A 0-0 draw is a real, common soccer
+        # result, and the draw fix (a293bf14) depends on it scoring as
+        # "the home side did not win". Suppressing it would re-break that.
+        chip = self._final_zero_zero("soccer")
+        self.assertEqual(chip["state"], "final")
+        self.assertEqual(chip["away"]["score"], "0")
+        self.assertEqual(chip["home"]["score"], "0")
+        self.assertIsNone(chip["score_suppressed"])
+
+    def test_nfl_final_zero_zero_is_preserved(self) -> None:
+        # Rare but legitimate, and NFL is in the draw table for that reason.
+        chip = self._final_zero_zero("nfl")
+        self.assertEqual(chip["away"]["score"], "0")
+        self.assertIsNone(chip["score_suppressed"])
+
+    def test_unknown_sport_final_zero_zero_is_preserved(self) -> None:
+        # ALLOWLIST, NOT A NEGATION: nulling is the destructive direction, so an
+        # unrecognised sport must keep its score rather than be assumed unable
+        # to draw.
+        chip = self._final_zero_zero("kabaddi")
+        self.assertEqual(chip["away"]["score"], "0")
+        self.assertIsNone(chip["score_suppressed"])
+
+    def test_mlb_live_zero_zero_is_preserved(self) -> None:
+        # A live 0-0 is a genuine scoreline -- scoreless through three innings
+        # is not a placeholder.
+        chip = build_game_chip(
+            "mlb",
+            {
+                "gamePk": "2",
+                "away": {"abbr": "AAA", "score": 0},
+                "home": {"abbr": "BBB", "score": 0},
+                "live_state": {"in_progress": True},
+            },
+        )
+        self.assertEqual(chip["state"], "live")
+        self.assertEqual(chip["away"]["score"], "0")
+        self.assertIsNone(chip["score_suppressed"])
+
+    def test_mlb_real_final_score_is_untouched(self) -> None:
+        chip = build_game_chip(
+            "mlb",
+            {
+                "gamePk": "3",
+                "away": {"abbr": "AAA", "score": 1},
+                "home": {"abbr": "BBB", "score": 7},
+                "status": {"is_final": True},
+            },
+        )
+        self.assertEqual(chip["home"]["score"], "7")
+        self.assertEqual(chip["away"]["score"], "1")
+        self.assertEqual(chip["leader"], "home")
+        self.assertIsNone(chip["score_suppressed"])

@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
 
+from syndicate.features.shared.live_gameline_score import LEVEL_FINAL_IS_A_BAD_ROW
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE, central_today_iso
 
 _BASKETBALL_SPORTS = {"nba", "wnba", "ncaab"}
@@ -434,9 +435,40 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
     is_live, is_final = _game_flags(game)
     away_score = _side_score(game, "away")
     home_score = _side_score(game, "home")
+    zero_zero = away_score == "0" and home_score == "0"
+    score_suppressed: str | None = None
     # A 0-0 score on a game that is neither live nor final is a schedule
     # placeholder, not a real score.
-    if not is_live and not is_final and away_score == "0" and home_score == "0":
+    if zero_zero and not is_live and not is_final:
+        score_suppressed = "pregame_placeholder"
+    # AND SO IS A 0-0 "FINAL" IN A SPORT THAT CANNOT END LEVEL. `is_final` and
+    # the score come from unrelated fields -- `_game_flags` reads status text,
+    # `_side_score` walks seven candidates -- so a game whose status has
+    # advanced to FINAL while its score is still the schedule placeholder used
+    # to pass 0-0 through as an observed result.
+    #
+    # Measured 2026-08-27 (MLB): `finals_seen=1462, finals_level=644` (44%),
+    # `games_with_outcome` 4 instead of ~15, the rest reported as
+    # `no_final_outcome_for_game`. Same instant, 08-26 read `finals_seen=3115,
+    # finals_level=0`.
+    #
+    # THIS RECOVERS NO GAMES. The scores are absent from this payload and
+    # `build_finals_index` already skipped these rows for MLB. What it fixes is
+    # the LIE -- 644 placeholders counted as observed finals, which aimed the
+    # diagnostics at the scorer instead of at the missing upstream data.
+    #
+    # ALLOWLIST, NOT A NEGATION. Nulling is the DESTRUCTIVE direction: a 0-0
+    # final is REAL in soccer/nfl/ncaaf, and suppressing it would re-break
+    # exactly what the draw fix (`a293bf14`) landed. So only sports KNOWN to be
+    # unable to draw are touched, and an unknown sport keeps its score. And
+    # `not is_live`, because a live 0-0 is a genuine scoreline.
+    elif zero_zero and is_final and not is_live and sport_slug in LEVEL_FINAL_IS_A_BAD_ROW:
+        score_suppressed = "level_final_impossible_for_sport"
+    # A NAMED REASON, NOT A SILENT NONE (`learnings.md 2026-08-28`, "grading an
+    # AMBIGUOUS zero as a definite outcome"): a value that two different states
+    # both produce is not evidence for either, and refusing it without saying
+    # why just moves the ambiguity somewhere nobody audits.
+    if score_suppressed:
         away_score = None
         home_score = None
 
@@ -489,6 +521,10 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         },
         "state": state,
         "status_token": status_token,
+        # Why the score is None, when it is. None means "the score stands as
+        # given" -- absent is NOT a suppression. Additive: every consumer reads
+        # this chip with `.get()`.
+        "score_suppressed": score_suppressed,
         "leader": leader,
         "start_time_utc": start_time_utc.isoformat() if start_time_utc else None,
     }
