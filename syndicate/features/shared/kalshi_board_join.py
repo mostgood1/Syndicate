@@ -428,9 +428,9 @@ def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | 
     # ABSENT MEANS FULL GAME, which is what every board row without an explicit
     # segment has always meant. Stated rather than implied, because the whole
     # defect was an implied value nobody checked.
-    from syndicate.features.shared.kalshi_catalogue import FULL_GAME_SEGMENT
+    from syndicate.features.shared.kalshi_catalogue import segment_for_board_row
 
-    segment = str(row.get("segment") or FULL_GAME_SEGMENT).strip().lower()
+    segment = segment_for_board_row(row)
     return (
         event_id,
         canonical_market_key(row.get("sport"), raw) or raw,
@@ -439,6 +439,33 @@ def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | 
         str(row.get("side") or "").strip().lower(),
         segment,
     )
+
+
+def _segments_agree(row: Mapping[str, Any], verdict: Mapping[str, Any]) -> bool:
+    """Does this board row cover the same portion of the game as this contract?
+
+    The board row's `segment` is what we intend to BET; the series' segment is
+    what the contract SETTLES on. They must be the same bet.
+
+    `verdict["series"]` rather than `market["series"]`: `classify_market`
+    already normalised it (`.strip().upper()`), and it is the value the record
+    carries. An earlier version of this fix stamped `market.get("series")` into
+    the record as a SECOND key of the same name -- redundant, raw rather than
+    normalised, and it won only by being last in the dict literal.
+
+    An unrecognised series returns None from `segment_for_series` and is refused
+    here. That is narrower than it looks: unmapped defaults to `full`, so only a
+    series carrying a segment MARKER we cannot map reaches None.
+    """
+    from syndicate.features.shared.kalshi_catalogue import (
+        segment_for_board_row,
+        segment_for_series,
+    )
+
+    contract = segment_for_series(verdict.get("series"))
+    if contract is None:
+        return False
+    return segment_for_board_row(row) == contract
 
 
 def kalshi_ticker_resolver(matches: Sequence[Mapping[str, Any]]):
@@ -844,6 +871,22 @@ def join_kalshi_to_board(
                 if kalshi_price is None:
                     _refuse(REASON_NO_PRICE)
                     continue
+                # SEGMENT AGREEMENT, COUNTED. `_match_key`/`_row_key` already
+                # refuse this pairing downstream -- but SILENTLY, by two keys
+                # failing to compare equal, which is indistinguishable from a
+                # venue that stopped quoting. Two consequences fixed here:
+                #
+                #  1. `REASON_SEGMENT_MISMATCH` was defined and referenced
+                #     NOWHERE. A named refusal that can never fire is not an
+                #     instrument, and `#601`'s own stated verification asked for
+                #     a count that did not exist.
+                #  2. Without this, a full-game `KXMLBTOTAL` still COLLECTS the
+                #     `first3` board row -- `_board_key`/`_event_key` are
+                #     3-tuples with no segment -- and builds a match record the
+                #     resolver can never price. `matched` counted a phantom.
+                if not _segments_agree(row, verdict):
+                    _refuse(REASON_SEGMENT_MISMATCH)
+                    continue
                 matches.append(
                     {
                         "ticker": market.get("ticker"),
@@ -866,13 +909,6 @@ def join_kalshi_to_board(
                         if isinstance(row.get("quote"), Mapping)
                         else None,
                         "board_event_id": row.get("event_id"),
-                        # WHICH CONTRACT THIS IS. `_match_key` derives the game
-                        # SEGMENT from it -- `KXMLBTOTAL` is nine innings and
-                        # `KXMLBF5TOTAL` is five, and without this field on the
-                        # record the key cannot tell them apart. It could not,
-                        # and five segment bets were placed on full-game
-                        # contracts on 2026-08-28.
-                        "series": market.get("series"),
                         "model_edge_pct": row.get("model_edge_pct"),
                         "game_line": True,
                     }
@@ -941,6 +977,13 @@ def join_kalshi_to_board(
             if kalshi_price is None:
                 _refuse(REASON_NO_PRICE)
                 continue
+            # See the game-line branch. Props are whole-game today, so this
+            # is expected to read zero -- which is the point: a guard that only
+            # ever fires is a guard nobody can calibrate, and one that never
+            # fires here proves the prop book is not being reclassified.
+            if not _segments_agree(row, verdict):
+                _refuse(REASON_SEGMENT_MISMATCH)
+                continue
             matches.append(
                 {
                     "ticker": market.get("ticker"),
@@ -958,10 +1001,6 @@ def join_kalshi_to_board(
                     if isinstance(row.get("quote"), Mapping)
                     else None,
                     "board_event_id": row.get("event_id"),
-                    # See the game-line record above. Player props are all
-                    # whole-game today, but the key is shared and a record that
-                    # omits this is a record that cannot be indexed.
-                    "series": market.get("series"),
                     "model_edge_pct": row.get("model_edge_pct"),
                 }
             )

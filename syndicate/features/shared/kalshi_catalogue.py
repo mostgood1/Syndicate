@@ -1044,6 +1044,49 @@ FULL_GAME_SEGMENT = "full"
 _SEGMENT_MARKERS = ("F5", "INNING", "1H", "2H", "H1", "H2", "Q1", "Q2", "Q3", "Q4")
 
 
+# THE BOARD SPELLS A SEGMENT TWO WAYS, and only one of them is a `segment`
+# field. `_INNINGS_PERIOD` above is the other: the board's market NAME carries
+# the suffix (`totals_1st_5_innings`, `spreads_q1`), and for those rows the
+# `segment` field is absent entirely.
+#
+# THIS MATTERS MORE THAN IT LOOKS. `#601` put `segment` into the join keys with
+# absent meaning `full`. For a suffix-vocabulary row that is WRONG in the
+# opposite direction from the original bug: the row keys as `full`, its correct
+# `KXMLBF5TOTAL` contract keys as `first5`, and a LEGITIMATE first-five pairing
+# stops resolving. One defect fixed into another, quieter one -- caught by
+# `test_a_total_takes_its_side_from_the_title`, which had no `segment` field on
+# its rows at all.
+_MARKET_SUFFIX_SEGMENT = {
+    "1st_1_innings": "first1",
+    "1st_3_innings": "first3",
+    "1st_5_innings": "first5",
+    "1st_7_innings": "first7",
+    "q1": "q1", "q2": "q2", "q3": "q3", "q4": "q4",
+    "1h": "1h", "2h": "2h",
+}
+
+
+def segment_for_board_row(row: Any) -> str:
+    """Which portion of the game a BOARD ROW bets, across both vocabularies.
+
+    The explicit `segment` field wins when set -- that is what production order
+    rows carry (`segment='first5'`, `market='totals'`). Otherwise the market
+    NAME's suffix is consulted (`totals_1st_5_innings`), because for those rows
+    the suffix IS the segment and nothing else says so.
+
+    Falls back to `full`, which is what a bare row has always meant.
+    """
+    get = row.get if hasattr(row, "get") else lambda _k, _d=None: None
+    explicit = str(get("segment") or "").strip().lower()
+    if explicit:
+        return _MARKET_SUFFIX_SEGMENT.get(explicit, explicit)
+    market = str(get("market") or "").strip().lower()
+    for suffix, segment in _MARKET_SUFFIX_SEGMENT.items():
+        if market.endswith("_" + suffix):
+            return segment
+    return FULL_GAME_SEGMENT
+
+
 def segment_for_series(series: Any) -> str | None:
     """Which portion of the game this series settles on.
 

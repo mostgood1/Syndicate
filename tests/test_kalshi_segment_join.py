@@ -133,3 +133,117 @@ def test_the_two_key_shapes_stay_one_shape():
     b = _match_key(_match(series="KXMLBF5TOTAL"))
     assert a is not None and b is not None
     assert len(a) == len(b) == 6
+
+
+# ---------------------------------------------------------------------------
+# `#604` -- THE GUARD MUST BE VISIBLE, NOT MERELY EFFECTIVE
+# ---------------------------------------------------------------------------
+
+
+def test_the_refusal_reason_is_actually_REFERENCED_not_just_defined():
+    """`REASON_SEGMENT_MISMATCH` was defined and used NOWHERE.
+
+    The key fix works silently -- two tuples fail to compare equal -- which is
+    indistinguishable from a venue that stopped quoting. `#601`'s own VERIFY
+    line asked for a refusal count that did not exist. This test fails if the
+    constant is ever orphaned again.
+    """
+    import inspect
+
+    from syndicate.features.shared import kalshi_board_join as mod
+
+    src = inspect.getsource(mod)
+    assert src.count("REASON_SEGMENT_MISMATCH") >= 2, "constant is defined but never used"
+
+
+def test_a_segment_row_and_a_full_game_contract_DISAGREE():
+    from syndicate.features.shared.kalshi_board_join import _segments_agree
+
+    assert not _segments_agree({"segment": "first3"}, {"series": "KXMLBTOTAL"})
+    assert not _segments_agree({"segment": "first5"}, {"series": "KXMLBTOTAL"})
+
+
+def test_matching_segments_AGREE_including_the_absent_case():
+    from syndicate.features.shared.kalshi_board_join import _segments_agree
+
+    assert _segments_agree({"segment": "first5"}, {"series": "KXMLBF5TOTAL"})
+    assert _segments_agree({}, {"series": "KXMLBTOTAL"})
+    assert _segments_agree({"segment": None}, {"series": "KXMLBTOTAL"})
+    assert _segments_agree({"segment": " FULL "}, {"series": "KXMLBTOTAL"})
+
+
+def test_an_unmappable_SEGMENT_MARKER_series_refuses_rather_than_agreeing():
+    """The mirror failure: a whole-game row must not land on a segment contract
+    we could not identify."""
+    from syndicate.features.shared.kalshi_board_join import _segments_agree
+
+    assert not _segments_agree({}, {"series": "KXMLBINNINGTOTAL"})
+
+
+def test_the_PROP_BOOK_still_agrees_and_this_is_the_control_again():
+    """Props are whole-game and unmapped; `#601`'s first version would have
+    refused them all. This guard must not resurrect that."""
+    from syndicate.features.shared.kalshi_board_join import _segments_agree
+
+    for series in ("KXMLBKS", "KXWNBAREB", "KXMLBHIT"):
+        assert _segments_agree({}, {"series": series}), series
+
+
+def test_the_match_record_does_not_carry_TWO_series_keys():
+    """The earlier fix stamped `market.get("series")` into records that already
+    carried the NORMALISED `verdict.get("series")`. It won by being last in the
+    dict literal -- harmless here, and exactly the kind of thing that is not
+    harmless the next time the order changes."""
+    import inspect
+
+    from syndicate.features.shared import kalshi_board_join as mod
+
+    src = inspect.getsource(mod)
+    assert '"series": market.get("series")' not in src
+
+
+# ---------------------------------------------------------------------------
+# THE SECOND VOCABULARY -- the near-miss inside the fix
+# ---------------------------------------------------------------------------
+
+
+def test_a_SUFFIX_vocabulary_row_is_not_mistaken_for_a_full_game_row():
+    """The board spells a segment TWO ways and only one is a `segment` field.
+
+    `totals_1st_5_innings` carries NO `segment` field -- the market NAME is the
+    segment. `#601` keyed absent as `full`, so such a row keyed `full` while its
+    CORRECT `KXMLBF5TOTAL` contract keyed `first5`, and a legitimate first-five
+    pairing would have stopped resolving. That is the original defect inverted:
+    not a wrong bet, a silently missing one.
+
+    Caught by `test_a_total_takes_its_side_from_the_title`, whose fixture rows
+    have no `segment` field at all -- which is why it was written that way and
+    why it must stay that way.
+    """
+    from syndicate.features.shared.kalshi_catalogue import segment_for_board_row
+
+    assert segment_for_board_row({"market": "totals_1st_5_innings"}) == "first5"
+    assert segment_for_board_row({"market": "spreads_1st_3_innings"}) == "first3"
+    assert segment_for_board_row({"market": "spreads_q1"}) == "q1"
+    assert segment_for_board_row({"market": "totals"}) == "full"
+
+
+def test_the_EXPLICIT_field_wins_over_the_market_name():
+    """Production order rows carry `segment='first5'` WITH `market='totals'`.
+    The field is the authority when both could speak."""
+    from syndicate.features.shared.kalshi_catalogue import segment_for_board_row
+
+    assert segment_for_board_row({"segment": "first3", "market": "totals"}) == "first3"
+    assert segment_for_board_row(
+        {"segment": "first5", "market": "totals_1st_5_innings"}
+    ) == "first5"
+
+
+def test_the_two_vocabularies_agree_on_the_SAME_key():
+    """A suffix row and a field row for the same bet must key identically, or
+    the join silently splits one market into two."""
+    from syndicate.features.shared.kalshi_board_join import _row_key
+
+    suffix = _row_key({"event_id": "e", "sport": "mlb",
+                       "market": "totals_1st_5_innings", "line": 3.5, "side": "under"})
+    assert suffix is not None and suffix[5] == "first5"
