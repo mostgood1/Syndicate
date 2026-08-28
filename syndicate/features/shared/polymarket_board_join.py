@@ -436,13 +436,35 @@ def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset
 # `polymarket_board_join:_outcome_probabilities`, and
 # `venue_quote_adapters._polymarket_sides` twice -- so every Polymarket price
 # in this system rests on `outcomes[i]` naming the club that `outcomePrices[i]`
-# prices. Searched 2026-08-28: that is asserted NOWHERE and proven NOWHERE.
+# prices.
 #
-# It came under suspicion when lane `portfolio-venue-and-side-integrity`
-# measured `marketSides[].long` varying across `outcomes[0]`/`[1]`, and found
-# one market where `marketSides` priced a club at `outcomePrices[0]` while the
-# arrays said `[1]`. **Their separation was ONE CENT (0.51 vs 0.50)** and they
-# flagged rather than asserted it, correctly -- a penny cannot carry this.
+# **CORRECTION TO THIS COMMENT AS FIRST WRITTEN.** It said the assumption was
+# "asserted NOWHERE and proven NOWHERE". That is false and the error was mine:
+# I searched `state.md` and `todo.md` and not `learnings.md`, where the proof
+# is recorded at lines 3647-3651 (lane `local_bb0d1330`, 2026-08-28). It
+# proposed misalignment, then refuted it: a TOTALS market, `under` at index 1
+# priced 0.445 against a planned 0.4444, where misalignment would have read
+# Over's ~0.555. Alignment proven at both indices, ~0.11 separation.
+#
+# **SO THE ACCURATE STATEMENT IS NEITHER "UNPROVEN" NOR "SETTLED":**
+#
+#     tested ONCE, on a TOTALS market, at ~0.11 separation
+#     the doubt is a MONEYLINE, at 0.01 separation
+#
+# Different populations, and neither settles the other. That distinction is
+# not pedantic, because THIS CODEBASE ALREADY CONTAINS THAT EXACT SPLIT:
+# `_side_to_outcome` maps `over`/`under` BY NAME and measured 9-of-9 correct,
+# while team sides had no name to fall back on and measured 3-of-8 WRONG. The
+# venue demonstrably treats totals and moneylines differently for the SIDE, so
+# assuming it treats them identically for the PRICE is unwarranted in the same
+# way. One measurement, taken on the market type least likely to expose the
+# failure, stands behind all three zip sites.
+#
+# The doubt arose when lane `portfolio-venue-and-side-integrity` measured
+# `marketSides[].long` varying across `outcomes[0]`/`[1]`, and found one market
+# where `marketSides` priced a club at `outcomePrices[0]` while the arrays said
+# `[1]`. **Their separation was ONE CENT (0.51 vs 0.50)** and they flagged
+# rather than asserted it, correctly -- a penny cannot carry this either.
 #
 # --------------------------------------------------------------------------
 # WHY THIS TEST CAN CARRY IT WHERE A ONE-CENT GAP CANNOT
