@@ -2374,6 +2374,18 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
      be graded. That is the same `#547` shape a third time, already visible.
 - Blocked by: none
 
+### mlb-overview-isolation — OPEN — opened 2026-08-28 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
+- Goal: MLB's hydrated overview builds again, WITHOUT lowering the 3000MB expensive floor — by running it in a SUBPROCESS whose memory is capped, so an excursion kills the child and the worker survives. `[USER DECISION 2026-08-28: "do 2 now", choosing this over lowering the floor]`
+- Files: `syndicate/features/intelligence.py`, NEW `syndicate/features/shared/overview_subprocess.py`, NEW `scripts/build_sport_overview_child.py`, and their tests.
+- MEASURED BASELINE 2026-08-28 13:23-13:42Z, refresh-worker: `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb floor=expensive floor_mb=3000` with `headroom_mb` 2167.5 / 2362.8 / 2220.2 against `min_required_mb 3000.0`, basis `unreclaimable` ~1.73-1.93GB. Gap ~640-830MB, far too wide for a `malloc_trim` (measured releases 16-110MB). `BOARD_OVERVIEW_READY sports=7` with NO `mlb:` entry — the board has carried zero MLB games for hours.
+- WHY NOT LOWER THE FLOOR: `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`'s own comment refuses it ("that variance is unexplained, so the gate in front of MLB keeps its full 3000MB margin"), and `learnings.md 2026-08-15` EXONERATES the eight-sport pass while the next entry names "MLB game hydration in pid 39" as the kill. The +3.5GB excursion is real and unexplained. This lane does not argue with that — it makes the excursion SURVIVABLE instead of pre-empting it with a margin that cannot cover it anyway (a +3.5GB spike kills a 4096MB container at ANY admissible floor).
+- Hypothesis: `_build_sport_overview` is a clean seam returning one JSON-able dict, so MLB's hydration can run out-of-process under `RLIMIT_AS`. A child that exceeds the cap dies alone; the parent reads a degraded row and continues.
+- Falsification: wrong if the sport row does not survive a JSON round-trip, or if the cap cannot be set low enough to protect the parent while still admitting the measured +968MB/+1543MB streamed-path cost.
+- KEY DESIGN CONSTRAINT: the cap is DERIVED FROM MEASURED HEADROOM AT CALL TIME (`headroom - reserve`), not a fixed constant. A fixed cap plus a drifting parent baseline is how the 3000MB floor became unreachable in the first place; a derived cap cannot repeat that.
+- Verification: `OVERVIEW_SPORT_BEGIN sport=mlb` followed by `OVERVIEW_SPORT_END sport=mlb` and `BOARD_OVERVIEW_READY ... sports=8` WITH an `mlb:g=N` entry, on a build where headroom is BELOW 3000MB — i.e. MLB builds in exactly the condition that refuses it today. Plus: a forced-excursion test showing the child dies and the parent survives.
+- RISK: OFF BY DEFAULT behind a flag. This worker has 110 OOM kills and `#241` restart-looped it; a subprocess per board build is periodic work and is not free.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
