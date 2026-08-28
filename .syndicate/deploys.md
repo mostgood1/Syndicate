@@ -131,6 +131,61 @@ bleeding while we waited. Had it been climbing, killing the refresh would have
 been the right trade. Preflight also correctly distinguished a defunct child
 awaiting reap from live work.
 
+## 2026-08-28 — refresh-worker `5a5efa8d`: NFL bets can be graded — **VERIFIED, and the counter accounts for itself exactly**
+
+Lane `nfl-settlement-resolver`. Claim acquired, preflight refused `TOO_SOON`
+twice (another session had deployed 3 min earlier); waited out the full 1500s
+spacing rather than `--allow-rapid`, deployed `03:41:29Z`, live `03:47:11Z`.
+
+### verify: `no_resolver_for_nfl` is GONE, and `resolved` rose by EXACTLY the count it had
+
+| | before (02:37/02:50Z) | after (03:59:18Z) |
+|---|---|---|
+| `BET_STATUS resolved` | 98 | **114** (+16) |
+| `BET_STATUS no_resolver_for_nfl` | **16** | **absent** |
+| `decided` / `won` / `lost` | 35 / 23 / 12 | 54 / 42 / 12 |
+| `SETTLED 08-27 graded` | 2 | **9** |
+| `SETTLED 08-27 no_resolver_for_nfl` | 8 | **absent** |
+
+`resolved` +16 against a counter that read 16 is the whole claim: those are the
+same orders, not a coincidence-sized coincidence.
+
+### THE 9-0 WAS CHALLENGED BEFORE IT WAS BANKED
+
+`outcomes={'won': 9}` with `lost` unchanged at 12 is exactly what an always-true
+comparison looks like, so it was tested rather than reported. Against the REAL
+captured slate the resolver returns losing values: Raiders moneyline (lost
+12-18) -> `current_value=-6.0` against `line=0.0`; `PIT@BUF over 200.5` ->
+`55.0`, final. Both must grade as losses under any correct comparison, and
+platform-wide `lost=12` is non-zero, so the grading path does record them. The
+9-0 is four preseason games' worth of model-selected bets, not a broken grader.
+
+Hand-checked end to end on real ESPN data before the deploy: the production
+order `tsc-nfl-pit-buf-2026-08-27 over 34.5` reads `current_value=55.0,
+is_final=True` against a real 27-28 final.
+
+### RESIDUAL, named rather than smoothed over
+
+`SETTLED date=2026-08-26` now reports `game_not_in_nfl_live_state: 1` where it
+previously reported `no_resolver_for_nfl: 1`. The resolver IS running for that
+date and fails at the JOIN, not at dispatch -- one NFL order whose game is not
+in the capture for its ledger date. Likely date-bucket skew (an NFL game
+kicking off 00:00Z belongs to the previous day locally, and the capture is
+fetched per ledger date). One order, named, and visible in the counter by
+design rather than silent.
+
+### AN INSTRUMENT I BUILT FIRED FALSE, AND IT IS RECORDED BECAUSE IT ALMOST COST THE READING
+
+The first settlement waiter tested `"SETTLED date=" in line`. `render_logs.py`
+ECHOES its own query as `# refresh-worker  text='SETTLED date='`, so the waiter
+matched its own search string and reported "SETTLEMENT PASS RAN" **one minute
+after the deploy went live**, when none had. It printed no log lines, which is
+the only reason it was caught. An instrument built out of the thing it measures
+-- the standing rule, violated by the tool built to check the rule's own fix.
+Fixed by excluding `#` lines, with the reason commented in place.
+
+---
+
 ## 2026-08-28 — refresh-worker `32b0cfaa`: the `_candidate_keys` ambiguity guard — **PARTIAL, and the counter that says so is the point**
 
 Lane `venue-candidate-key-token-guard`. Change is `1c37c220`, carried inside
