@@ -267,6 +267,44 @@ def idempotency_key(request: OrderRequest) -> str:
     return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:24]
 
 
+# THE LOAD-TIME SNAPSHOT, so `_persist` can tell OUR edits from rows we merely
+# read. Private, never serialised -- `_persist` strips it before writing.
+#
+# A fingerprint per order rather than a copy: ~40 bytes each against a 1.2MB
+# ledger, so the whole baseline is ~60KB.
+_BASELINE_KEY = "__baseline_fingerprints__"
+
+
+def _order_identity(order: Mapping[str, Any]) -> str:
+    """The key two writers must agree on to be talking about the same order.
+
+    `idempotency_key` is it -- `find_order` and the duplicate check already
+    treat it as identity, and `record_order` sets it on every row it writes.
+    `position_key` is a fallback for any legacy row that predates it. A row with
+    neither cannot be merged safely, so it gets a content hash: that makes it
+    stable against itself and simply never matches another writer's copy, which
+    is the conservative direction (it is carried, not silently dropped).
+    """
+    key = str(order.get("idempotency_key") or "").strip()
+    if key:
+        return f"idem:{key}"
+    key = str(order.get("position_key") or "").strip()
+    if key:
+        return f"pos:{key}"
+    return "hash:" + _order_fingerprint(order)
+
+
+def _order_fingerprint(order: Mapping[str, Any]) -> str:
+    try:
+        blob = json.dumps(order, sort_keys=True, separators=(",", ":"), default=str)
+    except Exception:  # noqa: BLE001 -- a row we cannot serialise is a row we
+        # cannot compare; returning a unique value makes it read as CHANGED,
+        # which errs toward writing our copy rather than silently keeping a
+        # stale one.
+        return "unfingerprintable:" + str(id(order))
+    return hashlib.sha1(blob.encode("utf-8", errors="replace")).hexdigest()
+
+
 def _load() -> dict[str, Any]:
     try:
         payload = read_json_file(_ledger_path())
@@ -277,16 +315,162 @@ def _load() -> dict[str, Any]:
         # than degrades.
         raise LedgerError(f"execution ledger unreadable: {type(exc).__name__}: {exc}") from exc
     if not isinstance(payload, Mapping):
-        return {"orders": [], "created_at": _utc_now()}
+        return {"orders": [], "created_at": _utc_now(), _BASELINE_KEY: {}}
     orders = payload.get("orders")
+    rows = [dict(o) for o in orders if isinstance(o, Mapping)] if isinstance(orders, list) else []
     return {
-        "orders": [dict(o) for o in orders if isinstance(o, Mapping)] if isinstance(orders, list) else [],
+        "orders": rows,
         "created_at": payload.get("created_at") or _utc_now(),
+        # WHAT THE STORE HELD WHEN WE READ IT. `_persist` diffs against this to
+        # decide which rows are ours to write and which belong to whoever else
+        # has touched the ledger since.
+        _BASELINE_KEY: {_order_identity(o): _order_fingerprint(o) for o in rows},
     }
 
 
+def _merge_onto_current(
+    ours: list[dict[str, Any]], baseline: Mapping[str, str] | None
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Three-way merge of OUR orders onto whatever the store holds NOW.
+
+    ----------------------------------------------------------------------
+    WHY THIS EXISTS: THE LEDGER WAS LOSING WRITES, MEASURED `#600`
+    ----------------------------------------------------------------------
+
+    `_persist` used to write the whole document blind. Two SERVICES hold this
+    ledger -- refresh-worker settles and grades, live-odds-worker places and
+    reconciles -- and both do `_load()` -> mutate -> `_persist()` with no lock,
+    no compare-and-swap and no merge. Last writer won with whatever it had
+    loaded, so a write could be minutes stale and still overwrite everything.
+
+    MEASURED 2026-08-28, from the two services' own `KEYVALUE_WRITE_LARGE`
+    sizes on one settlement pass:
+
+        refresh-worker    17:40:47   1,276,178   08-26 graded=8
+        refresh-worker    17:40:48   1,276,296   08-23 graded=1
+        live-odds-worker  17:41:00   1,268,265   <- 12s later, 8,031 SMALLER
+                                                    held there for 12 minutes
+
+    The ledger moved BACKWARDS. live-odds-worker's copy was smaller than
+    refresh-worker's write at 17:40:43, so its snapshot predated the whole
+    burst: nine grades and every `grade_check` memo were discarded. On the
+    record of real money, and silently -- the `SETTLED ... graded=9` line was
+    perfectly true and the rows were ungraded a second later.
+
+    ----------------------------------------------------------------------
+    WHY A THREE-WAY MERGE AND NOT "OURS WINS PER ORDER"
+    ----------------------------------------------------------------------
+
+    Per-order last-writer-wins does NOT fix the measured case. live-odds-worker
+    had every graded order in its state -- it loaded them before the grades
+    existed -- so overlaying "its" orders would discard them exactly as before.
+    The distinction that matters is not WHICH orders a writer holds but which
+    it CHANGED, and that needs the load-time baseline `_load` now captures.
+
+    So: a row we did not touch is left to whoever did. A row we changed is
+    ours. A row we deleted is deleted -- unless somebody else changed it since,
+    in which case theirs survives, because a deletion racing an update is the
+    one case where dropping the row destroys information nobody can recover.
+
+    STILL LAST-WRITER-WINS AT THE FIELD LEVEL when two writers change the SAME
+    order in the same window. That is deliberate and it is not the bug being
+    fixed: field-level union would resurrect fields that
+    `venue_settlement`'s repairs deliberately CLEAR (`_VENUE_GRADE_FIELDS` is
+    documented as "the only fields a repair may clear"). The blast radius goes
+    from the whole document to one row, which is the whole point.
+    """
+    counts = {"ours": 0, "theirs": 0, "added": 0, "deleted": 0, "concurrent": 0}
+    if baseline is None:
+        # NO BASELINE MEANS NO MERGE IS POSSIBLE, and the honest thing is to
+        # behave exactly as this function did before and say so. A caller that
+        # built `state` by hand rather than via `_load()` has no snapshot to
+        # diff against; guessing one would be worse than the old behaviour.
+        counts["ours"] = len(ours)
+        counts["no_baseline"] = 1
+        return list(ours), counts
+
+    try:
+        current = _load()
+    except Exception as exc:  # noqa: BLE001
+        # THE RE-READ FAILED. Falling back to a blind write is the OLD
+        # behaviour, so this is not a new risk -- but it is the exact moment a
+        # write can be lost, so it is loud rather than silent.
+        print(
+            f"[execution_ledger] MERGE_READ_FAILED {type(exc).__name__}: {exc}"
+            " -- writing our whole copy, concurrent edits may be lost",
+            flush=True,
+        )
+        counts["ours"] = len(ours)
+        counts["merge_failed"] = 1
+        return list(ours), counts
+
+    theirs = current.get("orders") or []
+    ours_by_key = {_order_identity(o): o for o in ours}
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for row in theirs:
+        key = _order_identity(row)
+        seen.add(key)
+        stored_print = _order_fingerprint(row)
+        was = baseline.get(key)
+        if was is not None and stored_print != was:
+            counts["concurrent"] += 1
+        mine = ours_by_key.get(key)
+        if mine is None:
+            if key in baseline and (was is None or stored_print == was):
+                # WE DELETED IT and nobody has touched it since. `record_order`
+                # pops a `rejected` row to free the retry, and that deletion
+                # must survive a merge or a transient refusal becomes permanent.
+                counts["deleted"] += 1
+                continue
+            # Either it is new to us, or we deleted it while somebody else
+            # updated it. Keep theirs: a deletion racing an update is the one
+            # case where dropping the row destroys information.
+            merged.append(row)
+            counts["theirs"] += 1
+            continue
+        if _order_fingerprint(mine) == was:
+            # WE DID NOT TOUCH THIS ROW. Whatever the store holds now is either
+            # unchanged or somebody else's newer write -- either way it is not
+            # ours to overwrite. THIS IS THE LINE THAT FIXES `#600`.
+            merged.append(row)
+            counts["theirs"] += 1
+        else:
+            merged.append(mine)
+            counts["ours"] += 1
+
+    for row in ours:
+        key = _order_identity(row)
+        if key not in seen:
+            merged.append(row)
+            counts["added"] += 1
+
+    return merged, counts
+
+
 def _persist(state: dict[str, Any]) -> dict[str, Any]:
-    orders = state.get("orders") or []
+    # MERGE BEFORE THE TRIM, not after. The cap is a property of the document
+    # actually being written, and trimming our copy first would drop rows the
+    # merge is about to re-add from the store.
+    baseline = state.pop(_BASELINE_KEY, None)
+    orders, merge_counts = _merge_onto_current(state.get("orders") or [], baseline)
+    state["orders"] = orders
+    if merge_counts.get("concurrent") or merge_counts.get("merge_failed"):
+        # WHAT THE MERGE ACTUALLY RESCUED. Printed only when the store had
+        # changed under us, because a line on every write would be constant
+        # noise -- and the write itself is already evidenced by
+        # `KEYVALUE_WRITE_LARGE`, so silence here is not ambiguous about
+        # whether the persist happened.
+        print(
+            f"[execution_ledger] LEDGER_MERGE concurrent={merge_counts.get('concurrent', 0)}"
+            f" kept_theirs={merge_counts.get('theirs', 0)}"
+            f" wrote_ours={merge_counts.get('ours', 0)}"
+            f" added={merge_counts.get('added', 0)}"
+            f" deleted={merge_counts.get('deleted', 0)}"
+            f"{' MERGE_FAILED' if merge_counts.get('merge_failed') else ''}",
+            flush=True,
+        )
     trimmed = 0
     if len(orders) > _MAX_RECORDS:
         trimmed = len(orders) - _MAX_RECORDS
