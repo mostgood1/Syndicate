@@ -100,20 +100,36 @@ def test_a_diagnostic_never_kills_the_worker(monkeypatch, capsys):
 def test_one_vote_per_fixture_not_one_per_rung():
     """A deep ladder must not let one fixture decide the answer.
 
-    Four rungs of the same fixture, all the same sign convention: if rungs
-    voted, this would read n=4 and look four times as confident as it is.
+    If rungs voted, a four-rung ladder would read n=4 and look four times as
+    confident as it is.
+
+    **THE FIXTURE CHANGED, AND THE ORIGINAL ONE IS WHY**
+    `[2026-08-28, lane venue-join-refusal-visibility]`. This used to pass
+    `neg-1pt5, neg-2pt5, pos-1pt5, pos-2pt5` and describe them as "all the same
+    sign convention". They are not -- that list contains both signs, and the
+    docstring asserting otherwise was the same false premise that made the
+    whole sign test non-identifying. On the live slate, 12 of 12 sampled MLB
+    fixture/magnitude pairs carry BOTH `pos` and `neg`.
+
+    Under the corrected semantics that fixture is deliberately NOT scored (see
+    `test_a_fixture_carrying_BOTH_signs_is_not_scored_at_all`), so asserting
+    `fixtures_compared == 1` on it was asserting the bug. The ladder here is
+    genuinely one-sided, which is what this test always meant to describe, and
+    the one-vote property is unchanged.
     """
     slate = [
         {"slug": f"asc-mlb-sd-nyy-2026-08-25-{tok}",
          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD"}
-        for tok in ("neg-1pt5", "neg-2pt5", "pos-1pt5", "pos-2pt5")
+        for tok in ("neg-1pt5", "neg-2pt5", "neg-3pt5", "neg-4pt5")
     ]
     board = [{
         "market": "spreads", "side": "home", "line": -1.5, "sport": "mlb",
         "selected_date": "2026-08-25",
         "home_team": "New York Yankees", "away_team": "San Diego Padres",
     }]
-    assert spread_sign_test(slate, board, min_sample=1)["fixtures_compared"] == 1
+    result = spread_sign_test(slate, board, min_sample=1)
+    assert result["fixtures_compared"] == 1
+    assert result["fixtures_both_signs_present"] == 0
 
 
 def test_verdict_refuses_below_min_sample():

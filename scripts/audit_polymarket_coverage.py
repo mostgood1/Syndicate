@@ -38,18 +38,38 @@ and each fixture's ladder is symmetric about zero, so the sign belongs to ONE
 reference club per game. The third -- whether that club is the slug's `<home>`
 or its `<away>` -- cannot be read from any log line production emits.
 
-This test settles it without touching the venue. For every fixture that appears
-in BOTH the Polymarket slate and the board, it compares the sign of the slug's
-handicap against the sign of the board's own home spread. The answer is bimodal:
+This test was built to settle it without touching the venue: for every fixture
+in BOTH the slate and the board, compare the sign of the slug's handicap against
+the sign of the board's own home spread, and read the answer off a bimodal rate
+(~1.0 -> the slug's <home>, ~0.0 -> its <away>, anything else -> falsified).
 
-    agreement ~1.0  ->  the reference club is the slug's <home>
-    agreement ~0.0  ->  the reference club is the slug's <away>
-    anything else   ->  §5.2 IS FALSIFIED: the reference is not fixed per game,
-                        and spreads must stay refused.
+**IT CANNOT SETTLE IT, AND THAT IS NOW MEASURED RATHER THAN SUSPECTED**
+`[2026-08-28, lane venue-join-refusal-visibility]`. The premise above assumed
+one signed rung per fixture. Polymarket publishes BOTH legs at every line: of
+12 sampled MLB fixture/magnitude pairs on the live slate, **12 carried both
+`pos` and `neg`**. So the sign names a LEG of a symmetric pair, not a TEAM,
+and comparing it to the board's sign is a coin flip no matter how the rung is
+chosen. Two successive readings, before and after narrowing to the board's own
+magnitude:
 
-It prints the rate WITH ITS SAMPLE SIZE and refuses to call it below
-`--min-sample` (default 30), because a mapping this expensive to get wrong
-should not be decided on a handful of fixtures.
+    first rung in slate order    10 runs, rate 0.44-0.60, n=9..22
+    rung at the board's line     rate 0.4706, n=17, no_comparable_rung=6
+
+The second is a strictly better comparison -- every disagreement is now
+like-for-like (`-3.5` vs `3.5`) instead of the ladder extreme against a
+near-pick'em line -- and it lands in the same place, because the defect is not
+in the sampling.
+
+**~0.5 IS WHAT A NON-IDENTIFYING TEST RETURNS**, so the "anything else ->
+FALSIFIED" branch was a trap: at `n >= min_sample` it would have recorded "the
+sign is not fixed per fixture; do not ship a mapping on this" as a durable
+measurement ABOUT THE VENUE, when it was only ever a fact about the instrument.
+A fixture carrying both signs is now counted and NOT scored, and the verdict
+says NON-IDENTIFYING rather than UNDECIDED -- the difference between "collecting
+more cannot help" and "collect more".
+
+Answering the reference-club question needs PRICE or SETTLEMENT, not sign.
+Until then spreads stay refused, which is where they already were.
 """
 
 from __future__ import annotations
@@ -260,6 +280,9 @@ def spread_sign_test(
     # Fixtures the venue quotes, at lines the board does not carry. Not a
     # disagreement and not an agreement -- an absence of anything to compare.
     no_comparable_rung = 0
+    # Fixtures where BOTH legs exist at the board's line. Not a disagreement,
+    # not an agreement -- proof that a sign comparison cannot identify a team.
+    both_signs_present = 0
 
     for row in slate:
         if str(row.get("sportsMarketTypeV2") or "").upper() != "SPORTS_MARKET_TYPE_SPREAD":
@@ -360,6 +383,31 @@ def spread_sign_test(
         if not comparable:
             no_comparable_rung += 1
             continue
+        # ------------------------------------------------------------------
+        # THE TEST IS NON-IDENTIFYING, AND THIS IS WHERE THAT BECOMES VISIBLE
+        # ------------------------------------------------------------------
+        #
+        # Narrowing to the board's own magnitude was necessary and NOT
+        # sufficient. Polymarket lists BOTH legs at every line, so the two rungs
+        # left standing here are `pos-1pt5` and `neg-1pt5` for the same fixture.
+        # Picking either one is still arbitrary, and the rate is still a coin
+        # flip -- MEASURED 2026-08-28T15:54:07Z on the first run after the
+        # magnitude fix: `fixtures=17 agree_home=8 disagree=9 rate=0.4706
+        # no_comparable_rung=6`, with every disagreement now correctly
+        # like-for-like (`-3.5` vs `3.5`, `-1.5` vs `1.5`).
+        #
+        # Verified on the live slate rather than assumed: of 12 sampled MLB
+        # fixture/magnitude pairs, 12 carried BOTH `pos` and `neg`.
+        #
+        # So the slug's sign does not name a TEAM at all -- it names which leg
+        # of a symmetric pair the market is, and both legs always exist. No
+        # amount of sample fixes that; `min_sample=30` was never the obstacle.
+        # A fixture in this state is recorded and NOT scored, so the rate stops
+        # being manufactured out of iteration order.
+        signs = {slug_line < 0 for slug_line, _ in comparable}
+        if len(signs) > 1:
+            both_signs_present += 1
+            continue
         seen_fixture.add(key)
         slug_line, row = comparable[0]
         if (slug_line < 0) == (board_line < 0):
@@ -376,7 +424,26 @@ def spread_sign_test(
 
     n = agree + disagree
     rate = None if not n else round(agree / n, 4)
-    if n < min_sample:
+    if both_signs_present and both_signs_present >= n:
+        # NOT "undecided", and the difference is the whole point. UNDECIDED
+        # says "collect more"; this says "collecting more cannot help". The
+        # venue publishes both legs at every line, so a sign comparison has no
+        # discriminating power here no matter how large the sample gets, and a
+        # verdict phrased as a sample-size problem sends the next reader to
+        # wait for something that will never arrive.
+        #
+        # THIS ALSO DISARMS THE TRAP. The FALSIFIED branch below fires at
+        # rate ~0.5, and ~0.5 is exactly what a non-identifying test returns --
+        # so the old ladder was one sample away from recording "the sign is not
+        # fixed per fixture; do not ship a mapping on this" as a MEASUREMENT
+        # about the venue, when it was only ever a fact about the instrument.
+        verdict = (
+            f"NON-IDENTIFYING: {both_signs_present} fixture(s) carry BOTH signs at "
+            "the compared line, so the slug's sign names a LEG, not a TEAM. "
+            "This test cannot answer the reference-club question at any sample "
+            "size -- it needs price or settlement, not sign. Spreads stay refused."
+        )
+    elif n < min_sample:
         verdict = f"UNDECIDED: n={n} < min_sample={min_sample}"
     elif rate is not None and rate >= 0.98:
         verdict = "REFERENCE CLUB IS THE SLUG'S <home>"
@@ -398,6 +465,7 @@ def spread_sign_test(
         # scoring these was the defect, so the count that replaced them has to
         # be visible or the fix is unauditable.
         "fixtures_no_comparable_rung": no_comparable_rung,
+        "fixtures_both_signs_present": both_signs_present,
         "agree_with_home_sign": agree,
         "disagree": disagree,
         "agreement_rate": rate,
@@ -503,6 +571,7 @@ def run_spread_audit_if_enabled() -> dict[str, Any] | None:
             f" rate={result['agreement_rate']}"
             f" no_board_fixture={result['spread_slugs_with_no_board_fixture']}"
             f" no_comparable_rung={result['fixtures_no_comparable_rung']}"
+            f" both_signs={result['fixtures_both_signs_present']}"
             f" segment_skipped={result['segment_slugs_skipped']}"
             f" verdict={result['verdict']!r}"
             f" disagreements={result['sample_disagreements']}",

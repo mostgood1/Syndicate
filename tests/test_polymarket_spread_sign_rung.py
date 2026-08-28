@@ -120,3 +120,42 @@ def test_an_unanimous_slate_still_reaches_a_real_verdict():
     out = mod.spread_sign_test(slate, board, min_sample=1, selected_date=DATE)
     assert out["agreement_rate"] == 1.0
     assert "FALSIFIED" not in out["verdict"]
+
+
+def test_a_fixture_carrying_BOTH_signs_is_not_scored_at_all():
+    """The magnitude filter was necessary and NOT sufficient.
+
+    MEASURED on the live slate 2026-08-28: 12 of 12 sampled MLB
+    fixture/magnitude pairs carry BOTH `pos` and `neg`. Narrowing to the
+    board's line leaves two rungs, one of each sign, so picking either is still
+    arbitrary and the rate is still manufactured out of iteration order --
+    which is exactly what production returned after the magnitude fix
+    (rate=0.4706, n=17).
+    """
+    slate = [
+        _spread(f"asc-mlb-lad-det-{DATE}-neg-1pt5"),
+        _spread(f"asc-mlb-lad-det-{DATE}-pos-1pt5"),
+    ]
+    out = mod.spread_sign_test(slate, [_board_row(1.5)], min_sample=1, selected_date=DATE)
+    assert out["fixtures_both_signs_present"] == 1
+    assert out["fixtures_compared"] == 0
+    assert out["agree_with_home_sign"] == 0 and out["disagree"] == 0
+
+
+def test_the_verdict_says_NON_IDENTIFYING_not_UNDECIDED_and_never_FALSIFIED():
+    """The trap, disarmed.
+
+    UNDECIDED says "collect more"; here collecting more cannot help, because
+    both legs exist at every line by construction. And the FALSIFIED branch
+    fires at rate ~0.5 -- precisely what a non-identifying test returns -- so
+    it was one sample away from recording a fact about the INSTRUMENT as a
+    measurement about the VENUE.
+    """
+    slate = [
+        _spread(f"asc-mlb-lad-det-{DATE}-neg-1pt5"),
+        _spread(f"asc-mlb-lad-det-{DATE}-pos-1pt5"),
+    ]
+    out = mod.spread_sign_test(slate, [_board_row(1.5)], min_sample=1, selected_date=DATE)
+    assert out["verdict"].startswith("NON-IDENTIFYING")
+    assert "FALSIFIED" not in out["verdict"]
+    assert "UNDECIDED" not in out["verdict"]
