@@ -36039,3 +36039,69 @@ an orientation counter to `_teams_match`'s refusal path -- how many soccer
 Also still unreachable and NOT soccer: `no_candidates|ncaaf|totals: 41` of 41,
 `|h2h: 6` of 6. Polymarket files college football under `cfb`; the board says
 `ncaaf`. Same class of token mismatch, outside this lane's soccer fix.
+
+---
+
+## 2026-08-28 12:23 CT — refresh-worker <- `73a7e358` — lane `venue-join-refusal-visibility` — **BREAK GLASS, preflight HOLD OVERRIDDEN**
+
+`dep-da8s8bgn74is73e059og`, created 17:23:58Z. Claim held by this lane.
+
+### this deploy KILLED a running MLB sim. On explicit user instruction, three times.
+
+Preflight returned `HOLD: 7 job(s) in flight` at deploy time (the set ranged
+2-10 all afternoon). Overridden with the guard's documented break-glass grant,
+`.syndicate/deploy/grants/<session_id>.json`, which the guard itself describes
+as "`--force` with an audit trail". Cost, stated to the user before each ask and
+accepted: **the in-flight MLB daily sim died mid-run and the board build in
+flight was discarded (`#563`)**.
+
+**THERE WAS NO GENTLER ROUTE, and this is the part worth keeping:**
+
+- `deploy_preflight.py` has `--allow-off-main` and `--allow-rapid` and **no
+  job override**. A HOLD on jobs cannot be waived.
+- `ops.py` exposes `/api/ops/odds-refresh/cancel` and **no sim cancel**. There
+  is no in-app way to stop `run_mlb_daily_sim_job.py`.
+- `SYNDICATE_DEPLOY_GUARD=off` is read from the **hook's own process
+  environment** (`deploy-guard.py:371`), so an inline prefix on the deploy
+  command cannot reach it. It is a config change, not a command flag.
+
+So "kill the sim" and "deploy" are the same action. Anyone reaching this state
+again: the grant file is the sanctioned path, and it should carry the reason.
+
+### WAITING WAS TRIED FIRST AND DID NOT CONVERGE — measured, not assumed
+
+The sim blocking at 16:47:11Z (`pid=365`, `reason=fingerprint_change`) finished
+on its own, and a NEW one started (`pid=1460`). A watcher polling preflight
+every 60s exited on a genuine `CLEAR` that had already closed by the time the
+next command ran. **refresh-worker's clear window today was narrower than one
+minute**, so "wait for a window" was not a converging strategy and saying so
+required the failed wait as evidence.
+
+### what shipped, and one fix that arrived from outside this lane
+
+Carries `56426d9a` (lane `portfolio-endpoint-improvements`, WNBA settlement) —
+one deploy, two lanes, agreed between the lanes beforehand.
+
+`73a7e358` is `432c5915` plus **two defects a SECOND READER found in my counter
+before its first run**, both verified here against the code:
+
+- `orientation_flip_counts` only incremented on a SUCCESSFUL flip, so a sport's
+  absence was an ABSENT KEY — indistinguishable from "the flip was never
+  attempted there". **And the control was selected for the property that
+  hollows it out:** mlb/nfl are the control BECAUSE they pair correctly, which
+  is exactly what leaves them almost no unmatched rows to try. `tried=` is now
+  a real denominator, counted once per ROW.
+- the log line was gated on a non-empty rescue dict, so "the flip rescues
+  nothing anywhere" — the most interesting possible result — would have printed
+  NO LINE, identical to an inert deploy. Now unconditional.
+
+Same defect class this lane spent the day fixing in other instruments, sitting
+in its own, on the exact number the lane has a hypothesis riding on.
+
+### verify (PENDING)
+
+`POLYMARKET_ORIENTATION would_match_if_flipped={...} tried={...}` on the first
+board publish (~21 min from boot). **READ `tried=` FIRST.** `mlb|h2h 0` out of
+`tried={'mlb|h2h': 47}` is a clean control; the same 0 out of `tried={}` is an
+untested branch. Soccer counts with mlb/nfl exercised-and-zero supports the
+orientation hypothesis; soccer AND mlb/nfl both counting FALSIFIES it.
