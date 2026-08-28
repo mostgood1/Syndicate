@@ -6644,3 +6644,31 @@ measurement work is finished; do not spend more on spans.
 
 The residual 107.7s (16%) is spread across gaps individually too small to
 chase.
+
+
+## [exchange-venues] Crypto.com is NOT a third venue — VERIFIED 2026-08-28, local full-egress session
+
+**The venue is attractive; the ACCESS is the blocker, and that is the whole
+finding.** Crypto.com Predictions sports contracts are real, CFTC-regulated via
+CDNA, and priced in dollars of probability against a $1 settlement — the SAME
+unit convention as Kalshi (`BOS $0.42 / NYY $0.59`, ~1pt vig, one MLB game at
+$1.37M cumulative traded). It still cannot be integrated:
+
+- The only JSON sports surface is the consumer app's undocumented internal
+  proxy, and it is **Cloudflare-gated: 200 to a challenged browser, 403 to a
+  plain client** (curl, with and without full Chrome headers). Workers use
+  `urllib.request`. Kalshi and Polymarket both answer a plain server-side GET.
+- That JSON **carries no prices** (RSC-rendered; only a 2-point sparkline).
+- The documented Exchange REST catalogue holds **957 instruments, 0 event
+  contracts** (CCY_PAIR 578 / PERPETUAL_SWAP 367 / FUTURE 12).
+- **OddsAPI has no crypto.com row** (`us_ex` = betopenly, kalshi, novig,
+  polymarket, prophetx), so the aggregator path Novig/ProphetX use is closed.
+
+Unblock is a **contact form, not code**. Do NOT build a browser-driven scraper.
+`cryptocom_client.FINDING` and `probe()` now say all of this; `probe()` returns
+`unblocked` (default False, flipped only by a non-crypto `inst_type` in the
+SANCTIONED catalogue). Full evidence:
+`.syndicate/findings_2026-08-28_cryptocom_venue_evaluation.md`.
+
+**Supersedes the 2026-08-24 record**, which was written from a sandbox that
+403s CONNECT to crypto.com and got three things wrong — see `learnings.md`.

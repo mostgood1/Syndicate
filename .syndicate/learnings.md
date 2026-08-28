@@ -5333,3 +5333,72 @@ WRITE-ONLY — into the document and into `ledger_summary()`, which nothing in
 production calls. **Durable state with no reader is barely better than the log
 line it replaced.** Found by reading the deployed endpoint's payload instead of
 assuming the field had arrived. Add the reader in the same commit as the field.
+
+
+## 2026-08-28 — FORBIDDEN: treating a "this API does not exist" finding as a fact about the VENUE when it was written from a network that could not reach the venue. It is a fact about the NETWORK.
+
+`cryptocom_client.py`'s `FINDING` (2026-08-24) said: no public REST/WebSocket
+market-data API has shipped; the one concrete endpoint anyone had cited came
+from "a third-party marketing site" and was "uncorroborated by any
+Crypto.com-owned source". It carried a `confidence` field admitting the agent
+proxy had denied a direct read of the page it was reasoning about.
+
+Re-checked 2026-08-28 from a machine with egress. **Three claims, three wrong,
+all in the direction that stops the next reader looking:**
+
+1. The endpoint is printed on **Crypto.com's own API page**, in the hero
+   terminal sample. The third party was quoting them.
+2. A JSON endpoint serving **sports events exists** and returns 200 with 200 MLB
+   rows. "Nothing shipped" was false.
+3. Sports was treated as uncovered because `exchange-pro` says "crypto, politics
+   and economics". That page describes the DCM/FCM institutional feed. Sports is
+   a **headline category of the product**. Neither page is evidence about the
+   other.
+
+The real blocker was findable only WITH egress and is much more specific:
+Cloudflare. 200 JSON to a challenged browser, **403 to curl with full Chrome
+headers**. That is a sharper, more actionable fact than "no API", and the
+blocked session could not have reached it.
+
+**The decision ("do not build") was right in both versions. The REASONS were
+false, and a false reason is worse than no reason** — it reads as a closed
+question. Compounding: the same finding's `probe()` named "HTML that mentions a
+live REST path" as its unblock signal; that would FIRE TODAY and be wrong, since
+the page advertises a REST path no host serves.
+
+**How to apply.** A finding whose own text says the network was blocked is a
+HYPOTHESIS with a stated expiry, not a result. Re-run it from egress before
+citing it, and write the status as what you could not do
+(`no_sanctioned_server_readable_api`) rather than as a claim about what the
+other party has not built (`no_public_api_yet`). Extends "trusting a refusal's
+stated premise without rechecking it" (same day) from code comments to findings.
+
+
+## 2026-08-28 — A lane disclaimer marker governs its OWN LINE ONLY. Three of five "contested" files were deference that PARSED as ownership.
+
+`check_lane_invariants` flagged 5 files with two or three OPEN holders. Three
+were never real contests — the ledger already recorded the resolution in prose:
+
+    ~~`scripts/run_refresh_worker.py`~~ (claim on THIS ONE FILE released
+    `paper_settlement.py` (held by `open-bet-live-status`, session `syndicate-27`,
+
+`lane-guard._claimable_prefix` cuts a line at its FIRST disclaimer marker and
+keeps what precedes it. In both lines the path precedes the marker, so both
+parsed as live claims. A **strikethrough means nothing to the parser**, and a
+marker on line N does not govern a path on line N+1.
+
+**The form that works** — marker first, path after, on ONE line:
+
+    RELEASED `[2026-08-28, session <id>]`: `syndicate/templates/portfolio.html`
+
+My first fix attempt failed for exactly this reason: I put the released paths on
+a continuation line under a marker line. It also created a PHANTOM claim on
+`/.claude`, because `PATH_RE` matched `~/.claude` in prose I wrote inside a
+`- Files:` block. **Do not write example paths, tool paths, or directories
+inside a Files block.**
+
+**How to apply.** After any edit to `lanes.md` claims, diff the CLAIM SET
+against `HEAD` with the checker's own parser rather than reading the text —
+`m.claims(git show HEAD:...)` vs `m.claims(working copy)`. It caught both
+mistakes here and proved the final state removed exactly 5 and added 0 (121 ->
+116). Reading the markdown would not have shown either.
