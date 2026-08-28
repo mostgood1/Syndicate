@@ -288,10 +288,23 @@ Check the ledger write sizes across both services before touching a resolver.
 ledger from either service can be lost: a grade, a `grade_check`, a
 reconciliation, a fill. It is the record of real money. `#600`.
 
-**NOT FIXED HERE.** A lock or compare-and-swap on the money ledger is a
-concurrency change on the money path and belongs to whoever owns
-`execution_ledger.py` — lane `portfolio-ledger-service-split` names this file.
-Recorded, surfaced, not touched.
+**FIXED — `f66c7441`, three-way merge in `_persist`, NOT DEPLOYED.** `_load()`
+captures a fingerprint per order; a row the writer did not touch is left to
+whoever did. A per-order upsert would NOT have fixed it — the stale writer held
+every graded order, so overlaying "its" rows discards the grades exactly as
+before. Guarantee stated narrowly: different orders no longer clobber; the same
+order in one window is still last-writer-wins at field level, blast radius one
+row. `off != on` 7 of 10.
+
+**SEVERITY IS HIGHER THAN A LOST GRADE.** `reconcile_live_orders` writes
+`reconciled_at` through the same path and the unreconciled gate is a GLOBAL
+LATCH (`learnings.md` 2026-08-25: one resting order blocked live placement on
+EVERY venue for 32 minutes). A lost `reconciled_at` can re-arm that block.
+
+**CLAIM ATTRIBUTION CORRECTED:** this section first said
+`portfolio-ledger-service-split` owns `execution_ledger.py`. It does not —
+`check_lane_invariants.claims()` returns NOBODY for that file. Read the claim
+map with the tool, not the prose.
 
 ## [wnba-game-lines-gradeable] WNBA GAME LINES CAN BE GRADED — a player box gives the team score, and always could `[verified 2026-08-28, lane portfolio-venue-and-side-integrity]`
 

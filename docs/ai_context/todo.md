@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#600` — **THE EXECUTION LEDGER IS READ-MODIFY-WRITTEN BY TWO SERVICES WITH NO LOCK. Settlement writes are being silently lost.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FOUND AND MEASURED, NOT FIXED**
+### `#600` — **THE EXECUTION LEDGER IS READ-MODIFY-WRITTEN BY TWO SERVICES WITH NO LOCK. Settlement writes were being silently lost.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED AND LANDED (`f66c7441`), NOT DEPLOYED**
 
 `execution_ledger._persist` is a blind whole-document `write_json_file`: no
 lock, no compare-and-swap, no merge. refresh-worker (settlement/grading) and
@@ -27,15 +27,61 @@ records and finding they pass every filter and reach the resolver.
 a grade, a `grade_check`, a reconciliation, a fill. This is the record of real
 money.
 
-**NOT FIXED.** A lock or CAS on the money ledger is a concurrency change on the
-money path. `execution_ledger.py` is claimed by lane
-`portfolio-ledger-service-split`. Surfaced rather than taken.
+**THE SEVERITY IS HIGHER THAN "A LOST GRADE"** `[raised by lane
+venue-join-refusal-visibility, verified here 2026-08-28]`. `reconcile_live_orders`
+writes `reconciled_at` through the same blind persist, and **the unreconciled
+gate is a GLOBAL LATCH** — `learnings.md` 2026-08-25: one resting Polymarket
+order made every live pass on EVERY venue return `status=blocked
+reason=unreconciled_orders`, Kalshi included, and "no order could be placed
+again by anything" for 32 minutes. So a `reconciled_at` lost to this race does
+not just lose a field: **it can re-arm a platform-wide block on all order
+placement**, and the symptom (absence of `LIVE_ORDER` lines) is documented as
+looking identical to a quiet slate.
 
-**Candidate shapes, none evaluated:** compare-and-swap on `updated_at` with a
-retry; a per-order merge on write instead of whole-document replace; or moving
-settlement's writes behind the same single-owner rule the refresh manifests
-already use. The second is the most likely fit — orders are independent records
-and a whole-document replace is a stronger operation than any writer needs.
+**FIXED — `f66c7441`, a THREE-WAY MERGE in `_persist`.** `_load()` captures a
+sha1 fingerprint per order (`_BASELINE_KEY`, ~60KB against a 1.2MB ledger,
+popped before the write). At persist time it re-reads and diffs:
+
+    row we did NOT touch  -> keep THEIRS   <- the line that fixes this
+    row we changed        -> keep OURS
+    row we deleted, untouched since        -> stays deleted
+    row we deleted, changed since          -> keep THEIRS
+
+**A PER-ORDER UPSERT WOULD NOT HAVE FIXED IT**, and this is the trap worth
+recording: live-odds-worker held *every* graded order — it loaded them before
+the grades existed — so upserting "its" orders overwrites the grades exactly as
+before. The distinction is not which orders a writer HOLDS but which it
+CHANGED, which is why the baseline is necessary and why this was not a two-line
+change.
+
+Merge happens BEFORE the trim (the cap belongs to the document actually being
+written). Deletion is a real operation — `record_order` pops a `rejected` row to
+free the retry — so a union would make a transient refusal permanent. A failed
+re-read falls back to the old blind write and says `MERGE_READ_FAILED` loudly.
+
+**THE GUARANTEE, stated narrowly:** different orders no longer clobber. The
+SAME order changed by two writers in the same window is still last-writer-wins
+at field level — deliberately, because field union would resurrect fields
+`venue_settlement`'s repairs deliberately CLEAR. Blast radius: one row instead
+of the whole document.
+
+`off != on`: 7 of 10 new tests fail against the pre-fix module, all 10 pass with
+it, and 3 pass in BOTH (deletion survives, our own edit wins, legacy rows
+carried). 707 passed across every ledger/execution/order-path suite.
+
+**CLAIM ATTRIBUTION CORRECTED.** This entry originally said `execution_ledger.py`
+was claimed by `portfolio-ledger-service-split`. **It was not, and is not.**
+`check_lane_invariants.claims()` over `lanes.md` returns NOBODY for that file;
+that lane holds `prediction_ledger.py`, `ledger_bridge.py`,
+`backfill_portfolio_settlement.py` and four tests. The real holders were two
+dead lanes, since struck. Caught by lane `venue-join-refusal-visibility` running
+the checker instead of reading the block by eye — which is the lesson: **read
+the claim map with the tool, not the prose.**
+
+**VERIFICATION WHEN DEPLOYED:** `LEDGER_MERGE concurrent=N kept_theirs=M` with
+`N>0` is the fix catching a real collision. `concurrent=0` on every line means
+no collision has occurred yet, NOT that the merge is inert — the write itself is
+evidenced separately by `KEYVALUE_WRITE_LARGE`.
 
 
 ### `#599` — **WNBA game lines could never be graded, because a comment said the player box had no team scores. It always had them.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **LANDED (`56426d9a`), NOT DEPLOYED**
