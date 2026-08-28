@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-08-28 — live-odds-worker `8edf77e5` + web `6a72040b`: tiles follow the date, and the unknown-order probe reports
+
+**web `6a72040b`** `dep-da8fpjrbc2fs73a4qa40`, live `03:16:40Z`. **verify MET**
+on served bytes, both scopes tying off:
+
+```
+default   Positions 41 on this slate / 89 all dates   Settled 14W  8L  17 open  + 2 unknown = 41
+?on=all   Positions 89 all dates                      Settled 34W 34L  19 open  + 2 unknown = 89
+```
+
+`periods` deliberately unchanged — a rollup that moves with a display control
+stops being quotable. Scoped from `whole_book` rather than the display list, so
+`?show=all` cannot move the tiles.
+
+**live-odds-worker `8edf77e5`** `dep-da8fvk8ae00c73cr1hvg`, live `03:29:10Z`.
+**verify MET `03:31:31Z`, first settlement tick after boot:**
+
+```
+UNKNOWN_ORDER_PROBE venue=polymarket unknown=2 evidenced=0
+  aec-mlb-kc-tor-2026-08-27             $6.22  resolution_rows=0  sole_claim=True
+  tsc-nfl-sf-lv-2026-08-27-total-36pt5  $1.99  resolution_rows=0  sole_claim=True
+```
+
+**READ IT THE RIGHT WAY ROUND.** `evidenced=0` is NOT "the orders did not
+land". The probe can only find POSITIVE evidence — a resolution row on a market
+we hold nothing else on. No row is consistent with three different worlds: the
+order never landed, it landed and is still open, or the market has not resolved
+yet. `sole_claim=True` on both means nothing else of ours could account for a
+row if one appeared, so the probe will speak if either market resolves against
+a position of ours.
+
+**THE $8.21 IS STILL UNRESOLVED AND ONLY THE VENUE UI CAN SETTLE IT.** Both
+carry `venue_order_id=None` from `http_503 {"code":14}` (gRPC UNAVAILABLE), and
+Polymarket publishes no route that lists orders — `/v1/orders` is `501`,
+`/v1/orders/open` is open-only, and the per-order read needs the id we never
+got. This probe is the only automated angle that exists on this venue and it is
+deliberately a reporter, not a grader.
+
+**PROCESS, AND THE GUARD WORKING AS DESIGNED.** The user authorised deploying
+THROUGH a `HOLD` to avoid waiting on a soccer artifact build.
+`.claude/hooks/deploy-guard.py` refused — the last recorded preflight was
+`HOLD`, not `CLEAR`. Rather than reach for `SYNDICATE_DEPLOY_GUARD=off`,
+preflight was re-run once and had gone `CLEAR` on its own. **So the deploy went
+out on a genuine CLEAR: no override used, no job killed, and the authorised
+cost was never paid.** My own 45-second sampling had been reporting the window
+as closed (3 → 3 → 3) while it was actually turning over faster than I was
+looking — the guard's fresher read is what surfaced that.
+
 ## 2026-08-28 — three deploys: the push defect, my own regression, and cursor pagination
 
 Sequence, all `trigger=api`, all preflight `CLEAR` for the exact SHA, claims
