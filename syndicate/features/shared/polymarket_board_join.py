@@ -94,8 +94,10 @@ MARKET_TYPE_TO_BOARD: dict[str, str] = {
 # one name, which is the property this repo keeps insisting on: two guards that
 # must agree should not be two literals.
 _JOINABLE_BOARD_MARKETS: frozenset[str] = frozenset(MARKET_TYPE_TO_BOARD.values()) | {
-    # Polymarket types BTTS as PROP; it is admitted by slug modifier below.
+    # Polymarket types both of these as PROP. BTTS is admitted by its slug
+    # modifier, corners by its question text -- see the branch in the join.
     "btts",
+    "alternate_totals_corners",
 }
 
 # `14pt5` -> 14.5. The venue writes decimals this way in slugs; reading it as an
@@ -541,6 +543,37 @@ def _classify_alignment(
         })
 
 
+def _is_corners_question(question: Any) -> bool:
+    """Is this Polymarket question the full-game corners market?
+
+    "Total Corners Taken (Reg. Time)" -- user-supplied 2026-08-28. Matched on
+    the two words that carry the meaning rather than the exact string, so
+    spacing and punctuation variants resolve, but a PERIOD variant must not:
+    a "1st Half" corners market is a different contract on the same fixture,
+    and pricing one as the other is the mistake that cost $7.08 in MLB orders
+    the same day.
+    """
+    text = " ".join(str(question or "").strip().lower().split())
+    if not text or "corner" not in text:
+        return False
+    if _has_segment_words(text):
+        return False
+    return True
+
+
+# Period words that make a market a SEGMENT contract. Checked against the
+# question text, where `_has_segment`'s slug-modifier form cannot reach.
+_SEGMENT_WORDS = (
+    "1st half", "2nd half", "first half", "second half", "1h", "2h",
+    "1st quarter", "2nd quarter", "3rd quarter", "4th quarter",
+    "1q", "2q", "3q", "4q", "period", "extra time",
+)
+
+
+def _has_segment_words(text: str) -> bool:
+    return any(word in text for word in _SEGMENT_WORDS)
+
+
 def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | None:
     """The two clubs as an UNORDERED, canonical pair -- or None if unreadable.
 
@@ -856,6 +889,30 @@ def join_polymarket_to_board(
                 parsed.get("modifiers") or []
             ):
                 board_market = "btts"
+            elif venue_type == "SPORTS_MARKET_TYPE_PROP" and _is_corners_question(
+                row.get("question")
+            ):
+                # CORNERS, IDENTIFIED FROM THE QUESTION rather than the slug.
+                #
+                # Question supplied by the user 2026-08-28: "Total Corners Taken
+                # (Reg. Time)". BTTS one branch up is identified by its slug
+                # modifier; no corners modifier has been observed, and this
+                # module's own note says it plainly -- "a slug says which game;
+                # only the question says what the bet IS".
+                #
+                # `(Reg. Time)` is REGULATION TIME, the ordinary 90 minutes, so
+                # this is the FULL-GAME corners market. That is the opposite of
+                # every other parenthetical period in this file and the reason
+                # the qualifier is matched explicitly rather than treated as a
+                # segment.
+                #
+                # THE LINE STILL COMES FROM THE SLUG, and if the slug carries
+                # none the row refuses downstream -- a total without a number
+                # would match any corners line at all, which is worse than
+                # matching none. That guard is what makes admitting this family
+                # safe while its slug shape is still unverified: the worst case
+                # is that it keeps refusing, not that it prices the wrong bet.
+                board_market = "alternate_totals_corners"
         if board_market is None:
             # PROP lands here -- a real market, deliberately out of scope (see
             # the module header). DRAWABLE_OUTCOME no longer does; it is in

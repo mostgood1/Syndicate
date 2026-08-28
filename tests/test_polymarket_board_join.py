@@ -1483,3 +1483,42 @@ def test_the_OTHER_prop_families_still_refuse(monkeypatch):
               "outcomes": '["Yes","No"]', "outcomePrices": '["0.5","0.5"]'}],
             [], selected_date="2026-08-28")
         assert out["refusals"].get("market_type_not_a_game_line") == 1, (slug, out)
+
+
+def test_polymarket_CORNERS_is_admitted_from_its_QUESTION(monkeypatch):
+    """"Total Corners Taken (Reg. Time)" -- user-supplied 2026-08-28.
+
+    BTTS is identified by a slug modifier; no corners modifier has been
+    observed, so corners is read from the question. This module already says
+    why that is the right field: "a slug says which game; only the question
+    says what the bet IS".
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
+
+    markets = [{
+        "slug": "atc-soccer-ala-vil-2026-08-28-9pt5",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+        "question": "Total Corners Taken (Reg. Time)",
+        "outcomes": '["Over","Under"]', "outcomePrices": '["0.52","0.48"]',
+    }]
+    board = [{
+        "market": "alternate_totals_corners", "side": "over", "line": 9.5,
+        "sport": "soccer", "selected_date": "2026-08-28",
+        "home_team": "Alaves", "away_team": "Villarreal", "event_id": "e1",
+    }]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+    assert out["refusals"].get("market_type_not_a_game_line") is None, out["refusals"]
+    assert out["refusals"].get("board_market_not_a_game_line") is None, out["refusals"]
+    assert out["matched"] == 1, out
+
+
+def test_a_SEGMENT_corners_question_still_refuses(monkeypatch):
+    """A 1st-half corners market is a different contract on the same fixture.
+    `(Reg. Time)` means the full 90 and must not be confused with a period."""
+    from syndicate.features.shared.polymarket_board_join import _is_corners_question
+    assert _is_corners_question("Total Corners Taken (Reg. Time)") is True
+    assert _is_corners_question("Total Corners Taken 1st Half") is False
+    assert _is_corners_question("Corners in the 2nd Half") is False
