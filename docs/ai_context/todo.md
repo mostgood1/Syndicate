@@ -43357,7 +43357,7 @@ against any hypothesis a redeploy would reset.
 a ticket already, close `#449` as a duplicate and keep theirs — an id is cheap,
 a split investigation is not.
 
-## `#594` — **RETIRE the laptop live-gameline collector once the worker-side one is deployed** `[2026-08-28, lane live-game-line-projection]`
+## `#594` — **RETIRE the laptop live-gameline collector once the worker-side one is deployed** `[2026-08-28, lane live-game-line-projection]` — **renumbered #598 -> #599.** Lane `venue-join-refusal-visibility` had already taken `#598` for the Polymarket fixture-orientation item; both landed on `origin/main` within minutes and `todo_id_reconcile` blocks a push while two items share a number. They were live in the file and this lane was closing out, so this side moved. Ids are never reused: `#598` belongs to them.
 
 `74f026a9` moved live-gameline score retention into the board build
 (`live_gameline_accuracy.py`, called from `book_grid_artifact.py`). **Pushed,
@@ -43389,7 +43389,7 @@ and model both ran normally (2026-08-28; Kernel-Power 506 03:57:42Z / 507
 13:48:00Z, corroborated across three other stalled sessions). Full working in
 `.syndicate/log/2026-08-28.md`.
 
-## `#598` — **`live_gameline_accuracy` counters serve `null`: name the key in web's forwarding allowlist** `[2026-08-28, lane live-game-line-projection]`
+## `#599` — **`live_gameline_accuracy` counters serve `null`: name the key in web's forwarding allowlist** `[2026-08-28, lane live-game-line-projection]`
 
 **One line, plus a test. The patch is below verbatim so nobody has to re-derive it.**
 
