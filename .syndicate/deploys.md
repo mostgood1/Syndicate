@@ -36105,3 +36105,70 @@ board publish (~21 min from boot). **READ `tried=` FIRST.** `mlb|h2h 0` out of
 `tried={'mlb|h2h': 47}` is a clean control; the same 0 out of `tried={}` is an
 untested branch. Soccer counts with mlb/nfl exercised-and-zero supports the
 orientation hypothesis; soccer AND mlb/nfl both counting FALSIFIES it.
+
+### VERIFIED 2026-08-28 17:40:42Z — the orientation number, and it is much smaller than the anecdote implied
+
+First real run of `POLYMARKET_ORIENTATION`, same build as
+`POLYMARKET_BOARD_JOIN board_rows=1313 matched=109`:
+
+```
+tried  = {soccer|h2h 106, soccer|totals 27, wnba|totals 6,
+          nfl|h2h 3, wnba|spreads 2, nfl|totals 2}
+flipped= {soccer|h2h 10, soccer|totals 2}
+```
+
+| bucket | flipped | tried | of `no_match` | rate |
+|---|---|---|---|---|
+| `soccer\|h2h` | 10 | 106 | 106 | **9.4%** |
+| `soccer\|totals` | 2 | 27 | 27 | 7.4% |
+| `nfl\|h2h` | 0 | 3 | 3 | 0% |
+| `nfl\|totals` | 0 | 2 | 29 | 0% |
+| `wnba\|totals` | 0 | 6 | 18 | 0% |
+| `wnba\|spreads` | 0 | 2 | 7 | 0% |
+| `mlb\|totals` | — | **0** | 24 | UNTESTED |
+| `mlb\|spreads` | — | **0** | 11 | UNTESTED |
+
+**THE HYPOTHESIS SURVIVES AND EXPLAINS ~A TENTH OF WHAT I ATTRIBUTED TO IT.**
+I called orientation "the actual blocker" for soccer on ONE fixture. It is
+10 of 106. The other ~96 soccer h2h refusals have a cause still unidentified,
+and looking for it is the real remaining work — not shipping a flip.
+
+**THE CONTROL IS EXERCISED BUT THIN, AND MLB IS NOT EXERCISED AT ALL.** This is
+exactly what `tried=` was added to expose, and it exposed it on the first run:
+
+- `mlb` appears in NO `tried` key. It had **35 unmatched game-line rows**
+  (24 totals + 11 spreads) and the flip ran on **zero** of them, because
+  spreads/totals only attempt when a candidate exists at the board's own line
+  and none did. Absent from `flipped=` therefore means NOTHING for mlb.
+  Without the denominator this would have read as the cleanest control on the
+  board. **The peer's critique was correct and it landed one run early.**
+- The only h2h control is `nfl|h2h`, **0 of 3**. Three rows.
+- Non-soccer attempts total **13**. A real zero, and far too few to carry the
+  "the slug order differs by sport" conclusion.
+
+**DO NOT SHIP A FLIP.** If soccer slugs were simply `<home>-<away>`, the rate
+would be near 100% of soccer, not 9.4%. A blanket flip would break the ~90%
+that pair correctly today. Whatever this is, it is narrower than a per-sport
+convention.
+
+Samples are unambiguous where it does fire — real fixtures, sides inverted,
+across FIVE competitions and both slug prefixes, so it is not one league's quirk:
+
+```
+board 'Paris Saint Germain@Lille'       slug atc-lg1-lil-psg-2026-08-28-lil
+board 'Manchester City@Crystal Palace'  slug atc-epl-cry-mnc-2026-08-28-cry
+board 'Villarreal@Alavés'               slug atc-lal-ala-vil-2026-08-28-ala
+board 'Birmingham City@Wrexham AFC'     slug atc-eflch-wre-bir-2026-08-28-wre
+board 'FC Dallas@St. Louis City SC'     slug aec-mlp-stl-dal-2026-08-28
+```
+
+Note every sample pairs a board row whose HOME team is the more prominent club
+with a slug listing that club second. Worth testing whether the BOARD has these
+fixtures inverted rather than the venue — `Man City @ Crystal Palace` on
+2026-08-28 is checkable against any fixture list, and that is a cheaper next
+step than reasoning about slug grammar.
+
+**NEXT, in order:** (1) check a handful of these five against a real fixture
+list to decide whether the board or the venue has home/away wrong; (2) find
+what explains the other ~96; (3) get mlb into `tried` before treating any
+non-soccer zero as a control.

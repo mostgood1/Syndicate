@@ -2682,7 +2682,23 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     `no_match|soccer|h2h` is 93 of 93 board rows. The hypothesis was half
     wrong: those rows were already `no_match`, not `no_candidates`.
   - item 4 ops reader/join agreement — **VERIFIED** (web `8b8a6579`)
-- **THE ONE OPEN THREAD, and the reason this lane is not closed:**
+- **MEASURED 2026-08-28T17:40:42Z — the orientation thread has its number and
+  the hypothesis is DOWNGRADED, not confirmed.** `soccer|h2h` flipped **10 of
+  106 tried** (9.4%), `soccer|totals` 2 of 27. I had called orientation "the
+  actual blocker" on ONE fixture; it explains a tenth. The other ~96 soccer
+  h2h refusals have a cause still unidentified. **Do not ship a flip** — a
+  per-sport slug-order difference would show near 100%, not 9.4%, and a blanket
+  flip breaks the ~90% pairing correctly today.
+- **THE CONTROL IS THIN AND `mlb` IS UNTESTED, which is exactly what `tried=`
+  was added to expose.** `mlb` appears in no `tried` key: 35 unmatched
+  game-line rows, flip attempted on ZERO (spreads/totals only attempt at the
+  board's own line). Its absence from the rescue counter means nothing. Only
+  h2h control is `nfl|h2h` 0 of 3; 13 non-soccer attempts total. The second
+  reader's critique landed one run before it would have misled us.
+- Next: check whether the BOARD has these fixtures inverted rather than the
+  venue (`Man City @ Crystal Palace` 2026-08-28 against any fixture list) —
+  cheaper than reasoning about slug grammar. See `#598`.
+- **REMAINING OPEN THREAD:**
   `POLYMARKET_ORIENTATION` (`432c5915`) counts, per `<league>|<market>`, rows
   that would pair with the slug's sides swapped. MLB/NFL are the control. It
   has **never run in production** — refresh-worker's live SHA `6078536b` does

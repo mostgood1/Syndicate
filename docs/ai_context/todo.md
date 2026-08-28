@@ -135,7 +135,45 @@ phrasing matched NONE of production).
 
 **Do not guess the wording.** The titles are in the log; read them.
 
-### `#598` — **THE POLYMARKET SOCCER BLOCKER IS FIXTURE ORIENTATION, MEASURED AT n=1. Counter shipped, never run.** — lane `venue-join-refusal-visibility`, 2026-08-28 — **OPEN, needs one refresh-worker deploy**
+### `#598` — **ORIENTATION EXPLAINS 10 OF 106 SOCCER h2h REFUSALS, NOT ALL OF THEM. Measured; do not ship a flip.** — lane `venue-join-refusal-visibility`, 2026-08-28 — **OPEN, hypothesis downgraded not closed**
+
+**MEASURED 17:40:42Z** (`73a7e358`, `board_rows=1313 matched=109`):
+
+    tried   = {soccer|h2h 106, soccer|totals 27, wnba|totals 6,
+               nfl|h2h 3, wnba|spreads 2, nfl|totals 2}
+    flipped = {soccer|h2h 10, soccer|totals 2}
+
+`soccer|h2h` **10 of 106 = 9.4%**. I had called orientation "the actual
+blocker" on ONE fixture; it is a tenth of them. **The other ~96 have a cause
+still unidentified and that is the real remaining work.**
+
+**DO NOT SHIP A FLIP.** If soccer slugs were simply `<home>-<away>` the rate
+would be near 100% of soccer. A blanket flip breaks the ~90% pairing correctly.
+
+**THE CONTROL IS THIN AND mlb IS UNTESTED.** `mlb` appears in no `tried` key at
+all: 35 unmatched game-line rows (24 totals + 11 spreads), flip attempted on
+**zero**, because spreads/totals only attempt when a candidate exists at the
+board's own line and none did. Its absence from `flipped=` means nothing.
+Only h2h control is `nfl|h2h` 0 of 3. Thirteen non-soccer attempts total.
+
+**CHEAPEST NEXT STEP — check whether the BOARD is inverted, not the venue.**
+Every sample pairs a board row whose HOME team is the more prominent club with
+a slug listing that club second, across five competitions and both prefixes:
+
+    board 'Manchester City@Crystal Palace'  slug atc-epl-cry-mnc-2026-08-28-cry
+    board 'Paris Saint Germain@Lille'       slug atc-lg1-lil-psg-2026-08-28-lil
+    board 'Villarreal@Alavés'               slug atc-lal-ala-vil-2026-08-28-ala
+    board 'Birmingham City@Wrexham AFC'     slug atc-eflch-wre-bir-2026-08-28-wre
+    board 'FC Dallas@St. Louis City SC'     slug aec-mlp-stl-dal-2026-08-28
+
+`Man City @ Crystal Palace` on 2026-08-28 is checkable against any fixture
+list. That decides board-vs-venue for a few minutes' work and outranks any
+reasoning about slug grammar.
+
+Then: (2) explain the other ~96; (3) get mlb into `tried` before treating any
+non-soccer zero as a control.
+
+ORIGINAL FILING (n=1) FOLLOWS —
 
 `no_match|soccer|h2h` is **93 of 93 board rows**, and `soccer|totals` 18 of 18.
 The league-bucketing fix that shipped this session (`soccer_competition_tokens`
