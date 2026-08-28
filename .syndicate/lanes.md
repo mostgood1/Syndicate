@@ -2113,6 +2113,18 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `.syndicate/deploys.md`. Claim released.
 - Blocked by: none. `render.yaml` untouched, so no `blueprint_sync`.
 
+### venue-refresh-decoupling — OPEN — opened 2026-08-27 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
+- Goal: (1) the ~56% of board-build compute that is currently UNMEASURED becomes visible in Render logs, and (2) Kalshi/Polymarket price refresh runs on its OWN cadence instead of being gated by the board build's 11-15 min period.
+- Files: `pipeline/intelligence_state.py`, `pipeline/kalshi_odds_refresh.py`, `pipeline/polymarket_odds_refresh.py`, NEW `pipeline/venue_odds_loop.py`, and their tests.
+- MEASURED BASELINE 2026-08-27 21:19-22:17Z, refresh-worker: cycle 680-874s, compute 614-782s, `build_intelligence_overview` 259-290s (~44% of compute). The remaining ~350s is invisible because `_log_stage_timing` is `logger.info`, which per CLAUDE.md never reaches Render's collector.
+- Hypothesis (1): every `_log_stage_timing` call is silently lost, so `candidate_building`, `board_publication`, `response_building` and `request_total` have never been read in production. Converting to `print(..., flush=True)` makes them appear with no other change.
+- Hypothesis (2): `run_kalshi_odds_refresh()` has exactly ONE production caller — inside `_compute_board_publication_response` — so its `DEFAULT_REFRESH_INTERVAL_SECONDS = 120` is unreachable; the board loop sets the venue cadence. Polymarket has NO loop at all since `_polymarket_catalogue_at_boot` was retired (`fcdc5c57`).
+- Falsification (1): wrong if the stage lines still do not appear after the change, or if they account for a trivial share of the ~350s. Falsification (2): wrong if a decoupled loop does not raise observed Kalshi refresh frequency above one-per-board-build.
+- Verification: (1) `[intelligence_state] STAGE_TIMING stage=<name> duration_ms=<n>` appears in refresh-worker logs for stages that emit NOTHING today, and the named stages sum to a materially larger share of compute than the 44% currently visible. (2) `[venue_odds_loop] REFRESH venue=kalshi` fires on its own interval, at a rate NOT equal to the board-build rate, and a board build reads CACHED markets rather than triggering a fetch.
+- CONSTRAINT, checked before design: both worker entrypoints are CLAIMED — `scripts/run_refresh_worker.py` by `exchange-markets-api-integration`, `scripts/run_live_odds_refresh_worker.py` by `open-bet-live-status`. So the loop is hosted from `start_intelligence_state_background_loop` in the UNCLAIMED `intelligence_state.py`, not from a worker script. No cross-lane edits.
+- RISK, stated up front: this worker has 110 OOM kills on record and `worker_periodic_work_never_free` is a standing rule. A new thread must be small, must not hold markets in memory beyond the refresh, and must be OFF by default behind a flag until measured.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
