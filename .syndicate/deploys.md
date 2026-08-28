@@ -35751,3 +35751,49 @@ previous entry stands, but it is the READER agreeing with the join's code --
 not the join's own output. Both remain to be seen.
 
 Claims RELEASED on all three services after writing this.
+
+### VERIFIED 2026-08-28 16:06:53Z — item 2, and the answer is stronger than the fix claimed
+
+First `SPREAD_SIGN_AUDIT` on `5463a681`:
+
+```
+fixtures=0 agree_home=0 disagree=0 rate=None
+no_board_fixture=2578 no_comparable_rung=6 both_signs=17 segment_skipped=630
+verdict="NON-IDENTIFYING: 17 fixture(s) carry BOTH signs at the compared line,
+         so the slug's sign names a LEG, not a TEAM. This test cannot answer
+         the reference-club question at any sample size -- it needs price or
+         settlement, not sign. Spreads stay refused."
+```
+
+**ALL 17 of the previously-scored fixtures were non-identifying. Not most --
+all.** The prior reading was `fixtures=17 agree_home=8 disagree=9 rate=0.4706`,
+and every one of those 17 votes was manufactured out of iteration order. Zero
+fixtures in that sample had anything to say about the reference club.
+
+`rate=None`, not 0.5, so the `FALSIFIED` branch is now unreachable rather than
+merely unlikely. That branch was 13 fixtures from firing.
+
+**THE PROGRESSION IS THE LESSON, and it is three rounds of the same mistake.**
+
+| instrument | reading | what it was actually measuring |
+|---|---|---|
+| first slug per fixture | rate 0.44-0.60, n=9..22 | slate iteration order |
+| rung at the board's line | rate 0.4706, n=17 | slate iteration order, like-for-like |
+| both-signs guard | rate=None, both_signs=17 | nothing, and it says so |
+
+Each round produced a number that looked like evidence, and the first two were
+BOTH ~0.5 for the same reason. The `f5` fix documented in the module header was
+round zero of the identical error. **A rate near 0.5 from a comparison you have
+not proven is discriminating is not weak evidence -- it is the signature of no
+evidence**, and it is indistinguishable from a real coin flip until you check
+whether the comparison can separate the cases at all.
+
+Item 2 is CLOSED as "not answerable by this instrument". Spreads remain refused,
+exactly as before -- no behaviour changed, and that is the correct outcome.
+Answering it needs PRICE or SETTLEMENT.
+
+Items 1 and 3 STILL NOT VERIFIED at 16:07Z: no board build since the deploy.
+Newest line remains the pre-deploy `refusals=None` at 15:48:15Z. Worker
+confirmed ALIVE on the new binary (soccer live-state writes at 16:04:57Z,
+memory_anon 1276MB, headroom 1742MB), so the silence is "has not reached that
+stage", not a lost line.
