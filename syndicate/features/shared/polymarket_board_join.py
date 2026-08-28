@@ -634,6 +634,10 @@ def join_polymarket_to_board(
     # `<league>|<market>` -> rows that would pair if the fixture's sides were
     # swapped. Diagnostic only; the flip is never applied.
     orientation_flip_counts: dict[str, int] = {}
+    # THE DENOMINATOR. Unmatched rows the flip was actually TRIED on, per
+    # `<league>|<market>`. Without it, a sport absent from the rescue counter
+    # above is indistinguishable from a sport the flip never ran on.
+    orientation_flip_attempts: dict[str, int] = {}
     orientation_flip_samples: list[dict[str, Any]] = []
 
     for row in markets:
@@ -808,6 +812,7 @@ def join_polymarket_to_board(
             # without ground truth is the `pos`/`neg` trap in a new costume: a
             # confident bet on the wrong team. This produces the rate that
             # decides whether the question is worth chasing, and nothing else.
+            _row_attempted = False
             for candidate in candidates:
                 if board_market in {"spreads", "totals"}:
                     if board_line is None or candidate["line"] is None:
@@ -820,6 +825,33 @@ def join_polymarket_to_board(
                     parsed_candidate.get("away"),
                     parsed_candidate.get("home"),
                 )
+                # THE DENOMINATOR, AND WITHOUT IT THE CONTROL IS NOT ONE.
+                #
+                # The rescue counter below only ever gains a key when a flip
+                # SUCCEEDS, so a sport's absence from it was being read as
+                # "tried and never matched". It cannot mean that on its own. An
+                # absent key is equally "the flip was never attempted here",
+                # and those imply opposite conclusions.
+                #
+                # WORSE, THE CONTROL WAS SELECTED FOR THE PROPERTY THAT HOLLOWS
+                # IT OUT: mlb/nfl are the control BECAUSE they pair correctly
+                # today, which is exactly the condition that leaves them almost
+                # no unmatched rows to try. The cleaner the control sport
+                # pairs, the less its silence proves. Caught by a second reader
+                # (`portfolio-endpoint-improvements`) BEFORE the first
+                # production run, which is the only reason the first reading is
+                # interpretable at all.
+                #
+                # Counted once per ROW, not per candidate: the question is how
+                # many unmatched rows the flip was tried on. `mlb|h2h 0 of 47
+                # tried` is a control; `mlb|h2h 0 of 0 tried` is an untested
+                # branch, and they must not print the same way.
+                if not _row_attempted:
+                    _row_attempted = True
+                    attempt_key = f"{league}|{board_market}"
+                    orientation_flip_attempts[attempt_key] = (
+                        orientation_flip_attempts.get(attempt_key, 0) + 1
+                    )
                 if _teams_match(board_row, flipped, board_row.get("sport") or sport):
                     key = f"{league}|{board_market}"
                     orientation_flip_counts[key] = orientation_flip_counts.get(key, 0) + 1
@@ -900,6 +932,9 @@ def join_polymarket_to_board(
         # pair correctly today and act as the control.
         "orientation_flip_counts": dict(
             sorted(orientation_flip_counts.items(), key=lambda kv: -kv[1])
+        ),
+        "orientation_flip_attempts": dict(
+            sorted(orientation_flip_attempts.items(), key=lambda kv: -kv[1])
         ),
         "orientation_flip_samples": orientation_flip_samples,
         # Competitions no board row can reach, with the club codes that would

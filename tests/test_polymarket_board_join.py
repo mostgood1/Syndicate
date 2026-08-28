@@ -900,3 +900,62 @@ def test_a_row_that_pairs_normally_is_NOT_counted_as_an_orientation_miss(monkeyp
     out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
     assert out["matched"] == 1
     assert out["orientation_flip_counts"] == {}
+
+
+def test_the_control_carries_its_DENOMINATOR_not_just_its_zero(monkeypatch):
+    """An absent rescue key must not be readable as a clean control.
+
+    Caught by a second reader before the first production run. The rescue
+    counter only increments when a flip SUCCEEDS, so a sport's absence meant
+    either "tried on every unmatched row and never matched" (the hypothesis) or
+    "never attempted here" (an untested branch reading as a pass).
+
+    And the control was selected for the property that hollows it out: mlb/nfl
+    are the control BECAUSE they pair correctly, which is exactly what leaves
+    them almost no unmatched rows to try.
+
+    So a row the flip was tried on and did NOT rescue must still move `tried`.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    # Nothing matches, in either orientation.
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    markets = [{
+        "slug": "tsc-mlb-lad-det-2026-08-28-7pt5",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "outcomes": '["Over","Under"]',
+        "outcomePrices": '["0.50","0.50"]',
+    }]
+    board = [{
+        "market": "totals", "side": "under", "line": 7.5, "sport": "mlb",
+        "selected_date": "2026-08-28", "home_team": "tigers", "away_team": "dodgers",
+        "event_id": "e1",
+    }]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+    assert out["orientation_flip_counts"] == {}, "nothing was rescued"
+    assert out["orientation_flip_attempts"].get("mlb|totals") == 1, (
+        "a zero with no denominator cannot be told from an untested branch"
+    )
+
+
+def test_a_row_with_no_line_compatible_candidate_is_NOT_counted_as_tried():
+    """`tried` has to be able to read zero too, or it is not a denominator.
+
+    A board row the venue quotes at no comparable line was never a test of
+    orientation. Counting it would inflate the denominator and make a genuinely
+    untested sport look exercised — the same failure this counter exists to
+    prevent, one level down.
+    """
+    markets = [{
+        "slug": "tsc-mlb-lad-det-2026-08-28-99pt5",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "outcomes": '["Over","Under"]',
+        "outcomePrices": '["0.50","0.50"]',
+    }]
+    board = [{
+        "market": "totals", "side": "under", "line": 7.5, "sport": "mlb",
+        "selected_date": "2026-08-28", "home_team": "tigers", "away_team": "dodgers",
+        "event_id": "e1",
+    }]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+    assert out["orientation_flip_attempts"] == {}

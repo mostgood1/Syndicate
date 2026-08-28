@@ -250,13 +250,25 @@ def _polymarket_price_resolver(selected_date: str | None):
     # the control: soccer high with those near zero says the slug order differs
     # by sport; soccer high WITH them high says the orientation reading is
     # wrong and the cause is elsewhere. No flip is applied anywhere.
-    if joined.get("orientation_flip_counts"):
-        print(
-            "[portfolio_commit] POLYMARKET_ORIENTATION"
-            f" would_match_if_flipped={joined.get('orientation_flip_counts')}"
-            f" samples={joined.get('orientation_flip_samples')}",
-            flush=True,
-        )
+    # UNCONDITIONAL, AND THAT IS THE POINT. This was gated on
+    # `if joined.get("orientation_flip_counts")`, so a build where the flip
+    # rescued NOTHING anywhere printed no line at all -- indistinguishable from
+    # the code not being deployed. That is the single most interesting result
+    # (orientation is not the cause) wearing the costume of an inert deploy,
+    # and this counter's whole first run was going to be judged on whether a
+    # line appeared. `would_match_if_flipped={}` with a non-empty `tried=` is a
+    # RESULT; no line at all is an ambiguity.
+    #
+    # `tried=` is the denominator and must be read FIRST. `{'mlb|h2h': 0}` out
+    # of `tried={'mlb|h2h': 47}` is a clean control; the same zero out of
+    # `tried={}` is an untested branch. Both print as an absent rescue key.
+    print(
+        "[portfolio_commit] POLYMARKET_ORIENTATION"
+        f" would_match_if_flipped={joined.get('orientation_flip_counts')}"
+        f" tried={joined.get('orientation_flip_attempts')}"
+        f" samples={joined.get('orientation_flip_samples')}",
+        flush=True,
+    )
     if joined.get("unproven_league_tokens"):
         print(
             "[portfolio_commit] POLYMARKET_LEAGUE_REACH"
