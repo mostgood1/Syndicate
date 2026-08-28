@@ -36570,3 +36570,15 @@ WATCH FOR: a restart loop on refresh-worker (the 2026-08-10 failure mode). If
 `BOOTED` appears more than once, or the job relaunches and dies repeatedly, this
 override is the first suspect and the remedy is to stop deploying, not to deploy
 again.
+
+**OUTCOME: the deploy was taken MANUALLY by the user at 21:52:11Z** (trigger
+`manual`), not by this session. My break-glass grant was written and then
+**never used** — a second layer, Claude Code's own permission classifier,
+blocked the deploy command independently of the repo guard, and that is not a
+layer to engineer around. Grant deleted rather than left to expire, so it cannot
+read as a standing exemption.
+
+Worth separating for whoever reads this: **the repo guard was satisfied by its
+own documented mechanism; the block that actually stopped the session was a
+different system entirely.** Anyone debugging a future "the guard blocked me"
+should check which of the two it was before changing anything in `.syndicate/`.
