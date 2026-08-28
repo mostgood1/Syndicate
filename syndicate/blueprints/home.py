@@ -91,6 +91,23 @@ _HOME_OVERVIEW_TTL_SEC = 10.0
 _HYDRATED_OVERVIEW_MIN_REBUILD_INTERVAL_SEC = 300.0
 
 
+def _sport_overview_phase_log_threshold_sec() -> float:
+    """Only sports SLOWER than this print phase timing.
+
+    Seven of eight sports build in 0.3-2.4s and would add eight lines a build
+    for nothing. Soccer was 247.6s and ncaaf 51.7s in the same pass -- those are
+    the two this exists for. Tunable so a cheap sport can be opened up without
+    a deploy if one starts misbehaving.
+    """
+    raw = str(os.environ.get("SYNDICATE_SPORT_OVERVIEW_PHASE_LOG_SEC") or "").strip()
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            pass
+    return 5.0
+
+
 def _hydrated_overview_min_rebuild_interval_sec() -> float:
     raw = os.environ.get("SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC")
     if raw is None or not str(raw).strip():
@@ -7430,6 +7447,20 @@ def _build_sport_overview(
     # Keyed into the cache separately from the normal (skip=False) result so
     # the two can never serve stale/wrong data to each other.
     slug = str(sport.get("slug") or "").strip().lower()
+    # PHASE TIMING `[2026-08-28]`. Three instrument-deploy-measure cycles on
+    # soccer located THREE SECONDS of a 247.6s sport bracket -- `games()` and
+    # `pregame_props()` together are now ~3s after the cards-context TTL fix,
+    # so >98% of soccer's cost is in NEITHER loop and has never been measured.
+    #
+    # Coarse marks rather than another guess at a sub-call: every prediction I
+    # made about soccer (fan-out, one slow league, props, TTL-dominance) was
+    # refuted by the reading that followed it. This splits the 586-line body
+    # into four spans so the next reading NAMES the phase instead of ruling out
+    # one more candidate.
+    #
+    # Printed only above a threshold, so the seven cheap sports (0.3-2.4s) stay
+    # silent and this costs one monotonic() each.
+    _bso_marks: list[tuple[str, float]] = [("entry", time.monotonic())]
     cache_key = _sport_cache_key(slug, today_value)
     if skip_game_hydration:
         cache_key = f"{cache_key}:skip_hydration"
@@ -7638,7 +7669,9 @@ def _build_sport_overview(
             {"label": "Tracked dates", "value": str(len(dates))},
         ]
 
+    _bso_marks.append(("links_and_dates", time.monotonic()))
     active_today = _is_active_today(slug, today_value, context_label)
+    _bso_marks.append(("is_active_today", time.monotonic()))
     game_bar = _choose_game_bar(
         links,
         is_active_today=active_today,
@@ -7646,6 +7679,7 @@ def _build_sport_overview(
         fallback_label=str(sport.get("primary_label") or f"Open {sport.get('name') or slug.upper()} cards"),
     )
     props_bar = _choose_props_bar(links, is_active_today=active_today)
+    _bso_marks.append(("bars", time.monotonic()))
     if slug == "mlb":
         pitcher_top_props_href = _link_lookup(links, "Pitcher top props")
         hitter_top_props_href = _link_lookup(links, "Hitter top props")
@@ -7987,6 +8021,23 @@ def _build_sport_overview(
         now=stamped_at,
         ttl=max(_HOME_OVERVIEW_TTL_SEC, _hydrated_overview_min_rebuild_interval_sec()),
     )
+    try:
+        _bso_marks.append(("sport_branch", time.monotonic()))
+        _bso_total = _bso_marks[-1][1] - _bso_marks[0][1]
+        if _bso_total >= _sport_overview_phase_log_threshold_sec():
+            _phases = [
+                (_bso_marks[i][0], round(_bso_marks[i][1] - _bso_marks[i - 1][1], 2))
+                for i in range(1, len(_bso_marks))
+            ]
+            print(
+                f"[home] SPORT_OVERVIEW_PHASES sport={slug} "
+                f"total_s={round(_bso_total, 2)} date={today_value} "
+                f"phases={_phases}",
+                flush=True,
+            )
+    except Exception:
+        # A timing line must never break the build it measures.
+        pass
     return dict(overview)
 
 
