@@ -172,6 +172,13 @@
      Performance section rendered as raw unstyled markup, and `is-up`/`is-down`
      coloured nothing. Both are defined here. */
   .live-error--loud { border-width: 2px; }
+  .live-resolve { display: inline-flex; gap: 6px; margin-left: 6px; }
+  .live-resolve__btn {
+    font-size: 10px; padding: 2px 8px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--cards-line-strong); background: transparent;
+    color: var(--cards-text-soft); font-family: inherit;
+  }
+  .live-resolve__btn:hover { border-color: var(--cards-accent); color: var(--cards-accent); }
   .live-unknown-list { margin: 6px 0 0; padding-left: 18px; font-size: 11px; line-height: 1.55; }
   .live-unknown-list .sub { display: block; color: var(--cards-text-dim); font-size: 10px; }
   .live-venuefilter { display: inline-flex; align-items: center; gap: 4px; }
@@ -1129,6 +1136,19 @@
      reopens, so a conflict shown only under its own date is a conflict shown
      to nobody.
      --------------------------------------------------------------------- #}
+  {# WHAT THE LAST ACTION DID. A 303 that silently swallowed a refusal would
+     make "resolved" and "refused, nothing changed" look identical. #}
+  {% if request.args.get('resolve') %}
+    {% set r = request.args.get('resolve') %}
+    <div class="{{ 'live-error' if ('refused' in r or 'failed' in r) else 'live-note' }}">
+      {% if 'refused' in r or 'failed' in r %}
+        <strong>Not applied.</strong> {{ r }}
+      {% else %}
+        Applied: {{ r }}.
+      {% endif %}
+    </div>
+  {% endif %}
+
   {% if L.grade_conflicts %}
     <div class="live-error live-error--loud">
       <strong>{{ L.grade_conflicts|length }} settled bet(s) disagree with the actual game result.</strong>
@@ -1148,9 +1168,27 @@
             the game says <strong>{{ gc.get('our_outcome')|upper }}</strong>,
             booked {{ "%+.2f"|format(o.get('pnl_dollars') or 0) }}
             <span class="sub">{{ o.get('venue_ticker') or '' }}</span>
+            {# THE WAY OUT. Acknowledging changes no money -- the venue paid
+               what it paid -- it only stops a known disagreement being
+               indistinguishable from a new one. Without this the banner is
+               permanent by construction and teaches the reader to skip it. #}
+            <form class="live-resolve" method="post"
+                  action="/portfolio/live/grade-conflict/{{ o.get('idempotency_key') }}/acknowledge">
+              <button type="submit" class="live-resolve__btn">Mark reviewed</button>
+            </form>
           </li>
         {% endfor %}
       </ul>
+    </div>
+  {% endif %}
+
+  {# Reviewed, and still counted. A disagreement does not stop being one
+     because somebody looked at it; what changes is that it is no longer NEWS. #}
+  {% if L.grade_conflicts_acknowledged %}
+    <div class="live-note">
+      {{ L.grade_conflicts_acknowledged }} settled bet(s) disagree with the game result and have been
+      <strong>reviewed</strong>. The money stands — the venue paid what it paid. The cause
+      (Polymarket moneylines resolving the side positionally) is refused at the order path.
     </div>
   {% endif %}
 
@@ -1184,9 +1222,32 @@
             · ${{ "%.2f"|format(o.get('requested_stake_dollars') or 0) }} requested
             <span class="sub">{{ o.get('venue_ticker') or '' }}</span>
             {% if o.get('error') %}<span class="sub warn">{{ o.get('error') }}</span>{% endif %}
+            {# THE ONLY WAY OUT, because no read this system can make will
+               settle these -- Polymarket answers 501 on the orders list and the
+               per-order read needs the id the 503 lost. A human opens the
+               venue's screen and says which they saw.
+
+               `No position` marks the row REJECTED, which is already the status
+               meaning "never reached the venue": it stops counting against the
+               day's budget AND frees the position to be retried. Freeing the
+               exposure without freeing the retry would be half a fix. #}
+            <form class="live-resolve" method="post"
+                  action="/portfolio/live/unknown/{{ o.get('idempotency_key') }}/resolve">
+              <button type="submit" name="finding" value="not_placed"
+                      class="live-resolve__btn">Venue shows no position</button>
+              <button type="submit" name="finding" value="placed"
+                      class="live-resolve__btn">Venue shows a position</button>
+            </form>
           </li>
         {% endfor %}
       </ul>
+    </div>
+  {% endif %}
+
+  {% if L.unknown_submits_resolved %}
+    <div class="live-note">
+      {{ L.unknown_submits_resolved }} unanswered submission(s) have been resolved against the
+      venue's own screen and are no longer in question.
     </div>
   {% endif %}
 

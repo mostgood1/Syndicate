@@ -8,6 +8,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import quote
 
 from flask import Blueprint, jsonify, make_response, redirect, render_template, request
 from flask import redirect
@@ -3978,6 +3979,12 @@ def _is_unknown_submit(order: Mapping[str, Any]) -> bool:
         return False
     if str(order.get("venue_order_id") or "").strip():
         return False
+    if order.get("operator_resolution"):
+        # A HUMAN HAS ANSWERED IT. That is the only thing that can -- no read
+        # available to us settles these -- so once they have looked at the
+        # venue's own screen the question is closed and the banner must stop
+        # asking. See `execution_ledger.resolve_unknown_submit`.
+        return False
     from syndicate.features.shared.execution_guard import is_non_position
 
     return not is_non_position(order)
@@ -4233,11 +4240,27 @@ def _live_portfolio_payload(
     # three-valued -- False is a disagreement, None is "we could not read the
     # game", and folding the second into the first would turn every feed outage
     # into a wall of money alarms.
-    grade_conflicts = [
+    all_grade_conflicts = [
         o
         for o in whole_book
         if isinstance(o.get("grade_check"), Mapping)
         and o["grade_check"].get("agrees") is False
+    ]
+    # UNACKNOWLEDGED IS THE ALARM; ACKNOWLEDGED IS A RECORD.
+    #
+    # `[user 2026-08-28]` "these items need to get resolved - we cant just keep
+    # these as front facing errors." The banner was permanent by construction:
+    # the venue paid what it paid and nothing re-grades it, so a count that can
+    # never fall was going to sit red forever and teach the reader to skip it.
+    #
+    # Acknowledging changes NO money -- see `acknowledge_grade_conflict`. It
+    # only separates "a human has looked at these three" from "a fourth has
+    # appeared", which is the distinction the red state exists to carry.
+    grade_conflicts = [
+        o for o in all_grade_conflicts if not o["grade_check"].get("acknowledged_at")
+    ]
+    grade_conflicts_acknowledged = [
+        o for o in all_grade_conflicts if o["grade_check"].get("acknowledged_at")
     ]
 
     # OPEN AT THE VENUE, from the venue's own answer -- NOT from our status.
@@ -4364,6 +4387,17 @@ def _live_portfolio_payload(
         # name the market and the money for each one, because the only thing
         # that settles them is a person opening the venue's own screen.
         "unknown_submits": unknown_submits,
+        # Answered by a human, and no longer asking. Counted so the page can say
+        # so rather than silently emptying -- an operator who resolved two
+        # orders should see that they stayed resolved.
+        "unknown_submits_resolved": len(
+            [
+                o
+                for o in whole_book
+                if o.get("operator_resolution")
+                and str(o.get("venue_order_id") or "").strip() == ""
+            ]
+        ),
         "unknown_submit_dollars": round(
             sum(
                 float(o.get("requested_stake_dollars") or 0.0)
@@ -4408,6 +4442,10 @@ def _live_portfolio_payload(
         "grade_conflict_dollars": round(
             sum(abs(float(o.get("pnl_dollars") or 0.0)) for o in grade_conflicts), 2
         ),
+        # Kept on the payload rather than dropped: a reviewed disagreement is
+        # still a disagreement, and the count is what makes "three known" and
+        # "three known plus a new one" different sentences.
+        "grade_conflicts_acknowledged": len(grade_conflicts_acknowledged),
         # Shown as information, not as an error. See the note above.
         "resting": resting,
         **payload_state,
@@ -4567,6 +4605,65 @@ def portfolio_home():
             selected_date, show_all=show_all, on_date=on_date, venue=venue
         ),
     )
+
+
+@intelligence_bp.post("/portfolio/live/unknown/<idempotency_key>/resolve")
+def portfolio_unknown_submit_resolve(idempotency_key: str):
+    """The operator tells us what the venue's screen showed. THE ONLY WAY OUT.
+
+    A plain page-form action, matching `portfolio_bet_delete` immediately below
+    -- `/portfolio` is server-rendered with no client-side JS, and adding a
+    fetch flow for one button would be the odd one out.
+
+    WRITES TO THE MONEY RECORD, so the finding is validated against a closed
+    vocabulary in `resolve_unknown_submit` and an unrecognised one is refused
+    rather than stored. The redirect carries the result so a refusal is visible
+    on the page instead of being swallowed by a 303.
+    """
+    from syndicate.features.shared.execution_ledger import (
+        OperatorResolutionError,
+        resolve_unknown_submit,
+    )
+
+    finding = request.form.get("finding")
+    note = request.form.get("note")
+    try:
+        resolve_unknown_submit(idempotency_key, finding, note=note)
+        outcome = f"resolved={finding}"
+    except OperatorResolutionError as exc:
+        _LOGGER.warning("UNKNOWN_SUBMIT_RESOLVE_REFUSED %s", exc)
+        outcome = f"refused={exc}"
+    except Exception as exc:  # noqa: BLE001
+        _LOGGER.exception("UNKNOWN_SUBMIT_RESOLVE_FAILED")
+        outcome = f"failed={type(exc).__name__}"
+    return redirect(f"/portfolio?resolve={quote(outcome)}#live", code=303)
+
+
+@intelligence_bp.post("/portfolio/live/grade-conflict/<idempotency_key>/acknowledge")
+def portfolio_grade_conflict_acknowledge(idempotency_key: str):
+    """Mark a venue-vs-scoreboard disagreement as seen. Changes no money.
+
+    The dollars stand -- they are what the venue actually moved, and rewriting
+    them on our own reading is exactly what `_check_venue_grade` refuses to do.
+    This only stops a known disagreement from being indistinguishable from a
+    new one.
+    """
+    from syndicate.features.shared.execution_ledger import (
+        OperatorResolutionError,
+        acknowledge_grade_conflict,
+    )
+
+    note = request.form.get("note")
+    try:
+        acknowledge_grade_conflict(idempotency_key, note=note)
+        outcome = "acknowledged"
+    except OperatorResolutionError as exc:
+        _LOGGER.warning("GRADE_CONFLICT_ACK_REFUSED %s", exc)
+        outcome = f"refused={exc}"
+    except Exception as exc:  # noqa: BLE001
+        _LOGGER.exception("GRADE_CONFLICT_ACK_FAILED")
+        outcome = f"failed={type(exc).__name__}"
+    return redirect(f"/portfolio?resolve={quote(outcome)}#live", code=303)
 
 
 @intelligence_bp.post("/portfolio/bets/<prediction_id>/delete")

@@ -449,6 +449,141 @@ def _merge_onto_current(
     return merged, counts
 
 
+class OperatorResolutionError(ValueError):
+    """The operator's finding could not be applied. Names why."""
+
+
+# What an operator may say about an order the system cannot settle itself.
+#
+# TWO VALUES, NOT A FREE STRING. This writes to the money record, and "whatever
+# the caller typed" is not a vocabulary -- an unrecognised finding must be a
+# refusal, not a stored surprise.
+RESOLUTION_NOT_PLACED = "not_placed"
+RESOLUTION_PLACED = "placed"
+_RESOLUTIONS = (RESOLUTION_NOT_PLACED, RESOLUTION_PLACED)
+
+
+def resolve_unknown_submit(
+    idempotency_key: str, finding: str, *, note: str | None = None
+) -> dict[str, Any]:
+    """Record what a human saw on the venue's own screen. THE ONLY WAY OUT.
+
+    ----------------------------------------------------------------------
+    WHY THIS EXISTS: A WARNING WITH NO EXIT IS A WARNING NOBODY READS
+    ----------------------------------------------------------------------
+
+    An order that failed with no venue answer and no `venue_order_id` cannot be
+    settled by anything this system can call. Polymarket publishes no route:
+    `GET /v1/orders` answers `501 UNIMPLEMENTED` and the per-order read needs
+    the id the 503 lost. `probe_unknown_polymarket_positions` says so in its own
+    docstring -- "Returns a report for a human to act on... The only thing that
+    settles these is the venue's own UI."
+
+    So `/portfolio` grew a red banner that was PERMANENT BY CONSTRUCTION. It
+    described real exposure ($8.21 across two orders on 2026-08-27) and offered
+    no way to clear it, ever. `[user 2026-08-28]` "these items need to get
+    resolved - we cant just keep these as front facing errors." Correct: this
+    file already argues that "a warning that fires on the system working
+    correctly teaches the reader to ignore the warning", and a warning that
+    cannot be actioned is the same defect reached from the other side.
+
+    `not_placed` -> the venue's screen showed nothing, so no position exists.
+    The row becomes `rejected`, which is ALREADY the status meaning "never
+    reached the venue": `is_non_position` recognises it, the day's budget stops
+    charging for it, and `record_order` will let the position be retried. That
+    last part matters -- freeing the exposure without freeing the retry is half
+    a fix, which this module already learned once.
+
+    `placed` -> a position exists. The row keeps its stake and stays counted as
+    exposure; only the "we do not know" claim is retired. It is NOT graded here:
+    what it settles for is the venue's business and `settle_from_venue`'s.
+
+    THE ORIGINAL `error` AND `status` ARE PRESERVED under `pre_resolution_*`.
+    An operator can be wrong, and a record that overwrites what actually
+    happened leaves nothing to reverse.
+    """
+    finding = str(finding or "").strip().lower()
+    if finding not in _RESOLUTIONS:
+        raise OperatorResolutionError(
+            f"unknown_finding: {finding!r} -- expected one of {list(_RESOLUTIONS)}"
+        )
+    key = str(idempotency_key or "").strip()
+    if not key:
+        raise OperatorResolutionError("no_idempotency_key")
+
+    state = _load()
+    for order in state.get("orders") or []:
+        if str(order.get("idempotency_key") or "") != key:
+            continue
+        if order.get("outcome"):
+            # Something graded it while the operator was looking. Their finding
+            # is about an open question that is no longer open, and overwriting
+            # a settled row on it would be worse than refusing.
+            raise OperatorResolutionError(f"already_settled: outcome={order.get('outcome')}")
+        order["operator_resolution"] = {
+            "finding": finding,
+            "note": (str(note).strip() or None) if note else None,
+            "at": _utc_now(),
+        }
+        if finding == RESOLUTION_NOT_PLACED:
+            order.setdefault("pre_resolution_status", order.get("status"))
+            order.setdefault("pre_resolution_error", order.get("error"))
+            order["status"] = STATUS_REJECTED
+        _persist(state)
+        print(
+            f"[execution_ledger] OPERATOR_RESOLUTION key={key} finding={finding}"
+            f" venue={order.get('venue')} ticker={order.get('venue_ticker')}"
+            f" stake={order.get('requested_stake_dollars')}",
+            flush=True,
+        )
+        return dict(order)
+    raise OperatorResolutionError(f"order_not_found: {key}")
+
+
+def acknowledge_grade_conflict(
+    idempotency_key: str, *, note: str | None = None
+) -> dict[str, Any]:
+    """Mark a venue-vs-scoreboard disagreement as SEEN. Changes no money.
+
+    `_check_venue_grade` raises a red banner when the venue's settlement
+    contradicts the actual game result -- on a moneyline, that the position was
+    on the other team. It is the right alarm and it had no exit: the venue paid
+    what it paid, nothing re-grades it, so the banner was permanent.
+
+    ACKNOWLEDGING IS NOT RE-GRADING, and the distinction is the whole point.
+    The dollars stand -- they are what the venue actually moved, and rewriting
+    them on our own reading is precisely what `_check_venue_grade` refuses to
+    do. What this records is that a human has looked, so a NEW disagreement is
+    visibly different from three known ones. A count that never falls cannot
+    signal anything.
+    """
+    key = str(idempotency_key or "").strip()
+    if not key:
+        raise OperatorResolutionError("no_idempotency_key")
+
+    state = _load()
+    for order in state.get("orders") or []:
+        if str(order.get("idempotency_key") or "") != key:
+            continue
+        check = order.get("grade_check")
+        if not isinstance(check, Mapping) or check.get("agrees") is not False:
+            raise OperatorResolutionError("not_a_grade_conflict")
+        updated = dict(check)
+        updated["acknowledged_at"] = _utc_now()
+        if note:
+            updated["acknowledged_note"] = str(note).strip() or None
+        order["grade_check"] = updated
+        _persist(state)
+        print(
+            f"[execution_ledger] GRADE_CONFLICT_ACKNOWLEDGED key={key}"
+            f" ticker={order.get('venue_ticker')}"
+            f" venue_said={check.get('venue_outcome')} game_said={check.get('our_outcome')}",
+            flush=True,
+        )
+        return dict(order)
+    raise OperatorResolutionError(f"order_not_found: {key}")
+
+
 def _persist(state: dict[str, Any]) -> dict[str, Any]:
     # MERGE BEFORE THE TRIM, not after. The cap is a property of the document
     # actually being written, and trimming our copy first would drop rows the
