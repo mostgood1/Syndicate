@@ -75,11 +75,42 @@ it, and the player-prop control passes in BOTH states. The final box is still
 read ONCE per resolver — the player index and the team-score index are two
 derivations of one read, pinned by a test that caught a double read.
 
+**THE DENOMINATOR, because "2 rows now grade" is a numerator and this repo has
+been burned by quoting those.** Raised by lane `venue-join-refusal-visibility`,
+which shipped a fix the same day that moved `no_match|soccer|h2h` 104 -> 93
+while the board itself shrank to 93 rows -- 100% unmatched either way.
+
+Measured on the live book 2026-08-28T17:0xZ. **WNBA game lines: 5, all-time.**
+
+    2026-08-26  totals under 151.5  ungraded   <- rescued by this
+    2026-08-26  totals over  151.5  ungraded   <- rescued by this
+    2026-08-26  totals over  176.5  lost, settled_by=VENUE
+    2026-08-28  totals over  178.5  ungraded, TODAY -- tips 19:30 EDT
+    2026-08-28  totals over  180.5  ungraded, TODAY -- tips 19:30 EDT
+
+So the immediate recovery is **2 of 5**, the other two ungraded rows are
+correctly pending (ESPN: all four of today's WNBA games are `completed=False`
+at the time of measurement), and the single settled one owed its outcome
+entirely to Kalshi.
+
+**BE HONEST ABOUT THE SIZE OF THIS.** Five orders, of 20 WNBA orders total --
+the other 15 are player props, which already worked. The value here is NOT the
+two rows; it is that WNBA game lines stop depending on the venue choosing to
+settle them. One of five got an outcome that way and one of five did not, which
+is the coin flip this removes. The paper book is additional and NOT measured
+from this surface.
+
 **Verification when deployed:** the two `KXWNBATOTAL-26AUG26GSCONN-152` rows
 gain an outcome on the first settlement pass (08-26 is inside the `#596`
 straggler window, so no manual step is needed). If they instead appear under
 `no_final_box_for_date`, the keyvalue copy of that date's CSV is missing and
 the job is the capture, not this.
+
+**The FORWARD test, which is the better one:** tonight's two 08-28 totals should
+grade off our own resolver once those games finish and the box is written --
+`matched_by: final_boxscore_team_totals`, not `settled_by: venue`. That is the
+reading that shows the dependency is actually broken rather than that two old
+rows were repaired.
 
 
 ### `#597` — **KALSHI LISTS ~665 SOCCER MARKETS WE CANNOT PARSE. It is a TITLE GRAMMAR gap, not a coverage gap.** — lane `venue-join-refusal-visibility`, 2026-08-28 — **DEPLOYED, work list now readable**
