@@ -682,6 +682,18 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # `pull_streamed_artifact` is the route; the sweep is not.
     "*_source/data/live_gameline_ledger/live_gameline_ledger_*.jsonl",
     "*_source/source_artifacts/data/live_gameline_ledger/live_gameline_ledger_*.jsonl",
+    # The SCORE of that ledger, retained per sport-date by the board build --
+    # the accumulating model-vs-market history. Written with a direct
+    # `path.open("a")` under `data/`, NOT through `write_json_file`, so this
+    # allowlist entry is meaningful: a keyvalue-backed path would make it inert
+    # and turn a 403 into an empty result (`learnings.md`, 2026-08-27).
+    #
+    # SWEEPS, unlike the ledger above: one row per date at a few hundred bytes
+    # is well under `_PUBLISH_MAX_BYTES` for years, so it needs no streaming
+    # route. The ledger is megabytes PER DAY and must stream; this is the
+    # reduction of it that answers "is the model worth anything".
+    "*_source/data/live_gameline_accuracy/live_gameline_accuracy_*.jsonl",
+    "*_source/source_artifacts/data/live_gameline_accuracy/live_gameline_accuracy_*.jsonl",
     # The change log's SIDECAR, and without it the log is only half readable
     # across services. `append_book_quotes` writes rows only when (line, price)
     # CHANGES, and records "when did we last OBSERVE this market" in

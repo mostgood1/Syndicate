@@ -306,6 +306,37 @@ def build_book_grid_artifact(
     except Exception as exc:  # pragma: no cover - instrumentation must not break the board
         live_gameline_score = {"enabled": True, "error": f"{type(exc).__name__}: {exc}"[:200]}
 
+    # RETAIN the score, here, for the same reason it is COMPUTED here: this is
+    # the only place the sample and the outcomes are both in hand, and nothing
+    # downstream keeps it. The served payload is overwritten by the next build,
+    # and the board rolls to the next slate date at midnight Central.
+    #
+    # This REPLACES a laptop cron (`live-gameline-accuracy-snapshot`, 23:25 CT)
+    # that lost 7 of its first 8 nights -- six to sitting disabled, and one to
+    # Windows Modern Standby suspending its python child for 9h13m while the
+    # scheduler and the model both ran normally (measured 2026-08-28; full chain
+    # in `live_gameline_accuracy`'s docstring). Recording on every build also
+    # removes the wall-clock DEADLINE that made a single missed run fatal.
+    #
+    # Appends only when `games_with_outcome` IMPROVES, so the build rate does
+    # not multiply the file. Never raises, same rule as the recorder and scorer
+    # above.
+    #
+    # ONE clock read, shared with the payload below, so the retained row's
+    # `board_generated_at` is the SAME instant the artifact publishes rather
+    # than a second reading microseconds later -- that field is how a retained
+    # row is joined back to the build that produced it.
+    generated_at = datetime.now(timezone.utc).isoformat()
+
+    from syndicate.features.shared.live_gameline_accuracy import record_live_gameline_score
+
+    live_gameline_accuracy = record_live_gameline_score(
+        live_gameline_score,
+        sport=sport,
+        date_str=date_str,
+        board_generated_at=generated_at,
+    )
+
     margin_coverage = attach_margin_model(grid)
 
     # Market taxonomy, served rather than re-derived on the client -- the serve
@@ -329,7 +360,7 @@ def build_book_grid_artifact(
         "version": BOOK_GRID_ARTIFACT_VERSION,
         "sport": str(sport or "").strip().lower(),
         "date": str(date_str or "").strip(),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": generated_at,
         "source_shard_bytes": shard_bytes,
         # RAW rows in the shard, unchanged in meaning by the `#331` reduction --
         # this field is how a partial shard is spotted, so it must keep counting
@@ -358,6 +389,13 @@ def build_book_grid_artifact(
         # way the sample leaves the worker: model vs market Brier on identical
         # rows, so "is the model worth anything" is answerable off a served API.
         "live_gameline_score": live_gameline_score,
+        # Counters for the RETENTION of the score above -- `written`,
+        # `skipped_not_improved`, `previous_best`. Served because the retained
+        # file lives on the worker's disk: without these, "the history stopped
+        # growing" and "every build saw no new final" are indistinguishable
+        # from any surface reachable off-worker, which is precisely the blind
+        # spot that let the old collector lose seven nights unnoticed.
+        "live_gameline_accuracy": live_gameline_accuracy,
         "margin_model": margin_coverage,
         "market_kinds": market_kinds,
         "rows": bounded,
