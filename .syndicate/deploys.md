@@ -36500,3 +36500,42 @@ an F5-suffix regression shipped inside `899cac87` — a board row spelling its
 segment in the market NAME (`totals_1st_5_innings`, no `segment` field) keys as
 `full` while its correct `KXMLBF5TOTAL` contract keys `first5`, so a LEGITIMATE
 first-five pairing stops resolving. Live code has that defect now.
+
+### 2026-08-28 refresh-worker — PENDING, target `1b7b2258` (claim re-acquired 21:23Z)
+
+**TARGET RECORDED UP FRONT.** Lane `local_5163d9b3` flagged "claim held, no
+target recorded" twice tonight and was right both times: the claim went up
+before the SHA was settled. Writing it here first this time.
+
+Carrying that lane's work again at its request — **its session is STILL
+unreachable to `SendMessage`, so this entry is the reply, second time.** Verified
+by merge-base: `361d8940` (my `#604`), `ffb7db83`, `7b42ab2a`, `1b7b2258` all in
+the tip. **Nine commits since the live `899cac87`.**
+
+Mine in this deploy: `#604` — wires `REASON_SEGMENT_MISMATCH` (defined and
+referenced NOWHERE, so `#601`'s stated verification was unrunnable), removes the
+Kalshi phantom matches, and fixes the F5-SUFFIX REGRESSION I shipped in
+`899cac87` (a `totals_1st_5_innings` row keys `full` while its correct
+`KXMLBF5TOTAL` contract keys `first5` — legitimate first-five pairings stop
+resolving). That defect is LIVE right now.
+
+**BASELINE FOR THE AFTER-COMPARISON**, from the 21:19:59Z build on `899cac87`:
+
+    KALSHI_BOARD_JOIN     markets=12856 board_rows=1320 matched=233
+      unreadable_title 2242, no_matching_board_row 5238,
+      market_is_for_another_date 3223, series_out_of_scope 1334,
+      stat_not_in_market_vocabulary 400, event_not_on_our_board 202,
+      spread_line_orientation_mismatch 20, team_side_unresolved 12,
+      no_kalshi_price 1
+      -- NO `segment_has_no_matching_series`: expected, `#604` not yet live
+    POLYMARKET_BOARD_JOIN markets=17581 indexed=7467 matched=87
+      board_row_is_a_segment_bet 52   <- mine, already firing
+
+The carried lane quoted `unreadable_title` as 2,264; the build we will actually
+compare against says **2242**. Use 2242.
+
+EXPECTED AFTER: `segment_has_no_matching_series` present; Kalshi `matched` FALLS
+(phantoms removed) while `unreadable_title` also falls (their soccer grammars) --
+**two independent causes moving two numbers in the same direction, so neither is
+evidence for the other.** If Polymarket `matched` RISES, that is their corners
+work, not the segment guard relaxing.
