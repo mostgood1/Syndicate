@@ -5,6 +5,74 @@
 
 ---
 
+## 2026-08-28 — refresh-worker `32b0cfaa`: the `_candidate_keys` ambiguity guard — **PARTIAL, and the counter that says so is the point**
+
+Lane `venue-candidate-key-token-guard`. Change is `1c37c220`, carried inside
+`32b0cfaa`. **Deployed by the USER, manually.** I held the refresh-worker claim
+at the time and preflight was returning `TOO_SOON` (7.5 min into a measured
+1500s spacing); the deploy went anyway and the claim was released afterwards
+with its token, not `--force`. Recorded because the ledger should say what
+happened, not what the protocol would have produced.
+
+### What shipped
+
+`team_name_tokens` resolves through `canonical_team` (no raw-string fallback on
+the BOARD side of the join) and keeps only tokens that `unambiguous_club_tokens`
+reports as naming exactly one club in the sport. Fixes two things: a board team
+the club map could not resolve was offering keys built of bare words ("Not A
+Real Club" -> `mlb|h2h|club`, `|not`, `|real`), and the only ambiguity check was
+subtracting the OPPONENT's words — the wrong SCOPE, since `apply_venue_quotes`
+resolves candidates against the sport's whole quote pool, not the row's game.
+
+### Measured — soccer, and it is a CONTROLLED comparison
+
+| build | unmatched | selected | rows | rate |
+|---|---|---|---|---|
+| 01:23 `635f869d` | 4,306 | 9,599 | 13,905 | 30.97% |
+| 01:53 `635f869d` | 4,387 | 9,895 | 14,282 | 30.72% |
+| 02:10 `635f869d` | 4,384 | 9,845 | 14,229 | 30.81% |
+| **02:36 `32b0cfaa`** | **4,387** | **9,895** | **14,282** | **30.72%** |
+
+Kalshi soccer `wanted_overlap` **83 -> 83**, which is what was PRE-REGISTERED
+before the AFTER existed, along with the falsification (a fall >1pp in the rate
+would mean the model of the change was wrong — removing candidate keys cannot
+increase matches). The soccer INPUTS are byte-identical to the 01:53 build —
+offered 137/13/15378/10, overlaps 83/1/9405/8, selected 9521/83/208/83 — so the
+same quote pool produced the same output. **The guard cost zero soccer matches.**
+
+Soccer is the only attributable sport here: its selections are 96.7%
+`oddsapi_props` and Kalshi is 0.84-0.86% of them, so it is insulated from the
+`SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS` 120 -> 300 change that landed with
+`029a8eb2`. mlb 221->137, wnba 1288->449, nfl 1154->1300 all moved and NONE of
+it is attributable — Kalshi-heavy plus overnight slate churn.
+
+### verify: NO REGRESSION. **NOT** "the guard fired." These are different claims.
+
+`wanted_overlap` counts `offered ∩ wanted`. This change shrinks *wanted*. But
+Kalshi's soccer keys are full club names (`lommel sk`, `club brugge`, `oh
+leuven`), which the guard PRESERVES by design — so the removed keys were never
+in `offered`, and **this counter reads 83 whether or not the code executed.**
+No counter distinguishes those states. The SHA is content-verified on
+refresh-worker (`live=32b0cfaa`, finished 02:23:18Z, build at 02:36:16Z is
+after it), and per the standing rule presence is not reachability.
+
+So: PARTIAL. A healthy reading from an instrument that cannot read unhealthy is
+not evidence, and this one names its own blind spot rather than being quoted as
+a pass.
+
+### STILL OWED, and it is a DIFFERENT question from the one above
+
+The nhl/ncaaf/ncaab half. `_alias_map` is `{}` for those sports, so before this
+change every one of their rows took the raw-string path with no guard at all —
+"Ohio State Buckeyes" offered `ncaaf|h2h|state` against a sport-wide pool. ncaaf
+IS live on the board (02:10 build: kalshi offered 524, `wanted_overlap` 32,
+selected 52), so the exposure was real, not theoretical. That is a WRONG-match
+question; the soccer numbers above are a MISSED-match question. A wrong match
+surfaces as a plausible number nowhere, so no counter here answers it and it
+needs its own instrument.
+
+---
+
 ## 2026-08-28 — all three services `32b0cfaa`: the venue reconciliation standard is LIVE and RUNNING, and Kalshi's cursor field is now measured
 
 **Deployed by the USER, manually, not by me.** `live-odds-worker` deploy_started
