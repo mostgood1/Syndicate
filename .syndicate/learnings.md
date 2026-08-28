@@ -5503,3 +5503,36 @@ replaced, as the record of a comment that went false silently.
 Fix: `632f3473`. `kalshi_catalogue.segment_for_series` + `segment` in both key
 tuples + `series` stamped at both match-record sites. 9 new tests, 127 passing
 across the Kalshi join and catalogue suites.
+
+## 2026-08-28 — FORBIDDEN: closing on the venue that was REPORTED when the join it mirrors has the same key
+
+`#601` arrived as "the Kalshi segment bug" and I fixed it as one — correctly,
+with tests, and landed. Then I ran the same query against Polymarket and found
+**four more bad orders of the same class, the same day.** Nine distinct wrong
+orders across both venues, not five. Nothing pointed at Polymarket; the only
+reason it surfaced is that the audit was repeated rather than concluded.
+
+**HALF A GUARD IS WORSE THAN NONE.** Polymarket's join ALREADY refused segment
+MARKETS on the venue side (`segment_market_not_full_game`), ~200 lines above the
+board loop that had no matching check. That guarantee made the index safe and
+the missing board-side check unsafe in the same stroke: because every indexed
+market is full-game, a `first3` row could not match a CORRECT contract — only a
+wrong one. **The half that exists is what makes the other half look
+unnecessary**, and a reader who finds the venue-side refusal will reasonably
+conclude segment is handled.
+
+So: when a guard exists on one side of a join, that is a reason to check the
+other side, not evidence that the concern is covered.
+
+**THE UPSTREAM SIGNAL WAS SITTING IN PLAIN SIGHT AND BOTH CONSUMERS IGNORED IT.**
+`layer2_board.py:623` keys a board row on `(event_id, market, **segment**, line,
+player_name)`. The board has always treated segment as part of a row's identity.
+Two independent venue resolvers each flattened that identity to a 5-tuple. That
+is not two bugs, it is one mistake made twice — which is the argument for
+grepping every consumer of a shared record shape when one is found wrong, rather
+than fixing the one that was reported. **Not yet done for the remaining
+consumers, and recorded as open in `#602`.**
+
+Related: the correction discipline that found it. The reported symptom named a
+venue; the DEFECT named a key. Fixing at the level of the symptom would have
+left half the money on the table and the ledger reading as if it were closed.

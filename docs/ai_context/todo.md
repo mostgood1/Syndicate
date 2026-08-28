@@ -1,5 +1,50 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#602` — **THE SAME SEGMENT DEFECT ON POLYMARKET. Four more orders. Found by repeating the audit, not by a report.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED AND LANDED (`d2ab7e86`), DEPLOY PENDING**
+
+`#601` was reported as a Kalshi bug and I fixed it as one. Re-running the same
+query against the other venue found four more, same day, same class:
+
+    first3  h2h home  aec-mlb-lad-det-2026-08-28   +199,  $2.35
+    first3  h2h away  aec-mlb-tex-mil-2026-08-28   +160,  $2.52
+    first5  h2h home  aec-mlb-lad-det-2026-08-28   +208,  $2.11
+    first3  h2h away  aec-mlb-pit-stl-2026-08-28   +106,  $2.40
+
+**Nine distinct bad orders across both venues, not five.** Kalshi ~$7.30
+requested stake, Polymarket ~$9.38. (The earlier $7.08 Kalshi figure came from a
+different field; both are recorded, and the discrepancy is stake-vs-fill, not a
+new order.)
+
+`_resolver_key` was `(event_id, market, player, line, side)` — no `segment`. One
+shared function serves the price AND ticker resolvers, so it reached the order
+path directly.
+
+**THE HALF-GUARD IS THE LESSON.** The venue side of this join already refuses
+segment MARKETS (`segment_market_not_full_game`). So every indexed Polymarket
+market is guaranteed full-game — which made the index safe and the missing
+board-side check unsafe in the same stroke: a `first3` row could not match a
+CORRECT contract, only a wrong one. **Half a guard is worse than none, because
+the half that exists is what makes the other half look unnecessary.**
+
+Fix: `segment` in the shared key (absent = full game, which is both what a bare
+board row has always meant and what every match record is), plus
+`refuse("board_row_is_a_segment_bet")` mirroring the venue-side guard — the key
+fix alone silences these rows, and a bet that stops being placed with no reason
+emitted is indistinguishable from a venue that stopped quoting.
+
+`layer2_board.py:623` keys a board row on `(event_id, market, **segment**, line,
+player_name)`. **The board has always counted segment as part of a row's
+identity and BOTH venue resolvers dropped it** — one mistake made twice, which
+is the reason to check a third consumer rather than assume two is the whole set.
+
+**STILL UNCHECKED:** any other consumer that keys a board row without `segment`.
+`basketball_market_join.py:106` already filters on it correctly. A grep for
+5-tuple row keys across the venue/quote modules has NOT been done.
+
+**VERIFY AFTER DEPLOY:** `board_row_is_a_segment_bet` appears with a non-zero
+count in the Polymarket join refusals, and no new order carries a `first3`/
+`first5` segment against a full-game slug.
+
 ### `#601` — **KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS. The join key had no `segment`. Five orders, $7.08.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED AND LANDED (`632f3473`), DEPLOY PENDING**
 
 `_match_key`/`_row_key` were five-tuples — game, market, player, line, side —
