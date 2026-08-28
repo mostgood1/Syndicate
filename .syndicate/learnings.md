@@ -5402,3 +5402,46 @@ against `HEAD` with the checker's own parser rather than reading the text —
 `m.claims(git show HEAD:...)` vs `m.claims(working copy)`. It caught both
 mistakes here and proved the final state removed exactly 5 and added 0 (121 ->
 116). Reading the markdown would not have shown either.
+
+---
+
+## 2026-08-28 — AMENDS the `createdAt`/`finishedAt` rule: the DEPLOY RECORD and the PROCESS are not the same instant `[lane venue-join-refusal-visibility]`
+
+The existing rule says *"a deploy timestamp marks when you ASKED; only
+`finishedAt` marks when the code ran."* The first half is right. **The second
+half is off by up to half a minute**, and on a worker that emits every few
+seconds that is a real window.
+
+Measured on refresh-worker, 2026-08-28:
+
+```
+deploy 521b6dea finishedAt   20:20:59      <- the deploy record
+[refresh_worker] BOOTED      20:21:29      <- the process, 30s later
+```
+
+A log line at 20:21:10 is AFTER `finishedAt` and BEFORE the new process
+existed. `finishedAt` says the artifact is ready; only the boot line says the
+code is running. **For a before/after they are not interchangeable, and the one
+that matters is the process.**
+
+**HONESTY ABOUT SCOPE, because overstating this would make it a worse rule:**
+in the incident that produced it, `finishedAt` WOULD have been sufficient. A
+peer read a `POLYMARKET_ORIENTATION` line from 20:19:16 as post-deploy — before
+`finishedAt` AND before `BOOTED` — because they INFERRED "~20:18Z" instead of
+reading the field at all. The actual error was not consulting the record; the
+30-second window is a hazard I found while checking, not the one that bit.
+
+Both halves are worth carrying:
+
+- **Read `finishedAt`, never infer a deploy time.** That is what went wrong.
+- **Prefer the service's own boot line when a reading sits within ~30s of it.**
+  That is what could go wrong next.
+
+**WHY IT MATTERED HERE.** The mislabelled reading showed `listed 5 -> 24` and
+`unreadable 66 -> 45` on a counter I had shipped, and I was told my tri-code
+table had worked. It had never executed. The change was slate turnover between
+two reads of the SAME binary — the exact "a count is not a rate when the
+population moves underneath it" error this lane spent the day fixing, arriving
+one level up as a gift from a peer. **A result handed to you by another session
+still needs its boundary established, and the more welcome it is the more that
+applies.**
