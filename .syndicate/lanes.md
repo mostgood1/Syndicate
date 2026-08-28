@@ -2765,7 +2765,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none. Next refresh-worker deploy by ANY lane carries the counter.
 
 
-### cryptocom-finding-correction — OPEN — opened 2026-08-28 — session 29794bbe-33cb-45fc-a046-136e18ef3e06
+### cryptocom-finding-correction — **CLOSED 2026-08-28** — VERIFIED AND LANDED on `origin/main` as `ceb3c830`. `FINDING` no longer asserts the falsified "no public REST/WebSocket market-data API has shipped" (a JSON sports endpoint exists and was read live), `rejected_source` -> `corrected_source` (the endpoint is Crypto.com's OWN documented sample, not a third party's invention — right decision, false reason), and `probe()`'s false-positive gate is replaced: `unblocked` defaults False and flips only on a non-crypto `inst_type` in the SANCTIONED Exchange catalogue. 16 tests pass including an off!=on pair proving the gate flips both ways; the old assertions were confirmed to FAIL first. Live run: `unblocked=False reason=exchange_rest_lists_no_event_contracts`, EXCHANGE_REST 957 instruments / non_crypto=0, APP_PROXY http_403. Evidence: `.syndicate/findings_2026-08-28_cryptocom_venue_evaluation.md`. Nothing deployed; no deploy claim taken. — opened 2026-08-28 — session 29794bbe-33cb-45fc-a046-136e18ef3e06
 - Goal: `cryptocom_client.py`'s `FINDING` and `probe()` state what was MEASURED
   on 2026-08-28, not what was inferred from a sandbox that could not reach the
   venue. Single testable outcome: `probe()` returns an explicit `unblocked`
