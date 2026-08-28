@@ -790,9 +790,12 @@ def join_polymarket_to_board(
              # difference between one pass over ~17k markets and a nested scan.
              #
              # Deliberately NOT `teams_match`: see `_canonical_fixture`.
+             # `_canonical_fixture` first; the venue tri-code table as a
+             # fallback, so a fixture whose codes only Polymarket names still
+             # becomes classifiable instead of counting as unreadable forever.
              "canon_pair": _canonical_fixture(
                  row_league, parsed.get("home"), parsed.get("away")
-             )}
+             ) or _venue_canonical_fixture(parsed)}
         )
 
     matches: list[dict[str, Any]] = []
@@ -1113,6 +1116,85 @@ def join_polymarket_to_board(
     }
 
 
+# POLYMARKET'S OWN CLUB TRI-CODES, KEYED BY COMPETITION.
+#
+# --------------------------------------------------------------------------
+# EVERY ENTRY IS PROVEN BY A NAMED FIXTURE. NONE ARE GUESSED.
+# --------------------------------------------------------------------------
+#
+# `_soccer_alias_to_name` is DERIVED from the team artifacts and deliberately
+# drops a token that names two clubs. That is correct and must stay -- but it
+# leaves Polymarket's vocabulary unreachable, because its tri-codes are its own
+# and are not ESPN's abbreviations. MEASURED 2026-08-28: of 17 codes seen on
+# the live slate, 13 resolve through neither the flat nor the per-league map.
+#
+# The consequence was not a missing club, it was a missing MEASUREMENT: with
+# these unresolved, `POLYMARKET_ORIENTATION` could classify only 5 of 71
+# unmatched soccer rows, and `not_listed` came back EMPTY -- we could not prove
+# a single fixture absent because we could not read the candidates.
+#
+# EACH ROW BELOW WAS READ OFF ESPN'S OWN SCOREBOARD for that competition and
+# date, using the slug's home-first ordering (itself established against ESPN
+# the same day). The fixture is recorded beside the code so the evidence
+# travels with the claim, exactly as `_SOCCER_VENDOR_NAME_ALIASES` does.
+#
+# --------------------------------------------------------------------------
+# KEYED BY (COMPETITION, CODE) AND NOT BY CODE ALONE -- THIS IS LOAD-BEARING
+# --------------------------------------------------------------------------
+#
+# A flat table would reintroduce the exact bug the derived map avoids:
+#
+#   `mil`  serie_a -> AC Milan, championship -> Millwall   (both in OUR maps)
+#   `fcb`  Bayern in `bun`; Barcelona is the other claimant, and this module's
+#          own history records `fcb` as the canonical ambiguous token
+#
+# Evidence for `mil` and `fcb` covers ONE competition each, so the entry is
+# scoped to that competition and says nothing about any other. A code seen in a
+# competition not listed here resolves to nothing and the row stays counted as
+# unreadable, which is the honest outcome.
+_VENUE_TRI_CODES: dict[tuple[str, str], str] = {
+    ("ligpor", "bra"): "Braga",          # atc-ligpor-bra-gil-2026-08-16  Gil Vicente @ Braga
+    ("ligpor", "rav"): "Rio Ave",        # atc-ligpor-rav-spo-2026-08-28  Sporting CP @ Rio Ave
+    ("ligpor", "spo"): "Sporting CP",    # atc-ligpor-rav-spo-2026-08-28  Sporting CP @ Rio Ave
+    ("bun", "fcb"): "Bayern Munich",     # asc-bun-fcb-stu-2026-08-28     VfB Stuttgart @ Bayern Munich
+    ("bun", "stu"): "VfB Stuttgart",     # asc-bun-fcb-stu-2026-08-28     VfB Stuttgart @ Bayern Munich
+    ("sea", "mil"): "AC Milan",          # asc-sea-mil-ven-2026-08-28     Venezia @ AC Milan
+    ("eflch", "wre"): "Wrexham",         # atc-eflch-wre-bir-2026-08-28   Birmingham City @ Wrexham
+}
+
+
+def _venue_canonical_fixture(parsed: Mapping[str, Any]) -> frozenset[str] | None:
+    """The fixture as an unordered canonical pair, via the venue tri-codes.
+
+    The eligibility classifier's fallback. Without it a fixture Polymarket
+    names in its own vocabulary stays `unreadable` even once we can read it,
+    and the denominator never improves.
+    """
+    a = _venue_club(parsed, (parsed or {}).get("home"))
+    b = _venue_club(parsed, (parsed or {}).get("away"))
+    if not a or not b or a == b:
+        return None
+    return frozenset((a, b))
+
+
+def _venue_club(parsed: Mapping[str, Any], token: Any) -> str | None:
+    """Polymarket's tri-code -> a canonical club, scoped to its competition.
+
+    Returns the CANONICAL name (through `canonical_team`) so this cannot become
+    a second vocabulary alongside the alias map -- the failure this repo keeps
+    paying for is two resolvers disagreeing, not one resolver missing a key.
+    """
+    league = str((parsed or {}).get("league") or "").strip().lower()
+    name = _VENUE_TRI_CODES.get((league, str(token or "").strip().lower()))
+    if not name:
+        return None
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:  # noqa: BLE001
+        return None
+    return canonical_team("soccer", name)
+
+
 def _teams_match(board_row: Mapping[str, Any], parsed: Mapping[str, Any], sport: Any) -> bool:
     """Both clubs, or no match.
 
@@ -1171,12 +1253,23 @@ def _teams_match(board_row: Mapping[str, Any], parsed: Mapping[str, Any], sport:
         )
     except Exception:
         return False
-    pair = soccer_fixture_clubs(parsed.get("home"), parsed.get("away"))
-    if not pair:
-        return False
     board_home = canonical_team("soccer", home)
     board_away = canonical_team("soccer", away)
     if not board_home or not board_away:
+        return False
+
+    # POLYMARKET'S OWN TRI-CODES, tried before the pair resolver. Additive and
+    # last-resort: reached only after `alias_match` has already declined both
+    # clubs, so it can add a pairing and can never remove one. Scoped to the
+    # slug's competition -- see `_VENUE_TRI_CODES` for why a flat table would
+    # be wrong.
+    venue_home = _venue_club(parsed, parsed.get("home"))
+    venue_away = _venue_club(parsed, parsed.get("away"))
+    if venue_home and venue_away:
+        return bool(venue_home == board_home and venue_away == board_away)
+
+    pair = soccer_fixture_clubs(parsed.get("home"), parsed.get("away"))
+    if not pair:
         return False
     return bool(pair[0] == board_home and pair[1] == board_away)
 

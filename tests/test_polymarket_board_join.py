@@ -1153,3 +1153,47 @@ def test_absence_IS_claimed_when_the_whole_bucket_reads(monkeypatch):
 
     assert out["orientation_fixture_not_listed"].get("soccer|h2h") == 1
     assert out["orientation_invariant_ok"] is True
+
+
+def test_a_venue_tri_code_resolves_only_inside_its_own_competition():
+    """`(competition, code)`, never code alone — and this is the whole design.
+
+    A flat table would reintroduce the bug `_soccer_alias_to_name` drops keys to
+    avoid. Our own maps carry `mil` as BOTH `serie_a: ac milan` and
+    `championship: millwall`; evidence for the Polymarket code covers Serie A
+    only, so it must say nothing about the Championship.
+    """
+    assert mod._venue_club({"league": "sea"}, "mil") == "ac milan"
+    assert mod._venue_club({"league": "eflch"}, "mil") is None, (
+        "evidence for one competition must not leak into another"
+    )
+    assert mod._venue_club({"league": "bun"}, "fcb") == "bayern munich"
+    assert mod._venue_club({"league": "lal"}, "fcb") is None, (
+        "`fcb` is Bayern in the Bundesliga and Barcelona in La Liga -- the "
+        "canonical ambiguous token this module's history records"
+    )
+
+
+def test_every_tri_code_entry_resolves_through_canonical_team():
+    """An entry naming a club the alias map cannot canonicalise is dead weight
+    that reads as a working mapping. Cheap to assert, and it catches a typo in
+    the club name — the most likely way one of these silently stops working."""
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    unresolved = [
+        (league, code, name)
+        for (league, code), name in mod._VENUE_TRI_CODES.items()
+        if not canonical_team("soccer", name)
+    ]
+    assert unresolved == [], f"tri-code entries naming an unknown club: {unresolved}"
+
+
+def test_the_tri_code_table_is_additive_and_cannot_remove_a_pairing(monkeypatch):
+    """Reached only after `alias_match` declines both clubs, so it can add a
+    match and never take one away."""
+    import syndicate.features.shared.team_aliases as aliases
+
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    parsed = {"league": "bun", "home": "fcb", "away": "stu"}
+    board = {"home_team": "anything", "away_team": "anything else"}
+    assert mod._teams_match(board, parsed, "soccer") is True
