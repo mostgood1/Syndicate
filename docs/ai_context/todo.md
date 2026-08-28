@@ -1,5 +1,43 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#600` — **THE EXECUTION LEDGER IS READ-MODIFY-WRITTEN BY TWO SERVICES WITH NO LOCK. Settlement writes are being silently lost.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FOUND AND MEASURED, NOT FIXED**
+
+`execution_ledger._persist` is a blind whole-document `write_json_file`: no
+lock, no compare-and-swap, no merge. refresh-worker (settlement/grading) and
+live-odds-worker (placement/reconciliation) both load the whole ledger, mutate,
+and write it back. **Last writer wins with whatever it loaded.**
+
+Measured from both services' own `KEYVALUE_WRITE_LARGE` size fields:
+
+    refresh-worker   17:40:47  1,276,178  paper_settlement.py:542  (08-26 graded=8)
+    refresh-worker   17:40:48  1,276,296  paper_settlement.py:542  (08-23 graded=1)
+    live-odds-worker 17:41:00  1,268,265  -- 12s later, 8,031 bytes SMALLER
+                                             and held there for 12 minutes
+
+The ledger moved **backwards**. live-odds-worker's copy is smaller than
+refresh-worker's write at 17:40:43, so it predates the whole burst.
+
+**Diagnostic signature, worth recognising directly:** a `SETTLED ... graded=N`
+line with `N>0` and **no** corresponding outcome change on `/api/portfolio/live`.
+That is a lost write, not a resolver bug. I burned three wrong theories on "what
+filters these rows" before running the deployed predicate chain against the real
+records and finding they pass every filter and reach the resolver.
+
+**Scope: not WNBA, not settlement.** Any write from either service can be lost —
+a grade, a `grade_check`, a reconciliation, a fill. This is the record of real
+money.
+
+**NOT FIXED.** A lock or CAS on the money ledger is a concurrency change on the
+money path. `execution_ledger.py` is claimed by lane
+`portfolio-ledger-service-split`. Surfaced rather than taken.
+
+**Candidate shapes, none evaluated:** compare-and-swap on `updated_at` with a
+retry; a per-order merge on write instead of whole-document replace; or moving
+settlement's writes behind the same single-owner rule the refresh manifests
+already use. The second is the most likely fit — orders are independent records
+and a whole-document replace is a stronger operation than any writer needs.
+
+
 ### `#599` — **WNBA game lines could never be graded, because a comment said the player box had no team scores. It always had them.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **LANDED (`56426d9a`), NOT DEPLOYED**
 
 `bet_status_wnba` refused every WNBA spread, moneyline and total since the

@@ -248,6 +248,51 @@ the three tickers were named before the reading. It never rewrites `outcome` or
 `pnl_dollars`. `learnings.md` had recorded this class as "caught twice by a human
 looking at a screen and zero times by a machine"; that is no longer true.
 
+## [execution-ledger-cross-service-race] THE MONEY LEDGER IS READ-MODIFY-WRITTEN BY TWO SERVICES WITH NO LOCK, and settlement writes are being silently lost `[verified 2026-08-28T17:4xZ, lane portfolio-venue-and-side-integrity]`
+
+`execution_ledger._persist` does a blind whole-document `write_json_file` — no
+lock, no compare-and-swap, no merge. **refresh-worker** (settlement, grading)
+and **live-odds-worker** (order placement, venue reconciliation) both `_load()`
+the entire ledger, mutate their own copy, and write it back. Last writer wins,
+with whatever it happened to load.
+
+**MEASURED, from the two services' own `KEYVALUE_WRITE_LARGE` sizes:**
+
+    refresh-worker  17:40:43  1,271,141   commit path
+    refresh-worker  17:40:46  1,275,216
+    refresh-worker  17:40:47  1,276,178   <- paper_settlement.py:542, 08-26 graded=8
+    refresh-worker  17:40:48  1,276,296   <- paper_settlement.py:542, 08-23 graded=1
+    live-odds-worker 17:41:00 1,268,265   <- 12s later, 8,031 bytes SMALLER
+    live-odds-worker 17:41:02 1,268,265
+    ... held at 1,268,265 for TWELVE MINUTES, then grows from its own orders
+
+**The ledger went BACKWARDS by 8,031 bytes.** live-odds-worker's snapshot is
+smaller than refresh-worker's write at 17:40:43, so it was holding a copy loaded
+before that entire burst and wrote it back over the top. The 9 grades and every
+`grade_check` memo from that settlement pass were discarded.
+
+**HOW IT WAS FOUND, and the symptom is the thing to recognise again.** Two WNBA
+totals reported `graded=8` for 2026-08-26 in the log while the served payload
+showed **zero** live rows changing outcome across that pass. I spent three wrong
+theories on "what filters these rows before the resolver" before running the
+deployed predicate chain against the real records: `outcome` falsy,
+`status='filled'`, `mode='live'`, age 42.8h/45.2h against a 24h grace — **they
+pass every filter and reach the resolver.** Nothing filters them. They were
+graded and the write was clobbered.
+
+**SO THE DIAGNOSTIC SIGNATURE IS: a `SETTLED ... graded=N` line with N>0 and no
+corresponding outcome change on the served payload.** Not a resolver problem.
+Check the ledger write sizes across both services before touching a resolver.
+
+**SCOPE — this is not about WNBA and not about settlement.** Any write to this
+ledger from either service can be lost: a grade, a `grade_check`, a
+reconciliation, a fill. It is the record of real money. `#600`.
+
+**NOT FIXED HERE.** A lock or compare-and-swap on the money ledger is a
+concurrency change on the money path and belongs to whoever owns
+`execution_ledger.py` — lane `portfolio-ledger-service-split` names this file.
+Recorded, surfaced, not touched.
+
 ## [wnba-game-lines-gradeable] WNBA GAME LINES CAN BE GRADED — a player box gives the team score, and always could `[verified 2026-08-28, lane portfolio-venue-and-side-integrity]`
 
 `bet_status_wnba` refused every WNBA spread, moneyline and total since the module
