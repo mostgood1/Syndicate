@@ -36582,3 +36582,66 @@ Worth separating for whoever reads this: **the repo guard was satisfied by its
 own documented mechanism; the block that actually stopped the session was a
 different system entirely.** Anyone debugging a future "the guard blocked me"
 should check which of the two it was before changing anything in `.syndicate/`.
+
+---
+
+## 2026-08-28 ~17:09 CT — refresh-worker `420dddaa` (user deploy) — READINGS
+
+Booted 21:55:15Z, read at 22:09. `1b7b2258`, `7b42ab2a`, `899cac87` all live
+(verified by ancestry, and read AFTER `BOOTED` rather than `finishedAt`).
+
+### WORKS — the two headline fixes
+
+```
+Polymarket  no_match|soccer|h2h        80 of 80  ->  6 of 99
+            no_matching_polymarket    227        ->  11
+Kalshi      unreadable_title         2264        ->  1790   (-474)
+            matched                   186/198    ->  255
+```
+
+**Fixture matching by the board's own matchups is the fix that mattered**
+`[user idea, 2026-08-28]`. Soccer h2h went from EVERY row unpaired to six.
+Kalshi's two soccer title shapes ("Tie is the result", "Will over N goals be
+scored?") account for the 474.
+
+### PARTLY WORKS — corners/BTTS reach the join and find nothing
+
+```
+board_market_not_a_game_line   913 -> 638   (-275 = exactly 236 corners + 39 btts)
+market_type_not_a_game_line   8879 -> 8715  (-164, BTTS venue rows admitted)
+indexed                       7515 -> 7713  (+198)
+no_candidates|soccer|alternate_totals_corners   221
+no_candidates|soccer|btts                        34
+```
+
+The BOARD half is exactly right -- the -275 matches the board's corners+btts
+row counts to the row. The VENUE half does not deliver candidates.
+
+### CORNERS IS INERT, AND FOR THE THIRD TIME TONIGHT I KEYED ON AN ABSENT FIELD
+
+`_is_corners_question` reads `row["question"]`. **That field is never populated
+in the persisted slate**: `/api/ops/polymarket/slate` returns samples with only
+`line`, `orderable`, `outcomes`, `slug`, and 14 of 14 sampled
+`POLYMARKET_OUT_OF_SCOPE` questions are the empty string. The branch cannot
+fire. All 221 corners rows refuse `no_candidates`, which reads as "the venue
+does not list corners" and is NOT what was measured.
+
+Same shape as the two Kalshi grammars shipped inert earlier today and as the
+`refusals`/`reasons` key this lane opened on. **Three separate times in one
+session: code that reads a name nothing writes.** The tests passed each time
+because they exercised the helper, never the field.
+
+BTTS is NOT explained. Venue rows ARE indexed (+198) yet 34 board rows find no
+candidates -- so the two halves are keyed differently, and the date and the
+`-btts` modifier both look right. Unmeasured; do not guess it.
+
+### NEXT
+
+1. Find how the slate DOES carry a corners market -- the `question` field is
+   not it. If corners have a slug modifier the way `-btts` does, that is the
+   hook; if the slate carries no corners at all, the 221 is honest and the
+   route should be removed rather than left looking installed.
+2. BTTS: print the index key beside the lookup key for one unmatched row. The
+   asymmetry is the whole question and neither number is currently emitted.
+3. `side_not_an_outcome_of_this_market` is 28 -- soccer rows now pair the
+   FIXTURE and fail on the SIDE. The loss moved downstream; it did not vanish.
