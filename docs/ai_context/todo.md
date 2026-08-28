@@ -43050,3 +43050,35 @@ against any hypothesis a redeploy would reset.
 **Do not let this ticket read as unowned.** If `Worker memory watchdog logs` has
 a ticket already, close `#449` as a duplicate and keep theirs — an id is cheap,
 a split investigation is not.
+
+## `#594` — **RETIRE the laptop live-gameline collector once the worker-side one is deployed** `[2026-08-28, lane live-game-line-projection]`
+
+`74f026a9` moved live-gameline score retention into the board build
+(`live_gameline_accuracy.py`, called from `book_grid_artifact.py`). **Pushed,
+NOT deployed** — `autoDeploy = no`, so it is inert until refresh-worker (writes)
+and web (serves counters, gates the export read) both take it.
+
+Held deliberately: web runs `6a72040b`, **14 commits behind**, so deploying it
+ships ~13 other lanes' work in one release. That is a multi-lane call.
+
+**Ordering matters — do these in sequence, not together:**
+
+1. Deploy refresh-worker + web to a SHA containing `74f026a9`.
+2. Verify the file exists and publishes:
+   `/api/ops/artifacts/export?path=mlb_source/data/live_gameline_accuracy/live_gameline_accuracy_mlb.jsonl`
+   must return rows, and the board payload's `live_gameline_accuracy` block must
+   read `written=1` on a build where a game has just gone final. **`written=0`
+   with `skipped_not_improved=1` is the HEALTHY steady state** — do not read it
+   as a failure; `previous_best` is the discriminator.
+3. ONLY THEN retire `live-gameline-accuracy-snapshot` (the 23:25 CT task) and
+   repoint `live-gameline-fixes-first-real-reading` at the published artifact
+   instead of `reports/live_gameline_accuracy/history.jsonl`.
+
+**Do NOT skip to step 3.** Until step 2 passes, the laptop task is the only
+retention path, and it is the one the recurring verification task reads.
+
+WHY THE MOVE: the cron lost 7 of its first 8 nights — six sitting disabled, one
+to Windows Modern Standby suspending its python child 9h13m while the scheduler
+and model both ran normally (2026-08-28; Kernel-Power 506 03:57:42Z / 507
+13:48:00Z, corroborated across three other stalled sessions). Full working in
+`.syndicate/log/2026-08-28.md`.
