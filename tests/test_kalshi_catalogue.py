@@ -857,11 +857,15 @@ def test_a_game_total_is_refused_unless_it_counts_this_sports_scoring_unit():
                 cat.SERIES_SPORT[key] = prior
 
     assert goals["status"] == "ok" and goals["market"] == "totals", goals
-    assert corners["status"] == "refused", corners
-    assert corners["reason"] == "stat_not_in_market_vocabulary", corners
-    # The stat VERBATIM, so the work queue names what to add rather than a
-    # count. A refusal that says "corners" is actionable; `totals 4.5` is a bet.
-    assert corners["detail"] == "corners", corners
+    # CORNERS NOW RESOLVE -- to their OWN market, which is what the audit asked
+    # for ("Needs a corners market. Do not widen the totals unit."). The safety
+    # property this test exists for is UNCHANGED and is asserted more strongly
+    # than before: corners must never be `totals`, because a corners line and a
+    # goals line sit at the same numbers and a shared key would join them.
+    assert corners["status"] == "ok", corners
+    assert corners["market"] == "alternate_totals_corners", corners
+    assert corners["market"] != "totals", corners
+    assert goals["market"] != corners["market"], (goals, corners)
 
 
 def test_the_scoring_unit_is_per_sport_and_the_period_survives_it():
@@ -1473,13 +1477,23 @@ def test_the_existing_totals_grammars_are_unchanged():
     assert _classified("KXMLBGAME", "Boston Red Sox wins", "mlb")["market"] == "h2h"
 
 
-def test_corners_still_refuse_with_their_real_text():
-    """The audit is explicit: "Needs a corners market. Do not widen the totals
-    unit." A grammar that MATCHES must still let the vocabulary refuse."""
+def test_corners_resolve_to_their_OWN_market_and_never_to_totals():
+    """The audit asked for exactly this: "Needs a corners market. Do not widen
+    the totals unit."
+
+    BOTH HALVES ARE ASSERTED. The totals unit is NOT widened -- corners still
+    return None from `total_market_from_stat` -- and the market now exists, so
+    the family stops being unreachable. Measured 2026-08-28:
+    `alternate_totals_corners` is 239 board rows, the LARGEST market of any
+    sport on the board, and every one was unreachable from Kalshi.
+    """
+    from syndicate.features.shared.market_keys import total_market_from_stat
+
     out = _classified("KXEPLCORNERS", "Will there be over 9.5 corners?", "soccer")
-    assert out["status"] == "refused"
-    assert out["reason"] == "stat_not_in_market_vocabulary"
-    assert out["detail"] == "corners"
+    assert out["status"] == "ok", out
+    assert out["market"] == "alternate_totals_corners", out
+    # The totals unit is untouched: this is the half the audit warned about.
+    assert total_market_from_stat("soccer", "corners") is None
 
 
 def test_the_period_prefix_is_bounded_so_a_prose_colon_is_not_a_period():

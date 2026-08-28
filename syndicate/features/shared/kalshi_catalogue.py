@@ -335,6 +335,47 @@ _TEAM_SPREAD = re.compile(
 _MONEYLINE = re.compile(r"^\s*(?P<team>.+?)\s+wins\s*\??\s*$", re.IGNORECASE)
 
 # --------------------------------------------------------------------------
+# THE TWO SOCCER SHAPES, READ FROM PRODUCTION RATHER THAN IMAGINED
+# --------------------------------------------------------------------------
+#
+# Soccer was the largest remaining `unreadable_title` family -- ~665 markets a
+# build across twelve series -- and the reason it stayed unread is that this
+# module's own header warned against guessing Kalshi's wording. Three grammars
+# were once written against an imagined phrasing and matched NONE of
+# production. So these come from the titles the join now prints, one per
+# series, sampled 2026-08-28T20:42:48Z:
+#
+#     KXLALIGAGAME       'Tie is the result'
+#     KXBUNDESLIGAGAME   'Tie is the result'
+#     KXEREDIVISIEGAME   'Tie is the result'
+#     KXBELGIANPLGAME    'Tie is the result'
+#     KXLALIGATOTAL      'Will over 5.5 goals be scored?'
+#     KXMLSTOTAL         'Will over 5.5 goals be scored?'
+#     KXSERIEATOTAL      'Will over 5.5 goals be scored?'
+#
+# "TIE IS THE RESULT" IS THE DRAW LEG OF A 3-WAY, and the board carries it:
+# soccer rows are keyed `soccer|h2h|draw`. It names no team, which is why every
+# team-shaped grammar above declines it -- `_MONEYLINE` needs "<team> wins".
+#
+# SEGMENT TITLES ARE DELIBERATELY NOT MATCHED HERE. 'Tie 1st Half'
+# (`KXLALIGA1H`, `KXBUNDESLIGA1H`, `KXLIGUE11H`, `KXSERIEA1H`) stays unread, so
+# it keeps refusing rather than being priced as a full-game draw. That is the
+# same distinction `#563`'s first-five-innings incident cost real money to
+# learn: a segment contract and a full-game contract are different bets on the
+# same fixture, and five orders were placed on the wrong one for $7.08.
+# `^Tie is the result$` is anchored so it cannot swallow the 1H wording.
+#
+# Season futures ('Will Zwolle win the 2026-27 Eredivisie?') also stay unread;
+# they are not a game line and no board row asks for them.
+_SOCCER_DRAW = re.compile(r"^\s*tie\s+is\s+the\s+result\s*\??\s*$", re.IGNORECASE)
+# "Will over 5.5 goals be scored?" -- full-game total, no team named.
+_SOCCER_TOTAL = re.compile(
+    r"^\s*will\s+(?P<direction>over|under)\s+(?P<line>\d+(?:\.\d+)?)\s+"
+    r"(?P<stat>goals?)\s+be\s+scored\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# --------------------------------------------------------------------------
 # THE GAME-LINE GRAMMARS KALSHI ACTUALLY USES, read from production titles
 # 2026-08-24T02:12Z. The three above were written against a different wording
 # and matched NONE of them -- 302 markets came back `unreadable_title` on the
@@ -1103,6 +1144,26 @@ def _parse_title(title: str) -> dict[str, Any] | None:
     "win" and a looser moneyline pattern would swallow it -- and a spread read
     as a moneyline is a bet on a different outcome at a confident price.
     """
+    # SOCCER FIRST, and both are fully anchored so they cannot shadow anything.
+    # `_SOCCER_DRAW` names no team and `_SOCCER_TOTAL` requires the literal
+    # "be scored", so neither can swallow a title another grammar would read.
+    if _SOCCER_DRAW.match(title):
+        return {
+            "grammar": GRAMMAR_MONEYLINE,
+            # The DRAW leg. `subject` is the side, not a club -- the board keys
+            # this row `soccer|h2h|draw` and there is no team to name.
+            "subject": "draw",
+            "stat_text": "",
+            "line": None,
+        }
+    match = _SOCCER_TOTAL.match(title)
+    if match:
+        return {
+            "grammar": GRAMMAR_TEAM_TOTAL,
+            "subject": _direction_word(match.group("direction")),
+            "stat_text": match.group("stat").strip(),
+            "line": float(match.group("line")),
+        }
     match = _PLAYER_THRESHOLD.match(title)
     if match:
         return {
@@ -1264,6 +1325,7 @@ def classify_market(market: Mapping[str, Any]) -> dict[str, Any]:
     from syndicate.features.shared.kalshi_client import is_combinatorial_series
     from syndicate.features.shared.market_keys import (
         canonical_market_key,
+        non_scoring_total_market,
         total_market_from_stat,
     )
 
@@ -1295,6 +1357,14 @@ def classify_market(market: Mapping[str, Any]) -> dict[str, Any]:
     stat_text = str(parsed["stat_text"])
     if parsed["grammar"] == GRAMMAR_TEAM_TOTAL and not stat_text.startswith("totals"):
         market_key = total_market_from_stat(sport, stat_text)
+        if market_key is None:
+            # A total whose UNIT is not the sport's scoring unit but IS a board
+            # market in its own right -- corners. Tried only AFTER the scoring
+            # unit declines, so it can add a market and can never reroute a
+            # goals total. Keyed separately from `totals` on purpose: a corners
+            # line and a goals line sit at the same numbers, so a shared key
+            # would join them and look clean.
+            market_key = non_scoring_total_market(sport, stat_text)
     else:
         market_key = canonical_market_key(sport, stat_text)
     if market_key is None:

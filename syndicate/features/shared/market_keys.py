@@ -269,6 +269,57 @@ _TOTAL_UNIT: dict[str, frozenset[str]] = {
 _TOTAL_FILLER = ("scored", "in total", "total")
 
 
+# NON-SCORING SOCCER TOTALS THAT ARE REAL BOARD MARKETS IN THEIR OWN RIGHT.
+#
+# `_TOTAL_UNIT` refuses any unit that is not the sport's scoring unit, and that
+# refusal is CORRECT and stays: "Over 4.5 corners?" priced as a 4.5 GOALS total
+# is a bet on a different event, and the comment above records exactly that
+# trap. But refusing is only right while we have nowhere to put it -- and we
+# do. MEASURED 2026-08-28 from `KALSHI_BOARD_JOIN board_market_vocabulary`:
+#
+#     alternate_totals_corners  239   <- the LARGEST board market of any sport
+#     totals                    211
+#     h2h                       156
+#     btts                       44
+#
+# Corners is bigger than goals totals and bigger than every moneyline on the
+# board, and every one of those rows was unreachable from Kalshi -- 400 markets
+# a build refused `stat_not_in_market_vocabulary` with the stat named.
+#
+# MAPPED TO ITS OWN MARKET, NEVER TO `totals`. That separation is the whole
+# safety property: a corners line and a goals line can sit at the same number,
+# so a shared key would join them and look clean. Different key, different bet.
+_NON_SCORING_TOTAL_MARKET: dict[tuple[str, str], str] = {
+    # "Over 4.5 corners?" -- the stat text production actually sends, recorded
+    # verbatim in the `_TOTAL_UNIT` comment above from a real refused market.
+    ("soccer", "corners"): "alternate_totals_corners",
+    ("soccer", "corner"): "alternate_totals_corners",
+}
+
+
+def non_scoring_total_market(sport: Any, stat_text: Any) -> str | None:
+    """A total whose UNIT is not the sport's scoring unit but IS a board market.
+
+    Returns None for anything unmapped, so an unrecognised unit keeps landing
+    in `stat_not_in_market_vocabulary` by name rather than being folded into
+    the nearest market that happens to share a line.
+
+    BTTS IS DELIBERATELY ABSENT. The board carries 44 `btts` rows and Kalshi
+    lists the family (`KXLALIGA1HBTTS` was user-confirmed 2026-08-25), but no
+    BTTS title has appeared in `unreadable_titles` yet, so its wording is
+    UNKNOWN. This module's own history is the argument for waiting: three
+    grammars were once written against an imagined phrasing and matched NONE of
+    production. The instrument already prints one title per series, so the
+    evidence arrives on its own.
+    """
+    sport_key = str(sport or "").strip().lower()
+    token = " ".join(str(stat_text or "").strip().lower().split())
+    for filler in _TOTAL_FILLER:
+        if token.endswith(" " + filler):
+            token = token[: -len(filler) - 1].strip()
+    return _NON_SCORING_TOTAL_MARKET.get((sport_key, token))
+
+
 def total_market_from_stat(sport: Any, stat_text: Any) -> str | None:
     """"1st half points scored" -> `totals_h1`. A corners line -> None.
 

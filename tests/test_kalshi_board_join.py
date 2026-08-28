@@ -122,7 +122,13 @@ def test_parlay_markets_are_refused_by_name():
 def test_an_unparseable_title_is_named_separately_from_a_missing_row():
     """'We could not read this market' and 'Kalshi has nothing we bet' are
     different facts and must not share a counter."""
-    report = join_kalshi_to_board([_kalshi(title="Will over 8.5 goals be scored?")], [_row()])
+    # A SEASON-FUTURES title, confirmed unreadable in production
+    # (`KXEREDIVISIE`, 2026-08-28). The old example here was "Will over 8.5
+    # goals be scored?" -- which `_SOCCER_TOTAL` now READS, so it stopped being
+    # an unparseable title and this test was asserting against a fixed bug.
+    report = join_kalshi_to_board(
+        [_kalshi(title="Will Zwolle win the 2026-27 Eredivisie?")], [_row()]
+    )
     assert report["reasons"][REASON_UNREADABLE_TITLE] == 1
     assert REASON_NO_BOARD_ROW not in report["reasons"]
 
