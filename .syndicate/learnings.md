@@ -5641,3 +5641,35 @@ sim was killed tonight, so there was no local example of a kill being harmless**
 only the ledger's example of one being harmful. I had inverted the evidence in
 the direction that made the action I was about to take look cheaper. Corrected
 to the user before they decided.
+
+## 2026-08-28 — FORBIDDEN: reaching for the next knob after a tuning change fails. Three attempts, each refuted by the next reading, when the second should have said "structural".
+
+The board displayed `as of 12:15 PM` at 4:33 PM. `computed_at` is the OLDEST
+contributing date's stamp, so one starved date sets the whole board's vintage.
+
+  1. I had raised `SLOW_REFRESH_SECONDS` 300 -> 1800 that morning and recorded
+     it "bought nothing" -- measured today's SHARE of cycles, never the board.
+  2. Set it to 600 to loosen the throttle. **`2026-08-29` went 3m -> 84m.**
+  3. Set `BOARD_WINDOW_DAYS=2` to remove a competitor. **Today absorbed the
+     freed slot: 36 minutes post-boot, two builds, both today.**
+
+**THE SIGNAL I IGNORED IS AT STEP 2.** A change that moves the metric the WRONG
+WAY is not a dosage problem, it is evidence the model is wrong. I read it as
+"not enough" and reached for a second knob. The cause was structural the whole
+time: today is re-queued every loop iteration UNTHROTTLED while futures are
+throttled, and with 11-15 minute builds today wins every slot. Eligibility was
+never the constraint; slot allocation was.
+
+**THE RULE:** when a tuning change makes the observable worse, STOP TUNING. One
+more knob is a guess that the mechanism is right and the value is wrong -- and
+the wrong-direction result is precisely the evidence against that. State the
+mechanism as unknown and go read the scheduler.
+
+**AND THE THIRD ATTEMPT PROVED IT CONCLUSIVELY, WHICH IS THE TELL.** Removing a
+competitor freed a slot and the DOMINANT party took it. If I had predicted that
+outcome I would not have run the experiment; I ran it because I still believed
+the starving date was merely under-eligible.
+
+Sits with the two rules already logged today: judging by the metric I chose
+rather than the one the user sees, and sizing a fix without the component's
+share of the whole. All three are confident measurement of the wrong quantity.

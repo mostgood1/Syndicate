@@ -6750,3 +6750,52 @@ SANCTIONED catalogue). Full evidence:
 
 **Supersedes the 2026-08-24 record**, which was written from a sandbox that
 403s CONNECT to crypto.com and got three things wrong — see `learnings.md`.
+
+## [board-window-staleness] — MEASURED 2026-08-28 23:4xZ — **UNFIXED, cause is STRUCTURAL, three config attempts failed**
+
+**SYMPTOM, from the user's own board:** `combined_board_window · as of Aug 28,
+12:15 PM · 1746 candidates` displayed at 4:33 PM. `computed_at` is the OLDEST
+contributing date's stamp BY DESIGN, so one starved date sets the vintage for
+the whole board while the others are minutes fresh.
+
+**CAUSE, and it is not a tunable.** `_ensure_default_board_window_watched`
+re-queues TODAY every loop iteration, UNTHROTTLED, while future dates are
+throttled. Board builds take 11-15 minutes. Today therefore wins effectively
+every slot. **ELIGIBILITY WAS NEVER THE CONSTRAINT; SLOT ALLOCATION IS.**
+
+**THREE CONFIG ATTEMPTS, ALL FAILED, in order:**
+
+1. `SLOW_REFRESH_SECONDS` code default 300 -> 1800 (mine, this morning). Starved
+   the third date to 264m. I recorded it "bought nothing" having measured only
+   today's SHARE of cycles, never `computed_at`.
+2. `SLOW_REFRESH_SECONDS=600` env override. **Made it WORSE** — `2026-08-29`
+   went 3m -> 84m. More eligibility does not produce a slot.
+3. `BOARD_WINDOW_DAYS=2`. Dropped `08-30` correctly, and **today absorbed the
+   freed slot**. Post-boot 23:06:55Z, 36 minutes, TWO builds, BOTH `08-28`.
+
+```
+last build per date, days=2 active, 23:45Z
+  2026-08-28  23:43:10     2m   IN WINDOW
+  2026-08-29  21:37:15   128m   IN WINDOW  <- now sets computed_at
+  2026-08-30  23:04:45    40m   dropped
+```
+
+Attempt 3 is the cleanest proof: removing a competitor freed a slot and TODAY
+took it, not the starving date.
+
+**CURRENT ENV ON refresh-worker** (all set by me, all live):
+`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS=2`,
+`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS=600`.
+Code default for the latter is 1800 and is ALSO mine — env currently wins.
+
+**THE REAL FIX (code, not config):** round-robin the pending queue so a future
+date gets a GUARANTEED slot, instead of today being unconditionally re-queued.
+Until then a multi-date board window cannot stay fresh at an 11-15 minute
+build.
+
+**CONFIG-ONLY MITIGATION, NOT APPLIED — user decision:**
+`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS=1` makes today the only contributor,
+so `computed_at` is always current. It makes the displayed number honest by
+NARROWING WHAT THE BOARD CLAIMS; it does not make a multi-date board fresh.
+Not set, because it drops tomorrow entirely and I had already been wrong three
+times in this area.
