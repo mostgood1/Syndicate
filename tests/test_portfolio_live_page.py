@@ -351,6 +351,57 @@ def test_the_whole_book_tiles_say_they_are_the_whole_book(app_client, live_env):
     assert "· all dates" in settled
 
 
+def test_the_settled_tile_adds_up_to_the_positions_count(live_env):
+    """[user 2026-08-27] "need to make sure all data ties off."
+
+    THE ARITHMETIC, AS ONE ASSERTION. won + lost + push + still-open + unknown
+    must equal the all-dates Positions count. It did not: `pending` counted only
+    `status == "filled"`, so an undecided row that is not filled fell out of
+    both buckets and off the page. Measured on the live book -- 89 positions
+    against 31W + 33L + 7P + 16 = 87, the missing two being Polymarket orders
+    that errored on submit without the venue ever answering.
+    """
+    live_env["orders"] = [
+        _order(idempotency_key="w", position_key="w", outcome="won"),
+        _order(idempotency_key="l", position_key="l", outcome="lost"),
+        _order(idempotency_key="p", position_key="p", outcome="push"),
+        # Filled and undecided -> pending.
+        _order(idempotency_key="o", position_key="o"),
+        # Errored on submit, venue never answered -> may well have landed, so
+        # it is a position on the page and belongs in `unknown`, not nowhere.
+        _order(idempotency_key="u", position_key="u", status="failed",
+               error="ReadTimeout", fill_price=None, fill_stake_dollars=None),
+        # Venue ANSWERED 4xx -> certainly not a position, counted in neither.
+        _order(idempotency_key="r", position_key="r", status="failed",
+               error="http_404: market_not_found", fill_price=None,
+               fill_stake_dollars=None),
+    ]
+    payload = intelligence_bp._live_portfolio_payload(DATE, on_date="all")
+    st = (payload["settlement"] or {}).get("total") or {}
+    positions = payload["position_count_all_dates"]
+
+    assert positions == 5                      # the 4xx refusal is not one
+    assert st["won"] + st["lost"] + st["push"] == 3
+    assert st["pending"] == 1
+    assert st["unknown"] == 1
+    assert (
+        st["won"] + st["lost"] + st["push"] + st["pending"] + st["unknown"]
+    ) == positions
+
+
+def test_an_unconfirmed_submit_is_not_quietly_called_pending(app_client, live_env):
+    """Calling it `pending` would assert we hold a position; dropping it would
+    assert we do not. It is neither -- it is the row somebody has to check at
+    the venue first, so the page names it."""
+    live_env["orders"] = [
+        _order(idempotency_key="u", position_key="u", status="failed",
+               error="ReadTimeout", fill_price=None, fill_stake_dollars=None),
+    ]
+    body = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    assert "1 unknown" in body
+    assert "never confirmed at the venue" in body
+
+
 def test_the_old_slate_chip_row_is_gone(app_client, live_env):
     """[user 2026-08-27] "that should mean this selector goes away".
 

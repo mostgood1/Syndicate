@@ -730,6 +730,7 @@ def _aggregate(buckets: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "orders": sum(int(b.get("orders") or 0) for b in buckets),
         "settled": sum(int(b.get("settled") or 0) for b in buckets),
         "pending": sum(int(b.get("pending") or 0) for b in buckets),
+        "unknown": sum(int(b.get("unknown") or 0) for b in buckets),
         "won": sum(int(b.get("won") or 0) for b in buckets),
         "lost": sum(int(b.get("lost") or 0) for b in buckets),
         "push": sum(int(b.get("push") or 0) for b in buckets),
@@ -756,6 +757,7 @@ def settlement_summary(
     and opposite facts.
     """
     from syndicate.features.shared.execution_ledger import _load
+    from syndicate.features.shared.execution_guard import _is_venue_refusal
 
     rows = list(orders) if orders is not None else (_load().get("orders") or [])
     if selected_date:
@@ -767,13 +769,36 @@ def settlement_summary(
         bucket = by_venue.setdefault(
             venue,
             {"venue": venue, "orders": 0, "settled": 0, "won": 0, "lost": 0, "push": 0,
-             "staked_dollars": 0.0, "pnl_dollars": 0.0, "pending": 0},
+             "staked_dollars": 0.0, "pnl_dollars": 0.0, "pending": 0, "unknown": 0},
         )
         bucket["orders"] += 1
         outcome = str(order.get("outcome") or "")
         if not outcome:
+            # THREE STATES, NOT TWO, AND THE THIRD USED TO VANISH.
+            #
+            # `pending` counted only `status == "filled"`, so an undecided row
+            # that is NOT filled fell out of both buckets and out of the tile.
+            # Measured on the live book 2026-08-28T02:1xZ: 89 positions, but
+            # 31W + 33L + 7P + 16 pending = 87. The missing two were Polymarket
+            # orders with `status=failed` -- a submit that ERRORED without the
+            # venue answering, which may well have landed.
+            #
+            # Neither existing bucket is honest about those. Calling them
+            # `pending` asserts we hold a position; dropping them asserts we do
+            # not; and they are exactly the rows a person must check at the
+            # venue before placing anything else. So they get their own counter
+            # and the page states it.
+            #
+            # THE REFUSAL RULE IS THE SHARED ONE. `execution_guard.
+            # _is_venue_refusal` is what the page and the day-budget already use
+            # to decide "never a position" -- a fourth definition here is how
+            # these totals drift apart again. A row the VENUE answered with a
+            # 4xx is genuinely not a position and stays counted in `orders`
+            # only.
             if str(order.get("status") or "") == "filled":
                 bucket["pending"] += 1
+            elif not _is_venue_refusal(order):
+                bucket["unknown"] += 1
             continue
         bucket["settled"] += 1
         bucket[outcome] = bucket.get(outcome, 0) + 1
@@ -946,6 +971,8 @@ def _grouped(rows: Sequence[Mapping[str, Any]], key_fn) -> list[dict[str, Any]]:
     rule the venue breakdown uses, so the three cuts are directly comparable
     rather than three slightly different questions.
     """
+    from syndicate.features.shared.execution_guard import _is_venue_refusal
+
     buckets: dict[str, dict[str, Any]] = {}
     for order in rows:
         try:
@@ -955,13 +982,19 @@ def _grouped(rows: Sequence[Mapping[str, Any]], key_fn) -> list[dict[str, Any]]:
         bucket = buckets.setdefault(
             key,
             {"key": key, "orders": 0, "settled": 0, "won": 0, "lost": 0, "push": 0,
-             "staked_dollars": 0.0, "pnl_dollars": 0.0, "pending": 0},
+             "staked_dollars": 0.0, "pnl_dollars": 0.0, "pending": 0, "unknown": 0},
         )
         bucket["orders"] += 1
         outcome = str(order.get("outcome") or "")
         if not outcome:
+            # SAME THREE-WAY SPLIT AS `settlement_summary`, deliberately -- this
+            # function's own docstring promises "the same rule the venue
+            # breakdown uses, so the three cuts are directly comparable". See
+            # there for why an unconfirmed submit is neither pending nor gone.
             if str(order.get("status") or "") == "filled":
                 bucket["pending"] += 1
+            elif not _is_venue_refusal(order):
+                bucket["unknown"] += 1
             continue
         bucket["settled"] += 1
         bucket[outcome] = bucket.get(outcome, 0) + 1

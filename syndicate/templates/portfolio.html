@@ -724,9 +724,20 @@
            Unlabelled beside a filtered Positions count, it read as though both
            described the same set. #}
         <div class="live-tile__meta">{{ st.get('pending', 0) }} still open · all dates</div>
+        {# THE ROW THAT MUST ADD UP. won + lost + push + still-open + unknown
+           equals the Positions count for all dates; without this line it came
+           up two short and nothing on the page said why. Shown only when
+           non-zero -- a permanent "0 unknown" is noise that teaches the reader
+           to skip the line on the day it is not zero. #}
+        {% if st.get('unknown') %}
+          <div class="live-tile__meta">{{ st.get('unknown') }} unknown — submitted, never confirmed at the venue</div>
+        {% endif %}
       {% else %}
         <div class="live-tile__value">—</div>
         <div class="live-tile__meta">{{ st.get('pending', 0) }} open, none decided · all dates</div>
+        {% if st.get('unknown') %}
+          <div class="live-tile__meta">{{ st.get('unknown') }} unknown — submitted, never confirmed at the venue</div>
+        {% endif %}
       {% endif %}
     </div>
     <div class="live-tile">
