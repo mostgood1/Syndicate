@@ -2521,84 +2521,46 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `ncaaf/oddsapi_lines.py::resolve_team`, a module this lane does not touch.
 - Blocked by: none
 
-### portfolio-venue-and-side-integrity — OPEN — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c
-- Goal: five things the user asked for on `/portfolio` `[user 2026-08-28]`, of
-  which the third is a real-money defect and the rest are the page:
-  (1) filter the live book by venue; (2) **Polymarket h2h buys the wrong team**;
-  (3) positions that never settle; (4) two 503 errors rendering as positions;
-  (5) pivot the live book by sport and bet type.
+### portfolio-venue-and-side-integrity — OPEN, ONE READING OWED — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c
+- Goal: five `/portfolio` asks `[user 2026-08-28]` — venue filter; Polymarket
+  h2h buying the wrong team; positions that never settle; two 503s rendering as
+  positions; sport/bet-type pivots. A sixth (WNBA game lines) came out of
+  verifying the third.
+- **ALL SIX SHIPPED AND DEPLOYED.** Narrative, evidence and dead ends:
+  `log/2026-08-28.md`. Measurements: `deploys.md`. Items: `todo.md` `#595`
+  `#596` `#599`.
 - Files: `syndicate/blueprints/intelligence.py`,
   `syndicate/templates/portfolio.html`,
   `syndicate/features/shared/portfolio_periods.py`,
   `syndicate/features/shared/paper_settlement.py`,
   `syndicate/features/shared/polymarket_us_orders.py`,
-  `pipeline/intelligence_state.py`, + tests.
-  **CLAIMS TRANSFERRED FROM TWO LANES WHOSE SESSIONS ARE GONE**
-  `[2026-08-28, session 12b2be57]`, on the same evidence session `3e5a9659`
-  used earlier today to move a claim out of the first of them. Verified
-  independently here, not taken on that note's word —
-  `list_sessions(include_archived=true)`:
-  `open-bet-live-status` / `syndicate-27` is the portfolio-consolidation
-  session, ARCHIVED, `isRunning: false`, last activity 2026-08-27T21:51:49Z;
-  `portfolio-decision-and-execution` / `9324a3e5` (opened 2026-08-22) appears
-  in NO roster entry at all, archived included. `portfolio-top-date-filter`
-  shipped edits to both contested paths and CLOSED today under the same
-  condition. Take them back by striking this note.
-  `polymarket_us_orders.py` is ALSO live in session `local_bb0d1330`
-  ("Fix 2 failing polymarket side-vocabulary tests"); messaged before editing,
-  offer standing to hand the finding over instead.
-- Hypothesis (diagnostic, WRITTEN BEFORE THE FIX): Polymarket resolves a
-  team side POSITIONALLY — `_resolve_outcome_side` sends YES iff our team sits
-  at `outcomes[0]` — and `outcomes[0]` is NOT reliably the venue's YES leg. The
-  totals path is immune because it resolves by NAME (`over`->YES); h2h has no
-  name to fall back on, so the side is a coin flip.
-- **RESULT: HYPOTHESIS HELD. MEASURED, NOT INFERRED.** Every settled MLB game
-  market in the live ledger cross-checked against MLB StatsAPI (`segment=full`,
-  schedule keyed by DATE, fixtures appearing twice excluded as ambiguous):
-
-      polymarket h2h,    venue-settled:  5 agree,  3 MISMATCH
-      polymarket totals, venue-settled:  9 agree,  0 mismatch
-      kalshi     totals, venue-settled:  4 agree,  0 mismatch
-
-  Rows graded by OUR resolver agree by construction and are not evidence —
-  they are graded from the same `side` field whose meaning is in question.
-  Only the venue-settled rows can falsify, and 3 of 8 do.
-- The decisive single case, three independent facts agreeing:
-  `aec-mlb-az-sf-2026-08-27`, `side=home` = San Francisco.
-  (a) live-odds-worker 2026-08-28T01:55:30Z: `POLYMARKET_ARTIFACT_PRICE
-      outcome_index=0 outcome='San Francisco Giants'` then `SUBMIT
-      side=OUTCOME_SIDE_YES action=BUY qty=15.45 price=0.48`.
-  (b) MLB StatsAPI: **ARI 1 @ SF 6, Final** — we bet the winner.
-  (c) The venue graded it `lost`, `pnl_dollars=-5.871` (= 15.45 x 0.38, our
-      whole cost basis), and its resolution row carries
-      `held_side=POSITION_RESOLUTION_SIDE_SHORT`.
-  The other two mismatches (`aec-mlb-col-wsh-2026-08-26`,
-  `aec-mlb-min-ath-2026-08-26`) are recorded as WINS we did not earn, so the
-  book's P&L is overstated as well as wrong.
-- **THIS DOES NOT RE-OPEN THE 2026-08-28 `FORBIDDEN` ENTRY — IT LANDS BESIDE
-  IT.** That entry retracted a claim of *systematic price/outcome-array
-  misalignment*, and it was right to: the PRICE alignment tests it ran were
-  sound and the prices are aligned. This is the SIDE, which that entry's own
-  closing paragraph names as the open gap — "the venue's order row carries no
-  outcome NAME ... nothing in the system can independently state which team is
-  held ... caught twice by a human looking at a screen and zero times by a
-  machine". The `positionResolution` row DOES carry it, and it only arrives
-  when the market resolves, which is after that investigation ran.
-- Falsification test (run, did not fire): if the mismatches were my truth
-  function rather than the venue, Kalshi and Polymarket totals would mismatch
-  at a similar rate over the same fixtures and the same resolver. They are
-  0 of 13.
-- **NOT DOING: flipping `_YES_OUTCOME_INDEX_DEFAULT` or inverting the index
-  rule.** `learnings.md 2026-08-28` is explicit that on this path the cost of a
-  wrong fix is the bug itself, and I have no reading of which leg IS the YES
-  one. `marketSides` and `question` come back from `/v1/markets` — both are in
-  `_KEEP` — and `_slate_row_for_storage` drops both, so no sound name rule is
-  writable today. Refuse now, log the shape, wire the name rule when measured.
-- Verification: (a) `off != on` on the h2h refusal before any correctness
-  claim; (b) the grade-conflict check re-derives all 3 known mismatches from
-  the ledger and 0 false positives on the 13 agreeing rows; (c) the page renders
-  the venue filter, the sport/type pivots and the unknown-submit block against
-  the real production payload, not a fixture.
+  `syndicate/features/shared/polymarket_us_markets.py`,
+  `syndicate/features/shared/bet_status_wnba.py`,
+  `pipeline/intelligence_state.py`, `pipeline/execute_portfolio.py`, + tests.
+  Claims transferred from `open-bet-live-status` and
+  `portfolio-decision-and-execution`, both sessions verified absent from
+  `list_sessions(include_archived=true)`. Take back by striking this note.
+- Deployed: web `8b8a6579`, live-odds-worker `d5db8e3d`, refresh-worker
+  `73a7e358` (all contain this lane's commits). Every refresh-worker deploy was
+  triggered by ANOTHER lane on a newer SHA containing mine; I forced nothing,
+  and `deploy_claim.py --force` is blocked by the harness classifier.
+- **THE ONE READING OWED — the two `KXWNBATOTAL-26AUG26GSCONN-152` rows have not
+  graded in production.** No settlement pass has run since refresh-worker booted
+  on `73a7e358` at 17:26:40Z. They grade offline against production's own
+  boxscore rows (over WON, under LOST, total 153). 08-26 is inside the `#596`
+  straggler window, so no manual step is needed.
+- **THE BETTER TEST, and it is FORWARD:** tonight's two 2026-08-28 WNBA totals
+  should grade `matched_by: final_boxscore_team_totals`, NOT `settled_by: venue`.
+  Repairing old rows proves the backfill; only this proves the venue dependency
+  is gone. Games tip 19:30 EDT.
+- Also unproven, deliberately: the Polymarket h2h refusal has never fired in
+  production (nothing tried to place one), and `marketSides[].long == YES` is an
+  INFERENCE from one observed entry — `#595` step 1 is to widen the log. **Do
+  not wire it on what has been read so far.**
+- Verification: DONE for four of five asks, read off the SERVED payload —
+  144/$238.45 -> 57/$101.06 on the venue filter, `unknown_submits 2 / $8.21`,
+  `by_sport`/`by_market` present, `grade_conflicts: 3 / $10.07` matching a
+  prediction registered before the reading.
 - Blocked by: none.
 
 ### soccer-overview-cost — OPEN — opened 2026-08-28 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8

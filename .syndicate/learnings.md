@@ -5191,3 +5191,61 @@ the ground truth and costs one read:
 Extends "session roster hides archived": that rule said the roster OMITS things;
 this says it can also answer a confident NOT FOUND about something running right
 now. Never reassign a claim on roster evidence alone.
+
+
+### 2026-08-28 — FORBIDDEN: trusting a refusal's stated premise without rechecking it. A REASONED "we cannot do this" is stickier than a bug, because it tells the next reader not to look
+
+**What the code said, and it had said it for months.**
+`bet_status_wnba` refused every WNBA spread, moneyline and total. Not by
+omission — by an argued comment:
+
+> The market IS gradeable in principle -- `game_line_bet` handles spreads and
+> moneylines for any sport that can supply two team scores. This capture is a
+> PLAYER box and has none, **so the fix is upstream in the capture** rather than
+> a missing entry in a table here.
+
+Every clause of that is true except the last one. The final boxscore CSV, which
+this same module ALREADY READS for player props, carries `TEAM_ABBREVIATION` and
+`PTS`. **In basketball a team's score IS the sum of its players' points** — there
+is no team-level scoring, no own goal, no defensive touchdown — so the team score
+was one `groupby` away in an artifact the function had open. Nothing upstream had
+to change.
+
+**Why it survived.** The comment is GOOD writing. It names the constraint,
+distinguishes two candidate fixes, says which is wrong and why, and points at the
+right owner. It reads like a conclusion someone reached carefully — which is
+exactly what makes it a stop sign. A missing feature invites investigation; a
+reasoned refusal closes it. This one even carried its own test
+(`test_a_game_line_names_the_CAPTURE_as_the_blocker_not_the_vocabulary`), so the
+premise had a green check beside it.
+
+**What it cost.** Five WNBA game lines exist in the live book. One settled, and
+only because Kalshi settled it for us. Two (`GSV @ CON` 2026-08-26, over and
+under 151.5) sat ungraded for two days with no mechanism that could ever reach
+them. The real total was 153.
+
+**HOW TO APPLY.**
+1. **A refusal's premise is a CLAIM, and claims get checked.** "This artifact has
+   no X" is falsifiable in about a minute — open the artifact. I found the
+   answer by fetching one CSV and reading its header.
+2. **Suspect a premise hardest when the code already reads the artifact it
+   claims is insufficient.** `_load_final_box` was fifteen lines away.
+3. **Domain invariants are evidence, and they are sport-specific.** Sum-of-parts
+   equals the whole for basketball points; it does NOT for soccer goals (own
+   goals) or football points (defensive scores). The reasoning transfers by
+   sport, not by shape — check the sport before reusing this.
+4. **Verify the derivation against an independent source BEFORE relying on it**,
+   even when the arithmetic looks obvious. Six of six exact against ESPN's own
+   scoreboard, both sides of three games, took one request. Had it been five of
+   six I would have shipped a settlement path on an assumption.
+5. **A test can pin a wrong premise as firmly as a right one.** When the premise
+   falls, the test is the thing to invert — not the evidence.
+
+**Companion, same session, same shape:** the SECOND wrong belief I held was
+`/api/ops/artifacts/export` showing no `boxscores_2026-08-26.csv`, which I read
+as "the capture died". It is a DISK read; the producer and the consumer both use
+`read_text_file` (KEYVALUE). The count endpoint returned `games: 2` the whole
+time. That is the keyvalue/artifact split already in this file, hit again — so
+the rule needs restating as an instruction rather than a fact: **before
+concluding an artifact is absent, name which STORE you looked in and which store
+its consumer reads.** They are frequently not the same one.

@@ -178,11 +178,70 @@ are YES-first.
 (alignment) is PROVEN correct. `OUTCOME_SIDE_YES <-> outcomes[0]` (the binding) is
 the false one. An alignment proof says nothing about the binding.
 
-`home`/`away` on Polymarket now REFUSES by name rather than guessing. The venue
-does name its own YES leg (`marketSides[].long` + `.team.name`) but it is **NOT
-wired** — only the first entry has been observed, so `long == YES` is an inference;
-`todo.md #595` carries the sequence, ending in scoring against all 8 venue-settled
-moneylines INCLUDING the 3 that went wrong.
+`home`/`away` on Polymarket now REFUSES by name rather than guessing, and that
+refusal is **LIVE on live-odds-worker since 2026-08-28T15:06:23Z** (escape hatch
+`SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE=1`). It has **never fired in production** —
+nothing tried to place an h2h in the observed window — so its reachability rests
+on tests (`off != on`: 4 fail against it, pass with the hatch, asserted through
+`order_body`) and on `verify_order_paths`, not on a production line.
+
+The venue does name its own YES leg (`marketSides[].long` + `.team.name`) but it
+is **NOT wired** — only the FIRST `marketSides` entry has been observed (the
+`MONEYLINE_YES_LEG_SHAPE` log truncates at 400 chars), so `long == YES` is an
+inference; `todo.md #595` carries the sequence, ending in scoring against all 8
+venue-settled moneylines INCLUDING the 3 that went wrong.
+
+**THE CLASS IS NOW CAUGHT BY A MACHINE.** `paper_settlement._check_venue_grade`
+cross-examines every VENUE-stated outcome against the real game result — the two
+authorities are independent because ours applies the order's own `side` while the
+venue's reads the realized P&L delta on the position it says we held, so a
+disagreement is the signature of a wrong-side fill. Live on refresh-worker;
+`/api/portfolio/live` serves `grade_conflicts: 3` / `$10.07`, 62 rows carrying
+`grade_check` (58 True / 3 False / 1 None). It hit a PRE-REGISTERED prediction —
+the three tickers were named before the reading. It never rewrites `outcome` or
+`pnl_dollars`. `learnings.md` had recorded this class as "caught twice by a human
+looking at a screen and zero times by a machine"; that is no longer true.
+
+## [wnba-game-lines-gradeable] WNBA GAME LINES CAN BE GRADED — a player box gives the team score, and always could `[verified 2026-08-28, lane portfolio-venue-and-side-integrity]`
+
+`bet_status_wnba` refused every WNBA spread, moneyline and total since the module
+was written, on a REASONED premise in its own source: "this capture is a PLAYER box
+and has none [no team scores], so the fix is upstream in the capture". The clause is
+true; the conclusion does not follow. **In basketball a team's score IS the sum of
+its players' points** — no team-level scoring exists — and `boxscores_<date>.csv`
+carries `TEAM_ABBREVIATION` and `PTS`. Nothing upstream had to change.
+
+Derived (sum of player `PTS`) vs ESPN official, 2026-08-25: CHI 81/CON 87, DAL
+96/POR 78, PHX 84/WSH 94 — **six of six exact, both sides of all three games**.
+Repeated 08-26: `401857176` GS 89 / CON 64.
+
+**WHAT IT COST, and the honest size of it.** WNBA game lines in the live book:
+**FIVE, all-time.** One settled — `settled_by=venue`. Two (`GSV @ CON` 2026-08-26,
+over and under 151.5) sat ungraded two days because Kalshi did not settle them and
+nothing else could. Two are today's and correctly pending. So the value is NOT the
+two rows: it is that **1 of 5 got an outcome because the venue chose to settle it
+and 1 of 5 did not**, and that coin flip is what goes away. 15 of 20 WNBA orders are
+player props, which already worked.
+
+Refuses by cause — `no_final_box_for_date` (wait), `game_not_in_final_box`,
+`final_box_roster_too_thin_to_total` (<5 a side is a TRUNCATED capture, and a total
+summed off half a roster settles the UNDER on a score that never happened),
+`final_box_is_full_game_not_<seg>`, `no_matchup_on_order`. Keyed on the tri-code
+matchup because the order carries an OddsAPI hash and the CSV an ESPN id;
+home/away re-checked explicitly since `_matchup_key` is a frozenset.
+
+**LANDED (`56426d9a`) AND DEPLOYED** — refresh-worker `73a7e358`, live
+2026-08-28T17:26:40Z. **THE PRODUCTION READING IS OWED:** no settlement pass has
+run since that boot, so the two rows have NOT yet graded in production (they grade
+offline against production's own boxscore rows: over WON, under LOST, total 153).
+The STRONGER test is forward — tonight's two 08-28 totals grading
+`matched_by: final_boxscore_team_totals` rather than `settled_by: venue`. Repairing
+old rows proves the backfill; only the forward reading proves the dependency broke.
+
+**NOT a producer failure.** "The boxscore capture died after 08-25" was my own
+wrong reading of `/api/ops/artifacts/export`, which is a DISK read while the
+producer and consumer both use `read_text_file` (keyvalue).
+`final_player_boxscore?date=2026-08-26&count_only=1` returns `games: 2`.
 
 ## [venue-candidate-key-ambiguity] BOARD JOIN KEYS: a bare token could name another fixture's team, and the guard's own counter cannot see it fire `[verified PARTIAL 2026-08-28T02:36Z, lane venue-candidate-key-token-guard]`
 

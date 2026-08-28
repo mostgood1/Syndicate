@@ -14745,3 +14745,86 @@ Status stubs remain in `lanes.md`. Nothing summarised; these are the blocks as w
   phase split has never been seen against a live slate (0/0/51 today). The 5
   out-of-season rank_board routes render stats but only against empty slates.
 - Blocked by: none.
+
+
+## portfolio-venue-and-side-integrity — pre-checkpoint block, moved VERBATIM 2026-08-28
+
+### portfolio-venue-and-side-integrity — OPEN — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c
+- Goal: five things the user asked for on `/portfolio` `[user 2026-08-28]`, of
+  which the third is a real-money defect and the rest are the page:
+  (1) filter the live book by venue; (2) **Polymarket h2h buys the wrong team**;
+  (3) positions that never settle; (4) two 503 errors rendering as positions;
+  (5) pivot the live book by sport and bet type.
+- Files: `syndicate/blueprints/intelligence.py`,
+  `syndicate/templates/portfolio.html`,
+  `syndicate/features/shared/portfolio_periods.py`,
+  `syndicate/features/shared/paper_settlement.py`,
+  `syndicate/features/shared/polymarket_us_orders.py`,
+  `pipeline/intelligence_state.py`, + tests.
+  **CLAIMS TRANSFERRED FROM TWO LANES WHOSE SESSIONS ARE GONE**
+  `[2026-08-28, session 12b2be57]`, on the same evidence session `3e5a9659`
+  used earlier today to move a claim out of the first of them. Verified
+  independently here, not taken on that note's word —
+  `list_sessions(include_archived=true)`:
+  `open-bet-live-status` / `syndicate-27` is the portfolio-consolidation
+  session, ARCHIVED, `isRunning: false`, last activity 2026-08-27T21:51:49Z;
+  `portfolio-decision-and-execution` / `9324a3e5` (opened 2026-08-22) appears
+  in NO roster entry at all, archived included. `portfolio-top-date-filter`
+  shipped edits to both contested paths and CLOSED today under the same
+  condition. Take them back by striking this note.
+  `polymarket_us_orders.py` is ALSO live in session `local_bb0d1330`
+  ("Fix 2 failing polymarket side-vocabulary tests"); messaged before editing,
+  offer standing to hand the finding over instead.
+- Hypothesis (diagnostic, WRITTEN BEFORE THE FIX): Polymarket resolves a
+  team side POSITIONALLY — `_resolve_outcome_side` sends YES iff our team sits
+  at `outcomes[0]` — and `outcomes[0]` is NOT reliably the venue's YES leg. The
+  totals path is immune because it resolves by NAME (`over`->YES); h2h has no
+  name to fall back on, so the side is a coin flip.
+- **RESULT: HYPOTHESIS HELD. MEASURED, NOT INFERRED.** Every settled MLB game
+  market in the live ledger cross-checked against MLB StatsAPI (`segment=full`,
+  schedule keyed by DATE, fixtures appearing twice excluded as ambiguous):
+
+      polymarket h2h,    venue-settled:  5 agree,  3 MISMATCH
+      polymarket totals, venue-settled:  9 agree,  0 mismatch
+      kalshi     totals, venue-settled:  4 agree,  0 mismatch
+
+  Rows graded by OUR resolver agree by construction and are not evidence —
+  they are graded from the same `side` field whose meaning is in question.
+  Only the venue-settled rows can falsify, and 3 of 8 do.
+- The decisive single case, three independent facts agreeing:
+  `aec-mlb-az-sf-2026-08-27`, `side=home` = San Francisco.
+  (a) live-odds-worker 2026-08-28T01:55:30Z: `POLYMARKET_ARTIFACT_PRICE
+      outcome_index=0 outcome='San Francisco Giants'` then `SUBMIT
+      side=OUTCOME_SIDE_YES action=BUY qty=15.45 price=0.48`.
+  (b) MLB StatsAPI: **ARI 1 @ SF 6, Final** — we bet the winner.
+  (c) The venue graded it `lost`, `pnl_dollars=-5.871` (= 15.45 x 0.38, our
+      whole cost basis), and its resolution row carries
+      `held_side=POSITION_RESOLUTION_SIDE_SHORT`.
+  The other two mismatches (`aec-mlb-col-wsh-2026-08-26`,
+  `aec-mlb-min-ath-2026-08-26`) are recorded as WINS we did not earn, so the
+  book's P&L is overstated as well as wrong.
+- **THIS DOES NOT RE-OPEN THE 2026-08-28 `FORBIDDEN` ENTRY — IT LANDS BESIDE
+  IT.** That entry retracted a claim of *systematic price/outcome-array
+  misalignment*, and it was right to: the PRICE alignment tests it ran were
+  sound and the prices are aligned. This is the SIDE, which that entry's own
+  closing paragraph names as the open gap — "the venue's order row carries no
+  outcome NAME ... nothing in the system can independently state which team is
+  held ... caught twice by a human looking at a screen and zero times by a
+  machine". The `positionResolution` row DOES carry it, and it only arrives
+  when the market resolves, which is after that investigation ran.
+- Falsification test (run, did not fire): if the mismatches were my truth
+  function rather than the venue, Kalshi and Polymarket totals would mismatch
+  at a similar rate over the same fixtures and the same resolver. They are
+  0 of 13.
+- **NOT DOING: flipping `_YES_OUTCOME_INDEX_DEFAULT` or inverting the index
+  rule.** `learnings.md 2026-08-28` is explicit that on this path the cost of a
+  wrong fix is the bug itself, and I have no reading of which leg IS the YES
+  one. `marketSides` and `question` come back from `/v1/markets` — both are in
+  `_KEEP` — and `_slate_row_for_storage` drops both, so no sound name rule is
+  writable today. Refuse now, log the shape, wire the name rule when measured.
+- Verification: (a) `off != on` on the h2h refusal before any correctness
+  claim; (b) the grade-conflict check re-derives all 3 known mismatches from
+  the ledger and 0 false positives on the 13 agreeing rows; (c) the page renders
+  the venue filter, the sport/type pivots and the unknown-submit block against
+  the real production payload, not a fixture.
+- Blocked by: none.
