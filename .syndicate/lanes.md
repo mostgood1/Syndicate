@@ -2304,7 +2304,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Out of scope here.
 - Blocked by: none
 
-### nfl-settlement-resolver — OPEN — opened 2026-08-27 — session 764eca35-178c-4c29-afbd-ec621894aaf1
+### nfl-settlement-resolver — **CLOSED 2026-08-28** — VERIFIED IN PRODUCTION: `no_resolver_for_nfl` 16 -> ABSENT, `BET_STATUS resolved` 98 -> 114 (+16, exactly the count that disappeared), `SETTLED 08-27 graded` 2 -> 9. Deployed `5a5efa8d` to refresh-worker 03:41:29Z, live 03:47:11Z; reading 03:59:18Z. Evidence in `deploys.md`. — opened 2026-08-27 — session 764eca35-178c-4c29-afbd-ec621894aaf1
 
 - Goal: NFL bets can be GRADED. One testable outcome: `no_resolver_for_nfl`
   goes to **zero** in `[paper_settlement] SETTLED` / `[bet_status] BET_STATUS`
@@ -2400,6 +2400,21 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **OWED, and it is the whole point of the lane:** the production reading.
   `no_resolver_for_nfl` must go to ZERO and at least one NFL order must reach a
   won/lost verdict. Nothing here is deploy-verified.
+- **CLOSED 2026-08-28.** Goal met and measured. Two things are handed ON rather
+  than closed with it, because neither is this lane's goal and neither should
+  vanish into a closed block:
+  1. **`game_not_in_nfl_live_state: 1`** on `SETTLED date=2026-08-26`. The
+     resolver RUNS for that date and fails at the JOIN, not at dispatch — one
+     NFL order whose game is not in the capture for its ledger date. Likely
+     date-bucket skew: an NFL kickoff at 00:00Z belongs to the previous day
+     locally, and the capture is fetched per ledger date. One order, named in
+     the counter by design.
+  2. **`{nba, nhl, ncaaf, ncaab}` still have NO settlement resolver.** Pinned by
+     the new `test_the_traded_sports_WITHOUT_a_resolver_are_pinned...` test, so
+     it can no longer pass quietly — but pinned is not fixed. NCAAF is on the
+     board TODAY (measured this session: kalshi offered 524 ncaaf quotes,
+     `wanted_overlap` 32, 52 selected), so its bets are being taken and cannot
+     be graded. That is the same `#547` shape a third time, already visible.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
