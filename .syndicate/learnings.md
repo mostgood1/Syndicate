@@ -5574,3 +5574,38 @@ checking whether it mattered.
 quantity is not a measurement of it, and I built a "slow league" theory on one
 `belgian_pro_league` reading. When the spread on identical inputs is larger
 than the difference you are explaining, you are explaining noise.
+
+## 2026-08-28 — FORBIDDEN: judging a change by the metric I chose instead of the metric the USER SEES. Mine read "bought nothing"; the board read 4h24m stale.
+
+I raised `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS` 300 -> 1800
+(code default) so future dates would stop stealing cycles from today. I then
+measured today's SHARE of build cycles, found it unmoved at ~50%, and recorded
+the change as **"bought nothing"** — harmless, left in place.
+
+Nine hours later the user asked why the board was stale. It was showing
+`as of 12:15 PM` at 4:33 PM:
+
+```
+2026-08-28   last build 21:20:24   19m
+2026-08-29   last build 21:37:15    3m
+2026-08-30   last build 17:15:20  264m   <- sets computed_at
+```
+
+`combined_board_window` reports `computed_at` as the OLDEST contributor's
+stamp, deliberately, so the weakest link is what the board shows. My throttle
+starved the third date of a 3-day window until it set the vintage for the
+whole board. Today and tomorrow were 19 and 3 minutes fresh and it did not
+matter.
+
+**THE RULE:** when a change alters scheduling, priority or cadence, check the
+USER-FACING freshness/quality signal, not only the internal counter you
+reasoned about. "Bought nothing" is a conclusion about MY metric. The question
+is always "what does the surface show now".
+
+**AND "NO EFFECT" IS NOT A SAFE VERDICT.** I left it deployed BECAUSE I
+believed it was inert. A change measured as neutral on the chosen metric is
+not thereby harmless — it is unmeasured on every other one. Either revert it
+or check the surface; do not bank neutrality as safety.
+
+Same family as the share-of-the-whole rule logged earlier today: both are
+measuring a real quantity confidently and it being the wrong quantity.

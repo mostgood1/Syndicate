@@ -6584,7 +6584,31 @@ ABSENT and the other seven present. Pre-fix the identical guard line returned
 Today's board went from rebuilt every ~7 min at `sports=0` — never actually
 built — to every ~25 min at `sports=7`/`sports=8`. Slower and real.
 
-**THE THROTTLE HALF BOUGHT NOTHING and is recorded as such.** Default 300 ->
+**THE THROTTLE HALF DID NOT "BUY NOTHING" — IT COST BOARD FRESHNESS, AND I
+MISSED IT FOR NINE HOURS `[CORRECTED 2026-08-28 21:4xZ]`.** Raising the code
+default 300 -> 1800s starved the THIRD date in a 3-day window. Measured from
+the user's own board screenshot and confirmed per date:
+```
+date         last build     age     candidates
+2026-08-28   21:20:24        19m      278
+2026-08-29   21:37:15         3m       68
+2026-08-30   17:15:20       264m       42   <- sets computed_at
+```
+`17:15:20Z` is 12:15 PM Central — EXACTLY the "as of" the board displayed at
+4:33 PM. `combined_board_window` reports `computed_at` as the OLDEST
+contributor's stamp by design, so one starved date drags the whole board's
+shown vintage down by 4h24m while today and tomorrow were 19m and 3m fresh.
+**MITIGATED:** `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS=600`
+set on refresh-worker (env overrides the 1800 code default; inert until that
+service next deploys). `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS=2` is the
+alternative — it drops 08-30 so the board stops claiming a date it is not
+maintaining — but that changes coverage and is a user decision.
+**THE ERROR:** I optimised a metric I chose (today's SHARE of cycles) and
+never checked the metric the user SEES (`computed_at`). Recording it as
+"bought nothing" was incomplete — it bought nothing AND cost this. Same
+family as the share-of-the-whole rule: measuring the wrong quantity
+confidently. ORIGINAL ENTRY FOLLOWS.
+~~THE THROTTLE HALF BOUGHT NOTHING and is recorded as such.~~ Default 300 ->
 1800s does throttle (future-date builds ~7min -> ~30min) but today's SHARE of
 iterations did not move (5/4/1 over 127 min vs a 9/9 baseline — 50% both ways).
 The `>=4:1` bar I wrote was unreachable: the board window is THREE dates, and
