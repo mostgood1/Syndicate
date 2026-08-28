@@ -186,10 +186,29 @@ def _polymarket_price_resolver(selected_date: str | None):
         print(f"[portfolio_commit] POLYMARKET_RESOLVER_BOARD_FAILED {type(exc).__name__}: {exc}", flush=True)
         return (None, None)
 
+    # TIMED `[2026-08-28]`. This join is INSIDE the `portfolio_commit` span the
+    # board build now emits, and that span is a black box: `polymarket` appears
+    # nowhere in `intelligence_state`, so Kalshi's refresh and join get their own
+    # spans while Polymarket's equivalent work is invisible. This join indexes
+    # ~8,973 markets against ~1,335 board rows, which makes it a credible
+    # largest-single-item inside the ~305s of board compute that no named stage
+    # accounts for -- and until now nothing could say so either way.
+    #
+    # ON THE EXISTING LINE rather than a new one: this print already reports what
+    # the join DID (markets, indexed, matched, refusals). Cost belongs beside
+    # outcome, or the two have to be joined by timestamp across two lines that a
+    # concurrent build can interleave.
+    #
+    # `monotonic`, not `time.time`: `slate_age_s` below is wall-clock by
+    # necessity (it is an age against a stored stamp) but a DURATION must not be
+    # readable as negative because the clock stepped.
+    _join_started = time.monotonic()
     joined = join_polymarket_to_board(markets, board_rows, selected_date=str(selected_date or ""))
+    _join_elapsed_s = round(time.monotonic() - _join_started, 2)
     age = None if fetched_at is None else round(time.time() - float(fetched_at), 1)
     print(
-        f"[portfolio_commit] POLYMARKET_BOARD_JOIN markets={joined.get('polymarket_markets')} "
+        f"[portfolio_commit] POLYMARKET_BOARD_JOIN elapsed_s={_join_elapsed_s} "
+        f"markets={joined.get('polymarket_markets')} "
         f"indexed={joined.get('indexed')} board_rows={joined.get('board_rows')} "
         f"matched={joined.get('matched')} slate_age_s={age} "
         f"refusals={joined.get('refusals')} "
