@@ -199,20 +199,25 @@ def test_the_box_is_read_once_per_resolver_not_once_per_order(_isolated, monkeyp
     assert reads["n"] == 1
 
 
-def test_a_game_line_names_the_CAPTURE_as_the_blocker_not_the_vocabulary(monkeypatch):
-    """`unmapped_market` on a spread would send the next person to add four
-    market names to a table, which would not work: `game_line_bet` already
-    grades spreads for any sport that can supply two team scores, and this
-    artifact is a PLAYER box that carries none.
+def test_a_game_line_with_no_final_box_says_WHICH_artifact_is_missing(monkeypatch):
+    """This test used to assert a permanent refusal, and the refusal was wrong.
 
-    MLB gained game-line grading on 2026-08-24 and WNBA did not. The reason
-    string is the difference between the two fixes."""
+    It pinned `REASON_NO_TEAM_SCORES` on every game line, on the argument that
+    "`game_line_bet` already grades spreads for any sport that can supply two
+    team scores, and this artifact is a PLAYER box that carries none". The
+    first clause was right and the conclusion did not follow: the FINAL box
+    carries `TEAM_ABBREVIATION` and `PTS`, and in basketball the team's score
+    IS the sum of its players' points.
+
+    So the refusal now names WHICH artifact is absent rather than declaring the
+    market ungradeable. With no final box written, that is
+    `no_final_box_for_date` -- a wait, not a dead end."""
     from syndicate.features.shared import bet_status_wnba as mod
 
     resolve = mod.wnba_status_resolver("2026-08-22")
-    for market in ("spreads", "h2h", "h2h_3_way", "spreads_alt"):
+    for market in ("spreads", "h2h", "h2h_3_way", "spreads_alt", "totals"):
         out = resolve({"sport": "wnba", "market": market, "side": "Las Vegas Aces"})
-        assert out["unavailable_reason"] == mod.REASON_NO_TEAM_SCORES, market
+        assert out["unavailable_reason"] == mod.REASON_NO_FINAL_BOX, market
 
 
 def test_an_actually_unknown_market_still_says_so(monkeypatch):
@@ -402,3 +407,191 @@ def test_a_combination_market_sums_from_the_final_box(_isolated):
     assert resolve(_order(market="player_points_rebounds"))["current_value"] == 31.0
     out = resolve(_order(market="player_points_rebounds_assists"))
     assert out["current_value"] == 34.0 and out["is_final"] is True
+
+
+# ---------------------------------------------------------------------------
+# GAME LINES FROM THE FINAL BOX -- the fix for two orders stuck since 08-26.
+#
+# Every number below is the REAL 2026-08-26 fixture: Golden State Valkyries 89
+# at Connecticut Sun 64, total 153, confirmed against ESPN's own scoreboard.
+# ---------------------------------------------------------------------------
+
+
+def _gs_con_rows():
+    """Enough of the real box to sum, with the real team abbreviations.
+
+    `GS` and `CON` are what ESPN writes and what the CSV carries;
+    `_canonical_wnba_tri` maps them and the order's full club names onto the
+    same codes (`GSV`, `CON`), which is the join this depends on.
+    """
+    rows = []
+    for i, pts in enumerate([25, 20, 16, 12, 8, 8]):
+        rows.append({"game_id": "401857176", "gameId": "401857176",
+                     "TEAM_ABBREVIATION": "GS", "PLAYER_NAME": f"GS Player {i}",
+                     "PTS": pts, "REB": 4, "AST": 2, "FG3M": 1, "MIN": 20})
+    for i, pts in enumerate([18, 14, 12, 10, 6, 4]):
+        rows.append({"game_id": "401857176", "gameId": "401857176",
+                     "TEAM_ABBREVIATION": "CON", "PLAYER_NAME": f"CON Player {i}",
+                     "PTS": pts, "REB": 4, "AST": 2, "FG3M": 1, "MIN": 20})
+    return rows
+
+
+def _gs_con_order(**kw):
+    order = {
+        "sport": "wnba",
+        "event_id": "a-board-hash-that-is-not-an-espn-id",
+        "market": "totals",
+        "side": "over",
+        "line": 151.5,
+        "segment": "full",
+        "away_team": "Golden State Valkyries",
+        "home_team": "Connecticut Sun",
+        "status": "filled",
+        "fill_price": 0.49,
+        "fill_stake_dollars": 1.95,
+    }
+    order.update(kw)
+    return order
+
+
+def test_a_total_grades_off_the_summed_team_scores(_isolated):
+    """THE TWO ORDERS THIS FIXES. Measured on the live book 2026-08-28: two
+    FILLED Kalshi totals on `GSV @ CON` 2026-08-26, over and under 151.5, still
+    ungraded two days later. Every other WNBA row on that slate had been
+    settled by the VENUE -- so WNBA game lines only ever settled when Kalshi
+    did it for us, and the pair Kalshi missed could never be recovered.
+    """
+    _write_final_box(_isolated, date="2026-08-26", rows=_gs_con_rows())
+    resolve = mod.wnba_status_resolver("2026-08-26")
+
+    out = resolve(_gs_con_order(side="over"))
+    assert out["current_value"] == 89 + 64
+    assert out["is_final"] is True
+    assert out["matched_by"] == "final_boxscore_team_totals"
+    # HOME AND AWAY NOT SWAPPED. `_matchup_key` is a frozenset and cannot tell
+    # them apart; this is the assertion that the scores are assigned by the
+    # order's own roles rather than by whichever side sorted first.
+    assert out["home_score"] == 64
+    assert out["away_score"] == 89
+
+
+def test_the_over_and_the_under_grade_OPPOSITE_ways_on_one_total(_isolated):
+    """153 against 151.5. A fixture where both sides resolved the same way
+    would pass under a rule that ignored `side` entirely."""
+    from syndicate.features.shared.bet_status import resolve_bet_status
+
+    _write_final_box(_isolated, date="2026-08-26", rows=_gs_con_rows())
+    resolve = mod.wnba_status_resolver("2026-08-26")
+
+    verdicts = {}
+    for side in ("over", "under"):
+        out = resolve(_gs_con_order(side=side))
+        verdicts[side] = resolve_bet_status(
+            market="totals", side=side, line=151.5,
+            current_value=out["current_value"],
+            is_final=out["is_final"], started=True,
+        )["status"]
+    assert verdicts == {"over": "won", "under": "lost"}
+
+
+def test_a_moneyline_grades_through_game_line_view(_isolated):
+    """Spreads and moneylines still route through `game_line_bet` -- they need
+    a TEAM side translated into a value and a direction, which a total does
+    not. GS won 89-64, so the away side wins and the home side loses."""
+    from syndicate.features.shared.bet_status import resolve_bet_status
+
+    _write_final_box(_isolated, date="2026-08-26", rows=_gs_con_rows())
+    resolve = mod.wnba_status_resolver("2026-08-26")
+
+    for side, expected in (("away", "won"), ("home", "lost")):
+        out = resolve(_gs_con_order(market="h2h", side=side, line=None))
+        assert out.get("unavailable_reason") is None, out
+        assert out["is_final"] is True
+        status = resolve_bet_status(
+            market="h2h", side=out.get("side"), line=out.get("line"),
+            current_value=out.get("current_value"), is_final=True, started=True,
+        )
+        assert status["status"] == expected, (side, status)
+
+
+def test_a_HALF_line_refuses_rather_than_grading_off_the_FULL_game(_isolated):
+    """The boxscore is the whole game and nothing else. Grading a first-half
+    total off the final score is a confident wrong answer, which is strictly
+    worse than a missing one."""
+    _write_final_box(_isolated, date="2026-08-26", rows=_gs_con_rows())
+    resolve = mod.wnba_status_resolver("2026-08-26")
+
+    out = resolve(_gs_con_order(segment="first_half"))
+    assert out["unavailable_reason"] == "final_box_is_full_game_not_first_half"
+
+
+def test_a_truncated_roster_refuses_instead_of_summing_a_smaller_number(_isolated):
+    """A team score summed from four players is a real number that is not the
+    score, and on a total it would settle the UNDER on a game that went over.
+    Five is the floor because five are on the floor."""
+    rows = [r for r in _gs_con_rows()
+            if r["TEAM_ABBREVIATION"] != "CON"][:6]
+    rows += [r for r in _gs_con_rows() if r["TEAM_ABBREVIATION"] == "CON"][:4]
+    _write_final_box(_isolated, date="2026-08-26", rows=rows)
+
+    out = mod.wnba_status_resolver("2026-08-26")(_gs_con_order())
+    assert out["unavailable_reason"] == mod.REASON_FINAL_BOX_ROSTER_THIN
+
+
+def test_an_unreadable_points_cell_poisons_the_GAME_not_just_the_row(_isolated):
+    """Skipping the row would silently subtract that player's points from their
+    team's score -- the same "partial sum is a smaller number that looks real"
+    failure `_MARKET_TO_BOX_SUM` already refuses on."""
+    rows = _gs_con_rows()
+    rows[0]["PTS"] = "n/a"
+    _write_final_box(_isolated, date="2026-08-26", rows=rows)
+
+    out = mod.wnba_status_resolver("2026-08-26")(_gs_con_order())
+    assert out["unavailable_reason"] == mod.REASON_GAME_NOT_IN_FINAL_BOX
+
+
+def test_a_game_that_is_not_in_the_box_refuses_rather_than_matching_another(_isolated):
+    _write_final_box(_isolated, date="2026-08-26", rows=_gs_con_rows())
+    out = mod.wnba_status_resolver("2026-08-26")(
+        _gs_con_order(home_team="Indiana Fever", away_team="Atlanta Dream")
+    )
+    assert out["unavailable_reason"] == mod.REASON_GAME_NOT_IN_FINAL_BOX
+
+
+def test_a_game_line_on_an_order_with_no_teams_says_THAT(_isolated):
+    """A thin ledger row and an absent game are different jobs and must not
+    share a counter -- the same split the player path already draws."""
+    _write_final_box(_isolated, date="2026-08-26", rows=_gs_con_rows())
+    out = mod.wnba_status_resolver("2026-08-26")(
+        _gs_con_order(home_team=None, away_team=None)
+    )
+    assert out["unavailable_reason"] == mod.REASON_NO_MATCHUP_ON_ORDER
+
+
+def test_player_props_are_untouched_by_the_game_line_path(_isolated):
+    """The control. Props were the only thing that worked before this change,
+    and a regression there would trade one gap for a bigger one."""
+    _write_box(_isolated, date="2026-08-26",
+               games=[_game("evt-1", [_player(pts=22)])])
+    out = mod.wnba_status_resolver("2026-08-26")(_order(market="player_points"))
+    assert out["current_value"] == 22
+    assert out.get("unavailable_reason") is None
+
+
+def test_the_final_box_is_read_ONCE_even_though_two_indexes_are_built(_isolated, monkeypatch):
+    """Adding game lines must not double the artifact reads: the player index
+    and the team-score index are two derivations of one read."""
+    _write_final_box(_isolated, date="2026-08-26", rows=_gs_con_rows())
+    reads = {"n": 0}
+    original = mod._final_csv_rows
+
+    def counting(date):
+        reads["n"] += 1
+        return original(date)
+
+    monkeypatch.setattr(mod, "_final_csv_rows", counting)
+    resolve = mod.wnba_status_resolver("2026-08-26")
+    for _ in range(5):
+        resolve(_gs_con_order())
+        resolve(_order(market="player_points"))
+    assert reads["n"] == 1
