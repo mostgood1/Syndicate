@@ -69,6 +69,86 @@ subjects are deliberately left stacked so the checker fails on a real thing —
 Collapsing those is owed work, not a bug in the tool.
 
 
+## [settlement-resolver-coverage] SETTLEMENT: NFL CAN BE GRADED, NCAAF IS WIRED-BUT-UNVERIFIED, and three sports still cannot settle a bet `[verified 2026-08-28T03:59:18Z, lanes nfl-settlement-resolver / ncaaf-settlement-resolver]`
+
+`paper_settlement._default_resolver` had builders for mlb/wnba/soccer only. NFL
+orders returned `no_resolver_for_nfl` forever — measured 2026-08-28T02:50Z,
+**6 of 21 orders on that slate (29%)**.
+
+**VERIFIED, NFL** (refresh-worker `5a5efa8d`, read 03:59:18Z): `no_resolver_for_nfl`
+**16 -> ABSENT**, `BET_STATUS resolved` **98 -> 114** (+16, exactly the count that
+disappeared), `SETTLED 08-27 graded` **2 -> 9**. Two stages were needed, not one:
+`nfl/live_game_state.py` fetches ESPN at call time and is keyed by
+`(season, week, seasontype)`, so `scripts/poll_nfl_live_state.py` is the producer,
+date-keyed and persisted through `refresh_state_store` (settlement runs on
+refresh-worker; Render cannot share a disk between services).
+
+**NOT VERIFIED, NCAAF** (refresh-worker `234c9e81` live 15:07:01Z): the counter
+`no_resolver_for_ncaaf` was NEVER non-zero, because NCAAF orders have not reached
+the ledger — so its absence is not evidence. Only no-harm is measured. Its join is
+registry-backed, NOT `teams_match`: `_alias_map("ncaaf")` is `{}` and the fallback
+heuristic matches "Michigan" to "Michigan State". `ncaaf_team_registry` holds 684
+teams, 2,342 keys, and REFUSES the **128 ambiguous** ones (`tigers` names 25
+teams); on the live 2026-08-29 ESPN slate 16/16 names resolved. Scheduled task
+`verify-ncaaf-settlement-593` (daily 08:25 CT) reports PENDING rather than passing
+on a quiet log.
+
+**STILL CANNOT SETTLE A BET: `nba`, `nhl`, `ncaab`.** Pinned by
+`tests/test_paper_settlement.py::test_the_traded_sports_WITHOUT_a_resolver_are_pinned...`,
+so adding a sport to the board without a resolver now FAILS instead of quietly
+demonstrating the bug. Pinned is not fixed.
+
+## [polymarket-h2h-buys-the-wrong-side] POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lanes portfolio-venue-and-side-integrity / venue-candidate-key-token-guard]`
+
+`outcome_side_for_index` assumes `OUTCOME_SIDE_YES` buys `outcomes[0]`. It does
+not. Measured against ground truth: polymarket h2h **5 agree, 3 MISMATCH**;
+polymarket totals 9/0; kalshi totals 4/0. Totals are immune BECAUSE they resolve by
+NAME (`over` -> YES); h2h has no name to fall back on, so the index is a positional
+guess.
+
+`aec-mlb-az-sf-2026-08-27`: our `side=home` (San Francisco), submitted
+`OUTCOME_SIDE_YES outcome_index=0 outcome='San Francisco Giants'` at 0.48. StatsAPI
+`Arizona 1 @ San Francisco 6`, Final, `home_win=True`. The venue graded it **lost**,
+pnl **-5.871** (our exact cost basis), `held_side=POSITION_RESOLUTION_SIDE_SHORT`.
+**We bet the winner and were paid a loss.**
+
+Cleanest evidence, needing no team-name reasoning: four sibling futures in ONE
+catalogue response, outcomes literally the strings "Yes"/"No", and
+`tec-mlb-nlchamp-2026-09-27-atl` lists them **NO-first** while its three siblings
+are YES-first.
+
+**TWO DIFFERENT MAPPINGS — do not conflate them.** `outcomes[i] <-> outcomePrices[i]`
+(alignment) is PROVEN correct. `OUTCOME_SIDE_YES <-> outcomes[0]` (the binding) is
+the false one. An alignment proof says nothing about the binding.
+
+`home`/`away` on Polymarket now REFUSES by name rather than guessing. The venue
+does name its own YES leg (`marketSides[].long` + `.team.name`) but it is **NOT
+wired** — only the first entry has been observed, so `long == YES` is an inference;
+`todo.md #595` carries the sequence, ending in scoring against all 8 venue-settled
+moneylines INCLUDING the 3 that went wrong.
+
+## [venue-candidate-key-ambiguity] BOARD JOIN KEYS: a bare token could name another fixture's team, and the guard's own counter cannot see it fire `[verified PARTIAL 2026-08-28T02:36Z, lane venue-candidate-key-token-guard]`
+
+`_candidate_keys` built city/nickname keys from a board team, bounded only by
+subtracting the OPPONENT's words — correct about the ROW and the wrong SCOPE for the
+lookup, since `apply_venue_quotes` resolves against the sport's WHOLE quote pool.
+Measured over the alias maps: **soccer 21 ambiguous tokens** (`city` names 14 clubs,
+`real` 4), **mlb 7**, **nfl 5**, **nba 3**; and `_alias_map` is `{}` for nhl/ncaaf/
+ncaab, so those rows had NO guard at all ("Ohio State Buckeyes" offered
+`ncaaf|h2h|state`). An unresolvable board team also fell through to raw words
+("Not A Real Club" -> `mlb|h2h|club`, `|not`, `|real`).
+
+`unambiguous_club_tokens` now keeps only tokens naming exactly one club, and
+`team_name_tokens` resolves through `canonical_team` with no raw fallback.
+
+**PARTIAL, and the limit is the instrument.** Production read (`32b0cfaa`, 02:36Z):
+soccer inputs byte-identical across the boundary and output identical — unmatched
+rate **30.72% -> 30.72%**, kalshi `wanted_overlap` **83 -> 83**. That shows NO HARM.
+It does NOT show the guard fired: `wanted_overlap` counts `offered ∩ wanted`, this
+change shrinks *wanted*, and kalshi's soccer keys are full club names the guard
+preserves — so the counter reads 83 either way. The nhl/ncaaf/ncaab **wrong**-match
+half is a different question and no counter here answers it.
+
 ## [espn-egress-and-wnba-boxscores] ESPN SERVES RENDER FROM ONE OF TWO HOSTS, and the WNBA boxscore had no producer `[verified 2026-08-26, lane kalshi-spread-join-sign]`
 
 **`site.api.espn.com` returns HTTP 403 to Render -- from WEB AND FROM BOTH
