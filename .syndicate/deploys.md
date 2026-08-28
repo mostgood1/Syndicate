@@ -35597,3 +35597,67 @@ never fired, so "the OS kills the child instead of the worker" remains proven
 only by a synthetic POSIX test — which is SKIPPED on Windows dev, where this
 was written. The failure path is designed to degrade to the old behaviour
 (fall through to the guard), and that path is unexercised in production.
+
+---
+
+## 2026-08-28 ~10:45-10:49 CT — web + live-odds-worker <- `8b8a6579` — lane `venue-join-refusal-visibility`
+
+Four join/instrument fixes. Claims taken and preflight CLEAR for each; web
+`dep-da8qq3jtqb8s73f112rg`, live-odds-worker `dep-da8qrrmk1f9s739t1u10`.
+refresh-worker deliberately NOT deployed — claim held by `live-game-line-projection`,
+an ACTIVE lane mid-deploy. Items 1 and 3 are therefore SHIPPED BUT NOT LIVE on
+the service that runs the join.
+
+### verify (web): the ops slate reader now agrees with the join, and soccer more than doubled
+
+`/api/ops/polymarket/slate`, same endpoint, same day, before and after:
+
+```
+              before (09:0xZ)      after (15:5xZ)
+soccer|h2h              114                  449
+soccer|spreads          288                  632
+soccer|totals           336                  728
+                        ---                  ---
+                        738                1,809
+```
+
+`mls`, `epl`, `bun`, `lg1`, `lal`, `ligpor`, `eflch` no longer appear as their
+own leagues — all fold into `soccer`. That is `soccer_competition_tokens`
+gaining the PAIR test (`soccer_fixture_clubs`), measured on real slugs as
+proven `['lg1']` -> `['epl','lg1','mls']`.
+
+**READ THIS AS A READER MEASUREMENT, NOT A JOIN MEASUREMENT.** Web runs the new
+code so the endpoint reports what the join WILL bucket; `join_polymarket_to_board`
+itself still runs on refresh-worker at `234c9e81`. `no_match|soccer|h2h: 104`
+will not move until refresh-worker deploys. Do not report soccer as executing
+on the strength of the table above.
+
+### verify: a premise I DOWNGRADED was too conservative, and the number says so
+
+I told the user `outcomes_count_mismatch: 372` was probably stale settled
+markets, on six sampled shapes all dated 08-15/16 at `0.9900`, and refused to
+ship a decode change on it. The new recency cut, first reading:
+
+```
+outcome_readability_by_reason_and_recency:
+  ok|upcoming                       8348
+  ok|past                            309
+  outcomes_count_mismatch|past       216
+  outcomes_count_mismatch|upcoming   193   <-- 47% of the refusals
+```
+
+**193 upcoming fixtures, not zero.** The six-row sample was unrepresentative in
+the direction that made the bug look harmless. Refusing to act on it was right;
+concluding it was stale was wrong, and only the measurement separates those.
+This is now a real open item, not a closed one.
+
+### next
+
+- refresh-worker <- `8b8a6579` verifies items 1 and 3 for real. PASSES only if
+  `KALSHI_BOARD_JOIN` prints a non-empty `reasons=` (it has printed
+  `refusals=None` on every build ever) AND `no_match|soccer|h2h` falls below 104.
+- live-odds-worker boot re-runs `SPREAD_SIGN_AUDIT` with the rung fix. The old
+  reading is NOT a verdict: 10 runs pinned at rate 0.44-0.60 came from scoring
+  an arbitrary ladder rung. Expect `no_comparable_rung` to be non-zero and the
+  rate to move off 0.5 or the sample to shrink; either is informative, the old
+  0.5 was not.
