@@ -3506,7 +3506,55 @@ def _get_cached_or_latest_response(payload: dict[str, Any] | None = None) -> dic
 
 
 def _log_stage_timing(stage_name: str, duration_ms: float) -> None:
-    logger.info(json.dumps({"stage": stage_name, "duration_ms": round(duration_ms, 3)}, sort_keys=True, default=str))
+    """A completed stage's wall time, on the ONLY channel Render actually keeps.
+
+    `print`, not `logger.info`, and the swap is the whole point of this
+    function existing in its current form.
+
+    MEASURED 2026-08-27, refresh-worker: a search of the Render logs API for
+    `duration_ms` returns ONLY `[INTEL_TRACE]` lines (a different, already-print
+    emitter) and a search for `board_publication` returns only the
+    print-based CALLING/READY/RETURNED lines. This function's own payload -- a
+    bare `{"duration_ms": ..., "stage": ...}` -- appears ZERO times. It has been
+    called on every board build for months and has never produced a production
+    log line, exactly as the comments at `_build_span_enter` and
+    `candidate_building` both say.
+
+    WHAT THAT COST: board-build compute measured 614-782s that night, of which
+    the print-based `build_intelligence_overview` span accounted for 259-290s.
+    The other ~350s -- more than half the cycle -- was attributable to nothing,
+    because the four stages that would have named it (`candidate_building`,
+    `board_publication`, `response_building`, `request_total`) all reported
+    through here.
+
+    The `[intelligence_state] STAGE_TIMING` prefix matches every other
+    diagnostic in this module so one grep finds them together, and the fields
+    are `key=value` rather than JSON for the same reason -- the surrounding
+    lines are read by eye far more often than they are parsed.
+
+    BOTH CHANNELS, and the logger call is NOT vestigial. `logger.info` is
+    kept because `test_compute_response_reuses_source_cache_until_state_changes`
+    asserts that `data_ingestion` appears among the LOGGED stages -- it captures
+    the logger, not stdout. Dropping it turned that assertion into
+    `'data_ingestion' not found in []`. The test encodes a real intent (stage
+    timings must be observable to something), so the fix is to add the channel
+    that reaches production, not to delete the one a test already depends on.
+
+    NEVER RAISES. A timing line must not be able to kill the build it measures;
+    that is the same rule `_build_span_enter` states for itself.
+    """
+    try:
+        logger.info(json.dumps({"stage": stage_name, "duration_ms": round(duration_ms, 3)}, sort_keys=True, default=str))
+    except Exception:
+        pass
+    try:
+        print(
+            f"[intelligence_state] STAGE_TIMING stage={stage_name} "
+            f"duration_ms={round(float(duration_ms), 3)}",
+            flush=True,
+        )
+    except Exception:
+        pass
 
 
 # #327. These three were the ORIGINAL of a pair, and the copy in
@@ -5501,11 +5549,24 @@ class IntelligenceStateService:
             except Exception as exc:
                 print(f"[intelligence_state] KALSHI_DISCOVERY_FAILED error={exc}", flush=True)
 
-            # KALSHI'S OWN PRICES, on Kalshi's own cadence. Called every board
-            # build, but `run_kalshi_odds_refresh` owns the interval (hourly by
-            # default) and serves the cached markets in between -- the board
-            # build's ~3min period is set by OddsAPI's rate limit and has no
-            # business deciding how often we hit a different venue. Then joined
+            # KALSHI'S OWN PRICES. `run_kalshi_odds_refresh` owns the interval
+            # and serves the cached markets in between, so this call is a CACHE
+            # READ whenever something else has kept the artifact warm.
+            #
+            # `[2026-08-27]` THE COMMENT THIS REPLACES SAID "hourly by default"
+            # AND THAT WAS WRONG IN A LOAD-BEARING WAY. The constant is
+            # `DEFAULT_REFRESH_INTERVAL_SECONDS = 120`; 3600 is the DORMANT
+            # interval for series with no live slate. Worse, the sentence after
+            # it -- "the board build's ~3min period ... has no business deciding
+            # how often we hit a different venue" -- described an intent the
+            # code did not implement: this was the ONLY production caller, so
+            # the board build's period WAS the Kalshi cadence, and measured
+            # 680-874s that night rather than the ~3min the comment assumed.
+            #
+            # `pipeline/venue_odds_loop.py` now refreshes both venues on their
+            # own cadence. This call is deliberately LEFT IN PLACE: it
+            # self-gates, so with the loop enabled it costs a cache read, and
+            # `join_to_board` below still needs the markets in hand. Then joined
             # to the shortlist to produce the first Kalshi coverage number that
             # is actually about Kalshi.
             #
@@ -7277,7 +7338,36 @@ _INTELLIGENCE_STATE_SERVICE = IntelligenceStateService()
 
 
 def start_intelligence_state_background_loop(app: Flask | None = None) -> bool:
-    return _INTELLIGENCE_STATE_SERVICE.start(app)
+    """Start the board loop, and alongside it the venue price loop.
+
+    THE VENUE LOOP IS HOSTED HERE, and that is a deliberate second choice. Its
+    natural home is a worker entrypoint, but on 2026-08-27 both were claimed by
+    other open lanes -- `scripts/run_refresh_worker.py` by
+    `exchange-markets-api-integration` and
+    `scripts/run_live_odds_refresh_worker.py` by `open-bet-live-status` -- and
+    editing across a lane is not worth a nicer import site. This function is
+    already the single place the refresh-worker turns background work on, so
+    the behaviour is right even if the address is borrowed.
+
+    It is a SEPARATE THREAD on purpose. The whole point is that venue price
+    refresh stops being gated by the board build's 680-874s period; starting it
+    from inside the board loop would reproduce exactly the coupling this is
+    meant to remove.
+
+    Returns the BOARD loop's result unchanged -- every existing caller reads it
+    as "did the board loop start", and quietly widening that to mean "did both
+    start" would let a disabled venue loop read as a failed board loop.
+    """
+    started = _INTELLIGENCE_STATE_SERVICE.start(app)
+    try:
+        from pipeline.venue_odds_loop import start_venue_odds_loop
+
+        start_venue_odds_loop()
+    except Exception as exc:
+        # A venue loop that cannot start must never take the board loop with
+        # it. Same rule every other optional subsystem on this worker follows.
+        print(f"[intelligence_state] VENUE_ODDS_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+    return started
 
 
 def queue_intelligence_state_refresh(payload: dict[str, Any]) -> str:
