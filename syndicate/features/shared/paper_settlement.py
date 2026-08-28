@@ -637,6 +637,13 @@ def _default_resolver(selected_date: str):
         # refuse (the live-state capture is capped at 12 players per match, so
         # an absent player is not a zero).
         "soccer": lambda: _build("syndicate.features.shared.bet_status_soccer", "soccer_status_resolver", selected_date),
+        # Same shape as `#547` above, one sport over. Measured 2026-08-28T02:50Z:
+        # `SETTLED date=2026-08-28 orders=21 graded=0` with
+        # `no_resolver_for_nfl: 6` -- 29% of the slate, and NFL was the only
+        # sport producing orders with no resolver at all. Game lines and totals;
+        # the resolver's docstring states why props refuse (the scoreboard
+        # capture carries team scores and nothing per-player).
+        "nfl": lambda: _build("syndicate.features.shared.bet_status_nfl", "nfl_status_resolver", selected_date),
     }
     cache: dict[str, Any] = {}
 

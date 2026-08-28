@@ -299,21 +299,51 @@ def test_each_sport_gets_its_own_resolver(monkeypatch):
 
 
 def test_a_sport_with_no_resolver_is_named_not_silent():
-    """NFL, not soccer.
+    """A sport this platform does not trade at all -- and that choice is the point.
 
-    This test used soccer as its example until `#547` gave soccer a resolver --
-    and soccer being the stand-in for "unresolvable" is exactly why it stayed
-    that way: `no_resolver_for_soccer` read as a correctly-reported gap in a
-    passing test, while all-time settled soccer bets sat at 0 against a board
-    that was ~97% soccer by row count.
+    This test used soccer until `#547` gave soccer a resolver, then NFL until
+    2026-08-28 gave NFL one. Both times the stand-in was a REAL sport, and both
+    times that is exactly what let a live gap read as a correctly-reported one:
+    `no_resolver_for_soccer` looked like a passing test while all-time settled
+    soccer bets sat at 0 against a board ~97% soccer by row count, and
+    `no_resolver_for_nfl` looked the same while 6 of 21 orders on the 08-28
+    slate could never be graded.
 
-    Kept pointed at a sport that genuinely has none, so the reason string stays
-    pinned; the day NFL gains one, this should move again rather than be
-    deleted.
+    Moving it to the next real sport would just re-arm the same trap -- NCAAF is
+    on the board TODAY. So the reason string is pinned against a sport that
+    cannot mask anything, and the WORK LIST moved to the test below, which fails
+    when a traded sport lacks a resolver instead of quietly demonstrating it.
     """
-    verdict = settle._default_resolver(DATE)({"sport": "nfl"})
+    verdict = settle._default_resolver(DATE)({"sport": "cricket"})
     # The ungraded counts stay a work list rather than a mystery.
-    assert verdict["unavailable_reason"] == "no_resolver_for_nfl"
+    assert verdict["unavailable_reason"] == "no_resolver_for_cricket"
+
+
+def test_the_traded_sports_WITHOUT_a_resolver_are_pinned_so_a_new_gap_cannot_pass_quietly():
+    """The tripwire the two rewrites above kept failing to be.
+
+    `no_resolver_for_<sport>` is a NAMED refusal, which means a sport can be
+    traded for months while its bets are ungradeable and every test stays green
+    -- twice now. This pins the exact set, so wiring a new sport onto the board
+    without a resolver changes this set and FAILS here, forcing the decision to
+    be made rather than discovered in a settlement counter.
+
+    Shrinking this set is the goal. It is not a list of sports that are fine.
+    """
+    traded = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
+    resolve = settle._default_resolver(DATE)
+    missing = {
+        sport
+        for sport in traded
+        # A bare dict reaches the market check before any artifact read, so this
+        # probe costs no I/O for the sports that DO have a resolver.
+        if resolve({"sport": sport}).get("unavailable_reason") == f"no_resolver_for_{sport}"
+    }
+
+    assert missing == {"nba", "nhl", "ncaaf", "ncaab"}, (
+        "settlement resolver coverage changed -- if a sport gained one, shrink this set; "
+        "if a sport was added to the board without one, its bets cannot be graded"
+    )
 
 
 def test_soccer_now_dispatches_to_its_own_resolver():

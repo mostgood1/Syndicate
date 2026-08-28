@@ -585,6 +585,10 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # as the mlb_source/wnba_source/nhl_source eval/boxscore entries above.
     "soccer_source/*/api/recommendations/recommendations_*.json",
     "soccer_source/*/api/live_state/live_state_*.json",
+    # poll_nfl_live_state.py. INERT under the keyvalue backend, where the
+    # capture never touches disk -- it is here so a backend change does not
+    # silently strand the one artifact NFL settlement reads.
+    "nfl_source/api/live_state/live_state_*.json",
     "soccer_source/*/api/display_prediction_dates.json",
     "soccer_source/*/api/schedule/schedule_*.json",
     # Raw bookmaker odds/props/picks (2026-07-24 market-board work): these

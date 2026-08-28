@@ -2297,6 +2297,104 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Out of scope here.
 - Blocked by: none
 
+### nfl-settlement-resolver — OPEN — opened 2026-08-27 — session 764eca35-178c-4c29-afbd-ec621894aaf1
+
+- Goal: NFL bets can be GRADED. One testable outcome: `no_resolver_for_nfl`
+  goes to **zero** in `[paper_settlement] SETTLED` / `[bet_status] BET_STATUS`
+  and at least one NFL order reaches a won/lost verdict in production.
+- MEASURED BEFORE STARTING, 2026-08-28T02:37-02:50Z refresh-worker:
+  `SETTLED date=2026-08-28 orders=21 graded=0 ungraded={... 'no_resolver_for_nfl': 6 ...}`
+  (**6 of 21 = 29% of today's slate**), `SETTLED date=2026-08-27` 8 of 158,
+  `BET_STATUS orders=158` 16. NFL is the ONLY sport producing orders with no
+  resolver. This is `#547` repeating: soccer sat at `no_resolver_for_soccer`
+  with 0 settled ALL-TIME while being ~97% of the board by row count.
+- **THE GAP IS TWO STAGES, NOT ONE — this is the finding that shapes the work.**
+  (1) `paper_settlement._default_resolver` has builders for mlb/wnba/soccer
+  only. (2) **There is nothing for an NFL resolver to READ.**
+  `poll_soccer_live_state.py` is the ONLY live-state poller in `scripts/`.
+  `syndicate/features/nfl/live_game_state.py` fetches ESPN over HTTP at call
+  time (`_fetch_scoreboard` -> `json.loads(response.read())`), is keyed by
+  `(season, week, seasontype)` rather than by DATE — and settlement resolvers
+  take `selected_date` — and its only callers are in `preseason_cards.py`,
+  always `SEASONTYPE_PRESEASON`. Regular season is not wired at all.
+  **Writing only the resolver ships a READER WITH NO PRODUCER** — the inverse
+  of `#547` — and it would go out inert with passing tests.
+- Files: NEW `scripts/poll_nfl_live_state.py`, NEW
+  `syndicate/features/shared/bet_status_nfl.py`, NEW
+  `tests/test_bet_status_nfl.py`, and `syndicate/features/shared/manifest.py`
+  (`HOT_ARTIFACT_PATTERNS` allowlist entry).
+- **NARROW CARVE-OUT, one line**, on `syndicate/features/shared/paper_settlement.py`
+  — held by lane `open-bet-live-status` (session `syndicate-27`, recorded in
+  that lane's own block as NOT RUNNING). Exactly one `"nfl": lambda: _build(...)`
+  entry added to `_default_resolver`'s `builders` dict; nothing else in the file
+  touched. Same narrow-carve-out pattern, and same justification, that
+  `venue-refresh-decoupling` used on this lane's `polymarket_board_join.py`
+  claim on 2026-08-28. Reclaim by re-asserting the path.
+- Hypothesis: NFL orders carry `home_team`/`away_team` (as soccer's do), so the
+  join is on the TEAM PAIR through `team_aliases`, never on `event_id` — the
+  order's id namespace is OddsAPI's and ESPN's is not the same, which is the
+  trap `bet_status_soccer` documents and `bet_status_wnba` says cost MLB a day.
+  The NFL alias map carries all 32 clubs (measured this session).
+- Falsification: wrong if NFL `OrderRequest` rows do NOT carry the team fields,
+  in which case the join needs a different key and the refusal must be BY NAME
+  rather than a fallback to an id that cannot match.
+- Verification: REACHABILITY BEFORE CORRECTNESS per the engine standard —
+  `off != on`. The resolver must be shown to change the counter, not merely to
+  exist: `no_resolver_for_nfl` non-zero before, zero after, on the SAME slate,
+  plus one NFL order reaching won/lost. A test that only proves the module
+  imports would pass in both states.
+- RISK / TO CHECK, not asserted: my notes carry "NFL week self-pins to 1" from
+  the August E2E assessment. Grepping the obvious places found no hardcode, so
+  it is NOT claimed as current — but `data/nfl_source/current_week.json` and the
+  week derivation must be checked, because a `(season, week)` join would inherit
+  it. **Date-keying the artifact sidesteps it entirely**, which is an
+  independent reason to prefer the poller over a live `nfl_game_state_index`
+  call.
+- **BUILT 2026-08-28, BOTH STAGES. NOT DEPLOYED.**
+  `scripts/poll_nfl_live_state.py` fetches ESPN by `?dates=YYYYMMDD` (never
+  season/week, so the week question is never asked) and persists through
+  `refresh_state_store.write_json_file`; `bet_status_nfl.py` reads with the
+  matching `read_json_file`, so producer and reader cannot land in different
+  places across the web/worker disk split.
+- **REACHABILITY PROVEN, `off != on`.** With the one-line `paper_settlement`
+  wiring REMOVED: **1 failed, 16 passed** — and the one failure is
+  `test_paper_settlement_DISPATCHES_nfl_to_a_real_resolver`, asserting exactly
+  `no_resolver_for_nfl`. Restored: **17 passed**. The other 16 pass in BOTH
+  states, which is the correct signature — only the reachability test can see a
+  dispatch miss.
+- **END TO END ON REAL ESPN DATA**, not a fixture. Polled 2026-08-27 live: 4
+  games, 3 final. The actual production order `tsc-nfl-pit-buf-2026-08-27 over
+  34.5` now grades — PIT 27 @ BUF 28, `current_value=55.0, is_final=True`.
+  Moneyline SF@LV returns `margin 6.0, line 0.0` (two-way PUSH semantics, the
+  `draw_possible=False` decision); the tri-code join returns the same; the
+  in-progress LAR@LAC game returns `started=True, is_final=False` and does not
+  settle.
+- **FALSIFICATION DID NOT FIRE.** `execute_portfolio.py:133` populates
+  `home_team=position.get("home_team")` sport-agnostically and both fields are
+  first-class in `execution_ledger`'s durable record. Where a position lacks
+  them the resolver refuses as `no_home_away_teams_on_order` — VISIBLE in the
+  counter rather than silently joined on an id that cannot match.
+- **A SECOND, BIGGER FIX FELL OUT OF A STALE TEST.**
+  `test_a_sport_with_no_resolver_is_named_not_silent` used NFL as its example of
+  an unwired sport and broke. Its own docstring said it had used SOCCER until
+  `#547`. Both times the stand-in was a REAL sport, and both times that is what
+  let a live gap read as a correctly-reported one in a green suite. Repointing
+  it at NCAAF would have re-armed the trap a third time — NCAAF is on the board
+  TODAY. So it now names a sport the platform does not trade, and a NEW test,
+  `test_the_traded_sports_WITHOUT_a_resolver_are_pinned_so_a_new_gap_cannot_pass_quietly`,
+  pins the set `{nba, nhl, ncaaf, ncaab}`. Adding a sport to the board without a
+  resolver now FAILS instead of quietly demonstrating the bug.
+- **GREEN: 297 passed** across the settlement/bet-status/game-line/artifact
+  surface. TWO FAILURES IN `test_artifact_publisher.py::MissingRequiredArtifactRepairTests`
+  ARE **PRE-EXISTING AND NOT MINE** — verified by removing my
+  `HOT_ARTIFACT_PATTERNS` entry and re-running: they fail identically without
+  it. Their counts read 5 != 7 and 10 != 12, i.e. LOWER than expected, and
+  adding a pattern cannot reduce a count.
+- **OWED, and it is the whole point of the lane:** the production reading.
+  `no_resolver_for_nfl` must go to ZERO and at least one NFL order must reach a
+  won/lost verdict. Nothing here is deploy-verified.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
