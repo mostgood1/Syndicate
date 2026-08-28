@@ -405,8 +405,30 @@ records -- a 0.04-separation test treated as conclusive. The other two markets
 have wide separation (0.42/0.59, 0.64/0.37) but both land `long_index=0`, so
 they do not test alignment at all. **What would settle it: a market where the
 long side is `outcomes[1]` AND the two prices are far apart.** This also
-scratches lane `venue-join-refusal-visibility`'s proof that outcomes and prices
-ARE aligned, which was run on totals; flagged to them.
+**ATTRIBUTION CORRECTED TWICE, AND THE TRUTH IS NEITHER VERSION.** I first
+wrote that this scratches lane `venue-join-refusal-visibility`'s alignment
+proof. Not theirs -- they checked their own commits and none tests alignment; I
+had conflated them with the OTHER polymarket session (`local_bb0d1330`,
+side-vocabulary). They then proposed the opposite, that alignment "has never
+been checked", having grepped `state.md` and `todo.md`.
+
+**It HAS been checked, and it is in `learnings.md`** -- which neither of us
+grepped. The 2026-08-28 corrected wrong-side entry records:
+
+    "the totals markets give a sharp test, `under` at index 1 priced 0.445
+     against a planned 0.4444 where misalignment would read Over's ~0.555.
+     Alignment proven at both indices."
+
+So the true state: **alignment was tested ONCE, on a TOTALS market, at ~0.11
+separation. My `hou-car` reading is a MONEYLINE at 0.01 separation.** Different
+populations, and neither settles the other -- a convention that holds for
+over/under need not hold for team outcomes, which is precisely the split that
+makes `_side_to_outcome` safe for totals and unsafe for teams.
+
+**What survives regardless, and is the useful residue:** `zip(outcomes, prices)`
+appears at `polymarket_board_join.py:566` and `venue_quote_adapters.py:810`
+and `:842`. Three call sites rest on this assumption, and it has ONE measurement
+behind it, taken on the market type least likely to expose the failure.
 
 **TWO INSTRUMENT DEFECTS FIXED ON THE WAY, both mine, both found by reading
 production rather than the code.** (1) `outcomes`/`outcomePrices` are JSON
