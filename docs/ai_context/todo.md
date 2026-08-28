@@ -1,5 +1,41 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#604` — **I shipped a named refusal that can never fire. `#601`'s own stated verification is not executable.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **OPEN, found by self-check**
+
+`kalshi_board_join.py:121` defines `REASON_SEGMENT_MISMATCH =
+"segment_has_no_matching_series"`. **It is referenced nowhere.** The Kalshi
+segment fix WORKS -- `_match_key`/`_row_key` no longer pair a segment row with a
+full-game contract -- but it works SILENTLY, by the two keys failing to be equal.
+Nothing counts it.
+
+**I wrote the counter for Polymarket (`refuse("board_row_is_a_segment_bet")`,
+`polymarket_board_join.py:943`) and did not write it for Kalshi**, in the same
+session, having given the reason in `#602`'s own commit message: "a bet that
+stops being placed with no reason emitted is indistinguishable from a venue that
+stopped quoting."
+
+CONSEQUENCE, and it is the reason this is not cosmetic: **`#601`'s VERIFY line
+says "refusal count going UP on segment rows is the expected reading". That
+reading does not exist.** The verification I specified cannot be run as written.
+`#601` must instead be verified at the money level -- no NEW order carries a
+`first3`/`first5` row against a full-game ticker -- which is weaker, because it
+confirms the absence of a bad outcome rather than the presence of the guard.
+
+A SECOND, SEPARATE DEFECT IN THE SAME PLACE. The Kalshi join still BUILDS a
+match record for a segment row: board rows are indexed by `_board_key`/
+`_event_key`, which are 3-tuples with no segment, so a full-game `KXMLBTOTAL`
+still collects the `first3` row and constructs a match. Only the downstream
+resolver refuses it. So `matched` COUNTS a pairing that can never be priced --
+a phantom match, inflating the join's headline number.
+
+FIX (one change, both problems): refuse at match-record construction when the
+board row's segment differs from `segment_for_series(market["series"])`, and
+`_refuse(REASON_SEGMENT_MISMATCH)` there. That removes the phantom from
+`matched` and gives the counter `#601` promised.
+
+NOT done in this pass: a code change while a deploy verification was in flight
+would have made the boot reading ambiguous about which commit produced it.
+
 ### `#603` — **THE THIRD CONSUMER: `quote_key` has NO game and NO segment, and it collides on real orders** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **MEASURED, NOT FIXED — cross-lane file, NOT edited**
 
 Swept every key-building function in `syndicate/features/shared/` and `pipeline/`
