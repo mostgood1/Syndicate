@@ -44,8 +44,13 @@ def _admin_token() -> str:
     return ""
 
 
-def fetch(base: str, sport: str, timeout: int = 120) -> dict:
+def fetch(base: str, sport: str, date: str = "", timeout: int = 120) -> dict:
+    """Fetch the board. With `date`, the server RE-SCORES that past date from
+    its retained live-gameline ledger, building the finals index from that
+    date's grid -- so a missed night is recoverable rather than lost."""
     url = f"{base.rstrip('/')}/api/board/book-grid?sport={sport}"
+    if date:
+        url += f"&date={date}"
     req = urllib.request.Request(url)
     tok = _admin_token()
     if tok:
@@ -59,18 +64,65 @@ def main() -> int:
     ap.add_argument("--sport", default="mlb")
     ap.add_argument("--base-url", default=DEFAULT_BASE)
     ap.add_argument("--out", default=str(HISTORY))
+    ap.add_argument(
+        "--date",
+        default="",
+        metavar="YYYY-MM-DD",
+        help="Re-score a PAST slate date instead of whatever the board is "
+             "currently serving. The collector runs at 23:25 CT precisely "
+             "because the slate rolls at midnight Central; if a run is missed "
+             "or fires pre-slate, `--date <yesterday>` recovers it from the "
+             "retained ledger. Rows are stamped `backfill: true`.",
+    )
+    ap.add_argument(
+        "--allow-date-mismatch",
+        action="store_true",
+        help="Append even if the board returns a different date than --date "
+             "asked for. Off by default: an ignored --date would otherwise "
+             "silently record today's slate under a backfill stamp.",
+    )
     ap.add_argument("--print-only", action="store_true")
     args = ap.parse_args()
 
+    if args.date:
+        try:
+            # strptime alone is lenient -- it accepts "2026-8-1". Round-trip
+            # so only the canonical zero-padded form passes, otherwise a
+            # malformed date reaches the API and fails as SCORER_DISABLED.
+            if datetime.strptime(args.date, "%Y-%m-%d").strftime("%Y-%m-%d") != args.date:
+                raise ValueError(args.date)
+        except ValueError:
+            print(f"BAD_DATE {args.date!r} -- expected YYYY-MM-DD (zero-padded)")
+            return 5
+
     try:
-        doc = fetch(args.base_url, args.sport)
+        doc = fetch(args.base_url, args.sport, args.date)
     except Exception as exc:
         print(f"FETCH_FAILED {type(exc).__name__}: {exc}")
         return 2
 
+    served = doc.get("date")
+    if args.date and served != args.date:
+        # UNKNOWN MUST NOT DEFAULT PERMISSIVE: if the server ignored `date`,
+        # this is today's slate, and appending it as a backfill would corrupt
+        # the history with a row that pooling then trusts as a past capture.
+        msg = (f"DATE_MISMATCH requested={args.date} served={served} -- "
+               f"the board did not honour ?date=")
+        if not args.allow_date_mismatch:
+            print(msg + " (use --allow-date-mismatch to append anyway)")
+            return 4
+        print("WARNING " + msg)
+
     score = doc.get("live_gameline_score") or {}
     ledger = doc.get("live_gameline_ledger") or {}
     gl = doc.get("live_gamelines") or {}
+    if args.date and not score:
+        # An empty score block on an HONOURED past date means no ledger was
+        # retained that far back -- NOT that the scorer is off. Exit 3 is
+        # documented as a real finding; do not let a stale backfill raise it.
+        print(f"NO_DATA_FOR_DATE sport={args.sport} date={args.date} -- "
+              f"board served the date but retained no live-gameline score")
+        return 6
     if not score.get("enabled"):
         print(f"SCORER_DISABLED sport={args.sport} -- nothing to record")
         return 3
@@ -78,8 +130,12 @@ def main() -> int:
     row = {
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "sport": args.sport,
-        "date": doc.get("date"),
+        "date": served,
         "board_generated_at": doc.get("generated_at"),
+        # Provenance: a reconstruction must never be mistaken for a live
+        # capture. Absent/false means the row came from the live board.
+        "backfill": bool(args.date),
+        "requested_date": args.date or None,
         # THE DENOMINATOR THAT MATTERS. Record counts are repeated snapshots of
         # the same games; this is the independent unit.
         "games_with_outcome": score.get("games_with_outcome"),
