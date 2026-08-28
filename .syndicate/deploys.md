@@ -36349,3 +36349,59 @@ denominator error of the day and the first one I shipped to production.
 And count a flip-match as proof of listing, so `flipped <= listed` becomes an
 invariant the counter cannot violate — that inequality is the cheapest possible
 self-check and it should be asserted rather than left for a human to notice.
+
+---
+
+## 2026-08-28 14:26 CT — refresh-worker <- `80dfb528` — lane `venue-join-refusal-visibility`
+
+`dep-da8u1pon74is73e62am0`, live 19:32:59Z. **Preflight CLEAR, no break-glass,
+no killed sim, no discarded build** — the only clean deploy of the evening.
+
+### VERIFIED 19:55:54Z — the eligibility rate, and it is 100%
+
+```
+invariant_ok = True
+flipped    = {soccer|h2h: 5,  soccer|totals: 5}
+listed     = {soccer|h2h: 5,  soccer|totals: 5}
+not_listed = {}
+unreadable = {soccer|h2h: 66, soccer|totals: 37, nfl|totals: 30, mlb|totals: 23, ...}
+tried      = {soccer|h2h: 71, soccer|totals: 42, ...}
+```
+
+**`flipped / listed` = 5/5 and 5/5. Every soccer fixture we can PROVE is listed
+was inverted; zero were correctly oriented.** Combined with the ESPN checks
+(Man City @ Crystal Palace, PSG @ Lille, Villarreal @ Alavés — board correct,
+slug home-first), the home-first reading is as well supported as this
+instrument can make it.
+
+`invariant_ok=True` — the classifier no longer contradicts itself. It was
+`flipped 9 > listed 4` on three consecutive builds before `80dfb528`.
+
+### TWO CAVEATS THAT MATTER AS MUCH AS THE RESULT
+
+**1. `listed` is 5 of 71. 93% of the population is UNCLASSIFIABLE.** The rate
+is 100% of a sample of five. It is not "orientation explains soccer"; it is
+"of the five we can check, five were inverted".
+
+**2. `not_listed` IS EMPTY, AND THAT RETIRES MY OWN COVERAGE CLAIM.** I wrote
+earlier — in `state.md`, `#598` and to the user — that the other ~96 soccer
+rows were "a COVERAGE question, the fixture is absent from the slate". **The
+counter cannot prove a single one of them absent.** Absence now requires the
+whole bucket to canonicalise and it never does: 66 soccer|h2h candidates are
+unreadable. So the remaining gap is NOT demonstrated coverage; it is
+`canonical_team` failing on Polymarket's club tri-codes.
+
+**That relocates the whole remaining problem from the VENUE to OUR ALIAS MAP,**
+and it is a much better place for it to be: if those 66 are mostly
+listed-but-unnameable, they are recoverable by extending `team_aliases`, and by
+the 5/5 evidence they are probably inverted too. `market_web_url` builds a
+checkable address for any of them from data already stored.
+
+### NEXT
+
+1. Extend the soccer alias map to Polymarket's tri-codes — measured, per code,
+   never guessed (`_soccer_alias_to_name` drops ambiguous keys on purpose).
+   Each one moves a row from `unreadable` into `listed` or `not_listed`.
+2. Only then is the orientation rate worth re-reading. At n=5 it is suggestive
+   plus three ESPN confirmations, not settled.
+3. STILL DO NOT SHIP A BLANKET FLIP. MLB pairs correctly away-first today.
