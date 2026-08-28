@@ -995,3 +995,59 @@ def test_the_favourites_market_pairs_both_rows_the_right_way_round(monkeypatch):
     assert by_side["home"]["line"] == -1.5
     assert by_side["away"]["kalshi_side"] == "no"
     assert by_side["away"]["line"] == 1.5
+
+
+# --------------------------------------------------------------------------
+# LANE `venue-join-refusal-visibility` (2026-08-28)
+# --------------------------------------------------------------------------
+
+
+def test_the_refusal_breakdown_is_returned_under_reasons_and_NOT_refusals():
+    """The key `portfolio_commit` prints must be the key this function returns.
+
+    MEASURED IN PRODUCTION 2026-08-28, refresh-worker, three consecutive builds:
+
+        KALSHI_BOARD_JOIN markets=11908 board_rows=1326 matched=186 refusals=None
+        KALSHI_BOARD_JOIN markets=11908 board_rows=677  matched=0   refusals=None
+        KALSHI_BOARD_JOIN markets=11823 board_rows=427  matched=0   refusals=None
+
+    1,140 refused rows on the first of those and not one word about why. The
+    log line read `joined.get('refusals')` and this function has never returned
+    that key -- the breakdown has always been under `reasons`. So the join
+    computed a complete per-reason count on every tick and the caller printed a
+    confident `None` over the top of it, for as long as the line has existed.
+
+    That is the difference between "Kalshi lists nothing we bet" and "our join
+    is broken", which this module's own docstring says must never share a
+    number -- and for the Kalshi half of "why is soccer never executed" it was
+    the only instrument there was.
+
+    ASSERTED IN BOTH DIRECTIONS ON PURPOSE. Checking only that `reasons` exists
+    would still pass if someone later added a DIFFERENT `refusals` key, leaving
+    two names for one idea and the same ambiguity that caused this. There must
+    be exactly one.
+    """
+    out = mod_join.join_kalshi_to_board([], [], selected_date="2026-08-28")
+    assert "reasons" in out
+    assert "refusals" not in out, (
+        "two names for one breakdown is how the caller came to print the wrong one"
+    )
+
+
+def test_the_caller_reads_a_key_the_join_actually_returns():
+    """The contract, enforced across the module boundary rather than assumed.
+
+    The bug was not inside either function -- both were individually correct.
+    It lived in the SEAM, where `.get()` on an absent key is indistinguishable
+    from a callee that genuinely had nothing to say. A unit test on either side
+    alone would have passed throughout.
+    """
+    import inspect
+
+    from pipeline import portfolio_commit
+
+    src = inspect.getsource(portfolio_commit._resolvers_from_markets)
+    assert "joined.get(\"reasons\")" in src or "joined.get('reasons')" in src
+    assert "refusals={joined.get" not in src, (
+        "the log line must not interpolate a key the join does not return"
+    )

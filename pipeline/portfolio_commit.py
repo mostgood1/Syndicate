@@ -238,6 +238,19 @@ def _polymarket_price_resolver(selected_date: str | None):
             f" samples={joined.get('unmatched_samples')}",
             flush=True,
         )
+    # WHICH COMPETITIONS THE BOARD CAN REACH, AND WHICH IT CANNOT. Printed
+    # unconditionally when the unreachable list is non-empty, because "soccer is
+    # not executing" was answerable for two days only by reading the join's
+    # source: the proven-token set decides whether a competition is filed under
+    # `soccer` at all, and nothing emitted it. The unreachable entry carries the
+    # club codes that would settle it -- see `join_polymarket_to_board`.
+    if joined.get("unproven_league_tokens"):
+        print(
+            "[portfolio_commit] POLYMARKET_LEAGUE_REACH"
+            f" soccer_tokens_proven={joined.get('soccer_tokens_proven')}"
+            f" unreachable={joined.get('unproven_league_tokens')}",
+            flush=True,
+        )
     if joined.get("out_of_scope_counts"):
         print(
             "[portfolio_commit] POLYMARKET_OUT_OF_SCOPE"
@@ -383,12 +396,51 @@ def _resolvers_from_markets(markets, selected_date: str | None = None):
         markets, board_rows, selected_date=str(selected_date or "")
     )
     matches = joined.get("matches") or []
+    # `reasons`, NOT `refusals`. This line read `joined.get('refusals')` and
+    # `join_kalshi_to_board` has never returned that key -- it returns the
+    # breakdown under `reasons`. So every build printed `refusals=None`, for as
+    # long as the line has existed, while the join computed a complete
+    # per-reason count and dropped it on the floor.
+    #
+    # MEASURED 2026-08-28 on refresh-worker: three consecutive builds printed
+    # `matched=186 refusals=None`, `matched=0 refusals=None`, `matched=0
+    # refusals=None`. 1,140 refused rows on the first of those and not one word
+    # about why -- which is exactly the question "why is soccer never executed
+    # by Kalshi" needed answered, and the reason it could not be answered from
+    # production at all. Polymarket's equivalent join has printed its refusals
+    # by name the whole time, which is why its story was readable and this one
+    # was not.
+    #
+    # THE MISS IS NOW SELF-REPORTING. A `.get()` on a key the callee does not
+    # return is indistinguishable from a callee that returned nothing, and that
+    # is the whole defect -- so when the key is absent this says WHICH keys
+    # exist rather than printing a confident `None` a second time.
+    reasons = joined.get("reasons")
+    if reasons is None:
+        reasons = f"<no 'reasons' key; join returned {sorted(joined)}>"
     print(
         f"[portfolio_commit] KALSHI_BOARD_JOIN markets={joined.get('kalshi_markets')}"
         f" board_rows={len(board_rows)} matched={len(matches)}"
-        f" refusals={joined.get('refusals')}",
+        f" reasons={reasons}",
         flush=True,
     )
+    # THE GRAMMAR WORK LIST, on its own line and only when non-empty. A title
+    # the catalogue cannot read is refused as `unreadable_title`, and the count
+    # alone cannot say WHICH families are lost -- measured 2026-08-25, eight
+    # soccer series refused 413 markets while not one soccer title was legible
+    # in any log. `unreadable_by_series` is complete rather than sampled, so an
+    # ABSENT family and a bounded sample that simply did not reach it stop
+    # sharing a number. Mirrors `POLYMARKET_UNMATCHED`, which is the reason the
+    # Polymarket side of this question was answerable and this one was not.
+    if joined.get("unreadable_by_series") or joined.get("unmatched_events"):
+        print(
+            "[portfolio_commit] KALSHI_UNMATCHED"
+            f" unreadable_by_series={joined.get('unreadable_by_series')}"
+            f" unreadable_titles={joined.get('unreadable_titles')}"
+            f" board_market_vocabulary={joined.get('board_market_vocabulary')}"
+            f" unmatched_events={joined.get('unmatched_events')}",
+            flush=True,
+        )
     if not matches:
         # Named, and `(None, None)` so the venue reverts to the aggregator
         # rather than losing its book -- but the line above says it happened,

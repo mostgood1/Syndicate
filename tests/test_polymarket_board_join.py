@@ -724,3 +724,102 @@ def test_an_unparseable_slug_yields_no_url_rather_than_a_broken_one():
     assert market_web_url("garbage") is None
     assert market_web_url("") is None
     assert market_web_url(None) is None
+
+
+# --------------------------------------------------------------------------
+# LANE `venue-join-refusal-visibility` (2026-08-28)
+#
+# Production trace behind these: `POLYMARKET_UNMATCHED counts=
+# {'no_match|soccer|h2h': 104, ...}` -- EVERY soccer h2h row on the board --
+# while `/api/ops/polymarket/slate` reported `mls|h2h 30` sitting under a
+# league token no board row can ever look up.
+# --------------------------------------------------------------------------
+
+
+def _slate(*slugs):
+    return [{"slug": s, "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE"} for s in slugs]
+
+
+def test_a_competition_is_proven_by_the_PAIR_test_when_the_flat_one_declines(monkeypatch):
+    """MLS was invisible for exactly this reason.
+
+    `canonical_team` is the flat cross-league map and drops a club token that
+    names two clubs in different leagues. `soccer_fixture_clubs` asks the same
+    question as a PAIR -- both codes inside ONE league -- and `_teams_match`
+    has trusted it as an additive fallback since 2026-08-27. It was never
+    applied to proving a COMPETITION, so a token whose every fixture has one
+    ambiguous code could never enter the soccer bucket.
+
+    MEASURED on the live slate 2026-08-28: of 9 MLS fixtures, the flat test
+    proved 0 and the pair test proved `tor-nyc`.
+    """
+    monkeypatch.setattr(mod, "parse_slug", mod.parse_slug)
+    import syndicate.features.shared.team_aliases as aliases
+
+    # Neither club resolves flat -- the real MLS condition.
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, name: None)
+    monkeypatch.setattr(
+        aliases,
+        "soccer_fixture_clubs",
+        # ARGUMENT ORDER IS (home, away) AND THE SLUG IS <away>-<home>.
+        # `atc-mls-tor-nyc-...` parses to away=tor, home=nyc, so the call is
+        # ("nyc", "tor"). Writing it the other way round made this test fail
+        # against a correct implementation -- the same reversal, in a test,
+        # that `_polymarket_sides` refuses to make in production.
+        lambda home, away: ("toronto fc", "new york city fc")
+        if (home, away) == ("nyc", "tor")
+        else None,
+    )
+    proven = mod.soccer_competition_tokens(_slate("atc-mls-tor-nyc-2026-08-29-tor"))
+    assert "mls" in proven, "the pair test must be able to prove a competition on its own"
+
+
+def test_the_pair_test_is_ADDITIVE_and_cannot_unprove_a_token(monkeypatch):
+    """Union, not replacement, and this is the measurement that forced it.
+
+    On the same 2026-08-28 sample `elv-lev` passes the FLAT test and returns
+    None as a pair. Swapping one test for the other would have bought MLS and
+    silently sold a Bundesliga fixture -- a strictly worse trade that every
+    aggregate number would have reported as an improvement.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, name: f"club-{name}")
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda home, away: None)
+    proven = mod.soccer_competition_tokens(_slate("atc-bun-elv-lev-2026-08-29-elv"))
+    assert "bun" in proven, "a token the flat test proves must stay proven"
+
+
+def test_a_sport_we_model_can_never_be_folded_into_soccer_by_the_pair_test(monkeypatch):
+    """The MLB tri-code collision (`min`->Minnesota United, `ath`->Athletic
+    Club) cost a real position on 2026-08-25. `_NON_SOCCER_LEAGUE_TOKENS`
+    short-circuits FIRST and the new test must not reach around it."""
+    import syndicate.features.shared.team_aliases as aliases
+
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, name: None)
+    monkeypatch.setattr(
+        aliases, "soccer_fixture_clubs", lambda home, away: ("minnesota united", "athletic club")
+    )
+    proven = mod.soccer_competition_tokens(_slate("tsc-mlb-min-ath-2026-08-25-10pt5"))
+    assert "mlb" not in proven
+
+
+def test_a_competition_no_board_row_can_reach_is_COUNTED_with_its_club_codes():
+    """`unproven_league_tokens` is the work list that replaces a guess.
+
+    The codes matter, not the count: Polymarket's tri-codes are its own
+    vocabulary, and each code here is one confirmable club -- the only basis on
+    which a vendor alias may be added. Guessing them from the name is how a bet
+    reaches the wrong team.
+    """
+    markets = [
+        {
+            "slug": "atc-nas-abc-xyz-2026-08-29-abc",
+            "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+            "outcomes": '["Yes","No"]',
+            "outcomePrices": '["0.40","0.60"]',
+        }
+    ]
+    out = mod.join_polymarket_to_board(markets, [], selected_date="2026-08-29")
+    assert "nas" in out["unproven_league_tokens"]
+    assert set(out["unproven_league_tokens"]["nas"]) == {"abc", "xyz"}

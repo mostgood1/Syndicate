@@ -172,9 +172,22 @@ def spread_sign_test(
     resolver `polymarket_board_join._teams_match` uses -- so this test and the
     join can never disagree about which fixture a slug names.
 
-    A fixture contributes ONE vote, not one per rung: a ladder has many rungs
-    of the same sign convention and counting each would let a single fixture
-    with a deep ladder decide the answer.
+    A fixture contributes ONE vote, not one per rung, so a single fixture with
+    a deep ladder cannot decide the answer.
+
+    **WHICH rung casts that vote is the whole test, and this used to get it
+    wrong.** The sentence here previously read "a ladder has many rungs OF THE
+    SAME SIGN CONVENTION" -- and that premise is false. Polymarket lists a
+    spread market per side per line, so one fixture's ladder spans BOTH SIGNS
+    (`asc-mlb-lad-det-2026-08-28-neg-2pt5` has a `pos` sibling). On that ladder
+    "does an arbitrary rung's sign agree with the board's home line" is not a
+    question with an answer; it is a coin flip, and 10 production runs returned
+    exactly that (rate 0.44-0.60 over n=9..22, every disagreement at the ladder
+    extreme against a board line of 1.0-3.5).
+
+    So the vote goes to the rung whose |line| EQUALS the board's |line| -- the
+    same bet, asked of both sides. A fixture the venue quotes only at other
+    lines has nothing comparable and is counted, not scored.
     """
     from syndicate.features.shared.polymarket_board_join import (
         _effective_league,
@@ -239,6 +252,14 @@ def spread_sign_test(
     segment_slugs = 0
     seen_fixture: set[tuple] = set()
     disagreements: list[dict[str, Any]] = []
+    # fixture key -> (board_home_line, [(slug_line, row), ...]). Every rung of
+    # the venue's ladder for that fixture, so the scoring pass can pick the one
+    # the board is actually on instead of the one the slate happened to list
+    # first.
+    by_fixture: dict[tuple, tuple[float, list]] = {}
+    # Fixtures the venue quotes, at lines the board does not carry. Not a
+    # disagreement and not an agreement -- an absence of anything to compare.
+    no_comparable_rung = 0
 
     for row in slate:
         if str(row.get("sportsMarketTypeV2") or "").upper() != "SPORTS_MARKET_TYPE_SPREAD":
@@ -287,11 +308,60 @@ def spread_sign_test(
             unmatched_fixtures += 1
             continue
         key, board_line = match
-        if key in seen_fixture:
-            continue
-        seen_fixture.add(key)
         if board_line == 0:
             continue
+        # COLLECTED, NOT SCORED HERE. See the scoring pass below for why the
+        # first slug per fixture is the wrong one to ask.
+        by_fixture.setdefault(key, (board_line, []))[1].append((slug_line, row))
+
+    # ------------------------------------------------------------------
+    # SCORING: COMPARE THE RUNG THE BOARD IS ON, NOT WHICHEVER CAME FIRST
+    # ------------------------------------------------------------------
+    #
+    # THE SAME DEFECT AS THE `f5` ONE ABOVE, ONE LEVEL UP, AND IT SURVIVED THE
+    # FIX FOR IT. That block records an instrument artefact that "looked like
+    # evidence" (rate 0.2857 from segment slugs) and names the compounding
+    # cause: `seen_fixture` gives a fixture exactly ONE vote, taken from the
+    # first matching slug. Excluding `f5` fixed which KIND of market votes. It
+    # did not fix WHICH RUNG -- and Polymarket lists a spread market per side
+    # per line, so a fixture's ladder spans BOTH SIGNS by construction.
+    #
+    # Asking "does the sign of an arbitrary rung agree with the board's home
+    # line" therefore has no well-posed answer, and the data says so plainly.
+    # MEASURED across 10 production runs, 2026-08-27 19:46Z to 2026-08-28
+    # 15:08Z, n growing 9 -> 22:
+    #
+    #     rate = 0.60, 0.5556, 0.4444, 0.50, 0.50, 0.5789, 0.5789, 0.5238,
+    #            0.5455, 0.5455
+    #
+    # Pinned at a coin flip, and EVERY disagreement sat at the ladder extreme
+    # (`neg-2pt5` for MLB, `neg-21pt5` for NFL) against a board line of 1.0-3.5.
+    # That is not a close call about the sign convention; it is a comparison of
+    # two different bets.
+    #
+    # WHY THIS HAD TO BE FIXED RATHER THAN LEFT UNDECIDED: the verdict ladder
+    # below maps ~0.5 to **"FALSIFIED: the sign is not fixed per fixture.
+    # Spreads must stay refused"**. That is a strong, durable, WRONG conclusion,
+    # and the only thing holding it back is `n < min_sample=30`. At n=22 and
+    # climbing it was days from writing itself into the ledger as a measurement.
+    # A broken instrument that reports UNDECIDED is a nuisance; one about to
+    # report a false FALSIFIED is a trap.
+    #
+    # LIKE FOR LIKE: score the rung whose |line| equals the board's |line|. A
+    # fixture with no such rung is NOT scored -- counted separately, because
+    # "we could not compare this" and "these disagreed" are different facts and
+    # sharing a number is what produced the 0.5 in the first place.
+    for key, (board_line, rungs) in by_fixture.items():
+        comparable = [
+            (slug_line, row)
+            for slug_line, row in rungs
+            if abs(abs(slug_line) - abs(board_line)) < 1e-9
+        ]
+        if not comparable:
+            no_comparable_rung += 1
+            continue
+        seen_fixture.add(key)
+        slug_line, row = comparable[0]
         if (slug_line < 0) == (board_line < 0):
             agree += 1
         else:
@@ -323,6 +393,11 @@ def spread_sign_test(
         "board_fixtures_keyed": len(home_line),
         "board_rows_unkeyable": skipped_board_rows,
         "fixtures_compared": n,
+        # Fixtures dropped because the venue quoted no rung at the board's own
+        # line. Reported beside `fixtures_compared` rather than folded into it:
+        # scoring these was the defect, so the count that replaced them has to
+        # be visible or the fix is unauditable.
+        "fixtures_no_comparable_rung": no_comparable_rung,
         "agree_with_home_sign": agree,
         "disagree": disagree,
         "agreement_rate": rate,
@@ -427,6 +502,7 @@ def run_spread_audit_if_enabled() -> dict[str, Any] | None:
             f" disagree={result['disagree']}"
             f" rate={result['agreement_rate']}"
             f" no_board_fixture={result['spread_slugs_with_no_board_fixture']}"
+            f" no_comparable_rung={result['fixtures_no_comparable_rung']}"
             f" segment_skipped={result['segment_slugs_skipped']}"
             f" verdict={result['verdict']!r}"
             f" disagreements={result['sample_disagreements']}",

@@ -497,9 +497,46 @@ def api_ops_polymarket_slate() -> Any:
             MARKET_TYPE_TO_BOARD,
             _effective_league,
             parse_slug,
+            soccer_competition_tokens,
         )
     except Exception as exc:  # noqa: BLE001
         return jsonify({"ok": False, "error": f"join_import: {type(exc).__name__}: {exc}"})
+
+    # THE SAME SOCCER TOKEN SET THE JOIN USES, and the reason this endpoint's
+    # own premise -- "parsed with the join's OWN functions, not a local copy" --
+    # was not yet true.
+    #
+    # `join_polymarket_to_board` computes `soccer_competition_tokens(markets)`
+    # and passes it into `_effective_league`; this reader called the same
+    # function with the argument OMITTED, which is its documented "no slate in
+    # hand" mode. So the two disagreed about which league a row is in, in the
+    # one direction that matters: a competition the JOIN reaches as `soccer` was
+    # reported here under its raw token.
+    #
+    # MEASURED 2026-08-28: this endpoint reported `mls|h2h 30`, `epl|h2h 18` and
+    # `bun|h2h 21` as separate leagues, so it could not be used to check the
+    # join's soccer coverage -- which is the only thing it exists for. A reader
+    # that disagrees with the decider is worse than no reader: it answers
+    # confidently and wrongly, and the answer looks like evidence.
+    soccer_tokens = soccer_competition_tokens(markets)
+
+    # Optional, and absent is NOT fatal: this is a diagnostic cut on an ops
+    # reader, and a private helper that moves must cost the extra number rather
+    # than the whole endpoint -- which is reached for when things are already
+    # broken.
+    try:
+        from syndicate.features.shared.polymarket_board_join import (
+            _outcome_probabilities as _outcome_reason_of,
+        )
+    except Exception:  # noqa: BLE001
+        _outcome_reason_of = None
+    outcome_readability: Counter = Counter()
+    # Imported here, not read as a module global: `central_today_iso` is not one
+    # in this file, and every other user in it imports locally for that reason
+    # (see the note at the top of `api_ops_wnba_refresh_decision`).
+    from syndicate.features.shared.timezone import central_today_iso
+
+    _today = central_today_iso()
 
     unparseable = 0
     for row in markets:
@@ -516,7 +553,7 @@ def api_ops_polymarket_slate() -> Any:
             # two numbers are not confused for each other.
             continue
         try:
-            league = str(_effective_league(parsed) or "").lower()
+            league = str(_effective_league(parsed, soccer_tokens) or "").lower()
         except Exception:  # noqa: BLE001
             league = "(unparsed)"
         by_league_market[f"{league}|{board_market}"] += 1
@@ -524,6 +561,29 @@ def api_ops_polymarket_slate() -> Any:
             continue
         if want_market and board_market != want_market:
             continue
+        # OUTCOME READABILITY, CUT BY WHETHER THE FIXTURE HAS ALREADY PLAYED.
+        #
+        # WHY THE CUT AND NOT JUST THE COUNT. `POLYMARKET_BOARD_JOIN` reports
+        # `outcomes_count_mismatch: 372`, and the log's bounded sample of SIX
+        # shapes was read (by me, 2026-08-28) as a live soccer 3-way decode bug
+        # worth fixing. All six were dated 2026-08-15/16 at price `0.9900` --
+        # SETTLED markets -- while all 25 live soccer h2h samples carried
+        # well-formed 2-name outcomes. Six of 372 is a sample, not a rate, and
+        # the two readings imply opposite work: a decode fix, or nothing at all.
+        #
+        # A refusal on a fixture that already played costs nothing and is not a
+        # bug. A refusal on a FUTURE fixture is lost coverage. Sharing one
+        # number is what made the question unanswerable, so they are split here
+        # and the endpoint returns the rate rather than another anecdote.
+        #
+        # `_outcome_probabilities` is the JOIN's function, for the same reason
+        # `parse_slug` and `_effective_league` are: a second decoder here could
+        # disagree with the one that actually refuses.
+        if _outcome_reason_of is not None:
+            _, decode_reason = _outcome_reason_of(row)
+            bucket = "past" if str(parsed.get("date") or "") < _today else "upcoming"
+            outcome_readability[f"{decode_reason or 'ok'}|{bucket}"] += 1
+
         if (want_league or want_market) and len(samples) < 25:
             samples.append({
                 "slug": row.get("slug"),
@@ -547,6 +607,15 @@ def api_ops_polymarket_slate() -> Any:
         "slug_unparseable": unparseable,
         "by_venue_market_type": dict(by_type.most_common()),
         "by_league_and_board_market": dict(by_league_market.most_common()),
+        # `<reason>|past` vs `<reason>|upcoming`, against today in Central. A
+        # decode refusal on a fixture that already played is not lost coverage;
+        # one on an upcoming fixture is. Absent when the join's decoder could
+        # not be imported -- stated rather than reported as all-zero.
+        "outcome_readability_by_reason_and_recency": (
+            dict(outcome_readability.most_common())
+            if _outcome_reason_of is not None
+            else None
+        ),
         "samples": samples,
         "filter": {"league": want_league or None, "market": want_market or None},
     })

@@ -329,13 +329,44 @@ def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset
     consulted here, so the measured MLB collision (`min`->Minnesota United,
     `ath`->Athletic Club) cannot be reintroduced: `mlb` can never enter this
     set, whatever its tri-codes look like.
+
+    TWO TESTS, UNIONED -- AND THE SECOND ONE IS WHY MLS WAS INVISIBLE.
+
+    The test above is `canonical_team` on each club SEPARATELY, against the
+    flat cross-league map. `_teams_match` already learned that this is too weak
+    for soccer and falls back to `soccer_fixture_clubs`, which asks the same
+    question as a PAIR: both codes inside ONE league, and exactly one league
+    qualifying. That fallback is documented there as able to "add matches and
+    never remove one". The identical argument applies one level up, to proving
+    a COMPETITION -- and it was never applied here.
+
+    MEASURED 2026-08-28, 9 MLS fixtures taken from the live slate:
+
+        flat, both clubs resolve separately   0 of 9
+        pair, `soccer_fixture_clubs`          1 of 9   (`tor-nyc`)
+
+    One is enough: a token earns membership from ANY ONE of its fixtures. So
+    `mls` goes from never-proven to proven, and all of its markets -- 30 h2h
+    plus its spreads and totals -- become reachable by a board that stamps
+    every soccer row `sport="soccer"`. Production before this: `no_match|
+    soccer|h2h: 104`, i.e. EVERY soccer h2h row on the board.
+
+    UNION, NOT REPLACEMENT, and that is load-bearing rather than caution. The
+    pair test is STRICTER in places, not uniformly stronger: on the same
+    sample `elv-lev` passes the flat test and returns None as a pair. Swapping
+    one for the other would have bought MLS and silently sold a Bundesliga
+    fixture. Either test proving a token is enough; neither can veto the other.
     """
     try:
-        from syndicate.features.shared.team_aliases import canonical_team
+        from syndicate.features.shared.team_aliases import (
+            canonical_team,
+            soccer_fixture_clubs,
+        )
     except Exception:  # noqa: BLE001 -- the join must survive a missing resolver
         return frozenset()
 
     proven: set[str] = set()
+    alias_table_broken = False
     for row in markets or ():
         parsed = parse_slug(row.get("slug") if isinstance(row, Mapping) else None)
         if parsed is None:
@@ -345,10 +376,50 @@ def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset
             continue
         if league in proven:
             continue
+        home, away = parsed.get("home"), parsed.get("away")
+        # DECLINING AND RAISING ARE DIFFERENT ANSWERS, and only one of them may
+        # fall through.
+        #
+        # A resolver that RETURNS falsy has read the alias table and said "I do
+        # not know this club" -- a healthy answer, and exactly the case the
+        # pair test exists to take a second look at.
+        #
+        # A resolver that RAISES means the alias table itself is unreadable. Its
+        # sibling lives in the same module and is built from the same artifacts,
+        # so asking it next is not a second opinion; it is the same broken
+        # source wearing a different name. `test_a_raising_resolver_yields_an_
+        # empty_set_not_an_exception` pins this: a broken alias table must admit
+        # NOTHING rather than admit tokens on whichever resolver happens to
+        # still answer. Caught by that test when the first version of this
+        # change fell through on both.
         try:
-            if canonical_team("soccer", parsed.get("home")) and canonical_team(
-                "soccer", parsed.get("away")
-            ):
+            if canonical_team("soccer", home) and canonical_team("soccer", away):
+                proven.add(league)
+            continue
+        except Exception:  # noqa: BLE001
+            # THE ALIAS TABLE IS UNREADABLE, AND THAT DISQUALIFIES BOTH TESTS.
+            # `soccer_fixture_clubs` is built from the same artifacts, so
+            # running the second pass now would admit tokens on the strength of
+            # a source we have just been told is broken.
+            alias_table_broken = True
+            break
+    if alias_table_broken:
+        return frozenset(proven)
+    for row in markets or ():
+        # SECOND PASS, so the flat test above decides every row before the pair
+        # test sees any. Interleaving them would make a token's membership
+        # depend on slate order, which is the defect this lane fixed one file
+        # over in `spread_sign_test`.
+        parsed = parse_slug(row.get("slug") if isinstance(row, Mapping) else None)
+        if parsed is None:
+            continue
+        league = str(parsed.get("league") or "")
+        if not league or league == "soccer" or league in _NON_SOCCER_LEAGUE_TOKENS:
+            continue
+        if league in proven:
+            continue
+        try:
+            if soccer_fixture_clubs(parsed.get("home"), parsed.get("away")):
                 proven.add(league)
         except Exception:  # noqa: BLE001
             continue
@@ -557,6 +628,9 @@ def join_polymarket_to_board(
     # rather than per row: the test is per COMPETITION, and running it inside
     # the loop would make it depend on iteration order.
     soccer_tokens = soccer_competition_tokens(markets)
+    # league token -> a bounded set of its club codes. See the note at the
+    # assignment below for why the CODES and not just a count.
+    unproven_league_tokens: dict[str, set[str]] = {}
 
     for row in markets:
         parsed = parse_slug(row.get("slug"))
@@ -608,7 +682,38 @@ def join_polymarket_to_board(
                     "prices": str(row.get("outcomePrices"))[:80],
                 })
             continue
-        key = (_effective_league(parsed, soccer_tokens), parsed["date"], board_market)
+        row_league = _effective_league(parsed, soccer_tokens)
+        # THE WORK LIST FOR THE COMPETITIONS STILL OUT OF REACH.
+        #
+        # A game-line row whose league is neither `soccer` nor a sport we model
+        # is a competition NOTHING on the board can ever look up -- the board
+        # stamps every soccer row `sport="soccer"`, so a row filed under `nas`
+        # or `arg2` is unreachable by construction. That was previously a
+        # silence: the rows were indexed under a key no lookup uses and nobody
+        # counted them.
+        #
+        # The CLUB CODES are what make this actionable rather than another
+        # count. Both tests in `soccer_competition_tokens` failed for every one
+        # of this token's fixtures, and the reason is that Polymarket's
+        # tri-codes are its OWN vocabulary, not ESPN's abbreviations -- measured
+        # 2026-08-28, `ner dcu sje nas fcc vwh aus sdg lag mim` are absent from
+        # the derived alias map entirely. Each code printed here is one
+        # confirmable club, which is the ONLY basis on which a vendor alias may
+        # be added. Guessing them from the name is how a bet reaches the wrong
+        # team, and `_soccer_alias_to_name` drops ambiguous keys precisely to
+        # stop that -- so this emits evidence and deliberately does not act.
+        if (
+            row_league
+            and row_league != "soccer"
+            and row_league not in _NON_SOCCER_LEAGUE_TOKENS
+            and len(unproven_league_tokens) < 40
+        ):
+            seen = unproven_league_tokens.setdefault(row_league, set())
+            if len(seen) < 8:
+                seen.update(
+                    str(code) for code in (parsed.get("home"), parsed.get("away")) if code
+                )
+        key = (row_league, parsed["date"], board_market)
         index.setdefault(key, []).append(
             {"parsed": parsed, "row": row, "outcomes": outcomes,
              "line": _line_from_modifiers(parsed["modifiers"])}
@@ -729,6 +834,13 @@ def join_polymarket_to_board(
             sorted(unmatched_counts.items(), key=lambda kv: -kv[1])
         ),
         "unmatched_samples": unmatched_samples,
+        # Competitions no board row can reach, with the club codes that would
+        # settle each one. Sorted so the list is stable across builds.
+        "soccer_tokens_proven": sorted(soccer_tokens),
+        "unproven_league_tokens": {
+            token: sorted(codes)
+            for token, codes in sorted(unproven_league_tokens.items())
+        },
     }
 
 
