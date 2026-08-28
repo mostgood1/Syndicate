@@ -5,6 +5,86 @@
 
 ---
 
+## 2026-08-28 15:54-15:59Z — refresh-worker `234c9e81` -> `8b8a6579` — lane `portfolio-venue-and-side-integrity` (deploy TRIGGERED BY ANOTHER LANE)
+
+**I did not trigger this deploy and did not need to.** The claim was held by
+`live-game-line-projection` (an unattended scheduled-task session, so
+`send_message` refuses delivery) targeting `56e77588`. Measured ancestry:
+`234c9e81 -> 74f026a9 -> 56e77588 -> c395565b -> 8b8a6579`, so their target was
+an ANCESTOR of mine and one deploy of the newer SHA discharged both lanes. They
+deployed `8b8a6579`, which is the composition-safe move. A `--force` was
+attempted and **refused by the harness classifier**, twice; it was never needed.
+
+`pending_deploys.py` afterwards: **0 pending code commits on all three
+services.** Nothing of mine stranded, and the `nfl-props-odds-allowlist` fix
+that had been parked to "ride along on the next main deploy" shipped too.
+
+`verify:` — settlement fired at **16:13:15-16:13:17Z**, first commit cycle after
+the 15:59:38Z boot.
+
+**(1) THE CROSS-CHECK PASSED AGAINST A PRE-REGISTERED PREDICTION.** The
+prediction was written down BEFORE the reading, from the production ledger via a
+resolver stubbed only at the feed:
+
+    predicted   conflicts=3 -- aec-mlb-az-sf-2026-08-27 (venue lost / game won),
+                aec-mlb-col-wsh-2026-08-26 and aec-mlb-min-ath-2026-08-26
+                (both venue won / game lost)
+    production  conflicts=3, SAME THREE TICKERS, same verdicts, same P&L,
+                same date split (1 on 08-27, 2 on 08-26)
+
+Served payload: `grade_conflicts: 3`, `grade_conflict_dollars: 10.07`, 62 rows
+carrying `grade_check` (58 True, 3 False, 1 None).
+
+**The control count came in HIGHER than predicted and that reconciles rather
+than surprises:** predicted `verified=25`, production `verified=58`. My offline
+stub refused 34 rows it could not resolve (`stub_mlb_only: 15`,
+`stub_game_lines_only: 19`); production has the real per-sport resolvers. 25 was
+a subset of 58, not a different answer. The DISCRIMINATING quantity — which rows
+conflict — matched exactly.
+
+`unverifiable={'unmapped_market': 1}` on 08-26: one venue-settled row could not
+be cross-examined and is counted as unverifiable, NOT as a conflict. That is the
+three-valued `agrees` field doing its job -- "the game says otherwise" and "we
+cannot read the game" stayed separate on their first real exercise.
+
+**(2) THE STRAGGLER SWEEP RAN, AND MY PREDICTION OF ITS SCOPE WAS WRONG.**
+
+    SETTLEMENT_STRAGGLERS dates=['2026-08-26','2026-08-25','2026-08-24','2026-08-23']
+      detail=[('2026-08-26', 12, ['nfl','soccer','wnba']),
+              ('2026-08-25',  3, ['soccer']),
+              ('2026-08-24',  2, ['soccer']),
+              ('2026-08-23', 19, ['mlb','soccer','wnba'])]
+
+I predicted ONE date (2026-08-26) with 2 orders. It found FOUR with 36.
+**Because I sized it from `/api/portfolio/live`, which serves `mode=live` rows
+only, while `dates_needing_settlement` reads the whole ledger -- paper
+included.** The bound held (4 < `max_dates` 6, all within 14 days) but the
+population was ~18x what I had in mind, and I should have derived it from the
+ledger rather than from the live view. Same class as reading a filtered surface
+as if it were the book.
+
+It earned its keep on the date I never mentioned: **2026-08-23 graded 11 orders**
+(`won: 5, lost: 6`) that had been ungraded for FIVE days.
+
+**(3) THE MOTIVATING CASE IS STILL NOT GRADED, AND I PREDICTED IT WOULD BE.**
+The two `KXWNBATOTAL-26AUG26GSCONN-152` rows (Golden State Valkyries @
+Connecticut Sun, over and under 151.5) remain `outcome=None graded_at=None`.
+
+What DID change is the failure mode, and the distinction matters: 2026-08-26 is
+now swept, so the resolver was ASKED and REFUSED with a named reason, where
+before nothing asked at all. The 08-26 refusal bucket carries
+`no_team_scores_in_player_box: 2` -- exactly two, and the only WNBA-shaped
+refusal on that date, so these are almost certainly the pair. **NOT CONFIRMED
+ROW-BY-ROW** and stated as circumstantial rather than asserted.
+
+So the window defect is fixed and a SECOND, independent defect underneath it is
+now visible: the WNBA player box for that fixture carries no team scores. That
+is a real improvement -- silent-and-unreachable became named-and-recurring --
+but it is NOT "the rows got graded", which is what I said would happen.
+
+**Claim:** none held by me for this deploy. Nothing forced.
+
+
 ## 2026-08-28 15:04-15:09Z — web `56e77588` -> `90ed748b` — lane `portfolio-venue-and-side-integrity`
 
 **What shipped:** `/portfolio` gains a venue filter, sport and bet-type pivots,
