@@ -1,5 +1,94 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#595` — **POLYMARKET MONEYLINES BOUGHT THE WRONG TEAM ON 3 OF 8 SETTLED ORDERS. Refused, not re-guessed.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **LANDED (`c748a239`), NOT DEPLOYED**
+
+`polymarket_us_orders._resolve_outcome_side` sent `OUTCOME_SIDE_YES` iff our
+team sat at `outcomes[0]`. That is an assumption that `outcomes[0]` is the
+venue's YES leg, made in the same file whose docstrings document the array being
+unreliable, and it is **false on roughly half the book**.
+
+Every settled MLB game market in the live ledger, cross-checked against MLB
+StatsAPI (`segment=full`, schedule keyed by DATE, fixtures appearing twice
+excluded):
+
+    polymarket h2h,    venue-settled:  5 agree,  3 MISMATCH
+    polymarket totals, venue-settled:  9 agree,  0 mismatch
+    kalshi     totals, venue-settled:  4 agree,  0 mismatch
+
+**Rows graded by OUR resolver cannot falsify this and were excluded.** It grades
+the bet we MEANT to place, applying the same `side` field whose meaning is in
+question, so it agrees with our intent whatever the venue bought. Only the
+venue's grade — read off the realized P&L delta on the position it says we held
+— is independent.
+
+**`aec-mlb-az-sf-2026-08-27`, three facts agreeing.** live-odds-worker
+01:55:30Z: `POLYMARKET_ARTIFACT_PRICE outcome_index=0 outcome='San Francisco
+Giants'`, then `SUBMIT side=OUTCOME_SIDE_YES action=BUY qty=15.45 price=0.48`.
+StatsAPI: **ARI 1 @ SF 6, Final.** The venue: `lost`, `pnl_dollars=-5.871`
+(= 15.45 x 0.38, the whole cost basis), `held_side=POSITION_RESOLUTION_SIDE_SHORT`.
+We bet the winner and were paid a loss. The other two mismatches
+(`aec-mlb-col-wsh-2026-08-26`, `aec-mlb-min-ath-2026-08-26`) are recorded WINS
+we did not earn — so the book's P&L is overstated as well as misstated.
+
+**THIS DOES NOT REOPEN THE 2026-08-28 `FORBIDDEN` ENTRY — it lands beside it.**
+That entry retracted a claim of systematic PRICE/outcome-array misalignment and
+was right to: the price alignment tests were sound and the prices are aligned.
+This is the SIDE, which that entry's own closing paragraph names as the gap
+still open — "nothing in the system can independently state which team is held
+... caught twice by a human looking at a screen and zero times by a machine".
+The `positionResolution` row does carry it, and it only arrives when the market
+resolves, which is after that investigation ran.
+
+**WHY IT IS A REFUSAL.** The sound rule needs the venue to name the YES leg.
+`/v1/markets` returns `marketSides` and `question` — both already in
+`polymarket_us_markets._KEEP` — and `_slate_row_for_storage` drops both before
+the order path sees a row. Only their KEY NAMES have ever been logged, never a
+value, so a name rule written today is a guess, and `learnings.md 2026-08-28`
+is explicit that a wrong fix here IS the bug. So: refuse (the same stop SPREAD
+already makes one market over), `SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE=1` to lift
+it without a deploy, and `MONEYLINE_YES_LEG_SHAPE` now logs one moneyline row's
+`marketSides`/`question` per slate write.
+
+**NEXT ACTION, and it is cheap:** deploy live-odds-worker, read one
+`MONEYLINE_YES_LEG_SHAPE` line, and if either field names an outcome, wire the
+name rule and lift the refusal. Until then Polymarket moneylines do not
+transact; totals and Kalshi are untouched.
+
+**ALSO SHIPPED, same commit:** `paper_settlement._check_venue_grade` — the
+machine that should have caught this. It cross-examines every venue-stated
+outcome against the real game result, writes a `grade_check` memo, and NEVER
+rewrites `outcome` or `pnl_dollars`. Re-derives all 3 conflicts over the
+production ledger with **0 false positives against 25 agreeing controls**
+(6 Polymarket moneylines and 12 Polymarket totals among them, so it
+discriminates within both). `/portfolio` renders it as a banner and a per-row
+flag, unscoped by the date and venue filters — a settled row's slate is the one
+nobody reopens.
+
+### `#596` — **Settlement ran on today and yesterday only, which is a window a bet can fall out of** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **LANDED (`c748a239`), NOT DEPLOYED**
+
+Measured on the live book 2026-08-28T14:0xZ: two FILLED WNBA totals on
+2026-08-26 (`Golden State Valkyries @ Connecticut Sun`, over and under 151.5)
+still ungraded, with a working WNBA resolver. Nothing had asked about that slate
+since the 27th and nothing ever would again.
+
+Every late-arriving resolver has this shape — soccer (`#547`), NFL (`#592`) and
+NCAAF (`#593`) all landed after rows they could have graded had aged out of the
+window — as does a backfilled feed and the 24h venue grace pushing a late game
+past the end of its own second day. A permanently ungradeable row is worse than
+a wrong one: it sits in `open` forever, so exposure reads high and settled ROI
+reads over a population quietly missing its hard cases.
+
+`paper_settlement.dates_needing_settlement` asks the LEDGER which slates still
+hold a filled ungraded order, bounded to 14 days and 6 slates, returning `[]` on
+a healthy book. A straggler date gets a WNBA boxscore refresh only when it holds
+an ungraded WNBA row — `#241`, periodic worker work is never free.
+
+**Verification when deployed:** `SETTLEMENT_STRAGGLERS` names 2026-08-26 and the
+two WNBA rows gain an outcome. If it names a date every cycle forever, something
+on that slate is permanently ungradeable and the bound is hiding it — check
+`SETTLED ... ungraded={}` for that date before widening anything.
+
+
 ### `#593` — **NCAAF bets could never be graded, and an NFL-shaped fix would have graded them against the WRONG GAME.** — lane `ncaaf-settlement-resolver`, 2026-08-28 — **SHIPPED (`234c9e81`); PRODUCTION VERIFICATION IS FUTURE-DATED**
 
 `paper_settlement._default_resolver` had no `ncaaf` builder. Unlike `#592`, the
