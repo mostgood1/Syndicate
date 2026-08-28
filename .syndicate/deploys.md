@@ -36210,3 +36210,72 @@ longer settle the question the way I claimed.
 
 Third denominator error in one session, all the same shape: a count read as a
 rate. `#598`, `state.md` and the lane now carry the corrected reading.
+
+---
+
+## 2026-08-28 13:35 CT — refresh-worker <- `874bb523` — BREAK GLASS #2, two lanes
+
+`dep-da8ta0dg1s2s738guojg`, live 18:38:25Z. Second break-glass of the day, on
+explicit user instruction ("deploy it and get me the eligibility numbers").
+Spacing was CLEAR; the only blocker was `run_mlb_daily_sim_job.py` pid=1711,
+killed. Grant recorded the cost.
+
+**Shipped TWO lanes, and the other one mattered more than mine:** `7634f04d`
+(this lane, `#598` eligibility denominator) and `f66c7441` + `745a1292` +
+`874bb523` (`portfolio-venue-and-side-integrity`, the `#600` execution-ledger
+three-way merge, its persist-read retry, and the blind-write document stamp).
+`#600` is the money-path fix for a measured lost-update race and had been
+landed-and-undeployed for over an hour.
+
+### VERIFIED 18:55:16Z — and the reading proves MY OWN COUNTER IS WRONG
+
+```
+flipped    = {soccer|h2h: 9}
+listed     = {soccer|h2h: 4}
+not_listed = {soccer|h2h: 94, soccer|totals: 20}
+tried      = {soccer|h2h: 98, soccer|totals: 20, wnba|totals: 6, nfl|h2h: 3, ...}
+unreadable = {nfl|totals: 30, mlb|totals: 22, wnba|totals: 18, ...}
+```
+
+**`flipped` (9) EXCEEDS `listed` (4), which is impossible if the classifier is
+right.** A row that flip-matched has PROVEN its fixture is listed. So at least
+five demonstrably-listed fixtures were filed as `not_listed`. The data caught
+this, not review.
+
+CAUSE, in the code I wrote:
+
+```python
+readable = [c for c in candidates if c.get("canon_pair")]
+if any(c["canon_pair"] == board_pair for c in readable):  listed
+elif readable:                                            not_listed   # WRONG
+else:                                                     unreadable
+```
+
+`elif readable` reasons "some candidates canonicalised and none matched ours,
+therefore ours is not listed". It does not follow — **our fixture's candidate
+may be one of the UNREADABLE ones**, and other candidates being readable says
+nothing about ours. `not_listed` is only concludable when EVERY candidate in
+the bucket canonicalised.
+
+**So I reproduced, one level down, the exact conflation this counter existed to
+remove.** `no_match` conflates "listed but unpairable" with "not listed"; my
+`not_listed` conflates "absent" with "its candidate was unreadable". Fourth
+denominator error of the day and the first one I shipped to production.
+
+### WHAT SURVIVES THIS READING
+
+- `flipped = 9 of 98 tried` — sound.
+- **At least 9 soccer h2h fixtures ARE listed**, since they flip-matched.
+  `listed=4` is a floor already contradicted by the same line; `not_listed=94`
+  is not trustworthy and must not be quoted as a coverage number.
+- Non-soccer `unreadable` is CORRECT and expected: `_canonical_fixture` returns
+  None for non-soccer by design, so those buckets honestly report "this counter
+  has nothing to say about them".
+- **The eligibility rate `#598` was built to measure is STILL UNMEASURED.**
+
+### FIX, NOT YET SHIPPED
+
+`not_listed` only when every candidate canonicalised; otherwise `unreadable`.
+And count a flip-match as proof of listing, so `flipped <= listed` becomes an
+invariant the counter cannot violate — that inequality is the cheapest possible
+self-check and it should be asserted rather than left for a human to notice.
