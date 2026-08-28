@@ -2723,6 +2723,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   **Checkpoint commit `d44e643d`'s message still says "Filed #596"** — it is
   pushed and immutable, so a reader following it lands on THEIR item. The id
   to use is `#598`.
+- **EXPOSURE CHECK against `#600` (execution-ledger cross-service race), done
+  rather than assumed.** A peer found that `execution_ledger._persist` is a
+  blind whole-document `write_json_file` with no lock or merge, and that
+  refresh-worker and live-odds-worker both read-modify-write it, so the last
+  writer wins with whatever it loaded. **Verified here independently** from
+  both services' own `KEYVALUE_WRITE_LARGE` lines: refresh-worker wrote
+  1,276,296 B at 17:40:48Z, live-odds-worker wrote 1,272,699 B at 17:52:47Z —
+  **3,597 bytes SMALLER, twelve minutes later.** The ledger moved backwards.
+  `_persist` confirmed by reading it: `write_json_file(_ledger_path(), state)`.
+  **THIS LANE'S FINDINGS ARE NOT EXPOSED.** Every verification recorded for
+  items 1-4 and the orientation number comes from LOG LINES
+  (`KALSHI_BOARD_JOIN`, `POLYMARKET_UNMATCHED`, `POLYMARKET_ORIENTATION`,
+  `SPREAD_SIGN_AUDIT`, `ORDER_PATH`) or from board/slate ARTIFACTS
+  (`/api/board/layer2-shortlist`, `/api/ops/polymarket/slate`) — none from
+  the execution ledger. Checked, not asserted.
+  **WHAT IS EXPOSED:** the order/stake counts quoted from
+  `/api/ops/execution/ledger-summary` early in this session (`live:polymarket`
+  21 orders / $65.88 and similar). Those were descriptive colour, never
+  load-bearing, and should be re-read rather than cited.
+  This lane writes the ledger via `execute_portfolio` -> `place_order`, so it
+  is on the OTHER side of the same race. Not fixing it: concurrency on the
+  money path, and `execution_ledger.py` is claimed by
+  `portfolio-ledger-service-split`.
 - Blocked by: none. Next refresh-worker deploy by ANY lane carries the counter.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
