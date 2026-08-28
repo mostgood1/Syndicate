@@ -4842,6 +4842,10 @@ class IntelligenceStateService:
         # reading nothing every time. Best-effort/never-raises by design, so
         # a network blip just means this cycle reads stale local data.
         _diag_log_all_process_memory("build_candidate_pool_start")
+        # SPANNED: this is the cross-service HTTP block (worker <- web). It is
+        # the one region expected to be OFF-CPU, so its span is what separates
+        # "waiting on web" from the CPU-bound remainder.
+        _pull_mark = _build_span_enter("pull_hot_artifacts", selected_date)
         # #285. Trim BEFORE the guard reads, never after: the guard's verdict is
         # the only thing in this function that consumes the number, so a trim
         # that runs afterwards changes nothing this cycle. All three trims in
@@ -4898,6 +4902,7 @@ class IntelligenceStateService:
             print(f"[intelligence_state] PULL_ODDS_HISTORY date={selected_date} written={pulled}", flush=True)
         except Exception as exc:
             print(f"[intelligence_state] PULL_ODDS_HISTORY_FAILED error={exc}", flush=True)
+        _build_span_exit("pull_hot_artifacts", _pull_mark)
         _diag_log_all_process_memory("post_pull_hot_artifacts")
         # #285, second trim. The guard that has actually been starving the board
         # is not this one -- it is `_overview_headroom_exhausted`, which fires
@@ -5439,6 +5444,9 @@ class IntelligenceStateService:
         # _collect_candidates has already paid the first-read cost for each of
         # them (postmortem §1.1d: first read is the whole cost, repeats are free).
         layer2_shortlist: dict[str, Any] = {}
+        # SPANNED because it was inside the 305s that `board_publication`
+        # accounted for and no named stage did. See `_log_stage_timing`.
+        _layer2_mark = _build_span_enter("layer2_shortlist_build", selected_date)
         try:
             from pipeline.layer2_shortlist import build_layer2_shortlist
 
@@ -5514,6 +5522,7 @@ class IntelligenceStateService:
                 self._layer2_fast_refresh_at = time.time()
         except Exception as exc:
             print(f"[intelligence_state] LAYER2_SHORTLIST_WRITE_FAILED error={exc}", flush=True)
+        _build_span_exit("layer2_shortlist_build", _layer2_mark)
         _diag_log_all_process_memory("post_layer2_shortlist")
 
         # PORTFOLIO COMMIT + PAPER EXECUTION, immediately after the shortlist
@@ -5578,7 +5587,9 @@ class IntelligenceStateService:
             try:
                 from pipeline.kalshi_odds_refresh import join_to_board, run_kalshi_odds_refresh
 
+                _kalshi_refresh_mark = _build_span_enter("kalshi_odds_refresh", selected_date)
                 odds = run_kalshi_odds_refresh()
+                _build_span_exit("kalshi_odds_refresh", _kalshi_refresh_mark)
                 kalshi_markets = odds.get("markets") or []
                 # `layer2_shortlist["rows"]`, NOT a bare `rows` -- there is no
                 # such name here, and the NameError would have been swallowed by
@@ -5587,17 +5598,50 @@ class IntelligenceStateService:
                 # thread has been untangling.
                 shortlist_rows = (layer2_shortlist or {}).get("rows") or []
                 if kalshi_markets and shortlist_rows:
+                    # SPANNED SEPARATELY FROM THE REFRESH ABOVE. They are
+                    # different quantities -- the refresh is a venue read that
+                    # may return cached, the join is O(markets x rows) CPU over
+                    # ~6,000 x ~1,300. A single span over both would report a
+                    # cache hit and a full join as the same number.
+                    _kalshi_join_mark = _build_span_enter("kalshi_board_join", selected_date)
                     join_to_board(
                         kalshi_markets,
                         list(shortlist_rows),
                         selected_date=str(selected_date or ""),
                     )
+                    _build_span_exit("kalshi_board_join", _kalshi_join_mark)
             except Exception as exc:
                 print(f"[intelligence_state] KALSHI_ODDS_FAILED error={exc}", flush=True)
 
             from pipeline.portfolio_commit import run_portfolio_commit
 
+            # THIS SPAN CONTAINS THE ENTIRE POLYMARKET PATH, and that is a
+            # limitation to read it with, not a naming accident.
+            #
+            # `polymarket` appears NOWHERE in this module. Kalshi gets a refresh
+            # and a join at board-build level (spanned separately above);
+            # Polymarket's equivalent work lives inside `run_portfolio_commit`,
+            # which calls `join_polymarket_to_board`. That join INDEXES ~8,973
+            # markets against ~1,335 board rows (measured 2026-08-27:
+            # `POLYMARKET_BOARD_JOIN markets=17376 indexed=8973 board_rows=1335
+            # matched=52`), so it is a credible candidate for the largest single
+            # CPU item inside this span -- and this span cannot tell you that.
+            #
+            # NOT SPLIT BECAUSE BOTH FILES ARE CLAIMED BY OTHER OPEN LANES
+            # (checked 2026-08-28): `pipeline/portfolio_commit.py` by
+            # `portfolio-decision-and-execution`, and
+            # `syndicate/features/shared/polymarket_board_join.py` by
+            # `open-bet-live-status`. Splitting it is a one-line span for
+            # whichever of them touches it next.
+            #
+            # SO: if `portfolio_commit` comes back large, the Polymarket join is
+            # the first thing to look inside it for, and the second is the
+            # Kalshi-only `_venue_price_resolver` that builds off the whole
+            # board-join. Do not read a large number here as "committing is
+            # slow".
+            _commit_mark = _build_span_enter("portfolio_commit", selected_date)
             commit_result = run_portfolio_commit(str(selected_date or ""))
+            _build_span_exit("portfolio_commit", _commit_mark)
             if commit_result.get("status") == "ok":
                 totals = (commit_result.get("plan") or {}).get("totals") or {}
                 print(
