@@ -43385,3 +43385,74 @@ to Windows Modern Standby suspending its python child 9h13m while the scheduler
 and model both ran normally (2026-08-28; Kernel-Power 506 03:57:42Z / 507
 13:48:00Z, corroborated across three other stalled sessions). Full working in
 `.syndicate/log/2026-08-28.md`.
+
+## `#598` — **`live_gameline_accuracy` counters serve `null`: name the key in web's forwarding allowlist** `[2026-08-28, lane live-game-line-projection]`
+
+**One line, plus a test. The patch is below verbatim so nobody has to re-derive it.**
+
+`74f026a9` added a `live_gameline_accuracy` block to the book-grid artifact.
+`syndicate/blueprints/intelligence.py` forwards artifact keys through an
+**EXPLICIT ALLOWLIST**, and the key was never named there — so the artifact
+carries the block and the API serves `null`. Measured 2026-08-28: board rebuilt
+`16:00:27Z` on live SHA `8b8a6579` (which contains the code, verified by
+content), served `live_gameline_accuracy: null`.
+
+**The comment four lines above the insertion point already documents this exact
+trap, because the SCORER shipped with it first:** *"Forwarding is an explicit
+allowlist here, so a new artifact key is invisible until it is named."* Same
+dict, same bug, twice. Tests, deploy, and the SHA check were all green — only
+reading the served bytes caught it.
+
+**IMPACT IS THE DIAGNOSTIC, NOT THE DATA.** The retained file is written
+worker-side and read via `/api/ops/artifacts/export`, gated by
+`HOT_ARTIFACT_PATTERNS`, which is verified live (200 on the allowlisted path vs
+403 on a same-instant control in the same directory). What is lost is the only
+off-worker answer to *"the recorder ran and deliberately wrote nothing"* — the
+normal mid-slate state, which without these counters is indistinguishable from a
+dead recorder. That is precisely the blind spot the move off the laptop cron was
+meant to close.
+
+**BLOCKED — CROSS-LANE, AND THE HOLDER IS LIVE.** `intelligence.py` is claimed
+by OPEN lanes `portfolio-venue-and-side-integrity` and
+`portfolio-decision-and-execution`; `.claude/hooks/lane-guard.py` blocks the edit
+and has **no env override** (its only route is "close or reassign"). The user
+authorised taking it anyway; I checked first and found the holding session
+(`12b2be57-...`) had been active **11 seconds earlier**, so reassigning would
+have pulled a file out from under live work. Held deliberately.
+
+**`get_session` answered "not found" for that session while it was demonstrably
+running** — an archived-but-running session and one that never existed look
+identical through the roster. The transcript's last timestamp is the ground
+truth. Do not conclude a claim is stale from the roster alone.
+
+### THE PATCH
+
+In `syndicate/blueprints/intelligence.py`, immediately after the line
+`"live_gameline_score": precomputed.get("live_gameline_score"),`:
+
+```python
+                    # The RETENTION counters for the score above, named here for
+                    # the reason the comment block already states: this allowlist
+                    # is explicit, so a new artifact key serves `null` until it
+                    # appears in it. Shipped without this line on 2026-08-28 and
+                    # the payload read `null` against an artifact that carried the
+                    # block -- the same producer-wired/reader-not trap the scorer
+                    # itself hit, in this same dict.
+                    #
+                    # These counters are the ONLY off-worker signal for whether
+                    # the recorder RAN and why it skipped. The retained file
+                    # answers "what was recorded"; nothing else answers "it ran
+                    # and deliberately wrote nothing".
+                    "live_gameline_accuracy": precomputed.get("live_gameline_accuracy"),
+```
+
+Add a test pinning it shut, so the trap cannot be sprung a third time:
+
+```python
+assert "live_gameline_accuracy" in served_payload, (
+    "forwarding is an explicit allowlist; a new artifact key is null until named")
+```
+
+**Reading it after the fix:** `written: 0` with `skipped_not_improved: 1` is the
+HEALTHY steady state, not a failure — `previous_best` is the discriminator. Verify
+on SERVED BYTES, not on the artifact; that distinction is the whole item.
