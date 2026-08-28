@@ -2125,6 +2125,102 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - RISK, stated up front: this worker has 110 OOM kills on record and `worker_periodic_work_never_free` is a standing rule. A new thread must be small, must not hold markets in memory beyond the refresh, and must be OFF by default behind a flag until measured.
 - Blocked by: none
 
+### venue-candidate-key-token-guard — OPEN — opened 2026-08-27 — session 764eca35-178c-4c29-afbd-ec621894aaf1
+
+- Goal: `_candidate_keys` stops emitting city/nickname token keys built from a
+  board team the club map could NOT resolve, and the two stale assertions in
+  `test_polymarket_side_vocabulary.py` are brought onto the shipped key shape.
+  One testable outcome: `py -3 -m pytest tests/test_polymarket_side_vocabulary.py
+  tests/test_kalshi_side_vocabulary.py tests/test_venue_quote_fanin.py -q` is
+  green, with a NEW test that fails before the code change.
+- Files: `syndicate/features/shared/venue_quote_fanin.py`,
+  `tests/test_polymarket_side_vocabulary.py`
+- CLAIM PROVENANCE: both paths were released. `kalshi-line-aware-rungs` removed
+  `venue_quote_fanin.py` from its `Files:` list on 2026-08-27 noting it was
+  re-claimed by `venue-quote-line-join`; that lane is OPEN, UNOWNED, session
+  `3515d143` archived 2026-08-27 ~21:45Z with **ALL CLAIMS RELEASED** and the
+  paths deliberately unwritten. The only other mention of
+  `test_polymarket_side_vocabulary.py` (line ~1414) is prose listing suites that
+  were RUN, not a `- Files:` claim. No live holder.
+- Hypothesis: the failures are NOT one bug. Commit `0acabd09` ("Kalshi offered
+  every game line under a side the board never asks for") added a THIRD key
+  shape — the city/nickname token — and shipped tests for it
+  (`test_kalshi_side_vocabulary.py`) without updating the exact-equality
+  assertions in the older `test_polymarket_side_vocabulary.py`. So:
+  (a) `test_the_board_row_derives_the_SAME_key_from_its_own_teams` is a STALE
+  TEST — `mlb|h2h|arizona` / `mlb|h2h|diamondbacks` are the intended new shape
+  and both clubs resolved; (b) `test_an_unresolvable_club_adds_NO_second_key` is
+  a REAL DEFECT — `team_quote_token` falls back to a normalised RAW string when
+  `canonical_team` returns None (correct at the VENUE, where Kalshi says
+  "Texas"), so an unresolvable BOARD team yields `mlb|h2h|club`, `mlb|h2h|not`,
+  `mlb|h2h|real` from "Not A Real Club". That contradicts the invariant written
+  three lines above it in the same function — *"No club, no second key -- never a
+  bare team string as a fallback."*
+- Falsification: (a) is wrong if `0acabd09` predates the assertions, or if the
+  token keys can be shown to be unintended. (b) is wrong if the token block's own
+  docstring bound ("the candidate set here is exactly two clubs and both are
+  known to be playing each other") is satisfiable without `canonical_team`
+  resolving — it is not.
+- **RESULT — both halves of the hypothesis CONFIRMED, and a THIRD, LARGER defect
+  found that neither test named.** History settles (a): the assertions were
+  written `3e8856e8` 2026-08-25T01:00:27Z, the token block landed `0acabd09` the
+  same evening at 21:44:32Z, and `3e8856e8` is an ancestor of it. That commit
+  shipped `test_kalshi_side_vocabulary.py` for the new shape and reported "655
+  tests green" over a filtered set that did not include the file it broke.
+- **MY OWN FALSIFICATION CLAUSE WAS PARTLY WRONG and is corrected here.** I wrote
+  that an unresolved OPPONENT is also unsafe because it cannot subtract its
+  shared tokens. Once the real bound is the sport's whole vocabulary, that is
+  false: a token unique across the sport cannot name the opponent whether the
+  opponent resolved or not. Requiring the opponent to resolve would have
+  narrowed the join for nothing. Only MY side must resolve.
+- **THE THIRD DEFECT: the opponent subtraction is the wrong SCOPE, not merely a
+  weak one.** `apply_venue_quotes` resolves each candidate against
+  `quotes_for_sport` — the sport's WHOLE pool — while the subtraction bounds
+  only the row's own game. Measured over the alias maps 2026-08-27, ambiguous
+  tokens the board was offering: **soccer 21** (`city` names 14 clubs, `real` 4,
+  `manchester` 2, `madrid` 2), **mlb 7** (`chicago`, `sox`, `new`, `york`, `los`,
+  `angeles`, `san`), **nfl 5** (`new` names 4), **nba 3**, wnba 0. A Manchester
+  City row offered `soccer|h2h|city` and could win a Bristol City quote from a
+  different fixture — a wrong-team match at a confident price, indistinguishable
+  downstream from a right one. And `_alias_map` is `{}` for **nhl, ncaaf,
+  ncaab**, so every one of their rows took the raw-string path unguarded: "Ohio
+  State Buckeyes" offered `ncaaf|h2h|state`. NCAAF reached the board side
+  2026-08-27, per this file's own `kalshi-line-aware-rungs` note.
+- **FIX, three files.** `team_aliases.unambiguous_club_tokens(sport)` [NEW,
+  `lru_cache`d, derived from `_alias_map().values()` exactly as
+  `_nickname_alias_map` is derived — no second hand-maintained list].
+  `venue_quote_adapters.team_name_tokens` now resolves through `canonical_team`
+  (NOT `team_quote_token`, whose raw fallback is correct at the venue and wrong
+  on the board side) and keeps only tokens that name exactly one club. Its one
+  caller `_candidate_keys` keeps the opponent subtraction as a subsumed second
+  check; its comment block, which asserted the wrong bound, is corrected in
+  place.
+- **MEASURED, before -> after.** `Not A Real Club` 5 keys -> 1. `Ohio State
+  Buckeyes` 5 -> 1. `Manchester City` 4 -> 2. `Texas Rangers` UNCHANGED at 4,
+  including `mlb|h2h|texas` — the case `0acabd09` was built for.
+- **REACHABILITY SHOWN, not assumed.** The three new refusal tests were run
+  against the pre-fix `team_name_tokens` (monkeypatched back in) and all three
+  produce the old keys, so they discriminate. The fourth new test
+  (`..._is_not_a_blanket_refusal`) passes in BOTH states BY DESIGN and is
+  paired with them: a filter that dropped everything would satisfy all three
+  refusals and silently take the Kalshi city match with it.
+- **GREEN: 1026 passed, 27 subtests** across every `venue|kalshi|polymarket|
+  team_alias` suite (43 files, 95s), plus `tests.test_kalshi_side_vocabulary`
+  under **unittest** — the runner CI actually uses — because that suite owns the
+  token shape and its end-to-end "Texas wins" -> board row test is the one that
+  would catch an over-narrow guard.
+- Verification: a reachability test in the pytest sense — the new
+  unresolved-club test must FAIL on the pre-fix function and PASS after, and
+  `test_kalshi_side_vocabulary.py` (the suite that OWNS the token shape) must
+  stay green, proving the guard narrowed the unresolved case and nothing else.
+  Per `learnings.md` 2026-08-27 (fixture that cannot violate its property): the
+  fixture must contain a row whose club genuinely does not resolve AND a row
+  whose OPPONENT does not resolve — the absence has to be present.
+- SCOPE NOTE, not taken: `venue-quote-line-join` records two UNFIXED items on
+  these files (a totals key that names no game; the 842-row zero-match builds).
+  Out of scope here.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

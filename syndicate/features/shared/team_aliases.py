@@ -551,6 +551,44 @@ def _nickname_alias_map(sport: str) -> dict[str, str]:
     }
 
 
+@lru_cache(maxsize=16)
+def unambiguous_club_tokens(sport: str) -> frozenset[str]:
+    """The words that name exactly ONE club in this sport, plus every full club
+    name. Derived from the sport's own alias map, never written out.
+
+    WHY THIS EXISTS. A venue that names a team by its city alone ("Texas wins",
+    "Chicago") has to be met by a key built from the BOARD's club name, and
+    `venue_quote_fanin._candidate_keys` builds one per word. The bound it used
+    was the OPPONENT's words -- correct for the pair, and the wrong bound for
+    the lookup, because `apply_venue_quotes` resolves a key against the sport's
+    WHOLE quote pool and not against the row's own game. So `soccer|h2h|city`,
+    offered by a Manchester City row, could win a Bristol City quote from an
+    entirely different fixture: a wrong-team match, stamped at a confident
+    price, and indistinguishable downstream from a right one.
+
+    MEASURED over the alias maps 2026-08-27 -- ambiguous tokens per sport:
+    soccer 21 (`city` names 14 clubs, `real` 4, `manchester` 2, `madrid` 2),
+    mlb 7 (`chicago`, `sox`, `new`, `york`, `los`, `angeles`, `san`),
+    nfl 5 (`new` names 4), nba 3, wnba 0. Every one of those is a key the board
+    was offering before this filter existed.
+
+    A SPORT WITH NO MAP GETS AN EMPTY SET, which is a refusal and not a
+    degradation: nhl, ncaaf and ncaab all resolve `_alias_map` to `{}`, so
+    nothing about them can be shown unambiguous and `unknown` must not land on
+    the permissive branch. NCAAF reaches the board side as of 2026-08-27 and
+    "Ohio State Buckeyes" would otherwise offer `ncaaf|h2h|state`.
+
+    Single-word tokens shorter than 3 characters are dropped by the caller, not
+    here; this reports ownership only.
+    """
+    clubs = set(_alias_map(sport).values())
+    owners: dict[str, int] = {}
+    for club in clubs:
+        for word in {club} | set(club.split()):
+            owners[word] = owners.get(word, 0) + 1
+    return frozenset(token for token, count in owners.items() if count == 1)
+
+
 def canonical_team(sport: Any, value: Any) -> str | None:
     """The canonical club name for a token, or None if unresolvable.
 

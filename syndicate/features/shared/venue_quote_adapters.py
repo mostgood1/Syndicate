@@ -110,19 +110,51 @@ def team_name_tokens(sport: Any, name: Any) -> set[str]:
     (`team_side_unresolved` on all of them) and solves it the same way: match a
     token against the club name.
 
-    THE CALLER MUST BOUND THE CANDIDATE SET AND SUPPRESS SHARED TOKENS. That
-    bound is the whole safety property: "chicago" sits inside both "chicago
-    cubs" and "chicago white sox", so on a Cubs/White Sox game it names neither
-    side, and returning a guess there is a bet on the wrong team at a price
-    that looks confident. This function only reports the tokens; it is
-    `_candidate_keys` that drops the ones the opponent shares.
+    A TOKEN IS REPORTED ONLY IF IT NAMES EXACTLY ONE CLUB IN THIS SPORT.
+    "chicago" sits inside both "chicago cubs" and "chicago white sox", so it
+    names neither side, and returning a guess there is a bet on the wrong team
+    at a price that looks confident.
+
+    THE OPPONENT IS THE WRONG BOUND, and was the one this function used to rely
+    on its caller for. `_candidate_keys` drops the tokens the opponent shares,
+    which is correct about the ROW and irrelevant to the LOOKUP:
+    `apply_venue_quotes` resolves a candidate key against the sport's whole
+    quote pool, not against the row's own game. A Manchester City row offering
+    `soccer|h2h|city` could therefore win a Bristol City quote from an entirely
+    different fixture. Measured 2026-08-27, `city` names 14 clubs in the soccer
+    map and `real` names 4; mlb, nfl and nba carry 7, 5 and 3 such tokens. So
+    the bound is `unambiguous_club_tokens`, the sport's WHOLE vocabulary, and
+    the opponent subtraction upstream is left in place as a second, narrower
+    check rather than the only one.
+
+    AN UNRESOLVABLE NAME YIELDS NOTHING. `team_quote_token` deliberately falls
+    back to a normalised raw string, because that is right at the VENUE --
+    Kalshi says "Texas" and no club map carries it. It is wrong here: the board
+    half of the join is where both clubs are supposed to be known, and a raw
+    fallback made "Not A Real Club" offer `mlb|h2h|club`, `mlb|h2h|not` and
+    `mlb|h2h|real` -- words with no team behind them, one of which is a real
+    soccer club token. Sports whose `_alias_map` is empty (nhl, ncaaf, ncaab)
+    resolve nothing and so offer nothing; NCAAF reaching the board on
+    2026-08-27 would otherwise have offered `ncaaf|h2h|state`.
     """
-    token = team_quote_token(sport, name)
+    from syndicate.features.shared.team_aliases import (
+        canonical_team,
+        unambiguous_club_tokens,
+    )
+
+    # `canonical_team`, NOT `team_quote_token`: the raw fallback that makes the
+    # venue side work is exactly what must not happen on the board side.
+    club = canonical_team(sport, name)
+    if not club:
+        return set()
+    token = str(club).strip().lower()
     if not token:
         return set()
+    allowed = unambiguous_club_tokens(str(sport or "").strip().lower())
     # The full form is a token too, so an exact name still matches through the
     # same path rather than through a second one.
-    return {token} | {word for word in token.split() if len(word) > 2}
+    candidates = {token} | {word for word in token.split() if len(word) > 2}
+    return {word for word in candidates if word in allowed}
 
 
 def probability_to_american(probability: float | None) -> int | None:

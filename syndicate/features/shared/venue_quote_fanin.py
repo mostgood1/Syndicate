@@ -653,12 +653,29 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
         #
         # AMBIGUOUS TOKENS ARE DROPPED, and that is the whole safety property.
         # "chicago" sits inside both "chicago cubs" and "chicago white sox", so
-        # on a Cubs/White Sox game it names NEITHER side. The candidate set here
-        # is exactly two clubs and both are known to be playing each other, so
-        # the opponent's tokens are available to subtract -- the same bound
-        # `kalshi_board_join._side_for_team` relies on, and the same refusal:
-        # guessing which side a shared name refers to is a bet on the wrong team
-        # half the time, at a price that looks confident.
+        # on a Cubs/White Sox game it names NEITHER side. Guessing which side a
+        # shared name refers to is a bet on the wrong team half the time, at a
+        # price that looks confident.
+        #
+        # THE OPPONENT SUBTRACTION BELOW IS NOT THAT PROPERTY, and used to be
+        # the only thing standing in for it. This comment said "the candidate
+        # set here is exactly two clubs and both are known to be playing each
+        # other" -- true of the ROW, and the wrong scope for the LOOKUP. The
+        # loop above resolves each candidate against `quotes_for_sport`, the
+        # sport's WHOLE pool, so a token only has to be unique across the sport
+        # to be safe and being unique within the pair buys nothing. Measured
+        # 2026-08-27: a Manchester City row offered `soccer|h2h|city`, a key 14
+        # clubs answer to, and `real` names 4. Worse, a board team the club map
+        # could not resolve fell through to a raw string -- "Not A Real Club"
+        # offered `mlb|h2h|club`, `mlb|h2h|not`, `mlb|h2h|real` -- directly
+        # contradicting the "no club, no second key" refusal three lines above.
+        #
+        # `team_name_tokens` now enforces both: it resolves through
+        # `canonical_team` (no raw fallback on this side of the join) and keeps
+        # only tokens `unambiguous_club_tokens` reports as naming exactly one
+        # club in the sport. The subtraction stays as a second, narrower check
+        # -- it is subsumed, not load-bearing, and removing it would change
+        # behaviour for no gain.
         opponent = "away_team" if side == "home" else "home_team"
         mine = team_name_tokens(sport, team)
         theirs = team_name_tokens(sport, row.get(opponent))
