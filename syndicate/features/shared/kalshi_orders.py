@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import math
 import os
+import urllib.parse
 from collections.abc import Mapping
 from typing import Any
 
@@ -920,8 +921,20 @@ def _order_read_url(order_id: str) -> str:
     return f"{_read_base().rstrip('/')}{_order_read_path()}/{order_id}"
 
 
-def _orders_list_url(limit: int) -> str:
-    return f"{_read_base().rstrip('/')}{_order_read_path()}?limit={int(limit)}"
+# HOW MANY PAGES ONE READ WILL WALK. A backstop, not a tuning knob: at the
+# default limit of 100 this is 2,000 orders, far above anything this account
+# has held (measured high-water mark 78). It exists so a venue that returns a
+# fresh cursor forever cannot spin this call, not to bound normal operation --
+# and when it DOES bind, coverage degrades to `page` and says so rather than
+# reporting a partial book as the whole one.
+_MAX_ORDER_PAGES = 20
+
+
+def _orders_list_url(limit: int, cursor: str = "") -> str:
+    url = f"{_read_base().rstrip('/')}{_order_read_path()}?limit={int(limit)}"
+    if cursor:
+        url += f"&cursor={urllib.parse.quote(str(cursor), safe='')}"
+    return url
 
 
 def _unwrap_order(payload: Any) -> dict[str, Any] | None:
@@ -992,26 +1005,101 @@ def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
     """
     from syndicate.features.shared.kalshi_auth import signed_request
 
-    try:
-        payload = signed_request("GET", _orders_list_url(limit))
-    except Exception as exc:
-        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
-    if not isinstance(payload, Mapping):
-        return {"status": "error", "reason": f"unexpected_shape:{type(payload).__name__}"}
-    raw = payload.get("orders")
-    if not isinstance(raw, list):
-        return {"status": "error", "reason": "no_orders_array"}
-    orders = [dict(o) for o in raw if isinstance(o, Mapping)]
-    # THE ENVELOPE, and it is here to answer one open question: this read takes
-    # a `limit` and has NO pagination, so if the account ever holds more orders
-    # than `limit` the tail is simply invisible. Kalshi's list conventionally
-    # carries a cursor, but the field name has never been observed and GUESSING
-    # IT IS THE SAME MISTAKE AS GUESSING A ROUTE -- `polymarket_us_orders` paid
-    # for that with an `http_501` on a reasoned-about path. So the envelope's
-    # keys are reported and one production read settles the name.
+    # PAGINATED, against a field name that was MEASURED rather than guessed.
+    #
+    # This read used to take a single page and stop, so an account holding more
+    # than `limit` orders had an invisible tail. The fix waited on one fact:
+    # what the cursor field is called. `ORDERS_ENVELOPE` was added to report the
+    # envelope instead of reasoning about it -- the same reasoning that cost
+    # `polymarket_us_orders` an `http_501` on a plausible-looking route -- and
+    # the first tick after deploy answered it, 2026-08-28T02:24:18Z:
+    #
+    #     ORDERS_ENVELOPE keys=['cursor', 'orders'] n=78 limit=100
+    #
+    # A top-level `cursor`. One production read, no error round-trip.
+    #
+    # AN EMPTY CURSOR IS THE AUTHORITATIVE END OF THE BOOK, and it outranks the
+    # `n >= limit` heuristic that stood in for it: a final page that happens to
+    # be exactly full is still the whole book if the venue says there is no
+    # more. The heuristic survives only for a response carrying no `cursor` key
+    # at all, where we genuinely cannot tell.
+    orders: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    seen_cursors: set[str] = set()
+    first_payload: Any = None
+    cursor = ""
+    pages = 0
+    exhausted = False
+    stopped = ""
+
+    while pages < _MAX_ORDER_PAGES:
+        try:
+            payload = signed_request("GET", _orders_list_url(limit, cursor))
+        except Exception as exc:
+            reason = f"{type(exc).__name__}: {exc}"
+            if pages == 0:
+                return {"status": "error", "reason": reason}
+            # A LATER PAGE FAILING IS NOT AN EMPTY BOOK, and it is not a total
+            # failure either. The pages already read are real orders and can
+            # still correct the rows they name; what is lost is the GUARANTEE
+            # of completeness, which is exactly what `coverage` carries. So the
+            # partial result is returned as `page` rather than discarded --
+            # discarding would change nothing about a live position we can see.
+            stopped = f"page_error:{reason}"
+            break
+        if not isinstance(payload, Mapping):
+            reason = f"unexpected_shape:{type(payload).__name__}"
+            if pages == 0:
+                return {"status": "error", "reason": reason}
+            stopped = reason
+            break
+        raw = payload.get("orders")
+        if not isinstance(raw, list):
+            if pages == 0:
+                return {"status": "error", "reason": "no_orders_array"}
+            stopped = "no_orders_array"
+            break
+
+        if first_payload is None:
+            first_payload = payload
+        pages += 1
+        for row in raw:
+            if not isinstance(row, Mapping):
+                continue
+            order = dict(row)
+            # DEDUPED BY VENUE ID. A cursor walk can legitimately overlap when
+            # the book changes underneath it, and the same order counted twice
+            # would inflate every count downstream.
+            order_id = str(order.get("order_id") or "").strip()
+            if order_id:
+                if order_id in seen_ids:
+                    continue
+                seen_ids.add(order_id)
+            orders.append(order)
+
+        has_cursor_field = "cursor" in payload
+        cursor = str(payload.get("cursor") or "").strip()
+        if not cursor:
+            exhausted = has_cursor_field
+            break
+        if cursor in seen_cursors:
+            # A venue repeating a cursor would loop forever. Treated as a bound
+            # hit, not as the end of the book -- we do not know what we missed.
+            stopped = "cursor_repeated"
+            break
+        seen_cursors.add(cursor)
+    else:
+        stopped = "max_pages"
+
+    payload = first_payload if isinstance(first_payload, Mapping) else {}
+    # THE ENVELOPE, still reported. It settled the cursor name once and it is
+    # what would catch the venue renaming or dropping the field -- a silent
+    # regression to single-page reads, which is the failure this loop exists to
+    # prevent and the one it could not detect on its own.
     print(
         f"[kalshi_orders] ORDERS_ENVELOPE keys={sorted(payload.keys())}"
-        f" n={len(orders)} limit={int(limit)}",
+        f" n={len(orders)} limit={int(limit)} pages={pages}"
+        f" exhausted={exhausted}{(' stopped=' + stopped) if stopped else ''}",
         flush=True,
     )
     # THE SHAPE, ONCE. This response has never been seen; `kalshi_client`'s
@@ -1049,29 +1137,41 @@ def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
     # whether `not_found=0` means "we agree with the venue" or only "we asked
     # about what we already believed" -- two very different guarantees that
     # were printing the same line.
-    # A FULL PAGE IS NOT A WHOLE BOOK, AND MUST NOT SAY IT IS.
+    # A PARTIAL READ IS NOT A WHOLE BOOK, AND MUST NOT SAY IT IS.
     #
     # `coverage` decides whether `reconcile_live_orders` runs an orphan scan and
     # whether `not_found=0` means "we agree with the venue" or only "we asked
-    # about what we already believed". Returning `book` unconditionally made a
-    # TRUNCATED read claim the stronger guarantee -- an unknown defaulting to
-    # the permissive branch, with no reason emitted.
+    # about what we already believed". It answers to the WALK now, in strict
+    # order of how much each signal actually proves:
     #
-    # `n == limit` cannot distinguish "exactly that many" from "more, cut off",
-    # so it degrades to `page` and the orphan scan is skipped rather than run
-    # against a partial book. Measured 2026-08-28T01:31Z: n=78 against
-    # limit=100, so today this is `book` on the evidence and not by assumption.
-    truncated = len(orders) >= int(limit)
-    if truncated:
+    #   stopped      we hit a bound or an error mid-walk. We do not know what
+    #                is past it, so `page` -- never mind how many rows we hold.
+    #   exhausted    the venue handed back an EMPTY cursor. That is the venue
+    #                stating there is no more, and it outranks the row count:
+    #                a final page that is exactly `limit` long is still the
+    #                whole book.
+    #   otherwise    no `cursor` key in the response at all, so we are blind
+    #                the way we were before pagination existed, and the old
+    #                heuristic is all that is left: a full page might be cut.
+    if stopped:
+        coverage = "page"
+    elif exhausted:
+        coverage = "book"
+    else:
+        coverage = "page" if len(orders) >= int(limit) else "book"
+
+    if coverage == "page":
         print(
-            f"[kalshi_orders] ORDERS_READ_TRUNCATED n={len(orders)} limit={int(limit)}"
+            f"[kalshi_orders] ORDERS_READ_PARTIAL n={len(orders)} limit={int(limit)}"
+            f" pages={pages} reason={stopped or 'no_cursor_field'}"
             " -- coverage degraded to page; orphan scan will be skipped",
             flush=True,
         )
     return {
         "status": "ok",
         "orders": orders,
-        "coverage": "page" if truncated else "book",
+        "coverage": coverage,
+        "pages": pages,
     }
 
 
