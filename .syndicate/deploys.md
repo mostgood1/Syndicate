@@ -36450,3 +36450,53 @@ first `POLYMARKET_PRICE_ALIGNMENT` counts.
 it is correct): an `inverted` count cannot distinguish "the venue's arrays are
 misaligned" from "our resolver picks the wrong outcome". Non-zero is a real
 defect, NOT a diagnosis.
+
+### 2026-08-28 refresh-worker `899cac87` — DEPLOYED AND MEASURED
+
+    deploy_started 20:58:17Z   build_ended 20:59:55Z   deploy_ended 21:01:03Z
+    [refresh_worker] BOOTED    21:01:32Z   <- 29s after deploy_ended
+    first board build          21:19:59Z .. 21:20:16Z  (~18 min after boot)
+
+The 29s gap is the reason `finishedAt` is not the anchor. A reading taken
+between 21:01:03 and 21:01:32 would be the OUTGOING instance.
+
+**verify (`#602`, Polymarket segment): PASS, on POSITIVE evidence.**
+
+    [portfolio_commit] POLYMARKET_BOARD_JOIN matched=87
+      refusals={... 'board_row_is_a_segment_bet': 52 ...}
+
+**52 segment board rows refused.** The guard FIRED — a counted refusal, not an
+absence. This is the reading `#601` could not produce for Kalshi (`#604`).
+
+**`#601` (Kalshi segment): NOT VERIFIED, and the money check is VACUOUS.**
+`segment_has_no_matching_series` is absent from `KALSHI_BOARD_JOIN` reasons —
+correct and expected, since `899cac87` predates `#604`, which is what wires that
+counter. The fallback check is also empty: **0 orders placed since boot**, so
+"0 bad segment orders" proves nothing. Absence in a window is not absence.
+`matched=233` still includes the `#604` phantom matches.
+
+**CARRIED LANE (`local_5163d9b3`) — its three readings, unreachable to message.**
+
+1 & 2. `POLYMARKET_ORIENTATION listed={'soccer|h2h': 3}
+   listed_by_canonical={} listed_by_flip_only={'soccer|h2h': 3}`
+   **`listed_by_canonical` IS STILL EMPTY** — and this build DID contain
+   `521b6dea`, so the tri-codes have now run. Their withdrawal of the "100%
+   eligibility rate" was correct, and this is the confirming negative rather
+   than a still-unrun instrument. `unreadable={'soccer|h2h': 104, ...}`.
+
+3. `POLYMARKET_PRICE_ALIGNMENT counts={mlb|h2h aligned 5 / too_close 19,
+   mlb|totals too_close 26, nfl|h2h aligned 3 / too_close 12, nfl|totals
+   too_close 13, wnba|h2h aligned 4, wnba|totals too_close 5}
+   inverted_samples=[]`
+   **aligned 12, too_close 75, INVERTED 0** (12+75 = 87 = `matched`).
+   No inversion on the 12 markets the gate could decide — h2h, i.e. exactly the
+   population the existing totals proof did not cover. **A zero does not prove
+   alignment**: 75 of 87 were too close to decide, and their own caveat (an
+   `inverted` count cannot separate "venue arrays misaligned" from "our resolver
+   picks the wrong outcome") simply does not get exercised at zero.
+
+**NOT DEPLOYED: `361d8940` (`#604`)**, which wires the Kalshi counter AND fixes
+an F5-suffix regression shipped inside `899cac87` — a board row spelling its
+segment in the market NAME (`totals_1st_5_innings`, no `segment` field) keys as
+`full` while its correct `KXMLBF5TOTAL` contract keys `first5`, so a LEGITIMATE
+first-five pairing stops resolving. Live code has that defect now.
