@@ -165,10 +165,27 @@ demonstrating the bug. Pinned is not fixed.
   orientations). So 12/133 is "flipped, out of all unmatched", not "flipped,
   out of fixtures where a flip was even possible". The true inversion rate
   among RESOLVABLE fixtures is unknown and higher. Nobody has that denominator.
-- **THEREFORE NEITHER SYSTEMATIC EXPLANATION IS SUPPORTED.** "Soccer slugs are
-  `<home>-<away>`" and "our board has soccer fixtures inverted" both predict
-  ~100% of resolvable soccer, not 9%. Whatever this is looks PER-FIXTURE. But
-  see the nested denominator above before treating even that as settled.
+- **RESOLVED 2026-08-28, and the earlier downgrade was wrong: THE SOCCER SLUG IS
+  HOME-FIRST.** Checked against ESPN scoreboards, independently in two sessions:
+  `eng.1 Manchester City @ Crystal Palace` / slug `atc-epl-cry-mnc` (cry = HOME,
+  listed first); `fra.1 PSG @ Lille` / `atc-lg1-lil-psg`; `esp.1 Villarreal @
+  Alavés` / `atc-lal-ala-vil`. **Our board is CORRECT on all three.** MLB is
+  away-first (`aec-mlb-lad-det` = Dodgers @ Tigers) and pairs today, so the slug
+  order genuinely DIFFERS BY SPORT.
+- **10 of 106 WAS THE WRONG DENOMINATOR AND IT IS WHY I DOWNGRADED IN ERROR.** A
+  board row reaches `no_match` only if it did NOT pair normally. So:
+  paired normally 0 · paired flipped 10 · never paired either way 96.
+  **Among soccer h2h fixtures pairable at all: 10 of 10 inverted, 0 correct.**
+  The 96 are a COVERAGE question — the fixture is absent from the slate, or its
+  venue tri-code resolves in neither orientation — not a join defect.
+- **`no_match` CONFLATES "listed but unpairable" WITH "NOT LISTED"**, because
+  `no_candidates` fires only when the whole `(league, date, market)` bucket is
+  empty, and for soccer it never is. That conflation is what made 96 look like
+  join failures. Splitting it is the next instrument.
+- Board-side resolvability MEASURED and exonerated: **all 106** board soccer h2h
+  rows have BOTH clubs resolving via `canonical_team`. Zero fail there.
+- **STILL DO NOT SHIP A BLANKET FLIP.** MLB pairs correctly away-first today; a
+  global flip breaks it. Any fix is per-sport and needs the 96 split first.
 - **THE SAMPLES SHOW THE MECHANISM, NOT THE RATE.** All 8 are soccer, across
   five competitions (Ligue 1, MLS, EFL Championship, La Liga, EPL) and both
   slug prefixes, every one board-`away@home` against the reversed slug pair.
