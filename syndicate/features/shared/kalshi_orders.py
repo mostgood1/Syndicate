@@ -80,14 +80,24 @@ _MIN_CONTRACTS = 1
 # Venue statuses that mean the trade HAPPENED. Everything else -- `resting`,
 # `pending`, `canceled`, or anything unrecognised -- is not a fill, and is
 # recorded as `submitted` rather than guessed into one.
-_VENUE_FILLED_STATUSES = frozenset({"executed", "filled", "matched", "closed"})
+from syndicate.features.shared.venue_order_states import (
+    VENUE_DEAD_STATUSES,
+    VENUE_FILLED_STATUSES,
+    VENUE_RESTING_STATUSES,
+)
+
+# SHARED WITH EVERY OTHER VENUE. These were a private copy until 2026-08-27
+# and had drifted from Polymarket's -- `complete` was a fill there and
+# `unknown` here, off the same word. See `venue_order_states` for why the
+# union is the safe direction and why `unknown` is not a harmless default.
+_VENUE_FILLED_STATUSES = VENUE_FILLED_STATUSES
 
 # ...and the two other things a venue status can mean. Split rather than
 # lumped into "not filled", because they have opposite consequences: a RESTING
 # order may still trade and must stay in the ledger untouched, while a DEAD one
 # never will and frees both its budget and its idempotency key.
-_VENUE_RESTING_STATUSES = frozenset({"resting", "pending", "open", "queued", "accepted", "active"})
-_VENUE_DEAD_STATUSES = frozenset({"canceled", "cancelled", "expired", "rejected"})
+_VENUE_RESTING_STATUSES = VENUE_RESTING_STATUSES
+_VENUE_DEAD_STATUSES = VENUE_DEAD_STATUSES
 
 
 class OrderBuildError(ValueError):
@@ -992,6 +1002,18 @@ def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
     if not isinstance(raw, list):
         return {"status": "error", "reason": "no_orders_array"}
     orders = [dict(o) for o in raw if isinstance(o, Mapping)]
+    # THE ENVELOPE, and it is here to answer one open question: this read takes
+    # a `limit` and has NO pagination, so if the account ever holds more orders
+    # than `limit` the tail is simply invisible. Kalshi's list conventionally
+    # carries a cursor, but the field name has never been observed and GUESSING
+    # IT IS THE SAME MISTAKE AS GUESSING A ROUTE -- `polymarket_us_orders` paid
+    # for that with an `http_501` on a reasoned-about path. So the envelope's
+    # keys are reported and one production read settles the name.
+    print(
+        f"[kalshi_orders] ORDERS_ENVELOPE keys={sorted(payload.keys())}"
+        f" n={len(orders)} limit={int(limit)}",
+        flush=True,
+    )
     # THE SHAPE, ONCE. This response has never been seen; `kalshi_client`'s
     # first live run corrected ten field names, and the same reporting is what
     # caught them. Keys only -- an order carries no credential, but it does
@@ -1027,7 +1049,30 @@ def fetch_orders(*, limit: int = 100, order_ids: Any = None) -> dict[str, Any]:
     # whether `not_found=0` means "we agree with the venue" or only "we asked
     # about what we already believed" -- two very different guarantees that
     # were printing the same line.
-    return {"status": "ok", "orders": orders, "coverage": "book"}
+    # A FULL PAGE IS NOT A WHOLE BOOK, AND MUST NOT SAY IT IS.
+    #
+    # `coverage` decides whether `reconcile_live_orders` runs an orphan scan and
+    # whether `not_found=0` means "we agree with the venue" or only "we asked
+    # about what we already believed". Returning `book` unconditionally made a
+    # TRUNCATED read claim the stronger guarantee -- an unknown defaulting to
+    # the permissive branch, with no reason emitted.
+    #
+    # `n == limit` cannot distinguish "exactly that many" from "more, cut off",
+    # so it degrades to `page` and the orphan scan is skipped rather than run
+    # against a partial book. Measured 2026-08-28T01:31Z: n=78 against
+    # limit=100, so today this is `book` on the evidence and not by assumption.
+    truncated = len(orders) >= int(limit)
+    if truncated:
+        print(
+            f"[kalshi_orders] ORDERS_READ_TRUNCATED n={len(orders)} limit={int(limit)}"
+            " -- coverage degraded to page; orphan scan will be skipped",
+            flush=True,
+        )
+    return {
+        "status": "ok",
+        "orders": orders,
+        "coverage": "page" if truncated else "book",
+    }
 
 
 def _int_or_none(value: Any) -> int | None:
@@ -1182,20 +1227,29 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     other way round is how a real position gets reconciled away to zero.
 
     ------------------------------------------------------------------
-    WHAT `_fp` MEANS IS NOT KNOWN, AND IS NOT GUESSED
+    `_fp` IS PLAIN CONTRACTS. SETTLED BY MEASUREMENT 2026-08-28T01:25:01Z
     ------------------------------------------------------------------
 
-    `fill_count_fp` and friends are the real field names, but the suffix is
-    undocumented here -- plausibly "floating point", plausibly a fixed-point
-    integer with a scale. If it is a scale, a 2-contract fill reads as some
-    large number, and booking it would claim a position orders of magnitude
-    larger than anything we could have bought.
+    This docstring used to say the suffix was undocumented and might be a
+    fixed-point scale -- in which case a 2-contract fill would read as some
+    large number and booking it would claim a position orders of magnitude too
+    big. The `COUNT_FIELDS` log was added to settle it, and it did. Two live
+    orders, straight from the worker:
 
-    Two things make that safe without knowing the answer. The raw values are
-    logged (`COUNT_FIELDS`), so one production read settles it. And
-    `reconcile_live_orders` refuses to book more contracts than the order
-    requested -- an invariant that holds regardless of the scale, and which is
-    worth having even once the scale is known.
+        fill_count_fp='16.00'  yes_price_dollars='0.4600'
+        taker_fill_cost_dollars='7.360000'      16 * 0.46 = 7.36   exact
+
+        fill_count_fp='3.00'   yes_price_dollars='0.5200'
+        taker_fill_cost_dollars='1.560000'       3 * 0.52 = 1.56   exact
+
+    So the scale is 1, the unit is CONTRACTS, and the wire type is a DECIMAL
+    STRING with two places -- not a number, which is why every read here goes
+    through `_int_or_none` rather than indexing the value directly. Fees are
+    quoted separately (`taker_fees_dollars`) and are NOT inside the fill cost.
+
+    `reconcile_live_orders` still refuses to book more contracts than the order
+    requested. That invariant was written as insurance against the scale being
+    something else; it is kept now for the ordinary reasons.
     """
     raw_status = str(order.get("status") or "").strip().lower()
 

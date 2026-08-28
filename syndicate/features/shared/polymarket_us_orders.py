@@ -120,7 +120,15 @@ _CURRENCY = "USD"
 # Venue statuses that mean the trade HAPPENED. Everything else -- resting,
 # pending, cancelled, or anything unrecognised -- is not a fill. Same rule
 # `kalshi_orders` learned by booking a position that did not exist.
-_VENUE_FILLED_STATUSES = frozenset({"filled", "executed", "matched", "closed", "complete"})
+from syndicate.features.shared.venue_order_states import (
+    VENUE_DEAD_STATUSES,
+    VENUE_FILLED_STATUSES,
+    VENUE_RESTING_STATUSES,
+)
+
+# SHARED WITH EVERY OTHER VENUE -- see `venue_order_states`. Was a private
+# copy until 2026-08-27 and had drifted from Kalshi's in both directions.
+_VENUE_FILLED_STATUSES = VENUE_FILLED_STATUSES
 
 _ORDERS_PATH = "/v1/orders"
 
@@ -503,12 +511,8 @@ def polymarket_us_submitter(resolve_market):
 # unreconciled order blocks EVERY live run on EVERY venue.
 # --------------------------------------------------------------------------
 
-_VENUE_RESTING_STATUSES = frozenset(
-    {"resting", "pending", "open", "queued", "accepted", "active", "live", "new"}
-)
-_VENUE_DEAD_STATUSES = frozenset(
-    {"canceled", "cancelled", "expired", "rejected", "failed", "voided"}
-)
+_VENUE_RESTING_STATUSES = VENUE_RESTING_STATUSES
+_VENUE_DEAD_STATUSES = VENUE_DEAD_STATUSES
 
 # THE DOCUMENTED LIST ROUTE -- and it lists OPEN orders only.
 #
