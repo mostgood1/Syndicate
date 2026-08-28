@@ -2790,6 +2790,63 @@ def build_intelligence_overview(
         # FINGERPRINT -- truncating that would key the caller's cache off a
         # partial sport list and quietly serve the wrong snapshot, which is a
         # worse failure than the one being prevented.
+        # ISOLATION IS TRIED BEFORE THE GUARD, and the order is the design.
+        #
+        # The guard's job is to refuse work that could kill this process. A
+        # capped CHILD cannot kill this process, so for an isolated sport the
+        # guard is answering a question that no longer applies -- and answering
+        # it "no" every single time (measured 2026-08-28: headroom 2167-2363MB
+        # against a 3000MB floor, `sports=7` with no `mlb:` entry for hours).
+        #
+        # Checking the guard first would preserve exactly the refusal this
+        # exists to remove. If isolation is off, unavailable, or refuses itself
+        # for want of room, control falls through to the guard unchanged and
+        # the previous behaviour is bit-for-bit intact.
+        _isolated_row = None
+        if not skip_game_hydration:
+            try:
+                from syndicate.features.shared.overview_subprocess import (
+                    build_sport_overview_isolated,
+                    isolated_sport_slugs,
+                    overview_isolation_enabled,
+                )
+
+                if overview_isolation_enabled() and sport_slug in isolated_sport_slugs():
+                    print(
+                        f"[intelligence] OVERVIEW_SPORT_BEGIN sport={sport_slug} "
+                        f"force_refresh={bool(force_refresh)} skip_game_hydration=False isolated=True",
+                        flush=True,
+                    )
+                    _isolated_row, _iso_reason = build_sport_overview_isolated(
+                        sport,
+                        effective_date,
+                        force_refresh=bool(force_refresh),
+                        preserve_requested_date=selected_date is not None,
+                    )
+                    if _isolated_row is not None:
+                        _emit(_isolated_row)
+                        _isolated_row = None
+                        print(f"[intelligence] OVERVIEW_SPORT_END sport={sport_slug} isolated=True", flush=True)
+                        continue
+                    # FELL THROUGH ON PURPOSE. A failed child leaves this sport
+                    # exactly where it was before isolation existed -- in front
+                    # of the guard, which will refuse it if there is no room.
+                    # Degrading to the OLD behaviour is the correct failure
+                    # mode; degrading to "sport absent" would make a child
+                    # crash strictly worse than not trying.
+                    print(
+                        f"[intelligence] OVERVIEW_ISOLATION_FELL_THROUGH sport={sport_slug} "
+                        f"reason={_iso_reason}",
+                        flush=True,
+                    )
+            except Exception as exc:
+                # Isolation is an optimisation. It must never be the reason a
+                # board build fails.
+                print(
+                    f"[intelligence] OVERVIEW_ISOLATION_UNAVAILABLE sport={sport_slug} "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
         if not skip_game_hydration and _overview_headroom_exhausted(
             next_sport=sport_slug,
             sports_done=sports_done,
