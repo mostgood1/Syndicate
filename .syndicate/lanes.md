@@ -1682,13 +1682,31 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 ### wnba-chip-live-token — OPEN, **UNOWNED** (session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 checkpointed and ARCHIVED 2026-08-27) — opened 2026-08-27 — **CLOCK FIXED AND VERIFIED IN PRODUCTION (web `e3dceb68`): `LIVE` -> `Q3 20.5`, control and after on the same game against ESPN. TWO THINGS OWED — refresh-worker is not deployed, and the projection guard is UNIT-TESTED ONLY. `todo.md #586`.** **CHECKPOINT 2026-08-27T01:2xZ: refresh-worker reached `070f452a` and DOES carry the fix; the WNBA half is owed on a MISSING SUBJECT, not a missing deploy — `WNBA live=0` when the artifact landed. Next window TOR @ SEA `02:00Z`. Session archived; lane UNOWNED.**
 - Goal: a live WNBA game chip carries its QUARTER AND CLOCK (`Q3 5:23`) instead
   of a bare `LIVE`, and never renders a SmartSim projection as an observed score.
-- Files: `syndicate/blueprints/home.py`,
-  `syndicate/features/shared/game_chip_scoreboard.py`,
+- Files: `syndicate/features/shared/game_chip_scoreboard.py`,
   `tests/test_home_wnba_live_state.py`
+- **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[2026-08-28,
+  session 3e5a9659]`.** Its claim moved to `soccer-overview-cost` for
+  INSTRUMENTATION ONLY — per-league timing inside the soccer games loop, no
+  behaviour change, nothing near the WNBA chip/live-token work this lane owns.
+  Taken because this lane is marked UNOWNED (session 3dcd0fb2 checkpointed and
+  ARCHIVED 2026-08-27). To reclaim, put the path back on the `- Files:` line.
+  **THE PATH IS REMOVED RATHER THAN STRUCK THROUGH** because
+  `check_lane_invariants.py` parses paths POSITIONALLY and a `~~struck~~` path
+  is still a live claim — that is a standing rule in `learnings.md` and I broke
+  it here first, producing a false contest between two OPEN lanes.
   — `game_chip_scoreboard.py` ADDED after the first test run: refusing to
   SET a fractional score in `home.py` is not enough, because `_side_score`
   falls through to `live_state.<side>_pts` and picks the projection back up.
   Unclaimed by any OPEN lane, checked before adding.
+  — **SCOPED CLAIM TRANSFERRED to `mlb-final-zero-placeholder`
+  `[2026-08-28, session 28195565, user authorised]`** — ONLY the 0-0
+  placeholder branch inside `build_game_chip`, which runs AFTER `_side_score`
+  returns. **`_side_score` and its `live_state.<side>_pts` fallthrough — this
+  lane's actual subject — are UNTOUCHED and stay yours**, as does everything
+  WNBA. Taken because this lane is UNOWNED (session 3dcd0fb2 archived
+  2026-08-27) and an MLB scoring defect was traced to that branch: a 0-0
+  schedule placeholder on a game whose status had advanced to FINAL was passed
+  through as a real result. Take it back by striking this note.
 - Hypothesis — **CONFIRMED FROM PRODUCTION BEFORE WRITING ANY CODE**, via
   `/api/ops/wnba/status-trace?date=2026-08-26`. `local_live_state_payload` (what
   `build_live_state_payload` returns, i.e. `live_row`) carries everything needed:
@@ -2470,6 +2488,130 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   test_albany_is_a_stated_judgement_not_an_inferred_one` — verified by stashing
   ALL my tracked edits and re-running: it fails identically. It targets
   `ncaaf/oddsapi_lines.py::resolve_team`, a module this lane does not touch.
+- Blocked by: none
+
+### portfolio-venue-and-side-integrity — OPEN — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c
+- Goal: five things the user asked for on `/portfolio` `[user 2026-08-28]`, of
+  which the third is a real-money defect and the rest are the page:
+  (1) filter the live book by venue; (2) **Polymarket h2h buys the wrong team**;
+  (3) positions that never settle; (4) two 503 errors rendering as positions;
+  (5) pivot the live book by sport and bet type.
+- Files: `syndicate/blueprints/intelligence.py`,
+  `syndicate/templates/portfolio.html`,
+  `syndicate/features/shared/portfolio_periods.py`,
+  `syndicate/features/shared/paper_settlement.py`,
+  `syndicate/features/shared/polymarket_us_orders.py`,
+  `pipeline/intelligence_state.py`, + tests.
+  **CLAIMS TRANSFERRED FROM TWO LANES WHOSE SESSIONS ARE GONE**
+  `[2026-08-28, session 12b2be57]`, on the same evidence session `3e5a9659`
+  used earlier today to move a claim out of the first of them. Verified
+  independently here, not taken on that note's word —
+  `list_sessions(include_archived=true)`:
+  `open-bet-live-status` / `syndicate-27` is the portfolio-consolidation
+  session, ARCHIVED, `isRunning: false`, last activity 2026-08-27T21:51:49Z;
+  `portfolio-decision-and-execution` / `9324a3e5` (opened 2026-08-22) appears
+  in NO roster entry at all, archived included. `portfolio-top-date-filter`
+  shipped edits to both contested paths and CLOSED today under the same
+  condition. Take them back by striking this note.
+  `polymarket_us_orders.py` is ALSO live in session `local_bb0d1330`
+  ("Fix 2 failing polymarket side-vocabulary tests"); messaged before editing,
+  offer standing to hand the finding over instead.
+- Hypothesis (diagnostic, WRITTEN BEFORE THE FIX): Polymarket resolves a
+  team side POSITIONALLY — `_resolve_outcome_side` sends YES iff our team sits
+  at `outcomes[0]` — and `outcomes[0]` is NOT reliably the venue's YES leg. The
+  totals path is immune because it resolves by NAME (`over`->YES); h2h has no
+  name to fall back on, so the side is a coin flip.
+- **RESULT: HYPOTHESIS HELD. MEASURED, NOT INFERRED.** Every settled MLB game
+  market in the live ledger cross-checked against MLB StatsAPI (`segment=full`,
+  schedule keyed by DATE, fixtures appearing twice excluded as ambiguous):
+
+      polymarket h2h,    venue-settled:  5 agree,  3 MISMATCH
+      polymarket totals, venue-settled:  9 agree,  0 mismatch
+      kalshi     totals, venue-settled:  4 agree,  0 mismatch
+
+  Rows graded by OUR resolver agree by construction and are not evidence —
+  they are graded from the same `side` field whose meaning is in question.
+  Only the venue-settled rows can falsify, and 3 of 8 do.
+- The decisive single case, three independent facts agreeing:
+  `aec-mlb-az-sf-2026-08-27`, `side=home` = San Francisco.
+  (a) live-odds-worker 2026-08-28T01:55:30Z: `POLYMARKET_ARTIFACT_PRICE
+      outcome_index=0 outcome='San Francisco Giants'` then `SUBMIT
+      side=OUTCOME_SIDE_YES action=BUY qty=15.45 price=0.48`.
+  (b) MLB StatsAPI: **ARI 1 @ SF 6, Final** — we bet the winner.
+  (c) The venue graded it `lost`, `pnl_dollars=-5.871` (= 15.45 x 0.38, our
+      whole cost basis), and its resolution row carries
+      `held_side=POSITION_RESOLUTION_SIDE_SHORT`.
+  The other two mismatches (`aec-mlb-col-wsh-2026-08-26`,
+  `aec-mlb-min-ath-2026-08-26`) are recorded as WINS we did not earn, so the
+  book's P&L is overstated as well as wrong.
+- **THIS DOES NOT RE-OPEN THE 2026-08-28 `FORBIDDEN` ENTRY — IT LANDS BESIDE
+  IT.** That entry retracted a claim of *systematic price/outcome-array
+  misalignment*, and it was right to: the PRICE alignment tests it ran were
+  sound and the prices are aligned. This is the SIDE, which that entry's own
+  closing paragraph names as the open gap — "the venue's order row carries no
+  outcome NAME ... nothing in the system can independently state which team is
+  held ... caught twice by a human looking at a screen and zero times by a
+  machine". The `positionResolution` row DOES carry it, and it only arrives
+  when the market resolves, which is after that investigation ran.
+- Falsification test (run, did not fire): if the mismatches were my truth
+  function rather than the venue, Kalshi and Polymarket totals would mismatch
+  at a similar rate over the same fixtures and the same resolver. They are
+  0 of 13.
+- **NOT DOING: flipping `_YES_OUTCOME_INDEX_DEFAULT` or inverting the index
+  rule.** `learnings.md 2026-08-28` is explicit that on this path the cost of a
+  wrong fix is the bug itself, and I have no reading of which leg IS the YES
+  one. `marketSides` and `question` come back from `/v1/markets` — both are in
+  `_KEEP` — and `_slate_row_for_storage` drops both, so no sound name rule is
+  writable today. Refuse now, log the shape, wire the name rule when measured.
+- Verification: (a) `off != on` on the h2h refusal before any correctness
+  claim; (b) the grade-conflict check re-derives all 3 known mismatches from
+  the ledger and 0 false positives on the 13 agreeing rows; (c) the page renders
+  the venue filter, the sport/type pivots and the unknown-submit block against
+  the real production payload, not a fixture.
+- Blocked by: none.
+
+### soccer-overview-cost — OPEN — opened 2026-08-28 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
+- Goal: name where soccer's 163.2s goes, per league, before optimising anything.
+- Files: `syndicate/blueprints/home.py` (instrumentation only), and its tests.
+- MEASURED: soccer 163.2s = **82% of hydrated overview time**, from `OVERVIEW_SPORT_BEGIN`/`END` brackets 2026-08-28 03:39-03:42Z (ncaaf 34.1s, nfl 2.0s, everything else <0.2s). MLB is NOT the cost — it is 4.43s isolated.
+- Hypothesis: `SoccerSport.games()` runs a NESTED loop — `for league in _active_leagues(today)` x `for week_offset in week_offsets` — calling `build_cards_page_context(league, week, season)` per pair. Soccer carries ~39 units/leagues where every other sport makes ONE call for a date or week, so the cost is the fan-out, not any single call.
+- Falsification: wrong if the per-league total is a small fraction of the 163.2s, i.e. the cost is outside this loop.
+- WHY INSTRUMENT FIRST, not tune: three hypotheses of mine died to measurement earlier this session (HTTP pulls 1.15s, Polymarket join 0.25s, venue-loop contention). Soccer's internals are currently unmeasured and anything else would be optimising an inferred shape.
+- NOTE, already true and NOT the target: `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC` is already raised to 900 (default 300) and DOES fire (`OVERVIEW_REBUILD_RATE_LIMITED sport=soccer age_sec=577`), so soccer already skips some builds. Raising it further is a cadence lever, not a cost fix, and trades freshness across all eight sports.
+- Verification: `[home] SOCCER_GAMES_TIMING` in production naming leagues, call count and elapsed, with the per-league total accounting for a material share of the 163.2s.
+- Blocked by: none
+
+### mlb-final-zero-placeholder — OPEN — opened 2026-08-28 — session 28195565
+- Goal: a 0-0 "FINAL" in a sport that cannot end level is treated as the
+  schedule placeholder it is, with a NAMED reason, instead of being passed
+  through as an observed result.
+- Files: `syndicate/features/shared/game_chip_scoreboard.py` (the 0-0
+  placeholder branch in `build_game_chip` ONLY — scoped claim transferred from
+  `wnba-chip-live-token`, which keeps `_side_score` and all WNBA semantics),
+  `tests/test_game_chip_scoreboard.py`
+- Hypothesis: CONFIRMED FROM PRODUCTION BEFORE ANY CODE. `/api/board/book-grid?sport=mlb&date=2026-08-27`
+  returns `games_with_outcome=4` against `finals_seen=1462, finals_level=644
+  (44%)` and `no_final_outcome_for_game=1304`. The 300-row sample carries five
+  distinct states: four real score-pairs (COL@WSH 7-1, BAL@STL 7-5, HOU@NYY
+  1-5, AZ@SF 6-1) and 114 rows at `final 0-0` (MIL@NYM, LAD@ATL, KC@TOR). Same
+  instant, 08-26 reads `finals_seen=3115, finals_level=0`, 15 games. `is_final`
+  (status text) and the score (`_side_score`'s seven candidates) are unrelated
+  fields, so status can advance to FINAL while the score is still the
+  placeholder.
+- Falsification test: wrong if the 0-0 finals carry a real 0-0 scoreline
+  somewhere upstream, or if the level rate is comparable on a healthy date.
+  Neither holds — MLB cannot end 0-0, and 08-26 measured 0%.
+- **THIS RECOVERS NO GAMES, and must not be reported as if it does.** The
+  scores are absent from the payload and `build_finals_index` already skipped
+  these rows for MLB. It fixes the MISREPORTING: 644 placeholders counted as
+  observed finals, which aimed the diagnostics at the scorer rather than at the
+  missing upstream data. The 11 lost games stay lost on this path.
+- Applies `learnings.md 2026-08-28` ("grading an AMBIGUOUS zero as a definite
+  outcome"): refuse with a NAMED reason rather than suppressing silently.
+- Verification: (a) MLB `final 0-0` suppressed AND carries its reason;
+  (b) soccer `final 0-0` PRESERVED — nulling it would re-break the draw fix
+  `a293bf14`; (c) MLB `live 0-0` preserved; (d) unknown sport preserved
+  (allowlist, never a negation); (e) existing pregame/live tests still pass.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
