@@ -373,8 +373,57 @@ resolution row on the wrong order carried `POSITION_RESOLUTION_SIDE_SHORT`.
 "`outcomes[0]` is the YES leg" as this venue could give -- no team-name
 ambiguity, no alias miss. 1 of 4 there, 3 of 8 on the settled book.
 
-**NEXT ACTION, AND `long == YES` IS STILL AN INFERENCE -- DO NOT SHIP IT AS A
-DEFAULT ON THIS ALONE.** The log line truncates at 400 chars, so only the FIRST
+**STEP 1 DONE, AND IT ANSWERED THE QUESTION. `long_index` VARIES.**
+`[measured 2026-08-28T20:08:15Z, live-odds-worker `54da64e1`, post-go-live at
+20:05:22Z]` Three NFL moneylines -- a sport we actually bet, `bettable=True`:
+
+    slug       outcomes                     prices              LONG side    long_index
+    was-bal    ['Commanders','Ravens']      ['0.4200','0.59']   Commanders   0
+    atl-mia    ['Falcons','Dolphins']       ['0.6400','0.37']   Falcons      0
+    hou-car    ['Panthers','Texans']        ['0.5100','0.5']    Texans       1
+
+**0, 0, 1. The YES leg is NOT `outcomes[0]`**, measured on the venue's own field
+rather than inferred, and it corroborates the 3-of-8 wrong-team rate
+independently. `marketSides[].long` + `.description`/`.team.name` IS the name
+rule. The positional rule is dead.
+
+`hou-car` carries the same signature as the order that cost us: slug
+`aec-nfl-hou-car` against `outcomes ['Panthers','Texans']` -- reversed relative
+to the slug -- with the long side being Texans, exactly as
+`aec-mlb-az-sf-2026-08-27` had `['San Francisco Giants','Arizona Diamondbacks']`
+against slug `az-sf`.
+
+**A SECOND, WEAKER FINDING -- FLAGGED, NOT ASSERTED.** On `hou-car` the price
+cross-check disagrees: `marketSides` prices Texans at `0.5100`, but
+`outcomes[1]` is Texans and `outcomePrices[1]` is `0.5`. If the two arrays were
+index-aligned Texans would be `0.5`. That would mean the misalignment reaches
+the PRICE too, not just the side.
+
+**It rests on a ONE-CENT separation (0.51 vs 0.50) and must not be quoted as
+proven.** That is precisely the thin-margin trap `learnings.md 2026-08-28`
+records -- a 0.04-separation test treated as conclusive. The other two markets
+have wide separation (0.42/0.59, 0.64/0.37) but both land `long_index=0`, so
+they do not test alignment at all. **What would settle it: a market where the
+long side is `outcomes[1]` AND the two prices are far apart.** This also
+scratches lane `venue-join-refusal-visibility`'s proof that outcomes and prices
+ARE aligned, which was run on totals; flagged to them.
+
+**TWO INSTRUMENT DEFECTS FIXED ON THE WAY, both mine, both found by reading
+production rather than the code.** (1) `outcomes`/`outcomePrices` are JSON
+STRINGS on the wire; `_long_index` guarded on `isinstance(list)` and returned
+None for every real market -- an instrument that could only ever answer None,
+shipped to answer a question, while fixtures passing lists made every test pass.
+(2) The sampler took whatever sorted first -- one boxing and two UFC markets --
+when every wrong-team order was MLB. Team sports are now preferred and a slate
+with none says `no_bettable_moneyline` before the samples.
+
+**AND A STALE READING NEARLY REPORTED AS A RESULT.** The first post-deploy line
+was timestamped 20:03:17 against a `finishedAt` of 20:05:22 -- the OUTGOING
+instance. Anchor the log window to `finishedAt`, never to when you started
+looking.
+
+**NEXT ACTION. `long == YES` IS NO LONGER AN INFERENCE -- STEP 1 MEASURED IT
+ABOVE -- BUT THE RULE IS STILL NOT SCORED AGAINST MONEY.** The log line truncates at 400 chars, so only the FIRST
 `marketSides` entry has been read; the second one's `long` value is unobserved,
 and on this path an unverified mapping IS the bug. The sequence:
 
