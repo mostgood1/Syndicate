@@ -912,6 +912,19 @@ def join_polymarket_to_board(
         if board_market not in set(MARKET_TYPE_TO_BOARD.values()):
             refuse("board_market_not_a_game_line")
             continue
+        # THE MIRROR OF THE VENUE-SIDE GUARD ABOVE. That one refuses a segment
+        # MARKET; this refuses a segment ROW. Without both, the only markets in
+        # the index are full-game and the only thing a `first3` row can match is
+        # the wrong contract -- which is what it did, four times, for real money.
+        #
+        # Counted rather than dropped: `_resolver_key` now also refuses these,
+        # but silently, and a bet that stops being placed with no reason emitted
+        # is indistinguishable from a venue that stopped quoting.
+        from syndicate.features.shared.kalshi_catalogue import FULL_GAME_SEGMENT
+
+        if str(board_row.get("segment") or FULL_GAME_SEGMENT).strip().lower() != FULL_GAME_SEGMENT:
+            refuse("board_row_is_a_segment_bet")
+            continue
         league = _norm(board_row.get("sport") or sport)
         # THE CALLER'S DATE IS THE FALLBACK, and in practice it is the value
         # that does the work. MEASURED 2026-08-25T01:23:04Z, the first build
@@ -1489,8 +1502,8 @@ def _probability_for_side(
     return hits[0] if len(hits) == 1 else None
 
 
-def _resolver_key(record: Mapping[str, Any]) -> tuple[str, str, str, float | None, str] | None:
-    """`(event_id, market, player, line, side)`, or None when it is not an identity.
+def _resolver_key(record: Mapping[str, Any]) -> tuple[str, str, str, float | None, str, str] | None:
+    """`(event_id, market, player, line, side, segment)`, or None when not an identity.
 
     --------------------------------------------------------------------------
     THE GAME IS PART OF THE KEY. IT WAS NOT, AND THAT BOUGHT THE WRONG GAME.
@@ -1531,16 +1544,33 @@ def _resolver_key(record: Mapping[str, Any]) -> tuple[str, str, str, float | Non
     means no order, and that is the direction that fails safe.
     """
     from syndicate.features.shared.kalshi_board_join import normalize_person
+    from syndicate.features.shared.kalshi_catalogue import FULL_GAME_SEGMENT
 
     event_id = str(record.get("event_id") or "").strip()
     if not event_id:
         return None
+    # WHICH PORTION OF THE GAME. Absent means the whole game, which is what a
+    # board row without an explicit segment has always meant AND what every
+    # match record is -- the venue side of this join refuses a segment market
+    # outright (`segment_market_not_full_game`, ~200 lines above), so an indexed
+    # Polymarket market is guaranteed full-game. That guarantee is exactly what
+    # made the omission here dangerous rather than merely incomplete: a first3
+    # row could not match a CORRECT contract, only a wrong one.
+    #
+    # MEASURED 2026-08-28, real money, four orders: `first3`/`first5` h2h rows
+    # resolved to full-game slugs `aec-mlb-lad-det-2026-08-28`,
+    # `aec-mlb-tex-mil-2026-08-28`, `aec-mlb-pit-stl-2026-08-28` at +199/+160/
+    # +208/+106. Same defect Kalshi had the same day (`#601`); the board's own
+    # dedupe key (`layer2_board.py:623`) has always counted `segment` as part of
+    # a row's identity and both venue resolvers dropped it.
+    segment = str(record.get("segment") or FULL_GAME_SEGMENT).strip().lower()
     return (
         event_id,
         str(record.get("market") or "").strip().lower(),
         normalize_person(record.get("player_name")),
         _as_float(record.get("line")),
         str(record.get("side") or "").strip().lower(),
+        segment,
     )
 
 
@@ -1553,7 +1583,7 @@ def polymarket_price_resolver(matches: Sequence[Mapping[str, Any]]):
     never quoted for it, which is the hazard `kalshi_board_join._match_key`
     states and the reason this is one shared function rather than two copies.
     """
-    index: dict[tuple[str, str, str, float | None, str], float] = {}
+    index: dict[tuple[str, str, str, float | None, str, str], float] = {}
     for match in matches:
         price = match.get("polymarket_american")
         key = _resolver_key(match)
@@ -1577,7 +1607,7 @@ def polymarket_ticker_resolver(matches: Sequence[Mapping[str, Any]]):
     float or a dict is one every caller must shape-test, and the caller that
     forgets places an order priced by a dict.
     """
-    index: dict[tuple[str, str, str, float | None, str], dict[str, Any]] = {}
+    index: dict[tuple[str, str, str, float | None, str, str], dict[str, Any]] = {}
     for match in matches:
         slug = str(match.get("polymarket_slug") or "")
         key = _resolver_key(match)
