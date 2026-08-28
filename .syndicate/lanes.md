@@ -71,7 +71,7 @@ death, never life — do not invert it.
   venue balances, venue settlement, live status on open bets. `[user 2026-08-26]`
 - Files: `syndicate/templates/portfolio.html`, `blueprints/intelligence.py`,
   `features/shared/execution_limits_settings.py`,
-  `execution_guard.py`, `execution_ledger.py`, `venue_balances.py`,
+  `execution_guard.py`, `venue_balances.py`,
   `venue_settlement.py`, `paper_settlement.py`,
   ~~`polymarket_board_join.py`~~ **INSTRUMENTATION-ONLY CLAIM TRANSFERRED to
   `venue-refresh-decoupling` `[2026-08-28, session 3e5a9659]`** — an additive
@@ -84,6 +84,7 @@ death, never life — do not invert it.
   `scripts/run_live_odds_refresh_worker.py`, + tests.
   RELEASED `[2026-08-28, session d617eefd]`: `blueprints/ops.py`
   RELEASED `[2026-08-28, session d617eefd]`: `team_aliases.py`
+  RELEASED `[2026-08-28, session d617eefd]`: `execution_ledger.py`
   RELEASED `[2026-08-28, session d617eefd]`: `polymarket_board_join.py` (its
   SEMANTIC scope; the instrumentation-only transfer struck above stands).
   A marker governs ONLY ITS OWN LINE -- `_claimable_prefix` cuts at the first
@@ -1380,7 +1381,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `.syndicate/plan_2026-08-22_portfolio_execution.md`,
   `syndicate/features/shared/portfolio_settings.py`,
   `syndicate/features/shared/portfolio_commit.py`,
-  `syndicate/features/shared/execution_ledger.py`,
+  RELEASED `[2026-08-28, session d617eefd]`: `syndicate/features/shared/execution_ledger.py`
+  RELEASED `[2026-08-28, session d617eefd]`: `tests/test_execution_ledger.py`
   RELEASED, no longer claimed here: ~~`pipeline/portfolio_commit.py`~~ — a
   full claim is now held by `venue-join-refusal-visibility`
   `[2026-08-28, session d617eefd]`, which is fixing this line's own
@@ -1401,8 +1403,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/opportunity_signals.py`,
   `scripts/score_sim_weight_impact.py`,
   `tests/test_layer2_blend_admission.py`,
-  `tests/test_portfolio_settings.py`, `tests/test_portfolio_commit.py`,
-  `tests/test_execution_ledger.py`, `tests/test_opportunity_signals.py`,
+  `tests/test_portfolio_settings.py`,
+  `tests/test_opportunity_signals.py`,
   `syndicate/templates/portfolio_paper.html`,
   `syndicate/static/shared/paper_portfolio_pulse.js`,
   `tests/test_portfolio_paper_page.py`,
@@ -2663,7 +2665,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `scripts/audit_polymarket_coverage.py`,
   `tests/test_polymarket_spread_audit_hook.py`,
   `tests/test_polymarket_spread_sign_rung.py`,
-  `tests/test_polymarket_board_join.py`, `tests/test_team_aliases.py`.
+  `tests/test_polymarket_board_join.py`, `tests/test_team_aliases.py`,
+  RELEASED `[2026-08-28, session d617eefd]`: `syndicate/features/shared/execution_ledger.py`
+  RELEASED `[2026-08-28, session d617eefd]`: `tests/test_execution_ledger.py`
+  — claimed to fix `#600`, then DROPPED UNAPPLIED. Lane
+  `portfolio-venue-and-side-integrity` shipped `f66c7441` while I was
+  implementing, and theirs is better: a three-way merge against a per-order
+  fingerprint captured at `_load()`, so it detects what the caller changed
+  WITHOUT a `touched` argument. That covers the four external callers in
+  files I could not edit, and handles deletion, which my design left
+  unguarded. My commit was reset, not merged. Do not resurrect it.
 - Claim provenance: RECLAIMED from three lanes whose sessions were verified
   gone in-session via `list_sessions(include_archived=true)` —
   `open-bet-live-status` (`local_f08f0df5`, archived),
