@@ -4809,3 +4809,63 @@ to it: the HTTP pulls, the Polymarket join (0.25s), and venue-loop contention.
 
 Same family as `feedback_read_the_field_you_already_have`, and this is now the
 second night running that the answer sat in a field I had already fetched.
+
+
+## 2026-08-28 FORBIDDEN: reading a "not yet running" list as proof something IS running
+
+`pending_deploys.py` enumerates what is committed and **NOT** deployed. I
+polled its JSON for my target SHA, matched, and announced the deploy was live —
+the match meant the exact opposite of what I read into it. Caught only because
+the SERVED page still had the old bytes.
+
+**The rule:** poll the PREDICATE, never a status field that merely mentions your
+SHA. For a deploy that means the changed behaviour appearing in the served
+response, or a log line that exists ONLY in the new code (`ORDERS_ENVELOPE` was
+built for exactly this and worked).
+
+## 2026-08-28 FORBIDDEN: a shared rule reimplemented as "the half I needed"
+
+The `unknown` bucket tested `not _is_venue_refusal`. The page's actual rule is
+`rejected` OR venue-refused. Production then described **63** build-time
+rejections — orders that never reached a venue — as *"submitted, never
+confirmed at the venue"*: possibly-live money. True figure: 2.
+
+The commit that shipped it had warned, in its own message, against "a fourth
+local definition of not a position, which is how these totals drifted apart in
+the first place." **A commit message asserting the discipline is not the
+discipline.** If two readers must agree, they call ONE function — identity,
+asserted in a test — and it lives in the module that owns the concept, not in
+whichever file noticed first.
+
+Every test passed through this because not one put a `rejected` row in front of
+the counter: the suite only exercised the case I had in mind while writing it.
+
+## 2026-08-28 FORBIDDEN: grading an AMBIGUOUS zero as a definite outcome
+
+`grade_polymarket_resolution` computed `delta = after.realized -
+before.realized` and called a zero delta a PUSH. That conflates "resolved and
+moved no money" with "nothing booked yet". Seven live orders were stamped
+`push / settled_by=venue` — one of them nine and a half hours BEFORE its game
+started — and grading is idempotent, so the verdict was permanent and
+self-concealing. It landed in the push column, the bucket nobody audits because
+it reads as a non-event.
+
+Measured afterwards: `sides=[LONG, SHORT]`, **no NEUTRAL row anywhere**. The
+venue never called any of them a push.
+
+**The rule:** a value that two different states both produce is not evidence
+for either. Refuse with a NAMED reason and leave the row for a later pass. And
+when a wrong verdict can be written permanently, the repair must carry a
+discriminator that makes it TERMINATE — `held_side` here, without which the
+repair would clear a correct grade every tick forever.
+
+## 2026-08-28 An absent log line is only evidence once you know the line is EMITTED
+
+Twice in one session. `UNKNOWN_ORDER_PROBE` prints only when it finds unknowns,
+so its absence was ambiguous — the neighbouring `VENUE_SETTLEMENT` line, which
+prints unconditionally, is what proved no tick had run. And a watcher grepped
+`"still open . this slate"` where `·` is two UTF-8 bytes: it reported "not yet"
+thirteen times against a deploy that was already live.
+
+**Check the instrument can fire before trusting what it says.** An unfiltered
+query returning *something* is the cheap version of that check.

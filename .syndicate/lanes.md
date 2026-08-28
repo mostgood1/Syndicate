@@ -2060,72 +2060,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `deploys.md`; full working block: `lanes_history.md`.
 - Blocked by: none.
 
-### portfolio-top-date-filter — OPEN — opened 2026-08-27 — session 39eeef04
-- Goal: `/portfolio` carries a date filter at the top of the page, in the shape
-  the paper page's date control already has (label, back/forward arrows, a
-  `type=date` input, a reset), driving the EXISTING opt-in `?on=` slate filter.
-  `[user 2026-08-27]`
-- Files: `syndicate/templates/portfolio.html`,
-  `syndicate/blueprints/intelligence.py` (`_live_portfolio_payload` and its
-  helpers only), `tests/test_portfolio_live_page.py`.
-- **CLAIM OVERLAP TAKEN DELIBERATELY, AND IT WAS ALREADY VIOLATED BEFORE THIS
-  LANE EXISTED.** `check_lane_invariants.py` reports both files contested; TWO
-  OPEN lanes already named them -- `open-bet-live-status` (2026-08-26) and
-  `portfolio-decision-and-execution` (2026-08-22) -- so the file was incoherent
-  on this point before today, which is what the session-start digest means by
-  LEDGER INCOHERENT. Neither is HELD: `grep -l` for either slug matches NONE of
-  the 42 `.current-lane.*` markers nor the retired ones, and the session whose
-  goal matches `open-bet-live-status` word for word ("Portfolio page
-  consolidation", `local_f08f0df5`) reads `isArchived: true, isRunning: false`,
-  last activity 2026-08-27T21:51Z via `list_sessions(include_archived=true)`;
-  `9324a3e5-364e-...` is absent from the roster entirely. Both RUNNING sessions
-  hold EMPTY markers, so neither claims a lane at all. Orphaned, not held -- the
-  same shape the 2026-08-17 sweep confirmed for `live-gameline-eval`. **This
-  lane does NOT close either of them** (that is their owners' call, and closing
-  another lane to make a check pass is how a claim silently stops being
-  enforced); it yields to whichever comes back.
-- **THIS BLOCK WAS LOST ONCE AND IS A RE-APPLICATION.** It was written at
-  ~22:1xZ and was gone by ~22:4xZ: `5a2c3666` ("checkpoint: session de363735")
-  landed in the SHARED primary tree mid-session and `lanes.md` came back with
-  no diff and no status entry at all. The code changes, being in files that
-  commit did not carry, survived untouched. Same lesson as this file's own
-  2026-08-27T17:1xZ entry for `open-bet-live-status` -- an uncommitted ledger
-  write is not a ledger write -- so this one is committed on sight.
-- Hypothesis: n/a (feature work, not diagnostic).
-- Falsification test: n/a.
-- Verification: **DONE, measured against a SERVED page, not the test client
-  alone.** A dev server on 127.0.0.1:5059 with four live orders injected across
-  three slate dates (2026-08-27 x2, 08-25, 08-24), screenshotted in three
-  states: (a) `/portfolio` -- input renders EMPTY, forward arrow dead, all four
-  orders present, header still reads "across all dates"; (b) `?on=2026-08-25` --
-  input shows 08/25/2026, BOTH arrows are real links (`on=2026-08-24` older,
-  `on=2026-08-27` newer), an "all dates" reset appears, header reads "filtered
-  to the 2026-08-25 slate"; (c) `?on=2026-08-14` -- a slate with no rows reads
-  "No live positions on 2026-08-14. The book is not empty", NOT the all-dates
-  sentence. 81 passed across `test_portfolio_live_page.py` +
-  `test_open_bet_live_status.py`, 209 across four adjacent execution suites.
-- **`off != on` PROVEN MECHANICALLY, not assumed:** none of the strings the 13
-  new tests assert on exist at HEAD -- `git show HEAD:` for both files reports
-  `live-datefilter` absent, `The book is not empty` absent, `_live_date_nav`
-  absent, `book_count` absent -- and `venue, across all dates` was
-  UNCONDITIONAL, so the filtered leg of the header test could not have passed.
-- **ONE PRE-EXISTING DEFECT FIXED IN PASSING.** The empty state printed "No live
-  positions have ever been placed" -- a claim about every live order ever --
-  over a `?on=` filtered view. It was already reachable by hand-typing the
-  parameter; a picker at the top of the page makes it routine, so it is fixed
-  here rather than deferred. `book_count` is new on the payload so the message
-  can say how many orders the book actually holds.
-- **DEPLOYED AND VERIFIED `[2026-08-27]`** -- web `e06fa72d`, deploy
-  `dep-da8bhg67bikc739qv5jg`, live `22:26:05Z`. Cumulative over the live SHA
-  `12928720` (ancestor check run BEFORE triggering, not assumed), and the only
-  code in the range is this lane's three files. **The reading that proves it:**
-  served production `/portfolio` renders the input `value=""` with 83 positions
-  and 47 venue tickers, `?on=2026-08-25` renders `value="2026-08-25"` with both
-  arrows live (08-24 / 08-26) and 10 positions / 3 tickers, and `?on=2026-07-04`
-  reads "The book is not empty" with "No live positions have ever been placed"
-  ABSENT. Full row + the false-positive that nearly banked a wrong result:
-  `.syndicate/deploys.md`. Claim released.
-- Blocked by: none. `render.yaml` untouched, so no `blueprint_sync`.
+### portfolio-top-date-filter — CLOSED — opened 2026-08-27 — closed 2026-08-28 — session 39eeef04
+- Goal: a date filter at the top of `/portfolio`. `[user 2026-08-27]` Widened by
+  the user during the session to: default to today, retire the old selector,
+  make the tiles match the date, and fix what that exposed underneath.
+- Files: `blueprints/intelligence.py`, `templates/portfolio.html`,
+  `features/shared/{venue_order_states,kalshi_orders,polymarket_us_orders,
+  venue_settlement,paper_settlement,execution_guard}.py`,
+  `docs/ai_context/venue_order_reconciliation.md`, + tests.
+- **SHIPPED AND VERIFIED IN PRODUCTION.** web `6a72040b`, live-odds-worker
+  `8edf77e5`. Narrative and every reading: `log/2026-08-28.md`; deploy rows and
+  measurements: `deploys.md`.
+- **CLAIMS: none held.** web and live-odds-worker released.
+- **OPEN, and owned by nobody yet:**
+  1. **$8.21 of unresolved Polymarket exposure** — two orders on `http_503`
+     `{"code":14}`, no `venue_order_id`, so no read available to us can confirm
+     or deny them. `probe_unknown_polymarket_positions` now watches those
+     markets and will speak if either resolves. **Only the venue UI settles it.**
+  2. **Why 7 of 32 resolutions carry `realized=0.0000` is unexplained.** The
+     refusal is safe; the cause is not known. `POLYMARKET_RESOLUTIONS` is the
+     instrument for it.
+  3. Kalshi pagination is **inert at `n=78`** and has never run a real
+     multi-page book.
+- Blocked by: none.
 
 ### venue-refresh-decoupling — **CLOSED 2026-08-28** — both goals shipped and VERIFIED in production; the board build's cost is now 84% named
 - OUTCOME (1) INSTRUMENTATION: `_log_stage_timing` was `logger.info`, which never reaches Render — verified in production BEFORE changing it (a logs search for `duration_ms` returned only `[INTEL_TRACE]`; this function's own payload appeared zero times). Now prints as well as logs, plus six new spans. Attribution went **40% -> 71% -> 84%**.
