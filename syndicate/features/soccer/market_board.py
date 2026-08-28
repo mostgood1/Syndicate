@@ -467,9 +467,51 @@ def _soccer_headshot_lookup(league: str) -> dict[str, str]:
     return lookup
 
 
+# COUNTS AND TIMES EVERY SHARD LOAD `[2026-08-28]`.
+#
+# WHY: soccer's overview bracket went 163.2s -> 247.6s -> 381.6s across one
+# day while its GAME COUNTS stayed flat, so the cost scales with something
+# that accumulates rather than with fixtures. The candidate is this shard:
+# `soccer_source/artifacts/soccer/odds_history/<date>.json` measured
+# 3,935,768 bytes yesterday and 48,169,883 bytes today -- 12x.
+#
+# The suspicion is a MULTIPLIER, not a single slow read.
+# `build_soccer_market_board` takes a LEAGUE and is cached on a 60s TTL, while
+# a board build runs every 680-874s -- so every build finds all ~10 league keys
+# cold and each one re-enters here. The shard is per-SPORT, so the same 48MB is
+# parsed once per league. `load_odds_history_payload_for_sport` accepts a
+# `cache` argument and this call does not pass one.
+#
+# THAT IS A HYPOTHESIS AND THIS EXISTS TO TEST IT, not to assert it. Four
+# earlier predictions about soccer were each refuted by the reading that
+# followed, so the counter reports what actually happens: how many loads, how
+# long each took, and how much they total per process.
+_ODDS_HISTORY_LOADS = 0
+_ODDS_HISTORY_SECONDS = 0.0
+
+
 def _soccer_odds_history_payload(selected_date: str) -> dict[str, Any]:
+    global _ODDS_HISTORY_LOADS, _ODDS_HISTORY_SECONDS
     shard_key = resolve_current_shard_key("soccer", selected_date)
+    _started = time.monotonic()
     payload = load_odds_history_payload_for_sport("soccer", shard_key)
+    _elapsed = time.monotonic() - _started
+    _ODDS_HISTORY_LOADS += 1
+    _ODDS_HISTORY_SECONDS += _elapsed
+    try:
+        # `markets` is the shard's own size signal and is already in hand --
+        # cheaper and more honest than stat()ing whichever of several candidate
+        # paths actually won on mtime.
+        _markets = payload.get("markets") if isinstance(payload, dict) else None
+        _n = len(_markets) if isinstance(_markets, dict) else -1
+        print(
+            f"[soccer_market_board] ODDS_HISTORY_LOAD n={_ODDS_HISTORY_LOADS} "
+            f"elapsed_s={round(_elapsed, 2)} cumulative_s={round(_ODDS_HISTORY_SECONDS, 2)} "
+            f"markets={_n} shard={shard_key} date={selected_date}",
+            flush=True,
+        )
+    except Exception:
+        pass
     return payload if isinstance(payload, dict) else {}
 
 
