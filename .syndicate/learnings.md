@@ -3551,7 +3551,62 @@ repeated the false claim to the user and to two peer sessions before checking.
   not a statement about `main`. Say the first and do not imply the second.
 
 
-### 2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "looks like the usual noise". A WARNING THAT IS USUALLY WRONG GETS TRAINED OUT — and two sessions proved it independently on the same night
+### 2026-08-28 — FORBIDDEN: escalating a wrong-side money alarm on a property the code already handles, when the refuting numbers were in the log I had already read
+
+A real filled order was reported as the wrong team: board row `h2h|home` on
+San Francisco, venue screen reading "Arizona ML", `aec-mlb-az-sf-2026-08-27`.
+
+I found that the venue's `outcomes` array was `["San Francisco Giants",
+"Arizona Diamondbacks"]` while the slug said `az-sf` — REVERSED relative to the
+slug — confirmed it against the live slate, saw it repeat across three dated
+markets for the fixture, and escalated to "systematic inversion, and the board
+priced the wrong team too."
+
+**It meant nothing.** `aec-mlb-lad-atl` carries `["Los Angeles Dodgers",
+"Atlanta Braves"]`, matching ITS slug. Outcomes order simply is not slug order
+and varies per market — which `outcome_side_for_index`'s own docstring states,
+with its own measured example, which is exactly WHY the code matches on NAME
+and not position. I read a known-and-handled property as a smoking gun.
+
+**The two facts that refuted me were in the first log I read.** (1) At submit,
+the venue's index-0 price was `0.48` against the board's independent
+`0.4808` — under misalignment index 0 would have carried Arizona's ~0.52. (2)
+The fill came at `0.38` when index-0 was `0.38`; Arizona was ~0.62 and cannot
+fill a 0.48 limit. Both were on screen before I proposed the misalignment
+theory, and I built the theory anyway because the user's screen outranked them
+in my head.
+
+**The test that should have been FIRST, because it has the most separation:**
+the TOTALS markets. `under` at index 1 priced `0.445` against planned `0.4444`;
+misaligned, it would read Over's ~`0.555`. Over/under are near-complementary,
+so that comparison separates by ~0.11 where the moneyline separates by ~0.04.
+Alignment proven at index 0 AND index 1. Second confirmation, already sitting
+in the reconciliation code as a measured table: a NO bought at `0.4545` came
+back `avgPx 0.55`, and `1-0.55 = 0.45` exact.
+
+**Rules:**
+1. **Before calling a venue property a bug, check whether the code's own
+   docstring already names it.** This one did, with a measured example, one
+   function above the line I was reading.
+2. **Rank candidate tests by SEPARATION before running them.** I ran the
+   moneyline comparison (0.04 apart) and treated it as inconclusive, when a
+   totals comparison (0.11 apart) was in the same log window and decisive.
+3. **A human screen-reading is evidence, not a verdict.** It outranks a
+   plausible number, it does not outrank two independent quantitative facts.
+   "Arizona ML" was the MARKET HEADING; the position was San Francisco.
+4. **On a money path, the cost of a wrong FIX is the bug itself.** Flipping
+   `_YES_OUTCOME_INDEX_DEFAULT` on this diagnosis would have inverted every
+   future order. Declining to write the fix was the only correct move
+   available, and it was available only because the diagnosis was not yet
+   confirmed. Confirm first is not caution here; it is the cheaper branch.
+
+What DOES survive: the venue's order row carries no outcome NAME — only
+`outcomeSide`, `marketSlug`, `avgPx` — so nothing in the system can
+independently state which team is held. This class has now been caught twice by
+a human looking at a screen and zero times by a machine. That is a real gap; it
+is not a live money risk, and it should not be described as one.
+
+## 2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "looks like the usual noise". A WARNING THAT IS USUALLY WRONG GETS TRAINED OUT — and two sessions proved it independently on the same night
 
 - **What we believed.** `session_worktree.py land` prints `ledger/todo ids
   PROBLEMS   (run scripts/todo_id_reconcile.py)` and pushes anyway. Both
