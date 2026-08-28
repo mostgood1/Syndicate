@@ -2524,45 +2524,39 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none
 
 ### portfolio-venue-and-side-integrity — OPEN, ONE READING OWED — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c
-- Goal: five `/portfolio` asks `[user 2026-08-28]` — venue filter; Polymarket
-  h2h buying the wrong team; positions that never settle; two 503s rendering as
-  positions; sport/bet-type pivots. A sixth (WNBA game lines) came out of
-  verifying the third.
-- **ALL SIX SHIPPED AND DEPLOYED.** Narrative, evidence and dead ends:
-  `log/2026-08-28.md`. Measurements: `deploys.md`. Items: `todo.md` `#595`
-  `#596` `#599`.
-- Files: `syndicate/blueprints/intelligence.py`,
+- Goal: five `/portfolio` asks `[user 2026-08-28]`, plus three things that fell
+  out of verifying them — WNBA game lines, `#600` (a lost-write race on the
+  money ledger), and operator actions for two un-actionable red banners.
+- **ALL EIGHT SHIPPED AND DEPLOYED.** Narrative, evidence and dead ends:
+  `log/2026-08-28.md` (two blocks). Measurements: `deploys.md`. Items:
+  `todo.md` `#595` `#596` `#599` `#600`.
+- Files: `syndicate/blueprints/intelligence.py`, `syndicate/blueprints/ops.py`,
   `syndicate/templates/portfolio.html`,
   `syndicate/features/shared/portfolio_periods.py`,
   `syndicate/features/shared/paper_settlement.py`,
   `syndicate/features/shared/polymarket_us_orders.py`,
   `syndicate/features/shared/polymarket_us_markets.py`,
   `syndicate/features/shared/bet_status_wnba.py`,
+  `syndicate/features/shared/execution_ledger.py`,
   `pipeline/intelligence_state.py`, `pipeline/execute_portfolio.py`, + tests.
-  Claims transferred from `open-bet-live-status` and
-  `portfolio-decision-and-execution`, both sessions verified absent from
-  `list_sessions(include_archived=true)`. Take back by striking this note.
-- Deployed: web `8b8a6579`, live-odds-worker `d5db8e3d`, refresh-worker
-  `73a7e358` (all contain this lane's commits). Every refresh-worker deploy was
-  triggered by ANOTHER lane on a newer SHA containing mine; I forced nothing,
-  and `deploy_claim.py --force` is blocked by the harness classifier.
-- **THE ONE READING OWED — the two `KXWNBATOTAL-26AUG26GSCONN-152` rows have not
-  graded in production.** No settlement pass has run since refresh-worker booted
-  on `73a7e358` at 17:26:40Z. They grade offline against production's own
-  boxscore rows (over WON, under LOST, total 153). 08-26 is inside the `#596`
-  straggler window, so no manual step is needed.
-- **THE BETTER TEST, and it is FORWARD:** tonight's two 2026-08-28 WNBA totals
-  should grade `matched_by: final_boxscore_team_totals`, NOT `settled_by: venue`.
-  Repairing old rows proves the backfill; only this proves the venue dependency
-  is gone. Games tip 19:30 EDT.
+- Live: all three services on `a36e3c1a` ~18:57Z, web on `89678782` 19:09Z.
+  Both workers were deployed BY THE USER manually — `deploy-guard` refuses on a
+  preflight HOLD and the break-glass grant was refused by the harness
+  classifier. Surfaced, not routed around.
+- **THE ONE READING OWED: `LEDGER_MERGE` has not fired.** `concurrent=0` on
+  both workers since 18:58Z is an absence in a short window, NOT a pass — a
+  collision needs a settlement pass overlapping a placement cycle. Watcher
+  `bwnlc4q33` armed on `concurrent>=1` and on `MERGE_READ_FAILED`. Equally
+  decisive: a `SETTLED ... graded=N` (N>0) whose outcomes DO appear on the
+  served payload, which is the exact signature that was failing.
 - Also unproven, deliberately: the Polymarket h2h refusal has never fired in
-  production (nothing tried to place one), and `marketSides[].long == YES` is an
-  INFERENCE from one observed entry — `#595` step 1 is to widen the log. **Do
-  not wire it on what has been read so far.**
-- Verification: DONE for four of five asks, read off the SERVED payload —
-  144/$238.45 -> 57/$101.06 on the venue filter, `unknown_submits 2 / $8.21`,
-  `by_sport`/`by_market` present, `grade_conflicts: 3 / $10.07` matching a
-  prediction registered before the reading.
+  production (nothing has tried to place one), and `marketSides[].long == YES`
+  is an INFERENCE from one observed entry — `#595` step 1 widens the truncated
+  log. **Do not wire it on what has been read.**
+- Verified in production: WNBA `GSCONN` rows graded `under lost` / `over won`
+  `settled_value 153.0`; the ledger stopped going backwards (`1,295,990 ->
+  1,298,163` monotonic across services vs a `-8,031` step); `last_blind_write`
+  readable and `None`; both banners carry working operator actions.
 - Blocked by: none.
 
 ### soccer-overview-cost — OPEN — opened 2026-08-28 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8

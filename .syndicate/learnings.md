@@ -5249,3 +5249,51 @@ time. That is the keyvalue/artifact split already in this file, hit again — so
 the rule needs restating as an instruction rather than a fact: **before
 concluding an artifact is absent, name which STORE you looked in and which store
 its consumer reads.** They are frequently not the same one.
+
+
+### 2026-08-28 — FORBIDDEN: diagnosing a resolver when the log said `graded=N` and the served payload changed nothing. That is a LOST WRITE, and I spent three theories on the wrong layer
+
+**The symptom, and how long it fooled me.** `[paper_settlement] SETTLED
+date=2026-08-26 ... graded=8` with `outcomes={'lost': 3, 'won': 5}` — and zero
+live rows changing outcome on `/api/portfolio/live` across that pass. I read
+that as "the rows never reached the resolver" and went looking for what filtered
+them, through **three** theories: a reconcile race on `status` (disproved —
+`reconciled_at` is re-stamped every cycle, so `reconciled_from: 'submitted'`
+records the ORIGINAL transition, not a recent one); an upstream sport filter;
+a missing artifact. A peer offered a fourth (a keyvalue/disk store mismatch).
+
+**What settled it was running the DEPLOYED predicate chain against the REAL
+order records** rather than reasoning about it:
+
+    outcome truthy?  False
+    status = 'filled'   -> not_filled?      False
+    mode   = 'live'     age 42.76h/45.21h   -> awaiting_venue? False (24h grace)
+    => REACHES RESOLVER: True
+
+Nothing filtered them. They were graded, and the write was discarded 12 seconds
+later by the other service.
+
+**The cause was two log lines apart the whole time.** Both services print
+`KEYVALUE_WRITE_LARGE` with a `size_bytes`:
+
+    refresh-worker    17:40:48   1,276,296
+    live-odds-worker  17:41:00   1,268,265   <- 8,031 bytes SMALLER
+
+**HOW TO APPLY.**
+1. **`graded=N` (N>0) with no outcome change on the served surface is a LOST
+   WRITE. It is not a resolver bug.** Check the write, not the reader.
+2. **A whole-document `size_bytes` that goes DOWN is the cheapest possible
+   detector for a clobber**, and both services already print it. Diff the sizes
+   across services before forming any theory about why data is missing.
+3. **Run the deployed predicate chain against the real record.** Every one of my
+   three theories was about which branch a row took; the branch was checkable in
+   about a minute and I kept reasoning instead.
+4. **A peer's theory is not evidence either.** Declining the fourth one because
+   the chain had already answered it was the only correct move available.
+
+**Related, same session, same shape one level up:** the durable
+`last_blind_write` stamp I added to replace an ephemeral log line shipped
+WRITE-ONLY — into the document and into `ledger_summary()`, which nothing in
+production calls. **Durable state with no reader is barely better than the log
+line it replaced.** Found by reading the deployed endpoint's payload instead of
+assuming the field had arrived. Add the reader in the same commit as the field.

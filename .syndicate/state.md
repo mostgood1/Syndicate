@@ -288,7 +288,21 @@ Check the ledger write sizes across both services before touching a resolver.
 ledger from either service can be lost: a grade, a `grade_check`, a
 reconciliation, a fill. It is the record of real money. `#600`.
 
-**FIXED — `f66c7441`, three-way merge in `_persist`, NOT DEPLOYED.** `_load()`
+**FIXED AND DEPLOYED — `f66c7441`, three-way merge in `_persist`. All three
+services on `a36e3c1a` 2026-08-28 ~18:57Z; web on `89678782` 19:09Z.**
+
+**DEPLOY-VERIFIED, PARTIAL.** The ledger stops going backwards: 18:55-18:57 runs
+`1,295,990 -> 1,298,163` monotonic ACROSS the service boundary, against the
+`-8,031` step that started this. `last_blind_write` is readable on
+`/api/ops/execution/ledger-summary` and reads `None` — a meaningful null, since
+`_persist` only writes that field and never clears it.
+
+**NOT YET PROVEN: `LEDGER_MERGE` has not fired.** `concurrent=0` since 18:58Z is
+an absence in a short window, not a pass — a collision needs a settlement pass
+overlapping a placement cycle. What settles it: one `concurrent>0`, or a
+`SETTLED ... graded=N` whose outcomes actually appear on the served payload.
+
+**The mechanism, unchanged:** `_load()`
 captures a fingerprint per order; a row the writer did not touch is left to
 whoever did. A per-order upsert would NOT have fixed it — the stale writer held
 every graded order, so overlaying "its" rows discards the grades exactly as
