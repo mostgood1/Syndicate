@@ -848,7 +848,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   6. The live-odds market-pricing pilot (does the book already price momentum?)
      sits at 1.46 SE, n=106 — needs ~2 more match-days of capture to resolve.
 - Files: `syndicate/features/shared/{board_enrichment,soccer_live_gameline_source,soccer_projections,layer2_board,publication_adapter,live_lens_loop}.py`,
-  `syndicate/features/soccer/{cards.py,features/live_lens.py,features/lineups.py,ingestion/fotmob_*.py}`,
+  `syndicate/features/soccer/{features/live_lens.py,features/lineups.py,ingestion/fotmob_*.py}`,
+  **`cards.py` REMOVED FROM THE BRACE ABOVE `[2026-08-28, session 3e5a9659]`** —
+  claim transferred to `soccer-overview-cost` for INSTRUMENTATION ONLY (two
+  sub-marks inside `_build_cards_page_context_uncached`, no behaviour change,
+  nothing near the FotMob/live-lens work this lane owns). Taken because this
+  lane is UNOWNED — session `f98be73b` checkpointed 2026-08-22 and does not
+  appear in `list_sessions` at all. REMOVED rather than struck through, and
+  removed from INSIDE the brace: `check_lane_invariants` parses paths
+  positionally and a brace expansion is a claim per member. To reclaim, put
+  `cards.py,` back inside the brace.
   `syndicate/templates/shared/_scoreboard_strip_soccer.html`, `syndicate/static/shared/dense_cards.css`,
   `scripts/{build_soccer_artifacts,backtest_soccer_live_totals,poll_soccer_live_state,soccer_*}.py`,
   `tests/test_soccer_*`, `tests/test_fotmob_*`.

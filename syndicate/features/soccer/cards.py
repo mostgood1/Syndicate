@@ -2507,13 +2507,54 @@ def build_cards_page_context(league: str, week: int | None = None, season: int |
     return copy.deepcopy(built)
 
 
+def _cards_phase_log_threshold_sec() -> float:
+    """Only leagues SLOWER than this print. One warm league is ~0.01s.
+
+    `import os` LOCALLY, matching `_cards_context_ttl_seconds` right above --
+    this module has no module-level `os` and adding one for a log threshold is
+    a wider change than the threshold deserves.
+    """
+    import os
+
+    raw = str(os.environ.get("SYNDICATE_SOCCER_CARDS_PHASE_LOG_SEC") or "").strip()
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            pass
+    return 1.0
+
+
 def _build_cards_page_context_uncached(league: str, week: int | None = None, season: int | None = None) -> dict[str, Any]:
+    # TWO SUB-MARKS `[2026-08-28]`. THE LAST UNMEASURED FUNCTION ON THE OVERVIEW
+    # PATH -- deliberately not a seventh hypothesis about soccer. Six mechanisms
+    # I proposed today were each refuted by the reading that followed, so this
+    # times the only box that has never been opened.
+    #
+    # WHY. `games()` reads **0.10s and 51.60s for the SAME 10 leagues and 20
+    # calls** (19:10-19:24Z, settled worker). Soccer is not slow, it is COLD --
+    # and cold on every build during live windows, because this function's cache
+    # wrapper keys on `_live_vintage`, which by design "changes the moment any
+    # match's status or clock moves".
+    #
+    # THE QUESTION THESE MARKS ANSWER: is the ~50s rebuild work a clock tick
+    # could actually have invalidated?
+    #     week_games      -- fixtures, projections, artifacts
+    #     board_contract  -- the contract/enrichment pass
+    # If the cost sits in work live state does NOT change, the key is too COARSE
+    # and the fix is to split it: cache the stable part WITHOUT the vintage and
+    # overlay live state, so a clock tick costs the overlay, not the rebuild.
+    # If the cost IS live work, that split buys nothing and the answer is
+    # elsewhere. Either reading is decisive, which is the point.
+    _cards_t0 = time.monotonic()
     league = normalize_league(league)
     resolved_season = int(season) if season else default_season(league)
     weeks = available_weeks(league, resolved_season)
     resolved_week = int(week) if week else default_week(league, resolved_season)
+    _cards_t_setup = time.monotonic()
 
     games = week_games(league, resolved_week, resolved_season)
+    _cards_t_games = time.monotonic()
     simulated_count = sum(1 for game in games if game.get("panels", [{}])[0].get("eyebrow") == "Match projection")
 
     query = f"?week={resolved_week}&season={resolved_season}"
@@ -2522,7 +2563,7 @@ def _build_cards_page_context_uncached(league: str, week: int | None = None, sea
     source_path = str(schedule_path(league, resolved_season))
     league_label = league_display_name(league)
 
-    return apply_game_board_contract(
+    _built = apply_game_board_contract(
         {
             "date": week_label(league, resolved_season, resolved_week),
             "requested_date": query,
@@ -2588,6 +2629,21 @@ def _build_cards_page_context_uncached(league: str, week: int | None = None, sea
         source_kind="artifact_backed",
         live_lens_integrated=True,
     )
+    try:
+        _total = time.monotonic() - _cards_t0
+        if _total >= _cards_phase_log_threshold_sec():
+            print(
+                f"[soccer_cards] CARDS_CONTEXT_PHASES league={league} "
+                f"total_s={round(_total, 2)} "
+                f"setup_s={round(_cards_t_setup - _cards_t0, 2)} "
+                f"week_games_s={round(_cards_t_games - _cards_t_setup, 2)} "
+                f"board_contract_s={round(time.monotonic() - _cards_t_games, 2)} "
+                f"games={len(games)} week={resolved_week} season={resolved_season}",
+                flush=True,
+            )
+    except Exception:
+        pass
+    return _built
 
 
 # ---------------------------------------------------------------------------
