@@ -231,11 +231,26 @@ nothing tried to place an h2h in the observed window — so its reachability res
 on tests (`off != on`: 4 fail against it, pass with the hatch, asserted through
 `order_body`) and on `verify_order_paths`, not on a production line.
 
-The venue does name its own YES leg (`marketSides[].long` + `.team.name`) but it
-is **NOT wired** — only the FIRST `marketSides` entry has been observed (the
-`MONEYLINE_YES_LEG_SHAPE` log truncates at 400 chars), so `long == YES` is an
-inference; `todo.md #595` carries the sequence, ending in scoring against all 8
-venue-settled moneylines INCLUDING the 3 that went wrong.
+**THE VENUE NAMES ITS OWN YES LEG, AND IT IS NOW MEASURED RATHER THAN INFERRED**
+`[2026-08-28T20:08:15Z, live-odds-worker 54da64e1, post-go-live 20:05:22Z]`.
+`marketSides[].long` + `.description`/`.team.name`, read on three NFL moneylines
+(`bettable=True`): `long_index` = **0, 0, 1** — `was-bal` Commanders,
+`atl-mia` Falcons, `hou-car` **Texans = outcomes[1]**. **So the YES leg is NOT
+`outcomes[0]`**, confirmed on the venue's own field and corroborating the 3-of-8
+wrong-team rate independently. `hou-car` repeats the `az-sf` signature exactly:
+outcomes reversed against the slug, long side second.
+
+WEAKER, FLAGGED NOT ASSERTED: on `hou-car` the long side's price (`0.5100`)
+matches `outcomePrices[0]` while the long side is `outcomes[1]`, which would mean
+the misalignment reaches the PRICE too. It rests on a ONE-CENT separation
+(0.51 vs 0.50) — the thin-margin trap this file's own learnings record — and
+needs a market where the long side is `outcomes[1]` AND the prices are far apart.
+It also scratches `venue-join-refusal-visibility`'s alignment proof, which was
+run on totals; flagged to them.
+
+STILL **NOT WIRED**: `todo.md #595` step 3 requires scoring the rule against all
+8 venue-settled moneylines INCLUDING the 3 that went wrong before the refusal
+comes off.
 
 **THE CLASS IS NOW CAUGHT BY A MACHINE.** `paper_settlement._check_venue_grade`
 cross-examines every VENUE-stated outcome against the real game result — the two
