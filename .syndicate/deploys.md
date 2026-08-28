@@ -5,6 +5,70 @@
 
 ---
 
+## 2026-08-27 — web `20362bfb`: the portfolio date filter defaults to today, and the chip row is gone
+
+**Deployed:** `dep-da8emfjbc2fs73a1qp2g`, triggered `01:58:22.706505Z`, live
+`02:04:03.6923Z`. Claim `web` held by `portfolio-top-date-filter` from
+`01:58:04Z`, token `6edd3377…`; **RETAINED rather than released after this row**
+because the follow-up deploy below is the same lane on the same service, minutes
+later. Preflight `CLEAR` for this exact SHA, on `origin/main`, only
+infrastructure processes.
+
+**THE PUSH WAS NOT MINE, AND THE COMMITS ARE NOT THE SHAs I WROTE.** The user
+started a background session for an unrelated test failure; it ran in the SHARED
+primary tree, rebased my two commits onto `origin/main`, and pushed both. So
+`b4b05f44` → `20362bfb` (this one) and `a3647571` → `029a8eb2` (the venue
+reconciliation work, which the user asked to hold back). **Holding it back
+locally stopped being available at that moment** — it is on `origin/main` now,
+undeployed. Nothing was lost and the content is identical; the SHAs are not.
+This is the shared-tree hazard the session protocol names, arriving through a
+session *I* spawned.
+
+**Blast radius, enumerated before triggering:** `20362bfb` is a descendant of
+the live `e06fa72d` (cumulative, not a revert), and the venue files
+(`kalshi_orders`, `polymarket_us_orders`, `venue_order_states`) are **absent**
+from `e06fa72d..20362bfb` — the hold-back held for the DEPLOY, which was the
+part that mattered. It does carry another lane's `635f869d` (board cycle:
+`pipeline/venue_odds_loop.py`, `intelligence_state.py`), unavoidably, since that
+sits below mine in the rebased history. refresh-worker was **already** live on
+`635f869d`, so web was the second service to get it, not the first.
+
+**verify: MET `02:05Z`, on the SERVED PRODUCTION BYTES in three states.**
+
+```
+                     band note                    input        held-back  chips  reset      tickers
+/portfolio           "on the 2026-08-27 slate"    2026-08-27       2      gone   all dates    30
+?on=all              "across all dates"           ""          (absent)   gone   today        51
+?on=2026-08-26       "on the 2026-08-26 slate"    2026-08-26      21      gone   all dates    16
+```
+
+The held-back column is the guarantee that replaced "all dates by construction",
+and it is doing work rather than sitting at zero: **2** open positions withheld
+by the default view, **21** by the older slate. `?on=all` correctly shows no
+such line because it withholds nothing. Ticker counts 30 / 51 / 16 are the
+falsification guard in both directions — the filter genuinely filters, and
+genuinely stops filtering.
+
+**THE NEW LOOP THIS DEPLOY CARRIED DID NOT START, and the null result was
+checked against its own emitter first.** `venue_odds_loop_enabled()` reads
+`SYNDICATE_VENUE_ODDS_LOOP_ENABLED`, absent → **False**, and the DISABLED branch
+*prints its own line*. So absence of `[venue_odds_loop]` in web's logs is
+evidence rather than silence: neither `LOOP_START` nor `DISABLED` appears from
+`02:03Z`, meaning the start path is not reached on web at all. Instrument
+confirmed live in the same window — 503 web log lines matched an empty filter,
+so the collector was not simply quiet.
+
+**A DEFECT SHIPPED IN THIS DEPLOY AND THE USER CAUGHT IT, NOT ME.** The
+Positions tile renders the VIEW's count with a hardcoded `all dates` label —
+true for as long as the view was every date, and a false statement the moment
+today became the default. It read `41` under `all dates` while the book held
+`87`. Two more tiles (Settled, Profit/loss) run over `whole_book` and carried
+**no** scope label at all, so beside a filtered Positions count they read as
+describing the same set. Fixed in the next row. **What this cost:** I verified
+the three things I had changed and did not re-read the tiles I had changed the
+MEANING of — a scope change invalidates every label on the page, not only the
+ones whose markup moved.
+
 ## 2026-08-27 — web `e06fa72d`: a date filter at the top of `/portfolio`, driving the opt-in `?on=`
 
 **Deployed:** `dep-da8bhg67bikc739qv5jg`, triggered `22:22:56.813813Z`, live
