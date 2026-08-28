@@ -2764,6 +2764,40 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `portfolio-ledger-service-split`.
 - Blocked by: none. Next refresh-worker deploy by ANY lane carries the counter.
 
+
+### cryptocom-finding-correction — OPEN — opened 2026-08-28 — session 29794bbe-33cb-45fc-a046-136e18ef3e06
+- Goal: `cryptocom_client.py`'s `FINDING` and `probe()` state what was MEASURED
+  on 2026-08-28, not what was inferred from a sandbox that could not reach the
+  venue. Single testable outcome: `probe()` returns an explicit `unblocked`
+  flag computed ONLY from a sanctioned, server-side-readable surface, and
+  `FINDING` no longer asserts "no public REST/WebSocket market-data API has
+  shipped" — an undocumented JSON sports endpoint exists and was read.
+- Files: `syndicate/features/shared/cryptocom_client.py`,
+  `scripts/probe_cryptocom.py`, `tests/test_cryptocom_client.py`.
+- **CROSS-LANE EDIT, EXPLICIT USER OVERRIDE `[2026-08-28, user: "fix the
+  cryptocom_client.py finding with what you found"]`.** These three files are
+  claimed by `exchange-markets-api-integration` (`lanes.md` above; OPEN, goal
+  complete, lane idle, session `71a74bb7` GONE). Protocol is to stop and
+  surface the conflict, which is what this line does; the user's instruction is
+  the override and is logged here rather than acted on silently. No file
+  outside the three above is touched, and the other lane's other five venue
+  clients are untouched.
+- Hypothesis: n/a — this is a record correction, not a diagnosis. What is being
+  corrected was itself a diagnosis made without egress.
+- Falsification test: the claim being removed ("no public market-data API")
+  would be re-established if the endpoint
+  `web.crypto.com/api/proxy/public/knock-out/predictions/public/api/v1/events`
+  did NOT return sports rows. It returned 200 with 200 MLB rows
+  (`event_kind_asset_type: "sports"`) on 2026-08-28. Kept as the falsifier
+  because it is the one reading the correction rests on.
+- Verification: `python -m pytest tests/test_cryptocom_client.py` passes with
+  tests that assert the NEW facts (a test asserting the old
+  `status == "no_public_api_yet"` string must fail before it is updated —
+  off != on), plus `python scripts/probe_cryptocom.py` printing
+  `unblocked=False` with a NAMED reason from a live run.
+- Blocked by: none. Nothing here is deployed or committed without a further
+  instruction; no deploy claim taken.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
