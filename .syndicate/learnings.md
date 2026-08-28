@@ -3551,60 +3551,72 @@ repeated the false claim to the user and to two peer sessions before checking.
   not a statement about `main`. Say the first and do not imply the second.
 
 
-### 2026-08-28 — FORBIDDEN: escalating a wrong-side money alarm on a property the code already handles, when the refuting numbers were in the log I had already read
+### 2026-08-28 — FORBIDDEN: treating a refuted MECHANISM as a refuted OBSERVATION. I disproved my own theory of how a wrong-side fill happened, and used that to dismiss the fill.
 
-A real filled order was reported as the wrong team: board row `h2h|home` on
-San Francisco, venue screen reading "Arizona ML", `aec-mlb-az-sf-2026-08-27`.
+**THIS ENTRY REPLACES THE ONE THAT STOOD HERE FOR SIX HOURS, WHICH WAS WRONG IN
+ITS CONCLUSION AND WOULD HAVE TAUGHT THE NEXT SESSION TO DISMISS A REAL ONE.**
+The superseded version was titled *"FORBIDDEN: escalating a wrong-side money
+alarm on a property the code already handles"* and concluded the alarm was
+false. It was not. Left in the history; do not restore it.
 
-I found that the venue's `outcomes` array was `["San Francisco Giants",
-"Arizona Diamondbacks"]` while the slug said `az-sf` — REVERSED relative to the
-slug — confirmed it against the live slate, saw it repeat across three dated
-markets for the fixture, and escalated to "systematic inversion, and the board
-priced the wrong team too."
+**What happened.** The user reported a filled order, `aec-mlb-az-sf-2026-08-27`,
+board `side=home` (San Francisco), as showing on Polymarket as "Arizona ML".
 
-**It meant nothing.** `aec-mlb-lad-atl` carries `["Los Angeles Dodgers",
-"Atlanta Braves"]`, matching ITS slug. Outcomes order simply is not slug order
-and varies per market — which `outcome_side_for_index`'s own docstring states,
-with its own measured example, which is exactly WHY the code matches on NAME
-and not position. I read a known-and-handled property as a smoking gun.
+I found the venue's `outcomes` array reversed relative to its slug, proposed
+that `outcomes[i]` and `outcomePrices[i]` were MISALIGNED, then tested that
+theory properly and refuted it — the totals markets give a sharp test, `under`
+at index 1 priced 0.445 against a planned 0.4444 where misalignment would read
+Over's ~0.555. Alignment proven at both indices.
 
-**The two facts that refuted me were in the first log I read.** (1) At submit,
-the venue's index-0 price was `0.48` against the board's independent
-`0.4808` — under misalignment index 0 would have carried Arizona's ~0.52. (2)
-The fill came at `0.38` when index-0 was `0.38`; Arizona was ~0.62 and cannot
-fill a 0.48 limit. Both were on screen before I proposed the misalignment
-theory, and I built the theory anyway because the user's screen outranked them
-in my head.
+**Then I concluded the fill was fine.** That step is the defect. Disproving my
+own mechanism said nothing about the user's observation, which never depended on
+my theory being right.
 
-**The test that should have been FIRST, because it has the most separation:**
-the TOTALS markets. `under` at index 1 priced `0.445` against planned `0.4444`;
-misaligned, it would read Over's ~`0.555`. Over/under are near-complementary,
-so that comparison separates by ~0.11 where the moneyline separates by ~0.04.
-Alignment proven at index 0 AND index 1. Second confirmation, already sitting
-in the reconciliation code as a measured table: a NO bought at `0.4545` came
-back `avgPx 0.55`, and `1-0.55 = 0.45` exact.
+**The truth, established by a parallel session and verified here:** SF won 6-1
+(MLB StatsAPI, `Arizona Diamondbacks 1 @ San Francisco Giants 6`, Final,
+`home_win=True`). The venue graded the order **lost**, pnl **-5.871** — exactly
+our cost basis — with `held_side=POSITION_RESOLUTION_SIDE_SHORT`. Across the
+settled ledger: polymarket h2h **5 agree, 3 MISMATCH**; polymarket totals 9/0;
+kalshi totals 4/0. A coin flip on h2h, and the totals path is immune only
+because it resolves by NAME (`over`->YES) where h2h has no name to fall back on.
+
+**THE CONFLATION THAT MADE IT PLAUSIBLE, and it is the reusable part.** There are
+TWO mappings here:
+
+    outcomes[i]  <->  outcomePrices[i]        (alignment)   -- I proved this
+    OUTCOME_SIDE_YES  <->  outcomes[0]        (the binding) -- I assumed this
+
+I proved the first and reported it as evidence about the second. They are
+independent, and only the second was ever in question. My follow-up argument —
+"a 0.38 fill is impossible for Arizona at 0.62" — inherits the same error, since
+it prices the leg using the alignment I proved rather than the binding I did
+not.
 
 **Rules:**
-1. **Before calling a venue property a bug, check whether the code's own
-   docstring already names it.** This one did, with a measured example, one
-   function above the line I was reading.
-2. **Rank candidate tests by SEPARATION before running them.** I ran the
-   moneyline comparison (0.04 apart) and treated it as inconclusive, when a
-   totals comparison (0.11 apart) was in the same log window and decisive.
-3. **A human screen-reading is evidence, not a verdict.** It outranks a
-   plausible number, it does not outrank two independent quantitative facts.
-   "Arizona ML" was the MARKET HEADING; the position was San Francisco.
-4. **On a money path, the cost of a wrong FIX is the bug itself.** Flipping
-   `_YES_OUTCOME_INDEX_DEFAULT` on this diagnosis would have inverted every
-   future order. Declining to write the fix was the only correct move
-   available, and it was available only because the diagnosis was not yet
-   confirmed. Confirm first is not caution here; it is the cheaper branch.
+1. **Refuting your own explanation is not refuting the report.** When a proposed
+   mechanism dies, the observation returns to unexplained — NOT to explained-away.
+   Say "I no longer know why" and keep the alarm open.
+2. **Name the mappings before claiming one is proven.** Write them down as
+   separate lines. Two adjacent index-keyed relations look like one fact and are
+   not.
+3. **A person looking at the venue outranks inference from our own logs, because
+   our logs cannot contain the answer.** The order row carries no outcome NAME —
+   measured keys are `action, avgPx, ..., marketSlug, outcomeSide, price, ...` —
+   so reading an order back only ever echoes the side we sent. When the only
+   independent observer is a human, their reading is the evidence, not the thing
+   to be explained away.
+4. **A settled ledger beats every live-price argument.** Three lines of
+   `held_side` and pnl against the real result ended a question that hours of
+   price reasoning could not. Go to settled outcomes first.
 
-What DOES survive: the venue's order row carries no outcome NAME — only
-`outcomeSide`, `marketSlug`, `avgPx` — so nothing in the system can
-independently state which team is held. This class has now been caught twice by
-a human looking at a screen and zero times by a machine. That is a real gap; it
-is not a live money risk, and it should not be described as one.
+**Still true from the superseded entry, and worth keeping:** the outcomes array
+being reversed relative to the slug means nothing on its own — `lad-atl` carries
+its outcomes in slug order and `az-sf` does not — because outcomes order is not
+slug order and `outcome_side_for_index`'s own docstring says so. That part was
+a genuine dead end. And the cost of a WRONG fix here is still the bug itself,
+so the correct response remains a named REFUSAL of `home`/`away` on this venue
+until the YES leg can be read by name, not a flip of
+`_YES_OUTCOME_INDEX_DEFAULT`.
 
 ## 2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "looks like the usual noise". A WARNING THAT IS USUALLY WRONG GETS TRAINED OUT — and two sessions proved it independently on the same night
 
