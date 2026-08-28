@@ -426,6 +426,59 @@ def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset
     return frozenset(proven)
 
 
+def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | None:
+    """The two clubs as an UNORDERED, canonical pair -- or None if unreadable.
+
+    --------------------------------------------------------------------------
+    WHY THIS EXISTS AND WHY IT MUST NOT USE `teams_match`
+    --------------------------------------------------------------------------
+
+    `POLYMARKET_ORIENTATION` reported `soccer|h2h` flipping 10 of 106 tried, and
+    10/106 is NOT the orientation rate. A row can fail to flip-match for a
+    reason that has nothing to do with orientation -- most obviously, the venue
+    never listed that fixture at all. Those rows sit in the denominator and
+    cannot possibly reach the numerator.
+
+    The denominator that makes it a rate is "rows whose fixture the venue lists,
+    orientation aside". That question has to be answered WITHOUT the
+    orientation-sensitive matcher, or it answers itself: `_teams_match` in
+    either orientation is exactly what the flip test already does, so defining
+    eligibility that way would make the rate 100% by construction and mean
+    nothing.
+
+    So this uses `canonical_team` on each token independently and compares the
+    two clubs as a SET. Order cannot affect a set, which is the whole point.
+
+    **IT IS A LOWER BOUND, STATED HERE SO THE NUMBER IS NOT OVER-READ.**
+    `canonical_team` is stricter than `teams_match`: measured 2026-08-28,
+    `canonical_team('soccer', 'rrc')` is None while
+    `teams_match('soccer', 'rrc', 'Real Racing Club de Santander')` is True. A
+    fixture whose venue tri-code will not canonicalise returns None here and is
+    counted as UNREADABLE rather than as absent -- "listed but we cannot read
+    it" and "not listed" are different facts and must not share a bucket, which
+    is the same conflation `no_match` itself makes one level up.
+    """
+    if str(sport or "").strip().lower() != "soccer":
+        # Only soccer needs this today, and canonicalising every MLB/NFL market
+        # would cost a resolver call per market for a question nobody asks of
+        # them. Non-soccer rows report as unreadable, which reads correctly:
+        # this counter has nothing to say about them.
+        return None
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        a, b = canonical_team("soccer", home), canonical_team("soccer", away)
+    except Exception:  # noqa: BLE001
+        return None
+    if not a or not b or a == b:
+        # `a == b` would collapse a fixture to a one-element set and match any
+        # other self-pair, which is a wrong answer rather than a missing one.
+        return None
+    return frozenset((a, b))
+
+
 def _has_segment(modifiers: Sequence[str]) -> bool:
     """A period/quarter/half qualifier. `1q`, `2h`, `1p`, `f5`.
 
@@ -638,6 +691,12 @@ def join_polymarket_to_board(
     # `<league>|<market>`. Without it, a sport absent from the rescue counter
     # above is indistinguishable from a sport the flip never ran on.
     orientation_flip_attempts: dict[str, int] = {}
+    # THE ELIGIBILITY SPLIT. `listed` is the denominator that makes
+    # `flipped` a rate; `not_listed` is coverage; `unreadable` is the
+    # honest third bucket where we cannot tell. See `_canonical_fixture`.
+    orientation_listed: dict[str, int] = {}
+    orientation_not_listed: dict[str, int] = {}
+    orientation_unreadable: dict[str, int] = {}
     orientation_flip_samples: list[dict[str, Any]] = []
 
     for row in markets:
@@ -724,7 +783,16 @@ def join_polymarket_to_board(
         key = (row_league, parsed["date"], board_market)
         index.setdefault(key, []).append(
             {"parsed": parsed, "row": row, "outcomes": outcomes,
-             "line": _line_from_modifiers(parsed["modifiers"])}
+             "line": _line_from_modifiers(parsed["modifiers"]),
+             # THE FIXTURE AS AN UNORDERED PAIR OF CANONICAL CLUB NAMES, or
+             # None when either token will not canonicalise. Computed ONCE per
+             # market here rather than per unmatched row, which is the
+             # difference between one pass over ~17k markets and a nested scan.
+             #
+             # Deliberately NOT `teams_match`: see `_canonical_fixture`.
+             "canon_pair": _canonical_fixture(
+                 row_league, parsed.get("home"), parsed.get("away")
+             )}
         )
 
     matches: list[dict[str, Any]] = []
@@ -812,6 +880,48 @@ def join_polymarket_to_board(
             # without ground truth is the `pos`/`neg` trap in a new costume: a
             # confident bet on the wrong team. This produces the rate that
             # decides whether the question is worth chasing, and nothing else.
+            # ---------------------------------------------------------------
+            # IS THIS FIXTURE LISTED AT ALL, ORIENTATION ASIDE?
+            # ---------------------------------------------------------------
+            #
+            # The denominator that turns `flipped/tried` into a rate. Three
+            # outcomes, kept apart because they imply different work:
+            #
+            #   listed     -> the venue has this fixture; if it still did not
+            #                 pair, orientation is a live explanation
+            #   not_listed -> a COVERAGE gap. No join change can recover it.
+            #   unreadable -> the venue lists fixtures here we cannot
+            #                 canonicalise, so eligibility is UNKNOWN for this
+            #                 row. Counted separately rather than folded into
+            #                 `not_listed`, because guessing which one it is
+            #                 is how `no_match` came to mean two things.
+            board_pair = _canonical_fixture(
+                board_row.get("sport") or sport,
+                board_row.get("home") or board_row.get("home_team"),
+                board_row.get("away") or board_row.get("away_team"),
+            )
+            eligibility_key = f"{league}|{board_market}"
+            if board_pair is None:
+                orientation_unreadable[eligibility_key] = (
+                    orientation_unreadable.get(eligibility_key, 0) + 1
+                )
+            else:
+                readable = [c for c in candidates if c.get("canon_pair")]
+                if any(c["canon_pair"] == board_pair for c in readable):
+                    orientation_listed[eligibility_key] = (
+                        orientation_listed.get(eligibility_key, 0) + 1
+                    )
+                elif readable:
+                    orientation_not_listed[eligibility_key] = (
+                        orientation_not_listed.get(eligibility_key, 0) + 1
+                    )
+                else:
+                    # Our side reads fine; not one candidate in the bucket does.
+                    # That is a venue-vocabulary gap, not a coverage answer.
+                    orientation_unreadable[eligibility_key] = (
+                        orientation_unreadable.get(eligibility_key, 0) + 1
+                    )
+
             _row_attempted = False
             for candidate in candidates:
                 if board_market in {"spreads", "totals"}:
@@ -958,6 +1068,15 @@ def join_polymarket_to_board(
         ),
         "orientation_flip_attempts": dict(
             sorted(orientation_flip_attempts.items(), key=lambda kv: -kv[1])
+        ),
+        "orientation_fixture_listed": dict(
+            sorted(orientation_listed.items(), key=lambda kv: -kv[1])
+        ),
+        "orientation_fixture_not_listed": dict(
+            sorted(orientation_not_listed.items(), key=lambda kv: -kv[1])
+        ),
+        "orientation_fixture_unreadable": dict(
+            sorted(orientation_unreadable.items(), key=lambda kv: -kv[1])
         ),
         "orientation_flip_samples": orientation_flip_samples,
         # Competitions no board row can reach, with the club codes that would

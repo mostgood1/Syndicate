@@ -959,3 +959,112 @@ def test_a_row_with_no_line_compatible_candidate_is_NOT_counted_as_tried():
     }]
     out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
     assert out["orientation_flip_attempts"] == {}
+
+
+def _soccer_market(slug, mtype="SPORTS_MARKET_TYPE_MONEYLINE"):
+    return {"slug": slug, "sportsMarketTypeV2": mtype,
+            "outcomes": '["Yes","No"]', "outcomePrices": '["0.40","0.60"]'}
+
+
+def _soccer_board(home, away, market="h2h", **over):
+    row = {"market": market, "side": "home", "sport": "soccer",
+           "selected_date": "2026-08-28", "home_team": home, "away_team": away,
+           "event_id": "e1"}
+    row.update(over)
+    return row
+
+
+def test_a_fixture_the_venue_LISTS_but_could_not_pair_is_the_real_denominator(monkeypatch):
+    """`flipped / tried` is not a rate; `flipped / listed` is.
+
+    A board row whose fixture the venue never listed sits in `tried` and can
+    never reach the numerator. Production reported `soccer|h2h` 10 of 106 tried
+    — and 106 included fixtures Polymarket does not carry at all.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    canon = {"cry": "crystal palace", "mnc": "manchester city",
+             "Crystal Palace": "crystal palace", "Manchester City": "manchester city"}
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+
+    markets = [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")]
+    board = [_soccer_board("Crystal Palace", "Manchester City")]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+
+    assert out["orientation_fixture_listed"].get("soccer|h2h") == 1
+    assert out["orientation_fixture_not_listed"] == {}
+
+
+def test_a_fixture_the_venue_DOES_NOT_LIST_is_coverage_not_a_join_defect(monkeypatch):
+    """The 96. No join change recovers these, and they must not inflate the
+    denominator that judges orientation."""
+    import syndicate.features.shared.team_aliases as aliases
+
+    canon = {"cry": "crystal palace", "mnc": "manchester city",
+             "Everton": "everton", "Arsenal": "arsenal"}
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+
+    markets = [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")]
+    board = [_soccer_board("Everton", "Arsenal")]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+
+    assert out["orientation_fixture_not_listed"].get("soccer|h2h") == 1
+    assert out["orientation_fixture_listed"] == {}
+
+
+def test_an_UNREADABLE_club_token_is_its_own_bucket_not_counted_as_absent(monkeypatch):
+    """"Listed but we cannot read it" and "not listed" are different facts.
+
+    `canonical_team('soccer','rrc')` is None while
+    `teams_match('soccer','rrc','Real Racing Club de Santander')` is True — so a
+    fixture can be present and still fail to canonicalise. Folding that into
+    `not_listed` would be the same conflation `no_match` already makes.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    canon = {"Elche CF": "elche", "Real Racing Club de Santander": "racing santander"}
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+
+    markets = [_soccer_market("atc-soccer-rrc-elc-2026-08-28-rrc")]
+    board = [_soccer_board("Real Racing Club de Santander", "Elche CF")]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+
+    assert out["orientation_fixture_unreadable"].get("soccer|h2h") == 1
+    assert out["orientation_fixture_not_listed"] == {}
+    assert out["orientation_fixture_listed"] == {}
+
+
+def test_eligibility_is_ORDER_INDEPENDENT_or_it_answers_its_own_question(monkeypatch):
+    """The load-bearing property.
+
+    Eligibility must NOT be decided by the orientation-sensitive matcher — that
+    is what the flip test already does, and defining the denominator that way
+    would make the rate 100% by construction. Comparing canonical clubs as a
+    SET is what keeps the two independent, so a listed fixture reads as listed
+    whichever way round the slug puts it.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    canon = {"cry": "crystal palace", "mnc": "manchester city",
+             "Crystal Palace": "crystal palace", "Manchester City": "manchester city"}
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    # `_teams_match` falls back to `soccer_fixture_clubs` for soccer, and the
+    # REAL one reads the club artifacts. Left unstubbed it paired one of the two
+    # orientations for real, so that row never reached the unmatched branch and
+    # the test compared a bookkeeping counter against a row that had matched.
+    # Both rows must be unmatched for this comparison to mean anything.
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+
+    board = [_soccer_board("Crystal Palace", "Manchester City")]
+    forward = mod.join_polymarket_to_board(
+        [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")], board,
+        selected_date="2026-08-28")
+    reverse = mod.join_polymarket_to_board(
+        [_soccer_market("atc-soccer-mnc-cry-2026-08-28-mnc")], board,
+        selected_date="2026-08-28")
+
+    assert forward["orientation_fixture_listed"] == reverse["orientation_fixture_listed"] == {"soccer|h2h": 1}

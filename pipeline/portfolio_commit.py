@@ -266,6 +266,17 @@ def _polymarket_price_resolver(selected_date: str | None):
         "[portfolio_commit] POLYMARKET_ORIENTATION"
         f" would_match_if_flipped={joined.get('orientation_flip_counts')}"
         f" tried={joined.get('orientation_flip_attempts')}"
+        # THE ELIGIBILITY SPLIT, and `listed` is the denominator that makes
+        # `would_match_if_flipped` a RATE. `flipped/tried` is not one:
+        # a row whose fixture the venue never listed sits in `tried` and can
+        # never reach the numerator. Read `listed` first, then
+        # flipped/listed. `not_listed` is coverage and no join change
+        # recovers it; `unreadable` is the honest bucket where a club token
+        # would not canonicalise on one side or the other, so eligibility is
+        # UNKNOWN -- never fold it into `not_listed`.
+        f" listed={joined.get('orientation_fixture_listed')}"
+        f" not_listed={joined.get('orientation_fixture_not_listed')}"
+        f" unreadable={joined.get('orientation_fixture_unreadable')}"
         f" samples={joined.get('orientation_flip_samples')}",
         flush=True,
     )
