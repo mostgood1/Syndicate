@@ -2240,6 +2240,43 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `VENUE_REPRICE_KEYS` `unmatched_by_sport` and `stamped` for soccer/mlb/nfl
   before and after, and must NOT treat a fall in `stamped` as a regression
   without checking `unmatched_by_sport_sample` for what stopped matching.
+- **NEAR-MISS, CAUGHT BY MESSAGE, 2026-08-27 21:0xZ CT.** `venue-refresh-decoupling`
+  acquired the refresh-worker claim at `target=a818f771` five minutes after my
+  push — the tip of `main`, which CONTAINS `1c37c220`. Their claim reason named
+  an env pickup (`SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS=300`) and a clean
+  post-boot baseline; nothing in it suggested they knew a venue key-derivation
+  narrowing had landed in that SHA. refresh-worker is the service that RUNS
+  `apply_venue_quotes`. I messaged them before the deploy fired; **they re-pinned
+  to `635f869d`** — the SHA already live, zero code delta, env vars injected at
+  deploy time regardless — so **nothing of mine shipped under their claim.**
+- **THEIR ARGUMENT WAS BETTER THAN MINE AND CORRECTS IT.** I told them my change
+  could not touch their CADENCE reading. True, and too narrow. Their other
+  reading is COMPUTE ATTRIBUTION — whether the venue loop moved board compute
+  614-782s -> 1061s — and `_candidate_keys` narrowing changes how much work
+  `apply_venue_quotes` does INSIDE the interval they are timing. Less work in the
+  venue join is exactly a number that would move for a reason that is not theirs.
+  It is not orthogonal to their diagnostic; it lands in the middle of it. Recorded
+  because I offered a clean bill I was not entitled to offer: "cannot touch your
+  verification criterion" is not the same claim as "cannot touch your
+  measurement", and I conflated them.
+- **A CONFOUND NOW EXISTS FOR MY OWN BEFORE/AFTER, AND I RE-DERIVED IT RATHER
+  THAN TAKING IT ON REPORT.** They set `SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS`
+  120 -> 300 on refresh-worker. Read directly off `/v1/services/<id>/env-vars`
+  (2 pages, paginated per CLAUDE.md): `SYNDICATE_KALSHI_REFRESH_INTERVAL_SECONDS
+  = '300'`, and alongside it `SYNDICATE_VENUE_ODDS_LOOP_ENABLED = '1'`. INERT
+  until their deploy lands, per `render_env_needs_deploy` — a restart does not
+  re-inject. After it does, Kalshi refreshes roughly half as often (they measured
+  a single refresh at 80-143s against the old 120s interval, i.e. near-continuous
+  fetching). **So any `VENUE_REPRICE_KEYS` freshness or quote-age reading taken
+  after their deploy is confounded for a reason that is theirs, and any `stamped`
+  / `unmatched_by_sport` reading is confounded for a reason that is mine.** The
+  two must not be read off the same deploy.
+- **A SECOND READING IS OWED AND IS NOT THE SAME AS THE FIRST.** The soccer
+  volume question (`stamped` / `unmatched_by_sport` falling) is a MISSED-match
+  question. The nhl/ncaaf/ncaab half is a WRONG-match question — `_alias_map` is
+  empty there, so `ncaaf|h2h|state` was being offered against a sport-wide quote
+  pool — and a wrong match surfaces as a plausible number nowhere, not as a bad
+  one. It cannot be read off the same counter and deserves its own deploy.
 - SCOPE NOTE, not taken: `venue-quote-line-join` records two UNFIXED items on
   these files (a totals key that names no game; the 842-row zero-match builds).
   Out of scope here.
