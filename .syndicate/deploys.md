@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-08-28 — web `56e77588`: the live-gameline collector moves off the laptop (refresh-worker STILL PENDING)
+
+**web `56e77588`** `dep-da8prrrtqb8s73eulreg`, trigger=api, live **`14:47:09.68Z`**.
+Preflight `CLEAR` for the exact SHA ("only infrastructure processes running"),
+claim held by `live-game-line-projection` and released after. Carried
+`74f026a9` plus 13 other lanes' work — **the user approved that batch
+explicitly** after being shown web was 14 commits behind.
+
+**verify MET — `off != on` on the allowlist gate, one fetch each, same directory:**
+
+```
+allowlisted (mine)   ?path=mlb_source/data/live_gameline_accuracy/live_gameline_accuracy_mlb.jsonl
+                     -> http=200  {"artifacts":{},"count":0,"ok":true}
+control (unlisted)   ?path=mlb_source/data/live_gameline_accuracy/notes.txt
+                     -> http=403  {"error":"path is not an allowed hot artifact."}
+```
+
+Same directory, same token, same instant — so the discriminator is the PATTERN,
+not the directory or the auth. Before this deploy the first URL answered 403 too.
+
+**`count: 0` IS THE CORRECT READING AND IS NOT THE FEATURE WORKING.** The file
+is written by `book_grid_artifact` on **refresh-worker**, which has NOT been
+deployed (see below). Zero artifacts is what "web can now read a file nobody
+has written yet" looks like. Do not record this as the capture working.
+
+### OPEN — refresh-worker is NOT on this SHA
+
+refresh-worker ran `69d940e0` at the time of writing. The claim was held by
+`ncaaf-settlement-resolver` (re-acquired 14:47:14Z, so ACTIVE, not stale) and
+was **not forced**.
+
+**Ordering, for whoever gets there:** `234c9e81` is an ANCESTOR of `56e77588`,
+so deploying 56e77588 to refresh-worker is cumulative — it carries the NCAAF
+settlement work too. The reverse is not: 234c9e81 applied after 56e77588 drops
+4 commits. Serialisation orders deploys, it does not compose them.
+
+That reverse is additionally blocked by tooling, not just by care:
+`render_deploy.py` re-reads the live SHA at deploy time and refuses a target
+that is not a descendant, absent `--allow-rollback`.
+
+I could not coordinate by message — `send_message` is unavailable from a
+scheduled-task session, which is what this one is.
+
+### What will and will NOT be provable when refresh-worker lands today
+
+`record_live_gameline_score` returns early with `written=0,
+reason=no_games_with_outcome` when no game on the grid is final. Today's MLB
+slate had not started. So the deploy proves **reachability** — a
+`live_gameline_accuracy` block present on the board payload means the build ran
+the new code — and nothing more. **The first `written=1` needs a game to go
+final tonight, and that is a separate reading.**
+
+When it does arrive: `written=0` with `skipped_not_improved=1` is the HEALTHY
+steady state, not a failure. `previous_best` is the discriminator.
+
+
 ## 2026-08-28 — live-odds-worker `8edf77e5` + web `6a72040b`: tiles follow the date, and the unknown-order probe reports
 
 **web `6a72040b`** `dep-da8fpjrbc2fs73a4qa40`, live `03:16:40Z`. **verify MET**
