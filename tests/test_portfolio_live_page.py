@@ -389,6 +389,54 @@ def test_the_settled_tile_adds_up_to_the_positions_count(live_env):
     ) == positions
 
 
+def test_a_REJECTED_order_is_not_called_unknown(live_env):
+    """THE CASE THAT SHIPPED WRONG, 2026-08-28.
+
+    The `unknown` bucket first asked only `_is_venue_refusal`, which covers a
+    4xx the venue answered but NOT `rejected` -- an order that never reached a
+    venue at all. Production then reported **63** orders as "unknown,
+    submitted, never confirmed at the venue" when the true figure was 2, and
+    the tile row summed to 150 against 89 positions.
+
+    Every test in the suite passed, because not one of them put a `rejected`
+    row in front of the counter. This is that row.
+    """
+    live_env["orders"] = [
+        _order(idempotency_key="w", position_key="w", outcome="won"),
+        # Never reached the venue: not a position, and not "unknown" either.
+        _order(idempotency_key="rej", position_key="rej", status="rejected",
+               error="OrderBuildError: no_venue_ticker",
+               fill_price=None, fill_stake_dollars=None),
+        # Errored with no venue answer: genuinely unknown.
+        _order(idempotency_key="u", position_key="u", status="failed",
+               error="ReadTimeout", fill_price=None, fill_stake_dollars=None),
+    ]
+    payload = intelligence_bp._live_portfolio_payload(DATE, on_date="all")
+    st = (payload["settlement"] or {}).get("total") or {}
+    assert st["unknown"] == 1, "a rejected order is not an unknown one"
+    assert payload["position_count_all_dates"] == 2
+    assert (
+        st["won"] + st["lost"] + st["push"] + st["pending"] + st["unknown"]
+    ) == payload["position_count_all_dates"]
+
+
+def test_every_reader_shares_one_definition_of_not_a_position():
+    """Three readers ask this: the page, the day's budget, and the settlement
+    summary. The settlement summary asking only half of it is what produced the
+    63. Identity, not equality -- two functions that agree today drift."""
+    from syndicate.features.shared.execution_guard import is_non_position
+    from syndicate.blueprints import intelligence as bp
+
+    rejected = {"status": "rejected", "error": "OrderBuildError: no_venue_ticker"}
+    refused = {"status": "failed", "error": "http_404: market_not_found"}
+    timed_out = {"status": "failed", "error": "ReadTimeout"}
+    for row in (rejected, refused):
+        assert is_non_position(row) is True
+        assert bp._is_non_position(row) is True
+    assert is_non_position(timed_out) is False
+    assert bp._is_non_position(timed_out) is False
+
+
 def test_an_unconfirmed_submit_is_not_quietly_called_pending(app_client, live_env):
     """Calling it `pending` would assert we hold a position; dropping it would
     assert we do not. It is neither -- it is the row somebody has to check at

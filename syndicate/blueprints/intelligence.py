@@ -3756,11 +3756,9 @@ def _is_non_position(order) -> bool:
     that line for the day's budget, and reusing it keeps the page and the cap
     telling one story instead of two functions drifting apart.
     """
-    from syndicate.features.shared.execution_guard import _is_venue_refusal
+    from syndicate.features.shared.execution_guard import is_non_position
 
-    if str(order.get("status") or "") == "rejected":
-        return True
-    return _is_venue_refusal(order)
+    return is_non_position(order)
 
 
 def _live_health(payload: Mapping[str, Any]) -> dict[str, Any]:

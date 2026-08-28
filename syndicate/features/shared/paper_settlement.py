@@ -757,7 +757,7 @@ def settlement_summary(
     and opposite facts.
     """
     from syndicate.features.shared.execution_ledger import _load
-    from syndicate.features.shared.execution_guard import _is_venue_refusal
+    from syndicate.features.shared.execution_guard import is_non_position
 
     rows = list(orders) if orders is not None else (_load().get("orders") or [])
     if selected_date:
@@ -797,7 +797,7 @@ def settlement_summary(
             # only.
             if str(order.get("status") or "") == "filled":
                 bucket["pending"] += 1
-            elif not _is_venue_refusal(order):
+            elif not is_non_position(order):
                 bucket["unknown"] += 1
             continue
         bucket["settled"] += 1
@@ -971,7 +971,7 @@ def _grouped(rows: Sequence[Mapping[str, Any]], key_fn) -> list[dict[str, Any]]:
     rule the venue breakdown uses, so the three cuts are directly comparable
     rather than three slightly different questions.
     """
-    from syndicate.features.shared.execution_guard import _is_venue_refusal
+    from syndicate.features.shared.execution_guard import is_non_position
 
     buckets: dict[str, dict[str, Any]] = {}
     for order in rows:
@@ -993,7 +993,7 @@ def _grouped(rows: Sequence[Mapping[str, Any]], key_fn) -> list[dict[str, Any]]:
             # there for why an unconfirmed submit is neither pending nor gone.
             if str(order.get("status") or "") == "filled":
                 bucket["pending"] += 1
-            elif not _is_venue_refusal(order):
+            elif not is_non_position(order):
                 bucket["unknown"] += 1
             continue
         bucket["settled"] += 1

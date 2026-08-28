@@ -202,6 +202,28 @@ def _is_venue_refusal(order: Mapping[str, Any]) -> bool:
     return bool(_VENUE_REFUSED_ERROR.search(str(order.get("error") or "")))
 
 
+def is_non_position(order: Mapping[str, Any]) -> bool:
+    """An order that never opened a position. THE one definition.
+
+    `rejected` never reached the venue at all. `failed` is the harder case -- a
+    submit that TIMED OUT may well have landed, which is what the write-ahead
+    record exists for -- so only a failure the venue ANSWERED (a 4xx) is
+    certainly not a position.
+
+    LIVES HERE BECAUSE THREE READERS NEED IT and a fourth definition is how
+    they drift. The page (`intelligence._is_non_position`), the day's budget,
+    and the settlement summary all ask this question; on 2026-08-28 the
+    settlement summary asked only half of it -- `_is_venue_refusal` without the
+    `rejected` clause -- and reported 63 orders as "unknown, submitted, never
+    confirmed at the venue" when the true figure was 2. Every `rejected` row,
+    which by definition never reached a venue, was being described to the
+    reader as possibly-live money.
+    """
+    if str(order.get("status") or "") == "rejected":
+        return True
+    return _is_venue_refusal(order)
+
+
 def _float_env(name: str, default: float) -> float:
     raw = os.environ.get(name)
     if raw is None or not str(raw).strip():
