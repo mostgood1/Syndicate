@@ -287,3 +287,67 @@ def test_a_TRANSIENT_read_failure_still_merges_instead_of_clobbering(monkeypatch
     assert after["theirs"].get("outcome") == "won"
     assert after["ours"].get("reconciled_at") == "now"
     assert "MERGE_READ_FAILED" not in capsys.readouterr().out
+
+
+def test_a_blind_write_is_STAMPED_into_the_document_not_only_logged(monkeypatch):
+    """A log line is ephemeral; this repo has burned itself on log-only evidence
+    more than once. A 03:00 blind write nobody was watching for should still be
+    discoverable at 09:00.
+
+    Raised by lane `venue-join-refusal-visibility`. Same instinct as
+    `reclassified_from` and `fill_stake_dollars_before_repair`: keep the fact
+    that a correction happened, not just the correction.
+    """
+    _seed("row")
+    state = ledger._load()
+    state["orders"][0]["outcome"] = "won"
+
+    real_load = ledger._load
+
+    def _always_broken():
+        raise ledger.LedgerError("store down")
+
+    # NOT `monkeypatch.undo()`: the autouse fixture shares this monkeypatch
+    # instance, so undoing here also reverts SYNDICATE_REPORTS_ROOT and the
+    # read lands on a different, empty ledger. Keeping a reference to the real
+    # loader is the narrower tool.
+    monkeypatch.setattr(ledger, "_load", _always_broken)
+    ledger._persist(state)
+    monkeypatch.setattr(ledger, "_load", real_load)
+
+    stamp = ledger._load()["last_blind_write"]
+    assert stamp is not None
+    assert stamp["reason"] == "merge_read_failed_after_retries"
+    assert stamp["at"]
+    # And it is reachable where somebody diagnosing would look.
+    assert ledger.ledger_summary()["last_blind_write"]["reason"] == (
+        "merge_read_failed_after_retries"
+    )
+
+
+def test_the_stamp_SURVIVES_later_healthy_writes():
+    """A successful merge later does not un-lose what the blind one dropped.
+    `_load` builds a fresh dict, so a field it does not name is one the next
+    `_persist` silently erases -- which is how this stamp would have been
+    write-only."""
+    _seed("row")
+    state = ledger._load()
+    state["last_blind_write"] = {"at": "2026-08-28T03:00:00Z", "reason": "x"}
+    ledger._persist(state)
+
+    for _ in range(3):
+        healthy = ledger._load()
+        healthy["orders"][0]["status"] = "filled"
+        ledger._persist(healthy)
+
+    assert ledger._load()["last_blind_write"]["at"] == "2026-08-28T03:00:00Z"
+
+
+def test_a_healthy_ledger_reports_no_blind_write():
+    """The control. A stamp that were always present would carry no signal."""
+    _seed("row")
+    state = ledger._load()
+    state["orders"][0]["outcome"] = "won"
+    ledger._persist(state)
+    assert ledger._load()["last_blind_write"] is None
+    assert ledger.ledger_summary()["last_blind_write"] is None

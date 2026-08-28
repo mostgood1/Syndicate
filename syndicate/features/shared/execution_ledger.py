@@ -315,12 +315,17 @@ def _load() -> dict[str, Any]:
         # than degrades.
         raise LedgerError(f"execution ledger unreadable: {type(exc).__name__}: {exc}") from exc
     if not isinstance(payload, Mapping):
-        return {"orders": [], "created_at": _utc_now(), _BASELINE_KEY: {}}
+        return {"orders": [], "created_at": _utc_now(), "last_blind_write": None, _BASELINE_KEY: {}}
     orders = payload.get("orders")
     rows = [dict(o) for o in orders if isinstance(o, Mapping)] if isinstance(orders, list) else []
     return {
         "orders": rows,
         "created_at": payload.get("created_at") or _utc_now(),
+        # CARRIED, because a later healthy merge does not un-lose whatever a
+        # blind write may have dropped. `_load` builds a fresh dict, so a field
+        # it does not name is a field the next `_persist` silently erases --
+        # which is how this stamp would have been write-only.
+        "last_blind_write": payload.get("last_blind_write"),
         # WHAT THE STORE HELD WHEN WE READ IT. `_persist` diffs against this to
         # decide which rows are ours to write and which belong to whoever else
         # has touched the ledger since.
@@ -612,6 +617,31 @@ def _persist(state: dict[str, Any]) -> dict[str, Any]:
     baseline = state.pop(_BASELINE_KEY, None)
     orders, merge_counts = _merge_onto_current(state.get("orders") or [], baseline)
     state["orders"] = orders
+    if merge_counts.get("merge_failed"):
+        # STAMPED INTO THE DOCUMENT, NOT ONLY LOGGED.
+        #
+        # Raised by lane `venue-join-refusal-visibility`: a log line is
+        # ephemeral, and this repo has burned itself on log-only evidence more
+        # than once -- Render's log API is spotty and a 03:00 blind write that
+        # nobody was watching for leaves no trace at all. So the fact that a
+        # write MAY have lost concurrent edits survives as state.
+        #
+        # Same instinct as `reclassified_from`, `fill_stake_dollars_before_
+        # repair` and `pre_resolution_status`: keep the fact that a correction
+        # happened, not just the correction.
+        #
+        # NOT SURFACED AS A BANNER. `[user 2026-08-28]` has just been shown why
+        # an un-actionable red state is worse than none -- there is no operator
+        # action that repairs a lost update, so this is evidence for whoever is
+        # diagnosing, reachable through `ledger_summary`, and nothing more.
+        state["last_blind_write"] = {
+            "at": _utc_now(),
+            "reason": "merge_read_failed_after_retries",
+            "orders_written": len(orders),
+        }
+    # No `else` branch: `_load` carries `last_blind_write` forward, so a healthy
+    # write preserves it rather than clearing it. A successful merge later does
+    # not un-lose whatever the blind one may have dropped.
     if merge_counts.get("concurrent") or merge_counts.get("merge_failed"):
         # WHAT THE MERGE ACTUALLY RESCUED. Printed only when the store had
         # changed under us, because a line on every write would be constant
@@ -2126,6 +2156,10 @@ def ledger_summary(selected_date: str | None = None) -> dict[str, Any]:
         "orders": len(orders),
         "by_status": dict(sorted(by_status.items())),
         "filled_stake_dollars": round(staked, 2),
+        # `None` on a healthy ledger. Non-null means a persist could not read
+        # the current document and wrote blind, so concurrent edits from the
+        # other service may have been lost at that timestamp. See `_persist`.
+        "last_blind_write": (_load() or {}).get("last_blind_write"),
         "modes": sorted({str(o.get("mode") or "unknown") for o in orders}),
         "unreconciled": sum(1 for o in orders if o.get("status") == STATUS_SUBMITTED),
     }
