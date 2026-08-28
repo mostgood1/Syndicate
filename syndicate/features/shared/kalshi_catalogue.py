@@ -936,6 +936,93 @@ def auto_game_series_from_catalogue(titles: Mapping[str, Any]) -> dict[str, str]
     return found
 
 
+# WHICH PORTION OF THE GAME A SERIES SETTLES ON.
+#
+# `KXMLBTOTAL` is the WHOLE GAME; `KXMLBF5TOTAL` is the first five innings. They
+# are different contracts on the same fixture at the same line, and nothing in
+# the board join distinguished them until 2026-08-28.
+#
+# MEASURED, real money: five orders carrying `segment=first3`/`first5` were
+# placed on full-game `KXMLBTOTAL` tickets, $7.08 staked.
+#
+#     first3  under 2.5   KXMLBTOTAL-26AUG281940TEXMIL-3   +1900, 5c
+#     first3  under 2.5   KXMLBTOTAL-26AUG282138PHILAA-3   +1900, 5c
+#     first3  under 2.5   KXMLBTOTAL-26AUG281845MIAWSH-3   +1900, 5c
+#     first3  under 2.5   KXMLBTOTAL-26AUG281840LADDET-3   +1567, 6c
+#     first5  under 3.5   KXMLBTOTAL-26AUG281840LADDET-4   +567,  15c
+#
+# THE PRICES ARE THE TELL AND THEY LOOK LIKE FREE MONEY. The model priced "under
+# 2.5 runs through three innings" -- an ordinary proposition -- and compared it
+# against the venue's price for "under 2.5 runs in nine", which is correctly ~5c
+# because it almost never happens. The entire apparent edge is the two numbers
+# describing different events. All five will lose.
+#
+# A TABLE, NOT A PREFIX RULE. `KXMLBF5` and `KXMLBF5TOTAL` and `KXMLBF5SPREAD`
+# are three markets, and a `startswith("KXMLBF5")` test would fold the moneyline
+# into the total. Unknown series return None, which the caller treats as
+# "cannot say" and refuses -- an unknown must not land on the permissive branch.
+_SERIES_SEGMENT: dict[str, str] = {
+    # First five innings. Kalshi's own titles: 'First 5 innings: Over 6.5 runs',
+    # 'Texas wins first 5 innings by over 2.5 runs?', 'first 5 innings tie'.
+    "KXMLBF5TOTAL": "first5",
+    "KXMLBF5SPREAD": "first5",
+    "KXMLBF5": "first5",
+    # Whole game.
+    "KXMLBTOTAL": "full",
+    "KXMLBSPREAD": "full",
+    "KXMLBGAME": "full",
+    "KXNBATOTAL": "full",
+    "KXNFLTOTAL": "full",
+    "KXNCAAFTOTAL": "full",
+    "KXNCAABTOTAL": "full",
+    "KXWNBAGAME": "full",
+}
+
+# The board's word for "the whole game". Rows carry `segment` and an absent one
+# means full -- the same default `_game_line_from_final_box` uses.
+FULL_GAME_SEGMENT = "full"
+
+
+# Tokens that mean "this series settles on PART of a game". A series carrying
+# one of these that is NOT in the table above is a segment market we have never
+# seen, and it must refuse rather than default.
+#
+# THE DEFAULT FOR EVERYTHING ELSE IS `full`, AND THAT IS DELIBERATE. The first
+# version of this refused every unmapped series, which would have unindexed the
+# entire player-prop book -- `KXMLBKS`, `KXWNBAREB`, `KXMLBHIT` and every other
+# prop series is absent from the table and inherently whole-game. Refusing them
+# would have traded a $7.08 defect for no Kalshi orders at all. Caught by
+# `test_the_price_resolver_is_keyed_as_tightly_as_the_join`, which failed
+# because a match record carried no `series` -- and that failure was itself the
+# discovery that NEITHER match record carried one.
+#
+# So the protection lives on the BOARD side of the key: a row saying `first3`
+# cannot match a contract saying `full`, whatever the venue series is called.
+# This list only closes the MIRROR failure -- a whole-game row matching a
+# segment contract we failed to recognise.
+_SEGMENT_MARKERS = ("F5", "INNING", "1H", "2H", "H1", "H2", "Q1", "Q2", "Q3", "Q4")
+
+
+def segment_for_series(series: Any) -> str | None:
+    """Which portion of the game this series settles on.
+
+    `full` for anything unrecognised that does not LOOK like a segment market,
+    because the prop book is whole-game and enumerating every prop series would
+    be a table that silently breaks the day Kalshi adds one.
+
+    `None` -- meaning refuse -- only when the name carries a segment marker we
+    cannot resolve. An unknown that looks like a segment is the one case where
+    guessing `full` reopens the defect from the other direction.
+    """
+    key = str(series or "").strip().upper()
+    known = _SERIES_SEGMENT.get(key)
+    if known is not None:
+        return known
+    if any(marker in key for marker in _SEGMENT_MARKERS):
+        return None
+    return FULL_GAME_SEGMENT
+
+
 def sport_for_series(series: Any) -> str | None:
     """The sport, or None. Hand registry first, then anything discovery added.
 

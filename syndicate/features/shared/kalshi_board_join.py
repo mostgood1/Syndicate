@@ -109,6 +109,17 @@ REASON_SPREAD_ORIENTATION = "spread_line_orientation_mismatch"
 # silently mis-dated instead of refused.
 REASON_UNDATABLE = "no_game_date_in_ticker"
 
+# The board row is for part of a game and this venue market is for a different
+# part -- or for a part we cannot name. NOT a match, and NOT silent.
+#
+# `#600`-adjacent in shape but a different defect: `_match_key`/`_row_key` were
+# five-tuples with no `segment`, so a board row for "under 2.5, first 3 innings"
+# matched Kalshi's FULL-GAME `KXMLBTOTAL` on game + market + line + side, and
+# nothing checked that the contract covers a different portion of the game.
+# Measured 2026-08-28: five orders, $7.08, all segment bets on full-game
+# tickets. See `kalshi_catalogue._SERIES_SEGMENT` for the list.
+REASON_SEGMENT_MISMATCH = "segment_has_no_matching_series"
+
 # How many DISTINCT SERIES get a sample title. One per series, so the bound is
 # on series rather than on samples.
 #
@@ -332,7 +343,7 @@ def _key_line(value: Any) -> tuple[bool, float | None]:
         return (False, None)
 
 
-def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
+def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | None:
     """The identity the join matched on. Shared by both resolvers ON PURPOSE.
 
     Two resolvers keyed by two slightly different tuples would pair a row with
@@ -352,6 +363,14 @@ def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str] | N
     The 171 game series registered on 2026-08-25 would have removed both
     accidents at once.
 
+    **THAT PARAGRAPH IS STALE AND THE ACCIDENT IT RELIED ON IS GONE.** This join
+    supplies game TOTALS now, and on 2026-08-28 the same class of omission --
+    `segment` missing from the key rather than the game -- put five orders on
+    full-game contracts that were priced as three- and five-inning bets, $7.08
+    of real money. `segment` is now in both tuples. Left in place as the record
+    of a reassurance that expired without anyone noticing, which is the reason
+    the correction sits here rather than replacing it.
+
     A record with no event id returns None and is never indexed -- an empty
     string would rebuild the same collision under a different spelling, and not
     indexed means no order, which is the direction that fails safe.
@@ -366,11 +385,20 @@ def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str] | N
     None here and looks like a key bug rather than a fixture that does not
     match what the join emits.
     """
+    from syndicate.features.shared.kalshi_catalogue import segment_for_series
+
     event_id = str(match.get("board_event_id") or "").strip()
     if not event_id:
         return None
     ok, line = _key_line(match.get("line"))
     if not ok:
+        return None
+    # WHICH PORTION OF THE GAME THIS CONTRACT SETTLES ON. An unrecognised series
+    # returns None and is NOT indexed -- the same fail-safe direction the
+    # missing-event-id branch above takes, and for the same reason: not indexed
+    # means no order, which is the direction that cannot lose money.
+    segment = segment_for_series(match.get("series"))
+    if segment is None:
         return None
     return (
         event_id,
@@ -378,10 +406,11 @@ def _match_key(match: Mapping[str, Any]) -> tuple[str, str, str, float, str] | N
         normalize_person(match.get("player_name")),
         line,
         str(match.get("board_side") or "").strip().lower(),
+        segment,
     )
 
 
-def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
+def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str, str] | None:
     """The board row's side of `_match_key`. The two must stay one shape.
 
     A board row's game is `event_id`; a match carries the same value under
@@ -396,12 +425,19 @@ def _row_key(row: Mapping[str, Any]) -> tuple[str, str, str, float, str] | None:
     if not ok:
         return None
     raw = str(row.get("market") or "").strip().lower()
+    # ABSENT MEANS FULL GAME, which is what every board row without an explicit
+    # segment has always meant. Stated rather than implied, because the whole
+    # defect was an implied value nobody checked.
+    from syndicate.features.shared.kalshi_catalogue import FULL_GAME_SEGMENT
+
+    segment = str(row.get("segment") or FULL_GAME_SEGMENT).strip().lower()
     return (
         event_id,
         canonical_market_key(row.get("sport"), raw) or raw,
         normalize_person(row.get("player_name")),
         line,
         str(row.get("side") or "").strip().lower(),
+        segment,
     )
 
 
@@ -830,6 +866,13 @@ def join_kalshi_to_board(
                         if isinstance(row.get("quote"), Mapping)
                         else None,
                         "board_event_id": row.get("event_id"),
+                        # WHICH CONTRACT THIS IS. `_match_key` derives the game
+                        # SEGMENT from it -- `KXMLBTOTAL` is nine innings and
+                        # `KXMLBF5TOTAL` is five, and without this field on the
+                        # record the key cannot tell them apart. It could not,
+                        # and five segment bets were placed on full-game
+                        # contracts on 2026-08-28.
+                        "series": market.get("series"),
                         "model_edge_pct": row.get("model_edge_pct"),
                         "game_line": True,
                     }
@@ -915,6 +958,10 @@ def join_kalshi_to_board(
                     if isinstance(row.get("quote"), Mapping)
                     else None,
                     "board_event_id": row.get("event_id"),
+                    # See the game-line record above. Player props are all
+                    # whole-game today, but the key is shared and a record that
+                    # omits this is a record that cannot be indexed.
+                    "series": market.get("series"),
                     "model_edge_pct": row.get("model_edge_pct"),
                 }
             )
