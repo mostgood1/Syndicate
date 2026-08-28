@@ -2595,7 +2595,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   STILL A HYPOTHESIS: I did not confirm matches were live. Testable by comparing these numbers against a quiet overnight window.
 - **THE COST IS STILL UNLOCATED.** soccer 163.2 -> 247.6 -> 381.6s in one day, ncaaf 34.1 -> 69.5s, GAME COUNTS FLAT — it scales with accumulation, not fixtures. The shard `soccer_source/artifacts/soccer/odds_history/<date>.json` went **3,935,768 -> 48,169,883 bytes (12x)**.
 - MEASURED AND RULED OUT: `is_active_today` 0.0s · `bars` 0.0s · `games()` ~2.8s · `pregame_props()` 0.17s · `market_board` NOT ON THE PATH. `sport_branch` is **98%** of every sport's overview cost.
-- **THE ONLY UNMEASURED SURFACE LEFT:** `soccer/cards.py::_build_cards_page_context_uncached` per league — the function the overview actually reaches. Nothing inside it is timed.
+- **MEASURED SINCE `[2026-08-28 20:24Z / 21:12Z]`. THE COST IS PER-FIXTURE ASSEMBLY INSIDE `week_games`, AND IT IS NOT DATES, PAYLOADS, OR THE LEAGUE.**
+  `_build_cards_page_context_uncached` splits as `week_games` **95-99.9%**, `board_contract` 0.00-1.28s, `setup` 0.00s.
+  Inside `week_games`:
+  ```
+  league          total  dates  payload_s  assemble_s  fixtures
+  la_liga          3.24    5       0.01       3.23        10
+  primeira_liga    6.86    4       0.22       6.64        10
+  la_liga         20.78    7       1.29      19.49        14
+  la_liga         13.99    5       0.48      13.51        10
+  ```
+  `payload_s` is **under 7%**; `payloads_present == dates` every time, so there is no missing-artifact retry. The cost is the `for fixture in fixtures` assembly AFTER the payloads are loaded.
+- **RETRACTED — MY REQUEST-SCOPED MEMO RECOMMENDATION.** I proposed memoizing `recommendations_payload` per build and sized it as the fix. **It would save at most ~1.3s of a 20.78s call.** The plumbing analysis behind it was correct and irrelevant: `games()` is an 8-implementation interface, `build_cards_page_context`/`week_games` need 3 signature changes, and memoizing `recommendations_payload` itself is FORBIDDEN (`@lru_cache` removed 2026-07-24 — matches froze at `status_state="pre"` 0-0 for days). All true, all aimed at 7% of the problem.
+- **AND THE LEAGUE THEORY IS DEAD TOO.** `la_liga` week 3, SAME 10 fixtures, read **3.24s and 13.99s** — 4x apart on identical inputs. My `belgian_pro_league` 23.73s-for-12-games "19x" was one sample of a highly variable quantity, over-read exactly as I over-read the TTL 42.34->2.76s comparison. **The VARIANCE is now as interesting as the magnitude.**
+- **SEVEN PREDICTIONS, SEVEN REFUTATIONS** on this subsystem in one session: ~39 leagues · fan-out · one slow league · props · TTL-dominance · the `market_board` multiplier (unreachable code path) · the payload memo. **DO NOT ADD AN EIGHTH LOG SPAN.** A profiler over ONE real build names the call directly; seven spans have cost a day and moved the target from "somewhere in soccer" to "the per-fixture assembly loop", which is real progress but at a poor rate.
 - **FIVE PREDICTIONS, FIVE REFUTATIONS:** ~39 leagues (it is 10) · fan-out (one cold league dominates) · `championship` is slow (it is whichever is cold) · props is the missing 92% (0.17s) · the `market_board` 60s-TTL x 10 leagues x 48MB multiplier (**counter emitted ZERO — that function is not on the overview path**). See `learnings.md 2026-08-28` on instrumenting an unreachable function.
 - **RECOMMENDATION TO THE NEXT SESSION: change method, do not add a sixth log span.** A profiler over ONE real build names the call directly; five incremental spans have cost a day and located 3s of 382s. My model of this subsystem is demonstrably poor and that is itself the evidence.
 - Claims: `syndicate/blueprints/home.py` (transferred from UNOWNED `wnba-chip-live-token`, instrumentation only — path REMOVED from its Files: line, not struck through) and `syndicate/features/soccer/market_board.py`. Deploy claims: none held.

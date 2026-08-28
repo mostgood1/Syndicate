@@ -5536,3 +5536,41 @@ consumers, and recorded as open in `#602`.**
 Related: the correction discipline that found it. The reported symptom named a
 venue; the DEFECT named a key. Fixing at the level of the symptom would have
 left half the money on the table and the ledger reading as if it were closed.
+
+## 2026-08-28 — FORBIDDEN: sizing a fix before measuring the component's SHARE of the whole. I did it twice in one day on the same subsystem.
+
+**Instance 1.** I found soccer's cards-context TTL (600s) was finer than the
+board build period (680-874s), fixed it, measured `games()` 42.34s -> 2.76s and
+recorded a verified 15x win. The sport bracket was 163-382s. The component I
+fixed was ~3s of it. I optimised a real defect that could not matter.
+
+**Instance 2, after being caught on the first.** I traced the cost to
+`week_games`, proposed a request-scoped memo of `recommendations_payload`, and
+worked out the plumbing in detail -- `games()` is an 8-implementation
+interface, three signatures below it need changing, and memoizing the payload
+itself is FORBIDDEN (`@lru_cache` removed 2026-07-24; matches froze at
+`status_state="pre"` 0-0 for days). Every word of that is correct. Then I
+measured:
+
+```
+la_liga  total 20.78s   payload_s 1.29   assemble_s 19.49
+```
+
+**`payload_s` is under 7%.** The memo would save 1.3 of 20.8 seconds.
+
+**THE RULE:** before designing a fix for component `C`, get `C / whole`. Not
+`C`'s absolute cost, not whether `C` contains a genuine defect -- its SHARE.
+A real defect in a 7% component is a real defect that cannot move the number.
+Both times I had the whole (163-382s bracket; 20.78s call) and the component
+in hand and did not divide.
+
+**WHY IT KEPT HAPPENING:** finding a defect feels like finding THE defect. The
+TTL was genuinely too fine. The payload memo was genuinely blocked by two
+recorded cache removals. Being right about the mechanism is what made me stop
+checking whether it mattered.
+
+**COROLLARY, from the same session:** `la_liga` week 3, SAME 10 fixtures, read
+3.24s and 13.99s -- 4x on identical inputs. A single sample of a variable
+quantity is not a measurement of it, and I built a "slow league" theory on one
+`belgian_pro_league` reading. When the spread on identical inputs is larger
+than the difference you are explaining, you are explaining noise.
