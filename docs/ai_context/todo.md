@@ -1,5 +1,62 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#603` — **THE THIRD CONSUMER: `quote_key` has NO game and NO segment, and it collides on real orders** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **MEASURED, NOT FIXED — cross-lane file, NOT edited**
+
+Swept every key-building function in `syndicate/features/shared/` and `pipeline/`
+for the `#601`/`#602` shape. **The sweep is the finding: the codebase already
+knew, in writing, and the venue path did not apply it.**
+
+CORRECT, and each states the reason in its own comment:
+
+    live_gameline_ledger.record_key      (game_pk, SEGMENT, market, books_key)
+    layer2_board.movement_join_key       "...a first-five total and a full-game
+                                          total are different bets"
+    clv_opening_ledger._opening_key      "...a first-half line and a full-game
+                                          line are different bets"
+    book_grid._INSTANCE_FIELDS           includes segment
+    basketball_market_join               filters on segment
+    venue_quote_adapters.prop_quote_key  includes the PLAYER (measured 0 prop
+                                         collisions -- this one is right)
+
+WRONG, and it is the pricing path:
+
+    venue_quote_adapters.quote_key(sport, market, side, line)
+      -> f"{sport}|{market}|{side}|{line}"
+
+**No event_id. No segment.** Its docstring says line is in the key because
+"a spread at -1.5 and the same spread at -2.5 are different bets" — the exact
+argument, applied to `line` and not to `segment` or the GAME.
+
+`collect_quotes` builds `by_key: dict[str, list[Quote]]` per SPORT per DATE and
+`select_quote()` picks ONE per key; `apply_venue_quotes_to_grid` then prices a
+whole-slate grid (`max_rows_per_sport`) through it.
+
+**MEASURED on 74 real distinct orders, 08-26..08-28, using each family's ACTUAL
+key** (my first pass overstated this at 50% by applying the game-line key to
+props too — props include the player and are clean):
+
+    GAME LINES  37 rows, 14 keys ->  6 keys map to >1 EVENT
+                                     2 keys map to >1 SEGMENT
+    PROPS       37 rows, 37 keys ->  0 and 0
+
+      ('mlb','h2h','away',None)       -> 6 events   AND ['first3','full']
+      ('mlb','h2h','home',None)       -> ['first3','first5','full']
+      ('mlb','totals','under',8.5)    -> 2 events
+      ('nfl','totals','over',36.5)    -> 2 events
+
+**LIMIT, STATED RATHER THAN GLOSSED.** This measures ORDER rows, whose `side` is
+`home`/`away`/`over`/`under`. The GRID's side vocabulary may differ —
+`venue_quote_fanin:642` keys soccer h2h by CLUB, which would distinguish games
+by accident. So the game-line collision is **demonstrated on the order
+population and NOT yet on the grid**, and h2h specifically may be narrower than
+it looks here. `totals` does not have that escape: over/under is over/under.
+
+**NOT EDITED — `venue_quote_adapters.py` / `venue_quote_fanin.py` belong to lane
+`venue-join-refusal-visibility`**, which has 10 currently-failing tests in
+exactly those files. Handing this over rather than editing across the lane.
+
+NEXT: reproduce the count on real GRID rows (not orders) before sizing the fix.
+
 ### `#602` — **THE SAME SEGMENT DEFECT ON POLYMARKET. Four more orders. Found by repeating the audit, not by a report.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED AND LANDED (`d2ab7e86`), DEPLOY PENDING**
 
 `#601` was reported as a Kalshi bug and I fixed it as one. Re-running the same
