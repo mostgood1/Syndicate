@@ -5,6 +5,85 @@
 
 ---
 
+## 2026-08-28 — refresh-worker `8b8a6579`: the live-gameline retention RODE ALONG, and the reader half was still missing
+
+**Closes the open obligation from the `web 56e77588` row above.** refresh-worker
+live `8b8a6579` at **`15:59:38.641Z`**, deployed by lane
+`venue-join-refusal-visibility`. **I did not deploy it.** My `74f026a9` was
+already inside that SHA, so the restart I was waiting to spend was never needed
+— and no in-flight MLB sim was killed.
+
+Verified BY CONTENT, not by ancestry alone:
+
+```
+git merge-base --is-ancestor 74f026a9 8b8a6579        -> yes
+git ls-tree 8b8a6579 -- .../live_gameline_accuracy.py -> present
+git grep -c record_live_gameline_score 8b8a6579 -- book_grid_artifact.py -> 2
+```
+
+Both services now on `8b8a6579`.
+
+### verify PARTIAL — and the missing half was MY defect, found by reading the bytes
+
+Board rebuilt `16:00:27Z`, AFTER the deploy. `live_gameline_accuracy` served
+**`null`**.
+
+Cause: `intelligence.py`'s forwarding block is an EXPLICIT ALLOWLIST, and I
+added the artifact key without naming it there. The comment four lines above the
+insertion point says so, and says the *scorer* shipped with this identical bug:
+*"Forwarding is an explicit allowlist here, so a new artifact key is invisible
+until it is named."* Producer wired, reader not — in the same dict, twice.
+
+**Nothing caught it except reading the served payload.** The tests passed, the
+deploy was green, the SHA check passed, and the reachability test I wrote
+asserts the BUILD reaches the recorder — which it does. None of that touches
+whether the result leaves the service.
+
+### What is and is not working
+
+- **Data path: INTACT.** The retained file is written worker-side and read via
+  the `artifact_publisher` allowlist, which is verified live (200 on the
+  allowlisted path vs 403 on a same-instant control in the same directory).
+  Independent of the forwarding defect.
+- **Diagnostic counters: INERT** until the one-line fix lands. Patch staged.
+- **`count: 0` on `?pattern=*live_gameline_accuracy*` is CORRECT, not a
+  symptom.** `games_with_outcome: 0`, `reason: no_final_games_on_this_grid` — no
+  MLB game had gone final. The recorder returns early and writes nothing by
+  design.
+
+**HONEST STATE: there is NO positive evidence the recorder has executed.** Only
+that the code is present and reachable in test. Both observation routes are
+currently blank — counters unforwarded, file not yet written. **The first real
+reading is tonight's first FINAL game.** Do not record this deploy as verified
+until then.
+
+### BLOCKED — the fix is cross-lane and the holder is LIVE
+
+`syndicate/blueprints/intelligence.py` is claimed by two OPEN lanes. User
+authorised taking it; `lane-guard.py` blocked it (no env override — its only
+route is "close or reassign"). Before reassigning I checked whether the holder
+was stale: **`get_session` answered "not found", which was misleading** — the
+transcript showed activity 11 seconds earlier. An archived-but-running session
+and one that never existed look identical through the roster. The transcript is
+the ground truth.
+
+So the claim is not stale and reassignment would take a file out from under live
+work. Holding, watching for the holder to idle or the lane to release.
+
+### PROCESS — the lock I forced was forced off me
+
+I force-acquired refresh-worker off `ncaaf-settlement-resolver` on explicit user
+instruction, against a holder that was ACTIVE, not gone — a deviation from the
+documented `--force` condition. I then did NOT deploy: preflight returned
+`TOO_SOON` inside the 25-minute spacing, and listed **10 JOB processes** including
+a running `run_mlb_daily_sim_job.py`. Deploying would have killed a live sim to
+ship something that arrived on its own 20 minutes later.
+
+`venue-join-refusal-visibility` then force-took the claim from me. **The claim
+mechanism did not prevent either force; preflight is what prevented the harm.**
+The claim orders deploys, it does not judge them.
+
+
 ## 2026-08-28 15:54-15:59Z — refresh-worker `234c9e81` -> `8b8a6579` — lane `portfolio-venue-and-side-integrity` (deploy TRIGGERED BY ANOTHER LANE)
 
 **I did not trigger this deploy and did not need to.** The claim was held by
