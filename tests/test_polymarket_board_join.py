@@ -843,7 +843,11 @@ def test_a_row_that_would_pair_only_when_flipped_is_counted_and_STILL_REFUSED(mo
     monkeypatch.setattr(
         aliases,
         "teams_match",
-        lambda sport, a, b: {("rrc", "racing"), ("elc", "elche")}.__contains__(
+        # Clubs NO token can name by prefix, initials or elimination -- the row
+        # must stay unmatched to reach the flip counter this asserts. `elc`
+        # against "elche" now pairs for real via fixture matching, which is
+        # correct behaviour and made the old fixture untestable.
+        lambda sport, a, b: {("zz1", "alpha"), ("zz2", "beta")}.__contains__(
             (str(a).lower(), str(b).lower())
         ),
     )
@@ -853,14 +857,14 @@ def test_a_row_that_would_pair_only_when_flipped_is_counted_and_STILL_REFUSED(mo
         # test assert against a correct implementation. League token `soccer`
         # rather than `lal` so the row is bucketed without depending on
         # `soccer_competition_tokens` resolving a real competition here.
-        "slug": "tsc-soccer-rrc-elc-2026-08-28-2pt5",
+        "slug": "tsc-soccer-zz1-zz2-2026-08-28-2pt5",
         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
         "outcomes": '["Over","Under"]',
         "outcomePrices": '["0.50","0.50"]',
     }]
     board = [{
         "market": "totals", "side": "under", "line": 2.5, "sport": "soccer",
-        "selected_date": "2026-08-28", "home_team": "racing", "away_team": "elche",
+        "selected_date": "2026-08-28", "home_team": "alpha", "away_team": "beta",
         "event_id": "e1",
     }]
     out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
@@ -1370,3 +1374,63 @@ def test_an_INITIALS_token_resolves_but_a_LOOSER_shape_still_refuses():
 def test_a_DIFFERENT_fixture_is_not_paired():
     """The wrong-game guard. Same competition and date, different clubs."""
     assert mod._fixture_tokens_name_matchup("ala", "vil", "Everton", "Arsenal") is False
+
+
+def _no_aliases(monkeypatch):
+    """Every alias resolver dark. Fixture matching must not need any of them."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
+
+
+_EPL_SLATE = [("Crystal Palace", "Manchester City"),
+              ("Everton", "Arsenal"),
+              ("Chelsea", "Fulham")]
+
+
+def test_ELIMINATION_resolves_a_token_that_names_no_club(monkeypatch):
+    """`mnc` is neither a prefix nor the initials of "Manchester City" ("mc"),
+    so no token rule reaches it. But `cry` names exactly ONE fixture that day,
+    which determines the opponent — the league's matchups doing the work the
+    alias map cannot."""
+    _no_aliases(monkeypatch)
+    assert mod._teams_match(
+        {"home_team": "Crystal Palace", "away_team": "Manchester City"},
+        {"league": "epl", "home": "mnc", "away": "cry", "date": "2026-08-28"},
+        "soccer", _EPL_SLATE) is True
+
+
+def test_ELIMINATION_refuses_when_the_token_names_TWO_fixtures(monkeypatch):
+    """Exactly-one is the guard. A token naming two fixtures discriminates
+    nothing — the same rule `_soccer_alias_to_name` applies when it drops a
+    code that names two clubs."""
+    _no_aliases(monkeypatch)
+    assert mod._teams_match(
+        {"home_team": "Chelsea", "away_team": "Fulham"},
+        {"league": "epl", "home": "xxx", "away": "ch", "date": "2026-08-28"},
+        "soccer", [("Chelsea", "Fulham"), ("Charlton", "Luton")]) is False
+
+
+def test_ELIMINATION_does_not_pair_a_DIFFERENT_fixture(monkeypatch):
+    """The wrong-game guard, with the slate present."""
+    _no_aliases(monkeypatch)
+    assert mod._teams_match(
+        {"home_team": "Everton", "away_team": "Arsenal"},
+        {"league": "epl", "home": "mnc", "away": "cry", "date": "2026-08-28"},
+        "soccer", _EPL_SLATE) is False
+
+
+def test_fixture_matching_works_with_EVERY_alias_resolver_DARK(monkeypatch):
+    """The reason this sits ABOVE the canonicalisation guard.
+
+    It compares raw board names and never calls `canonical_team`. Placed below
+    that guard it was unreachable for every row whose club the alias map cannot
+    name — 76 of 80 unmatched `soccer|h2h` rows measured tonight, i.e. exactly
+    the population it exists to serve.
+    """
+    _no_aliases(monkeypatch)
+    assert mod._teams_match(
+        {"home_team": "Alaves", "away_team": "Villarreal"},
+        {"league": "lal", "home": "vil", "away": "ala", "date": "2026-08-28"},
+        "soccer", None) is True

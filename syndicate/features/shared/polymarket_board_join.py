@@ -906,6 +906,23 @@ def join_polymarket_to_board(
              ) or _venue_canonical_fixture(parsed)}
         )
 
+    # BOARD FIXTURES PER (LEAGUE, DATE) -- the "matchups by league" the token
+    # elimination below reasons over. Built once; a nested scan per unmatched
+    # row would be O(rows x rows) on a 1,300-row board.
+    board_fixtures: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    for board_row in board_rows:
+        bl = _norm(board_row.get("sport") or sport)
+        bd = str(
+            board_row.get("selected_date") or board_row.get("date") or selected_date or ""
+        ).strip()
+        bh = board_row.get("home") or board_row.get("home_team")
+        ba = board_row.get("away") or board_row.get("away_team")
+        if bl and bd and bh and ba:
+            pair = (str(bh), str(ba))
+            slot = board_fixtures.setdefault((bl, bd), [])
+            if pair not in slot:
+                slot.append(pair)
+
     matches: list[dict[str, Any]] = []
     for board_row in board_rows:
         board_market = str(board_row.get("market") or "").strip().lower()
@@ -965,7 +982,10 @@ def join_polymarket_to_board(
                     continue
                 if abs(float(candidate["line"]) - float(board_line)) > 1e-9:
                     continue
-            if not _teams_match(board_row, candidate["parsed"], board_row.get("sport") or sport):
+            if not _teams_match(
+                board_row, candidate["parsed"], board_row.get("sport") or sport,
+                board_fixtures.get((league, date)),
+            ):
                 continue
             if picked is not None:
                 # AMBIGUITY IS A REFUSAL. Two venue markets claiming one board
@@ -1045,7 +1065,10 @@ def join_polymarket_to_board(
                     orientation_flip_attempts[attempt_key] = (
                         orientation_flip_attempts.get(attempt_key, 0) + 1
                     )
-                if _teams_match(board_row, flipped, board_row.get("sport") or sport):
+                if _teams_match(
+                    board_row, flipped, board_row.get("sport") or sport,
+                    board_fixtures.get((league, date)),
+                ):
                     key = f"{league}|{board_market}"
                     _flip_matched = True
                     orientation_flip_counts[key] = orientation_flip_counts.get(key, 0) + 1
@@ -1437,7 +1460,12 @@ def _venue_club(parsed: Mapping[str, Any], token: Any) -> str | None:
     return canonical_team("soccer", name)
 
 
-def _teams_match(board_row: Mapping[str, Any], parsed: Mapping[str, Any], sport: Any) -> bool:
+def _teams_match(
+    board_row: Mapping[str, Any],
+    parsed: Mapping[str, Any],
+    sport: Any,
+    fixtures: Sequence[tuple[str, str]] | None = None,
+) -> bool:
     """Both clubs, or no match.
 
     THROUGH `team_aliases`, NOT STRING CONTAINMENT. The venue writes
@@ -1488,6 +1516,52 @@ def _teams_match(board_row: Mapping[str, Any], parsed: Mapping[str, Any], sport:
     # unresolvable pair still refuses rather than guessing.
     if str(sport or "").strip().lower() != "soccer":
         return False
+
+    # BEFORE THE CANONICALISATION GUARD BELOW, DELIBERATELY.
+    #
+    # This path compares the slug's tokens against the board's RAW club names
+    # and never calls `canonical_team`, so gating it behind that resolver would
+    # refuse exactly the population it exists to serve: fixtures our alias map
+    # cannot name. Measured tonight, that is 76 of 80 unmatched `soccer|h2h`
+    # rows. Placing it after the guard made it unreachable for all of them --
+    # a fix that only helps the rows that were never broken.
+    if str(sport or "").strip().lower() == "soccer":
+        if _fixture_tokens_name_matchup(
+            parsed.get("home"), parsed.get("away"), home, away
+        ):
+            return True
+        # ELIMINATION ACROSS THE LEAGUE'S MATCHUPS FOR THAT DATE.
+        #
+        # A token that names exactly ONE fixture in the slate determines the
+        # other club even when the other token names nothing. That is how
+        # `mnc` (neither a prefix nor initials of "Manchester City") gets
+        # resolved: `cry` names Crystal Palace and no other fixture that day,
+        # so the slug is that fixture and `mnc` is its opponent.
+        #
+        # THE GUARD IS "EXACTLY ONE". If the token names two fixtures it
+        # discriminates nothing and this refuses -- the same rule as
+        # `_soccer_alias_to_name` dropping a code that names two clubs, and the
+        # reason a bare token cannot pair a row on its own.
+        if fixtures:
+            for token, other in (
+                (parsed.get("home"), parsed.get("away")),
+                (parsed.get("away"), parsed.get("home")),
+            ):
+                named = [
+                    (fh, fa) for fh, fa in fixtures
+                    if _club_token_names(token, fh) or _club_token_names(token, fa)
+                ]
+                if len(named) == 1 and (str(named[0][0]), str(named[0][1])) == (str(home), str(away)):
+                    # The other token must not contradict: if it names a club,
+                    # it has to be this fixture's other side.
+                    fh, fa = named[0]
+                    hit_h, hit_a = _club_token_names(other, fh), _club_token_names(other, fa)
+                    if not (hit_h or hit_a) or (
+                        _club_token_names(token, fh) and hit_a
+                    ) or (_club_token_names(token, fa) and hit_h):
+                        return True
+
+
     try:
         from syndicate.features.shared.team_aliases import (
             canonical_team,
@@ -1546,12 +1620,6 @@ def _teams_match(board_row: Mapping[str, Any], parsed: Mapping[str, Any], sport:
     # BOTH CLUBS MUST MATCH, and ambiguity is already refused one level up:
     # `join_polymarket_to_board` counts `ambiguous_polymarket_match` when a
     # board row is claimed by two candidates rather than resolving by order.
-    if str(sport or "").strip().lower() == "soccer":
-        if _fixture_tokens_name_matchup(
-            parsed.get("home"), parsed.get("away"), home, away
-        ):
-            return True
-
     pair = soccer_fixture_clubs(parsed.get("home"), parsed.get("away"))
     if not pair:
         return False
