@@ -3921,8 +3921,74 @@ def _resolve_live_slate(raw: Any) -> tuple[str | None, bool]:
     return value, False
 
 
+# THE THREE STATES A VENUE FILTER HAS, and "" is not one of them. `?venue=`
+# absent and `?venue=all` both mean the whole book; anything else names one
+# venue. Kept as a constant so the template, the payload and the API cannot
+# spell the all-venues token differently.
+_VENUE_ALL = "all"
+
+
+def _resolve_live_venue(raw: Any) -> str | None:
+    """`?venue=` -> one venue name, or None for the whole book.
+
+    LOWERCASED AND MATCHED AGAINST THE LEDGER'S OWN SPELLING, never validated
+    against a hardcoded list. A venue this system starts trading tomorrow must
+    appear in the filter the day its first order lands, not the day somebody
+    remembers to add it to a tuple -- the same reason `date_options` is built
+    from the book rather than from a calendar.
+    """
+    text = str(raw or "").strip().lower()
+    if not text or text == _VENUE_ALL:
+        return None
+    return text
+
+
+def _is_unknown_submit(order: Mapping[str, Any]) -> bool:
+    """We sent it, the venue never answered, and we hold no order id.
+
+    NOT A POSITION AND NOT A REFUSAL -- the third state, and until now the page
+    had no word for it. `execution_guard.is_non_position` deliberately keeps
+    these rows in the book because a 5xx or a timeout MAY have landed, which is
+    the whole reason the write-ahead record exists. That is the right call for
+    the day's budget and the wrong one for a table headed "positions":
+
+      REFUSED   the venue answered 4xx. Certainly no position. Hidden already.
+      POSITION  filled, or submitted and resting. Real money.
+      UNKNOWN   sent into a 5xx. We do not know. THIS.
+
+    `[user 2026-08-28]` "yesterday has 2 positions that were errors showing as
+    an actual position." Measured on the live book the same morning: exactly
+    two, both 2026-08-27, both `PolymarketUSAuthError: http_503 {"code":14}`
+    (gRPC UNAVAILABLE), $8.21 of possible exposure between them, neither
+    carrying a `venue_order_id`.
+
+    THEY ARE MOVED, NOT DROPPED, and that distinction is the whole point.
+    Polymarket publishes no route that can settle the question -- `GET
+    /v1/orders` answers `501 UNIMPLEMENTED` and the per-order read needs the id
+    we never got (`venue_settlement.probe_unknown_polymarket_positions` says so
+    at length). Rendering them as ordinary positions overstates the book;
+    deleting them would understate the exposure. They get their own block and
+    their own words.
+    """
+    if str(order.get("status") or "") != "failed":
+        return False
+    if order.get("outcome"):
+        # Something graded it, so it was a position after all. Whatever this
+        # row is, it is no longer an open question.
+        return False
+    if str(order.get("venue_order_id") or "").strip():
+        return False
+    from syndicate.features.shared.execution_guard import is_non_position
+
+    return not is_non_position(order)
+
+
 def _live_portfolio_payload(
-    selected_date: str, *, show_all: bool = False, on_date: str | None = None
+    selected_date: str,
+    *,
+    show_all: bool = False,
+    on_date: str | None = None,
+    venue: str | None = None,
 ) -> dict[str, Any]:
     """Real money only. The mirror image of `_paper_portfolio_payload`.
 
@@ -3956,12 +4022,16 @@ def _live_portfolio_payload(
     from pipeline.execute_portfolio import execution_enabled
 
     on_date, all_dates = _resolve_live_slate(on_date)
+    venue = _resolve_live_venue(venue)
 
     orders: list = []
     whole_book: list = []
     hidden_orders: list = []
     hidden_open_dated: list = []
+    hidden_open_venue: list = []
+    unknown_submits: list = []
     date_options: list = []
+    venue_options: list = []
     periods: dict[str, Any] = {}
     ledger_error = None
     try:
@@ -3991,6 +4061,28 @@ def _live_portfolio_payload(
         hidden_orders = [o for o in orders if _is_non_position(o)]
         if not show_all:
             orders = [o for o in orders if not _is_non_position(o)]
+
+        # THE THIRD STATE, LIFTED OUT OF THE POSITIONS TABLE ALTOGETHER.
+        # See `_is_unknown_submit`: these are neither positions nor refusals,
+        # and `?show=all` is not the control for them -- that toggle answers
+        # "show me what the venue turned down", which is a settled question.
+        # This one is open, so it gets its own block rather than a toggle that
+        # can leave it hidden.
+        #
+        # FROM THE WHOLE BOOK, NOT THE VIEW. An order we cannot account for is
+        # exposure whatever slate or venue is on screen -- the same argument
+        # `unreconciled` and `resting` already make below.
+        unknown_submits = [o for o in whole_book if _is_unknown_submit(o)]
+        unknown_keys = {id(o) for o in unknown_submits}
+        orders = [o for o in orders if id(o) not in unknown_keys]
+
+        # THE VENUE FILTER `[user 2026-08-28]`, built from the book's own
+        # spelling rather than a hardcoded tuple. Computed BEFORE the venue
+        # filter narrows anything, or picking Kalshi once would remove
+        # Polymarket from the control that put you there.
+        venue_options = sorted(
+            {str(o.get("venue") or "").strip().lower() for o in whole_book if o.get("venue")}
+        )
 
         # THE DATE FILTER. DEFAULTS TO TODAY; `?on=all` IS THE WHOLE BOOK.
         #
@@ -4022,6 +4114,22 @@ def _live_portfolio_payload(
             orders = [o for o in orders if str(o.get("selected_date") or "") == on_date]
         else:
             hidden_open_dated = []
+
+        # THE VENUE FILTER, AND IT CARRIES THE SAME GUARANTEE THE DATE FILTER
+        # DOES. A control that can hide an open position must say how many it
+        # is holding back -- that count is the only thing standing between a
+        # filtered page and a live bet nobody looks at again, and it is stated
+        # here for exactly the reason `hidden_open_dated` is.
+        #
+        # APPLIED AFTER the date filter so the count is what THIS view hides on
+        # top of the slate, not a second tally of the same rows.
+        if venue:
+            hidden_open_venue = [
+                o
+                for o in orders
+                if str(o.get("venue") or "").strip().lower() != venue and not o.get("outcome")
+            ]
+            orders = [o for o in orders if str(o.get("venue") or "").strip().lower() == venue]
     except Exception as exc:
         # An unreadable ledger must never render as "no live positions". That
         # is the one absence this page cannot afford to get wrong.
@@ -4051,6 +4159,20 @@ def _live_portfolio_payload(
             if all_dates
             else [o for o in whole_book if str(o.get("selected_date") or "") == on_date]
         )
+        # AND THE VENUE SELECTION, for the reason the date note above gives.
+        # The tiles follow the controls at the top of the page or they are not
+        # the tiles for the view being looked at -- a one-venue table above a
+        # both-venue P&L is the "some tiles are ytd instead of matching date"
+        # complaint with the other control substituted in.
+        #
+        # THE PIVOTS BELOW DELIBERATELY DO NOT FOLLOW IT. They answer "how has
+        # this done", which is a question about the whole book, and they carry
+        # a per-venue breakdown of their own.
+        if venue:
+            settlement_rows = [
+                o for o in settlement_rows
+                if str(o.get("venue") or "").strip().lower() == venue
+            ]
         settlement = settlement_summary(None, orders=settlement_rows)
     except Exception as exc:
         settlement_error = f"{type(exc).__name__}: {exc}"
@@ -4093,6 +4215,30 @@ def _live_portfolio_payload(
     # looking at.
     submitted_rows = [o for o in whole_book if str(o.get("status") or "") == STATUS_SUBMITTED]
     unreconciled = [o for o in submitted_rows if not o.get("reconciled_at")]
+
+    # THE VENUE AND THE SCOREBOARD DESCRIBING DIFFERENT POSITIONS.
+    #
+    # `paper_settlement._check_venue_grade` writes `grade_check` on the worker
+    # every time it cross-examines a venue-stated outcome against the real game
+    # result. This is a pure READ of that memo -- no resolver runs here, which
+    # it could not anyway: web holds no boxscore feed and must not compute.
+    #
+    # WHOLE BOOK, and for a stronger reason than `resting` or `unreconciled`.
+    # Those are about exposure, which is at least a property of open money. This
+    # is about SETTLED rows being wrong, and a settled row's date is exactly
+    # what a reader has stopped looking at. If it only rendered under the slate
+    # that produced it, it would appear on the one day nobody reopens.
+    #
+    # `agrees is False` and NOT `not agrees`. The field is deliberately
+    # three-valued -- False is a disagreement, None is "we could not read the
+    # game", and folding the second into the first would turn every feed outage
+    # into a wall of money alarms.
+    grade_conflicts = [
+        o
+        for o in whole_book
+        if isinstance(o.get("grade_check"), Mapping)
+        and o["grade_check"].get("agrees") is False
+    ]
 
     # OPEN AT THE VENUE, from the venue's own answer -- NOT from our status.
     #
@@ -4203,12 +4349,28 @@ def _live_portfolio_payload(
         # THE FILTER'S OWN STATE, and the count that keeps its guarantee: a page
         # holding back an OPEN position must say how many.
         "on_date": on_date or None,
+        # THE VENUE FILTER'S STATE AND ITS SAFETY COUNT, mirroring `on_date` /
+        # `hidden_open_dated` exactly. None means the whole book.
+        "venue": venue,
+        "venue_options": venue_options,
+        "hidden_open_venue": len(hidden_open_venue),
         # TRUE only for `?on=all`. The template needs to tell "every date" from
         # "a slate that happens to be today" -- `on_date is None` alone stopped
         # meaning "unfiltered" when today became the default.
         "all_dates": bool(all_dates),
         "hidden_open_dated": len(hidden_open_dated),
         "date_options": date_options,
+        # SENT AND NEVER ANSWERED. Rows, not just a count -- the page has to
+        # name the market and the money for each one, because the only thing
+        # that settles them is a person opening the venue's own screen.
+        "unknown_submits": unknown_submits,
+        "unknown_submit_dollars": round(
+            sum(
+                float(o.get("requested_stake_dollars") or 0.0)
+                for o in unknown_submits
+            ),
+            2,
+        ),
         # HOW BIG THE BOOK IS BEFORE ANY DISPLAY FILTER TOUCHES IT. The empty
         # state needs it: "no live positions on this slate" and "no live
         # position has ever been placed" are different sentences, and with a
@@ -4224,7 +4386,12 @@ def _live_portfolio_payload(
         # on a page whose own table says 88. `hidden_orders` is computed over
         # the whole book BEFORE the date filter, which is exactly the term that
         # makes this subtraction the position count rather than the order one.
-        "position_count_all_dates": len(whole_book) - len(hidden_orders),
+        #
+        # AND THE UNKNOWN SUBMITS COME OUT TOO, since 2026-08-28. They are no
+        # longer rendered in the table this number is compared against, so
+        # leaving them in would restore the same "41 against a table saying 39"
+        # mismatch the `hidden_orders` term was added to remove.
+        "position_count_all_dates": len(whole_book) - len(hidden_orders) - len(unknown_submits),
         # The arrows and the reset for that control. Computed here, not in
         # Jinja, for the reason `_paper_date_nav` gives: date arithmetic in a
         # template is where off-by-one-day bugs live.
@@ -4236,6 +4403,11 @@ def _live_portfolio_payload(
         "settlement": settlement,
         "settlement_error": settlement_error,
         "unreconciled": unreconciled,
+        # SETTLED WRONG, not open. See the note beside `grade_conflicts`.
+        "grade_conflicts": grade_conflicts,
+        "grade_conflict_dollars": round(
+            sum(abs(float(o.get("pnl_dollars") or 0.0)) for o in grade_conflicts), 2
+        ),
         # Shown as information, not as an error. See the note above.
         "resting": resting,
         **payload_state,
@@ -4300,8 +4472,13 @@ def api_portfolio_live():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     show_all = str(request.args.get("show") or "").strip().lower() == "all"
     on_date = str(request.args.get("on") or "").strip() or None
+    venue = request.args.get("venue")
     return _no_cache_response(
-        jsonify(_live_portfolio_payload(selected_date, show_all=show_all, on_date=on_date))
+        jsonify(
+            _live_portfolio_payload(
+                selected_date, show_all=show_all, on_date=on_date, venue=venue
+            )
+        )
     )
 
 
@@ -4321,9 +4498,9 @@ def portfolio_live_page():
     history, and a 404 on a real-money book is a bad way to learn about a
     rename.
 
-    The query string is carried through verbatim -- `?show=all`, `?period=` and
-    `?date=` all belong to the merged page and dropping them would silently
-    reset the reader's view.
+    The query string is carried through verbatim -- `?show=all`, `?period=`,
+    `?venue=` and `?date=` all belong to the merged page and dropping them
+    would silently reset the reader's view.
     """
     query = request.query_string.decode("utf-8", "replace")
     return redirect(f"/portfolio?{query}#live" if query else "/portfolio#live", code=302)
@@ -4369,6 +4546,7 @@ def portfolio_home():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     show_all = str(request.args.get("show") or "").strip().lower() == "all"
     on_date = str(request.args.get("on") or "").strip() or None
+    venue = request.args.get("venue")
     summary = build_portfolio_summary(limit=100)
     # THE CAPS AS *THIS* PROCESS RESOLVES THEM, which is not the same object as
     # the worker's stamped `limits` in the live payload. The form must edit the
@@ -4385,7 +4563,9 @@ def portfolio_home():
         portfolio_summary=summary,
         portfolio_settings=resolve_settings().as_dict(),
         execution_limits=execution_limits,
-        live=_live_portfolio_payload(selected_date, show_all=show_all, on_date=on_date),
+        live=_live_portfolio_payload(
+            selected_date, show_all=show_all, on_date=on_date, venue=venue
+        ),
     )
 
 

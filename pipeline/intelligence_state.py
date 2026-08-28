@@ -5728,7 +5728,10 @@ class IntelligenceStateService:
                 from datetime import date as _date
                 from datetime import timedelta as _timedelta
 
-                from syndicate.features.shared.paper_settlement import settle_orders
+                from syndicate.features.shared.paper_settlement import (
+                    dates_needing_settlement,
+                    settle_orders,
+                )
 
                 _today = str(selected_date or "").strip()
                 _dates = [_today]
@@ -5738,10 +5741,49 @@ class IntelligenceStateService:
                     )
                 except ValueError:
                     pass
+                # THE FIRST TWO ARE UNCONDITIONAL; THE REST ARE STRAGGLERS.
+                #
+                # Today and yesterday run whether or not anything is ungraded on
+                # them, because a game that has just finished must not wait a
+                # tick. Everything else is asked FROM THE LEDGER -- see
+                # `dates_needing_settlement` -- and on a healthy book that list
+                # is empty and this costs nothing.
+                #
+                # WHY IT IS NEEDED AT ALL: two days is a window a bet can fall
+                # out of. Measured 2026-08-28: two FILLED WNBA totals on
+                # 2026-08-26 were still ungraded with a working WNBA resolver,
+                # because nothing had asked about that slate since the 27th and
+                # nothing ever would again. The same trap catches every row that
+                # becomes gradeable late -- a resolver shipping for a sport that
+                # had none (soccer `#547`, NFL and NCAAF all landed that way), a
+                # feed backfilling, or the 24h venue grace pushing a late game
+                # past the end of its own second day.
+                _stragglers = dates_needing_settlement(today=_today)
+                _straggler_sports = {
+                    str(e.get("date")): set(e.get("sports") or []) for e in _stragglers
+                }
+                for _entry in _stragglers:
+                    _date_text = str(_entry.get("date") or "")
+                    if _date_text and _date_text not in _dates:
+                        _dates.append(_date_text)
+                if len(_dates) > 2:
+                    print(
+                        "[intelligence_state] SETTLEMENT_STRAGGLERS "
+                        f"dates={_dates[2:]} "
+                        f"detail={[(e['date'], e['orders'], e['sports']) for e in _stragglers if e['date'] in _dates[2:]]}",
+                        flush=True,
+                    )
                 for _settle_date in _dates:
-                    if _settle_date:
+                    if not _settle_date:
+                        continue
+                    # THE BOXSCORE REFRESH IS THE EXPENSIVE HALF, so a straggler
+                    # date only gets one when it actually holds an ungraded WNBA
+                    # row. Today and yesterday keep it unconditionally -- a slate
+                    # in progress has rows arriving that the ledger cannot know
+                    # about yet. `#241`: periodic worker work is never free.
+                    if _settle_date in _dates[:2] or "wnba" in _straggler_sports.get(_settle_date, set()):
                         _refresh_wnba_boxscores(_settle_date)
-                        settle_orders(_settle_date)
+                    settle_orders(_settle_date)
             except Exception as exc:
                 print(f"[intelligence_state] SETTLEMENT_FAILED error={exc}", flush=True)
 

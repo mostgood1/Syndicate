@@ -150,19 +150,60 @@ def yes_outcome_index() -> int:
 
 
 def outcome_side_for_index(index: Any) -> str:
-    """Which `outcomeSide` buys `outcomes[index]`.
+    """Which `outcomeSide` buys `outcomes[index]`, IF `outcomes[0]` is the YES
+    leg -- and it is not. **This function is no longer reachable for a team
+    side.** See `_resolve_outcome_side`.
 
-    THE ONLY SOUND WAY TO PICK A SIDE ON THIS VENUE. Polymarket's `outcomes`
-    carry bare names -- two teams, or Over/Under -- never "yes"/"no". So the
-    side we want is identified by MATCHING OUR TEAM AGAINST THAT ARRAY and
-    using where it landed. Anything else is a positional guess about an array
-    whose order is not guaranteed.
+    IT USED TO SAY "THE ONLY SOUND WAY TO PICK A SIDE ON THIS VENUE". That was
+    wrong, and the correction is kept here rather than in a commit message
+    because the sentence is exactly what made the defect survive a direct
+    investigation on 2026-08-28.
 
-    Measured, and this is why the guarantee cannot be assumed: slug
-    `aec-atp-domstr-markru` carries `outcomes: ["Martin Krumich", "Dominic
-    Stephan Stricker"]` -- REVERSED relative to its own slug. So slug order is
-    not outcomes order, and a rule derived from the slug is wrong for some
-    unknown fraction of the book.
+    The claim underneath it is that `outcomes[position]` can be converted into
+    a YES/NO by comparing `position` against a venue-wide `yes_outcome_index()`
+    -- i.e. that `outcomes[0]` IS the YES leg on every market. That is an
+    assumption about the array, made in the same file that documents the array
+    being unreliable.
+
+    MEASURED WRONG, 2026-08-28, on the settled live book. Every MLB game market
+    cross-checked against MLB StatsAPI (`segment=full`, schedule keyed by date,
+    fixtures appearing twice excluded):
+
+        polymarket h2h,    venue-settled:  5 agree,  3 MISMATCH
+        polymarket totals, venue-settled:  9 agree,  0 mismatch
+        kalshi     totals, venue-settled:  4 agree,  0 mismatch
+
+    The single decisive case, `aec-mlb-az-sf-2026-08-27`, three independent
+    facts agreeing:
+
+      * live-odds-worker 01:55:30Z -- `POLYMARKET_ARTIFACT_PRICE
+        outcome_index=0 outcome='San Francisco Giants'`, then `SUBMIT
+        side=OUTCOME_SIDE_YES action=BUY qty=15.45 price=0.48`. We asked for
+        index 0 and this function turned that into YES.
+      * StatsAPI -- **ARI 1 @ SF 6, Final.** We bet the team that won.
+      * The venue graded it `lost`, `pnl_dollars=-5.871` (= 15.45 x 0.38, the
+        whole cost basis), and its `positionResolution` row carries
+        `side=POSITION_RESOLUTION_SIDE_SHORT`. The venue says we held the short
+        leg of a market whose index 0 we had matched to San Francisco.
+
+    So on that market the YES leg is NOT `outcomes[0]`, while on the five that
+    agree it is. 3 of 8 is a coin flip, which is what a positional rule over an
+    unordered array is.
+
+    WHY TOTALS ARE IMMUNE, and why that is not luck: `_resolve_outcome_side`
+    sends an over/under through `_side_to_outcome`, which maps the NAME
+    (`over`->YES) and never consults the index at all. A team name carries no
+    yes/no axis, so h2h had nothing to fall back on -- and fell back to this.
+
+    Retained, not deleted, for three reasons: the over/under path still routes
+    through `yes_outcome_index()`'s constant, the env override remains the
+    documented way to correct the convention without a deploy, and the tests
+    that pin this arithmetic are what will prove the eventual name-based rule
+    is different from it.
+
+    Measured earlier, and still true -- it is why a slug rule is not the answer
+    either: `aec-atp-domstr-markru` carries `outcomes: ["Martin Krumich",
+    "Dominic Stephan Stricker"]`, REVERSED relative to its own slug.
     """
     try:
         position = int(index)
@@ -173,22 +214,86 @@ def outcome_side_for_index(index: Any) -> str:
     return _SIDE_YES if position == yes_outcome_index() else _SIDE_NO
 
 
-# The sides that must be read POSITIONALLY, and only these. A club name
-# carries no yes/no information, so the array index is the only sound source.
+# The sides a club name identifies, and therefore the ones that carry no
+# yes/no axis of their own. There is no sound rule for these on this venue
+# today -- see `_resolve_outcome_side`.
 _POSITIONAL_SIDES = frozenset({"home", "away"})
+
+# Re-open team betting on this venue WITHOUT A DEPLOY, once the YES leg can be
+# read by name. Off by default, and that default is the fix.
+#
+# An env switch rather than a code edit for the same reason
+# `yes_outcome_index()` has one: the answer lives at the venue, and when it is
+# finally read the correction should take minutes. It is also the escape hatch
+# if this refusal turns out to cost more than the defect -- but note that
+# turning it on restores a rule measured wrong on 3 of 8 real orders, so it is
+# not a knob to reach for casually.
+_ALLOW_TEAM_SIDE_ENV = "SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE"
+
+
+def team_side_allowed() -> bool:
+    import os
+
+    return str(os.environ.get(_ALLOW_TEAM_SIDE_ENV) or "").strip() == "1"
 
 
 def _resolve_outcome_side(side: Any, outcome_index: Any) -> str:
-    """Which leg to buy: by NAME where the name states it, by INDEX where only
-    the array can, and REFUSED where neither is true.
+    """Which leg to buy: by NAME where the name states it, and REFUSED where
+    nothing states it.
 
-    The third branch is not a formality. Routing every non-team side to the
-    index would make an unrecognised side (`draw`, a typo, an empty string)
-    resolve to whatever position happened to be passed -- a real bet on an
-    outcome nobody named. `_side_to_outcome` raises for those, and it is
-    reached here precisely so it keeps doing so.
+    ------------------------------------------------------------------
+    A TEAM SIDE IS NOW REFUSED. IT USED TO BE RESOLVED BY ARRAY POSITION.
+    ------------------------------------------------------------------
+
+    `over`/`under`/`yes`/`no` ARE the yes/no axis, so `_side_to_outcome` reads
+    them off the name and is right by construction whatever order the market's
+    `outcomes` happen to be in. Measured 9 of 9 correct on venue-settled MLB
+    totals, 2026-08-28.
+
+    `home`/`away` are not. A club name says nothing about which leg of a binary
+    market it is, and this function used to answer that question with
+    `outcome_side_for_index` -- a comparison of our team's POSITION in
+    `outcomes` against a venue-wide constant. That is an assumption that
+    `outcomes[0]` is the YES leg on every market, and it is false: measured
+    wrong on 3 of 8 venue-settled Polymarket moneylines, with real money on
+    both sides of the error (one full-stake loss on a bet whose team WON, and
+    two recorded wins we did not earn, which overstate the book's P&L as well
+    as misstating it). `outcome_side_for_index`'s docstring carries the case.
+
+    THE SAME STOP THE SPREAD PATH ALREADY MAKES, one market over.
+    `execute_portfolio._polymarket_resolve_market` refuses a spread with
+    `spread_side_needs_verified_team_mapping` because "nothing in [the
+    outcomes] says which TEAM is getting the points ... an assumed ordering on
+    this venue has already bought the wrong team once today at a real cost".
+    That is this situation exactly; the moneyline was left resolving
+    positionally only because its outcomes ARE team names, which answers which
+    team each entry is and not which leg either entry is.
+
+    WHY THIS IS A REFUSAL AND NOT A FIX. The sound rule needs the venue to say
+    which outcome the YES token pays, by name. `/v1/markets` returns
+    `marketSides` and `question` -- both are already in
+    `polymarket_us_markets._KEEP` -- and `_slate_row_for_storage` drops both
+    before the order path ever sees a row, so no name rule is writable today.
+    Neither field's SHAPE has ever been logged, only its key, so writing one
+    now would be a guess. `learnings.md 2026-08-28` is explicit about what a
+    guess costs here: flipping the constant on an unconfirmed diagnosis "would
+    have inverted every future order", and on a money path the cost of a wrong
+    fix is the bug itself. Refusing loses the h2h volume; guessing loses money
+    and looks like it is working.
+
+    THE THIRD BRANCH IS STILL NOT A FORMALITY. An unrecognised side (`draw`, a
+    typo, an empty string) must not resolve to whatever position happened to be
+    passed -- that would be a real bet on an outcome nobody named.
+    `_side_to_outcome` raises for those and is still reached here.
     """
     raw = str(side or "").strip().lower()
+    if raw in _POSITIONAL_SIDES and not team_side_allowed():
+        raise OrderBuildError(
+            f"team_side_needs_verified_yes_leg: {side!r} -- this venue's YES leg"
+            " is not `outcomes[0]` (measured wrong on 3 of 8 settled moneylines,"
+            " 2026-08-28) and nothing in the stored market row names it."
+            f" Set {_ALLOW_TEAM_SIDE_ENV}=1 to restore the positional rule."
+        )
     if raw in _POSITIONAL_SIDES and outcome_index is not None:
         return outcome_side_for_index(outcome_index)
     # Everything else lands on the NAME rule, which resolves

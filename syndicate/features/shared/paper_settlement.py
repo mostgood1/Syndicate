@@ -48,11 +48,12 @@ the strategy with a price it did not get.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 __all__ = [
     "american_profit",
+    "dates_needing_settlement",
     "grade_order",
     "settle_orders",
     "settlement_summary",
@@ -257,6 +258,142 @@ def grade_order(order: Mapping[str, Any], status: Mapping[str, Any]) -> dict[str
     }
 
 
+def _our_verdict(
+    order: Mapping[str, Any], resolver: Callable[[Mapping[str, Any]], dict[str, Any]]
+) -> tuple[dict[str, Any] | None, dict[str, Any], str]:
+    """Our own reading of one order: `(verdict | None, resolved, refusal)`.
+
+    EXTRACTED SO THERE IS EXACTLY ONE OF IT. `settle_orders` grades with this,
+    and `_check_venue_grade` cross-examines the venue with it. Two copies would
+    eventually disagree, and the whole value of the cross-check is that the two
+    readings are the SAME reading applied to different authorities.
+
+    A refusal comes back as a NAMED string, never a bare None, because the
+    caller files it into a counter that has to stay a work list.
+    """
+    from syndicate.features.shared.bet_status import resolve_bet_status
+
+    try:
+        resolved = resolver(order) or {}
+    except Exception as exc:
+        return None, {}, f"resolver_error:{type(exc).__name__}"
+    if resolved.get("unavailable_reason"):
+        # The feed's own vocabulary, passed through rather than flattened:
+        # `no_game_pk`, `no_feed` and `no_stat` are three different jobs.
+        return None, resolved, str(resolved["unavailable_reason"])
+
+    # THE RESOLVER MAY RESTATE `side` AND `line`, and for game lines it must.
+    #
+    # A spread arrives on the order as `side="Texas Rangers", line=-1.5` and
+    # a moneyline as `side="Levante", line=None`. Neither is expressible in
+    # the grader's over/under vocabulary, which is why 80 of 171 orders on
+    # 2026-08-23 refused with `unmapped_market` and always would have.
+    # `game_line_bet` translates them into a value, a direction and a
+    # number; the ORDER cannot be rewritten (it records what was actually
+    # bet), so the translation has to arrive here.
+    #
+    # Falls back to the order's own fields, so every player prop is
+    # untouched by this and the resolver only speaks up when it has
+    # something different to say.
+    status = resolve_bet_status(
+        market=order.get("market"),
+        side=resolved.get("side", order.get("side")),
+        line=resolved.get("line", order.get("line")),
+        current_value=resolved.get("current_value"),
+        is_final=bool(resolved.get("is_final")),
+        started=bool(resolved.get("started", True)),
+    )
+    if status.get("unavailable_reason"):
+        return None, resolved, str(status["unavailable_reason"])
+
+    verdict = grade_order(order, status)
+    if not verdict.get("graded"):
+        return None, resolved, str(verdict.get("reason"))
+    return verdict, resolved, ""
+
+
+def _check_venue_grade(
+    order: dict[str, Any], resolver: Callable[[Mapping[str, Any]], dict[str, Any]]
+) -> str | None:
+    """Does the VENUE's settlement agree with the GAME? Writes `grade_check`.
+
+    ----------------------------------------------------------------------
+    THE ONLY CHECK IN THIS SYSTEM THAT CAN CATCH A WRONG-SIDE ORDER
+    ----------------------------------------------------------------------
+
+    Two authorities settle a live bet, and they are independent in exactly the
+    way that matters:
+
+      OURS    the sport resolver reads the real result and applies the order's
+              own recorded `side`. It CANNOT detect a wrong side -- it grades
+              the bet we MEANT to place, so it agrees with our intent by
+              construction, whatever the venue actually bought.
+      VENUE   `venue_settlement.grade_polymarket_resolution` reads the realized
+              P&L delta on the position the venue says we held. It knows
+              nothing about our `side` field.
+
+    So a disagreement is not a tie to be broken -- it is the signature of the
+    two describing DIFFERENT POSITIONS, which is what a wrong-side fill is.
+
+    MEASURED 2026-08-28, the first time anything ran this comparison: 3 of 8
+    venue-settled Polymarket moneylines disagree, against 0 of 13 on totals
+    across both venues. `aec-mlb-az-sf-2026-08-27` is the clean one -- we bet
+    San Francisco, San Francisco won 6-1, the venue paid us a full-stake loss,
+    and its resolution row says we held the SHORT leg.
+
+    `learnings.md 2026-08-28` records that this class "has now been caught twice
+    by a human looking at a screen and zero times by a machine". This is the
+    machine.
+
+    NEVER TOUCHES `outcome` OR `pnl_dollars`. It records a disagreement; it does
+    not adjudicate one. Which authority is right is a question about the venue's
+    YES leg, and a cross-check that started rewriting settled money on its own
+    reading would be strictly worse than the defect it exists to report -- the
+    same argument `grade_polymarket_resolution` makes for refusing a zero delta
+    rather than calling it a push.
+
+    RUNS ONCE PER ORDER. `grade_check` is the memo: present means checked, so a
+    re-run costs no feed lookup, exactly as `outcome` gates the grading path.
+    Returns "agrees" / "conflict" / a refusal reason, or None when not eligible.
+    """
+    if str(order.get("settled_by") or "") != "venue":
+        # Only a venue-stated outcome is independent of our `side`. Checking one
+        # of OUR grades against OUR resolver would compare a reading with itself
+        # and report agreement forever -- an unfed field indistinguishable from
+        # a working one, which is the failure this repo names most often.
+        return None
+    if order.get("grade_check"):
+        return None
+
+    verdict, _resolved, refusal = _our_verdict(order, resolver)
+    if verdict is None:
+        # NOT a conflict. "The venue said won and the game says lost" and "the
+        # venue said won and we cannot read the game" are opposite findings and
+        # only the first is evidence of anything. `agrees: None` is the third
+        # value, and it is why this field is not a bool.
+        order["grade_check"] = {
+            "agrees": None,
+            "reason": refusal,
+            "venue_outcome": str(order.get("outcome") or ""),
+            "checked_at": _utc_now(),
+        }
+        return refusal
+
+    ours = str(verdict.get("outcome") or "")
+    theirs = str(order.get("outcome") or "")
+    agrees = ours == theirs
+    order["grade_check"] = {
+        "agrees": agrees,
+        "our_outcome": ours,
+        "venue_outcome": theirs,
+        # The scoreboard the disagreement rests on, so a person reading the row
+        # does not have to go and look the game up to believe it.
+        "settled_value": verdict.get("settled_value"),
+        "checked_at": _utc_now(),
+    }
+    return "agrees" if agrees else "conflict"
+
+
 def settle_orders(
     selected_date: str,
     *,
@@ -283,6 +420,17 @@ def settle_orders(
 
     graded = 0
     already = 0
+    # The cross-check's own counters, kept apart from `reasons` -- those are
+    # about rows we could not GRADE, and these are about rows we could not
+    # VERIFY. One counter for both would make a feed outage look like a wave of
+    # settlement disagreements.
+    conflicts = 0
+    agreements = 0
+    unchecked: dict[str, int] = {}
+    # `graded` alone used to decide whether to persist. The cross-check writes
+    # `grade_check` onto rows it never grades, so a slate with nothing new to
+    # grade can still have something new to save.
+    dirty = False
     reasons: dict[str, int] = {}
     outcomes: dict[str, int] = {}
     # WHICH markets we cannot grade, by name. The reason counter stays a stable
@@ -303,6 +451,34 @@ def settle_orders(
     for order in orders:
         if order.get("outcome"):
             already += 1
+            # CROSS-EXAMINE THE VENUE'S GRADES ON THE WAY PAST. A settled row is
+            # skipped for GRADING -- that idempotence is load-bearing and is not
+            # touched -- but a venue-stated outcome has never been checked
+            # against the actual game result, and 3 of 8 of them were wrong on
+            # 2026-08-28. See `_check_venue_grade`; it writes a memo, once, and
+            # never changes an outcome.
+            checked = _check_venue_grade(order, resolver)
+            if checked == "conflict":
+                conflicts += 1
+                dirty = True
+                print(
+                    "[paper_settlement] GRADE_CONFLICT"
+                    f" date={normalized} venue={order.get('venue')}"
+                    f" market={order.get('market')} side={order.get('side')}"
+                    f" ticker={order.get('venue_ticker')}"
+                    f" venue_said={order.get('outcome')}"
+                    f" game_says={(order.get('grade_check') or {}).get('our_outcome')}"
+                    f" pnl={order.get('pnl_dollars')}"
+                    " -- THE VENUE AND THE SCOREBOARD DESCRIBE DIFFERENT"
+                    " POSITIONS. Nothing was changed.",
+                    flush=True,
+                )
+            elif checked == "agrees":
+                agreements += 1
+                dirty = True
+            elif checked:
+                unchecked[checked] = unchecked.get(checked, 0) + 1
+                dirty = True
             continue
 
         if str(order.get("status") or "") != "filled":
@@ -334,46 +510,12 @@ def settle_orders(
                 _refuse(REASON_AWAITING_VENUE)
                 continue
 
-        try:
-            resolved = resolver(order) or {}
-        except Exception as exc:
-            _refuse(f"resolver_error:{type(exc).__name__}")
-            continue
-        if resolved.get("unavailable_reason"):
-            # The feed's own vocabulary, passed through rather than flattened:
-            # `no_game_pk`, `no_feed` and `no_stat` are three different jobs.
-            reason = str(resolved["unavailable_reason"])
-            _refuse(reason, order.get("market") if reason == "unmapped_market" else None)
-            continue
-
-        # THE RESOLVER MAY RESTATE `side` AND `line`, and for game lines it must.
-        #
-        # A spread arrives on the order as `side="Texas Rangers", line=-1.5` and
-        # a moneyline as `side="Levante", line=None`. Neither is expressible in
-        # the grader's over/under vocabulary, which is why 80 of 171 orders on
-        # 2026-08-23 refused with `unmapped_market` and always would have.
-        # `game_line_bet` translates them into a value, a direction and a
-        # number; the ORDER cannot be rewritten (it records what was actually
-        # bet), so the translation has to arrive here.
-        #
-        # Falls back to the order's own fields, so every player prop is
-        # untouched by this and the resolver only speaks up when it has
-        # something different to say.
-        status = resolve_bet_status(
-            market=order.get("market"),
-            side=resolved.get("side", order.get("side")),
-            line=resolved.get("line", order.get("line")),
-            current_value=resolved.get("current_value"),
-            is_final=bool(resolved.get("is_final")),
-            started=bool(resolved.get("started", True)),
-        )
-        if status.get("unavailable_reason"):
-            _refuse(str(status["unavailable_reason"]))
-            continue
-
-        verdict = grade_order(order, status)
-        if not verdict.get("graded"):
-            _refuse(str(verdict.get("reason")))
+        verdict, resolved, refusal = _our_verdict(order, resolver)
+        if verdict is None:
+            _refuse(
+                refusal,
+                order.get("market") if refusal == "unmapped_market" else None,
+            )
             continue
 
         order["outcome"] = verdict["outcome"]
@@ -395,6 +537,8 @@ def settle_orders(
         outcomes[verdict["outcome"]] = outcomes.get(verdict["outcome"], 0) + 1
 
     if graded:
+        dirty = True
+    if dirty:
         _persist(state)
 
     print(
@@ -406,7 +550,14 @@ def settle_orders(
         f" outcomes={outcomes}"
         # Named, because "we have not graded this yet" and "this lost" are the
         # two facts a performance number must never blur.
-        f" ungraded={reasons}",
+        f" ungraded={reasons}"
+        # THE CROSS-CHECK, ON THE SAME LINE, AND `conflicts=0` IS PRINTED EVEN
+        # WHEN IT IS ZERO. A zero here is a real reading only if a non-zero
+        # `verified` sits beside it -- `conflicts=0 verified=0` means nothing
+        # was checked, which is the state this whole line exists to distinguish
+        # from a clean book. Omitting the zero would make the two identical.
+        f" verified={agreements} conflicts={conflicts}"
+        f" unverifiable={unchecked}",
         flush=True,
     )
     if unmapped:
@@ -507,7 +658,112 @@ def settle_orders(
         "outcomes": outcomes,
         "ungraded": reasons,
         "unmapped_markets": dict(sorted(unmapped.items(), key=lambda kv: -kv[1])),
+        # The cross-check's result, so a caller can assert on it rather than
+        # grepping a log line for it. See `_check_venue_grade`.
+        "verified": agreements,
+        "conflicts": conflicts,
+        "unverifiable": dict(unchecked),
     }
+
+
+# How far back the straggler sweep will look, and how many slates it will do in
+# one pass. Both bound a WORKER loop, so both are deliberately small.
+#
+# `#241` is the standing lesson: periodic work on the worker is never free, and
+# a sweep that grows with the book would eventually cost a restart loop. This
+# one is bounded on both axes and skips a date entirely when nothing on it is
+# ungraded, so the steady state is zero extra resolver builds.
+_STRAGGLER_MAX_AGE_DAYS = 14
+_STRAGGLER_MAX_DATES = 6
+
+
+def dates_needing_settlement(
+    *,
+    today: str,
+    max_age_days: int = _STRAGGLER_MAX_AGE_DAYS,
+    max_dates: int = _STRAGGLER_MAX_DATES,
+) -> list[dict[str, Any]]:
+    """Slates that still hold a FILLED, UNGRADED order. Newest first.
+
+    ----------------------------------------------------------------------
+    WHY THIS EXISTS: "TODAY AND YESTERDAY" IS A WINDOW A BET CAN FALL OUT OF
+    ----------------------------------------------------------------------
+
+    `intelligence_state` has always settled exactly two dates, on the sound
+    argument that a night game finishes after midnight UTC and books under the
+    previous slate (`#370`). What that argument does not cover is a row that is
+    ungradeable ON BOTH of its two days and becomes gradeable LATER -- and every
+    mechanism this repo has been adding does exactly that:
+
+      * a resolver ships for a sport that had none. Soccer (`#547`), NFL and
+        NCAAF all landed this way, and NFL landed on 2026-08-28, by which time
+        2026-08-26's NFL rows were two days old and would never be asked again.
+      * a boxscore or a feed backfills after the fact.
+      * the venue grace (`REASON_AWAITING_VENUE`, 24h) defers a late game past
+        the end of its own second day.
+
+    MEASURED on the live book 2026-08-28T14:0xZ, which is what this fixes:
+    two WNBA totals on `2026-08-26` (`Golden State Valkyries @ Connecticut Sun`,
+    over and under 151.5, both FILLED) still carrying no outcome. The WNBA
+    resolver exists and works; nothing had asked it about that date since
+    2026-08-27, and nothing ever would have again.
+
+    A permanently ungradeable row is worse than a wrong one: it sits in `open`
+    forever, so the book's exposure reads high and its settled ROI reads over a
+    population that is quietly missing its hard cases.
+
+    ----------------------------------------------------------------------
+    BOUNDED, AND CHEAP WHEN THERE IS NOTHING TO DO
+    ----------------------------------------------------------------------
+
+    Returns at most `max_dates` slates no older than `max_age_days`, and only
+    ones that actually hold an ungraded filled order -- so on a healthy book it
+    returns `[]` and costs one ledger read that the caller was making anyway.
+
+    The SPORTS on each date come back with it. The caller uses them to decide
+    whether a date is worth a boxscore refresh, because refreshing WNBA boxes
+    for a slate with no ungraded WNBA row is exactly the free-looking periodic
+    work that is not free.
+
+    PURE: takes `today` rather than reading a clock, so a test can pin the
+    window instead of arranging for one.
+    """
+    from datetime import date as _date
+
+    from syndicate.features.shared.execution_ledger import _load
+
+    try:
+        floor = (_date.fromisoformat(str(today).strip()) - timedelta(days=int(max_age_days))).isoformat()
+    except (TypeError, ValueError):
+        # An unreadable `today` must not silently widen the window to the whole
+        # book -- that is the sweep this bound exists to prevent.
+        return []
+
+    pending: dict[str, dict[str, Any]] = {}
+    for order in (_load().get("orders") or []):
+        if not isinstance(order, Mapping):
+            continue
+        if order.get("outcome"):
+            continue
+        if str(order.get("status") or "") != "filled":
+            # Only a FILLED row can ever be graded. Anything else is refused by
+            # `settle_orders` on every pass, so counting it here would keep a
+            # date permanently "needing settlement" and burn the budget on it.
+            continue
+        slate = str(order.get("selected_date") or "").strip()
+        if not slate or slate < floor or slate > str(today):
+            continue
+        entry = pending.setdefault(slate, {"date": slate, "orders": 0, "sports": set()})
+        entry["orders"] += 1
+        sport = str(order.get("sport") or "").strip().lower()
+        if sport:
+            entry["sports"].add(sport)
+
+    ordered = sorted(pending.values(), key=lambda e: e["date"], reverse=True)
+    return [
+        {"date": e["date"], "orders": e["orders"], "sports": sorted(e["sports"])}
+        for e in ordered[: max(0, int(max_dates))]
+    ]
 
 
 def audit_game_line_grades(selected_date: str, *, limit: int = 25) -> dict[str, Any]:

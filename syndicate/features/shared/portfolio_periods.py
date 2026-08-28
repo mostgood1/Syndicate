@@ -1,7 +1,26 @@
-"""The book rolled up by day, month, and year.
+"""The book rolled up by day, month, year -- and by sport and bet type.
 
 [USER DECISION 2026-08-25] "We should be able to see a daily view (pivot on
 date), a monthly view, and a yearly view."
+
+[USER DECISION 2026-08-28] "we need to start tracking bets by sport and by bet
+type (this can be part of the area below the day/month/year selection)."
+
+--------------------------------------------------------------------------
+SPORT AND MARKET ARE THE SAME ROLLUP, NOT A SECOND ONE
+--------------------------------------------------------------------------
+
+`settlement_summary` already computes a `by_sport` and a `by_market_family`,
+and they were the obvious place to put this. They are deliberately NOT what
+the page shows below the period tabs, because they answer a different question
+over a different population: that summary is scoped to the DATE SELECTION and
+counts every order including the ones that never opened a position, so its
+`mlb: orders 221` cannot be reconciled against a day row reading `orders 54`
+by anybody looking at one screen.
+
+Five pivots over ONE bucket builder means the sport rows sum to the day rows
+sum to the year row, exactly, with no explanation needed. A reader who cannot
+add up two tables on the same page stops trusting both.
 
 PURE. Takes ledger rows, returns totals. No clock, no disk, no request -- which
 is what lets the page, the API, and a test all ask the same question and get
@@ -56,6 +75,23 @@ PERIODS = ("day", "month", "year")
 
 _PERIOD_WIDTH = {"day": 10, "month": 7, "year": 4}
 
+# The non-date pivots, keyed off a field the order already carries rather than
+# anything derived. Same reason the period keys are prefixes of `selected_date`:
+# a rollup is exactly where a clever derivation is least visible when it is
+# wrong, because nothing about a number looks broken.
+#
+# `market` IS the bet type -- `h2h`, `totals`, `batter_hits` -- and is used raw.
+# Folding it into families (game line / game total / player prop) would answer
+# a coarser question than the one asked, and `settlement_summary.
+# by_market_family` already answers that one.
+DIMENSIONS = ("sport", "market")
+
+# An order whose dimension field is empty is filed under this rather than
+# dropped. A dropped row would make the sport pivot silently short against the
+# day pivot beside it, which is the one property this module is buying by
+# sharing a bucket builder.
+UNKNOWN_KEY = "(unspecified)"
+
 
 def _as_float(value: Any) -> float:
     try:
@@ -76,6 +112,18 @@ def is_position(order: Mapping[str, Any]) -> bool:
     if str(order.get("status") or "") == "rejected":
         return False
     return not _is_venue_refusal(order)
+
+
+def dimension_key(order: Mapping[str, Any], dimension: str) -> str:
+    """The sport or market bucket this order belongs to.
+
+    NEVER "" -- see `UNKNOWN_KEY`. `period_key` may return "" because a row with
+    no readable slate date genuinely cannot be placed in time and the caller
+    counts it as `undated`; a row with no sport is still a bet that happened,
+    and hiding it would break the arithmetic these pivots exist to preserve.
+    """
+    value = str(order.get(dimension) or "").strip().lower()
+    return value or UNKNOWN_KEY
 
 
 def period_key(order: Mapping[str, Any], period: str) -> str:
@@ -103,6 +151,10 @@ def _empty_bucket(key: str) -> dict[str, Any]:
         "orders": 0,
         "filled": 0,
         "pending": 0,
+        # SENT, NEVER ANSWERED. Not open and not settled -- see `_add`. Without
+        # this the Orders column does not equal Open + Settled and nothing on
+        # the page says why.
+        "unknown": 0,
         "settled": 0,
         "won": 0,
         "lost": 0,
@@ -135,6 +187,16 @@ def _add(bucket: dict[str, Any], order: Mapping[str, Any]) -> None:
         # unresolved book look like a break-even one.
         if status == "filled":
             bucket["pending"] += 1
+        else:
+            # NOT FILLED, NOT REFUSED, NOT GRADED -- the row `is_position` keeps
+            # because a 5xx submit may have landed. It is counted in `orders`
+            # (it consumed the day's budget) and it is neither open nor settled,
+            # so `orders != pending + settled` and the difference had no name.
+            #
+            # `[user 2026-08-28]` "yesterday has 2 positions that were errors
+            # showing as an actual position." They were the two Polymarket
+            # `http_503` submits of 2026-08-27. This is the column that says so.
+            bucket["unknown"] += 1
         return
 
     bucket["settled"] += 1
@@ -180,6 +242,7 @@ def period_rollup(orders: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     rows = [order for order in orders if isinstance(order, Mapping) and is_position(order)]
 
     buckets: dict[str, dict[str, dict[str, Any]]] = {period: {} for period in PERIODS}
+    dims: dict[str, dict[str, dict[str, Any]]] = {name: {} for name in DIMENSIONS}
     undated = 0
     for order in rows:
         keys = {period: period_key(order, period) for period in PERIODS}
@@ -187,17 +250,41 @@ def period_rollup(orders: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
             # Dropped from EVERY period, not just the day: filing a row under a
             # month while it is missing from that month's days would make the
             # two views disagree and neither of them be wrong.
+            #
+            # AND FROM THE SPORT AND MARKET PIVOTS TOO, for the same reason one
+            # level up: `undated` is reported once, and a row present in the
+            # sport table while absent from every date table would make the two
+            # disagree with nothing on the page accounting for the difference.
             undated += 1
             continue
         for period in PERIODS:
             key = keys[period]
             bucket = buckets[period].setdefault(key, _empty_bucket(key))
             _add(bucket, order)
+        for name in DIMENSIONS:
+            key = dimension_key(order, name)
+            bucket = dims[name].setdefault(key, _empty_bucket(key))
+            _add(bucket, order)
+
+    def _rows(table: dict[str, dict[str, Any]], *, newest_first: bool) -> list[dict[str, Any]]:
+        if newest_first:
+            # Dates: the row a person wants is today's, and a table that opens
+            # on January is a table they have to scroll.
+            ordered = sorted(table.items(), reverse=True)
+        else:
+            # Sport and market have no chronology, so alphabetical would put
+            # `batter_hits` above `totals` on volume grounds nobody holds.
+            # BIGGEST FIRST -- the pivot exists to answer "where is the book",
+            # and the answer is the top row.
+            ordered = sorted(table.items(), key=lambda kv: (-kv[1]["orders"], kv[0]))
+        return [_finalize(b) for _, b in ordered]
 
     return {
-        "by_day": [_finalize(b) for _, b in sorted(buckets["day"].items(), reverse=True)],
-        "by_month": [_finalize(b) for _, b in sorted(buckets["month"].items(), reverse=True)],
-        "by_year": [_finalize(b) for _, b in sorted(buckets["year"].items(), reverse=True)],
+        "by_day": _rows(buckets["day"], newest_first=True),
+        "by_month": _rows(buckets["month"], newest_first=True),
+        "by_year": _rows(buckets["year"], newest_first=True),
+        "by_sport": _rows(dims["sport"], newest_first=False),
+        "by_market": _rows(dims["market"], newest_first=False),
         "counted_orders": len(rows) - undated,
         "undated": undated,
     }

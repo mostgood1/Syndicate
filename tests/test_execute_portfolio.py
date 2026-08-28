@@ -1231,10 +1231,22 @@ def test_the_verifier_reports_which_market_families_would_build(monkeypatch):
     import pipeline.execute_portfolio as runner
     from pipeline import portfolio_commit
 
-    _artifact_env(monkeypatch)
+    # BOTH FAMILIES IN THE SLATE, so the contrast this test is named for is a
+    # real one: a totals market that resolves by NAME beside a moneyline that
+    # can no longer resolve its side at all.
+    _artifact_env(monkeypatch, markets=[
+        _polymarket_row(),
+        _polymarket_row(slug="tsc-mlb-tex-chw-2026-08-24-8pt5",
+                        teams=("Under", "Over"), prices=("0.55", "0.45")),
+    ])
     monkeypatch.setattr(portfolio_commit, "read_portfolio_plan_for_venue",
                         lambda date, venue: {"positions": [
                             {"position_key": "p1", "sport": "mlb", "event_id": "e1",
+                             "market": "totals", "side": "under", "line": 8.5,
+                             "price": 0.55, "stake_dollars": 2.0,
+                             "venue_ticker": "tsc-mlb-tex-chw-2026-08-24-8pt5",
+                             "home_team": "CHW", "away_team": "TEX"},
+                            {"position_key": "p2", "sport": "mlb", "event_id": "e1",
                              "market": "h2h", "side": "home", "price": 0.55,
                              "stake_dollars": 2.0,
                              "venue_ticker": "aec-mlb-tex-chw-2026-08-24",
@@ -1243,7 +1255,18 @@ def test_the_verifier_reports_which_market_families_would_build(monkeypatch):
 
     report = runner.verify_order_paths("2026-08-24", venues=("polymarket",))
     markets = report["venues"]["polymarket"]["markets"]
-    assert markets["h2h"]["would_build"] == 1
+
+    # A market that still transacts. `under` resolves by NAME, which is why
+    # totals were 9 of 9 correct on the settled book while moneylines were not.
+    assert markets["totals"]["would_build"] == 1
+
+    # AND THE ONE THAT NO LONGER DOES, which is exactly what this report is for
+    # `[2026-08-28]`. `polymarket_us_orders._resolve_outcome_side` refuses a
+    # team side because the venue's YES leg is measurably not `outcomes[0]`, and
+    # a whole market family going dark must be legible HERE rather than as a
+    # scattering of per-order log lines.
+    assert markets["h2h"]["OrderBuildError"] == 1
+    assert "would_build" not in markets["h2h"]
 
 
 def test_the_verifier_cannot_place_an_order(monkeypatch):

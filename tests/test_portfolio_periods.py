@@ -144,5 +144,8 @@ def test_empty_book_is_empty_not_an_error():
     out = period_rollup([])
     assert out == {
         "by_day": [], "by_month": [], "by_year": [],
+        # The sport and bet-type pivots `[user 2026-08-28]`, built from the same
+        # buckets so every pivot on the page adds up to every other one.
+        "by_sport": [], "by_market": [],
         "counted_orders": 0, "undated": 0,
     }

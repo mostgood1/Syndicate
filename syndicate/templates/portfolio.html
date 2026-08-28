@@ -171,6 +171,16 @@
   /* THE PIVOTS HAD NO STYLES AT ALL on the old `/portfolio/live` -- the whole
      Performance section rendered as raw unstyled markup, and `is-up`/`is-down`
      coloured nothing. Both are defined here. */
+  .live-error--loud { border-width: 2px; }
+  .live-unknown-list { margin: 6px 0 0; padding-left: 18px; font-size: 11px; line-height: 1.55; }
+  .live-unknown-list .sub { display: block; color: var(--cards-text-dim); font-size: 10px; }
+  .live-venuefilter { display: inline-flex; align-items: center; gap: 4px; }
+  .live-venuefilter__opt {
+    font-size: 11px; padding: 1px 7px; border-radius: 999px; text-decoration: none;
+    border: 1px solid var(--cards-line); color: var(--cards-text-dim); text-transform: lowercase;
+  }
+  .live-venuefilter__opt:hover { border-color: var(--cards-line-strong); color: var(--cards-text-soft); }
+  .live-venuefilter__opt.is-active { border-color: var(--cards-accent); color: var(--cards-accent); }
   .live-periods { margin-top: 18px; }
   .live-periods__head {
     display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
@@ -532,7 +542,11 @@
 {# Everything the slate filter must NOT reset when it navigates. `?date=` only
    builds links and `?show=` is the hidden-orders toggle; a date control that
    dropped either would silently undo the reader's other choices. #}
-{% set qs_keep = 'date=' ~ qs_date ~ ('&show=all' if L.show_all else '') %}
+{% set qs_keep = 'date=' ~ qs_date ~ ('&show=all' if L.show_all else '') ~ ('&venue=' ~ L.venue if L.venue else '') %}
+{# Everything the VENUE control must not reset, which is the date selection --
+   `qs_keep` already carries `venue`, so a venue link built from it would pin
+   the current venue and the control could never change. #}
+{% set qs_keep_novenue = 'date=' ~ qs_date ~ ('&show=all' if L.show_all else '') ~ ('&on=' ~ L.on_date if (L.on_date and not L.all_dates) else ('&on=all' if L.all_dates else '')) %}
 
 <main class="portfolio-page">
 
@@ -650,6 +664,37 @@
         <a class="live-datefilter__all" href="?{{ qs_keep }}&on=all#live">all dates</a>
       {% endif %}
     </span>
+    {# ---------------------------------------------------------------
+       THE VENUE FILTER `[user 2026-08-28]`: "be able to filter by polymarket
+       or kalshi or show all".
+
+       OPTIONS COME FROM THE BOOK, NOT FROM A TUPLE HERE. The day a third
+       venue's first order lands it appears in this control by itself; a
+       hardcoded pair would silently exclude it and look like the venue placed
+       nothing. Same rule as the date picker's `date_options`.
+
+       IT HIDES ROWS, SO IT CARRIES THE SAME COUNT THE DATE CONTROL DOES --
+       see `hidden_open_venue` below the table. Every control on this page that
+       can conceal an open position has to say how many, or the page becomes a
+       way to forget a live bet.
+       --------------------------------------------------------------- #}
+    {% if L.venue_options %}
+      <span class="live-flag live-venuefilter">
+        <span class="live-flag__label">Venue</span>
+        {% if L.venue %}
+          <a class="live-venuefilter__opt" href="?{{ qs_keep_novenue }}#live">all</a>
+        {% else %}
+          <span class="live-venuefilter__opt is-active">all</span>
+        {% endif %}
+        {% for v in L.venue_options %}
+          {% if v == L.venue %}
+            <span class="live-venuefilter__opt is-active">{{ v }}</span>
+          {% else %}
+            <a class="live-venuefilter__opt" href="?{{ qs_keep_novenue }}&venue={{ v }}#live">{{ v }}</a>
+          {% endif %}
+        {% endfor %}
+      </span>
+    {% endif %}
   </div>
 
   {% if L.state_source != 'worker' %}
@@ -1060,6 +1105,91 @@
     </div>
   {% endif %}
 
+  {# The venue control's half of the same guarantee. Separate line, not folded
+     into the one above: "3 hidden by the date" and "3 hidden by the venue" are
+     cleared by different clicks, and a merged count tells the reader neither. #}
+  {% if L.hidden_open_venue %}
+    <div class="live-note">
+      <strong>{{ L.hidden_open_venue }} open position(s) at other venues are not shown here.</strong>
+      They are still live, and the tiles above count {{ L.venue }} only.
+      <a href="?{{ qs_keep_novenue }}#live">Show all venues</a>.
+    </div>
+  {% endif %}
+
+  {# ---------------------------------------------------------------------
+     THE VENUE AND THE SCOREBOARD DISAGREE ABOUT A SETTLED BET.
+
+     This is the loudest thing on the page and it is meant to be. Every other
+     warning here is about money whose result is not known yet; this one is
+     about money already booked against a result that the game contradicts,
+     which on a moneyline means the position was on the other team.
+
+     It is deliberately NOT scoped by the date or venue controls -- see
+     `grade_conflicts` in the payload. A settled row's slate is the one nobody
+     reopens, so a conflict shown only under its own date is a conflict shown
+     to nobody.
+     --------------------------------------------------------------------- #}
+  {% if L.grade_conflicts %}
+    <div class="live-error live-error--loud">
+      <strong>{{ L.grade_conflicts|length }} settled bet(s) disagree with the actual game result.</strong>
+      The venue booked a result the scoreboard contradicts, across
+      <strong>${{ "%.2f"|format(L.grade_conflict_dollars or 0) }}</strong> of recorded P&amp;L.
+      On a moneyline that means the position was on <em>the other team</em>.
+      Nothing has been re-graded — the numbers below still say what the venue said.
+      <ul class="live-unknown-list">
+        {% for o in L.grade_conflicts %}
+          {% set gc = o.get('grade_check') or {} %}
+          <li>
+            <strong>{{ o.get('selected_date') }}</strong> ·
+            {{ o.get('venue') }} ·
+            {{ o.get('market') }} {{ o.get('side') }}
+            {% if o.get('away_team') or o.get('home_team') %}· {{ o.get('away_team') or '?' }} @ {{ o.get('home_team') or '?' }}{% endif %}
+            — venue says <strong>{{ gc.get('venue_outcome')|upper }}</strong>,
+            the game says <strong>{{ gc.get('our_outcome')|upper }}</strong>,
+            booked {{ "%+.2f"|format(o.get('pnl_dollars') or 0) }}
+            <span class="sub">{{ o.get('venue_ticker') or '' }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {# ---------------------------------------------------------------------
+     SENT, NEVER ANSWERED. Its own block, above the table, because these are
+     not positions and the table is headed as though everything in it is.
+
+     `[user 2026-08-28]` "yesterday has 2 positions that were errors showing as
+     an actual position." They were, and the fix is not to delete them: we do
+     not know whether they landed. Polymarket has no route that can answer it
+     (`GET /v1/orders` -> 501, and the per-order read needs the id the 503 lost)
+     so the only thing that settles one of these is a person opening the venue's
+     own screen. The block says exactly that, names the market and the money,
+     and stops short of claiming either outcome.
+     --------------------------------------------------------------------- #}
+  {% if L.unknown_submits %}
+    <div class="live-error">
+      <strong>{{ L.unknown_submits|length }} order(s) were sent and the venue never answered.</strong>
+      Up to <strong>${{ "%.2f"|format(L.unknown_submit_dollars or 0) }}</strong> may or may not
+      be at risk. These are <em>not</em> counted as positions in the table below and
+      <em>not</em> counted as refusals — we hold no order id for them, so nothing
+      here can confirm or deny that a position exists.
+      <strong>Check them on the venue's own screen; do not re-submit.</strong>
+      <ul class="live-unknown-list">
+        {% for o in L.unknown_submits %}
+          <li>
+            <strong>{{ o.get('selected_date') }}</strong> ·
+            {{ o.get('venue') }} ·
+            {{ o.get('market') }}{% if o.get('line') is not none %} {{ o.get('side') }} {{ o.get('line') }}{% endif %}
+            {% if o.get('away_team') or o.get('home_team') %}· {{ o.get('away_team') or '?' }} @ {{ o.get('home_team') or '?' }}{% endif %}
+            · ${{ "%.2f"|format(o.get('requested_stake_dollars') or 0) }} requested
+            <span class="sub">{{ o.get('venue_ticker') or '' }}</span>
+            {% if o.get('error') %}<span class="sub warn">{{ o.get('error') }}</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
   {% if not orders %}
     <div class="live-empty">
       {% if L.ledger_error %}
@@ -1191,6 +1321,13 @@
                   {% endif %}
                 {% endif %}
                 {% if o.get('settled_value') is not none %}<span class="sub">{{ o.get('settled_value') }} vs {{ o.get('line') }}</span>{% endif %}
+                {# THE ROW-LEVEL HALF OF THE BANNER ABOVE. The banner says how
+                   many; this says which, so a reader scanning the table is not
+                   left cross-referencing tickers by hand. #}
+                {% set gc = o.get('grade_check') or {} %}
+                {% if gc.get('agrees') is sameas false %}
+                  <span class="sub warn">game says {{ gc.get('our_outcome')|upper }} — wrong side?</span>
+                {% endif %}
               </td>
               <td class="{{ 'pos' if (o.get('pnl_dollars') or 0) > 0 else ('neg' if (o.get('pnl_dollars') or 0) < 0 else '') }}">
                 {% if o.get('pnl_dollars') is not none %}{{ "%+.2f"|format(o.get('pnl_dollars')) }}
@@ -1231,20 +1368,45 @@
      --------------------------------------------------------------------- #}
   {% set P = L.periods or {} %}
   {% if P.get('by_day') %}
-    {% set view = request.args.get('period', 'day') %}
-    {% set rows = P.get('by_' ~ view) or P.get('by_day') %}
+    {# THE TABS, AND THE LAST TWO ARE NOT PERIODS `[user 2026-08-28]`: "we need
+       to start tracking bets by sport and by bet type (this can be part of the
+       area below the day/month/year selection)."
+
+       ONE ROLLUP, FIVE PIVOTS. `period_rollup` builds all five from the same
+       bucket over the same rows, so the sport rows add up to the day rows add
+       up to the year row. `settlement_summary` also has a `by_sport`, over a
+       different population, and putting THAT here would have given the page
+       two sport tables whose totals disagree for a reason no reader could see.
+
+       `type` IS `by_market` -- the tab is named for what a person calls it,
+       the payload key for the field it reads. An unknown `?period=` falls back
+       to `day` rather than rendering an empty table. #}
+    {% set tabs = ['day', 'month', 'year', 'sport', 'type'] %}
+    {% set tab_keys = {'day': 'by_day', 'month': 'by_month', 'year': 'by_year', 'sport': 'by_sport', 'type': 'by_market'} %}
+    {% set asked = request.args.get('period', 'day') %}
+    {% set view = asked if asked in tabs else 'day' %}
+    {% set rows = P.get(tab_keys.get(view)) or P.get('by_day') %}
+    {% set heading = {'day': 'Day', 'month': 'Month', 'year': 'Year', 'sport': 'Sport', 'type': 'Bet type'}.get(view, 'Day') %}
     <section class="live-periods">
       <div class="live-periods__head">
         <h2>Live performance</h2>
         <nav class="live-periods__tabs">
-          {% for tab in ['day', 'month', 'year'] %}
+          {% for tab in tabs %}
             {% if tab == view %}
               <span class="is-active">{{ tab }}</span>
             {% else %}
-              <a href="?date={{ qs_date }}{% if L.show_all %}&amp;show=all{% endif %}&amp;period={{ tab }}#live">{{ tab }}</a>
+              <a href="?{{ qs_keep }}{% if L.all_dates %}&amp;on=all{% elif L.on_date %}&amp;on={{ L.on_date }}{% endif %}&amp;period={{ tab }}#live">{{ tab }}</a>
             {% endif %}
           {% endfor %}
         </nav>
+      </div>
+      {# WHOLE BOOK, STATED. The pivots deliberately do not follow the date or
+         venue controls at the top of the page -- "how has this done" is a
+         question about every live order ever placed -- and with two filters up
+         there now, a reader whose table went quiet needs to know this one did
+         not. #}
+      <div class="live-periods__note" style="color: var(--cards-text-dim)">
+        Whole book, every date and every venue — these do not follow the filters above.
       </div>
       {% if P.get('undated') %}
         {# A pivot quietly missing bets says so, rather than just being short. #}
@@ -1255,7 +1417,11 @@
       <div class="live-table-wrap">
         <table class="live-table">
           <thead>
-            <tr><th>{{ view|capitalize }}</th><th>Orders</th><th>Open</th><th>Settled</th>
+            {# `Unknown` earns a column rather than a footnote: without it
+               Orders does not equal Open + Settled, and a reader who checks
+               the arithmetic finds it short with nothing to blame. It is the
+               `http_503` class -- sent, never answered. #}
+            <tr><th>{{ heading }}</th><th>Orders</th><th>Open</th><th>Unknown</th><th>Settled</th>
                 <th>W-L-P</th><th>Staked</th><th>P&amp;L</th><th>ROI</th><th>Win%</th></tr>
           </thead>
           <tbody>
@@ -1264,6 +1430,7 @@
                 <td>{{ r.key }}</td>
                 <td>{{ r.orders }}</td>
                 <td>{{ r.pending }}</td>
+                <td>{% if r.unknown %}<span class="warn">{{ r.unknown }}</span>{% else %}&mdash;{% endif %}</td>
                 <td>{{ r.settled }}</td>
                 <td>{{ r.won }}-{{ r.lost }}-{{ r.push }}</td>
                 <td>${{ "%.2f"|format(r.staked_dollars) }}</td>

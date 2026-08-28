@@ -872,13 +872,26 @@ def test_orders_that_never_opened_a_position_are_hidden_by_default(monkeypatch):
 
 
 def test_a_failed_order_of_UNKNOWN_outcome_stays_visible(monkeypatch):
-    """The row a person must see FIRST.
+    """The row a person must see FIRST -- and since 2026-08-28, NOT in the
+    positions table.
 
-    A submit that timed out may well have landed -- that gap is why the
-    write-ahead record exists. Hiding it would bury the one order that needs
-    checking against the venue before anything else is placed, which is what
-    the page's own banner says. Only a failure the venue ANSWERED (a 4xx) is
-    certainly not a position.
+    A submit that timed out may well have landed; that gap is why the
+    write-ahead record exists, and hiding these would bury the one order that
+    needs checking against the venue before anything else is placed. Only a
+    failure the venue ANSWERED (a 4xx) is certainly not a position, and that one
+    is still hidden.
+
+    WHAT CHANGED, AND WHY IT IS NOT A WEAKENING. `[user 2026-08-28]` "yesterday
+    has 2 positions that were errors showing as an actual position." They were
+    rendered as rows in a table headed as though everything in it is a position,
+    which overstates the book -- while deleting them would understate the
+    exposure, since nothing available to us can settle whether they landed
+    (`GET /v1/orders` answers 501 and the per-order read needs the id the 503
+    lost). So they move to `unknown_submits`, which the page renders ABOVE the
+    table in its own block with the dollars at risk named.
+
+    The guarantee this test has always defended is unchanged and is asserted
+    twice below: a 5xx row is still surfaced, and a 4xx row is still not.
     """
     from syndicate.blueprints import intelligence as mod
     from syndicate.features.shared import execution_ledger as ledger_mod
@@ -891,8 +904,18 @@ def test_a_failed_order_of_UNKNOWN_outcome_stays_visible(monkeypatch):
     monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": orders})
 
     payload = mod._live_portfolio_payload("2026-08-25", on_date="all")
-    visible = {o["position_key"] for o in payload["orders"]}
-    assert visible == {"unknown", "broke"}, visible
+
+    # STILL SURFACED, in the block that describes what they actually are.
+    surfaced = {o["position_key"] for o in payload["unknown_submits"]}
+    assert surfaced == {"unknown", "broke"}, surfaced
+
+    # AND NO LONGER COUNTED AS POSITIONS.
+    assert {o["position_key"] for o in payload["orders"]} == set()
+
+    # The venue's own refusal is still hidden and still not in either place --
+    # "we placed nothing" and "we tried and were refused" stay distinct.
+    assert "refused" not in surfaced
+    assert payload["hidden_count"] == 1
     assert payload["hidden_count"] == 1
 
 

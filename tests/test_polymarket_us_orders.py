@@ -322,13 +322,43 @@ def test_an_unusable_outcome_index_refuses_rather_than_defaulting():
             outcome_side_for_index(bad)
 
 
-def test_order_body_uses_the_index_over_the_side_name():
-    """The end the money comes out of. A `side=home` body must be able to send
-    OUTCOME_SIDE_NO -- which the old code could not express at all."""
-    from syndicate.features.shared.polymarket_us_orders import order_body
+def test_order_body_REFUSES_a_team_side_at_the_end_the_money_comes_out_of(monkeypatch):
+    """REACHABILITY, at the choke point every caller shares.
 
+    This test used to assert that `order_body` resolved `side=home` through the
+    outcome INDEX -- the fix for the Texas/White Sox inversion of 2026-08-25,
+    which was correct about the price and wrong about the leg. That rule assumes
+    `outcomes[0]` is the venue's YES leg, and on 2026-08-28 it was measured
+    wrong on 3 of 8 venue-settled moneylines: see
+    `outcome_side_for_index.__doc__` for `aec-mlb-az-sf-2026-08-27`, where we
+    bet a team that won 6-1 and the venue paid us a full-stake loss with
+    `held_side=POSITION_RESOLUTION_SIDE_SHORT`.
+
+    So the assertion is inverted, and it is asserted HERE -- through
+    `order_body` rather than through `_resolve_outcome_side` -- because a
+    refusal that a caller can route around is not a refusal. A body must not be
+    constructible for a team side at all.
+    """
+    from syndicate.features.shared import polymarket_us_orders as orders
+
+    monkeypatch.delenv(orders._ALLOW_TEAM_SIDE_ENV, raising=False)
     request = _Request(side="home")
-    body = order_body(
+    for index in (0, 1, None):
+        with pytest.raises(OrderBuildError, match="team_side_needs_verified_yes_leg"):
+            orders.order_body(
+                request,
+                market_slug="aec-mlb-tex-cws-2026-08-25",
+                price_dollars=0.495,
+                tick_size=0.005,
+                minimum_trade_qty=0.01,
+                outcome_index=index,
+            )
+
+    # AND THE OTHER STATE, so this is a switch and not a wall. With the escape
+    # hatch set the previous arithmetic is byte-for-byte what it was -- which is
+    # what makes `off != on` a proof rather than an assertion about one branch.
+    monkeypatch.setenv(orders._ALLOW_TEAM_SIDE_ENV, "1")
+    body = orders.order_body(
         request,
         market_slug="aec-mlb-tex-cws-2026-08-25",
         price_dollars=0.495,
@@ -337,8 +367,7 @@ def test_order_body_uses_the_index_over_the_side_name():
         outcome_index=1,
     )
     assert body["outcomeSide"] == "OUTCOME_SIDE_NO"
-
-    flipped = order_body(
+    flipped = orders.order_body(
         request,
         market_slug="aec-mlb-tex-cws-2026-08-25",
         price_dollars=0.495,
@@ -461,20 +490,44 @@ def test_under_buys_NO_at_either_position():
         assert body["outcomeSide"] == "OUTCOME_SIDE_NO", index
 
 
-def test_a_team_side_still_resolves_by_INDEX_not_by_name():
-    """The OPPOSITE rule, and it must not regress -- a club name carries no
-    yes/no information, so the array position is the only sound source. This
-    is the Texas/White Sox fix, made on the same venue the same morning."""
-    assert _body(request=_Request(side="home"), outcome_index=0)["outcomeSide"] == (
-        "OUTCOME_SIDE_YES"
-    )
-    assert _body(request=_Request(side="home"), outcome_index=1)["outcomeSide"] == (
-        "OUTCOME_SIDE_NO"
-    )
+def test_a_team_side_no_longer_resolves_by_INDEX_either(monkeypatch):
+    """The rule this file has now had wrong in BOTH directions, and the reason
+    the third answer is a refusal rather than a third guess.
+
+    2026-08-25: `home` mapped positionally to YES while the PRICE was matched by
+    name. Fixed by making the index feed both -- one reading, two uses.
+    2026-08-28: the index itself is not a reading of the yes/no axis. It says
+    which team `outcomes[position]` is; it does not say which leg that entry is,
+    and the venue's YES leg is not reliably `outcomes[0]`.
+
+    A club name carries no yes/no information -- the sentence this test used to
+    justify the index rule with -- and neither does an array position. Nothing
+    available to the order path today does, so nothing may answer it.
+    """
+    from syndicate.features.shared import polymarket_us_orders as orders
+
+    monkeypatch.delenv(orders._ALLOW_TEAM_SIDE_ENV, raising=False)
+    for index in (0, 1):
+        with pytest.raises(OrderBuildError, match="team_side_needs_verified_yes_leg"):
+            _body(request=_Request(side="home"), outcome_index=index)
 
 
-def test_a_team_side_with_no_index_still_refuses():
-    """Refusing beats guessing positionally -- unchanged."""
+def test_a_team_side_with_no_index_still_refuses(monkeypatch):
+    """Refusing beats guessing positionally -- unchanged in effect, and the
+    reason string moved UP a level rather than away.
+
+    With the escape hatch OFF the whole team path is refused before the index is
+    considered, so the message names the venue property. With it ON the original
+    `side_needs_outcome_index` refusal is still there underneath -- and it has
+    to be, or turning the hatch on would resolve a missing index by accident.
+    """
+    from syndicate.features.shared import polymarket_us_orders as orders
+
+    monkeypatch.delenv(orders._ALLOW_TEAM_SIDE_ENV, raising=False)
+    with pytest.raises(OrderBuildError, match="team_side_needs_verified_yes_leg"):
+        _body(request=_Request(side="home"), outcome_index=None)
+
+    monkeypatch.setenv(orders._ALLOW_TEAM_SIDE_ENV, "1")
     with pytest.raises(OrderBuildError, match="side_needs_outcome_index"):
         _body(request=_Request(side="home"), outcome_index=None)
 

@@ -1525,6 +1525,59 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
     #
     # `fetch_markets` already stops on a short page, so a high bound costs
     # nothing on a small slate and only binds on a genuinely huge one.
+    # ------------------------------------------------------------------
+    # WHICH OUTCOME DOES THE YES TOKEN PAY? NOBODY HAS EVER LOOKED.
+    # ------------------------------------------------------------------
+    #
+    # `marketSides` and `question` have been in `_KEEP` since this module was
+    # written and are read by nothing; `_slate_row_for_storage` drops both on
+    # the next line. Only their KEY NAMES have ever reached a log
+    # (`POLYMARKET_US_AUTH ... row_keys=[...]`), never their values.
+    #
+    # That gap is what makes `polymarket_us_orders._resolve_outcome_side` refuse
+    # a team side as of 2026-08-28: the YES leg is measurably NOT `outcomes[0]`
+    # (3 of 8 settled moneylines bought the wrong team) and no stored field
+    # names it, so the sound rule cannot be written. One of these two fields
+    # very likely does name it -- a `question` reading "Will the Tigers beat the
+    # Dodgers?" settles it outright -- and one log line is the whole cost of
+    # finding out.
+    #
+    # ONE MONEYLINE ROW PER WRITE, not per market: this is a shape report in the
+    # pattern `fetch_polymarket_resolutions` and `kalshi_client` already use,
+    # and the thing being reported is a schema, not a slate. Truncated, because
+    # `description` sits beside these and is prose.
+    _shape = next(
+        (
+            m for m in (slate.get("markets") or [])
+            if sports_market_type(m) == MONEYLINE_MARKET_TYPE
+            and (m.get("marketSides") is not None or m.get("question"))
+        ),
+        None,
+    )
+    if _shape is not None:
+        print(
+            "[polymarket_us_markets] MONEYLINE_YES_LEG_SHAPE"
+            f" slug={_shape.get('slug')!r}"
+            f" outcomes={_shape.get('outcomes')!r}"
+            f" outcomePrices={_shape.get('outcomePrices')!r}"
+            f" marketSides={str(_shape.get('marketSides'))[:400]!r}"
+            f" question={str(_shape.get('question') or '')[:200]!r}"
+            " -- WHICH OUTCOME IS YES? see polymarket_us_orders"
+            "._resolve_outcome_side",
+            flush=True,
+        )
+    else:
+        # A named zero. "No moneyline in the slate" and "the fields are absent
+        # from every moneyline" are different findings and must not both render
+        # as silence -- that is the same rule this module already applies to
+        # `sporting=0`.
+        print(
+            "[polymarket_us_markets] MONEYLINE_YES_LEG_SHAPE none"
+            f" moneylines={sum(1 for m in (slate.get('markets') or []) if sports_market_type(m) == MONEYLINE_MARKET_TYPE)}"
+            " -- no moneyline row carried marketSides or question",
+            flush=True,
+        )
+
     fetched = [_slate_row_for_storage(m) for m in (slate.get("markets") or [])]
     budgeted = _slate_within_budget(fetched)
     markets = budgeted["markets"]
