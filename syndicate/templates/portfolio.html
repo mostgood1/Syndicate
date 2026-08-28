@@ -171,6 +171,12 @@
   /* THE PIVOTS HAD NO STYLES AT ALL on the old `/portfolio/live` -- the whole
      Performance section rendered as raw unstyled markup, and `is-up`/`is-down`
      coloured nothing. Both are defined here. */
+  .portfolio-limits__group {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--cards-text-dim); margin: 14px 0 6px; font-weight: 600;
+  }
+  .portfolio-limits__lead { margin-bottom: 4px; }
+  .portfolio-limits__recon { border-left: 2px solid var(--cards-line-strong); padding-left: 10px; }
   .live-error--loud { border-width: 2px; }
   .live-resolve { display: inline-flex; gap: 6px; margin-left: 6px; }
   .live-resolve__btn {
@@ -922,7 +928,37 @@
      is this element and moving it would break the redirect silently.
      ----------------------------------------------------------------- #}
   <div class="portfolio-bankroll" id="bankroll">
-    <h2 class="portfolio-section-title">Bankroll &amp; staking policy</h2>
+    {# =================================================================
+       ONE SECTION, TWO STORES. `[user 2026-08-28]` "can we combine these
+       sections? Theres also redundancy in some of the inputs."
+
+       THE REDUNDANCY IS REAL IN PRESENTATION AND NOT IN FUNCTION, which is
+       exactly why it was confusing. Measured on the values as set:
+
+           max slate risk  0.251 x $1000 = $251.00     account max $/day $251.01
+           max positions               100             account orders/day    100
+
+       Those pairs are hand-matched to a cent, and they are NOT duplicates:
+       the first of each shapes what `portfolio_commit` will COMMIT (sizing,
+       in the plan) and the second is what `execution_guard` will REFUSE (at
+       submit, on the worker). Defence in depth across two stages, presented as
+       two unrelated panels, so the only way to see the relationship was to do
+       the arithmetic by hand.
+
+       SO THEY ARE MERGED BY WHAT EACH NUMBER GOVERNS -- bankroll, then per
+       slate, then per day -- rather than by which subsystem owns it, and the
+       reconciliation between the two ceilings is now stated instead of left to
+       the reader. The two SAVE buttons stay separate because the two stores
+       are separate and write through different endpoints; one button implying
+       one write would be a lie about what happens.
+       ================================================================= #}
+    <h2 class="portfolio-section-title">Risk &amp; limits</h2>
+    <div class="portfolio-bankroll__meta portfolio-limits__lead">
+      Two ceilings, at two stages. <strong>Per slate</strong> bounds what the engine
+      will <em>commit</em> — it shapes the plan. <strong>Per day</strong> is the guard that
+      <em>refuses</em> a submit on the worker. A bet has to clear both.
+    </div>
+    <h3 class="portfolio-limits__group">Per slate — what the planner may commit</h3>
     <form method="post" action="/portfolio/settings" class="portfolio-bankroll__row">
       <div class="portfolio-bankroll__field">
         <label for="bankroll_units">Bankroll ($)</label>
@@ -972,9 +1008,7 @@
       {# The caps above this form are the WORKER's, and they are a different
          ceiling from these: these bound what the engine will COMMIT, those
          bound what it may SUBMIT. A change here does not move those. #}
-      The per-order and per-day caps are set in the panel below.
     </div>
-  </div>
 
   {# -----------------------------------------------------------------
      THE VENUE CAPS, EDITABLE. [user decision 2026-08-26: "we need to be
@@ -988,8 +1022,8 @@
      too: they are checked BEFORE the per-venue budgets, so without them
      raising Kalshi would have been a form that changed nothing.
      ----------------------------------------------------------------- #}
-  <div class="portfolio-bankroll" id="venue-limits">
-    <h2 class="portfolio-section-title">Live venue limits</h2>
+  <div id="venue-limits">
+    <h3 class="portfolio-limits__group">Per day — what the guard will actually place</h3>
     <form method="post" action="/portfolio/limits" class="portfolio-bankroll__row">
       <div class="portfolio-bankroll__field">
         <label for="max_day_dollars_kalshi">Kalshi max $/day</label>
@@ -1079,6 +1113,46 @@
       Note the kill switch reads the same store and fails closed, so live orders are already blocked while this persists.
     </div>
     {% endif %}
+    {# ---------------------------------------------------------------
+       HOW THE TWO CEILINGS RELATE. Every line here is arithmetic the reader
+       was previously doing by hand across two panels, and each names a real
+       failure: a guard BELOW the planner silently truncates every slate, and
+       per-venue caps summing below the account cap mean the account cap never
+       binds at all.
+       --------------------------------------------------------------- #}
+    {% set slate_cap = (psettings.bankroll_units or 0) * (psettings.max_slate_exposure_fraction or 0) %}
+    {% set acct_cap = xl.max_day_dollars_all_venues or 0 %}
+    {% set venue_sum = (xl.max_day_dollars_kalshi or 0) + (xl.max_day_dollars_polymarket or 0) %}
+    <div class="portfolio-bankroll__meta portfolio-limits__recon">
+      <strong>Where the two ceilings meet.</strong>
+      Plan ${{ "%.2f"|format(slate_cap) }} per slate against a
+      ${{ "%.2f"|format(acct_cap) }} per-day guard —
+      {% if acct_cap + 0.005 < slate_cap %}
+        <span class="warn">the guard is ${{ "%.2f"|format(slate_cap - acct_cap) }} LOWER, so every
+        full slate is truncated at submit and the plan overstates what can be placed.</span>
+      {% elif acct_cap > slate_cap * 1.5 %}
+        the guard sits well above the plan, so it is a backstop rather than a binding cap.
+      {% else %}
+        they agree, so the plan is what gets placed.
+      {% endif %}
+      {% if venue_sum + 0.005 < acct_cap %}
+        Kalshi + Polymarket cap out at ${{ "%.2f"|format(venue_sum) }} together, which is below the
+        ${{ "%.2f"|format(acct_cap) }} account cap — <strong>the per-venue caps bind first</strong>
+        and the account number never fires.
+      {% endif %}
+      {% if (psettings.max_positions or 0) and (xl.max_day_orders_all_venues or 0) %}
+        {% if (xl.max_day_orders_all_venues or 0) < (psettings.max_positions or 0) %}
+          <span class="warn">The plan may hold {{ psettings.max_positions }} positions but the guard
+          allows {{ xl.max_day_orders_all_venues }} orders/day — the last
+          {{ (psettings.max_positions or 0) - (xl.max_day_orders_all_venues or 0) }} can never be placed.</span>
+        {% endif %}
+      {% endif %}
+      {% if slate_cap and (psettings.max_positions or 0) %}
+        At the slate cap across {{ psettings.max_positions }} positions the average bet is
+        ${{ "%.2f"|format(slate_cap / (psettings.max_positions or 1)) }}, so the
+        ${{ "%.2f"|format(xl.max_order_dollars or 0) }} per-order cap only binds on an outsized one.
+      {% endif %}
+    </div>
     <div class="portfolio-bankroll__meta">
       These bind <strong>live</strong> orders only. Paper deliberately stays uncapped, so the paper
       ledger measures the strategy rather than the cap.
