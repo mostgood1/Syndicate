@@ -226,3 +226,64 @@ def test_orders_without_an_idempotency_key_are_carried_not_dropped():
     state["orders"] = [{"position_key": "legacy-1", "status": "filled"}]
     ledger._persist(state)
     assert len(ledger._load()["orders"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Both raised by lane `venue-join-refusal-visibility` reviewing the fix.
+# ---------------------------------------------------------------------------
+
+
+def test_the_trim_runs_AFTER_the_merge_so_it_cannot_resurrect_a_dropped_row(monkeypatch):
+    """The cap belongs to the document actually being WRITTEN.
+
+    Trimming our own copy first and merging after would re-add, from the store,
+    exactly the oldest rows the trim had just dropped -- the cap would never
+    bind and `TRIMMED dropped=N` would be a lie. Trim was untested entirely
+    until this was pointed out.
+    """
+    monkeypatch.setattr(ledger, "_MAX_RECORDS", 4)
+    _seed("a", "b", "c", "d", "e", "f")
+
+    state = ledger._load()
+    state["orders"][-1]["outcome"] = "won"
+    ledger._persist(state)
+
+    kept = [o["idempotency_key"] for o in ledger._load()["orders"]]
+    # Capped, and capped to the NEWEST -- oldest out, as the trim intends.
+    assert len(kept) == 4
+    assert kept == ["c", "d", "e", "f"]
+    # And our edit survived the trim rather than being dropped and re-added.
+    assert ledger._load()["orders"][-1].get("outcome") == "won"
+
+
+def test_a_TRANSIENT_read_failure_still_merges_instead_of_clobbering(monkeypatch, capsys):
+    """The failure mode this fix INTRODUCED. `_persist` never re-read before,
+    so a blip on that read is a new way to lose exactly the writes the merge
+    exists to protect. One retry covers it.
+    """
+    _seed("theirs", "ours")
+
+    stale = ledger._load()
+    fresh = ledger._load()
+    fresh["orders"][0]["outcome"] = "won"
+    ledger._persist(fresh)
+
+    real_load = ledger._load
+    calls = {"n": 0}
+
+    def _flaky():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ledger.LedgerError("transient")
+        return real_load()
+
+    stale["orders"][1]["reconciled_at"] = "now"
+    monkeypatch.setattr(ledger, "_load", _flaky)
+    ledger._persist(stale)
+    monkeypatch.setattr(ledger, "_load", real_load)
+
+    after = _stored()
+    # NOT clobbered: the retry got a clean read and the merge ran.
+    assert after["theirs"].get("outcome") == "won"
+    assert after["ours"].get("reconciled_at") == "now"
+    assert "MERGE_READ_FAILED" not in capsys.readouterr().out

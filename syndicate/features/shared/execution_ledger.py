@@ -389,15 +389,36 @@ def _merge_onto_current(
         counts["no_baseline"] = 1
         return list(ours), counts
 
-    try:
-        current = _load()
-    except Exception as exc:  # noqa: BLE001
-        # THE RE-READ FAILED. Falling back to a blind write is the OLD
-        # behaviour, so this is not a new risk -- but it is the exact moment a
-        # write can be lost, so it is loud rather than silent.
+    # RETRIED, BECAUSE THIS READ DID NOT EXIST BEFORE THE FIX.
+    #
+    # Raised by lane `venue-join-refusal-visibility` reviewing this change: a
+    # transient read failure here becomes THE CLOBBER. `_persist` never re-read
+    # under the old code, so this failure mode is one the fix INTRODUCED, and
+    # when it fires it does exactly the damage the fix exists to prevent.
+    #
+    # A bounded retry is the cheap half of the answer -- the store is a local
+    # keyvalue read, so a second attempt costs nothing and covers the blip case
+    # the reviewer was actually worried about.
+    #
+    # WHY NOT RAISE INSTEAD, which was the reviewer's suggestion and is what
+    # `_load` itself does: refusing would lose OUR write rather than somebody
+    # else's, and it would add an exception path to nine call sites that do not
+    # expect one -- including `complete_order`, where dropping a recorded FILL
+    # is worse than a rare wide write. Falling back is also strictly no worse
+    # than the pre-fix behaviour, which blind-wrote every time. So it falls
+    # back, loudly, and counts itself.
+    current = None
+    last_exc: Exception | None = None
+    for _attempt in range(3):
+        try:
+            current = _load()
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+    if current is None:
         print(
-            f"[execution_ledger] MERGE_READ_FAILED {type(exc).__name__}: {exc}"
-            " -- writing our whole copy, concurrent edits may be lost",
+            f"[execution_ledger] MERGE_READ_FAILED {type(last_exc).__name__}: {last_exc}"
+            " -- 3 attempts, writing our whole copy, concurrent edits may be lost",
             flush=True,
         )
         counts["ours"] = len(ours)
