@@ -3609,6 +3609,50 @@ not.
    `held_side` and pnl against the real result ended a question that hours of
    price reasoning could not. Go to settled outcomes first.
 
+5. **Before calling a venue property a bug, check whether the code's own
+   docstring already names it.** `outcome_side_for_index` did, with its own
+   measured example, one function above the line being read.
+6. **Rank candidate tests by SEPARATION before running them.** The moneyline
+   comparison separates by ~0.04 and read as inconclusive; the totals comparison
+   separates by ~0.11 and was decisive, in the same log window.
+
+*(5 and 6 are restored from the superseded entry at the request of the session
+that found the real defect. They were good rules, they are not what failed, and
+dropping them was over-correction — the failure was one inference step, not the
+whole entry.)*
+
+**WHY THE HEADING WAS REPLACED ANYWAY, having kept the body.** That session
+argued for amending rather than retracting. Half right, and the half that is not
+is the heading specifically: the session-start digest surfaces STANDING RULES
+**as headings only**. A heading reading *"FORBIDDEN: escalating a wrong-side
+money alarm"* is therefore the most-read and least-qualified sentence in the
+entry, and it told the next session not to escalate the exact class of report
+that was correct. A rule whose body is right and whose title is wrong is worse
+than no rule, because the title is what survives compression.
+
+**A FOURTH CORROBORATION, and the cleanest, because it needs no team-name
+reasoning at all.** Measured 2026-08-28T15:07:31Z by the same session — four
+sibling futures in ONE catalogue response:
+
+    tec-mlb-nlchamp-2026-09-27-nym   outcomes=["Yes","No"]
+    tec-mlb-champ-2026-09-27-ath     outcomes=["Yes","No"]
+    tec-mlb-nlchamp-2026-09-27-atl   outcomes=["No","Yes"]   <-- reversed
+    tec-mlb-champ-2026-09-27-atl     outcomes=["Yes","No"]
+
+The outcomes are literally the strings "Yes" and "No", listed NO-first on 1 of
+4. No alias, no nickname, no slug to misread — the array simply is not
+YES-first, and any positional rule over it is a coin flip by construction.
+
+**THE VENUE NAMES ITS OWN YES LEG, and it is NOT wired yet — deliberately.**
+`marketSides[].long` with `.team.name` is a NAME rule of the same shape that
+makes totals immune. But only the FIRST `marketSides` entry has been observed (a
+400-char log truncation), so "long == YES" is still an INFERENCE, and the
+sequence in `todo.md #595` is: widen the log to both sides, persist a derived
+`yes_outcome` string (not `marketSides` itself — ~6.7MB against an 8MB ceiling),
+then score it against the 8 venue-settled moneylines where ground truth exists,
+INCLUDING the 3 that went the wrong way. A rule that predicts all 8 is proven on
+real money; anything less is a better-sourced guess. **Do not wire it early.**
+
 **Still true from the superseded entry, and worth keeping:** the outcomes array
 being reversed relative to the slug means nothing on its own — `lad-atl` carries
 its outcomes in slug order and `az-sf` does not — because outcomes order is not
