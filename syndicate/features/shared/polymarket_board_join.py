@@ -426,6 +426,85 @@ def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset
     return frozenset(proven)
 
 
+# `#595` step 2 -- DOES THE PRICE WE ASSIGN TO A SIDE BELONG TO THAT SIDE?
+#
+# --------------------------------------------------------------------------
+# THE ASSUMPTION UNDER TEST, WHICH NOBODY HAS EVER CHECKED
+# --------------------------------------------------------------------------
+#
+# Three call sites zip the venue's two arrays positionally --
+# `polymarket_board_join:_outcome_probabilities`, and
+# `venue_quote_adapters._polymarket_sides` twice -- so every Polymarket price
+# in this system rests on `outcomes[i]` naming the club that `outcomePrices[i]`
+# prices. Searched 2026-08-28: that is asserted NOWHERE and proven NOWHERE.
+#
+# It came under suspicion when lane `portfolio-venue-and-side-integrity`
+# measured `marketSides[].long` varying across `outcomes[0]`/`[1]`, and found
+# one market where `marketSides` priced a club at `outcomePrices[0]` while the
+# arrays said `[1]`. **Their separation was ONE CENT (0.51 vs 0.50)** and they
+# flagged rather than asserted it, correctly -- a penny cannot carry this.
+#
+# --------------------------------------------------------------------------
+# WHY THIS TEST CAN CARRY IT WHERE A ONE-CENT GAP CANNOT
+# --------------------------------------------------------------------------
+#
+# An inversion is not a small error. If we hand a side the OTHER side's price,
+# the number lands near `1 - fair` rather than `fair` -- on a lopsided market
+# that is a gap of tens of cents, not one. So the test compares the venue price
+# we assigned against the BOOKS' own no-vig probability for the same side
+# (`quote.fair_probability`, consensus across every book quoting it, wholly
+# independent of Polymarket) and asks which hypothesis it sits closer to.
+#
+# **IT REFUSES TO SCORE WHAT IT CANNOT SEPARATE**, which is the lesson from
+# this lane's spread-sign audit: a comparison whose two hypotheses are a cent
+# apart returns ~0.5 forever and looks like weak evidence when it is none.
+# Near a coin flip `fair` and `1 - fair` converge, so a market must be lopsided
+# by `_ALIGN_MIN_EDGE` before it votes at all, and the winning hypothesis must
+# beat the other by `_ALIGN_MIN_MARGIN`. Everything else is `too_close`, which
+# is a real answer and is reported.
+#
+# A normal betting edge is a few points; these thresholds put the two
+# hypotheses at least 0.20 apart, so an edge cannot masquerade as an inversion.
+_ALIGN_MIN_EDGE = 0.10     # |fair - 0.5|: hypotheses >= 0.20 apart
+_ALIGN_MIN_MARGIN = 0.10   # the winner must be closer by at least this much
+
+
+def _classify_alignment(
+    board_row: Mapping[str, Any],
+    venue_probability: Any,
+    key: str,
+    counts: dict[str, int],
+    samples: list[dict[str, Any]],
+) -> None:
+    """Count one matched row as aligned / inverted / too_close. Never decides."""
+    quote = board_row.get("quote") if isinstance(board_row.get("quote"), Mapping) else None
+    fair = _as_float((quote or {}).get("fair_probability"))
+    p = _as_float(venue_probability)
+    if fair is None or p is None or not (0.0 < fair < 1.0) or not (0.0 < p < 1.0):
+        counts[f"{key}|no_reference"] = counts.get(f"{key}|no_reference", 0) + 1
+        return
+    if abs(fair - 0.5) < _ALIGN_MIN_EDGE:
+        # Too near a coin flip for `fair` and `1 - fair` to be told apart.
+        counts[f"{key}|too_close"] = counts.get(f"{key}|too_close", 0) + 1
+        return
+    d_aligned, d_inverted = abs(p - fair), abs(p - (1.0 - fair))
+    if d_aligned + _ALIGN_MIN_MARGIN <= d_inverted:
+        verdict = "aligned"
+    elif d_inverted + _ALIGN_MIN_MARGIN <= d_aligned:
+        verdict = "inverted"
+    else:
+        verdict = "too_close"
+    counts[f"{key}|{verdict}"] = counts.get(f"{key}|{verdict}", 0) + 1
+    if verdict == "inverted" and len(samples) < 8:
+        samples.append({
+            "board": f"{board_row.get('away_team')}@{board_row.get('home_team')}",
+            "side": board_row.get("side"),
+            "venue_p": round(p, 4),
+            "book_fair": round(fair, 4),
+            "complement": round(1.0 - fair, 4),
+        })
+
+
 def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | None:
     """The two clubs as an UNORDERED, canonical pair -- or None if unreadable.
 
@@ -697,6 +776,9 @@ def join_polymarket_to_board(
     orientation_listed: dict[str, int] = {}
     orientation_not_listed: dict[str, int] = {}
     orientation_unreadable: dict[str, int] = {}
+    # `#595` step 2: does the price we ASSIGN to a side actually belong to it?
+    alignment_counts: dict[str, int] = {}
+    alignment_samples: list[dict[str, Any]] = []
     orientation_flip_samples: list[dict[str, Any]] = []
 
     for row in markets:
@@ -1033,6 +1115,11 @@ def join_polymarket_to_board(
             refuse("side_not_an_outcome_of_this_market")
             continue
 
+        _classify_alignment(
+            board_row, probability, f"{league}|{board_market}",
+            alignment_counts, alignment_samples,
+        )
+
         from syndicate.features.shared.venue_quote_adapters import probability_to_american
 
         matches.append({
@@ -1093,6 +1180,11 @@ def join_polymarket_to_board(
         # asserted: a diagnostic must never take down a board build, and a
         # `False` here on the same log line is as loud as a traceback and does
         # not cost a slate.
+        # `#595` step 2. `<league>|<market>|aligned|inverted|too_close` --
+        # whether the venue price we assign to a side tracks the BOOKS'
+        # independent no-vig probability for that same side, or its complement.
+        "price_alignment": dict(sorted(alignment_counts.items())),
+        "price_alignment_samples": alignment_samples,
         "orientation_invariant_ok": all(
             orientation_listed.get(k, 0) >= v for k, v in orientation_flip_counts.items()
         ),

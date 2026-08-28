@@ -285,6 +285,15 @@ def _polymarket_price_resolver(selected_date: str | None):
         f" samples={joined.get('orientation_flip_samples')}",
         flush=True,
     )
+    # `#595` step 2. Prints even when empty: "no matched row was lopsided enough
+    # to test" and "the code did not run" must not look the same, which is the
+    # gating mistake this lane already made once with POLYMARKET_ORIENTATION.
+    print(
+        "[portfolio_commit] POLYMARKET_PRICE_ALIGNMENT"
+        f" counts={joined.get('price_alignment')}"
+        f" inverted_samples={joined.get('price_alignment_samples')}",
+        flush=True,
+    )
     if joined.get("unproven_league_tokens"):
         print(
             "[portfolio_commit] POLYMARKET_LEAGUE_REACH"

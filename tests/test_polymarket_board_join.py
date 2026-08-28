@@ -1197,3 +1197,51 @@ def test_the_tri_code_table_is_additive_and_cannot_remove_a_pairing(monkeypatch)
     parsed = {"league": "bun", "home": "fcb", "away": "stu"}
     board = {"home_team": "anything", "away_team": "anything else"}
     assert mod._teams_match(board, parsed, "soccer") is True
+
+
+def _align(fair, venue_p):
+    counts, samples = {}, []
+    mod._classify_alignment(
+        {"quote": {"fair_probability": fair}, "side": "home",
+         "home_team": "H", "away_team": "A"},
+        venue_p, "soccer|h2h", counts, samples)
+    return counts, samples
+
+
+def test_a_price_matching_the_books_own_fair_reads_ALIGNED():
+    counts, _ = _align(0.75, 0.73)
+    assert counts == {"soccer|h2h|aligned": 1}
+
+
+def test_a_price_sitting_on_the_COMPLEMENT_reads_INVERTED():
+    """The signature of handing a side the other side's price: the number lands
+    near `1 - fair`, which on a lopsided market is tens of cents away."""
+    counts, samples = _align(0.75, 0.26)
+    assert counts == {"soccer|h2h|inverted": 1}
+    assert samples and samples[0]["complement"] == 0.25
+
+
+def test_a_NEAR_COINFLIP_market_is_refused_not_scored():
+    """`fair` and `1 - fair` converge at 0.5, so the test cannot separate the
+    hypotheses there. Scoring it anyway is exactly how the spread-sign audit
+    manufactured a rate out of a comparison with no discriminating power — and
+    how a ONE-CENT gap came to look like evidence in `#595` step 1.
+    """
+    counts, _ = _align(0.505, 0.50)
+    assert counts == {"soccer|h2h|too_close": 1}
+
+
+def test_a_NORMAL_BETTING_EDGE_cannot_masquerade_as_an_inversion():
+    """The confound that would make this instrument lie.
+
+    We bet Polymarket precisely when it disagrees with the books, so a few
+    points of disagreement is the signal, not an error. The thresholds put the
+    two hypotheses >= 0.20 apart so an ordinary edge cannot cross over.
+    """
+    counts, _ = _align(0.70, 0.62)          # an 8-point edge, still clearly aligned
+    assert counts == {"soccer|h2h|aligned": 1}
+
+
+def test_a_row_with_no_book_reference_is_counted_not_silently_dropped():
+    counts, _ = _align(None, 0.60)
+    assert counts == {"soccer|h2h|no_reference": 1}
