@@ -3551,7 +3551,51 @@ repeated the false claim to the user and to two peer sessions before checking.
   not a statement about `main`. Say the first and do not imply the second.
 
 
-### 2026-08-28 — FORBIDDEN: treating a refuted MECHANISM as a refuted OBSERVATION. I disproved my own theory of how a wrong-side fill happened, and used that to dismiss the fill.
+### 2026-08-28 — FORBIDDEN: chaining an EDIT and a COMMIT so that a FAILED edit still commits. The guard fired correctly and the commit ran anyway, taking another session's uncommitted work with it.
+
+Known cousin: [[never chain add and commit]]. This is the same lesson one step
+earlier in the pipeline, and the existing rule did not cover it — I was careful
+about `add`, and committed by explicit pathspec, and it happened anyway.
+
+**The shape.** One Bash call containing, on separate lines:
+
+    python - <<'PY'   ... assert old in s ...  PY      <-- FAILED, AssertionError
+    cat > msgfile <<'EOF' ... EOF && git commit -F msgfile -- fileA fileB
+
+The `assert` did exactly its job: the anchor no longer matched because another
+session had rewritten that part of `lanes.md`. But the statements were newline-
+separated, not `&&`-joined, so the failure printed a traceback and the shell ran
+the commit regardless.
+
+**Why pathspec did not save me.** `git commit -- <paths>` commits the WORKING
+TREE version of those paths. `lanes.md` held 97 lines of another session's
+uncommitted edits (`venue-join-refusal-visibility` transferring a claim, and a
+"DO NOT fire a separate refresh-worker deploy" note from a third lane). I
+committed all of it under a message about NCAAF settlement, having never read
+it. Pathspec bounds WHICH files, never WHOSE CHANGES.
+
+**Caught by arithmetic, not by review.** The commit said `2 files changed, 106
+insertions` for a ten-line constant rename. That mismatch is the whole
+detection: a number far larger than the change I made.
+
+**Repaired** (unpushed, so recoverable): `git reset --soft HEAD~1`, then
+`git restore --staged .syndicate/lanes.md` to return their work to the working
+tree uncommitted, then re-commit my file alone. The index was verified EMPTY
+first — a soft reset stages everything in the commit, so doing it with another
+session's staged work present would have made it worse.
+
+**Rules:**
+1. **Never put an edit and a commit in the same Bash call.** Separate calls, and
+   read the edit's result before committing. `&&` is not enough either — it
+   makes the failure mode quieter, not absent.
+2. **Check the diffstat against the size of the change you made** before
+   accepting a commit. "10 lines edited, 106 committed" is the alarm.
+3. **A file another session is editing is not yours to commit, even by
+   pathspec.** If a shared ledger file is dirty and the dirt is not yours, hold
+   your edit until it is clean rather than adding to it — an edit made now can
+   only be committed by entangling both.
+
+## 2026-08-28 — FORBIDDEN: treating a refuted MECHANISM as a refuted OBSERVATION. I disproved my own theory of how a wrong-side fill happened, and used that to dismiss the fill.
 
 **THIS ENTRY REPLACES THE ONE THAT STOOD HERE FOR SIX HOURS, WHICH WAS WRONG IN
 ITS CONCLUSION AND WOULD HAVE TAUGHT THE NEXT SESSION TO DISMISS A REAL ONE.**
