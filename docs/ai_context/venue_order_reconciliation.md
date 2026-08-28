@@ -260,12 +260,27 @@ Open, and listed so nobody re-derives them.
    [kalshi_orders] ORDERS_ENVELOPE keys=['cursor', 'orders'] n=78 limit=100
    ```
 
-   **The field is `cursor`, at the top level of the response.** That is what
-   pagination should be written against. It took one production read, versus a
-   guess that would have looked reasonable and cost an error round-trip — the
-   same shape as the `http_501` on Polymarket's reasoned-about list route.
-   Still to do: pass it back as a query parameter and loop until it is empty,
-   keeping the `page` degrade for any bound that remains.
+   **The field is `cursor`, at the top level of the response.** It took one
+   production read, versus a guess that would have looked reasonable and cost
+   an error round-trip — the same shape as the `http_501` on Polymarket's
+   reasoned-about list route.
+
+   **CLOSED `2026-08-28T02:58:17Z`.** The reader walks the cursor, deduping by
+   `order_id`, bounded at 20 pages with a repeated cursor treated as a bound —
+   never as an end of book. Live on the first tick:
+
+   ```
+   ORDERS_ENVELOPE keys=['cursor','orders'] n=78 limit=100 pages=1 exhausted=True
+   ```
+
+   **An empty cursor now OUTRANKS the `n >= limit` heuristic**, which is a
+   correction and not just plumbing: a final page exactly `limit` long is the
+   whole book if the venue says there is no more, and the old rule would have
+   called it truncated and suppressed the orphan scan for nothing. The
+   heuristic survives only where the response carries no `cursor` key at all.
+   A FIRST-page failure is still an error; a LATER-page failure returns what
+   was read as `page`, because those orders are real and only completeness was
+   lost.
 2. **Polymarket orphans are undetectable** (§6). Structural, not a defect —
    worth revisiting only if a list-all route appears. `probe_order_list_routes`
    exists to ask, read-only, and logs what it finds.

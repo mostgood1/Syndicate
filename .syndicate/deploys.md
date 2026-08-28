@@ -5,6 +5,84 @@
 
 ---
 
+## 2026-08-28 — three deploys: the push defect, my own regression, and cursor pagination
+
+Sequence, all `trigger=api`, all preflight `CLEAR` for the exact SHA, claims
+held by `portfolio-top-date-filter` and released after.
+
+| # | service | SHA | deploy | live |
+|---|---|---|---|---|
+| 1 | live-odds-worker | `be7cbdeb` | `dep-da8f9rvqj5pc73eb4d8g` | `02:42:33Z` |
+| 2 | web | `37bd91ea` | `dep-da8fe78n74is73dq4vrg` | `02:52:19Z` |
+| 3 | live-odds-worker | `a26ad83f` | `dep-da8fgpss728c73bk1r8g` | `02:58Z` |
+
+**1 — A ZERO REALIZED DELTA IS NOT A PUSH.** `[user 2026-08-27]` "polymarket is
+still calling everything from today a push." It was: 7 pushes, all Polymarket,
+all that day, all `pnl=0.0 settled_by=venue`, one graded settled 9.5 hours
+BEFORE its `commence_time`. **verify MET `02:45Z`** — and the shape report
+added in the same commit gave the root cause the commit message had refused to
+claim:
+
+```
+POLYMARKET_RESOLUTIONS n=32 zero_delta=7
+  sides=['POSITION_RESOLUTION_SIDE_LONG', 'POSITION_RESOLUTION_SIDE_SHORT']
+  before_realized={'value':'0.0000'}  after_realized={'value':'0.0000'}
+ZERO_DELTA_PUSHES_CLEARED n=7 dates=['2026-08-27']
+VENUE_SETTLEMENT refused={'both_sides_held': 1, 'zero_realized_delta': 7}
+```
+
+**NO ROW CARRIED A `NEUTRAL` SIDE.** The venue never called any of them a push,
+so all 7 were definitively wrong rather than merely suspect. 7 of 32 come back
+with `realized` flat at `0.0000` on both sides while 25 carry real deltas. The
+repair fired exactly once and the board went 7 pushes → **0**, the rows
+re-opening rather than re-grading — which is itself the proof they were never
+pushes.
+
+**2 — MY OWN REGRESSION, SHIPPED AND CAUGHT WITHIN THE HOUR.** With the pushes
+cleared, the tile read `unknown: 63` and summed to **150 against 89 positions**.
+The `unknown` bucket I added in `32b0cfaa` tested `not _is_venue_refusal`,
+which covers a 4xx the venue ANSWERED but not `rejected` — an order that never
+reached a venue at all. 61 build-time rejections were being described to the
+reader as *"submitted, never confirmed at the venue"*: possibly-live money.
+
+The commit that introduced it had warned, in its own message, against "a fourth
+local definition of not a position, which is how these totals drifted apart in
+the first place." Right about the danger, wrong about what the code did — the
+page's rule is `rejected` OR venue-refused and I took the second half only.
+`is_non_position` now lives in `execution_guard` with all three readers
+delegating. **verify MET `02:52Z`, on the served payload: sum=89 positions=89
+unknown=2.**
+
+**NOT ONE TEST HAD PUT A `rejected` ROW IN FRONT OF THE COUNTER** — the suite
+only ever exercised the case I had in mind while writing it. The regression
+test added was checked by STASHING the fix and watching it fail, so it cannot
+be vacuous.
+
+**3 — CURSOR PAGINATION, written against the measured field name.**
+`ORDERS_ENVELOPE keys=['cursor','orders']` from the `02:24:18Z` tick settled it;
+this closes gap 1 in `venue_order_reconciliation.md`. **verify MET `02:58:17Z`:**
+
+```
+ORDERS_ENVELOPE keys=['cursor','orders'] n=78 limit=100 pages=1 exhausted=True
+RECONCILE venue=kalshi     candidates=10 venue_orders=78 unknown=0 coverage=book
+          orphans=26 orphans_ours=0
+RECONCILE venue=polymarket candidates=9  venue_orders=9  unknown=0 coverage=per_order
+ORDERS_READ_PARTIAL — silent
+```
+
+`pages=1 exhausted=True` is the whole point: the venue returned an EMPTY
+cursor, so `book` is now the venue's own statement rather than the inference
+`n < limit`. The partial-read guard stayed silent, which is the correct
+negative — it is the line that would fire if the walk ever stopped early.
+
+**PROCESS NOTE, since two deploys today killed live jobs.** Deploy 3 waited for
+a clean window instead: preflight `HOLD: 3 job(s) in flight` on an NFL odds
+refresh, so the deploy sat until `CLEAR`. Justified by measurement rather than
+patience — the push count was checked and found STATIC at 7, so nothing was
+bleeding while we waited. Had it been climbing, killing the refresh would have
+been the right trade. Preflight also correctly distinguished a defunct child
+awaiting reap from live work.
+
 ## 2026-08-28 — refresh-worker `32b0cfaa`: the `_candidate_keys` ambiguity guard — **PARTIAL, and the counter that says so is the point**
 
 Lane `venue-candidate-key-token-guard`. Change is `1c37c220`, carried inside
