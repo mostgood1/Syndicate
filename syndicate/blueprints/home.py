@@ -6565,7 +6565,26 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
         # caller that builds a SportContext by hand behaves exactly as before.
         today = str(getattr(context, "requested_date", None) or central_today_iso())
         games: list[dict[str, Any]] = []
+        # TIMED PER LEAGUE `[2026-08-28]`. Soccer is 163.2s of hydrated overview
+        # against ncaaf 34.1s, nfl 2.0s and everything else under 0.2s -- 82% of
+        # the total, measured from the `OVERVIEW_SPORT_BEGIN`/`END` brackets. MLB,
+        # which the 3000MB floor was built around, is 4.43s.
+        #
+        # WHAT THIS IS FOR: soccer is the only sport whose
+        # `build_cards_page_context` takes a LEAGUE. Every other sport makes ONE
+        # call for a date or a week; this makes one per (league x week_offset)
+        # pair across ~39 units. So the suspicion is fan-out, not any single
+        # slow call -- and that is a different fix. A per-league total says
+        # which, and nothing in production currently says either.
+        #
+        # Bounded output: a total line plus the three worst leagues. Thirty-nine
+        # timing lines per build would be a log nobody reads, and the tail is
+        # not where a fan-out problem shows itself.
+        _soccer_started = time.monotonic()
+        _league_ms: dict[str, float] = {}
+        _cards_calls = 0
         for league in self._active_leagues(today):
+            _league_started = time.monotonic()
             # One broken league (missing schedule artifact, bad season roll)
             # must not empty the whole sport -- each league is best-effort.
             try:
@@ -6619,6 +6638,7 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
             week_offsets = (0, 1) if include_upcoming else (0,)
             for week_offset in week_offsets:
                 target_week = int(week) + week_offset
+                _cards_calls += 1
                 try:
                     payload = build_cards_page_context(league, target_week, season)
                 except Exception as exc:
@@ -6646,6 +6666,23 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
                         seen_ids.add(identity)
                     game.setdefault("league", league)
                     games.append(game)
+            # Recorded per league, OUTSIDE the per-week loop, so the number is
+            # the league's whole cost including every week offset it asked for.
+            _league_ms[league] = (time.monotonic() - _league_started) * 1000.0
+        _soccer_elapsed = time.monotonic() - _soccer_started
+        # `worst=` is the discriminator between the two shapes this could be.
+        # If one league dominates, it is a slow league and the fix is in that
+        # league's data. If the top three are unremarkable against the total,
+        # it is FAN-OUT and the fix is calling this fewer times -- which is a
+        # different change entirely. A total alone cannot tell those apart.
+        _worst = sorted(_league_ms.items(), key=lambda kv: -kv[1])[:3]
+        print(
+            f"[home] SOCCER_GAMES_TIMING elapsed_s={round(_soccer_elapsed, 2)} "
+            f"leagues={len(_league_ms)} cards_calls={_cards_calls} "
+            f"games={len(games)} date={today} "
+            f"worst={[(k, round(v / 1000.0, 2)) for k, v in _worst]}",
+            flush=True,
+        )
         return games
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
