@@ -2559,7 +2559,14 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   readable and `None`; both banners carry working operator actions.
 - Blocked by: none.
 
-### soccer-overview-cost — OPEN — opened 2026-08-28 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
+### soccer-overview-cost — OPEN, **UNSOLVED — five hypotheses refuted; DO NOT propose a sixth without changing method** — opened 2026-08-28 — session 3e5a9659
+- ONE REAL WIN, VERIFIED: cards-context TTL 600 -> 1200s (`SYNDICATE_SOCCER_CARDS_CONTEXT_TTL_SECONDS`, env only). `games()` **42.34s -> 2.76s**, worst league 16.49 -> 0.41. Safe because the cache key carries `_live_vintage` AND soccer's source artifacts only regenerate every 14400s.
+- **THE COST IS STILL UNLOCATED.** soccer 163.2 -> 247.6 -> 381.6s in one day, ncaaf 34.1 -> 69.5s, GAME COUNTS FLAT — it scales with accumulation, not fixtures. The shard `soccer_source/artifacts/soccer/odds_history/<date>.json` went **3,935,768 -> 48,169,883 bytes (12x)**.
+- MEASURED AND RULED OUT: `is_active_today` 0.0s · `bars` 0.0s · `games()` ~2.8s · `pregame_props()` 0.17s · `market_board` NOT ON THE PATH. `sport_branch` is **98%** of every sport's overview cost.
+- **THE ONLY UNMEASURED SURFACE LEFT:** `soccer/cards.py::_build_cards_page_context_uncached` per league — the function the overview actually reaches. Nothing inside it is timed.
+- **FIVE PREDICTIONS, FIVE REFUTATIONS:** ~39 leagues (it is 10) · fan-out (one cold league dominates) · `championship` is slow (it is whichever is cold) · props is the missing 92% (0.17s) · the `market_board` 60s-TTL x 10 leagues x 48MB multiplier (**counter emitted ZERO — that function is not on the overview path**). See `learnings.md 2026-08-28` on instrumenting an unreachable function.
+- **RECOMMENDATION TO THE NEXT SESSION: change method, do not add a sixth log span.** A profiler over ONE real build names the call directly; five incremental spans have cost a day and located 3s of 382s. My model of this subsystem is demonstrably poor and that is itself the evidence.
+- Claims: `syndicate/blueprints/home.py` (transferred from UNOWNED `wnba-chip-live-token`, instrumentation only — path REMOVED from its Files: line, not struck through) and `syndicate/features/soccer/market_board.py`. Deploy claims: none held.
 - Goal: name where soccer's 163.2s goes, per league, before optimising anything.
 - Files: `syndicate/blueprints/home.py` (instrumentation only), and its tests.
 - MEASURED: soccer 163.2s = **82% of hydrated overview time**, from `OVERVIEW_SPORT_BEGIN`/`END` brackets 2026-08-28 03:39-03:42Z (ncaaf 34.1s, nfl 2.0s, everything else <0.2s). MLB is NOT the cost — it is 4.43s isolated.
