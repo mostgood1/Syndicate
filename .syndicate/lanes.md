@@ -72,7 +72,15 @@ death, never life — do not invert it.
 - Files: `syndicate/templates/portfolio.html`, `blueprints/intelligence.py`,
   `blueprints/ops.py`, `features/shared/execution_limits_settings.py`,
   `execution_guard.py`, `execution_ledger.py`, `venue_balances.py`,
-  `venue_settlement.py`, `paper_settlement.py`, `polymarket_board_join.py`,
+  `venue_settlement.py`, `paper_settlement.py`,
+  ~~`polymarket_board_join.py`~~ **INSTRUMENTATION-ONLY CLAIM TRANSFERRED to
+  `venue-refresh-decoupling` `[2026-08-28, session 3e5a9659]`** — an additive
+  timing span around `join_polymarket_to_board`, NO behaviour change. Taken
+  because this lane's session (`syndicate-27`) is NOT RUNNING (`list_sessions`
+  shows every session `isRunning: false`) and the board build cannot attribute
+  ~305s of CPU without it. **The SEMANTIC scope of this file stays yours** —
+  side resolution, alias matching, the join's correctness. Take it back by
+  striking this note.
   `team_aliases.py`, `scripts/run_live_odds_refresh_worker.py`, + tests.
 - **STATUS 2026-08-27T21:45Z — 11 commits landed, 6 verified in production,
   5 shipped-but-unfired. Narrative and all 7 self-corrections in
@@ -1358,7 +1366,13 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/portfolio_settings.py`,
   `syndicate/features/shared/portfolio_commit.py`,
   `syndicate/features/shared/execution_ledger.py`,
-  `pipeline/portfolio_commit.py`,
+  ~~`pipeline/portfolio_commit.py`~~ **INSTRUMENTATION-ONLY CLAIM TRANSFERRED
+  to `venue-refresh-decoupling` `[2026-08-28, session 3e5a9659]`** — a timing
+  span around the Polymarket join only, NO behaviour change and nothing near
+  `_venue_price_resolver`, which this lane's block names as its own open work.
+  Taken because this lane opened 2026-08-22 and its session
+  (`9324a3e5`) does not appear in `list_sessions` at all. Take it back by
+  striking this note.
   `scripts/portfolio_commit_input_checklist.py`,
   `syndicate/blueprints/intelligence.py`,
   `syndicate/templates/portfolio.html`,
@@ -2116,6 +2130,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 ### venue-refresh-decoupling — OPEN — opened 2026-08-27 — session 3e5a9659-13d2-4985-a7d4-6897a1833bb8
 - Goal: (1) the ~56% of board-build compute that is currently UNMEASURED becomes visible in Render logs, and (2) Kalshi/Polymarket price refresh runs on its OWN cadence instead of being gated by the board build's 11-15 min period.
 - Files: `pipeline/intelligence_state.py`, `pipeline/kalshi_odds_refresh.py`, `pipeline/polymarket_odds_refresh.py`, NEW `pipeline/venue_odds_loop.py`, and their tests.
+- **ACQUIRED FOR INSTRUMENTATION ONLY `[2026-08-28, USER INSTRUCTION: "i need this lane to take the polymarket work"]`:** `pipeline/portfolio_commit.py` (from `portfolio-decision-and-execution`) and `syndicate/features/shared/polymarket_board_join.py` (from `open-bet-live-status`). WHY: `polymarket` appears NOWHERE in `intelligence_state.py` — Kalshi's refresh and join are spanned at board-build level, but Polymarket's equivalent runs inside `run_portfolio_commit`, so a `portfolio_commit` span is a black box over a join that indexes ~8,973 markets against ~1,335 rows and is a credible largest-single-item in the unattributed ~305s. BOTH holders verified NOT RUNNING before taking (`list_sessions`: every session `isRunning: false`; `9324a3e5` absent entirely, lane opened 2026-08-22). SCOPE IS A TIMING SPAN AND NOTHING ELSE — no behaviour change, no touching `_venue_price_resolver` or side-resolution. Annotated in place in both donor blocks so either can reclaim by striking the note.
 - MEASURED BASELINE 2026-08-27 21:19-22:17Z, refresh-worker: cycle 680-874s, compute 614-782s, `build_intelligence_overview` 259-290s (~44% of compute). The remaining ~350s is invisible because `_log_stage_timing` is `logger.info`, which per CLAUDE.md never reaches Render's collector.
 - Hypothesis (1): every `_log_stage_timing` call is silently lost, so `candidate_building`, `board_publication`, `response_building` and `request_total` have never been read in production. Converting to `print(..., flush=True)` makes them appear with no other change.
 - Hypothesis (2): `run_kalshi_odds_refresh()` has exactly ONE production caller — inside `_compute_board_publication_response` — so its `DEFAULT_REFRESH_INTERVAL_SECONDS = 120` is unreachable; the board loop sets the venue cadence. Polymarket has NO loop at all since `_polymarket_catalogue_at_boot` was retired (`fcdc5c57`).
