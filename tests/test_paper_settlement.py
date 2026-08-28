@@ -329,6 +329,9 @@ def test_the_traded_sports_WITHOUT_a_resolver_are_pinned_so_a_new_gap_cannot_pas
     be made rather than discovered in a settlement counter.
 
     Shrinking this set is the goal. It is not a list of sports that are fine.
+    `ncaaf` left it on 2026-08-28 -- and it is the ONLY one so far to be wired
+    BEFORE its orders reached the ledger, i.e. before the counter could show
+    the gap. Soccer and NFL were both found after the fact.
     """
     traded = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
     resolve = settle._default_resolver(DATE)
@@ -340,7 +343,7 @@ def test_the_traded_sports_WITHOUT_a_resolver_are_pinned_so_a_new_gap_cannot_pas
         if resolve({"sport": sport}).get("unavailable_reason") == f"no_resolver_for_{sport}"
     }
 
-    assert missing == {"nba", "nhl", "ncaaf", "ncaab"}, (
+    assert missing == {"nba", "nhl", "ncaab"}, (
         "settlement resolver coverage changed -- if a sport gained one, shrink this set; "
         "if a sport was added to the board without one, its bets cannot be graded"
     )

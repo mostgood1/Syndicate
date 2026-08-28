@@ -2386,6 +2386,85 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - RISK: OFF BY DEFAULT behind a flag. This worker has 110 OOM kills and `#241` restart-looped it; a subprocess per board build is periodic work and is not free.
 - Blocked by: none
 
+### ncaaf-settlement-resolver — OPEN — opened 2026-08-28 — session 764eca35-178c-4c29-afbd-ec621894aaf1
+
+- Goal: NCAAF bets can be GRADED, and are graded against the RIGHT GAME. One
+  testable outcome: `no_resolver_for_ncaaf` reaches production as zero (it does
+  not appear today only because NCAAF orders have not hit the ledger yet — see
+  below), and an NCAAF order reaches a won/lost verdict.
+- Files: NEW `syndicate/features/shared/ncaaf_team_registry.py`, NEW
+  `scripts/poll_ncaaf_live_state.py`, NEW
+  `syndicate/features/shared/bet_status_ncaaf.py`, NEW
+  `tests/test_bet_status_ncaaf.py`, plus the same ONE-LINE carve-out on
+  `paper_settlement.py` (held by `open-bet-live-status`, session `syndicate-27`,
+  recorded NOT RUNNING) and the pinned-set assertion in
+  `tests/test_paper_settlement.py` that `nfl-settlement-resolver` added.
+- **NCAAF IS NOT NFL, AND THE DIFFERENCE IS THE WHOLE LANE.**
+  `team_aliases._alias_map("ncaaf")` is `{}`, so `teams_match` falls through to
+  HEURISTICS — `len(token) >= 3 and any(word.startswith(token))`. Across ~130
+  FBS teams that means **"Michigan" matches "Michigan State"**, "Ohio" matches
+  "Ohio State", and both Miamis match each other. An NFL-shaped resolver would
+  therefore grade bets against the WRONG GAME, which is strictly worse than not
+  grading them: a wrong verdict is written confidently and nothing downstream
+  can tell.
+- **THE AUTHORITATIVE VOCABULARY EXISTS AND IS ALREADY ALLOWLISTED.**
+  `ncaaf_team_registry.csv`, **684 teams**, columns `team_id`,
+  `canonical_team_name`, `abbreviation`, pipe-separated `aliases`,
+  `display_name`, `school_name`, `mascot_name`; matched by
+  `*_source/source_artifacts/data/processed/team_registry/*.csv` in
+  `HOT_ARTIFACT_PATTERNS`.
+- **BUT THE EXISTING INDEX CANNOT BE REUSED.** `ncaaf/cards.py::_team_registry_index`
+  builds it with `setdefault`, so the FIRST row wins every collision. Measured
+  2026-08-28 over that same key construction: **2,342 distinct keys, 128
+  AMBIGUOUS** (owned by more than one `team_id`), worst `tigers` -> **25
+  teams**. `_resolve_team("Wildcats")` returns Abilene Christian. Same hazard
+  class as the venue `_candidate_keys` ambiguity fixed earlier today, and
+  disqualifying on a settlement path.
+- Hypothesis: dropping ambiguous keys costs nothing on real data, because ESPN
+  sends specific forms (`displayName` "TCU Horned Frogs", `location`,
+  `abbreviation`) rather than bare mascots.
+- **FALSIFICATION ALREADY RUN, AND IT DID NOT FIRE.** Against the live ESPN
+  college-football scoreboard for 2026-08-29 (Week 1 opener weekend, 8 games,
+  16 teams): **16/16 resolved unambiguously** against the ambiguity-dropped key
+  set. If a real slate had resolved poorly the join would need a different key
+  and this lane would be about that instead.
+- Verification: REACHABILITY BEFORE CORRECTNESS, `off != on`, exactly as
+  `nfl-settlement-resolver` proved it — the dispatch test must FAIL with the
+  one-line wiring removed. Plus a test that an AMBIGUOUS name ("Tigers") is
+  REFUSED rather than resolved to one of 25.
+- NOTE ON THE PRODUCTION READING: unlike NFL, `no_resolver_for_ncaaf` is NOT in
+  today's counters — NCAAF orders have not reached the ledger yet, though NCAAF
+  IS on the board (measured this session: kalshi offered 524 ncaaf quotes,
+  `wanted_overlap` 32, 52 selected). So the production reading here is a
+  FUTURE-DATED obligation, and a zero counter today is NOT evidence. Say so
+  rather than banking it.
+- **BUILT 2026-08-28. NOT DEPLOYED.** `ncaaf_team_registry.py` (unambiguous
+  index over the 684-team CSV, ambiguous keys DROPPED),
+  `poll_ncaaf_live_state.py` (ESPN `college-football` by `?dates=`, derived from
+  the NFL poller so the payload parsing cannot drift), `bet_status_ncaaf.py`
+  (registry-backed join, NOT `teams_match`).
+- **REACHABILITY PROVEN, `off != on`, and BETTER than NFL's.** With the one-line
+  wiring removed: **2 failed, 62 passed** — the dispatch test AND
+  `test_the_traded_sports_WITHOUT_a_resolver_are_pinned...`, which correctly
+  detected `ncaaf` reappearing in the missing set. That tripwire was added by
+  `nfl-settlement-resolver` an hour earlier and has now caught a real change.
+- **MEASURED ON THE REAL REGISTRY AND THE REAL FEED:** index holds **2,214
+  unambiguous keys** of 2,342 (**128 ambiguous dropped**, matching the
+  pre-build measurement exactly); on the live 2026-08-29 ESPN slate
+  **16/16 team names resolve, 0 unresolved**. `Tigers` and `Wildcats` refuse;
+  `Michigan` and `Michigan State` resolve to DIFFERENT ids.
+- **HONEST LIMIT ON THE END-TO-END:** the join is verified against real ESPN
+  names, the GRADING is not — **no NCAAF game has finished yet this season**
+  (08-22 and 08-23 return 0 games; 08-29 returns 8 with 0 finals). So grading is
+  unit-tested against synthetic scores only, unlike NFL where a real 27-28 final
+  was available. Do not describe this as end-to-end verified.
+- **GREEN: 324 passed** across the settlement/bet-status/game-line surface. ONE
+  PRE-EXISTING FAILURE, `test_ncaaf_team_registry_reachability.py::
+  test_albany_is_a_stated_judgement_not_an_inferred_one` — verified by stashing
+  ALL my tracked edits and re-running: it fails identically. It targets
+  `ncaaf/oddsapi_lines.py::resolve_team`, a module this lane does not touch.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

@@ -589,6 +589,8 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # capture never touches disk -- it is here so a backend change does not
     # silently strand the one artifact NFL settlement reads.
     "nfl_source/api/live_state/live_state_*.json",
+    # poll_ncaaf_live_state.py, same reasoning as the nfl entry above.
+    "ncaaf_source/api/live_state/live_state_*.json",
     "soccer_source/*/api/display_prediction_dates.json",
     "soccer_source/*/api/schedule/schedule_*.json",
     # Raw bookmaker odds/props/picks (2026-07-24 market-board work): these

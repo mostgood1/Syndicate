@@ -644,6 +644,15 @@ def _default_resolver(selected_date: str):
         # the resolver's docstring states why props refuse (the scoreboard
         # capture carries team scores and nothing per-player).
         "nfl": lambda: _build("syndicate.features.shared.bet_status_nfl", "nfl_status_resolver", selected_date),
+        # Wired BEFORE the volume lands, which is the only time this is
+        # cheap. NCAAF reaches the board today (2026-08-28T02:10Z: kalshi
+        # offered 524 ncaaf quotes, 52 selected) but its orders have not
+        # reached the ledger, so `no_resolver_for_ncaaf` never showed up in
+        # a counter -- unlike soccer and NFL, which were each found only
+        # after months of ungradeable bets. The join is registry-backed and
+        # NOT `teams_match`: see `bet_status_ncaaf` on why a prefix rule
+        # turns "Michigan" into "Michigan State".
+        "ncaaf": lambda: _build("syndicate.features.shared.bet_status_ncaaf", "ncaaf_status_resolver", selected_date),
     }
     cache: dict[str, Any] = {}
 
