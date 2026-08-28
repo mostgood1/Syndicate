@@ -140,6 +140,49 @@ def test_the_venues_own_word_for_a_void_is_a_push():
     assert v["outcome"] == "push"
 
 
+def test_a_zero_delta_is_REFUSED_not_called_a_push(app=None):
+    """[user 2026-08-27] "polymarket is still calling everything from today a
+    push."
+
+    IT WAS, AND THE ERROR WAS PERMANENT. Measured on the live book: seven
+    pushes, every one Polymarket, every one dated that day, every one
+    `pnl_dollars=0.0` and `settled_by='venue'`, while the same venue's rows
+    from the day before graded won/lost with real money. One carried
+    `settled_at=2026-08-27T13:49:55Z` against a `commence_time` of `23:16:00Z`
+    -- settled nine and a half hours before first pitch.
+
+    `delta == 0` conflates "resolved and moved no money" with "nothing booked
+    yet". Grading the second writes an AUTHORITATIVE outcome over a live bet,
+    and `settle_from_venue` skips rows that already carry one -- so the mistake
+    can never correct itself. Only the venue SAYING neutral may be a push.
+    """
+    v = vs.grade_polymarket_resolution(_p(before=3.0, after=3.0))
+    assert v["graded"] is False
+    assert v["reason"] == "zero_realized_delta"
+    assert "outcome" not in v
+
+
+def test_a_zero_delta_the_venue_CALLS_neutral_is_still_a_push():
+    """The refusal above must not swallow the one case that is genuinely a
+    push. The discriminator is the venue's own word, not the arithmetic."""
+    v = vs.grade_polymarket_resolution(
+        _p(before=3.0, after=3.0, side="POSITION_RESOLUTION_SIDE_NEUTRAL")
+    )
+    assert v["graded"] is True
+    assert v["outcome"] == "push"
+    assert v["pnl_dollars"] == pytest.approx(0.0)
+
+
+def test_a_refused_zero_delta_leaves_the_row_open_for_a_later_tick():
+    """The point of refusing rather than grading: the position stays ungraded,
+    so the next pass can settle it once the venue has actually booked the
+    resolution. A row frozen as `push` would never be looked at again."""
+    v = vs.grade_polymarket_resolution(_p(before=0.0, after=0.0))
+    assert v["graded"] is False
+    # No outcome and no money -- nothing for the writer to apply.
+    assert v.get("pnl_dollars") is None
+
+
 def test_a_resolution_with_no_realized_amount_is_refused():
     row = _p()
     row["afterPosition"] = {}
@@ -536,3 +579,74 @@ def test_repair_and_grader_cannot_oscillate(ledger, monkeypatch):
     second = vs.settle_from_venue()         # nothing left to repair or grade
     assert second["settled"] == 0
     assert "outcome" not in ledger["orders"][0]
+
+
+# --------------------------------------------------------------------------
+# The repair for pushes already written from a zero delta
+# --------------------------------------------------------------------------
+
+
+def _bad_push(**over):
+    """A row exactly as the defective grader left it: push, no money, venue's
+    word, and NO `held_side` -- because nothing stored it before this change."""
+    row = {
+        "mode": "live", "venue": "polymarket", "outcome": "push",
+        "pnl_dollars": 0.0, "settled_by": "venue", "selected_date": "2026-08-27",
+        "settled_at_venue": "2026-08-28T01:40:46Z", "graded_at": "2026-08-28T01:43:53Z",
+    }
+    row.update(over)
+    return row
+
+
+def _repair(monkeypatch, orders):
+    import syndicate.features.shared.execution_ledger as el
+
+    state = {"orders": orders}
+    monkeypatch.setattr(el, "_load", lambda: state)
+    monkeypatch.setattr(el, "_persist", lambda s: None)
+    return vs.repair_zero_delta_pushes(), state
+
+
+def test_the_repair_clears_a_push_written_from_a_zero_delta(monkeypatch):
+    out, state = _repair(monkeypatch, [_bad_push()])
+    assert out["cleared"] == 1
+    assert out["dates"] == ["2026-08-27"]
+    row = state["orders"][0]
+    # Un-graded, not re-graded: the repair never invents an outcome.
+    for field in ("outcome", "pnl_dollars", "settled_by", "settled_at_venue", "graded_at"):
+        assert field not in row
+
+
+def test_the_repair_TERMINATES_and_does_not_reopen_a_correct_push(monkeypatch):
+    """THE CLAUSE THAT MAKES THIS SAFE TO RUN EVERY TICK.
+
+    A genuine push -- one the venue itself called NEUTRAL -- looks identical in
+    the stored data: push / 0.00 / venue. Clearing on that signature alone
+    would re-open a CORRECT grade, the next tick would re-grade it push, and
+    this would clear it again forever. A row carrying `held_side` was written
+    by the fixed code and must be left alone.
+    """
+    good = _bad_push(held_side="POSITION_RESOLUTION_SIDE_NEUTRAL")
+    out, state = _repair(monkeypatch, [good])
+    assert out["cleared"] == 0
+    assert state["orders"][0]["outcome"] == "push"
+
+
+def test_the_repair_will_not_touch_another_modules_record(monkeypatch):
+    """An inferred grade belongs to the inference path. Kalshi never had this
+    defect, and a won/lost row is not the signature."""
+    rows = [
+        _bad_push(settled_by="inferred"),
+        _bad_push(venue="kalshi"),
+        _bad_push(outcome="lost", pnl_dollars=-2.0),
+        _bad_push(mode="paper"),
+    ]
+    out, _ = _repair(monkeypatch, rows)
+    assert out["cleared"] == 0
+
+
+def test_a_push_carrying_real_money_is_not_the_defect(monkeypatch):
+    """The signature is a ZERO P&L. A push with money attached came from
+    somewhere else and is not this repair's business."""
+    out, _ = _repair(monkeypatch, [_bad_push(pnl_dollars=-0.5)])
+    assert out["cleared"] == 0

@@ -284,6 +284,44 @@ def fetch_polymarket_resolutions(*, limit: int = 200, max_pages: int = 10) -> tu
         cursor = str(payload.get("nextCursor") or "")
         if payload.get("eof") or not cursor:
             break
+
+    # THE SHAPE, ONCE PER READ, BECAUSE THIS MODULE HAD NO LOGGING AT ALL.
+    #
+    # Every other venue reader here reports the payload it got on its first
+    # live run, and each time that has corrected field names nobody could have
+    # guessed -- ten on `kalshi_client`, `state` vs `status` on
+    # `polymarket_us_orders`. This module skipped it, which is exactly why the
+    # push defect above had to be diagnosed backwards from ledger rows instead
+    # of read off a log line.
+    #
+    # KEYS AND THE REALIZED PAIR ONLY. The delta is the whole grading input, so
+    # a zero one has to be visible as a zero rather than inferred from a
+    # `push` appearing downstream. These are our own settled positions, not
+    # credentials.
+    if rows:
+        sample = rows[0]
+        before = sample.get("beforePosition") if isinstance(sample.get("beforePosition"), Mapping) else {}
+        after = sample.get("afterPosition") if isinstance(sample.get("afterPosition"), Mapping) else {}
+        zero = sum(
+            1
+            for r in rows
+            if _amount((r.get("afterPosition") or {}).get("realized")) is not None
+            and (
+                (_amount((r.get("afterPosition") or {}).get("realized")) or 0.0)
+                - (_amount((r.get("beforePosition") or {}).get("realized")) or 0.0)
+            )
+            == 0.0
+        )
+        print(
+            f"[venue_settlement] POLYMARKET_RESOLUTIONS n={len(rows)}"
+            f" zero_delta={zero} keys={sorted(sample.keys())}"
+            f" sides={sorted({str(r.get('side') or '') for r in rows})}"
+            f" before_realized={before.get('realized')!r}"
+            f" after_realized={after.get('realized')!r}",
+            flush=True,
+        )
+    else:
+        print("[venue_settlement] POLYMARKET_RESOLUTIONS n=0", flush=True)
     return rows, None
 
 
@@ -307,14 +345,40 @@ def grade_polymarket_resolution(row: Mapping[str, Any]) -> dict[str, Any]:
     side = str(row.get("side") or "").strip().upper()
 
     if side.endswith("NEUTRAL"):
-        # The venue's own word for a resolution that moved nothing.
+        # The venue's own word for a resolution that moved nothing. This is the
+        # ONLY thing that may be graded a push -- the venue SAYING so.
         outcome = OUTCOME_PUSH
     elif delta > 0:
         outcome = OUTCOME_WON
     elif delta < 0:
         outcome = OUTCOME_LOST
     else:
-        outcome = OUTCOME_PUSH
+        # ------------------------------------------------------------------
+        # A ZERO DELTA IS AMBIGUOUS AND MUST NOT BE GRADED. `[user 2026-08-27]`
+        # "polymarket is still calling everything from today a push."
+        # ------------------------------------------------------------------
+        #
+        # It was. MEASURED on the live book 2026-08-28T02:3xZ: SEVEN pushes,
+        # every one Polymarket, every one dated that day, every one
+        # `pnl_dollars=0.0` and `settled_by='venue'` -- while the same venue's
+        # rows from the day before graded won/lost with real money. One of them
+        # carried `settled_at=2026-08-27T13:49:55.546Z` against a
+        # `commence_time` of `23:16:00Z`: settled nine and a half hours BEFORE
+        # first pitch, which no real resolution can be.
+        #
+        # `delta == 0` conflates two opposite facts: "this market resolved and
+        # moved no money" and "nothing has been booked against this position
+        # yet". Grading the second as a push writes an AUTHORITATIVE outcome
+        # (`settled_by='venue'`) over a live bet -- and `settle_from_venue`
+        # skips rows that already carry an outcome, so the error is PERMANENT
+        # and self-concealing. It also silently inflates the push column, which
+        # is the one bucket nobody audits because it looks like a non-event.
+        #
+        # Refusing costs nothing: the row stays open and the next tick grades
+        # it once the venue has actually booked the resolution. That is the
+        # same rule this file already applies everywhere else -- an absence is
+        # not evidence, and a named refusal is better than a confident zero.
+        return {"graded": False, "reason": "zero_realized_delta"}
 
     return {
         "graded": True,
@@ -372,7 +436,81 @@ def _derived_pnl(order: Mapping[str, Any], outcome: str) -> float | None:
 
 
 # Fields this module writes, and therefore the only fields a repair may clear.
-_VENUE_GRADE_FIELDS = ("outcome", "pnl_dollars", "settled_by", "settled_at_venue", "graded_at")
+_VENUE_GRADE_FIELDS = (
+    "outcome", "pnl_dollars", "settled_by", "settled_at_venue", "graded_at", "held_side",
+)
+
+
+def repair_zero_delta_pushes(*, dry_run: bool = False) -> dict[str, Any]:
+    """Un-grade pushes written from a ZERO realized delta. Worker only.
+
+    `[user 2026-08-27]` "polymarket is still calling everything from today a
+    push." MEASURED on the live book: seven pushes, all Polymarket, all that
+    day, all `pnl_dollars=0.0` / `settled_by='venue'`, while the previous day's
+    rows on the same venue graded won and lost with real money. One carried
+    `settled_at=2026-08-27T13:49:55Z` against a `commence_time` of `23:16:00Z`
+    -- graded settled nine and a half hours before first pitch.
+
+    `grade_polymarket_resolution` now REFUSES a zero delta, so no new row can
+    be written this way. That does nothing for the rows already carrying it:
+    grading is idempotent, so a wrong outcome is permanent unless something
+    deliberately removes it. Same reasoning as `repair_multi_side_grades`.
+
+    NARROW BY CONSTRUCTION, because this writes to a money record:
+
+      * `mode=live` only;
+      * `venue=polymarket` only -- Kalshi's grader never had this defect;
+      * rows THIS module graded (`settled_by == "venue"`); an inferred grade is
+        another module's record and is never touched;
+      * `outcome == push` with a P&L of zero -- the exact signature;
+      * and NO `held_side` recorded.
+
+    THAT LAST CLAUSE IS WHAT MAKES THIS TERMINATE, and it is worth being
+    explicit about. A legitimate push -- one where the venue itself said
+    NEUTRAL -- is indistinguishable from the defect in the stored data: both
+    are `push / 0.00 / venue`. Clearing on the signature alone would re-open a
+    CORRECT grade, the next tick would re-grade it push, and the repair would
+    clear it again on every tick forever. `held_side` is now persisted at grade
+    time, so a row written after this change carries it and is never touched,
+    while every row written before it is cleared exactly once.
+
+    Nothing here invents an outcome. It removes an assertion the venue never
+    made, and lets a later tick grade the row once the resolution is actually
+    booked. A row that really was neutral comes straight back as a push, this
+    time carrying the venue's word for it.
+    """
+    from syndicate.features.shared.execution_ledger import LIVE, _load, _persist
+
+    counters: dict[str, Any] = {"cleared": 0, "dates": []}
+    try:
+        state = _load()
+    except Exception as exc:
+        return {"status": "error", "reason": f"{type(exc).__name__}: {exc}", **counters}
+
+    for order in (state.get("orders") or []):
+        if str(order.get("mode") or "") != LIVE:
+            continue
+        if str(order.get("venue") or "").strip().lower() != "polymarket":
+            continue
+        if str(order.get("settled_by") or "") != "venue":
+            continue
+        if str(order.get("outcome") or "") != OUTCOME_PUSH:
+            continue
+        if order.get("held_side"):
+            continue
+        pnl = _num(order.get("pnl_dollars"))
+        if pnl is None or abs(pnl) > 1e-9:
+            continue
+        for field in _VENUE_GRADE_FIELDS:
+            order.pop(field, None)
+        counters["cleared"] += 1
+        date = str(order.get("selected_date") or "")
+        if date and date not in counters["dates"]:
+            counters["dates"].append(date)
+
+    if counters["cleared"] and not dry_run:
+        _persist(state)
+    return {"status": "ok", **counters}
 
 
 def repair_multi_side_grades(*, dry_run: bool = False) -> dict[str, Any]:
@@ -509,6 +647,18 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
         counters["errors"]["repair"] = f"{type(exc).__name__}: {exc}"
 
     try:
+        unpushed = repair_zero_delta_pushes(dry_run=dry_run)
+        if unpushed.get("cleared"):
+            counters["repaired_pushes"] = unpushed
+            print(
+                f"[venue_settlement] ZERO_DELTA_PUSHES_CLEARED n={unpushed['cleared']}"
+                f" dates={unpushed.get('dates')}",
+                flush=True,
+            )
+    except Exception as exc:
+        counters["errors"]["repair_pushes"] = f"{type(exc).__name__}: {exc}"
+
+    try:
         state = _load()
     except Exception as exc:
         counters["errors"]["ledger"] = f"{type(exc).__name__}: {exc}"
@@ -641,6 +791,15 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
                 order["settled_by"] = "venue"
                 order["settled_at_venue"] = verdict.get("settled_at_venue")
                 order["graded_at"] = _utc_now()
+                # THE VENUE'S OWN WORD FOR WHICH SIDE WE HELD, PERSISTED.
+                #
+                # Both graders have always returned it and nothing stored it,
+                # which is why the zero-delta push defect could not be told
+                # apart from a legitimate venue-stated NEUTRAL push after the
+                # fact -- both are `outcome=push, pnl=0, settled_by=venue`.
+                # Storing it makes `repair_zero_delta_pushes` able to terminate
+                # instead of clearing a correct grade every tick forever.
+                order["held_side"] = verdict.get("held_side")
                 if attributable and verdict.get("pnl_dollars") is not None:
                     # ONE ORDER: take the venue's own arithmetic, which nets
                     # fees the venue actually charged.
