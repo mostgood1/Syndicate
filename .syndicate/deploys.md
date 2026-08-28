@@ -36172,3 +36172,41 @@ step than reasoning about slug grammar.
 list to decide whether the board or the venue has home/away wrong; (2) find
 what explains the other ~96; (3) get mlb into `tried` before treating any
 non-soccer zero as a control.
+
+### CORRECTION to the entry above, same day — I over-read my own control, twice
+
+A second reader (`portfolio-endpoint-improvements`) applied the power test I
+did not, and I verified the arithmetic independently before accepting it:
+
+```
+soccer rate            12/133 = 0.0902
+P(zero in  5 | same)  = 0.623   <- nfl's 0 of 5 is the MAJORITY outcome
+P(zero in 13 | same)  = 0.293   <- all non-soccer pooled
+P(>=1 in 30 | same)   = 0.941   <- what would make a zero mean something
+```
+
+**A zero in NFL is what you'd most often see EVEN IF NFL FLIPPED AT SOCCER'S
+RATE.** My entry above said the control was "exercised but thin" and treated 13
+attempts as a real zero. It is a real zero and it is not evidence. The
+hypothesis is **SUPPORTED, NOT ESTABLISHED**, and `state.md` now says so in
+those words.
+
+**AND A SECOND DENOMINATOR PROBLEM, NESTED INSIDE THE FIRST.** The 106 includes
+rows that could never flip-match for reasons unrelated to orientation — a club
+the alias map cannot resolve fails BOTH orientations. So 12/133 is "flipped out
+of all unmatched", not "flipped out of fixtures where a flip was possible".
+**9% is a lower bound, not a rate**, and the denominator that would make it a
+rate does not exist yet.
+
+**That kills my own next-step reasoning from the entry above.** I read the
+samples' "prominent club is away in our data" pattern as pointing at the BOARD
+being inverted. Two things wrong with that: the samples are capped at 8 AND
+drawn only from rows that DID flip-match, so the pattern is conditioned on the
+outcome and says nothing about the other ~96; and a systematically inverted
+board predicts ~100% of resolvable soccer, not 9% — as does a per-sport slug
+order. **Neither systematic explanation survives the rate.** Checking Man City
+@ Crystal Palace against a fixture list is still worth minutes, but it can no
+longer settle the question the way I claimed.
+
+Third denominator error in one session, all the same shape: a count read as a
+rate. `#598`, `state.md` and the lane now carry the corrected reading.

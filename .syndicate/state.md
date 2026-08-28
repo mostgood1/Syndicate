@@ -140,13 +140,42 @@ demonstrating the bug. Pinned is not fixed.
   THE FIX SHIPPED.** Those rows were already `no_match` (candidates present,
   no fixture paired), never `no_candidates`. Bucketing was a real defect for
   MLS markets and was never the binding constraint for these rows.
-- **UNVERIFIED, one instance only:** orientation. Board `Elche CF @ Real Racing
-  Club de Santander` vs venue `rrc-elc@2.5` — same clubs, same line, refused.
-  `parse_slug` reads `<away>-<home>`; `teams_match('soccer','rrc','Real Racing
-  Club de Santander')` is True and `'elc'` is False, so flipped it pairs.
-  `POLYMARKET_ORIENTATION` (counter only, per sport, MLB/NFL as control) ships
-  in `432c5915` and **has never run in production**. DO NOT APPLY A FLIP on
-  one fixture.
+- **ORIENTATION: SUPPORTED, NOT ESTABLISHED** `[measured 2026-08-28T17:40:42Z,
+  73a7e358, board_rows=1313]`. `POLYMARKET_ORIENTATION`, read denominator-first:
+
+      tried   = {soccer|h2h 106, soccer|totals 27, wnba|totals 6,
+                 nfl|h2h 3, wnba|spreads 2, nfl|totals 2}
+      flipped = {soccer|h2h 10, soccer|totals 2}
+
+  Soccer flips at **12 of 133 = 9.0%**, a real rate on a real sample. **The
+  claim that this is SPORT-SPECIFIC is not established** and must not be
+  written as if it were.
+- **THE CONTROL CANNOT DISCRIMINATE AT THIS n, and that is arithmetic, not
+  caution.** `mlb` is absent from `tried` entirely — 0 of 0, 35 unmatched
+  game-line rows and the flip attempted on NONE (spreads/totals only attempt at
+  the board's own line). NFL was exercised at 0 of 5. At soccer's 9.02%,
+  P(zero rescues in 5) = **0.623** — a zero is the MAJORITY outcome even if NFL
+  behaved identically. All non-soccer pooled is 0 of 13, P(zero) = **0.293**.
+  Verified independently here and by a second reader. **~30 non-soccer attempts
+  would make a zero mean something** (P(>=1) = 0.941); NFL volume should climb
+  with the season.
+- **A SECOND, NESTED DENOMINATOR PROBLEM — the 9% is a LOWER BOUND, not a
+  rate.** The 106 includes rows that could never flip-match for reasons
+  unrelated to orientation (a club the alias map cannot resolve fails BOTH
+  orientations). So 12/133 is "flipped, out of all unmatched", not "flipped,
+  out of fixtures where a flip was even possible". The true inversion rate
+  among RESOLVABLE fixtures is unknown and higher. Nobody has that denominator.
+- **THEREFORE NEITHER SYSTEMATIC EXPLANATION IS SUPPORTED.** "Soccer slugs are
+  `<home>-<away>`" and "our board has soccer fixtures inverted" both predict
+  ~100% of resolvable soccer, not 9%. Whatever this is looks PER-FIXTURE. But
+  see the nested denominator above before treating even that as settled.
+- **THE SAMPLES SHOW THE MECHANISM, NOT THE RATE.** All 8 are soccer, across
+  five competitions (Ligue 1, MLS, EFL Championship, La Liga, EPL) and both
+  slug prefixes, every one board-`away@home` against the reversed slug pair.
+  They are capped at 8 AND SELECTED ON THE OUTCOME — drawn only from rows that
+  did flip-match — so the "prominent club is away in our data" pattern I read
+  off them is conditioned on flipping and cannot support an inference about the
+  other ~96. **DO NOT APPLY A FLIP.**
 - `/api/ops/polymarket/slate` now passes the join's `soccer_tokens`, so reader
   and decider agree; and it emits `outcome_readability_by_reason_and_recency`
   — `outcomes_count_mismatch` is `past 216 / upcoming 193`, i.e. NOT the stale
