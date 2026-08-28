@@ -4881,3 +4881,49 @@ thirteen times against a deploy that was already live.
 
 **Check the instrument can fire before trusting what it says.** An unfiltered
 query returning *something* is the cheap version of that check.
+
+## 2026-08-28 FORBIDDEN: reading a job's TIMESTAMP as evidence it ran, on a machine that sleeps
+
+`live-gameline-accuracy-snapshot` fired at 23:34:21 CT and issued its script call
+three seconds later. The tool result came back at **08:49:37 the next morning** —
+Windows Modern Standby (entered 22:57:42, exited 08:48:00) suspended the child
+while the scheduler and the model both ran normally. `lastRunAt` was correct and
+completely misleading: the cron fired, the session opened, the model wrote the
+call, and none of that means the work happened.
+
+I first reported this as "fired on time and left no row". It left a row — stamped
+with the WAKE time and carrying the rolled-over date. Displaced, not dropped.
+
+**Compounding it:** the sibling task `live-gameline-fixes-first-real-reading` had a
+hardcoded freshness window ("a row `captured_at` between 04:33Z and 04:45Z") and was
+instructed, on a miss, to declare *"the recurring task is not firing on its cron,
+which is EXACTLY the failure that lost six nights."* Under displacement that window
+can never be met, so it was primed to raise a false alarm indistinguishable from a
+real outage — and the plausible response to that alarm is re-enabling things that
+were never off. 6 of 10 nights (08-18..08-27) fell inside a standby span.
+
+**The rule:** gate on the ARTEFACT, not the clock. "Does a row exist for the slate
+date" survives a nine-hour displacement; "was it captured between 04:33 and 04:45Z"
+does not. A wall-clock window is only evidence on a machine you have shown stays
+awake. When you must distinguish "never fired" from "fired and was suspended", the
+readings that actually discriminate are `enabled: false` and a `lastRunAt` older
+than a full period — not a stale `captured_at`.
+
+## 2026-08-28 A lane-guard claim can be held by PROSE, and "TRANSFERRED" releases nothing
+
+Blocked from editing `game_chip_scoreboard.py` by `wnba-chip-live-token`. Removing
+the path from that lane's `- Files:` line did not clear it, because:
+
+- `lane-guard.py` matches `rel.endswith("/" + f)`, so a **bare filename anywhere in
+  the Files block counts as a claim**. The historical note "— `game_chip_scoreboard.py`
+  ADDED after the first test run" was holding the claim by itself.
+- Its disclaimer vocabulary is a **fixed list** — `not claimed`, `released`, `held by`,
+  `claimed by`, `collision check`, … — and **"TRANSFERRED" is not in it.** So the
+  `~~polymarket_board_join.py~~ **CLAIM TRANSFERRED**` note in `open-bet-live-status`
+  releases NOTHING; that claim is still live despite reading as handed off.
+
+**The rule:** a release is only real if the guard parses it. Verify by DRIVING the
+hook (`echo '{"tool_name":"Edit","tool_input":{"file_path":"..."}}' | python
+.claude/hooks/lane-guard.py`), never by reading the ledger and believing the prose.
+Note the guard cannot express a per-branch claim: releasing for one concern releases
+the file for everyone, so say so where the next reader will see it.

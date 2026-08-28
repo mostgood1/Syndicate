@@ -2594,10 +2594,25 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Goal: a 0-0 "FINAL" in a sport that cannot end level is treated as the
   schedule placeholder it is, with a NAMED reason, instead of being passed
   through as an observed result.
-- Files: `syndicate/features/shared/game_chip_scoreboard.py` (the 0-0
-  placeholder branch in `build_game_chip` ONLY — scoped claim transferred from
-  `wnba-chip-live-token`, which keeps `_side_score` and all WNBA semantics),
-  `tests/test_game_chip_scoreboard.py`
+- Files: NONE — **all claims RELEASED 2026-08-28 at checkpoint.** The code
+  work is landed on `origin/main` (`eca7e81b`, verified ancestor) and the one
+  remaining criterion is READ-ONLY production verification, so holding
+  `game_chip_scoreboard.py` would block other lanes for nothing. Paths are
+  named in the commit if this lane needs another code change.
+  **NOTE for whoever takes `game_chip_scoreboard.py` next:** the guard now
+  protects it for NEITHER this lane nor `wnba-chip-live-token` — see the
+  release note in that lane's block. Put the path back on a `- Files:` line to
+  re-arm it.
+- **STATUS 2026-08-28 — SHIPPED TO `origin/main`, NOT DEPLOYED, NOT VERIFIED
+  IN PRODUCTION.**
+  - `eca7e81b` — the fix + 6 tests. 33 chip / 76 chip+scorer / 90 board-grid
+    tests pass; reachability proven `off != on` (the reason string is
+    producible only by the new branch; mlb/soccer/nfl/kabaddi differ).
+  - `45b46d34` — the lane release from `wnba-chip-live-token`.
+  - `cadfbe31` — `--date` on `snapshot_live_gameline_score.py` (separate
+    concern, same session).
+  - **Web is live on `56e77588`. Nothing is deployed from today's work**, so
+    the 08-27 board still reports 644 phantom level finals.
 - Hypothesis: CONFIRMED FROM PRODUCTION BEFORE ANY CODE. `/api/board/book-grid?sport=mlb&date=2026-08-27`
   returns `games_with_outcome=4` against `finals_seen=1462, finals_level=644
   (44%)` and `no_final_outcome_for_game=1304`. The 300-row sample carries five
@@ -2621,7 +2636,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   (b) soccer `final 0-0` PRESERVED — nulling it would re-break the draw fix
   `a293bf14`; (c) MLB `live 0-0` preserved; (d) unknown sport preserved
   (allowlist, never a negation); (e) existing pregame/live tests still pass.
-- Blocked by: none
+  **(a)-(e) ALL PASS IN TESTS. (f) IS OWED AND IS THE ONLY ONE THAT COUNTS:**
+  on a deployed build, `/api/board/book-grid?sport=mlb&date=<a date with
+  placeholder finals>` must show `finals_level` FALL (644 -> ~0 for 08-27)
+  while `games_with_outcome` does NOT drop on a healthy date (08-26 must stay
+  15). A unit-test pass is not that reading — the whole defect was a
+  placeholder that every test-level check found plausible.
+- **DO NOT re-derive:** this recovers NO games. 08-27 stays capped at 4 of ~15
+  because the scores are absent from the payload, not misclassified. If a
+  future run sees `games_with_outcome` still 4 after deploy, that is EXPECTED
+  and is not a failure of this fix.
+- Blocked by: a deploy. Not urgent — the defect is misreporting, not data loss.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
