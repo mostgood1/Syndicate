@@ -5119,3 +5119,75 @@ the file for everyone, so say so where the next reader will see it.
 - `UNDECIDED` and `NON-IDENTIFYING` are different instructions to the reader:
   "collect more" versus "collecting more cannot help". A test that cannot tell
   them apart will keep being fed data forever.
+
+## 2026-08-28 — FORBIDDEN: reading `lastRunAt` as evidence a scheduled job RAN. It records DISPATCH, and on this machine the two were nine hours apart.
+
+`live-gameline-accuracy-snapshot` showed `lastRunAt: 2026-08-28T04:34:17Z`,
+exactly in its expected window, and had produced no row. The obvious readings —
+the task is broken, the script is broken, the scorer is off — were all wrong.
+
+The session fired on time and emitted its Bash call at `04:34:24.813Z`. **The
+result returned at `13:49:37.933Z`.** Windows entered Modern Standby at
+`03:57:42Z` (Kernel-Power **506**, Idle Timeout) and left it at `13:48:00Z`
+(**507**, "Reason: Input Mouse"). Modern Standby keeps the NETWORK alive — so
+the scheduler ran and the model produced a tool call — while the Desktop
+Activity Moderator suspends user-mode processes. The session could DECIDE to run
+the script and could not RUN it. The slate rolled in between; the capture landed
+empty.
+
+**How to tell it apart from a task bug, cheaply:** other concurrent sessions
+will show a gap ending at the SAME INSTANT. Three did — 10.22h, 9.99h, 9.78h,
+all resuming inside 72 seconds, from different start times. A per-task bug
+cannot do that. Confirm with `Get-WinEvent` System log, Kernel-Power 506/507.
+
+**The general form:** a scheduler's own record of firing is upstream of every
+interesting failure. Check the ARTIFACT the job writes and compare its timestamp
+to `lastRunAt`. Same family as "presence is not reachability" and "confirm the
+code ran".
+
+**Corollary, and it cost a near-miss the same day:** a wall-clock cron whose
+deadline is a real-world roll (a slate date, a market close) must not live on a
+machine that sleeps. The fix was not to harden the cron but to move the work to
+where the data already is — the worker that builds the artifact — which deleted
+the deadline rather than defending it.
+
+## 2026-08-28 — FORBIDDEN: baselining a test in a fresh worktree when the test reads state the worktree does not share. It is not a baseline, it is a different experiment.
+
+Two `MissingRequiredArtifactRepairTests` failed after my change. I created a
+worktree at `origin/main`, ran them, saw them PASS, and reported that my change
+had broken them.
+
+**A git worktree does not carry the primary tree's `data/` mirror, and that test
+reads the real data root** — visible in its own error output
+(`...\Syndicate\data\wnba_source\...`), which I had already been shown and did
+not read. The worktree was a different environment, so the comparison was
+meaningless.
+
+Reverting ONLY my edit **in place**, in the tree where the symptom appeared,
+reproduced both failures. They were pre-existing and environmental.
+
+**The rule: isolate the variable you changed, in the environment the symptom
+lives in.** Changing the environment and the code at once and attributing the
+delta to the code is the error. Related: "re-baseline before judging" — but note
+this failed the other way, a stale baseline said INNOCENT when the truth was
+also innocent, and I still got the attribution wrong.
+
+## 2026-08-28 — FORBIDDEN: concluding a lane claim is free because the roster says its session is gone. `get_session` said "not found" while the session was live.
+
+`syndicate/blueprints/intelligence.py` was claimed by an OPEN lane and I had
+authorisation to take it. `get_session` on the holding session
+(`12b2be57-...`) returned **"Session not found"** — which reads as "it ended,
+the claim is stale, reassign it."
+
+Its transcript's last entry was **11 seconds old**. The session was actively
+editing that file.
+
+An archived-but-running session, an ended session, and one that never existed
+are **indistinguishable** through the roster. The transcript's last timestamp is
+the ground truth and costs one read:
+
+    ~/.claude/projects/<project>/<session-id>.jsonl   -> max timestamp
+
+Extends "session roster hides archived": that rule said the roster OMITS things;
+this says it can also answer a confident NOT FOUND about something running right
+now. Never reassign a claim on roster evidence alone.
