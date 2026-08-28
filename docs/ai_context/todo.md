@@ -1,5 +1,87 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#599` — **WNBA game lines could never be graded, because a comment said the player box had no team scores. It always had them.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **LANDED (`56426d9a`), NOT DEPLOYED**
+
+`bet_status_wnba` refused every WNBA spread, moneyline and total since the
+module was written. The refusal was reasoned, not accidental, and the reasoning
+is in the source:
+
+> this capture is a PLAYER box and has none, so the fix is upstream in the
+> capture rather than a missing entry in a table here
+
+The first clause is true. **The conclusion does not follow.** In basketball a
+team's score IS the sum of its players' points — there is no team-level scoring,
+no own goal, no defensive touchdown — and `boxscores_<date>.csv` carries
+`TEAM_ABBREVIATION` and `PTS` per player. Nothing upstream had to change. The
+sentence is what stopped anyone looking, which is why the correction is written
+into the constant's own comment rather than only into a commit message.
+
+**VERIFIED AGAINST ESPN BEFORE IT WAS RELIED ON**, 2026-08-25, derived (sum of
+player `PTS`) vs official scoreboard:
+
+    401857173  CHI 81 / CON 87      ESPN  CHI 81 / CON 87
+    401857174  DAL 96 / POR 78      ESPN  DAL 96 / POR 78
+    401857175  PHX 84 / WSH 94      ESPN  PHX 84 / WSH 94
+
+Six of six exact, both sides of all three games. The derivation is not an
+estimate. Repeated on the fixture this fixes: `401857176` GS 89 / CON 64.
+
+**WHAT IT COST.** Two FILLED Kalshi totals on `GSV @ CON` 2026-08-26 (over and
+under 151.5) sat ungraded for two days. Every OTHER WNBA row on that slate
+carried `settled_by=venue` — **so WNBA game lines only ever settled when Kalshi
+settled them for us, and the one pair Kalshi missed could never be recovered by
+anything.** Real total 153. Both now grade: over WON, under LOST.
+
+**TWO WRONG ATTRIBUTIONS OF MINE, CORRECTED HERE SO NEITHER IS INHERITED.**
+1. I reported the stuck pair as the `no_team_scores_in_player_box: 2` entry in
+   the 08-26 counter, flagged as circumstantial. **Wrong.**
+   `is_game_line_market` covers moneylines and SPREADS only — `game_line_view`
+   translates a TEAM side into a value and a direction, which a total does not
+   need — so `totals` fell to `unmapped_market: 6`. Different bucket, same root.
+2. I reported the final-boxscore capture as "dead since 2026-08-25" from
+   `/api/ops/artifacts/export`. **Wrong, and it is the keyvalue/disk split
+   again:** the export is a DISK read while the producer and the consumer both
+   use `read_text_file` (keyvalue). `/wnba/api/final_player_boxscore?date=
+   2026-08-26&count_only=1` returns `games: 2`. The capture is healthy.
+
+**GUARDS, one reason string each, because each names a different job:**
+
+    no_final_box_for_date               capture has not run -- wait
+    game_not_in_final_box               it ran; this game is not in it
+    final_box_roster_too_thin_to_total  <5 a side: a TRUNCATED capture, not a
+                                        short bench. A total summed off half a
+                                        roster settles the UNDER on a score that
+                                        never happened.
+    final_box_is_full_game_not_<seg>    a half/quarter line this artifact cannot
+                                        answer; grading it off the final score
+                                        is a confident wrong answer
+    no_matchup_on_order                 a thin ledger row, not an absent game
+
+An unreadable `PTS` cell poisons the whole GAME rather than being skipped —
+skipping silently subtracts that player's points from their team. "No artifact"
+returns `None` and "artifact with no usable game" returns `{}`, so the two stop
+sharing a reason (caught by my own test, which had been asserting the misleading
+one).
+
+Keyed on the tri-code matchup, not the event id — the order carries the board's
+OddsAPI hash and the CSV carries an ESPN id, and the two namespaces never meet.
+`_canonical_wnba_tri` maps both onto the same code, checked in both directions
+on all nine clubs first (`GS`/`Golden State Valkyries` → `GSV`, and so on).
+Home/away is then re-checked explicitly, because `_matchup_key` is a frozenset
+and cannot tell them apart.
+
+**off != on:** 10 new tests fail against the pre-fix module, all 37 pass with
+it, and the player-prop control passes in BOTH states. The final box is still
+read ONCE per resolver — the player index and the team-score index are two
+derivations of one read, pinned by a test that caught a double read.
+
+**Verification when deployed:** the two `KXWNBATOTAL-26AUG26GSCONN-152` rows
+gain an outcome on the first settlement pass (08-26 is inside the `#596`
+straggler window, so no manual step is needed). If they instead appear under
+`no_final_box_for_date`, the keyvalue copy of that date's CSV is missing and
+the job is the capture, not this.
+
+
 ### `#597` — **KALSHI LISTS ~665 SOCCER MARKETS WE CANNOT PARSE. It is a TITLE GRAMMAR gap, not a coverage gap.** — lane `venue-join-refusal-visibility`, 2026-08-28 — **DEPLOYED, work list now readable**
 
 Answering "why is soccer never executed by Kalshi". Not because Kalshi lists no
