@@ -201,6 +201,36 @@ demonstrating the bug. Pinned is not fixed.
   venue files college football under `cfb`, the board says `ncaaf`.
   `no_candidates|ncaaf|totals` 41 of 41, `|h2h` 6 of 6.
 
+## [kalshi-segment-on-full-game] KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS: the join key had no `segment` `[verified 2026-08-28, lane portfolio-venue-and-side-integrity]`
+
+**Five orders, $7.08, real money.** `_match_key`/`_row_key` were five-tuples —
+game, market, player, line, side — with no `segment`, so a board row for "under
+2.5, first 3 innings" matched full-game `KXMLBTOTAL` on every field the key
+carried.
+
+    first3  under 2.5  KXMLBTOTAL-26AUG281940TEXMIL-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG282138PHILAA-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG281845MIAWSH-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG281840LADDET-3  +1567,  6c
+    first5  under 3.5  KXMLBTOTAL-26AUG281840LADDET-4  +567,  15c
+
+The +1900 is not an edge: the model priced three innings against the venue's
+nine-inning price, correctly ~5c. **A mis-keyed join presents as the best line
+on the board**, so edge-ranking selects for it. All five will lose. Kalshi has
+`KXMLBF5TOTAL` and we already fetch it — a mis-SELECTION, not an impossibility.
+
+FIXED AND LANDED `632f3473`, **NOT YET DEPLOYED as of this writing.**
+`segment_for_series` + `segment` in both key tuples + `series` stamped at both
+match-record sites (neither carried it). Unmapped defaults to `full` because the
+protection is on the BOARD side; refusal is reserved for an unmapped series
+carrying a segment MARKER (F5/INNING/1H). Refusing ALL unmapped — my first
+version — would have unindexed the whole prop book. 9 tests, 127 passing.
+
+**THE SERVICE IS refresh-worker, MEASURED NOT ASSUMED** `[2026-08-28T20:19Z]`:
+`[portfolio_commit] KALSHI_BOARD_JOIN` appears on refresh-worker and NEVER on
+live-odds-worker over the same 2h window. Execution stamps `ticker_resolver(row)`
+verbatim from the plan, so the ticker is decided at commit time.
+
 ## [polymarket-h2h-buys-the-wrong-side] POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lanes portfolio-venue-and-side-integrity / venue-candidate-key-token-guard]`
 
 `outcome_side_for_index` assumes `OUTCOME_SIDE_YES` buys `outcomes[0]`. It does

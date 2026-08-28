@@ -1,5 +1,45 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#601` — **KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS. The join key had no `segment`. Five orders, $7.08.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED AND LANDED (`632f3473`), DEPLOY PENDING**
+
+`_match_key`/`_row_key` were five-tuples — game, market, player, line, side —
+with no `segment`, so a board row for "under 2.5, first 3 innings" matched
+full-game `KXMLBTOTAL` on every field the key contained.
+
+    first3  under 2.5  KXMLBTOTAL-26AUG281940TEXMIL-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG282138PHILAA-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG281845MIAWSH-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG281840LADDET-3  +1567,  6c
+    first5  under 3.5  KXMLBTOTAL-26AUG281840LADDET-4  +567,  15c
+
+**The +1900 is the tell and it reads as free money.** Three innings priced
+against the venue's nine-inning number, correctly ~5c. A mis-keyed join does not
+present as a missing match — it presents as the best line on the board, so
+edge-ranking actively selects for it. All five will lose.
+
+FIX: `segment_for_series` in `kalshi_catalogue` + `segment` as a 6th element of
+both key tuples + `series` stamped at both match-record construction sites
+(**neither carried it**, which is why the first version would have unindexed
+every Kalshi match). Unmapped defaults to `full` — the protection is on the
+BOARD side — with refusal reserved for an unmapped series carrying a segment
+marker (F5/INNING/1H). Refusing all unmapped would have unindexed the entire
+prop book (`KXMLBKS`, `KXWNBAREB`, `KXMLBHIT`). 9 new tests, 127 passing.
+
+SERVICE IS **refresh-worker**, measured: `[portfolio_commit] KALSHI_BOARD_JOIN`
+appears there and never on live-odds-worker over a 2h window; execution stamps
+`ticker_resolver(row)` verbatim from the plan.
+
+**OPEN QUESTION FOR THE OPERATOR, NOT ACTED ON.** The five orders are in the
+ledger and will settle as losses. Whether they should be flagged as defect-caused
+(the way `#595`'s wrong-team orders are) so the ROI series is not read as
+strategy performance is a call I have not made. The bets themselves cannot be
+unwound.
+
+**VERIFY AFTER DEPLOY:** on the next slate carrying `first3`/`first5` board rows,
+no order's ticker is a `KXMLBTOTAL` for a segment row — and the F5 rows either
+match `KXMLBF5TOTAL` or refuse with `segment_has_no_matching_series`. Refusal
+count going UP on segment rows is the expected, correct reading.
+
 ### `#600` — **THE EXECUTION LEDGER IS READ-MODIFY-WRITTEN BY TWO SERVICES WITH NO LOCK. Settlement writes were being silently lost.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED AND LANDED (`f66c7441`), NOT DEPLOYED**
 
 `execution_ledger._persist` is a blind whole-document `write_json_file`: no

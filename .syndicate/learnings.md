@@ -5445,3 +5445,61 @@ population moves underneath it" error this lane spent the day fixing, arriving
 one level up as a gift from a peer. **A result handed to you by another session
 still needs its boundary established, and the more welcome it is the more that
 applies.**
+
+## 2026-08-28 — FORBIDDEN: keying a venue join on the fixture without keying it on the PORTION of the fixture
+
+**Measured, real money: five orders, $7.08.** `kalshi_board_join._match_key` and
+`_row_key` were five-tuples — game, market, player, line, side — with no
+`segment`. A board row for "under 2.5 runs, first 3 innings" therefore matched
+Kalshi's FULL-GAME `KXMLBTOTAL` on every field the key contained, and nothing
+downstream checked that the contract settles on a different portion of the game.
+
+    first3  under 2.5  KXMLBTOTAL-26AUG281940TEXMIL-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG282138PHILAA-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG281845MIAWSH-3  +1900,  5c
+    first3  under 2.5  KXMLBTOTAL-26AUG281840LADDET-3  +1567,  6c
+    first5  under 3.5  KXMLBTOTAL-26AUG281840LADDET-4  +567,  15c
+
+**THE PRICE IS THE TELL, AND IT LOOKS LIKE FREE MONEY RATHER THAN LIKE A BUG.**
+The model priced "under 2.5 through three innings" — an ordinary proposition —
+against the venue's price for "under 2.5 in nine", correctly ~5c because it
+almost never happens. +1900 is not an edge; it is the two numbers describing
+different events. **A mis-keyed join does not present as a missing match, it
+presents as the best line on the board** — so the edge-ranking that is supposed
+to find value actively SELECTS for the defect. Every one of the five will lose.
+
+Kalshi HAS the right contract (`KXMLBF5TOTAL`, 'First 5 innings: Over 6.5 runs')
+and we already fetch it, so this was a mis-SELECTION, not an impossibility.
+
+**RULE.** A join key must carry every dimension on which the two sides could
+disagree while still comparing equal. For a venue contract that is at minimum
+fixture + market + line + side + **segment**. Adding a market family to an
+existing join is the moment to re-audit the key, not to reuse it.
+
+**AND THE COROLLARY THAT NEARLY CAUSED A BIGGER LOSS.** My first fix refused
+every unmapped series. That would have unindexed the entire player-prop book —
+`KXMLBKS`, `KXWNBAREB`, `KXMLBHIT` are absent from the table and all inherently
+whole-game — trading a $7.08 defect for no Kalshi orders at all. The general
+rule "unknown must not default permissive" is right, but **the permissive branch
+has to be identified against what the field actually ranges over**, not assumed
+from the shape of the bug. Here the protection belongs on the BOARD side: a row
+saying `first3` cannot match a contract saying `full` whatever the series is
+named, so unmapped can safely default to `full`. Refusal is reserved for a
+series carrying a segment MARKER (F5, INNING, 1H…) that is not in the table,
+which closes the mirror failure without touching the props.
+
+Caught by the existing suite, not by me: `test_the_price_resolver_is_keyed_as
+_tightly_as_the_join` failed on a fixture with no `series` — which was itself
+the discovery that NEITHER match-record construction carried one, so version one
+would have unindexed every Kalshi match in production.
+
+**Stale reassurance is a hazard in its own right.** `_match_key`'s docstring
+said Kalshi "currently supplies only player props, whose `player_name` happens
+to identify a game" — true when written, and it named its own accident. The
+accident expired when the join started supplying game totals, and nothing
+re-read the paragraph that depended on it. Corrected in place rather than
+replaced, as the record of a comment that went false silently.
+
+Fix: `632f3473`. `kalshi_catalogue.segment_for_series` + `segment` in both key
+tuples + `series` stamped at both match-record sites. 9 new tests, 127 passing
+across the Kalshi join and catalogue suites.
