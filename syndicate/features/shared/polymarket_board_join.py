@@ -1333,6 +1333,78 @@ _VENUE_TRI_CODES: dict[tuple[str, str], str] = {
 }
 
 
+def _club_token_names(token: Any, club: Any) -> bool:
+    """Does `token` prefix this club's name, or one of its words?
+
+    Conservative on purpose -- see the call site. `ala`/"Alaves" and
+    `hof`/"1899 Hoffenheim" match; `mnc`/"Manchester City" does not.
+    """
+    tok = "".join(ch for ch in str(token or "").lower() if ch.isalnum())
+    if len(tok) < 2:
+        return False
+    raw = str(club or "")
+    try:
+        from syndicate.features.shared.team_aliases import fold_accents
+        raw = fold_accents(raw) or raw
+    except Exception:  # noqa: BLE001
+        pass
+    low = raw.lower()
+    flat = "".join(ch for ch in low if ch.isalnum())
+    if flat.startswith(tok):
+        return True
+    if any(
+        "".join(ch for ch in word if ch.isalnum()).startswith(tok)
+        for word in low.split()
+        if word
+    ):
+        return True
+    # INITIALS, which is the OTHER shape the venue actually uses and is not
+    # fuzzy: `psg`->Paris Saint Germain, `whu`->West Ham United,
+    # `rrc`->Real Racing Club de Santander. Taken as a PREFIX of the word
+    # initials so a trailing "de Santander" does not defeat it.
+    #
+    # Still refuses `mnc`->Manchester City ("mc"), which is neither a prefix
+    # nor initials. That stays refused rather than reached for with a looser
+    # rule: `mnc` would subsequence-match Manchester UNITED too, and a club
+    # match that can name the wrong team is worth less than no match.
+    initials = "".join(w[0] for w in low.split() if w and w[0].isalnum())
+    return len(tok) >= 2 and initials.startswith(tok)
+
+
+def _fixture_tokens_name_matchup(
+    token_a: Any, token_b: Any, board_home: Any, board_away: Any
+) -> bool:
+    """Do the slug's two tokens name this board fixture, in EITHER order?
+
+    Both clubs must be named and the two tokens must name DIFFERENT clubs --
+    otherwise one token matching both sides of a fixture would pair anything.
+    """
+    if not (board_home and board_away):
+        return False
+    a_home, a_away = _club_token_names(token_a, board_home), _club_token_names(token_a, board_away)
+    b_home, b_away = _club_token_names(token_b, board_home), _club_token_names(token_b, board_away)
+    return bool((a_home and b_away and not a_away) or (a_away and b_home and not a_home))
+
+
+def _slug_is_home_first(parsed: Mapping[str, Any], sport: Any) -> bool:
+    """Does this competition list the HOME club first in its slug?
+
+    SOCCER ONLY, and stated as a per-sport fact rather than a global rule
+    because the two known answers DIFFER: soccer is home-first (three ESPN
+    fixtures, two sessions), MLB is away-first and pairs correctly today. A
+    single global ordering would be wrong for one of them whichever way it was
+    written.
+
+    Keyed on the SPORT rather than the competition token because the evidence
+    spans five competitions (`epl`, `lg1`, `lal`, `eflch`, `mlp`) and both slug
+    prefixes with no counterexample -- narrowing it per competition would
+    refuse the ones nobody has checked yet, for no measured reason. A
+    competition that turns out to differ shows up as a soccer row matching
+    NORMALLY, which is the falsifier named at the call site.
+    """
+    return str(sport or "").strip().lower() == "soccer"
+
+
 def _venue_canonical_fixture(parsed: Mapping[str, Any]) -> frozenset[str] | None:
     """The fixture as an unordered canonical pair, via the venue tri-codes.
 
@@ -1437,6 +1509,48 @@ def _teams_match(board_row: Mapping[str, Any], parsed: Mapping[str, Any], sport:
     venue_away = _venue_club(parsed, parsed.get("away"))
     if venue_home and venue_away:
         return bool(venue_home == board_home and venue_away == board_away)
+
+    # ----------------------------------------------------------------------
+    # IDENTIFY THE FIXTURE FROM THE BOARD'S OWN MATCHUP, NOT FROM AN ALIAS
+    # ----------------------------------------------------------------------
+    #
+    # The alias route does not scale and the numbers say so: seven tri-codes
+    # verified one fixture at a time against ESPN moved `unreadable` for
+    # `soccer|h2h` from 80 to 76. Polymarket's club vocabulary is its own and
+    # there are hundreds of codes across ten competitions.
+    #
+    # But the pairing question never needed the vocabulary. The board row
+    # ALREADY NAMES THE FIXTURE -- `home_team` and `away_team` -- and the index
+    # has already narrowed candidates to the same `(league, date, market)`. So
+    # the only question left is whether this slug's two tokens are consistent
+    # with THIS matchup, and that can be answered against the board's own club
+    # names with no alias map at all.
+    #
+    # ORDER-INDEPENDENT, WHICH SUBSUMES THE ORIENTATION QUESTION ENTIRELY.
+    # Soccer slugs are home-first and MLB's are away-first (both measured
+    # against ESPN, 2026-08-28), and a matcher that compares the two clubs as
+    # an unordered pair does not care. That is strictly better than swapping
+    # per sport: it needs no per-competition ordering rule and cannot be wrong
+    # about one. The board row supplies home/away afterwards, and it is
+    # correct -- verified on three ESPN fixtures.
+    #
+    # PREFIX MATCHING ONLY, DELIBERATELY CONSERVATIVE. A token counts as naming
+    # a club when it prefixes the club's normalised name or one of its words.
+    # `ala`->Alaves, `vil`->Villarreal, `juv`->Juventus, `hof`->Hoffenheim all
+    # resolve; `mnc`->Manchester City does NOT and is refused. Subsequence or
+    # initials matching would catch `mnc` and would also let `mnc` name
+    # Manchester United -- a fuzzy club match is how a bet reaches the wrong
+    # team, which is the one outcome this module refuses everywhere else.
+    # Recovering fewer fixtures correctly beats recovering more on a guess.
+    #
+    # BOTH CLUBS MUST MATCH, and ambiguity is already refused one level up:
+    # `join_polymarket_to_board` counts `ambiguous_polymarket_match` when a
+    # board row is claimed by two candidates rather than resolving by order.
+    if str(sport or "").strip().lower() == "soccer":
+        if _fixture_tokens_name_matchup(
+            parsed.get("home"), parsed.get("away"), home, away
+        ):
+            return True
 
     pair = soccer_fixture_clubs(parsed.get("home"), parsed.get("away"))
     if not pair:

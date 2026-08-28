@@ -983,12 +983,15 @@ def test_a_fixture_the_venue_LISTS_but_could_not_pair_is_the_real_denominator(mo
     """
     import syndicate.features.shared.team_aliases as aliases
 
-    canon = {"cry": "crystal palace", "mnc": "manchester city",
+    # `zzz`/`qqq` name no club, so fixture-consistency matching cannot pair
+    # them -- these tests need the row to stay UNMATCHED to reach the
+    # eligibility classifier at all.
+    canon = {"zzz": "crystal palace", "qqq": "manchester city",
              "Crystal Palace": "crystal palace", "Manchester City": "manchester city"}
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
     monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
 
-    markets = [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")]
+    markets = [_soccer_market("atc-soccer-zzz-qqq-2026-08-28-zzz")]
     board = [_soccer_board("Crystal Palace", "Manchester City")]
     out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
 
@@ -1001,12 +1004,12 @@ def test_a_fixture_the_venue_DOES_NOT_LIST_is_coverage_not_a_join_defect(monkeyp
     denominator that judges orientation."""
     import syndicate.features.shared.team_aliases as aliases
 
-    canon = {"cry": "crystal palace", "mnc": "manchester city",
+    canon = {"zzz": "crystal palace", "qqq": "manchester city",
              "Everton": "everton", "Arsenal": "arsenal"}
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
     monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
 
-    markets = [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")]
+    markets = [_soccer_market("atc-soccer-zzz-qqq-2026-08-28-zzz")]
     board = [_soccer_board("Everton", "Arsenal")]
     out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
 
@@ -1028,7 +1031,9 @@ def test_an_UNREADABLE_club_token_is_its_own_bucket_not_counted_as_absent(monkey
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
     monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
 
-    markets = [_soccer_market("atc-soccer-rrc-elc-2026-08-28-rrc")]
+    # `zz1`/`zz2` name neither club, so fixture-consistency cannot pair them
+    # and the row reaches the flip test -- which is what this asserts.
+    markets = [_soccer_market("atc-soccer-zz1-zz2-2026-08-28-zz1")]
     board = [_soccer_board("Real Racing Club de Santander", "Elche CF")]
     out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
 
@@ -1048,7 +1053,10 @@ def test_eligibility_is_ORDER_INDEPENDENT_or_it_answers_its_own_question(monkeyp
     """
     import syndicate.features.shared.team_aliases as aliases
 
-    canon = {"cry": "crystal palace", "mnc": "manchester city",
+    # `zzz`/`qqq` name no club, so fixture-consistency matching cannot pair
+    # them -- these tests need the row to stay UNMATCHED to reach the
+    # eligibility classifier at all.
+    canon = {"zzz": "crystal palace", "qqq": "manchester city",
              "Crystal Palace": "crystal palace", "Manchester City": "manchester city"}
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
     monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
@@ -1061,10 +1069,10 @@ def test_eligibility_is_ORDER_INDEPENDENT_or_it_answers_its_own_question(monkeyp
 
     board = [_soccer_board("Crystal Palace", "Manchester City")]
     forward = mod.join_polymarket_to_board(
-        [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")], board,
+        [_soccer_market("atc-soccer-zzz-qqq-2026-08-28-zzz")], board,
         selected_date="2026-08-28")
     reverse = mod.join_polymarket_to_board(
-        [_soccer_market("atc-soccer-mnc-cry-2026-08-28-mnc")], board,
+        [_soccer_market("atc-soccer-zzz-qqq-2026-08-28-zzz-r")], board,
         selected_date="2026-08-28")
 
     assert forward["orientation_fixture_listed"] == reverse["orientation_fixture_listed"] == {"soccer|h2h": 1}
@@ -1082,13 +1090,14 @@ def test_a_FLIP_MATCH_counts_as_proof_the_fixture_is_listed(monkeypatch):
 
     # Board resolves; the venue tri-codes do NOT canonicalise -- the `rrc` case.
     canon = {"Real Racing Club de Santander": "racing santander", "Elche CF": "elche"}
+    # unchanged: the venue tokens deliberately do NOT canonicalise here
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
     monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
     # Pairs only when flipped.
     monkeypatch.setattr(
         aliases, "teams_match",
         lambda sport, a, b: (str(a), str(b)) in {
-            ("rrc", "Real Racing Club de Santander"), ("elc", "Elche CF")},
+            ("zz1", "Real Racing Club de Santander"), ("zz2", "Elche CF")},
     )
 
     # `<away>-<home>` = away:rrc home:elc, so FLIPPED gives home=rrc, which is
@@ -1096,7 +1105,9 @@ def test_a_FLIP_MATCH_counts_as_proof_the_fixture_is_listed(monkeypatch):
     # pairs with nothing -- the same slug-order slip this lane has now made
     # three times, and the reason the field is no longer called
     # `slug_away_home`.
-    markets = [_soccer_market("atc-soccer-rrc-elc-2026-08-28-rrc")]
+    # `zz1`/`zz2` name neither club, so fixture-consistency cannot pair them
+    # and the row reaches the flip test -- which is what this asserts.
+    markets = [_soccer_market("atc-soccer-zz1-zz2-2026-08-28-zz1")]
     board = [_soccer_board("Real Racing Club de Santander", "Elche CF")]
     out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
 
@@ -1117,14 +1128,14 @@ def test_absence_is_claimed_ONLY_when_every_candidate_canonicalised(monkeypatch)
     """
     import syndicate.features.shared.team_aliases as aliases
 
-    canon = {"cry": "crystal palace", "mnc": "manchester city",
+    canon = {"zzz": "crystal palace", "qqq": "manchester city",
              "Everton": "everton", "Arsenal": "arsenal"}
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
     monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
     monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
 
     markets = [
-        _soccer_market("atc-soccer-cry-mnc-2026-08-28-cry"),   # readable
+        _soccer_market("atc-soccer-zzz-qqq-2026-08-28-zzz"),   # readable
         _soccer_market("atc-soccer-rrc-elc-2026-08-28-rrc"),   # NOT readable
     ]
     board = [_soccer_board("Everton", "Arsenal")]
@@ -1141,13 +1152,13 @@ def test_absence_IS_claimed_when_the_whole_bucket_reads(monkeypatch):
     becomes unreachable and the coverage half goes silent."""
     import syndicate.features.shared.team_aliases as aliases
 
-    canon = {"cry": "crystal palace", "mnc": "manchester city",
+    canon = {"zzz": "crystal palace", "qqq": "manchester city",
              "Everton": "everton", "Arsenal": "arsenal"}
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
     monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
     monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
 
-    markets = [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")]
+    markets = [_soccer_market("atc-soccer-zzz-qqq-2026-08-28-zzz")]
     board = [_soccer_board("Everton", "Arsenal")]
     out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
 
@@ -1250,7 +1261,10 @@ def test_a_row_with_no_book_reference_is_counted_not_silently_dropped():
 def _listing_split(monkeypatch, *, canonical_hits, flip_hits):
     """One unmatched soccer h2h row; control whether canonical and/or flip find it."""
     import syndicate.features.shared.team_aliases as aliases
-    canon = {"cry": "crystal palace", "mnc": "manchester city",
+    # `zzz`/`qqq` name no club, so fixture-consistency matching cannot pair
+    # them -- these tests need the row to stay UNMATCHED to reach the
+    # eligibility classifier at all.
+    canon = {"zzz": "crystal palace", "qqq": "manchester city",
              "Crystal Palace": "crystal palace", "Manchester City": "manchester city"}
     monkeypatch.setattr(
         aliases, "canonical_team",
@@ -1258,12 +1272,15 @@ def _listing_split(monkeypatch, *, canonical_hits, flip_hits):
     monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
     monkeypatch.setattr(
         aliases, "teams_match",
-        # Pairs only when flipped: slug is <away>-<home> = away:cry home:mnc,
-        # so flipping gives home=cry, which is the board's home.
+        # Pairs only when flipped. Slug `zzz-qqq` parses to away=zzz, home=qqq,
+        # so the NORMAL test asks (qqq, board_home) and fails; flipping asks
+        # (zzz, board_home) and succeeds. Getting this pair the wrong way round
+        # makes the row match normally and never reach the flip -- the same
+        # slug-order slip this lane has now made four times.
         (lambda sport, a, b: (str(a), str(b)) in {
-            ("cry", "Crystal Palace"), ("mnc", "Manchester City")})
+            ("zzz", "Crystal Palace"), ("qqq", "Manchester City")})
         if flip_hits else (lambda sport, a, b: False))
-    markets = [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")]
+    markets = [_soccer_market("atc-soccer-zzz-qqq-2026-08-28-zzz")]
     board = [_soccer_board("Crystal Palace", "Manchester City")]
     return mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
 
@@ -1301,3 +1318,55 @@ def test_the_two_listing_buckets_partition_listed(monkeypatch):
         parts = (sum(out["orientation_listed_by_canonical"].values())
                  + sum(out["orientation_listed_by_flip_only"].values()))
         assert total == parts, f"listed={total} but split sums to {parts}"
+
+
+def test_the_slugs_two_tokens_identify_the_BOARDS_own_matchup(monkeypatch):
+    """The Villarreal @ Alaves row that sat unplaceable in tonight's plan.
+
+    Polymarket LISTS the fixture (`atc-lal-ala-vil-2026-08-28`); the board has
+    it; nothing paired them, so `venue_scope` fell back to the aggregator and
+    committed a row with `venue_ticker: None` that the placer refused with
+    `no_venue_ticker`. No alias map is needed to pair it -- the board row
+    already names the fixture.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(
+        aliases, "canonical_team",
+        lambda sport, n: {"Alaves": "alaves", "Villarreal": "villarreal"}.get(str(n)))
+
+    parsed = {"league": "lal", "home": "vil", "away": "ala"}
+    board = {"home_team": "Alaves", "away_team": "Villarreal"}
+    assert mod._teams_match(board, parsed, "soccer") is True
+
+
+def test_matching_is_ORDER_INDEPENDENT_so_no_per_sport_ordering_rule_is_needed():
+    """Soccer slugs are home-first and MLB's are away-first, both measured. A
+    matcher comparing the two clubs as an unordered pair does not care, which
+    is why this replaced the per-sport swap rather than sitting beside it."""
+    f = mod._fixture_tokens_name_matchup
+    assert f("ala", "vil", "Alaves", "Villarreal") is True
+    assert f("vil", "ala", "Alaves", "Villarreal") is True
+
+
+def test_a_token_naming_BOTH_clubs_refuses_rather_than_pairing():
+    """One token matching both sides would pair almost anything. Both clubs
+    must be named, and by DIFFERENT tokens."""
+    assert mod._fixture_tokens_name_matchup("man", "man", "Manchester City",
+                                            "Manchester United") is False
+
+
+def test_an_INITIALS_token_resolves_but_a_LOOSER_shape_still_refuses():
+    """`psg`/`whu`/`rrc` are initials, distinctive and safe. `mnc` is neither a
+    prefix nor initials of Manchester City ("mc"); it stays refused because the
+    looser rule that would catch it also lets it name Manchester United."""
+    f = mod._fixture_tokens_name_matchup
+    assert f("lil", "psg", "Lille", "Paris Saint Germain") is True
+    assert f("wat", "whu", "Watford", "West Ham United") is True
+    assert f("cry", "mnc", "Crystal Palace", "Manchester City") is False
+
+
+def test_a_DIFFERENT_fixture_is_not_paired():
+    """The wrong-game guard. Same competition and date, different clubs."""
+    assert mod._fixture_tokens_name_matchup("ala", "vil", "Everton", "Arsenal") is False
