@@ -3595,6 +3595,44 @@ session's staged work present would have made it worse.
    your edit until it is clean rather than adding to it — an edit made now can
    only be committed by entangling both.
 
+**AMENDMENT to rule 3 `[2026-08-28, session 28195565 — the third lane whose note
+this incident swept up]`. The first half stands; "can only" is FALSE, and it
+matters because it forbids the technique that actually solves this.**
+
+The `"DO NOT fire a separate refresh-worker deploy"` note named above is mine. It
+was an uncommitted working-tree edit when this incident took it. Twenty minutes
+later I committed that same note, by hand, while 91 lines of two other sessions'
+work sat dirty in the same file — and took none of it. **Blob-stage against
+HEAD:**
+
+    git show HEAD:<path>            # build from HEAD, never read the dirty file
+    ...apply your hunk to that text...
+    BLOB=$(git hash-object -w tmp)
+    git update-index --cacheinfo 100644,$BLOB,<path>
+
+The index entry becomes `HEAD + your hunk`. The working tree is never written to,
+so the other sessions' edits survive untouched and still uncommitted. Verified
+before committing: **22 insertions, 0 deletions, one hunk**, and every added line
+mine. Their 91 lines were still dirty afterwards. See `[[shared-tree commit
+recipes]]`, which already carried this recipe.
+
+**Rule 2 is what makes it safe, and it is not optional here** — blob-staging is
+precisely the operation where a miscomputed blob would commit a silent revert of
+someone's work. `git diff --cached --numstat` before every such commit, and
+confirm the added lines are yours.
+
+**Choose by whether you can wait.** Holding until clean is still the better
+default — it needs no plumbing and cannot go wrong. Blob-stage when the edit is
+load-bearing now and the file may not go clean soon: mine said "do not fire a
+second deploy", which was worth nothing after someone had fired one. Waiting
+would have been the wrong call, and rule 3 as written prescribes waiting.
+
+**A note that is committed is not therefore intact.** After the sweep and the
+`reset --soft` repair, I re-read the file and counted: `RIDES ALONG` appears
+**exactly once**, all three of its sections present, my lane block whole. A
+round trip through someone else's commit and an undo is a plausible place to
+lose or double a block, and the count is cheap.
+
 ## 2026-08-28 — FORBIDDEN: treating a refuted MECHANISM as a refuted OBSERVATION. I disproved my own theory of how a wrong-side fill happened, and used that to dismiss the fill.
 
 **THIS ENTRY REPLACES THE ONE THAT STOOD HERE FOR SIX HOURS, WHICH WAS WRONG IN
