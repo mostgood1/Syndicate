@@ -2216,6 +2216,30 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   Per `learnings.md` 2026-08-27 (fixture that cannot violate its property): the
   fixture must contain a row whose club genuinely does not resolve AND a row
   whose OPPONENT does not resolve — the absence has to be present.
+- **PUSHED 2026-08-27, `635f869d..1c37c220` on `main`. NOT DEPLOYED** — no
+  `render.yaml` in any of the three commits, so no `blueprint_sync`, so nothing
+  reached production. `autoDeploy = no` holds for the `.py`.
+- **THE PUSH CARRIED TWO COMMITS THAT ARE NOT THIS LANE'S**, and that is stated
+  rather than left to be discovered: local `main` was ahead 3 / behind 1 when I
+  came to push. Ahead were mine (`1c37c220`) plus `029a8eb2`
+  (venue order-reconciliation standard — `kalshi_orders.py`,
+  `polymarket_us_orders.py`, `venue_order_states.py`) and `20362bfb` (portfolio
+  date filter — `intelligence.py`, `portfolio.html`), both already committed by
+  other sessions before this one opened and both unpushed. Behind was
+  `635f869d` (`venue-refresh-decoupling`: `intelligence_state.py`,
+  `venue_odds_loop.py`) — **no file overlap with anything above**, rebase clean.
+  Re-ran after the rebase rather than trusting the pre-rebase green: **132
+  passed, 2 subtests** over my surface plus both incoming suites
+  (`test_venue_odds_loop.py`, `test_venue_order_states.py`).
+- **WHAT IS OWED AND IS NOT DISCHARGED: the production volume reading.** This
+  narrows real matching. `venue-quote-line-join` measured soccer unmatched
+  15,348 -> 4,006 and grid stamped 13.1% -> 66% on the code this changes, and
+  soccer is the sport carrying 21 of the ambiguous tokens. The dropped keys were
+  WRONG matches, not lost ones — but that is an argument, not a measurement, and
+  nothing here has read live data. Whoever deploys this must read
+  `VENUE_REPRICE_KEYS` `unmatched_by_sport` and `stamped` for soccer/mlb/nfl
+  before and after, and must NOT treat a fall in `stamped` as a regression
+  without checking `unmatched_by_sport_sample` for what stopped matching.
 - SCOPE NOTE, not taken: `venue-quote-line-join` records two UNFIXED items on
   these files (a totals key that names no game; the 842-row zero-match builds).
   Out of scope here.
