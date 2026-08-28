@@ -650,3 +650,88 @@ def test_a_push_carrying_real_money_is_not_the_defect(monkeypatch):
     somewhere else and is not this repair's business."""
     out, _ = _repair(monkeypatch, [_bad_push(pnl_dollars=-0.5)])
     assert out["cleared"] == 0
+
+
+# --------------------------------------------------------------------------
+# The unknown-order probe -- Polymarket's only orphan angle
+# --------------------------------------------------------------------------
+
+
+def _unknown_order(**over):
+    """An order the venue never answered: no id, failed, no outcome."""
+    row = {
+        "mode": "live", "venue": "polymarket", "status": "failed",
+        "error": 'PolymarketUSAuthError: http_503: {"code":14}',
+        "venue_order_id": None, "venue_ticker": "aec-mlb-kc-tor-2026-08-27",
+        "idempotency_key": "unk1", "selected_date": "2026-08-27",
+        "requested_stake_dollars": 6.22,
+    }
+    row.update(over)
+    return row
+
+
+def _resolution(slug="aec-mlb-kc-tor-2026-08-27"):
+    return {"marketSlug": slug, "side": "POSITION_RESOLUTION_SIDE_LONG"}
+
+
+def test_a_resolution_on_a_market_we_only_hold_an_unknown_on_is_evidence():
+    """The one angle that exists: the feed is keyed by marketSlug, not order id.
+    If that market resolved and NOTHING ELSE of ours could account for it, a
+    position of ours was probably there."""
+    out = vs.probe_unknown_polymarket_positions([_unknown_order()], [_resolution()])
+    assert out["unknown"] == 1
+    assert out["evidenced"] == 1
+    finding = out["findings"][0]
+    assert finding["resolution_rows"] == 1
+    assert finding["sole_claim"] is True
+
+
+def test_another_order_on_the_same_market_makes_it_a_COINCIDENCE():
+    """The discriminator between signal and noise. A filled order of ours on
+    that market explains the resolution row completely, so it is no longer
+    evidence about the unknown one."""
+    filled = {
+        "mode": "live", "venue": "polymarket", "status": "filled",
+        "venue_order_id": "ABC", "venue_ticker": "aec-mlb-kc-tor-2026-08-27",
+        "idempotency_key": "other",
+    }
+    out = vs.probe_unknown_polymarket_positions([_unknown_order(), filled], [_resolution()])
+    assert out["unknown"] == 1
+    assert out["evidenced"] == 0
+    assert out["findings"][0]["sole_claim"] is False
+
+
+def test_no_resolution_row_is_NOT_evidence_of_absence():
+    """The dangerous half. An order that landed and is still OPEN has no
+    resolution row, and neither does a market that has not settled. A clean
+    probe means "nothing found", never "nothing there" -- so the unknown order
+    is still reported, with zero rows against it."""
+    out = vs.probe_unknown_polymarket_positions([_unknown_order()], [])
+    assert out["unknown"] == 1, "it must still be reported"
+    assert out["evidenced"] == 0
+    assert out["findings"][0]["resolution_rows"] == 0
+
+
+def test_an_order_the_venue_REFUSED_is_not_in_question():
+    """A 4xx the venue answered is certainly not a position. Only a submit with
+    no answer is genuinely unknown."""
+    refused = _unknown_order(error="http_404: market_not_found", idempotency_key="refused")
+    out = vs.probe_unknown_polymarket_positions([refused], [_resolution()])
+    assert out["unknown"] == 0
+
+
+def test_an_order_we_hold_an_id_for_is_not_unknown():
+    """With a venue_order_id the per-order read can answer directly, so it is
+    reconciliation's job rather than this probe's."""
+    known = _unknown_order(venue_order_id="C4H2MGSSGGNP", idempotency_key="known")
+    out = vs.probe_unknown_polymarket_positions([known], [_resolution()])
+    assert out["unknown"] == 0
+
+
+def test_the_probe_writes_nothing():
+    """It reports. Grading on circumstantial evidence is exactly what the
+    zero-delta push defect did."""
+    orders = [_unknown_order()]
+    vs.probe_unknown_polymarket_positions(orders, [_resolution()])
+    assert "outcome" not in orders[0]
+    assert orders[0]["status"] == "failed"

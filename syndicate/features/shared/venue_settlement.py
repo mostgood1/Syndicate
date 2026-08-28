@@ -441,6 +441,109 @@ _VENUE_GRADE_FIELDS = (
 )
 
 
+def probe_unknown_polymarket_positions(
+    orders: Any, resolution_rows: Any
+) -> dict[str, Any]:
+    """Did an order we LOST THE RESPONSE TO actually reach the venue?
+
+    THE GAP THIS EXISTS FOR, and it is structural rather than a bug. A submit
+    that fails with no answer -- measured 2026-08-28, two orders on
+    `http_503 {"code":14}` (gRPC UNAVAILABLE) -- leaves us holding NO
+    `venue_order_id`. Polymarket publishes no route that lists orders:
+    `GET /v1/orders` answers `501 UNIMPLEMENTED`, `/v1/orders/open` is open-only,
+    and the per-order read needs the id we never got. So the order is invisible
+    to every read available to us, and $8.21 of possible exposure sits in the
+    `unknown` bucket that nothing can confirm or deny.
+
+    THE ONE ANGLE THAT EXISTS: the resolution feed is keyed by `marketSlug`,
+    not by order id. If that market resolved AND we hold no other order on it,
+    the resolution row is evidence a position of ours was there.
+
+    READ-ONLY AND IT WRITES NOTHING. It cannot grade, because the evidence is
+    circumstantial in both directions:
+
+      * EVIDENCE FOUND is not proof. Nothing in the row says the position was
+        ours -- only that the market resolved while we believed we might hold
+        it. `sole_claim` reports whether any OTHER order of ours could account
+        for it, which is what separates a real signal from a coincidence.
+      * NO EVIDENCE IS NOT ABSENCE, and this is the more dangerous half. An
+        order that landed and is STILL OPEN has no resolution row at all, and a
+        market that has not settled yet has none either. A clean probe means
+        "nothing found", never "nothing there".
+
+    Returns a report for a human to act on. The only thing that settles these
+    is the venue's own UI.
+    """
+    from syndicate.features.shared.execution_guard import is_non_position
+
+    rows = list(resolution_rows or [])
+    by_market: dict[str, int] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        key = _join_key(row.get("marketSlug"))
+        if key:
+            by_market[key] = by_market.get(key, 0) + 1
+
+    # EVERY polymarket order we hold, by market, so a resolution can be checked
+    # against ALL possible claimants rather than only the unknown one.
+    claims: dict[str, list[dict]] = {}
+    unknown: list[dict] = []
+    for order in (orders or []):
+        if not isinstance(order, Mapping):
+            continue
+        if str(order.get("mode") or "") != "live":
+            continue
+        if str(order.get("venue") or "").strip().lower() != "polymarket":
+            continue
+        key = _join_key(order.get("venue_ticker"))
+        if key:
+            claims.setdefault(key, []).append(dict(order))
+        # UNKNOWN: we sent it, the venue never answered, and we hold no id.
+        # `is_non_position` excludes the ones the venue REFUSED outright --
+        # those are certainly not positions and are not in question.
+        if (
+            not order.get("outcome")
+            and not str(order.get("venue_order_id") or "").strip()
+            and str(order.get("status") or "") == "failed"
+            and not is_non_position(order)
+        ):
+            unknown.append(dict(order))
+
+    findings: list[dict[str, Any]] = []
+    for order in unknown:
+        key = _join_key(order.get("venue_ticker"))
+        # BY KEY, NOT BY IDENTITY. `claims` holds copies, so `is not` would
+        # count the order against itself and never report a sole claim.
+        others = [
+            o
+            for o in claims.get(key, [])
+            if str(o.get("idempotency_key") or "") != str(order.get("idempotency_key") or "")
+        ]
+        findings.append(
+            {
+                "idempotency_key": str(order.get("idempotency_key") or ""),
+                "market": key,
+                "selected_date": str(order.get("selected_date") or ""),
+                "stake_dollars": order.get("requested_stake_dollars"),
+                "resolution_rows": by_market.get(key, 0),
+                # TRUE only when no other order of ours could account for the
+                # resolution. That is the difference between a signal and a
+                # coincidence, and it is why this is reported rather than
+                # inferred.
+                "sole_claim": not others,
+            }
+        )
+
+    evidenced = [f for f in findings if f["resolution_rows"] and f["sole_claim"]]
+    return {
+        "status": "ok",
+        "unknown": len(findings),
+        "evidenced": len(evidenced),
+        "findings": findings,
+    }
+
+
 def repair_zero_delta_pushes(*, dry_run: bool = False) -> dict[str, Any]:
     """Un-grade pushes written from a ZERO realized delta. Worker only.
 
@@ -719,6 +822,24 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
         fetched[venue] = rows
         if error:
             counters["errors"][venue] = error
+
+    # THE ORPHAN ANGLE POLYMARKET OTHERWISE HAS NONE OF. Runs on rows already
+    # fetched, so it costs no extra venue call, and it WRITES NOTHING -- see
+    # `probe_unknown_polymarket_positions` for why the evidence cannot grade.
+    try:
+        probe = probe_unknown_polymarket_positions(
+            [o for o in (state.get("orders") or [])], fetched.get("polymarket") or []
+        )
+        if probe.get("unknown"):
+            counters["unknown_probe"] = probe
+            print(
+                f"[venue_settlement] UNKNOWN_ORDER_PROBE venue=polymarket"
+                f" unknown={probe['unknown']} evidenced={probe['evidenced']}"
+                f" findings={probe['findings']}",
+                flush=True,
+            )
+    except Exception as exc:
+        counters["errors"]["unknown_probe"] = f"{type(exc).__name__}: {exc}"
 
     matched_keys: set[tuple[str, str]] = set()
     graded_any = False
