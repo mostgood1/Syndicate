@@ -2328,8 +2328,31 @@ def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
     # artifact builder. Indexed by match_id here so the card can show what
     # `/soccer/<league>/props` has always shown.
     squad_by_match: dict[str, list[dict[str, Any]]] = {}
-    for date_str in week_date_list(league, season, week):
+    # DATE COUNT AND PAYLOAD COST PER LEAGUE `[2026-08-28]`.
+    #
+    # `week_games` is 95-99.9% of the cards-context cost (measured 20:24Z:
+    # `week_games_s` 23.73 of 25.01 total for belgian_pro_league, 1.24 of 1.30
+    # for mls). But the per-GAME cost is wildly uneven -- belgian 23.73s for 12
+    # games against mls 1.24s for 15, i.e. ~19x per game for FEWER fixtures --
+    # so fixture volume is not the driver.
+    #
+    # This loop is the candidate: it does one `recommendations_payload` read
+    # per date in the league's week, and leagues do not have equal-length
+    # weeks. If belgian resolves to many more dates than mls, that is the 19x
+    # and it also sizes the request-scoped memo -- the repeats
+    # `_SoccerDataProvider.games()` makes are of THESE reads.
+    #
+    # Counted, not assumed: `week_date_list` is the one input nobody has read.
+    _dates = list(week_date_list(league, season, week))
+    _wg_t0 = time.monotonic()
+    _payload_seconds = 0.0
+    _payloads_present = 0
+    for date_str in _dates:
+        _p_t0 = time.monotonic()
         payload = recommendations_payload(league, date_str) or {}
+        _payload_seconds += time.monotonic() - _p_t0
+        if payload:
+            _payloads_present += 1
         for match in payload.get("matches") if isinstance(payload.get("matches"), list) else []:
             event_id = str(match.get("event_id") or match.get("match_id") or "").strip()
             if event_id:
@@ -2358,6 +2381,21 @@ def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
             )
         else:
             games.append(_unsimulated_game(fixture, league=league, week=week, season=season))
+    try:
+        _wg_total = time.monotonic() - _wg_t0
+        if _wg_total >= _cards_phase_log_threshold_sec():
+            print(
+                f"[soccer_cards] WEEK_GAMES_DATES league={league} "
+                f"total_s={round(_wg_total, 2)} dates={len(_dates)} "
+                f"payloads_present={_payloads_present} "
+                f"payload_s={round(_payload_seconds, 2)} "
+                f"assemble_s={round(_wg_total - _payload_seconds, 2)} "
+                f"fixtures={len(fixtures)} games={len(games)} "
+                f"week={week} season={season}",
+                flush=True,
+            )
+    except Exception:
+        pass
     return games
 
 
