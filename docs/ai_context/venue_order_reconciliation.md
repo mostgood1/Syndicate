@@ -247,15 +247,25 @@ marketSlug  outcomeSide  price  quantity  side  state  tif  type
 
 Open, and listed so nobody re-derives them.
 
-1. **Kalshi has no pagination.** The list takes a `limit` and this reader has
-   no `cursor` handling, so an account holding more than `limit` orders has an
-   invisible tail. Coverage now degrades to `page` when `n >= limit`, so the
-   *consequences* are contained — but the tail is still unread.
-   **Not fixed by guessing:** the envelope's cursor field name has never been
-   observed, and picking it by reasoning is the same mistake that produced the
-   501 above. `ORDERS_ENVELOPE keys=...` now logs on every read, so **one
-   production read settles the name**; implement pagination against that, not
-   against a vendor doc.
+1. **Kalshi has no pagination — but the field name is now MEASURED.** The list
+   takes a `limit` and this reader has no `cursor` handling, so an account
+   holding more than `limit` orders has an invisible tail. Coverage degrades to
+   `page` when `n >= limit`, so the *consequences* are contained; the tail is
+   still unread.
+
+   The envelope was logged rather than guessed, and the first tick after deploy
+   answered it — `2026-08-28T02:24:18Z`:
+
+   ```
+   [kalshi_orders] ORDERS_ENVELOPE keys=['cursor', 'orders'] n=78 limit=100
+   ```
+
+   **The field is `cursor`, at the top level of the response.** That is what
+   pagination should be written against. It took one production read, versus a
+   guess that would have looked reasonable and cost an error round-trip — the
+   same shape as the `http_501` on Polymarket's reasoned-about list route.
+   Still to do: pass it back as a query parameter and loop until it is empty,
+   keeping the `page` degrade for any bound that remains.
 2. **Polymarket orphans are undetectable** (§6). Structural, not a defect —
    worth revisiting only if a list-all route appears. `probe_order_list_routes`
    exists to ask, read-only, and logs what it finds.
@@ -263,6 +273,27 @@ Open, and listed so nobody re-derives them.
    reads while the live ledger held ~200 rows across both venues and all dates.
    That is consistent with a venue-side retention or recency window, but it has
    **not** been established which, and this document does not claim it.
+
+## First production run of the standard — `2026-08-28T02:24:18Z`
+
+Live on `live-odds-worker` at `32b0cfaa`. Both readers, one tick:
+
+```
+RECONCILE venue=kalshi     candidates=14 venue_orders=78 changed=0 not_found=0
+          unknown=0 implausible=0 stamped=14 coverage=book     orphans=26 orphans_ours=0
+RECONCILE venue=polymarket candidates=2  venue_orders=2  changed=0 not_found=0
+          unknown=0 implausible=0 stamped=2  coverage=per_order orphans=n/a
+```
+
+Reading it against §3 and §4: `coverage` is `book` for Kalshi **on the evidence**
+(`n=78 < limit=100`, and `ORDERS_READ_TRUNCATED` stayed silent) and `per_order`
+for Polymarket, which correctly reports `orphans=n/a` rather than a reassuring
+zero. `unknown=0` on both venues is the shared vocabulary doing its job — no
+status went unmapped, so nothing was left blocking live execution on a word.
+
+The orphan scan, licensed only by `book`, found **26** Kalshi orders we hold no
+row for: `ours=0`, `foreign_client=6`, `unclaimed=20`. `ours=0` is the number
+that matters — no order of ours is sitting at the venue unrecorded.
 
 ---
 

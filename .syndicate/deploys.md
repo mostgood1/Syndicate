@@ -5,6 +5,75 @@
 
 ---
 
+## 2026-08-28 — all three services `32b0cfaa`: the venue reconciliation standard is LIVE and RUNNING, and Kalshi's cursor field is now measured
+
+**Deployed by the USER, manually, not by me.** `live-odds-worker` deploy_started
+`02:20:27.849331Z` and `refresh-worker` `02:20:37.988778Z`, both
+`trigger=manual` under `mostgood@gmail.com`; my own web deploy
+(`dep-da8f0kfqj5pc73eaath0`, the tile tie-off) went at `02:20:01Z`. All three
+finished on `32b0cfaa` between `02:23:06Z` and `02:23:21Z`. My
+`live-odds-worker` claim was released afterwards rather than held against a
+deploy I did not run; the `web` claim stayed with me through my own deploy.
+
+**THE MANUAL DEPLOY KILLED THREE IN-FLIGHT JOBS**, which is exactly what
+preflight had been holding for since `02:13:53Z`: `refresh_odds_sources.py`
+(pid 19203) with `build_soccer_artifacts.py --league serie_a` beneath it, and
+`run_refresh_odds_job.py`. They re-run on the next tick — cost, not damage —
+but it is the measured reason the preflight said `HOLD: 3 job(s) in flight`.
+
+**PRESENCE WAS NOT ACCEPTED AS EXECUTION.** `git merge-base` confirmed
+`029a8eb2` is contained in `32b0cfaa`, but a manual dashboard deploy ships the
+commit the SERVICE is configured to, and services here have run curated deploy
+branches — so a SHA that looks right is not proof the code is on the box, and
+being on the box is not proof it runs. Held at "not proven" for ~3 minutes,
+through a null result that was checked against its own instrument: no
+`ORDERS_READ`, no worker output at all, and an unfiltered query returning the
+single line `Your service is live 🎉` — logs flowing, worker merely quiet
+between ~6.5-minute ticks.
+
+**verify: MET `02:24:18Z`, on the FIRST reconcile tick after boot.**
+
+```
+[kalshi_orders] ORDERS_ENVELOPE keys=['cursor', 'orders'] n=78 limit=100
+
+RECONCILE venue=kalshi     candidates=14 venue_orders=78 changed=0 not_found=0
+          unknown=0 implausible=0 stamped=14 coverage=book     orphans=26 orphans_ours=0
+RECONCILE venue=polymarket candidates=2  venue_orders=2  changed=0 not_found=0
+          unknown=0 implausible=0 stamped=2  coverage=per_order orphans=n/a
+```
+
+`ORDERS_ENVELOPE` **exists only in the new code**, which is why it was the
+predicate rather than the deployed SHA. Reading the rest:
+
+- `coverage=book` for Kalshi is earned, not assumed — `n=78 < limit=100` and
+  `ORDERS_READ_TRUNCATED` stayed silent. `per_order` for Polymarket correctly
+  reports `orphans=n/a` instead of a reassuring zero.
+- `unknown=0` on BOTH venues: the shared vocabulary is doing its job, nothing
+  left blocking live execution on an unmapped word.
+- The orphan scan, which only `book` licenses, found 26 Kalshi orders we hold
+  no row for — `ours=0`, `foreign_client=6`, `unclaimed=20`. **`ours=0` is the
+  number that matters:** no order of ours is sitting at the venue unrecorded.
+
+**THE THING THAT WAS DELIBERATELY NOT GUESSED IS NOW KNOWN.**
+`ORDERS_ENVELOPE keys=['cursor', 'orders']` — Kalshi's list cursor is a
+top-level field literally named `cursor`. That log line existed *because* the
+commit refused to guess it, on the precedent of the `http_501` Polymarket paid
+for a reasoned-about route. One production read, no error round-trip. Gap 1 in
+`venue_order_reconciliation.md` is now unblocked: pass `cursor` back as a query
+parameter and loop until empty, keeping the `page` degrade for any bound that
+remains. NOT implemented in this row — it is inert today at `n=78` and belongs
+in its own change.
+
+**A CORRECTION TO THE PREMISE THIS DEPLOY WAS REQUESTED UNDER.** The ask was
+"the pushes should get actually settled by polymarket if this is done
+correctly". Reconciliation and settlement are DIFFERENT PATHS — settlement
+reads `/v1/portfolio/activities?types=ACTIVITY_TYPE_POSITION_RESOLUTION`, this
+change touches the order-status reader — and Polymarket settlement was already
+working before it. Measured `02:08:49Z`, pre-deploy: `VENUE_SETTLEMENT status=ok
+settled=5 by_venue={'kalshi': {rows:62, settled:4}, 'polymarket': {rows:32,
+settled:1}}`. So this deploy was NOT expected to make more things settle and
+must not be credited with it. Said before deploying rather than after.
+
 ## 2026-08-27 — web `20362bfb`: the portfolio date filter defaults to today, and the chip row is gone
 
 **Deployed:** `dep-da8emfjbc2fs73a1qp2g`, triggered `01:58:22.706505Z`, live
