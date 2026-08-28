@@ -880,49 +880,8 @@ def join_polymarket_to_board(
             # without ground truth is the `pos`/`neg` trap in a new costume: a
             # confident bet on the wrong team. This produces the rate that
             # decides whether the question is worth chasing, and nothing else.
-            # ---------------------------------------------------------------
-            # IS THIS FIXTURE LISTED AT ALL, ORIENTATION ASIDE?
-            # ---------------------------------------------------------------
-            #
-            # The denominator that turns `flipped/tried` into a rate. Three
-            # outcomes, kept apart because they imply different work:
-            #
-            #   listed     -> the venue has this fixture; if it still did not
-            #                 pair, orientation is a live explanation
-            #   not_listed -> a COVERAGE gap. No join change can recover it.
-            #   unreadable -> the venue lists fixtures here we cannot
-            #                 canonicalise, so eligibility is UNKNOWN for this
-            #                 row. Counted separately rather than folded into
-            #                 `not_listed`, because guessing which one it is
-            #                 is how `no_match` came to mean two things.
-            board_pair = _canonical_fixture(
-                board_row.get("sport") or sport,
-                board_row.get("home") or board_row.get("home_team"),
-                board_row.get("away") or board_row.get("away_team"),
-            )
-            eligibility_key = f"{league}|{board_market}"
-            if board_pair is None:
-                orientation_unreadable[eligibility_key] = (
-                    orientation_unreadable.get(eligibility_key, 0) + 1
-                )
-            else:
-                readable = [c for c in candidates if c.get("canon_pair")]
-                if any(c["canon_pair"] == board_pair for c in readable):
-                    orientation_listed[eligibility_key] = (
-                        orientation_listed.get(eligibility_key, 0) + 1
-                    )
-                elif readable:
-                    orientation_not_listed[eligibility_key] = (
-                        orientation_not_listed.get(eligibility_key, 0) + 1
-                    )
-                else:
-                    # Our side reads fine; not one candidate in the bucket does.
-                    # That is a venue-vocabulary gap, not a coverage answer.
-                    orientation_unreadable[eligibility_key] = (
-                        orientation_unreadable.get(eligibility_key, 0) + 1
-                    )
-
             _row_attempted = False
+            _flip_matched = False
             for candidate in candidates:
                 if board_market in {"spreads", "totals"}:
                     if board_line is None or candidate["line"] is None:
@@ -964,6 +923,7 @@ def join_polymarket_to_board(
                     )
                 if _teams_match(board_row, flipped, board_row.get("sport") or sport):
                     key = f"{league}|{board_market}"
+                    _flip_matched = True
                     orientation_flip_counts[key] = orientation_flip_counts.get(key, 0) + 1
                     if len(orientation_flip_samples) < 8:
                         orientation_flip_samples.append({
@@ -1002,6 +962,60 @@ def join_polymarket_to_board(
                             "line": board_line,
                         })
                     break
+
+            # ---------------------------------------------------------------
+            # IS THIS FIXTURE LISTED AT ALL, ORIENTATION ASIDE?
+            # ---------------------------------------------------------------
+            #
+            # The denominator that turns `flipped/tried` into a rate: a row
+            # whose fixture the venue never listed sits in `tried` and cannot
+            # reach the numerator, so that ratio moves with COVERAGE rather
+            # than with orientation.
+            #
+            # RUNS AFTER THE FLIP LOOP, AND THAT ORDER IS THE FIX. The first
+            # version classified BEFORE it and could not use the one piece of
+            # hard evidence available: **a flip-match PROVES the fixture is
+            # listed.** Production 18:55:16Z returned `flipped={'soccer|h2h':
+            # 9}` against `listed={'soccer|h2h': 4}` -- nine rows paired with a
+            # fixture the classifier said was absent five times over. The data
+            # falsified the instrument on its first run.
+            #
+            # `flipped <= listed` IS NOW AN INVARIANT rather than a hope, and
+            # it is the cheapest self-check this counter can carry: any future
+            # regression in the classifier shows up as a violation of an
+            # inequality the same log line already prints.
+            #
+            # AND `not_listed` NEEDS EVERY CANDIDATE READABLE. The first
+            # version concluded absence from `elif readable` -- some candidates
+            # canonicalised and none matched ours, therefore ours is absent.
+            # That does not follow: OUR fixture's candidate may be one of the
+            # unreadable ones, and other candidates reading fine says nothing
+            # about it. That reproduced, one level down, the exact conflation
+            # this counter exists to remove -- `no_match` mixing "listed but
+            # unpairable" with "not listed". Absence is now claimed only when
+            # the whole bucket canonicalised.
+            eligibility_key = f"{league}|{board_market}"
+            board_pair = _canonical_fixture(
+                board_row.get("sport") or sport,
+                board_row.get("home") or board_row.get("home_team"),
+                board_row.get("away") or board_row.get("away_team"),
+            )
+            if _flip_matched or (
+                board_pair is not None
+                and any(c.get("canon_pair") == board_pair for c in candidates)
+            ):
+                orientation_listed[eligibility_key] = (
+                    orientation_listed.get(eligibility_key, 0) + 1
+                )
+            elif board_pair is not None and all(c.get("canon_pair") for c in candidates):
+                orientation_not_listed[eligibility_key] = (
+                    orientation_not_listed.get(eligibility_key, 0) + 1
+                )
+            else:
+                orientation_unreadable[eligibility_key] = (
+                    orientation_unreadable.get(eligibility_key, 0) + 1
+                )
+
             if "ambiguous_polymarket_match" not in refusals or refusals.get("ambiguous_polymarket_match", 0) == 0:
                 _note_unmatched(
                     "no_match", board_row, board_market, league, date, candidates
@@ -1068,6 +1082,16 @@ def join_polymarket_to_board(
         ),
         "orientation_flip_attempts": dict(
             sorted(orientation_flip_attempts.items(), key=lambda kv: -kv[1])
+        ),
+        # THE INVARIANT, CARRIED IN THE PAYLOAD. `flipped <= listed` per key,
+        # because a flip-match proves the fixture is listed. Violated on the
+        # counter's first production run (`flipped 9 > listed 4`, 18:55:16Z),
+        # which is how the classifier's defect was found. Reported rather than
+        # asserted: a diagnostic must never take down a board build, and a
+        # `False` here on the same log line is as loud as a traceback and does
+        # not cost a slate.
+        "orientation_invariant_ok": all(
+            orientation_listed.get(k, 0) >= v for k, v in orientation_flip_counts.items()
         ),
         "orientation_fixture_listed": dict(
             sorted(orientation_listed.items(), key=lambda kv: -kv[1])

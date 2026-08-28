@@ -1068,3 +1068,88 @@ def test_eligibility_is_ORDER_INDEPENDENT_or_it_answers_its_own_question(monkeyp
         selected_date="2026-08-28")
 
     assert forward["orientation_fixture_listed"] == reverse["orientation_fixture_listed"] == {"soccer|h2h": 1}
+
+
+def test_a_FLIP_MATCH_counts_as_proof_the_fixture_is_listed(monkeypatch):
+    """The invariant, and the defect that produced it.
+
+    Production 18:55:16Z: `flipped={'soccer|h2h': 9}` against
+    `listed={'soccer|h2h': 4}` — nine rows paired with a fixture the classifier
+    had called absent. A flip-match is direct evidence of listing, and the
+    first version could not use it because it classified BEFORE the flip loop.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    # Board resolves; the venue tri-codes do NOT canonicalise -- the `rrc` case.
+    canon = {"Real Racing Club de Santander": "racing santander", "Elche CF": "elche"}
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    # Pairs only when flipped.
+    monkeypatch.setattr(
+        aliases, "teams_match",
+        lambda sport, a, b: (str(a), str(b)) in {
+            ("rrc", "Real Racing Club de Santander"), ("elc", "Elche CF")},
+    )
+
+    # `<away>-<home>` = away:rrc home:elc, so FLIPPED gives home=rrc, which is
+    # the board's home. Written `elc-rrc` first, which flips to home=elc and
+    # pairs with nothing -- the same slug-order slip this lane has now made
+    # three times, and the reason the field is no longer called
+    # `slug_away_home`.
+    markets = [_soccer_market("atc-soccer-rrc-elc-2026-08-28-rrc")]
+    board = [_soccer_board("Real Racing Club de Santander", "Elche CF")]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+
+    assert out["orientation_flip_counts"].get("soccer|h2h") == 1
+    assert out["orientation_fixture_listed"].get("soccer|h2h") == 1, (
+        "a flip-match proves the fixture is listed"
+    )
+    assert out["orientation_fixture_not_listed"] == {}
+    assert out["orientation_invariant_ok"] is True
+
+
+def test_absence_is_claimed_ONLY_when_every_candidate_canonicalised(monkeypatch):
+    """The `elif readable` bug.
+
+    Some candidates canonicalising says nothing about OURS. If any candidate in
+    the bucket is unreadable, our fixture may be that one, so eligibility is
+    unknown — not absent.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    canon = {"cry": "crystal palace", "mnc": "manchester city",
+             "Everton": "everton", "Arsenal": "arsenal"}
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+
+    markets = [
+        _soccer_market("atc-soccer-cry-mnc-2026-08-28-cry"),   # readable
+        _soccer_market("atc-soccer-rrc-elc-2026-08-28-rrc"),   # NOT readable
+    ]
+    board = [_soccer_board("Everton", "Arsenal")]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+
+    assert out["orientation_fixture_unreadable"].get("soccer|h2h") == 1
+    assert out["orientation_fixture_not_listed"] == {}, (
+        "one unreadable candidate makes absence unprovable"
+    )
+
+
+def test_absence_IS_claimed_when_the_whole_bucket_reads(monkeypatch):
+    """The counter must still be able to say 'not listed', or `not_listed`
+    becomes unreachable and the coverage half goes silent."""
+    import syndicate.features.shared.team_aliases as aliases
+
+    canon = {"cry": "crystal palace", "mnc": "manchester city",
+             "Everton": "everton", "Arsenal": "arsenal"}
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: canon.get(str(n)))
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+
+    markets = [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")]
+    board = [_soccer_board("Everton", "Arsenal")]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+
+    assert out["orientation_fixture_not_listed"].get("soccer|h2h") == 1
+    assert out["orientation_invariant_ok"] is True

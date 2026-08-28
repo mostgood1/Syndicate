@@ -274,6 +274,11 @@ def _polymarket_price_resolver(selected_date: str | None):
         # recovers it; `unreadable` is the honest bucket where a club token
         # would not canonicalise on one side or the other, so eligibility is
         # UNKNOWN -- never fold it into `not_listed`.
+        # READ THIS FIRST. False means the classifier contradicted itself --
+        # more rows flip-matched than it called listed, which is impossible
+        # since a flip-match proves listing. Every number on this line is
+        # suspect when it is False.
+        f" invariant_ok={joined.get('orientation_invariant_ok')}"
         f" listed={joined.get('orientation_fixture_listed')}"
         f" not_listed={joined.get('orientation_fixture_not_listed')}"
         f" unreadable={joined.get('orientation_fixture_unreadable')}"
