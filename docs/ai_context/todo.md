@@ -1,5 +1,87 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#593` — **NCAAF bets could never be graded, and an NFL-shaped fix would have graded them against the WRONG GAME.** — lane `ncaaf-settlement-resolver`, 2026-08-28 — **SHIPPED (`234c9e81`); PRODUCTION VERIFICATION IS FUTURE-DATED**
+
+`paper_settlement._default_resolver` had no `ncaaf` builder. Unlike `#592`, the
+counter never showed it: NCAAF orders have not reached the ledger, though NCAAF
+reaches the board today (2026-08-28T02:10Z `VENUE_REPRICE_KEYS`: kalshi offered
+**524 ncaaf quotes**, `wanted_overlap` 32, **52 selected**). So this is the
+first of the three fixed BEFORE the volume landed — and a zero counter today is
+**not evidence**.
+
+**WHY IT IS NOT A COPY OF `#592`.** `team_aliases._alias_map("ncaaf")` is `{}`,
+so `teams_match` falls through to heuristics ending in
+`len(token) >= 3 and any(word.startswith(token))`. Over ~130 FBS teams that
+matches **"Michigan" -> "Michigan State"**, "Ohio" -> "Ohio State", and each
+Miami to the other. On a settlement path that writes a confident won/lost
+verdict for the wrong fixture.
+
+**The registry existed; the index over it was not safe.**
+`ncaaf_team_registry.csv` carries 684 teams and is already allowlisted, but
+`ncaaf/cards.py::_team_registry_index` uses `setdefault`, so the first row wins
+every collision. Measured over that same key construction: **2,342 keys, 128
+owned by more than one `team_id`**, worst `tigers` -> **25 teams**;
+`_resolve_team("Wildcats")` returns Abilene Christian. New
+`shared/ncaaf_team_registry.py` drops ambiguous keys instead of picking a
+winner, and **that refusal was measured to be free before it was written**: on
+the live 2026-08-29 ESPN slate, **16/16 names resolve, 0 unresolved**; the index
+keeps 2,214 of 2,342 keys.
+
+**Reachability proven `off != on`:** with the one-line wiring removed, **2**
+tests fail — the dispatch test and `#592`'s traded-sports tripwire, correctly
+detecting `ncaaf` back in the missing set. Its first real catch.
+
+**OWED, and it is not a formality.** The JOIN is verified against real ESPN
+names; the GRADING is not — no NCAAF game has finished this season (08-22/08-23
+return 0 games; 08-29 returns 8 with 0 finals), so grading is unit-tested on
+synthetic scores only. The reading needs a finished game AND a real NCAAF order.
+
+---
+
+### `#592` — **Every NFL bet was ungradeable, and writing only the resolver would have shipped a reader with no producer.** — lane `nfl-settlement-resolver`, 2026-08-28 — **FIXED AND VERIFIED IN PRODUCTION 2026-08-28T03:59:18Z** (refresh-worker `5a5efa8d`)
+
+`paper_settlement._default_resolver` had builders for `mlb`, `wnba` and
+`soccer` only. Measured before the fix, 2026-08-28T02:37–02:50Z:
+
+```
+SETTLED date=2026-08-28 orders=21  graded=0  no_resolver_for_nfl: 6   (29% of slate)
+SETTLED date=2026-08-27 orders=158 graded=2  no_resolver_for_nfl: 8
+BET_STATUS orders=158 resolved=98            no_resolver_for_nfl: 16
+```
+
+The `#547` shape one sport over — soccer sat on `no_resolver_for_soccer` with
+**0 settled all-time** while being ~97% of the board.
+
+**TWO STAGES, NOT ONE.** `poll_soccer_live_state.py` was the only live-state
+poller; `nfl/live_game_state.py` fetches ESPN at call time, is keyed by
+`(season, week, seasontype)` while a resolver takes a DATE, and its only callers
+are `preseason_cards.py` with `SEASONTYPE_PRESEASON` — the regular season was
+never wired. So `scripts/poll_nfl_live_state.py` is the missing producer, keyed
+by `?dates=` (which also means the date→week mapping is never asked for), and
+persisted through `refresh_state_store` because settlement runs on
+refresh-worker and Render cannot share a disk between services.
+
+**VERIFIED:** `no_resolver_for_nfl` 16 → **absent**; `BET_STATUS resolved`
+98 → **114**, i.e. **+16 against a counter that read 16**; `SETTLED 08-27
+graded` 2 → 9. The 9-0 was challenged before it was banked — against the real
+slate the resolver returns `-6.0` for the losing Raiders moneyline and `55.0`
+against `over 200.5`, both of which must grade as losses.
+
+**Also fixed, and larger than the headline:**
+`test_a_sport_with_no_resolver_is_named_not_silent` used NFL as its stand-in for
+"unwired", having used **soccer** until `#547`. Both times a REAL sport was the
+stand-in, and both times that is what let a live gap read as correctly-reported
+in a green suite. It now names a sport the platform does not trade, and a new
+test pins the traded sports lacking a resolver at **`{nba, nhl, ncaab}`** — so
+adding a sport to the board without a resolver FAILS instead of quietly
+demonstrating the bug.
+
+**RESIDUAL:** `SETTLED 08-26` now reports `game_not_in_nfl_live_state: 1` where
+it read `no_resolver_for_nfl: 1` — the resolver runs and fails at the JOIN,
+likely date-bucket skew (a 00:00Z kickoff belongs to the previous day locally).
+
+---
+
 ### `#591` — **The board card SUBTITLE still read the per-ROW sport, so `#590`'s fix stopped at the rail — and the same field was being POSTed as a bet's sport.** — lane `board-card-league-label`, 2026-08-27, found by checking the other sports — **FIXED AND VERIFIED IN PRODUCTION 2026-08-27T20:39:54Z** (web `fb9261b8`)
 
 `#590` fixed the rail card's head by going to the chip. `board-card__subtitle`
@@ -1226,7 +1308,35 @@ of the contention without touching cancellation semantics at all.
 
 ---
 
-### `#571` — **`test_polymarket_side_vocabulary` asserts a key set the source stopped producing. Recorded as baseline debt, NOT fixed — because the widened keys may be a mis-join risk, not just a stale expectation.** — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured
+### `#571` — **CLOSED 2026-08-28 by `1c37c220` (live on refresh-worker in `32b0cfaa`). This entry called it right: it WAS a mis-join risk, not a stale expectation — and the risk was bigger than the two tests showed.** `test_polymarket_side_vocabulary` asserts a key set the source stopped producing — lane `polymarket-oddsapi-coverage-audit`, 2026-08-26, measured; fixed by lane `venue-candidate-key-token-guard`
+
+**RESOLUTION.** Both halves of this entry's hypothesis were confirmed. The first
+test WAS stale (`0acabd09`'s city/nickname keys are the intended shape). The
+second was reporting a REAL defect, exactly as argued here: `team_name_tokens`
+called `team_quote_token`, whose raw-string fallback is correct at the VENUE
+(Kalshi says "Texas") and wrong on the BOARD side, so "Not A Real Club" offered
+`mlb|h2h|club`, `|not`, `|real`.
+
+**AND A THIRD DEFECT THIS ENTRY ANTICIPATED WITHOUT MEASURING.** It warned that
+"a bare token like `real` or `club` can collide with a different fixture's
+team". That is precisely right, and the scope was worse than the two tests
+could show: the only ambiguity check was subtracting the OPPONENT's words, which
+is correct about the ROW and the wrong scope for the LOOKUP — `apply_venue_quotes`
+resolves candidates against the sport's WHOLE quote pool. Measured over the
+alias maps: **soccer 21 ambiguous tokens** (`city` names 14 clubs, `real` 4),
+**mlb 7**, **nfl 5**, **nba 3**; and `_alias_map` is `{}` for nhl/ncaaf/ncaab,
+so those rows had no guard at all ("Ohio State Buckeyes" offered
+`ncaaf|h2h|state`).
+
+`team_aliases.unambiguous_club_tokens` now keeps only tokens naming exactly one
+club, and `team_name_tokens` resolves through `canonical_team` with no raw
+fallback. Production reading `32b0cfaa` 2026-08-28T02:36Z: soccer inputs
+byte-identical across the boundary and output identical — unmatched rate
+**30.72% -> 30.72%**, kalshi `wanted_overlap` **83 -> 83**. **Recorded as
+PARTIAL in `deploys.md`:** that shows NO HARM, not that the guard fired, because
+`wanted_overlap` is blind to key-set shrinkage that does not intersect the
+offered keys. The nhl/ncaaf/ncaab WRONG-match half is a different question and
+is still owed.
 
 Found while regenerating `tests/pytest_baseline.json` (`#569` work). Two tests
 fail and **reproduce standalone**, so they are real, not parallel-run flakes:
