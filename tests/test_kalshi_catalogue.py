@@ -1504,3 +1504,67 @@ def test_the_period_prefix_is_bounded_so_a_prose_colon_is_not_a_period():
     assert _ANY_PERIOD_TOTAL.match("9th inning: Over 1.5 runs")
     long_prefix = "x" * 41
     assert not _ANY_PERIOD_TOTAL.match(f"{long_prefix}: Over 1.5 runs")
+
+
+def _soccer_classified(series, title):
+    from syndicate.features.shared import kalshi_catalogue as cat
+    absent = object()
+    before = cat.SERIES_SPORT.get(series, absent)
+    cat.SERIES_SPORT[series] = "soccer"
+    try:
+        return cat.classify_market({
+            "ticker": f"{series}-26AUG28VCFRBB-X", "series": series, "title": title,
+            "yes_ask_dollars": 0.5, "no_ask_dollars": 0.5,
+        })
+    finally:
+        if before is absent:
+            cat.SERIES_SPORT.pop(series, None)
+        else:
+            cat.SERIES_SPORT[series] = before
+
+
+def test_the_four_soccer_shapes_resolve_END_TO_END_through_classify_market():
+    """THROUGH `classify_market`, NOT THE HELPERS, and that is the point.
+
+    `ffb7db83` shipped two of these grammars INERT and I did not know: the draw
+    passed `stat_text=""` and refused `stat_not_in_market_vocabulary`, and the
+    totals grammar called a helper name I had invented (`_direction_word`) and
+    RAISED NameError inside `classify_market`. Every test I had written called
+    the regexes or `market_keys` directly, so all of them passed against code
+    that could not work and one that crashed.
+    """
+    draw = _soccer_classified("KXLALIGAGAME", "Tie is the result")
+    assert draw["status"] == "ok" and draw["market"] == "h2h", draw
+    assert draw["side"] == "draw", draw
+
+    total = _soccer_classified("KXLALIGATOTAL", "Will over 5.5 goals be scored?")
+    assert total["status"] == "ok" and total["market"] == "totals", total
+    assert total["side"] == "over" and total["line"] == 5.5, total
+
+    btts = _soccer_classified("KXLALIGABTTS", "Will both teams score?")
+    assert btts["status"] == "ok" and btts["market"] == "btts", btts
+
+    corners = _soccer_classified("KXEPLCORNERS", "Will there be over 9.5 corners?")
+    assert corners["status"] == "ok", corners
+    assert corners["market"] == "alternate_totals_corners", corners
+
+
+def test_every_SEGMENT_variant_still_refuses():
+    """A segment contract and a full-game contract are different bets on the
+    same fixture. Measured cost of confusing them: five MLB orders placed on
+    full-game totals for first-3/first-5 contracts, $7.08, 2026-08-28.
+
+    Both soccer patterns are anchored so the 1st-half wording cannot match.
+    """
+    for series, title in [("KXLALIGAGAME", "Tie 1st Half"),
+                          ("KXLALIGABTTS", "Will both teams score in the 1st Half?")]:
+        out = _soccer_classified(series, title)
+        assert out["status"] == "refused", (series, out)
+        assert out["reason"] == "unreadable_title", (series, out)
+
+
+def test_a_season_FUTURES_title_still_refuses():
+    """"Will Zwolle win the 2026-27 Eredivisie?" is not a game line and no
+    board row asks for it. `_MONEYLINE` must not swallow it as a team win."""
+    out = _soccer_classified("KXEREDIVISIE", "Will Zwolle win the 2026-27 Eredivisie?")
+    assert out["status"] == "refused", out

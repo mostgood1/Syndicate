@@ -304,13 +304,11 @@ def non_scoring_total_market(sport: Any, stat_text: Any) -> str | None:
     in `stat_not_in_market_vocabulary` by name rather than being folded into
     the nearest market that happens to share a line.
 
-    BTTS IS DELIBERATELY ABSENT. The board carries 44 `btts` rows and Kalshi
-    lists the family (`KXLALIGA1HBTTS` was user-confirmed 2026-08-25), but no
-    BTTS title has appeared in `unreadable_titles` yet, so its wording is
-    UNKNOWN. This module's own history is the argument for waiting: three
-    grammars were once written against an imagined phrasing and matched NONE of
-    production. The instrument already prints one title per series, so the
-    evidence arrives on its own.
+    BTTS IS NOT HANDLED HERE and does not need to be: it is a yes/no GAME
+    market with no line, so it resolves through `_SOCCER`'s `btts` entry like
+    any other named market rather than through a totals unit. This docstring
+    previously recorded it as deliberately absent pending its wording; the
+    user supplied the titles 2026-08-28 and it is now mapped.
     """
     sport_key = str(sport or "").strip().lower()
     token = " ".join(str(stat_text or "").strip().lower().split())
@@ -516,6 +514,18 @@ _SOCCER: dict[str, str] = {
     "shots": "player_shots",
     "shots on target": "player_shots_on_target",
     "shots on goal": "player_shots_on_goal",
+    # BOTH TEAMS TO SCORE. A GAME market, not a player prop, and the only
+    # non-player entry here for that reason. Title supplied by the user
+    # 2026-08-28 -- "Will both teams score?" -- which is what this repo's rule
+    # asks for: read Kalshi's wording, never imagine it. The board carries 36
+    # rows keyed `soccer|btts|yes` / `|no`, line None, `segment=full`.
+    #
+    # The 1st-half variant ("Will both teams score in the 1st Half?") is
+    # refused upstream by an anchored pattern and never reaches this map, so a
+    # segment contract cannot be priced as a full-game one.
+    "btts": "btts",
+    "both teams to score": "btts",
+    "both teams score": "btts",
 }
 
 # --------------------------------------------------------------------------

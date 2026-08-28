@@ -369,6 +369,20 @@ _MONEYLINE = re.compile(r"^\s*(?P<team>.+?)\s+wins\s*\??\s*$", re.IGNORECASE)
 # they are not a game line and no board row asks for them.
 _SOCCER_DRAW = re.compile(r"^\s*tie\s+is\s+the\s+result\s*\??\s*$", re.IGNORECASE)
 # "Will over 5.5 goals be scored?" -- full-game total, no team named.
+# "Will both teams score?" -- BTTS, full game, no team and no line.
+# Titles supplied by the user 2026-08-28, which is what this file's own rule
+# asks for: read the wording, never imagine it.
+#
+#     "Will both teams score?"                  -> btts, full game
+#     "Will both teams score in the 1st Half?"  -> SEGMENT, must stay refused
+#
+# The `$` anchor after the question mark is what separates them: the 1st-half
+# wording cannot match, so it keeps refusing rather than being priced as a
+# full-game BTTS. Same reasoning as `_SOCCER_DRAW` against "Tie 1st Half", and
+# the same incident behind both -- five MLB orders placed on full-game totals
+# for first-3/first-5 contracts, $7.08, 2026-08-28.
+_SOCCER_BTTS = re.compile(r"^\s*will\s+both\s+teams\s+score\s*\??\s*$", re.IGNORECASE)
+
 _SOCCER_TOTAL = re.compile(
     r"^\s*will\s+(?P<direction>over|under)\s+(?P<line>\d+(?:\.\d+)?)\s+"
     r"(?P<stat>goals?)\s+be\s+scored\s*\??\s*$",
@@ -1196,16 +1210,42 @@ def _parse_title(title: str) -> dict[str, Any] | None:
             # The DRAW leg. `subject` is the side, not a club -- the board keys
             # this row `soccer|h2h|draw` and there is no team to name.
             "subject": "draw",
-            "stat_text": "",
+            # `classify_market` reads `parsed["side"]` unconditionally, so every
+            # grammar must supply it -- omitting it raised KeyError rather than
+            # refusing. The draw IS the side; the board keys it `soccer|h2h|draw`.
+            "side": "draw",
+            # "h2h", NOT "". `GRAMMAR_MONEYLINE` resolves its market through
+            # `canonical_market_key(sport, stat_text)`, so an empty string made
+            # the draw refuse `stat_not_in_market_vocabulary` -- the grammar
+            # matched and the market stayed unreachable. Shipped INERT in
+            # `ffb7db83` and found only by running `classify_market` end to end;
+            # every test I had written called the helpers, not the classifier.
+            "stat_text": "h2h",
             "line": None,
+        }
+    if _SOCCER_BTTS.match(title):
+        return {
+            "grammar": GRAMMAR_MONEYLINE,
+            # The board keys these `soccer|btts|yes` / `|no` with no line and
+            # `segment=full` (36 rows measured 2026-08-28). The SIDE comes from
+            # Kalshi's own yes/no legs, not from the title, so `subject` names
+            # the market rather than a team.
+            "subject": "btts",
+            "stat_text": "btts",
+            "line": None,
+            # NO SIDE FROM THE TITLE. "Will both teams score?" is the question;
+            # yes/no comes from Kalshi's own legs, which the pricing layer
+            # already reads. The board carries `btts|yes` and `btts|no`.
+            "side": None,
         }
     match = _SOCCER_TOTAL.match(title)
     if match:
         return {
             "grammar": GRAMMAR_TEAM_TOTAL,
-            "subject": _direction_word(match.group("direction")),
+            "subject": None,
             "stat_text": match.group("stat").strip(),
             "line": float(match.group("line")),
+            "side": _direction(match.group("direction")),
         }
     match = _PLAYER_THRESHOLD.match(title)
     if match:
