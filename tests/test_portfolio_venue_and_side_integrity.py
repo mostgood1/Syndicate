@@ -365,6 +365,54 @@ def test_the_check_runs_once_per_order():
     assert len(calls) == 1
 
 
+def test_the_cross_check_dispatches_by_SPORT_through_the_same_resolver(monkeypatch):
+    """A new sport's resolver covers the cross-check the day it lands, without
+    anyone remembering to wire it twice.
+
+    Raised by session local_bb0d1330: NCAAF settlement (`#593`) joins through
+    `ncaaf_team_registry`, NOT `teams_match`, because `team_aliases._alias_map
+    ("ncaaf")` is `{}` and the fallback heuristic matches "Michigan" to
+    "Michigan State" -- so a cross-check that reached NCAAF through some OTHER
+    join would grade against the wrong fixture and report a confident conflict.
+
+    IT CANNOT, and this pins why: `settle_orders` builds ONE `_default_resolver`
+    and hands the SAME object to the grading path and to `_check_venue_grade`.
+    There is no second dispatch to drift. Asserted rather than reasoned about,
+    because "the resolver is shared" is exactly the kind of structural claim
+    that stops being true in a refactor nobody thinks touches it.
+    """
+    from syndicate.features.shared import execution_ledger as ledger
+    from syndicate.features.shared.paper_settlement import settle_orders
+
+    seen = []
+
+    def _recording(order):
+        seen.append(str(order.get("sport") or ""))
+        return {"current_value": 11.0, "is_final": True, "started": True}
+
+    state = {
+        "orders": [
+            # Already graded BY THE VENUE -- only the cross-check will ask.
+            _graded_by_venue(selected_date="2026-08-27", sport="ncaaf"),
+            # Ungraded -- only the grading path will ask.
+            _order(selected_date="2026-08-27", sport="wnba", side="over", line=8.5,
+                   fill_price=0.5, outcome=None),
+        ]
+    }
+    monkeypatch.setattr(ledger, "_load", lambda *a, **k: state)
+    monkeypatch.setattr(ledger, "_persist", lambda *a, **k: None)
+    # The venue grace defers a FILLED LIVE row for 24h so the venue grades it
+    # first, which would hold the ungraded half of this test back and make the
+    # assertion pass or fail on the clock. Zero is a documented value for
+    # exactly this -- see `_venue_grace_hours`.
+    monkeypatch.setenv("SYNDICATE_VENUE_SETTLEMENT_GRACE_HOURS", "0")
+
+    settle_orders("2026-08-27", resolver=_recording)
+
+    # BOTH paths reached the resolver, and each carried its own order's sport.
+    assert sorted(seen) == ["ncaaf", "wnba"]
+
+
 def test_settle_orders_reports_the_cross_check_beside_the_grades(monkeypatch):
     """`conflicts=0` beside `verified=0` means nothing was checked, which is
     why both numbers are returned rather than just the alarming one."""
