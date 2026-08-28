@@ -1594,13 +1594,44 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
                 long_desc = "AMBIGUOUS_TWO_LONG" if long_desc is not None else desc
         return out, long_desc
 
+    def _as_list(value):
+        """`outcomes` and `outcomePrices` ARE JSON STRINGS ON THE WIRE.
+
+        MEASURED 2026-08-28T19:37:42Z, from this very log line printing
+        `long_index=None` on all three samples:
+
+            outcomes='["Canelo Alvarez","Christian Mbilli"]'   <- a str
+            prices='["0.6800","0.34"]'                          <- a str
+
+        The first version of `_long_index` guarded on `isinstance(list)` and
+        therefore returned None for every real market -- an instrument that
+        could only ever answer None, shipped to answer a question. Exactly the
+        assumed-shape error this file keeps paying for; the fix is to read the
+        type rather than assume it.
+        """
+        # Imported HERE, not borrowed from the `import json as _json` further
+        # down this function -- that one is bound AFTER this closure is called,
+        # so relying on it is a NameError at runtime and a clean parse in
+        # review. Caught by running the module rather than reading it.
+        import json as _json_local
+
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = _json_local.loads(value)
+            except Exception:  # noqa: BLE001
+                return None
+            return parsed if isinstance(parsed, list) else None
+        return None
+
     def _long_index(row, long_desc):
         """Where the long side sits in `outcomes`. THE ANSWER, if there is one."""
         if not long_desc or long_desc == "AMBIGUOUS_TWO_LONG":
             return long_desc
-        outcomes = row.get("outcomes")
-        if not isinstance(outcomes, list):
-            return None
+        outcomes = _as_list(row.get("outcomes"))
+        if outcomes is None:
+            return "outcomes_unparseable"
         for position, name in enumerate(outcomes):
             if str(name or "").strip().lower() == str(long_desc).strip().lower():
                 return position
@@ -1609,16 +1640,52 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
         # different key -- so it is reported, not swallowed.
         return "long_side_not_in_outcomes"
 
-    _samples = [
+    # THE SAMPLE MUST BE THE SPORT THAT LOST MONEY.
+    #
+    # The first run sampled `aec-boxing-...` and two `aec-ufc-...` markets --
+    # whatever sorted first. Every wrong-team order was MLB
+    # (`aec-mlb-az-sf-2026-08-27` and two more), and an individual-competitor
+    # market's convention says nothing about a team moneyline's. So even with
+    # `long_index` computed, those three samples could not have settled it.
+    #
+    # Team sports first, everything else only as filler, and the LEAGUE token is
+    # printed so a reader can see which they got rather than inferring it from
+    # the slug.
+    _bettable = ("mlb", "nfl", "nba", "wnba", "nhl", "ncaaf", "ncaab")
+
+    def _league_of(row):
+        # `aec-mlb-lad-det-2026-08-28` -> `mlb`. Positional on the slug, which is
+        # safe here because this is a DIAGNOSTIC label and a wrong one is
+        # visible beside the slug it came from.
+        parts = str(row.get("slug") or "").split("-")
+        return parts[1] if len(parts) > 1 else ""
+
+    _moneylines = [
         m for m in (slate.get("markets") or [])
         if sports_market_type(m) == MONEYLINE_MARKET_TYPE
         and (m.get("marketSides") is not None or m.get("question"))
-    ][:3]
+    ]
+    _preferred = [m for m in _moneylines if _league_of(m) in _bettable]
+    _other = [m for m in _moneylines if _league_of(m) not in _bettable]
+    _samples = (_preferred + _other)[:3]
     if _samples:
+        if not _preferred:
+            # A NAMED MISS. Three boxing markets reading `long_index=0` would
+            # otherwise look like an answer about MLB, which is the population
+            # that actually bought the wrong team.
+            print(
+                "[polymarket_us_markets] MONEYLINE_YES_LEG_SHAPE"
+                f" no_bettable_moneyline moneylines={len(_moneylines)}"
+                f" leagues={sorted({_league_of(m) for m in _moneylines})[:12]}"
+                " -- samples below are NOT from a sport we bet",
+                flush=True,
+            )
         for _row in _samples:
             _sides, _long_desc = _compact_sides(_row)
             print(
                 "[polymarket_us_markets] MONEYLINE_YES_LEG_SHAPE"
+                f" league={_league_of(_row)!r}"
+                f" bettable={_league_of(_row) in _bettable}"
                 f" slug={_row.get('slug')!r}"
                 f" outcomes={_row.get('outcomes')!r}"
                 f" prices={_row.get('outcomePrices')!r}"

@@ -19,17 +19,23 @@ The `atc-boxing-...` fixture is the real 2026-08-28T15:08:05Z production row.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from syndicate.features.shared import polymarket_us_markets as mod
 
 
 def _row(outcomes, sides, slug="aec-mlb-lad-det-2026-08-28"):
+    # OUTCOMES AND PRICES ARE JSON STRINGS ON THE WIRE, not lists. The first
+    # version of these fixtures passed lists, so every test passed while
+    # production printed `long_index=None` on all three samples -- a fixture
+    # that was wrong in exactly the way that hid the bug.
     return {
         "slug": slug,
         "sportsMarketTypeV2": mod.MONEYLINE_MARKET_TYPE,
-        "outcomes": outcomes,
-        "outcomePrices": ["0.60", "0.40"],
+        "outcomes": json.dumps(outcomes) if isinstance(outcomes, list) else outcomes,
+        "outcomePrices": json.dumps(["0.60", "0.40"]),
         "marketSides": sides,
         "question": "Who wins?",
         "gameStartTime": "2026-08-28T23:00:00Z",
@@ -144,3 +150,63 @@ def test_a_row_with_no_marketSides_still_prints_and_says_sides_None(monkeypatch,
     out = _emit(monkeypatch, capsys, [row])
     assert "MONEYLINE_YES_LEG_SHAPE" in out
     assert "sides=None" in out
+
+
+# ---------------------------------------------------------------------------
+# The two defects the FIRST production run exposed, 2026-08-28T19:37:42Z.
+# ---------------------------------------------------------------------------
+
+
+def test_outcomes_arriving_as_a_JSON_STRING_still_yields_a_long_index(monkeypatch, capsys):
+    """THE BUG THE FIRST RUN FOUND. `outcomes` is a JSON string on the wire and
+    `_long_index` guarded on `isinstance(list)`, so it returned None for every
+    real market -- an instrument that could only ever answer None, shipped to
+    answer a question.
+
+    Verbatim from production:
+        outcomes='["Canelo Alvarez","Christian Mbilli"]'   long_index=None
+    """
+    row = _row(None, [_side("Canelo Alvarez", True), _side("Christian Mbilli", False)],
+               slug="aec-boxing-canalv-chrmbi-2026-10-31")
+    row["outcomes"] = '["Canelo Alvarez","Christian Mbilli"]'   # the literal wire value
+    out = _emit(monkeypatch, capsys, [row])
+    assert "long_index=0" in out
+    assert "long_index=None" not in out
+
+
+def test_unparseable_outcomes_says_so_rather_than_reading_as_None(monkeypatch, capsys):
+    """`None` conflated "could not parse" with "no long side". Different jobs."""
+    row = _row(None, [_side("A", True), _side("B", False)])
+    row["outcomes"] = "{not json"
+    out = _emit(monkeypatch, capsys, [row])
+    assert "outcomes_unparseable" in out
+
+
+def test_a_bettable_sport_is_PREFERRED_over_whatever_sorts_first(monkeypatch, capsys):
+    """THE SECOND DEFECT. The first run sampled one boxing and two UFC markets.
+    Every wrong-team order was MLB, and an individual-competitor market's
+    convention says nothing about a team moneyline's -- so those samples could
+    not have settled it even with `long_index` working."""
+    rows = [
+        _row(["A", "B"], [_side("A", True), _side("B", False)], slug="aec-boxing-x-y-2026-10-31"),
+        _row(["C", "D"], [_side("C", True), _side("D", False)], slug="aec-ufc-p-q-2026-08-29"),
+        _row(["E", "F"], [_side("E", True), _side("F", False)], slug="aec-ufc-r-s-2026-08-29"),
+        _row(["Dodgers", "Tigers"], [_side("Dodgers", True), _side("Tigers", False)],
+             slug="aec-mlb-lad-det-2026-08-28"),
+    ]
+    out = _emit(monkeypatch, capsys, rows)
+    assert "aec-mlb-lad-det-2026-08-28" in out
+    assert "league='mlb'" in out
+    assert "bettable=True" in out
+
+
+def test_a_slate_with_NO_bettable_moneyline_says_so_before_the_samples(monkeypatch, capsys):
+    """Three boxing markets reading `long_index=0` would otherwise look like an
+    answer about the population that actually bought the wrong team."""
+    rows = [
+        _row(["A", "B"], [_side("A", True), _side("B", False)], slug="aec-boxing-x-y-2026-10-31"),
+        _row(["C", "D"], [_side("C", True), _side("D", False)], slug="aec-ufc-p-q-2026-08-29"),
+    ]
+    out = _emit(monkeypatch, capsys, rows)
+    assert "no_bettable_moneyline" in out
+    assert "bettable=False" in out
