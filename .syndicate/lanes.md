@@ -2647,6 +2647,28 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   future run sees `games_with_outcome` still 4 after deploy, that is EXPECTED
   and is not a failure of this fix.
 - Blocked by: a deploy. Not urgent — the defect is misreporting, not data loss.
+- **RIDES ALONG — DO NOT FIRE A SEPARATE refresh-worker DEPLOY FOR THIS
+  `[2026-08-28 15:1xZ]`.** All three commits (`74f026a9`, `cadfbe31`,
+  `eca7e81b`) sit BEFORE `c748a239` and `481c4b30` on main, so ANY
+  refresh-worker deploy of those — or of tip — carries them by construction.
+  `portfolio-venue-and-side-integrity` owes exactly that deploy: `c748a239` is
+  its real-money fix ("Polymarket has been buying the wrong team") and its
+  files (`paper_settlement.py`, `polymarket_us_orders.py`,
+  `intelligence_state.py`) are worker-side. It deployed **web** to `90ed748b`
+  and not refresh-worker. A second deploy would buy nothing and cost a worker
+  reboot plus an in-flight board build.
+- **VERIFICATION OWED ON WHOEVER'S DEPLOY LANDS — please take this reading:**
+  `/api/board/book-grid?sport=mlb&date=2026-08-27` should show `finals_level`
+  fall from **644** toward ~0 and `live_gameline_accuracy` stop being `null`,
+  **WHILE 08-26 STAYS AT `games_with_outcome: 15`**. The second half is the one
+  that matters — it is what catches the fix over-suppressing. `games_with_outcome`
+  for 08-27 staying at **4** is EXPECTED and is not a failure.
+- **web is NOT in the path and needs nothing** — it already runs all three
+  (live `90ed748b`). Measured 2026-08-28 15:09:55Z: web served a FRESHLY
+  generated 08-27 payload while carrying `eca7e81b`, and `finals_level` was
+  still 644 with `live_gameline_accuracy` still null. Presence is not
+  reachability — the scores are baked into the artifact by the board build on
+  refresh-worker, which is the only choke point.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
