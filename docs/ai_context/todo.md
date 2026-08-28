@@ -4,7 +4,10 @@
 
 Answering "why is soccer never executed by Kalshi". Not because Kalshi lists no
 soccer. Measured on refresh-worker 16:13:11Z, the first build where the join's
-refusal breakdown was readable at all (`#596`):
+refusal breakdown was readable at all (`#598`, renumbered from `#596`
+on 2026-08-28: `portfolio-venue-and-side-integrity` declared that id first
+-- `90ed748b` 10:01 CT is an ancestor of this lane's `d44e643d` 11:43 CT --
+and `todo_id_reconcile` blocks a push while two items share a number):
 
     KXMLSTOTAL 90   KXLALIGATOTAL 66   KXLIGUE1TOTAL 60   KXSERIEATOTAL 60
     KXBUNDESLIGATOTAL 54   KXEREDIVISIETOTAL 54   KXSERIEAGAME 40
@@ -19,7 +22,7 @@ phrasing matched NONE of production).
 
 **Do not guess the wording.** The titles are in the log; read them.
 
-### `#596` — **THE POLYMARKET SOCCER BLOCKER IS FIXTURE ORIENTATION, MEASURED AT n=1. Counter shipped, never run.** — lane `venue-join-refusal-visibility`, 2026-08-28 — **OPEN, needs one refresh-worker deploy**
+### `#598` — **THE POLYMARKET SOCCER BLOCKER IS FIXTURE ORIENTATION, MEASURED AT n=1. Counter shipped, never run.** — lane `venue-join-refusal-visibility`, 2026-08-28 — **OPEN, needs one refresh-worker deploy**
 
 `no_match|soccer|h2h` is **93 of 93 board rows**, and `soccer|totals` 18 of 18.
 The league-bucketing fix that shipped this session (`soccer_competition_tokens`
