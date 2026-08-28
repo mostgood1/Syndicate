@@ -2736,6 +2736,15 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   refresh-worker, each recorded in `deploys.md` with its reading. The
   refresh-worker claim was FORCED once on explicit user instruction (holder was
   ACTIVE, not gone) — recorded there.
+- TODO ids: `#597` (Kalshi soccer title grammar) and **`#598`** (the
+  orientation measurement). `#598` was filed by this lane as `#596` and
+  RENUMBERED by `portfolio-venue-and-side-integrity` (`d99d1672`) because we
+  both declared `#596` and theirs landed first — verified here, not taken on
+  their word: `git merge-base --is-ancestor 90ed748b d44e643d` is true. Their
+  renumber is correct and touched `todo.md` only.
+  **Checkpoint commit `d44e643d`'s message still says "Filed #596"** — it is
+  pushed and immutable, so a reader following it lands on THEIR item. The id
+  to use is `#598`.
 - Blocked by: none. Next refresh-worker deploy by ANY lane carries the counter.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
