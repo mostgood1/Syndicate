@@ -1434,3 +1434,52 @@ def test_fixture_matching_works_with_EVERY_alias_resolver_DARK(monkeypatch):
         {"home_team": "Alaves", "away_team": "Villarreal"},
         {"league": "lal", "home": "vil", "away": "ala", "date": "2026-08-28"},
         "soccer", None) is True
+
+
+def test_polymarket_BTTS_is_admitted_from_its_slug_modifier(monkeypatch):
+    """Polymarket types BTTS as PROP, so it was refused with the other 8,029
+    while the board carried 36 `btts` rows it could never reach.
+
+    MEASURED 2026-08-28 -- three on fixtures this lane chased all day:
+        astatc-lg1-lil-psg-2026-08-28-btts
+        astatc-sea-mil-ven-2026-08-28-btts
+        astatc-lal-ala-vil-2026-08-28-btts
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
+
+    markets = [{
+        "slug": "astatc-soccer-ala-vil-2026-08-28-btts",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+        "outcomes": '["Yes","No"]', "outcomePrices": '["0.55","0.45"]',
+    }]
+    board = [{
+        "market": "btts", "side": "yes", "line": None, "sport": "soccer",
+        "selected_date": "2026-08-28",
+        "home_team": "Alaves", "away_team": "Villarreal", "event_id": "e1",
+    }]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+    assert out["refusals"].get("market_type_not_a_game_line") is None, out["refusals"]
+    assert out["matched"] == 1, out
+
+
+def test_the_OTHER_prop_families_still_refuse(monkeypatch):
+    """PROP is admitted one NAMED family at a time, never as a class.
+
+    `exact-score-0-0` is not a board row and `winner-1h-was` is a segment. Both
+    sit in the same bucket as BTTS and must keep refusing -- opening PROP
+    wholesale would have admitted them too.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+
+    for slug in ("atc-soccer-ala-vil-2026-08-28-exact-score-0-0",
+                 "atc-soccer-ala-vil-2026-08-28-winner-1h-ala"):
+        out = mod.join_polymarket_to_board(
+            [{"slug": slug, "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+              "outcomes": '["Yes","No"]', "outcomePrices": '["0.5","0.5"]'}],
+            [], selected_date="2026-08-28")
+        assert out["refusals"].get("market_type_not_a_game_line") == 1, (slug, out)

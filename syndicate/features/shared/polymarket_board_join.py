@@ -84,6 +84,20 @@ MARKET_TYPE_TO_BOARD: dict[str, str] = {
     "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME": "h2h",
 }
 
+# THE BOARD MARKETS THIS JOIN CAN PAIR. `MARKET_TYPE_TO_BOARD.values()` plus
+# the families admitted from a slug modifier rather than a venue type.
+#
+# DERIVED, NOT RETYPED. The board-side gate used to read
+# `MARKET_TYPE_TO_BOARD.values()` directly, so admitting BTTS on the venue side
+# left the board side still refusing it -- `board_market_not_a_game_line`, one
+# half of the join fixed and the other silently not. Both halves now read this
+# one name, which is the property this repo keeps insisting on: two guards that
+# must agree should not be two literals.
+_JOINABLE_BOARD_MARKETS: frozenset[str] = frozenset(MARKET_TYPE_TO_BOARD.values()) | {
+    # Polymarket types BTTS as PROP; it is admitted by slug modifier below.
+    "btts",
+}
+
 # `14pt5` -> 14.5. The venue writes decimals this way in slugs; reading it as an
 # integer would price a +14.5 spread at +145.
 _SLUG_NUMBER = re.compile(r"^(?P<sign>neg|pos)?(?P<whole>\d+)(?:pt(?P<frac>\d+))?$")
@@ -815,6 +829,34 @@ def join_polymarket_to_board(
         venue_type = str(row.get("sportsMarketTypeV2") or "").upper()
         board_market = MARKET_TYPE_TO_BOARD.get(venue_type)
         if board_market is None:
+            # ONE PROP FAMILY IS ADMITTED BY NAME, AND ONLY BY NAME.
+            #
+            # Polymarket types BTTS as `SPORTS_MARKET_TYPE_PROP`, so it was
+            # refused wholesale with the other 8,029 -- while the board carries
+            # 36 `btts` rows it can never reach. MEASURED 2026-08-28, three of
+            # them on fixtures this lane has been chasing all day:
+            #
+            #     astatc-lg1-lil-psg-2026-08-28-btts    Lille v PSG
+            #     astatc-sea-mil-ven-2026-08-28-btts    Milan v Venezia
+            #     astatc-lal-ala-vil-2026-08-28-btts    Alaves v Villarreal
+            #
+            # THE SLUG MODIFIER IS THE WHOLE IDENTIFICATION -- `-btts`, a plain
+            # token this module already parses. No question text, no grammar.
+            #
+            # ADMITTED INDIVIDUALLY, NEVER BY OPENING `PROP`. The same bucket
+            # holds `exact-score-0-0` and `winner-1h-was`, which MUST keep
+            # refusing: an exact-score market is not a board row and a 1H
+            # winner is a segment. The module header's refusal of PROP stands;
+            # this is one named family stepping out of it with its own
+            # evidence, which is how `DRAWABLE_OUTCOME` was admitted in August.
+            #
+            # `_has_segment` below still screens period variants, so a
+            # first-half BTTS cannot be priced as a full-game one.
+            if venue_type == "SPORTS_MARKET_TYPE_PROP" and "btts" in (
+                parsed.get("modifiers") or []
+            ):
+                board_market = "btts"
+        if board_market is None:
             # PROP lands here -- a real market, deliberately out of scope (see
             # the module header). DRAWABLE_OUTCOME no longer does; it is in
             # `MARKET_TYPE_TO_BOARD` as of 2026-08-25, so this branch is
@@ -926,7 +968,7 @@ def join_polymarket_to_board(
     matches: list[dict[str, Any]] = []
     for board_row in board_rows:
         board_market = str(board_row.get("market") or "").strip().lower()
-        if board_market not in set(MARKET_TYPE_TO_BOARD.values()):
+        if board_market not in _JOINABLE_BOARD_MARKETS:
             refuse("board_market_not_a_game_line")
             continue
         # THE MIRROR OF THE VENUE-SIDE GUARD ABOVE. That one refuses a segment

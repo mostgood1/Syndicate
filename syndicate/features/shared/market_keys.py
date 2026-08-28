@@ -31,6 +31,8 @@ the class of error #217 fixed by making identity a hard filter.
 
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 # Stat/label vocabulary -> OddsAPI market key. Left side is what our producers
@@ -294,7 +296,25 @@ _NON_SCORING_TOTAL_MARKET: dict[tuple[str, str], str] = {
     # verbatim in the `_TOTAL_UNIT` comment above from a real refused market.
     ("soccer", "corners"): "alternate_totals_corners",
     ("soccer", "corner"): "alternate_totals_corners",
+    # "Total Corners Taken (Reg. Time)" -- supplied by the user 2026-08-28.
+    # `(Reg. Time)` is REGULATION TIME, i.e. the ordinary 90 minutes, so this
+    # is the FULL-GAME corners market and not a segment. It is stripped by
+    # `_REG_TIME_QUALIFIER` before lookup rather than matched here, so any
+    # spacing or punctuation variant resolves to the same key.
+    ("soccer", "corners taken"): "alternate_totals_corners",
+    ("soccer", "total corners taken"): "alternate_totals_corners",
+    ("soccer", "total corners"): "alternate_totals_corners",
 }
+
+# "(Reg. Time)" / "(Regulation Time)" -- a FULL-GAME qualifier, not a period.
+#
+# Stripped rather than enumerated into every corners spelling. It must never be
+# read as a segment: `_has_segment`-style period handling exists to stop a
+# first-half contract being priced as a full-game one, and regulation time is
+# the opposite -- it IS the full game, excluding only extra time.
+_REG_TIME_QUALIFIER = re.compile(
+    r"\s*\(\s*reg(?:ulation)?\.?\s*time\s*\)\s*$", re.IGNORECASE
+)
 
 
 def non_scoring_total_market(sport: Any, stat_text: Any) -> str | None:
@@ -311,7 +331,8 @@ def non_scoring_total_market(sport: Any, stat_text: Any) -> str | None:
     user supplied the titles 2026-08-28 and it is now mapped.
     """
     sport_key = str(sport or "").strip().lower()
-    token = " ".join(str(stat_text or "").strip().lower().split())
+    token = _REG_TIME_QUALIFIER.sub("", str(stat_text or "")).strip()
+    token = " ".join(token.lower().split())
     for filler in _TOTAL_FILLER:
         if token.endswith(" " + filler):
             token = token[: -len(filler) - 1].strip()
