@@ -36539,3 +36539,34 @@ EXPECTED AFTER: `segment_has_no_matching_series` present; Kalshi `matched` FALLS
 **two independent causes moving two numbers in the same direction, so neither is
 evidence for the other.** If Polymarket `matched` RISES, that is their corners
 work, not the segment guard relaxing.
+
+### 2026-08-28 21:45Z — GUARD OVERRIDDEN ON A HELD JOB, by explicit user decision
+
+`SYNDICATE_DEPLOY_GUARD=off` to deploy `1b7b2258` onto refresh-worker while
+preflight read `HOLD: 10 job(s) in flight`. **USER DECISION, asked and
+reaffirmed** — I put the choice up once with a recommendation to wait, the user
+chose to wait, and then instructed "push through and deploy". Logging it here
+because an override with no written reason is indistinguishable from a mistake.
+
+WHAT IS BEING KILLED: one `run_mlb_daily_sim_job` tree, started **21:02:16Z**,
+running **43+ min** at the moment of the deploy. Measured against its own
+history today — 12 runs: 2.6, 3.2, 3.9, 12.1, 14.2, 14.9, 15.0, 15.1, 18.8,
+34.0, 34.3 min — **this run had already exceeded every completed run today.**
+Bimodal: routine ticks 12-19 min, long passes ~34. This one was past both.
+
+WHAT THE GUARD SAYS, AND IT IS NOT GENERIC: *"measured 2026-08-10: a deploy
+fired 61 seconds after a smartsim child started, and cancelling it CAUSED the
+restart rather than avoiding it."* That risk is accepted here, not dismissed.
+
+**A CORRECTION THAT MADE THE OVERRIDE LOOK CHEAPER THAN IT IS.** I told the user
+the 20:22 sim "was killed the same way tonight and relaunched" — offering it as
+evidence that a kill is harmless. **It is not what happened.** The 20:22 run
+completed on its own at 20:56:24, ~2 min before the 20:58:17 deploy, which is
+exactly why preflight read CLEAR then. **No sim has been killed tonight, so
+there is no local example of a kill being harmless** — only the ledger's example
+of one being harmful. The user was told this before deciding.
+
+WATCH FOR: a restart loop on refresh-worker (the 2026-08-10 failure mode). If
+`BOOTED` appears more than once, or the job relaunches and dies repeatedly, this
+override is the first suspect and the remedy is to stop deploying, not to deploy
+again.
