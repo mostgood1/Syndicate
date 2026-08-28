@@ -2537,13 +2537,14 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `ncaaf/oddsapi_lines.py::resolve_team`, a module this lane does not touch.
 - Blocked by: none
 
-### portfolio-venue-and-side-integrity — OPEN, ONE READING OWED — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c
-- Goal: five `/portfolio` asks `[user 2026-08-28]`, plus three things that fell
-  out of verifying them — WNBA game lines, `#600` (a lost-write race on the
-  money ledger), and operator actions for two un-actionable red banners.
-- **ALL EIGHT SHIPPED AND DEPLOYED.** Narrative, evidence and dead ends:
-  `log/2026-08-28.md` (two blocks). Measurements: `deploys.md`. Items:
-  `todo.md` `#595` `#596` `#599` `#600`.
+### portfolio-venue-and-side-integrity — OPEN, TWO READINGS OWED — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c
+- Goal: five `/portfolio` asks `[user 2026-08-28]`, plus what fell out of
+  verifying them — WNBA game lines, `#600` (a lost-write race on the money
+  ledger), operator actions for two red banners, and then a SEGMENT defect that
+  turned out to span both venues.
+- **ELEVEN SHIPPED AND DEPLOYED.** Narrative, evidence, dead ends:
+  `log/2026-08-28.md` (three blocks). Measurements: `deploys.md`. Items:
+  `todo.md` `#595` `#596` `#599` `#600` `#601` `#602` `#603` `#604`.
 - Files: `syndicate/blueprints/intelligence.py`, `syndicate/blueprints/ops.py`,
   `syndicate/templates/portfolio.html`,
   `syndicate/features/shared/portfolio_periods.py`,
@@ -2552,41 +2553,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/polymarket_us_markets.py`,
   `syndicate/features/shared/bet_status_wnba.py`,
   `syndicate/features/shared/execution_ledger.py`,
+  `syndicate/features/shared/kalshi_board_join.py`,
+  `syndicate/features/shared/kalshi_catalogue.py`,
+  `syndicate/features/shared/polymarket_board_join.py`,
   `pipeline/intelligence_state.py`, `pipeline/execute_portfolio.py`, + tests.
-- Live: all three services on `a36e3c1a` ~18:57Z, web on `89678782` 19:09Z.
-  Both workers were deployed BY THE USER manually — `deploy-guard` refuses on a
-  preflight HOLD and the break-glass grant was refused by the harness
-  classifier. Surfaced, not routed around.
-- **THE ONE READING OWED: `LEDGER_MERGE` has not fired.** `concurrent=0` on
-  both workers since 18:58Z is an absence in a short window, NOT a pass — a
-  collision needs a settlement pass overlapping a placement cycle. Watcher
-  `bwnlc4q33` armed on `concurrent>=1` and on `MERGE_READ_FAILED`. Equally
-  decisive: a `SETTLED ... graded=N` (N>0) whose outcomes DO appear on the
-  served payload, which is the exact signature that was failing.
-- Also unproven, deliberately: the Polymarket h2h refusal has never fired in
-  production (nothing has tried to place one), and `marketSides[].long == YES`
-  is an INFERENCE from one observed entry — `#595` step 1 widens the truncated
-  log. **Do not wire it on what has been read.**
-- Verified in production: WNBA `GSCONN` rows graded `under lost` / `over won`
-  `settled_value 153.0`; the ledger stopped going backwards (`1,295,990 ->
-  1,298,163` monotonic across services vs a `-8,031` step); `last_blind_write`
-  readable and `None`; both banners carry working operator actions.
-- **CONTESTED: `syndicate/blueprints/ops.py` — TWO LIVE OPEN HOLDERS, NOT
-  RESOLVED** `[flagged 2026-08-28 ~15:0x CDT, session 29794bbe]`. Held by BOTH
-  `portfolio-venue-and-side-integrity` (session `12b2be57`) and
-  `venue-join-refusal-visibility` (session `d617eefd`). Four other contested
-  files were cleared in the same pass; this one was DELIBERATELY LEFT, because
-  both sessions are live and neither claim is stale: transcript last entries
-  **19:44:52Z** and **19:40:17Z**, i.e. minutes before this note. Neither lane
-  body says what it does to this file, so the ledger cannot decide it either.
-  **Whichever of the two finishes first: release it here in the single-line
-  form** — ``RELEASED `[date, session]`: `syndicate/blueprints/ops.py` `` — a
-  marker only governs its OWN line, so a path on a continuation line still
-  reads as a live claim (that mis-shape is what produced three of the four
-  contests cleared today). Until then `lane-guard` will block the second
-  editor, which is the system working, not a defect.
-- Blocked by: none.
-
+- Live: refresh-worker `420dddaa` (BOOTED 21:55:15Z), carrying this lane's
+  `#601`/`#602`/`#604` plus 12 commits of `local_5163d9b3`'s soccer work.
+  **Deployed manually BY THE USER, twice** — `deploy-guard` refuses on a
+  preflight HOLD, and when the user chose to override, the harness classifier
+  refused the command independently. Surfaced, not routed around.
+- **READING OWED 1 — `LEDGER_MERGE` has still not fired.** `concurrent=0` since
+  18:58Z is an absence in a short window, NOT a pass. Needs a settlement pass
+  overlapping a placement cycle.
+- **READING OWED 2 — the segment guards are proven to FIRE, not to have changed
+  an ORDER.** `board_row_is_a_segment_bet` 52 then 39;
+  `segment_has_no_matching_series: 2`. But **zero orders were placed after
+  either boot**, so the money-level check is vacuous. Re-run it on the next
+  slate that actually places.
+- Verified in production: WNBA `GSCONN` graded `under lost`/`over won`
+  `settled_value 153.0`; ledger monotonic (`1,295,990 -> 1,298,163` vs a
+  `-8,031` step); both banners carry working operator actions; ONE `BOOTED`
+  after the overridden deploy (no restart loop).
+- **`#603` HANDED OVER, NOT FIXED — cross-lane.**
+  `venue_quote_adapters.quote_key` is `sport|market|side|line`: no game, no
+  segment. Measured 6 of 14 game-line keys → >1 event, 2 → >1 segment on 74
+  real orders. Belongs to `venue-join-refusal-visibility`, which has 10 failing
+  tests in those files. NOT edited.
+- **CONTESTED: `syndicate/blueprints/ops.py` — TWO LIVE OPEN HOLDERS**
+  `[flagged 2026-08-28 ~15:0x CDT, session 29794bbe]`. Also held by
+  `venue-join-refusal-visibility` (session `d617eefd`). Left deliberately;
+  neither claim is stale. This lane's only edit there (`last_blind_write` on
+  `ledger-summary`) is deployed and did not collide.
 ### soccer-overview-cost — OPEN, **UNSOLVED — SEVEN hypotheses refuted; DO NOT add an eighth log span, USE A PROFILER** — opened 2026-08-28 — session 3e5a9659 (ENDED)
 - **HANDOFF STATE, read this first.** The target is narrowed to ONE loop and the method is the problem, not the target. `week_games`'s per-fixture assembly (`for fixture in fixtures`) is the cost: `assemble_s` 19.49 of a 20.78s call, `payload_s` under 7%, `dates` and league both ruled out. Same league + same 10 fixtures read 3.24s and 13.99s, so the VARIANCE is as interesting as the magnitude.
 - ~~ONE REAL WIN, VERIFIED~~ **SEE RETRACTION BELOW.** cards-context TTL 600 -> 1200s (`SYNDICATE_SOCCER_CARDS_CONTEXT_TTL_SECONDS`, env only), left in place deliberately.

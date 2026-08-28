@@ -219,7 +219,16 @@ nine-inning price, correctly ~5c. **A mis-keyed join presents as the best line
 on the board**, so edge-ranking selects for it. All five will lose. Kalshi has
 `KXMLBF5TOTAL` and we already fetch it — a mis-SELECTION, not an impossibility.
 
-FIXED AND LANDED `632f3473`, **NOT YET DEPLOYED as of this writing.**
+**FIXED, DEPLOYED AND MEASURED** — `632f3473` + `#602` `d2ab7e86` + `#604`
+`361d8940`, live in `420dddaa`, BOOTED 21:55:15Z. **BOTH GUARDS FIRE:**
+`board_row_is_a_segment_bet` 52 then 39 (Polymarket),
+`segment_has_no_matching_series: 2` (Kalshi). **THE DEFECT SPANNED BOTH VENUES
+— 9 bad orders, not 5** (Kalshi 5 ~$7.30, Polymarket 4 ~$9.38); the second was
+found by repeating the audit, not by a report.
+
+**PROVEN TO FIRE, NOT PROVEN TO HAVE CHANGED AN ORDER.** Zero orders were
+placed after either boot, so the money-level check is vacuous. Re-run on the
+next slate that actually places.
 `segment_for_series` + `segment` in both key tuples + `series` stamped at both
 match-record sites (neither carried it). Unmapped defaults to `full` because the
 protection is on the BOARD side; refusal is reserved for an unmapped series

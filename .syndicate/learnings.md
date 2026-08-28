@@ -5609,3 +5609,35 @@ or check the surface; do not bank neutrality as safety.
 
 Same family as the share-of-the-whole rule logged earlier today: both are
 measuring a real quantity confidently and it being the wrong quantity.
+
+## 2026-08-28 — Pre-registering a confound does not help if you get its SIGN wrong
+
+Before deploying `#604` I wrote the expected reading down in `deploys.md`:
+Kalshi `matched` would FALL (my phantom-match removal) while `unreadable_title`
+would also fall (a peer's soccer grammars) — "two independent causes moving two
+numbers in the same direction, so neither is evidence for the other."
+
+Measured after: `matched` **233 → 255, it ROSE**; `unreadable_title` 2242 → 1790.
+The two causes moved in **opposite** directions, and the peer's +452 newly
+readable titles swamped my guard, which fired **twice**.
+
+Writing the prediction down was still right — it is why the miss is legible at
+all instead of being quietly re-narrated. But two further rules come out of it:
+
+1. **A co-deployed change can swamp your effect entirely.** A 2-count guard is
+   not measurable against a 452-count change in what the same function can read.
+   The honest report is "cannot isolate", not a hedged causal story. If an effect
+   must be attributed, it needs its OWN counter — which is exactly what `#604`
+   added, and why `segment_has_no_matching_series: 2` is the real evidence while
+   `matched` is not.
+2. **Predict the SIGN, not just the confound.** "Both move together" felt like
+   rigour and was an unchecked assumption doing the work of a measurement.
+
+Related, same session, same shape: I told the user tonight's 20:22 sim "was
+killed by a deploy and relaunched harmlessly" while advising them on whether to
+override a deploy guard. It **completed on its own** at 20:56:24, two minutes
+before the 20:58:17 deploy — which is precisely why preflight read CLEAR. **No
+sim was killed tonight, so there was no local example of a kill being harmless**,
+only the ledger's example of one being harmful. I had inverted the evidence in
+the direction that made the action I was about to take look cheaper. Corrected
+to the user before they decided.
