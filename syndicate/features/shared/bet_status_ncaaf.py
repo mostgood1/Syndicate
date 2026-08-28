@@ -54,7 +54,16 @@ REASON_GAME_NOT_FOUND = "game_not_in_ncaaf_live_state"
 REASON_PROPS = "ncaaf_props_not_gradeable_from_scoreboard"
 REASON_UNKNOWN_MARKET = "unmapped_market"
 REASON_TEAM_TOTAL = "team_totals_needs_a_per_team_score"
-REASON_NO_SCORES = "game_carries_no_scores"
+# PREFIXED, unlike `bet_status_nfl`'s otherwise-identical constant, and that
+# asymmetry is deliberate. Both files defined the SAME string, so the first
+# production read after this shipped showed `game_carries_no_scores: 18` with
+# no way to say whether the NFL or the NCAAF resolver produced it -- the exact
+# collapse this module refuses one field below, where `REASON_TEAM_UNRESOLVED`
+# is kept distinct because "they point at different jobs". NFL keeps the
+# unprefixed string because it is already deployed and its verification
+# (2026-08-28T03:59:18Z) is recorded against it; renaming it would orphan that
+# reading for a cosmetic gain.
+REASON_NO_SCORES = "ncaaf_game_carries_no_scores"
 # DISTINCT FROM `game_not_in_ncaaf_live_state` ON PURPOSE. That one says the
 # fixture is not in a capture we DID read; this one says the ORDER's own team
 # names could not be pinned to a team at all, so no capture could ever match
