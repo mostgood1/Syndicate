@@ -4198,6 +4198,15 @@ def _live_portfolio_payload(
         # in one click. Printing the second over a filtered view would be the
         # page telling the reader the book is empty when it is not.
         "book_count": len(whole_book),
+        # POSITIONS ACROSS EVERY DATE -- what the Positions tile compares its
+        # own (filtered) count against, so the two tie off on the page.
+        #
+        # NOT `book_count`. That counts every live ORDER including the ones
+        # that never opened a position, so using it here would put "41 of 202"
+        # on a page whose own table says 88. `hidden_orders` is computed over
+        # the whole book BEFORE the date filter, which is exactly the term that
+        # makes this subtraction the position count rather than the order one.
+        "position_count_all_dates": len(whole_book) - len(hidden_orders),
         # The arrows and the reset for that control. Computed here, not in
         # Jinja, for the reason `_paper_date_nav` gives: date arithmetic in a
         # template is where off-by-one-day bugs live.

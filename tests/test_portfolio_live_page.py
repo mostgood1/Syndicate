@@ -295,6 +295,62 @@ def test_all_dates_is_one_click_and_restores_the_whole_book(app_client, live_env
     assert "across all dates" in body
 
 
+def test_the_positions_tile_does_not_call_a_filtered_count_all_dates(app_client, live_env):
+    """[user 2026-08-27] "the first box says this is the number of picks all
+    time but its really for the selected date."
+
+    THE TILE WAS RIGHT UNTIL THE DEFAULT CHANGED. Its value has always been the
+    view's count and its label was hardcoded `all dates` -- true while the view
+    was every date, a false statement the moment today became the default. The
+    whole-book figure is carried beside it so the two tie off.
+    """
+    live_env["orders"] = [
+        _order(selected_date=DATE),
+        _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-21"),
+        _order(idempotency_key="k-3", position_key="p-3", selected_date="2026-08-20"),
+    ]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    tile = body[body.index(">Positions<"):][:400]
+    assert ">1<" in tile                      # the view: today only
+    assert "on this slate" in tile
+    assert "3 all dates" in tile              # the whole book, stated
+    assert "all dates" not in tile.split("on this slate")[0]
+
+
+def test_the_positions_tile_counts_positions_not_orders(app_client, live_env):
+    """The whole-book figure must not be `book_count`, which counts every live
+    ORDER including the ones that never opened a position -- that would put
+    "1 of 3" beside a table showing 2."""
+    live_env["orders"] = [
+        _order(selected_date=DATE),
+        _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-21"),
+        # Refused at the venue: an order, never a position.
+        _order(idempotency_key="k-3", position_key="p-3", selected_date="2026-08-20",
+               status="failed", error="http_404: market_not_found",
+               fill_price=None, fill_stake_dollars=None),
+    ]
+    payload = intelligence_bp._live_portfolio_payload(DATE)
+    assert payload["book_count"] == 3               # every live order
+    assert payload["position_count_all_dates"] == 2  # only the ones that opened
+
+
+def test_the_whole_book_tiles_say_they_are_the_whole_book(app_client, live_env):
+    """Settlement runs over `whole_book`, so those tiles do not move when the
+    slate filter does. Unlabelled beside a filtered Positions count they read as
+    though both described the same set -- which is the confusion that made the
+    Positions tile worth reporting in the first place."""
+    live_env["orders"] = [
+        _order(selected_date=DATE),
+        _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-21"),
+    ]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    settled = body[body.index(">Settled<"):][:500]
+    # The tile has two branches -- "N still open" and "N open, none decided".
+    # Both make the same whole-book claim, so both must carry the scope; assert
+    # the property rather than one branch's wording.
+    assert "· all dates" in settled
+
+
 def test_the_old_slate_chip_row_is_gone(app_client, live_env):
     """[user 2026-08-27] "that should mean this selector goes away".
 

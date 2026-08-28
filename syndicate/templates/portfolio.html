@@ -698,9 +698,20 @@
 
   <div class="live-tiles">
     <div class="live-tile">
+      {# THE VALUE IS THE VIEW; THE META SAYS SO. This read "all dates"
+         under a filtered count from 2026-08-27 until the user caught it
+         `[user 2026-08-27]` -- the tile showed today's 41 and labelled it the
+         all-time book. The whole-book figure is carried alongside rather than
+         dropped, so the filtered number can be tied off against it instead of
+         being mistaken for it. #}
       <div class="live-tile__label">Positions</div>
       <div class="live-tile__value">{{ orders|length }}</div>
-      <div class="live-tile__meta">all dates</div>
+      {% if L.all_dates %}
+        <div class="live-tile__meta">all dates</div>
+      {% else %}
+        <div class="live-tile__meta">on this slate</div>
+        <div class="live-tile__meta">{{ L.position_count_all_dates }} all dates</div>
+      {% endif %}
     </div>
     <div class="live-tile">
       <div class="live-tile__label">Settled</div>
@@ -708,10 +719,14 @@
         <div class="live-tile__value">
           <span class="pos">{{ st.get('won', 0) }}W</span> · <span class="neg">{{ st.get('lost', 0) }}L</span>{% if st.get('push') %} · {{ st.get('push') }}P{% endif %}
         </div>
-        <div class="live-tile__meta">{{ st.get('pending', 0) }} still open</div>
+        {# ALL DATES, ALWAYS, and now stated. Settlement runs over
+           `whole_book`, so this tile does not move when the slate filter does.
+           Unlabelled beside a filtered Positions count, it read as though both
+           described the same set. #}
+        <div class="live-tile__meta">{{ st.get('pending', 0) }} still open · all dates</div>
       {% else %}
         <div class="live-tile__value">—</div>
-        <div class="live-tile__meta">{{ st.get('pending', 0) }} open, none decided</div>
+        <div class="live-tile__meta">{{ st.get('pending', 0) }} open, none decided · all dates</div>
       {% endif %}
     </div>
     <div class="live-tile">
@@ -720,7 +735,7 @@
         <div class="live-tile__value {{ 'pos' if (st.get('pnl_dollars') or 0) > 0 else ('neg' if (st.get('pnl_dollars') or 0) < 0 else '') }}">
           {{ "%+.2f"|format(st.get('pnl_dollars') or 0) }}</div>
         <div class="live-tile__meta">
-          {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% on {% endif %}${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled</div>
+          {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% on {% endif %}${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled · all dates</div>
         {# WHO DECIDED THESE OUTCOMES. The figure above is the whole book, which
            is the honest answer to "how has this done" -- but it BLENDS outcomes
            the venue stated with outcomes we inferred from our own boxscore
