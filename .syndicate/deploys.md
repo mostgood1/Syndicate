@@ -35402,3 +35402,48 @@ discriminating observation is tomorrow 09:00-14:00 CT**, the window that
 produced matched 5-27 today. Sustained 200+ through that window confirms it; a
 spike does not (today's morning carried isolated 146/210/99 inside a 5-27
 band).
+
+## 2026-08-28 14:02:38Z — refresh-worker `69d940e0` — MLB overview in a capped child — **VERIFIED, INCLUDING THE DISCRIMINATING READING**
+
+Deployed by me, claim released 14:03Z. Flags set BEFORE the deploy via
+`render_env_set.py` (single key, refresh-worker only, no `blueprint_sync`):
+`SYNDICATE_OVERVIEW_ISOLATION_ENABLED=1`.
+
+### verify: MLB BUILT IN THE CONDITION THAT REFUSES IT
+
+```
+14:03:59  [overview_child] CAP_SET rlimit_as_bytes=3377568153 prev_soft=-1
+14:03:59  [overview_child] OK sport=mlb bytes=1221725
+14:03:59  [overview_isolation] OK sport=mlb elapsed_s=4.43 cap_mb=3221 keys=24
+14:09:31  BOARD_OVERVIEW_READY date=2026-08-28 sports=8 mlb:g=15,r=3 ...
+14:17:06  unreclaimable=1327.8MB -> guard_headroom=2768.2MB  (< 3000MB floor)
+          isolated MLB SUCCEEDED at that headroom
+```
+
+**THE 14:17 READING IS THE ONE THAT COUNTS.** The 14:03 build ran 80s after a
+restart with a low baseline, and would probably have passed the floor on its
+own — proving the mechanism, not the fix. 2768.2MB is the SAME band where
+eighteen consecutive builds read `sports=0` this morning
+(`headroom_mb: 2798.5`). Guard refusals since deploy: **0**.
+
+### TWO BELIEFS THIS RETIRES
+
+- **"MLB is the expensive sport" IS FALSE TODAY.** It cost **4.43 SECONDS** and
+  produced a 1.19MB row. The 3000MB floor was sized on a 2026-08-07 "+2.9GB"
+  measurement and that number no longer describes MLB. The actual cost is
+  **soccer at 163.2s** — 82% of hydrated overview time, measured per-sport from
+  `OVERVIEW_SPORT_BEGIN`/`END` brackets.
+- **A FIXED CAP WOULD HAVE BEEN WRONG ON THE FIRST RUN.** The derived cap read
+  `cap_mb=3221` because headroom was 2935MB at that instant — not the
+  2167-2363MB measured an hour earlier. A constant chosen from my own reading
+  would have been HALF the correct size immediately. That is precisely how
+  `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` became unreachable, avoided by
+  construction.
+
+### STILL UNTESTED, and it is the safety property
+
+The child has never actually HIT its cap in production. `MEMORY_CAP_HIT` has
+never fired, so "the OS kills the child instead of the worker" remains proven
+only by a synthetic POSIX test — which is SKIPPED on Windows dev, where this
+was written. The failure path is designed to degrade to the old behaviour
+(fall through to the guard), and that path is unexercised in production.
