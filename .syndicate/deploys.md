@@ -5,6 +5,76 @@
 
 ---
 
+## 2026-08-28 18:53-19:09Z — `#600` LEDGER MERGE LIVE ON ALL THREE — lane `portfolio-venue-and-side-integrity`
+
+    web               a36e3c1a  18:56:35Z   then  89678782  19:09Z
+    refresh-worker    a36e3c1a  ~18:57Z     (user deployed manually)
+    live-odds-worker  a36e3c1a  ~18:58Z     (user deployed manually)
+
+**The two workers were deployed BY THE USER, manually.** I could not: the
+`deploy-guard` refuses on a preflight HOLD, and the documented break-glass
+(`.syndicate/deploy/grants/<session>.json`) was refused by the harness
+classifier — twice, along with a retry loop. Surfaced rather than routed around.
+The HOLD was 3 jobs on live-odds-worker: `refresh_odds_sources` +
+`run_refresh_odds_job` as a long parent sweep spawning a ROTATING per-league
+child (`serie_a`, then `belgian_pro_league`), so it was one long soccer sweep
+rather than three short jobs and would not have self-cleared.
+
+`verify:` — THREE READINGS, ONE OF WHICH IS NOT YET A RESULT.
+
+**(1) THE LEDGER STOPPED GOING BACKWARDS.** Writes across the service boundary,
+18:55-18:57:
+
+    refresh-worker    18:55:23   1,295,990
+    refresh-worker    18:55:24   1,296,958
+    live-odds-worker  18:56:46   1,298,000
+    live-odds-worker  18:56:59   1,298,163
+
+Monotonic. The failure it replaces, 17:40-17:41: refresh-worker `1,276,296`
+then live-odds-worker `1,268,265` — **−8,031 bytes**. No `MERGE_READ_FAILED` on
+either service.
+
+**BOUND, stated because it matters: those writes PREDATE go-live**, so
+live-odds-worker was still on the old code for them. They are a clean baseline,
+not proof.
+
+**(2) `last_blind_write` IS READABLE AND READS `None`.**
+`/api/ops/execution/ledger-summary` now carries it (top-level keys:
+`dates_in_ledger days last_blind_write mode ok orders_without_date summary`).
+**That null is meaningful** — `_persist` only ever WRITES the field and never
+clears it, so absence means no blind write has happened, not "not checked".
+
+This needed its own deploy (`89678782`) because the stamp was **WRITE-ONLY**:
+it went into the document and into `ledger_summary()`, and nothing in production
+calls `ledger_summary()` — this endpoint builds its own per-date structure.
+Found by reading the deployed payload instead of assuming the field had arrived.
+Durable state with no reader is barely better than the log line it replaced.
+
+**(3) `LEDGER_MERGE` HAS NOT FIRED. THIS IS NOT A PASS AND MUST NOT BE READ AS
+ONE.** `concurrent=0` on both services since 18:58Z. A collision needs a
+settlement pass overlapping a placement cycle in the same window, which is not
+every tick, and the workers have been up ~12 minutes. **This is an absence in a
+short window** — the same shape as `learnings.md`'s "absence in a window isn't
+absence". The monotonic sizes in (1) are equally consistent with "no collision
+yet".
+
+**WHAT WOULD ACTUALLY SETTLE IT:** one `LEDGER_MERGE concurrent=N kept_theirs=M`
+with `N>0`, or a `SETTLED ... graded=N` (N>0) whose outcomes DO appear on the
+served payload — the lost-write signature that started this was `graded=9`
+followed by zero rows changing. Until then the correct statement is "no
+collision observed since 18:58Z", not "the race is gone".
+
+**ALSO LIVE AND VERIFIED ON THE SERVED PAGE** (web `a36e3c1a`, 18:56:35Z): the
+operator-resolution actions `[user 2026-08-28]` — `Mark reviewed` on all three
+grade conflicts, `Venue shows no position` / `Venue shows a position` on both
+unknown submits. Neither banner is permanent any more. And the WNBA game-line
+resolver: `KXWNBATOTAL-26AUG26GSCONN-152` `under lost` / `over won`,
+`settled_value 153.0`.
+
+**Claims:** web acquired 19:06Z and released after this reading. The two workers
+were the user's own deploys; I held no claim on them.
+
+
 ## 2026-08-28 — refresh-worker `8b8a6579`: the live-gameline retention RODE ALONG, and the reader half was still missing
 
 **Closes the open obligation from the `web 56e77588` row above.** refresh-worker
