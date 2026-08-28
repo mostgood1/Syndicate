@@ -5250,7 +5250,42 @@ the rule needs restating as an instruction rather than a fact: **before
 concluding an artifact is absent, name which STORE you looked in and which store
 its consumer reads.** They are frequently not the same one.
 
-<<<<<<< HEAD
+## 2026-08-28 — FORBIDDEN: instrumenting a function without first proving it is ON the path you are measuring. I did it, and the counter read zero.
+
+Soccer's overview cost was unlocated. I found a mechanism that explained it
+beautifully: `build_soccer_market_board` takes a LEAGUE, caches on a **60s TTL**
+against a **680-874s** board build, and loads a **sport-wide** odds_history
+shard that had grown **3,935,768 -> 48,169,883 bytes (12x)** in a day — without
+passing the `cache` argument the loader accepts. Ten leagues x 48MB per build.
+Magnitude and growth curve both fit.
+
+**Every one of those facts is true, and the theory is worthless, because
+`build_soccer_market_board` IS NOT ON THE OVERVIEW PATH.** `soccer/cards.py` —
+what `_build_sport_overview` actually calls — never imports `market_board`. Its
+importers are the `/soccer` blueprint, `layer1_board`, `live_refresh_loop`. I
+shipped a counter into it and production emitted ZERO lines.
+
+**THE CHECK I SKIPPED IS ONE GREP.** Before instrumenting `f`, grep from the
+entry point you are timing to `f`. Not "is `f` plausible", not "does `f` have
+the right shape" — is `f` REACHED. A mechanism can be real, documented, and
+irrelevant at the same time, and a coherent story is the most dangerous form of
+that because it stops you checking.
+
+**THE ZERO WAS THE FIND.** A counter that never fires is not a failed
+measurement — it is a strong negative about reachability, and it arrived faster
+than any positive would have. Instrument to falsify, and treat an empty log as
+data rather than as something wrong with the logging.
+
+**THIS WAS PREDICTION FIVE OF FIVE, ALL REFUTED**, on one subsystem in one day:
+~39 leagues (10), fan-out (one cold league), one slow league (whichever is
+cold), props (0.17s), this. `feedback_presence_is_not_reachability` already
+covers the general case; the new part is that I applied it to DEPLOYS all
+session and never once to a CODE PATH.
+
+**AND THE HONEST CONSEQUENCE:** after five refutations my hit rate on a
+subsystem is evidence about my model of it. The right move was to stop
+proposing mechanisms and change method — a profiler over one real build, rather
+than a sixth incremental log span.
 
 ### 2026-08-28 — FORBIDDEN: diagnosing a resolver when the log said `graded=N` and the served payload changed nothing. That is a LOST WRITE, and I spent three theories on the wrong layer
 
@@ -5298,41 +5333,3 @@ WRITE-ONLY — into the document and into `ledger_summary()`, which nothing in
 production calls. **Durable state with no reader is barely better than the log
 line it replaced.** Found by reading the deployed endpoint's payload instead of
 assuming the field had arrived. Add the reader in the same commit as the field.
-=======
-## 2026-08-28 — FORBIDDEN: instrumenting a function without first proving it is ON the path you are measuring. I did it, and the counter read zero.
-
-Soccer's overview cost was unlocated. I found a mechanism that explained it
-beautifully: `build_soccer_market_board` takes a LEAGUE, caches on a **60s TTL**
-against a **680-874s** board build, and loads a **sport-wide** odds_history
-shard that had grown **3,935,768 -> 48,169,883 bytes (12x)** in a day — without
-passing the `cache` argument the loader accepts. Ten leagues x 48MB per build.
-Magnitude and growth curve both fit.
-
-**Every one of those facts is true, and the theory is worthless, because
-`build_soccer_market_board` IS NOT ON THE OVERVIEW PATH.** `soccer/cards.py` —
-what `_build_sport_overview` actually calls — never imports `market_board`. Its
-importers are the `/soccer` blueprint, `layer1_board`, `live_refresh_loop`. I
-shipped a counter into it and production emitted ZERO lines.
-
-**THE CHECK I SKIPPED IS ONE GREP.** Before instrumenting `f`, grep from the
-entry point you are timing to `f`. Not "is `f` plausible", not "does `f` have
-the right shape" — is `f` REACHED. A mechanism can be real, documented, and
-irrelevant at the same time, and a coherent story is the most dangerous form of
-that because it stops you checking.
-
-**THE ZERO WAS THE FIND.** A counter that never fires is not a failed
-measurement — it is a strong negative about reachability, and it arrived faster
-than any positive would have. Instrument to falsify, and treat an empty log as
-data rather than as something wrong with the logging.
-
-**THIS WAS PREDICTION FIVE OF FIVE, ALL REFUTED**, on one subsystem in one day:
-~39 leagues (10), fan-out (one cold league), one slow league (whichever is
-cold), props (0.17s), this. `feedback_presence_is_not_reachability` already
-covers the general case; the new part is that I applied it to DEPLOYS all
-session and never once to a CODE PATH.
-
-**AND THE HONEST CONSEQUENCE:** after five refutations my hit rate on a
-subsystem is evidence about my model of it. The right move was to stop
-proposing mechanisms and change method — a profiler over one real build, rather
-than a sixth incremental log span.
->>>>>>> b5303f18 (checkpoint 3e5a9659: MLB restored, board 84% attributed, soccer unsolved)
