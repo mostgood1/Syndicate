@@ -864,7 +864,30 @@ def join_polymarket_to_board(
                             # string for every sample and the evidence would be
                             # silently useless.
                             "slug": str((candidate.get("row") or {}).get("slug") or "")[:60],
-                            "slug_away_home": f"{parsed_candidate.get('away')}-{parsed_candidate.get('home')}",
+                            # NAMED NEUTRALLY, BECAUSE THE OLD NAME WAS THE
+                            # ASSUMPTION UNDER TEST. This was `slug_away_home`,
+                            # which asserts `parse_slug`'s `<away>-<home>`
+                            # reading in the very field collected to question
+                            # it -- a premise stated as a label, which is how a
+                            # wrong one survives review.
+                            #
+                            # REFUTED FOR SOCCER, 2026-08-28, against ESPN
+                            # scoreboards and verified independently in two
+                            # sessions:
+                            #   eng.1  Manchester City @ Crystal Palace
+                            #          slug atc-epl-cry-mnc  -> cry = HOME, FIRST
+                            #   fra.1  Paris Saint-Germain @ Lille
+                            #          slug atc-lg1-lil-psg  -> lil = HOME, FIRST
+                            #   esp.1  Villarreal @ Alaves
+                            #          slug atc-lal-ala-vil  -> ala = HOME, FIRST
+                            # Our board is CORRECT on all three; the soccer slug
+                            # is HOME-first. MLB is away-first (`aec-mlb-lad-det`
+                            # = Dodgers @ Tigers) and pairs correctly today, so
+                            # the order really does differ by sport.
+                            #
+                            # Still NOT a licence to flip: see the lane notes on
+                            # what the 10-of-106 denominator can and cannot say.
+                            "slug_first_second": f"{parsed_candidate.get('away')}-{parsed_candidate.get('home')}",
                             "market": board_market,
                             "line": board_line,
                         })
