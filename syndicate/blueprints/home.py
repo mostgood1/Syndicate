@@ -6690,15 +6690,41 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
 
         today = central_today_iso()
         rows: list[dict[str, Any]] = []
+        # TIMED PER LEAGUE `[2026-08-28]`, the same shape as `games()` above and
+        # for a reason that reading found rather than predicted.
+        #
+        # `games()` measured **13.5s across 10 leagues / 20 calls** against a
+        # soccer sport-total of **163.2s** -- so that loop is ~8% and the other
+        # ~92% is elsewhere. This is the next-largest candidate in the same
+        # class: another per-league fan-out, over the SAME `_active_leagues`,
+        # calling a different builder.
+        #
+        # It also corrects a prediction. I expected `games()` to BE the cost and
+        # to be fan-out-shaped; it was neither -- one league (`championship`,
+        # 8.45s) was 63% of it. So this line is not here on a theory that props
+        # is expensive. It is here because soccer's cost is UNLOCATED and this
+        # is the next unmeasured loop, which is a different and weaker claim.
+        _props_started = time.monotonic()
+        _props_league_ms: dict[str, float] = {}
+        _props_calls = 0
         for league in self._active_leagues(today):
+            _props_league_started = time.monotonic()
             try:
                 season, week = self._league_season_week(league, context, today)
+                _props_calls += 1
                 payload = build_props_page_context(league, week, season)
             except Exception as exc:
                 print(f"[home] SOCCER_LEAGUE_PROPS_FAILED league={league} error={exc}", flush=True)
                 continue
             cards = list(payload.get("rank_cards") or [])
             if not cards:
+                # RECORDED BEFORE THIS `continue`, not after the loop body.
+                # `build_props_page_context` has ALREADY run by here, so its
+                # cost is paid whether or not the league yields cards. Skipping
+                # the record would make an expensive league that returns
+                # nothing completely invisible -- which is the exact shape of
+                # cost this instrumentation exists to find.
+                _props_league_ms[league] = (time.monotonic() - _props_league_started) * 1000.0
                 continue
             league_rows = _prop_rows_from_rank_cards(
                 cards,
@@ -6718,6 +6744,15 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
                     row.setdefault("gamePk", match_id)
                 row.setdefault("league", league)
             rows.extend(league_rows)
+            _props_league_ms[league] = (time.monotonic() - _props_league_started) * 1000.0
+        _props_worst = sorted(_props_league_ms.items(), key=lambda kv: -kv[1])[:3]
+        print(
+            f"[home] SOCCER_PROPS_TIMING elapsed_s={round(time.monotonic() - _props_started, 2)} "
+            f"leagues={len(_props_league_ms)} props_calls={_props_calls} "
+            f"rows={len(rows)} date={today} "
+            f"worst={[(k, round(v / 1000.0, 2)) for k, v in _props_worst]}",
+            flush=True,
+        )
         if not rows:
             return _compact_prop_rows(home_games)
         return rows
