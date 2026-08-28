@@ -3898,6 +3898,31 @@ def _attach_open_bet_status(orders: list) -> list:
     return decorated
 
 
+# `?on=` takes a slate date, or this, which means the whole book.
+_ALL_DATES = "all"
+
+
+def _resolve_live_slate(raw: Any) -> tuple[str | None, bool]:
+    """`?on=` -> (slate to show, showing-every-date flag).
+
+    RESOLVED HERE RATHER THAN IN EACH ROUTE so `/portfolio` and
+    `/api/portfolio/live` cannot drift into different defaults. An API that
+    silently disagrees with the page it backs is a trap this repo has paid for
+    more than once.
+
+    Absent means TODAY `[user 2026-08-27]`, reversing the old never-filtered
+    default. `all` means every date. Anything else is passed through unchanged,
+    including a date the book has no rows on -- an empty slate is a real answer
+    and the template says so without claiming the whole book is empty.
+    """
+    value = str(raw or "").strip()
+    if not value:
+        return central_today_iso(), False
+    if value.lower() == _ALL_DATES:
+        return None, True
+    return value, False
+
+
 def _live_portfolio_payload(
     selected_date: str, *, show_all: bool = False, on_date: str | None = None
 ) -> dict[str, Any]:
@@ -3909,10 +3934,15 @@ def _live_portfolio_payload(
     real ones get mistaken for bets somebody placed. Adding a toggle would
     rebuild that confusion with better formatting.
 
-    Everything here is `mode=live`, across ALL dates rather than one: a real
-    position is not interesting only on the day it was opened, and a page that
-    hides yesterday's open bet behind a date picker is a page that will one day
-    let one expire unwatched.
+    Everything here is `mode=live`. THE VIEW DEFAULTS TO TODAY'S SLATE
+    `[user 2026-08-27]`, with `?on=all` for the whole book. That REVERSES this
+    page's original default, and the guarantee the old default was protecting --
+    "a page that hides yesterday's open bet is a page that will one day let one
+    expire unwatched" -- now rests entirely on `hidden_open_dated`: whenever
+    this view holds an OPEN position back, the page says how many and offers
+    the way to all dates. That count stopped being decoration on 2026-08-27; it
+    is the only thing between a default-today page and a forgotten live bet, so
+    it renders in the DEFAULT view and not just under a hand-picked filter.
     """
     from syndicate.features.shared.execution_ledger import (
         LIVE,
@@ -3926,6 +3956,8 @@ def _live_portfolio_payload(
     from syndicate.features.shared.paper_settlement import settlement_summary
     from syndicate.features.shared.portfolio_periods import period_rollup
     from pipeline.execute_portfolio import execution_enabled
+
+    on_date, all_dates = _resolve_live_slate(on_date)
 
     orders: list = []
     whole_book: list = []
@@ -3962,24 +3994,28 @@ def _live_portfolio_payload(
         if not show_all:
             orders = [o for o in orders if not _is_non_position(o)]
 
-        # THE DATE FILTER, AND WHY IT IS OPT-IN AND NEVER THE DEFAULT.
+        # THE DATE FILTER. DEFAULTS TO TODAY; `?on=all` IS THE WHOLE BOOK.
         #
-        # This book is all-dates by construction, because "a real position is
-        # not interesting only on the day it was opened, and a page that hides
-        # yesterday's open bet behind a date picker is a page that will one day
-        # let one expire unwatched". A filter that DEFAULTED to today would be
-        # exactly that page.
+        # It was opt-in and never-default until 2026-08-27, on the argument
+        # that a book hiding yesterday's open bet will one day let one expire
+        # unwatched. `[user 2026-08-27]` asked for today-by-default, so that
+        # risk is now REAL rather than designed out, and `hidden_open_dated` is
+        # what answers it: the count of OPEN positions this view is holding
+        # back, stated in the default view exactly as under a picked date.
         #
-        # So `?on=` is a separate parameter from `?date=` (which only builds
-        # links and defaults to today). Absent, nothing is filtered. Present,
-        # the page counts how many OPEN positions it is hiding and says so --
-        # the number is what keeps the guarantee: you cannot lose track of a
-        # live bet without the page telling you it is holding one back.
+        # KEEP THAT COUNT WIRED TO WHATEVER THE VIEW ACTUALLY HIDES. If it ever
+        # silently reads zero the page looks calm and the guarantee is gone
+        # with it -- an unfed field is indistinguishable from a working one at
+        # every level except the data.
+        #
+        # `?on=` stays a separate parameter from `?date=` (which only builds
+        # links). `date_options` is computed from the UNFILTERED orders so the
+        # arrows and the picker can still reach every slate the book has.
+        date_options = sorted(
+            {str(o.get("selected_date") or "") for o in orders if o.get("selected_date")},
+            reverse=True,
+        )
         if on_date:
-            date_options = sorted(
-                {str(o.get("selected_date") or "") for o in orders if o.get("selected_date")},
-                reverse=True,
-            )
             hidden_open_dated = [
                 o
                 for o in orders
@@ -3987,10 +4023,6 @@ def _live_portfolio_payload(
             ]
             orders = [o for o in orders if str(o.get("selected_date") or "") == on_date]
         else:
-            date_options = sorted(
-                {str(o.get("selected_date") or "") for o in orders if o.get("selected_date")},
-                reverse=True,
-            )
             hidden_open_dated = []
     except Exception as exc:
         # An unreadable ledger must never render as "no live positions". That
@@ -4033,7 +4065,15 @@ def _live_portfolio_payload(
     # warning that fires on the system working correctly teaches the reader to
     # ignore the warning, and this one is the last line of defence against a
     # double-spend.
-    submitted_rows = [o for o in orders if str(o.get("status") or "") == STATUS_SUBMITTED]
+    # WHOLE BOOK, NEVER THE FILTERED VIEW, and this is not a stylistic choice.
+    #
+    # When the slate filter defaulted to "every date" (before 2026-08-27) the
+    # distinction was invisible. It is not invisible now: a submitted row that
+    # was never read back is an order we do not know the fate of, and a date
+    # picker must not be able to hide one. The same argument as `resting`
+    # below -- exposure is not a property of the slate you happen to be
+    # looking at.
+    submitted_rows = [o for o in whole_book if str(o.get("status") or "") == STATUS_SUBMITTED]
     unreconciled = [o for o in submitted_rows if not o.get("reconciled_at")]
 
     # OPEN AT THE VENUE, from the venue's own answer -- NOT from our status.
@@ -4047,9 +4087,11 @@ def _live_portfolio_payload(
     #
     # `reconciled_at` is still required: an order we never read back is an
     # unknown, not a resting one, and it belongs in the banner above.
+    # WHOLE BOOK for the reason given above: an order still working at the
+    # venue is live money right now, whatever slate it was opened on.
     resting = [
         o
-        for o in orders
+        for o in whole_book
         if o.get("reconciled_at")
         and (o.get("venue_open") or str(o.get("status") or "") == STATUS_SUBMITTED)
     ]
@@ -4143,6 +4185,10 @@ def _live_portfolio_payload(
         # THE FILTER'S OWN STATE, and the count that keeps its guarantee: a page
         # holding back an OPEN position must say how many.
         "on_date": on_date or None,
+        # TRUE only for `?on=all`. The template needs to tell "every date" from
+        # "a slate that happens to be today" -- `on_date is None` alone stopped
+        # meaning "unfiltered" when today became the default.
+        "all_dates": bool(all_dates),
         "hidden_open_dated": len(hidden_open_dated),
         "date_options": date_options,
         # HOW BIG THE BOOK IS BEFORE ANY DISPLAY FILTER TOUCHES IT. The empty
@@ -4179,10 +4225,11 @@ def _live_date_nav(date_options: list, on_date: str | None) -> dict[str, Any]:
     most of its clicks landing on empty slates, which reads as a broken control.
     Stepping through `date_options` means every arrow goes somewhere with rows.
 
-    UNFILTERED IS NOT A POSITION IN THE SEQUENCE, so there is nothing to step
-    from: back enters the filter at the newest slate, forward is dead. The
-    filter stays opt-in either way -- an arrow is a click, not a default, and
-    "never filtered unless asked" is the guarantee `?on=` exists to keep.
+    ALL-DATES IS NOT A POSITION IN THE SEQUENCE, so there is nothing to step
+    from: back enters at the newest slate, forward is dead. TODAY IS OFTEN NOT
+    IN IT EITHER -- since 2026-08-27 the default view lands on today, which is
+    a real state the book may have no rows on (nothing traded yet), and it
+    takes the same path: back reaches the newest slate that does have rows.
     """
     options = [str(d) for d in (date_options or []) if d]
     nav = {"on_prev_date": options[0] if options else None, "on_next_date": None, "today_date": central_today_iso()}

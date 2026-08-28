@@ -156,15 +156,6 @@
   .live-table tr:last-child td { border-bottom: none; }
   .live-table .primary { font-weight: 600; color: var(--cards-text); }
   .sub { display: block; font-size: 10px; color: var(--cards-text-dim); }
-  .live-dates { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 0 0 10px; font-size: 11px; }
-  .live-dates__label { color: var(--cards-text-dim); text-transform: uppercase; letter-spacing: .05em; margin-right: 3px; }
-  .live-dates a, .live-dates span.is-active {
-    padding: 2px 9px; border-radius: 999px; text-decoration: none;
-    border: 1px solid var(--cards-line); color: var(--cards-text-dim);
-    font-variant-numeric: tabular-nums;
-  }
-  .live-dates a:hover { border-color: var(--cards-line-strong); color: var(--cards-text-soft); }
-  .live-dates .is-active { border-color: var(--cards-accent); color: var(--cards-accent); }
   .live-toggle { margin: 0 0 10px; font-size: 12px; color: var(--cards-text-dim); }
   .live-toggle a { color: var(--cards-accent); }
   .live-empty { border: 1px dashed var(--cards-line-strong); border-radius: 10px; padding: 18px; text-align: center;
@@ -553,7 +544,7 @@
   <div class="portfolio-band">
     <h2 id="live">Live book</h2>
     <span class="portfolio-band__note">Real submissions to a real venue,
-      {% if L.on_date %}filtered to the {{ L.on_date }} slate{% else %}across all dates{% endif %}.</span>
+      {% if L.all_dates %}across all dates{% else %}on the {{ L.on_date }} slate{% endif %}.</span>
     <span class="portfolio-band__links">
       <a href="/portfolio/paper">Paper portfolio</a> ·
       <a href="/api/portfolio/live">Live JSON</a>
@@ -613,12 +604,14 @@
        the only thing that actually hides rows. A date input bound to `?date=`
        would look like it filtered and quietly do nothing.
 
-       AND IT IS EMPTY UNLESS THE READER FILLED IT. The book is all-dates by
-       construction because "a page that hides yesterday's open bet behind a
-       date picker is a page that will one day let one expire unwatched" --
-       putting the picker at the top does not change that, so the input opens
-       blank, clearing it returns to every date, and the count of OPEN
-       positions being held back is still stated below whenever it is on.
+       IT OPENS ON TODAY [user 2026-08-27], and `?on=all` is the whole book.
+       The first version of this control opened BLANK on purpose -- "a page
+       that hides yesterday's open bet is a page that will one day let one
+       expire unwatched" -- and that default is now reversed at the user's
+       request. So the "N open position(s) on other dates" line further down
+       is the entire remaining guard against a live bet being forgotten behind
+       this input. It is deliberately conditional on the COUNT alone, never on
+       whether the reader touched the filter.
        --------------------------------------------------------------- #}
     <span class="live-flag live-datefilter">
       <span class="live-flag__label">Date</span>
@@ -626,7 +619,7 @@
         {# UNFILTERED IS NOT "THE NEWEST SLATE", so the back arrow does not
            mean the same thing in both states and must not claim to. From all
            dates it ENTERS the filter; from a slate it steps one older. #}
-        {% set back_label = 'Older slate' if L.on_date else 'Filter to the newest slate' %}
+        {% set back_label = 'Filter to the newest slate' if L.all_dates else 'Older slate' %}
         <a class="live-datefilter__arrow" href="?{{ qs_keep }}&on={{ L.on_prev_date }}#live"
            title="{{ back_label }} ({{ L.on_prev_date }})" aria-label="{{ back_label }}">&#9664;</a>
       {% else %}
@@ -648,8 +641,13 @@
       {% else %}
         <span class="live-datefilter__arrow live-datefilter__arrow--off" aria-hidden="true">&#9654;</span>
       {% endif %}
-      {% if L.on_date %}
-        <a class="live-datefilter__all" href="?{{ qs_keep }}#live">all dates</a>
+      {# BOTH DIRECTIONS ARE ONE CLICK. With today as the default, "all dates"
+         is the state a reader has to ask for, and getting back to the default
+         has to be equally cheap or the whole-book view becomes sticky. #}
+      {% if L.all_dates %}
+        <a class="live-datefilter__all" href="?{{ qs_keep }}#live">today</a>
+      {% else %}
+        <a class="live-datefilter__all" href="?{{ qs_keep }}&on=all#live">all dates</a>
       {% endif %}
     </span>
   </div>
@@ -1017,34 +1015,22 @@
   </div>
 
   {# ---------------------------------------------------------------
-     DATE FILTER. Opt-in via `?on=`, never the default -- this book is
-     all-dates by construction because a page that hides yesterday's
-     open bet behind a date picker will one day let one expire
-     unwatched. The count of OPEN positions being held back is what
-     keeps that guarantee, so it is stated whenever the filter is on.
+     THE CHIP ROW IS GONE [user 2026-08-27]. The control at the top of the
+     page selects the same `?on=` parameter, and two selectors for one
+     parameter is how a reader ends up trusting whichever one is stale.
+
+     WHAT DID NOT GO IS THE COUNT BELOW. The view defaults to TODAY now, so
+     this line renders in the DEFAULT state -- it is the whole of what
+     replaced "all dates by construction", and it is gated on the count
+     itself rather than on the filter having been touched, because the
+     default view is exactly the case where nobody touched it.
      --------------------------------------------------------------- #}
-  {% if L.date_options %}
-    <div class="live-dates">
-      <span class="live-dates__label">Slate</span>
-      {% if L.on_date %}
-        <a href="?{{ qs_keep }}#live">All dates</a>
-      {% else %}
-        <span class="is-active">All dates</span>
-      {% endif %}
-      {% for d in L.date_options[:10] %}
-        {% if d == L.on_date %}
-          <span class="is-active">{{ d }}</span>
-        {% else %}
-          <a href="?{{ qs_keep }}&on={{ d }}#live">{{ d }}</a>
-        {% endif %}
-      {% endfor %}
+  {% if L.hidden_open_dated %}
+    <div class="live-note">
+      <strong>{{ L.hidden_open_dated }} open position(s) on other dates are not shown here.</strong>
+      They are still live. The totals and the performance pivots below count the whole book, not this slate.
+      <a href="?{{ qs_keep }}&on=all#live">Show all dates</a>.
     </div>
-    {% if L.on_date and L.hidden_open_dated %}
-      <div class="live-note">
-        <strong>{{ L.hidden_open_dated }} open position(s) on other dates are hidden by this filter.</strong>
-        They are still live. The totals and the performance pivots below count the whole book, not this slate.
-      </div>
-    {% endif %}
   {% endif %}
 
   {% if not orders %}
@@ -1060,7 +1046,7 @@
            control at the top of the page makes it one click. #}
         No live positions on <strong>{{ L.on_date }}</strong>. The book is not empty —
         it holds {{ L.book_count }} order(s) on other dates.
-        <a href="?{{ qs_keep }}#live">Show all dates</a>.
+        <a href="?{{ qs_keep }}&on=all#live">Show all dates</a>.
       {% else %}
         No live positions have ever been placed.
       {% endif %}

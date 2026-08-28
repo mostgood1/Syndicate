@@ -102,6 +102,13 @@ def live_env(monkeypatch):
     # fail on whether that file happens to exist. The tests that DO exercise the
     # stamp override this themselves.
     monkeypatch.setattr(ledger_mod, "read_execution_state", lambda: None)
+    # TODAY IS PINNED, and this is load-bearing rather than tidy. The view
+    # defaults to TODAY'S slate as of 2026-08-27, so an unpinned clock would
+    # make every assertion below pass or fail on the date the suite happens to
+    # run -- and on any day but 2026-08-23 the "default shows today's order"
+    # tests would go green against an EMPTY page, which is the exact shape of
+    # a fixture that cannot violate the property it claims to guard.
+    monkeypatch.setattr(intelligence_bp, "central_today_iso", lambda: DATE)
     # The paper page reads these too; a live-only test must not depend on
     # whatever plan happens to be on disk.
     monkeypatch.setattr(commit_mod, "read_portfolio_plan", lambda date: None)
@@ -196,22 +203,35 @@ def test_nothing_settled_is_not_a_zero_pnl(app_client, live_env):
 # --------------------------------------------------------------------------
 
 
-def test_yesterdays_open_position_is_still_shown(live_env):
-    """A real position is not interesting only on the day it was opened. A page
-    that hides yesterday's open bet behind a date picker will one day let one
-    expire unwatched."""
+def test_yesterdays_open_position_is_held_back_but_counted(live_env):
+    """THE OLD GUARANTEE, AND WHAT REPLACED IT.
+
+    Until 2026-08-27 this book was all-dates by construction, because "a real
+    position is not interesting only on the day it was opened, and a page that
+    hides yesterday's open bet behind a date picker will one day let one expire
+    unwatched". `[user 2026-08-27]` asked for today-by-default, so that bet IS
+    hidden now and the risk is real rather than designed out.
+
+    `hidden_open_dated` is the whole of what stands in for the old default, so
+    this asserts BOTH halves. Dropping the second assertion would leave a test
+    that passes while the page silently swallows a live position.
+    """
     live_env["orders"] = [_order(selected_date="2026-08-22")]
-    assert len(_payload(live_env)["orders"]) == 1
+    payload = _payload(live_env)
+    assert payload["orders"] == []
+    assert payload["hidden_open_dated"] == 1
 
 
 # --------------------------------------------------------------------------
 # THE SLATE FILTER AT THE TOP OF THE PAGE. [user 2026-08-27] "Add a date filter
-# to the top of the portfolio page similar to the one on the paper page."
+# to the top of the portfolio page similar to the one on the paper page", then
+# "the date needs to default to today with an all dates option - that should
+# mean this selector goes away".
 #
-# The control is new; `?on=` is not. Everything below is about the property
-# that made `?on=` opt-in in the first place -- this book is all-dates by
-# construction, and moving the picker to the top of the page must not turn it
-# into a page that defaults to hiding yesterday's open bet.
+# The control defaults to TODAY and `?on=all` is the whole book. That reverses
+# the never-default rule these tests were originally written to protect, so
+# what they guard now is the replacement: the page may hide an open position,
+# but it may never hide one SILENTLY.
 # --------------------------------------------------------------------------
 
 
@@ -236,10 +256,8 @@ def test_the_control_writes_on_not_date(app_client, live_env):
     assert 'name="on"' in control
 
 
-def test_the_control_opens_empty_and_hides_nothing(app_client, live_env):
-    """THE GUARANTEE. With no query string the input must carry no value and
-    every date's orders must render -- a date control that defaulted to today
-    is exactly the page `?on=` was made opt-in to avoid."""
+def test_the_control_opens_on_today(app_client, live_env):
+    """[user 2026-08-27] "the date needs to default to today"."""
     live_env["orders"] = [
         _order(selected_date=DATE, player_name="Today Guard"),
         _order(idempotency_key="k-live-2", position_key="pos-2",
@@ -247,8 +265,62 @@ def test_the_control_opens_empty_and_hides_nothing(app_client, live_env):
     ]
     body = app_client.get("/portfolio").get_data(as_text=True)
     control = body[body.index('class="live-datefilter__input"'):][:400]
+    assert f'value="{DATE}"' in control
+    assert "Today Guard" in body
+    assert "Older Guard" not in body
+
+
+def test_the_default_view_says_what_it_is_holding_back(app_client, live_env):
+    """The count has to REACH THE PAGE in the default state, not just the
+    payload. It was previously gated on the reader having picked a date, which
+    is now precisely the case it must not be gated on."""
+    live_env["orders"] = [_order(selected_date="2026-08-22")]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert "1 open position(s) on other dates are not shown here" in body
+    assert "on=all" in body
+
+
+def test_all_dates_is_one_click_and_restores_the_whole_book(app_client, live_env):
+    """[user 2026-08-27] "with an all dates option". It has to actually bring
+    the other slates back, not merely relabel the header."""
+    live_env["orders"] = [
+        _order(selected_date=DATE, player_name="Today Guard"),
+        _order(idempotency_key="k-live-2", position_key="pos-2",
+               selected_date="2026-08-21", player_name="Older Guard"),
+    ]
+    body = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    control = body[body.index('class="live-datefilter__input"'):][:400]
     assert 'value=""' in control
     assert "Today Guard" in body and "Older Guard" in body
+    assert "across all dates" in body
+
+
+def test_the_old_slate_chip_row_is_gone(app_client, live_env):
+    """[user 2026-08-27] "that should mean this selector goes away".
+
+    Asserted on the CLASS rather than the word "Slate", which still appears in
+    the staking copy below and would make this pass for the wrong reason.
+    """
+    live_env["orders"] = [_order()]
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'class="live-dates"' not in body
+    assert 'class="live-dates__label"' not in body
+
+
+def test_the_api_and_the_page_cannot_drift_apart(app_client, live_env):
+    """`_resolve_live_slate` exists so one function answers `?on=` for both.
+    An API that quietly disagrees with the page it backs is worse than one that
+    is plainly wrong, because nothing surfaces the disagreement."""
+    live_env["orders"] = [
+        _order(selected_date=DATE),
+        _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-21"),
+    ]
+    default = app_client.get("/api/portfolio/live").get_json()
+    assert default["on_date"] == DATE and default["all_dates"] is False
+    assert len(default["orders"]) == 1
+    everything = app_client.get("/api/portfolio/live?on=all").get_json()
+    assert everything["on_date"] is None and everything["all_dates"] is True
+    assert len(everything["orders"]) == 2
 
 
 def test_picking_a_date_filters_and_says_what_it_is_holding_back(app_client, live_env):
@@ -262,13 +334,19 @@ def test_picking_a_date_filters_and_says_what_it_is_holding_back(app_client, liv
     assert "Older Guard" not in body
     # The count is the guarantee: you cannot lose sight of a live bet without
     # the page telling you it is holding one back.
-    assert "1 open position(s) on other dates are hidden" in body
+    assert "1 open position(s) on other dates are not shown here" in body
 
 
-def test_the_filter_offers_a_way_back_to_all_dates(app_client, live_env):
+def test_both_directions_are_one_click(app_client, live_env):
+    """All dates reachable from today, and today from all dates. Without the
+    second half the whole-book view is sticky and the default stops being one.
+    """
     live_env["orders"] = [_order()]
-    body = app_client.get(f"/portfolio?on={DATE}").get_data(as_text=True)
-    assert 'class="live-datefilter__all"' in body
+    default = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'class="live-datefilter__all"' in default
+    assert "on=all" in default
+    everything = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    assert ">today</a>" in everything
 
 
 def test_the_control_does_not_drop_the_show_all_toggle(app_client, live_env):
@@ -306,16 +384,26 @@ def test_the_ends_of_the_sequence_have_no_arrow(live_env):
     assert oldest["on_prev_date"] is None
 
 
-def test_unfiltered_has_no_forward_arrow_and_enters_at_the_newest_slate(live_env):
-    """Unfiltered is not a position in the sequence, so there is nothing to
-    step forward to."""
+def test_all_dates_has_no_forward_arrow_and_enters_at_the_newest_slate(live_env):
+    """All-dates is not a position in the sequence, so there is nothing to step
+    forward to."""
     live_env["orders"] = [
         _order(selected_date="2026-08-23"),
         _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-19"),
     ]
-    payload = _payload(live_env)
+    payload = intelligence_bp._live_portfolio_payload(DATE, on_date="all")
     assert payload["on_next_date"] is None
     assert payload["on_prev_date"] == "2026-08-23"
+
+
+def test_a_default_day_the_book_never_traded_still_reaches_the_newest_slate(live_env):
+    """Today is not necessarily IN the sequence -- most mornings it is not.
+    The back arrow has to land on the newest slate that has rows rather than
+    dying, or the default view is a dead end on every quiet day."""
+    live_env["orders"] = [_order(selected_date="2026-08-19")]
+    payload = _payload(live_env)          # today == DATE, and nothing traded
+    assert payload["orders"] == []
+    assert payload["on_prev_date"] == "2026-08-19"
 
 
 def test_the_back_arrow_does_not_call_the_newest_slate_an_older_one(app_client, live_env):
@@ -328,7 +416,7 @@ def test_the_back_arrow_does_not_call_the_newest_slate_an_older_one(app_client, 
     live_env["orders"] = [_order(selected_date="2026-08-23"),
                           _order(idempotency_key="k-2", position_key="p-2",
                                  selected_date="2026-08-19")]
-    unfiltered = app_client.get("/portfolio").get_data(as_text=True)
+    unfiltered = app_client.get("/portfolio?on=all").get_data(as_text=True)
     assert 'title="Filter to the newest slate (2026-08-23)"' in unfiltered
     filtered = app_client.get("/portfolio?on=2026-08-23").get_data(as_text=True)
     assert 'title="Older slate (2026-08-19)"' in filtered
@@ -356,13 +444,16 @@ def test_a_genuinely_empty_book_still_says_so_under_a_filter(app_client, live_en
     assert "No live positions have ever been placed" in body
 
 
-def test_the_header_stops_claiming_all_dates_while_filtered(app_client, live_env):
+def test_the_header_names_the_view_it_is_actually_showing(app_client, live_env):
+    """The banner sits under a LIVE - REAL MONEY badge. It claiming "all dates"
+    over a one-slate view is the page misreporting how much of the real book
+    the reader is looking at."""
     live_env["orders"] = [_order()]
-    unfiltered = app_client.get("/portfolio").get_data(as_text=True)
-    assert "across all dates" in unfiltered
-    filtered = app_client.get(f"/portfolio?on={DATE}").get_data(as_text=True)
-    assert "across all dates" not in filtered
-    assert f"filtered to the {DATE} slate" in filtered
+    default = app_client.get("/portfolio").get_data(as_text=True)
+    assert f"on the {DATE} slate" in default
+    assert "across all dates" not in default
+    everything = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    assert "across all dates" in everything
 
 
 # --------------------------------------------------------------------------
@@ -668,12 +759,15 @@ def test_orders_that_never_opened_a_position_are_hidden_by_default(monkeypatch):
     ]
     monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": orders})
 
-    default = mod._live_portfolio_payload("2026-08-25")
+    # `on_date="all"` keeps the DATE filter out of a test about the
+    # NON-POSITION filter. Without it these rows fall outside the
+    # default-today view and the test would go green on an empty page.
+    default = mod._live_portfolio_payload("2026-08-25", on_date="all")
     assert [o["position_key"] for o in default["orders"]] == ["a"]
     assert default["hidden_count"] == 2
     assert default["show_all"] is False
 
-    shown = mod._live_portfolio_payload("2026-08-25", show_all=True)
+    shown = mod._live_portfolio_payload("2026-08-25", show_all=True, on_date="all")
     assert len(shown["orders"]) == 3
     assert shown["hidden_count"] == 2
     assert shown["show_all"] is True
@@ -698,7 +792,7 @@ def test_a_failed_order_of_UNKNOWN_outcome_stays_visible(monkeypatch):
     ]
     monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": orders})
 
-    payload = mod._live_portfolio_payload("2026-08-25")
+    payload = mod._live_portfolio_payload("2026-08-25", on_date="all")
     visible = {o["position_key"] for o in payload["orders"]}
     assert visible == {"unknown", "broke"}, visible
     assert payload["hidden_count"] == 1

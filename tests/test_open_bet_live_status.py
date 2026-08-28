@@ -231,11 +231,20 @@ def book(monkeypatch):
     return state
 
 
-def test_all_dates_is_the_default(book):
-    """The book is all-dates by construction. A filter that defaulted to today
-    would be the page that lets yesterday's open bet expire unwatched."""
-    payload = bp._live_portfolio_payload("2026-08-26")
+def test_today_is_the_default_and_all_dates_is_explicit(book):
+    """REVERSED `[user 2026-08-27]`: "the date needs to default to today with
+    an all dates option".
+
+    This test previously asserted the OPPOSITE -- that the book is all-dates by
+    construction, because a filter defaulting to today would be the page that
+    lets yesterday's open bet expire unwatched. That risk is now real rather
+    than designed out, and what stands in for the old default is
+    `hidden_open_dated`, asserted here and in the three tests below: the view
+    may hold an open bet back, but never silently.
+    """
+    payload = bp._live_portfolio_payload("2026-08-26", on_date="all")
     assert payload["on_date"] is None
+    assert payload["all_dates"] is True
     assert len(payload["orders"]) == 3
     assert payload["hidden_open_dated"] == 0
 
