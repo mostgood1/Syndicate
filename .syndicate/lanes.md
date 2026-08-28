@@ -1682,8 +1682,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 ### wnba-chip-live-token — OPEN, **UNOWNED** (session 3dcd0fb2-a129-4c6a-95f2-29b11ea0d272 checkpointed and ARCHIVED 2026-08-27) — opened 2026-08-27 — **CLOCK FIXED AND VERIFIED IN PRODUCTION (web `e3dceb68`): `LIVE` -> `Q3 20.5`, control and after on the same game against ESPN. TWO THINGS OWED — refresh-worker is not deployed, and the projection guard is UNIT-TESTED ONLY. `todo.md #586`.** **CHECKPOINT 2026-08-27T01:2xZ: refresh-worker reached `070f452a` and DOES carry the fix; the WNBA half is owed on a MISSING SUBJECT, not a missing deploy — `WNBA live=0` when the artifact landed. Next window TOR @ SEA `02:00Z`. Session archived; lane UNOWNED.**
 - Goal: a live WNBA game chip carries its QUARTER AND CLOCK (`Q3 5:23`) instead
   of a bare `LIVE`, and never renders a SmartSim projection as an observed score.
-- Files: `syndicate/features/shared/game_chip_scoreboard.py`,
-  `tests/test_home_wnba_live_state.py`
+- Files: `tests/test_home_wnba_live_state.py`
 - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[2026-08-28,
   session 3e5a9659]`.** Its claim moved to `soccer-overview-cost` for
   INSTRUMENTATION ONLY — per-league timing inside the soccer games loop, no
@@ -1694,19 +1693,29 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `check_lane_invariants.py` parses paths POSITIONALLY and a `~~struck~~` path
   is still a live claim — that is a standing rule in `learnings.md` and I broke
   it here first, producing a false contest between two OPEN lanes.
-  — `game_chip_scoreboard.py` ADDED after the first test run: refusing to
-  SET a fractional score in `home.py` is not enough, because `_side_score`
-  falls through to `live_state.<side>_pts` and picks the projection back up.
-  Unclaimed by any OPEN lane, checked before adding.
-  — **SCOPED CLAIM TRANSFERRED to `mlb-final-zero-placeholder`
-  `[2026-08-28, session 28195565, user authorised]`** — ONLY the 0-0
-  placeholder branch inside `build_game_chip`, which runs AFTER `_side_score`
+  — RELEASED (see the note below) — `game_chip_scoreboard.py` was ADDED here
+  after the first test run, because refusing to SET a fractional score in
+  `home.py` was not enough: `_side_score` falls through to
+  `live_state.<side>_pts` and picks the projection back up.
+  — **RELEASED: `syndicate/features/shared/game_chip_scoreboard.py` IS NO
+  LONGER LISTED ABOVE, ON PURPOSE `[2026-08-28, session 28195565, user
+  authorised]`.** Its claim moved to `mlb-final-zero-placeholder` for the
+  0-0 placeholder branch
+  inside `build_game_chip` ONLY — the code that runs AFTER `_side_score`
   returns. **`_side_score` and its `live_state.<side>_pts` fallthrough — this
-  lane's actual subject — are UNTOUCHED and stay yours**, as does everything
-  WNBA. Taken because this lane is UNOWNED (session 3dcd0fb2 archived
-  2026-08-27) and an MLB scoring defect was traced to that branch: a 0-0
-  schedule placeholder on a game whose status had advanced to FINAL was passed
-  through as a real result. Take it back by striking this note.
+  lane's actual subject — are UNTOUCHED, as is everything WNBA.** Taken because
+  this lane is UNOWNED (session 3dcd0fb2 ARCHIVED 2026-08-27) and an MLB
+  scoring defect traced to that branch: a 0-0 schedule placeholder on a game
+  whose status had advanced to FINAL was passed through as an observed result.
+  **THE PATH IS REMOVED RATHER THAN STRUCK THROUGH**, for the same reason the
+  `home.py` note above gives — a `~~struck~~` path is still a live claim to
+  both `lane-guard.py` and `check_lane_invariants.py`, which read positionally.
+  (Confirmed here: the guard's disclaimer vocabulary is a fixed list —
+  `not claimed`, `released`, `held by`, `claimed by`, … — and "TRANSFERRED" is
+  not in it, so a prose transfer note alone releases nothing.)
+  **CONSEQUENCE, stated plainly: the guard now protects this file for NEITHER
+  lane.** There is no way to express a per-branch claim to it. To reclaim, put
+  the path back on the `- Files:` line.
 - Hypothesis — **CONFIRMED FROM PRODUCTION BEFORE WRITING ANY CODE**, via
   `/api/ops/wnba/status-trace?date=2026-08-26`. `local_live_state_payload` (what
   `build_live_state_payload` returns, i.e. `live_row`) carries everything needed:
