@@ -35661,3 +35661,93 @@ This is now a real open item, not a closed one.
   an arbitrary ladder rung. Expect `no_comparable_rung` to be non-zero and the
   rate to move off 0.5 or the sample to shrink; either is informative, the old
   0.5 was not.
+
+---
+
+## 2026-08-28 ~10:54-11:01 CT — refresh-worker <- `8b8a6579`, live-odds-worker <- `5463a681` — lane `venue-join-refusal-visibility`
+
+### the claim was FORCED, on explicit user instruction
+
+`deploy_claim.py acquire --service refresh-worker --holder venue-join-refusal-visibility --force`,
+replacing `live-game-line-projection` at 26.3 min old. **The holder was not
+gone.** Stated plainly because the escape hatch is for a session that has
+ENDED and this was not that: the user said "break the claim and deploy
+refresh-worker" after I reported the block.
+
+Coordination-by-message was attempted first and is NOT AVAILABLE for this
+holder: both candidate sessions (`local_9fcd997f` "Live gameline accuracy
+snapshot", `local_db29f94c` "Live gameline fixes first real reading") are
+UNATTENDED scheduled-task runs and `send_message` refuses delivery to them.
+Worth knowing generally — **a lane held by a scheduled task cannot be
+negotiated with, only waited out or forced.**
+
+### the claim was not the only lock, and the second one was real
+
+Preflight immediately returned **HOLD: 3 jobs in flight** --
+`refresh_odds_sources.py`, `run_refresh_odds_job.py`, and
+`build_soccer_artifacts.py --league la_liga`. Forcing the claim does nothing
+about that; they are independent locks and the second is the 2026-08-10 one.
+Since the claim was now MINE, waiting cost nothing and no peer could race in,
+so I waited ~2 min for CLEAR rather than killing a soccer artifact build.
+Deployed `dep-da8qu9navr4c73f0sdpg`, live 15:59:38Z.
+
+Also worth recording: `deploy-guard.py` refused a background loop that would
+have polled preflight and deployed on CLEAR. It evaluates preflight at
+SUBMISSION time, so "arm it and walk away" is not expressible. That is correct
+and I am not proposing to change it.
+
+### verify (live-odds-worker `5463a681`): item 2 had a SECOND layer
+
+The magnitude fix worked exactly as designed and did not solve the problem.
+First reading after it, 15:54:07Z:
+
+```
+fixtures=17 agree_home=8 disagree=9 rate=0.4706 no_comparable_rung=6
+disagreements: asc-nfl-atl-mia -3.5 vs board +3.5
+               asc-mlb-lad-det -1.5 vs board +1.5
+```
+
+Like-for-like at last (was `-21.5` vs `+3.5`), and STILL a coin flip. Checked
+the slate instead of assuming: **12 of 12 sampled MLB fixture/magnitude pairs
+carry BOTH `pos` and `neg`.** Polymarket publishes both legs at every line, so
+narrowing to the board's magnitude leaves two rungs, one of each sign, and
+picking either is arbitrary. The sign names a LEG, not a TEAM.
+
+**~0.5 is what a non-identifying test returns, which made the verdict ladder a
+trap rather than a nuisance.** Its `FALSIFIED: the sign is not fixed per
+fixture; do not ship a mapping on this` branch fires at exactly that rate, and
+would have entered the ledger as a measurement about the VENUE when it was a
+fact about the INSTRUMENT. It was at n=17 against min_sample=30.
+
+`5463a681` counts both-sign fixtures, refuses to score them, and returns
+NON-IDENTIFYING -- never UNDECIDED (which says "collect more" when collecting
+more cannot help) and never FALSIFIED. **ITEM 2 CLOSES AS "NOT ANSWERABLE BY
+THIS INSTRUMENT", NOT AS "FIXED".** Spreads stay refused. Answering the
+reference-club question needs PRICE or SETTLEMENT.
+
+### NOT YET VERIFIED — items 1 and 3, and do not read them as done
+
+refresh-worker is live on `8b8a6579` (15:59:38Z) but **no board build has run
+since**. The most recent lines are still the OLD code at 15:48:15Z:
+
+```
+KALSHI_BOARD_JOIN markets=11967 board_rows=425 matched=0 refusals=None
+```
+
+`refusals=None` there is the pre-deploy binary, not a failure of the fix.
+PASSES only when a build after 15:59:38Z prints:
+
+- `KALSHI_BOARD_JOIN ... reasons={...}` non-empty (the word `refusals=` should
+  never appear on this line again), plus a `KALSHI_UNMATCHED` line
+- `POLYMARKET_LEAGUE_REACH soccer_tokens_proven=[...]` including `mls`
+- `POLYMARKET_UNMATCHED`'s `no_match|soccer|h2h` below its same-board baseline
+
+**DO NOT COMPARE AGAINST THE 15:48 `no_match|soccer|h2h: 71`.** That build had
+`board_rows=425` for 2026-08-30; the 104 figure was `board_rows=1326` for
+2026-08-28. Different boards, not a trend. Re-baseline on a full-slate build.
+
+The web-side reader measurement (soccer buckets 738 -> 1,809) recorded in the
+previous entry stands, but it is the READER agreeing with the join's code --
+not the join's own output. Both remain to be seen.
+
+Claims RELEASED on all three services after writing this.

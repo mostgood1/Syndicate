@@ -2706,6 +2706,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `syndicate/features/shared/polymarket_board_join.py`,
   `syndicate/features/shared/team_aliases.py`,
   `scripts/audit_polymarket_coverage.py`,
+  `tests/test_polymarket_spread_audit_hook.py`,
+  `tests/test_polymarket_spread_sign_rung.py`,
   `tests/test_polymarket_board_join.py`, `tests/test_team_aliases.py`.
 - Claim provenance: **RECLAIMED FROM THREE LANES WHOSE SESSIONS ARE GONE**, each
   verified in THIS session via `list_sessions(include_archived=true)` rather
