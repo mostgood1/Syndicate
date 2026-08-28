@@ -4031,7 +4031,27 @@ def _live_portfolio_payload(
     settlement = None
     settlement_error = None
     try:
-        settlement = settlement_summary(None, orders=whole_book)
+        # THE TILES FOLLOW THE DATE SELECTION `[user 2026-08-27]`: "we need
+        # tiles to match date selection. some tiles are ytd instead of matching
+        # date."
+        #
+        # They were. Settled and Profit/loss ran over `whole_book` whatever the
+        # picker said, so a one-slate view showed that slate's Positions beside
+        # an all-time W/L and an all-time P&L. Labelling them "all dates" made
+        # that honest but not useful -- the point of picking a date is to see
+        # that date.
+        #
+        # SCOPED FROM `whole_book`, NOT FROM `orders`. `orders` has already had
+        # the non-position rows dropped and, under `?show=all`, had them put
+        # back; feeding that in would make the tiles move when the SHOW toggle
+        # moved. `settlement_summary` does its own position bucketing, so it
+        # wants the raw book for the dates in view and nothing else pre-removed.
+        settlement_rows = (
+            whole_book
+            if all_dates
+            else [o for o in whole_book if str(o.get("selected_date") or "") == on_date]
+        )
+        settlement = settlement_summary(None, orders=settlement_rows)
     except Exception as exc:
         settlement_error = f"{type(exc).__name__}: {exc}"
         _LOGGER.exception("LIVE_SETTLEMENT_SUMMARY_FAILURE")

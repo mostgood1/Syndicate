@@ -269,14 +269,27 @@ def test_a_settled_bet_on_another_date_is_not_counted_as_hidden_risk(book):
     assert payload["hidden_open_dated"] == 1  # only "a"
 
 
-def test_the_pivots_and_settlement_still_count_the_whole_book(book):
-    """The `?show=` toggle already changes what is DISPLAYED and never what is
-    counted. The date filter follows the same rule, or a rollup would move when
-    a display control flipped and stop being quotable."""
-    unfiltered = bp._live_portfolio_payload("2026-08-26")
+def test_the_pivots_keep_the_whole_book_but_the_TILES_follow_the_date(book):
+    """SPLIT `[user 2026-08-27]`: "we need tiles to match date selection. some
+    tiles are ytd instead of matching date."
+
+    This test previously asserted that BOTH stayed whole-book. Half of that
+    still holds and half was the complaint:
+
+      * `periods` -- the performance pivots -- must not move with a display
+        control, or a rollup stops being quotable. Unchanged.
+      * `settlement` -- what the Settled and Profit/loss TILES render -- now
+        follows the picker, because a tile showing an all-time W/L beside a
+        one-slate Positions count is the thing that was reported.
+    """
+    everything = bp._live_portfolio_payload("2026-08-26", on_date="all")
     filtered = bp._live_portfolio_payload("2026-08-26", on_date="2026-08-26")
-    assert filtered["periods"] == unfiltered["periods"]
-    assert filtered["settlement"] == unfiltered["settlement"]
+
+    assert filtered["periods"] == everything["periods"]
+
+    whole = (everything["settlement"] or {}).get("total") or {}
+    slate = (filtered["settlement"] or {}).get("total") or {}
+    assert whole["orders"] > slate["orders"], "the tiles must narrow with the date"
 
 
 def test_the_date_options_are_offered_newest_first(book):

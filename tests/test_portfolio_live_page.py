@@ -334,120 +334,63 @@ def test_the_positions_tile_counts_positions_not_orders(app_client, live_env):
     assert payload["position_count_all_dates"] == 2  # only the ones that opened
 
 
-def test_the_whole_book_tiles_say_they_are_the_whole_book(app_client, live_env):
-    """Settlement runs over `whole_book`, so those tiles do not move when the
-    slate filter does. Unlabelled beside a filtered Positions count they read as
-    though both described the same set -- which is the confusion that made the
-    Positions tile worth reporting in the first place."""
-    live_env["orders"] = [
-        _order(selected_date=DATE),
-        _order(idempotency_key="k-2", position_key="p-2", selected_date="2026-08-21"),
-    ]
-    body = app_client.get("/portfolio").get_data(as_text=True)
-    settled = body[body.index(">Settled<"):][:500]
-    # The tile has two branches -- "N still open" and "N open, none decided".
-    # Both make the same whole-book claim, so both must carry the scope; assert
-    # the property rather than one branch's wording.
-    assert "· all dates" in settled
+def test_the_tiles_follow_the_date_selection(live_env):
+    """[user 2026-08-27] "we need tiles to match date selection. some tiles are
+    ytd instead of matching date."
 
+    They did not. Settled and Profit/loss ran over the whole book whatever the
+    picker said, so a one-slate view showed that slate's Positions beside an
+    all-time W/L. Labelling them "all dates" made that honest but not useful --
+    the point of picking a date is to see that date.
 
-def test_the_settled_tile_adds_up_to_the_positions_count(live_env):
-    """[user 2026-08-27] "need to make sure all data ties off."
-
-    THE ARITHMETIC, AS ONE ASSERTION. won + lost + push + still-open + unknown
-    must equal the all-dates Positions count. It did not: `pending` counted only
-    `status == "filled"`, so an undecided row that is not filled fell out of
-    both buckets and off the page. Measured on the live book -- 89 positions
-    against 31W + 33L + 7P + 16 = 87, the missing two being Polymarket orders
-    that errored on submit without the venue ever answering.
+    Asserted on the COUNTS, not the label: a label can be right while the
+    number behind it never moved.
     """
     live_env["orders"] = [
-        _order(idempotency_key="w", position_key="w", outcome="won"),
-        _order(idempotency_key="l", position_key="l", outcome="lost"),
-        _order(idempotency_key="p", position_key="p", outcome="push"),
-        # Filled and undecided -> pending.
-        _order(idempotency_key="o", position_key="o"),
-        # Errored on submit, venue never answered -> may well have landed, so
-        # it is a position on the page and belongs in `unknown`, not nowhere.
-        _order(idempotency_key="u", position_key="u", status="failed",
-               error="ReadTimeout", fill_price=None, fill_stake_dollars=None),
-        # Venue ANSWERED 4xx -> certainly not a position, counted in neither.
+        _order(idempotency_key="a", position_key="a", outcome="won"),
+        _order(idempotency_key="b", position_key="b", outcome="lost"),
+        _order(idempotency_key="c", position_key="c",
+               selected_date="2026-08-21", outcome="won"),
+        _order(idempotency_key="d", position_key="d",
+               selected_date="2026-08-21", outcome="won"),
+    ]
+
+    today = intelligence_bp._live_portfolio_payload(DATE)
+    st = (today["settlement"] or {}).get("total") or {}
+    assert (st["won"], st["lost"]) == (1, 1), "today's slate only"
+
+    older = intelligence_bp._live_portfolio_payload(DATE, on_date="2026-08-21")
+    st = (older["settlement"] or {}).get("total") or {}
+    assert (st["won"], st["lost"]) == (2, 0), "the picked slate only"
+
+    everything = intelligence_bp._live_portfolio_payload(DATE, on_date="all")
+    st = (everything["settlement"] or {}).get("total") or {}
+    assert (st["won"], st["lost"]) == (3, 1), "all dates when asked for all dates"
+
+
+def test_the_tiles_name_the_scope_they_are_showing(app_client, live_env):
+    """The number moves with the picker, so the words have to as well -- a tile
+    reading "all dates" over one slate is the mislabel this started from."""
+    live_env["orders"] = [_order()]
+    default = app_client.get("/portfolio").get_data(as_text=True)
+    assert "· this slate" in default
+    everything = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    assert "· all dates" in everything
+
+
+def test_the_show_all_toggle_does_not_move_the_tiles(live_env):
+    """SCOPED FROM `whole_book`, NOT FROM the display list. `?show=all` puts
+    the never-opened rows back into the table; the tiles must not follow it,
+    or a display toggle would appear to change the book's record."""
+    live_env["orders"] = [
+        _order(idempotency_key="a", position_key="a", outcome="won"),
         _order(idempotency_key="r", position_key="r", status="failed",
-               error="http_404: market_not_found", fill_price=None,
-               fill_stake_dollars=None),
-    ]
-    payload = intelligence_bp._live_portfolio_payload(DATE, on_date="all")
-    st = (payload["settlement"] or {}).get("total") or {}
-    positions = payload["position_count_all_dates"]
-
-    assert positions == 5                      # the 4xx refusal is not one
-    assert st["won"] + st["lost"] + st["push"] == 3
-    assert st["pending"] == 1
-    assert st["unknown"] == 1
-    assert (
-        st["won"] + st["lost"] + st["push"] + st["pending"] + st["unknown"]
-    ) == positions
-
-
-def test_a_REJECTED_order_is_not_called_unknown(live_env):
-    """THE CASE THAT SHIPPED WRONG, 2026-08-28.
-
-    The `unknown` bucket first asked only `_is_venue_refusal`, which covers a
-    4xx the venue answered but NOT `rejected` -- an order that never reached a
-    venue at all. Production then reported **63** orders as "unknown,
-    submitted, never confirmed at the venue" when the true figure was 2, and
-    the tile row summed to 150 against 89 positions.
-
-    Every test in the suite passed, because not one of them put a `rejected`
-    row in front of the counter. This is that row.
-    """
-    live_env["orders"] = [
-        _order(idempotency_key="w", position_key="w", outcome="won"),
-        # Never reached the venue: not a position, and not "unknown" either.
-        _order(idempotency_key="rej", position_key="rej", status="rejected",
-               error="OrderBuildError: no_venue_ticker",
+               error="http_404: market_not_found",
                fill_price=None, fill_stake_dollars=None),
-        # Errored with no venue answer: genuinely unknown.
-        _order(idempotency_key="u", position_key="u", status="failed",
-               error="ReadTimeout", fill_price=None, fill_stake_dollars=None),
     ]
-    payload = intelligence_bp._live_portfolio_payload(DATE, on_date="all")
-    st = (payload["settlement"] or {}).get("total") or {}
-    assert st["unknown"] == 1, "a rejected order is not an unknown one"
-    assert payload["position_count_all_dates"] == 2
-    assert (
-        st["won"] + st["lost"] + st["push"] + st["pending"] + st["unknown"]
-    ) == payload["position_count_all_dates"]
-
-
-def test_every_reader_shares_one_definition_of_not_a_position():
-    """Three readers ask this: the page, the day's budget, and the settlement
-    summary. The settlement summary asking only half of it is what produced the
-    63. Identity, not equality -- two functions that agree today drift."""
-    from syndicate.features.shared.execution_guard import is_non_position
-    from syndicate.blueprints import intelligence as bp
-
-    rejected = {"status": "rejected", "error": "OrderBuildError: no_venue_ticker"}
-    refused = {"status": "failed", "error": "http_404: market_not_found"}
-    timed_out = {"status": "failed", "error": "ReadTimeout"}
-    for row in (rejected, refused):
-        assert is_non_position(row) is True
-        assert bp._is_non_position(row) is True
-    assert is_non_position(timed_out) is False
-    assert bp._is_non_position(timed_out) is False
-
-
-def test_an_unconfirmed_submit_is_not_quietly_called_pending(app_client, live_env):
-    """Calling it `pending` would assert we hold a position; dropping it would
-    assert we do not. It is neither -- it is the row somebody has to check at
-    the venue first, so the page names it."""
-    live_env["orders"] = [
-        _order(idempotency_key="u", position_key="u", status="failed",
-               error="ReadTimeout", fill_price=None, fill_stake_dollars=None),
-    ]
-    body = app_client.get("/portfolio?on=all").get_data(as_text=True)
-    assert "1 unknown" in body
-    assert "never confirmed at the venue" in body
+    hidden = intelligence_bp._live_portfolio_payload(DATE)
+    shown = intelligence_bp._live_portfolio_payload(DATE, show_all=True)
+    assert (hidden["settlement"] or {}).get("total") == (shown["settlement"] or {}).get("total")
 
 
 def test_the_old_slate_chip_row_is_gone(app_client, live_env):

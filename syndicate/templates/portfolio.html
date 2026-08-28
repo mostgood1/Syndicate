@@ -723,7 +723,7 @@
            `whole_book`, so this tile does not move when the slate filter does.
            Unlabelled beside a filtered Positions count, it read as though both
            described the same set. #}
-        <div class="live-tile__meta">{{ st.get('pending', 0) }} still open · all dates</div>
+        <div class="live-tile__meta">{{ st.get('pending', 0) }} still open · {{ 'all dates' if L.all_dates else 'this slate' }}</div>
         {# THE ROW THAT MUST ADD UP. won + lost + push + still-open + unknown
            equals the Positions count for all dates; without this line it came
            up two short and nothing on the page said why. Shown only when
@@ -734,7 +734,7 @@
         {% endif %}
       {% else %}
         <div class="live-tile__value">—</div>
-        <div class="live-tile__meta">{{ st.get('pending', 0) }} open, none decided · all dates</div>
+        <div class="live-tile__meta">{{ st.get('pending', 0) }} open, none decided · {{ 'all dates' if L.all_dates else 'this slate' }}</div>
         {% if st.get('unknown') %}
           <div class="live-tile__meta">{{ st.get('unknown') }} unknown — submitted, never confirmed at the venue</div>
         {% endif %}
@@ -746,7 +746,7 @@
         <div class="live-tile__value {{ 'pos' if (st.get('pnl_dollars') or 0) > 0 else ('neg' if (st.get('pnl_dollars') or 0) < 0 else '') }}">
           {{ "%+.2f"|format(st.get('pnl_dollars') or 0) }}</div>
         <div class="live-tile__meta">
-          {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% on {% endif %}${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled · all dates</div>
+          {% if st.get('roi_pct') is not none %}{{ "%+.2f"|format(st.get('roi_pct')) }}% on {% endif %}${{ "%.2f"|format(st.get('staked_dollars') or 0) }} settled · {{ 'all dates' if L.all_dates else 'this slate' }}</div>
         {# WHO DECIDED THESE OUTCOMES. The figure above is the whole book, which
            is the honest answer to "how has this done" -- but it BLENDS outcomes
            the venue stated with outcomes we inferred from our own boxscore
@@ -1054,7 +1054,8 @@
   {% if L.hidden_open_dated %}
     <div class="live-note">
       <strong>{{ L.hidden_open_dated }} open position(s) on other dates are not shown here.</strong>
-      They are still live. The totals and the performance pivots below count the whole book, not this slate.
+      They are still live, and the tiles above count this slate only — the
+      performance pivots further down still count the whole book.
       <a href="?{{ qs_keep }}&on=all#live">Show all dates</a>.
     </div>
   {% endif %}
