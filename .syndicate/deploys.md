@@ -35877,3 +35877,86 @@ Newest line remains the pre-deploy `refusals=None` at 15:48:15Z. Worker
 confirmed ALIVE on the new binary (soccer live-state writes at 16:04:57Z,
 memory_anon 1276MB, headroom 1742MB), so the silence is "has not reached that
 stage", not a lost line.
+
+### VERIFIED 2026-08-28 16:13:11Z — item 1 PASSES, item 3 PASSES ITS OWN TEST AND CHANGES NOTHING
+
+First board build on `8b8a6579` (`board_rows=1308`).
+
+**Item 1 — PASSES.** The word `refusals=` is gone and the breakdown appears for
+the first time in this line's existence:
+
+```
+KALSHI_BOARD_JOIN markets=11978 board_rows=1308 matched=198 reasons={
+  'no_matching_board_row': 4500, 'market_is_for_another_date': 3203,
+  'unreadable_title': 2260, 'series_out_of_scope': 1334,
+  'stat_not_in_market_vocabulary': 255, 'event_not_on_our_board': 239,
+  'spread_line_orientation_mismatch': 24, 'team_side_unresolved': 13}
+```
+
+**AND IT ANSWERS THE ORIGINAL QUESTION IMMEDIATELY.** `KALSHI_UNMATCHED`'s
+`unreadable_by_series` names the soccer families Kalshi lists and the catalogue
+cannot parse: `KXMLSTOTAL` 90, `KXLALIGATOTAL` 66, `KXLIGUE1TOTAL` 60,
+`KXSERIEATOTAL` 60, `KXBUNDESLIGATOTAL` 54, `KXEREDIVISIETOTAL` 54,
+`KXSERIEAGAME` 40, `KXLALIGAGAME` 39, `KXBUNDESLIGAGAME` 36, `KXLIGUE1GAME` 34,
+`KXBELGIANPLGAME` 12, `KXEREDIVISIEGAME` 9 (+ segment series). **~665 Kalshi
+soccer markets refuse on TITLE GRAMMAR.** So "Kalshi does not execute soccer"
+was never about absent markets; it is a parser gap, and it was unreadable for
+as long as this line printed `refusals=None`.
+
+**Item 3 — the fix works and buys nothing. BOTH halves are true.**
+
+```
+POLYMARKET_LEAGUE_REACH soccer_tokens_proven=['arg2','bun','eflch','epl','lal',
+  'lg1','ligpor','lng','lpa','mlp','mls','sea','swe2']
+```
+
+13 competitions proven, `mls` among them. The bucketing fix is doing exactly
+what it was built to do. And:
+
+```
+POLYMARKET_UNMATCHED no_match|soccer|h2h: 93   board soccer|h2h rows: 93
+                     no_match|soccer|totals: 18  board soccer|totals rows: 18
+```
+
+**100% still unmatched. The 104 -> 93 drop is the BOARD SHRINKING, not the fix
+working** (1326 rows -> 1308). I nearly reported that count as an improvement;
+the denominator is the only thing that stops it. `matched` 98 -> 107 on a
+smaller board, and none of the gain is attributable to soccer.
+
+**MY HYPOTHESIS WAS HALF WRONG, and the log said so before the fix shipped.**
+The lane predicted league bucketing was the soccer blocker. It is a real defect
+and MLS markets genuinely were unreachable -- but the board's 104 soccer h2h
+rows were ALREADY refusing as `no_match`, not `no_candidates`. `no_match` means
+candidates were in the bucket and no fixture paired. Bucketing was never the
+binding constraint for THOSE rows, and the distinction was printed in the
+refusal name all along.
+
+**THE ACTUAL BLOCKER, newly identified and confirmed at the resolver:**
+
+```
+board  'Elche CF @ Real Racing Club de Santander'  want totals|under|2.5
+venue  offered rrc-elc@0.5, @1.5, @2.5, @3.5
+```
+
+Same two clubs, same line, and it refuses. `parse_slug` reads `<away>-<home>`,
+so `rrc-elc` gives home=`elc`, away=`rrc`, while the board has home=Racing,
+away=Elche -- **inverted**:
+
+```
+teams_match('soccer','rrc','Real Racing Club de Santander') -> True
+teams_match('soccer','elc','Real Racing Club de Santander') -> False
+```
+
+Flipped, it pairs. So either soccer slugs are `<home>-<away>` while MLB's are
+`<away>-<home>` (MLB pairs correctly today, so the orders would differ by
+sport), or the board's soccer fixture orientation is inverted.
+
+**DO NOT SHIP A FLIP ON THIS.** It is one confirmed fixture and exactly the
+shape of the `pos`/`neg` trap: a plausible orientation applied without ground
+truth is a bet on the wrong team. The RATE is unmeasured. Measure it by adding
+an orientation counter to `_teams_match`'s refusal path -- how many soccer
+`no_match` rows would pair under a flip -- then decide from that number.
+
+Also still unreachable and NOT soccer: `no_candidates|ncaaf|totals: 41` of 41,
+`|h2h: 6` of 6. Polymarket files college football under `cfb`; the board says
+`ncaaf`. Same class of token mismatch, outside this lane's soccer fix.
