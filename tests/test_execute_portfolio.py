@@ -1265,7 +1265,17 @@ def test_the_verifier_reports_which_market_families_would_build(monkeypatch):
     # team side because the venue's YES leg is measurably not `outcomes[0]`, and
     # a whole market family going dark must be legible HERE rather than as a
     # scattering of per-order log lines.
-    assert markets["h2h"]["OrderBuildError"] == 1
+    # KEYED ON THE REFUSAL'S OWN TOKEN, not on the exception class. Every
+    # refusal `polymarket_us_orders` raises is an `OrderBuildError`, so a
+    # class-keyed bucket would hold this beside `price_out_of_range` and
+    # `stake_below_minimum_quantity` -- and Polymarket now has TWO populations
+    # refused for two different unverified mappings (`spread_side_needs_
+    # verified_team_mapping` and this one). They will be lifted at different
+    # times by different evidence, and a shared bucket means nobody can tell
+    # which population just became placeable. Raised by the session fixing the
+    # side-vocabulary tests, 2026-08-28.
+    assert markets["h2h"]["team_side_needs_verified_yes_leg"] == 1
+    assert "OrderBuildError" not in markets["h2h"]
     assert "would_build" not in markets["h2h"]
 
 

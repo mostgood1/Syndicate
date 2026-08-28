@@ -1260,7 +1260,45 @@ def verify_order_paths(
                 # The venue's own reason, by TYPE and message. A verifier that
                 # reported "failed" would reproduce the counter this whole
                 # session has been prying data out of.
-                note(market, f"{type(exc).__name__}", str(exc))
+                #
+                # AND FOR AN `OrderBuildError`, BY ITS REASON TOKEN RATHER THAN
+                # BY THE EXCEPTION CLASS `[2026-08-28]`. Every refusal that
+                # module raises is an `OrderBuildError`, so one bucket held
+                # `team_side_needs_verified_yes_leg` beside `price_out_of_range`
+                # and `stake_below_minimum_quantity` -- the count told you a
+                # family could not transact and not WHY, which is the thing this
+                # report exists to say.
+                #
+                # It matters now because two Polymarket populations are refused
+                # for two different unverified mappings:
+                # `spread_side_needs_verified_team_mapping` (the slug's
+                # `pos`/`neg` token vs the outcomes array) and
+                # `team_side_needs_verified_yes_leg` (which outcome the YES
+                # token pays). They will be lifted at different times by
+                # different evidence, and on the day one is, nobody can tell
+                # which population just became placeable from a count of
+                # `OrderBuildError`.
+                #
+                # `str(exc)` still carries the whole message into `examples`;
+                # this only changes the KEY. The token is the text before the
+                # first colon, which is the convention every refusal in
+                # `polymarket_us_orders` and `kalshi_orders` already writes.
+                # MATCHED BY CLASS NAME, NOT BY `isinstance`. There are THREE
+                # `OrderBuildError` classes -- `kalshi_orders`, `novig_orders`
+                # and `polymarket_us_orders` each define their own -- so an
+                # `isinstance` check would need all three imported here and
+                # would silently stop covering the fourth venue somebody adds.
+                # They all subclass `ValueError`, which is too broad to key on.
+                reason = str(exc)
+                if type(exc).__name__ == "OrderBuildError":
+                    token = reason.split(":", 1)[0].strip()
+                    # A refusal that carried no token would key on the whole
+                    # message -- unbounded cardinality in a counter. Fall back
+                    # to the class rather than let that happen.
+                    key = token if token and " " not in token else type(exc).__name__
+                else:
+                    key = type(exc).__name__
+                note(market, key, reason)
 
         out["venues"][venue] = {
             "status": "ok",
