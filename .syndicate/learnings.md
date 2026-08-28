@@ -4776,3 +4776,36 @@ broken query before treating it as a finding.
   contradiction of another lane's completed sweep. Caught only by checking the
   probe against a route known to be GOOD before trusting a negative. The real
   marker is `feature-summary-pill`.
+
+## 2026-08-28 — A GAP BETWEEN TWO LOG LINES IS NOT A COST. I measured one, believed it, and was wrong by 30x.
+
+Reading refresh-worker logs I saw ~37 seconds of `[artifact_publisher] PULL_*`
+lines inside the board build, two of them `error=timed out`, and reported the
+cross-service HTTP pull as a significant part of the build's unattributed time.
+
+**Spanned directly, it is `pull_hot_artifacts` = 1.15s.** The 37 seconds was
+everything happening on a shared worker between two prints — other threads, the
+memory watchdog, the sim tick, GC — not the work I attributed it to.
+
+`_timed_candidate_pool`'s own docstring in this repo already says this, and
+names three wrong answers produced the same way on 2026-08-25. I read that
+docstring while looking for something else and still did it.
+
+**THE TELL WAS ALREADY IN THE LOGS AND I HAD NOT READ IT.**
+`BOARD_BUILD_TIMING wall_s=1058.9 cpu_s=942.2 off_cpu_pct=11.0` had been
+emitting all along. A build that is 89% on-CPU cannot be dominated by HTTP
+waits, and one line settles it. The later build read `off_cpu_pct=2.2`.
+
+**HOW TO APPLY.** Before attributing time to a stage, ask which measurement you
+have: a SPAN around the call, or a GAP between two prints. Only the first is a
+cost. On a process with concurrent threads a gap is an upper bound on
+everything, and an estimate of nothing. If only a gap exists, say "at most" or
+add the span — do not name a component.
+
+**AND CHECK FOR AN EXISTING wall-vs-CPU READING FIRST.** "Is it slow or is it
+waiting" is one number, it is often already emitted, and it invalidates whole
+families of hypothesis before any instrumentation is written. Three of mine died
+to it: the HTTP pulls, the Polymarket join (0.25s), and venue-loop contention.
+
+Same family as `feedback_read_the_field_you_already_have`, and this is now the
+second night running that the answer sat in a field I had already fetched.

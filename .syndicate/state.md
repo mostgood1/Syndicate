@@ -6276,3 +6276,54 @@ supplying its own `summary_panel` is untouched. After: **21 of 21 rank_board
 routes render slate stats.** Verify by counting `feature-summary-pill`, NOT by
 grepping panel prose — "on the board" is body text that only appears on a
 populated slate and reads as a false negative on most routes out of season.
+
+## [board-compute-attribution] — VERIFIED 2026-08-28, refresh-worker `4805abe5`
+
+**THE BOARD BUILD'S COST IS NAMED. 84% attributed, and every venue/IO
+hypothesis is DEAD.** One complete build, `BOARD_BUILD_TIMING wall_s=678.8
+cpu_s=664.1 off_cpu_pct=2.2`:
+
+```
+build_intelligence_overview          331.09s   49%
+candidate_collection_with_fallback   168.40s   25%
+layer2_shortlist_build                51.00s    8%
+kalshi_odds_refresh                   12.84s
+portfolio_commit                       5.38s
+pull_hot_artifacts                     1.15s
+kalshi_board_join                      0.91s
+manifest_odds_history_join             0.31s
+candidate_building                     0.01s
+                                    --------
+named                                571.1s   84%
+unattributed                         107.7s   16%
+```
+
+**`off_cpu_pct=2.2` — THIS BUILD DID ESSENTIALLY NO WAITING. There is no I/O
+win available.** Confirmed twice, independently: the ratio itself, and
+`pull_hot_artifacts=1.15s` measured directly.
+
+### THREE HYPOTHESES RETIRED, ALL MINE, ALL WRONG
+
+1. **"The artifact_publisher HTTP pulls are a large part of it."** They are
+   **1.15s, ~0.2%**. I had measured ~37s of pull lines by GAP-BETWEEN-LOG-LINES
+   earlier and treated that as cost; the span says otherwise.
+2. **"The Polymarket join is a credible largest-single-item."** It is
+   **0.25s** (`POLYMARKET_BOARD_JOIN elapsed_s=0.25 markets=15303 indexed=7717
+   board_rows=1008`). Wrong by three orders of magnitude. Instrumenting it was
+   still correct — it was the largest UNMEASURED block and is now RULED OUT
+   rather than suspected.
+3. **"Compute doubled; suspect venue-loop contention."** The series is 480.6,
+   650.9, 778.8, 593.1, 735.5, 865.2, 1058.9, 855.6, 678.8 — and the 865.2s
+   build at 00:24Z PREDATES the venue loop. I read two points as a trend.
+
+### WHAT IS ACTUALLY LEFT, and it is where the first measurement pointed
+
+`build_intelligence_overview` (331s) + `candidate_collection_with_fallback`
+(168s) = **499s of 679s (73%)**. The overview is MLB's
+`build_cards_page_context` running HYDRATED on the worker — named as "the real
+work... untouched" by a code comment since 2026-08-07 and still true. **The
+next lever is an OPTIMISATION task, not an instrumentation one.** The
+measurement work is finished; do not spend more on spans.
+
+The residual 107.7s (16%) is spread across gaps individually too small to
+chase.
