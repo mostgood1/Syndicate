@@ -631,6 +631,10 @@ def join_polymarket_to_board(
     # league token -> a bounded set of its club codes. See the note at the
     # assignment below for why the CODES and not just a count.
     unproven_league_tokens: dict[str, set[str]] = {}
+    # `<league>|<market>` -> rows that would pair if the fixture's sides were
+    # swapped. Diagnostic only; the flip is never applied.
+    orientation_flip_counts: dict[str, int] = {}
+    orientation_flip_samples: list[dict[str, Any]] = []
 
     for row in markets:
         parsed = parse_slug(row.get("slug"))
@@ -776,6 +780,63 @@ def join_polymarket_to_board(
                 break
             picked = candidate
         if picked is None:
+            # ----------------------------------------------------------
+            # WOULD THIS ROW PAIR IF THE FIXTURE'S SIDES WERE SWAPPED?
+            # ----------------------------------------------------------
+            #
+            # COUNTING ONLY. Nothing below changes what is matched or priced;
+            # the row still refuses. This exists because a single fixture
+            # suggested an orientation bug and one fixture is an anecdote:
+            #
+            #   board  'Elche CF @ Real Racing Club de Santander' totals under 2.5
+            #   venue  offered rrc-elc@0.5 @1.5 @2.5 @3.5
+            #
+            # Same two clubs, same line, refused. `parse_slug` reads
+            # `<away>-<home>`, so `rrc-elc` gives home=elc / away=rrc while the
+            # board has home=Racing / away=Elche. Flipped, it pairs:
+            # `teams_match('soccer','rrc','Real Racing Club de Santander')` is
+            # True and the same call with `elc` is False.
+            #
+            # PER SPORT, AND THAT IS THE POINT. MLB and NFL game lines pair
+            # correctly today, so they are the control: if the flip rescues
+            # soccer and leaves them near zero, the slug order genuinely
+            # differs by sport. If it rescues MLB too, the orientation reading
+            # is wrong and the cause is elsewhere -- a counter that could only
+            # confirm would not be worth printing.
+            #
+            # THE FLIP IS NOT APPLIED. Acting on a plausible orientation
+            # without ground truth is the `pos`/`neg` trap in a new costume: a
+            # confident bet on the wrong team. This produces the rate that
+            # decides whether the question is worth chasing, and nothing else.
+            for candidate in candidates:
+                if board_market in {"spreads", "totals"}:
+                    if board_line is None or candidate["line"] is None:
+                        continue
+                    if abs(float(candidate["line"]) - float(board_line)) > 1e-9:
+                        continue
+                parsed_candidate = candidate["parsed"]
+                flipped = dict(parsed_candidate)
+                flipped["home"], flipped["away"] = (
+                    parsed_candidate.get("away"),
+                    parsed_candidate.get("home"),
+                )
+                if _teams_match(board_row, flipped, board_row.get("sport") or sport):
+                    key = f"{league}|{board_market}"
+                    orientation_flip_counts[key] = orientation_flip_counts.get(key, 0) + 1
+                    if len(orientation_flip_samples) < 8:
+                        orientation_flip_samples.append({
+                            "board": f"{board_row.get('away_team')}@{board_row.get('home_team')}",
+                            # From the ROW. `parse_slug` returns prefix/league/
+                            # away/home/date/modifiers and carries no `slug`
+                            # key, so reading one there would print an empty
+                            # string for every sample and the evidence would be
+                            # silently useless.
+                            "slug": str((candidate.get("row") or {}).get("slug") or "")[:60],
+                            "slug_away_home": f"{parsed_candidate.get('away')}-{parsed_candidate.get('home')}",
+                            "market": board_market,
+                            "line": board_line,
+                        })
+                    break
             if "ambiguous_polymarket_match" not in refusals or refusals.get("ambiguous_polymarket_match", 0) == 0:
                 _note_unmatched(
                     "no_match", board_row, board_market, league, date, candidates
@@ -834,6 +895,13 @@ def join_polymarket_to_board(
             sorted(unmatched_counts.items(), key=lambda kv: -kv[1])
         ),
         "unmatched_samples": unmatched_samples,
+        # Rows that refused on fixture pairing but WOULD pair with the
+        # slug's two sides swapped. Per sport deliberately: MLB and NFL
+        # pair correctly today and act as the control.
+        "orientation_flip_counts": dict(
+            sorted(orientation_flip_counts.items(), key=lambda kv: -kv[1])
+        ),
+        "orientation_flip_samples": orientation_flip_samples,
         # Competitions no board row can reach, with the club codes that would
         # settle each one. Sorted so the list is stable across builds.
         "soccer_tokens_proven": sorted(soccer_tokens),

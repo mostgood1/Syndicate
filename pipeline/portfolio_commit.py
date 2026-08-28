@@ -244,6 +244,19 @@ def _polymarket_price_resolver(selected_date: str | None):
     # source: the proven-token set decides whether a competition is filed under
     # `soccer` at all, and nothing emitted it. The unreachable entry carries the
     # club codes that would settle it -- see `join_polymarket_to_board`.
+    # THE ORIENTATION RATE, DIAGNOSTIC ONLY. Rows that refused on fixture
+    # pairing but would pair with the slug's two sides swapped. Printed per
+    # league|market because MLB and NFL pair correctly today and are therefore
+    # the control: soccer high with those near zero says the slug order differs
+    # by sport; soccer high WITH them high says the orientation reading is
+    # wrong and the cause is elsewhere. No flip is applied anywhere.
+    if joined.get("orientation_flip_counts"):
+        print(
+            "[portfolio_commit] POLYMARKET_ORIENTATION"
+            f" would_match_if_flipped={joined.get('orientation_flip_counts')}"
+            f" samples={joined.get('orientation_flip_samples')}",
+            flush=True,
+        )
     if joined.get("unproven_league_tokens"):
         print(
             "[portfolio_commit] POLYMARKET_LEAGUE_REACH"

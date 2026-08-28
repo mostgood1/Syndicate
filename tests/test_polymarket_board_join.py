@@ -823,3 +823,80 @@ def test_a_competition_no_board_row_can_reach_is_COUNTED_with_its_club_codes():
     out = mod.join_polymarket_to_board(markets, [], selected_date="2026-08-29")
     assert "nas" in out["unproven_league_tokens"]
     assert set(out["unproven_league_tokens"]["nas"]) == {"abc", "xyz"}
+
+
+def test_a_row_that_would_pair_only_when_flipped_is_counted_and_STILL_REFUSED(monkeypatch):
+    """The measurement, and the guarantee that it stays a measurement.
+
+    Production 2026-08-28: the board wanted `Elche CF @ Real Racing Club de
+    Santander` at `totals under 2.5` and the venue offered `rrc-elc@2.5` --
+    same two clubs, same line, refused. `parse_slug` reads `<away>-<home>`, so
+    the slug gives home=rrc/away=elc against a board carrying the reverse.
+
+    Two assertions, and the second is the important one: the row must be
+    COUNTED and must still REFUSE. Applying a plausible orientation without
+    ground truth is the `pos`/`neg` trap in a new costume -- a confident bet on
+    the wrong team.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    monkeypatch.setattr(
+        aliases,
+        "teams_match",
+        lambda sport, a, b: {("rrc", "racing"), ("elc", "elche")}.__contains__(
+            (str(a).lower(), str(b).lower())
+        ),
+    )
+    markets = [{
+        # `<away>-<home>` = away:rrc home:elc -- the INVERTED shape production
+        # showed. Written `elc-rrc` first, which pairs NORMALLY and made this
+        # test assert against a correct implementation. League token `soccer`
+        # rather than `lal` so the row is bucketed without depending on
+        # `soccer_competition_tokens` resolving a real competition here.
+        "slug": "tsc-soccer-rrc-elc-2026-08-28-2pt5",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "outcomes": '["Over","Under"]',
+        "outcomePrices": '["0.50","0.50"]',
+    }]
+    board = [{
+        "market": "totals", "side": "under", "line": 2.5, "sport": "soccer",
+        "selected_date": "2026-08-28", "home_team": "racing", "away_team": "elche",
+        "event_id": "e1",
+    }]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+    assert out["orientation_flip_counts"].get("soccer|totals") == 1
+    assert out["matched"] == 0, "counting the flip must never apply it"
+    assert out["refusals"].get("no_matching_polymarket_market") == 1
+
+
+def test_a_row_that_pairs_normally_is_NOT_counted_as_an_orientation_miss(monkeypatch):
+    """The control has to be able to read zero.
+
+    MLB and NFL pair correctly today. If this counter fired on rows that match
+    the normal way, every sport would look equally broken and the per-sport cut
+    -- the only thing that can distinguish "the slug order differs by sport"
+    from "my orientation reading is wrong" -- would carry no information.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+
+    monkeypatch.setattr(
+        aliases,
+        "teams_match",
+        lambda sport, a, b: {("lad", "dodgers"), ("det", "tigers")}.__contains__(
+            (str(a).lower(), str(b).lower())
+        ),
+    )
+    markets = [{
+        "slug": "tsc-mlb-lad-det-2026-08-28-7pt5",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "outcomes": '["Over","Under"]',
+        "outcomePrices": '["0.50","0.50"]',
+    }]
+    board = [{
+        "market": "totals", "side": "under", "line": 7.5, "sport": "mlb",
+        "selected_date": "2026-08-28", "home_team": "tigers", "away_team": "dodgers",
+        "event_id": "e1",
+    }]
+    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+    assert out["matched"] == 1
+    assert out["orientation_flip_counts"] == {}
