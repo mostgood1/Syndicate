@@ -36405,3 +36405,48 @@ checkable address for any of them from data already stored.
 2. Only then is the orientation rate worth re-reading. At n=5 it is suggestive
    plus three ESPN confirmations, not settled.
 3. STILL DO NOT SHIP A BLANKET FLIP. MLB pairs correctly away-first today.
+
+## 2026-08-28 — refresh-worker `dc1d571e` — PENDING (claim held, sim in flight)
+
+**Holder:** `portfolio-venue-and-side-integrity`. Claim acquired 20:31Z.
+
+**CARRYING A SECOND LANE'S WORK AT ITS REQUEST.** Lane
+`local_5163d9b3` (Polymarket execution gaps) asked me to either carry
+`7d555a37` or hand the claim back; I am carrying it. **Its session became
+unreachable before I could reply**, so this entry is the record — a successor
+session reading `deploys.md` gets what the message would have said.
+
+Verified by `git merge-base --is-ancestor`, not assumed. `dc1d571e` contains:
+
+    7d555a37  learnings: the finishedAt rule
+    3ff23be9  orientation: split `listed` by HOW it was established
+    3dbf54ce  #595 step 2 (price alignment)
+    14facbb2  docstring correction
+    521b6dea  soccer tri-codes
+    632f3473  KALSHI SEGMENT FIX (mine, #601)
+    dc1d571e  ledger (mine)
+
+**BLOCKED ON:** `run_mlb_daily_sim_job.py` pid 82, launched 20:22:07Z,
+4-game scoped resim (`--only-game-pks 822691,823013,823666,824638`,
+`--reason fingerprint_change`). Deploying kills it.
+
+**HOW I KNOW IT IS RUNNING — the predicate is positive-controlled and my first
+one was not.** `SIM_START` NEVER appears in these logs, so my initial "no
+SIM_START, no sim" was vacuous and I read it as a clear window while a sim was
+up. The real signal: the job's cmdline appears inside the `processes` array of
+every `ALL_PROCESS_MEMORY` line (947 matches while up). Exit = the newest such
+line no longer carries it.
+
+**verify:** read `[refresh_worker] BOOTED`, NOT the deploy's `finishedAt` —
+they were 30s apart on this service today and a reading between them is old code
+with a deploy record that says otherwise. I hit the same trap from the other
+side at 20:03:17 vs `finishedAt` 20:05:22. Then, for #601: on the next slate
+carrying `first3`/`first5` rows, no order's ticker is a `KXMLBTOTAL` for a
+segment row. For the carried lane: `POLYMARKET_ORIENTATION`
+(needs a BOARD BUILD, not just a boot), `listed_by_canonical` non-zero, and
+first `POLYMARKET_PRICE_ALIGNMENT` counts.
+
+**Limit to honour when those counts land** (the carried lane's own caveat, and
+it is correct): an `inverted` count cannot distinguish "the venue's arrays are
+misaligned" from "our resolver picks the wrong outcome". Non-zero is a real
+defect, NOT a diagnosis.
