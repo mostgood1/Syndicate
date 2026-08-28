@@ -798,6 +798,10 @@ def join_polymarket_to_board(
     orientation_listed: dict[str, int] = {}
     orientation_not_listed: dict[str, int] = {}
     orientation_unreadable: dict[str, int] = {}
+    # HOW listing was established. `by_canonical` is independent of the
+    # orientation matcher; `by_flip_only` is not. See the split below.
+    orientation_listed_by_canonical: dict[str, int] = {}
+    orientation_listed_by_flip_only: dict[str, int] = {}
     # `#595` step 2: does the price we ASSIGN to a side actually belong to it?
     alignment_counts: dict[str, int] = {}
     alignment_samples: list[dict[str, Any]] = []
@@ -1107,13 +1111,43 @@ def join_polymarket_to_board(
                 board_row.get("home") or board_row.get("home_team"),
                 board_row.get("away") or board_row.get("away_team"),
             )
-            if _flip_matched or (
-                board_pair is not None
-                and any(c.get("canon_pair") == board_pair for c in candidates)
-            ):
+            # SPLIT BY HOW LISTING WAS ESTABLISHED, AND THAT IS THE WHOLE
+            # POINT OF THIS BLOCK.
+            #
+            # `listed` was `flip_matched OR canonical_pair_matched`, reported as
+            # one number, and used as the DENOMINATOR for `flipped / listed`.
+            # If the canonical test never independently establishes listing,
+            # that denominator is just the numerator wearing a denominator's
+            # clothes and the rate is 1.0 TAUTOLOGICALLY -- a ratio that cannot
+            # come out any other way is not a measurement.
+            #
+            # MEASURED, and this is why it is being split rather than trusted:
+            # two consecutive production readings returned `listed` and
+            # `would_match_if_flipped` IDENTICAL -- 5/5, then 24/24. Flagged by
+            # a second reader (`layer-2-board-recommendation-engine`) as a
+            # coincidence worth distrusting, and they were right. That output
+            # cannot distinguish "every identifiable listed fixture is inverted"
+            # (the hypothesis) from "the canonical test contributes nothing"
+            # (an instrument that always reads 1.0).
+            #
+            # `by_canonical` is the INDEPENDENT evidence: the fixture was
+            # identified by comparing canonical club pairs, without consulting
+            # the orientation matcher at all. `by_flip_only` is the dependent
+            # kind. A rate computed against `by_canonical` cannot be circular;
+            # one computed against the total can be, and now says so.
+            canonical_listed = board_pair is not None and any(
+                c.get("canon_pair") == board_pair for c in candidates
+            )
+            if canonical_listed or _flip_matched:
                 orientation_listed[eligibility_key] = (
                     orientation_listed.get(eligibility_key, 0) + 1
                 )
+                bucket = (
+                    orientation_listed_by_canonical
+                    if canonical_listed
+                    else orientation_listed_by_flip_only
+                )
+                bucket[eligibility_key] = bucket.get(eligibility_key, 0) + 1
             elif board_pair is not None and all(c.get("canon_pair") for c in candidates):
                 orientation_not_listed[eligibility_key] = (
                     orientation_not_listed.get(eligibility_key, 0) + 1
@@ -1212,6 +1246,15 @@ def join_polymarket_to_board(
         ),
         "orientation_fixture_listed": dict(
             sorted(orientation_listed.items(), key=lambda kv: -kv[1])
+        ),
+        # THE NON-CIRCULAR DENOMINATOR. `flipped / listed` can be 1.0 by
+        # construction when every listing was established BY the flip;
+        # `flipped / listed_by_canonical` cannot.
+        "orientation_listed_by_canonical": dict(
+            sorted(orientation_listed_by_canonical.items(), key=lambda kv: -kv[1])
+        ),
+        "orientation_listed_by_flip_only": dict(
+            sorted(orientation_listed_by_flip_only.items(), key=lambda kv: -kv[1])
         ),
         "orientation_fixture_not_listed": dict(
             sorted(orientation_not_listed.items(), key=lambda kv: -kv[1])

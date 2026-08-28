@@ -280,6 +280,14 @@ def _polymarket_price_resolver(selected_date: str | None):
         # suspect when it is False.
         f" invariant_ok={joined.get('orientation_invariant_ok')}"
         f" listed={joined.get('orientation_fixture_listed')}"
+        # HOW the listing was established. `flipped / listed` is TAUTOLOGICAL
+        # when every listing came from the flip itself -- two production
+        # readings returned listed and flipped identical (5/5, then 24/24),
+        # which is what that failure looks like. `by_canonical` is the
+        # independent evidence and is the denominator to divide by; a
+        # `by_canonical` of 0 means the rate above measures nothing.
+        f" listed_by_canonical={joined.get('orientation_listed_by_canonical')}"
+        f" listed_by_flip_only={joined.get('orientation_listed_by_flip_only')}"
         f" not_listed={joined.get('orientation_fixture_not_listed')}"
         f" unreadable={joined.get('orientation_fixture_unreadable')}"
         f" samples={joined.get('orientation_flip_samples')}",

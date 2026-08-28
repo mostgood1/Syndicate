@@ -1245,3 +1245,59 @@ def test_a_NORMAL_BETTING_EDGE_cannot_masquerade_as_an_inversion():
 def test_a_row_with_no_book_reference_is_counted_not_silently_dropped():
     counts, _ = _align(None, 0.60)
     assert counts == {"soccer|h2h|no_reference": 1}
+
+
+def _listing_split(monkeypatch, *, canonical_hits, flip_hits):
+    """One unmatched soccer h2h row; control whether canonical and/or flip find it."""
+    import syndicate.features.shared.team_aliases as aliases
+    canon = {"cry": "crystal palace", "mnc": "manchester city",
+             "Crystal Palace": "crystal palace", "Manchester City": "manchester city"}
+    monkeypatch.setattr(
+        aliases, "canonical_team",
+        (lambda sport, n: canon.get(str(n))) if canonical_hits else (lambda sport, n: None))
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(
+        aliases, "teams_match",
+        # Pairs only when flipped: slug is <away>-<home> = away:cry home:mnc,
+        # so flipping gives home=cry, which is the board's home.
+        (lambda sport, a, b: (str(a), str(b)) in {
+            ("cry", "Crystal Palace"), ("mnc", "Manchester City")})
+        if flip_hits else (lambda sport, a, b: False))
+    markets = [_soccer_market("atc-soccer-cry-mnc-2026-08-28-cry")]
+    board = [_soccer_board("Crystal Palace", "Manchester City")]
+    return mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+
+
+def test_a_listing_found_ONLY_by_the_flip_is_not_independent_evidence(monkeypatch):
+    """The tautology this split exists to expose.
+
+    `flipped / listed` = 1.0 by construction when every listing was established
+    BY the flip. Two production readings returned listed and flipped identical
+    (5/5, then 24/24) and were indistinguishable from a working measurement.
+    """
+    out = _listing_split(monkeypatch, canonical_hits=False, flip_hits=True)
+    assert out["orientation_flip_counts"].get("soccer|h2h") == 1
+    assert out["orientation_fixture_listed"].get("soccer|h2h") == 1
+    assert out["orientation_listed_by_flip_only"].get("soccer|h2h") == 1
+    assert out["orientation_listed_by_canonical"] == {}, (
+        "a flip-established listing must not count as independent evidence"
+    )
+
+
+def test_a_listing_found_by_CANONICAL_pair_is_independent_evidence(monkeypatch):
+    """The denominator that cannot be circular: the fixture was identified by
+    comparing canonical club pairs, without consulting the orientation matcher."""
+    out = _listing_split(monkeypatch, canonical_hits=True, flip_hits=True)
+    assert out["orientation_listed_by_canonical"].get("soccer|h2h") == 1
+    assert out["orientation_listed_by_flip_only"] == {}
+
+
+def test_the_two_listing_buckets_partition_listed(monkeypatch):
+    """They must sum to `listed` exactly, or the split hides rows instead of
+    explaining them — the failure mode of every counter fixed in this lane."""
+    for canon in (True, False):
+        out = _listing_split(monkeypatch, canonical_hits=canon, flip_hits=True)
+        total = sum(out["orientation_fixture_listed"].values())
+        parts = (sum(out["orientation_listed_by_canonical"].values())
+                 + sum(out["orientation_listed_by_flip_only"].values()))
+        assert total == parts, f"listed={total} but split sums to {parts}"
