@@ -1546,26 +1546,89 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
     # pattern `fetch_polymarket_resolutions` and `kalshi_client` already use,
     # and the thing being reported is a schema, not a slate. Truncated, because
     # `description` sits beside these and is prose.
-    _shape = next(
-        (
-            m for m in (slate.get("markets") or [])
-            if sports_market_type(m) == MONEYLINE_MARKET_TYPE
-            and (m.get("marketSides") is not None or m.get("question"))
-        ),
-        None,
-    )
-    if _shape is not None:
-        print(
-            "[polymarket_us_markets] MONEYLINE_YES_LEG_SHAPE"
-            f" slug={_shape.get('slug')!r}"
-            f" outcomes={_shape.get('outcomes')!r}"
-            f" outcomePrices={_shape.get('outcomePrices')!r}"
-            f" marketSides={str(_shape.get('marketSides'))[:400]!r}"
-            f" question={str(_shape.get('question') or '')[:200]!r}"
-            " -- WHICH OUTCOME IS YES? see polymarket_us_orders"
-            "._resolve_outcome_side",
-            flush=True,
-        )
+    # ------------------------------------------------------------------
+    # WHICH OUTCOME DOES THE YES TOKEN PAY? `#595` step 1.
+    # ------------------------------------------------------------------
+    #
+    # `marketSides` and `question` have been in `_KEEP` since this module was
+    # written and are read by nothing; `_slate_row_for_storage` drops both on
+    # the next line. Until 2026-08-28 only their KEY NAMES had ever reached a
+    # log (`POLYMARKET_US_AUTH ... row_keys=[...]`), never their values.
+    #
+    # That gap is why `polymarket_us_orders._resolve_outcome_side` REFUSES a
+    # team side: the YES leg is measurably NOT `outcomes[0]` (3 of 8 settled
+    # moneylines bought the wrong team) and no stored field names it.
+    #
+    # THE FIRST VERSION OF THIS LOG TRUNCATED AT 400 CHARS AND SHOWED ONE SIDE.
+    # A single `marketSides` entry reading `long: True` cannot answer the
+    # question -- it does not say whether the OTHER side is `long: False` (so
+    # `long` is the axis) or also `long: True` (so it is not), and it does not
+    # say WHERE in `outcomes` the long side sits, which is the whole point.
+    # Reading it anyway is what would have made `long == YES` an inference
+    # rather than a measurement.
+    #
+    # So: BOTH sides, COMPACTED to the four fields that answer it, and the
+    # derived `long_index` stated outright -- the index in `outcomes` of the
+    # side carrying `long: True`. If that is 0 on every market the venue's YES
+    # leg IS `outcomes[0]` and the original positional rule was right for a
+    # different reason; if it varies, `long_index` is the name rule.
+    #
+    # THREE MARKETS, NOT ONE. One market's shape cannot show whether `long` is
+    # consistent, and consistency is exactly what is being tested.
+    def _compact_sides(row):
+        sides = row.get("marketSides")
+        if not isinstance(sides, list):
+            return None, None
+        out = []
+        long_desc = None
+        for side in sides:
+            if not isinstance(side, Mapping):
+                continue
+            team = side.get("team") if isinstance(side.get("team"), Mapping) else {}
+            desc = side.get("description") or team.get("name")
+            is_long = side.get("long")
+            out.append({"d": desc, "long": is_long, "p": side.get("price")})
+            if is_long is True:
+                # Two long sides means `long` is not the yes/no axis at all, and
+                # that must be VISIBLE rather than resolved by taking the first.
+                long_desc = "AMBIGUOUS_TWO_LONG" if long_desc is not None else desc
+        return out, long_desc
+
+    def _long_index(row, long_desc):
+        """Where the long side sits in `outcomes`. THE ANSWER, if there is one."""
+        if not long_desc or long_desc == "AMBIGUOUS_TWO_LONG":
+            return long_desc
+        outcomes = row.get("outcomes")
+        if not isinstance(outcomes, list):
+            return None
+        for position, name in enumerate(outcomes):
+            if str(name or "").strip().lower() == str(long_desc).strip().lower():
+                return position
+        # The long side is not NAMED in `outcomes`. That is itself a finding --
+        # it would mean the two fields cannot be joined and the rule needs a
+        # different key -- so it is reported, not swallowed.
+        return "long_side_not_in_outcomes"
+
+    _samples = [
+        m for m in (slate.get("markets") or [])
+        if sports_market_type(m) == MONEYLINE_MARKET_TYPE
+        and (m.get("marketSides") is not None or m.get("question"))
+    ][:3]
+    if _samples:
+        for _row in _samples:
+            _sides, _long_desc = _compact_sides(_row)
+            print(
+                "[polymarket_us_markets] MONEYLINE_YES_LEG_SHAPE"
+                f" slug={_row.get('slug')!r}"
+                f" outcomes={_row.get('outcomes')!r}"
+                f" prices={_row.get('outcomePrices')!r}"
+                f" sides={_sides!r}"
+                f" long_index={_long_index(_row, _long_desc)!r}"
+                f" question={str(_row.get('question') or '')[:120]!r}"
+                " -- long_index IS the answer: 0 on every market means the YES"
+                " leg is outcomes[0]; varying means it is the name rule",
+                flush=True,
+            )
     else:
         # A named zero. "No moneyline in the slate" and "the fields are absent
         # from every moneyline" are different findings and must not both render
