@@ -49,10 +49,63 @@ already makes one market over), `SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE=1` to lift
 it without a deploy, and `MONEYLINE_YES_LEG_SHAPE` now logs one moneyline row's
 `marketSides`/`question` per slate write.
 
-**NEXT ACTION, and it is cheap:** deploy live-odds-worker, read one
-`MONEYLINE_YES_LEG_SHAPE` line, and if either field names an outcome, wire the
-name rule and lift the refusal. Until then Polymarket moneylines do not
-transact; totals and Kalshi are untouched.
+**THE FIELD EXISTS AND IT NAMES THE LEG. `[2026-08-28T15:08:05Z, read off
+production]`** live-odds-worker deployed at 15:06:23Z and the first
+`MONEYLINE_YES_LEG_SHAPE` line landed at 15:08:05Z:
+
+    slug='aec-boxing-canalv-chrmbi-2026-10-31-canalv-chrmbi'
+    outcomes='["Canelo Alvarez","Christian Mbilli"]'
+    outcomePrices='["0.6900","0.34"]'
+    question='Canelo Alvarez vs Christian Mbilli'
+    marketSides=[{'id': '474340',
+                  'marketSideType': 'MARKET_SIDE_TYPE_INSTRUMENT',
+                  'description': 'Canelo Alvarez',
+                  'price': '0.6900',
+                  'long': True,
+                  'teamId': 20138,
+                  'team': {'id': 20138, 'name': 'Canelo Alvarez',
+                           'abbreviation': 'canalv', 'league': 'boxi...
+
+**`marketSides[].long` is the yes/no axis and `marketSides[].team.name` names
+which side holds it.** That is a NAME rule -- the same shape that makes the
+totals path immune -- and it needs no assumption about array order at all:
+match our team against `description`/`team.name`, read that entry's `long`,
+refuse if nothing matches or the field is absent.
+
+`long`/short is also the venue's own position vocabulary elsewhere: the
+resolution row on the wrong order carried `POSITION_RESOLUTION_SIDE_SHORT`.
+
+**AND THE VENUE CORROBORATED THE ORIGINAL DIAGNOSIS IN THE SAME MINUTE.**
+15:07:31Z, four `POLYMARKET_US_MARKET` lines on literal Yes/No futures:
+`tec-mlb-nlchamp-2026-09-27-nym` `["Yes","No"]`, `tec-mlb-champ-...-ath`
+`["Yes","No"]`, **`tec-mlb-nlchamp-2026-09-27-atl` `["No","Yes"]`**,
+`tec-mlb-champ-...-atl` `["Yes","No"]`. A market whose outcomes are the STRINGS
+"Yes" and "No", listing them NO-first, is as direct a refutation of
+"`outcomes[0]` is the YES leg" as this venue could give -- no team-name
+ambiguity, no alias miss. 1 of 4 there, 3 of 8 on the settled book.
+
+**NEXT ACTION, AND `long == YES` IS STILL AN INFERENCE -- DO NOT SHIP IT AS A
+DEFAULT ON THIS ALONE.** The log line truncates at 400 chars, so only the FIRST
+`marketSides` entry has been read; the second one's `long` value is unobserved,
+and on this path an unverified mapping IS the bug. The sequence:
+
+  1. Widen `MONEYLINE_YES_LEG_SHAPE` to emit BOTH sides compactly
+     (`description`/`long`/`price` only -- the full objects are ~450 bytes each
+     and this is a schema report, not a slate).
+  2. Persist a DERIVED `yes_outcome` on the slate row -- the `description` of
+     the `long: True` side, one short string. **Do NOT persist `marketSides`
+     itself**: ~450 bytes x 2 sides x ~7,500 markets is ~6.7MB against an
+     8MB keyvalue ceiling the slate already budgets to 90%.
+  3. VALIDATE BEFORE ENABLING: score `yes_outcome` against the settled book.
+     Ground truth exists for 8 venue-settled moneylines -- 5 where we held our
+     intended team and 3 where we did not. A rule that predicts all 8, the
+     three mismatches included, is proven on real money. Anything less is
+     another guess with better provenance.
+  4. Only then wire the name rule and drop
+     `SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE`.
+
+Until then Polymarket moneylines do not transact; totals and Kalshi are
+untouched and measured correct over the same window.
 
 **ALSO SHIPPED, same commit:** `paper_settlement._check_venue_grade` — the
 machine that should have caught this. It cross-examines every venue-stated

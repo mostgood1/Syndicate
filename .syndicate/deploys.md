@@ -5,6 +5,100 @@
 
 ---
 
+## 2026-08-28 15:04-15:09Z — web `56e77588` -> `90ed748b` — lane `portfolio-venue-and-side-integrity`
+
+**What shipped:** `/portfolio` gains a venue filter, sport and bet-type pivots,
+an unknown-submit block, and the grade-conflict banner. `todo.md #595`/`#596`.
+
+`verify:` — READ OFF THE SERVED PAYLOAD AND THE SERVED HTML, not off a fixture.
+`GET /api/portfolio/live?on=all` and `?venue=polymarket`, same instant:
+
+    all dates, all venues     orders 144   settlement staked $238.45
+    all dates, polymarket     orders  57   settlement staked $101.06
+                              hidden_open_venue 38   venue "polymarket"
+
+  So the filter moves the TABLE and the TILES together, which is the property
+  it was written for -- a one-venue table above a both-venue P&L is the "some
+  tiles are ytd instead of matching date" complaint with the other control
+  substituted in. `venue_options` = 2, built from the book's own spelling.
+
+    unknown_submits 2   unknown_submit_dollars 8.21
+
+  The two 2026-08-27 Polymarket `http_503` rows, out of the positions table and
+  into their own block. Matches `venue_settlement.probe_unknown_polymarket_
+  positions`' own independently-derived figure for the same two orders exactly.
+
+    periods keys: by_day by_month by_year by_sport by_market
+    by_sport: mlb 110 (unknown 1) | wnba 20 (0) | nfl 16 (1)
+
+  And the HTML carries `live-venuefilter`, "were sent and the venue never
+  answered", the `http_503` text, and the whole-book note on the pivots.
+
+**`grade_conflicts` READS 0, AND THAT IS NOT A CLEAN BILL.** The banner is a
+pure read of `grade_check`, which is written by `paper_settlement.
+_check_venue_grade` on **refresh-worker**, and refresh-worker is still on
+`234c9e81`. Nothing has run the check in production yet. The three known
+conflicts are re-derivable offline from this same ledger, so a zero here means
+"not yet computed", not "no conflicts" -- exactly the instrument-blindness this
+repo keeps paying for. **It becomes a real reading only after refresh-worker
+carries `90ed748b`.**
+
+**Claim:** acquired 15:04:02Z, released after this reading. Nothing forced.
+
+
+## 2026-08-28 15:03-15:06Z — live-odds-worker `8edf77e5` -> `90ed748b` — lane `portfolio-venue-and-side-integrity`
+
+**What shipped:** Polymarket team sides (`home`/`away`) are REFUSED in
+`polymarket_us_orders._resolve_outcome_side` with
+`team_side_needs_verified_yes_leg`, behind
+`SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE=1`. Plus `MONEYLINE_YES_LEG_SHAPE`, a
+once-per-slate-write log of one moneyline row's `marketSides`/`question`.
+
+**Why:** Polymarket moneylines bought the wrong team on **3 of 8 venue-settled
+orders**, measured against MLB StatsAPI (`todo.md #595`). Totals on the same
+venue are 9 of 9 correct because they resolve by NAME; moneylines resolved by
+ARRAY POSITION, assuming `outcomes[0]` is the venue's YES leg.
+
+`verify:` — TWO readings, and the second is the one that matters.
+
+1. **The deploy is live and running the new code.** `live_odds_worker` booted
+   15:06:23Z on `90ed748b`; `TICK_COMPLETE results={'mlb': True, 'wnba': True,
+   'soccer': True, 'nfl': True}` at 15:07:33Z. Deploy `dep-da8q6i15efls73eahocg`.
+
+2. **THE VENUE ITSELF CORROBORATED THE DIAGNOSIS, UNPROMPTED, IN THE FIRST
+   CATALOGUE READ AFTER THE DEPLOY.** 15:07:31Z, four `POLYMARKET_US_MARKET`
+   lines on literal Yes/No futures:
+
+       tec-mlb-nlchamp-2026-09-27-nym   outcomes='["Yes","No"]'
+       tec-mlb-champ-2026-09-27-ath     outcomes='["Yes","No"]'
+       tec-mlb-nlchamp-2026-09-27-atl   outcomes='["No","Yes"]'   <-- REVERSED
+       tec-mlb-champ-2026-09-27-atl     outcomes='["Yes","No"]'
+
+   A market whose outcomes are the STRINGS "Yes" and "No" listing them
+   `["No","Yes"]` is as direct a refutation of "outcomes[0] is the YES leg" as
+   this venue could give. It is not a team-name ambiguity or an alias miss --
+   the array simply is not in YES-first order, on one of four sibling markets in
+   one response. Same 1-in-4-ish rate as the 3-of-8 seen on settled moneylines.
+
+**STILL OWED, and it is the point of the log line:** no
+`MONEYLINE_YES_LEG_SHAPE` yet. The 15:07:31Z catalogue read returned
+`sporting=1635 games=0 futures=1635` -- no GAME market in that page, and the
+shape line fires in `persist_game_slate`. It will print on the first slate write
+that contains a moneyline. **Do not read its absence as the line being broken
+until a write with `games>0` has happened** -- that is the distinction the
+`else` branch (`MONEYLINE_YES_LEG_SHAPE none moneylines=N`) exists to make.
+
+**What this deploy does NOT prove:** that any h2h order was actually refused.
+Nothing tried to place one in the first four minutes. The refusal's reachability
+is proven in tests (`off != on`: 4 existing tests fail against it and pass with
+the escape hatch set, asserted through `order_body`, not through the private
+helper) and by `verify_order_paths`, which now reports
+`markets['h2h']['OrderBuildError']`. A production refusal line is a nice-to-have,
+not the evidence.
+
+**Claim:** acquired 15:03:14Z, released after this reading. Nothing forced.
+
+
 ## 2026-08-28 — web `56e77588`: the live-gameline collector moves off the laptop (refresh-worker STILL PENDING)
 
 **web `56e77588`** `dep-da8prrrtqb8s73eulreg`, trigger=api, live **`14:47:09.68Z`**.
