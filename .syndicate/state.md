@@ -4792,11 +4792,25 @@ REBUILT.
 **Every row for a game today or tomorrow carries state**, against zero on every
 date before. Coverage is strictly better everywhere; nothing regressed.
 
-**Residual, OBSERVED AND NOT EXPLAINED:** the two future dates are partial, and
-`_MAX_GAME_STATE_DATES = 7` against 4 distinct dates RULES OUT the date bound.
-The likely cause is the board carding a curated FBS-vs-FBS subset while the
-shortlist carries quote rows outside it — a hypothesis, not a measurement.
-Pre-existing, and no game in play is affected.
+**Residual, NOW MEASURED — TWO causes, and only ONE is a defect.** Over the 10
+unmatched matchups on 09-03/09-04:
+
+- **9 are CORRECT.** They are FBS-vs-**FCS** (Albany, Bethune-Cookman,
+  Merrimack, West Georgia, Arkansas Pine Bluff, Eastern Illinois, Idaho,
+  Indiana State, North Carolina A&T). The board cards FBS-vs-FBS only, so no
+  chip is built and no join is possible. This is the curated-subset property,
+  working as designed — the earlier "hypothesis" is confirmed for these.
+- **1 IS A REAL ALIAS GAP.** `Massachusetts @ Rutgers`, 09-03, **fbs vs fbs**,
+  chip correctly built as `MAS @ RUT`. The Rutgers side matches on BOTH name
+  and abbr; the UMass side fails on both:
+
+      row "UMass Minutemen"  vs  chip name "Massachusetts" -> False
+      row "UMass Minutemen"  vs  chip abbr "MAS"           -> False
+
+  No heuristic can bridge `Massachusetts` <-> `UMass`; it is a vocabulary fact,
+  the same class as `UNC` <-> `North Carolina` measured on NCAAB. Root cause is
+  that `team_aliases._alias_map("ncaaf")` is EMPTY. Costs **4 rows on a future
+  date**; no game in play is affected.
 
 ## [ncaaf-live-lens-state] THE NCAAF LIVE LENS'S STATE BRANCH WAS UNREACHABLE, NOT EMPTY — **FIXED AND VERIFIED IN PRODUCTION** `[measured 2026-08-29T16:30:28Z, web 061d5b2b, lane ncaaf-live-lens-state]`
 
