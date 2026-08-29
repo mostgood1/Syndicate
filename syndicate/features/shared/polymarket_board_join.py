@@ -48,6 +48,7 @@ coverage is diagnosable instead of merely low.
 
 from __future__ import annotations
 
+import datetime as _dt
 import re
 from typing import Any, Collection, Iterable, Mapping, Sequence
 
@@ -596,6 +597,14 @@ def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | Non
     return frozenset((a, b))
 
 
+# How far past the board's own date a soccer fixture may be looked up. `#545`
+# builds TWO MATCHDAYS per league, and a league matchday cycle is a week, so a
+# fortnight covers the horizon with room and still cannot reach a fixture the
+# board is not carrying. Bounded rather than unbounded because the slate holds
+# futures dated months out.
+_FORWARD_HORIZON_DAYS = 14
+
+
 def _has_segment(modifiers: Sequence[str]) -> bool:
     """A period/quarter/half qualifier. `1q`, `2h`, `1p`, `f5`, `fh`, `sh`.
 
@@ -844,6 +853,7 @@ def join_polymarket_to_board(
     # Soccer PROP slug-modifier shapes -- the venue's own vocabulary.
     prop_modifier_census: dict[str, int] = {}
     key_miss_seen: set[str] = set()
+    forward_date_widened: dict[str, int] = {}
     alignment_samples: list[dict[str, Any]] = []
     orientation_flip_samples: list[dict[str, Any]] = []
 
@@ -1052,6 +1062,15 @@ def join_polymarket_to_board(
              ) or _venue_canonical_fixture(parsed)}
         )
 
+    # THE SAME MARKETS KEYED WITHOUT THE DATE, for the forward-horizon lookup
+    # below. Built once here for the same reason `board_fixtures` is: scanning
+    # `index` on every missed row would be O(rows x keys).
+    by_league_market: dict[tuple[str, str], list[tuple[str, list[dict[str, Any]]]]] = {}
+    for (_lg, _dt_key, _mk), _entries in index.items():
+        by_league_market.setdefault((_lg, _mk), []).append((_dt_key, _entries))
+    for _slots in by_league_market.values():
+        _slots.sort(key=lambda pair: pair[0])
+
     # BOARD FIXTURES PER (LEAGUE, DATE) -- the "matchups by league" the token
     # elimination below reasons over. Built once; a nested scan per unmatched
     # row would be O(rows x rows) on a 1,300-row board.
@@ -1115,6 +1134,58 @@ def join_polymarket_to_board(
         ).strip()
         wanted_key = (league, date, board_market)
         candidates = index.get(wanted_key) or []
+        # ------------------------------------------------------------------
+        # THE BOARD DATES BY SLATE; THE VENUE DATES BY FIXTURE.
+        # ------------------------------------------------------------------
+        #
+        # A shortlist row carries no date of its own, so `date` above falls
+        # back to `selected_date` -- the date of the FILE being priced, i.e.
+        # today. Polymarket's slug carries the date the fixture is PLAYED. For
+        # a same-day sport those are the same string and this never fires.
+        #
+        # The soccer board is not same-day. `#545` widened the card build to
+        # TWO MATCHDAYS per league "to cover the board's forward horizon", so
+        # most soccer rows describe a fixture that has not happened yet.
+        #
+        # MEASURED 2026-08-29T04:14:58Z, and it is not a coverage gap:
+        #
+        #     venue soccer rows      420 h2h + 750 spreads + 868 totals = 2,038
+        #     of them on 2026-08-28  0        (`markets_for_our_league_date: []`)
+        #     board soccer h2h rows refusing  118 -- i.e. ALL of them
+        #
+        # 2,038 markets the board cannot see, because every one is filed under
+        # the day it is played and the board asked for today.
+        #
+        # SOCCER ONLY, AND THE GATE IS THE WHOLE SAFETY ARGUMENT. MLB plays the
+        # SAME FIXTURE on consecutive days -- a three-game series is one club
+        # pair on three dates -- so widening by date there could price tonight's
+        # game off tomorrow's market, which is a worse bug than the one being
+        # fixed. Soccer club pairs do not repeat inside a two-matchday horizon.
+        #
+        # FORWARD ONLY. `d >= date` excludes SETTLED markets: the slate still
+        # carries 2026-08-16 rows, and matching one would price a live board row
+        # off a resolved contract at 0.99.
+        #
+        # NOTHING HERE RELAXES THE FIXTURE TEST. The widened rows go through the
+        # same `_teams_match` loop and the same ambiguity refusal below, so a
+        # two-legged tie that does repeat a club pair refuses as ambiguous
+        # rather than guessing a leg.
+        if not candidates and date and _norm(board_row.get("sport") or sport) == "soccer":
+            try:
+                _horizon = (
+                    _dt.date.fromisoformat(date) + _dt.timedelta(days=_FORWARD_HORIZON_DAYS)
+                ).isoformat()
+            except ValueError:
+                _horizon = ""
+            if _horizon:
+                widened: list[dict[str, Any]] = []
+                for _cand_date, _entries in by_league_market.get((league, board_market)) or ():
+                    if date <= _cand_date <= _horizon:
+                        widened.extend(_entries)
+                if widened:
+                    candidates = widened
+                    _wkey = f"{league}|{board_market}"
+                    forward_date_widened[_wkey] = forward_date_widened.get(_wkey, 0) + 1
         if not candidates:
             # WHY THE KEY MISSED, not just that it did.
             #
@@ -1437,6 +1508,14 @@ def join_polymarket_to_board(
         # One per board market that found an empty bucket, with the
         # neighbouring index keys that say WHICH component disagreed.
         "key_miss_samples": key_miss_samples,
+        # HOW MANY BOARD ROWS ONLY FOUND CANDIDATES BY LOOKING FORWARD. This is
+        # the reachability reading for the slate/fixture date split: zero with
+        # soccer still refusing means the diagnosis was wrong, and a non-zero
+        # count that does NOT reduce `no_candidates|soccer|*` means the rows
+        # were found and then lost further down.
+        "forward_date_widened": dict(
+            sorted(forward_date_widened.items(), key=lambda kv: -kv[1])
+        ),
         # What soccer PROP markets Polymarket actually publishes, by
         # slug-modifier shape. `btts` was found this way; corners has
         # not been found at all yet.

@@ -1605,3 +1605,113 @@ def test_FULL_GAME_btts_still_matches(monkeypatch):
           "away_team": "Villarreal", "event_id": "e1"}],
         selected_date="2026-08-28")
     assert out["matched"] == 1, out
+
+
+def test_soccer_board_row_reaches_a_FORWARD_dated_fixture(monkeypatch):
+    """The board dates by SLATE, the venue dates by FIXTURE.
+
+    A shortlist row carries no date of its own, so it inherits `selected_date`
+    -- today. Polymarket files each slug under the day the fixture is PLAYED,
+    and `#545` widened the soccer card build to two matchdays, so most soccer
+    rows describe a future fixture.
+
+    Measured 2026-08-29T04:14:58Z: the venue carried 2,038 soccer rows and NONE
+    of them on 2026-08-28, while all 118 soccer h2h board rows refused for want
+    of a candidate.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [{"slug": "atc-soccer-liv-not-2026-08-29-liv",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+          "outcomes": '["Liverpool","Nottingham Forest"]',
+          "outcomePrices": '["0.60","0.40"]'}],
+        [{"market": "h2h", "side": "home", "line": None, "sport": "soccer",
+          "selected_date": "2026-08-28", "home_team": "Liverpool",
+          "away_team": "Nottingham Forest", "event_id": "e1"}],
+        selected_date="2026-08-28")
+    assert out["matched"] == 1, out
+    assert out["forward_date_widened"] == {"soccer|h2h": 1}, out["forward_date_widened"]
+
+
+def test_MLB_is_NOT_widened_across_dates(monkeypatch):
+    """THE SAFETY GATE, and the reason the widening is soccer-only.
+
+    MLB plays the SAME club pair on consecutive days -- a three-game series is
+    one fixture on three dates. Widening by date there could price tonight's
+    game off tomorrow's market, which is worse than the bug being fixed.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [{"slug": "atc-mlb-az-sf-2026-08-29-az",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+          "outcomes": '["Diamondbacks","Giants"]',
+          "outcomePrices": '["0.55","0.45"]'}],
+        [{"market": "h2h", "side": "away", "line": None, "sport": "mlb",
+          "selected_date": "2026-08-28", "home_team": "San Francisco Giants",
+          "away_team": "Arizona Diamondbacks", "event_id": "e1"}],
+        selected_date="2026-08-28")
+    assert out["matched"] == 0, out
+    assert out["forward_date_widened"] == {}, out["forward_date_widened"]
+
+
+def test_a_SETTLED_past_fixture_is_never_reached(monkeypatch):
+    """Forward only. The slate still carries 2026-08-16 rows; matching one
+    would price a live board row off a contract that resolved at 0.99."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [{"slug": "atc-soccer-bra-gil-2026-08-16-bra",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+          "outcomes": '["Braga","Gil Vicente"]',
+          "outcomePrices": '["0.99","0.01"]'}],
+        [{"market": "h2h", "side": "home", "line": None, "sport": "soccer",
+          "selected_date": "2026-08-28", "home_team": "Braga",
+          "away_team": "Gil Vicente", "event_id": "e1"}],
+        selected_date="2026-08-28")
+    assert out["matched"] == 0, out
+    assert out["forward_date_widened"] == {}, out["forward_date_widened"]
+
+
+def test_a_fixture_beyond_the_horizon_is_not_reached(monkeypatch):
+    """Bounded, because the slate holds futures dated months out."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [{"slug": "atc-soccer-liv-not-2026-11-30-liv",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+          "outcomes": '["Liverpool","Nottingham Forest"]',
+          "outcomePrices": '["0.60","0.40"]'}],
+        [{"market": "h2h", "side": "home", "line": None, "sport": "soccer",
+          "selected_date": "2026-08-28", "home_team": "Liverpool",
+          "away_team": "Nottingham Forest", "event_id": "e1"}],
+        selected_date="2026-08-28")
+    assert out["matched"] == 0, out
+
+
+def test_a_repeated_club_pair_across_dates_refuses_as_AMBIGUOUS(monkeypatch):
+    """A two-legged tie repeats the club pair. The widened rows go through the
+    same ambiguity refusal, so it declines rather than guessing a leg."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    markets = [
+        {"slug": f"atc-soccer-liv-not-2026-08-{d}-liv",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+         "outcomes": '["Liverpool","Nottingham Forest"]',
+         "outcomePrices": '["0.60","0.40"]'}
+        for d in ("29", "30")
+    ]
+    out = mod.join_polymarket_to_board(
+        markets,
+        [{"market": "h2h", "side": "home", "line": None, "sport": "soccer",
+          "selected_date": "2026-08-28", "home_team": "Liverpool",
+          "away_team": "Nottingham Forest", "event_id": "e1"}],
+        selected_date="2026-08-28")
+    assert out["matched"] == 0, out
+    assert out["refusals"].get("ambiguous_polymarket_match") == 1, out["refusals"]

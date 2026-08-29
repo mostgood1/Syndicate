@@ -243,7 +243,10 @@ def _polymarket_price_resolver(selected_date: str | None):
             # The venue's OWN soccer prop vocabulary. `btts` was found from a
             # slug token; corners has not been found at all, and its current
             # route reads a `question` field that is never populated.
-            f" soccer_prop_shapes={joined.get('prop_modifier_census')}",
+            f" soccer_prop_shapes={joined.get('prop_modifier_census')}"
+            # Board rows rescued by the slate/fixture date split. See the
+            # forward-horizon block in the join.
+            f" forward_date_widened={joined.get('forward_date_widened')}",
             flush=True,
         )
     # WHICH COMPETITIONS THE BOARD CAN REACH, AND WHICH IT CANNOT. Printed
