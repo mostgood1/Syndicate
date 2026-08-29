@@ -123,6 +123,14 @@ def _sport_branch_profile_slugs() -> set[str]:
     raw = str(os.environ.get("SYNDICATE_SPORT_OVERVIEW_PROFILE") or "").strip().lower()
     if not raw:
         return set()
+    # AN EXPLICIT OFF VALUE, because UNSETTING IS NOT AVAILABLE. Render's env-var
+    # API rejects an empty value (`HTTP 400 must provide a value or
+    # generateValue must be set to true`), so "turn this back off" has to be a
+    # WORD, and the only word that worked was one no sport is called. That is a
+    # coincidence, not a mechanism: naming a sport `off` would silently re-arm a
+    # profiler somebody believed was disabled. Handled here instead.
+    if raw in {"0", "off", "false", "no", "none", "disabled"}:
+        return set()
     if raw in {"1", "true", "yes", "on", "all"}:
         return {"all"}
     return {part.strip() for part in raw.split(",") if part.strip()}

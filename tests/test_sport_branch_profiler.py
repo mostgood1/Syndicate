@@ -102,3 +102,13 @@ def test_end_on_none_is_a_noop(capsys):
 def test_begin_never_raises_even_if_the_env_is_nonsense(monkeypatch):
     monkeypatch.setenv("SYNDICATE_SPORT_OVERVIEW_PROFILE", ",,,  ,")
     assert H._sport_branch_profile_begin("soccer", hydrated=True) is None
+
+
+@pytest.mark.parametrize("value", ["off", "0", "false", "no", "none", "disabled", "OFF", " Off "])
+def test_explicit_off_values_disable_it(monkeypatch, value):
+    """UNSETTING IS NOT AVAILABLE: Render's env-var API rejects an empty value
+    (HTTP 400), so turning this off has to be a WORD. Without this branch, `off`
+    disables the profiler only by the coincidence that no sport is named `off`."""
+    monkeypatch.setenv("SYNDICATE_SPORT_OVERVIEW_PROFILE", value)
+    assert H._sport_branch_profile_slugs() == set()
+    assert H._sport_branch_profile_begin("soccer", hydrated=True) is None
