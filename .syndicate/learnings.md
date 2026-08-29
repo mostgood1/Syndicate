@@ -6202,3 +6202,50 @@ was editing.**
   the detector's silence also meant nothing ever acted. That is luck, not
   design: the same class of error on the permissive side would have placed
   losing pairs at even money instead of finding nothing at the tails.
+
+---
+
+## 2026-08-29 — FORBIDDEN: reading `count: 0` from an artifact export as "the artifact is unreachable". It is a fact about what the READER scans. I had this rule on file and walked into it anyway. `[lane live-venue-order-placement]`
+
+- **What we believed:** `/api/ops/artifacts/export?pattern=*polymarket*`
+  returning `count: 0` meant the Polymarket slate was not reachable from web,
+  so any cross-venue measurement needed a worker-side probe or a publishing
+  change first. I put that in `state.md` and built a recommendation on it.
+- **What was actually true:** the slate has been reachable from web the whole
+  time. Both services run `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, so
+  `persist_game_slate` writes to the KEYVALUE store and never to disk, while
+  the export scans DISK. `/api/ops/polymarket/slate` returns `count: 17241`.
+  **`ops.py:450`'s docstring records this exact trap, measured 2026-08-27**,
+  including the observation that the obvious fix (allowlist it in
+  `HOT_ARTIFACT_PATTERNS`) would have been an inert no-op.
+- **And better than that:** `/api/board/layer2-shortlist` carries BOTH venues'
+  prices on the same row in `quote.book_prices`. The measurement I said needed
+  a credentialed worker probe needed ONE web call.
+- **How we found out:** a peer lane mentioned in passing that it had settled
+  several venue questions off `/api/ops/polymarket/slate` without credentials.
+  I checked instead of accepting, and they were right.
+- **Why the existing rule did not save me.** I have
+  `keyvalue_artifact_split_blinds_guards` in memory — "read_json_file sees only
+  keyvalue; a guard reading it is blind to exactly the big payloads that
+  matter". That is the SAME split, from the other side, and I did not connect
+  it because the symptom presented as an ordinary empty result rather than as a
+  guard misfiring. **A rule filed under one symptom does not fire on another.**
+- **The rules going forward:**
+  1. **A zero from a reader is a fact about the reader until you have checked
+     what it reads.** Before concluding "absent", name the STORE the writer
+     writes to and confirm the reader scans it. One question, and it is the
+     same question in both directions of this split.
+  2. **Before building a new reader, grep the ops blueprint for an existing
+     one.** `/api/ops/polymarket/slate` existed, was documented, and answered
+     the question. I proposed building a probe and publishing an artifact —
+     both unnecessary, both would have shipped.
+  3. **Ask what is already joined before assembling a join.** Two venues'
+     prices sitting on one board row is a stronger instrument than two
+     separately-fetched catalogues, because it is same-instant by construction
+     — which is a standing rule here (`measure_same_instant`) that I satisfied
+     by luck rather than by design.
+- **Cost:** none realised — no code was written against the wrong conclusion,
+  and the correction arrived before the next increment. But the recommendation
+  I gave the user ("worker-side probe, or publish the slate first") was wrong
+  in both branches, and had they picked either we would have built something
+  that already existed.

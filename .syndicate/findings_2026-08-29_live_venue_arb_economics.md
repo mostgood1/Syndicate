@@ -148,3 +148,94 @@ It says nothing about model edge. `live-game-line-projection` (CLOSED
 and a prior live-edge attempt produced fabricated edges twice the size of real
 ones. **Arb viability is model-independent and does not license live
 model-driven placement.** Those remain separate questions.
+
+---
+
+# CORRECTION + THE MEASUREMENT, 2026-08-29 ~22:1xZ
+
+## I WAS WRONG: the Polymarket slate IS reachable from web, and I repeated a documented trap
+
+**RETRACTED from §6 and from `state.md`:** *"The Polymarket slate is not
+published to web (`export?pattern=*polymarket*` -> `count: 0`)."*
+
+`count: 0` on the artifacts export does **not** mean the artifact is
+unreachable. `ops.py:450`'s own docstring records exactly this, measured
+2026-08-27: both services run `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, so
+`persist_game_slate` writes to the KEYVALUE STORE and never to disk, while the
+export scans DISK. *"The artifact was already reachable from web the whole time;
+what was missing was a reader."* `/api/ops/polymarket/slate` returns
+`count: 17241` right now.
+
+This is the `keyvalue_artifact_split_blinds_guards` trap, which I had on file
+and walked into anyway. **A zero from a reader is a fact about the READER until
+you have checked what it reads.** I then built a recommendation on top of it
+(a worker-side probe, or "publish the slate") — both unnecessary.
+
+Credit: peer lane `venue-join-refusal-visibility` flagged that
+`/api/ops/polymarket/slate` had answered venue questions all session without
+credentials. I verified it rather than taking it, and they are right.
+
+## THE MEASUREMENT THE LANE OWED — RAN FROM WEB, NO CREDENTIALS, NO PROBE
+
+`/api/board/layer2-shortlist` carries **both venues' prices on the same row**
+in `quote.book_prices`, so a same-instant cross-venue read needs one HTTP call.
+Board `written_at: 2026-08-29T21:56:11Z`, 1,195 rows.
+
+    per-row venue coverage   both 19 | kalshi_only 17 | poly_only 28 | neither 1,124
+    complementary cross-venue pairs formed                              12
+    pairs with POSITIVE net edge after real fees                         0
+
+### The zero is NOT a fee problem. The venues agree.
+
+    best raw edge across all 12 pairs          +0.00c
+    ...with a FREE Polymarket (fee = 0)        -0.87c   still negative
+
+So even setting the Polymarket cost to zero, nothing clears. The two venues
+price these markets to within a cent of each other, and Kalshi's own MLB fee
+alone exceeds the disagreement. **Measuring Polymarket's real fee would not
+change this verdict on this sample** — it remains the right fix for other
+reasons, but it is no longer the thing standing between us and an executed arb.
+
+### ALL 12 PAIRS ARE PREGAME AND AT EVEN MONEY — the worst possible regime
+
+Fee on every pair clustered at ~3.35c, the even-money peak of the parabola.
+The tail regime, where break-even is 0.52-1.11c, contributed **zero pairs**.
+
+### WHY: the coverage overlap fails exactly where the economics work
+
+28 live Polymarket rows exist. **All 28 have `sides=2` on the board and
+`other_side_has_kalshi=False`** — Polymarket quotes one side, Kalshi does not
+quote the opposite side of that same market, so the pair can never form. All 28
+are `totals`, and **16 of them sit at the tails** (>=0.90 or <=0.10), which is
+precisely the regime where a 1c gap would be profitable.
+
+## WHAT THIS CHANGES
+
+**The binding constraint is venue COVERAGE OVERLAP at the tails — not fees, not
+the YES-leg binding, and not the missing two-leg executor.** Building an
+executor now would be building a consumer for an empty set.
+
+Revised order of work:
+
+1. **Find out why Kalshi's opposite side is absent on live totals.** Line
+   mismatch (Kalshi's ladder vs Polymarket's) is the leading candidate and is
+   cheap to check — `KXMLBTOTAL` strikes are integers/halves and Polymarket's
+   `line` may not land on them. If Kalshi simply does not list that strike, the
+   pair is structurally impossible and cross-venue totals arb is dead at the
+   tails; if it is a JOIN gap, it is recoverable and it is the whole
+   opportunity.
+2. Only then revisit the executor.
+
+**UNCHANGED AND STILL TRUE:** the fee work stands on its own (18/18 real fills;
+`DEFAULT_FEE_BUFFER` was above MLB break-even at every price). It is what made
+this measurement interpretable — a flat 4c buffer would have reported the same
+zero and taught us nothing about why.
+
+## CAVEAT ON THE INSTRUMENT
+
+`quote.book_prices` is a board QUOTE SNAPSHOT (`book_age_seconds` ~294s on the
+sampled row), not a firm ask. Any positive result would have been a CANDIDATE
+requiring a live ask re-read before execution — which `_kalshi_price_for`
+already does at submit. A zero on a snapshot is weaker evidence than a zero on
+live asks, and n=12 is small: **this is "no arb on tonight's 12 observable
+pairs", not "no arb between these venues".**

@@ -87,12 +87,42 @@ callers must opt into a pessimistic bound by name. **At even money ~2/3 of the
 modelled pair cost is the number we cannot read — measuring it is worth more
 than any further precision on Kalshi's.**
 
+**THE CROSS-VENUE NUMBER IS MEASURED, AND IT IS ZERO — BUT NOT FOR A FEE
+REASON** `[2026-08-29 ~22:1xZ]`. `/api/board/layer2-shortlist` carries BOTH
+venues' prices on the same row in `quote.book_prices`, so this needs one web
+call and no credentials. Board `written_at 21:56:11Z`, 1,195 rows: **12
+complementary cross-venue pairs, 0 with positive net edge.** Best raw edge
+**+0.00c** — and **-0.87c even with a FREE Polymarket**, so the venues simply
+agree and Kalshi's own MLB fee exceeds the disagreement. All 12 pairs are
+PREGAME and at EVEN MONEY (fee ~3.35c, the parabola's peak); the tail regime
+contributed zero pairs.
+
+**THE BINDING CONSTRAINT IS COVERAGE OVERLAP AT THE TAILS**, not fees, not the
+YES-leg binding, not the missing executor. 28 live Polymarket rows exist and
+**all 28 have `other_side_has_kalshi=False`** — Polymarket quotes one side,
+Kalshi does not quote the opposite side of the same market, so no pair can
+form. All 28 are totals and **16 sit at the tails** (>=0.90 or <=0.10), exactly
+where a 1c gap would clear. Next step is whether that is a LINE MISMATCH
+(Kalshi's `KXMLBTOTAL` strike ladder vs Polymarket's `line`) or a join gap.
+Building a two-leg executor now would build a consumer for an empty set.
+
+**RETRACTED, and it was my error:** "the Polymarket slate is not published to
+web (`export?pattern=*polymarket*` -> `count: 0`)". **FALSE.** `count: 0` on
+the artifacts export is a fact about the EXPORT, which scans disk, while
+`persist_game_slate` writes to the KEYVALUE store — documented at `ops.py:450`
+since 2026-08-27 and reachable the whole time. `/api/ops/polymarket/slate`
+returns `count: 17241`. This is the `keyvalue_artifact_split_blinds_guards`
+trap, walked into with the rule already on file. No worker-side probe is
+needed and nothing needs "publishing".
+
+CAVEAT: `book_prices` is a quote snapshot (`book_age_seconds` ~294s), not a
+firm ask, and n=12. Read as "no arb on tonight's 12 observable pairs", NOT as
+"no arb between these venues".
+
 STILL BLOCKING EXECUTION: Polymarket refuses every moneyline
-(`team_side_needs_verified_yes_leg`) and an arb IS a moneyline trade; the
-Polymarket slate is not published to web (`export?pattern=*polymarket*` ->
-`count: 0`, unchanged since 08-26) so the cross-venue number can only be
-measured on the worker; `#600` (ledger read-modify-write race) is landed and NOT
-deployed; and no two-leg executor exists — a one-sided fill is a naked position.
+(`team_side_needs_verified_yes_leg`) and an arb IS a moneyline trade; `#600`
+(ledger read-modify-write race) is landed and NOT deployed; and no two-leg
+executor exists — a one-sided fill is a naked position.
 
 `.syndicate/findings_2026-08-29_live_venue_arb_economics.md` carries the tables.
 
