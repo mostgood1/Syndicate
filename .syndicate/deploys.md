@@ -93,7 +93,9 @@ git grep -c record_live_gameline_score 8b8a6579 -- book_grid_artifact.py -> 2
 
 Both services now on `8b8a6579`.
 
-### verify PARTIAL — and the missing half was MY defect, found by reading the bytes
+### verify MET (2026-08-29) for the CAPTURE — see the closure block below. Reader half still inert.
+
+### verify PARTIAL (as recorded 2026-08-28) — and the missing half was MY defect, found by reading the bytes
 
 Board rebuilt `16:00:27Z`, AFTER the deploy. `live_gameline_accuracy` served
 **`null`**.
@@ -126,6 +128,40 @@ that the code is present and reachable in test. Both observation routes are
 currently blank — counters unforwarded, file not yet written. **The first real
 reading is tonight's first FINAL game.** Do not record this deploy as verified
 until then.
+
+### CLOSED 2026-08-29 — verify MET. The recorder EXECUTED. Numbers below.
+
+Read by scheduled task `live-gameline-worker-retention-first-write`, 2026-08-29
+09:2x CT (14:2x Z). Full working in `.syndicate/log/2026-08-29.md`.
+
+refresh-worker is no longer on `8b8a6579` — live commit **`06d1c78c`**
+(2026-08-29T05:18:18Z, trigger `api`, another lane). The code SURVIVED that deploy,
+checked by content: module present, `record_live_gameline_score` count 2 in
+`book_grid_artifact.py`.
+
+`GET /api/ops/artifacts/export?pattern=*live_gameline_accuracy*` -> 200, **count 3**
+(mlb 15 rows, soccer 4, wnba 4). MLB slate **2026-08-28: 14 rows**, `captured_by:
+board_build`, `games_with_outcome` 1 -> 14 monotonic, last at 23:40:15 CT.
+Best row `priceable_only`: model **0.29708**, market **0.24318**,
+`model_minus_market_brier` **+0.05390**, `n = 3194/3194/3194`,
+`populations_matched: true`, `records_considered: 6425`.
+soccer 08-28 gwo=4 (+0.14319, n=91); wnba 08-28 gwo=3 (+0.11322, n=14); soccer also
+wrote a 2026-08-29 row (gwo=4, +0.08338, n=189) — the recorder runs across the roll.
+
+**The roll test passed harder than the bar required.** The same board, asked today for
+`date=2026-08-28`, returns `games_with_outcome: 1` with `priceable_only` identical to
+the FIRST retained row — the request-time rebuild of a past date recovers only the
+earliest state (`no_final_outcome_for_game: 6137`). The retained file holds 14 games
+the live system can no longer reconstruct. The IMPROVES-only guard also held: today's
+degraded gwo=1 did not overwrite the retained 14.
+
+NOT closed: the served `live_gameline_accuracy` counters block is still absent from
+`/api/board/book-grid` on both boards. That is the `intelligence.py` allowlist gap
+(`#599`), still cross-lane blocked, and it is a READER defect only — the producer is
+proven by the file above.
+
+Floor, not total: 14 may not be the complete 08-28 MLB slate. Last capture was 20 min
+before the roll and the degraded rebuild cannot be used to count the slate.
 
 ### BLOCKED — the fix is cross-lane and the holder is LIVE
 
