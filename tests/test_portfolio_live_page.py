@@ -1144,3 +1144,98 @@ def test_saving_returns_to_the_form_not_the_top_of_the_page(app_client, monkeypa
     assert r.status_code == 303
     assert r.headers["Location"].endswith("/portfolio#bankroll")
     assert seen == {"bankroll_units": "1000", "max_positions": "25"}
+
+
+# --------------------------------------------------------------------------
+# BALANCE EVIDENCE IN THE BANNER. The block used to tell the reader that only a
+# person at the venue's screen could settle one of these. True of the ORDER
+# routes, never true of the ACCOUNT -- `/account/balances` settled a real $1.84
+# case on 2026-08-29.
+# --------------------------------------------------------------------------
+
+
+def _bal_trail(*pairs):
+    return [{"recorded_at": at, "kalshi": {"status": "ok", "dollars": d}} for at, d in pairs]
+
+
+def _unknown_with_trail(monkeypatch, trail, **over):
+    from syndicate.blueprints import intelligence as mod
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    order = _live_order("failed", "http_503: {\"code\":14}", key="lost")
+    order["idempotency_key"] = "idem-lost"
+    order["venue_resolved_at"] = "2026-08-25T23:00:02Z"
+    order.update(over)
+    monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": [order]})
+    monkeypatch.setattr(
+        "syndicate.features.shared.venue_balances.read_balance_history", lambda: trail
+    )
+    return mod._live_portfolio_payload("2026-08-25", on_date="all")
+
+
+def test_a_flat_balance_reaches_the_payload_as_not_placed(monkeypatch):
+    payload = _unknown_with_trail(
+        monkeypatch,
+        _bal_trail(("2026-08-25T22:59:00Z", 50.0), ("2026-08-25T23:05:00Z", 50.0)),
+    )
+    be = payload["unknown_submits"][0]["balance_evidence"]
+    assert be["verdict"] == "not_placed"
+
+
+def test_the_banner_renders_the_verdict(app_client, monkeypatch):
+    _unknown_with_trail(
+        monkeypatch,
+        _bal_trail(("2026-08-25T22:59:00Z", 50.0), ("2026-08-25T23:05:00Z", 50.0)),
+    )
+    body = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    assert "Balance unchanged across the submit" in body
+    # The warning itself must survive -- evidence annotates it, never replaces it.
+    assert "do not re-submit" in body
+
+
+def test_the_banner_no_longer_claims_nothing_can_confirm_or_deny(app_client, monkeypatch):
+    """The sentence `/account/balances` disproved. Its removal is the point of
+    this change, so a regression that restores it must fail here."""
+    _unknown_with_trail(
+        monkeypatch,
+        _bal_trail(("2026-08-25T22:59:00Z", 50.0), ("2026-08-25T23:05:00Z", 50.0)),
+    )
+    body = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    assert "confirm or deny that a position exists" not in body
+
+
+def test_an_unknown_verdict_renders_no_verdict_word(app_client, monkeypatch):
+    """THE FALSIFICATION TEST NAMED IN THE LANE. A banner asserting a verdict
+    while the payload says `unknown` would prove the join wrong -- and on a busy
+    slate `unknown` is the COMMON answer, so this is the usual path."""
+    payload = _unknown_with_trail(monkeypatch, [])  # no trail at all
+    assert payload["unknown_submits"][0]["balance_evidence"]["verdict"] == "unknown"
+
+    body = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    assert "strong evidence it never reached the venue" not in body
+    assert "evidence a position WAS taken" not in body
+    assert "No balance reading either side of this submit" in body
+
+
+def test_the_banner_still_renders_when_the_evidence_lookup_explodes(app_client, monkeypatch):
+    """Losing the annotation is a degraded answer; losing the WARNING about
+    money we cannot account for is a silent one."""
+    from syndicate.blueprints import intelligence as mod
+    from syndicate.features.shared import execution_ledger as ledger_mod
+
+    order = _live_order("failed", "http_503: boom", key="lost")
+    order["idempotency_key"] = "idem-lost"
+    monkeypatch.setattr(ledger_mod, "_load", lambda: {"orders": [order]})
+
+    def _boom():
+        raise RuntimeError("store down")
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.venue_balances.read_balance_history", _boom
+    )
+    payload = mod._live_portfolio_payload("2026-08-25", on_date="all")
+    assert len(payload["unknown_submits"]) == 1
+    assert payload["unknown_submits"][0]["balance_evidence"] is None
+
+    body = app_client.get("/portfolio?on=all").get_data(as_text=True)
+    assert "do not re-submit" in body

@@ -860,3 +860,53 @@ def test_the_order_never_counts_as_its_own_confounder(monkeypatch):
     """By key, not identity -- the same bug `sole_claim` was written to avoid."""
     out = _probe(monkeypatch, [_the_503()], _THE_REAL_TRAIL)
     assert out["findings"][0]["balance_evidence"]["confounding_orders"] == 0
+
+
+# --------------------------------------------------------------------------
+# THE PAGE'S DOOR TO THE SAME ARITHMETIC. `balance_evidence_for_unknown_submits`
+# exists so the banner and the worker's UNKNOWN_ORDER_PROBE cannot disagree
+# about one order.
+# --------------------------------------------------------------------------
+
+
+def _evidence(monkeypatch, orders, readings):
+    monkeypatch.setattr(
+        "syndicate.features.shared.venue_balances.read_balance_history",
+        lambda: list(readings),
+    )
+    return vs.balance_evidence_for_unknown_submits(list(orders))
+
+
+def test_the_page_helper_returns_the_same_verdict_as_the_probe(monkeypatch):
+    """ONE implementation. If these ever diverge, the banner and the log line
+    describe the same order differently and nobody can tell which is right."""
+    order = _the_503()
+    via_helper = _evidence(monkeypatch, [order], _THE_REAL_TRAIL)[order["idempotency_key"]]
+    via_probe = _probe(monkeypatch, [order], _THE_REAL_TRAIL)["findings"][0]["balance_evidence"]
+    assert via_helper == via_probe
+    assert via_helper["verdict"] == "not_placed"
+
+
+def test_a_kalshi_order_does_not_confound_a_polymarket_submit(monkeypatch):
+    """A move in one venue's balance cannot be explained by the other's order.
+    Counting it would report `confounded` on something this can actually settle."""
+    kalshi = {
+        "mode": "live", "venue": "kalshi", "status": "filled",
+        "idempotency_key": "k1", "submitted_at": "2026-08-29T21:08:00Z",
+        "venue_order_id": "K",
+    }
+    out = _evidence(monkeypatch, [_the_503(), kalshi], _THE_REAL_TRAIL)
+    assert out["5c53789d4d21d05fc501b05d"]["verdict"] == "not_placed"
+    assert out["5c53789d4d21d05fc501b05d"]["confounding_orders"] == 0
+
+
+def test_an_order_with_no_key_is_skipped_not_given_a_synthetic_one(monkeypatch):
+    """Inventing an identity to make a dict shape work is how two different
+    orders end up sharing evidence."""
+    keyless = dict(_the_503()); keyless["idempotency_key"] = ""
+    assert _evidence(monkeypatch, [keyless], _THE_REAL_TRAIL) == {}
+
+
+def test_no_trail_yields_unknown_for_the_page_too(monkeypatch):
+    out = _evidence(monkeypatch, [_the_503()], [])
+    assert out["5c53789d4d21d05fc501b05d"]["verdict"] == "unknown"

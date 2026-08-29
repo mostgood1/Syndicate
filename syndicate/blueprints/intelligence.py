@@ -4083,6 +4083,33 @@ def _live_portfolio_payload(
         unknown_keys = {id(o) for o in unknown_submits}
         orders = [o for o in orders if id(o) not in unknown_keys]
 
+        # DID THE ACCOUNT MOVE WHEN THE SUBMIT FAILED? Attached here rather
+        # than computed in the template, and taken from the SAME function the
+        # worker's `UNKNOWN_ORDER_PROBE` uses so the banner and the log cannot
+        # disagree about one order.
+        #
+        # NO VENUE CALL -- `balance_evidence_for_unknown_submits` reads the
+        # stamped balance trail and does arithmetic. See its docstring for why
+        # that matters on this service.
+        #
+        # WRAPPED, because this banner is the one that reports money we cannot
+        # account for: if the evidence lookup fails the banner must still
+        # render, minus the evidence. Losing the annotation is a degraded
+        # answer; losing the warning is a silent one.
+        if unknown_submits:
+            try:
+                from syndicate.features.shared.venue_settlement import (
+                    balance_evidence_for_unknown_submits,
+                )
+
+                evidence = balance_evidence_for_unknown_submits(unknown_submits)
+            except Exception:
+                evidence = {}
+            for order in unknown_submits:
+                order["balance_evidence"] = evidence.get(
+                    str(order.get("idempotency_key") or "").strip()
+                )
+
         # THE VENUE FILTER `[user 2026-08-28]`, built from the book's own
         # spelling rather than a hardcoded tuple. Computed BEFORE the venue
         # filter narrows anything, or picking Kalshi once would remove

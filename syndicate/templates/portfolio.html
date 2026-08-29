@@ -1272,19 +1272,29 @@
 
      `[user 2026-08-28]` "yesterday has 2 positions that were errors showing as
      an actual position." They were, and the fix is not to delete them: we do
-     not know whether they landed. Polymarket has no route that can answer it
-     (`GET /v1/orders` -> 501, and the per-order read needs the id the 503 lost)
-     so the only thing that settles one of these is a person opening the venue's
-     own screen. The block says exactly that, names the market and the money,
-     and stops short of claiming either outcome.
+     not know whether they landed.
+
+     THIS BLOCK USED TO SAY only a person at the venue's own screen could settle
+     one of these. That was true of the ORDER routes -- `GET /v1/orders` answers
+     501 and the per-order read needs the id the 503 lost -- and it was never
+     true of the ACCOUNT. Measured 2026-08-29 on a $1.84 submit: Polymarket
+     `buyingPower` read 96.05 either side of the failed submit and fell only
+     once the retry filled, so nothing was ever placed. `balance_evidence`
+     carries that arithmetic per row now.
+
+     IT IS EVIDENCE, NOT A GRADE, and the wording keeps the difference.
+     `unknown` is the honest and common answer on a busy slate -- another order
+     inside the same balance window makes the delta unattributable -- so a
+     verdict is only RENDERED when the arithmetic actually reached one. The
+     block still names the market and the money and still says check the venue.
      --------------------------------------------------------------------- #}
   {% if L.unknown_submits %}
     <div class="live-error">
       <strong>{{ L.unknown_submits|length }} order(s) were sent and the venue never answered.</strong>
       Up to <strong>${{ "%.2f"|format(L.unknown_submit_dollars or 0) }}</strong> may or may not
       be at risk. These are <em>not</em> counted as positions in the table below and
-      <em>not</em> counted as refusals — we hold no order id for them, so nothing
-      here can confirm or deny that a position exists.
+      <em>not</em> counted as refusals — we hold no order id for them.
+      Where the account's balance can answer it, the row says so below.
       <strong>Check them on the venue's own screen; do not re-submit.</strong>
       <ul class="live-unknown-list">
         {% for o in L.unknown_submits %}
@@ -1296,6 +1306,36 @@
             · ${{ "%.2f"|format(o.get('requested_stake_dollars') or 0) }} requested
             <span class="sub">{{ o.get('venue_ticker') or '' }}</span>
             {% if o.get('error') %}<span class="sub warn">{{ o.get('error') }}</span>{% endif %}
+            {# THE ACCOUNT'S OWN ANSWER. Rendered only when the arithmetic
+               reached a verdict; `unknown` states WHY rather than going quiet,
+               because "we could not tell" and "we did not look" are different
+               and the reader has to be able to tell them apart. #}
+            {% set be = o.get('balance_evidence') %}
+            {% if be %}
+              {% if be.get('verdict') == 'not_placed' %}
+                <span class="sub ok">Balance unchanged across the submit
+                  (${{ "%.2f"|format(be.get('opening_dollars') or 0) }} before and after)
+                  &mdash; strong evidence it never reached the venue.</span>
+              {% elif be.get('verdict') == 'placed' %}
+                <span class="sub warn">Balance fell
+                  ${{ "%.2f"|format(be.get('delta_dollars') or 0) }} across the submit
+                  &mdash; evidence a position WAS taken. Treat as live exposure.</span>
+              {% elif be.get('reason') == 'confounded' %}
+                <span class="sub">Balance moved, but
+                  {{ be.get('confounding_orders') }} other order(s) went out in the same
+                  window &mdash; the change cannot be attributed to this one.</span>
+              {% elif be.get('reason') == 'no_bracketing_reading' %}
+                <span class="sub">No balance reading either side of this submit, so the
+                  account cannot answer it.</span>
+              {% elif be.get('reason') == 'unreadable' %}
+                <span class="sub">The balance could not be read around this submit &mdash;
+                  which is not the same as it not having moved.</span>
+              {% elif be.get('reason') == 'moved_but_not_by_this_order' %}
+                <span class="sub">Balance moved
+                  ${{ "%.2f"|format(be.get('delta_dollars') or 0) }}, which this order's
+                  stake does not explain.</span>
+              {% endif %}
+            {% endif %}
             {# THE ONLY WAY OUT, because no read this system can make will
                settle these -- Polymarket answers 501 on the orders list and the
                per-order read needs the id the 503 lost. A human opens the

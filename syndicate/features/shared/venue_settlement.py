@@ -584,6 +584,54 @@ def _balance_evidence(
     return verdict
 
 
+def balance_evidence_for_unknown_submits(orders: Any) -> dict[str, dict[str, Any]]:
+    """`{idempotency_key: balance_evidence}` for every unknown submit in `orders`.
+
+    THE PAGE'S DOOR TO THE SAME ARITHMETIC THE PROBE USES, and it exists so
+    there is exactly ONE implementation. `_live_portfolio_payload` needs this
+    per row; reimplementing the comparison there would let the banner and the
+    worker's `UNKNOWN_ORDER_PROBE` disagree about the same order, which is the
+    failure `_resolve_live_slate` already names in its own docstring -- "an API
+    that silently disagrees with the page it backs is a trap this repo has paid
+    for more than once".
+
+    SAFE ON THE WEB SERVICE, and that is a deliberate property rather than a
+    happy accident:
+
+      * NO VENUE CALL. It reads `venue_balances`' stamped trail and the ledger
+        rows the caller already holds, then does arithmetic. Web has no
+        credentials and must not get them (`venue_balances` says why at
+        length), and a second independent live caller of a venue is a
+        documented incident class here (`#139`/`#144`/`#148`).
+      * NO HEAVY COMPUTE. Two list walks over a bounded trail (128 readings).
+
+    Keyed by `idempotency_key` because that is this ledger's identity for an
+    order (`_order_identity`), and because the caller re-filters rows for
+    display -- a key survives that, a list position does not.
+
+    An order with no key is skipped rather than given a synthetic one: it could
+    not be joined back to a row anyway, and inventing an identity to make a
+    dict shape work is how two different orders end up sharing evidence.
+    """
+    from syndicate.features.shared.venue_balances import read_balance_history
+
+    rows = [o for o in (orders or []) if isinstance(o, Mapping)]
+    live = [o for o in rows if str(o.get("mode") or "") == "live"]
+    readings = read_balance_history()
+    out: dict[str, dict[str, Any]] = {}
+    for order in rows:
+        key = str(order.get("idempotency_key") or "").strip()
+        if not key:
+            continue
+        venue = str(order.get("venue") or "").strip().lower()
+        # SAME-VENUE ONLY. A Kalshi order inside the window cannot explain a
+        # move in the Polymarket balance, and counting it would report
+        # `confounded` on an order this evidence could actually settle.
+        same_venue = [o for o in live if str(o.get("venue") or "").strip().lower() == venue]
+        out[key] = _balance_evidence(order, readings=readings, same_venue_orders=same_venue)
+    return out
+
+
 def probe_unknown_polymarket_positions(
     orders: Any, resolution_rows: Any
 ) -> dict[str, Any]:
