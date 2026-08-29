@@ -37894,3 +37894,73 @@ times today (an untracked `cfbd_lines` mirror, a worktree baseline missing
 untracked data, and a watcher gated on elapsed time instead of `written_at`).
 The discriminator each time: *what would this reading look like if the thing I
 am testing had never run?*
+
+## 2026-08-29 22:45Z — live-odds-worker — `219d79ca` — unknown-submit-retry-provenance
+
+deploy: `dep-da9m24942hec738a3400`  api trigger  live 22:48:23Z (from `95c4fb12`, 4h stale)
+why:    the retry after an operator `not_placed` was DELETING the provenance
+        `resolve_unknown_submit` promises to preserve; Polymarket fills booked
+        with no fee; the unknown-submit probe claimed no venue read could
+        settle it.
+
+verify: **all three read on production, 22:50 tick.**
+
+  1. PROVENANCE CARRIED. Two real rows now hold the attempt they replaced:
+     `aec-mlb-bal-ath-2026-08-29` and `atc-mls-col-rsl-2026-08-29-rsl`, each
+     `prior_attempts=[{status:rejected, error:OrderBuildError:..., submitted_at
+     22:45:0x, replaced_at 22:50:4x}]`. Before this, `record_order`'s pop
+     deleted that. Observed on the retry path itself, not a fixture.
+
+  2. FEES RECORDED. 5 Polymarket rows carry non-null `fees_dollars`, against
+     **0 of 13 before** (the number `venue_fees.py` refuses on):
+
+       tsc-mls-nyr-phi-2026-08-29-3pt5   0.06 / 1.84   3.26%
+       tsc-mls-min-orl-2026-08-29-3pt5   0.07 / 2.12   3.30%
+       tsc-mlb-mia-wsh-2026-08-29-7pt5   0.05 / 1.60   3.12%
+       tsc-mlb-sd-tb-2026-08-29-7pt5     0.28 / 8.79   3.19%
+       tsc-sea-juv-par-2026-08-29-2pt5   0.04 / 1.05   3.81%
+
+     `COMMISSION order=C60JWBG0WKDK raw='0.0600' dollars=0.06 fill_price=0.47
+     filled=3.91 fill_cost=1.8377` — INDEPENDENTLY REPRODUCES the $0.06 derived
+     hours earlier from the balance delta ($1.8977 debit vs $1.8377 fill).
+     0 `COMMISSION_IMPLAUSIBLE`, so the unit guard withheld nothing.
+
+     **CAUTION FOR ANY RATE FIT: `commissionsBasisPoints` and
+     `makerCommissionsBasisPoints` are `'0'` on ALL 8 reads — NOT
+     discriminating.** Only `commissionNotionalTotalCollected / fill_cost` can
+     calibrate. `live-venue-order-placement` raised exactly this risk for
+     Kalshi (21 fills at 0.5 / 4 at 1.0 is what made that fit mean anything);
+     on Polymarket the bps fields cannot play that role.
+
+  3. BALANCE HISTORY — WRITE EXERCISED, CONTENT NOT DIRECTLY READ. `VENUE_BALANCES`
+     ran 22:50:24 (`kalshi=ok:45.24 polymarket=ok:91.96`), and
+     `append_balance_history` is called unconditionally before the stamp write,
+     so the path ran. **0 `HISTORY_WRITE_FAILED`** — an emitter I control, in an
+     unconditional `except`, so its silence means `write_json_file` did not raise.
+     NOT the same as reading the stored rows back: no ops endpoint enumerates a
+     key this small. `keyvalue/usage` and `sweep-preview` both returned "absent",
+     and BOTH ALSO RETURN ABSENT FOR `venue_balances.json`, which is written every
+     tick and rendered on the page — so those nulls are instrument blindness, not
+     evidence. Smallest key `usage` lists is 196,768 bytes.
+     STILL UNOBSERVED: `balance_evidence` / `balance_settled` in
+     `UNKNOWN_ORDER_PROBE`. It only fires when an unknown submit EXISTS, and
+     there are none. Not manufacturable — that would mean deliberately failing a
+     real order. Next genuine 503 is the test.
+
+rode along (not mine, deliberately carried so nothing is left half-shipped):
+  `venue_fees.py` + arb break-even, poly join/competition resolver + soccer
+  totals monotonicity, NCAAF slate watcher. 495 tests green on the full
+  affected surface in a `data/`-complete tree.
+
+  RETRACTED: I earlier reported this deploy carried 9 red tests / 1 new
+  regression. WRONG — artifact of running in a `data/`-less sparse worktree.
+  `_teams_match` -> `soccer_fixture_clubs` -> `all_teams` -> `rosters_path()`
+  reads `rosters_<season>.csv` from `data/`; absent it, the per-league soccer
+  alias map is EMPTY (measured: `_soccer_alias_by_league()` -> 0 leagues). Full
+  tree, same SHA: 144 passed. No regression shipped.
+
+claim: acquired 21:56Z, EXPIRED 22:41Z while waiting for a preflight lull,
+       re-acquired 22:45Z (unheld, no --force), released after this entry.
+       Preflight held ~86 attempts across 3 polls; the worker runs a continuous
+       league-by-league soccer artifact build during a live slate, so `[JOB]`
+       is almost never zero. CLEAR finally at 22:44:38Z.
