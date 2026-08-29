@@ -3476,6 +3476,45 @@ caaf-no-orders`). NOT
      live opportunities safe to place.
 - Blocked by: none
 
+### unknown-submit-retry-provenance — CLOSED 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411
+- Goal: a retry after an operator `not_placed` resolution must PRESERVE the
+  prior attempt's provenance; Polymarket fills must record the fee the venue
+  actually charged; and the unknown-submit probe must consult the balance
+  reading that can settle it. **ALL THREE BUILT AND TESTED; LANDED AS
+  `98e103e1`. NOT YET DEPLOYED — the worker still runs the old code.**
+- Files: `syndicate/features/shared/execution_ledger.py`,
+  `syndicate/features/shared/polymarket_us_orders.py`,
+  `syndicate/features/shared/venue_balances.py`,
+  `syndicate/features/shared/venue_settlement.py`, and their tests.
+  NOT taken: `blueprints/intelligence.py`, `templates/portfolio.html`
+  (claimed by `open-bet-live-status`). Surfacing `balance_evidence` in the
+  banner is a FOLLOW-UP for whoever holds those.
+- What was measured (full write-up:
+  `.syndicate/findings_2026-08-29_unknown_submit_retry_provenance.md`):
+  order `5c53789d4d21d05fc501b05d` ($1.84, `tsc-mls-nyr-phi-2026-08-29-3pt5`)
+  took `http_503 {"code":14}` at 21:06:37 with no order id. Polymarket
+  `buyingPower` read 96.05 at 21:05:56 / 21:12:47 / 21:18:46 / 21:25:09 and
+  fell to 94.15 only after the retry filled. **Flat across the failed submit:
+  submit #1 never reached the venue, there is no orphan, and the operator's
+  `not_placed` was correct.** The account moved $1.8977 against a $1.8377
+  fill — $0.06 of fee recorded nowhere.
+- Verification: `321 passed` across `test_execution_ledger`,
+  `test_venue_settlement`, `test_venue_balances`,
+  `test_polymarket_fill_price_side`, `test_portfolio_operator_resolutions`,
+  `test_portfolio_live_page`, `test_execution_ledger_concurrent_writers`.
+  Includes a REACHABILITY test for each fix (`record_venue_balances` actually
+  appends; `_LEAN_FIELDS` actually persists `prior_attempts`) because a
+  carried field dropped by a projection looks exactly like a working one.
+  **STILL OWED: a production reading** — a Polymarket fill carrying non-null
+  `fees_dollars`, and an `UNKNOWN_ORDER_PROBE` line carrying
+  `balance_settled`. Neither can exist until this is deployed.
+- Also fixed: two tests red on `origin/main` before this lane
+  (`test_venue_balances` stubs missing the `venue` kwarg).
+- Left alone, NOT mine: `test_polymarket_side_vocabulary` ::
+  `test_a_token_SHARED_ACROSS_THE_SPORT_is_refused...` is red on
+  `origin/main` and belongs to `kalshi-spread-join-sign`.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
