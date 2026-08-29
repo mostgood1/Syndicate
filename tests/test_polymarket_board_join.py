@@ -2224,6 +2224,64 @@ def test_the_real_fixture_still_pairs(monkeypatch):
     ) is True
 
 
+def _soccer_rosters_present() -> bool:
+    """Do the per-league soccer roster artifacts exist in THIS tree?
+
+    `soccer_fixture_clubs` -> `_soccer_alias_by_league` ->
+    `soccer.sources.all_teams` -> `rosters_path(league, season)` -> a
+    `rosters_<season>.csv` under `data/soccer_source/`. Absent it, the per-league
+    map is EMPTY and the resolver correctly returns None.
+    """
+    try:
+        from syndicate.features.soccer.sources import rosters_path
+    except Exception:  # noqa: BLE001
+        return False
+    for league in ("epl", "la_liga", "serie_a"):
+        for season in (2026, 2025):
+            try:
+                if rosters_path(league, season).exists():
+                    return True
+            except Exception:  # noqa: BLE001
+                continue
+    return False
+
+
+def test_the_pair_resolver_MECHANISM_with_an_injected_roster(monkeypatch):
+    """The resolver itself, with a MINIMAL roster fed in -- runs in ANY tree.
+
+    This is the half that must never depend on the mirror. It proves the rule
+    the wrong-game fix rests on: a pair that resolves inside ONE league is
+    authoritative, so a slug naming a different fixture refuses.
+    """
+    from syndicate.features.shared import team_aliases as ta
+
+    roster = {
+        "epl": {"cry": "crystal palace", "mnc": "manchester city"},
+        "serie_a": {"juv": "juventus", "par": "parma"},
+    }
+    monkeypatch.setattr(ta, "_soccer_alias_by_league", lambda: roster)
+    ta._soccer_alias_by_league.cache_clear() if hasattr(
+        ta._soccer_alias_by_league, "cache_clear") else None
+
+    assert ta.soccer_fixture_clubs("cry", "mnc") == ("crystal palace", "manchester city")
+    assert ta.soccer_fixture_clubs("juv", "par") == ("juventus", "parma")
+    # A pair spanning two leagues names no single competition.
+    assert ta.soccer_fixture_clubs("cry", "juv") is None
+
+
+@pytest.mark.skipif(
+    not _soccer_rosters_present(),
+    reason=(
+        "per-league soccer rosters absent from this tree -- "
+        "`scripts/session_worktree.py` excludes `data/` BY DEFAULT (34,689 of "
+        "37,745 tracked files) and CLAUDE.md tells every session to work that "
+        "way, so a protocol-standard worktree cannot load them. SKIPPED rather "
+        "than RED: this test's job is to fail when the alias table stops naming "
+        "fixtures, and a red that also means 'you followed the worktree "
+        "instructions' is a red people learn to ignore. The MECHANISM is covered "
+        "unconditionally by the injected-roster test above."
+    ),
+)
 def test_mnc_IS_carried_by_the_REAL_pair_resolver():
     """The production half of the trade above -- NO monkeypatching.
 
