@@ -18,6 +18,7 @@ from datetime import timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from syndicate.features.shared.branch_profiler import profile_branch
 from flask import Flask
 from flask import current_app
 
@@ -1543,6 +1544,22 @@ def canonical_board_state_enabled() -> bool:
 
 
 SYNDICATE_BOARD_L2A_ENABLED_FLAG = "SYNDICATE_BOARD_L2A_ENABLED"
+
+
+def _consume_sport_segment_log_threshold_sec() -> float:
+    """Only sports SLOWER than this print their consume segments.
+
+    Seven of eight sports consume in well under a second; soccer was ~360s in
+    the same pass. A blanket print would add eight lines a build to a channel
+    already carrying ~125 lines/minute, for the two that matter.
+    """
+    raw = str(os.environ.get("SYNDICATE_CONSUME_SPORT_SEGMENT_LOG_SEC") or "").strip()
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            pass
+    return 10.0
 
 
 def board_l2a_fallback_enabled() -> bool:
@@ -4957,28 +4974,79 @@ class IntelligenceStateService:
         tracked_repo_files = _tracked_repo_files()
 
         def _consume_sport(sport_row: dict[str, Any]) -> None:
+            # THIS IS WHERE SOCCER'S COST ACTUALLY IS, and it took a profiler
+            # pointed at the WRONG region to establish it. `[2026-08-29]`
+            #
+            # `OVERVIEW_SPORT_BEGIN`..`END` for soccer brackets exactly three
+            # things: `_build_sport_overview`, this consumer, and a memory log.
+            # Measured on refresh-worker, hydrated passes:
+            #
+            #     soccer bracket        452.97s (1fbc7a62)  ->  362.76s (da2de430)
+            #     _build_sport_overview  10.95s   (2.4%)    ->    3.22s   (0.9%)
+            #
+            # So ~99% of soccer is HERE, not in building its overview. A day of
+            # this lane's hypotheses aimed at soccer's cards/props code were
+            # aimed at 1-2% of the number. The `sport_branch is 98%` figure that
+            # sent everyone there was 98% OF `_build_sport_overview`'s OWN
+            # elapsed -- a share carried across two different denominators.
+            #
+            # TWO INSTRUMENTS, deliberately, because they answer different
+            # questions and have different lifetimes:
+            #   - the cProfile below names the LEAF, costs 1.3-2x, and is meant
+            #     to be turned off again;
+            #   - `CONSUME_SPORT_SEGMENTS` names WHICH OF THE FOUR CALLS, costs
+            #     four `monotonic()` reads, and stays. Without it, disarming the
+            #     profiler returns this region to being unmeasured, which is the
+            #     state that let it hide behind `_build_sport_overview` for a day.
             slug = _safe_text(sport_row.get("slug"), "sport").lower()
+            with profile_branch(
+                "SYNDICATE_CONSUME_SPORT_PROFILE", slug, label="consume_sport"
+            ):
+                _consume_sport_body(sport_row, slug)
+
+        def _consume_sport_body(sport_row: dict[str, Any], slug: str) -> None:
+            _t0 = time.monotonic()
             summary_parts.append(
                 f"{slug}:g={len(sport_row.get('dashboard_games') or [])},r={len(sport_row.get('home_rails') or [])}"
             )
             overview_summary.extend(self._overview_live_summary([sport_row]))
+            _t_summary = time.monotonic()
             try:
                 odds_history_by_sport.update(self._odds_history_payloads_by_sport([sport_row]))
             except Exception as exc:
                 print(f"[intelligence_state] STREAM_ODDS_HISTORY_FAILED sport={slug} {type(exc).__name__}: {exc}", flush=True)
+            _t_odds = time.monotonic()
             try:
                 advanced_by_sport[slug] = _advanced_input_rows_for_sport(sport_row, tracked_repo_files)
             except Exception as exc:
                 print(f"[intelligence_state] STREAM_ADVANCED_ROWS_FAILED sport={slug} {type(exc).__name__}: {exc}", flush=True)
+            _t_advanced = time.monotonic()
+            _collected = 0
             try:
-                streamed_candidates.extend(
-                    collect_candidates([sport_row], preferences, odds_history_by_sport) or []
-                )
+                _rows = collect_candidates([sport_row], preferences, odds_history_by_sport) or []
+                _collected = len(_rows)
+                streamed_candidates.extend(_rows)
             except Exception as exc:
                 # One sport failing to collect must not lose the other seven --
                 # the old whole-list call had the same all-or-nothing hazard and
                 # this is strictly better, but say so rather than swallowing.
                 print(f"[intelligence_state] STREAM_COLLECT_FAILED sport={slug} {type(exc).__name__}: {exc}", flush=True)
+            _t_end = time.monotonic()
+            try:
+                _total = _t_end - _t0
+                if _total >= _consume_sport_segment_log_threshold_sec():
+                    print(
+                        f"[intelligence_state] CONSUME_SPORT_SEGMENTS sport={slug} "
+                        f"total_s={round(_total, 2)} "
+                        f"summary_s={round(_t_summary - _t0, 2)} "
+                        f"odds_history_s={round(_t_odds - _t_summary, 2)} "
+                        f"advanced_s={round(_t_advanced - _t_odds, 2)} "
+                        f"collect_s={round(_t_end - _t_advanced, 2)} "
+                        f"candidates={_collected}",
+                        flush=True,
+                    )
+            except Exception:
+                pass
 
         # RETURN VALUE IS KEPT AND USED AS A FALLBACK, deliberately.
         #
