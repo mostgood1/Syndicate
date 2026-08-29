@@ -142,6 +142,37 @@ def past_or_current_dates(dates: Any, *, today: str | None = None) -> tuple[str,
     return tuple(sorted(seen))
 
 
+def stamp_scheduled_start_times(games: list[dict[str, Any]]) -> int:
+    """Give every card a `startTime` from the kickoff it already carries.
+
+    SEPARATE FROM THE ESPN JOIN, AND DELIBERATELY SO. ESPN is fetched only for
+    dates that have already started, so a join-supplied `startTime` reaches
+    only the games playing today -- 8 of 51 on the opener weekend, measured.
+    The remaining 43 would keep the `null` that findings 2026-08-26 §1 recorded
+    as blocking the shared board contract from sorting or filtering the slate
+    by kickoff.
+
+    No fetch is needed for any of it: `ncaaf_card.scoreboard.kickoff` is
+    already on all 51 cards as a full ISO timestamp. This is the "read the
+    field you already have" case -- widening the ESPN window to 10 dates to
+    recover a value sitting in the payload would have been ten round trips for
+    nothing.
+
+    `setdefault`, so a real ESPN kickoff already stamped by the join wins.
+    """
+    stamped = 0
+    for game in games:
+        if not isinstance(game, dict) or game.get("startTime"):
+            continue
+        card = game.get("ncaaf_card") if isinstance(game.get("ncaaf_card"), dict) else {}
+        scoreboard = card.get("scoreboard") if isinstance(card.get("scoreboard"), dict) else {}
+        kickoff = str(scoreboard.get("kickoff") or "").strip()
+        if kickoff:
+            game["startTime"] = kickoff
+            stamped += 1
+    return stamped
+
+
 def _state_rows_for_date(iso_date: str) -> list[dict[str, Any]]:
     """One date's events, with team ids and clock added to the shared parse.
 

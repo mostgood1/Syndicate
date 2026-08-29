@@ -31,6 +31,7 @@ from syndicate.features.ncaaf.live_game_state import (  # noqa: E402
     attach_ncaaf_live_game_state,
     espn_team_id_from_logo,
     past_or_current_dates,
+    stamp_scheduled_start_times,
 )
 
 
@@ -202,3 +203,35 @@ def test_malformed_and_duplicate_dates_are_dropped():
         "2026-08-29",
     )
     assert past_or_current_dates(None, today="2026-08-29") == ()
+
+
+# --------------------------------------------------------------------------
+# Scheduled kickoff -- the field that was already on the card
+# --------------------------------------------------------------------------
+
+
+def _card_with_kickoff(kickoff: str) -> dict:
+    card = _card("153", "2628")
+    card["ncaaf_card"] = {"scoreboard": {"kickoff": kickoff}}
+    return card
+
+
+def test_every_card_gets_a_start_time_without_a_fetch():
+    """ESPN reaches only started dates; kickoff is on all 51 cards already."""
+    cards = [_card_with_kickoff("2026-09-05T19:00:00.000Z") for _ in range(3)]
+    assert stamp_scheduled_start_times(cards) == 3
+    assert all(c["startTime"] == "2026-09-05T19:00:00.000Z" for c in cards)
+
+
+def test_a_real_espn_start_time_is_not_overwritten():
+    cards = [_card_with_kickoff("2026-08-29T16:00:00.000Z")]
+    attach_ncaaf_live_game_state(cards, {"153@2628": _state(in_progress=True)})
+    assert cards[0]["startTime"] == "2026-08-29T16:00Z"
+    assert stamp_scheduled_start_times(cards) == 0
+    assert cards[0]["startTime"] == "2026-08-29T16:00Z"
+
+
+def test_a_card_without_a_kickoff_is_left_alone():
+    cards = [_card("153", "2628")]
+    assert stamp_scheduled_start_times(cards) == 0
+    assert "startTime" not in cards[0]

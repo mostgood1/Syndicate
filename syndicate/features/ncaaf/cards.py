@@ -2699,9 +2699,13 @@ def _attach_live_state(games: list[dict[str, Any]], season: int, week: int) -> N
     try:
         from syndicate.features.ncaaf.live_game_state import attach_ncaaf_live_game_state
         from syndicate.features.ncaaf.live_game_state import ncaaf_game_state_index
+        from syndicate.features.ncaaf.live_game_state import stamp_scheduled_start_times
 
         index = ncaaf_game_state_index(_ncaaf_week_kickoff_dates(season, week))
         coverage = attach_ncaaf_live_game_state(games, index)
+        # Every card, not just today's: the ESPN join only reaches dates that
+        # have started, and kickoff is already on the card for all of them.
+        coverage["scheduled"] = stamp_scheduled_start_times(games)
     except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
         print(f"NCAAF_LIVE_STATE_ERROR week={week} error={type(exc).__name__}: {exc}", flush=True)
         return
