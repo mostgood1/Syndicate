@@ -2052,3 +2052,39 @@ def test_a_gt_threshold_on_a_DIFFERENT_line_refuses(monkeypatch):
     out = mod.join_polymarket_to_board(
         [_gt_corners("gt10pt5", 9.5)], _gt_board("over", 9.5), selected_date="2026-08-29")
     assert out["matched"] == 0, out
+
+
+def test_the_prop_census_covers_EVERY_sport_not_just_soccer(monkeypatch):
+    """The census was gated to soccer, so the venue's LARGEST discarded family
+    was invisible.
+
+    MEASURED 2026-08-29T19:08:56Z: `SPORTS_MARKET_TYPE_PROP|mlb 5000` discarded
+    every cycle, plus ufc 1039 / cfb 556 / nfl 119, and `_note_out_of_scope`
+    caps at 14 keys and never reached MLB. A COUNT WITH NO SHAPE -- the exact
+    state corners were in while 221 refusals read as "the venue does not list
+    them" and it listed 434.
+
+    Keyed by league because the answer differs per sport: soccer props are
+    team-level, MLB's are most likely player lines, and one merged vocabulary
+    would hide that.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
+    markets = [
+        {"slug": "astatc-mlb-col-atl-2026-08-29-ks-5pt5",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+         "outcomes": '["Yes","No"]', "outcomePrices": '["0.5","0.5"]'},
+        {"slug": "astatc-nfl-chi-ten-2026-08-29-anytime-td",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+         "outcomes": '["Yes","No"]', "outcomePrices": '["0.5","0.5"]'},
+        {"slug": "astatc-soccer-ala-vil-2026-08-29-ftts-ala",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+         "outcomes": '["Yes","No"]', "outcomePrices": '["0.5","0.5"]'},
+    ]
+    out = mod.join_polymarket_to_board(markets, [], selected_date="2026-08-29")
+    census = out["prop_modifier_census"]
+    assert census.get("mlb|ks") == 1, census
+    assert census.get("nfl|anytime-td") == 1, census
+    assert census.get("soccer|ftts-ala") == 1, census

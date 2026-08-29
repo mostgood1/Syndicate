@@ -1141,15 +1141,34 @@ def join_polymarket_to_board(
         # mistake as the fixture matcher earlier today, caught here because the
         # census returned `{'btts': 1}` on a fixture that also contained an
         # exact-score row.
-        if venue_type == "SPORTS_MARKET_TYPE_PROP" and _norm(
-            _effective_league(parsed, soccer_tokens)
-        ) == "soccer":
+        if venue_type == "SPORTS_MARKET_TYPE_PROP":
+            # EVERY SPORT, NOT JUST SOCCER -- and the soccer-only gate is the
+            # reason this had to be widened.
+            #
+            # MEASURED 2026-08-29T19:08:56Z: the venue discards
+            # `SPORTS_MARKET_TYPE_PROP|mlb 5000` every cycle -- the LARGEST
+            # family it lists -- plus ufc 1039, cfb 556, nfl 119. This census
+            # could not see any of it, and the `_note_out_of_scope` sampler caps
+            # at 14 keys and never reached MLB. So the platform had a COUNT with
+            # NO SHAPE for its biggest discarded family.
+            #
+            # That is exactly the state corners were in for a day: 221 refusals
+            # that read as "the venue does not list them" while it listed 434.
+            # A count without a vocabulary cannot answer whether those 5,000 are
+            # player lines the board wants or team props nothing asks for, and
+            # that question decides whether player props are worth wiring at all.
+            #
+            # KEYED BY LEAGUE, because the answer differs per sport: soccer's
+            # props are team-level (`ftts`, `exact-score`) while MLB's are most
+            # likely player lines, and one merged vocabulary would hide that.
+            league_key = _norm(_effective_league(parsed, soccer_tokens)) or "?"
             shape = "-".join(
                 tok for tok in (parsed.get("modifiers") or [])
                 if not any(ch.isdigit() for ch in tok)
             ) or "(no-modifier)"
-            if shape in prop_modifier_census or len(prop_modifier_census) < 40:
-                prop_modifier_census[shape] = prop_modifier_census.get(shape, 0) + 1
+            key = f"{league_key}|{shape}"
+            if key in prop_modifier_census or len(prop_modifier_census) < 60:
+                prop_modifier_census[key] = prop_modifier_census.get(key, 0) + 1
 
 
         if board_market is None:
