@@ -3038,7 +3038,12 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none. Nothing here is deployed or committed without a further
   instruction; no deploy claim taken.
 
-### finals-silent-score-drop — OPEN — opened 2026-08-29 — session 4ca1d41c-7532-44dc-87ff-cec47f1f07d0
+### finals-silent-score-drop — CLOSED 2026-08-29 — opened 2026-08-29 — session 4ca1d41c-7532-44dc-87ff-cec47f1f07d0
+- **OUTCOME: the cap is attributable from the served payload. `date=2026-08-28`
+  now reports `finals_skipped_no_numeric_score_games: 11` where it previously
+  reported nothing at all.** All four verification criteria discharged, (a) on a
+  LIVE DEPLOYED build. No game recovered and no scored number moved, as
+  specified.
 - Goal: the largest cause of lost `games_with_outcome` STOPS being the one path
   in the scorer that increments no counter. A final dropped for having no
   numeric score is COUNTED and NAMED, so the cap is attributable from the
@@ -3139,6 +3144,37 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     stopped mis-labelling, and that the two changes compose rather than overlap.
   - **08-26 (the healthy date) reads 0 lost / 15 indexed**, so the counter does
     not fire on a good day and this is not a constant offset.
+- **(a) DISCHARGED ON A DEPLOYED BUILD `[2026-08-29 ~16:3xZ]` — RODE ALONG, NO
+  DEPLOY FIRED BY THIS LANE.** `refresh-worker` went live on `6625b5e6`, which
+  is NEWER than `aa8f13bc`; verified BY CONTENT (`git show 6625b5e6:…/
+  live_gameline_score.py` carries the counter, 5 occurrences) rather than by
+  ancestry, and `pending_deploys.py` no longer lists `aa8f13bc` for that service.
+  Served payload, `/api/board/book-grid?sport=mlb&date=2026-08-28`, artifact
+  regenerated 16:31:06Z, re-read after two unrelated web deploys settled:
+
+      finals_seen                            196
+      finals_skipped_no_numeric_score       2258   (rows)
+      finals_skipped_no_numeric_score_games   11   (GAMES -- the number that matters)
+      games_with_outcome                       1
+
+  **11 is exactly the figure predicted from the local run over the production
+  payload before the deploy**, and exactly the hand count of scoreless finals
+  (15 games, 12 final, 1 scored). `finals_seen + skipped = 2454` final rows of
+  3122 total, consistent with the 2,432 implied by a 2,000-row sample; the
+  accounting is exact BY CONSTRUCTION (every `final` row takes exactly one of
+  the two branches) and is unit-tested, so the sample extrapolation is a
+  cross-check, not the proof.
+- **08-27 and 08-26 correctly report the counters as ABSENT** — their artifacts
+  date from 04:45:59Z and 08-28T03:48Z, both BEFORE the deploy. That is not a
+  failure: it confirms the counter appears only on artifacts rebuilt under the
+  new code, which is itself evidence the 08-28 reading is genuine rather than
+  coincidental. It also means this lane did NOT discharge
+  `mlb-final-zero-placeholder`'s owed 08-26 over-suppression reading, which
+  still needs 08-26 REBUILT.
+- Blocked by: nothing. CLOSED.
+- **Superseded note — the old blocker line, kept for the record:** the reading
+  below was written as needing a deploy this lane must not fire. It rode along
+  on another session's, exactly as intended.
 - Blocked by: none for the code. Reading (a) needs a refresh-worker deploy plus
   a past-date artifact rebuild; it must RIDE ALONG on another lane's deploy
   rather than firing one — a diagnostic counter does not justify a worker
