@@ -2537,7 +2537,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `ncaaf/oddsapi_lines.py::resolve_team`, a module this lane does not touch.
 - Blocked by: none
 
-### portfolio-venue-and-side-integrity — OPEN, TWO READINGS OWED — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c
+### portfolio-venue-and-side-integrity — CLOSED 2026-08-29 — both readings discharged; `#603` handed to `venue-join-refusal-visibility` — opened 2026-08-28 — session 12b2be57-d671-480b-b11e-399612c9e84c (ENDED)
 - Goal: five `/portfolio` asks `[user 2026-08-28]`, plus what fell out of
   verifying them — WNBA game lines, `#600` (a lost-write race on the money
   ledger), operator actions for two red banners, and then a SEGMENT defect that

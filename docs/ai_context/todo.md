@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#604` — **I shipped a named refusal that can never fire. `#601`'s own stated verification is not executable.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **OPEN, found by self-check**
+### `#604` — **I shipped a named refusal that can never fire. `#601`'s own stated verification is not executable.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED, LANDED (`361d8940`), DEPLOYED in `420dddaa`, COUNTER VERIFIED FIRING (`segment_has_no_matching_series: 2`, 22:09:15Z)**
 
 `kalshi_board_join.py:121` defines `REASON_SEGMENT_MISMATCH =
 "segment_has_no_matching_series"`. **It is referenced nowhere.** The Kalshi
@@ -35,6 +35,18 @@ board row's segment differs from `segment_for_series(market["series"])`, and
 
 NOT done in this pass: a code change while a deploy verification was in flight
 would have made the boot reading ambiguous about which commit produced it.
+
+**CLOSING READING FOR `#601`/`#602` `[2026-08-29 03:46Z]`.** The slate placed:
+2 orders after boot `21:55:15Z`, both `seg=full` on full-game tickets. **All 9
+segment orders in the ledger predate every fix** (newest `07:40:51Z`, earliest
+deploy `20:58Z`) — the bad set is bounded and closed. What makes this a
+verification rather than an absence: `board_row_is_a_segment_bet: 39` in the
+SAME window, i.e. segment rows were PRESENT and were STOPPED with a named
+reason, and none became an order.
+**LIMIT:** it does NOT prove those 39 would have become orders — most refused
+rows never place. The claim is "the path is closed", not "$X was saved". Only 2
+orders ran on the fixed code and neither was a segment candidate, so the order
+count alone proves little; it is the PAIRING that verifies.
 
 ### `#603` — **THE THIRD CONSUMER: `quote_key` has NO game and NO segment, and it collides on real orders** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **MEASURED, NOT FIXED — cross-lane file, NOT edited**
 
@@ -93,7 +105,7 @@ exactly those files. Handing this over rather than editing across the lane.
 
 NEXT: reproduce the count on real GRID rows (not orders) before sizing the fix.
 
-### `#602` — **THE SAME SEGMENT DEFECT ON POLYMARKET. Four more orders. Found by repeating the audit, not by a report.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED AND LANDED (`d2ab7e86`), DEPLOY PENDING**
+### `#602` — **THE SAME SEGMENT DEFECT ON POLYMARKET. Four more orders. Found by repeating the audit, not by a report.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED, DEPLOYED in `420dddaa`, VERIFIED: `board_row_is_a_segment_bet` 52 then 39 — the guard FIRES**
 
 `#601` was reported as a Kalshi bug and I fixed it as one. Re-running the same
 query against the other venue found four more, same day, same class:
@@ -138,7 +150,7 @@ is the reason to check a third consumer rather than assume two is the whole set.
 count in the Polymarket join refusals, and no new order carries a `first3`/
 `first5` segment against a full-game slug.
 
-### `#601` — **KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS. The join key had no `segment`. Five orders, $7.08.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED AND LANDED (`632f3473`), DEPLOY PENDING**
+### `#601` — **KALSHI PLACED SEGMENT BETS ON FULL-GAME CONTRACTS. The join key had no `segment`. Five orders, $7.08.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED, DEPLOYED in `420dddaa`, VERIFIED via `#604`'s counter; the ORDER-level check is PASS-with-a-limit (see below)**
 
 `_match_key`/`_row_key` were five-tuples — game, market, player, line, side —
 with no `segment`, so a board row for "under 2.5, first 3 innings" matched
