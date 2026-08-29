@@ -1603,3 +1603,47 @@ def test_the_slate_pages_far_enough_to_reach_the_end_of_the_block(monkeypatch):
     assert signature.parameters["max_pages"].default >= 100, (
         "a page budget this small cannot reach the end of a growing catalogue"
     )
+
+
+def test_every_stored_field_survives_the_upstream_trim():
+    """`_KEEP` runs BEFORE `_slate_row_for_storage`, so a field listed only in
+    the storage tuple is silently dropped and its entry is dead.
+
+    MEASURED 2026-08-29: `line` was exactly that. `_SLATE_STORAGE_FIELDS` had
+    listed it all along, but `fetch_markets` trims by `_KEEP` first
+    ("`fetch_markets` returns rows already trimmed and filtered to sporting"),
+    so every persisted row read `line: None` -- including
+    `tsc-wnba-chi-ny-2026-08-29-179pt5`, which plainly has one.
+
+    Totals survived because their line is in the SLUG and `_line_from_modifiers`
+    recovers it. Corners have no number in the slug, so their rungs reached the
+    join unpriceable and were skipped: `no_match|soccer|alternate_totals_corners:
+    37`.
+
+    This pins the ORDERING relationship, not the one field. A storage list that
+    asks for something the trim already removed cannot be seen in any test that
+    only exercises one of the two tuples.
+    """
+    from syndicate.features.shared.polymarket_us_markets import (
+        _KEEP,
+        _SLATE_STORAGE_FIELDS,
+        trimmed_row,
+    )
+
+    # `orderable` is COMPUTED by `trimmed_row` rather than copied, so it is the
+    # one legitimate member of the storage tuple that is not in `_KEEP`.
+    stripped = [f for f in _SLATE_STORAGE_FIELDS if f not in _KEEP and f != "orderable"]
+    assert not stripped, (
+        f"{stripped} are stored but stripped by _KEEP first, so they persist as None"
+    )
+
+    # And prove it end-to-end on a row shaped like the venue's, rather than
+    # trusting the tuples to agree in the abstract.
+    row = {
+        "slug": "tsc-wnba-chi-ny-2026-08-29-179pt5",
+        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+        "outcomes": '["Under","Over"]', "outcomePrices": '["0.53","0.47"]',
+        "line": 179.5,
+        "orderPriceMinTickSize": 0.01, "minimumTradeQty": 5,
+    }
+    assert trimmed_row(row).get("line") == 179.5

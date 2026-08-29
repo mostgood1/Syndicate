@@ -125,6 +125,24 @@ _KEEP = (
     "id", "slug", "question", "category", "tags",
     "marketType", "marketSides", "sportsMarketType", "sportsMarketTypeV2",
     "outcomes", "outcomePrices",
+    # THE LINE, AND IT WAS BEING STRIPPED BEFORE THE THING THAT WANTS IT.
+    #
+    # `_SLATE_STORAGE_FIELDS` has listed "line" all along, but this trim runs
+    # FIRST -- `fetch_game_markets` says so in its own comment, "`fetch_markets`
+    # returns rows already trimmed and filtered to sporting" -- so by the time
+    # `_slate_row_for_storage` asked for `line` it had been dropped here. The
+    # storage entry was dead the whole time.
+    #
+    # MEASURED 2026-08-29 via `/api/ops/polymarket/slate`: every totals row
+    # reads `line: None`, INCLUDING `tsc-wnba-chi-ny-2026-08-29-179pt5`, which
+    # plainly has one. Totals survive because their line is in the SLUG and
+    # `_line_from_modifiers` recovers it. Corners do not -- their rungs arrive
+    # at the join with `line=None` and are skipped as unpriceable, which is
+    # `no_match|soccer|alternate_totals_corners: 37`.
+    #
+    # This is the field the join's row-field fallback was written against, and
+    # without this line that fallback is INERT.
+    "line",
     "orderPriceMinTickSize", "minimumTradeQty", "feeCoefficient",
     "gameStartTime", "startDate", "endDate", "status", "active", "closed",
 )
