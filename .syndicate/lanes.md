@@ -849,7 +849,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
      sits at 1.46 SE, n=106 — needs ~2 more match-days of capture to resolve.
 - Files: `syndicate/features/shared/{board_enrichment,soccer_live_gameline_source,soccer_projections,layer2_board,publication_adapter,live_lens_loop}.py`,
   `syndicate/features/soccer/{features/live_lens.py,features/lineups.py,ingestion/fotmob_*.py}`,
-  **`cards.py` REMOVED FROM THE BRACE ABOVE `[2026-08-28, session 3e5a9659]`** —
+  **the soccer cards builder was REMOVED FROM THE BRACE ABOVE
+  `[2026-08-28, session 3e5a9659]`** —
   claim transferred to `soccer-overview-cost` for INSTRUMENTATION ONLY (two
   sub-marks inside `_build_cards_page_context_uncached`, no behaviour change,
   nothing near the FotMob/live-lens work this lane owns). Taken because this
@@ -857,7 +858,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   appear in `list_sessions` at all. REMOVED rather than struck through, and
   removed from INSIDE the brace: `check_lane_invariants` parses paths
   positionally and a brace expansion is a claim per member. To reclaim, put
-  `cards.py,` back inside the brace.
+  that filename back inside the brace.
+  **AND THE FILENAME ITSELF HAD TO GO, not just its position in the brace**
+  `[2026-08-29, session 6dc988f8, lane ncaaf-live-lens-state]` — this note
+  said the claim was removed while still spelling the bare filename twice
+  inside the `- Files:` block, so `_claims()` kept yielding it. `lane-guard`
+  matches on path SUFFIX (`rel.endswith("/" + f)`, line 420), and a bare
+  filename has no directory to disambiguate it, so this UNOWNED soccer lane
+  was claiming **every sport's cards builder** — mlb, nba, nfl, ncaaf, wnba.
+  It blocked an NCAAF edit on 2026-08-29 while the first game of the season
+  was in progress. `check_lane_invariants` did NOT catch it: it checks that
+  each claim has exactly one holder, and this claim did. Same basename
+  collision `state.md` records for `live_lens` across eight sports. **A
+  disclaimer next to a path does not unclaim it — only deleting the path
+  text does.**
   `syndicate/templates/shared/_scoreboard_strip_soccer.html`, `syndicate/static/shared/dense_cards.css`,
   `scripts/{build_soccer_artifacts,backtest_soccer_live_totals,poll_soccer_live_state,soccer_*}.py`,
   `tests/test_soccer_*`, `tests/test_fotmob_*`.
@@ -3071,8 +3085,20 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
       and after on the same fixture — this recovers no games and must not move
       a single number;
   (d) `python -m pytest tests/test_live_gameline_score.py` passes.
-- **STATUS 2026-08-29 — CODE WRITTEN AND VERIFIED IN A WORKTREE. NOT COMMITTED,
-  NOT PUSHED, NOT DEPLOYED. No deploy claim taken.**
+- **STATUS 2026-08-29 — LANDED ON `origin/main` AS `aa8f13bc`. NOT DEPLOYED.
+  No deploy claim taken; none needed to push.**
+  Verified BY CONTENT, not by ancestry (`learnings.md`: a live SHA need not be
+  an ancestor of main): `git show origin/main:syndicate/features/shared/
+  live_gameline_score.py` carries `finals_skipped_no_numeric_score` (5
+  occurrences) and the reachability test is present in the landed test file.
+  Push was CODE-ONLY — two `.py` files, **no `render.yaml`**, so it fired no
+  `blueprint_sync` and applied nothing to production.
+  Rebased from `session/finals-silent-score-drop` (`82fa5e1b` pre-rebase);
+  `3a016554..aa8f13bc`. Ledger/lane and todo-id checks clean at land time.
+  **The counter is INERT until a refresh-worker deploy plus a past-date
+  artifact rebuild** — the board build is the only choke point that bakes
+  `finals_index` into the artifact, and web already proved presence != reachability
+  for the sibling fix on 2026-08-28 15:09:55Z. Ride along; do not fire a deploy.
   Worktree `C:	mp\syndicate-sessionsinals-silent-score-drop`, branch
   `session/finals-silent-score-drop` off `origin/main` `9618cc75`.
   Two counters, because `finals_seen`/`finals_level` count ROWS and the
