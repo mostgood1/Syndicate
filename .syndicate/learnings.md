@@ -5905,3 +5905,33 @@ the changed route against the pre-deploy baseline in the same run, and treat
 would have failed it at 37.9s vs 3.5s, ~4 minutes before it was noticed by hand.
 A rule would not have caught this; I had the rule and violated it. Only a
 measurement in the verify step catches it.
+
+### 2026-08-29 — a cross-session ANSWER has to go where the reader looks, because SendMessage cannot address a lane
+
+- **What we believed:** that a peer session or a lane holder can be reached by
+  the identifier the ledger gives you.
+- **What was actually true:** lane blocks and inbound peer messages carry
+  session UUIDs (`3e5a9659`, `764eca35`, `local_5163d9b3…`); `ListAgents` lists
+  NAMES (`syndicate-9c [4ad613]`, `Polymarket execution gaps`). **There is no
+  mapping between the two**, and neither the UUID nor the quoted name resolved.
+  Three attempts, three failures, in one session:
+  `ncaaf-settlement-resolver` (wanted a 2-field parser addition),
+  `soccer-overview-cost` (wanted a carve-out on `home.py`), and a peer who
+  explicitly asked whether a revert-then-reapply was safe to deploy and said
+  they would HOLD until answered.
+- **How we found out:** `SendMessage` returned "No agent named … is reachable"
+  for the `from` attribute the message itself supplied, which is the exact value
+  the tool documentation says to reply to.
+- **The rule going forward:** when a peer or lane holder cannot be addressed,
+  **write the answer into the artefact they demonstrably read and say why it is
+  there.** The peer had cited `deploys.md`, so the answer went into `deploys.md`
+  under a heading naming them. Do not let an unreachable address turn into
+  silence — silence read as "no objection" is how a lane's file gets taken
+  without its holder ever hearing, which happened twice today.
+- **Cost:** two carve-outs taken without the holder's consent (both logged on
+  both lane blocks), and a peer blocked on an answer until the user relayed it
+  by hand.
+
+**Check, not prose:** the useful fix is for lane headers to carry the
+`ListAgents` NAME alongside the session UUID, so a holder is addressable from
+the ledger. Until then, `/lane open` should record both.
