@@ -570,18 +570,42 @@ def _classify_alignment(
     key: str,
     counts: dict[str, int],
     samples: list[dict[str, Any]],
-) -> None:
-    """Count one matched row as aligned / inverted / too_close. Never decides."""
+) -> str:
+    """Classify one matched row as aligned / inverted / too_close / no_reference.
+
+    RETURNS THE VERDICT NOW, AND THE CALLER REFUSES ON `inverted`. This used to
+    say "Never decides", and that was the defect: it detected wrong-side pricing
+    and let the order through.
+
+    MEASURED 2026-08-29T19:38:25Z, after the leg fixes made these rows match:
+
+        soccer|h2h|inverted 13  vs aligned 10
+        mlb|h2h|inverted     2  ·  soccer|alternate_totals_corners|inverted 3
+
+        'San Jose Earthquakes@Houston Dynamo' side=draw
+             venue_p 0.79   book_fair 0.2285   complement 0.7715
+
+    A draw priced at 0.79. `venue_p` tracks the COMPLEMENT, so the order pays
+    the opposite outcome's price -- reported by the user as "orders going
+    through at non-market prices". The inversion predates this lane (mlb|h2h and
+    nfl|totals were inverted at 17:49Z, before any of today's leg work); what
+    the leg fixes changed is how MANY rows reach it.
+
+    The thresholds below are why this is safe to act on: a market must be
+    lopsided by >= 0.20 before it votes at all, and the winning hypothesis must
+    beat the other by >= 0.10, so an ordinary betting edge cannot masquerade as
+    an inversion.
+    """
     quote = board_row.get("quote") if isinstance(board_row.get("quote"), Mapping) else None
     fair = _as_float((quote or {}).get("fair_probability"))
     p = _as_float(venue_probability)
     if fair is None or p is None or not (0.0 < fair < 1.0) or not (0.0 < p < 1.0):
         counts[f"{key}|no_reference"] = counts.get(f"{key}|no_reference", 0) + 1
-        return
+        return "no_reference"
     if abs(fair - 0.5) < _ALIGN_MIN_EDGE:
         # Too near a coin flip for `fair` and `1 - fair` to be told apart.
         counts[f"{key}|too_close"] = counts.get(f"{key}|too_close", 0) + 1
-        return
+        return "too_close"
     d_aligned, d_inverted = abs(p - fair), abs(p - (1.0 - fair))
     if d_aligned + _ALIGN_MIN_MARGIN <= d_inverted:
         verdict = "aligned"
@@ -598,6 +622,7 @@ def _classify_alignment(
             "book_fair": round(fair, 4),
             "complement": round(1.0 - fair, 4),
         })
+    return verdict
 
 
 def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | None:
@@ -1774,10 +1799,26 @@ def join_polymarket_to_board(
             refuse("side_not_an_outcome_of_this_market")
             continue
 
-        _classify_alignment(
+        alignment_verdict = _classify_alignment(
             board_row, probability, f"{league}|{board_market}",
             alignment_counts, alignment_samples,
         )
+        if alignment_verdict == "inverted":
+            # THE PRICE WE WOULD PAY BELONGS TO THE OTHER OUTCOME. Refuse.
+            #
+            # REFUSES, DOES NOT FLIP. Taking `1 - p` would assume the complement
+            # is the right price, which is a SECOND guess on top of the one that
+            # produced this -- and if the real cause is something other than a
+            # swap, flipping prices a bet on a number the venue never quoted.
+            # A refusal costs the bet; a flip can pay the wrong side twice.
+            #
+            # THE GATE IS THE BOARD'S OWN FAIR VALUE, per row, and only on
+            # markets lopsided enough for `fair` and `1 - fair` to be told apart
+            # (>= 0.20). A `too_close` row is NOT refused: the test cannot
+            # separate the hypotheses there, and refusing on an unreadable
+            # signal would silently drop half the slate.
+            refuse("venue_price_inverted_vs_book")
+            continue
 
         from syndicate.features.shared.venue_quote_adapters import probability_to_american
 

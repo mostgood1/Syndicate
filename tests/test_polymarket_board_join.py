@@ -2088,3 +2088,64 @@ def test_the_prop_census_covers_EVERY_sport_not_just_soccer(monkeypatch):
     assert census.get("mlb|ks") == 1, census
     assert census.get("nfl|anytime-td") == 1, census
     assert census.get("soccer|ftts-ala") == 1, census
+
+
+def _aligned_board(side, fair):
+    return [{"market": "h2h", "side": side, "line": None, "sport": "mlb",
+             "selected_date": "2026-08-29", "home_team": "Los Angeles Angels",
+             "away_team": "Philadelphia Phillies", "event_id": "e1",
+             "quote": {"fair_probability": fair}}]
+
+
+def _ml(prices):
+    return [{"slug": "atc-mlb-phi-laa-2026-08-29-laa",
+             "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+             "outcomes": '["Los Angeles Angels","Philadelphia Phillies"]',
+             "outcomePrices": prices}]
+
+
+def test_an_INVERTED_venue_price_is_REFUSED_not_traded(monkeypatch):
+    """The user-reported defect: orders going through at non-market prices.
+
+    MEASURED 2026-08-29T19:38:25Z: `soccer|h2h|inverted 13` vs `aligned 10`, and
+    'San Jose Earthquakes@Houston Dynamo' side=draw priced at venue_p 0.79
+    against book_fair 0.2285 -- a DRAW at 0.79. `venue_p` tracks the complement,
+    so the order pays the opposite outcome's price.
+
+    `_classify_alignment` detected this and its docstring said "Never decides".
+    It now decides.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    # book says home wins 32%; venue would hand us 0.685 -- the complement.
+    out = mod.join_polymarket_to_board(
+        _ml('["0.685","0.30"]'), _aligned_board("home", 0.3218),
+        selected_date="2026-08-29")
+    assert out["matched"] == 0, out
+    assert out["refusals"].get("venue_price_inverted_vs_book") == 1, out["refusals"]
+
+
+def test_an_ALIGNED_price_still_trades(monkeypatch):
+    """The control. Refusing inversions must not refuse correct prices."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        _ml('["0.33","0.66"]'), _aligned_board("home", 0.3218),
+        selected_date="2026-08-29")
+    assert out["matched"] == 1, out
+    assert out["refusals"].get("venue_price_inverted_vs_book") is None, out["refusals"]
+
+
+def test_a_TOO_CLOSE_row_is_not_refused(monkeypatch):
+    """A near-coin-flip market cannot separate `fair` from `1 - fair`. Refusing
+    on an unreadable signal would silently drop half the slate."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        _ml('["0.52","0.47"]'), _aligned_board("home", 0.49),
+        selected_date="2026-08-29")
+    assert out["matched"] == 1, out
+    assert out["refusals"].get("venue_price_inverted_vs_book") is None, out["refusals"]
