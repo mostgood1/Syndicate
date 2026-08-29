@@ -2681,6 +2681,41 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
     }
 
 
+def _attach_live_state(games: list[dict[str, Any]], season: int, week: int) -> None:
+    """Stamp ESPN live state onto the week's cards, before the board contract.
+
+    MUST run before `apply_game_board_contract`: that is what calls
+    `publication_adapter._shared_game_state`, and that function derives
+    `live`/`final`/`period`/`clock` from `game["live_state"]` -- the field this
+    board never set. Stamping after the contract would populate a dict nothing
+    reads again.
+
+    Fails soft to the board and loud to the log: NCAAF cards rendered without
+    live state for the whole 2026 preseason, so a scoreboard outage must cost
+    the eyebrow and nothing else.
+    """
+    if not games:
+        return
+    try:
+        from syndicate.features.ncaaf.live_game_state import attach_ncaaf_live_game_state
+        from syndicate.features.ncaaf.live_game_state import ncaaf_game_state_index
+
+        index = ncaaf_game_state_index(_ncaaf_week_kickoff_dates(season, week))
+        coverage = attach_ncaaf_live_game_state(games, index)
+    except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+        print(f"NCAAF_LIVE_STATE_ERROR week={week} error={type(exc).__name__}: {exc}", flush=True)
+        return
+    # `matched` is printed separately from `live`/`final` because a dead join
+    # and a quiet slate render identically and are different defects.
+    # `logger.info` does not reach Render's collector -- hence print/flush.
+    print(
+        f"NCAAF_LIVE_STATE week={week} games={coverage.get('games')} "
+        f"index={coverage.get('index')} matched={coverage.get('matched')} "
+        f"live={coverage.get('live')} final={coverage.get('final')}",
+        flush=True,
+    )
+
+
 def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
     season, runtime_weeks = _resolve_ncaaf_active_season_and_weeks()
     if not runtime_weeks:
@@ -2715,6 +2750,8 @@ def build_smartsim_cards_page_context(selected_week: int) -> dict[str, Any]:
         ]
         _note_board_truncation(board_row_counts, "smartsim2_standalone", runtime_rows, resolved_week)
         source_label_for_page = SMARTSIM2_PUBLIC_LABEL
+
+    _attach_live_state(games, season, resolved_week)
 
     record_trial_page_view(
         route="/ncaaf/cards",
@@ -2820,6 +2857,8 @@ def build_cards_page_context(selected_week: int) -> dict[str, Any]:
             flush=True,
         )
     using_sample_data = False
+
+    _attach_live_state(games, season, resolved_week)
 
     weeks = available_weeks()
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
