@@ -2576,6 +2576,22 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   "deletion racing an update -> keep theirs" are untested in production.
   Code live on all three writers (`f66c7441` an ancestor of every live SHA,
   checked — not assumed).
+  **CORRECTION `[2026-08-29, forced-collision test `1d6f324f`]` — THE NULL MEANS
+  LESS THAN I REPORTED.** `counts["concurrent"]` increments ONLY when a row
+  ALREADY IN OUR BASELINE has a different fingerprint now
+  (`execution_ledger.py:443`). An intruder that only APPENDS rows never trips
+  it, so an addition-only race is merged correctly and **logged nowhere**.
+  So "zero `LEDGER_MERGE` in 68 min" does NOT mean "no concurrent writes" — it
+  means "no other writer MODIFIED a row we had loaded". **A placement cycle
+  appending orders while settlement holds a snapshot is exactly that invisible
+  case**, which is very likely what was happening all along. Found by the test,
+  not by production; pinned by
+  `test_an_ADDITION_ONLY_race_is_MERGED_but_never_LOGGED`.
+  **MECHANISM NOW VERIFIED IN TEST**, which is what closes the gap waiting could
+  not: 8 forced-collision tests race real threads through the real
+  `_load()`->`_persist()` path, two asserting `concurrent >= 1` so a
+  non-overlapping run cannot pass silently. `off != on` — with the merge
+  neutered to the pre-fix blind write, **all 8 FAIL**.
   So: symptom-level PASS (ledger monotonic, `1,295,990 -> 1,298,163` vs a
   `-8,031` step) + mechanism-level UNPROVEN. Closing this needs a FORCED
   collision in a test, not more waiting — 68 minutes of real traffic did not

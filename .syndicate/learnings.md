@@ -5730,3 +5730,37 @@ first thing to reconcile, not the last.
 **Also: state the settle bar and then actually meet it.** I required >25 min
 post-boot and every sample I took was 2-19 min in, across two boots. I reported
 the numbers anyway. A caveat is not a substitute for a measurement.
+## 2026-08-29 — FORBIDDEN: reading a conditional log's silence as absence of the EVENT, when it is really absence of one SPECIAL CASE of the event
+
+`#600`'s merge logs `LEDGER_MERGE` only when `concurrent > 0` or the merge
+failed. I checked that the line is conditional, confirmed the code was live on
+all three writers, and reported a 68-minute production null — 59 settlement
+lines, 49 execute lines, zero merges — as "no collision happened, the conflict
+branch has never executed".
+
+**Both halves of that were wrong, and a forced-collision test found it in
+minutes.** `counts["concurrent"]` increments only when a row **already in our
+baseline** has a different fingerprint now (`execution_ledger.py:443`). An
+intruder that only APPENDS rows never trips it. So:
+
+- an addition-only race IS a collision, IS merged correctly, and logs NOTHING;
+- **a placement cycle appending orders while a settlement pass holds a snapshot
+  is exactly that case** — i.e. the most likely real-world race on this ledger
+  is the one the instrument cannot see;
+- the conflict branch may well have been running successfully all along.
+
+**The rule.** "This log is conditional, therefore its silence is meaningful" is
+only half the check. The other half is **what exactly the condition is**, read
+off the increment site — not the log line, not the function name. `concurrent`
+sounds like "another writer wrote"; it means "another writer modified a row I
+had already loaded". Those differ by the entire class of appends.
+
+I had already done the shallow version of this check twice the same night
+(`SIM_START` never emitted; `LEDGER_MERGE` is conditional) and both times
+stopped at "does the line exist". The deeper question is what makes it fire.
+
+**And the general one: when waiting cannot produce the event, FORCE it.** Sixty-
+eight minutes of real traffic produced no reading. A test with two threads and
+an `Event` produced it immediately, plus a defect in my own interpretation.
+Waiting for a rare event is not evidence-gathering — it is deferring the
+experiment that would settle it.
