@@ -3452,7 +3452,7 @@ caaf-no-orders`). NOT
 - Blocked by: none
 
 
-### ncaaf-compact-card-state — OPEN — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
+### ncaaf-compact-card-state — **PARTIAL / BLOCKED 2026-08-29** — strip FIXED and verified on production (`90c65694`: head `'11:20 - 2nd'`, rows `NC 10 / TCU 10`, was `'0:00'` + the projections `20.0/30.3`). **Layer 2 BLOCKED:** cause proven — `ncaaf_week_and_card_keys_for_date` needs `cfbd_lines_*.json`, which has NO PRODUCER on any service and exists at NO git SHA (`#557`, already recorded in `cards.py:246`), so NCAAF yields 0 chips everywhere. Fix belongs in `ncaaf/sources.py`, held by OPEN lane `ncaaf-pace-block`. Needs release or user override — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
 - Goal: the NCAAF compact strip and the Layer 2 compact cards show a game's
   REAL state and score while it is in progress. User report: "compact card is
   not updating with game state on the ncaaf page, layer 2 compact cards also
@@ -3508,6 +3508,26 @@ caaf-no-orders`). NOT
   label on the compact strip; (2) `layer2-shortlist` reports NCAAF rows with
   `game_state` non-null, measured against a game ESPN calls live in the same
   run.
+- **RESULT 2026-08-29 — DEFECT 1 FIXED AND VERIFIED; DEFECT 2 DIAGNOSED AND BLOCKED.**
+  Strip, served page 16:56Z: head `'11:20 - 2nd'`, rows `NC 10 / TCU 10`
+  (before: head `'0:00'`, rows `NC 20.0 / TCU 30.3` — the projections, on a
+  game that was 10-10). Pregame and final states rendered through Jinja first.
+- **MY HYPOTHESIS WAS FALSIFIED, AND THE FALSIFICATION SAVED A NO-OP DEPLOY.**
+  I blamed refresh-worker staleness. But `/api/board/game-chips?sports=ncaaf`
+  returned `source: inline_artifact_stale` with **0 chips** — WEB computed it
+  inline, on current code. Had I trusted the hypothesis I would have deployed
+  refresh-worker and changed nothing.
+- **AND THE LOCAL EVIDENCE WAS THE TRAP.** `build_game_chips('2026-08-29',
+  ['ncaaf'])` returns **8 chips**, `state: "live"`, `Q2 14:03`, scores 10/10 on
+  MY MACHINE — because this checkout has an UNTRACKED
+  `data/ncaaf_source/data/cfbd_lines_2026_wk*.json` mirror. `git ls-files`
+  returns **0** for that glob and it is absent from `HOT_ARTIFACT_PATTERNS`, so
+  it reaches no service by deploy OR by publish. Exactly the `CLAUDE.md`
+  "`data/**` in git is a lossy mirror" trap, and it produced a green local read
+  for a path that is dead in production.
+- **The `#273` fix does not work in production.** Its own docstring says it
+  cured NCAAF's 0-chips-forever bug; it replaced an unconditional `return []`
+  with a conditional one whose condition is never true on any service.
 - Blocked by: none
 
 

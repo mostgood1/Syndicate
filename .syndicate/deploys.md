@@ -37304,3 +37304,70 @@ Widening the ESPN window to ten dates to recover a value sitting in the
 payload would have been ten round trips for nothing.
 
 release: web claim released after this measurement.
+
+---
+
+## 2026-08-29 11:52 CT — web — `90c65694` — NCAAF compact strip shows the score — **VERIFIED**
+
+```
+deploy dep-da9gsmajnfac73drmqo0  created 16:52:41Z  live 16:55:58Z
+```
+
+**verify: served `/ncaaf/cards?week=1`, first strip card, 16:56Z**
+
+```
+before   head '0:00'          rows  NC 20.0 / TCU 30.3     <- the PROJECTIONS, game was 10-10
+after    head '11:20 - 2nd'   rows  NC 10  / TCU 10        <- the real score
+```
+
+Two defects, one card. The head read `clock or status`, and ESPN's clock is the
+truthy string `"0:00"` at the end of a quarter, so it beat `"End of 1st"`. The
+team rows read the model's projected totals unconditionally — on a live board a
+number beside a team is read as its score, and this one was a simulation.
+
+Pregame cards are unchanged (kickoff label + projection), verified through Jinja
+against fixtures for all three states before deploying.
+
+## LAYER 2 IS **NOT** FIXED BY THIS, AND THE CAUSE IS NAMED
+
+`/api/board/layer2-shortlist` NCAAF rows carry no game state, and it is not the
+same bug. Measured 2026-08-29T16:4xZ:
+
+```
+sport   rows  has game  game_state          soccer/mlb/wnba: 400/400 each
+ncaaf     82         0           0          nfl: 1/1
+```
+
+`layer2_board` sets `game_state` only `if game:`. Upstream,
+`/api/board/game-chips?sports=ncaaf` returns **0 chips** with
+`source: inline_artifact_stale` — i.e. WEB computed it inline, on current code,
+and got nothing. Not a worker-staleness problem and not a name-match problem.
+
+**Root cause, proven:** `_NCAAFDataProvider.games()` calls
+`ncaaf_week_and_card_keys_for_date` (`ncaaf/sources.py:266`), which returns None
+unless it can read `data/ncaaf_source/data/cfbd_lines_{season}_wk{N}.json`. That
+artifact **has no producer on any service and exists in git at no SHA** — which
+is not my finding but `#557`'s, already written into `ncaaf/cards.py:246`:
+*"`fetch_ncaaf_market_lines.py` and `fetch_cfbd_lines.py` have zero callers, and
+no `cfbd_lines_*.json` exists in git at any SHA."* It is not in
+`HOT_ARTIFACT_PATTERNS` either, so nothing can publish it worker->web.
+
+So NCAAF contributes 0 chips on every service on every date. The `#273` fix
+whose docstring claims to have solved exactly this replaced an unconditional
+`return []` with a conditional one that always takes the same branch in
+production.
+
+**I NEARLY SHIPPED A FIX THAT CHANGES NOTHING.** Locally
+`build_game_chips('2026-08-29', ['ncaaf'])` returns **8 chips**, `state: "live"`,
+`Q2 14:03`, scores 10/10 — because my dev checkout has an UNTRACKED
+`cfbd_lines_2026_wk*.json` mirror that production has never seen. `git ls-files`
+returns 0 for that glob. This is precisely the `CLAUDE.md` trap: *"Render is the
+source of truth — `data/**` in git is a lossy mirror."* The local green was an
+artifact of my disk.
+
+**BLOCKED, not deferred.** The fix belongs in
+`syndicate/features/ncaaf/sources.py`, held by OPEN lane `ncaaf-pace-block`.
+Not edited across lanes. Needs that lane's release or a user override.
+`schedule_adapter.ScheduleEvent` carries `home_team_id`/`away_team_id` for MLB
+ONLY, so the ESPN-id join that works so well on the cards is not directly
+available there either — the rewrite is real work, not a one-liner.
