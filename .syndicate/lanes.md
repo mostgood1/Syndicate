@@ -2653,6 +2653,15 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   neither claim is stale. This lane's only edit there (`last_blind_write` on
   `ledger-summary`) is deployed and did not collide.
 ### soccer-overview-cost — OPEN, **STILL UNSOLVED. The per-fixture read defect was REAL, FIXED, DEPLOYED, and is only ~6% of soccer.** — opened 2026-08-28 — session 3e5a9659
+- **`_NCAAFDataProvider.games()` IN `blueprints/home.py` WAS CHANGED BY ANOTHER
+  LANE `[2026-08-29, session 6dc988f8, lane ncaaf-compact-card-state]`.** Scope:
+  that ONE method, NCAAF only — nothing in the soccer paths this lane owns. It
+  answered the scoreboard-chip path with two full 51-game board builds (measured
+  3.15s + 3.26s), which took web to 502 earlier today once a resolver fix made
+  that path reachable. It now uses a light builder for chips only. You were not
+  reachable via ListAgents (lane blocks carry session UUIDs, ListAgents shows
+  names, and there is no mapping) — recorded here so you find it without going
+  looking. Revert freely if it collides with your cost work.
 - **`[2026-08-29 05:2xZ]` DEPLOYED `3e2cbd0b` AND MEASURED. PREDICATE REFUTED.**
   soccer hydrated bracket **206s -> 204s mean** (pre 210.1/202.7; post 177.7/231.0/124.4).
   Inside the spread. Full numbers and caveats in `deploys.md`.
@@ -3529,6 +3538,11 @@ caaf-no-orders`). NOT
 - Files: `syndicate/templates/shared/_scoreboard_strip_ncaaf.html`,
   `syndicate/features/ncaaf/sources.py` **[CLAIM TAKEN UNDER EXPLICIT USER
   OVERRIDE, 2026-08-29 — user: "fix it, override the lane claim"]**,
+  `syndicate/features/ncaaf/cards.py`,
+  `syndicate/blueprints/home.py` **[NARROW CARVE-OUT, `_NCAAFDataProvider.games()`
+  ONLY — user authorised the fix knowing it required this method ("yes, do it
+  properly"); holder `soccer-overview-cost` (session 3e5a9659) is NOT reachable
+  via ListAgents, so coordination was attempted and impossible]**,
   NEW `tests/test_ncaaf_week_and_card_keys_for_date.py`
 - Reads but does NOT claim: `syndicate/features/shared/board_enrichment.py`
   (held by `soccer-board-mlb-parity`), `pipeline/layer2_shortlist.py`,

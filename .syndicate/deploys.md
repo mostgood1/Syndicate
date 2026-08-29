@@ -37537,3 +37537,65 @@ sample should confirm.
 `SYNDICATE_SPORT_OVERVIEW_PROFILE=off`, set 17:15Z, took effect on this boot).
 `CONSUME_SPORT_SEGMENTS` stays -- four `monotonic()` reads, and it is what makes
 this region permanently measurable.
+
+---
+
+## 2026-08-29 12:46 CT — web — `fccd923d` — NCAAF chips, done properly — PENDING MEASUREMENT
+
+```
+deploy dep-da9hln942hec73fv1n00  created 17:46:05Z
+```
+
+Re-lands the resolver (`39cf5092`, a revert-of-the-revert) **behind the change
+that makes it safe to land** (`3e3ec51d`).
+
+**The fix for the outage:** `_NCAAFDataProvider.games()` no longer builds the
+board for chips. `build_ncaaf_chip_games` assembles only what
+`build_game_chip` reads — team pair, live/final flags, two scores, status
+token, kickoff — off the season schedule, using the SAME FBS gate and the SAME
+`f"{week}_{away}_{home}"` key formula as the card builder, so a chip and its
+card cannot disagree about identity. `_team_context` is not called: it is the
+expensive part and a chip needs none of it.
+
+**Equivalence measured, not assumed** — over all 8 games of the 08-29 slate,
+light chips vs full-card chips: **0 differences** across `sport`, `state`,
+`status_token`, `matchup`, `start_time_utc`, `leader`, and both sides' `abbr`
+and `score`.
+
+```
+build_game_chips(ncaaf)   1.71s cold / 0.23s warm     was 6.41s warm
+rails unchanged: ncaaf_card, metrics, summary, href, shared_predictions,
+                 market_tiles all still present; chip path carries 7 keys
+```
+
+### verify: THIS DEPLOY CARRIES A LATENCY GATE, which is the point
+
+The previous attempt was verified on CORRECTNESS ONLY (0 -> 8 chips) and took
+the site down four minutes later. `learnings.md` 2026-08-29 proposed a
+post-deploy latency assertion as the CHECK, because the rule already existed
+and was violated anyway. This is the first deploy to run it.
+
+**Pre-deploy baseline, 5 reads each, taken immediately before the deploy:**
+
+```
+/                    9.94  9.98  1.78  1.85  2.02   median 2.02
+/ncaaf/cards?week=1  3.18  3.27  3.27  2.96  3.05   median 3.18
+```
+
+**Gate: any median above 2x its baseline FAILS the deploy and it gets reverted**
+— `/` above ~4.0s, `/ncaaf/cards` above ~6.4s. Result recorded below when the
+deploy goes live.
+
+`include_upcoming` is the discriminator between the chip path and the game
+rails. It is overloaded — it means "widen the horizon" — and
+`tests/test_ncaaf_chip_games.py` pins the invariant it rests on:
+`build_game_chips` is its only caller and `_load_home_games` never passes it. A
+dedicated provider method would say it better; that lives in
+`game_chip_scoreboard.py`, held by OPEN lane `mlb-final-zero-placeholder`, so
+it is the follow-up rather than a second lane taken in one change.
+
+`blueprints/home.py` is held by OPEN lane `soccer-overview-cost` (session
+`3e5a9659`), which is NOT reachable via `ListAgents` — lane blocks carry session
+UUIDs and `ListAgents` shows names, with no mapping between them. Coordination
+was attempted and is impossible. Narrow carve-out, that one NCAAF method,
+logged on both lane blocks.
