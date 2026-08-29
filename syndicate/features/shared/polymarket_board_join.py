@@ -2185,13 +2185,36 @@ def _teams_match(
                     if _club_token_names(token, fh) or _club_token_names(token, fa)
                 ]
                 if len(named) == 1 and (str(named[0][0]), str(named[0][1])) == (str(home), str(away)):
-                    # The other token must not contradict: if it names a club,
-                    # it has to be this fixture's other side.
+                    # THE OTHER TOKEN MUST POSITIVELY NAME THE OTHER SIDE.
+                    #
+                    # This used to accept `not (hit_h or hit_a)` -- an opponent
+                    # token that names NOTHING was read as "does not contradict".
+                    # That is `unknown defaulting permissive`, and it placed a
+                    # REAL BET ON THE WRONG GAME.
+                    #
+                    # MEASURED 2026-08-29, user-reported, order filled $5.20:
+                    #
+                    #   board row   Nice @ Paris FC          (Ligue 1)
+                    #   slug        tsc-sea-juv-par-...-2pt5 (Serie A, Juventus-Parma)
+                    #   ledger      "totals over 2.5 · Nice @ Paris FC"
+                    #   Polymarket  "Over 2.5 total goals — Juventus FC vs Parma"
+                    #
+                    # `par` is a prefix of BOTH "Paris FC" and "Parma", so it
+                    # named exactly one fixture on OUR board and looked
+                    # decisive. `juv` then matched neither Nice nor Paris FC --
+                    # and naming nothing was treated as consent. Two clubs, two
+                    # competitions, one bet on the wrong match.
+                    #
+                    # THE COST OF THE FIX IS THE `mnc` CASE the note above
+                    # describes: a slug whose second token resolves to nothing
+                    # no longer pairs by elimination alone. That is coverage,
+                    # and coverage is the cheaper thing to lose. A wrong-game
+                    # fill cannot be unwound.
                     fh, fa = named[0]
                     hit_h, hit_a = _club_token_names(other, fh), _club_token_names(other, fa)
-                    if not (hit_h or hit_a) or (
-                        _club_token_names(token, fh) and hit_a
-                    ) or (_club_token_names(token, fa) and hit_h):
+                    if (_club_token_names(token, fh) and hit_a) or (
+                        _club_token_names(token, fa) and hit_h
+                    ):
                         return True
 
 

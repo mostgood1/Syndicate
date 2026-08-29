@@ -1389,16 +1389,34 @@ _EPL_SLATE = [("Crystal Palace", "Manchester City"),
               ("Chelsea", "Fulham")]
 
 
-def test_ELIMINATION_resolves_a_token_that_names_no_club(monkeypatch):
-    """`mnc` is neither a prefix nor the initials of "Manchester City" ("mc"),
-    so no token rule reaches it. But `cry` names exactly ONE fixture that day,
-    which determines the opponent — the league's matchups doing the work the
-    alias map cannot."""
+def test_ELIMINATION_NO_LONGER_resolves_a_token_that_names_no_club(monkeypatch):
+    """THIS TEST ASSERTED THE OPPOSITE UNTIL 2026-08-29, AND THE BEHAVIOUR IT
+    PROTECTED PLACED A BET ON THE WRONG GAME.
+
+    `mnc` is neither a prefix nor the initials of "Manchester City", so no token
+    rule reaches it. Elimination used to accept it: `cry` named exactly one
+    fixture, and `mnc` naming NOTHING was read as "does not contradict".
+
+    That same permissiveness, on a token collision, cost a real order:
+
+        board row   Nice @ Paris FC          (Ligue 1)
+        slug        tsc-sea-juv-par-...-2pt5 (Serie A, Juventus-Parma)
+        filled      $5.20 on "Over 2.5 total goals -- Juventus FC vs Parma"
+
+    `par` prefixes BOTH "Paris FC" and "Parma"; `juv` matched neither Nice nor
+    Paris FC and was waved through. The opponent token must now POSITIVELY name
+    the other side.
+
+    THE TRADE, STATED: this costs the `mnc` family -- slugs whose second token
+    resolves to nothing no longer pair by elimination alone. Coverage is the
+    cheaper thing to lose; a wrong-game fill cannot be unwound. The test is kept
+    and inverted rather than deleted so the trade stays visible.
+    """
     _no_aliases(monkeypatch)
     assert mod._teams_match(
         {"home_team": "Crystal Palace", "away_team": "Manchester City"},
         {"league": "epl", "home": "mnc", "away": "cry", "date": "2026-08-28"},
-        "soccer", _EPL_SLATE) is True
+        "soccer", _EPL_SLATE) is False
 
 
 def test_ELIMINATION_refuses_when_the_token_names_TWO_fixtures(monkeypatch):
@@ -2149,3 +2167,41 @@ def test_a_TOO_CLOSE_row_is_not_refused(monkeypatch):
         selected_date="2026-08-29")
     assert out["matched"] == 1, out
     assert out["refusals"].get("venue_price_inverted_vs_book") is None, out["refusals"]
+
+
+def test_a_slug_from_ANOTHER_COMPETITION_cannot_pair_by_elimination(monkeypatch):
+    """THE WRONG-GAME BET. User-reported 2026-08-29, order filled $5.20.
+
+        board row   Nice @ Paris FC          (Ligue 1)
+        slug        tsc-sea-juv-par-...-2pt5 (Serie A, Juventus-Parma)
+        ledger      "totals over 2.5 · Nice @ Paris FC"
+        Polymarket  "Over 2.5 total goals -- Juventus FC vs Parma Calcio"
+
+    `par` is a prefix of BOTH "Paris FC" and "Parma", so it named exactly one
+    fixture on our board and looked decisive. `juv` then matched neither Nice
+    nor Paris FC -- and the elimination branch read "names nothing" as "does not
+    contradict". Unknown defaulting permissive, on real money.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
+    assert mod._teams_match(
+        {"home_team": "Paris FC", "away_team": "Nice"},
+        {"league": "sea", "home": "par", "away": "juv", "date": "2026-08-29"},
+        "soccer", [("Paris FC", "Nice")],
+    ) is False
+
+
+def test_the_real_fixture_still_pairs(monkeypatch):
+    """The control. Refusing the collision must not refuse the true match --
+    otherwise the fix is just a coverage cut wearing a safety label."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
+    assert mod._teams_match(
+        {"home_team": "Parma", "away_team": "Juventus"},
+        {"league": "sea", "home": "par", "away": "juv", "date": "2026-08-29"},
+        "soccer", [("Parma", "Juventus")],
+    ) is True
