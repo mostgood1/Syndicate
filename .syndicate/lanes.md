@@ -2606,7 +2606,40 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `venue-join-refusal-visibility` (session `d617eefd`). Left deliberately;
   neither claim is stale. This lane's only edit there (`last_blind_write` on
   `ledger-summary`) is deployed and did not collide.
-### soccer-overview-cost — OPEN, **CAUSE FOUND 2026-08-29: per-fixture repeated artifact reads, 60 loads -> 4 (15x)** — opened 2026-08-28 — session 3e5a9659
+### soccer-overview-cost — OPEN, **STILL UNSOLVED. The per-fixture read defect was REAL, FIXED, DEPLOYED, and is only ~6% of soccer.** — opened 2026-08-28 — session 3e5a9659
+- **`[2026-08-29 05:2xZ]` DEPLOYED `3e2cbd0b` AND MEASURED. PREDICATE REFUTED.**
+  soccer hydrated bracket **206s -> 204s mean** (pre 210.1/202.7; post 177.7/231.0/124.4).
+  Inside the spread. Full numbers and caveats in `deploys.md`.
+- **THE MEMO WORKS. `assemble_s` per fixture, same leagues, overnight both sides:**
+  epl `0.23 -> 0.16` · ligue_1 `0.31 -> 0.16` · primeira_liga `0.34 -> 0.19` ·
+  belgian `0.20 -> 0.02`. The 60-loads-per-week count was structural and correct.
+- **WHY IT DID NOT MATTER, AND THIS RETIRES THE LANE'S OWN HEADLINE NUMBER.**
+  `assemble_s 19.49 of 20.78s` -- the figure this lane handed forward as "the target
+  is narrowed to ONE loop" -- was taken at **20:24Z, a European LIVE window**.
+  Overnight, ONE full eight-league pass totals `assemble_s` ~= **28.8s against a
+  ~206s soccer bracket = 14%**, not 95%. **DO NOT REUSE THE 19.49/20.78 RATIO.**
+  ```
+  04:25Z, one pass, PRE-deploy, assemble_s by league
+    mls 11.7(15fx) · mls 3.16(17) · epl 2.31(10) · ligue_1 3.39(11)
+    eredivisie 0.97(9) · primeira_liga 3.42(10) · championship 1.44(23) · belgian 2.43(12)
+    TOTAL ~= 28.8s
+  ```
+- **SO THE COST IS STILL UNLOCATED — and the search space is now DIFFERENT, not smaller.**
+  `week_games` assembly is ~14% overnight. `payload_s` is ~7%. That leaves **~80% of
+  soccer's 206s inside `sport_branch` but OUTSIDE `week_games`**, which is where nobody
+  has looked, because this lane spent a day narrowing onto `week_games` using a
+  live-window ratio. `pregame_props()` was measured at 0.17s and `games()` at ~2.8s,
+  both also possibly regime-scoped.
+- **EIGHT PREDICTIONS, EIGHT REFUTATIONS.** The method note stands and is now sharper:
+  a profiler over a real build, AND the profile must be taken in the regime the
+  answer is for. Both the TTL retraction and this one are the same error --
+  a quantity measured in one regime used as though it were constant.
+- MEASUREMENT HYGIENE, recorded against myself: I set a >25 min settled bar and
+  every sample was 2-19 min post-boot, across TWO boots (04:45:04Z, and 05:18:48Z
+  from lane `venue-join-refusal-visibility`'s 05:15:37Z deploy taken while this
+  claim was held). The verdict is robust -- 204 vs 206 is not a near miss -- but
+  the caveat is real and the next reading should meet the bar.
+- Deploy claim on refresh-worker: RELEASED 05:2xZ (`free`).
 - **`[2026-08-29]` FOUND IT. THE COST IS `_match_to_game` RE-READING THE SAME FILES ONCE PER FIXTURE.**
   Method: not an eighth log span. Counted loader calls through a real `week_games`
   with the simulated branch forced, which is STRUCTURAL and therefore immune to

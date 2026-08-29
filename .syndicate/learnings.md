@@ -5700,3 +5700,33 @@ count -- came from measuring the thing that was not visible in the code.
 that would refute it and take that reading. "Today starves tomorrow" is refuted by
 the build-start sequence, which is one query against a log line that already
 existed. Cost: two minutes. It was skipped for three deploys and a wrong ledger entry.
+
+## 2026-08-29 — FORBIDDEN: carrying a component's SHARE across regimes when the regime is what sets it
+
+I found a real defect (`_match_to_game` re-reading the same `(league,date)`
+artifacts once per FIXTURE; 60 file loads -> 4, structural and reproducible),
+sized it with `assemble_s 19.49 of 20.78s`, shipped it, and measured no change at
+the sport level. The share was the problem, not the defect. That 19.49/20.78 was
+taken at 20:24Z inside a European live window. Overnight -- when I deployed and
+measured -- one full eight-league pass totals ~28.8s of a ~206s soccer bracket:
+**14%, not 95%.** A 40% cut of 14% is ~6%, which is below the noise of the thing
+I promised to move.
+
+**This is the SAME confound this lane already retracted once**, in the other
+direction: a "TTL 42.34 -> 2.76s, 15x" win that was a quiet reading compared
+against a live one. I wrote that retraction, wrote the rule, and then re-used a
+live-window ratio as though it were a constant.
+
+**The generalisation:** a magnitude and a SHARE degrade differently when carried
+across regimes. `assemble_s = 19.49s` stays true of that moment. `assemble_s is
+95% of the call` is a ratio between two things that move independently, and it
+survives nothing. Treat every share as scoped to the window it was taken in.
+
+**How to apply:** before sizing a fix from a share, re-measure the share in the
+regime you will DEPLOY and MEASURE in. One query. If the deploy window and the
+measurement window differ from the window that motivated the work, that is the
+first thing to reconcile, not the last.
+
+**Also: state the settle bar and then actually meet it.** I required >25 min
+post-boot and every sample I took was 2-19 min in, across two boots. I reported
+the numbers anyway. A caveat is not a substitute for a measurement.
