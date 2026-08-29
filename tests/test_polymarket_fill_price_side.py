@@ -161,3 +161,74 @@ def test_an_absent_limit_cannot_withhold_anything(capsys):
     view = venue_order_view(_order(avgPx="0.40", outcomeSide="OUTCOME_SIDE_YES"))
     assert view["fill_price"] == 0.40
     assert "FILL_ABOVE_LIMIT" not in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# THE FEE. `fees_dollars` was hardcoded to None while the venue reported the
+# charge on every read.
+#
+# MEASURED 2026-08-29: C60JWBG0WKDK filled 3.91 @ $0.47 = $1.8377; the account
+# moved $1.8977. $0.06 -- ~3.3% of notional -- was recorded nowhere.
+# ---------------------------------------------------------------------------
+
+
+def _filled_order(**kw):
+    """The real shape, from today's ORDERS_READ key list."""
+    base = _order(
+        id="C60JWBG0WKDK",
+        marketSlug="tsc-mls-nyr-phi-2026-08-29-3pt5",
+        side="OUTCOME_SIDE_YES",
+        cumQuantity="3.91",
+        avgPx="0.47",
+        commissionNotionalTotalCollected="0.06",
+        commissionsBasisPoints="150",
+    )
+    base.update(kw)
+    return base
+
+
+def test_the_commission_the_venue_collected_is_recorded():
+    view = venue_order_view(_filled_order())
+    assert view["fill_price"] == 0.47
+    assert view["filled_count"] == 3.91
+    assert view["fees_dollars"] == 0.06
+
+
+def test_a_zero_commission_is_a_reading_not_a_silence():
+    """0.0 and None are different claims -- "no fee" versus "never read"."""
+    view = venue_order_view(_filled_order(commissionNotionalTotalCollected="0"))
+    assert view["fees_dollars"] == 0.0
+
+
+def test_an_absent_commission_field_stays_None():
+    order = _filled_order()
+    del order["commissionNotionalTotalCollected"]
+    assert venue_order_view(order)["fees_dollars"] is None
+
+
+def test_a_commission_exceeding_the_fill_is_refused_as_a_unit_error(capsys):
+    """The 100x guard. A fee bigger than the spend is cents read as dollars.
+
+    Withholding restores the old behaviour (None), which is visible; booking it
+    would put a wrong number into the money record silently.
+    """
+    # $1.8377 spent, "6" would be cents-as-dollars.
+    view = venue_order_view(_filled_order(commissionNotionalTotalCollected="6"))
+    assert view["fees_dollars"] is None
+    assert "COMMISSION_IMPLAUSIBLE" in capsys.readouterr().out
+
+
+def test_a_negative_commission_is_refused():
+    assert venue_order_view(_filled_order(commissionNotionalTotalCollected="-1"))["fees_dollars"] is None
+
+
+def test_a_commission_wrapped_in_a_value_object_is_read():
+    """`price` arrives as {'value': ..., 'currency': ...} on the submit side."""
+    view = venue_order_view(
+        _filled_order(commissionNotionalTotalCollected={"value": "0.06", "currency": "USD"})
+    )
+    assert view["fees_dollars"] == 0.06
+
+
+def test_an_unparseable_commission_does_not_raise():
+    assert venue_order_view(_filled_order(commissionNotionalTotalCollected="n/a"))["fees_dollars"] is None

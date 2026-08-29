@@ -336,7 +336,11 @@ def test_the_page_never_prints_a_total_over_a_partial_read(client, monkeypatch):
     monkeypatch.setattr(
         bp,
         "_live_portfolio_payload",
-        lambda date, show_all=False, on_date=None: {
+        # `**kwargs` rather than naming each one: this stub exists to return a
+        # payload, and re-listing the route's signature here just means it goes
+        # red again the next time a filter is added (it did -- `?venue=`,
+        # 2026-08-28, and these two tests were red on `origin/main`).
+        lambda date, **kwargs: {
             "date": date,
             "orders": [],
             "health": {},
@@ -365,9 +369,108 @@ def test_no_stamp_reads_as_not_reported_rather_than_no_money(client, monkeypatch
     monkeypatch.setattr(
         bp,
         "_live_portfolio_payload",
-        lambda date, show_all=False, on_date=None: {
+        # `**kwargs` rather than naming each one: this stub exists to return a
+        # payload, and re-listing the route's signature here just means it goes
+        # red again the next time a filter is added (it did -- `?venue=`,
+        # 2026-08-28, and these two tests were red on `origin/main`).
+        lambda date, **kwargs: {
             "date": date, "orders": [], "health": {}, "limits": {}, "kill_switch": {}, "balances": None,
         },
     )
     body = client.get("/portfolio").get_data(as_text=True)
     assert "worker has not reported" in body
+
+
+# ---------------------------------------------------------------------------
+# THE TRAIL. A single overwritten stamp answers "what is in the account now"
+# and cannot answer "did anything leave it when that submit failed" -- the only
+# question that settles an order the venue never answered.
+#
+# 2026-08-29: $1.84 was settled by five readings that existed only because the
+# worker prints them and Render retains logs.
+# ---------------------------------------------------------------------------
+
+
+def _stamp(at, dollars, status="ok"):
+    return {
+        "recorded_by": "live-odds-worker",
+        "recorded_at": at,
+        "venues": {"polymarket": {"status": status, "dollars": dollars, "cash_dollars": 118.15}},
+    }
+
+
+class _Store:
+    """A stand-in for the keyvalue store that actually remembers."""
+
+    def __init__(self):
+        self.data = {}
+
+    def read(self, path):
+        return self.data.get(str(path))
+
+    def write(self, path, payload):
+        self.data[str(path)] = payload
+
+
+@pytest.fixture
+def store(monkeypatch):
+    s = _Store()
+    monkeypatch.setattr(vb, "read_json_file", s.read)
+    monkeypatch.setattr(vb, "write_json_file", s.write)
+    return s
+
+
+def test_readings_accumulate_oldest_first(store):
+    vb.append_balance_history(_stamp("2026-08-29T21:05:56Z", 96.04765))
+    vb.append_balance_history(_stamp("2026-08-29T21:12:47Z", 96.04765))
+    vb.append_balance_history(_stamp("2026-08-29T21:32:08Z", 94.14995))
+
+    trail = vb.read_balance_history()
+    assert [r["recorded_at"] for r in trail] == [
+        "2026-08-29T21:05:56Z", "2026-08-29T21:12:47Z", "2026-08-29T21:32:08Z",
+    ]
+    assert trail[0]["polymarket"]["dollars"] == 96.04765
+    assert trail[-1]["polymarket"]["dollars"] == 94.14995
+
+
+def test_the_trail_is_bounded(store):
+    for i in range(vb._BALANCE_HISTORY_LIMIT + 25):
+        vb.append_balance_history(_stamp(f"2026-08-29T{i:04d}Z", 1.0))
+    assert len(vb.read_balance_history()) == vb._BALANCE_HISTORY_LIMIT
+
+
+def test_a_failed_reading_is_kept_with_its_status(store):
+    """Dropping it would leave a gap that reads as "no reading taken", and a
+    gap and a refusal are different facts about the same minute."""
+    vb.append_balance_history(_stamp("2026-08-29T21:05:56Z", None, status="auth_error"))
+    assert vb.read_balance_history()[0]["polymarket"]["status"] == "auth_error"
+
+
+def test_no_trail_reads_as_empty_not_as_an_error(store):
+    assert vb.read_balance_history() == []
+
+
+def test_a_history_write_failure_never_raises(monkeypatch, capsys):
+    """A nicety, like the stamp itself. It must not take down the tick that
+    places orders."""
+    monkeypatch.setattr(vb, "read_json_file", lambda path: None)
+
+    def _boom(path, payload):
+        raise OSError("disk gone")
+
+    monkeypatch.setattr(vb, "write_json_file", _boom)
+    vb.append_balance_history(_stamp("2026-08-29T21:05:56Z", 96.0))
+    assert "HISTORY_WRITE_FAILED" in capsys.readouterr().out
+
+
+def test_recording_balances_also_appends_to_the_trail(store, monkeypatch):
+    """The wiring. Without this the history is a function nothing calls."""
+    monkeypatch.setattr(vb, "fetch_kalshi_balance", lambda: {"venue": "kalshi", "status": "ok", "dollars": 50.19})
+    monkeypatch.setattr(
+        vb, "fetch_polymarket_balance", lambda: {"venue": "polymarket", "status": "ok", "dollars": 96.05}
+    )
+    vb.record_venue_balances(recorded_by="live-odds-worker")
+    trail = vb.read_balance_history()
+    assert len(trail) == 1
+    assert trail[0]["polymarket"]["dollars"] == 96.05
+    assert trail[0]["kalshi"]["dollars"] == 50.19

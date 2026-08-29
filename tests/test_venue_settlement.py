@@ -735,3 +735,128 @@ def test_the_probe_writes_nothing():
     vs.probe_unknown_polymarket_positions(orders, [_resolution()])
     assert "outcome" not in orders[0]
     assert orders[0]["status"] == "failed"
+
+
+# --------------------------------------------------------------------------
+# THE BALANCE ANGLE. Reproduces 2026-08-29 exactly: order 5c53789d... took
+# http_503 at 21:06:37 and Polymarket buyingPower read 96.05 before it and
+# 96.05 after it. Flat across the submit -- nothing was placed.
+#
+# The module's docstring used to say flatly that nothing could settle these.
+# --------------------------------------------------------------------------
+
+
+def _reading(at, dollars, status="ok"):
+    return {"recorded_at": at, "polymarket": {"status": status, "dollars": dollars}}
+
+
+_THE_REAL_TRAIL = [
+    _reading("2026-08-29T21:05:56Z", 96.04765),   # 40s before the submit
+    _reading("2026-08-29T21:12:47Z", 96.04765),
+    _reading("2026-08-29T21:18:46Z", 96.04765),
+    _reading("2026-08-29T21:25:09Z", 96.04765),
+]
+
+
+def _the_503(**over):
+    row = _unknown_order(
+        idempotency_key="5c53789d4d21d05fc501b05d",
+        venue_ticker="tsc-mls-nyr-phi-2026-08-29-3pt5",
+        selected_date="2026-08-29",
+        requested_stake_dollars=1.84,
+        submitted_at="2026-08-29T21:06:36.292084Z",
+        venue_resolved_at="2026-08-29T21:06:37.686282Z",
+    )
+    row.update(over)
+    return row
+
+
+def _probe(monkeypatch, orders, readings, resolutions=()):
+    monkeypatch.setattr(
+        "syndicate.features.shared.venue_balances.read_balance_history",
+        lambda: list(readings),
+    )
+    return vs.probe_unknown_polymarket_positions(list(orders), list(resolutions))
+
+
+def test_a_flat_balance_across_the_submit_says_NOT_PLACED(monkeypatch):
+    out = _probe(monkeypatch, [_the_503()], _THE_REAL_TRAIL)
+    evidence = out["findings"][0]["balance_evidence"]
+    assert evidence["verdict"] == "not_placed"
+    assert evidence["reason"] == "balance_unchanged_across_submit"
+    assert evidence["delta_dollars"] == 0.0
+    assert out["balance_settled"] == 1
+
+
+def test_a_debit_of_the_stake_says_PLACED(monkeypatch):
+    """The other direction, and the one that must never be missed: the order
+    DID land and we are holding a position we have no id for."""
+    trail = [
+        _reading("2026-08-29T21:05:56Z", 96.04765),
+        _reading("2026-08-29T21:12:47Z", 94.20765),  # -1.84
+    ]
+    out = _probe(monkeypatch, [_the_503()], trail)
+    evidence = out["findings"][0]["balance_evidence"]
+    assert evidence["verdict"] == "placed"
+    assert out["balance_settled"] == 1
+
+
+def test_another_order_in_the_window_is_CONFOUNDED_not_a_verdict(monkeypatch):
+    """A busy slate is the common case and the delta stops being attributable.
+    The honest answer is "I cannot tell", never the permissive one."""
+    other = {
+        "mode": "live", "venue": "polymarket", "status": "filled",
+        "idempotency_key": "other", "venue_ticker": "tsc-other",
+        "submitted_at": "2026-08-29T21:08:00Z", "venue_order_id": "X",
+    }
+    out = _probe(monkeypatch, [_the_503(), other], _THE_REAL_TRAIL)
+    evidence = out["findings"][0]["balance_evidence"]
+    assert evidence["verdict"] == "unknown"
+    assert evidence["reason"] == "confounded"
+    assert evidence["confounding_orders"] == 1
+    assert out["balance_settled"] == 0
+
+
+def test_no_trail_is_UNKNOWN_and_never_not_placed(monkeypatch):
+    """The ordinary state for any order older than the history. A guard that
+    maps absent onto its permissive branch would release a retry here."""
+    out = _probe(monkeypatch, [_the_503()], [])
+    evidence = out["findings"][0]["balance_evidence"]
+    assert evidence["verdict"] == "unknown"
+    assert evidence["reason"] == "no_bracketing_reading"
+
+
+def test_a_trail_that_starts_after_the_submit_proves_nothing(monkeypatch):
+    trail = [_reading("2026-08-29T21:12:47Z", 96.04765), _reading("2026-08-29T21:18:46Z", 96.04765)]
+    out = _probe(monkeypatch, [_the_503()], trail)
+    assert out["findings"][0]["balance_evidence"]["reason"] == "no_bracketing_reading"
+
+
+def test_an_unreadable_balance_is_not_an_unchanged_one(monkeypatch):
+    """"We could not read it" and "it did not move" are opposite facts that a
+    naive implementation renders identically."""
+    trail = [
+        _reading("2026-08-29T21:05:56Z", None, status="auth_error"),
+        _reading("2026-08-29T21:12:47Z", 96.04765),
+    ]
+    out = _probe(monkeypatch, [_the_503()], trail)
+    evidence = out["findings"][0]["balance_evidence"]
+    assert evidence["verdict"] == "unknown"
+    assert evidence["reason"] == "unreadable"
+
+
+def test_a_move_that_does_not_match_the_stake_is_INCONCLUSIVE(monkeypatch):
+    trail = [
+        _reading("2026-08-29T21:05:56Z", 96.04765),
+        _reading("2026-08-29T21:12:47Z", 95.90000),  # -0.15, not 1.84
+    ]
+    out = _probe(monkeypatch, [_the_503()], trail)
+    evidence = out["findings"][0]["balance_evidence"]
+    assert evidence["verdict"] == "unknown"
+    assert evidence["reason"] == "moved_but_not_by_this_order"
+
+
+def test_the_order_never_counts_as_its_own_confounder(monkeypatch):
+    """By key, not identity -- the same bug `sole_claim` was written to avoid."""
+    out = _probe(monkeypatch, [_the_503()], _THE_REAL_TRAIL)
+    assert out["findings"][0]["balance_evidence"]["confounding_orders"] == 0

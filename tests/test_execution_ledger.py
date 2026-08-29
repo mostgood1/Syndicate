@@ -1957,3 +1957,143 @@ def test_a_filled_order_is_never_retried_even_if_paused_text_appears(tmp_path, m
     stored["error"] = _paused_error()
     _, created_again = EL.record_order(request, mode=EL.LIVE)
     assert created_again is False
+
+
+# ---------------------------------------------------------------------------
+# THE RETRY MUST NOT ERASE WHY IT WAS ALLOWED.
+#
+# Reproduces 2026-08-29 exactly: a Polymarket submit takes `http_503`
+# {"code":14} with no order id, a human resolves it `not_placed` from the
+# venue's own screen, the position is re-proposed, and the retry pops the row.
+# Before `_prior_attempts_for_retry` the surviving row showed a clean first-try
+# order -- no 503, no unknown exposure, no human judgement call.
+# ---------------------------------------------------------------------------
+
+_LOST_503 = (
+    'PolymarketUSAuthError: http_503: https://api.polymarket.us/v1/orders: '
+    '{"code":14, "message":"The server was unable to process your request.", "details":[]}'
+)
+
+
+def _lose_the_response(EL, request):
+    """Submit, and have the venue never answer. Returns the ledger row."""
+    record, created = EL.record_order(request, mode=EL.LIVE)
+    assert created is True
+    EL.complete_order(record["idempotency_key"], status=EL.STATUS_FAILED, error=_LOST_503)
+    return record
+
+
+def test_a_retry_after_not_placed_keeps_the_operators_call(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record = _lose_the_response(EL, request)
+    key = record["idempotency_key"]
+    EL.resolve_unknown_submit(key, EL.RESOLUTION_NOT_PLACED, note="venue screen was empty")
+
+    retried, created_again = EL.record_order(request, mode=EL.LIVE)
+    assert created_again is True, "the resolution must still free the retry"
+
+    stored = EL.find_order(key)
+    attempts = stored.get("prior_attempts")
+    assert attempts, "the retry erased the attempt it replaced"
+    assert len(attempts) == 1
+    first = attempts[0]
+
+    # THE VENUE'S ANSWER, not the operator's conclusion. After `not_placed` the
+    # row's own `status`/`error` are the human's call; `pre_resolution_*` hold
+    # what actually happened, and those are what must survive.
+    assert first["status"] == EL.STATUS_FAILED
+    assert "http_503" in first["error"]
+    assert first["operator_resolution"]["finding"] == EL.RESOLUTION_NOT_PLACED
+    assert first["operator_resolution"]["note"] == "venue screen was empty"
+    assert first["submitted_at"] == record["submitted_at"]
+    assert first["replaced_at"]
+    # We never held one -- and that absence is the whole reason it was in doubt.
+    assert "venue_order_id" not in first
+
+
+def test_the_carried_provenance_survives_being_persisted_and_reloaded(tmp_path, monkeypatch):
+    """`_LEAN_FIELDS` is the projection every row goes through on write.
+
+    Without `prior_attempts` in that tuple the carry-forward is computed and
+    then silently dropped -- an unfed field indistinguishable from a working
+    one at every level except the data.
+    """
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record = _lose_the_response(EL, request)
+    EL.resolve_unknown_submit(record["idempotency_key"], EL.RESOLUTION_NOT_PLACED)
+    EL.record_order(request, mode=EL.LIVE)
+
+    # Re-read from disk rather than from the return value.
+    reloaded = [
+        o for o in (EL._load().get("orders") or [])
+        if o.get("idempotency_key") == record["idempotency_key"]
+    ]
+    assert len(reloaded) == 1, "the ledger must hold exactly one row per key"
+    assert reloaded[0]["prior_attempts"][0]["error"].startswith("PolymarketUSAuthError")
+
+
+def test_repeated_retries_chain_rather_than_replace(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    for _ in range(3):
+        record = _lose_the_response(EL, request)
+        EL.resolve_unknown_submit(record["idempotency_key"], EL.RESOLUTION_NOT_PLACED)
+    final, _ = EL.record_order(request, mode=EL.LIVE)
+
+    attempts = EL.find_order(final["idempotency_key"])["prior_attempts"]
+    assert len(attempts) == 3, "each attempt is a separate event and all of them happened"
+    stamps = [a["replaced_at"] for a in attempts]
+    assert stamps == sorted(stamps), "newest last"
+
+
+def test_prior_attempts_are_bounded(tmp_path, monkeypatch):
+    """A ledger row, not an audit log. Unbounded growth on a hot key is a bug."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    for _ in range(EL._MAX_PRIOR_ATTEMPTS + 4):
+        record = _lose_the_response(EL, request)
+        EL.resolve_unknown_submit(record["idempotency_key"], EL.RESOLUTION_NOT_PLACED)
+    final, _ = EL.record_order(request, mode=EL.LIVE)
+    assert len(EL.find_order(final["idempotency_key"])["prior_attempts"]) == EL._MAX_PRIOR_ATTEMPTS
+
+
+def test_a_first_submit_carries_no_prior_attempts(tmp_path, monkeypatch):
+    """The common case stays clean -- no wall of nulls on every fresh order."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    record, created = EL.record_order(_request(), mode=EL.LIVE)
+    assert created is True
+    assert record["prior_attempts"] == []
+
+
+def test_a_build_error_reclassification_is_also_carried(tmp_path, monkeypatch):
+    """The OTHER route to `rejected`, and it loses provenance the same way."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    from syndicate.features.shared import execution_ledger as EL
+
+    request = _request()
+    record, _ = EL.record_order(request, mode=EL.LIVE)
+    EL.complete_order(
+        record["idempotency_key"],
+        status=EL.STATUS_FAILED,
+        error="OrderBuildError: market_unresolved_for_position",
+    )
+    EL.reclassify_presend_failures()
+    retried, created_again = EL.record_order(request, mode=EL.LIVE)
+    assert created_again is True
+
+    first = EL.find_order(retried["idempotency_key"])["prior_attempts"][0]
+    assert first["reclassified_from"] == EL.STATUS_FAILED
+    assert first["reclassified_at"]
+    assert "OrderBuildError" in first["error"]

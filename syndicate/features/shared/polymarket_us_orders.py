@@ -873,6 +873,87 @@ def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) ->
     return {"status": "ok", "orders": orders, "count": len(orders), "coverage": "book"}
 
 
+# Polymarket's own name for the commission it has actually taken on an order.
+# NOT a rate -- `commissionsBasisPoints` and `makerCommissionsBasisPoints` are
+# the rates, and deriving dollars from a rate means re-deriving the notional it
+# applies to. The collected total is the venue's arithmetic, so it is the one
+# read.
+_COMMISSION_FIELDS = (
+    "commissionNotionalTotalCollected",
+    "commission_notional_total_collected",
+)
+
+
+def _commission_dollars(
+    order: Mapping[str, Any], *, fill_cost: float | None
+) -> float | None:
+    """What the venue CHARGED for this order, in dollars.
+
+    ----------------------------------------------------------------------
+    THIS RETURNED `None` UNCONDITIONALLY AND THE FIELD WAS ALWAYS THERE
+    ----------------------------------------------------------------------
+
+    `execution_ledger` already says it in its own words -- "FEES ARE REAL MONEY
+    AND WERE MODELLED AS ZERO EVERYWHERE" -- and fixed it for Kalshi by carrying
+    `taker_fees_dollars` across. Polymarket kept the hardcoded `None`, so every
+    Polymarket fill in the book records a cost lower than the one the account
+    paid.
+
+    MEASURED 2026-08-29: order `C60JWBG0WKDK` filled 3.91 contracts at $0.47 =
+    $1.8377, and the account moved $1.8977 (`buyingPower` 96.04765 -> 94.14995,
+    `cashBalance` 118.15 -> 116.25 agreeing). **$0.06 of real money, ~3.3% of
+    notional, recorded nowhere** -- against edges this system will act on at 3%.
+
+    The field was in the read the whole time. Today's `ORDERS_READ` key list:
+    `[..., 'commissionNotionalTotalCollected', 'commissionsBasisPoints', ...,
+    'makerCommissionsBasisPoints', ...]`.
+
+    THE UNIT IS AN ASSUMPTION AND IT IS NAMED, the same way `venue_balances`
+    names its cents assumption -- this repo has already paid for a 100x price
+    bug once. Dollars is the reading, and the guard below is what makes a wrong
+    reading LOUD instead of silent: a commission cannot exceed what was spent,
+    so a value that does is a unit error, not a fee, and is refused rather than
+    booked. Refusing leaves `fees_dollars` None, which is the status quo -- a
+    wrong fee is worse than a missing one, because a missing one is visible as
+    a null.
+    """
+    raw = None
+    for field in _COMMISSION_FIELDS:
+        value = order.get(field)
+        if isinstance(value, Mapping):
+            value = value.get("value")
+        if value not in (None, ""):
+            raw = value
+            break
+    if raw is None:
+        return None
+    try:
+        fee = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if fee < 0.0:
+        return None
+    if fee == 0.0:
+        # A REAL ANSWER. A maker fill genuinely pays nothing on some venues, and
+        # 0.0 is different from "we never read it" -- the same distinction
+        # `fees_dollars` already draws between None and 0.0 in the resting
+        # branch of reconciliation.
+        return 0.0
+    if fill_cost is not None and fill_cost > 0.0 and fee > fill_cost:
+        print(
+            f"[polymarket_us_orders] COMMISSION_IMPLAUSIBLE"
+            f" order={order.get('id') or order.get('orderId')}"
+            f" slug={order.get('marketSlug')!r} raw={raw!r} dollars={fee!r}"
+            f" fill_cost={fill_cost!r}"
+            " -- a commission cannot exceed the cost of the fill it is charged"
+            " on. Assuming a unit error and WITHHOLDING the fee; check whether"
+            " this venue reports commission in cents.",
+            flush=True,
+        )
+        return None
+    return fee
+
+
 def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     """One Polymarket order, reduced to the facts the ledger needs.
 
@@ -1122,8 +1203,12 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         # remainder and is already in the measured key list.
         "open_at_venue": bool(remaining) or state == "resting",
         "remaining_count": remaining,
-
-        "fees_dollars": None,
+        # THE VENUE'S OWN CHARGE, no longer hardcoded to None. See
+        # `_commission_dollars` -- $0.06 on a $1.84 fill was going unrecorded.
+        "fees_dollars": _commission_dollars(
+            order,
+            fill_cost=(price * filled) if (price is not None and filled) else None,
+        ),
         "order_id": order.get("id") or order.get("orderId"),
         "client_order_id": order.get("clientOrderId") or order.get("client_order_id"),
         "ticker": order.get("marketSlug") or order.get("market_slug"),

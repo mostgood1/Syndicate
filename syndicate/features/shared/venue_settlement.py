@@ -441,6 +441,149 @@ _VENUE_GRADE_FIELDS = (
 )
 
 
+# Tolerance on a balance comparison, in dollars. The venue reports to five
+# decimals (`96.04765`) and nothing else should move between two readings, so
+# this only has to absorb rounding -- not real money.
+_BALANCE_EPSILON = 0.005
+
+
+def _parse_stamp(value: Any) -> str:
+    """Readings and orders both stamp ISO-8601 Z, so string order IS time order."""
+    return str(value or "").strip()
+
+
+def _balance_evidence(
+    order: Mapping[str, Any],
+    *,
+    readings: list[Mapping[str, Any]],
+    same_venue_orders: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Did the account move when this submit failed?
+
+    ----------------------------------------------------------------------
+    THE READ THIS MODULE SAID DID NOT EXIST
+    ----------------------------------------------------------------------
+
+    `probe_unknown_polymarket_positions` has said, in its own docstring, that
+    "Polymarket publishes no route that can settle the question" and that "the
+    only thing that settles these is the venue's own UI". That was true of the
+    ORDER routes and was never true of the account: `/account/balances` was
+    supplied by the user on 2026-08-26, `venue_balances` has fetched it every
+    worker tick since, and it settles this question directly. A submit that
+    landed reserves or spends money; a submit that never arrived does not.
+
+    MEASURED 2026-08-29 on order `5c53789d4d21d05fc501b05d` ($1.84,
+    `tsc-mls-nyr-phi-2026-08-29-3pt5`, `http_503` at 21:06:37): Polymarket
+    `buyingPower` read 96.05 at 21:05:56 -- 40 seconds before the submit -- and
+    again at 21:12:47, 21:18:46 and 21:25:09, then fell to 94.15 only after the
+    retry filled. **Flat across the failed submit. Nothing was placed.** A human
+    had already been asked to go and look at a venue screen to learn that.
+
+    ----------------------------------------------------------------------
+    WHAT THIS REFUSES TO CONCLUDE, AND WHY EACH REFUSAL IS LOAD-BEARING
+    ----------------------------------------------------------------------
+
+    `unknown` is the DEFAULT and every path that cannot do the arithmetic
+    returns it. A guard that maps "I could not tell" onto its permissive branch
+    turns a failed join into a relaxed rule, and the permissive branch here
+    would release a retry that books a second real position.
+
+      no_bracketing_reading  the trail does not span the submit. A history that
+                             starts after the order proves nothing about it,
+                             and this is the ordinary state for any order older
+                             than the trail.
+      unreadable             a reading exists but its status is not `ok`. "We
+                             could not read the balance" and "the balance did
+                             not move" are opposite facts.
+      confounded             ANOTHER order of ours was submitted inside the same
+                             window, so the delta cannot be attributed to this
+                             one. Not a failure -- the honest answer, and the
+                             common one on a busy slate.
+      not_placed             flat across the submit, within a rounding epsilon.
+      placed                 the account fell by at least this order's stake.
+      inconclusive           it moved, but not by an amount this order explains.
+
+    STILL WRITES NOTHING. This is evidence handed to a human and to the banner,
+    not a grade -- same contract as the rest of the probe.
+    """
+    verdict = {"verdict": "unknown", "reason": None}
+    submitted = _parse_stamp(order.get("submitted_at"))
+    if not submitted:
+        verdict["reason"] = "no_submitted_at"
+        return verdict
+
+    # The last reading strictly BEFORE the submit, and the first strictly after
+    # the submit resolved. `venue_resolved_at` is when the failure came back;
+    # anything the venue did with the order had happened by then.
+    resolved = _parse_stamp(order.get("venue_resolved_at")) or submitted
+    venue = str(order.get("venue") or "").strip().lower()
+
+    before = None
+    after = None
+    for row in readings:
+        at = _parse_stamp(row.get("recorded_at"))
+        if not at:
+            continue
+        if at < submitted:
+            before = row
+        elif at > resolved and after is None:
+            after = row
+    if before is None or after is None:
+        verdict["reason"] = "no_bracketing_reading"
+        return verdict
+
+    def _reading(row: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        value = row.get(venue)
+        return value if isinstance(value, Mapping) else None
+
+    first, last = _reading(before), _reading(after)
+    if first is None or last is None or first.get("status") != "ok" or last.get("status") != "ok":
+        verdict["reason"] = "unreadable"
+        return verdict
+
+    try:
+        opening = float(first.get("dollars"))
+        closing = float(last.get("dollars"))
+    except (TypeError, ValueError):
+        verdict["reason"] = "unreadable"
+        return verdict
+
+    window = (_parse_stamp(before.get("recorded_at")), _parse_stamp(after.get("recorded_at")))
+    # ANY OTHER ORDER IN THE WINDOW POISONS THE ARITHMETIC. By key, so this
+    # order never counts against itself.
+    others = [
+        o
+        for o in same_venue_orders
+        if str(o.get("idempotency_key") or "") != str(order.get("idempotency_key") or "")
+        and window[0] < _parse_stamp(o.get("submitted_at")) < window[1]
+    ]
+    verdict.update(
+        {
+            "window": list(window),
+            "opening_dollars": round(opening, 5),
+            "closing_dollars": round(closing, 5),
+            "delta_dollars": round(opening - closing, 5),
+            "confounding_orders": len(others),
+        }
+    )
+    if others:
+        verdict["verdict"] = "unknown"
+        verdict["reason"] = "confounded"
+        return verdict
+
+    delta = opening - closing
+    stake = _num(order.get("requested_stake_dollars"))
+    if abs(delta) <= _BALANCE_EPSILON:
+        verdict["verdict"] = "not_placed"
+        verdict["reason"] = "balance_unchanged_across_submit"
+    elif stake is not None and delta >= stake - _BALANCE_EPSILON:
+        verdict["verdict"] = "placed"
+        verdict["reason"] = "balance_fell_by_at_least_the_stake"
+    else:
+        verdict["reason"] = "moved_but_not_by_this_order"
+    return verdict
+
+
 def probe_unknown_polymarket_positions(
     orders: Any, resolution_rows: Any
 ) -> dict[str, Any]:
@@ -455,9 +598,21 @@ def probe_unknown_polymarket_positions(
     to every read available to us, and $8.21 of possible exposure sits in the
     `unknown` bucket that nothing can confirm or deny.
 
-    THE ONE ANGLE THAT EXISTS: the resolution feed is keyed by `marketSlug`,
-    not by order id. If that market resolved AND we hold no other order on it,
-    the resolution row is evidence a position of ours was there.
+    TWO ANGLES EXIST, and the second one is stronger.
+
+    THE ACCOUNT `[added 2026-08-29]`. A submit that landed reserves or spends
+    money; one that never arrived does not. `/account/balances` is fetched every
+    worker tick and `venue_balances.append_balance_history` now keeps a bounded
+    trail of the readings, so the balance either side of a failed submit can be
+    compared directly -- see `_balance_evidence`. This is what actually settled
+    `5c53789d4d21d05fc501b05d`, and the paragraph above used to say flatly that
+    nothing could. **It was true of the ORDER routes and was never true of the
+    account, and stating it without that qualifier sent a human to look at a
+    venue screen for a question five numbers already answered.**
+
+    THE MARKET: the resolution feed is keyed by `marketSlug`, not by order id.
+    If that market resolved AND we hold no other order on it, the resolution row
+    is evidence a position of ours was there.
 
     READ-ONLY AND IT WRITES NOTHING. It cannot grade, because the evidence is
     circumstantial in both directions:
@@ -510,6 +665,18 @@ def probe_unknown_polymarket_positions(
         ):
             unknown.append(dict(order))
 
+    # THE BALANCE TRAIL, read once for the whole pass. Absent (or too short)
+    # simply yields `no_bracketing_reading` per order -- see `_balance_evidence`.
+    from syndicate.features.shared.venue_balances import read_balance_history
+
+    readings = read_balance_history()
+    polymarket_orders = [
+        o for o in (orders or [])
+        if isinstance(o, Mapping)
+        and str(o.get("mode") or "") == "live"
+        and str(o.get("venue") or "").strip().lower() == "polymarket"
+    ]
+
     findings: list[dict[str, Any]] = []
     for order in unknown:
         key = _join_key(order.get("venue_ticker"))
@@ -532,14 +699,30 @@ def probe_unknown_polymarket_positions(
                 # coincidence, and it is why this is reported rather than
                 # inferred.
                 "sole_claim": not others,
+                # DID THE ACCOUNT MOVE? The read this module used to say did
+                # not exist. Defaults to `unknown` on every path that cannot
+                # do the arithmetic.
+                "balance_evidence": _balance_evidence(
+                    order, readings=readings, same_venue_orders=polymarket_orders
+                ),
             }
         )
 
     evidenced = [f for f in findings if f["resolution_rows"] and f["sole_claim"]]
+    # COUNTED SEPARATELY FROM `evidenced`, which means "the market resolved and
+    # nothing else of ours could claim it" -- circumstantial, and about a
+    # market. This is about the ACCOUNT, and it is the stronger signal of the
+    # two. Merging them into one number would hide which kind of evidence a
+    # given finding actually rests on.
+    settled = [
+        f for f in findings
+        if (f.get("balance_evidence") or {}).get("verdict") in ("placed", "not_placed")
+    ]
     return {
         "status": "ok",
         "unknown": len(findings),
         "evidenced": len(evidenced),
+        "balance_settled": len(settled),
         "findings": findings,
     }
 
@@ -835,6 +1018,7 @@ def settle_from_venue(*, dry_run: bool = False) -> dict[str, Any]:
             print(
                 f"[venue_settlement] UNKNOWN_ORDER_PROBE venue=polymarket"
                 f" unknown={probe['unknown']} evidenced={probe['evidenced']}"
+                f" balance_settled={probe.get('balance_settled')}"
                 f" findings={probe['findings']}",
                 flush=True,
             )

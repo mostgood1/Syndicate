@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from collections.abc import Mapping
 from typing import Any
 
 from syndicate.features.shared.refresh_state_store import (
@@ -435,6 +436,96 @@ def _recorded_polymarket_path() -> str | None:
     return None
 
 
+# HOW MANY READINGS THE HISTORY KEEPS. The worker's execution tick is >=5
+# minutes apart, so 128 is roughly half a day -- comfortably longer than the
+# window between a submit and somebody asking what happened to it, and small
+# enough that the file stays trivial next to the ledger.
+_BALANCE_HISTORY_LIMIT = 128
+
+
+def balance_history_path():
+    # NO DATE TOKEN, same reason as `balances_path`.
+    return reports_root() / "intelligence" / "venue_balance_history.json"
+
+
+def _history_entry(stamp: Mapping[str, Any]) -> dict[str, Any]:
+    """One reading, reduced to what a later question can be asked of it.
+
+    NUMBERS AND STATUS ONLY. A history is for arithmetic across time, and
+    carrying the discovered path and unit assumptions on every row would make
+    it a log of things that do not change.
+    """
+    row: dict[str, Any] = {"recorded_at": stamp.get("recorded_at")}
+    venues = stamp.get("venues")
+    if isinstance(venues, Mapping):
+        for venue, reading in venues.items():
+            if not isinstance(reading, Mapping):
+                continue
+            row[str(venue)] = {
+                "status": reading.get("status"),
+                # `dollars` is the headline number each venue's fetch settled
+                # on; the extra two are Polymarket's and are absent elsewhere.
+                "dollars": reading.get("dollars"),
+                "cash_dollars": reading.get("cash_dollars"),
+                "open_orders_dollars": reading.get("open_orders_dollars"),
+            }
+    return row
+
+
+def append_balance_history(stamp: Mapping[str, Any]) -> None:
+    """Keep a bounded trail of readings. Never raises.
+
+    ----------------------------------------------------------------------
+    WHY A SINGLE STAMP WAS NOT ENOUGH
+    ----------------------------------------------------------------------
+
+    `balances_path()` is overwritten every tick, so it answers "what is in the
+    account now" and cannot answer "did anything leave the account when that
+    submit failed" -- which is the only question that settles an order the
+    venue never answered.
+
+    MEASURED 2026-08-29, and note HOW it was measured. Order
+    `5c53789d4d21d05fc501b05d` took `http_503` with no order id at 21:06:37,
+    and Polymarket `buyingPower` read 96.05 at 21:05:56, 21:12:47, 21:18:46 and
+    21:25:09, then 94.15 once the retry filled. Flat across the failed submit,
+    so **nothing was ever placed** -- $1.84 settled in five numbers.
+
+    Those five numbers existed only because the worker happens to `print` them
+    and Render happens to retain logs. Nothing in the artifact layer could have
+    answered it, and a human was asked to check a venue screen instead. This
+    makes the trail a first-class artifact so the probe can do that arithmetic
+    itself.
+    """
+    try:
+        existing = read_json_file(balance_history_path())
+    except Exception:
+        existing = None
+    rows = existing.get("readings") if isinstance(existing, Mapping) else None
+    history = [r for r in rows if isinstance(r, Mapping)] if isinstance(rows, list) else []
+    history.append(dict(_history_entry(stamp)))
+    try:
+        write_json_file(
+            balance_history_path(),
+            {"readings": history[-_BALANCE_HISTORY_LIMIT:]},
+        )
+    except Exception as exc:
+        # A NICETY, exactly like the stamp itself. A history that cannot be
+        # written must not take down the tick that places orders.
+        print(f"[venue_balances] HISTORY_WRITE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+def read_balance_history() -> list[dict[str, Any]]:
+    """Oldest first. An empty list means "no trail", never "nothing moved"."""
+    try:
+        payload = read_json_file(balance_history_path())
+    except Exception:
+        return []
+    rows = payload.get("readings") if isinstance(payload, Mapping) else None
+    if not isinstance(rows, list):
+        return []
+    return [dict(r) for r in rows if isinstance(r, Mapping) and r.get("recorded_at")]
+
+
 def record_venue_balances(*, recorded_by: str) -> dict[str, Any]:
     """Fetch both venues and stamp the result. **WORKER ONLY.**
 
@@ -454,6 +545,9 @@ def record_venue_balances(*, recorded_by: str) -> dict[str, Any]:
             venues[venue] = {"venue": venue, "status": "auth_error", "detail": f"{type(exc).__name__}: {exc}"}
 
     stamp = {"recorded_by": str(recorded_by), "recorded_at": _utc_now(), "venues": venues}
+    # BEFORE the stamp write, so a trail exists even on the tick whose stamp
+    # write is the thing that fails. `append_balance_history` never raises.
+    append_balance_history(stamp)
     try:
         write_json_file(balances_path(), stamp)
     except Exception as exc:

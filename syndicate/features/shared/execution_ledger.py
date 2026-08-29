@@ -172,6 +172,12 @@ _LEAN_FIELDS = (
     "settled_at",
     "venue_order_id",
     "error",
+    # EARLIER ATTEMPTS ON THIS KEY. Lean by construction (absent on a first
+    # submit, and every entry omits what it does not know), and load-bearing:
+    # without it in this tuple the carry-forward in `record_order` would be
+    # computed and then dropped by the projection -- an unfed field that looks
+    # exactly like a working one. See `_prior_attempts_for_retry`.
+    "prior_attempts",
 )
 
 
@@ -721,6 +727,84 @@ def _is_retryable_venue_pause(order: Mapping[str, Any]) -> bool:
     return bool(_RETRYABLE_VENUE_STATE.search(str(order.get("error") or "")))
 
 
+# How many earlier attempts a row keeps. Bounded because this is a ledger row
+# that gets rewritten on every retry, not an audit log -- and an unbounded list
+# on a hot key is how a 1.2MB ledger becomes a problem nobody predicted.
+_MAX_PRIOR_ATTEMPTS = 10
+
+
+def _prior_attempts_for_retry(order: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """What the attempt we are about to DELETE actually did.
+
+    ----------------------------------------------------------------------
+    THE RETRY WAS ERASING THE EVIDENCE THAT THE RETRY WAS RISKY
+    ----------------------------------------------------------------------
+
+    `resolve_unknown_submit` promises, in its own docstring: "THE ORIGINAL
+    `error` AND `status` ARE PRESERVED under `pre_resolution_*`. An operator can
+    be wrong, and a record that overwrites what actually happened leaves nothing
+    to reverse."
+
+    It could not keep that promise. `not_placed` is the ONLY thing that sets
+    `rejected`, and `rejected` is (with a retryable pause) the ONLY thing that
+    makes `record_order` pop the row -- so the pop deleted `operator_resolution`,
+    `pre_resolution_status` and `pre_resolution_error` in exactly the case they
+    were written for. The two functions were designed against each other.
+
+    MEASURED 2026-08-29, and the contrast is the proof rather than the theory.
+    Order `5c53789d4d21d05fc501b05d` (`tsc-mls-nyr-phi-2026-08-29-3pt5`, $1.84)
+    took `http_503 {"code":14}` at 21:06:37 with no order id, was resolved
+    `not_placed` by a human at 21:22:00, was retried at 21:25:39 and FILLED as
+    `C60JWBG0WKDK`. The surviving row showed a clean first-try fill: no 503, no
+    16 minutes of unknown exposure, no human judgement call. Meanwhile two
+    orders resolved `not_placed` on 2026-08-28 STILL carry full provenance --
+    because the board never re-proposed them, so `record_order` was never called
+    again. **The guarantee held only where it did not matter.**
+
+    WHY IT MATTERS: `not_placed` is a HUMAN'S READING of a venue screen, and the
+    order it releases is one we were told may already exist. If that reading is
+    wrong the retry books a second position, and the row that would let anyone
+    notice is the one being popped. Balance readings settled this instance --
+    Polymarket buying power held flat at 96.05 across the 503 and fell only
+    after the retry filled -- but that is evidence gathered AFTERWARDS, and it
+    only exists because the worker logs happened to persist.
+
+    Chains rather than replaces: a key retried twice keeps both attempts,
+    newest last, bounded by `_MAX_PRIOR_ATTEMPTS`. Absent fields are simply
+    absent -- a compact row beats a wall of nulls, and every reader here already
+    treats a missing key as "not known".
+    """
+    prior = order.get("prior_attempts")
+    attempts: list[dict[str, Any]] = [dict(a) for a in prior if isinstance(a, Mapping)] if isinstance(prior, list) else []
+
+    # The PRE-RESOLUTION values where an operator overwrote them, because those
+    # are what actually happened at the venue. `status`/`error` after a
+    # `not_placed` are the operator's conclusion, not the venue's answer.
+    entry: dict[str, Any] = {
+        "submitted_at": order.get("submitted_at"),
+        "status": order.get("pre_resolution_status") or order.get("status"),
+        "error": order.get("pre_resolution_error") or order.get("error"),
+        "replaced_at": _utc_now(),
+    }
+    # Only when we held one. A retry after a LOST RESPONSE has no id, and that
+    # absence is the whole reason the attempt was in question.
+    if str(order.get("venue_order_id") or "").strip():
+        entry["venue_order_id"] = order.get("venue_order_id")
+    # THE HUMAN'S CALL, carried verbatim. This is the field whose loss makes a
+    # wrong resolution unreviewable.
+    if isinstance(order.get("operator_resolution"), Mapping):
+        entry["operator_resolution"] = dict(order["operator_resolution"])
+    # The other route to `rejected` (`reclassify_build_errors`), kept for the
+    # same reason -- a correction nobody can see is indistinguishable from a
+    # rewrite.
+    if order.get("reclassified_from"):
+        entry["reclassified_from"] = order.get("reclassified_from")
+        entry["reclassified_at"] = order.get("reclassified_at")
+
+    attempts.append(entry)
+    return attempts[-_MAX_PRIOR_ATTEMPTS:]
+
+
 def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dict[str, Any], bool]:
     """WRITE-AHEAD. Persist the order as `submitted` BEFORE anything is sent.
 
@@ -731,6 +815,9 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
     key = idempotency_key(request)
     state = _load()
     orders = state.get("orders") or []
+    # WHAT THE ATTEMPT WE ARE REPLACING ACTUALLY DID. Empty unless a row is
+    # popped below -- see `_prior_attempts_for_retry`.
+    prior_attempts: list[dict[str, Any]] = []
     for index, order in enumerate(orders):
         if order.get("idempotency_key") != key:
             continue
@@ -747,6 +834,7 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         # Only `rejected`. `filled`, `submitted` and `failed` all mean the
         # venue may hold this order, and re-sending any of them is how one bet
         # becomes two.
+        prior_attempts = _prior_attempts_for_retry(order)
         orders.pop(index)
         state["orders"] = orders
         break
@@ -792,6 +880,9 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
         "settled_at": None,
         "venue_order_id": None,
         "error": None,
+        # EVERY EARLIER ATTEMPT ON THIS KEY. Empty for a first submit; see
+        # `_prior_attempts_for_retry` for why a retry must not drop it.
+        "prior_attempts": prior_attempts,
     }
     state.setdefault("orders", []).append({k: record[k] for k in _LEAN_FIELDS})
     _persist(state)
