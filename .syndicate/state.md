@@ -4746,6 +4746,45 @@ the collector reads, keeping the volume low: `MLB_INPUT_CHECKLIST`,
 `mlb_sim_engine_reference.md` were corrected on 2026-08-19 to say so.
 
 
+## [ncaaf-chip-grid-join] THE CHIP->GRID JOIN CALLED `teams_match` WITH ITS ARGUMENTS INVERTED `[measured 2026-08-29T18:43-18:59Z, web+worker 95c4fb12]`
+
+**`board_enrichment._side_matches` called `teams_match(sport, row_team, token)`.**
+The signature is `teams_match(sport, token, row_team)`, and the final heuristic
+(`team_aliases.py:660`) splits **`row_team`** into words asking whether any
+`word.startswith(token_norm)` — so it only answers when `token` is the SHORT
+side. Over 8 real pairs from the 2026-08-29 slate: **0/8 as called, 8/8
+reversed.** Not even `USC` against `USC Trojans`.
+
+**Why it survived:** with an alias map BOTH sides resolve canonically and
+`teams_match` returns at `team_aliases.py:644`, which is order-INDEPENDENT.
+`_alias_map` is **EMPTY for ncaaf, nhl and ncaab** — only those three reach the
+order-sensitive branch, and NCAAF was the one with a live slate.
+
+**VERIFIED on `book-grid`:** ncaaf `game_state` went
+`{"chips": 8, "rows_matched": 0, "unmatched_teams": [14 teams]}` ->
+**`{"chips": 8, "rows_matched": 44}`**, `unmatched_teams` gone.
+
+**Blast radius measured BEFORE shipping**, on production payloads, because this
+touches every sport:
+
+    sport   rows chips | as-called amb | reversed amb | delta
+    mlb      300    17 |       300  35 |      300  35 | +0
+    wnba     300     2 |       300   0 |      300   0 | +0
+    nfl      300    16 |       115   0 |      115   0 | +0
+    soccer   300   231 |       285   0 |      290   0 | +5
+    ncaaf     43     8 |         0   0 |       43   0 | +43
+
+No sport loses a match, none gains an ambiguous row, no pair flips True->False.
+MLB's 35 ambiguous rows are identical in both orders and pre-existing.
+
+**NOT PROVEN, and the distinction is load-bearing.** `book-grid` re-runs
+`attach_game_state` at READ time on web; `layer2-shortlist` enriches in
+`pipeline/layer2_shortlist.py:548` on the worker. At 18:59:25Z, with the worker
+on `95c4fb12` since 18:42:34Z (past the ~21-min first-publish window, `#563`),
+the shortlist still read **ncaaf 96 rows / 0 game / 0 state** against
+mlb/wnba/soccer 400/400 and nfl 17/17. **The fix is proven on one surface and
+unproven on the other.** Watcher `bn5covso7`.
+
 ## [ncaaf-live-lens-state] THE NCAAF LIVE LENS'S STATE BRANCH WAS UNREACHABLE, NOT EMPTY — **FIXED AND VERIFIED IN PRODUCTION** `[measured 2026-08-29T16:30:28Z, web 061d5b2b, lane ncaaf-live-lens-state]`
 
 **The reading that matters, one script run, production and ESPN together:**

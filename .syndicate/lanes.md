@@ -3577,7 +3577,7 @@ caaf-no-orders`). NOT
 - Blocked by: none
 
 
-### ncaaf-chip-grid-join — OPEN — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
+### ncaaf-chip-grid-join — **OPEN — FIX SHIPPED AND PROVEN ON ONE SURFACE, ONE READING OWED** — `95c4fb12` live on web+worker; `book-grid` ncaaf `rows_matched` **0 -> 44**, `unmatched_teams` gone; latency gate PASSED (`/` 1.18x, `/ncaaf/cards` 1.09x). **`layer2-shortlist` ncaaf STILL 96/0/0 at 18:59:25Z** (mlb/wnba/soccer 400/400, nfl 17/17) with the worker past its ~21-min publish window — do NOT close on the book-grid number. Watcher `bn5covso7`. Narrative: `log/2026-08-29.md` — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
 - Goal: NCAAF grid rows carry `game` (and therefore `game_state`) on
   `layer2-shortlist`, which is `0 of 96` while mlb/wnba/soccer are 400/400.
 - Files: `syndicate/features/shared/board_enrichment.py`

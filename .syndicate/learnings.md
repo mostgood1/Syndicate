@@ -5979,3 +5979,33 @@ already-dead lock). **Four instances in one session of a query matching somethin
 that was not what it was looking for.** The shared fix is to anchor the query on
 an identifier the target event actually emits, and to include in the output the
 field that would reveal a mismatch.
+
+### 2026-08-29 — a fix proven on ONE consumer is not proven on another that recomputes it elsewhere
+
+- **What we believed:** that fixing `board_enrichment._side_matches` would fix
+  every surface that shows NCAAF game state, because they all go through
+  `attach_game_state`.
+- **What was actually true:** `book-grid` re-runs the enrichment at READ time on
+  web, so a web deploy fixed it instantly (`rows_matched` 0 -> 44).
+  `layer2-shortlist` runs the same enrichment in
+  `pipeline/layer2_shortlist.py:548` on the WORKER, over its own artifact.
+  Measured 18:59:25Z with `95c4fb12` live on BOTH services and the worker past
+  its ~21-min first-publish window: book-grid **44**, shortlist **0 of 96**.
+- **How we found out:** reading both surfaces in the same minute instead of
+  generalising from the one that moved.
+- **The rule going forward:** when two endpoints display "the same" joined
+  field, find out WHERE each computes it before treating one reading as
+  evidence for the other. A shared function is not a shared execution site, and
+  on this platform the web/worker split makes that difference routine rather
+  than exotic.
+- **Cost:** none yet — the lane was NOT closed on the book-grid number, which is
+  the whole point of writing this down now rather than after closing it.
+
+### 2026-08-29 — PowerShell reserved variables can fake a regression
+
+`$home = git show <sha>:path` fails (`HOME` is read-only), leaving the variable
+empty, so a content check reported the light chip path MISSING from a commit
+that contained it. A false "regression" on a deploy candidate is exactly the
+reading that triggers an unnecessary revert. Use non-reserved names (`$homePy`)
+in verification scripts, and treat a surprising negative as suspect before
+acting on it.
