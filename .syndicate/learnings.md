@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 581 rules `[generated]`
+## Index — 662 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -6310,3 +6310,51 @@ was editing.**
 - Same family as [[feedback-instrument-blindness]] and
   [[feedback-absence-in-a-window-is-not-absence]]; this is the third instance,
   so the control is now the rule rather than the diligence.
+---
+
+### 2026-08-29 — FORBIDDEN: never treat a `lanes.md` claim as evidence that anyone is holding the file. `lane-guard.py` has NO liveness notion, so a claim outlives its session forever
+
+- **What we believed:** the lane system's file claims describe live contention —
+  if `lane-guard` blocks you, another session is working that file and the
+  correct move is to surface the conflict and work elsewhere. The protocol says
+  exactly that: "If another OPEN lane lists a file you need, stop and surface
+  the conflict."
+- **What was actually true:** claims never expire, and nothing ever released
+  them on a session's death. Measured 2026-08-29: **26 OPEN lanes held 133
+  claims while 3 sessions were alive.** 121 of those claims (91%) were enforced
+  on behalf of sessions that no longer existed — some archived nine days
+  earlier. There were also **56 `.current-lane.<session>` markers for 4 live
+  sessions.** The lane blocks themselves were often not even wrong: several
+  headers *say* "CLAIMS RELEASED" or "UNOWNED" in prose while their `- Files:`
+  block still parses as a live claim, because the guard reads the block, not
+  the header.
+- **How we found out:** a user asking why so many things were claimed. Liveness
+  is measurable and was never being measured: a session is live iff its
+  transcript `~/.claude/projects/<proj>/<id>.jsonl` was written recently, and
+  the break was unambiguous — 4 files inside 60s, the next 87 minutes back.
+  The cost had already been paid once that same day: `live-venue-order-placement`
+  needed a **USER OVERRIDE** to take `venue_quote_adapters.py` off
+  `kalshi-line-aware-rungs`, a lane whose session was gone and whose header
+  already said the files were free.
+- **The rules going forward:**
+  1. **Before honouring a claim, check the holder is alive.** The header names
+     a session id; if its transcript is hours stale, the claim is a phantom and
+     `py -3 scripts/release_phantom_lane_claims.py` releases it — no override,
+     no permission, no waiting on a session that cannot answer.
+  2. **A lane header saying "UNOWNED"/"CLAIMS RELEASED" releases NOTHING.**
+     `lane-guard` parses the `- Files:` block and never reads the header's
+     prose. Release means putting a `_DISCLAIMER_MARKERS` token ahead of the
+     path text on every line of the block. Verify with the hook itself.
+  3. **Prove a release on the guard, both directions.** Feed `lane-guard.py`
+     the real payload before and after: a released path must go exit 2 -> exit
+     0 **and a still-held path must stay exit 2**. A claim count dropping is
+     not that proof — it is consistent with having disarmed the guard.
+  4. **Do not run the release from PowerShell's pipe.** `'json' | py -3 hook.py`
+     returned **exit 0 with no output** — `json.load` failed on the piped
+     stdin and `main()` returns 0 on parse failure, so a BLOCKED path read as
+     ALLOWED. That is the exact shape of a false clean bill. Use bash `printf`.
+- **Cost:** one user override spent on a file nobody held, an unknown number of
+  earlier sessions routed away from files that were free, and 121 claims'
+  worth of standing false contention. Nothing was lost: the sweep released
+  enforceability only — every path stays in its block as a record, and a lane
+  resuming the work reclaims by striking the note.

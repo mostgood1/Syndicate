@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 581 rules `[generated]`
+## Index — 662 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 117**
+**FORBIDDEN — 164**
 
 - [2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-…](#2026-08-22-forbidden-never-read-a-service_updated-deploy-as-shipping-code-an-env-var-change-restarts-the-service-on-the-commit-it-is-already-running)
 - [2026-08-22 — FORBIDDEN: never name a datastore SETTING and a service ENV VAR by the sam…](#2026-08-22-forbidden-never-name-a-datastore-setting-and-a-service-env-var-by-the-same-store-without-saying-which-surface-a-4-minute-refresh-worker-outage-came-from-that-ambiguity)
@@ -83,9 +83,56 @@
 - [2026-08-26 — FORBIDDEN: TWO HOSTS ARE NOT ONE VENDOR, and "X can reach ESPN" is not a f…](#2026-08-26-forbidden-two-hosts-are-not-one-vendor-and-x-can-reach-espn-is-not-a-fact-about-x)
 - [2026-08-26 — FORBIDDEN: assuming an artifact "published to production" is where its CON…](#2026-08-26-forbidden-assuming-an-artifact-published-to-production-is-where-its-consumer-reads)
 - [2026-08-26 — FORBIDDEN: reporting a test as failing on `main` from a session worktree,…](#2026-08-26-forbidden-reporting-a-test-as-failing-on-main-from-a-session-worktree-when-its-fixture-is-derived-from-data-and-a-stash-and-rerun-does-not-isolate-it)
+- [2026-08-28 — FORBIDDEN: chaining an EDIT and a COMMIT so that a FAILED edit still commi…](#2026-08-28-forbidden-chaining-an-edit-and-a-commit-so-that-a-failed-edit-still-commits-the-guard-fired-correctly-and-the-commit-ran-anyway-taking-another-sessions-uncommitted-work-with-it)
+- [2026-08-28 — FORBIDDEN: treating a refuted MECHANISM as a refuted OBSERVATION. I dispro…](#2026-08-28-forbidden-treating-a-refuted-mechanism-as-a-refuted-observation-i-disproved-my-own-theory-of-how-a-wrong-side-fill-happened-and-used-that-to-dismiss-the-fill)
 - [2026-08-27 — FORBIDDEN: pushing past a ledger checker's warning because its output "loo…](#2026-08-27-forbidden-pushing-past-a-ledger-checkers-warning-because-its-output-looks-like-the-usual-noise-a-warning-that-is-usually-wrong-gets-trained-out-and-two-sessions-proved-it-independently-on-the-same-night)
 - [2026-08-27 — FORBIDDEN: REFUSING A BAD VALUE UPSTREAM OF A COALESCING FALLBACK and call…](#2026-08-27-forbidden-refusing-a-bad-value-upstream-of-a-coalescing-fallback-and-calling-it-fixed-the-fallback-picks-it-back-up-one-candidate-later-and-the-fix-ships-inert)
 - [2026-08-27 — FORBIDDEN: running `deploy_claim.py` from a session worktree. The claim fi…](#2026-08-27-forbidden-running-deploy_claimpy-from-a-session-worktree-the-claim-file-is-per-tree-so-nobody-else-can-see-it)
+- [2026-08-27 — FORBIDDEN: deferring work around a ledger BLOCKER without re-measuring it.…](#2026-08-27-forbidden-deferring-work-around-a-ledger-blocker-without-re-measuring-it-a-blocker-is-a-measurement-and-it-expires)
+- [2026-08-27 — FORBIDDEN: trusting a test whose FIXTURE cannot violate the property it as…](#2026-08-27-forbidden-trusting-a-test-whose-fixture-cannot-violate-the-property-it-asserts-it-is-not-weak-coverage-it-is-zero-coverage-that-reads-as-strong)
+- [2026-08-27 — FORBIDDEN: reading `pid` in a deploy claim as evidence the holder is alive](#2026-08-27-forbidden-reading-pid-in-a-deploy-claim-as-evidence-the-holder-is-alive)
+- [2026-08-27 — FORBIDDEN: measuring a dirty SHARED tree against `HEAD`. In a stale checko…](#2026-08-27-forbidden-measuring-a-dirty-shared-tree-against-head-in-a-stale-checkout-head-is-the-thing-that-is-wrong-and-every-diff-built-on-it-lies-in-the-safe-looking-direction)
+- [2026-08-27 — FORBIDDEN: allowlisting a KEYVALUE-backed path in `HOT_ARTIFACT_PATTERNS`…](#2026-08-27-forbidden-allowlisting-a-keyvalue-backed-path-in-hot_artifact_patterns-and-calling-it-readable-the-guard-will-pass-and-the-data-will-not-arrive)
+- [2026-08-27 — FORBIDDEN: validating a CONVERTED value while STORING the raw one. The gua…](#2026-08-27-forbidden-validating-a-converted-value-while-storing-the-raw-one-the-guard-clears-a-number-that-is-not-the-number-anything-uses)
+- [2026-08-27 FORBIDDEN: an instrument built out of the thing it measures, or out of a sym…](#2026-08-27-forbidden-an-instrument-built-out-of-the-thing-it-measures-or-out-of-a-symptom-the-slate-can-retire-four-instances-in-one-session-every-one-reading-healthy)
+- [2026-08-27 FORBIDDEN: calling a fix verified when the READING came from a different sur…](#2026-08-27-forbidden-calling-a-fix-verified-when-the-reading-came-from-a-different-surface-than-the-one-that-was-broken)
+- [2026-08-27 FORBIDDEN: inferring that a scheduled job SUCCEEDS from an age that sits at…](#2026-08-27-forbidden-inferring-that-a-scheduled-job-succeeds-from-an-age-that-sits-at-one-interval)
+- [2026-08-27 — FORBIDDEN: fitting a model to a total when you can COUNT the operation](#2026-08-27-forbidden-fitting-a-model-to-a-total-when-you-can-count-the-operation)
+- [2026-08-27 — FORBIDDEN: a verification criterion that can only be met by the failure it…](#2026-08-27-forbidden-a-verification-criterion-that-can-only-be-met-by-the-failure-it-is-watching-for)
+- [2026-08-28 FORBIDDEN: reading a "not yet running" list as proof something IS running](#2026-08-28-forbidden-reading-a-not-yet-running-list-as-proof-something-is-running)
+- [2026-08-28 FORBIDDEN: a shared rule reimplemented as "the half I needed"](#2026-08-28-forbidden-a-shared-rule-reimplemented-as-the-half-i-needed)
+- [2026-08-28 FORBIDDEN: grading an AMBIGUOUS zero as a definite outcome](#2026-08-28-forbidden-grading-an-ambiguous-zero-as-a-definite-outcome)
+- [2026-08-28 FORBIDDEN: reading a job's TIMESTAMP as evidence it ran, on a machine that s…](#2026-08-28-forbidden-reading-a-jobs-timestamp-as-evidence-it-ran-on-a-machine-that-sleeps)
+- [2026-08-28 — FORBIDDEN: building a fix for a hypothesis the REFUSAL NAME has already ru…](#2026-08-28-forbidden-building-a-fix-for-a-hypothesis-the-refusal-name-has-already-ruled-out-lane-venue-join-refusal-visibility)
+- [2026-08-28 — FORBIDDEN: reading ~0.5 as a weak signal from a comparison never shown to…](#2026-08-28-forbidden-reading-05-as-a-weak-signal-from-a-comparison-never-shown-to-discriminate-lane-venue-join-refusal-visibility)
+- [2026-08-28 — FORBIDDEN: reading `lastRunAt` as evidence a scheduled job RAN. It records…](#2026-08-28-forbidden-reading-lastrunat-as-evidence-a-scheduled-job-ran-it-records-dispatch-and-on-this-machine-the-two-were-nine-hours-apart)
+- [2026-08-28 — FORBIDDEN: baselining a test in a fresh worktree when the test reads state…](#2026-08-28-forbidden-baselining-a-test-in-a-fresh-worktree-when-the-test-reads-state-the-worktree-does-not-share-it-is-not-a-baseline-it-is-a-different-experiment)
+- [2026-08-28 — FORBIDDEN: concluding a lane claim is free because the roster says its ses…](#2026-08-28-forbidden-concluding-a-lane-claim-is-free-because-the-roster-says-its-session-is-gone-get_session-said-not-found-while-the-session-was-live)
+- [2026-08-28 — FORBIDDEN: trusting a refusal's stated premise without rechecking it. A RE…](#2026-08-28-forbidden-trusting-a-refusals-stated-premise-without-rechecking-it-a-reasoned-we-cannot-do-this-is-stickier-than-a-bug-because-it-tells-the-next-reader-not-to-look)
+- [2026-08-28 — FORBIDDEN: instrumenting a function without first proving it is ON the pat…](#2026-08-28-forbidden-instrumenting-a-function-without-first-proving-it-is-on-the-path-you-are-measuring-i-did-it-and-the-counter-read-zero)
+- [2026-08-28 — FORBIDDEN: diagnosing a resolver when the log said `graded=N` and the serv…](#2026-08-28-forbidden-diagnosing-a-resolver-when-the-log-said-gradedn-and-the-served-payload-changed-nothing-that-is-a-lost-write-and-i-spent-three-theories-on-the-wrong-layer)
+- [2026-08-28 — FORBIDDEN: treating a "this API does not exist" finding as a fact about th…](#2026-08-28-forbidden-treating-a-this-api-does-not-exist-finding-as-a-fact-about-the-venue-when-it-was-written-from-a-network-that-could-not-reach-the-venue-it-is-a-fact-about-the-network)
+- [2026-08-28 — FORBIDDEN: keying a venue join on the fixture without keying it on the POR…](#2026-08-28-forbidden-keying-a-venue-join-on-the-fixture-without-keying-it-on-the-portion-of-the-fixture)
+- [2026-08-28 — FORBIDDEN: closing on the venue that was REPORTED when the join it mirrors…](#2026-08-28-forbidden-closing-on-the-venue-that-was-reported-when-the-join-it-mirrors-has-the-same-key)
+- [2026-08-28 — FORBIDDEN: sizing a fix before measuring the component's SHARE of the whol…](#2026-08-28-forbidden-sizing-a-fix-before-measuring-the-components-share-of-the-whole-i-did-it-twice-in-one-day-on-the-same-subsystem)
+- [2026-08-28 — FORBIDDEN: judging a change by the metric I chose instead of the metric th…](#2026-08-28-forbidden-judging-a-change-by-the-metric-i-chose-instead-of-the-metric-the-user-sees-mine-read-bought-nothing-the-board-read-4h24m-stale)
+- [2026-08-28 — FORBIDDEN: reaching for the next knob after a tuning change fails. Three a…](#2026-08-28-forbidden-reaching-for-the-next-knob-after-a-tuning-change-fails-three-attempts-each-refuted-by-the-next-reading-when-the-second-should-have-said-structural)
+- [2026-08-29 — FORBIDDEN: naming a cause from a mechanism you can see without measuring t…](#2026-08-29-forbidden-naming-a-cause-from-a-mechanism-you-can-see-without-measuring-the-one-you-cannot)
+- [2026-08-29 — FORBIDDEN: carrying a component's SHARE across regimes when the regime is…](#2026-08-29-forbidden-carrying-a-components-share-across-regimes-when-the-regime-is-what-sets-it)
+- [2026-08-29 — FORBIDDEN: reading a conditional log's silence as absence of the EVENT, wh…](#2026-08-29-forbidden-reading-a-conditional-logs-silence-as-absence-of-the-event-when-it-is-really-absence-of-one-special-case-of-the-event)
+- [2026-08-29 — FORBIDDEN: breaking a lock before checking whether the thing it guards has…](#2026-08-29-forbidden-breaking-a-lock-before-checking-whether-the-thing-it-guards-has-already-happened)
+- [2026-08-29 FORBIDDEN: letting a shipped "cannot be tested until X" caveat stand without…](#2026-08-29-forbidden-letting-a-shipped-cannot-be-tested-until-x-caveat-stand-without-putting-the-test-on-xs-date)
+- [2026-08-29 FORBIDDEN: reading `check_lane_invariants` PASSING as proof that lane claims…](#2026-08-29-forbidden-reading-check_lane_invariants-passing-as-proof-that-lane-claims-are-sane)
+- [2026-08-29 — FORBIDDEN: making a previously-unreachable code path reachable without mea…](#2026-08-29-forbidden-making-a-previously-unreachable-code-path-reachable-without-measuring-the-cost-of-the-path-that-will-now-call-it)
+- [2026-08-29 — FORBIDDEN: trusting a profiler's ANSWER without validating its SCOPE again…](#2026-08-29-forbidden-trusting-a-profilers-answer-without-validating-its-scope-against-the-metric-you-care-about)
+- [2026-08-29 — FORBIDDEN: windowing a verification watcher on wall-clock time instead of…](#2026-08-29-forbidden-windowing-a-verification-watcher-on-wall-clock-time-instead-of-on-the-boot-it-is-verifying)
+- [2026-08-29 — FORBIDDEN: mapping an outcome polarity that the venue has not stated](#2026-08-29-forbidden-mapping-an-outcome-polarity-that-the-venue-has-not-stated)
+- [2026-08-29 — FORBIDDEN: gating a verdict on ELAPSED TIME when the artifact carries its…](#2026-08-29-forbidden-gating-a-verdict-on-elapsed-time-when-the-artifact-carries-its-own-build-stamp)
+- [2026-08-29 — FORBIDDEN: closing a name-join gap by POPULATING an alias map, without fir…](#2026-08-29-forbidden-closing-a-name-join-gap-by-populating-an-alias-map-without-first-checking-the-maps-source-carries-the-missing-name)
+- [2026-08-29 — FORBIDDEN: calling a placeholder threshold "conservative" without checking…](#2026-08-29-forbidden-calling-a-placeholder-threshold-conservative-without-checking-it-against-the-real-one-a-threshold-above-break-even-everywhere-is-a-disabled-feature-wearing-safety-language-lane-live-venue-order-placement)
+- [2026-08-29 — FORBIDDEN: reading `count: 0` from an artifact export as "the artifact is…](#2026-08-29-forbidden-reading-count-0-from-an-artifact-export-as-the-artifact-is-unreachable-it-is-a-fact-about-what-the-reader-scans-i-had-this-rule-on-file-and-walked-into-it-anyway-lane-live-venue-order-placement)
+- [2026-08-29 — FORBIDDEN: judging whether `main` is green from a session worktree OR the…](#2026-08-29-forbidden-judging-whether-main-is-green-from-a-session-worktree-or-the-primary-tree-neither-is-a-control-and-they-lie-in-opposite-directions)
+- [2026-08-29 — FORBIDDEN: never treat a `lanes.md` claim as evidence that anyone is holdi…](#2026-08-29-forbidden-never-treat-a-lanesmd-claim-as-evidence-that-anyone-is-holding-the-file-lane-guardpy-has-no-liveness-notion-so-a-claim-outlives-its-session-forever)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -136,7 +183,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 459**
+**Rules and corrections — 493**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -393,6 +440,40 @@
 - [2026-08-26 — RULE: a measurement can be REAL and still describe the WRONG POPULATION. S…](#2026-08-26-rule-a-measurement-can-be-real-and-still-describe-the-wrong-population-state-the-denominator-before-you-generalise-a-rate)
 - [2026-08-27 — RULE: a deploy claim serialises SESSIONS. It does not reserve a service ag…](#2026-08-27-rule-a-deploy-claim-serialises-sessions-it-does-not-reserve-a-service-against-a-human-and-an-assistant-cannot-lift-the-guard-from-inside-a-command)
 - [2026-08-27 — MEASURED NEGATIVE: the NCAAF advanced-data payload does not close the gap…](#2026-08-27-measured-negative-the-ncaaf-advanced-data-payload-does-not-close-the-gap-to-market)
+- [2026-08-27 — NCAAF TOTALS ARE NOT OVER-DISPERSED. The deficit is ONE CONSTANT BIAS, and…](#2026-08-27-ncaaf-totals-are-not-over-dispersed-the-deficit-is-one-constant-bias-and-the-residual-spread-already-matches-the-market)
+- [2026-08-27 — PRE-REGISTERED PREDICTION CONFIRMED: raw pace OVER-CORRECTS the totals bia…](#2026-08-27-pre-registered-prediction-confirmed-raw-pace-over-corrects-the-totals-bias-by-35-56)
+- [2026-08-27 — NCAAF drive structure is an ENGINE ACCOUNTING BUG, not a calibration gap.…](#2026-08-27-ncaaf-drive-structure-is-an-engine-accounting-bug-not-a-calibration-gap-the-sims-own-numbers-do-not-multiply-out)
+- [2026-08-27 — A GUARD THAT ASSERTS THE CALL, NOT THE RESULT, IS TRUE OF CODE THAT DOES N…](#2026-08-27-a-guard-that-asserts-the-call-not-the-result-is-true-of-code-that-does-nothing)
+- [2026-08-27 — MEASURE THE OUTCOME YOU PROMISED, NOT THE CHANGE YOU MADE](#2026-08-27-measure-the-outcome-you-promised-not-the-change-you-made)
+- [2026-08-27 — `Path(__file__).parents[1]` MAKES THE PRIMARY TREE THE RENDEZVOUS, AND A W…](#2026-08-27-path__file__parents1-makes-the-primary-tree-the-rendezvous-and-a-worktree-invisible)
+- [2026-08-27 — A COMMENTED-OUT PATH IS STILL A CLAIM; AND THE DEPLOY GUARD MATCHES LEDGER…](#2026-08-27-a-commented-out-path-is-still-a-claim-and-the-deploy-guard-matches-ledger-prose)
+- [2026-08-27 — A CLAIM HOLDER IS NOT A DEPLOY AUTHOR. The API cannot tell you who fired i…](#2026-08-27-a-claim-holder-is-not-a-deploy-author-the-api-cannot-tell-you-who-fired-it)
+- [2026-08-27 — RE-FITTING A MODEL CAN BE THE WRONG ANSWER. Measure the do-nothing arm.](#2026-08-27-re-fitting-a-model-can-be-the-wrong-answer-measure-the-do-nothing-arm)
+- [2026-08-27 — PROMOTING AN ARTIFACT IS A CHAIN. THREE LINKS FAILED SILENTLY.](#2026-08-27-promoting-an-artifact-is-a-chain-three-links-failed-silently)
+- [2026-08-27 — A CARRIED-FORWARD FACT DECAYS EACH TIME IT IS RESTATED WITHOUT RE-READING…](#2026-08-27-a-carried-forward-fact-decays-each-time-it-is-restated-without-re-reading-the-source-and-a-clean-kill-census-proves-nothing-until-you-prove-the-feature-was-running-in-that-window)
+- [2026-08-27 — A GREEN TEST SUITE OVER A FILE THAT CANNOT BOOT `[lane venue-quote-line-jo…](#2026-08-27-a-green-test-suite-over-a-file-that-cannot-boot-lane-venue-quote-line-join)
+- [2026-08-27 — CADENCE LIVES IN THE CALLER, NOT THE INTERVAL CONSTANT `[lane venue-quote-…](#2026-08-27-cadence-lives-in-the-caller-not-the-interval-constant-lane-venue-quote-line-join)
+- [2026-08-27 — A KEY MUST NAME EVERY PARTY TO THE BET `[lane venue-quote-line-join]`](#2026-08-27-a-key-must-name-every-party-to-the-bet-lane-venue-quote-line-join)
+- [2026-08-27 — A BREAKDOWN THAT DOES NOT RECONCILE IS NOT EVIDENCE `[lane venue-quote-lin…](#2026-08-27-a-breakdown-that-does-not-reconcile-is-not-evidence-lane-venue-quote-line-join)
+- [2026-08-27 — A SINGLE OBSERVATION READ AS A BOUND `[lane venue-quote-line-join]`](#2026-08-27-a-single-observation-read-as-a-bound-lane-venue-quote-line-join)
+- [2026-08-27 — A CONTROL THAT IS BROKEN IN THE SAME WAY AS THE TREATMENT DISTINGUISHES NO…](#2026-08-27-a-control-that-is-broken-in-the-same-way-as-the-treatment-distinguishes-nothing-i-ran-one-and-reported-the-result-as-positive)
+- [2026-08-27 — I CHECKED ANCESTRY AND CALLED IT CAUSATION. The fix's own log line said th…](#2026-08-27-i-checked-ancestry-and-called-it-causation-the-fixs-own-log-line-said-the-path-never-ran)
+- [2026-08-27 — A WATCHER IS AN INSTRUMENT AND IT LIES IN FOUR SPECIFIC WAYS](#2026-08-27-a-watcher-is-an-instrument-and-it-lies-in-four-specific-ways)
+- [2026-08-27 A lane can be CLOSED while a session keeps working under its name](#2026-08-27-a-lane-can-be-closed-while-a-session-keeps-working-under-its-name)
+- [2026-08-27 A survey keyed by BARE FUNCTION NAME collapses same-named functions across s…](#2026-08-27-a-survey-keyed-by-bare-function-name-collapses-same-named-functions-across-sports)
+- [2026-08-28 — A GAP BETWEEN TWO LOG LINES IS NOT A COST. I measured one, believed it, an…](#2026-08-28-a-gap-between-two-log-lines-is-not-a-cost-i-measured-one-believed-it-and-was-wrong-by-30x)
+- [2026-08-28 An absent log line is only evidence once you know the line is EMITTED](#2026-08-28-an-absent-log-line-is-only-evidence-once-you-know-the-line-is-emitted)
+- [2026-08-28 A lane-guard claim can be held by PROSE, and "TRANSFERRED" releases nothing](#2026-08-28-a-lane-guard-claim-can-be-held-by-prose-and-transferred-releases-nothing)
+- [2026-08-28 — A lane disclaimer marker governs its OWN LINE ONLY. Three of five "contest…](#2026-08-28-a-lane-disclaimer-marker-governs-its-own-line-only-three-of-five-contested-files-were-deference-that-parsed-as-ownership)
+- [2026-08-28 — AMENDS the `createdAt`/`finishedAt` rule: the DEPLOY RECORD and the PROCES…](#2026-08-28-amends-the-createdatfinishedat-rule-the-deploy-record-and-the-process-are-not-the-same-instant-lane-venue-join-refusal-visibility)
+- [2026-08-28 — Pre-registering a confound does not help if you get its SIGN wrong](#2026-08-28-pre-registering-a-confound-does-not-help-if-you-get-its-sign-wrong)
+- [2026-08-29 — the check that would have caught this ALREADY EXISTS and was not applied](#2026-08-29-the-check-that-would-have-caught-this-already-exists-and-was-not-applied)
+- [2026-08-29 — a cross-session ANSWER has to go where the reader looks, because SendMessa…](#2026-08-29-a-cross-session-answer-has-to-go-where-the-reader-looks-because-sendmessage-cannot-address-a-lane)
+- [2026-08-29 — a fix proven on ONE consumer is not proven on another that recomputes it e…](#2026-08-29-a-fix-proven-on-one-consumer-is-not-proven-on-another-that-recomputes-it-elsewhere)
+- [2026-08-29 — PowerShell reserved variables can fake a regression](#2026-08-29-powershell-reserved-variables-can-fake-a-regression)
+- [2026-08-29 — a diagnostic that TRUNCATES will be read as evidence. Twice.](#2026-08-29-a-diagnostic-that-truncates-will-be-read-as-evidence-twice)
+- [2026-08-29 — ancestry is a DEPLOY-TIME MEASUREMENT, never a claim](#2026-08-29-ancestry-is-a-deploy-time-measurement-never-a-claim)
+- [2026-08-29 — a null from an instrument you have not calibrated is not evidence. RUN THE…](#2026-08-29-a-null-from-an-instrument-you-have-not-calibrated-is-not-evidence-run-the-control)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

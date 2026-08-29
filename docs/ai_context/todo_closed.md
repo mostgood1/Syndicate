@@ -60,6 +60,32 @@ a light builder producing **field-for-field identical chips** (0 diffs over 8
 games) at **0.23s warm**. Every deploy since runs a pre-deploy latency baseline
 with a 2x gate.
 
+### `#609` — **`lanes.md` claims outlive the sessions that made them: 121 of 133 claims were held by nobody** — CLOSED 2026-08-29, lane `lane-claim-phantom-sweep`
+
+`lane-guard.py` enforces a lane's `- Files:` block against every other session
+and has **no notion of whether the claiming session still exists**. Nothing ever
+released a claim on a session's death, so they accumulated: measured 2026-08-29,
+**26 OPEN lanes holding 133 claims while 3 sessions were alive**, plus 56
+`.current-lane.<session>` markers for 4 live sessions.
+
+Already paid for once, the same day: `live-venue-order-placement` needed a USER
+OVERRIDE to take `venue_quote_adapters.py` off `kalshi-line-aware-rungs`, whose
+session was gone and whose header already SAID the files were free — the guard
+reads the `Files:` block, never the header's prose.
+
+FIXED by `scripts/release_phantom_lane_claims.py`: releases claims held by lanes
+whose session is stale (liveness = transcript mtime), verifying against
+`lane-guard._claims()` and refusing the write if a live lane's claim set moves or
+a released path goes missing. **Nothing closed, nothing deleted** — paths stay in
+their block as a record behind a `released:` token and a dated note.
+
+VERIFIED ON THE HOOK, off != on: `scripts/build_soccer_artifacts.py` exit 2
+"BLOCKED" -> exit 0; `syndicate/features/ncaaf/sources.py` (the file
+`ncaaf-chip-grid-join` was blocked on) exit 2 -> exit 0; and
+`venue_quote_adapters.py`, held by a LIVE lane, **still exit 2**. 52 stale
+markers moved to `.syndicate/lane_claims_retired/`. Rule in `learnings.md`
+2026-08-29.
+
 ### `#608` — **`board_enrichment._side_matches` called `teams_match` with its arguments INVERTED** — FIXED 2026-08-29 (`95c4fb12`)
 
 It passed the grid's LONG name as `token` and the chip's SHORT code as
