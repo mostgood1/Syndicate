@@ -931,8 +931,34 @@ def join_polymarket_to_board(
                 board_market = "btts"
             elif venue_type == "SPORTS_MARKET_TYPE_PROP" and _is_corners_question(
                 row.get("question")
-            ):  # NOTE: currently INERT -- `question` is never populated. See
-                # `prop_modifier_census` below, which exists to find the real hook.
+            ):
+                # ---------------------------------------------------------
+                # THIS BRANCH IS INERT AND IS KEPT ONLY AS A NAMED GAP.
+                # ---------------------------------------------------------
+                #
+                # It reads `row["question"]`, and that field is NEVER populated
+                # in the persisted slate -- 14 of 14 sampled questions were the
+                # empty string, and `/api/ops/polymarket/slate` exposes only
+                # line/orderable/outcomes/slug. It cannot fire.
+                #
+                # AND THE HOOK IT LOOKS FOR MAY NOT EXIST. 19 soccer PROP slugs
+                # sampled 2026-08-28 across every league Polymarket carries
+                # (epl, lal, bun, lg1, sea) show three families, no corners:
+                #
+                #     ftts-<club>    first team to score
+                #     exact-score    exact scoreline
+                #     btts           both teams to score
+                #
+                # So `no_candidates|soccer|alternate_totals_corners: 221` is
+                # plausibly HONEST -- the venue does not publish them -- rather
+                # than a keying bug.
+                #
+                # KEPT RATHER THAN DELETED because deleting it erases the
+                # question. `prop_modifier_census` settles it on the next
+                # deploy. IF NO CORNERS SHAPE APPEARS, DELETE this branch and
+                # `_is_corners_question`: code that looks installed and cannot
+                # fire is worse than an absence, which is the defect this lane
+                # was opened on.
                 # CORNERS, IDENTIFIED FROM THE QUESTION rather than the slug.
                 #
                 # Question supplied by the user 2026-08-28: "Total Corners Taken
