@@ -37856,3 +37856,41 @@ shortlist carries quote rows for games outside it — the same property
 `ncaaf_week_and_card_keys_for_date`'s docstring records — but that is a
 HYPOTHESIS, not a measurement. It is pre-existing, not caused by this change,
 and it does not affect any game in play.
+
+---
+
+## 2026-08-29 14:32 CT — **`Final` CONFIRMED ON ALL THREE SURFACES** — the last unverified path from this morning
+
+Same-instant read, 19:32:02Z:
+
+```
+ESPN      in=1  post=1        UNC VS TCU  Final
+LENS      Live=1  Final=1  Pregame=49
+          card NC @ TCU  eyebrow='Final'   Score: NC 15 - 10 TCU
+STRIP     head='Final'     rows=['NC 15', 'TCU 10']
+
+VERDICT: ESPN post=1 vs board Final=1 -> FLIP CONFIRMED
+```
+
+`[ncaaf-board-surfaces]` shipped the state PATH on 2026-08-27 saying its DATA
+"cannot be [tested] until a game is in progress". That caveat came due this
+morning and the live branch turned out to be unreachable. **The `Final` branch
+is now exercised too**, on both the lens and the strip, carrying the REAL final
+score rather than the projection. The full arc is verified end to end for
+NCAAF: **pregame -> live -> halftime -> final**.
+
+### A false alarm that was correctly NOT reported
+
+At 19:31:16Z the watcher logged `ESPN in=2 post=0 | BOARD live=1 final=1` —
+board final ahead of ESPN, which reads as a disagreement. It was not. ESPN's own
+status went `End of 4th Quarter` (`state: in`) -> `STATUS_FINAL` (`state: post`,
+`completed: True`) within **26 seconds**; the board's ESPN fetch was simply
+fresher than the watcher's snapshot. Checked the raw `status.type` fields before
+saying anything.
+
+**Reporting that first event as a MISMATCH would have raised a false alarm on a
+working system** — the same instrument-versus-system trap that appeared three
+times today (an untracked `cfbd_lines` mirror, a worktree baseline missing
+untracked data, and a watcher gated on elapsed time instead of `written_at`).
+The discriminator each time: *what would this reading look like if the thing I
+am testing had never run?*

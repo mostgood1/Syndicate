@@ -2790,6 +2790,15 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
     into a live game. Not this lane's; filed so it is not rediscovered.
   - **`elapsed_s` 68 -> 152** on the last deploy, unexplained and not attributed
     (a peer's `board_enrichment` fix is in the same binary).
+- **FOLLOW-UP AFTER CLOSE, recorded because it is out of protocol:** `53cd2df6`
+  widened `prop_modifier_census` to every sport (keyed by league) after the user
+  reported no props executing. Confirmed structural: `_JOINABLE_BOARD_MARKETS` has
+  no player-prop market, so 599 board prop rows refuse at the BOARD half and never
+  enter the join. The venue discards `PROP|mlb 5000` (its largest family) with NO
+  SHAPE recorded anywhere -- the census was soccer-gated and `_note_out_of_scope`
+  caps at 14 keys. Diagnostic only; wiring player props needs a board market, a
+  person key and a settlement path, and that decision should be made against the
+  venue's vocabulary rather than a count.
 - Superseded narrative + five `soccer-overview-cost` notes: `lanes_history.md`.
 ### cryptocom-finding-correction — **CLOSED 2026-08-28** — VERIFIED AND LANDED on `origin/main` as `ceb3c830`. `FINDING` no longer asserts the falsified "no public REST/WebSocket market-data API has shipped" (a JSON sports endpoint exists and was read live), `rejected_source` -> `corrected_source` (the endpoint is Crypto.com's OWN documented sample, not a third party's invention — right decision, false reason), and `probe()`'s false-positive gate is replaced: `unblocked` defaults False and flips only on a non-crypto `inst_type` in the SANCTIONED Exchange catalogue. 16 tests pass including an off!=on pair proving the gate flips both ways; the old assertions were confirmed to FAIL first. Live run: `unblocked=False reason=exchange_rest_lists_no_event_contracts`, EXCHANGE_REST 957 instruments / non_crypto=0, APP_PROXY http_403. Evidence: `.syndicate/findings_2026-08-28_cryptocom_venue_evaluation.md`. Nothing deployed; no deploy claim taken. — opened 2026-08-28 — session 29794bbe-33cb-45fc-a046-136e18ef3e06
 - Goal: `cryptocom_client.py`'s `FINDING` and `probe()` state what was MEASURED
@@ -3173,7 +3182,7 @@ caaf-no-orders`). NOT
 - Blocked by: none
 
 
-### ncaaf-live-lens-state — **CLOSED-VERIFIED 2026-08-29** — live lens reported `Live 1` against ESPN `in=1` in one script run (16:30:28Z, re-confirmed 16:39:49Z); 3 web deploys `061d5b2b`/`efc41b52`/`4822f8e4`, claim released. **`Final` still UNOBSERVED in production** — read it when a game ends. Narrative: `log/2026-08-29.md` — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
+### ncaaf-live-lens-state — **CLOSED-VERIFIED 2026-08-29** — live lens reported `Live 1` against ESPN `in=1` in one script run (16:30:28Z, re-confirmed 16:39:49Z); 3 web deploys `061d5b2b`/`efc41b52`/`4822f8e4`, claim released. **`Final` CONFIRMED 19:32:02Z** — ESPN post=1, lens `Final=1` eyebrow `'Final'` `Score: NC 15 - 10 TCU`, strip head `'Final'` rows `NC 15 / TCU 10`; full arc pregame->live->halftime->final verified. Narrative: `log/2026-08-29.md` — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
 - Goal: the NCAAF live lens reports a game that is ACTUALLY IN PROGRESS as live.
   Measured 2026-08-29T16:0xZ, with UNC @ TCU at `state=in` / 1st Quarter on
   ESPN, production `/ncaaf/api/live-lens` served

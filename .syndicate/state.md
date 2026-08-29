@@ -4800,6 +4800,8 @@ Pre-existing, and no game in play is affected.
 
 ## [ncaaf-live-lens-state] THE NCAAF LIVE LENS'S STATE BRANCH WAS UNREACHABLE, NOT EMPTY — **FIXED AND VERIFIED IN PRODUCTION** `[measured 2026-08-29T16:30:28Z, web 061d5b2b, lane ncaaf-live-lens-state]`
 
+> **`Final` DISCHARGED 2026-08-29T19:32:02Z.** ESPN `post=1`; lens `Final=1`, eyebrow `'Final'`, `Score: NC 15 - 10 TCU`; strip head `'Final'`, rows `NC 15 / TCU 10`. The 'Final is unit-tested only' caveat below is superseded.
+
 **The reading that matters, one script run, production and ESPN together:**
 
 ```
