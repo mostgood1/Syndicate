@@ -37540,7 +37540,7 @@ this region permanently measurable.
 
 ---
 
-## 2026-08-29 12:46 CT — web — `fccd923d` — NCAAF chips, done properly — PENDING MEASUREMENT
+## 2026-08-29 12:46 CT — web — `fccd923d` — NCAAF chips, done properly — **VERIFIED, GATE PASSED**
 
 ```
 deploy dep-da9hln942hec73fv1n00  created 17:46:05Z
@@ -37583,8 +37583,30 @@ and was violated anyway. This is the first deploy to run it.
 ```
 
 **Gate: any median above 2x its baseline FAILS the deploy and it gets reverted**
-— `/` above ~4.0s, `/ncaaf/cards` above ~6.4s. Result recorded below when the
-deploy goes live.
+— `/` above ~4.0s, `/ncaaf/cards` above ~6.4s.
+
+**RESULT — live `17:49:18Z`, 5 reads each, GATE PASSED ON BOTH ROUTES:**
+
+```
+route                   baseline   after  ratio   gate 2.0x
+/                           2.02    2.55   1.26x  PASS
+/ncaaf/cards?week=1         3.18    3.02   0.95x  PASS
+```
+
+`/` raw: 12.73 (cold, first read after the swap) 1.72 2.55 4.67 1.67.
+`/ncaaf/cards` is FASTER than baseline. Compare the reverted attempt, which put
+`/` at **37.9s** and 502'd this same route.
+
+**And the chips are live and correct at the same instant:**
+
+```
+chips=8  src=inline_artifact_stale
+LIVE  NC @ TCU  Q2 0:00  12 - 10
+```
+
+So the Layer 2 / Layer 1 mini game cards — which hydrate from
+`/api/board/game-chips` — now carry NCAAF game state. **This is the surface the
+user reported.**
 
 `include_upcoming` is the discriminator between the chip path and the game
 rails. It is overloaded — it means "widen the horizon" — and
@@ -37599,3 +37621,23 @@ it is the follow-up rather than a second lane taken in one change.
 UUIDs and `ListAgents` shows names, with no mapping between them. Coordination
 was attempted and is impossible. Narrow carve-out, that one NCAAF method,
 logged on both lane blocks.
+
+### STILL OWED: `layer2-shortlist` row-level `game_state`, refresh-worker
+
+Measured at the same instant, `/api/board/layer2-shortlist?date=2026-08-29&limit=2000`:
+
+```
+mlb    rows=400  game=400  state=400
+wnba   rows=400  game=400  state=400
+soccer rows=400  game=400  state=400
+nfl    rows= 16  game= 16  state= 16
+ncaaf  rows= 96  game=  0  state=  0     <- still zero
+```
+
+`attach_game_state` for the shortlist runs in `pipeline/layer2_shortlist.py:548`
+on **refresh-worker**, which is still on the old code. The web fix cannot reach
+it. NOT deployed because refresh-worker is HELD by OPEN lane
+`venue-join-refusal-visibility` (35.9 min into a 45-min TTL at 17:5xZ) — a LIVE
+claim, not an expired one, and the ledger's own rule is that a live claim is not
+forced. It expires shortly; the worker deploy is the next action and preflight
+must be re-read first (an MLB sim was in flight at 17:12Z).
