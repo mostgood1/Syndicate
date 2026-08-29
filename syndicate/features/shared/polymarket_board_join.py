@@ -661,6 +661,76 @@ def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | Non
 _FORWARD_HORIZON_DAYS = 14
 
 
+def _resolved_line(
+    parsed: Mapping[str, Any],
+    row: Mapping[str, Any],
+    board_market: str,
+    line_source: dict[str, int],
+    gap_samples: list[dict[str, Any]],
+) -> float | None:
+    """The market's line: from the SLUG, else from the row's own `line` field.
+
+    ------------------------------------------------------------------
+    WHY A FALLBACK, measured 2026-08-29T16:11:39Z
+    ------------------------------------------------------------------
+
+    `no_match|soccer|alternate_totals_corners: 37`, and the sample says why:
+
+        board    Rayo Vallecano @ Barcelona  alternate_totals_corners|over|13.5
+        offered  ['lev-bet@None', 'lev-bet@None', ... ]
+
+    `@None` is the candidate's own line. Corners is in
+    `_LINE_BEARING_BOARD_MARKETS`, so a candidate with no line is SKIPPED --
+    every corners rung was being discarded before it could be compared.
+
+    The slug parser is not at fault: `cor-all-13pt5` resolves to 13.5 correctly.
+    These corners slugs simply do not carry the number. The persisted slate row
+    DOES keep a `line` field (`polymarket_us_markets._KEEP`), and this join has
+    only ever read the slug -- the same shape as the corners `question` route
+    and the `refusals`/`reasons` key: a field that exists, populated, unread.
+
+    SLUG WINS WHEN IT HAS ONE. Every match working today is slug-derived, so the
+    fallback can only add rows, never re-price an existing one. A disagreement
+    between the two is COUNTED rather than silently resolved -- if the venue
+    ever ships both and they differ, that is a fact worth a line in the log, not
+    a preference buried in a helper.
+
+    SELF-VERIFYING, DELIBERATELY. I cannot read a soccer PROP row from outside
+    the worker -- `/api/ops/polymarket/slate` skips PROP before it samples -- so
+    whether `row["line"]` is populated for corners is UNMEASURED at the time of
+    writing. `line_source` reports where each line came from and
+    `line_gap_samples` carries the real slug shape, so the next reading either
+    shows the fallback firing or shows this is inert. Four routes this session
+    looked installed and could not fire; this one says which it is.
+    """
+    slug_line = _line_from_modifiers(parsed.get("modifiers") or [])
+    row_line = _as_float(row.get("line"))
+    if slug_line is not None:
+        if row_line is not None and abs(slug_line - row_line) > 1e-9:
+            line_source[f"{board_market}|DISAGREE"] = (
+                line_source.get(f"{board_market}|DISAGREE", 0) + 1
+            )
+        line_source[f"{board_market}|slug"] = line_source.get(f"{board_market}|slug", 0) + 1
+        return slug_line
+    if row_line is not None:
+        line_source[f"{board_market}|row_field"] = (
+            line_source.get(f"{board_market}|row_field", 0) + 1
+        )
+        return row_line
+    line_source[f"{board_market}|none"] = line_source.get(f"{board_market}|none", 0) + 1
+    # THE REAL SLUG SHAPE, for the families that carry no number anywhere. This
+    # is the field that would have named the corners format without a guess.
+    if len(gap_samples) < 6 and not any(
+        g.get("market") == board_market for g in gap_samples
+    ):
+        gap_samples.append({
+            "market": board_market,
+            "slug": str(row.get("slug") or "")[:64],
+            "row_line_raw": repr(row.get("line"))[:24],
+        })
+    return None
+
+
 def _has_segment(modifiers: Sequence[str]) -> bool:
     """A period/quarter/half qualifier. `1q`, `2h`, `1p`, `f5`, `fh`, `sh`.
 
@@ -1015,6 +1085,8 @@ def join_polymarket_to_board(
     # Soccer PROP slug-modifier shapes -- the venue's own vocabulary.
     prop_modifier_census: dict[str, int] = {}
     key_miss_seen: set[str] = set()
+    line_source: dict[str, int] = {}
+    line_gap_samples: list[dict[str, Any]] = []
     forward_date_widened: dict[str, int] = {}
     alignment_samples: list[dict[str, Any]] = []
     orientation_flip_samples: list[dict[str, Any]] = []
@@ -1209,7 +1281,7 @@ def join_polymarket_to_board(
         key = (row_league, parsed["date"], board_market)
         index.setdefault(key, []).append(
             {"parsed": parsed, "row": row, "outcomes": outcomes,
-             "line": _line_from_modifiers(parsed["modifiers"]),
+             "line": _resolved_line(parsed, row, board_market, line_source, line_gap_samples),
              # THE FIXTURE AS AN UNORDERED PAIR OF CANONICAL CLUB NAMES, or
              # None when either token will not canonicalise. Computed ONCE per
              # market here rather than per unmatched row, which is the
@@ -1684,6 +1756,11 @@ def join_polymarket_to_board(
         # One per board market that found an empty bucket, with the
         # neighbouring index keys that say WHICH component disagreed.
         "key_miss_samples": key_miss_samples,
+        # WHERE EACH MARKET'S LINE CAME FROM. `|row_field` non-zero proves the
+        # fallback fires; `|none` with a slug sample names the format that
+        # carries no number at all; `|DISAGREE` is the one that would matter.
+        "line_source": dict(sorted(line_source.items(), key=lambda kv: -kv[1])),
+        "line_gap_samples": line_gap_samples,
         # HOW MANY BOARD ROWS ONLY FOUND CANDIDATES BY LOOKING FORWARD. This is
         # the reachability reading for the slate/fixture date split: zero with
         # soccer still refusing means the diagnosis was wrong, and a non-zero

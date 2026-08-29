@@ -246,7 +246,12 @@ def _polymarket_price_resolver(selected_date: str | None):
             f" soccer_prop_shapes={joined.get('prop_modifier_census')}"
             # Board rows rescued by the slate/fixture date split. See the
             # forward-horizon block in the join.
-            f" forward_date_widened={joined.get('forward_date_widened')}",
+            f" forward_date_widened={joined.get('forward_date_widened')}"
+            # WHERE THE LINE CAME FROM. `|row_field` non-zero proves the slate's
+            # own `line` field is populated and the fallback fires; `|none` with
+            # a slug sample names a family that carries no number anywhere.
+            f" line_source={joined.get('line_source')}"
+            f" line_gaps={joined.get('line_gap_samples')}",
             flush=True,
         )
     # WHICH COMPETITIONS THE BOARD CAN REACH, AND WHICH IT CANNOT. Printed

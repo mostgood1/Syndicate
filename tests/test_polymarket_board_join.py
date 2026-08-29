@@ -1870,3 +1870,77 @@ def test_an_aliased_token_can_never_become_a_SOCCER_competition(monkeypatch):
         [{"slug": "tsc-cfb-sacst-emich-2026-08-29-total-52pt5"}]
     )
     assert "cfb" not in tokens, tokens
+
+
+def _corners_row(slug, line_field=None, prices='["0.52","0.48"]'):
+    row = {"slug": slug, "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+           "outcomes": '["Over","Under"]', "outcomePrices": prices}
+    if line_field is not None:
+        row["line"] = line_field
+    return row
+
+
+def _corners_want(line=13.5):
+    return [{"market": "alternate_totals_corners", "side": "over", "line": line,
+             "sport": "soccer", "selected_date": "2026-08-29",
+             "home_team": "Barcelona", "away_team": "Rayo Vallecano",
+             "event_id": "e1"}]
+
+
+def test_corners_line_comes_from_the_ROW_FIELD_when_the_slug_has_none(monkeypatch):
+    """`no_match|soccer|alternate_totals_corners: 37`, measured 16:11:39Z:
+
+        offered ['lev-bet@None', 'lev-bet@None', ...]
+
+    `@None` is the candidate's own line. Corners is line-bearing, so a candidate
+    with no line is skipped and every rung was discarded before comparison. The
+    slate row keeps a `line` field and this join only ever read the slug.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_corners_row("atc-soccer-ray-bar-2026-08-29-cor-all", line_field=13.5)],
+        _corners_want(13.5), selected_date="2026-08-29")
+    assert out["matched"] == 1, out
+    assert out["line_source"].get("alternate_totals_corners|row_field") == 1, out["line_source"]
+
+
+def test_off_is_not_on_for_the_line_fallback(monkeypatch):
+    """Same fixture, same slug, NO row line field -- must still refuse. Without
+    this the test above would pass on a row that matched for another reason."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_corners_row("atc-soccer-ray-bar-2026-08-29-cor-all")],
+        _corners_want(13.5), selected_date="2026-08-29")
+    assert out["matched"] == 0, out
+    assert out["line_source"].get("alternate_totals_corners|none") == 1, out["line_source"]
+    assert out["line_gap_samples"], "the slug shape must be reported when no line exists"
+    assert out["line_gap_samples"][0]["slug"].endswith("cor-all")
+
+
+def test_the_SLUG_still_wins_when_both_carry_a_line(monkeypatch):
+    """Every match working today is slug-derived. The fallback may only ADD
+    rows, never re-price an existing one."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_corners_row("atc-soccer-ray-bar-2026-08-29-cor-all-13pt5", line_field=99.5)],
+        _corners_want(13.5), selected_date="2026-08-29")
+    assert out["matched"] == 1, out
+    assert out["line_source"].get("alternate_totals_corners|slug") == 1, out["line_source"]
+    assert out["line_source"].get("alternate_totals_corners|DISAGREE") == 1, out["line_source"]
+
+
+def test_a_wrong_row_line_still_refuses(monkeypatch):
+    """The fallback supplies a line; it does not relax the comparison."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_corners_row("atc-soccer-ray-bar-2026-08-29-cor-all", line_field=8.5)],
+        _corners_want(13.5), selected_date="2026-08-29")
+    assert out["matched"] == 0, out
