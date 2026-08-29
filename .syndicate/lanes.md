@@ -2562,9 +2562,24 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   **Deployed manually BY THE USER, twice** — `deploy-guard` refuses on a
   preflight HOLD, and when the user chose to override, the harness classifier
   refused the command independently. Surfaced, not routed around.
-- **READING OWED 1 — `LEDGER_MERGE` has still not fired.** `concurrent=0` since
-  18:58Z is an absence in a short window, NOT a pass. Needs a settlement pass
-  overlapping a placement cycle.
+- **READING 1 — MEASURED WITH A DENOMINATOR `[2026-08-29 04:53Z]`, and the
+  answer is "outcome yes, mechanism no".** 20 polls / 68 min across BOTH
+  writers: **59 settlement lines, 49 execute lines, ZERO `LEDGER_MERGE`, ZERO
+  `MERGE_READ_FAILED`.** That is a real null, not the bare `concurrent=0` that
+  was previously quoted as a pass — the machinery that could collide was
+  demonstrably running.
+  **WHAT IS AND IS NOT EXERCISED, because this is the dead-constant trap again:**
+  `_merge_onto_current` runs on EVERY persist — the log at
+  `execution_ledger.py:645` is conditional, the merge is not. So the merge
+  function is reachable and running and finding nothing to merge. **Its
+  CONFLICT branch has never executed**: "row we did not touch -> keep theirs",
+  "deletion racing an update -> keep theirs" are untested in production.
+  Code live on all three writers (`f66c7441` an ancestor of every live SHA,
+  checked — not assumed).
+  So: symptom-level PASS (ledger monotonic, `1,295,990 -> 1,298,163` vs a
+  `-8,031` step) + mechanism-level UNPROVEN. Closing this needs a FORCED
+  collision in a test, not more waiting — 68 minutes of real traffic did not
+  produce one, which is itself the finding.
 - **READING 2 DISCHARGED `[2026-08-29 ~03:46Z]` — the path is CLOSED.** The
   slate placed: 2 orders after boot `21:55:15Z`, both `seg=full` on full-game
   tickets. **All 9 segment orders in the ledger predate every fix** (newest
