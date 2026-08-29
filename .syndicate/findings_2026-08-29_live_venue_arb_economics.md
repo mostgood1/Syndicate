@@ -239,3 +239,99 @@ requiring a live ask re-read before execution — which `_kalshi_price_for`
 already does at submit. A zero on a snapshot is weaker evidence than a zero on
 live asks, and n=12 is small: **this is "no arb on tonight's 12 observable
 pairs", not "no arb between these venues".**
+
+---
+
+# THE MISSING KALSHI SIDE — ANSWERED, AND IT UNCOVERED A LIVE WRONG-PRICE `[2026-08-29 ~22:3xZ]`
+
+## Direct answer: it is BOTH, 6 join gap / 7 venue gap — and the question turned out to be moot
+
+For the 13 live `(game, line)` totals combos Polymarket quoted, asked directly
+of the venue (`KXMLBTOTAL`, open markets, unauthenticated):
+
+    COLATL  7.5   Kalshi lists it (-8,  0.06/0.16)   JOIN GAP, recoverable
+    HOUNYM 10.5   Kalshi lists it (-11, 0.07/0.09)   JOIN GAP, recoverable
+    HOUNYM  7.5   Kalshi lists it (-8,  0.47/0.48)   JOIN GAP, recoverable
+    AZSFG1  7.5   Kalshi lists it (-8,  0.48/0.49)   JOIN GAP, recoverable
+    AZSFG1  8.5   Kalshi lists it (-9,  0.31/0.32)   JOIN GAP, recoverable
+    KCCLE  11.5   Kalshi lists it (-12, 0.12/0.13)   JOIN GAP, recoverable
+    KCCLE   9.5   NOT listed — ladder floor 10.5     VENUE GAP (settled)
+    SDTB   7.5/8.5/9.5/10.5  NOT listed — floor 13.5 VENUE GAP (settled)
+    SEATOR  8.5/9.5           no open markets        VENUE GAP (game FINAL)
+
+**Kalshi prunes in-play total strikes as runs accumulate.** SD@TB has 13 runs
+and its ladder floor is 13.5; KC@CLE has 10 and floors at 10.5; MIA@WSH has 8
+and floors at 8.5. Not an exact rule — HOU@NYM (6 runs) still lists 5.5 and
+AZ@SF (6) lists 4.5, so pruning lags — but the direction is clear and it is
+correct behaviour: a decided strike has nothing to trade.
+
+So **~46% of the live pairs are recoverable by fixing the join**, and the rest
+are structurally impossible.
+
+## BUT: the Polymarket side of those live rows is CORRUPT, so no pair was ever real
+
+Computing the net edge on the 6 recoverable combos returned **+10.93c to
++84.75c per contract**. An 85% risk-free return on a market with ~$900k daily
+turnover does not exist. That was the tell, and it was checked instead of
+reported.
+
+**26 of 28 live Polymarket totals quotes on the board are SHARED ACROSS GAMES,
+keyed on the LINE and carrying no game identity:**
+
+    over  7.5 @ -400   on 4 games: AZ@SF, COL@ATL, HOU@NYM, SD@TB
+    under 7.5 @ +344   on the same 4
+    over  8.5 @ +1233  on 3 games   over 9.5 @ +1900  on 3 games
+    over 10.5 @ -6567  on 2 games
+
+**IMPOSSIBILITY CHECK (the falsification test):** COL@ATL is 1 run in the 7th,
+so over 7.5 is worth ~2% (Kalshi: 0.08). SD@TB is 13 runs, so over 7.5 has
+ALREADY WON — 100%. Both carry `-400` (=80%). One price cannot be both. This is
+a join defect, not a market.
+
+**PREGAME rows are unaffected** — BAL@ATH 9.5, PHI@LAA 7.5/8.5, TEX@MIL 8.5 all
+carry prices unique to their game. The collapse is on the LIVE path only, which
+is exactly the path this lane exists to build on.
+
+This is the defect `venue-quote-line-join` recorded as UNFIXED — *"a TOTALS key
+names no GAME"* — previously seen on 672 soccer quotes collapsing to six keys.
+Same class, now measured on MLB, live, with a signature that identifies it in
+one read.
+
+## BLAST RADIUS — it is the price the board presents as best
+
+**`best_any_book` is `polymarket` on 28 of 28 live totals rows**, i.e. the
+fabricated cross-game quote is the one the board holds up as the best available
+price. `model_edge_pct` reaches 14.92 on rows priced off it.
+
+MITIGATING, and it is why this is a hazard rather than an incident: `ev_pct` on
+these rows sits at -0.99 to -1.40, so they are not surfacing as +EV bets; and
+the ORDER path does not read `book_prices` — `execute_portfolio.
+_polymarket_resolve_market` prices from the SLATE row, which is per-market and
+not affected. **No order has been priced off these numbers.** But any price
+shopping, any "best book" display, and any future consumer of `book_prices` on
+a live row is reading another game's price.
+
+## WHAT THIS CHANGES FOR THE LANE
+
+The ordering from the previous entry is superseded:
+
+1. **`venue-quote-line-join`'s totals key must name the game.** Until it does,
+   every live Polymarket totals number on the board is untrustworthy and no
+   cross-venue measurement on live totals means anything. This is now the top
+   item, and it is a correctness defect independent of arb.
+2. Then the Kalshi live-totals join gap (6 of 13 combos), which is real and
+   separately worth fixing.
+3. Only then re-run the arb measurement on live totals.
+4. **Live MONEYLINE remains genuinely unexplored** — Kalshi quotes tail
+   moneylines in play (verified: 14 markets, 0.04-0.96, all `active`), and the
+   board's 5 Polymarket h2h rows are all pregame. That path is blocked by the
+   YES-leg refusal, not by this defect.
+
+## METHOD NOTE
+
+The +84c figure was produced, recognised as impossible, and traced to its cause
+before being reported. The recognition came from a sanity bound (an 85%
+risk-free return cannot coexist with $900k of daily volume), not from the
+arithmetic — the arithmetic was correct and the INPUT was wrong. Recorded
+because this is the same shape as the backed-out live-edge attempt: fabricated
+numbers, larger than real ones, sorting to the top.

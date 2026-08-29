@@ -45,6 +45,53 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [polymarket-live-totals-quote-names-no-game] 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game identity `[verified 2026-08-29 ~22:3xZ, lane live-venue-order-placement]`
+
+Live Polymarket totals quotes in `quote.book_prices` are keyed on the LINE and
+fanned out across every live game carrying that line:
+
+    over  7.5 @ -400   AZ@SF, COL@ATL, HOU@NYM, SD@TB      (4 games)
+    under 7.5 @ +344   the same 4
+    over  8.5 @ +1233  3 games      over 9.5 @ +1900  3 games
+    over 10.5 @ -6567  2 games
+
+**IMPOSSIBILITY CHECK, which is what proves it a defect rather than a market:**
+COL@ATL was 1 run in the 7th, so over 7.5 is worth ~2% (Kalshi quoted 0.08);
+SD@TB was 13 runs, so over 7.5 had ALREADY WON at 100%. Both carry `-400`
+(=80%). One price cannot be both.
+
+**PREGAME rows are UNAFFECTED** — BAL@ATH, PHI@LAA, TEX@MIL totals all carry
+prices unique to their game. The collapse is on the LIVE path only.
+
+**`best_any_book` is `polymarket` on 28 of 28 live totals rows**, so the
+fabricated cross-game quote is what the board presents as the best available
+price; `model_edge_pct` reaches 14.92 on rows priced off it.
+
+**NOT AN INCIDENT, A HAZARD — and the reason is specific.** `ev_pct` on these
+rows is -0.99 to -1.40 so none is surfacing as a +EV bet, and the ORDER path
+does not read `book_prices`: `execute_portfolio._polymarket_resolve_market`
+prices from the per-market SLATE row. **No order has been priced off these
+numbers.** Price shopping, best-book display, and any future `book_prices`
+consumer on a live row ARE affected.
+
+This is the defect OPEN lane `venue-quote-line-join` recorded as UNFIXED — "a
+TOTALS key names no GAME", previously 672 soccer quotes collapsing to six keys.
+Same class, now measured on MLB live with a one-read signature (identical price
+on two games whose scores make it impossible).
+
+**CONSEQUENCE FOR CROSS-VENUE WORK: no measurement on live Polymarket totals
+means anything until the key names the game.** A net-edge computation over
+these rows returned +10.93c to +84.75c per contract — recognised as impossible
+(an 85% risk-free return against ~$900k daily turnover) and traced rather than
+reported. The arithmetic was right; the input was another game's price.
+
+SEPARATELY ANSWERED, the Kalshi side of the same question: of the 13 live
+(game, line) totals combos, **6 ARE listed on Kalshi right now (join gap,
+recoverable) and 7 are genuinely absent at the venue** — 5 because Kalshi
+prunes settled in-play strikes as runs accumulate (SD@TB at 13 runs floors its
+ladder at 13.5; KC@CLE at 10 floors at 10.5) and 2 because the game was final.
+Pruning lags rather than tracking exactly: HOU@NYM at 6 runs still listed 5.5.
+
 ## [kalshi-in-play-and-real-fees] KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE ON MLB `[verified 2026-08-29, lane live-venue-order-placement]`
 
 **Kalshi keeps game markets tradeable through the game.** `status=active`,
