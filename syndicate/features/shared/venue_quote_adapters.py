@@ -383,7 +383,76 @@ def _kalshi_leg_probability(row: Mapping[str, Any], leg: str) -> float | None:
     return value
 
 
-def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
+def _kalshi_game_token(ticker: Any, sport: Any, games: Any) -> str | None:
+    """The fixture a Kalshi ticker names, as a `game_token`, or None.
+
+    --------------------------------------------------------------------------
+    THE BLOB IS NOT SPLIT HERE. `match_event_blob` INVERTS THE PROBLEM.
+    --------------------------------------------------------------------------
+
+    `KXMLBTOTAL-26AUG291610SDTB-14` carries its event as `SDTB` --
+    `event_blob_from_ticker` strips the date and MLB's optional start time and
+    returns the run-together club codes. Its docstring is emphatic that the
+    blob must NOT be split into two teams: codes run 2-4 characters, nothing in
+    the string says where the boundary is, and "a wrong split pairs a bet with
+    the wrong game, which is the one failure this whole module is built to
+    prevent".
+
+    So this does not split it. `match_event_blob` tries every legal split and
+    CHECKS each against our own schedule, which is why it needs `games` -- and
+    it is the same resolver `kalshi_board_join._resolve_event` uses, reused
+    rather than reimplemented so a fix to it cannot be silently missed here.
+    (`kalshi_polymarket_arb` reuses it for the same reason and says so.)
+
+    RETURNS None ON ANY DOUBT, and every branch below is a doubt: no blob, no
+    schedule, no match, or a match `match_event_blob` itself will not vouch
+    for. A None key falls back to the bare key, which is exactly today's
+    behaviour -- so this can add precision and never subtract coverage.
+    """
+    if not games:
+        return None
+    try:
+        from syndicate.features.shared.kalshi_catalogue import (
+            event_blob_from_ticker,
+            match_event_blob,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    blob = event_blob_from_ticker(ticker)
+    if not blob:
+        return None
+    try:
+        result = match_event_blob(blob, list(games), sport=sport)
+    except Exception:  # noqa: BLE001
+        return None
+    # `match_event_blob`'s vocabulary is `ok` / `no_match` / `ambiguous`, read
+    # from the function rather than assumed. THE FIRST VERSION OF THIS LINE
+    # CHECKED FOR `"matched"`, a string that does not exist, so every Kalshi
+    # quote fell through to a bare key and the whole conversion was INERT --
+    # caught by `test_a_kalshi_totals_quote_names_its_game_OFF_vs_ON` and by
+    # nothing else, because an inert conversion looks exactly like a correct
+    # one from the outside.
+    #
+    # `ambiguous` is a REFUSAL and must stay one: it means the blob split more
+    # than one way against the schedule, and picking a winner there is the
+    # wrong-game pairing this is built to prevent.
+    if not isinstance(result, Mapping) or str(result.get("status") or "") != "ok":
+        return None
+    return game_token(sport, result.get("home_team"), result.get("away_team"))
+
+
+def kalshi_outcome(
+    sport: str,
+    selected_date: str,
+    *,
+    games: Any = None,
+) -> SourceOutcome:
+    """Kalshi's book as quotes.
+
+    `games` is `#603`'s Kalshi half and is OPTIONAL: absent, every key is bare
+    and this behaves exactly as before. Present, a game-line quote is keyed to
+    the fixture its TICKER names -- see `_kalshi_game_token`.
+    """
     payload, mtime = _artifact(("intelligence", "kalshi_markets.json"))
     if not isinstance(payload, Mapping):
         return SourceOutcome(source="kalshi", status="error", reason="kalshi_markets.json_unreadable")
@@ -529,10 +598,20 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
             h2h_keyed += 1
         else:
             line = _as_float(classified.get("line"))
+        # `#603`, Kalshi half. A GAME-LINE key names its fixture where the
+        # ticker resolves to one. Props are untouched -- `prop_quote_key`
+        # already names the PLAYER, which is a stronger identity than the game.
+        # h2h is excluded for the same reason it is on the board side: its side
+        # IS the club, so it cannot collide across fixtures.
+        k_game = (
+            _kalshi_game_token(row.get("ticker"), sport, games)
+            if (not prop_player and market in _ROLE_KEYED_MARKETS)
+            else None
+        )
         primary_key = (
             prop_quote_key(sport, market, prop_player, side, line)
             if prop_player
-            else quote_key(sport, market, side, line)
+            else quote_key(sport, market, side, line, k_game)
         )
         if primary_key is None:
             prop_unnamed += 1
@@ -541,6 +620,11 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
             Quote(
                 key=primary_key,
                 source="kalshi",
+                # Carried even when the key is bare, so the fan-in's
+                # cross-game rejection can refuse a bare-key match that lands
+                # on the wrong fixture. None means the ticker named no game we
+                # could resolve, which is treated as unknown, not as "any".
+                game=k_game,
                 sport=str(sport or ""),
                 market=market,
                 side=side,
@@ -587,12 +671,16 @@ def kalshi_outcome(sport: str, selected_date: str) -> SourceOutcome:
                 mirror_key = (
                     prop_quote_key(sport, market, prop_player, mirrored, line)
                     if prop_player
-                    else quote_key(sport, market, mirrored, line)
+                    # Same `k_game` as the primary leg: the mirror is the OTHER
+                    # SIDE of the same contract on the same fixture, so keying
+                    # it to a different game would be incoherent.
+                    else quote_key(sport, market, mirrored, line, k_game)
                 )
                 quotes.append(
                     Quote(
                         key=mirror_key,
                         source="kalshi",
+                        game=k_game,
                         sport=str(sport or ""),
                         market=market,
                         side=mirrored,

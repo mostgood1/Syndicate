@@ -297,3 +297,101 @@ def test_h2h_is_deliberately_left_unqualified():
     )
     assert keys[0] == "mlb|h2h|home"
     assert not any("|@" in k for k in keys), f"h2h gained a game-qualified key: {keys}"
+
+
+# ---------------------------------------------------------------------------
+# `#603`, Kalshi half. The ticker names the fixture -- via `match_event_blob`,
+# never by splitting the blob here.
+# ---------------------------------------------------------------------------
+
+
+def _kalshi_totals_payload():
+    """The shape the WRITER persists (`series` -> `markets`), not the old flat
+    `markets` key -- the same fixture correction `test_kalshi_catalogue` records.
+
+    `BOSMIA` is the run-together club blob. Nothing in it says whether the
+    boundary is BOS|MIA or BOSM|IA; `match_event_blob` decides by checking every
+    legal split against the schedule passed in.
+    """
+    return {
+        "fetched_at": "2026-08-25T20:15:00Z",
+        "series": {
+            "KXMLBTOTAL": {
+                "markets": [{
+                    "ticker": "KXMLBTOTAL-26AUG251840BOSMIA-7",
+                    "series": "KXMLBTOTAL",
+                    "title": "Over 7.5 runs scored?",
+                    "yes_ask_dollars": 0.54,
+                    "no_ask_dollars": 0.48,
+                }]
+            }
+        },
+    }
+
+
+_BOS_MIA = [{"event_id": "evt-bos-mia",
+             "home_team": "Miami Marlins",
+             "away_team": "Boston Red Sox"}]
+
+
+def test_a_kalshi_totals_quote_names_its_game_OFF_vs_ON(monkeypatch):
+    """off != on for the whole Kalshi conversion.
+
+    Without `games` the adapter cannot resolve the blob and keys bare -- which
+    is exactly its behaviour before this change. With `games` it keys to the
+    fixture. Asserting only the ON case would pass just as happily if the
+    qualifier were unconditional, and asserting only OFF would pass if the
+    conversion were inert.
+    """
+    import time
+
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    monkeypatch.setattr(adapters, "_artifact", lambda parts: (_kalshi_totals_payload(), time.time()))
+
+    off = {q.key for q in adapters.kalshi_outcome("mlb", "2026-08-25").quotes}
+    on = adapters.kalshi_outcome("mlb", "2026-08-25", games=_BOS_MIA).quotes
+    on_keys = {q.key for q in on}
+
+    assert off, "the adapter produced no quotes at all -- fixture is wrong, not the code"
+    assert not any("|@" in k for k in off), f"keyed to a game with no schedule to resolve against: {off}"
+    assert on_keys != off, "passing `games` changed nothing -- the conversion is inert"
+    assert all("|@boston red sox+miami marlins" in k for k in on_keys), on_keys
+    # And the quote CARRIES the game, so the fan-in's cross-game rejection can
+    # refuse it on the wrong row even if a bare key matched.
+    assert {q.game for q in on} == {"boston red sox+miami marlins"}
+
+
+def test_a_kalshi_ticker_whose_blob_matches_NO_game_keys_bare(monkeypatch):
+    """Unresolvable falls back to today's behaviour, never to a guess.
+
+    `match_event_blob` refuses rather than picking a split, and this must
+    inherit that refusal as a BARE key -- not as a fabricated fixture and not
+    as a dropped quote.
+    """
+    import time
+
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    monkeypatch.setattr(adapters, "_artifact", lambda parts: (_kalshi_totals_payload(), time.time()))
+    elsewhere = [{"event_id": "evt-other",
+                  "home_team": "Atlanta Braves",
+                  "away_team": "Colorado Rockies"}]
+
+    keys = {q.key for q in adapters.kalshi_outcome("mlb", "2026-08-25", games=elsewhere).quotes}
+
+    assert keys, "an unresolvable blob must not drop the quote"
+    assert not any("|@" in k for k in keys), f"a blob matching no game was keyed anyway: {keys}"
+
+
+def test_the_kalshi_blob_is_never_split_locally():
+    """The rule `event_blob_from_ticker` states, asserted rather than trusted.
+
+    It returns the blob WHOLE. A future edit that split it here -- rather than
+    letting `match_event_blob` check every split against the schedule -- would
+    pair bets with the wrong game, which is the failure the whole module exists
+    to prevent.
+    """
+    from syndicate.features.shared.kalshi_catalogue import event_blob_from_ticker
+
+    assert event_blob_from_ticker("KXMLBTOTAL-26AUG251840BOSMIA-7") == "BOSMIA"

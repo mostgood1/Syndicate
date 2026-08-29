@@ -411,3 +411,94 @@ along the way was mine and none was pre-existing. 12 new tests.
 **No production reading exists and cannot until this deploys.** The number that
 would prove it: `cross_game_rejected` > 0 on a live slate, and the board's live
 Polymarket totals no longer sharing a price across games.
+
+---
+
+# `#603`, KALSHI HALF — its quotes name the game too `[2026-08-29 ~23:5xZ]`
+
+**LANDED ON `main`, NOT DEPLOYED.**
+
+## The problem Kalshi posed that Polymarket did not
+
+Polymarket's slug carries both clubs (`aec-mlb-chc-ari-...`), so its adapter
+could name the fixture from data it already held. **Kalshi cannot.**
+`classify_market` returns market/side/subject/line and NO teams for a total.
+The only game identity is in the TICKER, as a run-together blob:
+`KXMLBTOTAL-26AUG251840BOSMIA-7` -> `BOSMIA`.
+
+`event_blob_from_ticker`'s docstring refuses to split that blob, and is right
+to: club codes run 2-4 characters, nothing in the string says where the
+boundary falls, and "a wrong split pairs a bet with the wrong game, which is
+the one failure this whole module is built to prevent". `match_event_blob`
+inverts it — every legal split, each CHECKED against our own schedule.
+
+So naming a Kalshi quote's game needs the schedule, and the adapter did not
+have one.
+
+## How the schedule gets there without breaking the adapter contract
+
+Adapters are called `adapter(sport, date)` and the registry is INJECTABLE —
+several suites substitute it. Widening the call signature would break every
+adapter and every injection site. So `games` is **bound into** the one adapter
+that needs it, via `functools.partial` in `_default_adapters(games)`. An
+adapter that takes no `games` is registered unchanged; a caller that passes
+none gets exactly today's behaviour.
+
+`apply_venue_quotes` derives the list from its own rows (`_distinct_games`,
+one entry per event_id — the same de-duplication `kalshi_board_join.
+_resolve_event` documents, because one row per market per game would make an
+ordinary slate look ambiguous).
+
+**`games` is passed ONLY when non-empty.** Several suites monkeypatch
+`collect_quotes` with a three-argument stub, and an unconditional keyword turns
+those into a `TypeError` that the surrounding except-clause swallows into an
+EMPTY QUOTE POOL — a silent zero, which is precisely what rule 3 of that module
+exists to prevent. Two tests caught it.
+
+## THE CONVERSION SHIPPED INERT AND ONE TEST CAUGHT IT
+
+`_kalshi_game_token` gated on `result["status"] == "matched"`. **That string
+does not exist.** `match_event_blob`'s vocabulary is `ok` / `no_match` /
+`ambiguous`. Every Kalshi quote fell through to a bare key and the entire
+conversion did nothing.
+
+Every other part worked — blob extracted, split resolved, teams returned,
+token built. Only the guard was wrong, and an inert conversion is
+indistinguishable from a correct one from the outside: the suite was GREEN,
+the code was present, and it changed nothing.
+
+What caught it was `test_a_kalshi_totals_quote_names_its_game_OFF_vs_ON`,
+which asserts `on_keys != off` — the conversion must CHANGE something. An
+ON-only assertion would have passed if the qualifier were unconditional; an
+OFF-only one would have passed while inert. This is the standing
+`presence_is_not_reachability` rule, and it earned its place again.
+
+`ambiguous` stays a refusal: a blob that splits more than one way against the
+schedule is exactly the wrong-game pairing this prevents.
+
+## Scope, matching the Polymarket half
+
+Role-keyed markets only (`totals`, `spreads`, `_alt`). Props are untouched —
+`prop_quote_key` already names the PLAYER, a stronger identity than the game.
+h2h is excluded because its side IS the club. The mirror leg (`no`) takes the
+SAME game token as the primary: it is the other side of one contract on one
+fixture.
+
+Unresolvable falls back to a BARE key — never a guess, never a dropped quote.
+
+## Verification
+
+`322 passed` across eight venue/join/catalogue suites; `188 passed` across the
+downstream consumers (`layer2_board`, `book_grid`, `clv_join`,
+`position_marks`, `execution_multi_venue`, `kalshi_leg_pricing`,
+`kalshi_odds_cadence`). 4 new tests.
+
+**Still no production reading, and there cannot be one until this deploys.**
+
+## What remains after this
+
+- **OddsAPI and Novig still emit bare keys.** OddsAPI is the larger remaining
+  exposure by volume. Its rows are per-event so the identity is available; it
+  has simply not been converted.
+- **Doubleheaders**, unchanged and NOT closed: `BOSMIA` appears in both halves'
+  tickers and `game_token` collapses to one string either way.

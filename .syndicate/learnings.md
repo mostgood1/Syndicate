@@ -6358,3 +6358,50 @@ was editing.**
   worth of standing false contention. Nothing was lost: the sweep released
   enforceability only — every path stays in its block as a record, and a lane
   resuming the work reclaims by striking the note.
+
+---
+
+## 2026-08-29 — FORBIDDEN: gating on a status string you did not read from the function that emits it. The whole conversion shipped INERT and every test was green. `[lane live-venue-order-placement]`
+
+- **What we believed:** `#603`'s Kalshi half was done. The adapter resolved a
+  ticker's club blob through `match_event_blob`, took the matched fixture, and
+  keyed the quote to it. Code present, suite green, downstream green.
+- **What was actually true:** the guard read
+  `result["status"] == "matched"`. **`"matched"` is not a value that function
+  ever returns.** Its vocabulary is `ok` / `no_match` / `ambiguous`. Every
+  Kalshi quote failed the check, fell back to a bare key, and the conversion
+  did **nothing at all**.
+- **Everything else was right.** Blob extracted, split resolved against the
+  schedule, teams returned, token built correctly. One guessed string, and the
+  feature was decorative.
+- **Why green meant nothing.** An inert conversion is indistinguishable from a
+  correct one from outside: no test failed, no log line changed, and the
+  fallback it landed in is the pre-change behaviour — which is by design
+  *correct*, just not new. Had the fallback been an error instead of graceful
+  degradation, this would have been obvious in a second.
+- **How we found out:** ONE test —
+  `test_a_kalshi_totals_quote_names_its_game_OFF_vs_ON` — asserting
+  `on_keys != off`, i.e. *passing the new argument must CHANGE something*.
+  An ON-only assertion passes if the qualifier is unconditional. An OFF-only
+  assertion passes while inert. Only the pair discriminates.
+- **The rules going forward:**
+  1. **A status string is a fact about the emitting function. Read it there.**
+     One grep of `match_event_blob` for `"status"` would have shown three
+     values and none of them mine. I had already read that function's
+     docstring in the same session and still guessed the value.
+  2. **Every graceful fallback needs an off != on test.** Where wrong input
+     degrades quietly instead of raising, "it works" and "it never runs" look
+     identical. The test must assert the CHANGE, not the outcome.
+  3. **Suspect inertness hardest when a feature is additive.** This one could
+     only add a key. Adding nothing is a perfectly valid-looking state for an
+     additive change, which is what let it through the whole suite.
+- **Related, same session, same shape:** a `TypeError` from passing a new
+  keyword to a monkeypatched three-argument `collect_quotes` stub was being
+  swallowed by a surrounding `except Exception` into an EMPTY QUOTE POOL — a
+  silent zero, the failure that module's own rule 3 exists to prevent. Two
+  tests caught that one. **Both defects are the same species: a new argument
+  that fails quietly and leaves the system looking healthy.**
+- **Cost:** none realised — caught before commit, by a test written in the same
+  pass. Had the off != on test not been written, a green suite and a
+  confident finding would have recorded "Kalshi now names its game" while the
+  cross-game bleed continued on every Kalshi quote in production.

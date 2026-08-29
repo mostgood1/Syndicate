@@ -226,13 +226,14 @@ def collect_quotes(
     *,
     adapters: Mapping[str, Callable[[str, str], SourceOutcome]] | None = None,
     now: float | None = None,
+    games: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run every enabled source and report what each one actually did.
 
     Never raises for a source problem: one venue being unreachable must not
     cost the others' quotes, and the whole point is comparing across them.
     """
-    registry = dict(adapters if adapters is not None else _default_adapters())
+    registry = dict(adapters if adapters is not None else _default_adapters(games))
     outcomes: list[SourceOutcome] = []
 
     for name in SOURCES:
@@ -470,7 +471,22 @@ def apply_venue_quotes(
             continue
         if sport not in by_sport:
             try:
-                by_sport[sport] = collect_quotes(sport, selected_date, now=now)
+                # `games` is passed ONLY when the board actually named some.
+                #
+                # `collect_quotes` is monkeypatched in several suites with a
+                # three-argument stub, and an unconditional keyword turns those
+                # into a TypeError that the except-clause below swallows into
+                # an empty quote pool -- a silent zero, which is the exact
+                # failure mode rule 3 of this module exists to prevent. Passing
+                # only a non-empty list keeps the stub contract intact and
+                # costs nothing: a board with no named fixtures has nothing to
+                # resolve a Kalshi ticker against anyway.
+                sport_games = _distinct_games(rows, sport)
+                by_sport[sport] = (
+                    collect_quotes(sport, selected_date, now=now, games=sport_games)
+                    if sport_games
+                    else collect_quotes(sport, selected_date, now=now)
+                )
             except Exception:
                 # One sport's venue failure must not cost the others' rows.
                 by_sport[sport] = {"quotes": {}}
@@ -614,6 +630,29 @@ _OFFERED_SAMPLE_LIMIT = 4
 # club or a player, so the key names no fixture on its own. `h2h` is
 # deliberately absent -- its side IS the club. See `_candidate_keys`.
 _ROLE_KEYED_MARKETS = {"totals", "totals_alt", "spreads", "spreads_alt"}
+
+
+def _distinct_games(
+    rows: Sequence[Mapping[str, Any]], sport: str
+) -> list[dict[str, Any]]:
+    """One entry per GAME for this sport, in `match_event_blob`'s shape.
+
+    DISTINCT, for the reason `kalshi_board_join._resolve_event` already states:
+    "the board carries one row per market per game, so feeding every row in
+    would make an ordinary slate look ambiguous." A blob that matches two
+    entries of the same game would be refused as ambiguous and the quote would
+    lose its game for no reason.
+    """
+    seen: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if str(row.get("sport") or "").strip().lower() != sport:
+            continue
+        event_id = str(row.get("event_id") or "").strip()
+        home, away = row.get("home_team"), row.get("away_team")
+        if not (event_id and home and away) or event_id in seen:
+            continue
+        seen[event_id] = {"event_id": event_id, "home_team": home, "away_team": away}
+    return list(seen.values())
 
 
 def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
@@ -850,11 +889,34 @@ def _iso(epoch: float) -> str:
     return datetime.datetime.fromtimestamp(float(epoch), datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _default_adapters() -> dict[str, Callable[[str, str], SourceOutcome]]:
+def _default_adapters(
+    games: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, Callable[[str, str], SourceOutcome]]:
+    """The registry. `games` is BOUND IN rather than added to the call signature.
+
+    `#603`, Kalshi half. A Kalshi ticker names its event as a run-together club
+    blob (`KXMLBTOTAL-26AUG291610SDTB-14` -> `SDTB`), and
+    `event_blob_from_ticker`'s docstring is explicit that it must NOT be split
+    into two codes here: club codes vary in length, nothing in the string says
+    where the boundary is, and "a wrong split pairs a bet with the wrong game,
+    which is the one failure this whole module is built to prevent".
+    `match_event_blob` inverts it -- it tries every legal split and CHECKS each
+    against our own schedule -- so naming a Kalshi quote's game needs that
+    schedule.
+
+    Adapters are called `adapter(sport, date)` and the registry is injectable
+    (tests substitute it), so widening the call signature would break every
+    adapter and every injection site. Binding the schedule into the one adapter
+    that needs it keeps the contract intact: an adapter that takes no `games`
+    is registered unchanged, and a caller that passes none gets exactly today's
+    behaviour.
+    """
+    from functools import partial
+
     from syndicate.features.shared import venue_quote_adapters as adapters
 
     return {
-        "kalshi": adapters.kalshi_outcome,
+        "kalshi": partial(adapters.kalshi_outcome, games=games) if games else adapters.kalshi_outcome,
         "polymarket_us": adapters.polymarket_us_outcome,
         "novig": adapters.novig_outcome,
         "oddsapi": adapters.oddsapi_outcome,
