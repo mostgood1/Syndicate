@@ -2159,6 +2159,59 @@ def _teams_match(
     # rows. Placing it after the guard made it unreachable for all of them --
     # a fix that only helps the rows that were never broken.
     if str(sport or "").strip().lower() == "soccer":
+        # ------------------------------------------------------------------
+        # THE PAIR RESOLVER IS AUTHORITATIVE, AND IT RUNS FIRST.
+        # ------------------------------------------------------------------
+        #
+        # `soccer_fixture_clubs` requires BOTH slug codes to resolve inside the
+        # SAME league and exactly ONE league to satisfy that. When it answers,
+        # it has named the COMPETITION as well as the clubs -- which is the
+        # check this function could not otherwise make, because the board stamps
+        # every soccer row `sport="soccer"` and never carries its league here.
+        #
+        # WHY IT IS A REFUSAL AND NOT JUST A MATCH. The wrong-game bet of
+        # 2026-08-29 (filled $5.20: board `Nice @ Paris FC`, Ligue 1, placed
+        # against `tsc-sea-juv-par`, Serie A) happened because ELIMINATION ran
+        # and this did not. The resolver knew the answer the whole time:
+        #
+        #     soccer_fixture_clubs('juv','par') -> ('juventus', 'parma')
+        #
+        # Juventus and Parma, unambiguously, in Serie A. Nothing consulted it,
+        # so a club-token prefix collision (`par` prefixes both "Paris FC" and
+        # "Parma") was allowed to decide the fixture instead.
+        #
+        # So: if the resolver names the pair and it is NOT this board row's
+        # fixture, refuse outright. No later rule may rescue it -- that is the
+        # whole point of putting it first.
+        #
+        # COMPARED AS AN UNORDERED PAIR, because slug order and board order are
+        # a separate question this function has its own handling for; a
+        # wrong-GAME check must not be entangled with a wrong-SIDE one.
+        #
+        # AND IT RESTORES THE `mnc` FAMILY the first fix traded away:
+        # `soccer_fixture_clubs('cry','mnc')` resolves to
+        # ('crystal palace', 'manchester city'), so that pair now matches HERE
+        # rather than needing elimination to carry a token naming nothing.
+        try:
+            from syndicate.features.shared.team_aliases import (
+                canonical_team as _canon,
+                soccer_fixture_clubs as _pair,
+            )
+            resolved = _pair(parsed.get("home"), parsed.get("away"))
+        except Exception:  # noqa: BLE001 -- a dark resolver must not decide
+            resolved = None
+        if resolved:
+            try:
+                board_pair = {
+                    _norm(_canon("soccer", home) or home),
+                    _norm(_canon("soccer", away) or away),
+                }
+            except Exception:  # noqa: BLE001
+                board_pair = None
+            slug_pair = {_norm(resolved[0]), _norm(resolved[1])}
+            if board_pair:
+                # A named pair that is not this fixture is a DIFFERENT GAME.
+                return board_pair == slug_pair
         if _fixture_tokens_name_matchup(
             parsed.get("home"), parsed.get("away"), home, away
         ):

@@ -1389,9 +1389,10 @@ _EPL_SLATE = [("Crystal Palace", "Manchester City"),
               ("Chelsea", "Fulham")]
 
 
-def test_ELIMINATION_NO_LONGER_resolves_a_token_that_names_no_club(monkeypatch):
-    """THIS TEST ASSERTED THE OPPOSITE UNTIL 2026-08-29, AND THE BEHAVIOUR IT
-    PROTECTED PLACED A BET ON THE WRONG GAME.
+def test_with_EVERY_RESOLVER_DARK_mnc_is_no_longer_carried(monkeypatch):
+    """`mnc` COVERAGE, KEPT -- but carried by the pair resolver, not elimination.
+
+    This test has flipped twice in one day and the history is the point.
 
     `mnc` is neither a prefix nor the initials of "Manchester City", so no token
     rule reaches it. Elimination used to accept it: `cry` named exactly one
@@ -1407,10 +1408,26 @@ def test_ELIMINATION_NO_LONGER_resolves_a_token_that_names_no_club(monkeypatch):
     Paris FC and was waved through. The opponent token must now POSITIVELY name
     the other side.
 
-    THE TRADE, STATED: this costs the `mnc` family -- slugs whose second token
-    resolves to nothing no longer pair by elimination alone. Coverage is the
-    cheaper thing to lose; a wrong-game fill cannot be unwound. The test is kept
-    and inverted rather than deleted so the trade stays visible.
+    The first fix removed the permissive branch and TRADED THIS AWAY, on the
+    reasoning that coverage is cheaper to lose than a wrong-game fill. That was
+    the right call with the information available.
+
+    The trade turned out to be unnecessary. `soccer_fixture_clubs('cry','mnc')`
+    resolves to ('crystal palace', 'manchester city') -- the pair resolver knew
+    this fixture all along, and it requires BOTH codes inside ONE league, so it
+    also answers the competition question that let the wrong-game bet through.
+    Running it FIRST and treating it as authoritative refuses `sea-juv-par`
+    against a Ligue 1 row AND carries `mnc`.
+
+    SO THE TRADE IS NARROWER THAN "LOST", AND NARROWER THAN "RESTORED":
+
+      - alias table AVAILABLE (production): `mnc` is carried by the pair
+        resolver. Proven by the test below, which uses the REAL resolver.
+      - EVERY resolver dark (this test): `mnc` is NOT carried. Elimination alone
+        can no longer rescue a token that names nothing, and that is the cost.
+
+    This test pins the dark case because that is the half that actually changed.
+    Kept rather than deleted so nobody re-adds the permissive branch.
     """
     _no_aliases(monkeypatch)
     assert mod._teams_match(
@@ -2205,3 +2222,31 @@ def test_the_real_fixture_still_pairs(monkeypatch):
         {"league": "sea", "home": "par", "away": "juv", "date": "2026-08-29"},
         "soccer", [("Parma", "Juventus")],
     ) is True
+
+
+def test_mnc_IS_carried_by_the_REAL_pair_resolver():
+    """The production half of the trade above -- NO monkeypatching.
+
+    `soccer_fixture_clubs` requires both codes inside ONE league and exactly one
+    league to qualify, so when it answers it has named the COMPETITION too. That
+    is what refuses `sea-juv-par` against a Ligue 1 board row, and the same call
+    is what carries `mnc`:
+
+        soccer_fixture_clubs('cry','mnc') -> ('crystal palace', 'manchester city')
+        soccer_fixture_clubs('juv','par') -> ('juventus', 'parma')
+
+    One rule, both outcomes. If this test ever fails, the alias table stopped
+    naming the fixture and the coverage claim above is void.
+    """
+    assert mod._teams_match(
+        {"home_team": "Crystal Palace", "away_team": "Manchester City"},
+        {"league": "epl", "home": "mnc", "away": "cry", "date": "2026-08-28"},
+        "soccer", _EPL_SLATE) is True
+
+
+def test_the_pair_resolver_REFUSES_a_different_competition():
+    """The wrong-game bet, through the real resolver rather than a fixture."""
+    assert mod._teams_match(
+        {"home_team": "Paris FC", "away_team": "Nice"},
+        {"league": "sea", "home": "par", "away": "juv", "date": "2026-08-29"},
+        "soccer", [("Paris FC", "Nice")]) is False
