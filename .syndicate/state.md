@@ -4777,13 +4777,26 @@ touches every sport:
 No sport loses a match, none gains an ambiguous row, no pair flips True->False.
 MLB's 35 ambiguous rows are identical in both orders and pre-existing.
 
-**NOT PROVEN, and the distinction is load-bearing.** `book-grid` re-runs
-`attach_game_state` at READ time on web; `layer2-shortlist` enriches in
-`pipeline/layer2_shortlist.py:548` on the worker. At 18:59:25Z, with the worker
-on `95c4fb12` since 18:42:34Z (past the ~21-min first-publish window, `#563`),
-the shortlist still read **ncaaf 96 rows / 0 game / 0 state** against
-mlb/wnba/soccer 400/400 and nfl 17/17. **The fix is proven on one surface and
-unproven on the other.** Watcher `bn5covso7`.
+**PROVEN ON BOTH SURFACES, and the distinction between them is load-bearing.**
+`book-grid` re-runs `attach_game_state` at READ time on web; `layer2-shortlist`
+is a PURE READ (`source: layer2_shortlist_artifact`) of a pool built on the
+worker inside `_build_candidate_pool`, so it changes only when that pool is
+REBUILT.
+
+    layer2-shortlist  written_at 2026-08-29T19:03:08Z (post-fix)
+    ncaaf  0/96  ->  49/92        mlb 400/400  wnba 374/374  soccer 400/400  nfl 18/18
+
+    by kickoff date:  08-29  28/28 ALL     09-03   2/20 partial
+                      08-30   6/6  ALL     09-04  13/38 partial
+
+**Every row for a game today or tomorrow carries state**, against zero on every
+date before. Coverage is strictly better everywhere; nothing regressed.
+
+**Residual, OBSERVED AND NOT EXPLAINED:** the two future dates are partial, and
+`_MAX_GAME_STATE_DATES = 7` against 4 distinct dates RULES OUT the date bound.
+The likely cause is the board carding a curated FBS-vs-FBS subset while the
+shortlist carries quote rows outside it — a hypothesis, not a measurement.
+Pre-existing, and no game in play is affected.
 
 ## [ncaaf-live-lens-state] THE NCAAF LIVE LENS'S STATE BRANCH WAS UNREACHABLE, NOT EMPTY — **FIXED AND VERIFIED IN PRODUCTION** `[measured 2026-08-29T16:30:28Z, web 061d5b2b, lane ncaaf-live-lens-state]`
 

@@ -6083,3 +6083,34 @@ The same discipline caught a real one later: a peer deployed `6625b5e6` and I
 checked rather than assumed -- `1be9fa3e` was NOT in it. Had I assumed the other
 way I would have read an unchanged counter off a binary without the fix and
 called it inert.
+
+### 2026-08-29 — FORBIDDEN: gating a verdict on ELAPSED TIME when the artifact carries its own build stamp
+
+- **What we believed:** that enough minutes after a worker deploy, a zero on
+  `/api/board/layer2-shortlist` meant the fix had failed. The watcher was built
+  on that: a grace window counted from the deploy, then a `STILL ZERO` verdict.
+- **What was actually true:** the endpoint is a **PURE READ**
+  (`source: layer2_shortlist_artifact`) of a pool built on refresh-worker inside
+  `_build_candidate_pool`. It computes nothing at request time. The pool it was
+  serving carried `written_at 2026-08-29T18:30:44Z` — **twelve minutes OLDER
+  than the fix**, which went live at 18:42:34Z. No amount of waiting would have
+  changed that reading, because nothing had rebuilt it.
+- **How we found out:** dumping every scalar key on the payload instead of only
+  the rows, and finding `written_at` already there.
+- **The rule going forward:** when a surface serves an artifact, the ONLY input
+  that licenses a verdict about a code change is the artifact's own build stamp
+  crossing the deploy time. Elapsed time is a fact about you, not about the
+  system. Find the build stamp BEFORE arming a watcher — `written_at`,
+  `generated_at`, `published_at` — and gate on it. If a surface has no such
+  stamp, that absence is the first thing to fix, not to work around.
+- **Cost:** none — the false `STILL ZERO` was caught before it was reported.
+  Once re-gated on `written_at`, the confirmation arrived in 90 seconds:
+  ncaaf 0/96 -> 49/92.
+
+This is the same shape as two other errors the same day: a green local read off
+an untracked `cfbd_lines` mirror production has never had, and a "baseline"
+worktree that passed only because it lacked untracked MLB data. **Three times
+in one session the instrument, not the system, produced the reading** — see
+[[feedback_instrument_blindness]] in spirit. The discriminator is always the
+same question: *what would this reading look like if the thing I am testing had
+never run?*
