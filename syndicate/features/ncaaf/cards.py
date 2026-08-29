@@ -18,6 +18,7 @@ from syndicate.features.ncaaf.sources import default_ncaaf_source_root
 from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import _legacy_default_season_from_summary_index
 from syndicate.features.ncaaf.sources import default_week
+from syndicate.features.ncaaf.sources import ncaaf_week_and_card_keys_for_date
 from syndicate.features.ncaaf.sources import format_moneyline
 from syndicate.features.ncaaf.sources import format_num
 from syndicate.features.ncaaf.sources import format_pct
@@ -786,6 +787,101 @@ def _ncaaf_market_board_rows_for_game(
             sim_rows.append({"game_id": game_id, "market": "total", "period": "full_game", "entity": None, "sim_projection": over_prob, "projected_value": model_total_value, "sim_source": "ncaaf_model"})
 
     return odds_rows, sim_rows
+
+
+def build_ncaaf_chip_games(context_label: str, *, season: int | None = None) -> list[dict[str, Any]]:
+    """MINIMAL game dicts for the scoreboard chips. Builds no cards at all.
+
+    ------------------------------------------------------------------
+    WHY THIS EXISTS: THE CHIP PATH TOOK THE SITE DOWN
+    ------------------------------------------------------------------
+
+    `_NCAAFDataProvider.games()` answers the chips path with
+    `build_smartsim_cards_page_context` PLUS `build_ncaaf_market_board` --
+    roughly two full 51-game board builds, measured locally at **3.15s + 3.26s
+    = 6.4s warm**. That was survivable only because the date resolver was
+    broken and returned `[]` before reaching any of it: an accidental circuit
+    breaker.
+
+    Fixing the resolver (2026-08-29) removed the breaker and put that build on
+    the HOME PAGE's request path behind a 30s TTL, on a 2GB display-only
+    service with two gunicorn workers. Measured on production: `/` went
+    **3.5s -> 37.9s** and `/ncaaf/cards` returned **502**. Reverted within
+    minutes. Full account: `deploys.md` 2026-08-29 12:18 CT.
+
+    ------------------------------------------------------------------
+    A CHIP DOES NOT NEED A CARD
+    ------------------------------------------------------------------
+
+    `build_game_chip` reads only: the team pair, live/final flags, the two
+    scores, a status token and a kickoff. It reads no projection, no market
+    tile, no team context, no roster and no market board. Every expensive
+    thing the card builder does is discarded before a chip is emitted.
+
+    So this assembles those fields directly from the season schedule -- the
+    same source, the same FBS gate and the same `f"{week}_{away}_{home}"` key
+    formula the card builder uses, so a chip and its card cannot disagree about
+    identity -- and then stamps live state through the ordinary ESPN join.
+
+    `_team_context` is deliberately NOT called: it is the expensive part (roster
+    counts, transfer counts, coach and returning-production joins per team) and
+    a chip needs none of it. Branding is resolved directly, which is what
+    supplies the ESPN team id the live-state join keys on.
+
+    Returns `[]` for a date with no FBS games -- the same "no slate" answer the
+    provider already gives, and never a fabricated one.
+    """
+    resolved_season = int(season) if season is not None else int(default_season())
+    resolved = ncaaf_week_and_card_keys_for_date(resolved_season, context_label)
+    if resolved is None:
+        return []
+    week, card_keys = resolved
+
+    try:
+        schedule = load_games_season(resolved_season)
+    except Exception:
+        return []
+
+    games: list[dict[str, Any]] = []
+    for row in schedule:
+        if not isinstance(row, dict) or row.get("week") != week:
+            continue
+        if row.get("homeClassification") != "fbs" or row.get("awayClassification") != "fbs":
+            continue
+        home_team = str(row.get("homeTeam") or "").strip()
+        away_team = str(row.get("awayTeam") or "").strip()
+        if not home_team or not away_team:
+            continue
+        game_pk = f"{week}_{away_team}_{home_team}".replace(" ", "_")
+        if game_pk not in card_keys:
+            continue
+
+        away_branding = _resolve_branding(str((_resolve_team(away_team) or {}).get("team_id") or ""))
+        home_branding = _resolve_branding(str((_resolve_team(home_team) or {}).get("team_id") or ""))
+        games.append(
+            {
+                "gamePk": game_pk,
+                "card_variant": "ncaaf_main",
+                # `status` is the week label until the ESPN join replaces it on
+                # a started game -- identical to the full card's behaviour.
+                "status": _week_label(week, season=resolved_season),
+                "startTime": row.get("startDate"),
+                "away": {
+                    "abbr": _abbr(away_team),
+                    "name": away_team,
+                    # Carries the ESPN team id; the live-state join keys on it.
+                    "logo_url": away_branding.logo_url if away_branding else None,
+                },
+                "home": {
+                    "abbr": _abbr(home_team),
+                    "name": home_team,
+                    "logo_url": home_branding.logo_url if home_branding else None,
+                },
+            }
+        )
+
+    _attach_live_state(games, resolved_season, week)
+    return games
 
 
 def build_ncaaf_market_board(week: int) -> dict[str, Any]:

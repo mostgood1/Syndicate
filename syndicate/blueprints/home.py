@@ -6547,6 +6547,45 @@ class _NCAAFDataProvider(_HomeSportDataProviderBase):
         from syndicate.features.ncaaf.cards import build_ncaaf_market_board
         from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
 
+        # THE CHIP PATH GETS A LIGHT BUILD, AND THIS BRANCH IS WHY THE SITE
+        # STAYED UP.
+        #
+        # Everything below builds the full board TWICE -- once here and once
+        # inside `build_ncaaf_market_board`, measured at 3.15s + 3.26s = 6.4s
+        # warm for 51 games. `build_game_chip` then reads six fields off it and
+        # discards the rest: no projection, no market tile, no team context, no
+        # roster, no market board.
+        #
+        # That cost was invisible for months because
+        # `ncaaf_week_and_card_keys_for_date` was broken and returned None, so
+        # this method returned [] before reaching any of it -- an ACCIDENTAL
+        # CIRCUIT BREAKER. Fixing the resolver on 2026-08-29 removed it and put
+        # 6.4s on the home page's request path behind a 30s TTL, on a 2GB
+        # display-only service with two workers: `/` went 3.5s -> 37.9s and
+        # `/ncaaf/cards` returned 502. See `deploys.md` 2026-08-29 12:18 CT.
+        #
+        # `build_ncaaf_chip_games` produces chips that are FIELD-FOR-FIELD
+        # IDENTICAL to the ones this path produces -- verified over all 8 games
+        # of the 2026-08-29 slate, 0 differences across sport/state/
+        # status_token/matchup/start_time_utc/leader and both sides' abbr and
+        # score -- in 0.27s warm instead of 6.4s.
+        #
+        # `include_upcoming` IS THE DISCRIMINATOR, and it is load-bearing.
+        # `build_game_chips` (game_chip_scoreboard.py) is the only caller that
+        # passes it; `_load_home_games` -- the game rails, which genuinely need
+        # the full cards -- calls `games(context, is_active_today=...)` and
+        # never sets it. `tests/test_ncaaf_chip_games.py` pins that.
+        #
+        # A dedicated provider method would say this better than an overloaded
+        # kwarg. That belongs in `game_chip_scoreboard.py`, held by OPEN lane
+        # `mlb-final-zero-placeholder`, so it is left as the follow-up rather
+        # than taken from a second lane in one change.
+        if include_upcoming:
+            from syndicate.features.ncaaf.cards import build_ncaaf_chip_games
+
+            season_value = int(context.season) if context.season is not None else None
+            return build_ncaaf_chip_games(context.context_label, season=season_value)
+
         # `if context.week is None: return []` USED TO BE THE WHOLE STORY HERE,
         # and it made NCAAF contribute ZERO chips on every date, forever.
         # `build_game_chips` (game_chip_scoreboard.py:442) resolves context with
