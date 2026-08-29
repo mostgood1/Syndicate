@@ -3017,6 +3017,226 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none. Nothing here is deployed or committed without a further
   instruction; no deploy claim taken.
 
+### finals-silent-score-drop — OPEN — opened 2026-08-29 — session 4ca1d41c-7532-44dc-87ff-cec47f1f07d0
+- Goal: the largest cause of lost `games_with_outcome` STOPS being the one path
+  in the scorer that increments no counter. A final dropped for having no
+  numeric score is COUNTED and NAMED, so the cap is attributable from the
+  served payload alone.
+- Files:
+  - `syndicate/features/shared/live_gameline_score.py`
+  - `tests/test_live_gameline_score.py`
+- **THIS DOES NOT RE-OPEN THE SCORER EXONERATION** (`lanes.md` 2026-08-27, "do
+  not go looking for a scorer bug"). The scorer is RIGHT to refuse a final with
+  no score; refusing SILENTLY is the defect. Observability, not correctness. No
+  scoring maths changes and no game is recovered.
+- Hypothesis: CONFIRMED FROM PRODUCTION BEFORE ANY CODE `[2026-08-29 ~14:4xZ]`.
+  `/api/board/book-grid?sport=mlb&date=2026-08-28` (artifact regenerated
+  14:31:06Z, stable across 3 fetches) reports `games_with_outcome=1`,
+  `records_considered=6466`, `no_final_outcome_for_game=6137`. A `limit=2000`
+  sample resolves the cause exactly: **15 distinct `event_id` on the grid — 12
+  `final`, 3 `pregame` — and of the 12 finals only ONE carries numeric scores**
+  (Reds 10 @ Cubs 8). The other 11 are `state: final, home_score: None,
+  away_score: None`, nulled upstream by `game_chip_scoreboard.py:465`
+  (`level_final_impossible_for_sport`). `build_finals_index` then hits
+  `float(None) -> TypeError -> continue`, and **that `continue` sits BEFORE
+  `diag["finals_seen"] += 1`**, so 11 of 15 games leave NO trace in any
+  counter. The index ends with one key; `games_with_outcome=1` follows.
+- The counters that DO exist point away from the cause: `finals_seen=196`,
+  `finals_level=0`, `finals_skipped_level=0`,
+  `finals_skipped_level_sport_unknown=0`. Reading those alone, the finals index
+  looks healthy and the blame lands on the ledger/join. It is neither.
+  (`learnings.md` "Instrument blindness": a healthy reading is evidence only
+  once you know what makes it read unhealthy.)
+- **NEW AND NOT PREVIOUSLY RECORDED — a `--date` backfill DECAYS.** The same
+  date, scored off two different artifact builds ~9 minutes apart:
+  `14:22:04Z -> 4 games`, `14:31:06Z -> 1 game`. Each rebuild of a PAST date
+  re-reads the CURRENT scoreboard, which retains fewer of yesterday's scores as
+  the feed rolls forward. So `snapshot_live_gameline_score.py --date` is not
+  time-neutral: the later it runs the fewer games survive, and an on-time
+  capture is worth strictly more than any recovery. This is the mechanism
+  behind the scheduled task's "a recovered night can be incomplete" note, and
+  it is WHY — the note recorded the symptom only.
+- Falsification test: wrong if the 11 scoreless finals carry a real score
+  anywhere in the served payload (they do not — `game` holds exactly
+  `away_score, home_score, matchup, start_time_utc, state, status_token`, and
+  both score fields are `None` on all 11), or if adding the counter changes any
+  Brier or any `games_with_outcome` (it must not — a pure diagnostic).
+- Verification:
+  (a) a new `finals_skipped_no_numeric_score` counter reads **11** for
+      `date=2026-08-28` on a rebuilt artifact, and `finals_seen` + that counter
+      account for every `final` row on the grid;
+  (b) `off != on` reachability — a test asserting the counter is ABSENT must
+      fail before the change (the counter is producible only by the new branch);
+  (c) `games_with_outcome`, every Brier and every `n` are BYTE-IDENTICAL before
+      and after on the same fixture — this recovers no games and must not move
+      a single number;
+  (d) `python -m pytest tests/test_live_gameline_score.py` passes.
+- **STATUS 2026-08-29 — CODE WRITTEN AND VERIFIED IN A WORKTREE. NOT COMMITTED,
+  NOT PUSHED, NOT DEPLOYED. No deploy claim taken.**
+  Worktree `C:	mp\syndicate-sessionsinals-silent-score-drop`, branch
+  `session/finals-silent-score-drop` off `origin/main` `9618cc75`.
+  Two counters, because `finals_seen`/`finals_level` count ROWS and the
+  question anyone asks is about GAMES:
+  `finals_skipped_no_numeric_score` (rows) and
+  `finals_skipped_no_numeric_score_games` (games, reported NET of the index so
+  a game skipped on one row and indexed from another is not called lost).
+  - (b) **REACHABILITY PROVEN, `off != on`.** The 3 counter tests fail against
+    the pre-change source with `KeyError: 'finals_skipped_no_numeric_score'`.
+  - (c) **NO NUMBER MOVES.** The invariance test passes against BOTH the old
+    and new source — that is the proof, not a claim. 74 tests green across
+    `test_live_gameline_score.py`, `test_live_gameline_accuracy.py`,
+    `test_game_chip_scoreboard.py`.
+  - (d) `python -m pytest tests/test_live_gameline_score.py` — **19 passed**.
+  - (a) **DISCHARGED IN PREDICTION, over REAL production payloads** (new code
+    run locally against `/api/board/book-grid?sport=mlb&limit=2000`, not a
+    fixture). Sample-bounded where noted; the server scores the full grid:
+
+    | date | rows sampled | NEW rows skipped | **NEW games lost** | `finals_seen` | `finals_level` | games indexed |
+    |---|---|---|---|---|---|---|
+    | 08-28 | 2000 of 3122 | 1429 | **11** | 129 | 0 | 1 |
+    | 08-27 | 1462 of 1462 (COMPLETE) | 644 | **3** | 818 | 0 | 4 |
+    | 08-26 | 2000 of 3115 | 0 | **0** | 2000 | 0 | 15 |
+
+  - **08-28 reads exactly 11 games lost, matching the hand count of scoreless
+    finals (12 finals, 1 scored). The cap is now attributable from the payload.**
+  - **08-27's 644 skipped ROWS is EXACTLY the `finals_level: 644` that
+    `mlb-final-zero-placeholder` measured before its fix.** The placeholders did
+    not vanish, they moved from one counter to the other — an independent
+    cross-check that this counter catches precisely the population that fix
+    stopped mis-labelling, and that the two changes compose rather than overlap.
+  - **08-26 (the healthy date) reads 0 lost / 15 indexed**, so the counter does
+    not fire on a good day and this is not a constant offset.
+- Blocked by: none for the code. Reading (a) needs a refresh-worker deploy plus
+  a past-date artifact rebuild; it must RIDE ALONG on another lane's deploy
+  rather than firing one — a diagnostic counter does not justify a worker
+  reboot or an in-flight board build.
+
+### READINGS TAKEN FOR ANOTHER LANE — `mlb-final-zero-placeholder` `[2026-08-29 ~15:2xZ]`
+That lane's block asks, verbatim, "VERIFICATION OWED ON WHOEVER'S DEPLOY LANDS
+— please take this reading". I was in the payload already, so here it is.
+Single fetch per date, same instant, `/api/board/book-grid?sport=mlb&date=…`:
+
+| date | artifact generated | `finals_seen` | `finals_level` | `games_with_outcome` |
+|---|---|---|---|---|
+| 08-26 | 2026-08-28T03:48:26Z | 3115 | 0 | 15 |
+| 08-27 | 2026-08-29T04:45:59Z | 818 | **0** (was 644) | 4 |
+| 08-28 | 2026-08-29T15:26:46Z | 196 | 0 | 1 |
+
+- **08-27 half: DISCHARGED, PASS.** `finals_level` fell **644 -> 0** on an
+  artifact regenerated at 04:45:59Z, i.e. AFTER the 04:39:08Z refresh-worker
+  deploy (`dep-da964qqjnfac73cqb0ag`, `3e2cbd0b`) that carried `eca7e81b`.
+  `games_with_outcome` stayed **4**, which that lane predicted in advance and
+  labelled EXPECTED. The fix is live and behaves as specified.
+- **08-26 half: NOT DISCHARGED — DO NOT BANK IT.** It reads 15, but its
+  artifact was generated **2026-08-28T03:48:26Z**, which PREDATES the deploy,
+  so it was never rebuilt under the fix. 15 is a pre-fix number and is
+  therefore no evidence about over-suppression. The over-suppression check is
+  still owed and needs 08-26 REBUILT. (`learnings.md` "Test the fix's
+  predicate, not its deploy state" / "presence is not reachability".)
+- **`live_gameline_accuracy` is ABSENT, NOT `null` — that criterion is
+  UNMEASURABLE ON THIS ENDPOINT.** `book_grid_artifact.py:398` writes the key
+  into the artifact, but `syndicate/blueprints/intelligence.py` contains ZERO
+  references to it, so the route never passes it through and the key is not in
+  the served payload at all. A `.get()` returning `None` here means "key
+  absent", which is exactly the reading that lane recorded as "still null" on
+  2026-08-28. That was never a signal about the recorder. Whoever closes that
+  lane must read the field where it actually lives (the artifact on
+  refresh-worker) or serve it first.
+
+### ncaaf-no-orders — OPEN — opened 2026-08-29 — session 7b278ebe-b1fa-4ea4-9648-834fb63961b7
+- Goal: name the FIRST stage in the NCAAF chain that is zero, with a production
+  number at that stage and at the stage before it. NCAAF is emphatically on the
+  board (`BOARD_OVERVIEW_READY` 2026-08-29 `ncaaf:g=51`; `INTEL_TRACE`
+  `by_sport ncaaf: 213` of 606 scored candidates) and yet **0 NCAAF rows exist
+  in the execution ledger across 2026-08-24..08-29 — 1,207 rows, every one
+  mlb/wnba/nfl/soccer.** Measured via `/api/portfolio/paper?date=`, whose
+  `bet_status.rows` carry `sport`.
+- Files: `scripts/generate_smartsim2_ncaaf_projections.py`
+- Reads but does NOT claim (the parser turns any path inside a `- Files:` block
+  into a CLAIM, so these are deliberately kept out of it): the portfolio commit
+  module is held by `venue-join-refusal-visibility` and the refresh-worker
+  entrypoint by `exchange-markets-api-integration`. Both are READ-ONLY to this
+  lane; if a fix needs either, surface the conflict first.
+- Hypothesis: **the NCAAF season-projection artifact has not rebuilt since
+  2026-08-26 because every rebuild dies on CFBD `HTTP 429`, so NCAAF rows carry
+  no model probability and are refused `no_model_edge_pct` before sizing.**
+  Supporting, not yet decisive: `SEASON_PROJECTION_LAUNCHING sport=ncaaf` fires
+  every few minutes with `reason=artifact_stale` and a MONOTONICALLY GROWING
+  `age_seconds` (228,608 -> 238,496 over 2h45m on 08-29), each launch ending in
+  `urllib.error.HTTPError: HTTP Error 429: Too Many Requests` at
+  `generate_smartsim2_ncaaf_projections.py:66 (_cfbd_get)` via
+  `load_ppa_ratings:179` <- `load_ppa_ratings_asof:271` — the prior-season
+  fallback. Today's plan refuses `no_model_edge_pct: 843` of `rows_in: 1291`,
+  and `sim_coverage.rows_without_sim_edge` is **exactly 843**, so that refusal
+  IS the no-sim-edge population.
+- **THIS IS A RE-OCCURRENCE, NOT A DISCOVERY.** `learnings.md` 2026-08-27
+  ("FORBIDDEN: inferring that a scheduled job SUCCEEDS from an age that sits at
+  one interval") records four NCAAF projection runs 21:21:37-21:23:31Z dying on
+  the same `HTTP 429` in the same function. That entry fixed the INSTRUMENT
+  (age is stamped by the launcher, not by success) and left the 429 itself
+  unaddressed. Two days later the artifact is 2.76 days stale.
+- Falsification test: the hypothesis is WRONG if NCAAF rows are absent from
+  `rows_in` altogether (filtered upstream of sizing — a venue/board-join
+  problem, not a model problem), or if NCAAF rows are present WITH a
+  `model_edge_pct` and refused for some other reason. Either result moves this
+  lane to a different stage and the 429 becomes a real but separate defect.
+  Decisive read: per-sport breakdown of the plan's candidate rows, not the
+  by-market counts the endpoint currently serves.
+- Verification: a named stage with a production count on both sides of it.
+  Diagnostic only — no fix, no deploy, until the stage is named.
+- **RESULT 2026-08-29 — STAGE NAMED, AND MY HYPOTHESIS IS FALSIFIED. NOTHING IS
+  BROKEN: NCAAF IS WITHHELD FROM SIZING ON PURPOSE.**
+  Decisive read, production, `/api/board/layer2-shortlist?date=2026-08-29&limit=2000`
+  (the default `limit=200` shows only 2 NCAAF rows and would have misled; the
+  plan sizes over the full `cards_present=1291`, which matches the plan's
+  `rows_in`):
+
+      ncaaf candidate rows            90   (h2h 3, spreads 3, totals 84)
+      ...carrying `model_edge_pct`     0   <- the zero stage
+      mlb  307/400   soccer 121/400   wnba 20/400   (for contrast)
+
+  All 90 are therefore refused `no_model_edge_pct` at
+  `shared/portfolio_commit.py:210` before Kelly, so 0 sized -> 0 orders -> 0
+  ledger rows. That matches the 6-day ledger census exactly.
+  The 90 split: **40 carry no `projection` at all; 50 carry one whose
+  `edge_vs_market_pct` is NULL**, each with an explicit
+  `edge_unavailable_reason` — 44 totals *"totals are 1.67x over-dispersed
+  against the market and were never scored against the close"*, 6 margin
+  *"margin model loses to the closing line by 3.563 points of MAE over 2233
+  games (t=17.2)"*.
+  Source: `syndicate/features/football/pick_gate.py` `_SERVING_REGISTRY` —
+  `("ncaaf","spread")`, `("ncaaf","moneyline")` and `("ncaaf","total")` are all
+  `servable=False`, measured 2026-08-19, 2023 SP+ -> 2024 games, clean
+  out-of-sample (`graded_leak_status {'clean': 2236}`). Its docstring is
+  explicit that DEFAULT IS DENY and that generation/display continue so the
+  measurement that lifts the gate can still be taken.
+- **EXONERATED: the CFBD 429 loop is NOT the cause.** The suppression reasons
+  are STATIC verdicts about measured model skill (n=2233, t=17.2) and about
+  totals never having been scored at all — a fresh artifact would carry the
+  same two strings. So `no_model_edge_pct` would still be 90/90 with the
+  projections rebuilt. I recorded the 429 as the hypothesis before testing it
+  and it does not survive; saying so here rather than letting the strong
+  supporting numbers stand in for a cause. `learnings.md` 2026-08-29 already
+  FORBIDS naming a cause from a mechanism visible without showing it is the
+  operative one — this is that rule firing on me.
+- **STILL REAL, AND SEPARATE — logged so it does not get closed with this lane:**
+  the NCAAF season-projection artifact has not rebuilt since **2026-08-26T16:16
+  CDT** (every served `projection.generated_at` is that date) because every
+  relaunch dies on `urllib.error.HTTPError: HTTP Error 429` at
+  `generate_smartsim2_ncaaf_projections.py:66 (_cfbd_get)` via
+  `load_ppa_ratings:179` <- `load_ppa_ratings_asof:271`. `artifact_stale` then
+  refires within minutes, so the worker retries ~30x in 2h45m and the CFBD
+  quota is spent on a call that cannot succeed. `age_seconds` grew 228,608 ->
+  238,496 over that window. **This is a RE-OCCURRENCE**: `learnings.md`
+  2026-08-27 records the same 429 in the same function; that entry fixed the
+  age-as-liveness INSTRUMENT and left the 429 itself alone. Consequence today
+  is bounded (projections are 3 days old and gated out of sizing anyway), but
+  it will bite whenever the gate lifts. Not fixed here — no lane holds
+  `scripts/run_refresh_worker.py` for the backoff, and the user asked for a
+  diagnosis.
+- Blocked by: none
+
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
