@@ -37812,3 +37812,47 @@ So the two surfaces are now cleanly separated by evidence, not by reasoning.
 **STILL OWED: refresh-worker.** HELD by OPEN lane
 `venue-join-refusal-visibility` — a LIVE claim, not forced. Deploy `95c4fb12`
 there when it frees; the shortlist number is the verification.
+
+---
+
+## 2026-08-29 14:04 CT — `95c4fb12` on refresh-worker — **LAYER 2 JOIN CONFIRMED**
+
+**verify: MET, and only once the pool was actually rebuilt.**
+
+```
+written_at 2026-08-29T19:03:08Z   (POST-FIX; worker took 95c4fb12 at 18:42:34Z)
+ncaaf  92 rows, 49 carry game_state      was 96 rows / 0 / 0
+mlb 400/400   wnba 374/374   soccer 400/400   nfl 18/18
+```
+
+**By kickoff date, which is the reading that matters:**
+
+```
+2026-08-29    28 rows    28 with state    ALL
+2026-08-30     6 rows     6 with state    ALL
+2026-09-03    20 rows     2 with state    partial
+2026-09-04    38 rows    13 with state    partial
+```
+
+**Every row for a game today or tomorrow carries state.** Before the fix it was
+zero on every date, so coverage is strictly better everywhere and nothing
+regressed.
+
+### THE VERDICT NEARLY CAME OUT WRONG, AND THE CLOCK IS WHY
+
+The first watcher counted minutes since the worker deploy and was about to
+report `STILL ZERO`. The endpoint is a **PURE READ** — `source:
+layer2_shortlist_artifact`, built on the worker inside `_build_candidate_pool`
+— and it was serving `written_at 18:30:44Z`, **12 minutes older than the fix**.
+Elapsed time licensed nothing; only `written_at` crossing the deploy time did.
+Re-gated on `written_at` and the confirmation arrived 90 seconds later.
+
+### RESIDUAL, OBSERVED AND NOT EXPLAINED
+
+09-03 (2/20) and 09-04 (13/38) are partial. **`_MAX_GAME_STATE_DATES = 7` and
+NCAAF spans only 4 distinct dates, so the date bound does NOT explain it.** The
+likely cause is that the board cards a CURATED SUBSET (FBS-vs-FBS) while the
+shortlist carries quote rows for games outside it — the same property
+`ncaaf_week_and_card_keys_for_date`'s docstring records — but that is a
+HYPOTHESIS, not a measurement. It is pre-existing, not caused by this change,
+and it does not affect any game in play.
