@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 import json
 import re
@@ -267,125 +266,78 @@ def ncaaf_target_week(season: int) -> int | None:
 def ncaaf_week_and_card_keys_for_date(season: int, date_text: str) -> tuple[int, set[str]] | None:
     """(week, card gamePk keys) for the real NCAAF games on `date_text`.
 
-    THE NCAAF HALF OF THE #273 FIX, REWRITTEN 2026-08-29 BECAUSE THE FIRST
-    VERSION NEVER WORKED IN PRODUCTION.
+    THE NCAAF HALF OF THE #273 FIX. `_NCAAFDataProvider.games()` opened with
+    ``if context.week is None: return []``, and `build_game_chips` resolves
+    context with NO week -- so NCAAF contributed ZERO chips on every date,
+    forever. MEASURED on production: 0 chips on 09-05 and 09-12 while ESPN had
+    68 and 80 real games. Silent, because zero chips is indistinguishable from
+    no slate.
 
-    `_NCAAFDataProvider.games()` opens with a `return []` when this returns
-    None, and `build_game_chips` resolves context with NO week -- so whatever
-    this function cannot answer, NCAAF contributes ZERO chips for. Zero chips
-    is indistinguishable from "no slate", which is how this stayed invisible
-    twice.
+    DELIBERATELY NOT A COPY OF EITHER NFL RESOLVER, because NCAAF's data shape
+    differs from both and the difference was measured, not assumed:
 
-    ------------------------------------------------------------------
-    WHY THE cfbd_lines VERSION COULD NEVER HAVE WORKED
-    ------------------------------------------------------------------
+    * NCAAF cards carry a SYNTHETIC key -- ``f"{week}_{away}_{home}"`` with
+      spaces underscored (`1_North_Carolina_TCU`), built in three places in
+      cards.py. It is neither an ESPN numeric id nor an nflverse id, and the
+      card carries no date field at all, so neither NFL approach ports over.
+    * `cfbd_lines_{season}_wk{week}.json` is the bridge: it carries an
+      ESPN-compatible numeric ``id``, the ``week``, ``startDate``, and both
+      team names -- enough to reconstruct the card key AND join to ESPN.
 
-    It joined ESPN event ids -> `cfbd_lines_{season}_wk{week}.json` -> card
-    keys. That file **has no producer on any service and exists in git at no
-    SHA** -- not this session's finding but `#557`'s, already written into
-    `ncaaf/cards.py`: *"`fetch_ncaaf_market_lines.py` and `fetch_cfbd_lines.py`
-    have zero callers, and no `cfbd_lines_*.json` exists in git at any SHA."*
-    It is absent from `HOT_ARTIFACT_PATTERNS` too, so nothing can publish it
-    worker->web either.
+    So this joins ESPN event ids -> cfbd rows -> reconstructed card keys, and
+    the date is never compared to a date (same property that makes the NFL
+    preseason resolver immune to the UTC/local boundary: cfbd's ``startDate``
+    is UTC and is deliberately NOT used for matching).
 
-    So the loop over weeks 1..20 found no file, `best` stayed None, and NCAAF
-    served 0 chips on every service on every date. Measured on production
-    2026-08-29T16:5xZ, with a game visibly in progress:
-    `/api/board/game-chips?sports=ncaaf` -> **0 chips**, `source:
-    inline_artifact_stale` (i.e. web computed it inline, on current code), while
-    soccer/mlb/wnba each joined 400/400 rows. Layer 2's 82 NCAAF rows therefore
-    carried `game_state: None`, because `layer2_board` sets it only `if game:`.
+    Note the card set is a CURATED SUBSET: cfbd lists 99 week-1 games and the
+    board builds 16 cards. Measured join rate on 2026 week 1: 16/16 cards
+    resolved. So a correct result here is "the cards whose games fall on this
+    date", never "every game ESPN lists".
 
-    **The previous fix replaced an unconditional `return []` with a conditional
-    one whose condition is never true in production.** It read as fixed, and its
-    own docstring said so.
-
-    **AND THE LOCAL EVIDENCE ARGUED FOR KEEPING IT.** On a dev checkout
-    `build_game_chips` returns 8 correct live chips, because `data/ncaaf_source/`
-    holds an UNTRACKED `cfbd_lines_2026_wk*.json` mirror. `git ls-files` returns
-    0 for that glob. This is exactly the `CLAUDE.md` rule that `data/**` in git
-    is a lossy mirror and never evidence about production.
-
-    ------------------------------------------------------------------
-    WHAT THIS READS INSTEAD: THE SCHEDULE THE CARDS ARE BUILT FROM
-    ------------------------------------------------------------------
-
-    The card key is not a lookup, it is a FORMULA, and it is built from the
-    season schedule in `cards.py`:
-
-        gamePk = f"{week}_{away_team}_{home_team}".replace(" ", "_")
-
-    over `load_games_season(season)`, keeping only rows where `week` matches and
-    BOTH classifications are `fbs`. Reconstructing it from that same source with
-    that same filter is exact by construction rather than by join -- there is no
-    id to match, no name to normalise, and no second artifact that has to exist.
-    It also removes the last consumer of `cfbd_lines_*.json` from the chips path.
-
-    The FBS filter is load-bearing and is why this cannot just return every
-    schedule row for the date: the board is a curated subset (cfbd lists 99
-    week-1 games; the board builds cards for the FBS-vs-FBS ones), and a key
-    the board never built would filter every game out of the chip list.
-
-    ------------------------------------------------------------------
-    THE DATE IS COMPARED IN CENTRAL, AND THE UTC PREFIX IS A REAL BUG
-    ------------------------------------------------------------------
-
-    The old docstring avoided date comparison over a UTC-boundary worry. That
-    worry was RIGHT and a first cut of this rewrite reproduced the bug: matching
-    `startDate[:10]` returned **7** of Saturday 08-29's **8** games, silently
-    dropping MEM @ UNLV, which kicks 9pm Central and is therefore
-    `2026-08-30T02:00Z`. The board's date is Central (`central_today_iso`), so a
-    UTC prefix moves every late-evening game to the following day -- and on a
-    football Saturday the late window is the marquee one.
-
-    `central_date_from_iso` exists for precisely this and carries its own
-    measurement (WNBA, 2026-07-21). Reused rather than re-derived.
-
-    None when the schedule cannot be read or carries no FBS game on the date.
+    None if no cfbd week contains any of the date's ESPN ids.
     """
-    date_value = str(date_text or "").strip()[:10]
-    if len(date_value) != 10:
+    date_value = str(date_text or "").strip()
+    if not date_value:
         return None
     try:
-        target_day = date.fromisoformat(date_value)
-    except ValueError:
-        return None
+        from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
 
-    from syndicate.features.football.sim_engine.smartsim2.historical_truth.ncaaf_historical_loader import load_games_season
-    from syndicate.features.shared.timezone import central_date_from_iso
-
-    try:
-        schedule = load_games_season(season)
+        events = fetch_schedule_for_date("ncaaf", date_value)
     except Exception:
         return None
+    event_ids = {str(getattr(event, "event_id", "") or "").strip() for event in events}
+    event_ids.discard("")
+    if not event_ids:
+        return None
 
-    keys_by_week: dict[int, set[str]] = {}
-    for game in schedule:
-        if not isinstance(game, dict):
-            continue
-        # CENTRAL, never the UTC prefix -- see the docstring. A 9pm Central
-        # kickoff is the next UTC day, and prefix matching drops it.
-        if central_date_from_iso(game.get("startDate")) != target_day:
-            continue
-        # Same gate `_smartsim2_standalone_rows` applies before building a card.
-        if game.get("homeClassification") != "fbs" or game.get("awayClassification") != "fbs":
-            continue
-        home_team = str(game.get("homeTeam") or "").strip()
-        away_team = str(game.get("awayTeam") or "").strip()
-        if not home_team or not away_team:
+    data_root = default_ncaaf_source_root() / "data"
+    best: tuple[int, set[str]] | None = None
+    for week in range(1, 21):
+        path = data_root / f"cfbd_lines_{season}_wk{week}.json"
+        if not path.exists():
             continue
         try:
-            week = int(game.get("week"))
-        except (TypeError, ValueError):
+            with path.open("r", encoding="utf-8") as handle:
+                rows = json.load(handle)
+        except Exception:
             continue
-        keys_by_week.setdefault(week, set()).add(
-            f"{week}_{away_team}_{home_team}".replace(" ", "_")
-        )
-
-    if not keys_by_week:
-        return None
-    # A date's games belong to one week in practice; take the week carrying the
-    # most of them rather than the lowest number, so a stray cross-week fixture
-    # cannot capture the date.
-    week = max(keys_by_week, key=lambda item: (len(keys_by_week[item]), -item))
-    return week, keys_by_week[week]
+        if not isinstance(rows, list):
+            continue
+        keys: set[str] = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("id") or "").strip() not in event_ids:
+                continue
+            away = str(row.get("awayTeam") or "").strip()
+            home = str(row.get("homeTeam") or "").strip()
+            row_week = row.get("week")
+            if not away or not home or row_week is None:
+                continue
+            keys.add(f"{row_week}_{away}_{home}".replace(" ", "_"))
+        # The date's games can only belong to one cfbd week in practice; take
+        # the week that matched the most of them rather than the first file
+        # that happened to match one.
+        if keys and (best is None or len(keys) > len(best[1])):
+            best = (week, keys)
+    return best
