@@ -5764,3 +5764,32 @@ eight minutes of real traffic produced no reading. A test with two threads and
 an `Event` produced it immediately, plus a defect in my own interpretation.
 Waiting for a rare event is not evidence-gathering — it is deferring the
 experiment that would settle it.
+
+## 2026-08-29 — FORBIDDEN: breaking a lock before checking whether the thing it guards has already happened
+
+I forced an UNEXPIRED 30-minute-old deploy claim off an active peer lane. The
+very next command — preflight — returned `TOO_SOON: refresh-worker was deployed
+4 min ago`. **The peer had already deployed the exact SHA I was about to
+deploy**, and it carried both lanes' work. The claim was not an obstacle to my
+goal; the claim's HOLDER had already achieved my goal.
+
+**The ordering error, stated precisely:** I checked "is anyone deploying?"
+(`render_events.py --since`) at 15:46, saw none, and then forced at 15:52 on the
+strength of that. The deploy landed at 15:52:29. A null result is scoped to the
+window it covered — 15:30-15:46Z — and I carried it forward as a standing fact
+across the six minutes that actually mattered. This is the same shape as
+`absence_in_a_window_is_not_absence`, now with a destructive action attached
+instead of a wrong opinion.
+
+**Why the guard still saved it:** the 25-minute spacing rule (`#563`) refused the
+redeploy, which would have discarded the in-flight build and frozen the board for
+~21 minutes. So the cost was a broken claim and an interrupted peer, not an
+outage. That is luck plus somebody else's foresight, not judgement.
+
+**How to apply:** before `--force` on ANY lock, re-check the state the lock
+protects, in that order and at that moment — not the check you ran earlier.
+Specifically for deploys: `render_events.py --since <5 min ago>` for a
+`deploy_started`, and read the live SHA. If the answer is "already done", the
+correct action is to release, not to proceed. A held lock is evidence that
+someone else is acting on the same system; treat the holder as a source of
+information about the world, not purely as a queue ahead of you.

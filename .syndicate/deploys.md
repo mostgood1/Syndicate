@@ -36860,3 +36860,49 @@ slug name an NCAAF fixture on our board?
 `fh-`/`sh-` = first/second half · `ftts-<club>` = first team to score ·
 `exact-score` · `btts` · `cor-all` = corners. Same shape as the Kalshi title
 grammar: once the vocabulary is READ rather than guessed, the fix is two lines.
+
+## 2026-08-29 15:52:29Z — refresh-worker — `da2de430` — NOT MY DEPLOY, and I broke a live claim to discover that
+
+**The deploy was taken by lane `venue-join-refusal-visibility`** while holding the
+refresh-worker claim. It finished 15:52:29Z, `[refresh_worker] BOOTED` 15:53:01Z.
+Recorded here because it carries `soccer-overview-cost` work and I nearly shipped
+a second, harmful deploy of the same SHA.
+
+**BOTH LANES RIDE IT — verified BY CONTENT in `da2de430`, not by ancestry:**
+```
+  peer  cfb 8 hits · forward_date_widened 5 · cor-all 4
+  mine  _sport_branch_profile_begin 2 · soccer_read_scope 9 · _preferred_source_roots_cached 3
+```
+
+**I FORCED A LIVE CLAIM AND SHOULD NOT HAVE NEEDED TO.** On explicit user
+instruction ("this should be deployed now") I ran `acquire --force` against
+`venue-join-refusal-visibility`'s 30-minute-old, UNEXPIRED claim. Preflight then
+returned `TOO_SOON: refresh-worker was deployed 4 min ago` — **the deploy I was
+about to make had already happened.** The claim was doing exactly its job; I read
+its holder as an obstacle rather than as information.
+
+**The check that would have prevented it takes one command and I ran it in the
+wrong order:** `render_events.py --since` for a recent `deploy_started`, BEFORE
+forcing rather than after. I had even run it 6 minutes earlier, seen no deploys,
+and treated that null as durable — it was a statement about 15:30-15:46Z, and the
+deploy landed at 15:52. **An absence measured in one window is not an absence
+now.**
+
+Claim released immediately on discovery; `refresh-worker free`.
+
+**A SECOND DEPLOY WOULD HAVE BEEN ACTIVELY HARMFUL, not merely redundant:**
+`#563` — a deploy inside the 25-minute spacing throws away the build in flight
+and leaves the board frozen for the ~21 min refresh-worker takes to reach its
+first publish. The guard refused it. The guard was right and I was wrong.
+
+**verify: PENDING.** The profiler (`SYNDICATE_SPORT_OVERVIEW_PROFILE=soccer`) is
+still armed on this boot, so the reading that settles the `source_roots` cache is
+whether **`posix.lstat` leaves the top of `tottime`** — it was 5.050s of a 10.92s
+soccer branch (46%), from 1,260 `Path.resolve()` calls via
+`preferred_source_roots`. Settled sample due ~16:20Z.
+
+**ATTRIBUTION WARNING FOR WHOEVER READS THE BOARD NUMBERS NEXT:** this boot also
+carries the peer's Polymarket join fix (`elapsed_s` 291 -> 176, `matched`
+85 -> 135, re-derived independently by this lane). Any BOARD-level improvement
+here is partly theirs. The `lstat` line is not — nothing in their change touches
+path resolution.
