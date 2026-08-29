@@ -37488,3 +37488,52 @@ unusable. Second success-only filter this session. Full write-up:
 service has) but cannot ship until `_NCAAFDataProvider.games()` stops building
 the full board on the chips path. `refuse_if_compute_in_request_path` already
 exists for this and the chips path calls neither it nor its warn-only sibling.
+
+## 2026-08-29 17:28:39Z — refresh-worker — `6f475d8f` (peer's deploy) — **SOCCER 363s -> 80.5s, VERIFIED**
+
+Deploy taken by lane `venue-join-refusal-visibility`; boot 17:32:26Z. Carried 17
+commits from ~5 lanes including `05fdabd5` (this lane). My fix confirmed present
+BY CONTENT in the live SHA (`git show 6f475d8f:syndicate/features/intelligence.py
+| grep -c _normalized_market_text_cached` -> 4), not merely by ancestry.
+
+**verify: MET, and against a threshold written down before the reading.**
+
+```
+soccer hydrated OVERVIEW_SPORT bracket, cProfile OFF on both sides
+  1fbc7a62   452.97 s
+  da2de430   362.76 s
+  6f475d8f    80.50 s   (17:34:43.083 -> 17:36:03.579)      ~4.5x
+
+CONSUME_SPORT_SEGMENTS sport=soccer
+  total_s=75.78  summary_s=0.0  odds_history_s=0.37  advanced_s=0.0
+  collect_s=75.41  candidates=249
+```
+
+**`candidates=249` against 241/252 before: the same work is being produced, so
+this is not a speedup bought by doing less.** That check matters more than the
+ratio -- a join that got faster by matching fewer rows would look identical on
+the clock.
+
+**PREDICTION AND OUTCOME, recorded because this lane's record on predictions is
+0 for 8.** Stated before the reading: "well under 150s if the 48x carries;
+REFUTED if it sits in the 350-450s band". Actual 75.41s.
+
+**WHAT THE FIX WAS:** `_normalized_market_text` -- six `re.sub` calls with STRING
+patterns (238,477,602 `re._compile` entries) in a pure `str->str` function called
+39,281,743 times per soccer pass, because `_candidate_odds_history_match_score`
+is a candidates x odds-history cross product. Precompiled + `lru_cache(65536)`.
+
+**ATTRIBUTION.** 17 commits rode this boot, so BOARD-level numbers are shared.
+`collect_s` is not: the profile put `_normalized_market_text` at 713.5s cumulative
+of 901.59s `collect_candidates`, and `05fdabd5` is the only commit touching it.
+`matched` counts remain jointly attributable and `venue-join` was warned to check
+before crediting -- `_normalized_market_text` IS their join key too.
+
+**CAVEAT: one sample, 3.6 min post-boot.** Not settled. The pre-fix numbers it is
+compared against were also early-boot, so it is like-for-like, but a second
+sample should confirm.
+
+**PROFILERS DISARMED** (`SYNDICATE_CONSUME_SPORT_PROFILE=off`,
+`SYNDICATE_SPORT_OVERVIEW_PROFILE=off`, set 17:15Z, took effect on this boot).
+`CONSUME_SPORT_SEGMENTS` stays -- four `monotonic()` reads, and it is what makes
+this region permanently measurable.
