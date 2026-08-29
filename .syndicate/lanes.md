@@ -3446,7 +3446,21 @@ caaf-no-orders`). NOT
   LOST IN THE JOIN (a keying mismatch, a day of work) or NEVER PRODUCED (engine
   work under `model_engine_standard.md`, a week). No code change until it is
   decided.
-- Files: syndicate/features/shared/live_projection_join.py
+- Files: syndicate/features/shared/live_projection_join.py,
+  syndicate/features/shared/polymarket_board_join.py,
+  pipeline/portfolio_commit.py
+- CLAIM CORRECTION, 2026-08-29 ~17:0xZ CT, recorded rather than quietly fixed:
+  the last two paths were being EDITED WITHOUT A CLAIM. `venue-join-refusal-
+  visibility` was CLOSED and its claims RELEASED at ~19:10Z, and five further
+  commits went into those two files afterwards under a lane that no longer
+  held them (the wrong-game fix, the competition check, the inversion refusal,
+  the prop census, the ladder check). Nothing collided -- no OPEN lane held
+  either path -- but two sessions are live on adjacent code
+  (`Kalshi/Polymarket live game orders`, `Polymarket order submission failure`)
+  and `live-venue-order-placement` had already picked up
+  `polymarket_us_markets.py` the moment my lane released it. A peer could have
+  taken these two the same way at any point tonight. Claimed here so the
+  enforcement matches what is actually being written.
 - Hypothesis: the probabilities ARE produced and the join cannot find them.
   `[live_props] LIVE_MC_PRICED game=822770 outcomes={'priced': 82,
   'no_dist_for_player_or_stat': 36}` against `LIVE_PROJECTION_JOIN sport=mlb
@@ -3514,6 +3528,55 @@ caaf-no-orders`). NOT
   `test_a_token_SHARED_ACROSS_THE_SPORT_is_refused...` is red on
   `origin/main` and belongs to `kalshi-spread-join-sign`.
 - Blocked by: none.
+
+### live-venue-order-placement — OPEN — opened 2026-08-29 — session 69f9e24f-00e5-4e2c-8f5a-7c674d80dc2b
+- Goal: Kalshi and Polymarket can place orders against IN-PLAY game markets,
+  and a cross-venue Kalshi/Polymarket arb can be executed as two legs. ONE
+  testable outcome for the first increment: a production reading of the arb
+  scan that states, with real per-venue fee models, how many EXECUTABLE
+  two-leg opportunities exist on a live slate and their size — a number, not
+  a capability claim.
+- Files: `syndicate/features/shared/kalshi_polymarket_arb.py`,
+  `syndicate/features/shared/polymarket_us_markets.py`,
+  `pipeline/venue_odds_loop.py`,
+  `syndicate/features/shared/venue_fees.py`,
+  `scripts/probe_live_venue_arb.py`
+- NOT TAKEN — CONFLICT SURFACED, read-only to this lane (paths deliberately
+  kept out of the Files block above so the parser does not turn them into
+  claims): the Polymarket order module is claimed by OPEN lane
+  `unknown-submit-retry-provenance` (session 6475567d). The YES-leg binding
+  fix (`#595` step 3) lands there. This lane can PRODUCE the evidence that fix
+  needs (`marketSides` `long_index` persisted onto the stored slate row, in
+  `polymarket_us_markets.py`, which IS free — released by
+  `venue-join-refusal-visibility` 2026-08-29) but must hand the consuming edit
+  to that lane or get a user override. The Kalshi order module is claimed by
+  `kalshi-spread-join-sign` (OPEN, UNOWNED); the execution ledger by
+  `unknown-submit-retry-provenance`.
+- Hypothesis: the blocker on live venue placement is NOT the execution path.
+  `execute_portfolio` has no pregame gate, Kalshi already re-reads the venue's
+  CURRENT ask at submit bounded by slippage, and both venues have filled real
+  orders. The binding constraints are, in order: (1) Polymarket REFUSES every
+  moneyline today (`team_side_needs_verified_yes_leg`, live since
+  2026-08-28T15:06:23Z) and moneyline is exactly the market the arb detector
+  covers, so the arb path is blocked at the venue adapter; (2) the arb
+  detector's `DEFAULT_FEE_BUFFER = 0.04` is a placeholder, not either venue's
+  fee schedule, so no flagged opportunity is known to be executable; (3) the
+  live MODEL trails the market (`live-game-line-projection`, CLOSED 2026-08-29:
+  model-minus-market Brier positive on 8 of 9 scored dates), so a model-driven
+  live edge is a FALSE edge and must stay gated.
+- Falsification test: (1) is wrong if a Polymarket moneyline order reaches the
+  venue today without the `SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE=1` hatch.
+  (2) is wrong if a real fee model leaves the flagged-opportunity set
+  materially unchanged. (3) is wrong if a live-priced row's probability is
+  measurably different from its pregame probability AND scores better than the
+  market on a held-out slate — neither has been shown.
+- Verification: the first increment is a MEASUREMENT, not a deploy — the arb
+  scan run against a production slate, reporting executable opportunities net
+  of real fees, split pregame vs in-play. No order is placed by this session.
+  Arming live placement is the user's action, not mine.
+- Blocked by: none for the measurement. Two-leg EXECUTION is blocked by `#595`
+  step 3 (the Polymarket YES-leg binding), held by
+  `unknown-submit-retry-provenance`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
