@@ -543,37 +543,6 @@ def _classify_alignment(
         })
 
 
-def _is_corners_question(question: Any) -> bool:
-    """Is this Polymarket question the full-game corners market?
-
-    "Total Corners Taken (Reg. Time)" -- user-supplied 2026-08-28. Matched on
-    the two words that carry the meaning rather than the exact string, so
-    spacing and punctuation variants resolve, but a PERIOD variant must not:
-    a "1st Half" corners market is a different contract on the same fixture,
-    and pricing one as the other is the mistake that cost $7.08 in MLB orders
-    the same day.
-    """
-    text = " ".join(str(question or "").strip().lower().split())
-    if not text or "corner" not in text:
-        return False
-    if _has_segment_words(text):
-        return False
-    return True
-
-
-# Period words that make a market a SEGMENT contract. Checked against the
-# question text, where `_has_segment`'s slug-modifier form cannot reach.
-_SEGMENT_WORDS = (
-    "1st half", "2nd half", "first half", "second half", "1h", "2h",
-    "1st quarter", "2nd quarter", "3rd quarter", "4th quarter",
-    "1q", "2q", "3q", "4q", "period", "extra time",
-)
-
-
-def _has_segment_words(text: str) -> bool:
-    return any(word in text for word in _SEGMENT_WORDS)
-
-
 def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | None:
     """The two clubs as an UNORDERED, canonical pair -- or None if unreadable.
 
@@ -628,13 +597,32 @@ def _canonical_fixture(sport: Any, home: Any, away: Any) -> frozenset[str] | Non
 
 
 def _has_segment(modifiers: Sequence[str]) -> bool:
-    """A period/quarter/half qualifier. `1q`, `2h`, `1p`, `f5`.
+    """A period/quarter/half qualifier. `1q`, `2h`, `1p`, `f5`, `fh`, `sh`.
 
     Segment markets are refused: the board's `totals` means the FULL GAME, and
     pricing it from a first-quarter market is a different bet at a confident
     -looking number.
+
+    `fh`/`sh` ARE SOCCER HALVES AND THIS SCREEN DID NOT CATCH THEM. Measured
+    from `prop_modifier_census` 2026-08-29T04:14:58Z: the venue publishes
+    `fh-btts` (62) and `sh-btts` (62) alongside full-game `btts` (62). The old
+    pattern only matched a DIGIT-led half (`1h`, `2h`), so `fh` and `sh` fell
+    through -- and because this screen runs AFTER the market is assigned, the
+    BTTS branch had already keyed on `"btts" in modifiers`, which is true of
+    all three. 124 first- and second-half contracts were therefore admitted as
+    full-game BTTS.
+
+    That is the same error the corners note one screen up warns about and the
+    same one that cost $7.08 in MLB orders on 2026-08-28: a segment priced as
+    the full game, at a number that looks entirely reasonable. It shipped in
+    the BTTS admission earlier the same day and was invisible until the census
+    printed the venue's own vocabulary -- the token set was ASSUMED to be
+    digit-led because every previously-read sport's was.
     """
-    return any(re.fullmatch(r"(?:[1-4](?:q|h|p)|f[357])", str(m).lower()) for m in modifiers or [])
+    return any(
+        re.fullmatch(r"(?:[1-4](?:q|h|p)|f[357]|fh|sh)", str(m).lower())
+        for m in modifiers or []
+    )
 
 
 def _norm(value: Any) -> str:
@@ -868,12 +856,13 @@ def join_polymarket_to_board(
         board_market = MARKET_TYPE_TO_BOARD.get(venue_type)
         # THE PROP VOCABULARY, CENSUSED SO THE NEXT FAMILY DOES NOT NEED A GUESS.
         #
-        # `_is_corners_question` reads `row["question"]` and that field is NEVER
-        # POPULATED in the persisted slate -- 14 of 14 sampled questions were
-        # the empty string, and `/api/ops/polymarket/slate` exposes only
-        # line/orderable/outcomes/slug. So the corners route is INERT and its
-        # 221 `no_candidates` read as "the venue lists no corners", which was
-        # never measured.
+        # THIS CENSUS IS WHY CORNERS WORKS. The corners route used to key on
+        # `row["question"]`, which is NEVER POPULATED in the persisted slate --
+        # 14 of 14 sampled questions were the empty string. It was inert, and
+        # its 221 `no_candidates` read as "the venue lists no corners", which
+        # was never measured. This line measured it: `cor-all`, 434 rows. KEEP
+        # IT -- it is the standing instrument for the next unknown family, and
+        # it is the reason `fh`/`sh` were caught as unscreened halves too.
         #
         # BTTS was found because its slug carries a plain `-btts` token. This
         # counts the modifier SHAPES on every soccer PROP row so the rest of
@@ -929,56 +918,47 @@ def join_polymarket_to_board(
                 parsed.get("modifiers") or []
             ):
                 board_market = "btts"
-            elif venue_type == "SPORTS_MARKET_TYPE_PROP" and _is_corners_question(
-                row.get("question")
-            ):
-                # ---------------------------------------------------------
-                # THIS BRANCH IS INERT AND IS KEPT ONLY AS A NAMED GAP.
-                # ---------------------------------------------------------
+            elif venue_type == "SPORTS_MARKET_TYPE_PROP" and "cor" in (
+                parsed.get("modifiers") or []
+            ) and "all" in (parsed.get("modifiers") or []):
+                # CORNERS, IDENTIFIED FROM THE SLUG MODIFIER `cor-all`.
                 #
-                # It reads `row["question"]`, and that field is NEVER populated
-                # in the persisted slate -- 14 of 14 sampled questions were the
-                # empty string, and `/api/ops/polymarket/slate` exposes only
-                # line/orderable/outcomes/slug. It cannot fire.
+                # THE PREVIOUS ROUTE KEYED ON `row["question"]` AND COULD NEVER
+                # FIRE -- that field is the empty string in every persisted
+                # slate row, and `/api/ops/polymarket/slate` exposes only
+                # line/orderable/outcomes/slug. It was kept as a named gap with
+                # an explicit instruction to DELETE it if the census found no
+                # corners family, on the reasoning that 19 sampled PROP slugs
+                # showed only ftts/exact-score/btts.
                 #
-                # AND THE HOOK IT LOOKS FOR MAY NOT EXIST. 19 soccer PROP slugs
-                # sampled 2026-08-28 across every league Polymarket carries
-                # (epl, lal, bun, lg1, sea) show three families, no corners:
+                # THE CENSUS FOUND THE OPPOSITE. `prop_modifier_census`, read
+                # 2026-08-29T04:14:58Z:
                 #
-                #     ftts-<club>    first team to score
-                #     exact-score    exact scoreline
-                #     btts           both teams to score
+                #     exact-score 930 · fh-exact-score 496 · cor-all 434
+                #     · btts 62 · ftts-none 62 · ...
                 #
-                # So `no_candidates|soccer|alternate_totals_corners: 221` is
-                # plausibly HONEST -- the venue does not publish them -- rather
-                # than a keying bug.
+                # 434 corners rows -- the third-largest soccer PROP family at
+                # the venue -- against 239 `alternate_totals_corners` board
+                # rows. The 19-slug sample was not a rate; deleting on it would
+                # have removed the route to a market the venue lists 434 times
+                # and recorded "the venue does not publish corners" as fact.
                 #
-                # KEPT RATHER THAN DELETED because deleting it erases the
-                # question. `prop_modifier_census` settles it on the next
-                # deploy. IF NO CORNERS SHAPE APPEARS, DELETE this branch and
-                # `_is_corners_question`: code that looks installed and cannot
-                # fire is worse than an absence, which is the defect this lane
-                # was opened on.
-                # CORNERS, IDENTIFIED FROM THE QUESTION rather than the slug.
+                # `all` IS REQUIRED, NOT DECORATIVE. It is the full-match
+                # qualifier, and it is the only corners shape observed -- there
+                # is no bare `cor` in the census. Requiring it means a future
+                # period variant refuses rather than being priced as full-game,
+                # which is the failure `_has_segment` exists for and which the
+                # BTTS branch above shipped for `fh`/`sh` earlier today.
                 #
-                # Question supplied by the user 2026-08-28: "Total Corners Taken
-                # (Reg. Time)". BTTS one branch up is identified by its slug
-                # modifier; no corners modifier has been observed, and this
-                # module's own note says it plainly -- "a slug says which game;
-                # only the question says what the bet IS".
+                # ADMITTED INDIVIDUALLY, NEVER BY OPENING `PROP` -- the same
+                # rule BTTS was admitted under one branch up. The bucket still
+                # holds exact-score and LoL map winners, which must keep
+                # refusing.
                 #
-                # `(Reg. Time)` is REGULATION TIME, the ordinary 90 minutes, so
-                # this is the FULL-GAME corners market. That is the opposite of
-                # every other parenthetical period in this file and the reason
-                # the qualifier is matched explicitly rather than treated as a
-                # segment.
-                #
-                # THE LINE STILL COMES FROM THE SLUG, and if the slug carries
-                # none the row refuses downstream -- a total without a number
-                # would match any corners line at all, which is worse than
-                # matching none. That guard is what makes admitting this family
-                # safe while its slug shape is still unverified: the worst case
-                # is that it keeps refusing, not that it prices the wrong bet.
+                # THE LINE STILL COMES FROM THE SLUG (`_line_from_modifiers`,
+                # e.g. `cor-all-9pt5` -> 9.5). A corners total without a number
+                # would match any corners line at all, so a slug carrying none
+                # refuses downstream rather than pricing the wrong contract.
                 board_market = "alternate_totals_corners"
         if board_market is None:
             # PROP lands here -- a real market, deliberately out of scope (see

@@ -1485,40 +1485,123 @@ def test_the_OTHER_prop_families_still_refuse(monkeypatch):
         assert out["refusals"].get("market_type_not_a_game_line") == 1, (slug, out)
 
 
-def test_polymarket_CORNERS_is_admitted_from_its_QUESTION(monkeypatch):
-    """"Total Corners Taken (Reg. Time)" -- user-supplied 2026-08-28.
-
-    BTTS is identified by a slug modifier; no corners modifier has been
-    observed, so corners is read from the question. This module already says
-    why that is the right field: "a slug says which game; only the question
-    says what the bet IS".
-    """
+def _soccer_unpaired(monkeypatch):
+    """Force the alias resolvers to admit nothing, so a match can only come
+    from the code under test rather than from a lucky alias hit."""
     import syndicate.features.shared.team_aliases as aliases
     monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
     monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
 
-    markets = [{
-        "slug": "atc-soccer-ala-vil-2026-08-28-9pt5",
-        "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
-        "question": "Total Corners Taken (Reg. Time)",
-        "outcomes": '["Over","Under"]', "outcomePrices": '["0.52","0.48"]',
-    }]
-    board = [{
-        "market": "alternate_totals_corners", "side": "over", "line": 9.5,
+
+def _corners_board_row(side="over", line=9.5):
+    return {
+        "market": "alternate_totals_corners", "side": side, "line": line,
         "sport": "soccer", "selected_date": "2026-08-28",
         "home_team": "Alaves", "away_team": "Villarreal", "event_id": "e1",
-    }]
-    out = mod.join_polymarket_to_board(markets, board, selected_date="2026-08-28")
+    }
+
+
+def _prop(slug, outcomes='["Over","Under"]', prices='["0.52","0.48"]'):
+    return {
+        "slug": slug, "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+        "outcomes": outcomes, "outcomePrices": prices,
+    }
+
+
+def test_polymarket_CORNERS_is_admitted_from_its_cor_all_slug_modifier(monkeypatch):
+    """`cor-all` is the corners family, and it is 434 rows -- not absent.
+
+    The previous route keyed on `row["question"]`, which is the empty string in
+    every persisted slate row, so it could never fire. It was kept as a named
+    gap with an explicit instruction to DELETE it if the census found no
+    corners family -- 19 sampled PROP slugs had shown only ftts/exact-score/
+    btts.
+
+    `prop_modifier_census`, read 2026-08-29T04:14:58Z, found the opposite:
+
+        exact-score 930 | fh-exact-score 496 | cor-all 434 | btts 62 | ...
+
+    Deleting on that 19-slug sample would have removed the route to a market
+    the venue lists 434 times. THROUGH THE JOIN, not the helper: every corners
+    test before this one called a helper the classifier never reached.
+    """
+    _soccer_unpaired(monkeypatch)
+    out = mod.join_polymarket_to_board(
+        [_prop("atc-soccer-ala-vil-2026-08-28-cor-all-9pt5")],
+        [_corners_board_row()], selected_date="2026-08-28")
     assert out["refusals"].get("market_type_not_a_game_line") is None, out["refusals"]
     assert out["refusals"].get("board_market_not_a_game_line") is None, out["refusals"]
     assert out["matched"] == 1, out
 
 
-def test_a_SEGMENT_corners_question_still_refuses(monkeypatch):
-    """A 1st-half corners market is a different contract on the same fixture.
-    `(Reg. Time)` means the full 90 and must not be confused with a period."""
-    from syndicate.features.shared.polymarket_board_join import _is_corners_question
-    assert _is_corners_question("Total Corners Taken (Reg. Time)") is True
-    assert _is_corners_question("Total Corners Taken 1st Half") is False
-    assert _is_corners_question("Corners in the 2nd Half") is False
+def test_corners_reaches_the_join_only_when_it_is_KEYED_correctly(monkeypatch):
+    """`off != on`. The same fixture with the OLD hook present and the new one
+    absent must NOT match -- otherwise the test above passes on a row that
+    would have matched anyway, which is how the inert route survived review."""
+    _soccer_unpaired(monkeypatch)
+    row = _prop("atc-soccer-ala-vil-2026-08-28-9pt5")
+    row["question"] = "Total Corners Taken (Reg. Time)"
+    out = mod.join_polymarket_to_board(
+        [row], [_corners_board_row()], selected_date="2026-08-28")
+    assert out["matched"] == 0, out
+    assert out["refusals"].get("market_type_not_a_game_line") == 1, out["refusals"]
+
+
+def test_a_SEGMENT_corners_slug_still_refuses(monkeypatch):
+    """A first-half corners market is a different contract on the same fixture.
+    It must refuse as a SEGMENT, not be priced as the full 90."""
+    _soccer_unpaired(monkeypatch)
+    out = mod.join_polymarket_to_board(
+        [_prop("atc-soccer-ala-vil-2026-08-28-fh-cor-all-9pt5")],
+        [_corners_board_row()], selected_date="2026-08-28")
+    assert out["matched"] == 0, out
+    assert out["refusals"].get("segment_market_not_full_game") == 1, out["refusals"]
+
+
+def test_bare_cor_without_all_is_not_admitted(monkeypatch):
+    """`all` is the full-match qualifier and is REQUIRED. There is no bare
+    `cor` shape in the census, so an unrecognised corners variant must refuse
+    rather than be priced as the full game."""
+    _soccer_unpaired(monkeypatch)
+    out = mod.join_polymarket_to_board(
+        [_prop("atc-soccer-ala-vil-2026-08-28-cor-9pt5")],
+        [_corners_board_row()], selected_date="2026-08-28")
+    assert out["matched"] == 0, out
+    assert out["refusals"].get("market_type_not_a_game_line") == 1, out["refusals"]
+
+
+def test_HALF_btts_is_screened_as_a_segment(monkeypatch):
+    """REGRESSION, and it was live in production.
+
+    `_has_segment` matched only a DIGIT-led half (`1h`, `2h`), so the venue's
+    soccer tokens `fh`/`sh` fell straight through. The screen runs AFTER the
+    market is assigned, and the BTTS branch keys on `"btts" in modifiers` --
+    true of `btts`, `fh-btts` and `sh-btts` alike. The census counted 62 of
+    each half shape, so 124 half contracts were being admitted as full-game
+    BTTS: a segment priced as the full game, which is the $7.08 MLB error.
+    """
+    _soccer_unpaired(monkeypatch)
+    for slug in ("astatc-soccer-ala-vil-2026-08-28-fh-btts",
+                 "astatc-soccer-ala-vil-2026-08-28-sh-btts"):
+        out = mod.join_polymarket_to_board(
+            [_prop(slug, '["Yes","No"]', '["0.55","0.45"]')],
+            [{"market": "btts", "side": "yes", "line": None, "sport": "soccer",
+              "selected_date": "2026-08-28", "home_team": "Alaves",
+              "away_team": "Villarreal", "event_id": "e1"}],
+            selected_date="2026-08-28")
+        assert out["matched"] == 0, (slug, out)
+        assert out["refusals"].get("segment_market_not_full_game") == 1, (slug, out["refusals"])
+
+
+def test_FULL_GAME_btts_still_matches(monkeypatch):
+    """The segment screen must not take the full-game family with it -- the
+    control for the test above."""
+    _soccer_unpaired(monkeypatch)
+    out = mod.join_polymarket_to_board(
+        [_prop("astatc-soccer-ala-vil-2026-08-28-btts", '["Yes","No"]', '["0.55","0.45"]')],
+        [{"market": "btts", "side": "yes", "line": None, "sport": "soccer",
+          "selected_date": "2026-08-28", "home_team": "Alaves",
+          "away_team": "Villarreal", "event_id": "e1"}],
+        selected_date="2026-08-28")
+    assert out["matched"] == 1, out
