@@ -634,6 +634,112 @@ def _has_segment(modifiers: Sequence[str]) -> bool:
     )
 
 
+# Board markets whose match REQUIRES the line to agree. `alternate_totals_corners`
+# was missing and that was a real defect: a corners total is quoted at many rungs
+# per fixture, so without the line every rung matched the same board row and they
+# refused each other as ambiguous -- the same failure as the 3-way legs below,
+# from the opposite cause.
+_LINE_BEARING_BOARD_MARKETS = frozenset({"spreads", "totals", "alternate_totals_corners"})
+
+
+_SEGMENT_TOKEN = re.compile(r"(?:[1-4](?:q|h|p)|f[357]|fh|sh)")
+
+# The board sides that name a ROLE rather than an outcome. Only these reach the
+# subject logic below: `btts` and `totals` name their own outcome (`yes`/`no`,
+# `over`/`under`) and the literal compare in `_probability_for_side` already
+# resolves them. Routing those through a subject test would break a working
+# family to fix a broken one.
+_ROLE_SIDES = frozenset({"home", "away", "draw"})
+
+
+def _is_yes_no_market(outcomes: Any) -> bool:
+    """A binary Yes/No contract, as opposed to one naming both teams."""
+    return {_norm(name) for name, _ in (outcomes or ())} == {"yes", "no"}
+
+
+def _subject_token(parsed: Mapping[str, Any]) -> str:
+    """The slug's trailing SUBJECT -- who the Yes/No contract is ABOUT.
+
+    `atc-epl-liv-not-2026-08-29-liv` is "Liverpool win?", `-draw` is "draw?".
+    Numbers and period tokens are skipped so a subject is never read off a line
+    or a half qualifier.
+    """
+    for token in reversed(parsed.get("modifiers") or []):
+        text = str(token).strip().lower()
+        if not text or _slug_number(text) is not None or _SEGMENT_TOKEN.fullmatch(text):
+            continue
+        return text
+    return ""
+
+
+def _subject_is_side(
+    candidate: Mapping[str, Any], board_row: Mapping[str, Any], side: Any, sport: Any
+) -> bool:
+    """Is this Yes/No contract the one the board's ROLE side is asking about?
+
+    ------------------------------------------------------------------
+    WHY THIS EXISTS: soccer h2h is THREE markets, not one.
+    ------------------------------------------------------------------
+
+    Polymarket splits a 3-way into one binary per outcome, with the subject in
+    the slug. MEASURED 2026-08-29T05:16:29Z, the sample says it literally:
+
+        offered: ['liv-not@None', 'liv-not@None', 'liv-not@None', ...]
+
+    All three carry the same fixture and `line=None`, so all three passed the
+    candidate filter, and the ambiguity guard -- correctly -- refused rather
+    than picking one by iteration order: `ambiguous_polymarket_match: 186`.
+
+    The guard was never the problem. Nothing was reading the leg.
+
+    AND THE SECOND HALF, which the same fact causes: the outcomes are literally
+    `["Yes","No"]`, so `_probability_for_side` could not map a board side onto
+    them either -- "Liverpool" is not "Yes". That is
+    `side_not_an_outcome_of_this_market`. One root, two counters.
+
+    REFUSES RATHER THAN GUESSING. An unreadable subject returns False, which
+    costs a match; assigning a leg positionally would price the wrong team at a
+    confident-looking number, and this file already refuses a positional pick in
+    `_probability_for_side` and `_side_for_team` for that reason.
+    """
+    wanted = str(side or "").strip().lower()
+    subject = _subject_token(candidate.get("parsed") or {})
+    if not subject or wanted not in _ROLE_SIDES:
+        return False
+    if wanted == "draw" or subject == "draw":
+        # A draw contract can only ever be the draw leg, in either direction.
+        return wanted == "draw" and subject == "draw"
+    parsed = candidate.get("parsed") or {}
+    # The slug's OWN tri-code for that role first -- no alias table needed, and
+    # `parse_slug` already read `<away>-<home>` positionally.
+    if subject == str(parsed.get(wanted) or "").strip().lower():
+        return True
+    # THE OPPOSITE LEG IS A DEFINITIVE NO, and it is checked BEFORE the alias
+    # fallback rather than left to it. The slug names BOTH tri-codes, so
+    # `subject == parsed[other]` settles it from data already in hand -- no
+    # resolver, no table, no chance of a permissive alias answering yes.
+    #
+    # Caught by `test_soccer_THREE_WAY_picks_the_right_leg` running against a
+    # maximally permissive `teams_match` (always True): without this, `not`
+    # resolved as Liverpool's leg too and all three legs stayed ambiguous. A
+    # real alias table would have hidden that, and the guard would have been
+    # resting on the resolver being well-behaved.
+    other = "away" if wanted == "home" else "home"
+    if subject == str(parsed.get(other) or "").strip().lower():
+        return False
+    team = (board_row or {}).get(f"{wanted}_team")
+    if not str(team or "").strip():
+        return False
+    try:
+        from syndicate.features.shared.team_aliases import teams_match as alias_match
+    except Exception:  # noqa: BLE001
+        return False
+    try:
+        return bool(alias_match(sport, subject, str(team)))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _norm(value: Any) -> str:
     return "".join(ch for ch in str(value or "").lower() if ch.isalnum())
 
@@ -1226,11 +1332,25 @@ def join_polymarket_to_board(
         side = str(board_row.get("side") or "").strip()
         picked: dict[str, Any] | None = None
         for candidate in candidates:
-            if board_market in {"spreads", "totals"}:
+            if board_market in _LINE_BEARING_BOARD_MARKETS:
                 if board_line is None or candidate["line"] is None:
                     continue
                 if abs(float(candidate["line"]) - float(board_line)) > 1e-9:
                     continue
+            # THE LEG, for a venue that splits a 3-way into three binaries.
+            # Without this every leg of a soccer h2h matches the same board row
+            # and the ambiguity guard refuses all of them -- 186 rows on
+            # 2026-08-29T05:16:29Z. Only Yes/No contracts asked about a ROLE
+            # side reach this; `btts` (yes/no) and totals (over/under) name
+            # their own outcome and are untouched.
+            if (
+                str(side or "").strip().lower() in _ROLE_SIDES
+                and _is_yes_no_market(candidate["outcomes"])
+                and not _subject_is_side(
+                    candidate, board_row, side, board_row.get("sport") or sport
+                )
+            ):
+                continue
             if not _teams_match(
                 board_row, candidate["parsed"], board_row.get("sport") or sport,
                 board_fixtures.get((league, date)),
@@ -1910,6 +2030,28 @@ def _probability_for_side(
     """
     wanted = str(side or "").strip()
     if not wanted:
+        return None
+
+    # A YES/NO CONTRACT PRICES ITS SUBJECT, NOT A NAMED TEAM.
+    #
+    # Polymarket splits a soccer 3-way into three binaries whose outcomes are
+    # literally `["Yes","No"]`, so neither the literal compare nor `teams_match`
+    # below can ever place a board side on them -- "Liverpool" is not "Yes".
+    # That was `side_not_an_outcome_of_this_market`.
+    #
+    # THE SUBJECT IS RE-VERIFIED HERE rather than trusted from the candidate
+    # filter. This function's whole contract is "None if we cannot tell", and a
+    # helper that returns the Yes price on the strength of a check made
+    # somewhere else would hand a confident price to any future caller that
+    # skipped it -- the inert-route failure this lane has now hit four times.
+    if str(side or "").strip().lower() in _ROLE_SIDES and _is_yes_no_market(
+        candidate.get("outcomes")
+    ):
+        if not _subject_is_side(candidate, board_row or {}, side, sport):
+            return None
+        for name, probability in candidate.get("outcomes") or ():
+            if _norm(name) == "yes":
+                return probability
         return None
 
     # A ROLE IS NOT AN OUTCOME NAME. The board keys a moneyline side as

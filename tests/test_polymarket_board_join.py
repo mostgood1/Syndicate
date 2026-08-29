@@ -1715,3 +1715,106 @@ def test_a_repeated_club_pair_across_dates_refuses_as_AMBIGUOUS(monkeypatch):
         selected_date="2026-08-28")
     assert out["matched"] == 0, out
     assert out["refusals"].get("ambiguous_polymarket_match") == 1, out["refusals"]
+
+
+def _threeway(subject, price="0.55"):
+    """One leg of a soccer 3-way: a Yes/No binary with the subject in the slug.
+    Away is `liv`, home is `not` -- `parse_slug` reads `<away>-<home>`."""
+    return {"slug": f"atc-epl-liv-not-2026-08-29-{subject}",
+            "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_DRAWABLE_OUTCOME",
+            "outcomes": '["Yes","No"]',
+            "outcomePrices": f'["{price}","{round(1-float(price),2)}"]'}
+
+
+def _threeway_board(side):
+    return [{"market": "h2h", "side": side, "line": None, "sport": "soccer",
+             "selected_date": "2026-08-29", "home_team": "Nottingham Forest",
+             "away_team": "Liverpool", "event_id": "e1"}]
+
+
+def test_soccer_THREE_WAY_picks_the_right_leg(monkeypatch):
+    """The production failure, verbatim.
+
+    Polymarket splits a 3-way into three binaries. All three carry the same
+    fixture and `line=None`, so all three matched one board row and the
+    ambiguity guard refused every one -- `ambiguous_polymarket_match: 186` at
+    2026-08-29T05:16:29Z, sample `offered: ['liv-not@None'] x3`.
+
+    Each side must now select exactly one leg and take its YES price.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    markets = [_threeway("liv", "0.60"), _threeway("draw", "0.25"),
+               _threeway("not", "0.15")]
+    for side, expected in (("away", 0.60), ("draw", 0.25), ("home", 0.15)):
+        out = mod.join_polymarket_to_board(
+            markets, _threeway_board(side), selected_date="2026-08-29")
+        assert out["refusals"].get("ambiguous_polymarket_match") is None, (side, out["refusals"])
+        assert out["matched"] == 1, (side, out)
+        row = out["rows"][0] if out.get("rows") else None
+        if row is not None and row.get("venue_probability") is not None:
+            assert abs(float(row["venue_probability"]) - expected) < 1e-6, (side, row)
+
+
+def test_the_draw_leg_is_never_given_to_a_TEAM_side(monkeypatch):
+    """A draw contract can only be the draw leg. Handing it to home or away
+    would price 'nobody wins' as 'this team wins'."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    for side in ("home", "away"):
+        out = mod.join_polymarket_to_board(
+            [_threeway("draw")], _threeway_board(side), selected_date="2026-08-29")
+        assert out["matched"] == 0, (side, out)
+
+
+def test_an_UNREADABLE_subject_refuses_rather_than_guessing(monkeypatch):
+    """No positional fallback. A leg we cannot name must cost a match, never
+    price the wrong team."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: False)
+    monkeypatch.setattr(aliases, "soccer_fixture_clubs", lambda h, a: None)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: None)
+    out = mod.join_polymarket_to_board(
+        [_threeway("zzz")], _threeway_board("home"), selected_date="2026-08-29")
+    assert out["matched"] == 0, out
+
+
+def test_BTTS_yes_no_is_NOT_routed_through_the_subject_test(monkeypatch):
+    """`btts` is also a Yes/No contract, but its board side NAMES the outcome.
+    Routing it through the subject test would break a working family."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [{"slug": "astatc-soccer-ala-vil-2026-08-29-btts",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+          "outcomes": '["Yes","No"]', "outcomePrices": '["0.55","0.45"]'}],
+        [{"market": "btts", "side": "yes", "line": None, "sport": "soccer",
+          "selected_date": "2026-08-29", "home_team": "Alaves",
+          "away_team": "Villarreal", "event_id": "e1"}],
+        selected_date="2026-08-29")
+    assert out["matched"] == 1, out
+
+
+def test_CORNERS_rungs_no_longer_refuse_each_other_as_ambiguous(monkeypatch):
+    """`alternate_totals_corners` was absent from the line-bearing set, so every
+    rung on a fixture matched the same board row and they cancelled out."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    markets = [
+        {"slug": f"atc-soccer-ala-vil-2026-08-29-cor-all-{tok}",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+         "outcomes": '["Over","Under"]', "outcomePrices": '["0.52","0.48"]'}
+        for tok in ("8pt5", "9pt5", "10pt5")
+    ]
+    out = mod.join_polymarket_to_board(
+        markets,
+        [{"market": "alternate_totals_corners", "side": "over", "line": 9.5,
+          "sport": "soccer", "selected_date": "2026-08-29",
+          "home_team": "Alaves", "away_team": "Villarreal", "event_id": "e1"}],
+        selected_date="2026-08-29")
+    assert out["refusals"].get("ambiguous_polymarket_match") is None, out["refusals"]
+    assert out["matched"] == 1, out
