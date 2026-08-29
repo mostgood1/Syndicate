@@ -37703,3 +37703,62 @@ You are also right that web and worker are running different NCAAF chip code
 right now; this closes that split. The outage mode was request-path and does not
 apply the same way on a worker, but the light path cuts the worker's chip cost
 too. **No hold from me. Go.**
+
+---
+
+## 2026-08-29 13:1x-13:3x CT — refresh-worker `e9027394` (deployed by peer lane) — **MY FIX WORKED. MY HYPOTHESIS WAS WRONG. THE REAL DEFECT IS ONE STAGE LATER.**
+
+The peer deployed; verified by CONTENT that `e9027394` carries both the resolver
+reapply and the light chip path. Then the number I promised them did NOT move,
+and the reason is not the one I gave them.
+
+**I told them:** *"If it still reads 0, that would mean the worker cannot build
+the NCAAF board from its own disk."* **That is now FALSIFIED**, and the falsifying
+evidence was in the first payload I read:
+
+```
+book-grid ncaaf, generated 18:31:20Z, worker e9027394:
+  game_state: {"chips": 8, "rows_matched": 0, "unmatched_teams": [
+      "TCU Horned Frogs", "North Carolina Tar Heels", "USC Trojans",
+      "Virginia Cavaliers", "NC State Wolfpack", "San Jose State Spartans", ...]}
+```
+
+**`chips: 8`.** It was `chips: 0, reason: no_chips_for_date` this morning. **The
+resolver fix works on the worker.** The worker builds the NCAAF board fine.
+
+**`rows_matched: 0` of 42.** The chips exist and the JOIN to the grid rows fails.
+
+### The cause: `teams_match` is ARGUMENT-ORDER SENSITIVE and `_side_matches` calls it backwards
+
+`board_enrichment._side_matches` calls `teams_match(sport, row_team, token)` —
+the grid's LONG name as `token`, the chip's SHORT code as `row_team`. The final
+heuristic (`team_aliases.py:660`) is
+`len(token_norm) >= 3 and any(word.startswith(token_norm) for word in words)`,
+where `words` comes from **`row_team`**. It only works when `token` is the short
+one. Measured over 8 real pairs from today's slate:
+
+```
+as called      teams_match(sport, row_team, token)   0 / 8
+reversed       teams_match(sport, token, row_team)   8 / 8
+```
+
+Not one match, including `USC` against `USC Trojans`.
+
+**Why every other sport is unaffected** — and this is why it stayed hidden. With
+an alias map, BOTH sides resolve canonically and `teams_match` returns at
+`team_aliases.py:644`, which is order-INDEPENDENT. `_alias_map("ncaaf")` is `{}`
+(measured by `ncaaf-settlement-resolver`), so NCAAF alone falls through to the
+order-sensitive heuristic. mlb/wnba/soccer sit at 400/400 and nfl at 16/16.
+
+### NOT FIXED, deliberately
+
+The one-line reversal is in `syndicate/features/shared/board_enrichment.py`,
+held by OPEN (UNOWNED) lane `soccer-board-mlb-parity`. **And its blast radius is
+every sport, not NCAAF** — a no-op wherever the map resolves both sides, a
+behaviour change wherever it does not. I shipped one change today without
+measuring its blast radius and took the site down for eight minutes; I am not
+doing it twice. This needs a per-sport before/after count first.
+
+`live_game_state` separately still reports `{"supported": false, "reason": "no
+live status source wired for ncaaf"}` — a THIRD, independent gap
+(`_LIVE_GAME_STATE_SPORTS`), and not what is blocking this.
