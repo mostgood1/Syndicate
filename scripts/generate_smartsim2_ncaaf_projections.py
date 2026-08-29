@@ -38,6 +38,7 @@ from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2
 from syndicate.features.football.sim_engine.smartsim2.game_simulator import simulate_game
 from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import NCAAF_CALIBRATION_PROFILE
 from syndicate.features.football.sim_engine.smartsim2.ncaaf_calibration_profile import NCAAF_CALIBRATION_PROFILE_METADATA
+from syndicate.features.ncaaf.cfbd_backoff import call_with_retry
 from syndicate.features.ncaaf.smartsim2_projection import SmartSimNcaafProjection
 from syndicate.features.ncaaf.smartsim2_projection import write_projection_artifact
 from syndicate.features.ncaaf.sources import default_ncaaf_source_root
@@ -59,12 +60,45 @@ def _api_key() -> str:
     raise RuntimeError("Missing CFBD API key. Set CFBD_API_KEY, COLLEGEFOOTBALLDATA_API_KEY, or COLLEGE_FOOTBALL_DATA_API_KEY.")
 
 
+def _classify_cfbd_error(exc: BaseException) -> tuple[int | None, object] | None:
+    """`(status, Retry-After)` for an HTTP error, or None to re-raise as-is.
+
+    Only `HTTPError` carries a status. A bare `URLError` (DNS, connection
+    refused) deliberately falls through to None: it is not the throttle this
+    backoff exists for, and retrying it here would delay a real outage behind
+    three minutes of sleeping.
+    """
+    if isinstance(exc, urllib.error.HTTPError):
+        return getattr(exc, "code", None), (exc.headers or {}).get("Retry-After")
+    return None
+
+
 def _cfbd_get(path: str, params: dict[str, object]) -> object:
+    """One CFBD GET, retried on 429/5xx per `ncaaf/cfbd_backoff.py`.
+
+    THE 429 THAT MADE THIS NECESSARY was not on the path this script's usage
+    line advertises: week 1 has no in-season PPA, so `load_ppa_ratings_asof`
+    falls back to the PRIOR season and issues a second `/ppa/teams` call. That
+    is the one that was throttled, ~30 times over 2h45m on 2026-08-29, leaving
+    the projection artifact three days stale.
+    """
     query = "&".join(f"{key}={value}" for key, value in params.items())
     url = f"{CFBD_API_BASE}{path}?{query}"
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {_api_key()}", "User-Agent": "syndicate-smartsim2-shadow/1.0"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+
+    def _once() -> object:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    return call_with_retry(
+        _once,
+        classify=_classify_cfbd_error,
+        describe=f"GET {path}",
+        # `print`, not `logging`: `logger.info` never reaches Render's log
+        # collector, and a backoff nobody can see is indistinguishable from a
+        # hang. See CLAUDE.md.
+        log=lambda message: print(message, flush=True),
+    )
 
 
 def norm(name: str) -> str:

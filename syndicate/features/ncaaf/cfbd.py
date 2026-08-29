@@ -13,6 +13,7 @@ from typing import Any
 
 import requests
 
+from syndicate.features.ncaaf.cfbd_backoff import call_with_retry
 from syndicate.features.ncaaf.sources import coach_continuity_snapshot_path
 from syndicate.features.ncaaf.sources import player_game_stats_snapshot_path
 from syndicate.features.ncaaf.sources import player_identity_snapshot_path
@@ -42,6 +43,24 @@ def _merge_season_aware_rows(
 from syndicate.features.ncaaf.sources import returning_production_snapshot_path
 from syndicate.features.ncaaf.sources import roster_snapshot_path
 from syndicate.features.ncaaf.sources import transfer_portal_snapshot_path
+
+
+def _classify_requests_error(exc: BaseException) -> tuple[int | None, Any] | None:
+    """`(status, Retry-After)` for a `requests` HTTP error, or None to re-raise.
+
+    Reads the status off `exc.response` rather than parsing the message.
+    `ConnectionError`/`Timeout` return None deliberately -- see the matching
+    note in `scripts/generate_smartsim2_ncaaf_projections.py`: a backoff aimed
+    at a throttle must not also delay a real outage.
+    """
+    response = getattr(exc, "response", None)
+    if response is None:
+        return None
+    status = getattr(response, "status_code", None)
+    if status is None:
+        return None
+    headers = getattr(response, "headers", None) or {}
+    return status, headers.get("Retry-After")
 
 
 CFBD_API_BASE = "https://api.collegefootballdata.com"
@@ -328,10 +347,28 @@ class CfbdClient:
         )
 
     def _get_json(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
-        url = f"{self.base_url}{path}"
-        response = self.session.get(url, params=params or {}, timeout=self.timeout, headers=dict(self.session.headers))
-        response.raise_for_status()
-        return response.json()
+        """One CFBD GET, retried on 429/5xx per `cfbd_backoff.py`.
+
+        THIS CLIENT WAS NOT THE ONE OBSERVED FAILING and is fixed anyway. Ten
+        snapshot builders reach CFBD through here on the SAME API key, so they
+        share the quota with `generate_smartsim2_ncaaf_projections.py` -- and
+        leaving this side hammering a limit would spend the budget the other
+        side is now waiting for. Fixing only the call site in the traceback is
+        how the defect survives.
+        """
+
+        def _once() -> Any:
+            url = f"{self.base_url}{path}"
+            response = self.session.get(url, params=params or {}, timeout=self.timeout, headers=dict(self.session.headers))
+            response.raise_for_status()
+            return response.json()
+
+        return call_with_retry(
+            _once,
+            classify=_classify_requests_error,
+            describe=f"GET {path}",
+            log=lambda message: print(message, flush=True),
+        )
 
     def test_connection(self, *, season: int) -> dict[str, Any]:
         payload = self._get_json("/teams/fbs", params={"year": season})
