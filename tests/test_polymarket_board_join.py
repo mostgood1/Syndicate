@@ -1818,3 +1818,55 @@ def test_CORNERS_rungs_no_longer_refuse_each_other_as_ambiguous(monkeypatch):
         selected_date="2026-08-29")
     assert out["refusals"].get("ambiguous_polymarket_match") is None, out["refusals"]
     assert out["matched"] == 1, out
+
+
+def test_NCAAF_board_row_reaches_a_cfb_slug(monkeypatch):
+    """The venue files college football under `cfb`; the board stamps `ncaaf`.
+
+    PROVEN 2026-08-29 against the production slate, not inferred from a
+    truncated diagnostic list:
+
+        cfb    h2h 180 | spreads 1265 | totals 749 = 2,194 rows
+        ncaaf  nothing, under any market
+        tsc-cfb-sacst-emich-2026-08-29-total-52pt5
+
+    That slug is Sacramento State @ Eastern Michigan -- the exact fixture in the
+    production refusal sample, same date, filed under `cfb`.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [{"slug": "tsc-cfb-sacst-emich-2026-08-29-total-52pt5",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+          "outcomes": '["Over","Under"]', "outcomePrices": '["0.52","0.48"]'}],
+        [{"market": "totals", "side": "over", "line": 52.5, "sport": "ncaaf",
+          "selected_date": "2026-08-29", "home_team": "Eastern Michigan Eagles",
+          "away_team": "Sacramento State Hornets", "event_id": "e1"}],
+        selected_date="2026-08-29")
+    assert out["refusals"].get("no_polymarket_market_for_league_date_market") is None, out["refusals"]
+    assert out["matched"] == 1, out
+
+
+def test_an_UNALIASED_league_token_is_still_returned_verbatim(monkeypatch):
+    """Only `cfb` is mapped. A token we have not proven must not be bent onto
+    some sport because it looks close -- `nba`/`nhl`/`ncaab` read as zero rows
+    today because it is AUGUST, not because they are aliased."""
+    monkeypatch.setattr(mod, "_VENUE_LEAGUE_ALIASES", {"cfb": "ncaaf"})
+    assert mod._effective_league({"league": "cfb"}, None) == "ncaaf"
+    for token in ("nfl", "mlb", "wnba", "nba", "nhl"):
+        assert mod._effective_league({"league": token}, None) == token
+
+
+def test_an_aliased_token_can_never_become_a_SOCCER_competition(monkeypatch):
+    """`cfb` is not in `_NON_SOCCER_LEAGUE_TOKENS`, so without the alias guard a
+    college tri-code that happened to resolve as a club could have proven `cfb`
+    a soccer competition."""
+    monkeypatch.setattr(
+        "syndicate.features.shared.team_aliases.canonical_team",
+        lambda sport, n: "club",
+    )
+    tokens = mod.soccer_competition_tokens(
+        [{"slug": "tsc-cfb-sacst-emich-2026-08-29-total-52pt5"}]
+    )
+    assert "cfb" not in tokens, tokens

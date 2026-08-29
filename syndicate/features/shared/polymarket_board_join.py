@@ -228,6 +228,15 @@ _NON_SOCCER_LEAGUE_TOKENS = frozenset({
 })
 
 
+# Venue league token -> the sport Syndicate's board stamps. One entry, because
+# one is all that is PROVEN; see the block inside `_effective_league`.
+_VENUE_LEAGUE_ALIASES: dict[str, str] = {
+    # 2,194 venue rows vs zero under `ncaaf`, plus a named fixture match
+    # (`sacst-emich`). Measured 2026-08-29.
+    "cfb": "ncaaf",
+}
+
+
 def _effective_league(
     parsed: Mapping[str, Any], soccer_tokens: Collection[str] | None = None
 ) -> str:
@@ -258,6 +267,35 @@ def _effective_league(
     league = str(parsed.get("league") or "")
     if league == "soccer":
         return league
+    # THE VENUE'S NAME FOR A SPORT WE MODEL UNDER A DIFFERENT ONE.
+    #
+    # Applied BEFORE `_NON_SOCCER_LEAGUE_TOKENS` so the alias resolves rather
+    # than being returned verbatim as its own league.
+    #
+    # PROVEN, NOT GUESSED -- and the first evidence for it was WRONG. The
+    # `key_miss` diagnostic reports `market_indexed_under` as `sorted(...)[:4]`,
+    # and `cfb` sorts first alphabetically, so it filled the cap on every market
+    # it touched. The identical `['cfb|...']` list appeared under `wnba|totals`,
+    # where `cfb` cannot possibly be the alias. That is truncation, not
+    # attribution, and it was nearly recorded as a finding twice.
+    #
+    # What settles it, measured 2026-08-29T14:5xZ against the production slate:
+    #
+    #     cfb    h2h 180 | spreads 1265 | totals 749   = 2,194 rows
+    #     ncaaf  nothing, under any market
+    #     tsc-cfb-sacst-emich-2026-08-29-total-52pt5
+    #
+    # That last slug is Sacramento State @ Eastern Michigan -- the exact board
+    # fixture in the refusal sample, same date, filed under `cfb`. A named
+    # fixture on both sides is evidence a sorted-and-truncated list can never be.
+    #
+    # ONLY `cfb`. `nba`, `nhl`, `ncaab` and `ncaabb` also show zero venue rows
+    # today, and that is AUGUST rather than an alias -- they are out of season,
+    # so there is nothing to prove and a guessed mapping would be indistinguish
+    # -able from a working one until their season started.
+    aliased = _VENUE_LEAGUE_ALIASES.get(league)
+    if aliased is not None:
+        return aliased
 
     # A LEAGUE TOKEN WE ALREADY KNOW IS NOT SOCCER ENDS THE QUESTION HERE.
     #
@@ -389,7 +427,16 @@ def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset
         if parsed is None:
             continue
         league = str(parsed.get("league") or "")
-        if not league or league == "soccer" or league in _NON_SOCCER_LEAGUE_TOKENS:
+        if (
+            not league
+            or league == "soccer"
+            or league in _NON_SOCCER_LEAGUE_TOKENS
+            # An ALIASED token names a sport we model, so it can never be a
+            # soccer competition however its tri-codes happen to resolve. Same
+            # guarantee `_NON_SOCCER_LEAGUE_TOKENS` gives the literal names, for
+            # the tokens that reach the board under a different one.
+            or league in _VENUE_LEAGUE_ALIASES
+        ):
             continue
         if league in proven:
             continue
@@ -431,7 +478,16 @@ def soccer_competition_tokens(markets: Iterable[Mapping[str, Any]]) -> frozenset
         if parsed is None:
             continue
         league = str(parsed.get("league") or "")
-        if not league or league == "soccer" or league in _NON_SOCCER_LEAGUE_TOKENS:
+        if (
+            not league
+            or league == "soccer"
+            or league in _NON_SOCCER_LEAGUE_TOKENS
+            # An ALIASED token names a sport we model, so it can never be a
+            # soccer competition however its tri-codes happen to resolve. Same
+            # guarantee `_NON_SOCCER_LEAGUE_TOKENS` gives the literal names, for
+            # the tokens that reach the board under a different one.
+            or league in _VENUE_LEAGUE_ALIASES
+        ):
             continue
         if league in proven:
             continue
