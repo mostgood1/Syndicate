@@ -6249,3 +6249,64 @@ was editing.**
   I gave the user ("worker-side probe, or publish the slate first") was wrong
   in both branches, and had they picked either we would have built something
   that already existed.
+
+
+## 2026-08-29 — FORBIDDEN: judging whether `main` is green from a session worktree OR the primary tree. Neither is a control, and they lie in OPPOSITE directions
+
+- **What we believed:** that running a test file in my own worktree told me
+  whether the branch was healthy. I reported to the user that a deploy carried
+  "9 red tests, 1 of them a new regression," named the regression, identified
+  which lane owned it, and messaged that lane about it.
+- **What was actually true:** every one of those 9 was an artifact of my
+  worktree. `scripts/session_worktree.py` excludes `data/` BY DEFAULT (34,689 of
+  37,745 tracked files) and CLAUDE.md instructs every session to work that way.
+  `_teams_match` -> `soccer_fixture_clubs` -> `all_teams` -> `rosters_path()`
+  reads `rosters_<season>.csv` from `data/`; absent it,
+  `_soccer_alias_by_league()` returns **0 leagues** and every soccer pair
+  resolves to None. Same SHA, `data/`-complete tree: **144 passed**.
+- **And the mirror-image failure, same evening, same two files.** Asked to fix
+  the primary tree's failures, I found it 3 commits stale AND carrying 141
+  uncommitted entries from other sessions -- including `venue_quote_fanin.py`
+  (+107), mid-change, adding a game-scoped candidate key. Six tests asserting
+  exact `_candidate_keys` lists were red there while `origin/main` was **145
+  passed**. So the primary tree showed red main did not have, minutes after my
+  worktree had shown red main did not have.
+- **The general form:** a sparse worktree under-reports what code can see; a
+  shared tree over-reports, because it contains work nobody has committed. Both
+  produce confident, specific, WRONG failure names -- with assertion text, line
+  numbers, and a plausible owner. Nothing about the output says "environment".
+
+**How to apply:**
+- **Only a clean worktree at `origin/main` answers "is main green."** `git
+  worktree add --detach /c/tmp/<x> origin/main`, run, remove. It costs ~40s.
+- Before attributing ANY test failure to a commit, reproduce it there. If you
+  cannot, the failure is yours, not the code's.
+- **Never "fix" a red in the primary tree without checking `git status` on the
+  module under test first.** The six here were another lane's in-flight
+  cross-game-bleed fix; reverting the file to make them green would have deleted
+  a live-money safety change. A shared tree showing red actively invites that.
+- A peer's "I cannot reproduce" outranks your own reproduction when your
+  environment is the non-standard one. `[session 5163d9b3 pushed back twice and
+  was right both times.]`
+- Corollary they supplied and it is the same rule one level up: **checks that
+  agree are only independent if they differ in the decisive variable.** They
+  reported "three configurations, all green"; all three carried `data/`. Their
+  three checks were one check.
+
+## 2026-08-29 — a null from an instrument you have not calibrated is not evidence. RUN THE CONTROL
+
+- **What we believed:** that `venue_balance_history.json` being absent from
+  `/api/ops/keyvalue/usage?top_keys=100` and from `sweep-preview` meant the new
+  write was not happening.
+- **What was actually true:** both endpoints ALSO report `venue_balances.json`
+  absent -- a file written every worker tick and rendered on `/portfolio`. The
+  smallest key `usage` lists is **196,768 bytes**; both files are a few hundred.
+  The instrument cannot see artifacts of that size at all.
+- **How to apply:** before reading a null as absence, ask what makes this
+  instrument read PRESENT, and check it against something you already know is
+  there. One extra call. Without it the honest answer ("not observable by any
+  route available to me") is indistinguishable from a real finding -- and the
+  real finding here would have been a false alarm about my own fix.
+- Same family as [[feedback-instrument-blindness]] and
+  [[feedback-absence-in-a-window-is-not-absence]]; this is the third instance,
+  so the control is now the rule rather than the diligence.

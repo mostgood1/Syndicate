@@ -3490,43 +3490,28 @@ caaf-no-orders`). NOT
      live opportunities safe to place.
 - Blocked by: none
 
-### unknown-submit-retry-provenance — CLOSED 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411
-- Goal: a retry after an operator `not_placed` resolution must PRESERVE the
-  prior attempt's provenance; Polymarket fills must record the fee the venue
-  actually charged; and the unknown-submit probe must consult the balance
-  reading that can settle it. **ALL THREE BUILT AND TESTED; LANDED AS
-  `98e103e1`. NOT YET DEPLOYED — the worker still runs the old code.**
-- Files: `syndicate/features/shared/execution_ledger.py`,
-  `syndicate/features/shared/polymarket_us_orders.py`,
-  `syndicate/features/shared/venue_balances.py`,
-  `syndicate/features/shared/venue_settlement.py`, and their tests.
+### unknown-submit-retry-provenance — CLOSED-VERIFIED 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411
+- Goal: a retry after an operator `not_placed` must PRESERVE the prior attempt's
+  provenance; Polymarket fills must record the fee actually charged; the
+  unknown-submit probe must consult the balance reading that can settle it.
+- Status: **ALL THREE SHIPPED. `219d79ca` LIVE on live-odds-worker 22:48:23Z.**
+  Two of three READ ON PRODUCTION (`prior_attempts` on 2 real retry rows; 5
+  Polymarket rows carrying a fee, 0 of 13 before). Third is PARTIAL — see owed.
+- Files: `execution_ledger.py`, `polymarket_us_orders.py`, `venue_balances.py`,
+  `venue_settlement.py` + their tests. ALL CLAIMS RELEASED.
   NOT taken: `blueprints/intelligence.py`, `templates/portfolio.html`
-  (claimed by `open-bet-live-status`). Surfacing `balance_evidence` in the
-  banner is a FOLLOW-UP for whoever holds those.
-- What was measured (full write-up:
-  `.syndicate/findings_2026-08-29_unknown_submit_retry_provenance.md`):
-  order `5c53789d4d21d05fc501b05d` ($1.84, `tsc-mls-nyr-phi-2026-08-29-3pt5`)
-  took `http_503 {"code":14}` at 21:06:37 with no order id. Polymarket
-  `buyingPower` read 96.05 at 21:05:56 / 21:12:47 / 21:18:46 / 21:25:09 and
-  fell to 94.15 only after the retry filled. **Flat across the failed submit:
-  submit #1 never reached the venue, there is no orphan, and the operator's
-  `not_placed` was correct.** The account moved $1.8977 against a $1.8377
-  fill — $0.06 of fee recorded nowhere.
-- Verification: `321 passed` across `test_execution_ledger`,
-  `test_venue_settlement`, `test_venue_balances`,
-  `test_polymarket_fill_price_side`, `test_portfolio_operator_resolutions`,
-  `test_portfolio_live_page`, `test_execution_ledger_concurrent_writers`.
-  Includes a REACHABILITY test for each fix (`record_venue_balances` actually
-  appends; `_LEAN_FIELDS` actually persists `prior_attempts`) because a
-  carried field dropped by a projection looks exactly like a working one.
-  **STILL OWED: a production reading** — a Polymarket fill carrying non-null
-  `fees_dollars`, and an `UNKNOWN_ORDER_PROBE` line carrying
-  `balance_settled`. Neither can exist until this is deployed.
-- Also fixed: two tests red on `origin/main` before this lane
-  (`test_venue_balances` stubs missing the `venue` kwarg).
-- Left alone, NOT mine: `test_polymarket_side_vocabulary` ::
-  `test_a_token_SHARED_ACROSS_THE_SPORT_is_refused...` is red on
-  `origin/main` and belongs to `kalshi-spread-join-sign`.
+  (`open-bet-live-status`).
+- Commits: `98e103e1` `1795f3dc` `fb749d97` `9f898acf`.
+- OWED, and it cannot be forced: `balance_evidence`/`balance_settled` in
+  `UNKNOWN_ORDER_PROBE` has NEVER been observed — the probe only fires when an
+  unknown submit exists and there are none. The balance-history WRITE is
+  believed-not-verified (call site ran, 0 `HISTORY_WRITE_FAILED`, stored rows
+  never read back). **Next genuine 503 on Polymarket is the test.**
+- FOLLOW-UP for whoever holds `intelligence.py`/`portfolio.html`: surface
+  `balance_evidence` in the unknown-submit banner, and correct the stale claim
+  at `intelligence.py:3969` that no venue read can settle these — `/account/balances` can.
+- Evidence: `.syndicate/log/2026-08-29.md`, `.syndicate/deploys.md`,
+  `.syndicate/findings_2026-08-29_unknown_submit_retry_provenance.md`.
 - Blocked by: none.
 
 ### live-venue-order-placement — OPEN — opened 2026-08-29 — session 69f9e24f-00e5-4e2c-8f5a-7c674d80dc2b — **FEE MODEL SHIPPED AND VERIFIED AGAINST 18/18 REAL FILLS (`be6dc14b`, pushed, NOT deployed).** Kalshi trades IN-PLAY with real liquidity (14 markets, vol24 904k, 1c spreads, prices moving between reads). Kalshi publishes `fee_type`/`fee_multiplier` per series and **every MLB game/total/spread/K series is HALF RATE**; rounding is ceil-to-4dp (18/18) not to the cent (9/18). **`DEFAULT_FEE_BUFFER = 0.04` sat ABOVE MLB break-even at EVERY price (3.38c even money -> 0.39c at 0.97), so the detector was structurally incapable of reporting a profitable MLB pair.** In-play games sit at the TAILS (5 of 7 with a side >= 0.90, break-even 0.52-1.11c vs a 1c spread) — the live-market opportunity is FEE GEOMETRY, not model edge. **THE LANE'S TESTABLE OUTCOME IS STILL OWED** and cannot be produced from a local session: `api.polymarket.us` needs credentials and the slate is not published to web (`count: 0`), so the cross-venue number needs a WORKER-SIDE probe. `#595` evidence half handed off (`handoff_2026-08-29_polymarket_yes_leg_evidence.md`).

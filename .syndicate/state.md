@@ -128,11 +128,44 @@ against a 1c venue spread; pregame moneylines sit at 0.40-0.60 where break-even
 is ~3.3c. This says nothing about model edge — `live-game-line-projection`
 (CLOSED 2026-08-29) measured the live model TRAILING the market on 8 of 9 dates.
 
-**Polymarket's fee remains UNMEASURED**: `fees_dollars` null on **13 of 13**
-filled orders, `feeCoefficient` units never observed. `venue_fees` REFUSES and
-callers must opt into a pessimistic bound by name. **At even money ~2/3 of the
-modelled pair cost is the number we cannot read — measuring it is worth more
-than any further precision on Kalshi's.**
+**Polymarket's fee is NOW READ FROM THE VENUE** `[2026-08-29 22:50Z, VERIFIED
+on production]`. It was never absent: `venue_order_view` hardcoded
+`fees_dollars: None` while `commissionNotionalTotalCollected` sat in every
+`ORDERS_READ`. Mapped in `98e103e1`, live on live-odds-worker as `219d79ca`.
+Five reconciled fills, `commission / fill_cost`:
+
+    tsc-mls-nyr-phi-3pt5  0.06/1.8377  3.26%   tsc-mlb-mia-wsh-7pt5  0.05/1.5980  3.12%
+    tsc-mls-min-orl-3pt5  0.07/2.1199  3.30%   tsc-mlb-sd-tb-7pt5    0.28/8.7890  3.19%
+    tsc-sea-juv-par-2pt5  0.04/1.0500  3.81%
+
+`C60JWBG0WKDK`'s $0.06 independently reproduces the figure derived that
+afternoon from a balance delta ($1.8977 debit vs $1.8377 fill) -- two routes,
+one number.
+
+**DO NOT FIT A RATE ON THIS YET**, and the reason is the same discriminating-
+variable rule Kalshi's fit turned on: `commissionsBasisPoints` and
+`makerCommissionsBasisPoints` are `'0'` on ALL 8 reads -- uniformly zero, so
+they corroborate nothing and the rate rests on the collected total alone. Only
+**5 of 73** filled Polymarket rows carry a fee (reconciliation re-reads open
+candidates; the 68 settled earlier are NOT backfilled), all from one evening.
+
+**AN UNKNOWN SUBMIT CAN BE SETTLED BY THE ACCOUNT, NOT ONLY BY A HUMAN**
+`[2026-08-29, VERIFIED]`. `venue_settlement` and `execution_ledger` both said
+nothing this system can call settles a submit lost to a 5xx -- true of the ORDER
+routes, never true of the account. MEASURED on the $1.84 case: `buyingPower`
+96.05 at 21:05:56 / 21:12:47 / 21:18:46 / 21:25:09, then 94.15 only after the
+retry filled -- flat across the failed submit, so it never reached the venue.
+`venue_balances` now keeps a bounded trail and the probe does that arithmetic.
+**Its output (`balance_evidence`/`balance_settled`) has NOT been observed in
+production -- the probe only fires when an unknown submit exists, and there are
+none. Next genuine 503 is the test.**
+
+**A RETRY USED TO DELETE THE PROVENANCE THAT MADE IT RISKY** `[2026-08-29,
+FIXED + VERIFIED]`. `not_placed` is the only thing that sets `rejected`, and
+`rejected` is the only thing that makes `record_order` pop the row -- so the pop
+deleted `operator_resolution`/`pre_resolution_*`, the exact fields
+`resolve_unknown_submit` promises to preserve. Now carried as `prior_attempts`;
+read on two real retry rows at 22:50:4x.
 
 **THE CROSS-VENUE NUMBER IS MEASURED, AND IT IS ZERO — BUT NOT FOR A FEE
 REASON** `[2026-08-29 ~22:1xZ]`. `/api/board/layer2-shortlist` carries BOTH
