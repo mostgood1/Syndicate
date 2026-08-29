@@ -149,6 +149,19 @@ they corroborate nothing and the rate rests on the collected total alone. Only
 **5 of 73** filled Polymarket rows carry a fee (reconciliation re-reads open
 candidates; the 68 settled earlier are NOT backfilled), all from one evening.
 
+**AND THE BANNER NOW SAYS SO** `[2026-08-29 23:24Z, web `3371ad96`]`. The
+unknown-submit block on `/portfolio` used to state that only a person opening
+the venue's own screen could settle one of these; that sentence and "nothing
+here can confirm or deny that a position exists" are DELETED, and a test fails
+if either returns. Each row now renders the account's own answer, or states why
+it could not (`confounded` / `no_bracketing_reading` / `unreadable`). The page
+calls the SAME `_balance_evidence` the worker probe uses, through
+`venue_settlement.balance_evidence_for_unknown_submits` — one implementation, a
+test asserts the two agree, and it makes NO venue call (arithmetic over the
+stamped balance trail plus ledger rows web already holds).
+**NOT YET SEEN RENDERING: zero unknown submits exist, so the block is absent
+entirely. Verified by tests and by the deployed tree object, not by a live read.**
+
 **AN UNKNOWN SUBMIT CAN BE SETTLED BY THE ACCOUNT, NOT ONLY BY A HUMAN**
 `[2026-08-29, VERIFIED]`. `venue_settlement` and `execution_ledger` both said
 nothing this system can call settles a submit lost to a 5xx -- true of the ORDER

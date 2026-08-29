@@ -3438,8 +3438,7 @@ deploys — the exact deploy-churn mechanism this lane had just documented.
 
 ## 2026-08-23 — RULE: editing a fast-appended shared ledger from a stale local copy manufactures a fake conflict
 
-- **Twice in one session, on `.syndicate/deploys.md`.** I read the file, appended a new section with `Edit`, committed, pushed, opened a PR — and GitHub reported "Pull Request has merge conflicts" on a PURE APPEND with nothing else touched. The cause both times: `main` had moved between my read and my push (this repo runs many parallel sessions appending to the same few ledger files), so my commit's diff was computed against a base that was already behind. A rebase onto `origin/main` then showed the "conflict" for what it was — an EMPTY `<<<<<<< HEAD` block, meaning nothing textually competed; git was just confused by a diff shaped as "replace the whole stale tail" instead of "append after the current tail."
-- *(evidence in `learnings_evidence.md`)*
+- **Twice in one session, on `.syndicate/deploys.md`.** I read the file, appended a new section with `Edit`, committed, pushed, opened a PR — and GitHub reported "Pull Request has merge conflicts" on a PURE APPEND with nothing else touched. The cause both times: `main` had moved between my read and my push (this repo runs many parallel sessions appending to the same few ledger files), so my commit's diff was computed against a base that was already behind. A rebase onto `origin/main` then showed the "conflict" for what it was — an EMPTY `- *(evidence in `learnings_evidence.md`)*
 
 ## 2026-08-23 — RULE: an empty tmp dir for `SYNDICATE_NFL_SOURCE_ROOT` can still resolve to the REAL checkout, and a test can write into it
 
@@ -6405,3 +6404,33 @@ was editing.**
   pass. Had the off != on test not been written, a green suite and a
   confident finding would have recorded "Kalshi now names its game" while the
   cross-game bleed continued on every Kalshi quote in production.
+
+## 2026-08-29 — FORBIDDEN: verifying a DELETION by grepping for the deleted string, without first proving the container renders
+
+- **What we believed:** that grepping the served `/portfolio` HTML for the two
+  sentences I had just removed, and finding them ABSENT, confirmed the edit was
+  live. I reported it that way, with a tidy `ABSENT ok` next to each.
+- **What was actually true:** there are ZERO unknown submits right now, so the
+  entire `{% if L.unknown_submits %}` block does not render. Both sentences
+  would have read ABSENT against the OLD template too. The check could not fail,
+  which means it could not confirm anything either.
+- **The shape, and it is the general one:** a test for the absence of X is only
+  evidence once you know the page WOULD have shown X. Deletion checks are
+  uniquely prone to this because the passing result and the vacuous result are
+  byte-identical. Two other strings on the same page misled the same way in the
+  same minute -- `500 ` matched `drift=+0.0500`, and `live-unknown-list` matched
+  the CSS class DEFINITION in `<style>` rather than a rendered banner.
+
+**How to apply:**
+- **Verify a deployment by the ARTEFACT, not by the rendered absence:**
+  `git show <deployed-sha>:<path>` for the content, plus the service's own
+  reported SHA. That pair cannot be vacuous.
+- If you must assert on rendered output, assert something POSITIVE that only the
+  new code emits, and make the fixture actually reach that branch. The unit
+  tests here did exactly that (`assert "Balance unchanged across the submit" in
+  body`) and were the only real evidence the template works.
+- State plainly when a path is covered by tests but has never run in
+  production. "Deployed" and "exercised" are different claims.
+- Third instance in one session of the same family, so it is now a rule rather
+  than diligence: see [[feedback-instrument-blindness]] and the entry above on
+  running the control before reading a null as absence.
