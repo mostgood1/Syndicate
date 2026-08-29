@@ -1087,6 +1087,7 @@ def join_polymarket_to_board(
     key_miss_seen: set[str] = set()
     line_source: dict[str, int] = {}
     line_gap_samples: list[dict[str, Any]] = []
+    side_gap_samples: list[dict[str, Any]] = []
     forward_date_widened: dict[str, int] = {}
     alignment_samples: list[dict[str, Any]] = []
     orientation_flip_samples: list[dict[str, Any]] = []
@@ -1701,6 +1702,39 @@ def join_polymarket_to_board(
         if probability is None:
             # The measured failure of the game-line join, kept as its own
             # counter: the market matched but we cannot place the SIDE.
+            #
+            # WHAT THE VENUE ACTUALLY OFFERED, because the count alone cannot
+            # be acted on. This counter went 30 -> 93 on 2026-08-29T17:49:25Z
+            # the moment the corners line fix let 454 corners rungs reach this
+            # line: they pair the fixture AND the rung, then fail here. The
+            # loss moved downstream rather than closing.
+            #
+            # THE OBVIOUS READING IS THAT CORNERS ARE `["Yes","No"]` while the
+            # board asks `over`/`under`, and mapping over->Yes would close it.
+            # THAT IS NOT SHIPPED, DELIBERATELY: if the polarity is reversed --
+            # if `Yes` is the UNDER -- the map prices the opposite side of a
+            # real bet at a confident-looking number. This file already refuses
+            # a positional pick in `_probability_for_side` and `_side_for_team`
+            # for exactly that reason, and a wrong-side fill is the single most
+            # expensive mistake available here ($7.08 in MLB, 2026-08-28).
+            #
+            # So this samples the OUTCOME NAMES beside the wanted side and the
+            # slug. One reading names the polarity from data instead of from
+            # the shape of the words, and then the map is safe to write.
+            if len(side_gap_samples) < 8:
+                _sg_key = f"{board_market}|{side}"
+                if not any(g.get("key") == _sg_key for g in side_gap_samples):
+                    side_gap_samples.append({
+                        "key": _sg_key,
+                        "wanted_side": str(side),
+                        "board_line": board_line,
+                        "slug": str((picked.get("row") or {}).get("slug") or "")[:56],
+                        # The names AND their prices: polarity is readable from
+                        # the price when the board's own line is known.
+                        "outcomes": [
+                            (str(n)[:14], p) for n, p in (picked.get("outcomes") or [])
+                        ][:4],
+                    })
             refuse("side_not_an_outcome_of_this_market")
             continue
 
@@ -1761,6 +1795,9 @@ def join_polymarket_to_board(
         # carries no number at all; `|DISAGREE` is the one that would matter.
         "line_source": dict(sorted(line_source.items(), key=lambda kv: -kv[1])),
         "line_gap_samples": line_gap_samples,
+        # WHY A MATCHED MARKET COULD NOT PLACE THE SIDE -- outcome names and
+        # prices beside the side we wanted. Names the polarity from data.
+        "side_gap_samples": side_gap_samples,
         # HOW MANY BOARD ROWS ONLY FOUND CANDIDATES BY LOOKING FORWARD. This is
         # the reachability reading for the slate/fixture date split: zero with
         # soccer still refusing means the diagnosis was wrong, and a non-zero

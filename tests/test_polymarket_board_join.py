@@ -1944,3 +1944,55 @@ def test_a_wrong_row_line_still_refuses(monkeypatch):
         [_corners_row("atc-soccer-ray-bar-2026-08-29-cor-all", line_field=8.5)],
         _corners_want(13.5), selected_date="2026-08-29")
     assert out["matched"] == 0, out
+
+
+def test_a_side_that_cannot_be_placed_reports_the_OUTCOME_NAMES(monkeypatch):
+    """`side_not_an_outcome_of_this_market` went 30 -> 93 the moment the corners
+    line fix let 454 rungs reach it. The count alone cannot be acted on: it
+    reads identically for "the venue names its outcomes Yes/No" and "we picked
+    the wrong market".
+
+    The sample carries the outcome NAMES and PRICES beside the wanted side, so
+    the polarity is readable from data rather than guessed from the words.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [{"slug": "atc-soccer-ray-bar-2026-08-29-cor-all",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+          "line": 13.5,
+          "outcomes": '["Yes","No"]', "outcomePrices": '["0.52","0.48"]'}],
+        [{"market": "alternate_totals_corners", "side": "over", "line": 13.5,
+          "sport": "soccer", "selected_date": "2026-08-29",
+          "home_team": "Barcelona", "away_team": "Rayo Vallecano",
+          "event_id": "e1"}],
+        selected_date="2026-08-29")
+    assert out["matched"] == 0, out
+    assert out["refusals"].get("side_not_an_outcome_of_this_market") == 1, out["refusals"]
+    gaps = out["side_gap_samples"]
+    assert gaps, "a side that cannot be placed must report what the venue offered"
+    g = gaps[0]
+    assert g["wanted_side"] == "over"
+    assert g["board_line"] == 13.5
+    assert [n for n, _ in g["outcomes"]] == ["Yes", "No"], g
+
+
+def test_an_over_under_market_still_places_its_side(monkeypatch):
+    """The control: a market that DOES name over/under must keep matching, so
+    the census above is reporting a real gap rather than a broken path."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [{"slug": "atc-soccer-ray-bar-2026-08-29-cor-all",
+          "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+          "line": 13.5,
+          "outcomes": '["Over","Under"]', "outcomePrices": '["0.52","0.48"]'}],
+        [{"market": "alternate_totals_corners", "side": "over", "line": 13.5,
+          "sport": "soccer", "selected_date": "2026-08-29",
+          "home_team": "Barcelona", "away_team": "Rayo Vallecano",
+          "event_id": "e1"}],
+        selected_date="2026-08-29")
+    assert out["matched"] == 1, out
+    assert not out["side_gap_samples"], out["side_gap_samples"]

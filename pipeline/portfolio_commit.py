@@ -251,7 +251,10 @@ def _polymarket_price_resolver(selected_date: str | None):
             # own `line` field is populated and the fallback fires; `|none` with
             # a slug sample names a family that carries no number anywhere.
             f" line_source={joined.get('line_source')}"
-            f" line_gaps={joined.get('line_gap_samples')}",
+            f" line_gaps={joined.get('line_gap_samples')}"
+            # Outcome names beside the side we wanted, for the matched markets
+            # whose side could not be placed.
+            f" side_gaps={joined.get('side_gap_samples')}",
             flush=True,
         )
     # WHICH COMPETITIONS THE BOARD CAN REACH, AND WHICH IT CANNOT. Printed
