@@ -5793,3 +5793,50 @@ Specifically for deploys: `render_events.py --since <5 min ago>` for a
 correct action is to release, not to proceed. A held lock is evidence that
 someone else is acting on the same system; treat the holder as a source of
 information about the world, not purely as a queue ahead of you.
+
+## 2026-08-29 FORBIDDEN: letting a shipped "cannot be tested until X" caveat stand without putting the test on X's date
+
+`ncaaf-board-surfaces` shipped the NCAAF live-lens state path on 2026-08-27 and
+wrote, accurately: *"The live lens's state PATH is tested; its DATA cannot be
+until a game is in progress."* The first game of the season kicked off
+2026-08-29 16:00Z. At 16:05Z, with the game visibly in progress, production
+served `Games 51 | Live 0 | Final 0 | Pregame 51`. `ncaaf/cards.py` had **zero
+occurrences of `live_state`** — the key `_shared_game_state` derives
+`live`/`final`/`period`/`clock` from. The live branch was **unreachable by
+construction**, and had been for the whole preseason.
+
+**An honest caveat is not a mitigation. It is a defect with a date on it**, and
+the date arrives when nobody is looking at that surface.
+
+Compounding it: `test_smartsim_live_lens_runtime_uses_runtime_cards` had been
+FAILING since 08-27, asserting the pre-08-27 constant eyebrow. **A test that is
+already red cannot report that something else broke.** It was the one test over
+this exact code path.
+
+**How to apply:** when a trigger condition arrives (opening day, first live
+game, first scheduled run), grep the ledger for THAT CONDITION and re-test what
+named it, before starting anything new. And never let a red test sit in the area
+you are relying on the suite to watch.
+
+## 2026-08-29 FORBIDDEN: reading `check_lane_invariants` PASSING as proof that lane claims are sane
+
+`lane-guard` blocked an NCAAF edit during the first game of the season,
+attributing `syndicate/features/ncaaf/cards.py` to the UNOWNED lane
+`soccer-board-mlb-parity`. That lane's `- Files:` block spelled a bare
+`cards.py` twice — **inside a note stating the claim had been REMOVED**. The
+guard matches on path SUFFIX (`rel.endswith("/" + f)`, `lane-guard.py:420`), and
+a bare filename has no directory to disambiguate it, so that one token claimed
+**mlb, nba, nfl, ncaaf and wnba** cards builders simultaneously.
+
+`check_lane_invariants` reported `INVARIANTS HOLD` throughout — it verifies that
+each claim has exactly ONE holder, and this claim did. The two tools disagree
+about what a claim IS, and only one of them gates edits.
+
+Same basename-collision class `state.md` already records for `live_lens` across
+eight sports.
+
+**How to apply:** a disclaimer next to a path does not unclaim it — only
+deleting the path text does. Never write a bare filename inside a `- Files:`
+block, prose or not; always the full repo-relative path. And when the guard
+blocks you on a file you believe is unclaimed, read the guard's matching rule
+before assuming the ledger is right.

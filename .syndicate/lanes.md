@@ -3353,7 +3353,7 @@ caaf-no-orders`). NOT
 - Blocked by: none
 
 
-### ncaaf-live-lens-state — OPEN — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
+### ncaaf-live-lens-state — **CLOSED-VERIFIED 2026-08-29** — live lens reported `Live 1` against ESPN `in=1` in one script run (16:30:28Z, re-confirmed 16:39:49Z); 3 web deploys `061d5b2b`/`efc41b52`/`4822f8e4`, claim released. **`Final` still UNOBSERVED in production** — read it when a game ends. Narrative: `log/2026-08-29.md` — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
 - Goal: the NCAAF live lens reports a game that is ACTUALLY IN PROGRESS as live.
   Measured 2026-08-29T16:0xZ, with UNC @ TCU at `state=in` / 1st Quarter on
   ESPN, production `/ncaaf/api/live-lens` served
