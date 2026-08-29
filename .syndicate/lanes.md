@@ -2769,6 +2769,48 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   **WHILE 08-26 STAYS AT `games_with_outcome: 15`**. The second half is the one
   that matters — it is what catches the fix over-suppressing. `games_with_outcome`
   for 08-27 staying at **4** is EXPECTED and is not a failure.
+- **THE OWED READING IS DISCHARGED — AND NOT FROM 08-26. `[2026-08-29 ~17:0xZ]`
+  Taken by `finals-silent-score-drop` (session 4ca1d41c) at the user's request.**
+  **PASS: the fix suppressed EXACTLY the placeholders and preserved EXACTLY the
+  real scores.** Read off 08-27, whose artifact regenerated `2026-08-29T04:45:59Z`
+  — AFTER the 04:39:08Z refresh-worker deploy — and which is provably post-fix
+  because `finals_level` is now **0**, down from the 644 this lane measured.
+
+  | 08-27 game | pre-fix (this lane) | post-fix rebuild |
+  |---|---|---|
+  | COL @ WSH | 7-1 real | **KEPT** 1 @ 7 |
+  | BAL @ STL | 7-5 real | **KEPT** 5 @ 7 |
+  | HOU @ NYY | 1-5 real | **KEPT** 5 @ 1 |
+  | AZ @ SF | 6-1 real | **KEPT** 1 @ 6 |
+  | KC @ TOR | `final 0-0` placeholder | **NULLED** |
+  | MIL @ NYM | `final 0-0` placeholder | **NULLED** |
+  | LAD @ ATL | `final 0-0` placeholder | **NULLED** |
+
+  The three nulled games are EXACTLY the three this lane named as `final 0-0`
+  (KC@TOR, MIL@NYM, LAD@ATL) and the four kept are EXACTLY the four it named as
+  real. Zero false positives, zero false negatives. This is STRICTLY BETTER than
+  the 08-26 reading the lane asked for, because on 08-27 the branch was ACTIVE
+  — 08-26 would only have shown it not firing.
+
+- **DO NOT REBUILD 08-26 TO GET THE ORIGINAL READING. It cannot produce the
+  signal, and it would destroy data.**
+  1. **It cannot fire.** The branch needs `zero_zero and is_final and not
+     is_live`. Measured on the served 08-26 grid: **0 games are 0-0** (15 of 15
+     carry real scores). Over-suppression there is structurally impossible, so a
+     rebuild could only ever show absence of an impossible event.
+  2. **It would very likely destroy the artifact.** A past-date rebuild re-reads
+     the CURRENT scoreboard, which sheds yesterday's scores as it rolls —
+     measured this session: 08-28 decayed **4 games -> 1** across two rebuilds
+     NINE MINUTES apart, and 08-27 now stands at 4 real of 15 played. 08-26 is
+     the ONLY complete date left (15/15) and the largest row in
+     `reports/live_gameline_accuracy/history.jsonl`. `write_book_grid_artifact`
+     overwrites; there is no undo.
+  3. So the rebuild trades the single best date in the accuracy history for a
+     reading that is already in hand from a date where the branch actually ran.
+  Worker-side there is also no automatic path: `run_refresh_worker.py` builds
+  only `selected_date` + `previous_date` (+ forward days), so 08-26 would need a
+  FORCED rebuild — a deliberate act, not a tick.
+
 - **web is NOT in the path and needs nothing** — it already runs all three
   (live `90ed748b`). Measured 2026-08-28 15:09:55Z: web served a FRESHLY
   generated 08-27 payload while carrying `eca7e81b`, and `finals_level` was
@@ -3398,6 +3440,41 @@ caaf-no-orders`). NOT
   post-deploy latency gate passes (`/` and `/ncaaf/cards` under 2x baseline).
 - Blocked by: none
 
+
+### live-prob-producer-reader-gap — OPEN — opened 2026-08-29 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
+- Goal: decide, with ONE measurement, whether MLB live prop probabilities are
+  LOST IN THE JOIN (a keying mismatch, a day of work) or NEVER PRODUCED (engine
+  work under `model_engine_standard.md`, a week). No code change until it is
+  decided.
+- Files: syndicate/features/shared/live_projection_join.py
+- Hypothesis: the probabilities ARE produced and the join cannot find them.
+  `[live_props] LIVE_MC_PRICED game=822770 outcomes={'priced': 82,
+  'no_dist_for_player_or_stat': 36}` against `LIVE_PROJECTION_JOIN sport=mlb
+  projected=598 prob_withheld=598`. A producer writing 82 priced outcomes and a
+  reader reporting none is the exact shape of the five defects the
+  `venue-join-refusal-visibility` lane closed today (`refusals` vs `reasons`,
+  corners on `question`, `fh`/`sh`, `row["line"]`, `"line"` absent from `_KEEP`).
+- Falsification test: read ONE `LIVE_MC_PRICED` payload and the key
+  `live_projection_join` looks it up under. If the priced outcomes carry a
+  probability the join simply misses -> KEYING. If the priced rows carry a MEAN
+  and no probability -> ENGINE, hypothesis dead, and the lane re-scopes.
+- Verification: the answer is stated with the two keys printed side by side,
+  not inferred from counts.
+- PRIOR EVIDENCE THAT CONSTRAINS THE OUTCOME, both to be surfaced before any
+  edge work:
+  1. A live-edge attempt was SHIPPED AND BACKED OUT. It priced `modelProbOver`,
+     which measured bit-identical to the PREGAME probability on 24 of 28 rows;
+     three props whose over had ALREADY WON still read 0.659/0.655/0.745,
+     producing +36.5%/+32.3%/+15.8%. Mean |edge| on decided rows 28.2% vs 12.0%
+     on undecided — fabricated numbers twice the size of real ones, sorting
+     straight to the top of an edge-ranked board. Documented in
+     `live_projection_join.py`; treat as a standing decision.
+  2. `live-game-line-projection` (CLOSED 2026-08-29) measured the live model
+     TRAILING the market: `priceable_only` model minus market Brier positive on
+     8 of 9 scored dates. **A live edge computed against a model that trails the
+     market is a false edge.** Even a clean keying fix does not by itself make
+     live opportunities safe to place.
+- Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
