@@ -3151,7 +3151,10 @@ Single fetch per date, same instant, `/api/board/book-grid?sport=mlb&date=…`:
   in the execution ledger across 2026-08-24..08-29 — 1,207 rows, every one
   mlb/wnba/nfl/soccer.** Measured via `/api/portfolio/paper?date=`, whose
   `bet_status.rows` carry `sport`.
-- Files: `scripts/generate_smartsim2_ncaaf_projections.py`
+- Files: `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `syndicate/features/ncaaf/cfbd.py`,
+  `syndicate/features/ncaaf/cfbd_backoff.py`,
+  `tests/test_cfbd_backoff.py`
 - Reads but does NOT claim (the parser turns any path inside a `- Files:` block
   into a CLAIM, so these are deliberately kept out of it): the portfolio commit
   module is held by `venue-join-refusal-visibility` and the refresh-worker
@@ -3234,6 +3237,83 @@ Single fetch per date, same instant, `/api/board/book-grid?sport=mlb&date=…`:
   it will bite whenever the gate lifts. Not fixed here — no lane holds
   `scripts/run_refresh_worker.py` for the backoff, and the user asked for a
   diagnosis.
+- **FIX COMMITTED 2026-08-29 — `ba8bf640` on `session/ncaaf-no-orders`, in this
+  session's own worktree (`C:	mp\syndicate-sessions
+caaf-no-orders`). NOT
+  pushed, NOT deployed, no deploy claim taken.**
+  New `syndicate/features/ncaaf/cfbd_backoff.py`: the policy as a pure,
+  network-free function plus a transport-agnostic executor. Retries 429/5xx
+  ONLY, 5 attempts, exponential-with-full-jitter from 2s, `Retry-After`
+  honoured but capped, hard **180s total-sleep ceiling** — the worker does not
+  `wait()` on this subprocess, so an over-patient backoff would hold
+  `_season_projection_process_still_running` and become an outage in the
+  launcher. Non-429 4xx and connection errors are deliberately NOT retried, and
+  an exception the classifier does not recognise re-raises at once rather than
+  being swallowed into the loop and reported as a rate limit. The final failure
+  re-raises the ORIGINAL exception so the traceback still names the real status
+  — a wrapper would have hidden the very `HTTP Error 429 ... in _cfbd_get` line
+  that made this diagnosable.
+  **Wired into BOTH entry points, not only the one in the traceback:**
+  `_cfbd_get` (urllib) and `CfbdClient._get_json` (requests, reached by ten
+  snapshot builders). They share one API key and therefore one quota.
+- **VERIFICATION — `off != on` PROVEN, not asserted.** 15 tests pass. With the
+  `call_with_retry` wrapper removed from both call sites the run is
+  **2 failed, 13 passed** — exactly the two reachability tests, which drive the
+  real `_cfbd_get`/`_get_json` rather than the policy. No regression:
+  `-k "ncaaf or cfbd"` is **55F/539P before, 55F/554P after**; the 55 are
+  `data/`-absent in the session worktree (worktrees exclude the mirror by
+  default) and fail identically without my changes. **This is bench evidence
+  only — nothing is deployed, so nothing here is a production reading.**
+- **HALF THE DEFECT IS STILL OPEN, AND IT IS THE HALF THAT MAKES THE LOOP HOT.**
+  `run_refresh_worker.py::_season_projection_should_launch` consults the
+  last-LAUNCH backstop **only when the artifact is MISSING**; the STALE branch
+  returns `artifact_stale` unconditionally, so a run that fails leaves the
+  artifact exactly as stale as it found it and the next tick relaunches. That
+  is `#389`'s own bug surviving in its sibling branch — same shape, same file,
+  and `#389`'s docstring already argues the case. **`lane-guard` BLOCKED the
+  edit: `scripts/run_refresh_worker.py` is claimed by OPEN lane
+  `exchange-markets-api-integration`.** That lane is idle/GOAL COMPLETE and its
+  claim on this file is described in its own `Files` line as **NARROW** — "one
+  small, additive, opt-in-only boot-probe hook" — a different region entirely.
+  Not edited across lanes. Needs the holder's release or a user override.
+  Without it, the backoff reduces each doomed run's damage but not the ~30
+  relaunches per 2h45m.
+- Blocked by: none
+
+
+### ncaaf-live-lens-state — OPEN — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
+- Goal: the NCAAF live lens reports a game that is ACTUALLY IN PROGRESS as live.
+  Measured 2026-08-29T16:0xZ, with UNC @ TCU at `state=in` / 1st Quarter on
+  ESPN, production `/ncaaf/api/live-lens` served
+  `Games 51 | Live 0 | Final 0 | Pregame 51`.
+- Files: NEW `syndicate/features/ncaaf/live_game_state.py`,
+  `syndicate/features/ncaaf/cards.py`, `syndicate/features/ncaaf/live_lens.py`,
+  NEW `tests/test_ncaaf_live_game_state.py`
+- Reads but does NOT claim (held by OPEN lane `ncaaf-settlement-resolver`):
+  `scripts/poll_ncaaf_live_state.py`, `syndicate/features/shared/ncaaf_team_registry.py`,
+  `syndicate/features/shared/bet_status_ncaaf.py`. READ-ONLY to this lane — if the
+  fix needs a change inside any of them, surface the conflict first.
+- Hypothesis: **this is not a timing artifact and not a lens defect.**
+  `_shared_game_state` (`publication_adapter.py:32`) derives `live`/`final`/
+  `period`/`clock` from `game["live_state"]`, and `ncaaf/cards.py` contains
+  **zero occurrences of `live_state`** — so the field is absent on every NCAAF
+  game and the lens's state branch is unreachable by construction. The state
+  PATH shipped 2026-08-27 (`ncaaf-board-surfaces`) and was explicitly recorded
+  there as "its DATA cannot be [tested] until a game is in progress". A game is
+  now in progress and the data is not there.
+- Supporting production read, same instant as the ESPN read: on the served
+  UNC @ TCU card, `shared_game_state` = `{live: false, final: false,
+  period: null, clock: "", startTime: null, status: "Week 1"}`. `status` is the
+  constant `"Week 1"`, not a state — so the eyebrow shows `kickoff_label` for
+  all 51 cards and will keep doing so after games go final.
+- Falsification test: the hypothesis is WRONG if `live_state` reaches the card
+  from somewhere other than `cards.py` (a publisher or artifact hop I have not
+  read), or if the served payload starts reporting live without a code change
+  — either would mean the feed exists and something narrower drops it.
+- Verification: production `/ncaaf/api/live-lens` reports `Live >= 1` while
+  ESPN reports a game `state=in` in the SAME script run, plus `Final` becoming
+  non-zero after a game ends. A unit test is NOT sufficient here — that is
+  exactly what passed while this shipped inert.
 - Blocked by: none
 
 
