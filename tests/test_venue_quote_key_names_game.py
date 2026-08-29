@@ -395,3 +395,108 @@ def test_the_kalshi_blob_is_never_split_locally():
     from syndicate.features.shared.kalshi_catalogue import event_blob_from_ticker
 
     assert event_blob_from_ticker("KXMLBTOTAL-26AUG251840BOSMIA-7") == "BOSMIA"
+
+
+# ---------------------------------------------------------------------------
+# `#603`, OddsAPI half. Its shard key already names the fixture -- no schedule.
+# ---------------------------------------------------------------------------
+
+
+def _oddsapi_shard(*keys):
+    return {
+        "fetched_at": "2026-08-29T21:00:00Z",
+        "markets": {k: {"last_odds": -110, "last_line": 7.5} for k in keys},
+    }
+
+
+_OA_TOTALS_A = (
+    "event_id=e1|home_team=Atlanta Braves|away_team=Colorado Rockies"
+    "|market=totals|side=over|line=7.5|book=draftkings"
+)
+_OA_TOTALS_B = (
+    "event_id=e2|home_team=Tampa Bay Rays|away_team=San Diego Padres"
+    "|market=totals|side=over|line=7.5|book=draftkings"
+)
+
+
+def test_two_oddsapi_totals_on_the_same_line_no_longer_collide(monkeypatch):
+    """THE DEFECT, on the source with the most volume.
+
+    Two different games, same market/side/line. Before `#603` both emitted
+    `mlb|totals|over|7.5` and the pool -- one entry per key -- kept whichever
+    came last, so one game's price answered both.
+    """
+    import syndicate.features.shared.odds_control_plane as ocp
+
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    # Patched on the SOURCE module, not on `adapters`: the import is inside
+    # `oddsapi_outcome`, so it resolves through `odds_control_plane` at call
+    # time and a name bound on the adapter module would never be consulted.
+    monkeypatch.setattr(
+        ocp, "load_odds_history_payload_for_sport",
+        lambda sport, date: _oddsapi_shard(_OA_TOTALS_A, _OA_TOTALS_B),
+    )
+
+    quotes = adapters.oddsapi_outcome("mlb", "2026-08-29").quotes
+    keys = {q.key for q in quotes}
+
+    assert len(quotes) == 2, quotes
+    assert len(keys) == 2, f"two different games still share one key: {keys}"
+    assert all("|@" in k for k in keys), keys
+    assert {q.game for q in quotes} == {
+        "atlanta braves+colorado rockies",
+        "san diego padres+tampa bay rays",
+    }
+
+
+def test_an_oddsapi_row_whose_clubs_do_not_resolve_keys_bare(monkeypatch):
+    """off != on, via the only lever this source has.
+
+    OddsAPI needs no schedule -- its key carries the clubs -- so the ON/OFF
+    contrast is a resolvable pair against an unresolvable one. An unresolvable
+    club must fall back to the bare key, never to a raw-string token that only
+    one half of the join would recognise.
+    """
+    import syndicate.features.shared.odds_control_plane as ocp
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    unresolvable = (
+        "event_id=e9|home_team=Not A Real Club|away_team=Also Not Real"
+        "|market=totals|side=over|line=7.5|book=draftkings"
+    )
+    monkeypatch.setattr(
+        ocp, "load_odds_history_payload_for_sport",
+        lambda sport, date: _oddsapi_shard(unresolvable),
+    )
+
+    quotes = adapters.oddsapi_outcome("mlb", "2026-08-29").quotes
+
+    assert quotes, "an unresolvable club must not drop the quote"
+    assert all("|@" not in q.key for q in quotes), [q.key for q in quotes]
+    assert all(q.game is None for q in quotes)
+
+
+def test_oddsapi_h2h_is_left_unqualified(monkeypatch):
+    """Deliberate, and for a different reason than Kalshi's.
+
+    The board's h2h rows offer a role key AND club/token keys that this source
+    cannot produce. Qualifying only OddsAPI's half of that pair would break the
+    match rather than sharpen it.
+    """
+    import syndicate.features.shared.odds_control_plane as ocp
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    h2h = (
+        "event_id=e1|home_team=Atlanta Braves|away_team=Colorado Rockies"
+        "|market=h2h|side=home|book=draftkings"
+    )
+    monkeypatch.setattr(
+        ocp, "load_odds_history_payload_for_sport",
+        lambda sport, date: _oddsapi_shard(h2h),
+    )
+
+    quotes = adapters.oddsapi_outcome("mlb", "2026-08-29").quotes
+
+    assert quotes
+    assert all("|@" not in q.key for q in quotes), [q.key for q in quotes]

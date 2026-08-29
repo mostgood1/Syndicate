@@ -1183,9 +1183,31 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
         line = _oddsapi_quote_line(market, parsed_key, entry)
         if line is None and not str(market).strip().lower().startswith("h2h"):
             no_line += 1
+        # `#603`, OddsAPI half -- and this source needs NO schedule at all.
+        #
+        # The shard's own key names the fixture outright:
+        #   event_id=..|home_team=..|away_team=..|market=h2h|bookmaker=fanduel
+        # `_parse_odds_history_key` is a generic `k=v` splitter, so both club
+        # names are already in `parsed_key`. Kalshi needed `match_event_blob`
+        # against a schedule because its ticker carries a run-together blob;
+        # here the identity is handed over directly and was simply unused.
+        #
+        # SAME SCOPE AS THE OTHER TWO: role-keyed markets only. h2h keys by
+        # ROLE here too (`side` comes from the shard), but a moneyline's side
+        # is `home`/`away`/`Draw` rather than a club, so h2h on THIS source has
+        # no implicit game -- and is deliberately still excluded, because the
+        # board's h2h rows carry club and token keys that this source cannot
+        # produce, and qualifying only one half of that pair would break the
+        # match rather than sharpen it. Totals and spreads are where both
+        # halves key by role and the collision is real.
+        oa_game = (
+            game_token(sport, parsed_key.get("home_team"), parsed_key.get("away_team"))
+            if str(market).strip().lower() in _ROLE_KEYED_MARKETS
+            else None
+        )
         quotes.append(
             Quote(
-                key=quote_key(sport, market, side, line),
+                key=quote_key(sport, market, side, line, oa_game),
                 source="oddsapi",
                 sport=str(sport or ""),
                 market=str(market),
@@ -1194,6 +1216,9 @@ def oddsapi_outcome(sport: str, selected_date: str) -> SourceOutcome:
                 american=int(american),
                 line=line,
                 fetched_at=fetched_at,
+                # Carried even when the key is bare, so the fan-in can refuse a
+                # bare-key match that lands on the wrong fixture.
+                game=oa_game,
             )
         )
     dropped = []

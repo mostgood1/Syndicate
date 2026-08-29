@@ -502,3 +502,76 @@ downstream consumers (`layer2_board`, `book_grid`, `clv_join`,
   has simply not been converted.
 - **Doubleheaders**, unchanged and NOT closed: `BOSMIA` appears in both halves'
   tickers and `game_token` collapses to one string either way.
+
+---
+
+# `#603`, ODDSAPI HALF — and it needed no schedule at all `[2026-08-30 ~00:0xZ]`
+
+**LANDED ON `main`, NOT DEPLOYED.** All three quote sources now name the game.
+
+## The identity was already in hand and simply unused
+
+Where Kalshi hid its fixture in a run-together ticker blob and needed
+`match_event_blob` against a schedule, the OddsAPI shard's own key names both
+clubs outright:
+
+    event_id=..|home_team=..|away_team=..|market=totals|side=over|line=7.5|book=..
+
+`_parse_odds_history_key` is a generic `k=v` splitter, so `home_team` and
+`away_team` were already sitting in `parsed_key` on every iteration. The
+conversion is one call to `game_token`. **No schedule, no resolver, no
+threading** — the hardest source turned out to be the easiest.
+
+## Scope, and why h2h is excluded for a DIFFERENT reason here
+
+Role-keyed markets only, same as the other two. But the reasoning differs and
+that is worth stating, because "same scope" hides it:
+
+- **Kalshi/Polymarket h2h** is excluded because its side IS the club, so the
+  key already names the fixture implicitly.
+- **OddsAPI h2h** keys by ROLE (`home`/`away`/`Draw`), so it has no implicit
+  game. It is still excluded — because the BOARD's h2h rows offer a role key
+  plus club and token keys that this source cannot produce, and qualifying only
+  one half of that pair would break the match rather than sharpen it.
+
+Same decision, two different justifications. Totals and spreads are the only
+family where both halves key by role and the collision is real.
+
+## Verification
+
+`325 passed` across eight venue/join/catalogue suites, `138 passed` downstream.
+3 new tests, including the discriminating pair the Kalshi half taught me to
+write:
+
+- two totals on the SAME line for DIFFERENT games now produce two distinct
+  keys and two quotes (before: one key, one surviving pool entry, one price
+  answering both);
+- an unresolvable club falls back to a BARE key, never a raw-string token only
+  one half of the join would recognise.
+
+A note on the test itself: the patch target is `odds_control_plane`, NOT the
+adapter module. `oddsapi_outcome` imports the loader INSIDE the function, so it
+resolves through the source module at call time and a name bound on `adapters`
+would never be consulted — a stub that silently never fires is the same
+species of defect as the inert Kalshi guard.
+
+## STATE OF `#603` AFTER THIS
+
+| source | names its game | how |
+|---|---|---|
+| Polymarket | YES | slug carries both clubs |
+| Kalshi | YES | ticker blob via `match_event_blob` + schedule |
+| OddsAPI | YES | shard key carries both clubs |
+| Novig | no | DISABLED by default (`NOVIG_PUBLIC_TIER_REFUSAL`) — its public tier is anonymised and cannot price a named bet at all, so there is nothing to qualify |
+
+**Every source that can actually price a named bet now names its fixture.**
+
+## STILL NOT CLOSED
+
+- **Doubleheaders.** Unchanged. Two games between the same clubs on one date
+  produce one token on every source. Narrowed from "any game sharing a line"
+  to "the two halves of a doubleheader" and no further. AZ@SF and BOS@NYY both
+  played one on 2026-08-29.
+- **No production reading exists**, and cannot until this deploys. The number
+  that proves it: `cross_game_rejected` on a live slate, and live Polymarket
+  totals no longer sharing a price across games.
