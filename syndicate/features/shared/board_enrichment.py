@@ -111,9 +111,43 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
         return {"chips": 0, "rows_matched": 0}
 
     def _side_matches(row_team: str, chip_side: dict) -> bool:
+        """`teams_match` IS ARGUMENT-ORDER SENSITIVE, and this called it backwards.
+
+        Signature is `teams_match(sport, token, row_team)`. This passed the
+        GRID's long name (`"TCU Horned Frogs"`) as `token` and the CHIP's short
+        code (`"TCU"`) as `row_team` -- exactly inverted. The final heuristic
+        (`team_aliases.py:660`) is
+        `len(token_norm) >= 3 and any(word.startswith(token_norm) for word in words)`,
+        where `words` comes from `row_team`, so it only answers when `token` is
+        the SHORT side. Measured over 8 real pairs from the 2026-08-29 slate:
+        **0/8 as called, 8/8 reversed** -- not even `USC` against `USC Trojans`.
+
+        WHY THIS HID FOR SO LONG. With an alias map, BOTH sides resolve
+        canonically and `teams_match` returns at `team_aliases.py:644`, which is
+        order-INDEPENDENT -- so mlb/nba/wnba/nfl/soccer never noticed. Only the
+        sports whose `_alias_map` is EMPTY reach the order-sensitive branch:
+        **ncaaf, nhl and ncaab**. NCAAF was the one with a live slate, reporting
+        `chips: 8, rows_matched: 0` with all 14 teams in `unmatched_teams`.
+
+        BLAST RADIUS MEASURED BEFORE CHANGING IT, on production payloads,
+        because this touches every sport:
+
+            sport   rows chips | as-called amb | reversed amb | delta
+            mlb      300    17 |       300  35 |      300  35 | +0
+            wnba     300     2 |       300   0 |      300   0 | +0
+            nfl      300    16 |       115   0 |      115   0 | +0
+            soccer   300   231 |       285   0 |      290   0 | +5
+            ncaaf     43     8 |         0   0 |       43   0 | +43
+
+        No sport loses a match, none gains an ambiguous row, and no pair flips
+        True->False. MLB's 35 ambiguous rows are identical in both orders and
+        are pre-existing. nba/nhl/ncaab had no slate that day; on representative
+        pairs nhl goes 0/5 -> 5/5 and ncaab 0/5 -> 2/5, its three misses being
+        alias gaps (`UNC`) that neither order can derive.
+        """
         for key in ("name", "abbr"):
             token = (chip_side or {}).get(key)
-            if token and teams_match(sport, row_team, token):
+            if token and teams_match(sport, token, row_team):
                 return True
         return False
 
