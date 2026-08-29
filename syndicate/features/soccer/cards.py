@@ -26,6 +26,7 @@ from syndicate.features.soccer.sources import team_by_name
 from syndicate.features.soccer.sources import week_date_list
 from syndicate.features.soccer.sources import week_label
 from syndicate.features.soccer.sources import week_matches
+from syndicate.features.soccer.sources import soccer_read_scope
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.soccer.props import _normalize_player_name
 from syndicate.features.soccer.props import _prop_picks_by_player
@@ -2313,7 +2314,7 @@ def _match_to_game(
     }
 
 
-def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
+def _week_games_inner(league: str, week: int, season: int) -> list[dict[str, Any]]:
     """The real fixture list for a week (from the schedule artifact),
     enriched with SoccerSim's simulated output where it exists -- a fixture
     on the schedule that hasn't been simulated yet still shows up, as a
@@ -2397,6 +2398,28 @@ def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
     except Exception:
         pass
     return games
+
+
+def week_games(league: str, week: int, season: int) -> list[dict[str, Any]]:
+    """`_week_games_inner` under a call-scoped read memo. `[2026-08-29]`
+
+    THE MEMO IS THE POINT, AND ITS LIFETIME IS THIS CALL. `_match_to_game` runs
+    once per fixture and each run re-reads the SAME `(league, date)` artifacts:
+    measured 2.0 `live_state_payload` + 1.0 `picks_rows` + 1.0
+    `game_markets_rows` + 1.0 `_prop_picks_by_player` PER FIXTURE, all with
+    identical arguments. On refresh-worker `live_state_payload` resolves through
+    the keyvalue store, so those are round trips.
+
+    That is the `assemble_s` block -- 19.49 of a 20.78s call. It is NOT the
+    `recommendations_payload` memo this lane tried and retracted; that one was
+    `payload_s`, under 7%.
+
+    Nothing is retained past this return, so the 2026-07-24 freeze bug (an
+    `@lru_cache` that pinned matches at `status_state="pre"` 0-0 for days)
+    cannot recur -- see the CALL-SCOPED READ MEMO block in `sources.py`.
+    """
+    with soccer_read_scope():
+        return _week_games_inner(league, week, season)
 
 
 # `#565`. THE SOCCER FORWARD-SLATE FAN-OUT, and the ONE key that makes memoising

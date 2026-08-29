@@ -6751,51 +6751,100 @@ SANCTIONED catalogue). Full evidence:
 **Supersedes the 2026-08-24 record**, which was written from a sandbox that
 403s CONNECT to crypto.com and got three things wrong — see `learnings.md`.
 
-## [board-window-staleness] — MEASURED 2026-08-28 23:4xZ — **UNFIXED, cause is STRUCTURAL, three config attempts failed**
+## [board-window-staleness] — **CAUSE CORRECTED 2026-08-29. Still UNFIXED; the fix is build COST, not the queue.**
 
 **SYMPTOM, from the user's own board:** `combined_board_window · as of Aug 28,
 12:15 PM · 1746 candidates` displayed at 4:33 PM. `computed_at` is the OLDEST
-contributing date's stamp BY DESIGN, so one starved date sets the vintage for
-the whole board while the others are minutes fresh.
+contributing date's stamp BY DESIGN (`read_combined_intelligence_response`), and
+that anchoring is load-bearing: `_apply_freshness_recompute` would otherwise
+recompute the age to ~0 and hand back `is_fresh: True`. **The number on the board
+is TRUE. There is no display bug and no display fix.**
 
-**CAUSE, and it is not a tunable.** `_ensure_default_board_window_watched`
+### SUPERSEDED CAUSE — kept visible because it is actionable and WRONG
+
+Recorded 2026-08-28 in `b1f791fd`: *"`_ensure_default_board_window_watched`
 re-queues TODAY every loop iteration, UNTHROTTLED, while future dates are
-throttled. Board builds take 11-15 minutes. Today therefore wins effectively
-every slot. **ELIGIBILITY WAS NEVER THE CONSTRAINT; SLOT ALLOCATION IS.**
+throttled ... ELIGIBILITY WAS NEVER THE CONSTRAINT; SLOT ALLOCATION IS,"* with
+"round-robin the pending queue" named as the real fix.
 
-**THREE CONFIG ATTEMPTS, ALL FAILED, in order:**
-
-1. `SLOW_REFRESH_SECONDS` code default 300 -> 1800 (mine, this morning). Starved
-   the third date to 264m. I recorded it "bought nothing" having measured only
-   today's SHARE of cycles, never `computed_at`.
-2. `SLOW_REFRESH_SECONDS=600` env override. **Made it WORSE** — `2026-08-29`
-   went 3m -> 84m. More eligibility does not produce a slot.
-3. `BOARD_WINDOW_DAYS=2`. Dropped `08-30` correctly, and **today absorbed the
-   freed slot**. Post-boot 23:06:55Z, 36 minutes, TWO builds, BOTH `08-28`.
+**REFUTED 2026-08-29.** The starvation mechanism is really in the code; it is not
+what was happening. `BUILD_SPAN_ENTER stage=pull_hot_artifacts`, refresh-worker,
+00:28-03:55Z, `days=2` + `SLOW_REFRESH=600`:
 
 ```
-last build per date, days=2 active, 23:45Z
-  2026-08-28  23:43:10     2m   IN WINDOW
-  2026-08-29  21:37:15   128m   IN WINDOW  <- now sets computed_at
-  2026-08-30  23:04:45    40m   dropped
+00:28  08-28    01:35  08-28    02:31  08-28    03:54  08-28
+00:49  08-28    02:07  08-29    03:16  08-29
+01:20  08-29
 ```
 
-Attempt 3 is the cleanest proof: removing a competitor freed a slot and TODAY
-took it, not the starving date.
+The dates ALTERNATE. Allocation is roughly fair. **Do not build the round-robin.**
 
-**CURRENT ENV ON refresh-worker** (all set by me, all live):
+### ACTUAL CAUSE — build duration
+
+| stage | range (s) |
+|---|---|
+| `build_intelligence_overview` | 257 – **1158** |
+| `candidate_collection_with_fallback` | 119 – **656** |
+| layer2 + kalshi + portfolio | ~100 – 400 |
+
+**900–2000s per build.** Two dates alternating fairly => each date rebuilt every
+30–66 min => the older one sets `computed_at`. That is the whole symptom.
+
+**WHY THE THREE CONFIG ATTEMPTS COULD NOT HAVE WORKED.** All three moved slot
+ALLOCATION, which was never binding. A knob that redistributes a fixed amount of
+work between two dates cannot reduce the age of the older one -- it can only
+choose WHICH date is stale. That is why `SLOW_REFRESH=600` made `08-29` worse
+(3m -> 84m) and why `days=2` was absorbed by today (36 min post-boot, two builds,
+both `08-28`). Three spellings of the same non-fix.
+
+1. `SLOW_REFRESH_SECONDS` code default 300 -> 1800 (mine). Starved the third date
+   to 264m. Recorded as "bought nothing" having measured only today's SHARE of
+   cycles, never `computed_at`.
+2. `SLOW_REFRESH_SECONDS=600` env override. **Made it WORSE.**
+3. `BOARD_WINDOW_DAYS=2`. Dropped `08-30` correctly; today absorbed the slot.
+
+### CHECKED AND EXONERATED
+
+The hydrated-overview rate limit (`SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC=900`)
+reads `cache_entries=0` on every pass and fired ZERO times in 4 hours -- but
+retention is `max(10, 900)` = 900s and the per-date gap is 1220–1307s, so the
+cache is CORRECTLY empty. `#336`'s own comment already predicted this. Raising the
+interval would make it bind only by serving an overview older than the gap:
+trading a measured number for a hidden one. **NOT DONE, deliberately.**
+
+### CURRENT ENV ON refresh-worker (all set by me, all live)
+
 `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS=2`,
-`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS=600`.
-Code default for the latter is 1800 and is ALSO mine — env currently wins.
+`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS=600`. Code default for
+the latter is 1800 and is ALSO mine — env currently wins. `DAYS=1` remains
+available and is NOT set: it makes `computed_at` current by NARROWING WHAT THE
+BOARD CLAIMS, which is not what was asked for.
 
-**THE REAL FIX (code, not config):** round-robin the pending queue so a future
-date gets a GUARANTEED slot, instead of today being unconditionally re-queued.
-Until then a multi-date board window cannot stay fresh at an 11-15 minute
-build.
+### THE FIX, and what it is worth
 
-**CONFIG-ONLY MITIGATION, NOT APPLIED — user decision:**
-`SYNDICATE_INTELLIGENCE_BOARD_WINDOW_DAYS=1` makes today the only contributor,
-so `computed_at` is always current. It makes the displayed number honest by
-NARROWING WHAT THE BOARD CLAIMS; it does not make a multi-date board fresh.
-Not set, because it drops tomorrow entirely and I had already been wrong three
-times in this area.
+Cut build cost. Landed 2026-08-29: soccer's per-fixture repeated artifact reads,
+**60 file loads -> 4 (15x)** -- see lane `soccer-overview-cost`. Soccer is ~60% of
+`build_intelligence_overview` (all seven other sports together were 101s of a
+1158s pass).
+
+**HONEST ARITHMETIC, stated so nobody reads this as solved:** if soccer drops to
+~50s, the build goes ~1500s -> ~700s and the per-date period ~50min -> ~23min.
+Better, NOT fresh. `candidate_collection_with_fallback` (119-656s) is untouched
+and uninstrumented internally.
+
+### KNOWN, NOT ACTIONED — USER DECISION
+
+`#385` records that refilling the legacy pool costs **~580s per build and
+contributes 0 rows** when Layer 2 owns the board, gated on
+`board_l2a_fallback_enabled()` (`SYNDICATE_BOARD_L2A_ENABLED`, default OFF).
+Turning it on is a PRODUCT decision: the board template reads 70 fields per row
+and ~40 have no source on an L2-A row, so cards render leaner. Surfaced, not flipped.
+
+### SEPARATELY MEASURED — worth someone's lane
+
+Soccer generates 151 candidates per build and loses ALL of them at
+`CANDIDATE_SLATE_FILTER` (`SPORT_LOST_ALL_CANDIDATES sport=soccer no_match=28
+chips=351 -- alias gap, NOT a date exclusion`), while Polymarket reports
+`no_candidates|soccer|alternate_totals_corners: 222` and `no_match|soccer|h2h: 93`.
+Soccer is currently the most expensive sport in the build AND contributes zero
+board rows.

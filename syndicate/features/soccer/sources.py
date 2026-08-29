@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 import csv
 from datetime import date as date_cls
 from datetime import timedelta
@@ -8,6 +10,7 @@ import io
 import json
 from pathlib import Path
 from typing import Any
+from typing import Iterator
 
 from syndicate.features.soccer.features.schedule import default_season as _computed_default_season
 from syndicate.features.shared.source_roots import preferred_source_roots
@@ -26,6 +29,99 @@ LEAGUE_DISPLAY_NAMES: dict[str, str] = {
     "championship": "Championship",
     "belgian_pro_league": "Belgian Pro League",
 }
+
+# ---------------------------------------------------------------------------
+# CALL-SCOPED READ MEMO  `[2026-08-29]`
+#
+# WHAT THIS IS NOT: it is not an `@lru_cache`, and it must never become one.
+# `recommendations_payload`, `picks_rows`, `game_markets_rows` and
+# `live_state_payload` all carry an explicit "Not cached (2026-07-24 fix)"
+# comment, and that fix is CORRECT: these files are rewritten in place as a
+# match moves pre -> in -> post, gunicorn workers never recycle, and a
+# process-lifetime cache froze every MLS match at `status_state="pre"` 0-0 for
+# days. Nothing below changes that. Outside a scope these functions read from
+# disk/keyvalue on EVERY call, exactly as they do today.
+#
+# WHAT IT IS: a memo whose entire lifetime is ONE assembly pass. Measured
+# 2026-08-29 by counting loader calls through `week_games` with the simulated
+# branch forced (9 fixtures, belgian_pro_league week 2):
+#
+#     288  (32.0 per fixture)  team_by_name
+#      18  ( 2.0 per fixture)  live_state_payload   <- same (league, date) file
+#       9  ( 1.0 per fixture)  picks_rows           <- same file
+#       9  ( 1.0 per fixture)  game_markets_rows    <- same file
+#       9  ( 1.0 per fixture)  _prop_picks_by_player
+#
+# `_match_to_game` re-reads the SAME `(league, date)` artifacts once per
+# FIXTURE. On refresh-worker `live_state_payload` resolves through
+# `read_json_file` -> the keyvalue store, so each of those is a round trip, and
+# a miss pays the disk read on top. That count is a FLOOR: `props.py` imports
+# `picks_rows` into its own namespace, so `_prop_picks_by_player`'s own
+# per-date reads were not counted.
+#
+# This is the `assemble_s` block, which is 19.49 of a 20.78s `week_games` call
+# (`payload_s` under 7%). It is NOT the `recommendations_payload` memo this
+# lane already tried and retracted -- that one addressed the 7%.
+#
+# WHY A SCOPE IS SAFE WHERE A CACHE IS NOT. Within a single assembly pass,
+# reading one file 24 times cannot make the cards FRESHER -- the poller may
+# rewrite it midway, and then some cards in one board reflect the old state and
+# some the new. Memoizing gives every card in a pass ONE consistent view, which
+# is strictly more correct than what it replaces. Across passes nothing is
+# retained, so the 2026-07-24 failure mode cannot recur.
+#
+# Re-entrant on purpose: the OUTERMOST scope owns the lifetime, so
+# `_build_cards_page_context_uncached` wrapping the whole build and
+# `week_games` wrapping its own body share one memo instead of nesting two.
+#
+# ContextVar rather than a module global: refresh-worker assembles boards on a
+# dedicated drain thread while web serves requests on others, and a plain dict
+# would leak one thread's snapshot into another's cards.
+_READ_SCOPE: "ContextVar[dict[Any, Any] | None]" = ContextVar(
+    "syndicate_soccer_read_scope", default=None
+)
+
+
+@contextmanager
+def soccer_read_scope() -> "Iterator[dict[Any, Any]]":
+    """Memoize soccer artifact reads for the duration of ONE assembly pass."""
+    existing = _READ_SCOPE.get()
+    if existing is not None:
+        # Already inside a scope -- reuse it and do NOT reset on exit, or the
+        # inner `with` would tear down the outer one's memo at its own exit.
+        yield existing
+        return
+    memo: dict[Any, Any] = {}
+    token = _READ_SCOPE.set(memo)
+    try:
+        yield memo
+    finally:
+        _READ_SCOPE.reset(token)
+
+
+def soccer_read_scope_active() -> bool:
+    """Whether a scope is currently established (used by tests and telemetry)."""
+    return _READ_SCOPE.get() is not None
+
+
+def _scoped_read(cache_key: Any, build: Any) -> Any:
+    """Return `build()`, memoized iff a scope is active.
+
+    `None` and empty results are memoized too, deliberately: a miss is the
+    expensive case on the keyvalue path (it pays the store round trip AND the
+    disk fallback), so re-running it per fixture is exactly what this exists to
+    stop. Within one pass a miss cannot become a hit for a reason the pass
+    would want to see.
+    """
+    memo = _READ_SCOPE.get()
+    if memo is None:
+        return build()
+    if cache_key in memo:
+        return memo[cache_key]
+    value = build()
+    memo[cache_key] = value
+    return value
+
 
 DEFAULT_LEAGUE = "epl"
 
@@ -192,7 +288,7 @@ def live_state_path(league: str, selected_date: str) -> Path:
     return _api_read_path(league, "live_state", f"live_state_{selected_date}.json")
 
 
-def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None:
+def _live_state_payload_uncached(league: str, selected_date: str) -> dict[str, Any] | None:
     """The live poller's per-league state, readable ACROSS SERVICES.
 
     Not cached: overwritten by the poller every cycle, unlike the once-per-date
@@ -238,11 +334,25 @@ def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None
     return load_json(live_state_path(league, selected_date))
 
 
+def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None:
+    """Memoized for the duration of an active `soccer_read_scope()` only.
+
+    Outside a scope this is a straight call to
+    `_live_state_payload_uncached` -- no caching, unchanged behaviour. See the
+    CALL-SCOPED READ MEMO block above for why that distinction is the
+    whole point.
+    """
+    return _scoped_read(
+        ("live_state", league, selected_date),
+        lambda: _live_state_payload_uncached(league, selected_date),
+    )
+
+
 def game_markets_path(league: str, selected_date: str) -> Path:
     return _api_read_path(league, "props", f"game_markets_{selected_date}.json")
 
 
-def game_markets_rows(league: str, selected_date: str) -> tuple[dict[str, Any], ...]:
+def _game_markets_rows_uncached(league: str, selected_date: str) -> tuple[dict[str, Any], ...]:
     """Per-event GAME markets (btts, corners), readable ACROSS SERVICES.
 
     THE PATH IS BUILT FROM `data_root()`, for the same reason
@@ -291,11 +401,23 @@ def game_markets_rows(league: str, selected_date: str) -> tuple[dict[str, Any], 
     return tuple(r for r in rows if isinstance(r, dict)) if isinstance(rows, list) else ()
 
 
+def game_markets_rows(league: str, selected_date: str) -> tuple[dict[str, Any], ...]:
+    """Memoized for the duration of an active `soccer_read_scope()` only.
+
+    Outside a scope this is a straight call to
+    `_game_markets_rows_uncached` -- no caching, unchanged behaviour.
+    """
+    return _scoped_read(
+        ("game_markets_rows", league, selected_date),
+        lambda: _game_markets_rows_uncached(league, selected_date),
+    )
+
+
 def picks_path(league: str, selected_date: str) -> Path:
     return _api_read_path(league, "picks", f"picks_{selected_date}.csv")
 
 
-def picks_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
+def _picks_rows_uncached(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
     # Not cached (2026-07-24 fix, same reasoning as recommendations_payload
     # above): this file gets regenerated repeatedly as odds/scores update,
     # and gunicorn workers never auto-recycle, so an @lru_cache here (as
@@ -308,6 +430,20 @@ def picks_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
             return tuple(dict(row) for row in csv.DictReader(handle))
     except Exception:
         return ()
+
+
+def picks_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
+    """Memoized for the duration of an active `soccer_read_scope()` only.
+
+    Outside a scope this is a straight call to
+    `_picks_rows_uncached` -- no caching, unchanged behaviour. See the
+    CALL-SCOPED READ MEMO block above for why that distinction is the
+    whole point.
+    """
+    return _scoped_read(
+        ("picks_rows", league, selected_date),
+        lambda: _picks_rows_uncached(league, selected_date),
+    )
 
 
 def game_odds_path(league: str) -> Path:

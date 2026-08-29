@@ -5673,3 +5673,30 @@ the starving date was merely under-eligible.
 Sits with the two rules already logged today: judging by the metric I chose
 rather than the one the user sees, and sizing a fix without the component's
 share of the whole. All three are confident measurement of the wrong quantity.
+
+## 2026-08-29 — FORBIDDEN: naming a cause from a mechanism you can see without measuring the one you cannot
+
+I diagnosed board staleness as queue starvation -- today re-queued unthrottled,
+futures throttled -- and wrote it into `state.md` and `learnings.md` as the
+STRUCTURAL cause, with "round-robin the pending queue" as the fix. The starvation
+mechanism is really in the code. It is not what was happening. One log query
+(`BUILD_SPAN_ENTER`, 8 builds) showed the dates alternating cleanly, and the real
+cause -- 900-2000s build duration against a 2-date window -- was in a stage timer
+I had already deployed and never read.
+
+**Why it survived three failed fixes:** each failure was read as "not enough of
+the right thing" rather than "the wrong thing". The `=600` result moved `08-29`
+the WRONG way, which is a refutation of the model, and I took it as a dosage
+problem. The rule written that day (`stop tuning when the observable moves the
+wrong way`) fired correctly and I still did not re-examine the CAUSE, only the knob.
+
+**The asymmetry to watch for:** a mechanism you can read in the source is
+available for free; the quantity that decides whether it BINDS costs a query. The
+free one will always be more available, and it is not evidence. Both of the
+session's real findings this day -- the alternation, and the 60-loads-per-week
+count -- came from measuring the thing that was not visible in the code.
+
+**How to apply:** before writing a cause into `state.md`, state the ONE reading
+that would refute it and take that reading. "Today starves tomorrow" is refuted by
+the build-start sequence, which is one query against a log line that already
+existed. Cost: two minutes. It was skipped for three deploys and a wrong ledger entry.

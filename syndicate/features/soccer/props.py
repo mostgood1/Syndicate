@@ -11,6 +11,7 @@ from syndicate.features.soccer.sources import league_display_name
 from syndicate.features.soccer.sources import league_select_control
 from syndicate.features.soccer.sources import normalize_league
 from syndicate.features.soccer.sources import picks_rows
+from syndicate.features.soccer.sources import _scoped_read
 from syndicate.features.soccer.sources import recommendations_payload
 from syndicate.features.soccer.sources import week_date_list
 from syndicate.features.shared.rank_board import build_rank_page_context
@@ -60,7 +61,7 @@ def _american_odds_text(price: Any) -> str:
     return f"+{int(value)}" if value > 0 else str(int(value))
 
 
-def _prop_picks_by_player(league: str, week: int, season: int) -> dict[str, dict[str, Any]]:
+def _prop_picks_by_player_uncached(league: str, week: int, season: int) -> dict[str, dict[str, Any]]:
     # #150 follow-up. build_soccer_picks.py's build_prop_picks grades the
     # sim's anytime-goalscorer probability against a real captured price
     # (market="PROP"), written into the same picks_{date}.csv the game-market
@@ -84,6 +85,20 @@ def _prop_picks_by_player(league: str, week: int, season: int) -> dict[str, dict
             # _soccer_week_matches uses for its own date-window merge.
             picks[player_key] = row
     return picks
+
+
+def _prop_picks_by_player(league: str, week: int, season: int) -> dict[str, dict[str, Any]]:
+    """Memoized for the duration of an active `soccer_read_scope()` only.
+
+    `cards._match_to_game` calls this ONCE PER FIXTURE with identical
+    arguments, and each call loops `week_date_list` x `picks_rows` -- so a
+    12-fixture week re-parsed the same picks CSVs 12 times. Outside a scope
+    this is a straight call to `_prop_picks_by_player_uncached`.
+    """
+    return _scoped_read(
+        ("prop_picks_by_player", league, week, season),
+        lambda: _prop_picks_by_player_uncached(league, week, season),
+    )
 
 
 def _prop_rank_card(row: dict[str, Any], *, league: str, week: int, season: int, pick: dict[str, Any] | None = None) -> dict[str, Any]:

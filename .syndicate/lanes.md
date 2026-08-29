@@ -2591,7 +2591,50 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   `venue-join-refusal-visibility` (session `d617eefd`). Left deliberately;
   neither claim is stale. This lane's only edit there (`last_blind_write` on
   `ledger-summary`) is deployed and did not collide.
-### soccer-overview-cost — OPEN, **UNSOLVED — SEVEN hypotheses refuted; DO NOT add an eighth log span, USE A PROFILER** — opened 2026-08-28 — session 3e5a9659 (ENDED)
+### soccer-overview-cost — OPEN, **CAUSE FOUND 2026-08-29: per-fixture repeated artifact reads, 60 loads -> 4 (15x)** — opened 2026-08-28 — session 3e5a9659
+- **`[2026-08-29]` FOUND IT. THE COST IS `_match_to_game` RE-READING THE SAME FILES ONCE PER FIXTURE.**
+  Method: not an eighth log span. Counted loader calls through a real `week_games`
+  with the simulated branch forced, which is STRUCTURAL and therefore immune to
+  the thin local mirror that has confounded three readings in this lane.
+  ```
+  9 fixtures, belgian_pro_league week 2 -- calls per week_games()
+    288  (32.0 per fixture)  team_by_name          (cheap: 0.003s/108 calls)
+     18  ( 2.0 per fixture)  live_state_payload    <- SAME (league,date) file
+      9  ( 1.0 per fixture)  picks_rows            <- SAME file
+      9  ( 1.0 per fixture)  game_markets_rows     <- SAME file
+      9  ( 1.0 per fixture)  _prop_picks_by_player <- identical args every call
+  ```
+  A FLOOR, not a ceiling: `props.py` imports `picks_rows` into its own namespace,
+  so `_prop_picks_by_player`'s own per-date reads went uncounted.
+  On refresh-worker `live_state_payload` resolves through `read_json_file` -> the
+  keyvalue store, so each is a ROUND TRIP, and a miss pays the disk fallback too.
+- **THIS IS THE `assemble_s` BLOCK (19.49 of 20.78s), NOT the `payload_s` 7% I
+  retracted.** The retracted proposal memoized `recommendations_payload` (the
+  per-DATE loop). These four loaders are inside the per-FIXTURE loop. Same word
+  "memo", different loop, ~13x the target.
+- **IT ALSO EXPLAINS THE VARIANCE**, which no previous hypothesis did. Same league
+  and same 10 fixtures read 3.24s and 13.99s. 20 keyvalue round trips whose payload
+  size and hit/miss tracks live-match churn is consistent with a 4x spread on
+  identical inputs; "one slow league" never was.
+- **FIX: a CALL-SCOPED read memo** (`soccer_read_scope()`, `sources.py`), NOT an
+  `@lru_cache` -- those four loaders each carry an explicit "Not cached (2026-07-24
+  fix)" and that fix is correct. Outside a scope, behaviour is unchanged. Inside
+  one assembly pass, one read per `(league, date)`. Across passes nothing is
+  retained, so the freeze bug (MLS matches pinned at `status_state="pre"` 0-0 for
+  days) cannot recur. Within a pass, re-reading a file 24 times cannot make cards
+  FRESHER -- it can only make one board internally inconsistent -- so this is
+  strictly more correct than what it replaces.
+  MEASURED, 12 fixtures x 2 dates: **60 file loads -> 4, 15.0x.** Scales as 5N -> ~4.
+- Tests: `tests/test_soccer_read_scope.py`, 11 passing. Includes the `off != on`
+  CONTROL (`test_week_games_without_the_scope_reads_per_fixture` neutralises the
+  scope and asserts the count explodes), the across-scope regression test for
+  2026-07-24, thread isolation, and exception-path release.
+- **PRE-EXISTING FAILURES, NOT MINE AND NOT REAL:** 15 soccer tests fail in the
+  WORKTREE identically with and without this diff, and all 38 of the same tests
+  PASS in the primary tree. Data-less-worktree artifact. Recording it because the
+  same shape produced a false "5 tests are failing" report earlier in this lane --
+  a stash control proves "not my diff", never "not a real failure"; the primary
+  tree is what settles the second question.
 - **HANDOFF STATE, read this first.** The target is narrowed to ONE loop and the method is the problem, not the target. `week_games`'s per-fixture assembly (`for fixture in fixtures`) is the cost: `assemble_s` 19.49 of a 20.78s call, `payload_s` under 7%, `dates` and league both ruled out. Same league + same 10 fixtures read 3.24s and 13.99s, so the VARIANCE is as interesting as the magnitude.
 - ~~ONE REAL WIN, VERIFIED~~ **SEE RETRACTION BELOW.** cards-context TTL 600 -> 1200s (`SYNDICATE_SOCCER_CARDS_CONTEXT_TTL_SECONDS`, env only), left in place deliberately.
 - **RETRACTED — THE 15x WAS A QUIET-vs-LIVE COMPARISON, NOT A BEFORE/AFTER.** I recorded `games()` 42.34s -> 2.76s as a verified TTL win. Re-measured 2026-08-28 19:10-19:24Z on a SETTLED worker (10-26 min uptime), the same call reads: `0.10, 0.13, 0.26, 0.37` **and** `51.60, 15.51, 10.87, 6.60`. Builds 8-10 min apart still rebuild COLD, well inside the 1200s TTL, so "the first call of each build now hits cache" is FALSE.
@@ -2618,7 +2661,7 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **RECOMMENDATION TO THE NEXT SESSION: change method, do not add a sixth log span.** A profiler over ONE real build names the call directly; five incremental spans have cost a day and located 3s of 382s. My model of this subsystem is demonstrably poor and that is itself the evidence.
 - Claims: `syndicate/blueprints/home.py` (transferred from UNOWNED `wnba-chip-live-token`, instrumentation only — path REMOVED from its Files: line, not struck through) and `syndicate/features/soccer/market_board.py`. Deploy claims: none held.
 - Goal: name where soccer's 163.2s goes, per league, before optimising anything.
-- Files: `syndicate/blueprints/home.py` (instrumentation only), and its tests.
+- Files: `syndicate/blueprints/home.py` (instrumentation only), `syndicate/features/soccer/sources.py`, `syndicate/features/soccer/cards.py`, `syndicate/features/soccer/props.py`, `tests/test_soccer_read_scope.py`, and its tests.
 - MEASURED: soccer 163.2s = **82% of hydrated overview time**, from `OVERVIEW_SPORT_BEGIN`/`END` brackets 2026-08-28 03:39-03:42Z (ncaaf 34.1s, nfl 2.0s, everything else <0.2s). MLB is NOT the cost — it is 4.43s isolated.
 - Hypothesis: `SoccerSport.games()` runs a NESTED loop — `for league in _active_leagues(today)` x `for week_offset in week_offsets` — calling `build_cards_page_context(league, week, season)` per pair. Soccer carries ~39 units/leagues where every other sport makes ONE call for a date or week, so the cost is the fan-out, not any single call.
 - Falsification: wrong if the per-league total is a small fraction of the 163.2s, i.e. the cost is outside this loop.
