@@ -6151,3 +6151,54 @@ the other direction — a merged map made `("wnba", "min")` vs "Minnesota Lynx"
 FALSE, "a wrong answer, and worse than no answer, because the map is treated as
 authoritative and skips the heuristic fallback." **The warning was in the file I
 was editing.**
+
+---
+
+## 2026-08-29 — FORBIDDEN: calling a placeholder threshold "conservative" without checking it against the real one. A threshold above break-even everywhere is a DISABLED FEATURE wearing safety language. `[lane live-venue-order-placement]`
+
+- **What we believed:** `kalshi_polymarket_arb.DEFAULT_FEE_BUFFER = 0.04` was a
+  safe stand-in. Its own docstring says so at length and honestly — "a
+  conservative placeholder, not either venue's real fee schedule", "only
+  `edge_after_buffer` should be read as an actionable signal". Every word of
+  that is true and it still produced the wrong outcome.
+- **What was actually true:** measured break-even for a two-leg MLB pair runs
+  **3.38c at even money down to 0.39c at 0.97**. The flat 4.00c threshold sat
+  **above break-even at every price on the board.** The detector could not
+  report a profitable MLB pair — not "rarely", not "only the big ones". Never.
+  And MLB is the sport with the most volume on the platform.
+- **Why the honest label made it worse, not better.** "Conservative" names the
+  DIRECTION of the error and says nothing about its MAGNITUDE. Over-stating a
+  cost feels like the safe side, so nobody re-derived it. But a detector that
+  never fires is indistinguishable from a market with no arb in it — the exact
+  empty-list confusion `kalshi_client.py`'s header already warns about, arriving
+  through a threshold instead of through a return value.
+- **How we found out:** not by auditing the buffer. By computing the real fee
+  from the venue's own `fee_type`/`fee_multiplier` fields for an unrelated
+  reason, and noticing the break-even table was under 4c on every row.
+- **The rules going forward:**
+  1. **A placeholder threshold must be compared to the real quantity before it
+     is called conservative.** One number and one comparison. Until then the
+     right word is "unvalidated", which invites the check that "conservative"
+     suppresses.
+  2. **A flat stand-in for a curved cost is wrong in SHAPE, not just level, and
+     no single value fixes it.** Kalshi's fee is `rate * P * (1-P)`. At p=0.05
+     the flat buffer was 12x the truth; at even money on a full-rate series it
+     was roughly right. A constant cannot approximate a parabola, so the error
+     changes sign across the book and any calibration of the constant just
+     moves where it is wrong.
+  3. **When a detector reports zero, the first question is whether it CAN
+     report non-zero.** `test_arb_net_edge.py::test_the_old_flat_buffer_was_
+     above_mlb_break_even_at_every_price` asserts exactly that, so the class
+     cannot come back silently. Same shape as the standing
+     `presence_is_not_reachability` rule, applied to a threshold.
+- **Also corrected, and it is the smaller half:** every third-party source says
+  Kalshi rounds fees "up to the next cent". Against 18 real fills that is wrong
+  — ceil-to-4dp matches **18/18**, round-to-4dp **9/18**. A spot check on one or
+  two fills cannot separate them (9 of the 18 agree under both rules), which is
+  why the count is the evidence and a sample is not. **The venue's own fields
+  and our own fills outrank any explainer, and both were available the whole
+  time.**
+- **Cost:** none realised — no money was placed on the bad threshold, because
+  the detector's silence also meant nothing ever acted. That is luck, not
+  design: the same class of error on the permissive side would have placed
+  losing pairs at even money instead of finding nothing at the tails.

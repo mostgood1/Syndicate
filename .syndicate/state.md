@@ -45,6 +45,57 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [kalshi-in-play-and-real-fees] KALSHI TRADES IN-PLAY AND PUBLISHES ITS OWN FEE PARAMETERS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE ON MLB `[verified 2026-08-29, lane live-venue-order-placement]`
+
+**Kalshi keeps game markets tradeable through the game.** `status=active`,
+`close_time` ~3 days out, and `occurrence_datetime` is expected game **END**,
+not start — so the in-play test is `occurrence_datetime` future AND
+`occurrence_datetime - 3h` past. 14 of 76 open `KXMLBGAME` in play at 22:02Z,
+every observed spread **1 cent**, `KXMLBGAME-26AUG291507SEATOR-TOR` at vol24
+**904,281** / OI **558,549**. Prices moved between reads 4 minutes apart, which
+is what distinguishes a repricing in-play book from a stale pregame one.
+
+**`GET /trade-api/v2/series/<ticker>` carries `fee_type` and `fee_multiplier`.**
+Four distinct combinations across the thirteen series this platform trades.
+**Every MLB game/total/spread/K series is `fee_multiplier: 0.5` — half rate.**
+NFL/WNBA/NBA/NCAAF game series are 1.0. A hardcoded rate is wrong on MLB by 2x.
+
+**Base rate 0.07, MEASURED off 27 of our own fills** (21 at multiplier 0.5 imply
+0.0350; 4 at 1.0 imply 0.0700 — a discriminating 2:1). Not circular:
+`fees_dollars` comes from Kalshi's own `taker_fees_dollars` via
+`kalshi_orders._FEE_FIELDS`, and nothing in this repo computes a fee from a rate.
+
+**Rounding is ceil to a HUNDREDTH of a cent (4dp), not to a cent** — ceil-4dp
+matches **18/18** real fills, round-4dp **9/18**. Third-party sources all say
+"next cent"; that overstates an order by up to 0.9c.
+
+**CONSEQUENCE: `kalshi_polymarket_arb.DEFAULT_FEE_BUFFER = 0.04` demanded a flat
+4.00c raw gap at every price, while MLB break-even runs 3.38c at even money down
+to 0.39c at 0.97 — above break-even at EVERY price on the board.** The detector
+was not conservative on MLB; it could not report a profitable pair at all.
+Replaced by `venue_fees.py` + `kalshi_polymarket_arb.net_edge_per_contract`.
+
+**In-play is where arb is viable, and the mechanism is FEE GEOMETRY, not model
+edge.** 5 of 7 in-play games had a side >= 0.90, where break-even is 0.52-1.11c
+against a 1c venue spread; pregame moneylines sit at 0.40-0.60 where break-even
+is ~3.3c. This says nothing about model edge — `live-game-line-projection`
+(CLOSED 2026-08-29) measured the live model TRAILING the market on 8 of 9 dates.
+
+**Polymarket's fee remains UNMEASURED**: `fees_dollars` null on **13 of 13**
+filled orders, `feeCoefficient` units never observed. `venue_fees` REFUSES and
+callers must opt into a pessimistic bound by name. **At even money ~2/3 of the
+modelled pair cost is the number we cannot read — measuring it is worth more
+than any further precision on Kalshi's.**
+
+STILL BLOCKING EXECUTION: Polymarket refuses every moneyline
+(`team_side_needs_verified_yes_leg`) and an arb IS a moneyline trade; the
+Polymarket slate is not published to web (`export?pattern=*polymarket*` ->
+`count: 0`, unchanged since 08-26) so the cross-venue number can only be
+measured on the worker; `#600` (ledger read-modify-write race) is landed and NOT
+deployed; and no two-leg executor exists — a one-sided fill is a naked position.
+
+`.syndicate/findings_2026-08-29_live_venue_arb_economics.md` carries the tables.
+
 ## [how-to-use] HOW TO USE THIS FILE
 
 Facts only, grouped by subject. If a subject has an owning lane, it is named.

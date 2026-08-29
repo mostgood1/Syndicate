@@ -3529,7 +3529,7 @@ caaf-no-orders`). NOT
   `origin/main` and belongs to `kalshi-spread-join-sign`.
 - Blocked by: none.
 
-### live-venue-order-placement — OPEN — opened 2026-08-29 — session 69f9e24f-00e5-4e2c-8f5a-7c674d80dc2b
+### live-venue-order-placement — OPEN — opened 2026-08-29 — session 69f9e24f-00e5-4e2c-8f5a-7c674d80dc2b — **FEE MODEL SHIPPED AND VERIFIED AGAINST 18/18 REAL FILLS (`be6dc14b`, pushed, NOT deployed).** Kalshi trades IN-PLAY with real liquidity (14 markets, vol24 904k, 1c spreads, prices moving between reads). Kalshi publishes `fee_type`/`fee_multiplier` per series and **every MLB game/total/spread/K series is HALF RATE**; rounding is ceil-to-4dp (18/18) not to the cent (9/18). **`DEFAULT_FEE_BUFFER = 0.04` sat ABOVE MLB break-even at EVERY price (3.38c even money -> 0.39c at 0.97), so the detector was structurally incapable of reporting a profitable MLB pair.** In-play games sit at the TAILS (5 of 7 with a side >= 0.90, break-even 0.52-1.11c vs a 1c spread) — the live-market opportunity is FEE GEOMETRY, not model edge. **THE LANE'S TESTABLE OUTCOME IS STILL OWED** and cannot be produced from a local session: `api.polymarket.us` needs credentials and the slate is not published to web (`count: 0`), so the cross-venue number needs a WORKER-SIDE probe. `#595` evidence half handed off (`handoff_2026-08-29_polymarket_yes_leg_evidence.md`).
 - Goal: Kalshi and Polymarket can place orders against IN-PLAY game markets,
   and a cross-venue Kalshi/Polymarket arb can be executed as two legs. ONE
   testable outcome for the first increment: a production reading of the arb
@@ -3574,9 +3574,26 @@ caaf-no-orders`). NOT
   scan run against a production slate, reporting executable opportunities net
   of real fees, split pregame vs in-play. No order is placed by this session.
   Arming live placement is the user's action, not mine.
-- Blocked by: none for the measurement. Two-leg EXECUTION is blocked by `#595`
-  step 3 (the Polymarket YES-leg binding), held by
-  `unknown-submit-retry-provenance`.
+- **STATUS 2026-08-29 22:3xZ — HALF DISCHARGED.** The FEE half is measured and
+  shipped (`venue_fees.py`, 18/18 real fills; `net_edge_per_contract` replaces
+  the flat buffer; 52 new tests, 361 green in the venue/arb suites). The
+  CROSS-VENUE half is NOT: it needs a Polymarket price beside a Kalshi price at
+  the same instant, and this session could not get one.
+- **NEXT ACTION, and it is a worker-side job:** a probe that calls
+  `polymarket_us_markets.fetch_game_markets()` and Kalshi's in-play book in the
+  SAME pass and reports pairs where `net_edge_per_contract > 0`, split pregame
+  vs in-play. Cannot run locally (`api.polymarket.us` 401s past `limit=1`, no
+  local creds) and cannot be read after the fact (slate not published to web,
+  `export?pattern=*polymarket*` -> `count: 0` since 08-26). Publishing the
+  slate is the cheaper unblock and is likely worth doing first.
+- **HIGHEST-VALUE MEASUREMENT IN THIS LANE:** Polymarket's real fee. It is
+  ~2/3 of modelled pair cost at even money and is currently a bound, not a
+  number. `unknown-submit-retry-provenance` is already reading
+  `commissionNotionalTotalCollected` for its own reasons — that lands it.
+- Blocked by: none for the fee work (done). Two-leg EXECUTION is blocked by
+  `#595` step 3 (the Polymarket YES-leg binding), held by
+  `unknown-submit-retry-provenance` — evidence half delivered, scoring against
+  the 8 settled moneylines still required before its refusal comes off.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
