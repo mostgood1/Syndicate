@@ -36645,3 +36645,31 @@ candidates -- so the two halves are keyed differently, and the date and the
    asymmetry is the whole question and neither number is currently emitted.
 3. `side_not_an_outcome_of_this_market` is 28 -- soccer rows now pair the
    FIXTURE and fail on the SIDE. The loss moved downstream; it did not vanish.
+
+## 2026-08-29 04:39:08Z — refresh-worker — `3e2cbd0b` — soccer call-scoped read memo
+
+lane: `soccer-overview-cost` · deploy `dep-da964qqjnfac73cqb0ag` · trigger `api`
+claim: held by `soccer-overview-cost` · preflight: CLEAR at 04:38:33Z, re-run
+bound to `--target-commit 3e2cbd0b` after the guard correctly refused a preflight
+that vouched for no SHA.
+
+**what shipped:** `soccer_read_scope()` — a CALL-SCOPED memo over
+`live_state_payload` / `picks_rows` / `game_markets_rows` / `_prop_picks_by_player`,
+established by `week_games`. `_match_to_game` was re-reading the same
+`(league, date)` artifacts once per FIXTURE. Offline, structural: **60 file loads
+-> 4 (15.0x)** for 12 fixtures x 2 dates.
+
+**verify: PENDING — the predicate, stated before the reading.**
+On a SETTLED worker (>25 min post-boot; every deploy reboots and a fresh process
+flatters any fix), soccer's `OVERVIEW_SPORT_BEGIN`->`END` bracket and
+`WEEK_GAMES_DATES assemble_s` must fall materially below the OVERNIGHT pre-deploy
+baseline. Baseline, `BUILD_SPAN_EXIT stage=build_intelligence_overview`,
+2026-08-29 00:28-03:55Z: **257 / 282 / 350 / 398 / 442 / 446 / 459 / 487 / 1158 s**,
+of which ~101s was the other seven sports (mlb->nhl, 03:55:26-03:57:07).
+
+**LIKE-FOR-LIKE OR IT IS NOT A READING.** The comparison window must be overnight.
+Soccer's 381.6s reading was 17:50Z, inside a European live window, and comparing a
+live number against a quiet one is exactly the error that produced this lane's
+retracted "TTL 42.34 -> 2.76s, 15x" claim.
+
+**REFUTED IF:** the settled overnight bracket sits inside the baseline spread.
