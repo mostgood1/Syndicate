@@ -1605,9 +1605,16 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Files still claimed: `syndicate/features/shared/{coinbase,prophetx,novig,
   polymarket,robinhood,cryptocom}_client.py`, matching `scripts/probe_*.py` and
   `tests/test_*_client.py`, `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`,
-  `scripts/probe_exchange_markets.py`. **NARROW claim only** on
-  `scripts/run_refresh_worker.py` (one small, additive, opt-in-only boot-probe
-  hook).
+  `scripts/probe_exchange_markets.py`.
+  RELEASED `[2026-08-29, USER OVERRIDE, to ncaaf-no-orders]`: `scripts/run_refresh_worker.py`
+  This lane's claim on it was always **NARROW** and self-described as "one
+  small, additive, opt-in-only boot-probe hook"; the lane is idle with
+  "nothing outstanding". `ncaaf-no-orders` needs a DIFFERENT region of the same
+  file (`_season_projection_should_launch`), `lane-guard` BLOCKED it, the
+  conflict was surfaced to the user rather than worked around, and the user
+  granted the override. Marker on its own line so the parser SEES the release,
+  per the note in `portfolio-ledger-service-split` — which released this same
+  path to this same lane on 2026-08-24 for the same reason.
 - **Status: nothing outstanding for this lane.** `#544`'s stated NEXT phase
   (order automation for whichever of polymarket/novig/prophetx clears
   legal/ToS review) is externally resolved: Polymarket order automation
@@ -3180,11 +3187,14 @@ Single fetch per date, same instant, `/api/board/book-grid?sport=mlb&date=…`:
 - Files: `scripts/generate_smartsim2_ncaaf_projections.py`,
   `syndicate/features/ncaaf/cfbd.py`,
   `syndicate/features/ncaaf/cfbd_backoff.py`,
-  `tests/test_cfbd_backoff.py`
+  `tests/test_cfbd_backoff.py`,
+  `scripts/run_refresh_worker.py`,
+  `tests/test_season_projection_staleness.py`
+  (the last two added 2026-08-29 by USER OVERRIDE — `exchange-markets-api-integration`
+  released the worker entrypoint; see its Files line.)
 - Reads but does NOT claim (the parser turns any path inside a `- Files:` block
-  into a CLAIM, so these are deliberately kept out of it): the portfolio commit
-  module is held by `venue-join-refusal-visibility` and the refresh-worker
-  entrypoint by `exchange-markets-api-integration`. Both are READ-ONLY to this
+  into a CLAIM, so this is deliberately kept out of it): the portfolio commit
+  module is held by `venue-join-refusal-visibility`. READ-ONLY to this
   lane; if a fix needs either, surface the conflict first.
 - Hypothesis: **the NCAAF season-projection artifact has not rebuilt since
   2026-08-26 because every rebuild dies on CFBD `HTTP 429`, so NCAAF rows carry
@@ -3314,7 +3324,7 @@ caaf-no-orders`). NOT
   `Games 51 | Live 0 | Final 0 | Pregame 51`.
 - Files: NEW `syndicate/features/ncaaf/live_game_state.py`,
   `syndicate/features/ncaaf/cards.py`, `syndicate/features/ncaaf/live_lens.py`,
-  NEW `tests/test_ncaaf_live_game_state.py`
+  NEW `tests/test_ncaaf_live_game_state.py`, `tests/test_ncaaf_live_lens_local.py`
 - Reads but does NOT claim (held by OPEN lane `ncaaf-settlement-resolver`):
   `scripts/poll_ncaaf_live_state.py`, `syndicate/features/shared/ncaaf_team_registry.py`,
   `syndicate/features/shared/bet_status_ncaaf.py`. READ-ONLY to this lane — if the
@@ -3340,6 +3350,35 @@ caaf-no-orders`). NOT
   ESPN reports a game `state=in` in the SAME script run, plus `Final` becoming
   non-zero after a game ends. A unit test is NOT sufficient here — that is
   exactly what passed while this shipped inert.
+- **RESULT 2026-08-29 — HYPOTHESIS CONFIRMED, FIXED, VERIFIED ON PRODUCTION.**
+  Same-instant read at 16:30:28Z (web `061d5b2b`):
+
+      ESPN        events=8  in=1  post=0   UNC VS TCU "4:00 - 1st Quarter"
+      PRODUCTION  games=51  Live=1  Final=0  Pregame=50
+                  card "NC @ TCU"  eyebrow 'Q1 - 4:00'      -> MATCH
+
+  Before, 16:05Z, same game already in progress: `Live 0 | Pregame 51`.
+  The falsification test did NOT fire: nothing else fed `live_state`, and the
+  payload did not change until the code did.
+
+  Three deploys, each verified before the next:
+  1. `061d5b2b` live 16:29:36Z — the join. `Live 0 -> 1`.
+  2. `efc41b52` live ~16:34Z — real score on the lens.
+     Read back: `NC @ TCU [Q1 - 4:00] Score: NC 3 - 10 TCU`.
+  3. `4822f8e4` — `startTime` 8/51 -> 51/51 from the card's own kickoff.
+
+  **NOT FIXED, and named rather than left implicit:** NCAAF is still absent
+  from `_LIVE_LENS_SPORTS` in `shared/live_lens_loop.py`, so the cross-sport
+  live-lens snapshot still carries no NCAAF — a different subsystem. And
+  `Final` has never been observed in production; no game had finished at the
+  time of the reading, so that path is unit-tested only. That is the SAME
+  class of claim `ncaaf-board-surfaces` made about the live path, which is
+  what this lane just had to fix.
+
+  Side finding, fixed: `lane-guard` matches path SUFFIX, so the UNOWNED lane
+  `soccer-board-mlb-parity`'s bare `cards.py` — in prose that SAID the claim
+  was removed — was claiming every sport's cards builder. It blocked this
+  work mid-game. `check_lane_invariants` passed throughout.
 - Blocked by: none
 
 

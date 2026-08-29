@@ -4746,6 +4746,99 @@ the collector reads, keeping the volume low: `MLB_INPUT_CHECKLIST`,
 `mlb_sim_engine_reference.md` were corrected on 2026-08-19 to say so.
 
 
+## [ncaaf-live-lens-state] THE NCAAF LIVE LENS'S STATE BRANCH WAS UNREACHABLE, NOT EMPTY — **FIXED AND VERIFIED IN PRODUCTION** `[measured 2026-08-29T16:30:28Z, web 061d5b2b, lane ncaaf-live-lens-state]`
+
+**The reading that matters, one script run, production and ESPN together:**
+
+```
+ESPN        events=8  in=1  post=0   UNC VS TCU  "4:00 - 1st Quarter"
+PRODUCTION  games=51  Live=1  Final=0  Pregame=50
+            card "NC @ TCU"  eyebrow 'Q1 - 4:00'
+VERDICT     MATCH
+```
+
+25 minutes earlier, same endpoint, same game already in progress:
+`Games 51 | Live 0 | Final 0 | Pregame 51`.
+
+**`ncaaf/cards.py` contained ZERO occurrences of `live_state`.**
+`publication_adapter._shared_game_state` derives `live`, `final`, `period` and
+`clock` from exactly that key, so every NCAAF card carried
+`{live:false, final:false, period:null, clock:"", startTime:null,
+status:"Week 1"}` — `status` a constant, not a state. `_game_state_label`'s
+live branch could not be taken by any input.
+
+**This is the entry directly below this one coming due.**
+`[ncaaf-board-surfaces]` shipped the state PATH on 2026-08-27 and said so
+honestly: *"The live lens's state PATH is tested; its DATA cannot be until a
+game is in progress."* That was accurate and it was a **deferred
+falsification** — the first NCAAF game of the season was the test, and the
+test failed. A caveat written down is not a defect prevented; it is a defect
+scheduled.
+
+### The join key was in the payload all along
+
+`logo_url` carries ESPN's own team id (`.../i/teamlogos/ncaa/500/153.png`),
+stamped by `_resolve_branding`. Measured over the 51-game week-1 board:
+
+| key | result |
+|---|---|
+| **ESPN team id pair** | **51/51 carry both, 51 distinct pairs, exact** |
+| abbreviation pair | **0 of 10** comparable games matched |
+| display name | unsafe — no alias map, degrades to a prefix heuristic |
+
+Board abbreviations are CFBD's, not ESPN's: `NC`/`UNC`, `SJS`/`SJSU`,
+`NS`/`NCSU`, `VIR`/`UVA`, `JS`/`JVST`, `NDS`/`NDSU`, `SS`/`SAC`, `EM`/`EMU`,
+`NMS`/`NMSU`, `FS`/`FSU`. **A board joined on abbreviations reports every game
+pregame forever and is indistinguishable from the bug being fixed.** Names are
+worse — `ncaaf-settlement-resolver` measured that NCAAF has no alias map, so
+"Michigan" matches "Michigan State".
+
+### What changed
+
+- NEW `syndicate/features/ncaaf/live_game_state.py`. State semantics are
+  IMPORTED from `scripts/poll_ncaaf_live_state._game_from_event` (owned by
+  OPEN lane `ncaaf-settlement-resolver`, untouched) rather than
+  reimplemented — that module warns against exactly this drift, and it already
+  measured that `final` needs BOTH `completed` and `state == "post"`. This
+  adds only the join key and `period`/`displayClock`, off the same event.
+- Request-path fetch behind a 45s TTL cache and
+  `warn_if_compute_in_request_path` — the shape `nfl/live_game_state.py`
+  already runs in production. Fails soft to an EMPTY index; `matched` is
+  logged separately from `live`/`final` so a dead join and a quiet slate are
+  distinguishable (`NCAAF_LIVE_STATE ...`).
+- Only dates that have STARTED are fetched — one call on opening Saturday, not
+  ten for a week spanning 08-29..09-07.
+- The lens now shows the REAL score (`Score: NC 3 - 3 TCU`) above
+  `Predicted final:`. The old "NO LIVE SCORE, deliberately" rule was correct
+  and its premise is now false: it refused because the only `score` in the
+  contract was the PROJECTED one.
+- `startTime` **8/51 -> 51/51**, from `scoreboard.kickoff` already on the
+  card. Findings 2026-08-26 §1 flagged the null; no fetch was needed to fix it.
+
+### Two things this did NOT fix, stated so nobody reads a match as completeness
+
+- **NCAAF is still absent from `_LIVE_LENS_SPORTS`** in
+  `shared/live_lens_loop.py` (`mlb, nba, wnba, soccer, nfl`). The cross-sport
+  live-lens SNAPSHOT carries no NCAAF. This lane fixed the NCAAF board and
+  lens, which are a different subsystem.
+- **`Final` has not been observed in production.** At the time of the reading
+  no game had finished. The final path is unit-tested only — the same class of
+  claim that `[ncaaf-board-surfaces]` made about the live path, and it is
+  named here rather than left implicit.
+
+### A lane guard was silently claiming every sport's cards builder
+
+The UNOWNED lane `soccer-board-mlb-parity` had a bare `cards.py` in the prose
+of its `- Files:` block, inside a note that *said the claim had been removed*.
+`lane-guard` matches on path SUFFIX (`rel.endswith("/" + f)`), and a bare
+filename has no directory to disambiguate it — so that token claimed **mlb,
+nba, nfl, ncaaf and wnba** cards builders at once, and blocked an NCAAF edit
+during the first game of the season. `check_lane_invariants` passed the whole
+time: it verifies each claim has exactly ONE holder, and this one did. Same
+basename-collision class this file already records for `live_lens` across
+eight sports. **A disclaimer beside a path does not unclaim it — only deleting
+the path text does.**
+
 ## [ncaaf-board-surfaces] NCAAF BOARD SURFACES — projections published, compact strip rebuilt, live lens state-aware `[measured 2026-08-27T15:47Z, web 87c36d05]`
 
 **Projections reach the SHARED contract: 0/51 -> 51/51** on `home_mean`,

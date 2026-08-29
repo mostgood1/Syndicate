@@ -36930,3 +36930,377 @@ carries the peer's Polymarket join fix (`elapsed_s` 291 -> 176, `matched`
 85 -> 135, re-derived independently by this lane). Any BOARD-level improvement
 here is partly theirs. The `lstat` line is not — nothing in their change touches
 path resolution.
+
+> **UNION RESOLUTION `[2026-08-29, session 6dc988f8, lane ncaaf-live-lens-state]`.**
+> A `git rebase --autostash` restore conflicted here. The two sides held ONE
+> upstream section and THREE stashed ones, with zero shared headers, so both
+> were kept whole and nothing was dropped. Note that upstream's
+> `15:52:29Z da2de430` and the stashed `10:49 CT da2de430` are the SAME deploy
+> written up by two sessions (15:52Z = 10:52 CT) -- kept both readings rather
+> than picking one, because they were authored independently and neither is
+> mine to overwrite.
+
+---
+
+## 2026-08-29 00:15 CT — refresh-worker `06d1c78c` (break-glass #4) — MEASURED
+
+```
+deploy dep-da96ludg1s2s739dl970  created 05:15:37Z  BOOTED 05:18:48Z  read 05:33:30Z
+```
+
+Cost: 3 cheap jobs killed (odds refresh, run_refresh_odds_job, belgian_pro_league
+schedule build) — all re-run next tick. **NO MLB sim in flight.** I had told the
+user this would be a fourth MLB-sim kill; that was WRONG and was corrected from
+the preflight process list before deploying.
+
+### VERIFIED — corners (`0e61720d`, live via peer's `3e2cbd0b` 04:44:34Z)
+
+```
+corners market_indexed_under:  []  ->  ['lgscup|2026-09-02','lmx|2026-08-28',
+                                        'lmx|2026-08-29','soccer|2026-08-29']
+```
+
+Indexed under NOTHING before; indexed now. Direct before/after on the exact
+diagnostic field, independent of slate size. `cor-all` is the right hook.
+
+### VERIFIED — the `fh`/`sh` segment screen, and it was BIGGER than predicted
+
+```
+segment_market_not_full_game   465 -> 1825/1835   (3.1% -> 12.8% of markets)
+```
+
+Predicted ~124 (soccer BTTS halves). Actual ~1,370: `fh`/`sh` half TOTALS and
+SPREADS across lg1/mls/epl/sea/bun/lal plus cfb, mlb, nfl.
+
+**EXPOSURE WAS NARROWER THAN THAT COUNT AND MUST NOT BE QUOTED AS PREVENTED
+MISPRICINGS.** For totals/spreads the line filter already rejected most (a 1H
+total of 1.5 rarely equals a full-game 2.5). BTTS is the genuinely exposed case:
+it carries NO line, so `fh-btts` and `btts` differ only by the modifier and the
+line filter gave no protection at all. That is the 124.
+
+No false positives: ZERO moneyline or 3-way markets were screened, so no club
+tri-code is being read as a half token.
+
+### NOT PROVEN — the date fix (`8c53d701`) FIRED ZERO TIMES
+
+```
+forward_date_widened={}
+```
+
+Soccer refusals did collapse (219 corners + 118 h2h + 40 btts + 23 totals -> 0),
+**and none of it is attributable to this fix.** The slate rolled over at 05:00Z:
+the board's `selected_date` became 2026-08-29, which equals the venue's fixture
+dates, so the EXACT key hits and the widening branch is never reached.
+
+The rollover, not the binary, is the cause — pinned by a reading on the OLD
+binary at 05:16:29Z, 2m19s BEFORE mine booted:
+
+```
+05:16:29Z (old code)  elapsed_s=254.68  board_rows=758  matched=35
+05:33:30Z (new code)  elapsed_s=356.16  board_rows=758  matched=36
+```
+
+matched 35 -> 36 across different slates is not a result. **The fix is
+UNEXERCISED, not disproven**: the bug it targets is real and was measured
+(2,038 markets unreachable while the board asked 08-28 and every soccer fixture
+was 08-29+), and it will bite again whenever the `#545` two-matchday horizon
+carries rows past the slate date. It needs a DAYTIME reading to prove.
+
+### NEW, PRE-EXISTING, AND NOT MINE — two problems the rollover exposed
+
+Both present on the OLD binary at 05:16:29Z, so neither is attributable to this
+deploy:
+
+1. **`elapsed_s` 0.62 -> 254.68s.** The join short-circuited while soccer buckets
+   were empty; now they are populated it runs `_teams_match` over real
+   candidates. A 4-6 minute join inside a worker loop.
+2. **`ambiguous_polymarket_match: 186`.** Soccer 3-way h2h is THREE slugs per
+   fixture (`-liv`, `-draw`, `-not`), all line=None, so all three are candidates
+   for one board row and the ambiguity guard refuses. The sample shows it
+   literally: `offered: ['liv-not@None','liv-not@None','liv-not@None', ...]`.
+   The guard is behaving correctly; the join is not using `side` to pick the leg.
+   **This is now the top blocker on the user's original question — why soccer
+   does not execute.**
+
+---
+
+## 2026-08-29 09:23 CT — refresh-worker `7935cc4d` — PENDING MEASUREMENT
+
+```
+deploy dep-da9empcs728c73dhvvig  trigger=api  created 2026-08-29T14:23:33Z
+```
+
+**CLEAN GATE — no break-glass.** Preflight `CLEAR`: only infrastructure
+processes, plus 1 defunct child already dead and unkillable by a deploy. First
+deploy of this lane that needed no grant. 545 min since the last deploy, 25 min
+minimum.
+
+The guard refused the first attempt correctly: the CLEAR preflight had been run
+without `--target-commit`, so it vouched for no particular SHA. Re-run pinned to
+`7935cc4d`.
+
+**SHIPS:** soccer 3-way leg selection. Polymarket splits a 3-way into one Yes/No
+binary per outcome with the subject in the slug; all three carried the same
+fixture and `line=None`, so all three matched one board row and the ambiguity
+guard refused every one. Same root also caused
+`side_not_an_outcome_of_this_market` -- the outcomes are `["Yes","No"]` and
+"Liverpool" is not "Yes". Also adds `alternate_totals_corners` to the
+line-bearing set, which had the same ambiguity failure from the opposite cause.
+
+**BASELINE, read on the OUTGOING binary at 14:08:06Z** (not remembered, not
+carried over from last night):
+
+```
+elapsed_s=349.77  markets=17526  indexed=6993  board_rows=1291  matched=85
+ambiguous_polymarket_match: 206
+side_not_an_outcome_of_this_market: 30
+no_polymarket_market_for_league_date_market: 90
+```
+
+**verify:** `ambiguous_polymarket_match` falls sharply AND `matched` rises, read
+on a `POLYMARKET_BOARD_JOIN` line stamped after `[refresh_worker] BOOTED`. If
+ambiguity falls and `side_not_an_outcome_of_this_market` does NOT, the Yes-price
+path is not working and the fix is half-done. `elapsed_s` is the cost reading:
+the ambiguity path scanned every leg of every fixture, so it should fall; if it
+does not, the 254->356s cost attributed to populated buckets needs re-examining.
+
+**SECOND READING THIS DEPLOY CARRIES:** it is 09:23 Central, the DAYTIME window
+the date fix (`8c53d701`) has never been exercised in -- last night's reading was
+taken after the 05:00Z slate rollover, when board date equalled fixture date and
+`forward_date_widened={}` fired zero times. Non-zero here would be its first
+real reading. Still zero means the board is not carrying forward rows right now,
+NOT that the fix works.
+
+**Counts differ between the two reads (`markets` 17526 vs whatever lands,
+`board_rows` 1291). Compare RATES against their denominators.** Crediting a raw
+count to a fix is exactly how last night's soccer collapse was nearly
+misattributed to the date fix when the slate rollover had caused it.
+
+---
+
+## 2026-08-29 10:49 CT — refresh-worker `da2de430` — MEASURED
+
+```
+deploy dep-da9fv9p42hec73fq3ll0  trigger=api  created 2026-08-29T15:49:59Z
+```
+
+Clean gate, no break-glass. **Waited the full 25 min spacing rather than
+`--allow-rapid`**: the peer deployed `1fbc7a62` at 15:22:02Z and the board was
+neither broken nor being reverted, so an override would have cost a live board
+publish (`#563`) to save two minutes on a measurement.
+
+**SHIPS (mine):** `3f0e4f1d`, the `cfb` -> `ncaaf` league alias. The venue files
+college football under `cfb` -- h2h 180 / spreads 1265 / totals 749 = 2,194 rows
+-- while `ncaaf` is empty and the board stamps `ncaaf`.
+
+**RIDES ALONG (peer, `soccer-overview-cost`):** `da2de430` source-roots resolver
+cache (7,955 lstat syscalls per soccer branch) + `9618cc75` lanes. **Real code,
+so `elapsed_s` is now JOINTLY OWNED and I must not claim its movement.**
+
+**BASELINE, read on the outgoing binary at 15:22:26Z:**
+
+```
+elapsed_s=175.9  markets=17810  indexed=6984  board_rows=1291  matched=135
+no_polymarket_market_for_league_date_market: 90
+ambiguous_polymarket_match: 20   side_not_an_outcome_of_this_market: 30
+```
+
+**verify:** `no_polymarket_market_for_league_date_market` 90 -> near zero AND
+`matched` > 135, on a line stamped after `BOOTED`. Both are unaffected by the
+peer's cache, which is why they are the verdict rather than `elapsed_s`.
+
+**CONFOUND, STATED IN ADVANCE:** Saturday college slate fills through the
+afternoon. If `board_rows` moves off 1291, report RATES not counts.
+
+### CORRECTION OWED, FROM THE PEER — and they were right
+
+I twice told them they would "carry my commits anyway". `3f0e4f1d` landed AFTER
+their 15:22:02Z trigger, so it could not have been in it. I asserted ancestry
+instead of measuring it at THEIR deploy moment. Main moves under both sessions;
+ancestry is a deploy-time measurement, never a claim.
+
+They also re-derived my join numbers rather than taking them, and found a
+baseline I did not have:
+
+```
+elapsed_s  291 -> 349.77 -> 201.41 -> 175.9
+matched     89 -> 85     -> 133    -> 135
+```
+
+The join had already climbed 291 -> 349.77 BEFORE my fix pulled it to 175.9, and
+`matched` improved as well as the elapsed -- which I had under-reported. Their
+ledger now credits ~100-175s of any post-15:1xZ board-build gain to this lane
+rather than to soccer work.
+
+### MEASUREMENT — read 16:11:39Z (18m38s after BOOTED 15:53:01Z)
+
+**NCAAF ALIAS VERIFIED.**
+
+```
+                                    15:22:26Z      16:11:39Z
+no_polymarket_market_for_league_date_market   90 -> ABSENT (0)
+no_candidates|ncaaf|totals                    84 -> 0
+no_candidates|ncaaf|h2h                        3 -> 0
+no_candidates|ncaaf|spreads                    3 -> 0
+remaining NCAAF loss                              -> no_match|ncaaf|h2h: 1
+board_rows                                  1291 -> 1286
+```
+
+89 of 90 NCAAF board rows now resolve. `no_candidates` is gone for EVERY league.
+
+**A HYPOTHESIS I FORMED AND KILLED BEFORE STATING IT.** On seeing
+`no_matching_polymarket_market` jump 1 -> 47 I read it as "NCAAF rows now find a
+bucket but fail the fixture match -- college tri-codes need aliasing". The
+per-league breakdown says otherwise:
+
+```
+no_match|soccer|alternate_totals_corners: 37   <- dominates
+no_match|soccer|h2h: 5   mlb|spreads: 3   ncaaf|h2h: 1   mlb|totals: 1
+```
+
+NCAAF is 1 of 47. The 47 is a SOCCER CORNERS problem. Reporting the aggregate
+without the split would have sent the next session to alias college tri-codes,
+which are not broken.
+
+**NOT EXPLAINED, AND NOT CLAIMED AS FIXED: `matched` FELL 135 -> 122.**
+
+Soccer corners `no_match` rose 1 -> 37 across the same interval, which accounts
+for the direction but not the cause. Corners line-matching was working at
+14:56:38Z (`no_match|soccer|alternate_totals_corners: 1`) with the same
+`_LINE_BEARING_BOARD_MARKETS` code, so this is NOT the corners line filter
+regressing. Two live candidates, neither measured:
+
+- slate composition: `markets` 17810 -> 17529, `indexed` 6984 -> 6865. Thinner
+  corners rungs mean a board line finds no exact rung.
+- the peer's source-roots cache in the same binary changing which artifacts the
+  board reads.
+
+**A net -13 on `matched` alongside a +89 on NCAAF reachability is not a win to
+bank.** Next session: split corners `no_match` by whether the board line has ANY
+rung on that fixture.
+
+**`elapsed_s` 175.9 -> 118.0. REPORTED, NOT CLAIMED.** The peer's source-roots
+cache ships in this binary (`SOCCER_GAMES_TIMING elapsed_s=5.09 leagues=10
+games=231`), so the movement is jointly owned.
+
+**`forward_date_widened={}` — FOURTH consecutive zero.** The date fix
+(`8c53d701`) has now never fired in production across four readings spanning
+night and day. It stays UNPROVEN, and at four readings the honest reading is
+that the condition it targets may be rarer than the 2,038-market measurement
+implied.
+
+---
+
+## 2026-08-29 11:26 CT — web — `061d5b2b` — NCAAF LIVE LENS, **VERIFIED ON PRODUCTION**
+
+```
+deploy dep-da9gg8ss728c73dn0290  created 16:26:12Z  swap 16:28:13-16:29:31Z  serving 16:29:57Z
+```
+
+**verify: `/ncaaf/api/live-lens` reported `Live 1` while ESPN reported exactly
+one game `state=in`, read in ONE script run at 16:30:28Z.**
+
+```
+ESPN        events=8  in=1  post=0   UNC VS TCU  "4:00 - 1st Quarter"
+PRODUCTION  games=51  Live=1  Final=0  Pregame=50
+            card "NC @ TCU"  eyebrow 'Q1 - 4:00'
+VERDICT     MATCH
+```
+
+Before, same endpoint, 16:05Z with the same game already in progress:
+`Games 51 | Live 0 | Final 0 | Pregame 51`. So this is a 0 -> 1 on the number
+the board exists to show, against an independent source read at the same
+instant, not a green log line.
+
+**What was wrong.** `publication_adapter._shared_game_state` derives
+`live`/`final`/`period`/`clock` from `game["live_state"]`, and
+`ncaaf/cards.py` had **zero occurrences of that key**. Every NCAAF card
+carried `{live:false, final:false, period:null, clock:"", startTime:null,
+status:"Week 1"}`. The lens's live branch was unreachable by construction —
+not empty, unreachable. The state PATH shipped 2026-08-27
+(`ncaaf-board-surfaces`) and its own entry recorded that the DATA could not be
+tested until a game was in progress. Today was that test and it failed.
+
+**The join key was already in the payload.** `logo_url` carries ESPN's own
+team id (`.../500/153.png`). Measured over the 51-game board: **51/51 carry
+both ids, 51 distinct pairs, exact.** The obvious alternative is a trap —
+board abbreviations are CFBD's, and **0 of 10** comparable games match
+(`NC`/`UNC`, `SJS`/`SJSU`, `VIR`/`UVA`, `FS`/`FSU`...). A board joined on
+abbreviations would report every game pregame forever and look **exactly like
+the bug being fixed**.
+
+**Ops note — a lane guard was blocking every sport's cards builder.** The
+UNOWNED lane `soccer-board-mlb-parity` had a bare `cards.py` in the prose of
+its `- Files:` block, in a note that *said the claim had been removed*.
+`lane-guard` matches on path SUFFIX, so that unclaimed token claimed mlb, nba,
+nfl, ncaaf and wnba cards builders simultaneously. `check_lane_invariants`
+passed throughout — it checks that each claim has ONE holder, and this one
+did. Corrected in `lanes.md` with the reasoning.
+
+**Not done, and not claimed to be.** NCAAF is still absent from
+`_LIVE_LENS_SPORTS` in `shared/live_lens_loop.py`, so the cross-sport
+live-lens SNAPSHOT still carries no NCAAF. This deploy fixes the NCAAF board
+and lens only. Separately, `scripts/poll_ncaaf_live_state.py` (owned by OPEN
+lane `ncaaf-settlement-resolver`, untouched here) emits no `period`/`clock`;
+this reads them off the same event rather than editing that file.
+
+release: web claim released after the follow-up deploy below.
+
+---
+
+## 2026-08-29 11:30 CT — web — `efc41b52` — NCAAF LIVE SCORE ON THE LENS — **VERIFIED**
+
+```
+deploy dep-da9gifijnfac73dqocf0  created 16:30:54Z  serving 16:34:18Z
+```
+
+**verify: the served lens now carries the REAL score, read back from
+production 16:34:18Z:**
+
+```
+NC @ TCU  [Q1 - 4:00]  Score: NC 3 - 10 TCU
+```
+
+And from the rendered HTML page (not the API) at 16:36Z:
+
+```
+Q1 - 2:57          Score: NC 3 - 10 TCU
+Live 1             "51 games on the board -- 1 live, 0 final, 50 pregame."
+```
+
+The previous "NO LIVE SCORE, deliberately" rule was CORRECT on the data that
+existed — the only `score` in the contract was the PROJECTED one, so showing
+it beside a live clock would have rendered a simulation as the result. The
+join now supplies a real score, and only for started games (the parser
+suppresses the pregame 0-0 placeholder), so a value present always means the
+game has begun. Rendered as `Score:` above `Predicted final:`.
+
+Also un-redded `test_smartsim_live_lens_runtime_uses_runtime_cards`, which had
+been failing since 2026-08-27 asserting the OLD constant eyebrow. **That is
+why nothing reported today's breakage: a test already red cannot tell you
+something else broke.**
+
+**Latency, measured because this adds a request-path fetch:** 5 reads of
+`/ncaaf/api/live-lens` returned 3.03/3.03/3.31/3.90/5.28s, against a
+**4.85s** pre-change baseline at 16:03Z. The 45s TTL cache absorbs the ESPN
+call; no regression.
+
+## 2026-08-29 11:35 CT — web — `4822f8e4` — startTime on all 51 cards — **MEASURED**
+
+```
+deploy dep-da9gkfpf2nfc73fgkuqg  created 16:35:11Z  serving by 16:38:5xZ
+```
+
+**verify: `/ncaaf/api/cards?week=1` on production, 16:38:5xZ:**
+
+```
+startTime=51/51   live=1        (was startTime=8/51 on efc41b52, and 0/51 before this lane)
+```
+
+The ESPN join reaches only dates that have STARTED, which is 8 of 51 on an
+opener weekend whose week spans 08-29..09-07. The other 43 came from
+`ncaaf_card.scoreboard.kickoff`, already on every card — **no extra fetch**.
+Widening the ESPN window to ten dates to recover a value sitting in the
+payload would have been ten round trips for nothing.
+
+release: web claim released after this measurement.
