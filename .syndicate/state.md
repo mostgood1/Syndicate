@@ -6844,7 +6844,7 @@ SANCTIONED catalogue). Full evidence:
 **Supersedes the 2026-08-24 record**, which was written from a sandbox that
 403s CONNECT to crypto.com and got three things wrong — see `learnings.md`.
 
-## [board-window-staleness] — **CAUSE CORRECTED 2026-08-29. Still UNFIXED; the fix is build COST, not the queue.**
+## [board-window-staleness] — **CAUSE FOUND AND VERIFIED 2026-08-29. It is neither the queue NOR build cost — see `[week-scoped-board-window]`.**
 
 **SYMPTOM, from the user's own board:** `combined_board_window · as of Aug 28,
 12:15 PM · 1746 candidates` displayed at 4:33 PM. `computed_at` is the OLDEST
@@ -6913,18 +6913,30 @@ the latter is 1800 and is ALSO mine — env currently wins. `DAYS=1` remains
 available and is NOT set: it makes `computed_at` current by NARROWING WHAT THE
 BOARD CLAIMS, which is not what was asked for.
 
-### THE FIX, and what it is worth
+### THE FIX — and BOTH earlier answers in this section are superseded
 
-Cut build cost. Landed 2026-08-29: soccer's per-fixture repeated artifact reads,
-**60 file loads -> 4 (15x)** -- see lane `soccer-overview-cost`. Soccer is ~60% of
-`build_intelligence_overview` (all seven other sports together were 101s of a
-1158s pass).
+**MEASURED on the served payload, 2026-08-29 18:13:02Z:**
 
-**HONEST ARITHMETIC, stated so nobody reads this as solved:** if soccer drops to
-~50s, the build goes ~1500s -> ~700s and the per-date period ~50min -> ~23min.
-Better, NOT fresh. `candidate_collection_with_fallback` (119-656s) is untouched
-and uninstrumented internally.
+```
+computed_at 2026-08-28T23:03:31Z   age 68,971 s (19.2 h)   newest_age 300 s
+by_date  2026-08-29  153 candidates, 12 sports
+         2026-08-30   42 candidates, ["serie a"]   <- 19.2h old, REAL ROWS
+         2026-08-31    0 candidates                <- ignored (#603)
+```
 
+`2026-08-30` has ONLY soccer fixtures (`SCHEDULE_RECONCILE_CHECK
+scheduled_games=0`). `_supported_intelligence_dates()` covers FIVE DAILY SPORTS
+ONLY, so that date is never eligible to BUILD, while the read side correctly
+shows its 42 real rows — whose 19.2h stamp then sets `computed_at`.
+
+**BUILD SPEED CANNOT MOVE THIS**, which is why nothing did: three config changes
+AND two verified performance fixes (`lstat` 7,955 -> absent; soccer bracket
+363s -> 80.5s, full board build 1005s vs a 900-2000s baseline) all left it at 19.2h.
+
+`#603` (landed `a1d7ad4e`, verified firing) removed EMPTY dates from the age —
+08-31 no longer counts. 08-30 is not empty, so it still does, correctly.
+
+**The remaining fix is scoped, not built: `[week-scoped-board-window]` below.**
 ### KNOWN, NOT ACTIONED — USER DECISION
 
 `#385` records that refilling the legacy pool costs **~580s per build and

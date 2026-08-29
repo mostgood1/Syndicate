@@ -5935,3 +5935,47 @@ measurement in the verify step catches it.
 **Check, not prose:** the useful fix is for lane headers to carry the
 `ListAgents` NAME alongside the session UUID, so a holder is addressable from
 the ledger. Until then, `/lane open` should record both.
+
+## 2026-08-29 — FORBIDDEN: trusting a profiler's ANSWER without validating its SCOPE against the metric you care about
+
+I wired cProfile into `_build_sport_overview`, read `posix.lstat` at 46% of it,
+fixed that, and reported it as soccer's cost. The profile was correct. **The
+region was 2.4% of soccer's `OVERVIEW_SPORT` bracket** (10.95s of 452.97s, later
+3.22s of 362.76s). I had carried "sport_branch is 98%" from this lane's own
+notes, where it meant 98% OF `_build_sport_overview`'S OWN ELAPSED — a share
+against a different denominator.
+
+**The instrument does not know what you are trying to explain.** A profiler tells
+you where time went INSIDE ITS BRACKET, with total authority and no opinion about
+whether that bracket is the thing you care about. That check is one subtraction:
+compare the profile's `elapsed_s` against the enclosing measurement. 10.95 vs
+452.97 was visible in logs I had already pulled, and I did not do it until the
+second profile forced the question.
+
+**The correct move, once done, took one step:** `OVERVIEW_SPORT_BEGIN..END`
+contains exactly three calls, so ~99% had to be in the consumer. Profiling THERE
+gave `collect_s=901.59 of 902.06` and named the leaf in one run.
+
+**How to apply:** before acting on a profile, state the profiled region's share of
+the number you are trying to move, from a measurement OUTSIDE the profiler. If
+you cannot, you do not yet know what you measured.
+
+## 2026-08-29 — FORBIDDEN: windowing a verification watcher on wall-clock time instead of on the boot it is verifying
+
+My post-deploy watcher opened its log window at a fixed timestamp and returned
+`CONSUME_SPORT_SEGMENTS total_s=1114.41` — a clean, plausible, correctly-formatted
+number **from a pass that ran eight minutes BEFORE the deploy started**, on the old
+code, with a profiler still armed. Read as a post-fix result it says the fix made
+things worse. The `boot=none` field in the same output was the only tell.
+
+Fixed by keying the window on the BOOTED timestamp and requiring the sample to be
+strictly after it. The rewritten watcher then produced the real number, 75.78s.
+
+**This is the same family as the substring collisions this session** (`BOOTED`
+matching the log tool's own header; `ODDS_HISTORY_LOAD` matching
+`ODDS_HISTORY_LOADED`; a claim watcher grepping `free` against a status line
+reading `EXPIRED (does not block)`, which cost 13 minutes of waiting on an
+already-dead lock). **Four instances in one session of a query matching something
+that was not what it was looking for.** The shared fix is to anchor the query on
+an identifier the target event actually emits, and to include in the output the
+field that would reveal a mismatch.
