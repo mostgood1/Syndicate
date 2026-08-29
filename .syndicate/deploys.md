@@ -37371,3 +37371,61 @@ Not edited across lanes. Needs that lane's release or a user override.
 `schedule_adapter.ScheduleEvent` carries `home_team_id`/`away_team_id` for MLB
 ONLY, so the ESPN-id join that works so well on the cards is not directly
 available there either — the rewrite is real work, not a one-liner.
+
+---
+
+## 2026-08-29 12:10 CT — web — `fbc794d9` — NCAAF chips: resolve off the schedule — PENDING MEASUREMENT
+
+```
+deploy dep-da9h50hsrm7s73cbnh00  created 17:10:26Z
+```
+
+verify (owed): `/api/board/game-chips?sports=ncaaf` returns **8** chips with the
+live game carrying `state: "live"` and a real score, against **0** before.
+
+**Deployed under an EXPLICIT USER OVERRIDE of a lane claim** — `[user, 2026-08-29:
+"fix it, override the lane claim"]`. `syndicate/features/ncaaf/sources.py` is held
+by OPEN lane `ncaaf-pace-block`; the edit is scoped to
+`ncaaf_week_and_card_keys_for_date` alone (diff touches that function and one
+import, nothing else in the file) and is logged on BOTH lane blocks so the holder
+finds it without going looking.
+
+**What was wrong:** the resolver gated on `cfbd_lines_{season}_wk{N}.json`, which
+has no producer on any service, exists in git at no SHA, and is not in
+`HOT_ARTIFACT_PATTERNS`. It returned None everywhere, so `_NCAAFDataProvider.games()`
+returned `[]`, so NCAAF served 0 chips on every service on every date, so Layer 2's
+82 NCAAF rows carried `game_state: None`.
+
+**What it reads now:** the season schedule the cards are already built from. The
+card key is a FORMULA, not a lookup — `f"{week}_{away}_{home}"` with spaces
+underscored, over `load_games_season`, FBS-vs-FBS only — so reconstructing it from
+the same source with the same filter is exact by construction. Local:
+
+    2026-08-29  week 1   8 keys   8/8 matched real card gamePks, 0 unmatched
+    2026-09-05  week 1  30 keys  30/30 matched
+    build_game_chips -> 8 chips, NC @ TCU state=live 'Q2 7:48' score 10-10
+
+**A UTC prefix would have silently dropped the marquee window.** A first cut
+matched `startDate[:10]` and returned 7 of Saturday's 8 games — a 9pm Central
+kickoff is `02:00Z` the next day. `central_date_from_iso` already existed for this
+exact bug class (WNBA, 2026-07-21) and is reused rather than re-derived. The
+retired docstring warned about the UTC boundary and I dismissed it too quickly;
+the warning was right.
+
+**Deleted `tests/test_ncaaf_date_keying.py`.** All six of its tests wrote
+`cfbd_lines` into a temp dir before calling the resolver, so they passed
+continuously while the production path they covered returned None on every
+service. **Their green was the strongest single reason this survived.** One of
+them asserted the exact production behaviour (`None`) for entirely the wrong
+reason. Replaced by a suite whose FIRST test asserts the resolver works with no
+`cfbd_lines` file present at all, plus a guard against reintroducing the
+dependency.
+
+**Regression baseline:** `pytest -k ncaaf` -> **603 passed, 6 failed**, and those
+6 are the same pre-existing failures measured on a clean HEAD worktree earlier
+today (the 7th, `test_ncaaf_live_lens_local`, is fixed by this lane's earlier work).
+
+**STILL OWED — refresh-worker.** `pipeline/layer2_shortlist.py:548` runs
+`attach_game_state` on the WORKER, so the `layer2-shortlist` `game` join stays
+0/82 until refresh-worker also runs this commit. Web only fixes the chips
+endpoint and the inline fallback.

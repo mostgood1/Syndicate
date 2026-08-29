@@ -2011,6 +2011,15 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 
 
 ### ncaaf-pace-block — OPEN — NCAAF calibration re-fitted and PROMOTED (15.00% -> 7.24%, impossible drives 159 -> 0); NFL deliberately NOT re-fitted (best as shipped); production read of the profile still owed — opened 2026-08-27 — session de363735
+- **`syndicate/features/ncaaf/sources.py` WAS EDITED OUT FROM UNDER THIS LANE
+  ON EXPLICIT USER OVERRIDE `[2026-08-29, session 6dc988f8, lane
+  ncaaf-compact-card-state]`.** Scope: `ncaaf_week_and_card_keys_for_date`
+  ONLY — it depended on `cfbd_lines_*.json`, which has no producer on any
+  service and exists at no git SHA (`#557`), so NCAAF served **0 game chips
+  on every service on every date** and Layer 2's NCAAF rows carried no game
+  state. Nothing else in the file was touched; the calibration/pace work this
+  lane owns is elsewhere in it. Recorded here rather than only in my own lane
+  so the holder finds it without going looking.
 - Goal: the NCAAF `pace` block carries a REAL per-team seconds-per-play, so the
   engine stops running every game on the hardcoded 24.0 (`pace_index +0.400`).
 - Files: `scripts/build_ncaaf_pace_snapshot.py`,
@@ -3458,7 +3467,10 @@ caaf-no-orders`). NOT
   not updating with game state on the ncaaf page, layer 2 compact cards also
   are not updating." Follows `ncaaf-live-lens-state`, which fixed the LENS and
   the cards contract; these are two further consumers that did not follow.
-- Files: `syndicate/templates/shared/_scoreboard_strip_ncaaf.html`
+- Files: `syndicate/templates/shared/_scoreboard_strip_ncaaf.html`,
+  `syndicate/features/ncaaf/sources.py` **[CLAIM TAKEN UNDER EXPLICIT USER
+  OVERRIDE, 2026-08-29 — user: "fix it, override the lane claim"]**,
+  NEW `tests/test_ncaaf_week_and_card_keys_for_date.py`
 - Reads but does NOT claim: `syndicate/features/shared/board_enrichment.py`
   (held by `soccer-board-mlb-parity`), `pipeline/layer2_shortlist.py`,
   `syndicate/features/shared/game_chip_scoreboard.py`,
