@@ -390,6 +390,110 @@ def join_kalshi_polymarket_moneylines(
     return {"matches": matches, "refusals": reasons}
 
 
+def net_edge_per_contract(
+    kalshi_price: float,
+    polymarket_price: float,
+    *,
+    kalshi_fee_multiplier: float,
+    polymarket_fee_bound: bool = True,
+) -> dict[str, Any]:
+    """The edge on ONE complementary pair, net of each venue's own fee model.
+
+    --------------------------------------------------------------------------
+    THIS REPLACES A FLAT 4% BUFFER THAT WAS WRONG IN BOTH DIRECTIONS
+    --------------------------------------------------------------------------
+
+    `DEFAULT_FEE_BUFFER = 0.04` was a single flat number standing in for two
+    venues' unknown costs. Against the measured schedule it is far too
+    PESSIMISTIC, in two compounding ways:
+
+    - **The fee is quadratic, not flat.** Kalshi charges `rate * P * (1-P)`, so
+      at P=0.05 the full-rate cost is 0.0033/contract, not 0.04 -- twelve times
+      smaller. Lopsided in-play lines (WSH at 0.94 tonight) are exactly where
+      the cheapest crossings live, and a flat buffer hid every one of them.
+    - **MLB is half rate.** Every MLB game/total/spread/K series carries
+      `fee_multiplier: 0.5` (read live 2026-08-29), so Kalshi's WORST case
+      there -- even money, the peak of the parabola -- is 0.00875/contract,
+      about a fifth of the flat buffer.
+
+    Over-stating a cost sounds like the safe error and is not: it reports zero
+    opportunities on a book that may well have had some, and a detector that
+    never fires is indistinguishable from a market with no arb in it. That is
+    the same confusion `kalshi_client`'s header warns about for empty lists,
+    and it is why this returns a computed cost rather than a margin of safety.
+
+    --------------------------------------------------------------------------
+    SIZE-FREE, ON PURPOSE
+    --------------------------------------------------------------------------
+
+    Kalshi's fee is `rate * C * P * (1-P)`, so the fee PER CONTRACT is
+    `rate * P * (1-P)` -- independent of C except for the rounding, which is to
+    a hundredth of a cent and cannot move a per-contract edge materially. The
+    edge therefore does not depend on how much we would bet, which is what
+    makes it a property of the market rather than of our sizing.
+
+    --------------------------------------------------------------------------
+    THE POLYMARKET LEG IS A BOUND, NOT A COST
+    --------------------------------------------------------------------------
+
+    `fees_dollars` is null on all 13 of our filled Polymarket orders, and the
+    per-market `feeCoefficient` has never had its units observed. So the
+    Polymarket half uses `venue_fees.polymarket_worst_case_fee_dollars`, which
+    is deliberately more expensive than the venue we HAVE measured. An
+    opportunity that survives it is real even if Polymarket turns out to cost
+    more than we think; one that only appears with a cheaper number is not
+    evidence of anything. `polymarket_fee_bound=False` refuses instead, for a
+    caller that would rather have no number than a bound.
+    """
+    from syndicate.features.shared.venue_fees import (
+        kalshi_taker_fee_dollars,
+        polymarket_fee_dollars,
+        polymarket_worst_case_fee_dollars,
+    )
+
+    gross_cost = float(kalshi_price) + float(polymarket_price)
+    # Per ONE contract on each leg. See the size-free note above.
+    kalshi_fee = kalshi_taker_fee_dollars(1.0, kalshi_price, fee_multiplier=kalshi_fee_multiplier)
+    if polymarket_fee_bound:
+        polymarket_fee = polymarket_worst_case_fee_dollars(1.0, polymarket_price)
+        polymarket_fee_basis = "worst_case_bound"
+    else:
+        polymarket_fee = polymarket_fee_dollars(1.0, polymarket_price)  # raises
+        polymarket_fee_basis = "measured"
+
+    # Fees at a single contract round up to a full grain each, which at C=1
+    # over-weights the rounding. Compute the unrounded per-contract rate too,
+    # so a 1,000-contract execution is not judged on a 1-contract rounding.
+    from syndicate.features.shared.venue_fees import (
+        KALSHI_BASE_TAKER_RATE,
+        POLYMARKET_ASSUMED_WORST_CASE_RATE,
+    )
+
+    kalshi_rate_cost = (
+        KALSHI_BASE_TAKER_RATE * float(kalshi_fee_multiplier)
+        * float(kalshi_price) * (1.0 - float(kalshi_price))
+    )
+    polymarket_rate_cost = (
+        POLYMARKET_ASSUMED_WORST_CASE_RATE
+        * float(polymarket_price) * (1.0 - float(polymarket_price))
+    )
+    total_rate_cost = kalshi_rate_cost + polymarket_rate_cost
+
+    return {
+        "gross_cost": gross_cost,
+        "raw_edge": 1.0 - gross_cost,
+        "kalshi_fee_per_contract": kalshi_rate_cost,
+        "polymarket_fee_per_contract": polymarket_rate_cost,
+        "polymarket_fee_basis": polymarket_fee_basis,
+        "total_fee_per_contract": total_rate_cost,
+        "net_edge_per_contract": 1.0 - gross_cost - total_rate_cost,
+        # The rounded, single-contract figures, kept so a reader can see what
+        # one contract literally costs rather than only the rate.
+        "kalshi_fee_one_contract_rounded": kalshi_fee,
+        "polymarket_fee_one_contract_rounded": polymarket_fee,
+    }
+
+
 def detect_arb_opportunities(
     matches: Sequence[Mapping[str, Any]],
     *,

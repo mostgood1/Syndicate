@@ -77,6 +77,9 @@ from __future__ import annotations
 from typing import Any, Iterable, Mapping, Sequence
 
 __all__ = [
+    "YES_LEG_INDEX_FIELD",
+    "YES_LEG_REASON_FIELD",
+    "yes_leg_index_from_market",
     "fetch_markets",
     "is_settled_row",
     "MARKET_STATUS_OPEN",
@@ -1432,12 +1435,164 @@ _SLATE_STORAGE_FIELDS = (
     "gameStartTime", "orderPriceMinTickSize", "minimumTradeQty", "orderable",
 )
 
+# The derived field this module adds on top of the venue's own keys. An INDEX
+# and a REASON, never the `marketSides` blob it came from -- see
+# `yes_leg_index_from_market`.
+YES_LEG_INDEX_FIELD = "yesLegIndex"
+YES_LEG_REASON_FIELD = "yesLegReason"
+
+# Refusal reasons for the YES-leg derivation. Named rather than boolean so a
+# census can say WHICH way the venue failed to state it, which is the
+# difference between "this market family never declares a side" and "our
+# name-matching is broken".
+YES_LEG_NO_MARKET_SIDES = "no_market_sides"
+YES_LEG_SIDES_UNREADABLE = "market_sides_unreadable"
+YES_LEG_NO_LONG_SIDE = "no_side_marked_long"
+YES_LEG_TWO_LONG_SIDES = "two_sides_marked_long"
+YES_LEG_LONG_SIDE_UNNAMED = "long_side_has_no_name"
+YES_LEG_NAME_NOT_IN_OUTCOMES = "long_side_name_not_in_outcomes"
+YES_LEG_NAME_AMBIGUOUS = "long_side_name_matches_both_outcomes"
+YES_LEG_OUTCOMES_UNREADABLE = "outcomes_unreadable"
+
+
+def _decode_outcome_list(value: Any) -> list[Any] | None:
+    """`outcomes`/`outcomePrices` ARE JSON STRINGS ON THE WIRE, sometimes.
+
+    Measured 2026-08-28 elsewhere in this module: a probe printed
+    `long_index=None` on all three samples purely because the arrays arrived as
+    strings and were compared as strings. Both shapes are accepted here so the
+    derivation cannot fail for that reason again.
+    """
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        import json
+
+        try:
+            decoded = json.loads(value)
+        except (ValueError, TypeError):
+            return None
+        return decoded if isinstance(decoded, list) else None
+    return None
+
+
+def _normalise_name(text: Any) -> str:
+    return " ".join(str(text or "").split()).casefold()
+
+
+def yes_leg_index_from_market(row: Mapping[str, Any]) -> tuple[int | None, str | None]:
+    """`(index_in_outcomes_of_the_YES_leg, refusal_reason)` -- one or the other.
+
+    --------------------------------------------------------------------------
+    WHY THIS EXISTS: `outcomes[0]` IS NOT THE YES LEG, AND IT COST REAL MONEY
+    --------------------------------------------------------------------------
+
+    `polymarket_us_orders._resolve_outcome_side` used to send
+    `OUTCOME_SIDE_YES` iff our team sat at `outcomes[0]`. Measured wrong on
+    **3 of 8 venue-settled moneylines** (`#595`): `aec-mlb-az-sf-2026-08-27`
+    bought San Francisco, SF won 6-1, and the venue graded the position LOST at
+    -$5.871 with `held_side=POSITION_RESOLUTION_SIDE_SHORT`. The order module
+    now REFUSES a team side outright, which is correct and costs the whole h2h
+    book -- including every cross-venue arb, since an arb is a moneyline trade.
+
+    The venue does state the answer: `marketSides[].long`. Read live
+    2026-08-28 on three NFL moneylines, `long_index` came back **0, 0, 1** --
+    it VARIES, which is what proves `long` is the yes/no axis rather than a
+    constant that happens to agree with position twice.
+
+    --------------------------------------------------------------------------
+    MATCHED BY NAME, NEVER BY THE POSITION OF THE `marketSides` ENTRY
+    --------------------------------------------------------------------------
+
+    The obvious implementation -- "whichever `marketSides[i]` has `long: True`,
+    take `i`" -- reintroduces exactly the bug being fixed, one array over. It
+    assumes `marketSides` is ordered the same as `outcomes`, which is the same
+    class of assumption as `outcomes[0] == YES` and has just as little behind
+    it. So the long side's `description`/`team.name` is matched against the
+    `outcomes` strings, and the INDEX COMES FROM `outcomes`.
+
+    --------------------------------------------------------------------------
+    EVERY AMBIGUITY IS A NAMED REFUSAL. NONE OF THEM RESOLVES TO AN INDEX.
+    --------------------------------------------------------------------------
+
+    Two `long: True` sides means `long` is not the axis on this market and the
+    whole rule is void here. Zero means the venue did not state it. A name that
+    matches neither outcome, or both, means the join failed. Each returns its
+    own reason so a census can separate "the venue never says" from "our
+    matching is broken" -- `learnings.md` is explicit that a guard mapping
+    unknown onto its permissive branch is how a failed join becomes a relaxed
+    rule with no reason emitted.
+
+    **THIS FUNCTION DOES NOT DECIDE WHETHER TO TRADE.** It reports what the
+    venue stated. `#595` step 3 requires the rule be scored against all 8
+    venue-settled moneylines -- including the 3 that went wrong -- before the
+    order module's refusal comes off. That scoring is the consuming lane's
+    (`unknown-submit-retry-provenance`) call, not this one's.
+    """
+    sides = row.get("marketSides")
+    if sides is None:
+        return None, YES_LEG_NO_MARKET_SIDES
+    if isinstance(sides, str):
+        import json
+
+        try:
+            sides = json.loads(sides)
+        except (ValueError, TypeError):
+            return None, YES_LEG_SIDES_UNREADABLE
+    if not isinstance(sides, list) or not sides:
+        return None, YES_LEG_SIDES_UNREADABLE
+
+    long_names: list[str] = []
+    for side in sides:
+        if not isinstance(side, Mapping):
+            continue
+        if side.get("long") is not True:
+            continue
+        team = side.get("team")
+        name = side.get("description") or (team.get("name") if isinstance(team, Mapping) else None)
+        long_names.append(_normalise_name(name))
+
+    if not long_names:
+        return None, YES_LEG_NO_LONG_SIDE
+    if len(long_names) > 1:
+        # `long` is not the yes/no axis on this market. Taking the first would
+        # be a coin flip dressed as a rule.
+        return None, YES_LEG_TWO_LONG_SIDES
+    long_name = long_names[0]
+    if not long_name:
+        return None, YES_LEG_LONG_SIDE_UNNAMED
+
+    outcomes = _decode_outcome_list(row.get("outcomes"))
+    if not isinstance(outcomes, list) or len(outcomes) != 2:
+        return None, YES_LEG_OUTCOMES_UNREADABLE
+
+    matches = [i for i, name in enumerate(outcomes) if _normalise_name(name) == long_name]
+    if len(matches) == 1:
+        return matches[0], None
+    if len(matches) > 1:
+        # Two identically-named outcomes: the name cannot pick one.
+        return None, YES_LEG_NAME_AMBIGUOUS
+    return None, YES_LEG_NAME_NOT_IN_OUTCOMES
+
 
 def _slate_row_for_storage(row: Mapping[str, Any]) -> dict[str, Any]:
     """The persisted row. Drops `question`, `description`, `tags`, `category`
     and the rest -- readable from the venue on demand, and none of them is read
-    by anything downstream of this artifact."""
-    return {key: row[key] for key in _SLATE_STORAGE_FIELDS if key in row}
+    by anything downstream of this artifact.
+
+    ADDS the derived `yesLegIndex`/`yesLegReason`. **The `marketSides` blob
+    itself is deliberately NOT persisted**: the trimmed slate is already 4.9MB
+    of an 8MB keyvalue ceiling, and `marketSides` carries two nested objects
+    per row. A small int and a short string cost a few bytes; the blob would
+    cost the ceiling. The derivation happens here, once, where the full venue
+    payload is still in hand -- which is the only place it can happen at all,
+    since nothing downstream ever sees `marketSides`.
+    """
+    stored = {key: row[key] for key in _SLATE_STORAGE_FIELDS if key in row}
+    index, reason = yes_leg_index_from_market(row)
+    stored[YES_LEG_INDEX_FIELD] = index
+    stored[YES_LEG_REASON_FIELD] = reason
+    return stored
 
 
 # How much of the ceiling the slate may use. The remainder is margin: the
