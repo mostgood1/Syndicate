@@ -239,7 +239,11 @@ def _polymarket_price_resolver(selected_date: str | None):
             # WHICH COMPONENT of the key disagreed. `no_candidates` alone
             # cannot distinguish a league mismatch from a date or a market one,
             # and BTTS is currently unexplained for exactly that reason.
-            f" key_misses={joined.get('key_miss_samples')}",
+            f" key_misses={joined.get('key_miss_samples')}"
+            # The venue's OWN soccer prop vocabulary. `btts` was found from a
+            # slug token; corners has not been found at all, and its current
+            # route reads a `question` field that is never populated.
+            f" soccer_prop_shapes={joined.get('prop_modifier_census')}",
             flush=True,
         )
     # WHICH COMPETITIONS THE BOARD CAN REACH, AND WHICH IT CANNOT. Printed

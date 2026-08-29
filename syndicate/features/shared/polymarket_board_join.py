@@ -853,6 +853,8 @@ def join_polymarket_to_board(
     alignment_counts: dict[str, int] = {}
     # Why a `no_candidates` key missed -- see the block that fills it.
     key_miss_samples: list[dict[str, Any]] = []
+    # Soccer PROP slug-modifier shapes -- the venue's own vocabulary.
+    prop_modifier_census: dict[str, int] = {}
     key_miss_seen: set[str] = set()
     alignment_samples: list[dict[str, Any]] = []
     orientation_flip_samples: list[dict[str, Any]] = []
@@ -864,6 +866,41 @@ def join_polymarket_to_board(
             continue
         venue_type = str(row.get("sportsMarketTypeV2") or "").upper()
         board_market = MARKET_TYPE_TO_BOARD.get(venue_type)
+        # THE PROP VOCABULARY, CENSUSED SO THE NEXT FAMILY DOES NOT NEED A GUESS.
+        #
+        # `_is_corners_question` reads `row["question"]` and that field is NEVER
+        # POPULATED in the persisted slate -- 14 of 14 sampled questions were
+        # the empty string, and `/api/ops/polymarket/slate` exposes only
+        # line/orderable/outcomes/slug. So the corners route is INERT and its
+        # 221 `no_candidates` read as "the venue lists no corners", which was
+        # never measured.
+        #
+        # BTTS was found because its slug carries a plain `-btts` token. This
+        # counts the modifier SHAPES on every soccer PROP row so the rest of
+        # the vocabulary is readable the same way -- the instrument that made
+        # Kalshi's soccer titles fixable rather than guessable.
+        #
+        # NUMBERS STRIPPED, so `exact-score-0-0` and `exact-score-2-1` collapse
+        # to one family instead of one row each. Bounded to 40 shapes.
+        #
+        # ABOVE THE `board_market is None` REFUSAL, DELIBERATELY. Placed below
+        # it the census only ever saw PROP rows already ADMITTED -- `btts` and
+        # nothing else -- which makes an instrument for finding UNKNOWN
+        # families structurally unable to find one. Same placed-below-the-guard
+        # mistake as the fixture matcher earlier today, caught here because the
+        # census returned `{'btts': 1}` on a fixture that also contained an
+        # exact-score row.
+        if venue_type == "SPORTS_MARKET_TYPE_PROP" and _norm(
+            _effective_league(parsed, soccer_tokens)
+        ) == "soccer":
+            shape = "-".join(
+                tok for tok in (parsed.get("modifiers") or [])
+                if not any(ch.isdigit() for ch in tok)
+            ) or "(no-modifier)"
+            if shape in prop_modifier_census or len(prop_modifier_census) < 40:
+                prop_modifier_census[shape] = prop_modifier_census.get(shape, 0) + 1
+
+
         if board_market is None:
             # ONE PROP FAMILY IS ADMITTED BY NAME, AND ONLY BY NAME.
             #
@@ -894,7 +931,8 @@ def join_polymarket_to_board(
                 board_market = "btts"
             elif venue_type == "SPORTS_MARKET_TYPE_PROP" and _is_corners_question(
                 row.get("question")
-            ):
+            ):  # NOTE: currently INERT -- `question` is never populated. See
+                # `prop_modifier_census` below, which exists to find the real hook.
                 # CORNERS, IDENTIFIED FROM THE QUESTION rather than the slug.
                 #
                 # Question supplied by the user 2026-08-28: "Total Corners Taken
@@ -1393,6 +1431,12 @@ def join_polymarket_to_board(
         # One per board market that found an empty bucket, with the
         # neighbouring index keys that say WHICH component disagreed.
         "key_miss_samples": key_miss_samples,
+        # What soccer PROP markets Polymarket actually publishes, by
+        # slug-modifier shape. `btts` was found this way; corners has
+        # not been found at all yet.
+        "prop_modifier_census": dict(
+            sorted(prop_modifier_census.items(), key=lambda kv: -kv[1])
+        ),
         # Rows that refused on fixture pairing but WOULD pair with the
         # slug's two sides swapped. Per sport deliberately: MLB and NFL
         # pair correctly today and act as the control.
