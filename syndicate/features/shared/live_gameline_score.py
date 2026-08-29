@@ -144,9 +144,18 @@ def build_finals_index(
             "finals_level": 0,
             "finals_skipped_level": 0,
             "finals_skipped_level_sport_unknown": 0,
+            "finals_skipped_no_numeric_score": 0,
+            "finals_skipped_no_numeric_score_games": 0,
         })
 
     out: dict[str, bool] = {}
+    # DISTINCT GAMES behind the skipped ROWS. `finals_seen` and `finals_level`
+    # count rows, and a row is one market on one game -- 196 rows was ONE game
+    # on 2026-08-28. A row count alone therefore cannot answer the only
+    # question anyone asks of this block ("how many games did we lose?"), so
+    # the games are counted separately rather than left to be inferred from a
+    # ratio that does not hold.
+    skipped_no_score_games: set[str] = set()
     if not isinstance(grid, (list, tuple)):
         return out
     for row in grid:
@@ -159,6 +168,56 @@ def build_finals_index(
         try:
             h, a = float(home), float(away)
         except (TypeError, ValueError):
+            # COUNTED, NOT DROPPED IN SILENCE. This `continue` sits BEFORE
+            # `finals_seen` is incremented, so a final with no numeric score
+            # used to leave no trace in ANY counter -- and it is the LARGEST
+            # cause of a capped `games_with_outcome`, not a rare edge.
+            #
+            # Measured on production 2026-08-29 (`/api/board/book-grid?
+            # sport=mlb&date=2026-08-28`, artifact regenerated 14:31:06Z): the
+            # grid carried **15 games, 12 of them `final`, and exactly ONE with
+            # numeric scores**. The other 11 were `home_score: None,
+            # away_score: None` -- nulled upstream by `game_chip_scoreboard`'s
+            # `level_final_impossible_for_sport`, which is CORRECT (a 0-0 MLB
+            # "final" is the schedule placeholder) but leaves this scorer with
+            # nothing to score. Result: `games_with_outcome: 1`, and 6,137 of
+            # 6,466 ledger records reported as `no_final_outcome_for_game`.
+            #
+            # Every counter that DID exist read healthy at that instant --
+            # `finals_seen: 196`, `finals_level: 0`, `finals_skipped_level: 0`,
+            # `finals_skipped_level_sport_unknown: 0` -- so the diagnostics
+            # pointed at the ledger and the JOIN, which were both fine. The
+            # eleven missing games were invisible by construction.
+            #
+            # This RECOVERS NO GAMES and moves no number: the scores are absent
+            # upstream and refusing them is right. It makes the refusal
+            # ATTRIBUTABLE from the served payload alone, which is the only
+            # reason the cap needed a live investigation to explain at all.
+            if diag is not None:
+                diag["finals_skipped_no_numeric_score"] = (
+                    int(diag["finals_skipped_no_numeric_score"]) + 1
+                )
+                # Same identifier precedence the index itself uses below, so a
+                # game counted here is one that COULD have been indexed. A row
+                # carrying no identifier at all is still counted as a skipped
+                # ROW -- it is one -- but cannot be attributed to a game, and
+                # inventing a key for it would inflate the game count.
+                lg_skipped = (
+                    row.get("live_gameline")
+                    if isinstance(row.get("live_gameline"), Mapping)
+                    else {}
+                )
+                for ident in (
+                    row.get("game_pk"),
+                    game.get("game_pk"),
+                    lg_skipped.get("game_pk"),
+                    row.get("event_id"),
+                    game.get("event_id"),
+                ):
+                    ident_key = str(ident or "").strip()
+                    if ident_key:
+                        skipped_no_score_games.add(ident_key)
+                        break
             continue
         if diag is not None:
             diag["finals_seen"] = int(diag["finals_seen"]) + 1
@@ -195,6 +254,16 @@ def build_finals_index(
             key = str(ident or "").strip()
             if key:
                 out[key] = won
+    if diag is not None:
+        # NOT the raw set: a game can be skipped for want of a score on one row
+        # and indexed from another, and it is not "lost" in that case. Reported
+        # net of what actually made it into the index, so this number always
+        # means "games this scorer could not score BECAUSE no score was
+        # published" -- which is the number that explains a capped
+        # `games_with_outcome` and the one a reader will subtract.
+        diag["finals_skipped_no_numeric_score_games"] = len(
+            skipped_no_score_games - set(out)
+        )
     return out
 
 

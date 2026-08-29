@@ -224,3 +224,72 @@ def test_a_row_with_no_market_price_still_scores_the_model():
     assert out["all_records"]["model"]["n"] == 1
     assert out["all_records"]["market"]["n"] == 0
     assert out["all_records"]["model_minus_market_brier"] is None
+
+
+def test_a_final_with_no_numeric_score_is_counted_not_dropped_in_silence():
+    """The LARGEST cause of a capped `games_with_outcome`, and until this
+    counter existed it was the only path in the scorer that incremented
+    nothing.
+
+    Measured on production 2026-08-29 (`date=2026-08-28`): 15 games on the
+    grid, 12 `final`, and exactly ONE carrying numeric scores -- the other 11
+    nulled upstream by `game_chip_scoreboard`'s `level_final_impossible_for_sport`.
+    Every counter that existed read healthy at that instant (`finals_seen: 196`,
+    `finals_level: 0`, `finals_skipped_level: 0`), so the diagnostics pointed at
+    the ledger and the join, which were both fine.
+    """
+    grid = [
+        _grid_row("g1", "final", 5, 3),        # scoreable
+        _grid_row("g2", "final", None, None),  # score nulled upstream
+        _grid_row("g3", "final", None, None),  # ditto, a DIFFERENT game
+        _grid_row("g4", "final", "", 2),       # half-present is still unusable
+    ]
+    diag = {}
+    assert build_finals_index(grid, sport="mlb", diagnostics=diag) == {"g1": True}
+    # off != on: the counter is producible ONLY by the new branch. Asserting
+    # the old behaviour (absent key / silent zero) must fail here.
+    assert diag["finals_skipped_no_numeric_score"] == 3
+    assert diag["finals_skipped_no_numeric_score_games"] == 3
+    # The counters now ACCOUNT for every final row on the grid, which is the
+    # property that makes a cap attributable from the payload alone.
+    assert diag["finals_seen"] + diag["finals_skipped_no_numeric_score"] == 4
+
+
+def test_the_skipped_counters_separate_rows_from_games():
+    """`finals_seen` counts ROWS -- 196 rows was ONE game on 2026-08-28. A row
+    count cannot answer "how many games did we lose?", so the games are counted
+    separately rather than inferred from a ratio that does not hold."""
+    grid = [_grid_row("g1", "final", None, None) for _ in range(40)]
+    grid += [_grid_row("g2", "final", None, None) for _ in range(160)]
+    diag = {}
+    assert build_finals_index(grid, sport="mlb", diagnostics=diag) == {}
+    assert diag["finals_skipped_no_numeric_score"] == 200      # rows
+    assert diag["finals_skipped_no_numeric_score_games"] == 2  # games
+
+
+def test_a_game_indexed_from_another_row_is_not_reported_as_lost():
+    """Reported NET of the index. A game skipped on one row and indexed from
+    another was never lost, and counting it would overstate the damage."""
+    grid = [_grid_row("g1", "final", None, None), _grid_row("g1", "final", 6, 2)]
+    diag = {}
+    assert build_finals_index(grid, sport="mlb", diagnostics=diag) == {"g1": True}
+    assert diag["finals_skipped_no_numeric_score"] == 1       # the row happened
+    assert diag["finals_skipped_no_numeric_score_games"] == 0  # the game did not
+
+
+def test_the_new_counter_recovers_no_games_and_moves_no_number():
+    """A pure diagnostic. The scores are absent upstream and refusing them is
+    correct -- this must not change a single scored value."""
+    grid = [
+        _grid_row("g1", "final", 5, 3),
+        _grid_row("g2", "final", None, None),
+        _grid_row("g3", "final", 2, 2),
+    ]
+    finals = build_finals_index(grid, sport="mlb")
+    assert finals == {"g1": True}
+    scored = score_ledger_records(
+        [_rec("g1", 0.6, 0.55), _rec("g2", 0.7, 0.5), _rec("g3", 0.4, 0.45)], finals
+    )
+    assert scored["games_with_outcome"] == 1
+    assert scored["all_records"]["model"]["n"] == 1
+    assert scored["unscored"]["no_final_outcome_for_game"] == 2
