@@ -2565,11 +2565,18 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - **READING OWED 1 — `LEDGER_MERGE` has still not fired.** `concurrent=0` since
   18:58Z is an absence in a short window, NOT a pass. Needs a settlement pass
   overlapping a placement cycle.
-- **READING OWED 2 — the segment guards are proven to FIRE, not to have changed
-  an ORDER.** `board_row_is_a_segment_bet` 52 then 39;
-  `segment_has_no_matching_series: 2`. But **zero orders were placed after
-  either boot**, so the money-level check is vacuous. Re-run it on the next
-  slate that actually places.
+- **READING 2 DISCHARGED `[2026-08-29 ~03:46Z]` — the path is CLOSED.** The
+  slate placed: 2 orders after boot `21:55:15Z`, both `seg=full` on full-game
+  tickets. **All 9 segment orders in the ledger predate every fix** (newest
+  `07:40:51Z`; earliest deploy `20:58Z`), so the bad set is bounded and closed.
+  What makes this more than an absence: `board_row_is_a_segment_bet: 39` in the
+  SAME window — segment rows were PRESENT and were STOPPED, with a named reason,
+  and none became an order.
+  **LIMIT, STATED:** it does not prove those 39 would have become orders (most
+  refused rows never do — only top-edge ones place), so this is "the path is
+  closed", NOT "$X was saved on this slate". Only 2 orders ran on the fixed
+  code and neither was a segment candidate, so the order count alone proves
+  little; it is the PAIRING of 39-refused with 0-segment-orders that verifies.
 - Verified in production: WNBA `GSCONN` graded `under lost`/`over won`
   `settled_value 153.0`; ledger monotonic (`1,295,990 -> 1,298,163` vs a
   `-8,031` step); both banners carry working operator actions; ONE `BOOTED`
