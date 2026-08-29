@@ -831,6 +831,17 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none.
 
 ### soccer-board-mlb-parity — OPEN, UNOWNED (session `f98be73b` checkpointed 2026-08-22 23:2xZ) — **TWO THINGS DEPLOYED TONIGHT. (1) `#518` FOTMOB MOMENTUM — live-odds-worker `94a16efe`, live 22:18:35Z: the event-signal sweep (momentum/xG/shot pressure) was killed by a null control, but a pooled 60-120s model IS real and DIRECTIONAL (which team scores next, dAUC +0.071), driven by FotMob's own momentum series; production's ESPN proxy carries NO signal at any half-life — retired. 5,552-match dataset committed. (2) COMPACT CARD REDESIGN — web `a1dc1e9a`, live 23:08:55Z, VERIFIED ON PRODUCTION HTML: pregame cards show sim-projected totals + BTTS/goals/corners/top-score; final cards RECONCILE those same facts against the real result (19 hit/62 miss on today's slate, spot-checked by hand).** OWED: (a) the FotMob join has never resolved a real fixture — MLS kickoff 2026-08-23T01:30Z is the first test; (b) the live-odds market-pricing pilot sits at 1.46 SE, n=106, needs ~2 more match-days. Full detail: `state.md [soccer-live-momentum]` + `[soccer-compact-cards]`, `log/2026-08-22.md` 22:0x-23:1xZ entries. — opened 2026-08-20 — session f98be73b-b686-42b7-bdf9-248ab97f65b7
+- **`board_enrichment._side_matches` WAS FIXED BY ANOTHER LANE**
+  `[2026-08-29, session 6dc988f8, lane ncaaf-chip-grid-join]`. One line:
+  `teams_match(sport, row_team, token)` -> `teams_match(sport, token, row_team)`.
+  It was calling the helper with its arguments inverted; the heuristic is
+  order-sensitive and only answers when `token` is the short side. 0/8 as
+  called, 8/8 reversed on real pairs. **SOCCER GAINS 5 MATCHED ROWS**
+  (285 -> 290, ambiguity 0 -> 0); mlb/wnba/nfl are unchanged. Blast radius
+  measured across every sport BEFORE the change — no sport loses a match,
+  none gains ambiguity. Taken on explicit user instruction; this lane is
+  UNOWNED and its session checkpointed 2026-08-22. Revert freely if it
+  collides, but the soccer delta is in your favour.
 - Goal (unchanged): `/soccer` serves a date-scoped board whose cards carry the
   same information classes MLB's do, and whose live tier updates during a match.
 - **OWED, and not claimed as done:**
@@ -3563,6 +3574,45 @@ caaf-no-orders`). NOT
   can only ship once `_NCAAFDataProvider.games()` stops building the full board
   on the chips path. `refuse_if_compute_in_request_path` already exists for
   exactly this and the chips path calls neither it nor its warn-only sibling.
+- Blocked by: none
+
+
+### ncaaf-chip-grid-join — OPEN — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
+- Goal: NCAAF grid rows carry `game` (and therefore `game_state`) on
+  `layer2-shortlist`, which is `0 of 96` while mlb/wnba/soccer are 400/400.
+- Files: `syndicate/features/shared/board_enrichment.py`
+  **[claim taken from OPEN, UNOWNED lane `soccer-board-mlb-parity` — user
+  authorised after the measurement: "run the measurement and ship it if it's
+  clean". Soccer, that lane's own sport, GAINS 5 matched rows.]**
+- **CAUSE, measured.** `_side_matches` calls
+  `teams_match(sport, row_team, token)` — the grid's LONG name as `token`, the
+  chip's SHORT code as `row_team`. The final heuristic
+  (`team_aliases.py:660`) splits **`row_team`** into words and asks whether any
+  `word.startswith(token_norm)`, so it only works when `token` is the short one.
+  Over 8 real pairs from today's slate: **0/8 as called, 8/8 reversed** — not
+  even `USC` against `USC Trojans`.
+- Why it was invisible: with an alias map both sides resolve canonically and
+  `teams_match` returns at `team_aliases.py:644`, which is order-INDEPENDENT.
+  `_alias_map` is EMPTY for **ncaaf, nhl and ncaab** — only those three reach
+  the order-sensitive branch.
+- **BLAST-RADIUS MEASUREMENT (the thing that gates this), production payloads:**
+
+      sport   rows chips | as-called amb | reversed amb | delta
+      mlb      300    17 |       300  35 |      300  35 | +0
+      wnba     300     2 |       300   0 |      300   0 | +0
+      nfl      300    16 |       115   0 |      115   0 | +0
+      soccer   300   231 |       285   0 |      290   0 | +5
+      ncaaf     43     8 |         0   0 |       43   0 | +43
+
+  nba/nhl/ncaab had no slate today; on representative pairs, nhl 0/5 -> 5/5 and
+  ncaab 0/5 -> 2/5 (its 3 misses are alias gaps like `UNC`, unchanged either
+  way). **No sport loses a match, none gains ambiguity, no case flips
+  True->False.** MLB's 35 ambiguous rows are identical in both orders and are
+  pre-existing.
+- Falsification test: WRONG if any sport's matched count falls or its ambiguous
+  count rises after deploy. Verified against the same per-sport counts.
+- Verification: `layer2-shortlist` ncaaf rows carry `game_state`, AND the
+  post-deploy latency gate passes (`/` and `/ncaaf/cards` under 2x baseline).
 - Blocked by: none
 
 

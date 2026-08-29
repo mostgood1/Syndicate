@@ -37762,3 +37762,53 @@ doing it twice. This needs a per-sport before/after count first.
 `live_game_state` separately still reports `{"supported": false, "reason": "no
 live status source wired for ncaaf"}` — a THIRD, independent gap
 (`_LIVE_GAME_STATE_SPORTS`), and not what is blocking this.
+
+---
+
+## 2026-08-29 13:40 CT — web — `95c4fb12` — `teams_match` argument order — **VERIFIED, GATE PASSED**
+
+```
+deploy dep-da9if2ajnfac73dvrqs0  created 18:40:09Z  live 18:43:37Z
+```
+
+**verify: MET, on the number that names the stage.** `/api/board/book-grid?sport=ncaaf`,
+same endpoint, 12 minutes apart:
+
+```
+18:31:20Z (worker e9027394, web a1d7ad4e)
+  game_state: {"chips": 8, "rows_matched": 0, "unmatched_teams": [
+      "TCU Horned Frogs", "North Carolina Tar Heels", "USC Trojans", ...14 teams]}
+
+18:43:56Z (web 95c4fb12)
+  game_state: {"chips": 8, "rows_matched": 43}
+```
+
+`rows_matched` **0 -> 43**, and `unmatched_teams` disappears entirely.
+
+**Latency gate PASSED, second deploy to run it:**
+
+```
+route                   baseline   after  ratio   gate 2.0x
+/                           3.02    3.56   1.18x  PASS
+/ncaaf/cards?week=1         2.69    2.93   1.09x  PASS
+```
+
+(`/` carried a 16.5s cold read immediately after the swap; the median absorbs it.)
+
+### A distinction this deploy MEASURED rather than assumed
+
+`book-grid` re-runs `attach_game_state` at READ time on web, so a web deploy
+fixes it immediately. `layer2-shortlist` does NOT — its enrichment runs in
+`pipeline/layer2_shortlist.py:548` on refresh-worker. Measured at the same
+instant as the 43:
+
+```
+mlb 400/400   wnba 400/400   soccer 400/400   nfl 17/17
+ncaaf  96 rows / 0 game / 0 state      <- unchanged, needs the WORKER
+```
+
+So the two surfaces are now cleanly separated by evidence, not by reasoning.
+
+**STILL OWED: refresh-worker.** HELD by OPEN lane
+`venue-join-refusal-visibility` — a LIVE claim, not forced. Deploy `95c4fb12`
+there when it frees; the shortlist number is the verification.
