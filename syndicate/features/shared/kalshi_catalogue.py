@@ -61,6 +61,8 @@ __all__ = [
     "all_series",
     "classify_market",
     "unmapped_series",
+    "recognised_unpriceable_title",
+    "REASON_RECOGNISED_UNPRICEABLE",
     "GRAMMAR_PLAYER_THRESHOLD",
     "GRAMMAR_TEAM_TOTAL",
     "GRAMMAR_TEAM_SPREAD",
@@ -314,6 +316,42 @@ REASON_UNMAPPED_SERIES = "unmapped_series"
 REASON_OUT_OF_SCOPE = "series_out_of_scope"
 REASON_COMBINATORIAL = "combinatorial_series"
 REASON_UNREADABLE_TITLE = "unreadable_title"
+
+# RECOGNISED, AND DELIBERATELY UNPRICEABLE. Distinct from `unreadable_title`
+# because the two call for OPPOSITE work: an unreadable title is a grammar to
+# write, a recognised-unpriceable one is a board market that does not exist and
+# must NOT be flattened onto a full-game contract.
+#
+# THEY WERE THE SAME COUNTER UNTIL 2026-08-29, and the comment beside
+# `_NEITHER_TEAM_WINS` shows the intent was always otherwise -- "the pattern
+# exists so it is refused as a KNOWN shape rather than counted as a title nobody
+# has looked at". It returned None, and None collapsed straight back into
+# `unreadable_title`, so the distinction the pattern was written to make never
+# reached a counter. `unreadable_title: 1,362` therefore mixed grammars-to-write
+# with shapes-we-understand-and-decline, and no reader could tell which.
+REASON_RECOGNISED_UNPRICEABLE = "recognised_but_no_board_market"
+
+
+def recognised_unpriceable_title(title: Any) -> str | None:
+    """A title we UNDERSTAND and decline, or None. Never admits anything.
+
+    Every pattern here is one the module already carried:
+      `_INNINGS_TIE`         'first 3 innings tie'      -- defined and NEVER CALLED
+      `_NEITHER_TEAM_WINS`   'Will neither team win the 1st Half?'
+      `_SEGMENT_TIE`         '1st quarter tie', 'Tie in the 2nd half', 'Tie 1st Half'
+
+    All are the DRAW leg of a three-way on a SEGMENT, and the board carries no
+    three-way segment market to join them to. Reading one as either side of a
+    two-way line is a bet on a different thing -- the `#563` first-five-innings
+    distinction that cost $7.08 across five orders.
+    """
+    text = " ".join(str(title or "").strip().split())
+    if not text:
+        return None
+    for pattern in (_INNINGS_TIE, _NEITHER_TEAM_WINS, _SEGMENT_TIE):
+        if pattern.match(text):
+            return REASON_RECOGNISED_UNPRICEABLE
+    return None
 REASON_UNMAPPED_STAT = "stat_not_in_market_vocabulary"
 
 # "Andrew Abbott: 7+ strikeouts?" / "Pete Crow-Armstrong: 2+ home runs?"
@@ -517,6 +555,22 @@ _TEAM_SCORES = re.compile(
 # as either side of a two-way line would be a bet on a different thing.
 _INNINGS_TIE = re.compile(
     r"^\s*first\s+(?P<innings>\d+)\s+innings\s+tie\s*\??\s*$", re.IGNORECASE
+)
+
+
+# '1st quarter tie' · 'Tie in the 2nd half' · 'Tie 1st Half'
+#
+# THE SAME CONTRACT IN THREE WORDINGS, all the draw leg of a segment three-way.
+# Sampled from production 2026-08-29T23:12:09Z across KXNCAAF1Q/2Q/3Q/4Q,
+# KXNCAAF2H and the soccer 1H series. Matched ONLY to refuse them by name --
+# see `recognised_unpriceable_title`. Anchored so it cannot swallow the
+# full-game 'Tie is the result', which IS priceable and is a different contract.
+_SEGMENT_TIE = re.compile(
+    r"^\s*(?:tie\s+(?:in\s+the\s+)?(?P<p1>1st|2nd|3rd|4th|first|second|third|fourth)"
+    r"\s+(?:quarter|half)"
+    r"|(?P<p2>1st|2nd|3rd|4th|first|second|third|fourth)\s+(?:quarter|half)\s+tie)"
+    r"\s*\??\s*$",
+    re.IGNORECASE,
 )
 
 
@@ -1121,15 +1175,93 @@ def segment_for_series(series: Any) -> str | None:
     return FULL_GAME_SEGMENT
 
 
+# Kalshi soccer series prefix -> `soccer`. OBSERVED IN PRODUCTION, not guessed:
+# every entry appeared in `unreadable_by_series` on 2026-08-29T23:12:09Z or in
+# the sampled titles above. Kalshi's spelling is its own (`KXLALIGA`, not
+# `la_liga`), so this cannot be derived from `LEAGUE_DISPLAY_NAMES` the way the
+# title prefixes are -- but `test_every_kalshi_soccer_series_token_maps_to_a_
+# BOARD_league` pins each one to a league the board actually carries, so a token
+# for a competition we do not model fails the suite rather than quietly
+# admitting markets nothing can price.
+#
+# LONGEST FIRST, for the same reason `_SPORT_TOKENS` is: a prefix scan on a
+# shorter token can shadow a longer one.
+# EXPLICIT token -> board league slug, NOT a fuzzy name match. Kalshi
+# abbreviates ("BELGIANPL" for `belgian_pro_league`), so a substring test either
+# fails on the real token or is loosened until it stops checking anything. The
+# mapping is stated, and `test_every_kalshi_soccer_series_token_names_a_board_
+# league` asserts every VALUE is a league the board actually models -- so a
+# token for a competition we cannot price fails the suite.
+#
+# LONGEST FIRST, same reason `_SPORT_TOKENS` is ordered: a shorter token can
+# shadow a longer one on a prefix scan.
+_SOCCER_SERIES_TOKENS: dict[str, str] = {
+    "CHAMPIONSHIP": "championship",
+    "BUNDESLIGA": "bundesliga",
+    "EREDIVISIE": "eredivisie",
+    "BELGIANPL": "belgian_pro_league",
+    "PRIMEIRA": "primeira_liga",
+    "LALIGA": "la_liga",
+    "LIGUE1": "ligue_1",
+    "SERIEA": "serie_a",
+    "EPL": "epl",
+    "MLS": "mls",
+}
+
+
 def sport_for_series(series: Any) -> str | None:
-    """The sport, or None. Hand registry first, then anything discovery added.
+    """The sport, or None. Hand registry, then discovery, then the SERIES NAME.
 
     Discovery writes into `_DISCOVERED` rather than into `SERIES_SPORT`, so a
     hand-written entry always wins and the two never become indistinguishable
     -- "we chose this" and "a title matched" are different confidence levels.
+
+    ------------------------------------------------------------------
+    NO TICKER FALLBACK HERE, AND I TRIED TO ADD ONE
+    ------------------------------------------------------------------
+
+    `sport_for_ticker` derives the sport from these names correctly --
+    `KXNCAAF1H -> ncaaf`, `KXMLBF3 -> mlb`, `KXWNBA1HSPREAD -> wnba` -- and
+    falling back to it mapped ~967 unmapped markets in one line. It also broke
+    `test_an_unseen_series_is_refused_by_name_never_guessed_from_its_ticker`,
+    which is right and I was wrong.
+
+    `unmapped_series` IS THE WORK QUEUE. Its own docstring says so. A blanket
+    scan turns "nobody has looked at this series" into "assume it is in scope",
+    for ANY series whose name happens to contain a sport token -- `KXNBAPTS` is
+    an NBA player-points series we may not model at all, and it would have been
+    silently admitted to `nba`. That erases the distinction `SERIES_OUT_OF_SCOPE`
+    and `REASON_UNMAPPED_SERIES` exist to keep: "we decline this" and "we have
+    not looked" are different states.
+
+    So series still earn a sport by being NAMED -- registry, then discovery.
+    What changed instead is that a title we RECOGNISE AND DECLINE now says so
+    (`recognised_unpriceable_title`) rather than counting as `unreadable_title`,
+    which was mixing grammars-to-write with shapes-we-understand.
     """
     key = str(series or "").strip().upper()
-    return SERIES_SPORT.get(key) or _DISCOVERED.get(key)
+    hand = SERIES_SPORT.get(key) or _DISCOVERED.get(key)
+    if hand:
+        return hand
+    # SOCCER BY COMPETITION NAME, and ONLY by competition name.
+    #
+    # Kalshi names soccer series for the competition (`KXLALIGAGAME`,
+    # `KXSERIEA1H`) with no sport token to scan, which is why zero soccer series
+    # sit in the hand registry -- `auto_series_from_catalogue` discovers them
+    # from TITLES, and that path only registers player props, so the GAME series
+    # were never reached.
+    #
+    # THIS IS NOT THE BLANKET TICKER SCAN I TRIED FIRST. A competition name is
+    # specific: `KXNBAPTS` contains no competition and stays unmapped, so
+    # `unmapped_series` keeps working as the work queue. The token set is
+    # checked against the board's own `LEAGUE_DISPLAY_NAMES` by
+    # `test_every_kalshi_soccer_series_token_names_a_board_league`, so a token
+    # for a competition we do not model fails the suite rather than admitting
+    # markets nothing can price.
+    for token in _SOCCER_SERIES_TOKENS:
+        if token in key:
+            return "soccer"
+    return None
 
 
 _DISCOVERED: dict[str, str] = {}
@@ -1425,10 +1557,23 @@ def classify_market(market: Mapping[str, Any]) -> dict[str, Any]:
 
     sport = sport_for_series(series)
     if sport is None:
+        # A SHAPE WE UNDERSTAND OUTRANKS AN UNKNOWN SERIES. `1st quarter tie` is
+        # the draw leg of a segment three-way whatever series carries it, and
+        # reporting it as `unmapped_series` would put it on the work queue as
+        # though a registry line would fix it. It would not: there is no board
+        # market for it.
+        known_unmapped = recognised_unpriceable_title(str(market.get("title") or ""))
+        if known_unmapped:
+            return {"status": "refused", "reason": known_unmapped, "series": series}
         return {"status": "refused", "reason": REASON_UNMAPPED_SERIES, "series": series}
 
-    parsed = _parse_title(str(market.get("title") or ""))
+    raw_title = str(market.get("title") or "")
+    parsed = _parse_title(raw_title)
     if parsed is None:
+        known = recognised_unpriceable_title(raw_title)
+        if known:
+            # UNDERSTOOD, DECLINED, AND SAID SO. Not a grammar to write.
+            return {"status": "refused", "reason": known, "series": series}
         return {"status": "refused", "reason": REASON_UNREADABLE_TITLE, "series": series}
 
     # A GAME TOTAL IS RESOLVED BY ITS UNIT, not by the general vocabulary. The

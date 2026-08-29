@@ -1555,12 +1555,28 @@ def test_every_SEGMENT_variant_still_refuses():
     full-game totals for first-3/first-5 contracts, $7.08, 2026-08-28.
 
     Both soccer patterns are anchored so the 1st-half wording cannot match.
+
+    THE REFUSAL IS THE ASSERTION. The REASON split in two on 2026-08-29 and the
+    two cases now land in different counters, which is the point of the split:
+
+      'Tie 1st Half'                          -> recognised_but_no_board_market
+      'Will both teams score in the 1st Half?' -> unreadable_title
+
+    The first is a shape we UNDERSTAND and decline -- there is no three-way
+    segment market on the board to join it to, and no grammar will change that.
+    The second is a genuine gap: nothing has read that wording yet. Mixing them
+    made `unreadable_title: 1,362` unreadable in its own right, because a reader
+    could not tell a grammar to write from a market we will never price.
+
+    Both still REFUSE, which is what protects the $7.08 lesson above.
     """
-    for series, title in [("KXLALIGAGAME", "Tie 1st Half"),
-                          ("KXLALIGABTTS", "Will both teams score in the 1st Half?")]:
+    for series, title, reason in [
+        ("KXLALIGAGAME", "Tie 1st Half", "recognised_but_no_board_market"),
+        ("KXLALIGABTTS", "Will both teams score in the 1st Half?", "unreadable_title"),
+    ]:
         out = _soccer_classified(series, title)
         assert out["status"] == "refused", (series, out)
-        assert out["reason"] == "unreadable_title", (series, out)
+        assert out["reason"] == reason, (series, out)
 
 
 def test_a_season_FUTURES_title_still_refuses():
@@ -1568,3 +1584,40 @@ def test_a_season_FUTURES_title_still_refuses():
     board row asks for it. `_MONEYLINE` must not swallow it as a team win."""
     out = _soccer_classified("KXEREDIVISIE", "Will Zwolle win the 2026-27 Eredivisie?")
     assert out["status"] == "refused", out
+
+
+def test_every_kalshi_soccer_series_token_names_a_board_league():
+    """A token for a competition the board does not model would admit markets
+    nothing can price. Pinned against the soccer module's own league list so a
+    token cannot outlive the league it was added for."""
+    from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+
+    for token, slug in cat._SOCCER_SERIES_TOKENS.items():
+        assert slug in LEAGUE_DISPLAY_NAMES, (
+            f"{token!r} maps to {slug!r}, which the board does not model: "
+            f"{sorted(LEAGUE_DISPLAY_NAMES)}"
+        )
+
+
+def test_an_unseen_series_is_STILL_refused_even_though_soccer_now_falls_back():
+    """The work-queue invariant, re-pinned after a fallback that broke it.
+
+    A blanket `sport_for_ticker` fallback mapped ~967 markets in one line and
+    also turned "nobody has looked at this series" into "assume it is in scope"
+    for ANY series carrying a sport token -- `KXNBAPTS` would have been silently
+    admitted to `nba`. The soccer fallback is COMPETITION-specific precisely so
+    this still holds.
+    """
+    assert cat.sport_for_series("KXNBAPTS") is None
+    assert cat.sport_for_series("KXNCAAF1H") is None
+    verdict = cat.classify_market(_market("Somebody: 3+ things?", series="KXNBAPTS"))
+    assert verdict["reason"] == cat.REASON_UNMAPPED_SERIES
+
+
+def test_a_recognised_segment_shape_outranks_an_unmapped_series():
+    """`1st quarter tie` is the draw leg of a segment three-way whatever series
+    carries it. Reporting it as `unmapped_series` would put it on the work queue
+    as though a registry line would fix it. It would not."""
+    verdict = cat.classify_market(_market("1st quarter tie", series="KXNCAAF1Q"))
+    assert verdict["status"] == "refused"
+    assert verdict["reason"] == cat.REASON_RECOGNISED_UNPRICEABLE
