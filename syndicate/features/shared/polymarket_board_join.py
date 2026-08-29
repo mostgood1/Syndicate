@@ -1130,6 +1130,7 @@ def join_polymarket_to_board(
     line_source: dict[str, int] = {}
     line_gap_samples: list[dict[str, Any]] = []
     side_gap_samples: list[dict[str, Any]] = []
+    ladder_points: dict[tuple[str, str, str], list[tuple[float, float, int]]] = {}
     forward_date_widened: dict[str, int] = {}
     alignment_samples: list[dict[str, Any]] = []
     orientation_flip_samples: list[dict[str, Any]] = []
@@ -1820,6 +1821,18 @@ def join_polymarket_to_board(
             refuse("venue_price_inverted_vs_book")
             continue
 
+        # LADDER POINT, for the monotonicity check after the loop. Keyed on the
+        # BOARD's own fixture id so two clubs cannot be conflated across dates.
+        _lkey = (
+            str(board_row.get("event_id") or ""),
+            board_market,
+            str(side or "").strip().lower(),
+        )
+        if _lkey[0] and board_line is not None and _lkey[2] in {"over", "under"}:
+            ladder_points.setdefault(_lkey, []).append(
+                (float(board_line), float(probability), len(matches))
+            )
+
         from syndicate.features.shared.venue_quote_adapters import probability_to_american
 
         matches.append({
@@ -1843,6 +1856,71 @@ def join_polymarket_to_board(
             "tick_size": picked["row"].get("orderPriceMinTickSize"),
             "minimum_trade_qty": picked["row"].get("minimumTradeQty"),
         })
+
+    # ----------------------------------------------------------------------
+    # LADDER MONOTONICITY -- the one check that works where the fair-value
+    # alignment gate is BLIND.
+    # ----------------------------------------------------------------------
+    #
+    # On ONE fixture, P(over) must not RISE as the line rises: over 3.5 goals
+    # cannot be likelier than over 2.5 in the same match. P(under) must not
+    # FALL. That is arithmetic, not a model opinion, so it needs no fair value
+    # and no reference book -- which is exactly why it can see what
+    # `_classify_alignment` cannot.
+    #
+    # WHY IT WAS BUILT, measured 2026-08-29:
+    #
+    #     soccer|totals|over   7      mlb|totals|under  4
+    #     soccer|totals|under  1      mlb|totals|over   2
+    #
+    # Soccer totals ran 7:1 OVER while MLB stayed balanced, on a day down
+    # $42.80. The alignment gate votes only when the book is lopsided by >=0.20
+    # from a coin flip, and a 2.5-goal total sits ON the coin flip: every soccer
+    # total classified `too_close`, zero aligned, zero inverted. A systematic
+    # side error had nowhere to show up.
+    #
+    # A VIOLATION CONDEMNS THE WHOLE LADDER, not the rung that trips it. If two
+    # rungs of one fixture contradict each other, the pairing that produced them
+    # is not trustworthy at ANY rung, and picking which of the two is "right"
+    # would be the same guess this file refuses everywhere else. So every match
+    # on that fixture/market/side is dropped.
+    ladder_counts: dict[str, int] = {}
+    ladder_samples: list[dict[str, Any]] = []
+    drop_indices: set[int] = set()
+    for (event_id, market_name, side_name), points in ladder_points.items():
+        if len({round(line, 6) for line, _p, _i in points}) < 2:
+            continue
+        ordered = sorted(points, key=lambda t: t[0])
+        # `over` must be non-increasing in the line; `under` non-decreasing.
+        worst = 0.0
+        for (l_a, p_a, _ia), (l_b, p_b, _ib) in zip(ordered, ordered[1:]):
+            delta = (p_b - p_a) if side_name == "over" else (p_a - p_b)
+            if delta > worst:
+                worst = delta
+        league_key = f"{market_name}|{side_name}"
+        # A tolerance, because two rungs quoted a tick apart are noise rather
+        # than a contradiction. Anything above it is an ORDERING error.
+        if worst > 0.02:
+            ladder_counts[f"{league_key}|non_monotonic"] = (
+                ladder_counts.get(f"{league_key}|non_monotonic", 0) + 1
+            )
+            drop_indices.update(i for _l, _p, i in points)
+            if len(ladder_samples) < 6:
+                ladder_samples.append({
+                    "event_id": event_id[:12],
+                    "market": market_name,
+                    "side": side_name,
+                    "worst_rise": round(worst, 4),
+                    "ladder": [(l, round(p, 4)) for l, p, _i in ordered][:6],
+                })
+        else:
+            ladder_counts[f"{league_key}|monotonic"] = (
+                ladder_counts.get(f"{league_key}|monotonic", 0) + 1
+            )
+    if drop_indices:
+        for idx in drop_indices:
+            refuse("ladder_not_monotonic")
+        matches = [m for i, m in enumerate(matches) if i not in drop_indices]
 
     return {
         "matched": len(matches),
@@ -1875,6 +1953,10 @@ def join_polymarket_to_board(
         # WHY A MATCHED MARKET COULD NOT PLACE THE SIDE -- outcome names and
         # prices beside the side we wanted. Names the polarity from data.
         "side_gap_samples": side_gap_samples,
+        # P(over) must not rise with the line on one fixture. Works where the
+        # fair-value gate is blind, which is precisely soccer totals.
+        "ladder_counts": dict(sorted(ladder_counts.items(), key=lambda kv: -kv[1])),
+        "ladder_samples": ladder_samples,
         # HOW MANY BOARD ROWS ONLY FOUND CANDIDATES BY LOOKING FORWARD. This is
         # the reachability reading for the slate/fixture date split: zero with
         # soccer still refusing means the diagnosis was wrong, and a non-zero

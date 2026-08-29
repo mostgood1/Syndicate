@@ -254,7 +254,12 @@ def _polymarket_price_resolver(selected_date: str | None):
             f" line_gaps={joined.get('line_gap_samples')}"
             # Outcome names beside the side we wanted, for the matched markets
             # whose side could not be placed.
-            f" side_gaps={joined.get('side_gap_samples')}",
+            f" side_gaps={joined.get('side_gap_samples')}"
+            # P(over) must not rise with the line on one fixture. The one check
+            # that sees soccer totals, where the fair-value gate is all
+            # `too_close`.
+            f" ladder={joined.get('ladder_counts')}"
+            f" ladder_bad={joined.get('ladder_samples')}",
             flush=True,
         )
     # WHICH COMPETITIONS THE BOARD CAN REACH, AND WHICH IT CANNOT. Printed

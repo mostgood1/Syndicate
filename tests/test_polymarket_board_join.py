@@ -2250,3 +2250,68 @@ def test_the_pair_resolver_REFUSES_a_different_competition():
         {"home_team": "Paris FC", "away_team": "Nice"},
         {"league": "sea", "home": "par", "away": "juv", "date": "2026-08-29"},
         "soccer", [("Paris FC", "Nice")]) is False
+
+
+def _tot(slug_line_tok, line, prices):
+    return {"slug": f"tsc-mls-col-rsl-2026-08-29-{slug_line_tok}",
+            "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+            "outcomes": '["Over","Under"]', "outcomePrices": prices}
+
+
+def _tot_board(line):
+    return {"market": "totals", "side": "over", "line": line, "sport": "soccer",
+            "selected_date": "2026-08-29", "home_team": "Real Salt Lake",
+            "away_team": "Colorado Rapids", "event_id": "fixture-1"}
+
+
+def test_a_NON_MONOTONIC_ladder_is_dropped_entirely(monkeypatch):
+    """P(over) must not RISE as the line rises: over 3.5 cannot be likelier
+    than over 2.5 in the same match. Arithmetic, not a model opinion.
+
+    WHY THIS EXISTS, measured 2026-08-29: soccer totals ran 7:1 OVER while MLB
+    stayed balanced, on a day down $42.80. `_classify_alignment` votes only when
+    the book is lopsided by >=0.20 from a coin flip, and a 2.5-goal total sits
+    ON the coin flip -- every soccer total classified `too_close`, zero aligned,
+    zero inverted. A systematic side error had nowhere to show up.
+
+    THE WHOLE LADDER GOES. If two rungs contradict each other the pairing is
+    untrustworthy at any rung, and choosing which one is "right" would be the
+    guess this file refuses everywhere else.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    markets = [_tot("2pt5", 2.5, '["0.42","0.58"]'), _tot("3pt5", 3.5, '["0.61","0.39"]')]
+    out = mod.join_polymarket_to_board(
+        markets, [_tot_board(2.5), _tot_board(3.5)], selected_date="2026-08-29")
+    assert out["matched"] == 0, out
+    assert out["refusals"].get("ladder_not_monotonic") == 2, out["refusals"]
+    assert out["ladder_samples"], out
+    assert out["ladder_samples"][0]["side"] == "over"
+
+
+def test_a_MONOTONIC_ladder_is_kept(monkeypatch):
+    """The control. A well-ordered ladder must survive, or the check is just a
+    coverage cut wearing a safety label."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    markets = [_tot("2pt5", 2.5, '["0.58","0.42"]'), _tot("3pt5", 3.5, '["0.36","0.64"]')]
+    out = mod.join_polymarket_to_board(
+        markets, [_tot_board(2.5), _tot_board(3.5)], selected_date="2026-08-29")
+    assert out["matched"] == 2, out
+    assert out["refusals"].get("ladder_not_monotonic") is None, out["refusals"]
+    assert out["ladder_counts"].get("totals|over|monotonic") == 1, out["ladder_counts"]
+
+
+def test_a_SINGLE_RUNG_fixture_is_not_judged(monkeypatch):
+    """One rung has no ordering to violate. Judging it would refuse on no
+    evidence."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_tot("2pt5", 2.5, '["0.42","0.58"]')], [_tot_board(2.5)],
+        selected_date="2026-08-29")
+    assert out["matched"] == 1, out
+    assert not out["ladder_counts"], out["ladder_counts"]
