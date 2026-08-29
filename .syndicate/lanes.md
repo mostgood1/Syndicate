@@ -3336,10 +3336,29 @@ caaf-no-orders`). NOT
   `data/`-absent in the session worktree (worktrees exclude the mirror by
   default) and fail identically without my changes. **This is bench evidence
   only — nothing is deployed, so nothing here is a production reading.**
-- **HALF THE DEFECT IS STILL OPEN, AND IT IS THE HALF THAT MAKES THE LOOP HOT.**
-  `run_refresh_worker.py::_season_projection_should_launch` consults the
-  last-LAUNCH backstop **only when the artifact is MISSING**; the STALE branch
-  returns `artifact_stale` unconditionally, so a run that fails leaves the
+- **SECOND HALF NOW DONE TOO — `b59ee603`, 2026-08-29, BY USER OVERRIDE of the
+  lane-guard block.** `_season_projection_should_launch` now consults the
+  last-LAUNCH backstop on the STALE branch as well, gated by a new
+  `_season_projection_relaunch_cooldown_seconds()` (**absent env var = 3600**,
+  and deliberately NOT in `render.yaml`, so the absent default IS the
+  production behaviour — pinned by test, per CLAUDE.md's `blueprint_sync`
+  rule). Shorter than the 86400 interval on purpose: reusing the interval would
+  park a sport for a day on one transient failure. **The hold is LOGGED**
+  (`SEASON_PROJECTION_RELAUNCH_HELD`, rate-limited to the same 600s as its
+  sibling) — a cooldown that suppressed launches silently would delete the only
+  evidence the loop ever existed, leaving a quiet worker and a three-day-old
+  artifact with nothing connecting them.
+  **`off != on` PROVEN AGAIN:** delete the cooldown branch and exactly the 2
+  tests pinning it FAIL while the 29 existing `#389` tests pass. No regression:
+  `-k "refresh_worker or season_projection or autorun or ncaaf or cfbd"` is
+  **58F/808P before, 58F/827P after**.
+  **NEITHER HALF IS SUFFICIENT ALONE** and the commits say so: backoff without
+  the cooldown still relaunches every tick; the cooldown without backoff just
+  fails more slowly.
+- **HISTORICAL — this is what the block WAS, kept because the reasoning is the
+  record.** `_season_projection_should_launch` consulted the
+  last-LAUNCH backstop **only when the artifact was MISSING**; the STALE branch
+  returned `artifact_stale` unconditionally, so a run that fails leaves the
   artifact exactly as stale as it found it and the next tick relaunches. That
   is `#389`'s own bug surviving in its sibling branch — same shape, same file,
   and `#389`'s docstring already argues the case. **`lane-guard` BLOCKED the
@@ -3347,9 +3366,24 @@ caaf-no-orders`). NOT
   `exchange-markets-api-integration`.** That lane is idle/GOAL COMPLETE and its
   claim on this file is described in its own `Files` line as **NARROW** — "one
   small, additive, opt-in-only boot-probe hook" — a different region entirely.
-  Not edited across lanes. Needs the holder's release or a user override.
-  Without it, the backoff reduces each doomed run's damage but not the ~30
-  relaunches per 2h45m.
+  Not edited across lanes. **The user granted the override on 2026-08-29** and
+  the release is now recorded on that lane's own `Files` line.
+- **PUSHED, NOT DEPLOYED.** Both halves are on `origin/main`
+  (`bf184804` backoff, `b59ee603` cooldown) so `deploy_preflight.py` will not
+  reject them as `OFF_MAIN`; they ride along with the next refresh-worker
+  deploy. No deploy triggered, no claim taken, `render.yaml` untouched.
+- **STILL OWED — the production reading.** Everything above is BENCH evidence.
+  The reading that closes this: after a deploy carrying `b59ee603`, either a
+  `[cfbd_backoff] ... status=429 ... sleeping=` line followed by a run that
+  COMPLETES (backoff worked), or `SEASON_PROJECTION_RELAUNCH_HELD sport=ncaaf`
+  with `SEASON_PROJECTION_LAUNCHING` falling to ~1/hour (cooldown worked).
+  Until then neither half has been observed doing anything in production, and a
+  quiet log is not a pass — the same trap `#593`'s verification carried.
+- **NOTE FOR WHOEVER CLOSES THIS: the lane's ORIGINAL question is answered and
+  is NOT what these commits fix.** Zero NCAAF orders is `pick_gate` denying
+  ncaaf spread/moneyline/total on a measured out-of-sample loss, working as
+  designed. Fixing the 429 will NOT produce NCAAF orders. Do not let these two
+  commits read as a fix for that.
 - Blocked by: none
 
 
@@ -3415,6 +3449,65 @@ caaf-no-orders`). NOT
   `soccer-board-mlb-parity`'s bare `cards.py` — in prose that SAID the claim
   was removed — was claiming every sport's cards builder. It blocked this
   work mid-game. `check_lane_invariants` passed throughout.
+- Blocked by: none
+
+
+### ncaaf-compact-card-state — OPEN — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
+- Goal: the NCAAF compact strip and the Layer 2 compact cards show a game's
+  REAL state and score while it is in progress. User report: "compact card is
+  not updating with game state on the ncaaf page, layer 2 compact cards also
+  are not updating." Follows `ncaaf-live-lens-state`, which fixed the LENS and
+  the cards contract; these are two further consumers that did not follow.
+- Files: `syndicate/templates/shared/_scoreboard_strip_ncaaf.html`
+- Reads but does NOT claim: `syndicate/features/shared/board_enrichment.py`
+  (held by `soccer-board-mlb-parity`), `pipeline/layer2_shortlist.py`,
+  `syndicate/features/shared/game_chip_scoreboard.py`,
+  `syndicate/features/shared/layer2_board.py`. READ-ONLY — surface the
+  conflict before any edit inside them.
+- **TWO INDEPENDENT DEFECTS, and they are NOT the same bug.**
+  1. **NCAAF compact strip — a template that predates live data.** Measured on
+     the served page 16:47Z with the game live: the strip head renders `0:00`
+     and the two team rows render `NC 20.0 / TCU 30.3` — the PROJECTIONS —
+     while the real score was 10-10. Two causes in
+     `_scoreboard_strip_ncaaf.html`: the head is
+     `state.clock or state.status`, so a bare `0:00` at end of quarter beats
+     the informative `End of 1st`; and the team rows read
+     `scoreboard.away_points`/`home_points` unconditionally, which are the
+     model's numbers. Web-side, entirely in this lane.
+  2. **Layer 2 — NCAAF is the ONLY sport with no game join at all.** Measured
+     on `/api/board/layer2-shortlist?date=2026-08-29&limit=2000`:
+
+         sport   rows  has game  game_state  is_live
+         soccer   400       400         400        5
+         mlb      400       400         400        0
+         wnba     400       400         400        0
+         ncaaf     82         0           0        0
+         nfl        1         1           1        0
+
+     `layer2_board` sets `game_state` only `if game:`, so all 82 NCAAF rows are
+     stateless. Upstream, `/api/board/book-grid?sport=ncaaf` reports
+     `game_state {"chips": 0, "reason": "no_chips_for_date"}` and
+     `live_game_state {"supported": false, "reason": "no live status source
+     wired for ncaaf"}`. **The stage is named: zero chips, not a failed name
+     match** — which matters, because NCAAF's empty alias map made a name-match
+     failure the obvious suspect and it is exonerated.
+- Hypothesis: the chip join runs on **refresh-worker**
+  (`pipeline/layer2_shortlist.py:548`; the grid arrives at web as
+  `enrichment_state: "from_artifact"`, generated 16:41:48Z), and the worker is
+  on `da2de430` — which PREDATES the `live_state` work. Locally, with the new
+  code, `build_game_chips('2026-08-29', ['ncaaf'])` returns **8 chips**,
+  `state: "live"`, `status_token: "Q2 14:03"`, scores 10/10. So the chip
+  builder is correct and the worker is simply running older code, OR the
+  worker additionally cannot build the NCAAF board from its own disk.
+- Falsification test: the hypothesis is WRONG if, after refresh-worker runs the
+  current code, `book-grid` still reports `chips: 0`. That would mean the
+  provider raises on the worker (missing NCAAF artifacts on its disk — the
+  `ncaaf-no-orders` lane's stale-projection finding would then be the cause),
+  and the fix moves to artifact delivery rather than to code.
+- Verification: (1) the served NCAAF page shows the live score and a real state
+  label on the compact strip; (2) `layer2-shortlist` reports NCAAF rows with
+  `game_state` non-null, measured against a game ESPN calls live in the same
+  run.
 - Blocked by: none
 
 
