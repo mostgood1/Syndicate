@@ -3520,7 +3520,7 @@ caaf-no-orders`). NOT
 - Blocked by: none
 
 
-### ncaaf-compact-card-state — **PARTIAL / BLOCKED 2026-08-29** — strip FIXED and verified on production (`90c65694`: head `'11:20 - 2nd'`, rows `NC 10 / TCU 10`, was `'0:00'` + the projections `20.0/30.3`). **Layer 2 BLOCKED:** cause proven — `ncaaf_week_and_card_keys_for_date` needs `cfbd_lines_*.json`, which has NO PRODUCER on any service and exists at NO git SHA (`#557`, already recorded in `cards.py:246`), so NCAAF yields 0 chips everywhere. Fix belongs in `ncaaf/sources.py`, held by OPEN lane `ncaaf-pace-block`. Needs release or user override — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
+### ncaaf-compact-card-state — **PARTIAL 2026-08-29; STRIP SHIPPED, CHIPS FIX REVERTED AFTER IT DEGRADED WEB** — strip FIXED and verified on production (`90c65694`: head `'11:20 - 2nd'`, rows `NC 10 / TCU 10`, was `'0:00'` + the projections `20.0/30.3`). **Layer 2 BLOCKED:** cause proven — `ncaaf_week_and_card_keys_for_date` needs `cfbd_lines_*.json`, which has NO PRODUCER on any service and exists at NO git SHA (`#557`, already recorded in `cards.py:246`), so NCAAF yields 0 chips everywhere. Fix belongs in `ncaaf/sources.py`, held by OPEN lane `ncaaf-pace-block`. Needs release or user override — opened 2026-08-29 — session 6dc988f8-c05d-4b4b-a7b3-0f1f30bb2ee3
 - Goal: the NCAAF compact strip and the Layer 2 compact cards show a game's
   REAL state and score while it is in progress. User report: "compact card is
   not updating with game state on the ncaaf page, layer 2 compact cards also
@@ -3599,6 +3599,20 @@ caaf-no-orders`). NOT
 - **The `#273` fix does not work in production.** Its own docstring says it
   cured NCAAF's 0-chips-forever bug; it replaced an unconditional `return []`
   with a conditional one whose condition is never true on any service.
+- **2026-08-29 INCIDENT — the chips resolver fix (`fbc794d9`) was CORRECT,
+  was VERIFIED (0 -> 8 chips, live game `Q2 5:44` 10-10 at 17:14:02Z), and
+  DEGRADED WEB TO 502 within minutes.** `/` 3.5s -> 37.9s, `/ncaaf/cards` 502.
+  Reverted forward as `0163f904`; `/` back to 1.8s, all routes 200.
+  Cause: `_NCAAFDataProvider.games()` builds the whole 51-game NCAAF board on
+  every chips build, and the broken resolver had been an accidental circuit
+  breaker in front of it. Postmortem in `learnings.md` 2026-08-29; full
+  measurements in `deploys.md`.
+- **STILL OWED, and the code is written:** the resolver rewrite is on `main`
+  history (`fbc794d9`, reverted) and is correct — 8/8 and 30/30 key matches, and
+  it removes the last consumer of `cfbd_lines_*.json`, which no service has. It
+  can only ship once `_NCAAFDataProvider.games()` stops building the full board
+  on the chips path. `refuse_if_compute_in_request_path` already exists for
+  exactly this and the chips path calls neither it nor its warn-only sibling.
 - Blocked by: none
 
 

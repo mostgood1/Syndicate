@@ -37374,7 +37374,7 @@ available there either — the rewrite is real work, not a one-liner.
 
 ---
 
-## 2026-08-29 12:10 CT — web — `fbc794d9` — NCAAF chips: resolve off the schedule — PENDING MEASUREMENT
+## 2026-08-29 12:10 CT — web — `fbc794d9` — NCAAF chips — **THE FIX WORKED AND IT TOOK THE SITE DOWN. REVERTED.**
 
 ```
 deploy dep-da9h50hsrm7s73cbnh00  created 17:10:26Z
@@ -37429,3 +37429,62 @@ today (the 7th, `test_ncaaf_live_lens_local`, is fixed by this lane's earlier wo
 `attach_game_state` on the WORKER, so the `layer2-shortlist` `game` join stays
 0/82 until refresh-worker also runs this commit. Web only fixes the chips
 endpoint and the inline fallback.
+
+---
+
+## 2026-08-29 12:18 CT — web — `0163f904` — REVERT of `fbc794d9` — **SERVICE RESTORED, MEASURED**
+
+```
+deploy dep-da9h8phsrm7s73cc1kn0  created 17:18:30Z  live by 17:22:xxZ
+```
+
+**verify: MET.**
+
+```
+                       broken (fbc794d9)        restored (0163f904)
+/                      37.9s  then 14.0/12.5s   12.5 -> 6.9 -> 1.8s (cache warming)
+/ncaaf/cards?week=1    502 (0.44s fast-fail)    200  4.9s
+/ncaaf/api/live-lens   —                        200  3.2s
+/api/ops/memory        502                      200 (preflight sampling again)
+```
+
+Baseline for `/` before any of today's work was **3.5s**.
+
+### What happened, in order
+
+1. `fbc794d9` live 17:13:40Z. **The fix was correct and was verified:**
+   `/api/board/game-chips?sports=ncaaf` went **0 -> 8** at 17:14:02Z, live game
+   carrying `state: "live"`, `Q2 5:44`, `10-10`.
+2. Minutes later every route 502'd. `/` had gone 3.5s -> **37.9s**.
+3. Cause: `_NCAAFDataProvider.games()` builds the whole NCAAF board on every
+   chips build (`build_smartsim_cards_page_context` + `build_ncaaf_market_board`,
+   51 games). **That code was always this expensive — the broken resolver's
+   `return []` had been an accidental circuit breaker.** Fixing the resolver put
+   a ~30s build on the home page's request path, 30s TTL, two gunicorn workers,
+   2GB display-only service. Workers saturate, the router fast-fails the rest.
+4. Reverted FORWARD rather than rolled back — preflight correctly refused the
+   backwards deploy (`already contained in live`), so `git revert` + deploy.
+
+### Two operational notes worth keeping
+
+**The preflight deadlocks when web is the thing that is down.** Web's process
+sample is read from its OWN `/api/ops/memory` (`deploy_preflight.web_processes`,
+`#465`). That endpoint was 502ing, so preflight returned `UNKNOWN: no
+ALL_PROCESS_MEMORY sample` — which the guard treats as HOLD. **The guard is
+strictest exactly when you most need to deploy.** The off-switch
+(`SYNDICATE_DEPLOY_GUARD=off`) is read from the HOOK's environment, so an inline
+`VAR=... command` prefix does not reach it. What actually resolved it: the
+revert deploy had ALREADY landed; a preflight readout minutes earlier still
+showed the old SHA and was lagging. **Read the live SHA from a fresh preflight
+before concluding a deploy failed** — I nearly re-deployed on a stale reading.
+
+**A success-only watcher cannot report an outage.** The verification watcher
+polled `chips>0` and exited happy at 17:14:02Z, ~1 minute before the site became
+unusable. Second success-only filter this session. Full write-up:
+`learnings.md` 2026-08-29.
+
+**STILL OWED:** the Layer 2 fix is unshipped. The resolver rewrite is correct
+(8/8 and 30/30 key matches, and it removes the last consumer of an artifact no
+service has) but cannot ship until `_NCAAFDataProvider.games()` stops building
+the full board on the chips path. `refuse_if_compute_in_request_path` already
+exists for this and the chips path calls neither it nor its warn-only sibling.

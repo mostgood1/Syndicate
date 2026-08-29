@@ -5840,3 +5840,68 @@ deleting the path text does. Never write a bare filename inside a `- Files:`
 block, prose or not; always the full repo-relative path. And when the guard
 blocks you on a file you believe is unclaimed, read the guard's matching rule
 before assuming the ledger is right.
+
+### 2026-08-29 — FORBIDDEN: making a previously-unreachable code path reachable without measuring the cost of the path that will now call it
+
+- **What we believed:** that fixing `ncaaf_week_and_card_keys_for_date` was a
+  CORRECTNESS change. It restored a dead join, so the risk seemed to be "does
+  it return the right games", and that is what was measured: 8/8 and 30/30 keys
+  matched real card gamePks locally, and production went 0 -> 8 chips at
+  17:14:02Z with the live game carrying `Q2 5:44` and `10-10`. **The fix worked.
+  It was verified. And it took the site down anyway.**
+- **What was actually true:** `_NCAAFDataProvider.games()` builds the ENTIRE
+  NCAAF board on every chips build — `build_smartsim_cards_page_context` PLUS
+  `build_ncaaf_market_board`, 51 games. That code was always that expensive.
+  The broken resolver's `return []` had been acting as an **accidental circuit
+  breaker** for months. Removing it put a ~30s build on the home page's request
+  path behind a 30s TTL, on a 2GB display-only service with two gunicorn
+  workers. One slow build occupies a worker; two exhaust the pool; Render's
+  router then fast-fails everything else with 502 in ~0.4s.
+- **How we found out:** the user's board went down. Measured: `/` 3.5s baseline
+  -> **37.9s**; `/ncaaf/cards` **502**; `/api/ops/memory` **502**. Restored by
+  reverting forward (`0163f904`) — `/` settles to 1.8s, all routes 200.
+- **The rule going forward:** **enabling dead code is a performance change, not
+  only a correctness one.** Before shipping a fix that makes an unreachable path
+  reachable, read what the newly-reachable code CALLS and measure it on the path
+  that will now call it. "It returns the right answer" is not a deploy
+  verification for a change that alters *how often* something runs.
+- **Cost:** ~8 minutes of degraded-to-502 production during the FIRST live
+  college football game of the season — the exact surface the user was watching
+  — plus a revert, plus the resolver fix now unshipped and owed.
+
+#### The epistemic failure is worse than the technical one, three times over
+
+1. **I noticed the risk and shipped anyway.** Before deploying I wrote to myself
+   that the chips path would now do "real NCAAF board work" and that it was
+   "worth flagging". Then I deployed and did not measure it. A noticed-and-
+   unacted risk is worse than an unnoticed one, because it proves the
+   information was in hand.
+2. **I dropped a habit exactly when it mattered most.** Two deploys earlier I
+   measured latency on this very endpoint family (3.0/3.0/3.3/3.9/5.3s against a
+   4.85s baseline) and wrote it into `deploys.md`. On the riskier change I
+   measured only correctness.
+3. **My verification watcher could not have seen it.** It polled
+   `chips>0` and exited on success — a success-only filter, which the Monitor
+   guidance explicitly warns against, and the SECOND one I wrote this session
+   (the first broke on `head != '0:00'` and fired on a stale render). **A
+   watcher that cannot express the failure is not a watcher.**
+
+### 2026-08-29 — the check that would have caught this ALREADY EXISTS and was not applied
+
+`syndicate/features/shared/request_path_guard.py` carries **two** functions:
+`warn_if_compute_in_request_path` (logs only) and
+**`refuse_if_compute_in_request_path`** — a HARD refusal written for `#56/#98/#109`,
+whose docstring names this exact failure: *"the web service does no heavy
+computation ... `_build_candidate_pool` directly on the 2GB [service]"*.
+
+Neither is called anywhere on the game-chips path, and `_NCAAFDataProvider.games()`
+calls neither. The rule was written down, the enforcement was built, and the
+new caller simply never opted in.
+
+**PROPOSED CHECK, because another line of prose will not catch the next one:**
+a post-deploy latency assertion in the web verification loop — measure `/` and
+the changed route against the pre-deploy baseline in the same run, and treat
+**>2x** as a FAILED deploy verification rather than a passing one. This incident
+would have failed it at 37.9s vs 3.5s, ~4 minutes before it was noticed by hand.
+A rule would not have caught this; I had the rule and violated it. Only a
+measurement in the verify step catches it.
