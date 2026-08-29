@@ -232,3 +232,16 @@ def test_a_commission_wrapped_in_a_value_object_is_read():
 
 def test_an_unparseable_commission_does_not_raise():
     assert venue_order_view(_filled_order(commissionNotionalTotalCollected="n/a"))["fees_dollars"] is None
+
+
+def test_the_fee_inputs_are_logged_beside_the_charge(capsys):
+    """`venue_fees.py` needs the DENOMINATOR to model a rate, not just the fee.
+
+    Recording only `fees_dollars` would replace "no number" with "a number
+    nobody can calibrate".
+    """
+    venue_order_view(_filled_order())
+    out = capsys.readouterr().out
+    assert "COMMISSION " in out
+    for field in ("dollars=0.06", "fill_price=0.47", "filled=3.91", "bps='150'"):
+        assert field in out, f"{field!r} missing -- the rate cannot be back-derived"

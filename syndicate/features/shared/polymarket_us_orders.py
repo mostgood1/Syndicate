@@ -885,7 +885,11 @@ _COMMISSION_FIELDS = (
 
 
 def _commission_dollars(
-    order: Mapping[str, Any], *, fill_cost: float | None
+    order: Mapping[str, Any],
+    *,
+    fill_cost: float | None,
+    price: float | None = None,
+    filled: float | None = None,
 ) -> float | None:
     """What the venue CHARGED for this order, in dollars.
 
@@ -951,6 +955,26 @@ def _commission_dollars(
             flush=True,
         )
         return None
+    # THE INPUTS, LOGGED BESIDE THE ANSWER. Asked for by `venue_fees.py`, which
+    # currently refuses every Polymarket arb on
+    # `polymarket_fee_never_observed: fees_dollars is null on 13/13 filled` --
+    # the null this function was written to remove. Modelling the rate needs
+    # the DENOMINATOR as well as the charge, and it needs the venue's own
+    # basis-point fields to check the derived rate against what it says it
+    # charges. Recording only `fees_dollars` would replace "no number" with "a
+    # number nobody can calibrate", which is the same mistake one step later.
+    #
+    # NOT CIRCULAR, and that has to be true or the calibration is worthless:
+    # every value here comes off the venue's order read. Nothing in this repo
+    # computes a Polymarket fee -- which is exactly why it was null.
+    print(
+        f"[polymarket_us_orders] COMMISSION order={order.get('id') or order.get('orderId')}"
+        f" slug={order.get('marketSlug')!r} raw={raw!r} dollars={fee!r}"
+        f" fill_price={price!r} filled={filled!r} fill_cost={fill_cost!r}"
+        f" bps={order.get('commissionsBasisPoints')!r}"
+        f" maker_bps={order.get('makerCommissionsBasisPoints')!r}",
+        flush=True,
+    )
     return fee
 
 
@@ -1208,6 +1232,8 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         "fees_dollars": _commission_dollars(
             order,
             fill_cost=(price * filled) if (price is not None and filled) else None,
+            price=price,
+            filled=filled,
         ),
         "order_id": order.get("id") or order.get("orderId"),
         "client_order_id": order.get("clientOrderId") or order.get("client_order_id"),
