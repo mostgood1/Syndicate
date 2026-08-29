@@ -6941,3 +6941,97 @@ chips=351 -- alias gap, NOT a date exclusion`), while Polymarket reports
 `no_candidates|soccer|alternate_totals_corners: 222` and `no_match|soccer|h2h: 93`.
 Soccer is currently the most expensive sport in the build AND contributes zero
 board rows.
+
+## [week-scoped-board-window] SCOPED, NOT BUILT `[2026-08-29]`
+
+**THE REMAINING CAUSE OF BOARD STALENESS, after everything else today was fixed
+and did not fix it.**
+
+### Evidence, served payload 18:13:02Z
+
+```
+state_meta: computed_at 2026-08-28T23:03:31Z   age 68,971 s (19.2 h)
+            newest_age 300 s   artifacts_dated 4   status stale
+            source combined_board_window+layer2_fallback
+by_date:    2026-08-29  153 candidates, 12 sports
+            2026-08-30   42 candidates, ["serie a"]   <- 19.2h old, REAL ROWS
+            2026-08-31    0 candidates                <- correctly ignored (#603)
+```
+
+### The chain
+
+1. `2026-08-30` has ONLY soccer fixtures. `SCHEDULE_RECONCILE_CHECK date=2026-08-30
+   scheduled_games=0` for MLB; `BETTING_PAYLOAD_READ exists=False`.
+2. `_supported_intelligence_dates()` unions FIVE DAILY LOADERS ONLY --
+   `mlb_available_daily_summary_dates`, `nba_/wnba_/ncaab_/nhl_available_dates`.
+   **No soccer, no NFL, no NCAAF.**
+3. `_default_board_window_dates()` = today UNION (window INTERSECT supported), so a
+   soccer-only date is NEVER ELIGIBLE TO BUILD.
+4. The read side deliberately does not filter, so it still shows tomorrow's 42
+   Serie A rows -- which are real, so `#603`'s row-gate correctly passes them.
+5. Their 19.2h stamp sets `computed_at`. **No build-speed work can ever move this.**
+
+The code already names the gap: *"soccer's available-date probe is per-league --
+conflating either into this rolling day-window would be the wrong shape for them.
+Tracked as a separate follow-up (`_default_week_scoped_dates`, not yet implemented)."*
+
+### The primitives ALREADY EXIST -- this is not new plumbing
+
+- `soccer.sources.available_dates(league)` -> reads `display_prediction_dates.json`
+  under `_api_root(league)`. One JSON per league, 10 leagues in `LEAGUE_DISPLAY_NAMES`.
+- `soccer.sources.active_leagues_for_date(date)` -> `league_active_for_date` per league.
+- Path resolution for those reads is no longer a cost: the `source_roots` cache
+  landed today (`lstat` 7,955 -> absent).
+
+### Proposed change (v1, SOCCER ONLY)
+
+```
+_week_scoped_supported_dates()  -> union of available_dates(league) over leagues
+_default_board_window_dates()   -> today UNION (window INTERSECT (daily UNION week_scoped))
+```
+
+**NFL/NCAAF DELIBERATELY OUT OF v1.** They are week-scoped, not date-scoped; mapping
+week -> dates is a different transform and the existing comment is right that
+bolting it on here is the wrong shape. Soccer is date-indexed already, so it fits
+the rolling window as-is.
+
+### THE PART THAT MUST NOT BE SKIPPED: this makes today WORSE unless throttled
+
+Each eligible date costs a FULL BOARD BUILD. Measured 2026-08-29 17:32-17:49,
+post-fix: **1005 s wall** (24.72 pull + 177.34 overview + 282.67 collect + 137.04
+layer2 + 106.34 kalshi + 122.62 portfolio). Today is currently the ONLY eligible
+date and rebuilds every ~21 min. Add tomorrow and they alternate: **~42 min each.**
+
+So the naive widening trades a 19.2h displayed age for a 42-min one AND HALVES
+TODAY'S REFRESH RATE. `SYNDICATE_INTELLIGENCE_BOARD_WINDOW_SLOW_REFRESH_SECONDS`
+exists precisely for this and already applies to non-today dates -- **verify it
+BINDS before widening**, because this lane has already shipped three tuning changes
+to that knob that did nothing (see `[board-window-staleness]`).
+
+### Risks
+
+1. **Today regresses** if the throttle does not bind. Measured earlier today with 2
+   eligible dates: per-date period 30-66 min.
+2. **`display_prediction_dates.json` staleness** -- if that artifact lags, the same
+   class of bug recurs one level down. WHO WRITES IT AND HOW OFTEN IS UNVERIFIED.
+3. Memory: builds are serial, and the OOM history is on `build_intelligence_overview`
+   per build, not across concurrent dates -- likely fine, not verified.
+
+### Verification predicate, to be written down BEFORE deploying
+
+- `BUILD_SPAN_ENTER stage=pull_hot_artifacts date=<tomorrow>` appears at all.
+- Served `state_meta.computed_at` age drops below the slow-refresh interval.
+- Today's own per-date period does not exceed ~30 min.
+- REFUTED IF today's period doubles without tomorrow's age improving.
+
+### THE ALTERNATIVE, and why it is worse
+
+Gate `computed_at` on "is this date in the BUILD window" rather than "does it have
+rows". Cheap, no extra builds -- but the board would then read FRESH while showing
+19.2h-old Serie A rows. That is a display that lies, and `#334`/`#563` exist because
+this repo has already been burned by asserted freshness. **Not recommended.**
+
+### Effort
+
+~30 lines plus tests for the eligibility change. The real work is the cost
+verification, not the code.
