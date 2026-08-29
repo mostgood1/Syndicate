@@ -17,6 +17,69 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+## Closed 2026-08-29 — NCAAF live surfaces, opening Saturday: four defects, lanes `ncaaf-live-lens-state` / `ncaaf-compact-card-state` / `ncaaf-chip-grid-join`
+
+All four found and fixed during the first NCAAF slate of the season, each
+verified on production against ESPN in the same script run. Full narrative:
+`.syndicate/log/2026-08-29.md`; measurements in `.syndicate/deploys.md`.
+
+### `#605` — **the NCAAF live lens's state branch was UNREACHABLE, not empty** — FIXED 2026-08-29 (`061d5b2b`)
+
+`publication_adapter._shared_game_state` derives `live`/`final`/`period`/`clock`
+from `game["live_state"]`, and `ncaaf/cards.py` contained **zero occurrences of
+that key**. With UNC @ TCU visibly in progress, production served
+`Games 51 | Live 0 | Final 0 | Pregame 51`. `[ncaaf-board-surfaces]` had shipped
+the state PATH on 08-27 noting its DATA "cannot be [tested] until a game is in
+progress" — **a caveat is a defect with a date on it**. Joined on the ESPN team
+ids the cards already carried in `logo_url` (51/51 exact); the obvious
+alternative fails, as **0 of 10** CFBD abbreviations match ESPN's. Verified
+`Live 0 -> 1`, eyebrow `Q1 - 4:00`, later `Final` + `Score: NC 15 - 10 TCU`.
+
+### `#606` — **the compact strip showed the MODEL'S PROJECTION where a reader expects the score** — FIXED 2026-08-29 (`90c65694`)
+
+On a live, tied game the strip read `NC 20.0 / TCU 30.3` — the projected totals —
+with a bare `0:00` as its only state, because the head preferred `clock` over
+`status` and ESPN's clock is a truthy `"0:00"` at end of quarter. Now
+`11:20 - 2nd` with `NC 10 / TCU 10`; pregame cards unchanged.
+
+### `#607` — **NCAAF game chips were 0 on every service on every date: the date resolver gated on an artifact NOBODY WRITES** — FIXED 2026-08-29 (`8c1aa834` + `fccd923d`)
+
+`ncaaf_week_and_card_keys_for_date` needed `cfbd_lines_{season}_wk{N}.json`,
+which has no producer on any service and exists at no git SHA (`#557`'s own
+finding). It returned None everywhere, so `_NCAAFDataProvider.games()` returned
+`[]` and Layer 2's NCAAF rows carried no game state. **The `#273` fix that
+claimed to cure this replaced an unconditional `return []` with a conditional
+one that is never true in production.** Rewritten onto the season schedule the
+cards are already built from (8/8 and 30/30 key matches).
+
+**AND IT TOOK WEB DOWN FOR ~8 MINUTES ON THE FIRST ATTEMPT.** The broken
+resolver had been an accidental circuit breaker in front of two full 51-game
+board builds (6.41s) on the home page's request path: `/` went 3.5s -> **37.9s**,
+`/ncaaf/cards` 502'd. Reverted, then re-landed behind `build_ncaaf_chip_games`,
+a light builder producing **field-for-field identical chips** (0 diffs over 8
+games) at **0.23s warm**. Every deploy since runs a pre-deploy latency baseline
+with a 2x gate.
+
+### `#608` — **`board_enrichment._side_matches` called `teams_match` with its arguments INVERTED** — FIXED 2026-08-29 (`95c4fb12`)
+
+It passed the grid's LONG name as `token` and the chip's SHORT code as
+`row_team`; the heuristic splits `row_team` into words and only answers when
+`token` is the short side. **0/8 as called, 8/8 reversed** — not even `USC`
+against `USC Trojans`. Invisible for every sport with an alias map, because
+those resolve canonically on an order-INDEPENDENT branch; `_alias_map` is EMPTY
+only for **ncaaf, nhl and ncaab**. Blast radius measured across every sport
+BEFORE shipping: no sport loses a match, none gains ambiguity, soccer **+5**,
+ncaaf **+43**. `book-grid` `rows_matched` 0 -> 44; `layer2-shortlist` ncaaf
+0/96 -> **49/92** with **all of today's and tomorrow's rows covered**.
+
+**OPEN RESIDUAL, handed off:** one FBS-vs-FBS game still misses because the team
+registry has no `UMass` alias (`Massachusetts @ Rutgers`). Populating
+`_alias_map("ncaaf")` was built, measured and REVERTED — it cannot invent
+vocabulary its source lacks, and it makes `MAS` resolve to `UMass Dartmouth`
+authoritatively. The gap is registry DATA, upstream in CFBD. See
+`.syndicate/handoff_2026-08-29_ncaaf_umass_alias_gap.md`, lane
+`ncaaf-settlement-resolver`. Costs 4 rows on a future date.
+
 ## Closed 2026-08-20 — WNBA advanced-data coverage: eleven items, lane `basketball-model-owner`
 
 **Read the ID note first.** These were shipped and deployed over 2026-08-19..20
