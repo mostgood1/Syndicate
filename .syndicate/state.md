@@ -4808,9 +4808,22 @@ unmatched matchups on 09-03/09-04:
       row "UMass Minutemen"  vs  chip abbr "MAS"           -> False
 
   No heuristic can bridge `Massachusetts` <-> `UMass`; it is a vocabulary fact,
-  the same class as `UNC` <-> `North Carolina` measured on NCAAB. Root cause is
-  that `team_aliases._alias_map("ncaaf")` is EMPTY. Costs **4 rows on a future
-  date**; no game in play is affected.
+  the same class as `UNC` <-> `North Carolina` measured on NCAAB. Costs **4 rows
+  on a future date**; no game in play is affected.
+
+  **AND POPULATING `_alias_map("ncaaf")` DOES NOT FIX IT — built, measured,
+  REVERTED 2026-08-29.** A map derived from
+  `ncaaf_team_registry.unambiguous_team_index()` (2,232 keys) still returned
+  `None` for `UMass Minutemen`, because team 113 carries no `umass` key — a
+  derived map cannot invent vocabulary its source lacks. Worse, it made
+  `canonical_team("ncaaf", "MAS")` resolve to **`UMass Dartmouth`** (team 379's
+  real abbreviation), and once a map exists `teams_match` is MAP-AUTHORITATIVE
+  (`team_aliases.py:640-644` skips the heuristics), turning a harmless miss into
+  a confident wrong answer. Control after reverting: map back to 0 keys, the 8
+  slate pairs still 8/8. **The gap is REGISTRY DATA, upstream of both** — CFBD
+  does not ship the alias and `cfbd.py:475` is faithful to it. Handed to lane
+  `ncaaf-settlement-resolver`:
+  `.syndicate/handoff_2026-08-29_ncaaf_umass_alias_gap.md`.
 
 ## [ncaaf-live-lens-state] THE NCAAF LIVE LENS'S STATE BRANCH WAS UNREACHABLE, NOT EMPTY — **FIXED AND VERIFIED IN PRODUCTION** `[measured 2026-08-29T16:30:28Z, web 061d5b2b, lane ncaaf-live-lens-state]`
 

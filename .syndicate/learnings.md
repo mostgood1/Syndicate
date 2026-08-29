@@ -6114,3 +6114,40 @@ in one session the instrument, not the system, produced the reading** — see
 [[feedback_instrument_blindness]] in spirit. The discriminator is always the
 same question: *what would this reading look like if the thing I am testing had
 never run?*
+
+### 2026-08-29 — FORBIDDEN: closing a name-join gap by POPULATING an alias map, without first checking the map's source carries the missing name
+
+- **What we believed:** that NCAAF's join gap was a missing alias MAP, so
+  deriving one from `ncaaf_team_registry.unambiguous_team_index()` would close
+  it. The registry has 684 teams and is the lane's authoritative vocabulary; it
+  looked like the obvious source.
+- **What was actually true, on two counts:**
+  1. **A derived map cannot invent vocabulary its source lacks.** With 2,232
+     keys built, `canonical_team("ncaaf", "UMass Minutemen")` still returned
+     `None` — team 113 is `Massachusetts` and carries no `umass` in any column,
+     so the combined key is `massachusetts minutemen`. The target case was
+     untouched.
+  2. **Populating a map CHANGES THE SEMANTICS of every lookup for that sport.**
+     `teams_match` returns the map's verdict when both sides resolve
+     (`team_aliases.py:640-644`) and deliberately does NOT fall through to the
+     heuristics. So a mis-resolution stops being a harmless miss and becomes a
+     confident wrong answer. Measured: `canonical_team("ncaaf", "MAS")` ->
+     **`UMass Dartmouth`**, team 379's real abbreviation, colliding with the
+     chip's synthetic abbr for Massachusetts.
+- **How we found out:** spot-checking the map's own output on the exact failing
+  token before trusting the key count. 2,232 keys looked like success; the one
+  token that mattered still returned `None`.
+- **The rule going forward:** before adding a map for a sport that has none,
+  (a) confirm the SOURCE contains the specific name the join is failing on, and
+  (b) enumerate what the new map resolves that the heuristics previously left
+  unresolved — because those are exactly the lookups whose semantics flip from
+  "fall back" to "authoritative". A map is not a strictly-additive change.
+- **Cost:** none shipped. Built, measured, reverted; control confirmed the map
+  back to 0 keys and the 8 slate pairs still 8/8. The real gap is REGISTRY DATA
+  upstream (CFBD does not ship the alias), handed to the owning lane.
+
+`_basketball_alias_to_name`'s docstring already recorded this exact failure from
+the other direction — a merged map made `("wnba", "min")` vs "Minnesota Lynx"
+FALSE, "a wrong answer, and worse than no answer, because the map is treated as
+authoritative and skips the heuristic fallback." **The warning was in the file I
+was editing.**
