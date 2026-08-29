@@ -36675,8 +36675,8 @@ soccer hydrated bracket, force_refresh=True skip_game_hydration=False, overnight
 Mean 206 -> 204 s. Inside the spread. By the refutation condition written above,
 this is refuted.
 
-**CAVEAT I MUST STATE RATHER THAN BURY: NO SAMPLE MET MY OWN >25 MIN SETTLED BAR.**
-Boots at 04:45:04Z and again at 05:18:48Z (a deploy at 05:15:37Z from lane
+**CAVEAT STATED RATHER THAN BURIED: NO SAMPLE MET MY OWN >25 MIN SETTLED BAR.**
+Boots at 04:45:04Z and again at 05:18:48Z (a 05:15:37Z deploy from lane
 `venue-join-refusal-visibility`, taken while this claim was still held). The
 05:20 sample runs `8c53d701`, which CONTAINS this memo (verified by content:
 `git show 8c53d701:syndicate/features/soccer/sources.py | grep -c soccer_read_scope`
@@ -36691,13 +36691,136 @@ Boots at 04:45:04Z and again at 05:18:48Z (a deploy at 05:15:37Z from lane
   belgian         0.20 -> 0.02
 ```
 
-**WHY IT COULD NOT HAVE SHOWN UP, and this is the real finding.** I sized this
-fix on `assemble_s` = **19.49 of a 20.78 s** `week_games` call. That figure is from
+**WHY IT COULD NOT HAVE SHOWN UP, and this is the real finding.** I sized this fix
+on `assemble_s` = **19.49 of a 20.78 s** `week_games` call. That figure is from
 **20:24Z — a European LIVE window.** Measured overnight, one full pass of all eight
 leagues totals `assemble_s` ~= **28.8 s** against a ~206 s soccer bracket: **14%,
 not the 95% I built against.** A ~40% cut of 14% is ~6% of soccer, ~12 s of 206 s
 -- invisible at the sport level, exactly as observed.
 
 **STILL UNTESTED:** the live-window case, which is where those keyvalue reads are
-actually expensive and where soccer's cost genuinely spikes. This is "not proven",
-NOT "it does not work". Do not revert it and do not bank it.
+actually expensive. This is "not proven", NOT "it does not work". Do not revert it
+and do not bank it.
+
+## 2026-08-28 22:57 CT — refresh-worker `2e587db4` (break-glass #3) — MEASURED
+
+```
+deploy   dep-da95h3psrm7s73b8h4f0   trigger=api   created 2026-08-29T03:57:03Z
+build_ended 03:58:46Z   deploy_ended 03:59:48Z   [refresh_worker] BOOTED 04:00:17Z
+```
+
+**Break-glass, third of this session**, on the explicit instruction "deploy it
+and get me the census". Grant at
+`.syndicate/deploy/grants/d617eefd-….json`, `target_commit 2e587db4`.
+
+**COST, STATED AND ACCEPTED BEFORE THE POST:** preflight returned
+`HOLD: 7 job(s) in flight` — `run_mlb_daily_sim_job.py` pid=8895 plus
+`daily_update.py --workflow ui-daily` and four `mlb_bettingv2` children. The
+in-flight MLB daily sim died mid-run. Spacing was CLEAR; the sim was the only
+blocker. No sanctioned alternative exists: `deploy_preflight` has no
+job-override flag, `ops.py` exposes odds-refresh/cancel but no sim cancel, and
+the guard's env switch is read from the hook's own process environment so a
+command-line prefix cannot reach it.
+
+**SHIPS:** `prop_modifier_census` (the soccer PROP slug-modifier census) and
+the `key_miss` diagnostic, which reports WHICH component of an index key
+disagreed rather than only that the bucket was empty.
+
+**verify:** the `soccer_prop_shapes=` field on the `[portfolio_commit]
+POLYMARKET_UNMATCHED` line, read at a timestamp AFTER `BOOTED 04:00:17Z` —
+not after `deploy_ended`, which precedes boot by 29s here. The token
+`soccer_prop_shapes` is emitted by no earlier binary, so a match cannot be a
+stale line. Join cadence measured over the preceding 8h: 16 emissions, every
+15–50 min, so the reading is due 04:20–04:50Z.
+
+**What the reading decides:** whether Polymarket publishes a soccer corners
+family at all. 19 sampled PROP slugs across epl/lal/bun/lg1/sea showed only
+`ftts`/`exact-score`/`btts` and no corners. If no corners shape appears, the
+221 `no_candidates|soccer|alternate_totals_corners` are HONEST, and the inert
+`question`-keyed route plus `_is_corners_question` get DELETED per the
+condition written at the call site — code that looks installed and cannot fire
+is worse than an absence, which is the defect this lane was opened on.
+
+**INSTRUMENT NOTE.** The first watcher armed for this read was silently dead:
+it did `grep '^RENDER_API_KEY=' .env` against an inherited cwd, and from the
+worktree there is no `.env`, so the key was empty, curl 401'd, and the loop
+slept forever emitting nothing. Its output file was 0 bytes — which is exactly
+what a HEALTHY quiet poller also produces. Replaced with one that exits
+non-zero on an empty key, on 3 consecutive empty responses, and on an auth
+rejection, so silence now means "still waiting" and nothing else.
+
+### MEASUREMENT — census read 2026-08-29T04:14:58Z (14m41s after BOOTED)
+
+**POLYMARKET DOES PUBLISH SOCCER CORNERS. The deletion condition is NOT met.**
+
+```
+soccer_prop_shapes={'exact-score': 930, 'fh-exact-score': 496, 'cor-all': 434,
+ 'btts': 62, 'exact-score-other': 62, 'ftts-none': 62, 'fh-draw': 62,
+ 'fh-btts': 62, 'sh-btts': 62, 'ftts-lev': 2, 'ftts-liv': 1, ...}
+```
+
+`cor-all` is the corners family — **434 rows, third-largest of any soccer PROP
+shape**, against 239 `alternate_totals_corners` board rows (several lines per
+fixture, so >1 venue row per board row is the expected shape). The census
+strips digits, so the real slugs are `…-cor-all-<line>`.
+
+**I was one reading away from deleting a route to a market the venue lists 434
+times.** The plan of record was: no corners shape ⇒ delete `_is_corners_question`
+and call the 221 refusals honest. That plan was wrong, and only the census says
+so. The branch stays; what changes is the FIELD it keys on — the slug modifier
+`cor-all`, never `question`, which is empty in 14 of 14 sampled rows.
+
+The corners key_miss corroborates it exactly:
+
+```
+{'wanted': 'soccer|2026-08-28|alternate_totals_corners',
+ 'market_indexed_under': [], 'markets_for_our_league_date': []}
+```
+
+BOTH fields empty = the market is indexed under NOTHING, i.e. corners rows are
+never admitted to the index at all. That is the signature of an inert admission
+branch, not of an absent market — and the two are indistinguishable from the
+`no_candidates` count alone, which is why that count read as "venue lists no
+corners" for a day.
+
+### BTTS IS EXPLAINED — two causes, neither of them the market name
+
+```
+{'wanted': 'soccer|2026-08-28|btts',
+ 'market_indexed_under': ['lgscup|2026-09-02', 'lmx|2026-08-28',
+                          'lmx|2026-08-29', 'soccer|2026-08-29'],
+ 'markets_for_our_league_date': []}
+```
+
+`market_indexed_under` non-empty ⇒ BTTS **is** indexed; league or date is the
+disagreement. Both are:
+
+1. **Unmapped competition tokens.** `lmx` (Liga MX) and `lgscup` (Leagues Cup)
+   are not in the proven soccer token set, so those rows never become `soccer`.
+   Soccer h2h shows the same shape with `alsv`.
+2. **A date boundary.** `soccer|2026-08-29` is the right league and the wrong
+   date, while `markets_for_our_league_date` is EMPTY — zero venue markets of
+   any type under `soccer|2026-08-28`. Evening US kickoffs land on the next UTC
+   day; the board stamps Central.
+
+### NCAAF — A LEAD, EXPLICITLY NOT A FINDING
+
+51 board rows refuse (`totals` 41, `h2h` 6, `spreads` 4) and
+`markets_for_our_league_date` is empty for `ncaaf|2026-08-28`, while
+`cfb|2026-08-28` carries the market. The obvious reading is "the venue files
+college football under `cfb` and no alias exists" — and there is no cfb→ncaaf
+mapping in `_effective_league`.
+
+**But that inference does not follow from this line.** `market_indexed_under`
+is `sorted(...)[:4]`, and `cfb` sorts first alphabetically, so it fills the cap
+on ANY market it carries. The identical `['cfb|…']` list appears under
+`wnba|totals`, where `cfb` cannot possibly be the alias. The list is therefore
+truncation, not attribution. What IS solid: zero venue markets under league
+`ncaaf` for that date. Confirming read still owed — does any `cfb|2026-08-28`
+slug name an NCAAF fixture on our board?
+
+### VOCABULARY LEARNED (the instrument's second product)
+
+`fh-`/`sh-` = first/second half · `ftts-<club>` = first team to score ·
+`exact-score` · `btts` · `cor-all` = corners. Same shape as the Kalshi title
+grammar: once the vocabulary is READ rather than guessed, the fix is two lines.
