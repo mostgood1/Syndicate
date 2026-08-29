@@ -2498,6 +2498,18 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
 - Blocked by: none
 
 ### ncaaf-settlement-resolver — OPEN — opened 2026-08-28 — session 764eca35-178c-4c29-afbd-ec621894aaf1
+- **HANDOFF FOR YOU: `.syndicate/handoff_2026-08-29_ncaaf_umass_alias_gap.md`**
+  `[2026-08-29, session 6dc988f8, lane ncaaf-chip-grid-join]`. The registry
+  knows UMass only as `Massachusetts`; OddsAPI sends `UMass Minutemen`, so a
+  legitimate fbs-vs-fbs game (`Massachusetts @ Rutgers`, 09-03) fails its
+  chip<->grid join while its home side matches on both name and abbr. CFBD does
+  not ship the alias, so the generated CSV is faithful and the gap is upstream.
+  **Includes a dead end you should not repeat:** I built the whole ncaaf
+  `_alias_map` from your `unambiguous_team_index()`, measured it, and REVERTED
+  it — it does not fix this case AND makes `MAS` resolve to `UMass Dartmouth`
+  (team 379's real abbr), which is worse than no answer once the map is
+  authoritative. Costs 4 rows on a future date; no game in play affected.
+  Nothing of yours was edited.
 
 - Goal: NCAAF bets can be GRADED, and are graded against the RIGHT GAME. One
   testable outcome: `no_resolver_for_ncaaf` reaches production as zero (it does
