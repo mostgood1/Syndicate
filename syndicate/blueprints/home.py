@@ -91,6 +91,120 @@ _HOME_OVERVIEW_TTL_SEC = 10.0
 _HYDRATED_OVERVIEW_MIN_REBUILD_INTERVAL_SEC = 300.0
 
 
+# ---------------------------------------------------------------------------
+# SPORT_BRANCH PROFILER  `[2026-08-29]`
+#
+# WHY A PROFILER AND NOT A NINTH LOG SPAN. Eight predictions about soccer's cost
+# have been refuted on this subsystem, and the eighth was refuted BY ITS OWN FIX
+# SHIPPING: `week_games`'s per-fixture repeated reads were real (60 file loads ->
+# 4) and moved the sport bracket 206s -> 204s, because `assemble_s` is ~14% of
+# soccer OVERNIGHT and the 95% figure that motivated the work was measured at
+# 20:24Z inside a European live window.
+#
+# So `sport_branch` is ~98% of a sport's overview, `week_games` assembly is ~14%
+# and payloads ~7%, and **~80% of soccer's ~206s is unaccounted for**. Another
+# hand-placed span would be a ninth guess at where. A profiler names the call.
+#
+# ON A REAL BUILD, deliberately. The local mirror cannot reproduce this: profiled
+# offline, all 9 fixtures took the `_unsimulated_game` path and `week_games`
+# returned in 0.007s. The cost only exists where the artifacts do.
+#
+# HYDRATED PASSES ONLY. `skip_game_hydration=True` runs all eight sports in ~2s
+# and is called several times a build for `_source_state_fingerprint`; profiling
+# those would flood the log and dilute the sample with the cheap path.
+#
+# OFF BY DEFAULT and per-sport: `SYNDICATE_SPORT_OVERVIEW_PROFILE=soccer`.
+# cProfile costs roughly 1.3-2x on the profiled region, which is why this is a
+# diagnostic you turn on for a few builds and turn off again -- not telemetry.
+_SPORT_BRANCH_PROFILER: dict[str, Any] = {"profile": None, "slug": None}
+
+
+def _sport_branch_profile_slugs() -> set[str]:
+    raw = str(os.environ.get("SYNDICATE_SPORT_OVERVIEW_PROFILE") or "").strip().lower()
+    if not raw:
+        return set()
+    if raw in {"1", "true", "yes", "on", "all"}:
+        return {"all"}
+    return {part.strip() for part in raw.split(",") if part.strip()}
+
+
+def _sport_branch_profile_begin(slug: str, *, hydrated: bool):
+    """Start profiling this sport's branch, or return None. Never raises."""
+    try:
+        if not hydrated:
+            return None
+        wanted = _sport_branch_profile_slugs()
+        if not wanted or (slug not in wanted and "all" not in wanted):
+            return None
+        # DEFENSIVE: a previous branch that raised before its `end` would have
+        # left a profiler enabled on this thread, and cProfile permits only one.
+        # Clearing it here is what keeps a single exception from disabling the
+        # instrument for the life of the process.
+        stale = _SPORT_BRANCH_PROFILER.get("profile")
+        if stale is not None:
+            try:
+                stale.disable()
+            except Exception:
+                pass
+            print(
+                f"[home] SPORT_BRANCH_PROFILE_STALE_CLEARED prev_sport={_SPORT_BRANCH_PROFILER.get('slug')}",
+                flush=True,
+            )
+        import cProfile
+
+        profile = cProfile.Profile()
+        _SPORT_BRANCH_PROFILER["profile"] = profile
+        _SPORT_BRANCH_PROFILER["slug"] = slug
+        profile.enable()
+        return profile
+    except Exception as exc:
+        print(f"[home] SPORT_BRANCH_PROFILE_BEGIN_FAILED sport={slug} err={exc}", flush=True)
+        return None
+
+
+def _sport_branch_profile_end(profile, slug: str, *, elapsed_s: float) -> None:
+    """Stop and print the profile. Never raises."""
+    if profile is None:
+        return
+    try:
+        profile.disable()
+    except Exception:
+        pass
+    _SPORT_BRANCH_PROFILER["profile"] = None
+    _SPORT_BRANCH_PROFILER["slug"] = None
+    try:
+        import io as _io
+        import pstats
+
+        raw = str(os.environ.get("SYNDICATE_SPORT_OVERVIEW_PROFILE_TOP") or "").strip()
+        try:
+            top = max(5, min(60, int(raw))) if raw else 30
+        except (TypeError, ValueError):
+            top = 30
+        stats = pstats.Stats(profile)
+        # `tottime` FIRST and it is the one to read. Self time names the leaf
+        # that is actually burning the seconds; cumulative names the branch that
+        # contains it, and on a call this deep almost every frame near the top
+        # of a cumulative listing is a wrapper. Both are printed because the
+        # pair is what distinguishes "one slow call" from "a million fast ones".
+        for order in ("tottime", "cumulative"):
+            buffer = _io.StringIO()
+            stats.stream = buffer
+            stats.sort_stats(order).print_stats(top)
+            lines = [ln.rstrip() for ln in buffer.getvalue().splitlines() if ln.strip()]
+            print(
+                f"[home] SPORT_BRANCH_PROFILE sport={slug} order={order} "
+                f"elapsed_s={round(elapsed_s, 2)} rows={len(lines)}",
+                flush=True,
+            )
+            for line in lines[:top + 6]:
+                # One line per row: Render's collector drops very long lines and
+                # a truncated table is unreadable in exactly the place it matters.
+                print(f"[home] SPORT_BRANCH_PROFILE | {line[:300]}", flush=True)
+    except Exception as exc:
+        print(f"[home] SPORT_BRANCH_PROFILE_REPORT_FAILED sport={slug} err={exc}", flush=True)
+
+
 def _sport_overview_phase_log_threshold_sec() -> float:
     """Only sports SLOWER than this print phase timing.
 
@@ -7680,6 +7794,9 @@ def _build_sport_overview(
     )
     props_bar = _choose_props_bar(links, is_active_today=active_today)
     _bso_marks.append(("bars", time.monotonic()))
+    _bso_profile = _sport_branch_profile_begin(
+        slug, hydrated=bool(force_refresh) and not bool(skip_game_hydration)
+    )
     if slug == "mlb":
         pitcher_top_props_href = _link_lookup(links, "Pitcher top props")
         hitter_top_props_href = _link_lookup(links, "Hitter top props")
@@ -8024,6 +8141,7 @@ def _build_sport_overview(
     try:
         _bso_marks.append(("sport_branch", time.monotonic()))
         _bso_total = _bso_marks[-1][1] - _bso_marks[0][1]
+        _sport_branch_profile_end(_bso_profile, slug, elapsed_s=_bso_total)
         if _bso_total >= _sport_overview_phase_log_threshold_sec():
             _phases = [
                 (_bso_marks[i][0], round(_bso_marks[i][1] - _bso_marks[i - 1][1], 2))
