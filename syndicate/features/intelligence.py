@@ -848,7 +848,56 @@ def _decimal_to_american(value: float | None) -> str | None:
     return str(american)
 
 
+# `#601` PRECOMPILED, AND MEMOIZED. `[2026-08-29]`
+#
+# MEASURED, cProfile over `_consume_sport` on refresh-worker `6625b5e6`,
+# 16:47:55Z, soccer: **2,270,519,134 function calls in 902.06 s**, of which
+# `collect_candidates` was 901.59 s -- 99.95%. (`odds_history_s` 0.48 s,
+# `advanced_s` 0.0 s, `summary_s` 0.0 s: the 48MB-odds-history-shard hypothesis
+# this lane carried for a day is DEAD.) Inside that 901.59 s:
+#
+#     235,804,664  147.9s  re.sub
+#      39,281,743  123.3s  _normalized_market_text            cum 713.5s
+#     235,804,692  117.2s  re.Pattern.sub
+#     238,477,602  102.4s  re._compile          <- RECOMPILED PER CALL
+#     371,866,484   92.2s  the char-filter genexpr below
+#     333,786,995   19.4s  unicodedata.combining
+#       2,240,608   34.2s  _candidate_odds_history_match_score cum 883.9s
+#
+# TWO SEPARATE DEFECTS, both here:
+#
+# 1. `re.sub(r"...", ...)` with a STRING pattern re-enters `re._compile` on
+#    EVERY call -- 238 million cache lookups. Module-level `re.compile` removes
+#    that lookup entirely.
+# 2. This is a PURE function of ONE STRING over a SMALL vocabulary (market
+#    names, team names, player names) and it was called 39 MILLION times in one
+#    sport's pass. `_candidate_odds_history_match_score` is a cross product of
+#    candidates x odds-history rows, so the same handful of strings are
+#    renormalized over and over.
+#
+# UNLIKE EVERY OTHER CACHE IN THIS REPO, THIS ONE HAS NO STALENESS QUESTION.
+# It reads no env var, no file and no clock -- `source_roots` needed an env
+# fingerprint in its key and the soccer loaders needed a call-scoped lifetime,
+# precisely because those DO. A pure str -> str map cannot go stale.
+#
+# `maxsize` is a real bound, not decoration: ~65k entries x ~260 bytes is ~17MB
+# against a 4GiB worker that runs at ~1.6GB headroom. Unbounded is not an option
+# in this process -- see the OOM history on `build_intelligence_overview`.
+_MARKET_TEXT_POSSESSIVE = re.compile(r"([a-z0-9])['\u2019]s\b")
+_MARKET_TEXT_3PTM = re.compile(r"\b3\s*pt\s*m\b")
+_MARKET_TEXT_3POINT_MAKES = re.compile(r"\b3\s*point\s*makes?\b")
+_MARKET_TEXT_THREE_POINT_MAKES = re.compile(r"\bthree\s+point\s+makes?\b")
+_MARKET_TEXT_NON_ALNUM = re.compile(r"[^a-z0-9]+")
+_MARKET_TEXT_RUNS = re.compile(r"\s+")
+
+
 def _normalized_market_text(value: Any) -> str:
+    """Normalize market/name text for joining. Memoized; see the note above."""
+    return _normalized_market_text_cached(str(value or ""))
+
+
+@lru_cache(maxsize=65536)
+def _normalized_market_text_cached(value: str) -> str:
     # NFKD-fold diacritics before the char-class filter below strips
     # anything outside [a-z0-9] -- without this, an accented character (the
     # "i" in "Rodriguez" from MLB's own roster data) gets replaced by a
@@ -860,15 +909,15 @@ def _normalized_market_text(value: Any) -> str:
     # nunez" that this function's own candidate-side normalization could
     # never produce). Same pattern as basketball_props_edges.py/
     # basketball_props_onnx.py's own name normalization.
-    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = unicodedata.normalize("NFKD", value)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     lowered = text.lower()
-    lowered = re.sub(r"([a-z0-9])['’]s\b", r"\1", lowered)
-    lowered = re.sub(r"\b3\s*pt\s*m\b", " 3pm ", lowered)
-    lowered = re.sub(r"\b3\s*point\s*makes?\b", " 3pm ", lowered)
-    lowered = re.sub(r"\bthree\s+point\s+makes?\b", " 3pm ", lowered)
-    normalized = re.sub(r"[^a-z0-9]+", " ", lowered).strip()
-    return re.sub(r"\s+", " ", normalized)
+    lowered = _MARKET_TEXT_POSSESSIVE.sub(r"\1", lowered)
+    lowered = _MARKET_TEXT_3PTM.sub(" 3pm ", lowered)
+    lowered = _MARKET_TEXT_3POINT_MAKES.sub(" 3pm ", lowered)
+    lowered = _MARKET_TEXT_THREE_POINT_MAKES.sub(" 3pm ", lowered)
+    normalized = _MARKET_TEXT_NON_ALNUM.sub(" ", lowered).strip()
+    return _MARKET_TEXT_RUNS.sub(" ", normalized)
 
 
 def _text_has_market_alias(text: str, alias: str) -> bool:
