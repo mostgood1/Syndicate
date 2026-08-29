@@ -29,6 +29,40 @@ from syndicate.features.shared import venue_quote_adapters as adapters
 from syndicate.features.shared.venue_quote_fanin import _candidate_keys, apply_venue_quotes
 
 
+# SHARED WITH `test_polymarket_board_join.py` BY DUPLICATION, DELIBERATELY.
+# A conftest fixture would hide the predicate from the file that needs to state
+# WHY it skips, and this is eight lines. See the long note in the join test file.
+#
+# Without `data/` the per-league soccer map is EMPTY, so anything reaching
+# `soccer_fixture_clubs` fails. `scripts/session_worktree.py` excludes `data/`
+# by default, so a protocol-standard worktree fails these for a reason that has
+# nothing to do with the code under test.
+def _soccer_rosters_present() -> bool:
+    try:
+        from syndicate.features.soccer.sources import rosters_path
+    except Exception:  # noqa: BLE001
+        return False
+    for league in ("epl", "la_liga", "serie_a"):
+        for season in (2026, 2025):
+            try:
+                if rosters_path(league, season).exists():
+                    return True
+            except Exception:  # noqa: BLE001
+                continue
+    return False
+
+
+needs_soccer_rosters = pytest.mark.skipif(
+    not _soccer_rosters_present(),
+    reason=(
+        "per-league soccer rosters absent from this tree -- the pair resolver "
+        "has no map to answer from. SKIPPED rather than RED so a worktree that "
+        "followed the documented protocol does not report a false failure."
+    ),
+)
+
+
+
 def _slate(*markets):
     return {"fetched_at": time.time(), "markets": list(markets)}
 
@@ -153,6 +187,7 @@ def test_a_sport_with_NO_club_map_offers_no_token_keys():
     assert _candidate_keys(row, "ncaaf") == ["ncaaf|h2h|home"]
 
 
+@needs_soccer_rosters
 def test_a_token_SHARED_ACROSS_THE_SPORT_is_refused_even_against_a_clean_opponent():
     """The bound is the sport's vocabulary, not the row's opponent.
 

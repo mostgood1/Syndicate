@@ -14,6 +14,56 @@ import pytest
 from syndicate.features.shared import polymarket_board_join as mod
 
 
+# ---------------------------------------------------------------------------
+# THE PER-LEAGUE SOCCER ROSTERS, AND THE ONE PREDICATE EVERY TEST THAT NEEDS
+# THEM SHARES.
+# ---------------------------------------------------------------------------
+#
+# `soccer_fixture_clubs` -> `_soccer_alias_by_league` -> `soccer.sources
+# .all_teams` -> `rosters_path(league, season)` -> a `rosters_<season>.csv`
+# under `data/soccer_source/`. Without `data/` the per-league map is EMPTY --
+# not missing one club, empty -- so EVERY test that reaches the pair resolver
+# fails.
+#
+# `scripts/session_worktree.py` excludes `data/` BY DEFAULT (34,689 of 37,745
+# tracked files) and CLAUDE.md tells every session to work that way, so a
+# protocol-standard worktree fails all of them. A red that also means "you
+# followed the worktree instructions" is a red people learn to ignore.
+#
+# ONE PREDICATE, ONE REASON, APPLIED AT EVERY SITE. The first fix gated a single
+# test and left eight more red -- fixing one instance of a shared cause, which
+# is how a defect comes back under a different name.
+def _soccer_rosters_present() -> bool:
+    try:
+        from syndicate.features.soccer.sources import rosters_path
+    except Exception:  # noqa: BLE001
+        return False
+    for league in ("epl", "la_liga", "serie_a"):
+        for season in (2026, 2025):
+            try:
+                if rosters_path(league, season).exists():
+                    return True
+            except Exception:  # noqa: BLE001
+                continue
+    return False
+
+
+needs_soccer_rosters = pytest.mark.skipif(
+    not _soccer_rosters_present(),
+    reason=(
+        "per-league soccer rosters absent from this tree -- "
+        "`scripts/session_worktree.py` excludes `data/` BY DEFAULT and CLAUDE.md "
+        "tells every session to work that way, so the pair resolver has no map "
+        "to answer from. SKIPPED rather than RED: a red that also means 'you "
+        "followed the worktree instructions' is a red people learn to ignore. "
+        "Mechanism coverage that does NOT need the mirror lives in "
+        "`test_the_pair_resolver_MECHANISM_with_an_injected_roster`."
+    ),
+)
+
+
+
+
 def _market(slug="aec-mlb-pit-sd-2026-08-24", kind="SPORTS_MARKET_TYPE_MONEYLINE",
             outcomes=("Pirates", "Padres"), prices=("0.45", "0.55"), **kw):
     row = {
@@ -367,6 +417,7 @@ def test_the_sample_is_BOUNDED_so_the_log_line_stays_a_log_line():
 # ==========================================================================
 
 
+@needs_soccer_rosters
 def test_drawable_outcome_is_a_mapped_game_line_not_a_refusal():
     """Was refused as `market_type_not_a_game_line` alongside PROP -- the
     largest refusal bucket measured (5,810-6,612 of ~12,200-12,900 markets
@@ -383,6 +434,7 @@ def test_drawable_outcome_is_a_mapped_game_line_not_a_refusal():
     assert result["matched"] == 1
 
 
+@needs_soccer_rosters
 def test_a_draw_outcome_with_no_board_side_is_dropped_not_an_error():
     """A third "Draw" outcome resolves to no club and no board `h2h` side asks
     for it today -- it must simply not match anything, not raise or refuse
@@ -399,6 +451,7 @@ def test_a_draw_outcome_with_no_board_side_is_dropped_not_an_error():
     assert result["matches"][0]["polymarket_probability"] == pytest.approx(0.45)
 
 
+@needs_soccer_rosters
 def test_soccer_effective_league_overrides_a_non_soccer_literal_token():
     """Polymarket lists soccer per COMPETITION (`eflc` observed live for EFL
     Championship); Syndicate stamps every soccer board row `sport="soccer"`
@@ -425,6 +478,7 @@ def test_effective_league_does_not_relabel_an_unresolvable_pair():
     assert mod._effective_league(parsed) == "xyz"
 
 
+@needs_soccer_rosters
 def test_a_soccer_row_matches_the_board_across_a_non_soccer_league_token():
     """End to end: the board asks for `sport="soccer"`, the venue's slug
     carries the competition token `eflc`, and the row still matches -- the
@@ -632,6 +686,7 @@ def test_the_colliding_game_now_joins_end_to_end():
     assert report["matched"] == 1, report["refusals"]
 
 
+@needs_soccer_rosters
 def test_a_real_soccer_competition_token_still_resolves_to_soccer():
     """The behaviour `e27812117` added is preserved and is the reason for an
     ALLOWLIST rather than a soccer denylist: Polymarket names soccer per
@@ -1170,6 +1225,7 @@ def test_absence_IS_claimed_when_the_whole_bucket_reads(monkeypatch):
     assert out["orientation_invariant_ok"] is True
 
 
+@needs_soccer_rosters
 def test_a_venue_tri_code_resolves_only_inside_its_own_competition():
     """`(competition, code)`, never code alone — and this is the whole design.
 
@@ -1189,6 +1245,7 @@ def test_a_venue_tri_code_resolves_only_inside_its_own_competition():
     )
 
 
+@needs_soccer_rosters
 def test_every_tri_code_entry_resolves_through_canonical_team():
     """An entry naming a club the alias map cannot canonicalise is dead weight
     that reads as a working mapping. Cheap to assert, and it catches a typo in
@@ -2224,28 +2281,6 @@ def test_the_real_fixture_still_pairs(monkeypatch):
     ) is True
 
 
-def _soccer_rosters_present() -> bool:
-    """Do the per-league soccer roster artifacts exist in THIS tree?
-
-    `soccer_fixture_clubs` -> `_soccer_alias_by_league` ->
-    `soccer.sources.all_teams` -> `rosters_path(league, season)` -> a
-    `rosters_<season>.csv` under `data/soccer_source/`. Absent it, the per-league
-    map is EMPTY and the resolver correctly returns None.
-    """
-    try:
-        from syndicate.features.soccer.sources import rosters_path
-    except Exception:  # noqa: BLE001
-        return False
-    for league in ("epl", "la_liga", "serie_a"):
-        for season in (2026, 2025):
-            try:
-                if rosters_path(league, season).exists():
-                    return True
-            except Exception:  # noqa: BLE001
-                continue
-    return False
-
-
 def test_the_pair_resolver_MECHANISM_with_an_injected_roster(monkeypatch):
     """The resolver itself, with a MINIMAL roster fed in -- runs in ANY tree.
 
@@ -2269,19 +2304,7 @@ def test_the_pair_resolver_MECHANISM_with_an_injected_roster(monkeypatch):
     assert ta.soccer_fixture_clubs("cry", "juv") is None
 
 
-@pytest.mark.skipif(
-    not _soccer_rosters_present(),
-    reason=(
-        "per-league soccer rosters absent from this tree -- "
-        "`scripts/session_worktree.py` excludes `data/` BY DEFAULT (34,689 of "
-        "37,745 tracked files) and CLAUDE.md tells every session to work that "
-        "way, so a protocol-standard worktree cannot load them. SKIPPED rather "
-        "than RED: this test's job is to fail when the alias table stops naming "
-        "fixtures, and a red that also means 'you followed the worktree "
-        "instructions' is a red people learn to ignore. The MECHANISM is covered "
-        "unconditionally by the injected-roster test above."
-    ),
-)
+@needs_soccer_rosters
 def test_mnc_IS_carried_by_the_REAL_pair_resolver():
     """The production half of the trade above -- NO monkeypatching.
 
