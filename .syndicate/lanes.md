@@ -3586,6 +3586,17 @@ caaf-no-orders`). NOT
   local creds) and cannot be read after the fact (slate not published to web,
   `export?pattern=*polymarket*` -> `count: 0` since 08-26). Publishing the
   slate is the cheaper unblock and is likely worth doing first.
+- **SCOPE REPLIES to two peer lanes, 2026-08-29** —
+  `.syndicate/handoff_2026-08-29_scope_replies_live_venue.md`. Both asked
+  whether I hold their files; I hold NONE of the six
+  (`execution_ledger.py`, `polymarket_us_orders.py`, `venue_settlement.py`,
+  `live_projection_join.py`, `layer2_shortlist.py`, `execute_portfolio.py`).
+  **Neither session was reachable via `SendMessage` when I answered**, so the
+  replies are in the ledger instead. They also carry one correction worth
+  reading: "live placement is zero and it is NOT the venues refusing" is true
+  for props/totals and FALSE for moneyline, where
+  `team_side_needs_verified_yes_leg` refuses by name — it has simply never
+  fired because nothing has tried an h2h in the observed window.
 - **HIGHEST-VALUE MEASUREMENT IN THIS LANE:** Polymarket's real fee. It is
   ~2/3 of modelled pair cost at even money and is currently a bound, not a
   number. `unknown-submit-retry-provenance` is already reading
