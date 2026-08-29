@@ -41,18 +41,48 @@
         {%- set state = game.shared_game_state if game.shared_game_state is defined and game.shared_game_state else {} -%}
         {%- set is_live = game.shared_is_live or state.get('live') -%}
         <a class="cards-strip-card cards-strip-card--ncaaf" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
-          {#- The head is the kickoff, or the live clock once there is one. A
-              status badge reading "Week 1" on all 51 cards told a scanning
-              reader nothing. -#}
+          {#- The head is the kickoff, or the game's live state once it has one.
+              A status badge reading "Week 1" on all 51 cards told a scanning
+              reader nothing.
+
+              STATUS BEFORE CLOCK, and the order is the defect.
+              This read `clock or status`. ESPN's clock is "0:00" at the end of
+              a quarter -- a truthy string -- so the head rendered a bare
+              "0:00" while `status` held "End of 1st". Measured on the served
+              page 2026-08-29T16:47Z, first live game of the season.
+              `status` is ESPN's shortDetail ("14:55 - 2nd", "End of 1st"),
+              which already carries period AND clock; the clock alone carries
+              neither. -#}
           <div class="cards-strip-pregame-head">
             {%- if is_live -%}
-              {{ state.get('clock') or state.get('status') or 'Live' }}
+              {{ state.get('status') or state.get('clock') or 'Live' }}
             {%- elif state.get('final') -%}
               Final
             {%- else -%}
               {{ kickoff or game.detail or game.status }}
             {%- endif -%}
           </div>
+          {#- ONCE A GAME HAS STARTED, THE NUMBER BESIDE A TEAM IS ITS SCORE.
+              This rendered `scoreboard.away_points`/`home_points` -- the
+              MODEL's projected totals -- unconditionally. Measured on the
+              served page while UNC @ TCU was live and tied 10-10, the strip
+              showed "NC 20.0 / TCU 30.3". A reader scanning a live board reads
+              those as the score, and they are a simulation.
+              A real score is only ever present on a started game (the ESPN
+              parser suppresses the pregame 0-0 placeholder), so presence is
+              the condition. Pregame cards are untouched and still show the
+              projection, which is the right number when there is no other.
+
+              NO SEPARATE `--score` CLASS ON PURPOSE. `dense_cards.css` is held
+              by OPEN lane `soccer-board-mlb-parity`, and this template's own
+              header rule is that classes are checked before use -- adding a
+              modifier with zero rules would look styled and do nothing. The
+              live head ("14:55 - 2nd") is what distinguishes these numbers
+              from a projection. -#}
+          {%- set started = is_live or state.get('final') -%}
+          {%- set away_score = game.away.score if game.away is defined else none -%}
+          {%- set home_score = game.home.score if game.home is defined else none -%}
+          {%- set show_score = started and away_score is not none and home_score is not none -%}
           <div class="cards-strip-pregame-rows">
             <div class="cards-strip-pregame-row">
               {% if game.away.logo_url %}
@@ -61,7 +91,9 @@
                 <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text">{{ game.away.abbr }}</span>
               {% endif %}
               <span class="cards-strip-pregame-team">{{ game.away.abbr }}</span>
-              {% if scoreboard.get('away_points') is not none %}
+              {% if show_score %}
+                <span class="cards-strip-pregame-total">{{ away_score }}</span>
+              {% elif scoreboard.get('away_points') is not none %}
                 <span class="cards-strip-pregame-total">{{ scoreboard.get('away_points') }}</span>
               {% endif %}
             </div>
@@ -72,7 +104,9 @@
                 <span class="cards-strip-pregame-crest cards-strip-pregame-crest--text">{{ game.home.abbr }}</span>
               {% endif %}
               <span class="cards-strip-pregame-team">{{ game.home.abbr }}</span>
-              {% if scoreboard.get('home_points') is not none %}
+              {% if show_score %}
+                <span class="cards-strip-pregame-total">{{ home_score }}</span>
+              {% elif scoreboard.get('home_points') is not none %}
                 <span class="cards-strip-pregame-total">{{ scoreboard.get('home_points') }}</span>
               {% endif %}
             </div>
