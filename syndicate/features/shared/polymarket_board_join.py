@@ -778,6 +778,23 @@ _SEGMENT_TOKEN = re.compile(r"(?:[1-4](?:q|h|p)|f[357]|fh|sh)")
 _ROLE_SIDES = frozenset({"home", "away", "draw"})
 
 
+_GT_TOKEN = re.compile(r"^gt(?P<num>\d+(?:pt\d+)?)$", re.IGNORECASE)
+
+
+def _greater_than_line(parsed: Mapping[str, Any]) -> float | None:
+    """The threshold in a `gt<number>` modifier, or None.
+
+    `cor-all-gt10pt5` is "more than 10.5 corners". The `gt` is the venue SAYING
+    which direction its `Yes` means, in the slug, and it is the reason the
+    over/under map below is not a guess.
+    """
+    for token in parsed.get("modifiers") or []:
+        match = _GT_TOKEN.match(str(token).strip())
+        if match:
+            return _slug_number(match.group("num"))
+    return None
+
+
 def _is_yes_no_market(outcomes: Any) -> bool:
     """A binary Yes/No contract, as opposed to one naming both teams."""
     return {_norm(name) for name, _ in (outcomes or ())} == {"yes", "no"}
@@ -2246,6 +2263,47 @@ def _probability_for_side(
         wanted = str(team).strip()
 
     outcomes = candidate.get("outcomes") or []
+
+    # A `gt<line>` YES/NO CONTRACT PRICES "OVER", AND SAYS SO IN THE SLUG.
+    #
+    # MEASURED 2026-08-29T18:33:49Z via `side_gap_samples`, which exists because
+    # guessing this polarity is the one mistake here that costs money rather
+    # than coverage:
+    #
+    #   astatc-mls-sdg-lag-2026-08-29-cor-all-gt10pt5  board over 10.5
+    #                                                  Yes 0.41  No 0.67
+    #   astatc-sea-juv-par-2026-08-29-cor-all-gt7pt5   board under 7.5
+    #                                                  Yes 0.76  No 0.26
+    #
+    # TWO INDEPENDENT CONFIRMATIONS, which is why this is now safe to write:
+    #
+    #   1. THE TOKEN. `gt10pt5` is "greater than 10.5". The venue states the
+    #      direction in the slug; nothing is being inferred from word order.
+    #   2. THE PRICE. `Yes` on the 7.5 line is 0.76. Over 7.5 corners is the
+    #      likely side of a ~10-corner match and under would be ~0.24, so `Yes`
+    #      tracks OVER at a magnitude the reverse reading cannot explain.
+    #
+    # GATED ON THE `gt` TOKEN, NOT ON "Yes/No + a line". A Yes/No contract with
+    # no stated direction gets no map and keeps refusing: the gate IS the
+    # evidence, so a family that never carried `gt` can never be silently
+    # assigned a polarity it did not declare.
+    #
+    # AND THE THRESHOLD MUST EQUAL THE BOARD'S LINE. `gt10pt5` against a board
+    # row on 9.5 is a different contract, and pricing one as the other is the
+    # rung-mismatch this file already refuses everywhere else.
+    if str(side or "").strip().lower() in {"over", "under"} and _is_yes_no_market(outcomes):
+        threshold = _greater_than_line(candidate.get("parsed") or {})
+        board_line = None if board_row is None else _as_float(board_row.get("line"))
+        if (
+            threshold is not None
+            and board_line is not None
+            and abs(threshold - board_line) <= 1e-9
+        ):
+            want_yes = str(side).strip().lower() == "over"
+            for name, probability in outcomes:
+                if _norm(name) == ("yes" if want_yes else "no"):
+                    return probability
+            return None
 
     for name, probability in outcomes:
         if _norm(name) == _norm(wanted):

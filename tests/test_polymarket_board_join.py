@@ -1996,3 +1996,59 @@ def test_an_over_under_market_still_places_its_side(monkeypatch):
         selected_date="2026-08-29")
     assert out["matched"] == 1, out
     assert not out["side_gap_samples"], out["side_gap_samples"]
+
+
+def _gt_corners(line_tok, line_field, prices='["0.41","0.67"]'):
+    return {"slug": f"astatc-mls-sdg-lag-2026-08-29-cor-all-{line_tok}",
+            "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+            "line": line_field,
+            "outcomes": '["Yes","No"]', "outcomePrices": prices}
+
+
+def _gt_board(side, line):
+    return [{"market": "alternate_totals_corners", "side": side, "line": line,
+             "sport": "soccer", "selected_date": "2026-08-29",
+             "home_team": "LA Galaxy", "away_team": "San Diego FC", "event_id": "e1"}]
+
+
+def test_gt_yes_is_OVER_and_no_is_UNDER(monkeypatch):
+    """`cor-all-gt10pt5` is "more than 10.5". Yes = over, No = under.
+
+    MEASURED 2026-08-29T18:33:49Z, confirmed two independent ways:
+      TOKEN  `gt10pt5` states the direction in the slug.
+      PRICE  Yes on the 7.5 line was 0.76 -- over 7.5 corners is the likely side
+             of a ~10-corner match; under would be ~0.24.
+    """
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    for side, expected in (("over", 0.41), ("under", 0.67)):
+        out = mod.join_polymarket_to_board(
+            [_gt_corners("gt10pt5", 10.5)], _gt_board(side, 10.5),
+            selected_date="2026-08-29")
+        assert out["matched"] == 1, (side, out)
+        assert not out["side_gap_samples"], (side, out["side_gap_samples"])
+
+
+def test_a_yes_no_market_with_NO_gt_token_still_refuses(monkeypatch):
+    """THE GATE IS THE EVIDENCE. A Yes/No contract that does not state its
+    direction gets no polarity, so a family that never declared one can never be
+    silently assigned the wrong side."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_gt_corners("", 10.5)], _gt_board("over", 10.5), selected_date="2026-08-29")
+    assert out["matched"] == 0, out
+    assert out["refusals"].get("side_not_an_outcome_of_this_market") == 1, out["refusals"]
+
+
+def test_a_gt_threshold_on_a_DIFFERENT_line_refuses(monkeypatch):
+    """`gt10pt5` against a board row on 9.5 is a different contract. The rung
+    must agree or it is the mismatch this file refuses everywhere else."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    out = mod.join_polymarket_to_board(
+        [_gt_corners("gt10pt5", 9.5)], _gt_board("over", 9.5), selected_date="2026-08-29")
+    assert out["matched"] == 0, out
