@@ -1614,10 +1614,14 @@ def _layer2_fallback_recommendations(
             continue
         if not isinstance(shortlist, Mapping):
             continue
-        if vintages is not None:
-            stamp = str(shortlist.get("written_at") or "").strip()
-            if stamp:
-                vintages.append(stamp)
+        # `#603`, SECOND PATH. Same rule as the combined read: a date sets the
+        # board's age only if it PUT ROWS ON IT. This appended `written_at` for
+        # any date whose shortlist merely EXISTED, before knowing whether it
+        # yielded a single card -- so an empty shortlist for a date nobody is
+        # building could pin `computed_at` exactly as the main path did. Fixing
+        # only the main path would have moved the defect here and looked fixed.
+        _cards_before = len(cards)
+        _stamp = str(shortlist.get("written_at") or "").strip() if vintages is not None else ""
         for card in shortlist.get("cards") or []:
             if not isinstance(card, Mapping):
                 continue
@@ -1628,6 +1632,19 @@ def _layer2_fallback_recommendations(
             _normalize_card_edge_units(tagged)
             _backfill_layer2_board_columns(tagged)
             cards.append(tagged)
+        # NOTE the granularity: this counts cards this DATE contributed, before
+        # `_prune_decided_layer2_cards` below runs across the whole list. A date
+        # whose every card is later pruned still counts here -- it did put rows
+        # on the board, and they were removed for being DECIDED, not for being
+        # absent.
+        if vintages is not None and _stamp and len(cards) > _cards_before:
+            vintages.append(_stamp)
+        elif vintages is not None and _stamp:
+            print(
+                f"[intelligence_state] LAYER2_VINTAGE_IGNORED date={requested_date} "
+                f"stamp={_stamp} reason=no_cards",
+                flush=True,
+            )
     # `#367`: after the per-card work, because it needs the whole list to build
     # one scoreboard index instead of one lookup per card. Never raises -- a
     # scoreboard blip must leave the board stale, not empty.
@@ -7716,9 +7733,9 @@ def read_combined_intelligence_response(
             by_date_summary[requested_date] = {"candidate_count": 0, "covered_sports": []}
             print(f"[intelligence_state] COMBINED_BOARD_STATE_DATE_MISS date={requested_date}", flush=True)
             continue
+        # `#603` DEFERRED: a date sets the board's age only if it PUT ROWS ON IT.
+        # `[2026-08-29]` -- appended after the row loop below, not here.
         date_stamp = _state_payload_timestamp(date_response)
-        if date_stamp:
-            artifact_vintages.append(date_stamp)
         date_by_sport = date_response.get("by_sport") if isinstance(date_response.get("by_sport"), dict) else {}
         date_candidate_count = 0
         date_covered_sports: set[str] = set()
@@ -7737,6 +7754,42 @@ def read_combined_intelligence_response(
                 date_covered_sports.add(str(sport_key))
                 covered_sports.add(str(sport_key))
         by_date_summary[requested_date] = {"candidate_count": date_candidate_count, "covered_sports": sorted(date_covered_sports)}
+        # `#603`. THE BOARD'S AGE IS THE AGE OF THE DATA IT IS ACTUALLY SHOWING.
+        #
+        # THE BUG THIS FIXES, measured 2026-08-29. `computed_at` is the OLDEST
+        # contributing stamp, and it was collected for every date that had a
+        # stored payload -- INCLUDING ONE THE BUILDER HAD CORRECTLY DECIDED NOT
+        # TO BUILD. `_default_board_window_dates` intersects future dates with
+        # `_supported_intelligence_dates()`, so with
+        # `SCHEDULE_RECONCILE_CHECK date=2026-08-30 scheduled_games=0` and
+        # `BETTING_PAYLOAD_READ date=2026-08-30 exists=False`, tomorrow was not
+        # built all day -- while this read side, which "deliberately does NOT
+        # filter", kept handing tomorrow's hours-old stamp to `computed_at`.
+        #
+        # So the displayed age was pinned by a date carrying NO ROWS, and no
+        # amount of making builds faster could ever move it. Three config
+        # attempts and two verified performance fixes (soccer 363s -> 80.5s)
+        # all failed to shift that number, because none of them was about it.
+        #
+        # WHY `date_candidate_count > 0` AND NOT AN AVAILABILITY FILTER.
+        # Filtering the requested DATES by `_supported_intelligence_dates()`
+        # would have been the obvious fix and it regresses a known case: WNBA's
+        # 2026-07-28 board built 36 real candidates while `wnba_available_dates()`
+        # still did not list that date, which is exactly why the read side does
+        # not filter. Gating on ROWS keeps that board AND its vintage -- 36 rows
+        # is a real board and its age is real -- while an empty date, which shows
+        # the user nothing, can no longer make the board read stale.
+        #
+        # A stale date that IS showing rows still counts, deliberately. That is
+        # not a miss; it is the honest reading.
+        if date_stamp and date_candidate_count > 0:
+            artifact_vintages.append(date_stamp)
+        elif date_stamp:
+            print(
+                f"[intelligence_state] COMBINED_BOARD_VINTAGE_IGNORED date={requested_date} "
+                f"stamp={date_stamp} reason=no_rows",
+                flush=True,
+            )
 
     # build_intelligence_board_contract does the real, date-agnostic ranking
     # (publication_priority/coverage_score/advanced_ready/score/edge/
