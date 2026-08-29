@@ -7086,3 +7086,52 @@ this repo has already been burned by asserted freshness. **Not recommended.**
 
 ~30 lines plus tests for the eligibility change. The real work is the cost
 verification, not the code.
+
+---
+
+## [polymarket-venue-join] VERIFIED 2026-08-29, all three services on `95c4fb12`
+
+**Soccer, corners, BTTS and NCAAF now execute on Polymarket.** Readings are
+post-`BOOTED` lines on refresh-worker, not post-`finishedAt`.
+
+```
+matched                              85 (15:22Z) -> 167 (19:08Z)
+ambiguous_polymarket_match          206 -> 24     (3-way leg selection)
+side_not_an_outcome_of_this_market   81 -> 22     (gt<line> polarity map)
+no_candidates|ncaaf|*                90 -> 0      (cfb -> ncaaf alias)
+no_match|soccer|alternate_totals_corners  37 -> 3 (line restored to _KEEP)
+no_match|soccer|h2h              80 of 80 -> 0    (fixture matching)
+kalshi unreadable_title            2264 -> 1790   (two soccer title grammars)
+```
+
+**Polymarket's soccer market grammar, measured rather than guessed:**
+- 3-way h2h is **THREE Yes/No markets**, one per outcome, subject in the slug
+  (`-liv`, `-draw`, `-not`). Not one market with three outcomes.
+- Corners are `cor-all-gt<line>` PROP rows; `gt` states the direction, so
+  **`Yes` = over**. 434 of them — the third-largest soccer PROP family.
+- PROP vocabulary: `exact-score` 930, `fh-exact-score` 496, `cor-all` 434,
+  `btts` 62, `ftts-<club>`, with `fh-`/`sh-` half variants.
+- College football is filed under **`cfb`**, never `ncaaf` (2,194 rows).
+- **The venue row's `line` field is the ONLY source for corners** — their slug
+  carries no parseable number. `_KEEP` must retain `"line"` or every
+  `_SLATE_STORAGE_FIELDS` reader silently gets `None`.
+
+**`_has_segment` must screen `fh`/`sh`.** They are soccer halves and the old
+pattern only matched digit-led ones (`1h`/`2h`), so 124 half-BTTS contracts were
+admitted as full-game. Segment refusals 465 -> ~1,850 after the fix; that RISE is
+the correction.
+
+**STILL FAILING, deliberately:** MLB spreads, 22 rows. Outcomes are signed
+numbers (`+1.50`/`-1.50`) against a board asking home/away, and the two observed
+samples both carry `pos-1pt5`, so they cannot establish whose perspective the
+venue states the spread from. Left refusing — a wrong polarity is a wrong-side
+fill on live money.
+
+**UNPROVEN, five readings:** `forward_date_widened` is `{}` on every production
+read, night and day. The slate-vs-fixture date fix has never fired.
+
+**ORDERS: there is NO Polymarket cancel path.** `kalshi_orders.py` has
+`cancel_order`; `polymarket_us_orders.py` has submit/fetch/view and none.
+Resting orders are GTC with no `commence_time` expiry, so a pre-game limit rests
+into a live game — one was submitted 13 seconds before kickoff and never filled.
+Cancelling requires Polymarket's own UI.

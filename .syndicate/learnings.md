@@ -6009,3 +6009,77 @@ that contained it. A false "regression" on a deploy candidate is exactly the
 reading that triggers an unnecessary revert. Use non-reserved names (`$homePy`)
 in verification scripts, and treat a surprising negative as suspect before
 acting on it.
+
+---
+
+## 2026-08-29 — a diagnostic that TRUNCATES will be read as evidence. Twice.
+
+`key_miss_samples`' `market_indexed_under` is `sorted({...})[:4]`. Alphabetical,
+capped at four. `cfb` and `alsv` sort first, so they filled the cap on EVERY
+market they touched.
+
+I read that as attribution twice in one session:
+
+- `soccer|btts` -> `['lgscup|...', 'lmx|...', 'soccer|2026-08-29']` was read as
+  "unmapped competitions are losing BTTS". It was not. The meaningful entry was
+  the FOURTH -- right league, wrong date. No tokens needed adding at all.
+- `ncaaf|spreads` -> `['cfb|...']` was read as the `cfb` alias. The IDENTICAL
+  list appeared under `wnba|totals`, where `cfb` cannot possibly be the alias.
+
+**RULE: a bounded, sorted sample is not a rate and not an attribution.** Before
+drawing a conclusion from a truncated list, ask what a NULL result would look
+like -- here, the same list under an unrelated key, which was visible the whole
+time. The `cfb` alias was real, but it was settled by a NAMED FIXTURE on both
+sides (`tsc-cfb-sacst-emich` = the exact board row), not by the list.
+
+**Corollary that cost the most:** the same session nearly DELETED the corners
+route on a 19-slug sample showing no corners family. The census found 434.
+A sample that finds nothing is not evidence of absence at any n you did not
+choose in advance.
+
+---
+
+## 2026-08-29 — FORBIDDEN: mapping an outcome polarity that the venue has not stated
+
+Polymarket corners are `["Yes","No"]` while the board asks over/under. The
+obvious map (`over -> Yes`) would have closed 59 refusals in two lines. If the
+polarity were reversed it prices the OPPOSITE SIDE of a live bet at a
+confident-looking number -- the $7.08 MLB error, at scale.
+
+What made it safe was NOT reasoning about which word "should" mean over. It was
+shipping a census first (`side_gap_samples`: outcome names AND prices beside the
+wanted side and the board's line), then reading two independent confirmations:
+
+    TOKEN  `cor-all-gt10pt5` -- the venue states "greater than" IN THE SLUG
+    PRICE  `Yes` = 0.76 on a 7.5 line; over 7.5 corners is the likely side of a
+           ~10-corner match, under would be ~0.24
+
+The fix is gated on the `gt` TOKEN, not on "Yes/No plus a line": the gate IS the
+evidence, so a family that never declares a direction keeps refusing instead of
+being assigned one.
+
+**MLB spreads are still refusing for the same reason and must stay that way**
+until a sample settles them: outcomes are `+1.50`/`-1.50`, both observed samples
+carry `pos-1pt5` and differ only in the side wanted, so they cannot establish
+whose perspective the venue states the spread from.
+
+**RULE: coverage may be traded for certainty; a side may not.** A refusal costs
+a bet. A wrong polarity costs the bet AND pays the other side.
+
+---
+
+## 2026-08-29 — ancestry is a DEPLOY-TIME MEASUREMENT, never a claim
+
+I twice told a peer they would "carry my commits anyway, they're on main ahead
+of you". Wrong both times -- my commit landed AFTER their trigger. They
+corrected me, and the correction is the rule:
+
+**main moves under every session. Only the deploying session can see its own
+trigger moment.** Telling a peer what their deploy contains is asserting a fact
+only they can measure. State main's head as a fact they can check; let them
+verify ancestry themselves.
+
+The same discipline caught a real one later: a peer deployed `6625b5e6` and I
+checked rather than assumed -- `1be9fa3e` was NOT in it. Had I assumed the other
+way I would have read an unchanged counter off a binary without the fix and
+called it inert.

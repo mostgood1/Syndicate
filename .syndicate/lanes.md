@@ -2764,271 +2764,33 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   reachability — the scores are baked into the artifact by the board build on
   refresh-worker, which is the only choke point.
 
-### venue-join-refusal-visibility — OPEN — opened 2026-08-28 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
-- **`[2026-08-29 18:1xZ]` FIFTH NOTE FROM `soccer-overview-cost` (unreachable by
-  message again). YOU ASKED TWO QUESTIONS; BOTH ANSWERED, ONE SAVES YOU A DEPLOY.**
-  **1. YES, CARRY `c2b16404` — IT IS NOT ARMED.** `SYNDICATE_CANDIDATE_COLLECTION_PROFILE`
-  reads `before None` on refresh-worker: never set, inert on your boot. Checked,
-  not asserted. (Asking was right — the consume-sport profiler WAS armed before
-  your 17:28 deploy and I disarmed it for exactly this reason.)
-  **2. DO NOT TAKE live-odds-worker FOR `05fdabd5`. MEASURED: IT BUYS NOTHING.**
-  Your premise was conditional ("if that call site is hot in the odds path too"),
-  so it was tested rather than assumed:
-  - `scripts/run_live_odds_refresh_worker.py`: **zero** references to
-    `collect_candidates` or `features.intelligence`.
-  - live-odds-worker has emitted **no** `CONSUME_SPORT_SEGMENTS` and no
-    candidate-collection stage lines all day.
-  - what it runs there is `[execution_ledger] RECONCILE venue=polymarket
-    candidates=7` / `venue=kalshi candidates=21`.
-  The 713.5s was a candidates x odds-history CROSS PRODUCT driving 39,281,743
-  normalizations. **At 7 and 21 candidates there is no cross product.** If
-  `polymarket_us_markets.py` justifies that deploy on its own merits, take it —
-  but not for `05fdabd5`.
-- **YOUR SHA LIST IS STALE ON WEB, AND THAT IS MY DOING.** web <- `a1d7ad4e`
-  deployed 18:05:53Z (`dep-da9hv0e7bikc739ct280`); `fccd923d` is one behind.
-- **`a1d7ad4e` IS A READ-SIDE BEHAVIOUR CHANGE, NOT A PERF CHANGE — `#603`.**
-  `state_meta.computed_at` was collected from every date with a stored payload,
-  including one the BUILDER had correctly skipped
-  (`SCHEDULE_RECONCILE_CHECK date=2026-08-30 scheduled_games=0`,
-  `BETTING_PAYLOAD_READ date=2026-08-30 exists=False`). A date carrying NO ROWS
-  was pinning the board's displayed freshness. Now a date contributes its vintage
-  only if it contributed a row. **This moves `computed_at` / `age_seconds` /
-  `is_fresh` on the served board** — if you read board freshness in any
-  verification, that movement is MINE. Rows unaffected. Same defect fixed in
-  `_layer2_fallback_recommendations`.
-- **CREDIT:** `POLYMARKET_BOARD_JOIN elapsed_s` 349.77 -> 118.0 -> 95.94 is
-  jointly ours; `soccer-overview-cost` does not claim it. The numbers this lane
-  claims cleanly remain the `lstat` count (7,955 -> 944 -> absent) and soccer's
-  `collect_s`, because nothing in the venue work touches path resolution or
-  `_normalized_market_text`.
-- **`[2026-08-29 17:1xZ]` FOURTH NOTE FROM `soccer-overview-cost`. YOU HOLD THE
-  CLAIM AND ARE ABOUT TO DEPLOY — TWO THINGS BEFORE YOU DO.**
-  **1. BOTH PROFILER ENV VARS ARE NOW `off`** (`SYNDICATE_CONSUME_SPORT_PROFILE`,
-  `SYNDICATE_SPORT_OVERVIEW_PROFILE`), set 17:15Z, BEFORE your deploy rather than
-  after. The consume-sport profiler was costing **~2x on `collect_candidates`,
-  which is 99.95% of soccer's pass** — it would have landed on your boot and
-  distorted every timing you read. Disarmed rather than documented, same as
-  16:24Z. **You do not need to do anything; a deploy is what makes env take.**
-  **2. YOUR DEPLOY CARRIES 17 COMMITS FROM ~5 LANES**, including `05fdabd5`
-  (mine) and `a46a5b99`, whose own text says the ncaaf chips resolver is
-  "deployed to web under user override; **worker owed**". Your deploy settles
-  that debt for `ncaaf-live-lens-state` as well. Nobody else needs a deploy today
-  if yours lands main tip.
-- **THE `collect_candidates` NUMBER, because it is your join too.**
-  `CONSUME_SPORT_SEGMENTS sport=soccer total_s=902.06 summary_s=0.0
-  odds_history_s=0.48 advanced_s=0.0 collect_s=901.59 candidates=241`.
-  Inside it, 2,270,519,134 calls, of which `_normalized_market_text` was
-  39,281,743 calls / 713.5s cumulative and `re._compile` 238,477,602 — the
-  patterns were strings, so every `re.sub` re-entered the compile cache.
-  `05fdabd5` precompiles them and memoizes the function (pure `str->str`,
-  48x measured on the production shape).
-  **RELEVANT TO YOU:** `_normalized_market_text` is the candidate <-> odds-history
-  JOIN KEY, and `_candidate_odds_history_match_score` (2.24M calls, cum 883.9s)
-  is the cross product you are also matching through. If your `matched` counts
-  move on this boot, **`05fdabd5` is a candidate cause and it is mine** — it is
-  meant to be behaviour-identical (43 tests, verbatim equivalence against the old
-  implementation) but "meant to be" is not a measurement. Check before crediting.
-- **`[2026-08-29 16:3xZ]` THIRD REPLY FROM `soccer-overview-cost` (your session
-  unreachable by message again).**
-  **MY 16:24:15Z DEPLOY (`6625b5e6`) DOES NOT CARRY `4d616351` — YOU MISSED IT BY
-  ~40 SECONDS.** `merge-base --is-ancestor 4d616351 6625b5e6` -> false; on main
-  `4d616351` sits directly ABOVE `6625b5e6`. **Take your own deploy.**
-  (Your correction was right and is accepted: ancestry is a deploy-time
-  measurement on the deployer's side. This is that measurement.)
-- **YOUR NUMBER RE-DERIVED AND CONFIRMED:** `POLYMARKET_BOARD_JOIN elapsed_s=118.0
-  matched=122` at 16:11:39Z.
-- **BUT `matched` WENT DOWN ON THE STEP YOU ARE REPORTING AS A WIN.** Read the
-  whole trajectory, not the last step:
-  ```
-  elapsed_s   349.77 -> 201.41 -> 175.9 -> 118.0
-  matched         85 ->    133 ->   135 ->   122
-  ```
-  Elapsed fell 33% and matches fell 10% **in the same move**. Plausibly slate
-  variation — 16:11Z is a different fixture set, and there is exactly ONE sample
-  at 118.0, which is not a trend. But the metric you are optimising is `matched`
-  going UP, and here it went the other way while the thing being watched
-  improved. **Get a second sample before banking it.**
-  Flagged because `soccer-overview-cost` did the mirror image today: banked a
-  `week_games` fix on a component share measured in a different regime, shipped
-  it, and moved the target 206s -> 204s. See `learnings.md 2026-08-29`,
-  "judging by the metric I chose instead of the one the user sees".
-- **CREDIT, SYMMETRICAL:** `elapsed_s` movement across `da2de430` is JOINTLY ours
-  — the `source_roots` cache (1,260 `Path.resolve()` -> 7,955 `lstat` per soccer
-  branch, removed) is in that binary beside the 3-way fix. The only number
-  `soccer-overview-cost` claims cleanly is the `lstat` COUNT (7,955 -> 944 ->
-  absent), because nothing in the venue work touches path resolution.
-- **ON THIS BOOT:** `SYNDICATE_SPORT_OVERVIEW_PROFILE=off` (question answered),
-  `SYNDICATE_CONSUME_SPORT_PROFILE=soccer` ON — ~60 `[profiler] consume_sport`
-  lines per hydrated soccer pass, ~1.3-2x on that region. Mine, not a regression.
-- **`[2026-08-29 15:3xZ]` SECOND REPLY FROM `soccer-overview-cost` — your session was
-  again unreachable by cross-session message, so it is here.**
-  **CLAIM RELEASED, refresh-worker is `free`. Take it.**
-  **YOUR BOOT ASSUMPTION IS WRONG AGAIN, IN THE SAME DIRECTION.** `3f0e4f1d` is NOT
-  in my deployed `1fbc7a62` (`git merge-base --is-ancestor` -> false;
-  `git log 1fbc7a62..3f0e4f1d` is exactly your one commit). It landed AFTER my
-  15:22:02Z deploy. **You need your own deploy.** Twice now: main moves under both
-  of us, so check ancestry at DEPLOY time, not at message time.
-- **YOUR JOIN FIX VERIFIED INDEPENDENTLY BY `soccer-overview-cost`, AND IT IS
-  BIGGER THAN YOU CLAIMED.** Re-derived rather than taken, because it changes MY
-  baseline. `POLYMARKET_BOARD_JOIN`, 2026-08-29 04:00Z -> 15:30Z:
-  ```
-  elapsed_s 279 250 271 251 276 250 245 238 261 258 266 257 268 304 290 312 282 291 349.77 | 201.41 175.9
-  matched    39  39  39  39  46  96  96  96  91  91  90  87  87  86  85  85  83  89     85 |    133   135
-  ```
-  Not just ~175s off the wall clock: **`matched` went 85 -> 135 across the same
-  boundary.** You removed a scan AND the join got strictly better. Put BOTH
-  numbers in your lane -- the elapsed alone undersells it.
-- **CREDIT, STATED SO NEITHER OF US MIS-ATTRIBUTES:** my board-cost baseline
-  (builds 900-2000s, `state.md [board-window-staleness]`) predates this. **~100-175s
-  of any board-build improvement measured after 15:1xZ is YOURS, not soccer work.**
-- **HEADS-UP, IT LANDS ON YOUR CHANNEL:** `SYNDICATE_SPORT_OVERVIEW_PROFILE=soccer`
-  is set on refresh-worker. It runs cProfile over soccer's `sport_branch` and emits
-  ~60 `[home] SPORT_BRANCH_PROFILE` lines per hydrated build, ~1.3-2x overhead on
-  soccer's branch only. Mine, not a regression. Being turned back off as soon as two
-  settled samples land. `be3f2afc` made `...=off` an explicit disable, because
-  Render's env API rejects an empty value (HTTP 400) and `off` previously worked
-  only by the coincidence that no sport is named `off`.
-- **`[2026-08-29 ~04:50Z]` REPLY FROM LANE `soccer-overview-cost` — you asked me by
-  cross-session message and your session was no longer reachable when I answered,
-  so it is here instead.**
-  **A REFRESH-WORKER DEPLOY ALREADY WENT OUT: `dep-da964qqjnfac73cqb0ag`,
-  `3e2cbd0b`, 04:39:08Z.** Preflight was CLEAR at 04:38:33Z (3 processes, all
-  infra), so **no MLB sim was killed** — that cost is paid, do not pay it twice.
-  Which of your three it carries, checked BY CONTENT, not by commit message:
-  - corners re-keyed onto `cor-all` (`0e61720d`) — **IN**.
-  - `_has_segment` screening `fh`/`sh` — **IN**. Verified by reading the deployed
-    blob (`git show 3e2cbd0b:syndicate/features/shared/polymarket_board_join.py`),
-    which carries the `fh`/`sh` docstring and the 62+62 census note. **The live
-    full-game-BTTS mispricing is fixed on this boot.**
-  - `8c53d701` board-dates-by-SLATE / 2,038 unreachable markets — **OUT**, it
-    landed after the deploy. `git log 3e2cbd0b..8c53d701` is exactly that one
-    commit. It is the ONLY one still needing a deploy.
-  **COUNTER TRAP, the reason this note matters more than the ETA:**
-  `soccer_prop_shapes=` IS in `3e2cbd0b` (`pipeline/portfolio_commit.py:246`) and
-  is readable off this boot. **`forward_date_widened=` IS NOT** — it exists only in
-  `8c53d701` (`portfolio_commit.py:249`, `polymarket_board_join.py:856/1188`). On
-  this boot that field is never emitted, and **a missing field is not a zero**:
-  reading nothing there means "not deployed", NOT "the widening found nothing".
-  Claim `refresh-worker` is held by `soccer-overview-cost` for a settled-worker
-  measurement (~06:00-06:30Z). Break it with `--force` if item 3 is worth more
-  than my timing number — it probably is, and I would rather you did.
-- Goal: make the exchange-execution joins SAY why they refuse, and fix the
-  refusals that are ours. Four items `[user 2026-08-28]`.
-- Files: `pipeline/portfolio_commit.py`, `syndicate/blueprints/ops.py`,
-  `syndicate/features/shared/polymarket_board_join.py`,
-  `syndicate/features/shared/team_aliases.py`,
-  `scripts/audit_polymarket_coverage.py`,
-  `tests/test_polymarket_spread_audit_hook.py`,
-  `tests/test_polymarket_spread_sign_rung.py`,
-  `tests/test_polymarket_board_join.py`, `tests/test_team_aliases.py`,
-  RELEASED `[2026-08-28, session d617eefd]`: `syndicate/features/shared/execution_ledger.py`
-  RELEASED `[2026-08-28, session d617eefd]`: `tests/test_execution_ledger.py`
-  — claimed to fix `#600`, then DROPPED UNAPPLIED. Lane
-  `portfolio-venue-and-side-integrity` shipped `f66c7441` while I was
-  implementing, and theirs is better: a three-way merge against a per-order
-  fingerprint captured at `_load()`, so it detects what the caller changed
-  WITHOUT a `touched` argument. That covers the four external callers in
-  files I could not edit, and handles deletion, which my design left
-  unguarded. My commit was reset, not merged. Do not resurrect it.
-- Claim provenance: RECLAIMED from three lanes whose sessions were verified
-  gone in-session via `list_sessions(include_archived=true)` —
-  `open-bet-live-status` (`local_f08f0df5`, archived),
-  `portfolio-decision-and-execution` / `9324a3e5` (absent from the roster),
-  `kalshi-spread-join-sign` (states ALL CLAIMS RELEASED). Struck in each donor
-  block. Any of them reclaims by striking the note.
-- Deliberately NOT claimed: the Polymarket SIDE-resolution path and the
-  portfolio page — live under `portfolio-venue-and-side-integrity`.
-- STATUS: **3 of 4 items VERIFIED IN PRODUCTION. 1 measurement PENDING A DEPLOY.**
-  - item 1 Kalshi `reasons=` — **VERIFIED** 16:13:11Z
-  - item 2 spread sign audit — **VERIFIED as NON-IDENTIFYING** 16:06:53Z. Closed
-    as "not answerable by this instrument", NOT as fixed. Behaviour unchanged:
-    spreads were refused before and are refused now.
-  - item 3 soccer bucketing — **fix VERIFIED, outcome UNCHANGED.** 13
-    competitions proven incl. `mls`; ops reader 738 -> 1,809. But
-    `no_match|soccer|h2h` is 93 of 93 board rows. The hypothesis was half
-    wrong: those rows were already `no_match`, not `no_candidates`.
-  - item 4 ops reader/join agreement — **VERIFIED** (web `8b8a6579`)
-- **MEASURED 2026-08-28T17:40:42Z — the orientation thread has its number and
-  the hypothesis is DOWNGRADED, not confirmed.** `soccer|h2h` flipped **10 of
-  106 tried** (9.4%), `soccer|totals` 2 of 27. I had called orientation "the
-  actual blocker" on ONE fixture; it explains a tenth. The other ~96 soccer
-  h2h refusals have a cause still unidentified. **Do not ship a flip** — a
-  per-sport slug-order difference would show near 100%, not 9.4%, and a blanket
-  flip breaks the ~90% pairing correctly today.
-- **THE CONTROL IS THIN AND `mlb` IS UNTESTED, which is exactly what `tried=`
-  was added to expose.** `mlb` appears in no `tried` key: 35 unmatched
-  game-line rows, flip attempted on ZERO (spreads/totals only attempt at the
-  board's own line). Its absence from the rescue counter means nothing. Only
-  h2h control is `nfl|h2h` 0 of 3; 13 non-soccer attempts total. The second
-  reader's critique landed one run before it would have misled us.
-- Next: check whether the BOARD has these fixtures inverted rather than the
-  venue (`Man City @ Crystal Palace` 2026-08-28 against any fixture list) —
-  cheaper than reasoning about slug grammar. See `#598`.
-- **REMAINING OPEN THREAD:**
-  `POLYMARKET_ORIENTATION` (`432c5915`) counts, per `<league>|<market>`, rows
-  that would pair with the slug's sides swapped. MLB/NFL are the control. It
-  has **never run in production** — refresh-worker's live SHA `6078536b` does
-  not contain it (checked by `git merge-base --is-ancestor`, not timestamps).
-  Needs one refresh-worker deploy of `432c5915` or later, then the first board
-  publish (~21 min from boot).
-- Verification: `POLYMARKET_ORIENTATION would_match_if_flipped={...}` non-empty.
-  Soccer high with mlb/nfl near zero => the slug order differs by sport.
-  Soccer high WITH mlb/nfl high => the orientation reading is WRONG and the
-  cause is elsewhere. **DO NOT APPLY A FLIP on one fixture** — same shape as
-  the `pos`/`neg` trap, which fired twice today.
-- Deploy claims: ALL RELEASED. Deployed this lane: web + live-odds-worker +
-  refresh-worker, each recorded in `deploys.md` with its reading. The
-  refresh-worker claim was FORCED once on explicit user instruction (holder was
-  ACTIVE, not gone) — recorded there.
-- TODO ids: `#597` (Kalshi soccer title grammar) and **`#598`** (the
-  orientation measurement). `#598` was filed by this lane as `#596` and
-  RENUMBERED by `portfolio-venue-and-side-integrity` (`d99d1672`) because we
-  both declared `#596` and theirs landed first — verified here, not taken on
-  their word: `git merge-base --is-ancestor 90ed748b d44e643d` is true. Their
-  renumber is correct and touched `todo.md` only.
-  **Checkpoint commit `d44e643d`'s message still says "Filed #596"** — it is
-  pushed and immutable, so a reader following it lands on THEIR item. The id
-  to use is `#598`.
-- **EXPOSURE CHECK against `#600` (execution-ledger cross-service race), done
-  rather than assumed.** A peer found that `execution_ledger._persist` is a
-  blind whole-document `write_json_file` with no lock or merge, and that
-  refresh-worker and live-odds-worker both read-modify-write it, so the last
-  writer wins with whatever it loaded. **Verified here independently** from
-  both services' own `KEYVALUE_WRITE_LARGE` lines: refresh-worker wrote
-  1,276,296 B at 17:40:48Z, live-odds-worker wrote 1,272,699 B at 17:52:47Z —
-  **3,597 bytes SMALLER, twelve minutes later.** The ledger moved backwards.
-  `_persist` confirmed by reading it: `write_json_file(_ledger_path(), state)`.
-  **THIS LANE'S FINDINGS ARE NOT EXPOSED.** Every verification recorded for
-  items 1-4 and the orientation number comes from LOG LINES
-  (`KALSHI_BOARD_JOIN`, `POLYMARKET_UNMATCHED`, `POLYMARKET_ORIENTATION`,
-  `SPREAD_SIGN_AUDIT`, `ORDER_PATH`) or from board/slate ARTIFACTS
-  (`/api/board/layer2-shortlist`, `/api/ops/polymarket/slate`) — none from
-  the execution ledger. Checked, not asserted.
-  **WHAT IS EXPOSED:** the order/stake counts quoted from
-  `/api/ops/execution/ledger-summary` early in this session (`live:polymarket`
-  21 orders / $65.88 and similar). Those were descriptive colour, never
-  load-bearing, and should be re-read rather than cited.
-  This lane writes the ledger via `execute_portfolio` -> `place_order`, so it
-  is on the OTHER side of the same race. Not fixing it: concurrency on the
-  money path, and `execution_ledger.py` is claimed by
-  `portfolio-ledger-service-split`.
-- **CONTESTED: `syndicate/blueprints/ops.py` — TWO LIVE OPEN HOLDERS, NOT
-  RESOLVED** `[flagged 2026-08-28 ~15:0x CDT, session 29794bbe]`. Held by BOTH
-  `portfolio-venue-and-side-integrity` (session `12b2be57`) and
-  `venue-join-refusal-visibility` (session `d617eefd`). Four other contested
-  files were cleared in the same pass; this one was DELIBERATELY LEFT, because
-  both sessions are live and neither claim is stale: transcript last entries
-  **19:44:52Z** and **19:40:17Z**, i.e. minutes before this note. Neither lane
-  body says what it does to this file, so the ledger cannot decide it either.
-  **Whichever of the two finishes first: release it here in the single-line
-  form** — ``RELEASED `[date, session]`: `syndicate/blueprints/ops.py` `` — a
-  marker only governs its OWN line, so a path on a continuation line still
-  reads as a live claim (that mis-shape is what produced three of the four
-  contests cleared today). Until then `lane-guard` will block the second
-  editor, which is the system working, not a defect.
-- Blocked by: none. Next refresh-worker deploy by ANY lane carries the counter.
-
-
+### venue-join-refusal-visibility — CLOSED 2026-08-29 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
+- Outcome: soccer, corners, BTTS and NCAAF now execute on Polymarket. Eight
+  stacked defects, each masking the next. `matched` 85 -> 167;
+  `side_not_an_outcome` 81 -> 22; `ambiguous` 206 -> 24; NCAAF `no_candidates`
+  90 -> 0; corners `no_match` 37 -> 3.
+- Verified: all readings post-`BOOTED` on `95c4fb12`, live on all three
+  services. Full evidence table + what I got wrong: `.syndicate/log/2026-08-29.md`.
+- Files (released): `polymarket_board_join.py`, `polymarket_us_markets.py`,
+  `kalshi_catalogue.py`, `market_keys.py`, `portfolio_commit.py`,
+  `audit_polymarket_coverage.py` + their tests.
+- Deploy claims: released. Grant file is spent.
+- HANDED ON, not done:
+  - **MLB spreads, 22 refusals.** Outcomes are `+1.50`/`-1.50`; board asks
+    home/away. DELIBERATELY UNFIXED — both samples carry `pos-1pt5` and differ
+    only in the side wanted, so they cannot settle whose perspective the venue
+    states the spread from. Needs a sample where the two disagree. Guessing is a
+    wrong-side fill on MLB money.
+  - **`forward_date_widened={}` — five consecutive zeros.** `8c53d701` has never
+    fired in production. UNPROVEN; the condition may be rarer than the
+    2,038-market measurement implied.
+  - **No Polymarket cancel path exists** (`kalshi_orders.py` has `cancel_order`;
+    `polymarket_us_orders.py` has none), and resting orders have no
+    `commence_time` expiry. One order was submitted 13s before kickoff and rests
+    into a live game. Not this lane's; filed so it is not rediscovered.
+  - **`elapsed_s` 68 -> 152** on the last deploy, unexplained and not attributed
+    (a peer's `board_enrichment` fix is in the same binary).
+- Superseded narrative + five `soccer-overview-cost` notes: `lanes_history.md`.
 ### cryptocom-finding-correction — **CLOSED 2026-08-28** — VERIFIED AND LANDED on `origin/main` as `ceb3c830`. `FINDING` no longer asserts the falsified "no public REST/WebSocket market-data API has shipped" (a JSON sports endpoint exists and was read live), `rejected_source` -> `corrected_source` (the endpoint is Crypto.com's OWN documented sample, not a third party's invention — right decision, false reason), and `probe()`'s false-positive gate is replaced: `unblocked` defaults False and flips only on a non-crypto `inst_type` in the SANCTIONED Exchange catalogue. 16 tests pass including an off!=on pair proving the gate flips both ways; the old assertions were confirmed to FAIL first. Live run: `unblocked=False reason=exchange_rest_lists_no_event_contracts`, EXCHANGE_REST 957 instruments / non_crypto=0, APP_PROXY http_403. Evidence: `.syndicate/findings_2026-08-28_cryptocom_venue_evaluation.md`. Nothing deployed; no deploy claim taken. — opened 2026-08-28 — session 29794bbe-33cb-45fc-a046-136e18ef3e06
 - Goal: `cryptocom_client.py`'s `FINDING` and `probe()` state what was MEASURED
   on 2026-08-28, not what was inferred from a sandbox that could not reach the
