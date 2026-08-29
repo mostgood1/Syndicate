@@ -36895,11 +36895,35 @@ Claim released immediately on discovery; `refresh-worker free`.
 and leaves the board frozen for the ~21 min refresh-worker takes to reach its
 first publish. The guard refused it. The guard was right and I was wrong.
 
-**verify: PENDING.** The profiler (`SYNDICATE_SPORT_OVERVIEW_PROFILE=soccer`) is
-still armed on this boot, so the reading that settles the `source_roots` cache is
-whether **`posix.lstat` leaves the top of `tottime`** — it was 5.050s of a 10.92s
-soccer branch (46%), from 1,260 `Path.resolve()` calls via
-`preferred_source_roots`. Settled sample due ~16:20Z.
+**verify: MET.** `posix.lstat` left the top of `tottime` in call volume, and
+`Path.resolve()` left the top 30 entirely. Both samples ~3 min post-boot, so they
+are like-for-like with each other (neither is settled -- see the caveat).
+
+```
+soccer sport_branch, cProfile, tottime
+                        BEFORE 15:28:22Z      AFTER 15:55:45Z
+                        (1fbc7a62)            (da2de430)
+  posix.lstat calls          7,955                  944     8.4x fewer
+  posix.lstat time           5.050 s              0.893 s    5.7x less
+  posix.stat  calls          1,638                  395
+  Path.resolve()      1,260 / 5.624 s cum    NOT IN TOP 30
+  branch elapsed_s          10.95                  3.22      3.4x
+  function calls         3,981,640            3,479,533
+```
+
+**ATTRIBUTION, and the call-count is the honest number.** This boot also carries
+the peer's Polymarket join fix, so `elapsed_s` 10.95 -> 3.22 has a confound.
+**The 7,955 -> 944 `lstat` COUNT does not**: nothing in their change touches path
+resolution, and the count is a direct mechanical consequence of memoizing
+`preferred_source_roots`. Cite the count, not the elapsed.
+
+**CAVEAT: NEITHER SAMPLE IS SETTLED.** Both are ~3 min post-boot, against soccer
+brackets that read 202-231s overnight. So this proves the MECHANISM is removed at
+this scale; it does not yet prove what soccer costs at full slate. That is the
+same gap that made the `week_games` memo look like a fix and then read 206 -> 204.
+
+**NEXT TARGET, named by the same profile:** `copy.deepcopy` is now #2 --
+**351,698 calls, 0.336s tottime / 0.642s cum** for 20 board contracts.
 
 **ATTRIBUTION WARNING FOR WHOEVER READS THE BOARD NUMBERS NEXT:** this boot also
 carries the peer's Polymarket join fix (`elapsed_s` 291 -> 176, `matched`
