@@ -96,6 +96,36 @@ def _phase_counts(games: list[dict[str, Any]]) -> dict[str, int]:
     return counts
 
 
+def _live_score_item(game: dict[str, Any]) -> str | None:
+    """"Score: NC 3 - 0 TCU" for a started game, or None.
+
+    THE OLD "NO LIVE SCORE, DELIBERATELY" RULE WAS RIGHT AND ITS PREMISE IS
+    NOW FALSE. `_game_state_label` records the reason it refused: the shared
+    contract carried no score field, and the only `score` in it was the
+    PROJECTED one, so rendering "score" beside a live clock would have shown a
+    simulation as if it were the result. Correct call on the data that existed.
+
+    `ncaaf/live_game_state.py` now stamps the REAL ESPN score onto the side
+    containers for started games only -- a pregame 0-0 placeholder is
+    suppressed at the parser, so a value here always means the game has begun.
+    The label says "Score" while the projection beside it says "Predicted
+    final", which keeps the two readable as different things.
+    """
+    state = game.get("shared_game_state") if isinstance(game.get("shared_game_state"), dict) else {}
+    if not (bool(state.get("live")) or bool(game.get("shared_is_live")) or bool(state.get("final"))):
+        return None
+    away = game.get("away") if isinstance(game.get("away"), dict) else {}
+    home = game.get("home") if isinstance(game.get("home"), dict) else {}
+    away_score = away.get("score")
+    home_score = home.get("score")
+    if away_score is None or home_score is None:
+        return None
+    return (
+        f"Score: {_safe_text(away.get('abbr'), 'AWY')} {away_score} - "
+        f"{home_score} {_safe_text(home.get('abbr'), 'HOM')}"
+    )
+
+
 def _runtime_rank_card(game: dict[str, Any]) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
@@ -114,6 +144,11 @@ def _runtime_rank_card(game: dict[str, Any]) -> dict[str, Any]:
         f"Projected total: {scoreboard.get('total_points') or '-'}",
         f"Win probability: {scoreboard.get('win_probability') or '-'}",
     ]
+    # Real score FIRST when the game has started: on a live board the actual
+    # result outranks the projection of it.
+    live_score = _live_score_item(game)
+    if live_score:
+        list_items.insert(0, live_score)
     return {
         "title": f"{_safe_text(away.get('abbr'), 'AWY')} @ {_safe_text(home.get('abbr'), 'HOM')}",
         # The GAME STATE, not a constant source label repeated 51 times.

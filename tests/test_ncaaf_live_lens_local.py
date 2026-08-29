@@ -49,10 +49,29 @@ class NcaafLiveLensLocalTests(unittest.TestCase):
             context = build_smartsim_live_lens_page_context(1)
 
         self.assertEqual(context["source_title"], "NCAAF Enhanced Totals Engine live lens runtime")
-        self.assertEqual(context["rank_cards"][0]["eyebrow"], "Enhanced Totals Engine")
+        # THE EYEBROW IS THE GAME STATE, NOT A CONSTANT SOURCE LABEL.
+        #
+        # This asserted "Enhanced Totals Engine" -- the same string on all 51
+        # cards, carrying no information -- and had been FAILING since lane
+        # `ncaaf-board-surfaces` made the eyebrow state-aware on 2026-08-27.
+        # It was left red, which is why it could not report anything when the
+        # live path itself turned out to be broken on 2026-08-29: a test that
+        # is already failing cannot tell you that something ELSE broke.
+        #
+        # This fixture carries no `shared_game_state` and no `kickoff_label`,
+        # so "Pregame" is the correct terminal fallback of `_game_state_label`.
+        self.assertEqual(context["rank_cards"][0]["eyebrow"], "Pregame")
+        # The source label moved to `meta`, where it belongs -- it describes
+        # the PRODUCER, and the eyebrow describes the GAME.
+        self.assertEqual(context["rank_cards"][0]["meta"], "Enhanced Totals Engine")
         self.assertIn("34.2", context["rank_cards"][0]["list_items"][0])
         self.assertIn("73.1%", context["rank_cards"][0]["list_items"][3])
         self.assertEqual(context["rows"], 1)
+        # A pregame game must NOT gain a score line -- that would shift every
+        # index asserted above and, worse, print a projection as a result.
+        self.assertFalse(
+            any(str(item).startswith("Score:") for item in context["rank_cards"][0]["list_items"])
+        )
 
     def test_smartsim_live_lens_runtime_falls_back_to_summary_builder(self) -> None:
         fallback_context = {"date": "2025 Week 1", "rank_cards": [], "source_title": "Fallback"}
