@@ -282,5 +282,129 @@ class SeasonProjectionAutorunWiringTests(unittest.TestCase):
         mocked_popen.assert_called_once()
 
 
+class StaleArtifactRelaunchCooldownTests(SeasonProjectionStalenessTests):
+    """`#389`'s BACKSTOP WAS ONLY EVER WIRED TO THE MISSING-ARTIFACT BRANCH.
+
+    The class above pins "the artifact never appeared". This one pins the
+    sibling nobody wired: the artifact EXISTS, is stale, and every rebuild
+    fails, so it stays exactly as stale as it was and the gate relaunches on
+    every tick forever.
+
+    MEASURED on refresh-worker 2026-08-29, NCAAF: `SEASON_PROJECTION_LAUNCHING
+    ... reason=artifact_stale` ~30 times in 2h45m with `age_seconds` climbing
+    228,608 -> 238,496, each run dying on a CFBD `HTTP 429`. The artifact had
+    not rebuilt since 2026-08-26 16:16 CDT.
+
+    Inherits the harness above deliberately -- same fixture, same store stub --
+    so the two branches cannot drift apart in test setup.
+    """
+
+    COOLDOWN = 3600
+
+    def setUp(self) -> None:
+        super().setUp()
+        cooldown_patch = patch.object(
+            worker, "_season_projection_relaunch_cooldown_seconds", return_value=self.COOLDOWN
+        )
+        cooldown_patch.start()
+        self.addCleanup(cooldown_patch.stop)
+
+    # -- the measured bug -------------------------------------------------
+
+    def test_a_stale_artifact_does_not_relaunch_minutes_after_the_last_attempt(self) -> None:
+        """THE bug. Old code returned `artifact_stale` unconditionally here."""
+        self._touch_artifact(INTERVAL + 5000)
+        worker._record_season_projection_launch(SPORT, 4242, season=SEASON, week=WEEK)
+        self._marker["started_at_epoch"] = time.time() - 300
+
+        should_launch, reason = self._decide()
+
+        self.assertFalse(should_launch)
+        self.assertTrue(reason.startswith("artifact_stale_relaunched_recently"), reason)
+
+    def test_the_hold_is_logged_so_the_cooldown_is_not_a_silent_suppression(self) -> None:
+        """A cooldown that removes the LAUNCHING lines and says nothing removes
+        the only evidence the loop ever existed."""
+        self._touch_artifact(INTERVAL + 5000)
+        worker._record_season_projection_launch(SPORT, 4242, season=SEASON, week=WEEK)
+        self._marker["started_at_epoch"] = time.time() - 300
+        _, reason = self._decide()
+
+        with patch("builtins.print") as mocked_print:
+            for _ in range(5):
+                worker._log_season_projection_skip(SPORT, reason)
+
+        self.assertEqual(mocked_print.call_count, 1, "rate-limited, not 2,880 lines/day")
+        self.assertIn("SEASON_PROJECTION_RELAUNCH_HELD", mocked_print.call_args[0][0])
+
+    # -- and it must not become a dead loop -------------------------------
+
+    def test_a_stale_artifact_relaunches_once_the_cooldown_has_passed(self) -> None:
+        """Backoff, not abandonment -- the same bar `#389` set for its branch."""
+        self._touch_artifact(INTERVAL + 5000)
+        worker._record_season_projection_launch(SPORT, 4242, season=SEASON, week=WEEK)
+        self._marker["started_at_epoch"] = time.time() - (self.COOLDOWN + 60)
+
+        should_launch, reason = self._decide()
+
+        self.assertTrue(should_launch)
+        self.assertTrue(reason.startswith("artifact_stale"), reason)
+        self.assertFalse(reason.startswith("artifact_stale_relaunched_recently"), reason)
+
+    def test_a_stale_artifact_with_no_prior_launch_still_launches(self) -> None:
+        """`_seconds_since_season_projection_launch` returns None for "nothing
+        comparable tried". That must NOT read as "tried recently" -- the exact
+        inversion `#389`'s own helper docstring warns about."""
+        self._touch_artifact(INTERVAL + 5000)
+        self._marker = None
+
+        should_launch, reason = self._decide()
+
+        self.assertTrue(should_launch)
+        self.assertTrue(reason.startswith("artifact_stale"), reason)
+
+    def test_a_new_week_is_not_held_by_last_weeks_launch(self) -> None:
+        """Same regression the season/week fields exist to prevent, on this
+        branch: a week-1 marker must not hold week 2's first run."""
+        self._touch_artifact(INTERVAL + 5000)
+        worker._record_season_projection_launch(SPORT, 4242, season=SEASON, week=WEEK)
+        self._marker["started_at_epoch"] = time.time() - 60
+
+        should_launch, reason = self._decide(week=WEEK + 1)
+
+        self.assertTrue(should_launch)
+        self.assertFalse(reason.startswith("artifact_stale_relaunched_recently"), reason)
+
+    def test_a_fresh_artifact_is_still_fresh_and_the_cooldown_never_sees_it(self) -> None:
+        """The healthy path must be untouched: `artifact_fresh` short-circuits
+        before the cooldown, so a recent launch cannot relabel a good state."""
+        self._touch_artifact(10)
+        worker._record_season_projection_launch(SPORT, 4242, season=SEASON, week=WEEK)
+        self._marker["started_at_epoch"] = time.time() - 60
+
+        should_launch, reason = self._decide()
+
+        self.assertFalse(should_launch)
+        self.assertTrue(reason.startswith("artifact_fresh"), reason)
+
+
+class RelaunchCooldownDefaultTests(unittest.TestCase):
+    """ABSENT != OFF. CLAUDE.md's `blueprint_sync` rule: this key is NOT in
+    `render.yaml` (pushing that file rewrites every env var on all three
+    services), so the DEFAULT is the production behaviour."""
+
+    def test_absent_env_var_defaults_to_one_hour(self) -> None:
+        with patch.dict(worker.os.environ, {}, clear=True):
+            self.assertEqual(worker._season_projection_relaunch_cooldown_seconds(), 3600)
+
+    def test_an_unparseable_value_falls_back_rather_than_crashing_the_tick(self) -> None:
+        with patch.dict(worker.os.environ, {"SEASON_PROJECTION_RELAUNCH_COOLDOWN_SECONDS": "soon"}):
+            self.assertEqual(worker._season_projection_relaunch_cooldown_seconds(), 3600)
+
+    def test_an_explicit_value_is_honoured(self) -> None:
+        with patch.dict(worker.os.environ, {"SEASON_PROJECTION_RELAUNCH_COOLDOWN_SECONDS": "900"}):
+            self.assertEqual(worker._season_projection_relaunch_cooldown_seconds(), 900)
+
+
 if __name__ == "__main__":
     unittest.main()

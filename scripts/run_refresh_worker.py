@@ -2365,6 +2365,29 @@ def _season_projection_refresh_interval_seconds() -> int:
     return max(1, value)
 
 
+def _season_projection_relaunch_cooldown_seconds() -> int:
+    """Minimum gap between launches for the SAME target when the artifact is
+    stale. Absent env var = 3600.
+
+    A SEPARATE, SHORTER NUMBER THAN THE REFRESH INTERVAL, DELIBERATELY.
+    Reusing the 86400 cadence as the cooldown would mean one transient upstream
+    failure parks the sport for a day; an hour recovers from a blip while
+    turning a hot loop into ~1 launch/hour.
+
+    NOT IN `render.yaml`, ON PURPOSE. Pushing that file fires `blueprint_sync`,
+    which rewrites the WHOLE env block on all three services regardless of
+    `autoDeploy = no` (CLAUDE.md). This key's behaviour must therefore be
+    correct with the variable ABSENT, which is what the `or 3600` gives it --
+    "absent != off" is the trap that rule exists for.
+    """
+    raw_value = str(os.environ.get("SEASON_PROJECTION_RELAUNCH_COOLDOWN_SECONDS") or "").strip()
+    try:
+        value = int(raw_value or 3600)
+    except ValueError:
+        value = 3600
+    return max(1, value)
+
+
 def _season_projection_target_week(sport: str, season: int) -> int | None:
     if sport == "nfl":
         from syndicate.features.nfl.sources import nfl_target_week
@@ -3403,6 +3426,31 @@ def _season_projection_should_launch(sport: str, artifact_path: Path, *, season:
     if age_seconds is not None:
         if age_seconds < interval:
             return False, f"artifact_fresh age_seconds={int(age_seconds)} interval_seconds={int(interval)}"
+
+        # `#389`'S BACKSTOP WAS ONLY EVER WIRED TO THE MISSING-ARTIFACT BRANCH,
+        # AND THE SAME BUSY LOOP LIVES HERE.
+        #
+        # Measured on refresh-worker 2026-08-29: `SEASON_PROJECTION_LAUNCHING
+        # sport=ncaaf reason=artifact_stale` fired ~30 times in 2h45m with
+        # `age_seconds` climbing 228,608 -> 238,496, because every run died on a
+        # CFBD `HTTP 429` and a run that FAILS leaves the artifact exactly as
+        # stale as it found it. The docstring above already argues the general
+        # case -- "an artifact that never appears makes the sport permanently
+        # stale" -- and a stale artifact that never REFRESHES is the same
+        # sentence with one word changed. A STALE artifact can answer "is it
+        # old"; like a MISSING one it cannot answer "will relaunching now help",
+        # so ask the second question `#389` already recorded the state for.
+        #
+        # The 429 itself is fixed separately in `ncaaf/cfbd_backoff.py`. Neither
+        # half is sufficient alone: backoff without this still relaunches every
+        # tick, and this without backoff just fails more slowly.
+        since_stale_launch = _seconds_since_season_projection_launch(sport, season=season, week=week)
+        cooldown = float(_season_projection_relaunch_cooldown_seconds())
+        if since_stale_launch is not None and since_stale_launch < cooldown:
+            return False, (
+                f"artifact_stale_relaunched_recently age_seconds={int(age_seconds)} "
+                f"since_launch_seconds={int(since_stale_launch)} cooldown_seconds={int(cooldown)}"
+            )
         return True, f"artifact_stale age_seconds={int(age_seconds)} interval_seconds={int(interval)}"
 
     since_launch = _seconds_since_season_projection_launch(sport, season=season, week=week)
@@ -3426,16 +3474,28 @@ def _log_season_projection_skip(sport: str, reason: str) -> None:
     tick. `artifact_missing_after_launch` means we launched and the artifact did
     not appear -- the condition that was invisible for the entire life of this
     bug -- so it is worth saying out loud, just not 2,880 times a day.
+
+    `artifact_stale_relaunched_recently` is the 2026-08-29 sibling and is logged
+    for the SAME reason. A cooldown that suppresses launches SILENTLY is a
+    regression dressed as a fix: the symptom it removes is the log line
+    (`SEASON_PROJECTION_LAUNCHING` ~30x in 2h45m) that made the busy loop
+    visible at all, so without a line of its own the next reader sees a quiet
+    worker and a three-day-old artifact with nothing connecting them.
     """
-    if not reason.startswith("artifact_missing_after_launch"):
+    if not reason.startswith(("artifact_missing_after_launch", "artifact_stale_relaunched_recently")):
         return
     now = time.time()
     last = _LAST_SEASON_PROJECTION_MISSING_LOG.get(sport, 0.0)
     if now - last < _SEASON_PROJECTION_MISSING_LOG_INTERVAL_SECONDS:
         return
     _LAST_SEASON_PROJECTION_MISSING_LOG[sport] = now
+    label = (
+        "SEASON_PROJECTION_ARTIFACT_MISSING"
+        if reason.startswith("artifact_missing_after_launch")
+        else "SEASON_PROJECTION_RELAUNCH_HELD"
+    )
     # print, not logger.info -- logger.info never reaches Render's log collector.
-    print(f"[refresh_worker] SEASON_PROJECTION_ARTIFACT_MISSING sport={sport} {reason}", flush=True)
+    print(f"[refresh_worker] {label} sport={sport} {reason}", flush=True)
 
 
 def _launch_autorun_season_projections(
