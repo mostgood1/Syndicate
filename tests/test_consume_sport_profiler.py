@@ -116,3 +116,49 @@ def test_segment_threshold_default_and_override(monkeypatch):
     assert thr() == 0.5
     monkeypatch.setenv("SYNDICATE_CONSUME_SPORT_SEGMENT_LOG_SEC", "nonsense")
     assert thr() == 10.0
+
+
+# ---------------------------------------------------------------------------
+# The candidate_collection hook uses the SAME shared profiler with its own env
+# var. These pin that the two are independent -- arming one must not arm the
+# other, or "turn the profiler off" stops meaning anything specific.
+
+CC_ENV = "SYNDICATE_CANDIDATE_COLLECTION_PROFILE"
+
+
+def test_candidate_collection_env_is_independent_of_consume_sport(monkeypatch):
+    monkeypatch.delenv(CC_ENV, raising=False)
+    monkeypatch.setenv(ENV, "all")
+    assert BP.profile_enabled_for(ENV, "soccer")
+    assert not BP.profile_enabled_for(CC_ENV, "2026-08-29"), "arming one armed the other"
+
+
+def test_candidate_collection_keys_on_the_date(monkeypatch):
+    monkeypatch.setenv(CC_ENV, "2026-08-29")
+    assert BP.profile_enabled_for(CC_ENV, "2026-08-29")
+    assert not BP.profile_enabled_for(CC_ENV, "2026-08-30")
+
+
+def test_candidate_collection_all_and_off(monkeypatch):
+    monkeypatch.setenv(CC_ENV, "all")
+    assert BP.profile_enabled_for(CC_ENV, "any-date")
+    monkeypatch.setenv(CC_ENV, "off")
+    assert not BP.profile_enabled_for(CC_ENV, "any-date")
+
+
+def test_the_two_hooks_park_separately(monkeypatch, capsys):
+    """_PARKED is keyed by env var. If it were global, the candidate_collection
+    hook entering would clear the consume_sport hook's live profiler."""
+    monkeypatch.setenv(ENV, "all")
+    monkeypatch.setenv(CC_ENV, "all")
+    with BP.profile_branch(ENV, "soccer", label="consume_sport"):
+        with BP.profile_branch(CC_ENV, "2026-08-29", label="candidate_collection"):
+            pass
+    out = capsys.readouterr().out
+    # ASSERT SUCCESS, NOT MERELY THE LABEL. `BEGIN_FAILED` also contains the
+    # label, so `"candidate_collection" in out` passes on the failure path --
+    # which is exactly what happens if cProfile refuses a second concurrent
+    # profiler on this thread. Assert the REPORT line instead.
+    assert "candidate_collection key=2026-08-29 order=tottime" in out, out[:400]
+    assert "BEGIN_FAILED" not in out, out[:400]
+    assert "STALE_CLEARED" not in out, "one hook cleared the other's profiler"

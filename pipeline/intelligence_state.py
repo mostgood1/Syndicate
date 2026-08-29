@@ -5221,27 +5221,55 @@ class IntelligenceStateService:
         # this path's own SYNDICATE_BOARD_APPLY_EDGE_FILTER toggle (default
         # on) -- a kill-switch for the edge-quality gate without a code
         # revert if published-candidate volume drops more than expected.
-        raw_candidates = _span(
-            "candidate_collection_with_fallback",
-            _profile_stage,
-            "candidate_collection_with_fallback",
-            collect_candidates_with_fallback_merge,
-            # None, not the rows: the rare thin-pool/empty-pool fallbacks
-            # re-hydrate for themselves when handed None, so they still work
-            # without every cycle carrying eight sports just in case.
-            None,
-            preferences,
-            odds_history_by_sport,
-            precollected_candidates=streamed_candidates,
-            advanced_by_sport=advanced_by_sport,
-            selected_date=selected_date,
-            apply_edge_filter=_env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True),
-            # `#385`: driven by the SAME predicate that sets
-            # `layer2_is_primary` further down, not a second flag that could
-            # drift out of step with it. When Layer 2 owns the board, refilling
-            # the legacy pool costs ~580s per build and contributes 0 rows.
-            apply_empty_pool_fallback=not board_l2a_fallback_enabled(),
-        )
+        # `#602` PROFILE HOOK ON THE STAGE THAT IS NOW THE LARGEST. `[2026-08-29]`
+        #
+        # With soccer's `collect_s` fixed (363s -> 80.5s bracket, `_normalized_
+        # market_text` precompiled + memoized), the per-build ranking changed:
+        #
+        #     build_intelligence_overview         177.34 s   (was 257-1158)
+        #     candidate_collection_with_fallback  282.67 s   <- now the largest
+        #     layer2_shortlist_build              137.04 s
+        #
+        # 282.67s sits INSIDE this stage's own historical 119-656s range, so it
+        # is NOT known to have changed -- one sample of a quantity that varied 5x
+        # on its own says nothing. That is exactly why this gets a profiler and
+        # not a hypothesis: the last three guesses about where board time goes
+        # were all wrong, and the profiler was right three times running.
+        #
+        # Note this stage ALSO consumes `streamed_candidates`, which
+        # `_consume_sport` already produced -- so some of what it does is a
+        # second pass over rows this build has already touched. Whether that is
+        # the cost or a red herring is a question for the reading, not for me.
+        #
+        # OFF by default: `SYNDICATE_CANDIDATE_COLLECTION_PROFILE=all` (or a
+        # date). ~1.3-2x on a 280s stage is 90-280s added, so this is a
+        # turn-on-read-turn-off diagnostic, never telemetry.
+        with profile_branch(
+            "SYNDICATE_CANDIDATE_COLLECTION_PROFILE",
+            str(selected_date or "all"),
+            label="candidate_collection",
+        ):
+            raw_candidates = _span(
+                "candidate_collection_with_fallback",
+                _profile_stage,
+                "candidate_collection_with_fallback",
+                collect_candidates_with_fallback_merge,
+                # None, not the rows: the rare thin-pool/empty-pool fallbacks
+                # re-hydrate for themselves when handed None, so they still work
+                # without every cycle carrying eight sports just in case.
+                None,
+                preferences,
+                odds_history_by_sport,
+                precollected_candidates=streamed_candidates,
+                advanced_by_sport=advanced_by_sport,
+                selected_date=selected_date,
+                apply_edge_filter=_env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True),
+                # `#385`: driven by the SAME predicate that sets
+                # `layer2_is_primary` further down, not a second flag that could
+                # drift out of step with it. When Layer 2 owns the board, refilling
+                # the legacy pool costs ~580s per build and contributes 0 rows.
+                apply_empty_pool_fallback=not board_l2a_fallback_enabled(),
+                )
         _diag_log_all_process_memory("post_collect_candidates_with_fallback_merge")
         if _abort_build_candidate_pool_if_memory_critical("post_collect_candidates_with_fallback_merge"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
