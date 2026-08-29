@@ -335,3 +335,79 @@ risk-free return cannot coexist with $900k of daily volume), not from the
 arithmetic — the arithmetic was correct and the INPUT was wrong. Recorded
 because this is the same shape as the backed-out live-edge attempt: fabricated
 numbers, larger than real ones, sorting to the top.
+
+---
+
+# `#603` FIXED — the totals key names the game `[2026-08-29, USER OVERRIDE to take the files]`
+
+**LANDED ON `main`, NOT DEPLOYED** (user instruction). So production still
+carries the defect; this is code on the branch, not a production reading.
+
+## The change, in three parts
+
+1. **`quote_key(sport, market, side, line, game=None)`** — optional trailing
+   `|@<game>` term. Absent `game` produces byte-identical output to before.
+2. **`game_token(sport, home, away)`** — both clubs through `canonical_team`,
+   **sorted** so home/away confusion cannot break the join, `None` if either is
+   unresolvable (no raw-string fallback — that is how the two halves of a join
+   end up on different vocabularies).
+3. **A match-time rejection in the fan-in.** A quote whose `game` names a
+   DIFFERENT fixture is refused and counted (`cross_game_rejected`), even when
+   its key matched.
+
+## Three design decisions, each forced by evidence rather than taste
+
+**ROLE-KEYED MARKETS ONLY (`totals`, `spreads`, and their `_alt` variants).**
+h2h is deliberately left alone: `mlb|h2h|chicago cubs` names a CLUB, and a club
+plays one game a day, so it cannot collide across fixtures. That is exactly what
+production showed — all 26 shared quotes were TOTALS, while every Polymarket
+h2h row carried a price unique to its game. Qualifying h2h would have added a
+redundant key to every moneyline row and fixed nothing. **This scoping took the
+regression from 11 failing tests to 3.**
+
+**THE ROLE KEY STAYS FIRST; the qualified key is APPENDED LAST.** Written the
+other way first, and it broke eleven tests — two of which assert `keys[1]` /
+`keys[2]` by POSITION, and several of which exist to assert "the role key is
+tried FIRST and unchanged, so every match that worked before still works".
+Ordering buys nothing: the match loop rejects a wrong-fixture quote and falls
+through, so a bare hit lands on the qualified key on the next iteration. Same
+behaviour, one fewer invariant broken.
+
+**ONE QUOTE PER SIDE, keyed qualified — not two.** The first version emitted
+both a qualified and a bare quote so a teamless board row would still match.
+The tests were right to reject it: it doubled every count in the adapter's
+contract, and the coverage it bought is coverage we should not want. If the
+BOARD cannot name the fixture, nothing can verify the price.
+
+## The coverage trade, stated rather than discovered later
+
+**A totals row with no `home_team`/`away_team` is no longer priced by
+Polymarket.** It goes unmatched instead of taking whichever fixture's quote was
+in the pool. Pinned by
+`test_a_totals_row_that_cannot_name_its_game_is_not_priced`. Real board rows
+carry both teams, so the production population should be small — but it is a
+loss and `stamped` may fall.
+
+## What is NOT fixed
+
+- **Only Polymarket names its game.** Kalshi, OddsAPI and Novig still emit bare
+  keys, so their quotes can still cross games on a live row. The rejection
+  check cannot help — it only fires when a quote NAMES a different fixture, and
+  theirs name none. Converting them is the remaining work: Kalshi needs
+  `match_event_blob` against the schedule (its `classified` carries no teams for
+  a total), which is a bigger change than this one.
+- **Doubleheaders.** Two games between the same clubs on one date share a token
+  and the pool is only date-scoped. Narrowed from "any game sharing a line"
+  (four at once, measured) to "the two halves of a doubleheader" — not closed.
+  Neither venue can distinguish them either: Polymarket's slug carries the date
+  and no game number. AZ@SF and BOS@NYY both played doubleheaders that day.
+
+## Verification
+
+`247 passed` across the seven venue/join suites, against a **measured baseline
+of 235 passed / 0 failed** taken with the change stashed — so every failure
+along the way was mine and none was pre-existing. 12 new tests.
+
+**No production reading exists and cannot until this deploys.** The number that
+would prove it: `cross_game_rejected` > 0 on a live slate, and the board's live
+Polymarket totals no longer sharing a price across games.

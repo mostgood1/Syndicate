@@ -72,19 +72,41 @@ def test_two_games_with_the_same_total_do_not_share_a_key():
     sd = _candidate_keys(SD_TB, "mlb")
     assert col, "COL@ATL produced no key at all"
     assert sd, "SD@TB produced no key at all"
-    assert not (set(col) & set(sd)), (
-        "a totals key is shared between two different games:\n"
-        f"  COL@ATL -> {col}\n  SD@TB   -> {sd}\n"
-        "One venue quote will answer both, and in production it did."
+    col_qualified = [k for k in col if "|@" in k]
+    sd_qualified = [k for k in sd if "|@" in k]
+    assert col_qualified and sd_qualified, (
+        f"no game-qualified key offered:\n  COL@ATL -> {col}\n  SD@TB   -> {sd}"
     )
+    assert not (set(col_qualified) & set(sd_qualified)), (
+        "the game-qualified keys collide between two different games:\n"
+        f"  COL@ATL -> {col_qualified}\n  SD@TB   -> {sd_qualified}"
+    )
+    # The BARE key IS still shared, deliberately, and the ROLE key stays first
+    # (`test_the_role_key_is_still_tried_FIRST...` in the sibling suites asserts
+    # that invariant with a measurement behind it). Dropping the fallback would
+    # take venue coverage to zero on every source that cannot yet name its game.
+    # What stops it being a hole is the rejection check, asserted in
+    # `test_a_bare_key_match_on_a_DIFFERENT_game_is_rejected`. Pinned here so
+    # the fallback's existence stays a DECISION rather than drifting back into
+    # being the whole key.
+    assert set(col) & set(sd) == {"mlb|totals|over|7.5"}
 
 
 def test_spreads_are_the_same_defect_and_must_also_name_the_game():
     """Spreads have no game term either, and `#603` measured 2 of 14 keys
     spanning more than one SEGMENT on top of that."""
-    a = _candidate_keys(_row("evt-a", "Team A", "Team B", market="spreads", side="home", line=-1.5), "mlb")
-    b = _candidate_keys(_row("evt-c", "Team C", "Team D", market="spreads", side="home", line=-1.5), "mlb")
-    assert not (set(a) & set(b)), f"spreads key shared across games: {a} vs {b}"
+    a = _candidate_keys(
+        _row("evt-a", "Colorado Rockies", "Atlanta Braves", market="spreads", side="home", line=-1.5),
+        "mlb",
+    )
+    b = _candidate_keys(
+        _row("evt-c", "San Diego Padres", "Tampa Bay Rays", market="spreads", side="home", line=-1.5),
+        "mlb",
+    )
+    aq = [k for k in a if "|@" in k]
+    bq = [k for k in b if "|@" in k]
+    assert aq and bq, f"no game-qualified spreads key: {a} / {b}"
+    assert not (set(aq) & set(bq)), f"qualified spreads key shared across games: {aq} vs {bq}"
 
 
 def test_the_same_game_still_keys_consistently():
@@ -113,20 +135,91 @@ def test_different_sides_on_the_same_game_and_line_stay_distinct():
     assert not (set(over) & set(under))
 
 
-def test_no_game_blind_fallback_key_is_offered():
-    """The property that makes this a FIX rather than a preference.
+def test_the_role_key_stays_first_and_the_qualified_key_is_offered_after_it():
+    """Ordering is DELIBERATE, and it is not "most specific first".
 
-    `_candidate_keys` tries every key it returns and takes the first hit. If a
-    game-blind key remains in the list, the game-qualified key simply misses
-    and the blind one still wins another game's quote — the bug intact, with a
-    more complicated key list. `prop_quote_key` returns ALONE for exactly this
-    reason.
+    Putting the qualified key first broke eleven tests asserting "the role key
+    is tried FIRST and unchanged, so every match that worked before still
+    works" -- two of them assert `keys[1]`/`keys[2]` by POSITION. Ordering buys
+    nothing here: the match loop rejects a quote naming a different fixture and
+    falls through, so a bare hit on the wrong game lands on the qualified key on
+    the next iteration anyway. So it is appended LAST and every existing index
+    is untouched.
     """
     keys = _candidate_keys(COL_ATL, "mlb")
-    assert "mlb|totals|over|7.5" not in keys, (
-        "the game-blind key is still offered as a fallback; it will still match"
-        " another game's quote whenever the qualified key misses"
+    assert keys[0] == "mlb|totals|over|7.5", f"role key is not first: {keys}"
+    assert "mlb|totals|over|7.5|@atlanta braves+colorado rockies" in keys
+
+
+def test_a_bare_key_match_on_a_DIFFERENT_game_is_rejected():
+    """THE SAFETY PROPERTY, and the reason the bare fallback is allowed to stay.
+
+    Dropping the bare key would take venue coverage to zero on every source
+    that cannot yet name its game, so it stays — and this is what stops it
+    being a hole. A quote whose `game` names another fixture must not price
+    this row even when its key matched.
+
+    This is the exact production shape: one `over 7.5 @ -400` quote belonging
+    to SD@TB, offered under the bare key, reaching COL@ATL.
+    """
+    from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes
+
+    foreign = Quote(
+        key="mlb|totals|over|7.5",
+        source="polymarket_us",
+        sport="mlb",
+        market="totals",
+        side="over",
+        probability=0.80,
+        american=-400,
+        line=7.5,
+        fetched_at=1_000_000.0,
+        game="san diego padres+tampa bay rays",
     )
+    row = dict(COL_ATL, sport="mlb", game={"state": "live"})
+    result = apply_venue_quotes(
+        [row],
+        selected_date="2026-08-29",
+        now=1_000_010.0,
+        collected_by_sport={"mlb": {"quotes": {foreign.key: foreign}}},
+    )
+    assert result["stamped"] == 0, "a quote naming SD@TB priced a COL@ATL row"
+    assert result["cross_game_rejected"] == 1, (
+        "the rejection must be COUNTED, not silent -- a zero here is how the"
+        " bleed stayed invisible for as long as it did"
+    )
+
+
+def test_a_quote_that_names_no_game_still_matches():
+    """The asymmetry that makes this incapable of regressing coverage.
+
+    `game=None` means the SOURCE could not name the fixture. Those pass exactly
+    as they do today, so this change can only ever remove a match that is
+    provably wrong.
+    """
+    from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes
+
+    unnamed = Quote(
+        key="mlb|totals|over|7.5",
+        source="oddsapi",
+        sport="mlb",
+        market="totals",
+        side="over",
+        probability=0.5,
+        american=-110,
+        line=7.5,
+        fetched_at=1_000_000.0,
+        game=None,
+    )
+    row = dict(COL_ATL, sport="mlb", game={"state": "live"})
+    result = apply_venue_quotes(
+        [row],
+        selected_date="2026-08-29",
+        now=1_000_010.0,
+        collected_by_sport={"mlb": {"quotes": {unnamed.key: unnamed}}},
+    )
+    assert result["stamped"] == 1
+    assert result["cross_game_rejected"] == 0
 
 
 def test_a_row_that_cannot_name_its_game_yields_no_key_rather_than_a_blind_one():
@@ -148,3 +241,59 @@ def test_explicit_venue_quote_key_still_wins():
     row = dict(COL_ATL)
     row["venue_quote_key"] = "explicit|key"
     assert _candidate_keys(row, "mlb") == ["explicit|key"]
+
+
+def test_a_totals_row_that_cannot_name_its_game_is_not_priced():
+    """THE COVERAGE TRADE, made explicit so it is a decision and not a surprise.
+
+    Polymarket's totals quote is keyed to the GAME. A board row with no teams
+    cannot build that key, so it goes unmatched rather than taking a price
+    belonging to whichever fixture happened to be in the pool.
+
+    That is a real loss of coverage and it is the correct direction: if the
+    board cannot name the fixture, nothing can verify the price, and matching
+    anyway IS the cross-game pricing this whole change removes. Coverage may be
+    traded for certainty; a price may not.
+    """
+    from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes
+
+    quote = Quote(
+        key="mlb|totals|over|7.5|@atlanta braves+colorado rockies",
+        source="polymarket_us",
+        sport="mlb",
+        market="totals",
+        side="over",
+        probability=0.02,
+        american=4900,
+        line=7.5,
+        fetched_at=1_000_000.0,
+        game="atlanta braves+colorado rockies",
+    )
+    teamless = {"sport": "mlb", "market": "totals", "side": "over", "line": 7.5}
+    result = apply_venue_quotes(
+        [teamless],
+        selected_date="2026-08-29",
+        now=1_000_010.0,
+        collected_by_sport={"mlb": {"quotes": {quote.key: quote}}},
+    )
+    assert result["stamped"] == 0
+    # NOT counted as a cross-game rejection: nothing was rejected, the key was
+    # never built. The two are different facts and the counters keep them apart.
+    assert result["cross_game_rejected"] == 0
+
+
+def test_h2h_is_deliberately_left_unqualified():
+    """h2h keys already name the game IMPLICITLY -- their side is the CLUB.
+
+    A club plays one game a day, so `mlb|h2h|chicago cubs` cannot collide across
+    fixtures the way `mlb|totals|over|7.5` does. Production agreed: all 26
+    shared quotes were totals, while every Polymarket h2h row carried a price
+    unique to its game. Qualifying h2h would add a redundant key to every
+    moneyline row and fix nothing.
+    """
+    keys = _candidate_keys(
+        _row("evt-x", "Colorado Rockies", "Atlanta Braves", market="h2h", side="home", line=None),
+        "mlb",
+    )
+    assert keys[0] == "mlb|h2h|home"
+    assert not any("|@" in k for k in keys), f"h2h gained a game-qualified key: {keys}"

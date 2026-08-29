@@ -23,6 +23,7 @@ from syndicate.features.shared.venue_quote_fanin import (
     NOVIG_PUBLIC_TIER_REFUSAL,
     Quote,
     SourceOutcome,
+    _ROLE_KEYED_MARKETS,
 )
 
 __all__ = [
@@ -32,15 +33,103 @@ __all__ = [
     "oddsapi_outcome",
     "probability_to_american",
     "quote_key",
+    "game_token",
 ]
 
 
-def quote_key(sport: str, market: str, side: str, line: float | None) -> str:
+def quote_key(sport: str, market: str, side: str, line: float | None, game: str | None = None) -> str:
     """The join key. Line is part of it: a spread at -1.5 and the same spread
     at -2.5 are different bets, and collapsing them prices one at the other's
-    number."""
+    number.
+
+    --------------------------------------------------------------------------
+    `#603`: THE GAME IS PART OF IT TOO, AND LEAVING IT OUT PRICED THE WRONG GAME
+    --------------------------------------------------------------------------
+
+    This key used to be `sport|market|side|line` and nothing else. The fan-in
+    resolves it against `quotes_for_sport` -- a pool scoped to the WHOLE SPORT
+    -- so every live MLB game with a 7.5 total asked for the single key
+    `mlb|totals|over|7.5`, and one venue quote answered all of them.
+
+    MEASURED IN PRODUCTION 2026-08-29, board `written_at 21:56:11Z`:
+    **26 of 28 live Polymarket totals quotes were shared across games.**
+
+        over  7.5 @ -400   AZ@SF, COL@ATL, HOU@NYM, SD@TB   (four at once)
+        over  8.5 @ +1233  three games
+        over 10.5 @ -6567  two games
+
+    COL@ATL was 1 run in the 7th, so over 7.5 was worth ~2% (Kalshi quoted
+    0.08). SD@TB was 13 runs, so over 7.5 had ALREADY WON -- 100%. Both carried
+    `-400` (=80%). One price cannot be both, which is what makes this a defect
+    rather than a market. `best_any_book` was `polymarket` on 28 of 28 of those
+    rows, so the cross-game quote was the price the board held up as best.
+
+    `#603` had already measured the same thing from the order side: 6 of 14
+    game-line keys spanned more than one event, 2 more than one segment, across
+    74 real orders.
+
+    THE SAME FIX PROPS ALREADY GOT. `prop_quote_key` exists because every
+    player's row keyed to one player-blind string and "rows that share a key are
+    indistinguishable here: the first wins, and the quote it wins describes a
+    different human." Identical shape, one market family over: a different GAME.
+
+    `game` is OPTIONAL and appended last, so a caller that does not pass one
+    produces exactly the old string. That keeps this additive -- see
+    `venue_quote_fanin._candidate_keys`, which offers the qualified key FIRST
+    and the bare key after it, and the game check in the fan-in's match loop,
+    which is what makes the bare fallback safe rather than a hole.
+    """
     line_part = "" if line is None else f"|{float(line):g}"
-    return f"{str(sport or '').lower()}|{str(market or '').lower()}|{str(side or '').lower()}{line_part}"
+    game_part = "" if not game else f"|@{str(game).lower()}"
+    return (
+        f"{str(sport or '').lower()}|{str(market or '').lower()}"
+        f"|{str(side or '').lower()}{line_part}{game_part}"
+    )
+
+
+def game_token(sport: Any, home: Any, away: Any) -> str | None:
+    """A game's identity as BOTH clubs, order-independent, or None.
+
+    --------------------------------------------------------------------------
+    SORTED, SO HOME/AWAY CONFUSION CANNOT BREAK THE JOIN
+    --------------------------------------------------------------------------
+
+    The two halves of this join disagree about roles constantly -- that is the
+    whole subject of `_candidate_keys`' docstring, and Polymarket's `outcomes`
+    array has already been measured reversed against its own slug. A token that
+    depended on which club is "home" would inherit every one of those
+    arguments. Sorting removes the question: home/away and away/home produce the
+    same token, and the SIDE carries direction, as it already did.
+
+    RESOLVED THROUGH `canonical_team`, THE SAME RESOLVER BOTH HALVES ALREADY
+    USE. `_candidate_keys` says it outright -- "two resolvers is how the halves
+    of a join end up on different vocabularies; one cannot disagree with
+    itself." A raw-string fallback here would rebuild that disagreement, so
+    there is none: **either club unresolvable yields None**, and the caller
+    falls back to the bare key rather than keying on a name only one side would
+    recognise.
+
+    KNOWN RESIDUAL -- DOUBLEHEADERS, and it is NOT closed. Two games between the
+    same clubs on the same date share a token. The pool is already date-scoped
+    (`collect_quotes(sport, selected_date)`), so this narrows the collision from
+    "any game in the sport sharing a line" -- four at once, measured -- to "the
+    two halves of a doubleheader". It is not eliminated because neither venue
+    can distinguish them either: Polymarket's slug carries the date and no game
+    number (`aec-mlb-az-sf-2026-08-29`), so there is no shared vocabulary to key
+    on. The fan-in's game check cannot catch it either, since both halves
+    produce the same token. Recorded rather than papered over -- AZ@SF and
+    BOS@NYY both played doubleheaders on the day this was written.
+    """
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    try:
+        one = canonical_team(sport, home)
+        two = canonical_team(sport, away)
+    except Exception:
+        return None
+    if not one or not two:
+        return None
+    return "+".join(sorted([str(one).strip().lower(), str(two).strip().lower()]))
 
 
 def prop_quote_key(sport: Any, market: Any, player: Any, side: Any, line: float | None) -> str | None:
@@ -626,10 +715,42 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
         if not parsed:
             continue
         market, sides, line = parsed
+        # `#603`. THE SLUG NAMES BOTH CLUBS AND THE KEY WAS THROWING THEM AWAY.
+        #
+        # `parse_slug` returns `away`/`home` -- this venue's own tokens for the
+        # two clubs -- and until now they were used only to pick the league and
+        # then discarded. So every live game sharing a line collapsed onto one
+        # key and one quote answered all of them: measured 2026-08-29,
+        # `over 7.5 @ -400` on FOUR games at once, one worth ~2% and one already
+        # won. See `quote_key`'s docstring for the full reading.
+        #
+        # ONE QUOTE PER SIDE, KEYED QUALIFIED WHERE THE SLUG NAMES BOTH CLUBS.
+        #
+        # The first version emitted TWO -- qualified and bare -- so a board row
+        # that could not name its own teams would still match. That was the
+        # wrong trade and the tests said so: it doubled every count in this
+        # adapter's contract, and the coverage it bought is coverage we should
+        # not want. If the BOARD cannot name the fixture, the fixture cannot be
+        # verified, and matching anyway is exactly the cross-game pricing this
+        # is fixing. Refusing there is the standing rule -- coverage may be
+        # traded for certainty, a price may not.
+        #
+        # Where the slug does NOT name both clubs, the key stays bare and this
+        # adapter behaves exactly as it did. `game` is still carried so the
+        # fan-in can reject a bare-key match that lands on the wrong fixture.
+        # ROLE-KEYED MARKETS ONLY, mirroring `_candidate_keys`. An h2h key
+        # already names the game implicitly (its side is the CLUB), so
+        # qualifying it adds a key nothing asks for. Totals and spreads name
+        # nothing, which is where every one of the 26 shared quotes was.
+        pm_game = (
+            game_token(sport, parsed_slug.get("home"), parsed_slug.get("away"))
+            if market in _ROLE_KEYED_MARKETS
+            else None
+        )
         for side, probability in sides:
             quotes.append(
                 Quote(
-                    key=quote_key(sport, market, side, line),
+                    key=quote_key(sport, market, side, line, pm_game),
                     source="polymarket_us",
                     sport=str(sport or ""),
                     market=market,
@@ -639,6 +760,7 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
                     line=line,
                     fetched_at=fetched_at,
                     venue_ref=str(row.get("slug") or "") or None,
+                    game=pm_game,
                 )
             )
     if not quotes:

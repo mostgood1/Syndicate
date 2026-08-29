@@ -3700,6 +3700,28 @@ caaf-no-orders`). NOT
   re-grepped in the file; `check_lane_invariants.py` exit 0 after.
 - Blocked by: none. No OPEN lane claims `.syndicate/lanes.md` or the markers.
 
+### unknown-submit-balance-evidence-ui — OPEN — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411
+- Goal: the unknown-submit banner shows the BALANCE EVIDENCE, and stops telling
+  the reader that only a human at the venue's screen can settle these. That
+  sentence is now false — `/account/balances` settled the $1.84 case.
+- Files: `syndicate/features/shared/venue_settlement.py`,
+  `syndicate/blueprints/intelligence.py`, `syndicate/templates/portfolio.html`,
+  and their tests. RECLAIMED from `open-bet-live-status` /
+  `portfolio-decision-and-execution`, both of which mark these `released:` under
+  the 2026-08-29 phantom sweep (owning sessions gone).
+- Design constraint: ONE implementation. The page must call the same
+  `_balance_evidence` the worker probe uses, not a reimplementation — an API
+  that silently disagrees with the page it backs is a trap this repo has paid
+  for more than once. Web-safe because it is arithmetic over two artifacts web
+  already reads (`read_balance_history` + the ledger); NO venue call, no
+  credentials, so the second-live-caller incident class is not reopened.
+- Falsification test: a banner rendering a verdict word while the payload's
+  `balance_evidence.verdict` is `unknown` would prove the join wrong.
+- Verification: unit tests over the payload + template, and the banner read on
+  a real unknown submit. NOTE the same limit as the parent lane — no unknown
+  submit currently exists, so the live read waits on the next 503 (watch armed).
+- Blocked by: none. Parent: `unknown-submit-retry-provenance` (CLOSED-VERIFIED).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

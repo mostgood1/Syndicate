@@ -80,7 +80,16 @@ class CandidateKeys(unittest.TestCase):
              "home_team": "Texas Rangers", "away_team": "Chicago White Sox"},
             "mlb",
         )
-        self.assertEqual(keys, ["mlb|totals|over|8.5"])
+        # `#603`: a totals row now ALSO offers a game-qualified key. It gains
+        # no TEAM key -- which is what this test is about -- and the role key
+        # is still first and unchanged.
+        self.assertEqual(
+            keys,
+            [
+                "mlb|totals|over|8.5",
+                "mlb|totals|over|8.5|@chicago white sox+texas rangers",
+            ],
+        )
 
 
 class TheTwoHalvesMeet(unittest.TestCase):

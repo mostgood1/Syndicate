@@ -138,6 +138,16 @@ class Quote:
     # re-deriving it. `venue_ref` is the venue's own identifier -- Kalshi's
     # ticker, Polymarket's slug -- which is what makes an order placeable.
     venue_ref: str | None = None
+    # `#603`. WHICH FIXTURE THIS PRICE IS FOR, as `venue_quote_adapters.
+    # game_token` renders it: both clubs, canonicalised and sorted.
+    #
+    # None means the source could not name the game -- NOT that the game does
+    # not matter. The match loop treats the two differently on purpose: a quote
+    # that names a DIFFERENT fixture is rejected, while a quote that names none
+    # is allowed through exactly as it is today. That asymmetry is deliberate
+    # and is the reason this change cannot regress coverage: it can only ever
+    # remove a match that is provably wrong.
+    game: str | None = None
 
     def age_seconds(self, *, now: float | None = None) -> float:
         return max(0.0, (time.time() if now is None else now) - float(self.fetched_at))
@@ -440,6 +450,10 @@ def apply_venue_quotes(
     by_sport: dict[str, Mapping[str, Any]] = dict(collected_by_sport or {})
     out: list[Mapping[str, Any]] = []
     stamped = 0
+    # `#603`. Matches REFUSED because the quote named a different fixture.
+    # A zero here after the adapters all name their games is the signal that
+    # the cross-game bleed is actually gone; a non-zero one is the fix working.
+    cross_game_rejected = 0
     per_source: dict[str, int] = {}
     per_source_by_sport: dict[str, dict[str, int]] = {}
     wanted_by_sport: dict[str, set[str]] = {}
@@ -473,13 +487,37 @@ def apply_venue_quotes(
         # Every key this sport ASKED FOR, for the overlap counter below.
         wanted_by_sport.setdefault(sport, set()).update(str(k) for k in keys)
         quotes_for_sport = payload.get("quotes") or {}
+        from syndicate.features.shared.venue_quote_adapters import game_token
+
         quote = None
-        key = keys[0]
+        key = keys[0] if keys else None
+        row_game = game_token(sport, row.get("home_team"), row.get("away_team"))
         for candidate in keys:
             found = quotes_for_sport.get(str(candidate))
-            if found is not None:
-                quote, key = found, candidate
-                break
+            if found is None:
+                continue
+            # `#603`. A QUOTE THAT NAMES A DIFFERENT FIXTURE IS NOT THIS ROW'S
+            # PRICE, however well its key matched.
+            #
+            # This is the safety property, and it is deliberately NOT the key
+            # shape. The bare key above still exists so nothing regresses, and
+            # a bare match can still land on another game's quote -- this is
+            # what stops it being used. Measured 2026-08-29: `over 7.5 @ -400`
+            # answered four different games at once, one worth ~2% and one
+            # already decided.
+            #
+            # ASYMMETRIC ON PURPOSE. `quote.game is None` means the SOURCE could
+            # not name the fixture, not that the fixture is irrelevant; those
+            # quotes pass exactly as they do today, so this can only ever remove
+            # a match that is provably wrong. Tightening that to "no game, no
+            # match" is the right end state and belongs with the adapter work
+            # that makes every source name its game -- doing it now would take
+            # coverage to zero on sources that have not been converted.
+            if found.game and row_game and found.game != row_game:
+                cross_game_rejected += 1
+                continue
+            quote, key = found, candidate
+            break
         if quote is None:
             # WHAT THE UNMATCHED KEY ACTUALLY LOOKED LIKE, bounded to a handful.
             #
@@ -527,6 +565,7 @@ def apply_venue_quotes(
         "rows": out,
         "rows_in": len(rows),
         "stamped": stamped,
+        "cross_game_rejected": cross_game_rejected,
         # The number that predicts whether this actually helped. Rows left
         # unstamped keep whatever age they had and will be gated on it.
         "unstamped": len(rows) - stamped,
@@ -571,6 +610,12 @@ _UNMATCHED_SAMPLE_LIMIT = 8
 _OFFERED_SAMPLE_LIMIT = 4
 
 
+# Markets whose SIDE is a role (`over`/`under`, `home`/`away`) rather than a
+# club or a player, so the key names no fixture on its own. `h2h` is
+# deliberately absent -- its side IS the club. See `_candidate_keys`.
+_ROLE_KEYED_MARKETS = {"totals", "totals_alt", "spreads", "spreads_alt"}
+
+
 def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     """Every key shape this row could legitimately be quoted under, in order.
 
@@ -592,6 +637,7 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     itself.
     """
     from syndicate.features.shared.venue_quote_adapters import (
+        game_token,
         prop_quote_key,
         quote_key,
         team_name_tokens,
@@ -625,6 +671,31 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
         # launder someone else's freshness onto it.
         return [keyed] if keyed else []
 
+    # `#603`. A GAME-QUALIFIED KEY, OFFERED ALONGSIDE THE ROLE KEY.
+    #
+    # `quotes_for_sport` is a pool scoped to the WHOLE SPORT, so a key with no
+    # game term makes every fixture sharing a line ask the same question and
+    # take the same answer. Measured on production 2026-08-29: 26 of 28 live
+    # Polymarket totals quotes were shared across games, `over 7.5 @ -400` on
+    # four at once where COL@ATL was worth ~2% and SD@TB had already won.
+    #
+    # THE ROLE KEY STAYS FIRST, and that is deliberate rather than incidental.
+    # The obvious move is to put the more specific key first, and it was written
+    # that way and then reverted: it broke eleven tests, several of which exist
+    # to assert precisely that "the role key is tried FIRST and unchanged, so
+    # every match that worked before still works". Those tests are right, and
+    # ordering buys nothing here anyway -- the match loop REJECTS a quote naming
+    # a different fixture and falls through to the next candidate, so a bare-key
+    # hit on the wrong game lands on the qualified key on the very next
+    # iteration. Same outcome, one fewer invariant broken.
+    #
+    # WHY NOT DROP THE BARE KEY, the way `prop_quote_key` drops the blind one?
+    # A prop key is derived from the row ALONE and either names its player or
+    # does not; this one has to agree with the VENUE's idea of the fixture.
+    # Dropping the fallback before every adapter emits a qualified key would
+    # take venue coverage to zero on sources not yet converted -- today that is
+    # everything except Polymarket. The rejection check gets the safety without
+    # that cliff.
     keys = [quote_key(sport, market, side, line)]
 
     if market == "h2h" and side in {"home", "away"}:
@@ -683,6 +754,34 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
             candidate = quote_key(sport, market, token, None)
             if candidate not in keys:
                 keys.append(candidate)
+
+    # APPENDED LAST, so every index above is exactly where it was. Two sibling
+    # suites assert `keys[1]`/`keys[2]` by position, and they are asserting a
+    # real invariant -- "the role key is tried FIRST and unchanged, so every
+    # match that worked before still works". Inserting ahead of them broke
+    # eleven tests for no behavioural gain, because the match loop REJECTS a
+    # quote naming a different fixture and falls through to the next candidate:
+    # a bare hit on the wrong game lands here on the very next iteration.
+    # ROLE-KEYED MARKETS ONLY -- and that restriction is the finding, not a
+    # convenience.
+    #
+    # An h2h key already names the game IMPLICITLY: `mlb|h2h|chicago cubs`
+    # names a CLUB, and a club plays one game a day, so two fixtures cannot
+    # collide on it. Totals and spreads key by ROLE (`over`/`under`,
+    # `home`/`away`) and name nothing at all, which is why they collide and
+    # h2h does not. That is exactly what production showed on 2026-08-29 --
+    # 26 of 28 shared quotes were TOTALS, while the five Polymarket h2h rows
+    # each carried a price unique to their game.
+    #
+    # So qualifying h2h would add a redundant key to every moneyline row and
+    # change six assertions for no defect fixed. Scoped to where the collision
+    # is real.
+    if market in _ROLE_KEYED_MARKETS:
+        game = game_token(sport, row.get("home_team"), row.get("away_team"))
+        if game:
+            qualified = quote_key(sport, market, side, line, game)
+            if qualified not in keys:
+                keys.append(qualified)
     return keys
 
 

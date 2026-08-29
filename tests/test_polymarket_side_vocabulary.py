@@ -297,7 +297,14 @@ def test_a_total_takes_its_line_from_the_SLUG_when_the_row_has_none(_slate_of):
 
     keys = {q.key for q in adapters.polymarket_us_outcome("mlb", "2026-08-24").quotes}
 
-    assert keys == {"mlb|totals|over|8.5", "mlb|totals|under|8.5"}
+    # `#603`: a totals key now also names the GAME. The slug carries both clubs
+    # (`chc-ari`), so this adapter can state which fixture the price is for --
+    # and must, because `mlb|totals|over|8.5` alone answered FOUR different
+    # games at once in production, one worth ~2% and one already decided.
+    assert keys == {
+        "mlb|totals|over|8.5|@arizona diamondbacks+chicago cubs",
+        "mlb|totals|under|8.5|@arizona diamondbacks+chicago cubs",
+    }
 
 
 def test_a_total_with_NO_line_anywhere_is_refused(_slate_of):
@@ -330,7 +337,14 @@ def test_the_board_rows_that_matched_NOTHING_now_get_priced(_slate_of):
     rows = [
         {"sport": "mlb", "market": "h2h", "side": "home", "line": None,
          "home_team": "Arizona Diamondbacks", "away_team": "Chicago Cubs"},
-        {"sport": "mlb", "market": "totals", "side": "over", "line": 8.5},
+        # CARRIES ITS TEAMS, as every real board row does. `#603` made that
+        # load-bearing: a totals row that cannot name its fixture can no longer
+        # be priced from Polymarket, because the venue's quote is keyed to the
+        # GAME and matching it blind is exactly the cross-game pricing that fix
+        # removes. The refusal is pinned by
+        # `test_a_totals_row_that_cannot_name_its_game_is_not_priced` below.
+        {"sport": "mlb", "market": "totals", "side": "over", "line": 8.5,
+         "home_team": "Arizona Diamondbacks", "away_team": "Chicago Cubs"},
         {"sport": "wnba", "market": "h2h", "side": "away", "line": None,
          "home_team": "Connecticut Sun", "away_team": "Chicago Sky"},
     ]
