@@ -4082,7 +4082,7 @@ caaf-no-orders`). NOT
   `pipeline/layer2_shortlist.py` is named only by a CLOSED lane
   (`ncaaf-compact-card-state`, CLOSED-VERIFIED 2026-08-29).
 
-### score-reliability-resolution — **CLOSED 2026-08-30, MEASURED NOT DEPLOYED** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+### score-reliability-resolution — **CLOSED-VERIFIED 2026-08-30** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
 - Goal met: both RELIABILITY terms in `blended_score` discriminate again over the
   range the board actually occupies. Neither WEIGHT changed — re-weighting is
   still gated on settled rows with CLV decomposed (`settled: 0`) and was not
@@ -4119,9 +4119,19 @@ caaf-no-orders`). NOT
 - Both changes REVERTIBLE WITHOUT A DEPLOY, matching this file's own standard for
   contested constants: `SYNDICATE_SCORE_MOVEMENT_SATURATING=0` restores the clip;
   the freshness rungs are ordinary constants.
-- **NOT DEPLOYED.** Code on `main` is inert until a refresh-worker deploy carries
-  it. The reading this owes when it ships: on the served board, `freshness_factor`
-  no longer 0.25 for ~48% of rows, and `movement_capped` true on materially fewer.
+- **DEPLOYED AND VERIFIED IN PRODUCTION.** `bf21f284` live 04:40:44Z
+  (`dep-da9r7bhsrm7s73d42r0g`); read off the served board `written_at 04:48:24Z`,
+  the first publish after the deploy, with a `written_at` cutoff enforced:
+
+      rows with an age                 513
+      would have been on 0.25 floor    346  (67.4%)
+      now on a NEW rung (0.15 / 0.08)  229
+      histogram  {0.08: 84, 0.15: 145, 0.25: 117, 0.5: 44, 0.75: 55, 1.0: 68}
+      PROMOTED vs old ladder             0   <- hard constraint, in production
+      movement_capped=True              16 of 63 rows with a move
+
+  Six levels where there were four with two-thirds on the bottom. Measurement in
+  `deploys.md`. Deploy claim released.
 - Claims released.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

@@ -38243,3 +38243,44 @@ silently truncated.
 refresh-worker was deployed to `843fadc5` at 03:03Z by this lane and to tip by
 `stale-row-cause-blind-spot`; live-odds-worker is the direct caller of the NCAAF
 capture and is what this deploy carried.
+
+## 2026-08-30 04:37Z — refresh-worker `bf21f284` — scoring reliability terms discriminate again `[lane score-reliability-resolution]`
+
+deploy `dep-da9r7bhsrm7s73d42r0g`, trigger `api`, live **04:40:44Z**. Locks: claim
+held by `score-reliability-resolution`; preflight CLEAR **bound to
+`--target-commit bf21f284`**; 65 min since the prior deploy against a 25 min
+minimum; no MLB sim in flight. No `--allow-rapid`, no `--force`.
+
+**Checked BEFORE deploying, not after:** whether `web` also computes
+`blended_score`, which would have left two surfaces disagreeing. It does not —
+`game_chip_scoreboard.py` only names it in a comment, and the served board
+carries `source: layer2_shortlist_artifact`. Worker computes, web reads, so one
+service needed this and no split-brain exists.
+
+**verify: the freshness ladder must produce rungs that did not exist, AND no row
+may be PROMOTED.** Read from the served board `written_at 04:48:24Z`, the first
+publish after the deploy (a `written_at` cutoff was enforced — an earlier
+verifier this session read a PRE-deploy line and reported FAIL on a working fix):
+
+    rows with an age                 513
+    would have been on 0.25 floor    346   (67.4%)
+    now on a NEW rung (0.15 / 0.08)  229
+    factor histogram   {0.08: 84, 0.15: 145, 0.25: 117, 0.5: 44, 0.75: 55, 1.0: 68}
+    PROMOTED vs old ladder             0   <- the hard constraint, in production
+    rows with a move                  63
+    movement_capped=True              16
+
+Six distinct levels where there were four with two-thirds of the board piled on
+the bottom one. **Zero promoted** is the constraint that mattered: a freshness
+term that RAISED a row would be the inversion `blended_score`'s `min()` exists to
+prevent, and it now holds against real data rather than only fixtures.
+
+**Pre-deploy impact measurement, for comparison** (677 rows, same method):
+movement bound-ties 35/80 -> 21/80, distinct movement values 22 -> 36, rank churn
+top-25 **0/25** and top-50 5/50 — every top-50 departure a `market_gone` soccer
+row aged 8.2-12.5h, every arrival fresher.
+
+**NOT VERIFIED HERE:** whether the re-ranking improves CLV. It cannot be, and
+saying so is the point — `settled` is still 0, no weight was changed, and this is
+a RESOLUTION fix. Reversible without a deploy:
+`SYNDICATE_SCORE_MOVEMENT_SATURATING=0` restores the clip.
