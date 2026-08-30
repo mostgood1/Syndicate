@@ -245,3 +245,75 @@ def test_the_fee_inputs_are_logged_beside_the_charge(capsys):
     assert "COMMISSION " in out
     for field in ("dollars=0.06", "fill_price=0.47", "filled=3.91", "bps='150'"):
         assert field in out, f"{field!r} missing -- the rate cannot be back-derived"
+
+
+# ---------------------------------------------------------------------------
+# `commissionsBasisPoints == 0` IS NOT A CONTRADICTION AND IS NOT "NO FEE".
+#
+# The fee is FLAT PER CONTRACT ($0.015, measured across five fills), so it has
+# no ad-valorem component for a rate field to express. That zero already caused
+# one wrong answer: a sibling lane read it as a free venue and moved MLB
+# break-even 3.38c -> 0.88c, which is the direction that manufactures arbs
+# losing money on every fill.
+# ---------------------------------------------------------------------------
+
+
+def test_a_zero_rate_beside_a_real_collected_total_is_still_a_real_fee():
+    """The exact production shape: bps '0', collected 0.0600."""
+    view = venue_order_view(
+        _filled_order(commissionNotionalTotalCollected="0.0600",
+                      commissionsBasisPoints="0", makerCommissionsBasisPoints="0")
+    )
+    assert view["fees_dollars"] == 0.06, "the zero rate must not suppress the charge"
+
+
+def test_the_flat_per_contract_model_reproduces_the_measured_fills():
+    """0.015/contract, independent of price. If this drifts, the figure carried
+    in `venue_fees` is stale and the arb threshold moves with it."""
+    for contracts, collected in ((18.70, "0.2805"), (3.91, "0.0587"), (2.38, "0.0357")):
+        view = venue_order_view(
+            _filled_order(cumQuantity=str(contracts), avgPx="0.47",
+                          commissionNotionalTotalCollected=collected)
+        )
+        assert abs(view["fees_dollars"] / contracts - 0.015) < 0.0005
+
+
+def test_an_absent_collected_total_is_unknown_NOT_free():
+    """None, never 0.0. "We could not read the fee" and "there is no fee" are
+    opposite facts, and one of them moves a threshold."""
+    order = _filled_order(commissionsBasisPoints="0")
+    del order["commissionNotionalTotalCollected"]
+    assert venue_order_view(order)["fees_dollars"] is None
+
+
+def test_a_rate_that_APPEARS_is_reported_loudly(capsys):
+    """The guard. A non-zero rate means the schedule may have changed under
+    every caller modelling a flat fee."""
+    venue_order_view(_filled_order(commissionsBasisPoints="150"))
+    assert "COMMISSION_RATE_APPEARED" in capsys.readouterr().out
+
+
+def test_a_maker_rate_appearing_also_fires(capsys):
+    venue_order_view(_filled_order(makerCommissionsBasisPoints="25"))
+    assert "COMMISSION_RATE_APPEARED" in capsys.readouterr().out
+
+
+def test_the_guard_does_NOT_fire_on_the_normal_zero(capsys):
+    """Every order observed to date. A guard that fires always is ignored."""
+    venue_order_view(_filled_order(commissionsBasisPoints="0", makerCommissionsBasisPoints="0"))
+    assert "COMMISSION_RATE_APPEARED" not in capsys.readouterr().out
+
+
+def test_an_absent_rate_is_not_treated_as_a_rate(capsys):
+    """Absent is not non-zero -- this venue omits fields freely and a guard that
+    fired on None would cry wolf on every order."""
+    order = _filled_order()
+    order.pop("commissionsBasisPoints", None)
+    venue_order_view(order)
+    assert "COMMISSION_RATE_APPEARED" not in capsys.readouterr().out
+
+
+def test_an_unparseable_rate_is_NOT_dismissed(capsys):
+    """A rate we cannot parse is a rate we cannot dismiss."""
+    venue_order_view(_filled_order(commissionsBasisPoints="tbd"))
+    assert "COMMISSION_RATE_APPEARED" in capsys.readouterr().out

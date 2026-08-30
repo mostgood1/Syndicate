@@ -874,14 +874,45 @@ def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) ->
 
 
 # Polymarket's own name for the commission it has actually taken on an order.
-# NOT a rate -- `commissionsBasisPoints` and `makerCommissionsBasisPoints` are
-# the rates, and deriving dollars from a rate means re-deriving the notional it
-# applies to. The collected total is the venue's arithmetic, so it is the one
-# read.
+#
+# NEVER DERIVE THE FEE FROM `commissionsBasisPoints`. It reads `'0'` on EVERY
+# order this platform has observed, and that zero is not a contradiction of the
+# collected total sitting beside it -- **the fee is FLAT PER CONTRACT, so it has
+# no ad-valorem component for a basis-points field to express.** Measured
+# 2026-08-30 across five fills: $0.015/contract, independent of price
+# (18.70 contracts -> $0.28; 3.91 -> $0.06; 2.38 -> $0.04, i.e. 0.0142-0.0168
+# per contract once cent-rounding is allowed for). Expressed against the $1
+# notional that happens to equal 150 bps, but the venue does not report it that
+# way.
+#
+# THIS EXACT ZERO ALREADY CAUSED ONE WRONG ANSWER. A sibling lane concluded
+# "Polymarket's fee is ZERO" and moved MLB break-even 3.38c -> 0.88c on it --
+# wrong in the direction that manufactures arbs which lose on every fill.
+# `bps == 0` is evidence of the fee's SHAPE, never of its ABSENCE.
+#
+# So the collected total is the only field read here, and an absent one yields
+# None (unknown), never 0.0 (free).
 _COMMISSION_FIELDS = (
     "commissionNotionalTotalCollected",
     "commission_notional_total_collected",
 )
+
+
+def _nonzero_bps(value: Any) -> bool:
+    """True only for a basis-points figure that is present AND not zero.
+
+    Absent is NOT non-zero: this venue omits fields freely, and a guard that
+    fired on `None` would cry wolf on every order. `"0"`, `0`, `0.0` and `""`
+    all mean "no rate reported", which is the state every observation so far
+    has been in.
+    """
+    if value in (None, ""):
+        return False
+    try:
+        return float(value) != 0.0
+    except (TypeError, ValueError):
+        # A rate we cannot parse is a rate we cannot dismiss.
+        return True
 
 
 def _commission_dollars(
@@ -967,6 +998,24 @@ def _commission_dollars(
     # NOT CIRCULAR, and that has to be true or the calibration is worthless:
     # every value here comes off the venue's order read. Nothing in this repo
     # computes a Polymarket fee -- which is exactly why it was null.
+    # THE ASSUMPTION, GUARDED. Every observation so far says the charge is flat
+    # per contract and `commissionsBasisPoints` is 0. If the venue ever reports
+    # a non-zero rate, that assumption has changed underneath every caller that
+    # models the fee, and the flat $0.015/contract figure in `venue_fees` stops
+    # being safe. Say so loudly once rather than let a silent schedule change
+    # be discovered by a losing position.
+    _bps = order.get("commissionsBasisPoints")
+    _maker_bps = order.get("makerCommissionsBasisPoints")
+    if _nonzero_bps(_bps) or _nonzero_bps(_maker_bps):
+        print(
+            f"[polymarket_us_orders] COMMISSION_RATE_APPEARED"
+            f" order={order.get('id') or order.get('orderId')}"
+            f" bps={_bps!r} maker_bps={_maker_bps!r} collected={raw!r}"
+            " -- this venue has always reported 0 here and the fee was modelled"
+            " as FLAT per contract. A non-zero rate means the fee schedule may"
+            " have changed; re-measure before trusting any modelled fee.",
+            flush=True,
+        )
     print(
         f"[polymarket_us_orders] COMMISSION order={order.get('id') or order.get('orderId')}"
         f" slug={order.get('marketSlug')!r} raw={raw!r} dollars={fee!r}"
