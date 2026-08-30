@@ -1571,36 +1571,22 @@ def _append_mlb_book_quotes(date_str: str, rows: list[dict[str, Any]]) -> dict[s
 
 
 def _game_line_regions(regions: str) -> str:
-    """Regions for the GAME-LINE call only, from the base list plus S0b's extras.
+    """Extra OddsAPI regions on GAME-LINE calls only.
 
-    THE SPLIT IS A BILLING FACT, NOT A PREFERENCE. OddsAPI bills game lines
-    per REQUEST and player props per EVENT, and measured on production
-    2026-08-07 the per-event families (props + segment + alternate) are
-    **95.5% of all credits**. So a region added to the game-line call costs
-    roughly 30K/month, while the same region added to the prop calls costs
-    ~1M. Wiring both through one flat `regions` string is what made the plan's
-    "eu and us_ex on game lines only" inexpressible.
+    **MOVED to `syndicate/features/shared/odds_regions.py` on 2026-08-29** so
+    NCAAF could use the same mechanism instead of a second copy of it. The full
+    reasoning -- why game lines and props are separate knobs (a billing fact:
+    per-request vs per-event, and the per-event families are 95.5% of credits),
+    and why extras can never silently drop `us` -- now lives there.
 
-    Configured by `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` as EXTRAS, not a
-    replacement: the base `regions` is always kept, so a misconfigured value
-    can widen coverage but can never silently drop `us`. Unset (the default) is
-    exactly today's behaviour, which is why this can ship before the env var
-    exists anywhere.
-
-    Order-preserving dedupe so `us` stays first and a region named twice is
-    not billed twice.
+    Kept as a thin alias rather than deleted: this name is the one
+    `tests/test_game_line_regions.py` exercises and the one the call site below
+    reads, and a rename would have made a pure move look like a behaviour
+    change in the diff of a live capture path.
     """
-    extra = str(os.environ.get("SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS") or "").strip()
-    if not extra:
-        return regions
-    seen: set[str] = set()
-    merged: list[str] = []
-    for candidate in list(str(regions or "").split(",")) + list(extra.split(",")):
-        name = candidate.strip().lower()
-        if name and name not in seen:
-            seen.add(name)
-            merged.append(name)
-    return ",".join(merged) or regions
+    from syndicate.features.shared.odds_regions import game_line_regions
+
+    return game_line_regions(regions)
 
 
 def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = None, overwrite: bool = True, regions: str = "us", bookmakers: str | None = None, hitter_markets: list[str] | None = None) -> dict[str, Any]:

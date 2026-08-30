@@ -436,3 +436,68 @@ def test_total_lines_are_never_signed():
     assert _line_for_side(50.5, "over", "totals") == "50.5"
     assert _line_for_side(50.5, "under", "totals") == "50.5"
     assert _line_for_side(None, "over", "totals") == "-"
+
+
+# ------------------------------------- the region knob actually reaches NCAAF
+
+
+def test_ncaaf_game_lines_reach_the_shared_region_knob(monkeypatch):
+    """REACHABILITY. `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` had ONE reader --
+    the MLB fetcher -- so setting it for NCAAF was inert: present in the
+    environment, read by nothing, and the sharps never appeared.
+
+    Asserts the REQUEST, not the config: the value has to land in the `regions`
+    parameter of the call NCAAF actually makes.
+    """
+    import scripts.fetch_ncaaf_oddsapi_game_lines as fetcher
+
+    monkeypatch.setenv("SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS", "us_ex,eu")
+    captured: dict = {}
+
+    class _Response:
+        url = "https://example.invalid/odds"
+        status_code = 200
+        headers: dict = {}
+
+        def json(self):
+            return []
+
+        def raise_for_status(self):
+            return None
+
+    def _get(url, params=None, timeout=None):
+        captured["params"] = params or {}
+        return _Response()
+
+    monkeypatch.setattr(fetcher.requests, "get", _get)
+    try:
+        fetcher.fetch_events("KEY", region="us")
+    except Exception:
+        # The call may fail downstream of the request; the request is the claim.
+        pass
+
+    assert captured, "no request was made"
+    regions = captured["params"].get("regions", "")
+    assert regions.split(",")[0] == "us", "extras must widen, never replace `us`"
+    assert "us_ex" in regions, f"us_ex never reached the request: {regions!r}"
+    assert "eu" in regions, f"eu never reached the request: {regions!r}"
+
+
+def test_region_extras_never_drop_the_base(monkeypatch):
+    from syndicate.features.shared.odds_regions import game_line_regions
+
+    assert game_line_regions("us", env={}) == "us"
+    assert game_line_regions("us", env={"SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS": "eu"}) == "us,eu"
+    # A region named twice is not billed twice, and order is preserved.
+    assert (
+        game_line_regions("us,eu", env={"SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS": "eu,us_ex"})
+        == "us,eu,us_ex"
+    )
+
+
+def test_mlb_and_ncaaf_share_one_region_owner():
+    """Two copies of this rule would drift, and the drift is a billing change."""
+    import scripts.fetch_mlb_oddsapi_local as mlb
+    from syndicate.features.shared.odds_regions import game_line_regions
+
+    assert mlb._game_line_regions("us,us2") == game_line_regions("us,us2")

@@ -110,6 +110,9 @@ def _market_map() -> dict[str, tuple[str, str]]:
     return full_game_market_keys(("h2h", "spreads", "totals"))
 
 
+from syndicate.features.shared.odds_regions import game_line_regions
+
+
 def fetch_events(
     api_key: str,
     *,
@@ -119,11 +122,24 @@ def fetch_events(
     timeout: int = 25,
 ) -> list[dict[str, Any]]:
     markets = ",".join(sorted(_market_map().keys()))
+    # EXTRA REGIONS ON GAME LINES, the same knob and the same one owner MLB
+    # uses (`shared/odds_regions.py`). This call is the reason the knob had to
+    # be shared rather than copied: `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` had
+    # exactly ONE reader -- the MLB fetcher -- so setting it for NCAAF would
+    # have been read by nothing and the sharps would not have appeared, while
+    # the variable sat in the environment looking configured.
+    #
+    # SAFE BY CONSTRUCTION: extras widen, never replace, so an unset or
+    # misconfigured value leaves this exactly as it was (`us`). This is a
+    # GAME-LINE call and OddsAPI bills those per REQUEST -- 3 credits per region
+    # on the whole NCAAF slate -- which is why it is affordable here and is
+    # deliberately NOT applied to the per-event prop capture.
+    regions = game_line_regions(region)
     response = requests.get(
         f"{_base_url()}/sports/{sport_key}/odds",
         params={
             "apiKey": api_key,
-            "regions": region,
+            "regions": regions,
             "markets": markets,
             "oddsFormat": odds_format,
         },
