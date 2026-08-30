@@ -7782,7 +7782,25 @@ That is the next reading.
   positional answer; the discriminating case needs `yes_leg_index=1`.
 - props: refused BY DESIGN in `polymarket_board_join.py` — a prop priced by a
   guessed player token is a real order on the wrong person.
-- spreads: TRACED 2026-08-30. NOT a coverage gap and NOT the team-mapping gate.
+- spreads: NOT ESTABLISHED. My earlier "the join never matches them" is WITHDRAWN
+  -- it rested on ONE fixture that had already left the slate.
+  KC@CLE started 18:40Z. Its TOTALS resolved fine at 19:05/19:10/19:17Z, and the
+  spread `no_venue_ticker` drops are all 19:33-20:24Z, i.e. AFTER it aged out.
+  Confirmed 21:15Z: `?slug=kc-cle` now returns `matched=0` for spreads AND for
+  totals AND for h2h -- the whole fixture is gone, so a zero there says nothing
+  about spread coverage. The TOTALS control is what caught this; without it the
+  zero reads as "the venue lists no spread".
+  A game that has started dropping out of the slate is CORRECT behaviour, so
+  there may be no spread defect at all.
+  WHAT IS ESTABLISHED: the venue carries orderable, correctly-signed MLB spreads
+  for LIVE fixtures -- `asc-mlb-lad-det-2026-08-30-neg-1pt5 line=-1.5
+  orderable=true`, plus pos-1pt5/neg-2pt5/pos-2pt5 (`?slug=lad-det` -> matched=4,
+  which also proves the filter works).
+  TO SETTLE IT: catch a board spread row and a live venue fixture at the SAME
+  moment. No Polymarket-scoped spread reached ORDER_PATH in the 90 min to 21:10Z,
+  so it could not be tested then. The tooling now exists and is verified.
+  (Superseded detail below is kept only for the join mechanics it records.)
+- spreads, ORIGINAL TRACE (mechanics still valid, CONCLUSION withdrawn):
   The venue carries 200 `mlb|spreads` (1,900 spreads overall, from
   `/api/ops/polymarket/slate`). Spreads DO reach `ORDER_PATH` -- 9 times in 12h,
   correcting an earlier "zero" that came from a 6-tick window -- and every one is
