@@ -7783,3 +7783,24 @@ deploy — see `handoff_2026-08-30_order_state_logging.md`.
 refuses `team_side_not_in_outcomes` (e.g. `atc-mls-stl-dal`). This is why the
 YES-leg fix has had no chance to run and must NOT be read as inert.
 
+**THE `commence_time` DUPLICATE DEFECT IS FIXED AND LIVE** (`165c448f`, both
+workers, 2026-08-30 18:50Z). `commence_time` left `_POSITION_IDENTITY_FIELDS`:
+ANY restatement — verified down to ONE SECOND — minted a new `position_key`, and
+`idempotency_key` hangs off it, so the duplicate guard was never consulted. Two
+pairs resulted. `HOU@NYY` h2h FILLED AND LOST (`pnl -3.41` and `-0.78`);
+`LAD@DET` totals 7.5 EXPIRED UNFILLED and cost nothing (user-confirmed on the
+venue screen). **Measured cost of the defect: $0.78.** Two is a FLOOR — the scan
+only sees pairs where both legs survive sharing an `opening_key`.
+
+A dual-key migration guard (`legacy_position_key` / `_legacy_idempotency_key`)
+stops the fix re-placing the open book, since changing the key formula changes
+every open order's identity at once. **Its behavioural proof is still OWED**:
+`LEGACY_KEY_MATCH` must fire on a plan REBUILD. `placed=0 duplicates=N` is NOT
+proof — that exact reading appeared at 18:41Z while the guard was inert.
+
+**`polymarket_us_orders.cancel_order` now EXISTS** (`3170db13`) — dry-run by
+default, reads before writing, refuses on a wrong-leg mismatch. Never fired in
+anger; its route (`DELETE /v1/order/{id}`) is a convention guess and the first
+real call is the probe. **Not wired into any automatic path**, because Kalshi's
+equivalent rests on "cancelling costs nothing at Kalshi" and nobody has
+established that for Polymarket.

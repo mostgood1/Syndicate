@@ -38958,3 +38958,47 @@ market=h2h price=257.0 stake=4.43`.
 - **The open question, unowned:** orders rest because we bid the quote exactly
   and never re-price or cancel, and the slate carries no bid/ask at all.
 
+## 2026-08-30 ~19:0xZ — the resting duplicate EXPIRED UNFILLED. Closed, nothing owed
+
+**Reported by the USER from Polymarket's own Orders screen** — the only route
+available, since `POLYMARKET_US_API_KEY_ID`/`PRIVATE_KEY` are absent from this
+machine and from the `syndicate` web service (they live on live-odds-worker and
+refresh-worker).
+
+    tsc-mlb-lad-det-2026-08-30-7pt5  under 7.5
+      C6H7WE0DPKDJ  $4.06  16:42:22Z   original    -> EXPIRED UNFILLED
+      C6HN0XD92KDE  $5.44  17:19:26Z   duplicate   -> EXPIRED UNFILLED
+
+First pitch was 18:11Z; both legs aged out unfilled. **No cancellation was
+needed and none was made.** Consistent with the earlier live read
+(`open_orders_dollars: 0.0`, the only `resting` row a different market).
+
+### WHAT THIS DOES AND DOES NOT CHANGE
+
+**The measured cost of the `commence_time` identity defect stays at $0.78** —
+the `HOU@NYY` pair (`pnl -3.41` and `-0.78`), which FILLED. This second pair was
+exposure that did not land.
+
+**It is not evidence the defect is cheap.** Two known pairs, one filled and one
+expired, is a 50% realisation rate on a sample of two, and the scan that found
+them only sees pairs where BOTH legs survive in the book sharing an
+`opening_key` — a floor, not a count. The right reading is that this instance
+cost nothing, not that the mechanism costs little.
+
+**The fix is live on both workers (`165c448f`)**, so no further pair can be
+minted by a restated start time. The `LEGACY_KEY_MATCH` behavioural proof
+remains OWED — see the entry above; the morning task checks it.
+
+### The cancel adapter was still worth building
+
+`3170db13` shipped `polymarket_us_orders.cancel_order` — dry-run by default,
+read-before-write, refusing on a wrong-leg expectation mismatch or a failed
+read. It did not retire this pair (expiry did) and it has never been fired in
+anger. It closes the gap that made this incident a manual hunt: Kalshi had a
+cancel path and Polymarket had none.
+
+**Its precondition is unmeasured and recorded as such:** wiring it into an
+automatic path like `_cancel_stale_resting` needs someone to establish that
+cancelling costs nothing at Polymarket. That is the load-bearing assumption in
+Kalshi's version, and this venue's fee model was falsified at low prices the
+same day.
