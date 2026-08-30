@@ -6480,3 +6480,45 @@ was editing.**
   diagnosis that named the wrong cause. No money path affected — the adapters
   only qualify keys when handed a schedule, and the grid path passed none, so
   the inert version could not regress coverage either.
+
+
+## 2026-08-30 — FORBIDDEN: an exact-count assertion over a pipeline that has an unmocked ADDITIVE source. It measures the machine, not the code
+
+- **What we believed:** that `assertEqual(len(rows), 1)` tested "when the
+  betting card is empty, the top-props source is used". It had been green in CI
+  for as long as anyone had looked.
+- **What was actually true:** `pregame_props` ends
+  `return list(mlb_rows) + hr_target_rows` — HR targets are appended WHATEVER
+  the fallback chain did. The test patched the two FALLBACK sources and left the
+  ADDITIVE one live, so the count was really "1 + however many HR targets this
+  machine has". Measured: **1 on a checkout with no MLB data, 11 on a populated
+  mirror.** Row[0] was the patched row in both cases — the property under test
+  was never broken. Only the count was environment-dependent.
+- **The same shape one file over, and worse:** `test_artifact_publisher`
+  asserted 7 repair requests. A PATH RESOLVER (`daily_artifact_path` ->
+  `_resolve_data_path_with_reconcile` -> `shutil.copy2`) wrote **2.46MB into a
+  fresh tempdir** as a side effect of being asked which paths are required, so
+  two artifacts stopped looking missing and the count fell to 5.
+
+**How to apply:**
+- Assert the PROPERTY, not the population size, unless every contributor is
+  stubbed. `rows[0]["name"] == "MLB top prop"` is the claim; `len(rows) == 1`
+  smuggles in "and nothing else contributes", which is a statement about the
+  machine.
+- Before stubbing "the source", read the function to the RETURN. A fallback
+  chain that ends in a `+` has a contributor no `if not rows:` branch reveals.
+- **Treat a resolver that can WRITE as a mutation, not a lookup.** Nothing in
+  the name `daily_artifact_path` suggests 2.46MB of I/O, and the caller
+  explicitly wanted to judge presence on the runtime disk.
+- Environment isolation is NOT the universal fix and reaching for it first cost
+  me four attempts here: `SYNDICATE_DATA_ROOT`, `_MLB_SOURCE_ROOT`,
+  `_REPORTS_ROOT`, `_ARTIFACT_ROOT_MLB` all failed because the leak was an
+  unmocked call, and for the publisher because `_artifact_roots()` appends the
+  repo path with no env over it. Find the contributor first.
+- Verify a test fix in BOTH directions — the tree where it failed AND a clean
+  worktree at `origin/main` where it passed. A fix that only makes the red tree
+  green is indistinguishable from weakening the assertion.
+- **A fix that makes things worse must be reverted, not defended.** Mocking
+  `deploy_claim.active_claim` to None to stop six live-state failures produced
+  eight. Reverted; the finding is logged unfixed. Related:
+  [[feedback-rebaseline-before-judging]].

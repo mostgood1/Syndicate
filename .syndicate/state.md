@@ -149,6 +149,22 @@ they corroborate nothing and the rate rests on the collected total alone. Only
 **5 of 73** filled Polymarket rows carry a fee (reconciliation re-reads open
 candidates; the 68 settled earlier are NOT backfilled), all from one evening.
 
+**A PATH RESOLVER WRITES 2.46MB AND SUPPRESSES THE ARTIFACT REPAIR**
+`[2026-08-29, MEASURED]`. `artifact_publisher._required_daily_artifact_paths`
+— which only asks WHICH artifacts are required — reaches
+`mlb.sources.daily_artifact_path` → `_resolve_data_path_with_reconcile` →
+`shutil.copy2` (`mlb/sources.py:116`), hydrating from the repo's git-tracked
+`data/mlb_source`. On a FRESH tempdir: 0 files before the call, 2 after
+(2,458,484 B + 186,623 B). The copies then look present, so
+`_missing_required_artifact_relative_paths` requests 5 repairs instead of 7 —
+defeating, from underneath, its own rule that presence is judged "ON THE
+RUNTIME DISK, never at whatever path the helper returned".
+Live wherever `SYNDICATE_DATA_ROOT` is set (always, on Render), and
+`_artifact_roots()` appends the repo path with NO env override.
+**NOT SHOWN TO SERVE STALE DATA — an mtime/size `should_copy` guard exists.**
+The proven claim is only that the REPAIR is suppressed. Lane
+`mlb-resolver-write-side-effect`; nothing on the data path was changed.
+
 **AND THE BANNER NOW SAYS SO** `[2026-08-29 23:24Z, web `3371ad96`]`. The
 unknown-submit block on `/portfolio` used to state that only a person opening
 the venue's own screen could settle one of these; that sentence and "nothing

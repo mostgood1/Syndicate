@@ -3723,39 +3723,37 @@ caaf-no-orders`). NOT
 
 ### mlb-resolver-write-side-effect — OPEN — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411 — **UNOWNED, handed off**
 - **A PATH RESOLVER WRITES 2.46MB AND SUPPRESSES THE REPAIR THAT WOULD FETCH
-  THE REAL FILE.** Not a test artifact — measured on a FRESH tempdir, 0 files
-  before and 2 after, from a call that only asks WHICH artifacts are required.
+  THE REAL FILE.** Measured on a FRESH tempdir: 0 files before, 2 after, from a
+  call that only asks WHICH artifacts are required.
 - Chain: `artifact_publisher._required_daily_artifact_paths` →
-  `mlb.sources.daily_artifact_path` → `_resolve_data_path_with_reconcile`
-  (`sources.py:80`) → `shutil.copy2(candidate, target)` at `sources.py:116`,
-  hydrating from the repo's git-tracked `data/mlb_source` into the configured
-  root. `_missing_required_artifact_relative_paths` then sees the two
-  `daily_summary_*` files as present and DOES NOT request them: 5 repairs
-  instead of 7.
-- Why it matters: that function's own comment says presence must be judged
-  "ON THE RUNTIME DISK, never at whatever path the helper returned — asking
-  'does the repo have a copy' answers a question nobody asked." The reconcile
-  copy turns the repo's copy INTO the runtime disk's copy, defeating the guard
-  from the layer beneath it. This is the hazard CLAUDE.md's "Render is the
-  source of truth / data in git is a lossy mirror" section exists for.
-- ACTIVE IN PRODUCTION: `_reconcile_from_repo_enabled()` is just
-  `bool(SYNDICATE_DATA_ROOT)`, always set on Render. `_artifact_roots()` appends
-  the repo's `data/mlb_source` UNCONDITIONALLY — no env var overrides it — so a
-  candidate always exists and `len(roots) > 1` always holds.
-- **NOT YET SHOWN TO SERVE STALE DATA.** There IS an mtime/size `should_copy`
-  guard (`sources.py:99-113`). The proven claim is narrow: the required-artifact
-  REPAIR can be suppressed by a git-tracked mirror copy. Whether a stale copy
-  has ever won on a live worker is UNMEASURED and is the first thing to check.
+  `mlb.sources.daily_artifact_path` → `_resolve_data_path_with_reconcile` →
+  `shutil.copy2` (`mlb/sources.py:116`). The copies then look present, so
+  `_missing_required_artifact_relative_paths` asks for 5 repairs, not 7.
+- That function's own comment requires presence be judged "ON THE RUNTIME DISK,
+  never at whatever path the helper returned". The copy turns the repo's copy
+  INTO the runtime disk's copy, defeating the guard from underneath.
+- ACTIVE IN PROD: `_reconcile_from_repo_enabled()` is `bool(SYNDICATE_DATA_ROOT)`,
+  always set on Render; `_artifact_roots()` appends the repo path with NO env
+  override (measured: 4 roots even with `SYNDICATE_MLB_SOURCE_ROOT` pinned).
+- **SCOPE OF THE CLAIM: the REPAIR is suppressed. Stale data being SERVED is
+  NOT shown** — an mtime/size `should_copy` guard exists (`sources.py:99-113`).
+  First thing to check, and the falsification test: if `should_copy` never
+  fires on a worker, this is test-hygiene only.
 - Files: `syndicate/features/mlb/sources.py`,
-  `syndicate/features/shared/artifact_publisher.py`. NOT CLAIMED — nothing is
-  held, so a lane picking this up should claim them.
-- Falsification test: if `should_copy` never fires on a Render worker (compare
-  mtimes of the deploy checkout's `data/mlb_source` against the mounted disk),
-  the production impact is nil and this is test-hygiene only.
-- Verification: a worker-side reading that `_missing_required_artifact_relative_paths`
-  returns the full required set on a real tick.
-- Deliberately NOT fixed on discovery: it changes data-hydration behaviour on a
-  live path, mid-slate. `[user 2026-08-29: fix the tests, open a lane for this]`
+  `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED** — a lane
+  picking this up should claim them.
+- Verification wanted: a worker-side reading that
+  `_missing_required_artifact_relative_paths` returns the full required set.
+- Status: FINDING ONLY, nothing changed on the data path. The two TESTS this
+  surfaced through are fixed and green in both trees (`beaf5533`); they now
+  patch the reconcile gate rather than depend on it.
+- Deliberately not fixed on discovery: changes data hydration on a live path,
+  mid-slate. `[user 2026-08-29: fix the tests, open a lane for this]`
+- ALSO OPEN, same family, NOT fixed: `test_deploy_preflight.TooSoonVerdictTests`
+  (6 tests) read the LIVE shared deploy claim via `deploy_claim.active_claim`
+  and fail whenever any session holds one. Mocking it to None made it WORSE
+  (6 → 8 failures) and was reverted — needs someone who knows what those tests
+  expect from the claim.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
