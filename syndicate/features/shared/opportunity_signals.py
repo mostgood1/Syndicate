@@ -356,6 +356,24 @@ def _env_float(name: str, default: float) -> float:
     return parsed
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    """Same contract as `_env_float`: an UNRECOGNISED value falls back to the
+    default rather than to False.
+
+    Deliberately not `bool(os.environ.get(name))`, which reads the string
+    `"false"` as True -- the exact shape of the `SYNDICATE_REFRESH_STATE_BACKEND`
+    incident this module's sibling helper already cites, where a value that
+    parsed but meant something else was worse than one that failed loudly."""
+    import os as _os
+
+    raw = str(_os.environ.get(name) or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
 # Blended-score weights (#243). PROVISIONAL, and labelled as such on purpose:
 # nothing here is measured yet. #213 records the quote struck at bet time and
 # #214 derives closes, so the honest way to set these is to compare each
@@ -495,11 +513,85 @@ _MODEL_EDGE_MAX_POINTS_HINT = 15.0
 # rows, with CLV decomposed by component, so "did the moved rows actually win"
 # is a measurement rather than a preference. Until then the cap is doing the
 # work, not the weight.
-_SCORE_MOVEMENT_WEIGHT = 0.05     # per American-odds point of same-book move
-_SCORE_MOVEMENT_CAP_PCT = 1.0     # hard bound on the contribution, in EV points
+_SCORE_MOVEMENT_WEIGHT = _env_float("SYNDICATE_SCORE_MOVEMENT_WEIGHT", 0.05)
+_SCORE_MOVEMENT_CAP_PCT = _env_float("SYNDICATE_SCORE_MOVEMENT_CAP_PCT", 1.0)
+
+# THE CAP BOUND THE CONTRIBUTION AND DESTROYED THE SIGNAL'S RESOLUTION, which
+# are different jobs and only the first one was wanted.
+#
+# `clip(0.05 * d, +/-1.0)` saturates at **20 American-odds points**. Measured on
+# the served board 2026-08-30, 1,261 rows: 35 carry a move and **18 of them are
+# at or past saturation**, so these all contributed an identical 1.0 --
+#
+#     25 30 40 40 40 45 50 55 60 100 130 150 175 240 245 250 490 2000
+#
+# A 25-point drift and a 2000-point collapse are not the same event, and 20
+# points is a routine move rather than an extreme one. The cap was binding in
+# the middle of the distribution instead of at its tail.
+#
+# THE FIX IS THE SHAPE, NOT THE WEIGHT. `_SCORE_MOVEMENT_WEIGHT` is unchanged
+# and is NOT this lane's to change: re-weighting is gated on settled rows with
+# CLV decomposed by component, which still does not exist (`settled: 0`). What
+# changes is how the contribution approaches the SAME bound:
+#
+#     contribution = cap * (1 - exp(-weight * |d| / cap))      * sign(d)
+#
+# Three properties, each load-bearing and each pinned by a test:
+#
+#   1. SLOPE AT THE ORIGIN IS EXACTLY `weight`. d(contribution)/d|d| at 0 is
+#      `weight`, so small moves are scored as they always were -- 5 points gives
+#      0.221 against the old 0.250. This is why it is a resolution fix and not a
+#      re-tune: the region the old curve got RIGHT is preserved.
+#   2. IT NEVER EXCEEDS THE CAP. `1 - exp(-x) < 1` for all finite x, so the
+#      hard bound the cap exists to provide is at least as strong as before.
+#      **In FLOAT it does reach the cap exactly**, at |d| of roughly 2000 and up,
+#      where `exp(-100)` rounds to 0 — measured, not assumed: 500 -> 0.9999999999,
+#      2000 -> exactly 1.0. That is harmless (the bound holds, which is the
+#      safety property) but the earlier wording here said "never reaches", which
+#      was true of the algebra and false of the arithmetic. Domination stays
+#      structurally impossible either way.
+#   3. IT IS STRICTLY MONOTONE. Every larger move scores higher than every
+#      smaller one, forever. That is the property `clip` destroyed past 20.
+#
+# What it buys, on the same 18 rows: 25 -> 0.713, 40 -> 0.865, 60 -> 0.950,
+# 100 -> 0.993. Ties at the cap fall from 18 to 0, and the rows that still
+# cluster are the ones genuinely in the tail (>150), where a bounded term SHOULD
+# flatten. Flattening at 150 is the cap doing its job; flattening at 20 was not.
+_SCORE_MOVEMENT_SATURATING = _env_bool("SYNDICATE_SCORE_MOVEMENT_SATURATING", default=True)
 
 _SCORE_BOOK_CONFIDENCE = ((1, 0.5), (2, 0.7), (4, 0.85))   # books quoting -> factor
-_SCORE_FRESHNESS = ((300, 1.0), (1800, 0.9), (3600, 0.75), (10800, 0.5))  # seconds -> factor
+# THE LADDER RAN OUT AT THREE HOURS AND THE BOARD DID NOT.
+#
+# The first four rungs are unchanged. What follows them used to be a single
+# `return 0.25` for everything past 10,800s, which made a 3h01m price and a
+# 12.4h price rank IDENTICALLY -- and measured on the served board 2026-08-30,
+# **95 of 200 rows (47.5%) sat on that floor**. Nearly half the board was
+# ordered by a term that had stopped varying.
+#
+# The middle rungs are nearly empty for a reason worth stating, because it is
+# why extending the ladder is the right fix rather than re-spacing it: only 3 of
+# 200 rows land in the whole 300-1800s band. The board is BIMODAL -- exchange
+# quotes at seconds (30 rows at the full 1.0) and sportsbook quotes past three
+# hours -- so the resolution is needed at the STALE end, which is exactly where
+# the ladder stopped.
+#
+# MONOTONE NON-INCREASING AGAINST THE OLD VALUES, and this is a hard constraint
+# rather than a preference: every age now scores the same as before or LOWER,
+# never higher. 3-6h keeps 0.25 exactly; only 6h+ is pushed down. A freshness
+# term that PROMOTED a row would be the same inversion `blended_score`'s `min()`
+# exists to prevent -- a discount that can raise a score is not a discount.
+#
+#     age        before   after
+#     <= 5min      1.00    1.00
+#     <= 30min     0.90    0.90
+#     <= 1h        0.75    0.75
+#     <= 3h        0.50    0.50
+#     <= 6h        0.25    0.25     unchanged -- no row is promoted
+#     <= 12h       0.25    0.15
+#     >  12h       0.25    0.08
+_SCORE_FRESHNESS = (
+    (300, 1.0), (1800, 0.9), (3600, 0.75), (10800, 0.5), (21600, 0.25), (43200, 0.15),
+)  # seconds -> factor
 
 # EV% IS NOT COMPARABLE ACROSS PRICE LEVELS, and ranking on it alone put a
 # 60-to-1 longshot at the top of the board.
@@ -582,7 +674,40 @@ def _freshness_factor(book_age_seconds: Any, seen_age_seconds: Any = None) -> fl
     for threshold, factor in _SCORE_FRESHNESS:
         if age <= threshold:
             return factor
-    return 0.25
+    # Past the last rung (12h). Was 0.25 for EVERYTHING over three hours, which
+    # is what made half the board tie; see the table above _SCORE_FRESHNESS.
+    return 0.08
+
+
+def _movement_contribution(move: float) -> float:
+    """Movement in American-odds points -> its bounded contribution in EV points.
+
+    See the block above `_SCORE_MOVEMENT_SATURATING` for why this is a curve and
+    not `clip(weight * move, +/-cap)`. In one line: the clip saturated at 20
+    points, which is a routine move, so 18 of 35 live rows tied at the bound.
+
+        cap * (1 - exp(-weight * |d| / cap))     slope `weight` at 0,
+                                                 strictly monotone,
+                                                 strictly less than `cap`
+
+    The legacy clip stays reachable behind `SYNDICATE_SCORE_MOVEMENT_SATURATING=0`
+    so this is revertible without a deploy -- the same standard the file already
+    applies to `_SCORE_SIM_WEIGHT`, and the only reason changing a contested
+    scoring constant is defensible at all.
+    """
+    cap = _SCORE_MOVEMENT_CAP_PCT
+    weight = _SCORE_MOVEMENT_WEIGHT
+    if not _SCORE_MOVEMENT_SATURATING:
+        return max(-cap, min(cap, weight * move))
+    if cap <= 0 or weight <= 0:
+        # Degenerate config: fall back to the clip rather than dividing by zero.
+        # An operator who zeroes the cap means "no movement term", and that is
+        # what the clip gives.
+        return max(-cap, min(cap, weight * move))
+    import math as _math
+
+    magnitude = cap * (1.0 - _math.exp(-weight * abs(move) / cap))
+    return magnitude if move > 0 else -magnitude
 
 
 def _price_reliability(price: Any, fair_prob: Any) -> float:
@@ -645,8 +770,7 @@ def blended_score(
     move = _as_float(movement_price_delta)
     value_move = 0.0
     if move:
-        raw = _SCORE_MOVEMENT_WEIGHT * move
-        value_move = max(-_SCORE_MOVEMENT_CAP_PCT, min(_SCORE_MOVEMENT_CAP_PCT, raw))
+        value_move = _movement_contribution(move)
     # The sim term is CAPPED, not merely weighted -- see `_SCORE_SIM_CAP_PCT`.
     # A bare weight scales with the edge, so a large enough model disagreement
     # always wins eventually; the cap is what makes domination structurally
@@ -708,7 +832,21 @@ def blended_score(
         # "we had no opening to compare against", and a single absent key
         # cannot say which.
         "movement_component": None if move is None else round(value_move, 4),
-        "movement_capped": bool(move) and abs(_SCORE_MOVEMENT_WEIGHT * move) > _SCORE_MOVEMENT_CAP_PCT,
+        # "AT THE BOUND", not "would the old clip have fired".
+        #
+        # This used to be `abs(weight * move) > cap`, which under the saturating
+        # curve tests a condition that CAN NO LONGER OCCUR -- the curve
+        # approaches the cap and never reaches it. Left alone, the field would
+        # have kept reporting what the LEGACY clip would have done, under a name
+        # that reads as a fact about the value actually published. That is the
+        # 2026-08-21 FORBIDDEN shape: a field named for a different quantity
+        # than the one it carries.
+        #
+        # Now it means what a consumer would assume: the contribution is within
+        # 1% of the bound, so this row's movement is no longer meaningfully
+        # ordered against another saturated one. Under the clip that was true
+        # from 20 points; under the curve it starts around 92.
+        "movement_capped": bool(move) and abs(value_move) >= 0.99 * _SCORE_MOVEMENT_CAP_PCT,
         "book_confidence": confidence,
         "freshness_factor": freshness,
         "price_reliability": price_reliability,

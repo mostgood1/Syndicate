@@ -4082,6 +4082,48 @@ caaf-no-orders`). NOT
   `pipeline/layer2_shortlist.py` is named only by a CLOSED lane
   (`ncaaf-compact-card-state`, CLOSED-VERIFIED 2026-08-29).
 
+### score-reliability-resolution — **CLOSED 2026-08-30, MEASURED NOT DEPLOYED** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+- Goal met: both RELIABILITY terms in `blended_score` discriminate again over the
+  range the board actually occupies. Neither WEIGHT changed — re-weighting is
+  still gated on settled rows with CLV decomposed (`settled: 0`) and was not
+  touched. Only the SHAPE between existing anchors moved.
+- MEASURED ON THE SERVED BOARD (677 scoreable rows, 2026-08-30), old vs new:
+
+      movement: rows at the bound      35/80  ->  21/80
+                distinct contributions  22    ->  36
+                slope at origin         0.05  ->  0.05   (unchanged, by test)
+      freshness: rows on bottom rung   323 (47.7%) -> 76 (11.2%)
+                 rows PROMOTED                        0   <- hard constraint held
+
+- RANK CHURN, the falsification test: top 10 **0/10 churned**, top 25 **0/25**,
+  top 50 **5/50**, top 100 **2/100**. Every row that LEFT the top 50 is a soccer
+  `alternate_totals_corners` aged 29,355–45,102s (8.2–12.5h) — i.e. the
+  `market_gone` cohort measured at 293/293 by lane `stale-row-cause-blind-spot`,
+  which had been ranking top-50 on EV ~5.0 while priced off a dead market. Every
+  row that entered is fresher (12s, 83s, 754s, two at ~3.9h).
+- **MY PRE-REGISTERED CRITERION WAS BADLY DRAWN AND I AM NOT PRETENDING IT
+  PASSED.** It said "rows entering or leaving the top 50 means this is a
+  re-ranking and must be reconsidered". Five did. But fixing a RESOLUTION defect
+  necessarily moves the rows that defect misranked, so that criterion would have
+  failed any correct fix. The criterion I should have written — and the one this
+  is judged on — is whether the churn is EXPLAINED BY the defect. It is:
+  all five departures are 8h+ stale, all five arrivals fresher, top 25 untouched.
+- Tests: 11 new in `tests/test_score_reliability_resolution.py`; **3 verified to
+  go RED when the fixes are reverted** (bound, monotonicity, past-3h
+  discrimination). 146 green across score / opportunity_signals / layer2 floors /
+  layer2 api / served_quote_age.
+- A WRONG CLAIM OF MINE WAS CAUGHT BY THESE TESTS AND CORRECTED IN PLACE: the
+  code comment said the curve "NEVER REACHES THE CAP". True algebraically, FALSE
+  in float — it reaches it exactly at |d| ≳ 2000 where `exp(-100)` underflows.
+  The safety property is *never exceeds*, which holds; the comment now says so.
+- Both changes REVERTIBLE WITHOUT A DEPLOY, matching this file's own standard for
+  contested constants: `SYNDICATE_SCORE_MOVEMENT_SATURATING=0` restores the clip;
+  the freshness rungs are ordinary constants.
+- **NOT DEPLOYED.** Code on `main` is inert until a refresh-worker deploy carries
+  it. The reading this owes when it ships: on the served board, `freshness_factor`
+  no longer 0.25 for ~48% of rows, and `movement_capped` true on materially fewer.
+- Claims released.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
