@@ -195,6 +195,19 @@ def test_live_mode_is_blocked_while_an_order_is_unreconciled(monkeypatch):
     on top of it."""
     from syndicate.features.shared.execution_ledger import OrderRequest, record_order
 
+    # MODE FIRST, and that ordering is the whole test. `record_order` stamps the
+    # order with the mode in force AT THE TIME IT IS CALLED, so setting these
+    # afterwards recorded a PAPER order and then asked whether it blocked LIVE.
+    # It did, until 2026-08-30, because the block predicate ignored mode -- and
+    # that was the deadlock: a paper order could halt live execution forever.
+    # With that fixed the old setup no longer builds the condition the test
+    # names, so it asserted `blocked` and got `skipped`. The fix belongs in the
+    # fixture, not in the assertion: a LIVE order of unknown result must still
+    # block, and that is what this now exercises.
+    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
+
     record_order(
         OrderRequest(
             position_key="stranded",
@@ -209,9 +222,6 @@ def test_live_mode_is_blocked_while_an_order_is_unreconciled(monkeypatch):
         )
     )
     _write_plan(monkeypatch, [_row()])
-    monkeypatch.setenv("SYNDICATE_EXECUTION_ENABLED", "1")
-    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
-    monkeypatch.setenv("SYNDICATE_EXECUTION_VENUE", "kalshi")
     from pipeline import execute_portfolio as runner
 
     result = runner.run_execution("2026-08-22")

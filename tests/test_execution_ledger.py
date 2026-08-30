@@ -2522,3 +2522,46 @@ def test_the_LEGACY_KEY_SURVIVES_THE_WHOLE_CHAIN_commit_to_request():
         "the legacy idempotency key is not computable, so record_order cannot "
         "recognise a pre-fix order"
     )
+
+
+def test_an_order_ABSENT_from_a_complete_book_and_carrying_NO_VENUE_ID_stops_blocking(monkeypatch):
+    """MEASURED 2026-08-30. `not_found` was a bare `continue`: counted, never
+    stamped, never named. One order (`3243b1c994b6a445ae917a45`, a spreads_alt
+    row with no ticker and no venue id) blocked live execution on BOTH venues
+    for 22 minutes, appearing in seven log lines that all said
+    BLOCKED_ON_UNRECONCILED and none of which said why."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(mod, monkeypatch, key="never-sent", status=mod.STATUS_SUBMITTED)
+    # A COMPLETE book read that simply does not contain it.
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: _reader([]))
+
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
+
+    result = mod.reconcile_live_orders()
+    assert result["not_found"] == 1
+
+    resolved = mod.find_order(key)
+    assert resolved["status"] == mod.STATUS_REJECTED
+    assert resolved["auto_resolution"]["finding"] == mod.RESOLUTION_NOT_PLACED
+    assert resolved["pre_resolution_status"] == mod.STATUS_SUBMITTED
+    # THE POINT: it no longer jams live execution.
+    assert mod.unreconciled_orders() == []
+
+
+def test_an_order_WITH_a_venue_id_absent_from_the_book_KEEPS_blocking(monkeypatch):
+    """The other half. A venue id means the venue accepted it once, so absence
+    is a genuine unknown and blocking stays the safe direction -- it just has to
+    be NAMED now instead of latching silently."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _live_order(
+        mod, monkeypatch, key="had-an-id", status=mod.STATUS_SUBMITTED,
+        venue_order_id="ord-9",
+    )
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: _reader([]))
+
+    result = mod.reconcile_live_orders()
+    assert result["not_found"] == 1
+    assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
