@@ -6860,3 +6860,48 @@ justified was independently correct.
 - **Cost:** a wrong money-path threshold live on `main` for ~40 minutes,
   2.8x too permissive at even money. Not deployed, and the arb verdict was
   negative either way, so nothing was placed on it. Caught by a peer, not by me.
+
+## 2026-08-30 — FORBIDDEN: attributing a commit to a session by ADJACENCY. And: a method that cannot return a non-zero answer has not measured zero
+
+Two distinct rules from one exchange; both cost real time.
+
+### 1. Commit adjacency is not authorship
+- **What we believed:** that `c17bc3d8` belonged to the session whose commit
+  landed 45 seconds earlier. I sent that session a substantive challenge to a
+  live-money finding it had never touched.
+- **What was actually true:** `git show --stat c17bc3d8` names five files; the
+  accused session's commits touched **0 of 5**, and 0 for `state.md`. In this
+  repo EVERY commit carries `github-actions[bot]`, so the author field cannot
+  separate sessions — and with a dozen sessions pushing to one branch, temporal
+  proximity is the default, not a signal.
+- **How to apply:** attribute by `git show --stat <commit>` intersected with the
+  lane's declared `- Files:` block. One command. Never by neighbourhood, never
+  by "who was working on something similar". If no lane claims the files, say
+  the owner is unknown rather than guessing — a misrouted challenge is worse
+  than an unrouted one, because it burns a peer's turn and leaves the real owner
+  uninformed.
+
+### 2. An instrument whose output is constant is not evidence
+- **What we believed:** that ten venue-settled orders showing zero implied fee
+  measured a zero fee. Break-even was moved 3.38c -> 0.88c on it and a test was
+  inverted to pin it.
+- **What was actually true:** the venue's realized-P&L field is fee-EXCLUSIVE.
+  Every settled row's `pnl_dollars` equals ±(contracts x fill_price) EXACTLY —
+  the no-fee arithmetic. **That method returns zero whether or not a commission
+  was charged**, so it could not have found one.
+- **The account settled it.** `buyingPower` 101.33 -> 91.17 over a window
+  enumerated FIRST and containing exactly two filled orders: no-fee expectation
+  9.84, with-fee 10.16, observed **10.16**. Exact with fees, on a second
+  independent window too.
+- **How to apply:** before believing a null, ask what input would make this
+  instrument return non-null, and confirm it CAN. If the answer is "nothing in
+  the population I sampled", the reading is structural, not empirical. Prefer
+  the measurement that is not a field interpretation — cash moved is harder to
+  misread than a field named `commissionNotionalTotalCollected`.
+- **Direction of error matters when deciding whether to wait.** A fee measured
+  too LOW moves a threshold BELOW break-even and manufactures arbs that lose on
+  every fill. That asymmetry is why the ledger was corrected before the owning
+  lane replied — the code was left untouched, and the refutation was placed
+  ABOVE the original rather than replacing it.
+- Fifth instance of the family this session: see the 2026-08-30 entry on
+  artifacts, and [[feedback-instrument-blindness]].
