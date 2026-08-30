@@ -2304,12 +2304,82 @@ def unreconciled_orders() -> list[dict[str, Any]]:
     positively account for.
     """
     window = _float_env("SYNDICATE_EXECUTION_RECONCILE_FRESH_SECONDS", 900.0)
-    return [
+    stale = [
         order
         for order in _load().get("orders") or []
         if order.get("status") == STATUS_SUBMITTED
         and not _reconciled_recently(order, within_seconds=window)
     ]
+
+    # ONLY BLOCK ON WHAT A RECONCILER CAN ACTUALLY EXAMINE.
+    #
+    # THE DEADLOCK THIS REMOVES, measured 2026-08-30. This predicate was
+    # STRICTLY BROADER than `reconcile_live_orders`'s candidate filter:
+    #
+    #     blocks here      status == submitted AND stale
+    #     candidate there  mode == LIVE
+    #                  AND status in (submitted, filled)
+    #                  AND outcome is None
+    #                  AND venue prefix matches the venue being reconciled
+    #
+    # An order failing one of those three extra conditions blocked live
+    # execution FOREVER and was never looked at. Production, that day:
+    # `08e9385059f46852b160eeab` appeared in 39 log lines across the day, EVERY
+    # one `BLOCKED_ON_UNRECONCILED` and not one a reconcile line, while both
+    # venues reported `implausible=0` and everything stamped. Nothing in the
+    # system could clear it, because the only thing that clears it never saw
+    # it.
+    #
+    # `_venue_reader`'s own docstring already names this class from a different
+    # instance: "A gap in the read side is not a missing feature; it is a
+    # latch." This is that, one layer out.
+    #
+    # WHAT IS RELAXED, and only where relaxing is provably safe:
+    #   mode != LIVE          a PAPER order must never halt live execution.
+    #   outcome is not None   the order is resolved; there is nothing to learn.
+    # Neither can be a live position of unknown state, so neither is evidence
+    # that placing again risks doubling -- which is the ONLY thing this block
+    # exists to prevent.
+    #
+    # WHAT STILL BLOCKS: an order at a venue we cannot read. That IS a genuine
+    # unknown and blocking stays the safe direction -- but it is a latch, so it
+    # is now NAMED on every pass instead of looking like ordinary
+    # reconciliation lag. A halt nobody can attribute is how twelve hours go by.
+    blocking: list[dict[str, Any]] = []
+    for order in stale:
+        ok, why = _reconcilable(order)
+        if ok:
+            blocking.append(order)
+            continue
+        if why == "no_reader_for_venue":
+            blocking.append(order)
+        print(
+            "[execution_ledger] UNRECONCILABLE_ORDER"
+            f" key={order.get('idempotency_key')!r} venue={order.get('venue')!r}"
+            f" mode={order.get('mode')!r} outcome={order.get('outcome')!r}"
+            f" reason={why}"
+            f" blocks_live={why == 'no_reader_for_venue'}"
+            " -- no reconcile pass will ever examine this order",
+            flush=True,
+        )
+    return blocking
+
+
+def _reconcilable(order: Mapping[str, Any]) -> tuple[bool, str]:
+    """Could ANY `reconcile_live_orders` pass examine this order? `(ok, why_not)`.
+
+    Mirrors that function's candidate filter deliberately. The two predicates
+    drifting apart is what produced the deadlock documented above, so they are
+    written to be read together -- if the candidate filter changes, this must.
+    """
+    if str(order.get("mode") or "") != LIVE:
+        return False, "mode_not_live"
+    if order.get("outcome") is not None:
+        return False, "outcome_already_set"
+    fetch, _view, _coverage = _venue_reader(str(order.get("venue") or ""))
+    if fetch is None:
+        return False, "no_reader_for_venue"
+    return True, ""
 
 
 def ledger_summary(selected_date: str | None = None) -> dict[str, Any]:

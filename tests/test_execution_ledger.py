@@ -168,12 +168,75 @@ def test_a_submit_that_raises_leaves_the_order_recorded_and_failed(monkeypatch):
     assert ledger_summary()["orders"] == 1
 
 
-def test_an_order_stranded_in_submitted_is_reported_for_reconciliation():
-    record, _ = record_order(_request())
+def test_a_LIVE_order_stranded_in_submitted_is_reported_for_reconciliation(monkeypatch):
+    """The invariant: a submitted order of unknown result must block a new live
+    slate, because placing on top of it risks doubling.
+
+    NOW ON A LIVE ORDER. This test used the default PAPER request and so pinned
+    the OLD behaviour rather than the invariant it names -- see the paper test
+    below for why that mattered.
+    """
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    record, _ = record_order(_request(venue="kalshi"), mode=LIVE)
     stranded = unreconciled_orders()
     assert [o["idempotency_key"] for o in stranded] == [record["idempotency_key"]]
     complete_order(record["idempotency_key"], status=STATUS_FILLED, fill_price=-110.0)
     assert unreconciled_orders() == []
+
+
+def test_a_PAPER_order_stranded_in_submitted_does_NOT_halt_LIVE_execution():
+    """A paper order cannot be a live position, so it is not evidence that
+    placing again risks doubling -- which is the ONLY thing the block exists
+    for. It used to halt live trading anyway, and nothing could clear it:
+    `reconcile_live_orders` only ever considers `mode == LIVE`, so a stranded
+    paper order was blocked forever and never examined.
+
+    Measured 2026-08-30: `08e9385059f46852b160eeab` appeared in 39 log lines in
+    one day, every one `BLOCKED_ON_UNRECONCILED`, not one a reconcile line,
+    while both venues reported everything stamped.
+    """
+    record, _ = record_order(_request())            # paper by default
+    assert record["mode"] == PAPER
+    assert unreconciled_orders() == [], "a paper order is halting live execution"
+
+
+def test_an_order_AT_A_VENUE_WE_CANNOT_READ_still_blocks(monkeypatch):
+    """The relaxation is deliberately narrow. An order at a venue with no read
+    side IS a genuine unknown -- it could be a real live position -- so
+    blocking stays the safe direction. It is a latch, and the fix for a latch
+    is to NAME it, not to wave it through."""
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    record, _ = record_order(_request(venue="novig"), mode=LIVE)
+    keys = [o["idempotency_key"] for o in unreconciled_orders()]
+    assert keys == [record["idempotency_key"]]
+
+
+def test_the_block_set_is_a_SUBSET_of_what_reconcile_can_examine(monkeypatch):
+    """THE PROPERTY, not an instance of it.
+
+    The deadlock was that this predicate was strictly broader than
+    `reconcile_live_orders`'s candidate filter. Anything blocking that a
+    reconcile pass would never select can never clear. Asserted directly so the
+    two cannot drift apart again -- with the single documented exception of a
+    venue we have no reader for, which blocks on purpose.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    record_order(_request(position_key="p1", venue="kalshi"), mode=LIVE)
+    record_order(_request(position_key="p2", venue="polymarket_us"), mode=LIVE)
+    record_order(_request(position_key="p3", venue="paper"))
+    record_order(_request(position_key="p4", venue="novig"), mode=LIVE)
+
+    for order in mod.unreconciled_orders():
+        ok, why = mod._reconcilable(order)
+        assert ok or why == "no_reader_for_venue", (
+            f"{order.get('idempotency_key')} blocks but no reconcile pass can "
+            f"select it ({why}) -- this is the deadlock"
+        )
 
 
 # --------------------------------------------------------------------------
