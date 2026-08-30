@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from syndicate.features.shared.clv_opening_ledger import _opening_key
 from syndicate.features.shared.layer2_board import movement_join_key
 from syndicate.features.shared.layer2_board import (
@@ -150,10 +152,22 @@ def test_movement_is_capped_not_merely_weighted():
     base = dict(ev_pct=4.0, books_quoting=6, book_age_seconds=100, price=-105, fair_prob=0.52)
     big = blended_score(**base, movement_price_delta=60)
     mid = blended_score(**base, movement_price_delta=20)
-    assert big["movement_component"] == mid["movement_component"] == 1.0
-    assert big["movement_capped"] is True and mid["movement_capped"] is False
-    # A materially better price still wins against a maximal move.
+    # UPDATED 2026-08-30 (lane `score-reliability-resolution`). This used to
+    # assert `big == mid == 1.0` -- i.e. that 20 and 60 points scored
+    # IDENTICALLY. That equality was the DEFECT, not the property: the clip
+    # saturated at 20 points, a routine move, so 35 of 80 live rows tied at the
+    # bound. The contribution is now a saturating curve.
+    #
+    # THE TEST'S STATED PURPOSE IS UNCHANGED AND STILL ENFORCED BELOW: the cap
+    # bounds the contribution so DOMINATION stays structurally impossible. What
+    # is dropped is the incidental pinning of *where* it saturated.
+    assert 0 < mid["movement_component"] < big["movement_component"] < 1.0
+    assert big["movement_capped"] is False and mid["movement_capped"] is False
+    # A materially better price still wins against a maximal move. THIS is the
+    # property the docstring is about, and it is why the cap exists.
     assert blended_score(**dict(base, ev_pct=12.0))["value_pct"] > big["value_pct"]
+    # And the bound genuinely holds however far a price ran.
+    assert abs(blended_score(**base, movement_price_delta=100000)["movement_component"]) <= 1.0
 
 
 def test_zero_movement_is_distinguishable_from_no_movement_data():
@@ -182,7 +196,21 @@ def test_the_scored_movement_is_the_one_the_card_shows():
     assert scored, "the over side should survive"
     candidate = scored[0]
     assert candidate["movement"]["movement_price_delta"] == 20.0
-    assert candidate["score"]["movement_component"] == 1.0
+    # THE POINT OF THIS TEST is that the SCORED movement is the one the CARD
+    # SHOWS -- `#364`'s unit mismatch. The component's exact value is incidental
+    # and moved when the clip became a saturating curve (lane
+    # `score-reliability-resolution`, 2026-08-30): 20 points was the clip's
+    # saturation point and scored a flat 1.0; it now scores ~0.632.
+    #
+    # Asserted against the FUNCTION rather than a literal, so this test pins the
+    # identity "card delta -> scored delta" and cannot drift out of sync with the
+    # curve again.
+    from syndicate.features.shared.opportunity_signals import _movement_contribution
+
+    # `round(..., 4)` because that is what the score dict publishes; comparing
+    # against the raw float fails on the 5th decimal and would read as a real
+    # mismatch.
+    assert candidate["score"]["movement_component"] == round(_movement_contribution(20.0), 4)
 
 
 # --------------------------------------------------------------------------

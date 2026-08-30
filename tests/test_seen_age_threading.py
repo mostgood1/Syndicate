@@ -12,7 +12,7 @@ moving overnight, on a board rebuilt 1.4 minutes earlier.
 End to end, one market whose price last moved 11.9h ago but which we observed 4
 minutes ago:
 
-    without last_seen   book_age 42840  seen_age None   freshness 0.25
+    without last_seen   book_age 42840  seen_age None   freshness 0.15
     with    last_seen   book_age 42840  seen_age  240   freshness 1.00
 
 Absent seen-age must stay ABSENT rather than collapsing to the movement age --
@@ -102,7 +102,17 @@ class EndToEndTests(unittest.TestCase):
         """The regression this fixes, and proof the default path is unchanged."""
         opportunity = _first_opportunity(None)
         self.assertIsNone(opportunity["quote"]["quote_seen_age_seconds"])
-        self.assertEqual(opportunity["score"]["freshness_factor"], 0.25)
+        # 0.25 -> 0.15, lane `score-reliability-resolution` 2026-08-30. This
+        # fixture's book_age is 42,840s (11.9h). The ladder used to FLOOR at
+        # 0.25 for everything past 3h, so 11.9h and 3h01m scored identically --
+        # 323 of 677 live rows sat on that floor. It now has 6h and 12h rungs.
+        #
+        # THE PROPERTY THIS TEST IS ABOUT IS UNCHANGED and is the assertion
+        # above plus this one: without `last_seen` the row falls back to the
+        # movement clock and is DISCOUNTED rather than treated as fresh. It is
+        # now discounted MORE, never less -- the freshness change is monotone
+        # non-increasing by construction and promotes no row.
+        self.assertEqual(opportunity["score"]["freshness_factor"], 0.15)
 
     def test_movement_age_is_still_reported_either_way(self) -> None:
         """Time-since-moved remains a real market-activity signal; the fix
