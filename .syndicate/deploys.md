@@ -38678,3 +38678,51 @@ orders log `avgPx='0.0000'` and disagree on the result -- `YES -> recorded=0.0`,
 unfilled order. Both are `submitted` so it likely never reaches a stamp; I did
 not touch it because I cannot tell from outside whether the asymmetry predates
 this change, and guessing on the live-money path is what started this thread.
+
+## 2026-08-30 17:3xZ — CORRECTION: the second blocker WAS my deadlock fix, and I recorded the opposite
+
+**The 16:42Z entry above says "ATTRIBUTION, and it is NOT my deadlock fix" and
+credits the peer's `avgPx` reader for clearing `08e9385059f46852b160eeab`. THAT
+IS WRONG.** Production, from 17:25Z onward, once the executor reached the path:
+
+    UNRECONCILABLE_ORDER key='08e9385059f46852b160eeab'
+      venue='paper:polymarket'  mode='paper'  outcome=None
+      reason=mode_not_live  blocks_live=False
+
+**It is a PAPER order.** It was halting live execution on both venues, and
+nothing could ever clear it because `reconcile_live_orders` only selects
+`mode == LIVE`. That is precisely the case the deadlock fix relaxed, and
+precisely the case
+`test_a_PAPER_order_stranded_in_submitted_does_NOT_halt_LIVE_execution` pins.
+
+### HOW I GOT IT WRONG, because the method matters more than the credit
+
+At 16:41 I queried `UNRECONCILABLE_ORDER`, found **zero lines**, and reasoned:
+*"zero lines means it was RECONCILED, not excused — so the peer's fix cleared
+it."* The absence was **TIMING**, not mechanism. The order re-enters the stale
+set only after the 900s freshness window lapses, so the first diagnostic lines
+appear at 17:25, not at 16:41. I read a not-yet as a never.
+
+This is `absence-in-a-window-is-not-absence` and
+`feedback-absent-signal-is-about-the-emitter`, committed by me **in the same
+session in which I twice caught the identical error** — once when a false
+"VENUE_REPRICE never fires" turned out to be log truncation, and once when I
+queried log windows that had not happened yet. Third instance, and the only one
+that reached the permanent record.
+
+**Attribution as it actually stands:**
+
+    0f0e2a67…  cleared by MY contract-bound -> dollars-at-limit fix
+               (implausible 1 -> 0, stamped 3 -> 4). Unchanged.
+    08e93850…  a PAPER order, excused by MY deadlock fix (blocks_live=False).
+               NOT the peer's avgPx fix.
+
+The peer's `avgPx` fix is independently verified and valuable — `FILL_PRICE
+order=C65VD0R72KDG avgPx='0.2350' recorded=0.235`, and `fill_cost=3.08555`
+against my `$3.4828` ceiling, which correctly demotes my bound to a fallback.
+It just did not clear the second order.
+
+**The lesson I would keep over the credit:** I under-claimed here, which felt
+like the safe direction and was not. A wrong attribution in the ledger is wrong
+in both directions — the next person debugging a paper-order latch would have
+found a note saying the paper-order fix was not what fixed it.
