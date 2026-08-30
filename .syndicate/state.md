@@ -153,6 +153,42 @@ strictly positive, so the negatives are reconstruction rounding. One row
 excluded for the `#595` wrong-side signature (`held_side ...SIDE_SHORT` on an
 order placed `under`).
 
+> **REFUTED 2026-08-30 BY A THREE-WAY TEST. DO NOT ACT ON THE ZERO.**
+> The inference above is FEE-BLIND BY CONSTRUCTION: the venue's realized-P&L
+> field is fee-EXCLUSIVE, so it returns zero whether or not a commission was
+> charged. Every settled row's `pnl_dollars` equals ±(contracts x fill_price)
+> EXACTLY -- `mia-wsh` 3.4x0.47 = -1.598, `sd-tb` 18.7x0.47 = -8.789,
+> `nyr-phi` 3.91-1.8377 = +2.0723 -- which is the no-fee arithmetic, not a
+> reading of what the account paid.
+>
+> **THE ACCOUNT DISAGREES, MEASURED ON TWO INDEPENDENT WINDOWS.** Polymarket
+> `buyingPower` 101.33 -> 91.17 across 18:15:44-18:22:40Z, a window containing
+> EXACTLY two filled orders (`sd-tb` 18.7x0.47 and `juv-par` 2.38x0.44):
+>
+>     fill cost (contracts x price)  9.8362      no-fee expectation   9.84
+>     commissions reported           0.3200      with-fee expectation 10.16
+>     OBSERVED buyingPower delta                                     10.16
+>
+> Exact to the penny WITH fees. The earlier `nyr-phi` window agrees
+> independently: 96.04765 -> 94.14995 = 1.8977 against a 1.8377 fill, a $0.06
+> excess matching that order's reported commission.
+>
+> So `commissionNotionalTotalCollected` is REAL DOLLARS, taken at fill:
+> 3.12-3.81% across five fills. Two independent readings (the field, and the
+> cash) agree; the third cannot see it.
+>
+> **THE ERROR DIRECTION IS THE DANGEROUS ONE.** Break-even was moved
+> 3.38c -> 0.88c on the zero. A threshold BELOW true break-even manufactures
+> arbs that lose money on every fill -- what `venue_fees.py`'s own docstring
+> says to round against. `venue_fees.py` / `kalshi_polymarket_arb.py` are
+> claimed by `live-venue-order-placement` and are NOT changed here; the owner
+> has the measurement and the reconciliation.
+>
+> UNRESOLVED EITHER WAY: `commissionsBasisPoints` and
+> `makerCommissionsBasisPoints` read `'0'` on the SAME payload that reports
+> `commissionNotionalTotalCollected = 0.0600`. Those fields contradict each
+> other; at least one does not mean what its name says.
+
 **This INVERTS the priority recorded here earlier.** Polymarket was called "two
 thirds of the modelled pair cost" and the highest-value measurement left; it is
 zero, and **Kalshi is now the entire bar**. MLB break-even at even money falls
