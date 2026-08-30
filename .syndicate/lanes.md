@@ -3576,6 +3576,7 @@ caaf-no-orders`). NOT
   `pipeline/venue_odds_loop.py`,
   `syndicate/features/shared/venue_fees.py`,
   `scripts/probe_live_venue_arb.py`,
+  `scripts/verify_603_cross_game.py`,
   `syndicate/features/shared/venue_quote_adapters.py`,
   `syndicate/features/shared/venue_quote_fanin.py`,
   `tests/test_venue_quote_key_names_game.py`,
@@ -3773,6 +3774,159 @@ caaf-no-orders`). NOT
   and fail whenever any session holds one. Mocking it to None made it WORSE
   (6 → 8) and was reverted.
 - Blocked by: none.
+
+
+### venue-first-market-universe — OPEN — opened 2026-08-29 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
+- Goal: let what Kalshi and Polymarket ACTUALLY LIST define the tradeable set,
+  instead of the odds source. FIRST INCREMENT ONLY: decode Kalshi titles we
+  already hold and cannot read. `unreadable_title` falls by the number of
+  families decoded, measured post-BOOTED on refresh-worker.
+- Files: syndicate/features/shared/kalshi_catalogue.py
+- WHY THIS LANE EXISTS, measured 2026-08-29T23:12:44Z:
+    Polymarket  15,457 markets captured ->  60 matched  (0.4%)
+    Kalshi       9,267 markets captured -> 217 matched  (2.3%)
+    board_rows 1,179 against ~25,000 venue markets
+  The Polymarket capture is NOT the gap -- `truncated: False`,
+  `dropped_for_size: 0`, `slug_unparseable: 0`, 2,508 totals against 1,385
+  moneylines, so the alt ladders are already in hand. **We discard them at
+  CONSUMPTION**: the board is built from the ODDS SOURCE, so its market
+  universe is OddsAPI's, and a venue market with no board row has no model
+  probability, no edge, and cannot be traded however good the quote.
+- Hypothesis (this increment): the 1,362 `unreadable_title` markets are a small
+  number of TITLE FAMILIES, not 1,362 unique shapes -- the same result as the
+  soccer titles today, where two grammars took `unreadable_title` 2,264 -> 1,790.
+- Falsification test: read `unreadable_by_series` from production. If the count
+  is spread thinly across many series with no repeated grammar, decoding is not
+  a small fix and this increment re-scopes rather than proceeding.
+- Verification: `unreadable_title` falls on a `KALSHI_BOARD_JOIN` line stamped
+  after `[refresh_worker] BOOTED`, by roughly the family sizes decoded, with
+  `matched` not falling. A rise in `stat_not_in_market_vocabulary` is EXPECTED
+  and is the loss moving downstream, not a regression.
+- NOT IN THIS INCREMENT, and deliberately: intervals stay refused. The 1,430
+  `segment_market_not_full_game` are the fix for five orders / $7.08 of segment
+  bets matched to full-game series, and lifting that guard needs segment-aware
+  keys on BOTH sides first. Doing it after the grammar, not before.
+- Blocked by: none
+
+
+### exchange-join-refusals — OPEN — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+- Goal: establish, as a MEASUREMENT rather than a belief, how many of the
+  exchange quotes the Layer 2 board discards at the venue-adapter boundary are
+  RECOVERABLE, and by which mechanism. No fix in this lane — the fix lives in
+  files another lane holds (see Blocked by).
+- Files: `scripts/probe_polymarket_ncaaf_slug_role_join.py`,
+  `.syndicate/findings_2026-08-30_layer2_board_assessment.md`
+- NOT CLAIMED, AND DELIBERATELY NAMED OUTSIDE THE `Files:` BLOCK ABOVE: the two
+  fix sites (the venue quote adapters module and the venue quote fan-in module,
+  both under syndicate/features/shared/) are held by `live-venue-order-placement`.
+  This lane does not touch them. The paths are written un-backticked and out of
+  the block on purpose — `check_lane_invariants.py` reads any backticked path
+  inside a `- Files:` block as a live CLAIM, which is how this lane briefly
+  contested a file it is explicitly staying off. Same trap the holder's own
+  block records.
+- A measurement script will go under scripts/ with a distinct name; it will be
+  added to the `Files:` line above before it is written, not after.
+- Hypothesis: the 314 NCAAF `clubs_unresolved` refusals are recoverable WITHOUT
+  an alias map, because `_polymarket_pair_games` already learns
+  `(away_token, home_token) -> event_id` from the moneyline row's own slug, so
+  the game identity never required the club NAME. The h2h path keys on
+  `canonical_team` (adapters:1198) only because that measured better for MLB and
+  WNBA, where the resolver works; for NCAAF it resolves nothing at all.
+- Falsification test: if the slug token pair fails to resolve the game on a
+  material fraction of the same rows that fail `canonical_team`, the role key is
+  not a fix and the gap is upstream registry/feed data — same verdict the
+  2026-08-29 FORBIDDEN rule reached for the alias map. Report the RATE with its
+  denominator, not a count.
+- Verification: a per-row table over a real production Polymarket NCAAF payload:
+  rows | canonical_team resolves | slug pair resolves | both | neither.
+  Recoverable = (slug resolves AND canonical_team does not).
+- Standing rule this lane is subordinate to: `learnings.md` 2026-08-29
+  "FORBIDDEN: closing a name-join gap by POPULATING an alias map, without first
+  checking the map's source carries the missing name". NOT overridden. This lane
+  exists partly to supply the evidence that rule demands before any fix.
+- RESULT `[measured 2026-08-30, n=25 of a 165-market population]`: **HYPOTHESIS
+  FALSIFIED, and the replacement is sound but small.** `canonical_team` resolves
+  0/25 (today's path). The slug-token pair resolves **2/25 = 8%** — Polymarket's
+  abbreviations are not the registry's (`nmxst` vs `NMSU`, `flst` vs `FSU`,
+  `emich` vs `EMU`), the SAME upstream-vocabulary wall the reverted alias map
+  hit. A schedule-constrained mascot-pair join resolves **4/25 = 16%** with
+  **0 ambiguity** (51 carded games -> 51 distinct mascot pairs, 0 colliding).
+  **21 of 25 sampled markets are games this platform does not card** — FCS/D-II/
+  D-III — so `clubs_unresolved: 314` is ~157 markets of which **~26 are ours**.
+  The counter is not a backlog and anything sized off 314 is sized wrong.
+  Full write-up + the correction to a 15x-wrong first scope test:
+  `.syndicate/findings_2026-08-30_layer2_board_assessment.md` §6b.
+- Next, and NOT this lane's to take: the Kalshi `h2h_keyed_by_team` 905 and the
+  ~3,290 spread refusals have NOT had this scope check. Do it before sizing
+  either — the NCAAF result is the reason to distrust a raw refusal count.
+- Blocked by: `live-venue-order-placement` (holds both fix sites). Coordination
+  message sent 2026-08-30 to the two running sessions in that territory; no
+  reply at lane open. This lane produces the measurement regardless, so the
+  holder — whoever it turns out to be — inherits the evidence rather than
+  re-deriving it.
+
+
+### ncaaf-market-basis-picks — OPEN — opened 2026-08-29 — session 7b55ff7c-dc3d-46dd-b8bb-e63e4862f11d
+- Goal: the NCAAF board serves an EDGE and PICKS on a MARKET basis — best
+  available price vs the fresh multi-book consensus — which asserts nothing
+  about the model. `pick_gate` keeps denying the MODEL basis exactly as
+  measured; what changes is that it stops denying a claim it never measured.
+- Files: `syndicate/features/football/pick_gate.py`,
+  `syndicate/templates/shared/layer1_board.html`,
+  `syndicate/features/ncaaf/picks.py`,
+  `tests/test_football_pick_gate.py`,
+  `tests/test_market_basis_picks.py`
+- Reads but does NOT claim (kept out of the `- Files:` block so the parser does
+  not turn it into a claim): `syndicate/features/shared/book_grid.py` is the
+  PRODUCER of `edge_vs_consensus_pct` and is read-only here;
+  `pipeline/portfolio_commit.py:210` — the `no_model_edge_pct` refusal that
+  makes NCAAF orders zero — is held by OPEN lane
+  `portfolio-decision-and-execution`. **The sizing hop is NOT fixed by this
+  lane.** Surfacing the pick on the board and sizing it into an order are two
+  different stages; this lane does the first and hands the second over.
+- Hypothesis: n/a for the diagnostic half — already settled, and NOT by me.
+  `ncaaf-no-orders` (OPEN, session 7b278ebe) named the stage on 2026-08-29 and
+  falsified its own CFBD-429 hypothesis: all 90 NCAAF candidate rows are
+  refused `no_model_edge_pct`, source `pick_gate._SERVING_REGISTRY`. This lane
+  is the FIX to the surface half of that finding; that lane is diagnostic-only
+  by its own terms ("no fix, no deploy, until the stage is named").
+- The measurement this lane rests on — production, `/api/board/book-grid?sport=ncaaf&date=2026-08-29`,
+  fetched 2026-08-29 by this session, 45 rows / 90 sides:
+
+      sides carrying `best[side].edge_vs_consensus_pct`   90 / 90
+        >= 2.0 pct pts  25      >= 3.0 pct pts  14      max  16.04
+      rows carrying a MODEL edge                           0 / 45
+      books on the row  11 quoting, 7 fresh (stale excluded from the consensus)
+
+  The number is ALREADY COMPUTED and ALREADY SERVED (`book_grid.py:496`). The
+  board discards it at render: `layer1_board.html:943` reads only
+  `projection.edge_vs_market_pct`. This is not a new edge source — it is a
+  field we already have, thrown away one layer below the user.
+- **What this number IS, stated so nobody upgrades it later:** a PRICE-SHOPPING
+  delta against a VIGGED consensus (`consensus_vigged_price`, and `book_grid`'s
+  own comment says "nothing here de-vigs"). It is NOT expected value and must
+  never be labelled as such. Its anchor is 11 soft books with **no sharp and no
+  exchange** — pinnacle/novig/prophetx/kalshi/polymarket are absent because
+  `SYNDICATE_LIVE_ODDS_REFRESH_REGIONS = us`, a USER decision of 2026-08-27
+  (`state.md [ncaaf-props-live]`). Price shopping itself is measured at
+  **+2.79 ROI pts** platform-wide (`state.md [sharp-reference-price]`) and
+  **+2.95** on the NFL prop grade (`lanes.md nfl-props-odds-allowlist`), on
+  controlled identical bets — which is the whole claim being served, and no
+  more.
+- Falsification test: the lane is WRONG if the market edge is an artefact of
+  stale quotes rather than of real price dispersion. Decisive read: recompute
+  the served distribution with `suspect_stale`/`all_quotes_stale` rows removed.
+  If the `>=2 pct pts` population collapses to near zero once stale sides are
+  dropped, there is nothing to surface and this lane closes with a negative
+  result rather than shipping a column of stale-line artefacts.
+- Verification: (a) `off != on` — the EDGE column is non-null on N of 90 NCAAF
+  sides where it was null on 90 of 90, read from the SERVED payload/page, not a
+  fixture; (b) the model gate still denies — a test asserts
+  `market_verdict("ncaaf","spread",basis="model").servable is False` with the
+  n=2233 / t=17.2 numbers intact; (c) the two bases are never spelled the same
+  way on the page, so a market edge can not be read as a model claim.
+- Blocked by: none for the board surfaces. The ORDER path is blocked on
+  `portfolio-decision-and-execution` and is deliberately out of scope.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
