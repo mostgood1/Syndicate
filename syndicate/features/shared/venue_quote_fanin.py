@@ -696,6 +696,14 @@ def _distinct_games(
     """
     seen: dict[str, dict[str, Any]] = {}
     for row in rows:
+        # A MALFORMED ROW IS SKIPPED, NOT RAISED ON. `apply_venue_quotes_to_grid`
+        # guards its own loop against a non-mapping row, and this pre-pass --
+        # added with `#603` and running BEFORE that loop -- did not, so a single
+        # `None` in the grid raised `AttributeError` and took the whole venue
+        # reprice with it. Caught by `test_a_malformed_grid_row_does_not_raise`,
+        # which was already asserting exactly this and was already red.
+        if not isinstance(row, Mapping):
+            continue
         if str(row.get("sport") or "").strip().lower() != sport:
             continue
         event_id = str(row.get("event_id") or "").strip()
@@ -1083,6 +1091,7 @@ def apply_venue_quotes_to_grid(
     repriced = 0
     sides_seen = 0
     cross_game_rejected = 0
+    venue_basis_rows = 0
     by_source: dict[str, int] = {}
 
     benchmark_rows = 0
@@ -1108,6 +1117,15 @@ def apply_venue_quotes_to_grid(
         # two paths disagreeing about a row's identity is a join that works on
         # whichever one you happen to read.
         row_game = _row_game_token(row, sport_slug)
+        # Same vocabulary and same source of truth as `_reprice_live_benchmark`
+        # below, read once per row rather than per side so the two cannot
+        # disagree about whether a game has started.
+        _row_game_state = row.get("game")
+        row_is_live = (
+            str((_row_game_state or {}).get("state") or "").strip().lower() in _LIVE_STATES
+            if isinstance(_row_game_state, Mapping)
+            else False
+        )
         role_keyed = str(market or "").strip().lower() in _ROLE_KEYED_MARKETS
         for side_key in side_names:
             candidates = [str(quote_key(sport_slug, market, side_key, line))]
@@ -1140,6 +1158,41 @@ def apply_venue_quotes_to_grid(
             if quote is None:
                 continue
             venue_age = quote.age_seconds(now=now)
+
+            # THE VENUE-BASIS VERDICT -- and it MUST be computed HERE, above the
+            # two writes below. Not stylistic; the ordering is the correctness.
+            #
+            # 1. The block below overwrites `side_best["age_seconds"]` with the
+            #    VENUE's age. Read after it, the anchor-vintage guard would be
+            #    handed the venue's own freshness as though it were the books',
+            #    and a two-hour-old pregame consensus would sail through the one
+            #    guard written to catch it.
+            # 2. `_reprice_live_benchmark`, further down, deliberately SETS
+            #    SUPERSEDED BOOKS ASIDE in `cells`/`consensus` so the venue does
+            #    not get median-averaged with pregame prices. After it runs, on
+            #    exactly the rows where it succeeds, there is no independent book
+            #    consensus left to compare against -- the comparison would be the
+            #    venue against itself.
+            #
+            # So the only moment both halves exist is this one.
+            if _venue_basis_edge is not None:
+                side_best["venue_basis"] = _venue_basis_edge(
+                    side_best,
+                    venue=_VENUE_BASIS_NAME.get(quote.source, quote.source),
+                    venue_price=quote.american,
+                    venue_quote_age_seconds=venue_age,
+                    venue_game_token=quote.game,
+                    row_game_token=row_game,
+                    # The BOOK's age, still unmodified at this point. See (1).
+                    book_quote_age_seconds=side_best.get("age_seconds"),
+                    # Absent from `kalshi_markets.json`; the module assumes the
+                    # full rate and stamps `fee_is_upper_bound`.
+                    kalshi_fee_multiplier=None,
+                    is_live=row_is_live,
+                ).as_payload()
+                if side_best["venue_basis"].get("displayable"):
+                    venue_basis_rows += 1
+
             existing_age = _as_float_or_none(side_best.get("age_seconds"))
             if existing_age is not None and existing_age <= venue_age:
                 # The book really is fresher. Leave it entirely alone.
@@ -1162,6 +1215,19 @@ def apply_venue_quotes_to_grid(
         elif outcome:
             benchmark_skipped[outcome] = benchmark_skipped.get(outcome, 0) + 1
 
+    # A COUNTER NOTHING PRINTS IS NOT AN INSTRUMENT. `cross_game_rejected`'s
+    # first version lived only in a return value nothing read, which made the
+    # mechanism unreadable in production -- on file five times in this repo.
+    # Printed UNCONDITIONALLY, including the zero: this module's whole hazard is
+    # that "no live venue edges exist" and "the comparison never ran" look
+    # identical, and only the denominator tells them apart.
+    print(
+        "[venue_quote_fanin] VENUE_BASIS"
+        f" sport={sport_slug} displayable={venue_basis_rows} sides_seen={sides_seen}"
+        " -- in-play exchange vs book consensus, net of venue fee; DISPLAY ONLY",
+        flush=True,
+    )
+
     if cross_game_rejected:
         print(
             "[venue_quote_fanin] CROSS_GAME_REJECTED_GRID"
@@ -1179,6 +1245,10 @@ def apply_venue_quotes_to_grid(
         # NOTHING printed, which made the mechanism unreadable in production --
         # the instrument-blindness failure this repo has on file five times.
         "cross_game_rejected": cross_game_rejected,
+        # Reported for the same reason, and the DENOMINATOR beside it:
+        # "no live venue edges" and "the comparison never ran" are different
+        # facts that look identical without `sides_seen`.
+        "venue_basis_rows": venue_basis_rows,
         "by_source": by_source,
         "benchmark_rows": benchmark_rows,
         "benchmark_skipped": benchmark_skipped,
@@ -1201,6 +1271,26 @@ try:  # pragma: no cover - import-order guard, not a behaviour branch
     )
 except ImportError:  # pragma: no cover
     _BENCHMARK_SUPERSEDE_LAG_SECONDS = 900.0
+
+
+# `venue_basis_edge`'s vocabulary for the venue, which is NOT this module's.
+# Quotes carry `polymarket_us`; the fee model and `IN_PLAY_VENUES` know
+# `polymarket`. Mapped explicitly rather than string-trimmed, so a new source
+# name has to be considered rather than silently falling through to a refusal
+# that reads like "no edge found".
+_VENUE_BASIS_NAME = {"polymarket_us": "polymarket", "kalshi": "kalshi"}
+
+# Imported defensively for the same reason `opportunity_gate` is below: this
+# module is imported during board build, and a hard failure here would take out
+# the price reprice -- which works and is measured -- for the sake of a
+# display-only annotation that does not. None means the annotation is skipped
+# and every other behaviour in this file is unchanged.
+try:  # pragma: no cover - import-order guard, not a behaviour branch
+    from syndicate.features.shared.venue_basis_edge import (
+        venue_basis_edge as _venue_basis_edge,
+    )
+except ImportError:  # pragma: no cover
+    _venue_basis_edge = None
 
 
 def _reprice_live_benchmark(

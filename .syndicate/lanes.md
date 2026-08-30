@@ -3592,6 +3592,9 @@ caaf-no-orders`). NOT
   `scripts/verify_603_cross_game.py`,
   `syndicate/features/shared/venue_quote_adapters.py`,
   `syndicate/features/shared/venue_quote_fanin.py`,
+  `syndicate/features/shared/venue_basis_edge.py`,
+  `tests/test_venue_basis_edge.py`,
+  `tests/test_venue_basis_wiring.py`,
   `tests/test_venue_quote_key_names_game.py`,
   `tests/test_polymarket_side_vocabulary.py`,
   `tests/test_kalshi_side_vocabulary.py`
