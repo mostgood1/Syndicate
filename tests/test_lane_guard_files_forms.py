@@ -135,8 +135,27 @@ def test_the_real_ledger_parses_and_claims_something(guard):
     above while unguarding the entire repo."""
     lanes = (REPO_ROOT / ".syndicate" / "lanes.md").read_text(encoding="utf-8-sig")
     got = claims(guard, lanes)
-    assert len(got) > 50, f"only {len(got)} claims parsed from the real ledger"
+
+    # NO FIXED FLOOR. This asserted `> 50` and went red on 2026-08-30 at 22
+    # claims -- not because the parser broke, but because the LEDGER SHRANK
+    # legitimately: lanes closed, and a phantom sweep released 121 of 133 file
+    # claims held by sessions that no longer exist. A threshold on total claims
+    # tracks how much work happens to be open, which is not a property of the
+    # parser and drops every time somebody tidies up.
+    #
+    # The stated intent -- catching a parser that silently returns NOTHING --
+    # is kept, and strengthened past `> 0` by requiring several DISTINCT lanes
+    # to contribute: a parser that found only the first block, or only one
+    # form of `Files:` line, would satisfy a bare non-empty check and fail
+    # this one. Lane count is bounded below by the protocol (a repo with fewer
+    # than three open lanes is not the state this guard exists for) without
+    # being coupled to how many paths each lane happens to list.
+    assert got, "the parser returned NO claims from the real ledger"
     assert any(p.endswith(".py") for _, p in got)
+    assert len({slug for slug, _ in got}) >= 3, (
+        f"only {len({s for s, _ in got})} distinct lane(s) contributed claims; "
+        "a parser that reads one block and stops would look like this"
+    )
 
 
 def test_disclaimer_on_the_initial_files_line_is_also_skipped(guard):

@@ -482,13 +482,27 @@ class RefreshOddsSourcesTests(unittest.TestCase):
     def test_source_root_helpers_prefer_render_disk(self) -> None:
         module = self._load_module()
 
+        # `.resolve()` ON BOTH SIDES, because production resolves and this
+        # assertion did not. `_source_repo_root` returns `hosted_root.resolve()`
+        # (refresh_odds_sources.py:500); on POSIX that is a no-op for
+        # `/opt/render/...` so the raw comparison passed, and on Windows
+        # `.resolve()` prepends the drive, giving
+        # `WindowsPath('C:/opt/render/project/data/nfl_source')` against an
+        # expected `WindowsPath('/opt/render/project/data/nfl_source')`. The
+        # test could never pass off Linux.
+        #
+        # Resolving the EXPECTED side is symmetric with production and cannot
+        # mask a real mismatch: a genuinely different path still differs after
+        # resolution. The property under test -- that the Render disk WINS over
+        # the workspace checkout -- is unchanged.
         with patch.dict(module.os.environ, {"SYNDICATE_DATA_ROOT": self._RENDER_DISK}, clear=False):
             self.assertEqual(
-                module._source_repo_root("nfl", "NFL-Betting"), Path(self._RENDER_DISK) / "nfl_source"
+                module._source_repo_root("nfl", "NFL-Betting"),
+                (Path(self._RENDER_DISK) / "nfl_source").resolve(),
             )
             self.assertEqual(
                 module._basketball_source_root("nba", "nba_betting_repo"),
-                Path(self._RENDER_DISK) / "nba_source",
+                (Path(self._RENDER_DISK) / "nba_source").resolve(),
             )
 
     def test_validate_source_root_reports_missing_render_disk(self) -> None:
