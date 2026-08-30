@@ -62,3 +62,14 @@ The seven dropped remain reachable by the SHAs above until git gc prunes them:
 
 Dropped in DESCENDING index order. Dropping a low index renumbers everything
 above it, which is how the wrong stash gets deleted.
+
+## DONE 2026-08-30 — 7 dropped, verified after
+
+    stash count      30 -> 23
+    autostash entries 8 -> 1   (the kept one)
+    stash@{24} renumbered to stash@{19}, SHA bf7f4202 confirmed by re-read
+
+Dropped in DESCENDING index order so a low drop could not renumber a higher
+target out from under the next command. Spot-checked two dropped SHAs
+(`95ef31f4`, `aff2b193`) AFTER the drops: both still reachable in the object
+store, so the recovery path above is real and not a claim.
