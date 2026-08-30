@@ -1666,7 +1666,62 @@ def test_a_FULL_GAME_winner_is_not_read_as_a_segment():
         "Seattle wins the game by over 6.5 points",
         "Barcelona vs Vallecano Winner?",
         "Barcelona wins",
-        "Minnesota over 96.5 points scored",
         "Tie is the result",
     ]:
         assert cat.recognised_unpriceable_title(title) is None, title
+
+    # 'Minnesota over 96.5 points scored' WAS in this list, written when I still
+    # believed team totals were priceable. They are not -- the board carries no
+    # `team_totals` market -- so it now belongs in the DECLINED set, and
+    # `test_a_team_total_is_declined_because_the_board_has_no_such_market`
+    # asserts that. Moved rather than deleted so the correction is visible.
+    assert cat.recognised_unpriceable_title("Minnesota over 96.5 points scored") is not None
+
+
+def test_a_FULL_GAME_spread_reads_through_the_game_wording():
+    """KXWNBASPREAD sends 'Seattle wins the game by over 6.5 points' -- 42
+    markets a build -- and `_TEAM_SPREAD_WINS_BY` read the shorter
+    'Seattle wins by over 6.5 points' but not that. Two words between `wins`
+    and `by`, and a full-game spread we CAN price sat in `unreadable_title`.
+
+    ONLY THE REACH CHANGED, NOT THE MEANING: the same grammar already produced
+    these fields for the shorter wording, so the sign handling downstream is
+    untouched by this.
+    """
+    verdict = cat.classify_market(
+        _market("Seattle wins the game by over 6.5 points", series="KXWNBASPREAD")
+    )
+    assert verdict["status"] == "ok", verdict
+    assert verdict["subject"] == "Seattle", verdict
+    assert verdict["line"] == 6.5, verdict
+
+
+def test_a_SEGMENT_spread_is_not_read_as_a_full_game_one():
+    """`the game` is spelled out rather than `.*?` for exactly this reason: a
+    wildcard would swallow 'wins the 1st half by over 6.5 points', the same
+    contract on a different period, which has NO board market."""
+    verdict = cat.classify_market(
+        _market("Minnesota wins the 1st half by over 6.5 points?", series="KXWNBA1HSPREAD")
+    )
+    assert verdict["status"] == "refused", verdict
+    assert verdict["reason"] == cat.REASON_RECOGNISED_UNPRICEABLE, verdict
+
+
+def test_a_team_total_is_declined_because_the_board_has_no_such_market():
+    """DECLINED FOR WANT OF A BOARD ROW, not for want of a model.
+
+    `basketball_props_smart_sim` already projects per-team scoring --
+    `home_mu`/`away_mu`, `home_team_total_pts_mean`, and `team_total_pts` in
+    every simulated box -- so P(Minnesota over 96.5) is countable off the runs
+    today. What is missing is a board row, because the board is built from the
+    odds source and OddsAPI supplies no WNBA team total.
+
+    I first wrote "not priceable". That was wrong and it matters: "we cannot
+    model this" and "nothing generates the row" call for completely different
+    work, and only one of them is a modelling problem.
+    """
+    verdict = cat.classify_market(
+        _market("Minnesota over 96.5 points scored", series="KXWNBATEAMTOTAL")
+    )
+    assert verdict["status"] == "refused", verdict
+    assert verdict["reason"] == cat.REASON_RECOGNISED_UNPRICEABLE, verdict

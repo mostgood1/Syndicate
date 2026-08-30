@@ -407,6 +407,7 @@ def recognised_unpriceable_title(title: Any) -> str | None:
         _SEGMENT_SPREAD_WORDS,   # before _SEGMENT_WINNER: "wins the 1st half BY over"
         _SEGMENT_WINNER,
         _INNINGS_WINNER,
+        _TEAM_TOTAL_SCORED,
     ):
         if pattern.match(text):
             return REASON_RECOGNISED_UNPRICEABLE
@@ -535,12 +536,46 @@ _INNINGS_PERIOD = {
 # goals". The PERIOD token is separate from MLB's innings phrase because the
 # board spells them differently (`spreads_q1` vs `spreads_1st_5_innings`) and
 # collapsing them would join a quarter line to a full-game row.
+# `the game` IS OPTIONAL AND WAS THE WHOLE BLOCKER. Measured 2026-08-30:
+# KXWNBASPREAD sends 'Seattle wins the game by over 6.5 points' -- 42 markets a
+# build -- and this pattern read 'Seattle wins by over 6.5 points' but not that.
+# Two words between `wins` and `by`, and a full-game spread we can price sat in
+# `unreadable_title`.
+#
+# IT IS SPELLED OUT RATHER THAN `.*?` because a wildcard there would also
+# swallow the SEGMENT wording, `wins the 1st half by over 6.5 points` -- the
+# same contract on a different period, which has no board market and must keep
+# refusing. `test_a_SEGMENT_spread_is_not_read_as_a_full_game_one` pins it.
 _TEAM_SPREAD_WINS_BY = re.compile(
     r"^\s*(?P<team>.+?)\s+wins\s+"
+    r"(?:the\s+game\s+)?"
     r"(?:first\s+(?P<innings>\d+)\s+innings\s+)?"
     r"(?:(?P<period>[1-4](?:Q|H)|OT)\s+)?"
     r"by\s+(?P<direction>over|under|more\s+than|less\s+than)\s+"
     r"(?P<line>\d+(?:\.\d+)?)\s+(?P<stat>.+?)\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# 'Minnesota over 96.5 points scored' -- KXWNBATEAMTOTAL, 36 markets.
+#
+# DECLINED FOR WANT OF A BOARD ROW -- NOT because we cannot price it, and the
+# distinction matters because it decides whose problem this is.
+#
+# THE MODEL ALREADY COMPUTES THIS QUANTITY. `basketball_props_smart_sim`
+# projects per-team scoring directly -- `home_mu`/`away_mu` (line ~1116),
+# `home_team_total_pts_mean`/`away_team_total_pts_mean` (~738), and a
+# `team_total_pts` in every simulated box (~3039). It is a Monte Carlo, so
+# P(Minnesota over 96.5) is countable off the runs today.
+#
+# What is missing is a BOARD ROW. Nothing generates one, because the board is
+# built from the ODDS SOURCE and OddsAPI supplies no WNBA team total -- the same
+# reason 2,508 Polymarket totals rungs reach a board that asks for one line.
+# A venue market with no board row has nothing to compare a price against.
+#
+# So this refuses TODAY and the refusal is honest, but it is a MISSING ROW, not
+# a missing model. I first wrote "not priceable" here and that was wrong.
+_TEAM_TOTAL_SCORED = re.compile(
+    r"^\s*(?P<team>.+?)\s+(?:over|under)\s+\d+(?:\.\d+)?\s+.+?\s+scored\s*\??\s*$",
     re.IGNORECASE,
 )
 
