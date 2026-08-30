@@ -235,6 +235,12 @@ data/odds_events/
 # persisted work from lost work. Both are per-machine, per-session.
 .syndicate/.current-lane
 .syndicate/.last-checkpoint
+# Liveness marker for the hourly `unknown-submit-balance-evidence-capture`
+# task. Overwritten each run, never appended, and deliberately NOT committed:
+# it answers a LOCAL question (did this machine run it recently) and hourly
+# commits would be the noise the task's silence exists to avoid. Ignored so it
+# cannot be swept into another session's `git add` from the shared tree.
+.syndicate/.unknown_submit_watch_heartbeat
 
 # Deploy claims are runtime state about RIGHT NOW, not history. A claim in git
 # would be a claim that outlives its truth.
