@@ -6578,3 +6578,43 @@ number of rows returned is a truncation signal, and mine returned exactly 200.
 **Cost:** a wrong causal claim committed to `learnings.md`, `findings_...md` and
 a commit message, live for roughly 40 minutes. No wrong code: the change it
 justified was independently correct.
+
+
+## 2026-08-30 — RULE: an artifact is evidence only once you have checked it contains what its NAME claims. Four instances in one session
+
+- **What we believed:** that `.syndicate/lanes.md.CONFLICTED.bak` held the
+  pre-resolution ledger. It was offered to a user as the safety net that made an
+  unresolved-merge situation recoverable.
+- **What was actually true:** measured before use — 337,086 bytes, **0
+  `<<<<<<<`, 0 `>>>>>>>`, 0 `=======`**, 54 headings, all four lanes present
+  exactly once. It is the RESOLVED file under a name that says otherwise. The
+  pre-resolution state is gone. **A file named `.CONFLICTED.bak` that contains
+  no conflict is worse than no backup, because the next person will trust it.**
+- **The same shape, three more times the same night, all measured:**
+  - `INVARIANTS HOLD` printed over a file with conflict markers in it — the
+    guard parsed BOTH sides as lanes. A green from a checker that cannot see the
+    corruption it is standing in front of.
+  - Production's `daily_summary_2026_07_12.json` byte-identical to the git
+    mirror, which looks like proof the reconcile copy won and proves NOTHING —
+    the mirror is refreshed FROM production, so identity is expected either way.
+  - Grepping a served page for two sentences I had just deleted, and finding
+    them absent — because the whole block does not render. The check could not
+    have failed, so it could not confirm.
+
+**How to apply:**
+- **Before citing an artifact — backup, fixture, receipt, log, snapshot — open
+  it and assert it contains the thing its name promises.** One `grep -c` for the
+  distinguishing feature. If the artifact's whole purpose is to hold X, the check
+  is "does it hold X", not "does it exist".
+- A guard's PASS is evidence only if you know what makes it FAIL. Feed it the
+  broken input once. `check_lane_invariants.py` now refuses conflict markers
+  (`10f45a0c`) precisely because its green had never been tested against a
+  corrupted ledger.
+- Prefer artifacts that cannot be vacuous: `git show <sha>:<path>` for content
+  and the service's own reported SHA for deployment beat any rendered absence.
+- Corollary for backups specifically: **verify the copy before you rely on the
+  original being disposable**, not after. The window in which the original still
+  exists is the only window in which the check is actionable.
+- Same family as [[feedback-instrument-blindness]] and the 2026-08-29 entry on
+  running the control before reading a null as absence — this is the fourth
+  distinct instance, so it is a standing rule, not diligence.

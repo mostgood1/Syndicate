@@ -45,6 +45,38 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [lane-ledger-conflict-guard] THE LANE CHECKER USED TO PASS A FILE WITH CONFLICT MARKERS IN IT `[fixed 2026-08-30, `10f45a0c`]`
+
+MEASURED: `.syndicate/lanes.md` sat `UU` in the shared tree from an unfinished
+stash pop — markers at 3724/3778/3966 — and `scripts/check_lane_invariants.py`
+printed **INVARIANTS HOLD**. It parsed BOTH sides as real lanes, so one lane
+existed twice and read as two legitimate blocks rather than as corruption.
+
+**Why that was worse than no check:** this is the script a session runs BEFORE
+committing the ledger, so its green is the reassurance that precedes writing the
+damage in. Three OPEN lanes (`venue-first-market-universe`,
+`exchange-join-refusals`, `ncaaf-market-basis-picks`) existed ONLY on the stashed
+side — zero copies in HEAD, zero in `origin/main`. Resolving the other way would
+have dropped them to zero copies anywhere.
+
+**Now:** any line starting `<<<<<<< ` or `>>>>>>> ` is refused BEFORE parsing,
+with exit code **3** and every marker line named. A conflicted file is not a
+ledger with violations, it is two files, so every downstream count is
+meaningless — "cannot be checked" is a distinct answer from "failed".
+`=======` is deliberately NOT a trigger: a markdown setext H1 underline is a run
+of `=` on its own line. Verified both ways — the live 54-lane ledger still exits
+0; a conflict spliced at line 3725 exits 3.
+
+**THE OUTCOME WAS FINE AND THE TRIGGER IS STILL UNKNOWN.** The conflict was
+resolved correctly by someone (strict union: `+153/-0` vs `origin/main`, all
+four lanes once). But `stash@{0} "autostash"` was created 2026-08-29T16:24Z and
+nothing explains what made it or what popped it — `rebase.autoStash` and
+`merge.autoStash` are both UNSET repo-wide. It can recur.
+
+**Do not trust `.syndicate/lanes.md.CONFLICTED.bak`** — measured 0 markers, 54
+headings, all four lanes once. It is the RESOLVED file misnamed; the
+pre-resolution state was never captured.
+
 ## [603-cross-game-quote-keys] VENUE QUOTES NAMED NO GAME; FIXED ON EVERY PATH, DEPLOYED, AND STILL UNPROVEN AFTER THREE READINGS `[2026-08-30, lane live-venue-order-placement]`
 
 `quote_key` was `sport|market|side|line` and the fan-in resolves it against a
