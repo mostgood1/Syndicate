@@ -6905,3 +6905,83 @@ Two distinct rules from one exchange; both cost real time.
   ABOVE the original rather than replacing it.
 - Fifth instance of the family this session: see the 2026-08-30 entry on
   artifacts, and [[feedback-instrument-blindness]].
+
+---
+
+## 2026-08-30 — checks that AGREE are only independent if they differ in the decisive variable
+
+I reported "three configurations, all green" against a peer's red test. All
+three carried `data/soccer_source`. It was ONE configuration run three times,
+and the peer reproduced it immediately in a `data/`-less worktree -- which is
+what `scripts/session_worktree.py` creates BY DEFAULT and what CLAUDE.md tells
+every session to use.
+
+The same shape three times in one day:
+- three trees that shared the decisive variable
+- a fee rate fitted on fills that all share one multiplier (a peer's, caught
+  before it was quoted)
+- `market_indexed_under` as `sorted(...)[:4]`, where `cfb` and `alsv` sort first
+  and fill the cap on ANY market -- read as attribution TWICE
+
+**RULE: before reporting agreement across N checks, name the variable that
+differs between them. If you cannot, you have one check and N-1 rehearsals.**
+
+Corollary that cost the most: a bounded sample that finds NOTHING is not
+evidence of absence. 19 sampled Polymarket PROP slugs showed no corners family
+and I was one reading from DELETING the corners route. The census found 434.
+
+---
+
+## 2026-08-30 — FORBIDDEN: gating one instance of a shared cause
+
+A peer's test went red because the per-league soccer roster lives in `data/`,
+which the documented worktree excludes. I gated THAT test, wrote the reason into
+its skip text, and left EIGHT more failing for the identical cause -- in a
+session whose whole theme is that a fix without a mechanism looks like a working
+one.
+
+`_soccer_rosters_present()` was already the exact predicate for all nine.
+
+**RULE: when a cause is named, grep for every site it reaches BEFORE fixing the
+one that was reported.** The reported instance is a sample, not the population.
+
+Related, same day: a peer shipped `#603` fixing "the wrong function" and had to
+follow with "fix the GRID path -- the one that actually runs".
+
+---
+
+## 2026-08-30 — "not priceable" and "no board row" are different problems with different owners
+
+I told the user Kalshi team totals were "not priceable" because the board has no
+`team_totals` market. Wrong framing, and they challenged it.
+
+`basketball_props_smart_sim` already projects per-team scoring -- `home_mu`,
+`away_mu`, `home_team_total_pts_mean`, `team_total_pts` in every simulated box.
+It is a Monte Carlo, so P(team over N) is countable off the runs TODAY.
+
+What is missing is a BOARD ROW, because the board is built from the odds source
+and OddsAPI supplies no WNBA team total.
+
+**RULE: "we cannot model this" and "nothing generates the row" call for
+completely different work and different owners. Say which.** One is a modelling
+problem; the other is a plumbing problem that a model already solved.
+
+This generalises to the session's strategic finding: 25,000 venue markets
+captured, 277 acted on, and almost none of the loss is modelling.
+
+---
+
+## 2026-08-30 — an orphaned `autostash` is somebody's work, and nothing reads a stash list
+
+Eight orphaned `autostash` entries had accumulated in the shared tree, oldest
+from June. An autostash only survives when the rebase that created it did NOT
+finish, so each is uncommitted work picked up and never handed back.
+
+Triage: 3 were already on main (checked by SYMBOL, not line count -- they
+differed by 662-790 lines purely because main had moved on), 4 were `data/**`
+mirror output, and ONE (`tools/ask.py`, 2026-06-22) existed nowhere else.
+
+**RULE: drop stashes in DESCENDING index order** -- a low drop renumbers every
+higher one, which is how the wrong stash gets deleted. **Record SHAs BEFORE the
+first drop and re-check one AFTER**, so the recovery path is verified rather
+than asserted.

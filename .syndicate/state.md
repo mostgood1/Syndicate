@@ -7519,3 +7519,47 @@ read, night and day. The slate-vs-fixture date fix has never fired.
 Resting orders are GTC with no `commence_time` expiry, so a pre-game limit rests
 into a live game — one was submitted 13 seconds before kickoff and never filled.
 Cancelling requires Polymarket's own UI.
+
+---
+
+## [venue-market-universe] The venues list ~25,000 markets and the board acts on 277 — VERIFIED 2026-08-30
+
+Measured on `refresh-worker 7d5addba`, both joins, same cycle:
+
+```
+Polymarket  15,457 captured ->  60 matched   (0.4%)
+Kalshi       9,267 captured -> 217 matched   (2.3%)
+board_rows   1,179
+```
+
+**THE CAPTURE IS NOT THE GAP.** `/api/ops/polymarket/slate` reports
+`truncated: False`, `dropped_for_size: 0`, `slug_unparseable: 0`, 15,104 rows,
+horizon to 2026-09-27, and **2,508 totals rungs against 1,385 moneylines** — the
+alt ladders are already in hand, 4-9 rungs per soccer fixture.
+
+**WE DISCARD AT CONSUMPTION.** The board is built from the ODDS SOURCE, so its
+market universe is OddsAPI's. A venue market with no board row has no model
+probability, no edge, and cannot be traded however good the quote:
+
+```
+market_type_not_a_game_line   6,647   props, exact-score, ftts
+segment_market_not_full_game  1,430   intervals — refused BY DESIGN (#563, $7.08)
+no_matching_board_row         2,016   kalshi
+series_out_of_scope           1,334   kalshi
+```
+
+**A MISSING ROW IS NOT A MISSING MODEL.** Kalshi team totals
+(`KXWNBATEAMTOTAL`, 36/build) refuse for want of a board row, NOT for want of a
+price: `basketball_props_smart_sim` already projects `home_mu`/`away_mu`,
+`home_team_total_pts_mean` and `team_total_pts` per simulated box, so
+P(team over N) is countable today. The two states call for different work.
+
+**Polymarket soccer market grammar, measured rather than guessed:** 3-way h2h is
+THREE Yes/No markets with the subject in the slug; corners are `cor-all-gt<line>`
+where `gt` states the direction (`Yes` = over); college football is filed under
+`cfb`; the venue row's `line` field is the ONLY source for corners and `_KEEP`
+must retain it.
+
+**Kalshi refusals now say WHICH KIND.** `unreadable_title` 1,371 -> 458 with
+`recognised_but_no_board_market` 838: a grammar to WRITE is separated from a
+market we understand and will never price. Segments remain untradeable.
