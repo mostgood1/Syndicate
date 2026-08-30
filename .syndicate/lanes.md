@@ -3039,6 +3039,15 @@ caaf-no-orders`). NOT
 - Incident handled: live execution halted on BOTH venues 19:47:34Z. Correct fix was another lane's dd33c865. My 63661af1 auto-reject was UNSAFE and is reverted (ef0d2d47).
 - Shipped and useful: ORDER_STATE logging of cumQuantity/leavesQuantity (d8b6c847, landed as bf1dd290) — NOT YET READ.
 - Next: read ORDER_STATE for the cancelled orders; trace why 71 board spread rows reach ORDER_PATH zero times.
+### ncaaf-totals-dispersion — OPEN — opened 2026-08-30 — session 6475567d
+- Goal: compress NCAAF simulated-total dispersion (SD 5.77 vs market 3.46 = 1.67x) at its carrier, and MEASURE totals skill vs market -- a measurement `pick_gate` says has never existed.
+- Files: NONE HELD — c5afcf27 is landed; no further edits planned.
+- Status: DIAL BUILT AND VERIFIED, VALUE NOT FITTED, GATE NOT OPENED.
+- Verified: carrier confirmed -- `drive_success_probability` bottoms at 0.214 against the gate's measured 0.208, and it drives BOTH touchdown (proportional) and field-goal (0.08) probability. Default sensitivity 1.0 is an EXACT algebraic no-op for any anchor, so NFL's frozen profile and NCAAF alike are unchanged by this commit. Dial authority measured: scoring-rate spread 14.9pp -> 9.8 -> 7.2 -> 5.8 at sensitivity 1.0/0.6/0.4/0.3, with the even-teams level moving <5pp. `drive_priors` now receives the profile at all -- `drive_simulator` had one in scope and never passed it down.
+- NOT DONE, and both are required before any bet is placed on this: (1) FIT the sensitivity against a production-representative slate -- a synthetic sweep understates the range because `offense_index` is averaged with a fallback pulling it toward 0.5; `scripts/refit_ncaaf_smartsim2_payload.py` is the harness shape, benchmarked against the market rather than the model's own past. (2) MEASURE totals accuracy vs market -- `pick_gate` refuses on TWO grounds and dispersion is only one: "no model-vs-market accuracy measurement exists for totals at all, so default-deny applies on its own terms".
+- Do NOT re-sweep the rating weights: `calibration_profile.py:51-64` records that as a measured dead end (parity made totals WORSE, 7.83 vs 7.51).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
