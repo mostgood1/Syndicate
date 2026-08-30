@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 670 rules `[generated]`
+## Index — 672 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,8 +8,9 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 170**
+**FORBIDDEN — 172**
 
+- [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
 - [2026-08-30 — FORBIDDEN: offering a backup as a safety net without verifying it contains…](#2026-08-30-forbidden-offering-a-backup-as-a-safety-net-without-verifying-it-contains-what-its-name-claims-mine-held-the-resolved-file-lane-exchange-join-refusals)
 - [2026-08-30 — FORBIDDEN: sizing work off a REFUSAL COUNTER before checking how much of i…](#2026-08-30-forbidden-sizing-work-off-a-refusal-counter-before-checking-how-much-of-it-is-out-of-scope-clubs_unresolved-314-was-26-recoverable-markets-lane-exchange-join-refusals)
 - [2026-08-22 — FORBIDDEN: never read a `service_updated` deploy as shipping code. An env-…](#2026-08-22-forbidden-never-read-a-service_updated-deploy-as-shipping-code-an-env-var-change-restarts-the-service-on-the-commit-it-is-already-running)
@@ -139,6 +140,7 @@
 - [2026-08-29 — FORBIDDEN: verifying a DELETION by grepping for the deleted string, withou…](#2026-08-29-forbidden-verifying-a-deletion-by-grepping-for-the-deleted-string-without-first-proving-the-container-renders)
 - [2026-08-30 — FORBIDDEN: fixing the caller whose NAME matches what you are looking for,…](#2026-08-30-forbidden-fixing-the-caller-whose-name-matches-what-you-are-looking-for-without-checking-which-caller-actually-runs-603-shipped-inert-twice-for-this-lane-live-venue-order-placement)
 - [2026-08-30 — FORBIDDEN: an exact-count assertion over a pipeline that has an unmocked A…](#2026-08-30-forbidden-an-exact-count-assertion-over-a-pipeline-that-has-an-unmocked-additive-source-it-measures-the-machine-not-the-code)
+- [2026-08-30 — FORBIDDEN: `git checkout --theirs .` to clear a conflict in an append-only…](#2026-08-30-forbidden-git-checkout---theirs-to-clear-a-conflict-in-an-append-only-ledger-it-is-a-deletion-tool-and-it-staged-929-of-them-over-a-peers-work)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`

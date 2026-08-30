@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 670 rules `[generated]`
+## Index — 672 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -37,6 +37,47 @@
 ---
 
 
+
+
+### 2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch where every commit carries one bot author `[lane exchange-join-refusals]`
+
+- **What we believed:** a peer session attributed commit `c17bc3d8`
+  ("polymarket's fee MEASURED ... it is ZERO", touching `venue_fees.py` and
+  `kalshi_polymarket_arb.py`) to THIS session, and opened a substantive
+  contradiction against it — asking this session to adjudicate a fee model that
+  moved a break-even threshold 3.38c -> 0.88c and gates real money.
+- **What was actually true:** not this session's commit. It landed **45 seconds**
+  after this session's `a29dd997` and 5 minutes before `3a00f35d`. This session
+  touched **0 of its 5 files**, `state.md` included. The owner was
+  `live-venue-order-placement`, which claims both fee files in its `Files:` block
+  and whose checkpoint header describes exactly that work.
+- **Why the author field could not help:** every commit in this repo is authored
+  `github-actions[bot] <github-actions[bot]@users.noreply.github.com>`. Several
+  sessions push to one branch under one identity, so `%an` separates nobody and
+  temporal order is the only remaining signal. **It is not a signal.** Sessions
+  here commit minutes apart all evening.
+- **The rules going forward:**
+  1. **Attribute a commit by CONTENT against a lane's declared `Files:`, never
+     by position in the log.** One line does it:
+     `git show --stat <commit>` and compare to the `Files:` blocks in
+     `lanes.md`. `git log --oneline <mine> -- <path>` confirms the negative.
+  2. **A misattributed commit is not a harmless mixup when it carries a
+     REQUEST.** This one asked a session with no stake and no independent
+     reading to break a tie on a live financial threshold. Refusing to
+     adjudicate was the correct answer, not a lack of helpfulness — and the
+     refusal only became available by checking authorship first.
+- **Cost:** none. Caught before any edit to `state.md` or the fee model; the peer
+  re-verified and re-routed to the owning session.
+
+**THIRD INSTANCE TONIGHT OF ONE ROOT CAUSE — identity is not recoverable from the
+artifact in a shared tree.** (1) A lane block's PROSE naming a contested path
+inside a `- Files:` block was parsed as a live CLAIM on a file the lane was
+explicitly staying off. (2) A backup named `.CONFLICTED.bak` contained the
+RESOLVED file, because `cp` raced another session's resolution. (3) This. Each
+was caught by someone checking the artifact against an independent source rather
+than reading its name, its neighbours, or its timestamp.
+
+---
 
 ### 2026-08-30 — FORBIDDEN: offering a backup as a safety net without verifying it contains what its NAME claims. Mine held the RESOLVED file `[lane exchange-join-refusals]`
 
