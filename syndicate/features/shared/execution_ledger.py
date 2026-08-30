@@ -1627,6 +1627,31 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 # NO READABLE FILL PRICE -- STILL BOUND IN DOLLARS, using OUR
                 # OWN LIMIT as the per-contract ceiling.
                 #
+                # **THE PREMISE BELOW IS WRONG AND THE CORRECTION MATTERS.** A
+                # venue probe of `C65VD0R72KDG` on 2026-08-30T15:40:16Z returned
+                # `avgPx 0.2350`. **The venue DID report a fill price.** Ours
+                # read None because `polymarket_us_orders`'s FILL_ABOVE_LIMIT
+                # guard WITHHELD it: 0.2350 > 0.22 + 0.01, so it fired and
+                # nulled the field. This branch is therefore reached by OUR OWN
+                # withholding far more often than by venue silence, and
+                # "Polymarket gave no price" was never established.
+                #
+                # The withholding is arguably CORRECT here and is not being
+                # changed: that order is `side=ORDER_SIDE_SELL`,
+                # `intent=ORDER_INTENT_BUY_SHORT`, and whether 0.2350 against a
+                # 0.22 limit is a violation or price improvement depends on the
+                # side convention this module has already had wrong in BOTH
+                # directions. Withholding a price we cannot validate is right.
+                #
+                # BUT THE JUSTIFICATION FOR THIS BOUND IS WEAKER THAN IT READS.
+                # "A BUY cannot fill above its own limit" does not hold for a
+                # SELL or a short, so `contracts * requested_price` is NOT
+                # proven to be an upper bound in general. It DID hold on this
+                # order -- bound $3.4828 against an actual $3.0856 -- and the
+                # absurd band still catches unit errors, which is what this
+                # guard exists for. Treat it as a serviceable bound with a
+                # known gap, not a proof.
+                #
                 # THIS BRANCH CARRIED THE 2026-08-25 DEFECT THE DOLLAR BRANCH
                 # ABOVE WAS WRITTEN TO REMOVE. It compared CONTRACTS against a
                 # ROUNDING epsilon (`_FILL_COUNT_TOLERANCE`, 0.01) while its own

@@ -161,7 +161,32 @@ $0.00675/contract against ~$0.015 observed, wrong by 2.2x on every fill.)
 So `POLYMARKET_REJECTED_COST_RATE` is kept as a NAMED and still-live
 alternative, not a closed question.
 
-**THE DECIDING OBSERVATION, PRE-COMMITTED.** Order `C65VD0R72KDG` (stake $2.89,
+**THE DECIDING OBSERVATION CAME BACK, AND IT FALSIFIED ALL THREE MODELS
+INCLUDING MINE.** Probe of `C65VD0R72KDG`, 2026-08-30T15:40:16Z:
+
+    cumQuantity 13.13   avgPx 0.2350   commissionNotionalTotalCollected 0.1400
+
+    predicted  $0.197 (per-contract) / $0.163 / $0.094 (cost-basis)
+    ACTUAL     $0.1400
+
+    $0.010663 per contract      -- not $0.015
+    1.066% of $1 notional       -- not 150 bps
+    4.537% of cost basis        -- not 3.247%
+
+**`POLYMARKET_MEASURED_NOTIONAL_RATE = 0.015` DOES NOT SURVIVE THIS ORDER.** It
+was fitted on five fills at 0.43-0.47 and this one filled at 0.235 -- precisely
+the extrapolation the crossover analysis above predicted would break, and it
+broke in the direction that OVERSTATES the fee. The constant is left in place
+because one order is not a refit and an overstated cost is the safe direction
+for an edge calculation, but **it is now KNOWN WRONG at low prices and must not
+be quoted as measured outside 0.43-0.47.**
+
+The venue's `commissionsBasisPoints` read `"0"` while collecting $0.14, which is
+consistent with the shape argument above and rules the field out as a basis a
+fourth time.
+
+**THE OLD DECIDING-OBSERVATION TABLE, kept because the pre-commitment is the
+point:** Order `C65VD0R72KDG` (stake $2.89,
 implied fill ~0.2201 -- as far from 0.4620 as anything we hold) predicts three
 values that survive cent-rounding:
 
