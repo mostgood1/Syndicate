@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 672 rules `[generated]`
+## Index — 679 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -38,6 +38,56 @@
 
 
 
+
+
+### 2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form commits the WORKING TREE, which in this repo holds every other session's uncommitted edits to that file `[lane stale-row-cause-blind-spot]`
+
+- **What we believed:** `git commit --only -- <paths>` is the safe way to commit
+  in a shared tree, because the pathspec decides the contents rather than the
+  shared index. That is true and it is why it was chosen — the index really can
+  hold another session's staged work, and this form ignores it.
+- **What was actually true:** the pathspec form commits the **working tree**
+  state of those paths. For a file only this session touches that is exactly
+  right. For a SHARED file — `lanes.md`, `learnings.md`, `state.md`,
+  `deploys.md` — the working tree already contains every other session's
+  uncommitted edits, and they all ship. Commit `888d02ee` carried another
+  session's closure of `venue-first-market-universe` from OPEN to CLOSED. **I
+  did not close that lane, do not own it, and had no way to judge whether the
+  closure was ready.**
+- **AND IT RUNS BOTH WAYS, observed within the hour.** Commit `fde61650`
+  ("lanes: CLOSE venue-first-market-universe") swept THIS session's pending
+  `stale-row-cause-blind-spot` lane block into their commit. Neither session
+  chose to publish the other's work; the tree did it.
+- **How we found out:** a rebase. The commit would not fast-forward, and the
+  3-way merge of `lanes.md` conflicted on a lane block whose two sides were
+  CLOSED (mine) and OPEN (theirs) — for a lane I had never edited. Comparing
+  base/mine/theirs on that one heading is what exposed it.
+- **The rules going forward:**
+  1. **Never commit a shared ledger file by pathspec from the shared tree.**
+     Build the blob deterministically instead: take `origin/main`'s version,
+     apply YOUR edit to that, and commit it via
+     `update-index --cacheinfo` / `write-tree` / `commit-tree`. Then the
+     committed content is provably `remote + your change` and nothing else.
+  2. **Before committing any shared file, diff the working copy against
+     `origin/main` and read every hunk.** If a hunk is not yours, you are about
+     to publish someone else's draft. `git diff origin/main -- <file>` is the
+     whole check.
+  3. This does NOT retract the existing rule about the shared INDEX. Both are
+     real and they are different: the index can hold a stale-HEAD revert, the
+     working tree can hold another session's half-finished edit. `--only`
+     dodges the first and walks into the second.
+- **Cost:** none shipped wrong — caught during the rebase, the commit was
+  rebuilt from `origin/main` with only this session's two code files, and
+  `lanes.md` was left exactly as the remote had it. The other session's closure
+  then landed under their own commit, which is where it belonged.
+
+**THE GENERAL SHAPE, and it is the fourth instance tonight:** in a tree several
+sessions share, an artifact does not carry the identity of who made it — not a
+commit (author is one bot for everyone), not a lane claim (prose parsed as a
+claim), not a backup (named for a state it did not hold), and not a working-tree
+edit. **Attribution has to come from outside the artifact every time.**
+
+---
 
 ### 2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch where every commit carries one bot author `[lane exchange-join-refusals]`
 

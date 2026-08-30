@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 672 rules `[generated]`
+## Index — 679 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,8 +8,9 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 172**
+**FORBIDDEN — 176**
 
+- [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
 - [2026-08-30 — FORBIDDEN: offering a backup as a safety net without verifying it contains…](#2026-08-30-forbidden-offering-a-backup-as-a-safety-net-without-verifying-it-contains-what-its-name-claims-mine-held-the-resolved-file-lane-exchange-join-refusals)
 - [2026-08-30 — FORBIDDEN: sizing work off a REFUSAL COUNTER before checking how much of i…](#2026-08-30-forbidden-sizing-work-off-a-refusal-counter-before-checking-how-much-of-it-is-out-of-scope-clubs_unresolved-314-was-26-recoverable-markets-lane-exchange-join-refusals)
@@ -141,6 +142,9 @@
 - [2026-08-30 — FORBIDDEN: fixing the caller whose NAME matches what you are looking for,…](#2026-08-30-forbidden-fixing-the-caller-whose-name-matches-what-you-are-looking-for-without-checking-which-caller-actually-runs-603-shipped-inert-twice-for-this-lane-live-venue-order-placement)
 - [2026-08-30 — FORBIDDEN: an exact-count assertion over a pipeline that has an unmocked A…](#2026-08-30-forbidden-an-exact-count-assertion-over-a-pipeline-that-has-an-unmocked-additive-source-it-measures-the-machine-not-the-code)
 - [2026-08-30 — FORBIDDEN: `git checkout --theirs .` to clear a conflict in an append-only…](#2026-08-30-forbidden-git-checkout---theirs-to-clear-a-conflict-in-an-append-only-ledger-it-is-a-deletion-tool-and-it-staged-929-of-them-over-a-peers-work)
+- [2026-08-30 — FORBIDDEN: measuring a FILL-time cost from a SETTLEMENT-time quantity. Rea…](#2026-08-30-forbidden-measuring-a-fill-time-cost-from-a-settlement-time-quantity-realized-pl-is-exit---entry-a-commission-taken-at-fill-is-invisible-to-it-by-construction-so-the-method-returns-zero-whether-or-not-a-fee-was-charged)
+- [2026-08-30 — FORBIDDEN: attributing a commit to a session by ADJACENCY. And: a method t…](#2026-08-30-forbidden-attributing-a-commit-to-a-session-by-adjacency-and-a-method-that-cannot-return-a-non-zero-answer-has-not-measured-zero)
+- [2026-08-30 — FORBIDDEN: gating one instance of a shared cause](#2026-08-30-forbidden-gating-one-instance-of-a-shared-cause)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -191,7 +195,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 495**
+**Rules and corrections — 498**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -484,6 +488,9 @@
 - [2026-08-29 — a null from an instrument you have not calibrated is not evidence. RUN THE…](#2026-08-29-a-null-from-an-instrument-you-have-not-calibrated-is-not-evidence-run-the-control)
 - [2026-08-30 — CORRECTION to the entry above: my "VENUE_REPRICE never fires" was LOG TRUN…](#2026-08-30-correction-to-the-entry-above-my-venue_reprice-never-fires-was-log-truncation-not-absence-the-rule-i-wrote-from-it-was-right-the-evidence-i-wrote-it-from-was-not)
 - [2026-08-30 — RULE: an artifact is evidence only once you have checked it contains what…](#2026-08-30-rule-an-artifact-is-evidence-only-once-you-have-checked-it-contains-what-its-name-claims-four-instances-in-one-session)
+- [2026-08-30 — checks that AGREE are only independent if they differ in the decisive vari…](#2026-08-30-checks-that-agree-are-only-independent-if-they-differ-in-the-decisive-variable)
+- [2026-08-30 — "not priceable" and "no board row" are different problems with different o…](#2026-08-30-not-priceable-and-no-board-row-are-different-problems-with-different-owners)
+- [2026-08-30 — an orphaned `autostash` is somebody's work, and nothing reads a stash list](#2026-08-30-an-orphaned-autostash-is-somebodys-work-and-nothing-reads-a-stash-list)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
