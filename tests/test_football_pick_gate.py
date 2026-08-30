@@ -25,6 +25,7 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.features.football import pick_gate
+from syndicate.features.shared.market_basis_edge import MODEL_BASIS
 from syndicate.features.football.pick_gate import MarketVerdict
 from syndicate.features.football.pick_gate import LIFT_CONDITION
 from syndicate.features.football.pick_gate import board_notice
@@ -39,7 +40,15 @@ def _open_ncaaf_markets():
     """Force the three board markets open, leaving the rest of the registry."""
     patched = dict(pick_gate._SERVING_REGISTRY)
     for market in ("spread", "moneyline", "total"):
-        patched[("ncaaf", market)] = MarketVerdict(servable=True, reason="TEST: forced open")
+        # THREE-TUPLE KEY. The registry gained a BASIS dimension on 2026-08-29
+        # so a market-basis edge stops sharing a verdict with the model's. A
+        # two-tuple key here does not raise -- it simply never matches, so the
+        # gate stays shut and `test_off_is_not_on` fails with "gate-open board
+        # served nothing", which reads as a broken board rather than a stale
+        # fixture.
+        patched[("ncaaf", market, MODEL_BASIS)] = MarketVerdict(
+            servable=True, reason="TEST: forced open"
+        )
     return patch.dict(pick_gate._SERVING_REGISTRY, patched, clear=True)
 
 
@@ -175,7 +184,7 @@ class FilterAndNoticeTests(unittest.TestCase):
         markets = ("spread", "moneyline", "total")
         self.assertIsNotNone(board_notice("ncaaf", markets))
         patched = dict(pick_gate._SERVING_REGISTRY)
-        patched[("ncaaf", "total")] = MarketVerdict(servable=True, reason="TEST")
+        patched[("ncaaf", "total", MODEL_BASIS)] = MarketVerdict(servable=True, reason="TEST")
         with patch.dict(pick_gate._SERVING_REGISTRY, patched, clear=True):
             self.assertIsNone(board_notice("ncaaf", markets))
 

@@ -56,7 +56,16 @@ def test_price_columns_sort_on_the_rows_own_side_not_the_projections():
     """
     html = _html()
     start = html.index("function sortValue")
-    body = html[start:start + 2600]
+    # SCOPED TO THE FUNCTION, NOT TO A CHARACTER COUNT. This read
+    # `html[start:start + 2600]`, and on 2026-08-29 a comment added inside
+    # `case "edge"` pushed `(r.consensus || {})[priceSide]` past 2,600
+    # characters -- so the test failed while the code it guards was correct and
+    # present. A fixed window silently stops covering the tail of whatever it
+    # points at as that grows, which is the opposite of what a guard should do:
+    # the failure mode is a false alarm today and, once someone "fixes" it by
+    # bumping the number, a shrinking real window tomorrow.
+    end = html.index("function sortRows", start)
+    body = html[start:end]
     assert "var priceSide = (r.sides || [])[0];" in body
     for expr in ("(r.best || {})[priceSide]", "(r.consensus || {})[priceSide]",
                  "(r.modelled_fair || {})[priceSide]", "noVigFair(r, priceSide)"):

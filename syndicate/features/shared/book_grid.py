@@ -42,6 +42,7 @@ from syndicate.features.shared.book_shortlist import (
     is_direct_feed_book,
 )
 from syndicate.features.shared.opportunity_signals import consensus_vigged_price
+from syndicate.features.shared.market_basis_edge import market_basis_edge
 
 # The market instance, i.e. everything except which book quoted it and which
 # side it is. Mirrors `market_sides_for_quote`'s own base tuple exactly -- if
@@ -566,6 +567,34 @@ def build_book_grid(
                 ).get("commence_time")
                 or ""
             ) or None
+            # THE MARKET-BASIS VERDICT, attached at the producer.
+            #
+            # `edge_vs_consensus_pct` in `best[side]` is the NUMBER; this is
+            # whether the number may be shown and whether it may be called a
+            # pick. The policy belongs here because every input its guards need
+            # -- fresh-book count, the staleness flags, the start time -- is
+            # already in hand, and a consumer that recomputed them would be a
+            # second owner of a rule that must have exactly one.
+            #
+            # **BELOW `commence_time`, NOT INSIDE THE SIDES LOOP ABOVE**, and
+            # the difference is not stylistic. `commence_time` is a plain local
+            # reassigned once per grid row; read from inside the sides loop it
+            # is not undefined, it silently holds the PREVIOUS row's value. The
+            # pregame guard would then have been evaluated against a different
+            # game's kickoff -- no exception, no log line, and wrong only on the
+            # rows where it mattered. Written down because the first draft of
+            # this attach did exactly that.
+            #
+            # Attached for EVERY sport, not only the gated ones: the claim
+            # ("this book beats the market's own consensus") is identical
+            # arithmetic everywhere, and a per-sport attach would show it on
+            # NCAAF while silently omitting it on NFL.
+            for side in side_names:
+                side_best = best.get(side)
+                if isinstance(side_best, dict):
+                    side_best["market_basis"] = market_basis_edge(
+                        side_best, commence_time=commence_time, now=now
+                    ).as_payload()
             grid.append(
                 {
                     "sport": key[0],

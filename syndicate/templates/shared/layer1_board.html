@@ -117,6 +117,13 @@
   .l1-best { color: #34d399; font-weight: 700; }
   .l1-edge-pos { color: #34d399; }
   .l1-edge-neg { color: #f87171; }
+  /* A MARKET-basis edge, deliberately NOT green. Green is the model's colour on
+     this board and a price-shopping delta is a weaker, different claim; giving
+     it the same colour is how "+2.16 better than the consensus price" gets read
+     as "+2.16% expected value". Amber reads as "look at this" without reading
+     as "the model likes this", and the dotted underline marks it as a cell with
+     a `title` worth hovering. */
+  .l1-edge-mkt { color: #fbbf24; border-bottom: 1px dotted #fbbf2455; }
   .l1-gap { color: #f0b429; font-size: 11px; cursor: help; }
   .l1-empty { padding: 26px 12px; color: #8fa2b8; font-size: 13px; }
   .l1-empty code { color: #f0b429; }
@@ -787,10 +794,19 @@
         + (r.line === null || r.line === undefined ? "" : r.line) + " " + segOf(r);
       case "side": return String(priceSide || "");
       case "proj": return (p.projected === null || p.projected === undefined) ? null : p.projected;
-      case "edge":
+      case "edge": {
         if (p.edge_vs_market_pct !== null && p.edge_vs_market_pct !== undefined) return p.edge_vs_market_pct;
         if (p.edge_vs_line !== null && p.edge_vs_line !== undefined) return p.edge_vs_line;
+        // Same precedence the CELL uses, so the column sorts on the number it
+        // is showing. A sort key that reads a different field from its own cell
+        // is the failure this switch's header comment already records for the
+        // price columns -- the arrows flip and the board does not move.
+        var mbs = (best || {}).market_basis || null;
+        if (mbs && mbs.displayable && mbs.edge_pct !== null && mbs.edge_pct !== undefined) {
+          return mbs.edge_pct;
+        }
         return null;
+      }
       case "best": return (best.price === null || best.price === undefined) ? null : best.price;
       case "fair": {
         var mf = (r.modelled_fair || {})[priceSide] || {};
@@ -938,6 +954,25 @@
       // formatter would be worse: it would print "+0.2%" for +0.19 rebounds --
       // a fabricated number in the wrong unit, which is the failure mode this
       // board is least allowed to have.
+      //
+      // THREE, since 2026-08-29. The third is not the model's at all.
+      //
+      // `best[side].market_basis` is the MARKET-basis edge: the best quoted
+      // price against the market's own multi-book consensus. It uses no model,
+      // so it survives a sport whose model is gated -- which is the whole
+      // reason it is read here. Measured on production the same day, NCAAF
+      // served 90 of 90 sides carrying that number while 45 of 45 rows rendered
+      // "·", because this function read only the model fields. The producer
+      // (`shared/market_basis_edge.py`) owns every guard and has already
+      // decided `displayable`; this must NOT second-guess it with a threshold
+      // of its own, or there are two policies and the page shows whichever is
+      // stricter for reasons no one can find.
+      //
+      // It reads on EVERY side, not just `onProj`. A price-shopping delta is a
+      // property of the PRICE, so it belongs to whichever side is quoted -- the
+      // `onProj` restriction exists because a model projection describes one
+      // side only, and applying it here would blank the number on exactly the
+      // half of the board the model never had an opinion about.
       var edge = null, edgeUnit = "";
       if (onProj) {
         if (p.edge_vs_market_pct !== null && p.edge_vs_market_pct !== undefined) {
@@ -946,10 +981,16 @@
           edge = p.edge_vs_line; edgeUnit = "line";
         }
       }
-      var edgeCls = edge === null || edge === undefined ? "" : (edge > 0 ? "l1-edge-pos" : "l1-edge-neg");
-      var edgeTxt = edge === null || edge === undefined ? (edgeWhy ? "·*" : "·")
-        : (edgeUnit === "pct" ? pct(edge)
-           : (edge > 0 ? "+" : "") + Number(edge).toFixed(2) + " vs line");
+      // MODEL FIRST, MARKET AS FALLBACK -- never merged. Where the model has an
+      // edge that is the stronger claim and it keeps the cell; where it does
+      // not, the cell shows the market's own number rather than a dash. The two
+      // are never added, averaged, or spelled the same way: they are different
+      // assertions and the suffix below is what keeps them distinguishable.
+      var mb = (best || {}).market_basis || null;
+      if (edge === null && mb && mb.displayable && mb.edge_pct !== null
+          && mb.edge_pct !== undefined) {
+        edge = mb.edge_pct; edgeUnit = "mkt";
+      }
       // WHY a dash is a dash. An edge suppressed because the game is LIVE is a
       // different fact from no projection at all, and both render as "·".
       // `edge_unavailable_reason` is the incoming contract for the first (the
@@ -957,10 +998,39 @@
       // `probability_unavailable_reason` already explains why a mean-based
       // model cannot express its edge as a percentage. Read defensively so this
       // works before and after that change ships.
+      //
+      // **MOVED ABOVE `edgeTxt`, 2026-08-29, AND THAT IS A BUG FIX.** It was
+      // declared below, so the `edgeWhy ? "·*" : "·"` test one line down read a
+      // hoisted `undefined` and took the bare-dash branch EVERY time: the
+      // asterisk that tells a reader there is a reason to hover has never once
+      // rendered. The `title` itself worked, because it is computed after -- so
+      // the caveat was present in the DOM and unreachable in the UI, which is
+      // precisely the "stated refusal that nobody could read" that
+      // `ncaaf/game_projections.py` chose this field to avoid. It picked the
+      // right channel; the channel was broken.
+      //
+      // The market-basis reason is appended LAST so it never displaces a model
+      // reason: where the model is suppressed, that is the more important thing
+      // to say, and where it is not, `mb.reason` explains why the market number
+      // is missing or is not a pick.
       var edgeWhy = p.edge_unavailable_reason
         || (edge === null ? p.probability_unavailable_reason : "")
         || (edgeUnit === "line" ? p.probability_unavailable_reason : "")
+        || (mb ? (edgeUnit === "mkt" ? mb.label : mb.reason) : "")
         || "";
+      var edgeCls = edge === null || edge === undefined ? ""
+        // A market-basis edge gets its OWN class. It must not be coloured like a
+        // model edge -- same colour, same weight, different claim is how a price
+        // -shopping delta gets read as "the model likes this".
+        : (edgeUnit === "mkt" ? "l1-edge-mkt" : (edge > 0 ? "l1-edge-pos" : "l1-edge-neg"));
+      var edgeTxt = edge === null || edge === undefined ? (edgeWhy ? "·*" : "·")
+        : (edgeUnit === "pct" ? pct(edge)
+           // "mkt" carries a visible suffix rather than sharing the model's
+           // bare percent. The suffix is the only thing standing between a
+           // +2.16 price-shopping delta and a reader who thinks it is +EV.
+           : edgeUnit === "mkt"
+             ? (edge > 0 ? "+" : "") + Number(edge).toFixed(2) + " mkt"
+             : (edge > 0 ? "+" : "") + Number(edge).toFixed(2) + " vs line");
       var edgeTitle = edgeWhy ? ' title="' + esc(edgeWhy) + '"' : "";
       var name = r.player_name || (g.matchup || "");
       var priced = best.price !== null && best.price !== undefined;

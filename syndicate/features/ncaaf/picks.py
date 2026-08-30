@@ -377,6 +377,202 @@ def _standalone_smartsim2_picks_context(*, season: int, resolved_week: int, week
 _PICKS_BOARD_MARKETS = ("spread", "moneyline", "total")
 
 
+def _market_basis_pick_cards(
+    season: int, week: int, *, limit: int = 12, counts: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    """Picks whose edge is the MARKET's, not the model's.
+
+    The model gate denies a claim it measured and lost. This is the OTHER claim
+    on the same rows -- *this book's price is better than the market's own
+    consensus* -- which uses no model and which the gate never measured. Until
+    2026-08-29 the two shared a key, so the second was suppressed by the first
+    and this page rendered a blackout over 90 sides that each carried a computed
+    number.
+
+    READS ARTIFACTS, COMPUTES NOTHING. `read_book_grid_artifact` is the
+    web-side reader by its own docstring ("Cheap: one file, already bounded"),
+    and `market_basis_edge` is arithmetic over fields the worker already wrote.
+    No shard is pivoted here -- that is worker work and would not belong on a
+    request path.
+
+    Week -> dates via `_ncaaf_week_kickoff_dates`, which exists for exactly this
+    mismatch: the quote log shards by DATE, this board is scoped by WEEK, and
+    2026 week 1 runs 08-29 to 09-07, so a window guessed from the week number
+    would miss most of the slate.
+    """
+    from syndicate.features.ncaaf.cards import _ncaaf_week_kickoff_dates
+    from syndicate.features.shared.book_grid_artifact import read_book_grid_artifact
+    from syndicate.features.shared.market_basis_edge import market_basis_edge
+
+    dates = _ncaaf_week_kickoff_dates(season, week)
+    best_by_bet: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    dates_read = dates_absent = sides_seen = 0
+
+    for date_str in dates:
+        payload = read_book_grid_artifact("ncaaf", date_str)
+        if not isinstance(payload, dict):
+            # ABSENT, not empty. The reader's own contract says so, and counting
+            # it separately is what keeps "no grid published for this date" from
+            # reading as "no edges on this date".
+            dates_absent += 1
+            continue
+        dates_read += 1
+        for row in payload.get("rows") or ():
+            if not isinstance(row, dict):
+                continue
+            for side in row.get("sides") or ():
+                block = (row.get("best") or {}).get(side)
+                if not isinstance(block, dict):
+                    continue
+                sides_seen += 1
+                verdict = market_basis_edge(
+                    block, commence_time=row.get("commence_time")
+                )
+                if not verdict.servable or verdict.edge_pct is None:
+                    continue
+                key = (
+                    str(row.get("event_id") or ""),
+                    str(row.get("market") or ""),
+                    str(row.get("segment") or "full"),
+                    str(side),
+                )
+                current = best_by_bet.get(key)
+                if current is None or verdict.edge_pct > current["edge_pct"]:
+                    best_by_bet[key] = {
+                        "edge_pct": verdict.edge_pct,
+                        "anchor_books": verdict.anchor_books,
+                        "label": verdict.as_payload()["label"],
+                        "row": row,
+                        "side": side,
+                        "block": block,
+                    }
+
+    ordered = sorted(best_by_bet.values(), key=lambda item: item["edge_pct"], reverse=True)
+    if counts is not None:
+        counts.clear()
+        counts.update(
+            {
+                "dates_in_week": len(dates),
+                "dates_read": dates_read,
+                "dates_absent": dates_absent,
+                "sides_considered": sides_seen,
+                "servable": len(ordered),
+                # A cap that bites must announce it -- the same out-param idiom
+                # `_collapse_results` uses for the gate counts above.
+                "shown": min(len(ordered), limit),
+                "withheld_by_cap": max(0, len(ordered) - limit),
+            }
+        )
+
+    cards: list[dict[str, Any]] = []
+    for item in ordered[:limit]:
+        row = item["row"]
+        block = item["block"]
+        home_team = str(row.get("home_team") or "Home").strip()
+        away_team = str(row.get("away_team") or "Away").strip()
+        market = str(row.get("market") or "BET").strip().lower()
+        provider = str(block.get("bookmaker") or "Book").strip() or "Book"
+        side = str(item["side"])
+        side_label = _side_label(side, home_team=home_team, away_team=away_team)
+        line_text = _line_for_side(row.get("line"), side, market)
+        cards.append(
+            {
+                "title": (
+                    f"{away_team} at {home_team} {market.upper()} {side_label}"
+                    + ("" if line_text == "-" else f" {line_text}")
+                ),
+                # Same `market` vocabulary `_collapse_results` uses, and for the
+                # same reason: without it `home.py._is_game_level_rank_card_market`
+                # returns False and these game bets flow into pregame_props()
+                # mislabelled as player props.
+                "market": (
+                    "moneyline" if market == "h2h"
+                    else "spread" if market == "spreads"
+                    else "total" if market == "totals"
+                    else "game bet"
+                ),
+                "eyebrow": provider,
+                "badge": f"{item['edge_pct']:+.2f} vs consensus",
+                "meta": f"{away_team} at {home_team}",
+                "metrics": [
+                    {"label": "Best price", "value": format_moneyline(block.get("price"))},
+                    {"label": "Consensus", "value": format_moneyline(
+                        (row.get("consensus") or {}).get(side)
+                    )},
+                    {"label": "Books", "value": str(item["anchor_books"])},
+                    {"label": "Line", "value": line_text},
+                ],
+                # THE SENTENCE THAT KEEPS THIS FROM BEING READ AS THE MODEL'S.
+                # It names the basis, the anchor and what the number is not, on
+                # the card itself rather than in a page-level footnote a reader
+                # scrolling a list of cards never reaches.
+                "summary": (
+                    f"{provider} is quoting {format_moneyline(block.get('price'))} on "
+                    f"{side_label}"
+                    + ("" if line_text == "-" else f" {line_text}")
+                    + f" where {item['anchor_books']} books average "
+                    f"{format_moneyline((row.get('consensus') or {}).get(side))}. This is a "
+                    "PRICE-SHOPPING edge, not a model opinion and not expected value: the "
+                    "NCAAF model is gated and had no part in this."
+                ),
+                "list_items": [
+                    item["label"],
+                    f"Market: {market} · side: {side_label}"
+                    + ("" if line_text == "-" else f" at {line_text}"),
+                    f"Anchor: {item['anchor_books']}-book vigged consensus (no sharp book in the NCAAF feed)",
+                    "The model's own edge is withheld on this game; see the panel below for why.",
+                ],
+            }
+        )
+    return cards
+
+
+def _side_label(side: str, *, home_team: str, away_team: str) -> str:
+    """`home`/`away` -> the team's name; `over`/`under` unchanged.
+
+    A card headed "Memphis Tigers at UNLV Rebels H2H away" makes the reader do
+    the mapping, and on a spread they will do it while looking at a line stated
+    from the OTHER side. Name the team.
+    """
+    token = str(side or "").strip().lower()
+    if token == "home":
+        return home_team or "home"
+    if token == "away":
+        return away_team or "away"
+    return token or "side"
+
+
+def _line_for_side(line: Any, side: str, market: str = "") -> str:
+    """The line as THIS side holds it.
+
+    `book_grid._canonical_line` normalises every row's `line` to the away/over
+    perspective on purpose, so a SPREAD row's stored 4.5 is the AWAY team's
+    +4.5 and the home side of that same row is -4.5. Printing the stored number
+    against the home side states the opposite bet -- the exact sign ambiguity
+    `ncaaf/game_projections.py` refuses to guess at when it declines to give
+    spreads a probability. Here the side IS known, so the sign can be resolved
+    rather than guessed.
+
+    **THE SIGN CONVENTION IS THE SPREAD'S ALONE**, and applying it everywhere is
+    a bug this function shipped for one draft: a TOTAL of 50.5 rendered as
+    "+50.5", which reads as a handicap rather than a points total, and the same
+    flip on the under side would have printed "-50.5" -- a number no total has.
+    Totals are unsigned and identical on both sides; only which side you take
+    changes.
+    """
+    if line is None:
+        return "-"
+    try:
+        value = float(line)
+    except (TypeError, ValueError):
+        return str(line)
+    if str(market or "").strip().lower() not in {"spread", "spreads", "handicap"}:
+        return f"{value:g}"
+    if str(side or "").strip().lower() == "home":
+        value = -value
+    return f"{value:+g}"
+
+
 def _suppressed_picks_context(
     *,
     season: int,
@@ -384,36 +580,65 @@ def _suppressed_picks_context(
     active_weeks: list[int],
     gate: dict[str, Any],
 ) -> dict[str, Any]:
-    """The picks board with nothing to serve, saying so and saying why.
+    """The picks board with no MODEL pick to serve, saying so and saying why.
 
     Deliberately NOT an error or an empty board. A blank surface with no reason
     reads as a data outage, and the repair somebody reaches for is deleting the
     gate. The board keeps its navigation so projections stay reachable -- the
     model's opinion is still published on /ncaaf/cards, it is only the BET that
     is withheld.
+
+    **AND IT IS NO LONGER NECESSARILY EMPTY (2026-08-29).** The model gate now
+    speaks only for the model's basis, so this page serves MARKET-basis picks
+    beside the notice. When there are none the page is exactly what it was; when
+    there are some, the notice becomes a caveat on a board rather than the whole
+    board. The two are never blended: the cards say what they rest on and the
+    panel says what is withheld.
     """
     weeks = active_weeks or [1]
     resolved_week = _clamp_week(selected_week or (weeks[-1] if weeks else 1))
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
+    market_counts: dict[str, Any] = {}
+    try:
+        market_cards = _market_basis_pick_cards(season, resolved_week, counts=market_counts)
+    except Exception:
+        # A market-basis failure must NOT take down the page that explains the
+        # model suppression. The notice below is the thing this surface has
+        # always owed the reader; the cards are the addition.
+        market_cards, market_counts = [], {"error": "market-basis pick build failed"}
+    if market_counts.get("withheld_by_cap"):
+        print(
+            "NCAAF_MARKET_BASIS_PICKS_CAPPED "
+            f"shown={market_counts.get('shown')} withheld={market_counts.get('withheld_by_cap')}",
+            flush=True,
+        )
     return {
         **build_rank_page_context(
             selected_date=_selected_date_token(resolved_week, season=season),
             route_path="/ncaaf/picks",
             intro_title="NCAAF Picks",
             intro_body=(
-                "NCAAF picks are currently suppressed. Projections remain "
-                "available on the cards board; what is withheld is the "
-                "recommendation to bet them."
+                "NCAAF MODEL picks are suppressed -- the model is measured as losing "
+                "to the closing line, and the panel below says by how much. The cards "
+                "here are a different claim: books that are quoting a better price "
+                "than the rest of the market on the same bet. That is price shopping, "
+                "not a model opinion and not expected value."
+                if market_cards
+                else
+                "NCAAF model picks are currently suppressed, and no market-basis pick "
+                "clears its bar this week either. Projections remain available on the "
+                "cards board; what is withheld is the recommendation to bet them."
             ),
             aria_label="NCAAF picks board",
             source_path="syndicate/features/football/pick_gate.py",
             source_title="NCAAF pick serving gate",
             source_date_display=f"Week {resolved_week}",
-            rank_cards=[],
+            rank_cards=market_cards,
             using_sample_data=False,
             header_stats=[
-                {"label": "Cards", "value": "0"},
-                {"label": "Suppressed markets", "value": str(len(gate["markets"]))},
+                {"label": "Cards", "value": str(len(market_cards))},
+                {"label": "Basis", "value": "market" if market_cards else "-"},
+                {"label": "Model picks withheld", "value": str(len(gate["markets"]))},
                 {"label": "Weeks", "value": str(len(weeks) or "-")},
             ],
             module_links=build_module_links(resolved_week, "Picks"),
@@ -446,13 +671,27 @@ def _suppressed_picks_context(
                     "loses, so this is a property of the model rather than of a "
                     "tuning constant."
                 ),
-                "list_items": [reason["detail"] for reason in gate["reasons"]],
+                "list_items": [reason["detail"] for reason in gate["reasons"]]
+                + (
+                    [
+                        "The cards above are NOT affected by this measurement. They "
+                        "rest on cross-book price dispersion and the model plays no "
+                        "part in them -- see each card's own summary for its anchor.",
+                    ]
+                    if market_cards
+                    else []
+                ),
             },
         ),
         "week": resolved_week,
         "available_weeks": weeks,
         "season": season,
         "picks_gate": gate,
+        # The instrument for this surface. `servable` vs `sides_considered` is
+        # the rate that says whether an empty board is a working filter or a
+        # missing artifact, and `dates_absent` separates the two -- a count with
+        # no denominator cannot.
+        "market_basis": market_counts,
     }
 
 

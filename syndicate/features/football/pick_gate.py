@@ -41,11 +41,36 @@ WHAT THIS DELIBERATELY DOES NOT DO:
   * It is NOT silent. notice_for() gives every caller the reason and the
     numbers. An empty picks page with no explanation reads as an outage, and
     someone will "fix" it by removing the gate.
+
+  * **It does NOT govern an edge the model had no part in.** Added 2026-08-29,
+    and the omission was costing the whole board. Every verdict above is about
+    the MODEL's claim, but the registry was keyed on `(sport, market)` alone --
+    so it also denied a claim that was never measured here and needs no model:
+    *this book's price is better than the market's own consensus.* Measured on
+    production the same day, NCAAF served 45 grid rows in which 90 of 90 sides
+    carried a computed `edge_vs_consensus_pct` and 45 of 45 rows showed no edge
+    at all, because both the board and the sizing path read only the model
+    field. A gate is entitled to deny what it measured; denying a different
+    claim by sharing a key with it is an accident, not a policy.
+
+    The registry is therefore keyed on `(sport, market, BASIS)`. Model basis is
+    unchanged in every value and still default-deny. Market basis is governed by
+    `shared/market_basis_edge.py`, which owns its own four guards and is where
+    the reasoning for them lives -- **including that it is a price-shopping
+    delta against a VIGGED consensus and is not expected value.** Nothing here
+    relaxes anything: a market-basis row still has to clear that module, and an
+    unknown basis still lands on DENY.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
+
+from syndicate.features.shared.market_basis_edge import BASIS as MARKET_BASIS
+from syndicate.features.shared.market_basis_edge import MIN_BOOKS_TO_SERVE
+from syndicate.features.shared.market_basis_edge import MIN_EDGE_PCT_TO_SERVE
+from syndicate.features.shared.market_basis_edge import MODEL_BASIS
+from syndicate.features.shared.market_keys import canonical_market_key
 
 
 @dataclass(frozen=True)
@@ -73,8 +98,8 @@ class MarketVerdict:
 
 # Markets a model claim is priced against. Anything not listed is denied by
 # default -- see the module docstring.
-_SERVING_REGISTRY: dict[tuple[str, str], MarketVerdict] = {
-    ("ncaaf", "spread"): MarketVerdict(
+_SERVING_REGISTRY: dict[tuple[str, str, str], MarketVerdict] = {
+    ("ncaaf", "spread", MODEL_BASIS): MarketVerdict(
         servable=False,
         reason="NCAAF margin model loses to the closing line",
         measured_on="2026-08-19",
@@ -94,7 +119,7 @@ _SERVING_REGISTRY: dict[tuple[str, str], MarketVerdict] = {
             "cannot lift this."
         ),
     ),
-    ("ncaaf", "moneyline"): MarketVerdict(
+    ("ncaaf", "moneyline", MODEL_BASIS): MarketVerdict(
         servable=False,
         reason="NCAAF moneyline is the same margin distribution, priced differently",
         measured_on="2026-08-19",
@@ -108,7 +133,7 @@ _SERVING_REGISTRY: dict[tuple[str, str], MarketVerdict] = {
             "label, which is a loophole, not a narrower scope."
         ),
     ),
-    ("ncaaf", "total"): MarketVerdict(
+    ("ncaaf", "total", MODEL_BASIS): MarketVerdict(
         servable=False,
         reason="NCAAF totals are over-dispersed and were never scored against the close",
         measured_on="2026-08-19",
@@ -124,16 +149,45 @@ _SERVING_REGISTRY: dict[tuple[str, str], MarketVerdict] = {
 }
 
 
-def _normalise_market(market: Any) -> str:
+#: `market_keys`' canonical game-line vocabulary -> this registry's spelling.
+#: Held as a MAPPING FROM the authority rather than as a private list, and the
+#: test `test_pick_gate_market_folding_covers_market_keys` derives one from the
+#: other. `learnings.md` 2026-08-23 FORBIDS a module holding its own list of
+#: market names -- "hold BOTH spellings AND a test that derives one set from the
+#: other; a private list with no such test is a silent time bomb". This is that
+#: shape: the fallback below still exists because the registry's own words
+#: ("spread"/"moneyline"/"total") are not `market_keys`' words ("spreads"/"h2h"/
+#: "totals"), and a rename on either side must not silently open the gate.
+_CANONICAL_TO_REGISTRY: dict[str, str] = {
+    "h2h": "moneyline",
+    "spreads": "spread",
+    "totals": "total",
+}
+
+
+def _normalise_market(market: Any, sport: Any = None) -> str:
     """Fold the market spellings that reach this code onto registry keys.
 
     The same market arrives as 'SPREAD', 'spread', 'moneyline_home' and
     'game bet' depending on which surface built the row, so a bare equality
     check would silently pass most of them straight through the gate.
+
+    `canonical_market_key` FIRST when a sport is in hand -- it is the one
+    authority for market names (`#224`) and it resolves spellings this function
+    never knew about. Its answer is then folded onto the registry's own
+    vocabulary. The hand-rolled rules below remain as the no-sport fallback and
+    as the branch for spellings the authority returns None for; they are second,
+    not first, so a market the authority knows can no longer be classified here
+    by accident.
     """
     text = str(market or "").strip().lower()
     if not text:
         return ""
+    if sport is not None:
+        canonical = canonical_market_key(sport, text)
+        folded = _CANONICAL_TO_REGISTRY.get(str(canonical or "").strip().lower())
+        if folded:
+            return folded
     if text.startswith("moneyline") or text in {"ml", "h2h"}:
         return "moneyline"
     if text.startswith("spread") or text in {"ats", "handicap", "run_line", "puck_line"}:
@@ -143,12 +197,67 @@ def _normalise_market(market: Any) -> str:
     return text
 
 
-def market_verdict(sport: str, market: str) -> MarketVerdict:
-    """The serving decision for one (sport, market). Unknown -> DENY."""
-    key = (str(sport or "").strip().lower(), _normalise_market(market))
+#: The market-basis verdict. Not in `_SERVING_REGISTRY` because it is not a
+#: per-(sport, market) measurement and pretending otherwise would invite someone
+#: to "measure" it per market and find nothing to measure -- the claim is
+#: arithmetic over live prices, identical in every sport, and its conditions are
+#: per-ROW rather than per-market. `market_basis_edge` enforces those per row;
+#: this verdict only says the BASIS is allowed to reach a picks surface at all.
+_MARKET_BASIS_VERDICT = MarketVerdict(
+    servable=True,
+    reason="best available price against the market's own multi-book consensus",
+    measured_on="2026-08-29",
+    detail=(
+        "A PRICE-SHOPPING delta, NOT expected value: the anchor is "
+        "`consensus_vigged_price` and nothing de-vigs it. It asserts only that "
+        "one book is quoting a better number than the others on the same market "
+        "at the same moment, which uses no model and is unaffected by the model "
+        "measurements above. Price shopping is measured at +2.79 ROI pts "
+        "platform-wide and +2.95 pts on the NFL prop grade, both on controlled "
+        f"identical bets. Per-row conditions are owned by "
+        f"`shared/market_basis_edge.py` and are NOT relaxed here: at least "
+        f"{MIN_BOOKS_TO_SERVE} fresh books, a pregame market, no stale side, and "
+        f"at least {MIN_EDGE_PCT_TO_SERVE:.2f} pts against consensus. On the "
+        "2026-09-05 NCAAF pregame slate those leave 3 of 552 sides, and on "
+        "2026-09-06 they leave zero -- a short or empty list is the correct "
+        "output, not a threshold to tune."
+    ),
+)
+
+
+def market_verdict(sport: str, market: str, *, basis: str = MODEL_BASIS) -> MarketVerdict:
+    """The serving decision for one (sport, market, basis). Unknown -> DENY.
+
+    `basis` defaults to MODEL so every existing caller keeps the verdict it had
+    before the dimension existed. That default is deliberate and is the safe
+    direction: a caller that has not been taught about bases asks the same
+    question it always asked and gets the same answer.
+    """
+    resolved_basis = str(basis or "").strip().lower() or MODEL_BASIS
+    if resolved_basis == MARKET_BASIS:
+        return _MARKET_BASIS_VERDICT
+    key = (
+        str(sport or "").strip().lower(),
+        _normalise_market(market, sport),
+        resolved_basis,
+    )
     known = _SERVING_REGISTRY.get(key)
     if known is not None:
         return known
+    if resolved_basis != MODEL_BASIS:
+        # An unrecognised basis is the most dangerous input here: it is not a
+        # market we failed to measure, it is a claim nobody has described. It
+        # must not inherit the model branch's wording either, which would
+        # attribute a measurement to it that was never taken.
+        return MarketVerdict(
+            servable=False,
+            reason=f"unknown edge basis {resolved_basis!r}",
+            detail=(
+                "Default-deny. A basis names WHAT a pick claims; an unrecognised "
+                f"one claims something undescribed. Known bases: {MODEL_BASIS!r}, "
+                f"{MARKET_BASIS!r}."
+            ),
+        )
     return MarketVerdict(
         servable=False,
         reason=(
@@ -162,8 +271,8 @@ def market_verdict(sport: str, market: str) -> MarketVerdict:
     )
 
 
-def is_servable(sport: str, market: str) -> bool:
-    return market_verdict(sport, market).servable
+def is_servable(sport: str, market: str, *, basis: str = MODEL_BASIS) -> bool:
+    return market_verdict(sport, market, basis=basis).servable
 
 
 def filter_pick_rows(
@@ -171,22 +280,34 @@ def filter_pick_rows(
     rows: Iterable[Mapping[str, Any]],
     *,
     market_key: str = "market",
+    basis_key: str = "edge_basis",
 ) -> tuple[list[Mapping[str, Any]], dict[str, int]]:
     """Split priced pick rows into (servable, suppressed-counts-by-market).
 
     Returns the counts so callers can SAY what was withheld. A suppression
     nobody can see is one somebody deletes.
+
+    A row may declare its own `edge_basis`. **A row that does not declare one is
+    read as MODEL basis, not as "any basis"** -- these rows come from the
+    recommendation artifact, whose edge has always been the model's, so absent
+    means model here rather than unknown. The permissive reading would let a
+    model pick through by omitting a field, which is the failure mode
+    `learnings.md` calls "unknown must not default permissive"; the strict
+    reading costs a market-basis producer one explicit field.
     """
     kept: list[Mapping[str, Any]] = []
     suppressed: dict[str, int] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        market = _normalise_market(row.get(market_key))
-        if is_servable(sport, market):
+        market = _normalise_market(row.get(market_key), sport)
+        basis = str(row.get(basis_key) or "").strip().lower() or MODEL_BASIS
+        if is_servable(sport, market, basis=basis):
             kept.append(row)
         else:
             label = market or "unknown"
+            if basis != MODEL_BASIS:
+                label = f"{label} ({basis})"
             suppressed[label] = suppressed.get(label, 0) + 1
     return kept, suppressed
 
@@ -209,9 +330,15 @@ def notice_for(sport: str, suppressed: Mapping[str, int] | None = None) -> dict[
         "suppressed_count": total,
         "markets": markets,
         "headline": (
-            f"{total} {str(sport or '').upper()} pick{plural} withheld: the "
+            f"{total} {str(sport or '').upper()} MODEL pick{plural} withheld: the "
             f"model does not beat the closing line in {scope}."
         ),
+        # NAMED, because the page now serves a second kind of pick beside these.
+        # A headline that says "picks withheld" next to a list of picks reads as
+        # a contradiction, and the reader resolves it by distrusting whichever
+        # one they notice second.
+        "basis": MODEL_BASIS,
+        "other_bases_unaffected": [MARKET_BASIS],
         "reasons": [
             {
                 "market": m,
@@ -265,7 +392,7 @@ def board_notice(sport: str, markets: Iterable[str]) -> dict[str, Any] | None:
     wanted = [str(m).strip().lower() for m in markets if str(m).strip()]
     if not wanted:
         return None
-    blocked = [m for m in wanted if not is_servable(sport, m)]
+    blocked = [m for m in wanted if not is_servable(sport, m, basis=MODEL_BASIS)]
     if len(blocked) < len(wanted):
         return None
     verdicts = {m: market_verdict(sport, m) for m in blocked}
@@ -274,9 +401,14 @@ def board_notice(sport: str, markets: Iterable[str]) -> dict[str, Any] | None:
         "sport": str(sport or "").lower(),
         "markets": blocked,
         "headline": (
-            f"{str(sport or '').upper()} picks are suppressed: the model does "
-            "not beat the closing line in any market this board serves."
+            f"{str(sport or '').upper()} MODEL picks are suppressed: the model "
+            "does not beat the closing line in any market this board serves."
         ),
+        # See notice_for(). This notice is now a BANNER on a board that may
+        # still have market-basis rows under it, not necessarily a blackout --
+        # the caller decides which, and says so.
+        "basis": MODEL_BASIS,
+        "other_bases_unaffected": [MARKET_BASIS],
         "reasons": [
             {
                 "market": m,
