@@ -38107,3 +38107,46 @@ anchored on 11 soft books with 0 sharps. Enabling needs the key set on
 `219d79ca`) and on `refresh-worker` (the sweep), then a deploy of each — an env
 change does not reach a running process. My `render_env_set.py` call was refused
 by the permission classifier and was NOT worked around.
+
+## 2026-08-30 03:29:51Z — refresh-worker `77e61607` — STALE_ROW_CAUSE classifies every stale row `[lane stale-row-cause-blind-spot]`
+
+deploy: `dep-da9q7bpf2nfc7389ug30`, trigger `api`, live **03:32:26Z**. Locks: claim
+held by `stale-row-cause-blind-spot` from 03:18:30Z; preflight CLEAR **bound to
+`--target-commit 77e61607`** (an unbound CLEAR was refused by the guard, correctly).
+Waited the full 25-min spacing and the in-flight MLB sim (`sim_procs` 1 → 0 at
+03:25:13Z); fired 42s after CLEAR. No `--allow-rapid`, no `--force`.
+
+**verify: the per-sport cause counts SUM to that sport's `stale=` instead of capping
+at 3.** Read from production `03:42:11Z`, first board publish after boot:
+
+    STALE_ROW_CAUSE mlb[stale=2 worst=940s sidecar=164s market_gone=2]
+                    soccer[stale=293 worst=12971s sidecar=6729s market_gone=293]
+
+    mlb     stale=2    counted=2     SUM MATCHES  (stale<=3 -- NOT discriminating)
+    soccer  stale=293  counted=293   SUM MATCHES  <- the cap would have printed 3
+
+**Only the soccer row proves anything** and the instrument was built to insist on
+that: a sport with `stale<=3` cannot distinguish "fixed" from "capped", so the
+verifier refused to pass until it saw `stale>3`. Prior art on this exact line:
+`soccer[... market_gone=3]` with `stale=288`, which reads as "3 of 288 explained"
+and meant "3 of 3 sampled".
+
+**A FALSE FAIL ON THE FIRST ATTEMPT, recorded because it nearly became the result.**
+The first verifier queried a 30-minute log window and took the newest line —
+`03:20:08Z`, twelve minutes BEFORE the deploy — read the old build's capped output
+and reported FAIL on a fix that was working. Fixed with a hard cutoff at the
+deploy's `finishedAt`. A verification that can read pre-fix output cannot fail
+honestly.
+
+**THE FINDING THIS NOW MAKES READABLE IN ONE LINE:** 293 of 293 stale soccer rows
+are `market_gone` — one cause, 100%, previously invisible. Those rows are ~⅓ of the
+served board, PREGAME, with kickoff ~15h out, so the feed did not legitimately
+close. **Whether to DROP them or carry a per-family staleness ceiling instead of the
+flat 14h is an open product decision and was deliberately NOT taken.**
+
+**NOT VERIFIED HERE, and not read as improvement:** worker RSS 900MB at boot against
+1534MB before. Every deploy reboots, so that number is boot-confounded by
+construction. Also carried by this deploy but owned by other lanes: the NCAAF
+game-line region widening (`odds_regions.py`, `ncaaf-market-basis-picks`) and the
+`venue_basis` fan-out carry (`live-venue-order-placement`) — each owns its own
+reading.
