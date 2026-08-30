@@ -16399,29 +16399,34 @@ Single fetch per date, same instant, `/api/board/book-grid?sport=mlb&date=…`:
   team totals need a BOARD ROW, not a model (the sim already computes them).
 - Superseded narrative: `log/2026-08-30.md`.
 
-### ncaaf-market-basis-picks — **CLOSED-VERIFIED 2026-08-30** — NCAAF serves picks on a MARKET basis; sharps restored; two board-emptying defects fixed — opened 2026-08-29 — session 7b55ff7c-dc3d-46dd-b8bb-e63e4862f11d
-- OUTCOME, all verified on the SERVED payload (evidence + the unverified list:
-  `log/2026-08-30.md`; measurements: `deploys.md`; facts: `state.md`
-  `[ncaaf-market-basis-edge]`, `[layer1-board-date-scoping]`):
-  90/90 sides carried a computed market edge while 45/45 rows rendered none;
-  book set 11 -> 25 (pinnacle, novig); displayed 143 -> 418, servable 5 -> 125;
-  board `window=day` 7 -> 8 games (MEM @ UNLV); `date=2026-09-05` 0 -> 67 games.
-- The MODEL gate is UNCHANGED and still denies at n=2233, t=17.20. What shipped
-  is a BASIS dimension, not a relaxation. The edge is a PRICE-SHOPPING delta
-  against a vigged consensus and is **not** expected value.
+### ncaaf-market-basis-picks — **CLOSED-VERIFIED 2026-08-30** — NCAAF market-basis picks + sharps; then, at user direction, the venue fill-price halt — opened 2026-08-29 — session 7b55ff7c-dc3d-46dd-b8bb-e63e4862f11d
+- OUTCOME A (the lane's own goal, verified earlier): 90/90 sides carried a
+  computed market edge while 45/45 rows rendered none; book set 11 -> 25
+  (pinnacle, novig); displayed 143 -> 418, servable 5 -> 125; board
+  `window=day` 7 -> 8 games (MEM @ UNLV); `date=2026-09-05` 0 -> 67 games.
+  The MODEL gate is UNCHANGED and still denies at n=2233, t=17.20.
+- OUTCOME B (venue work, done AFTER close at explicit user direction, on
+  `live-venue-order-placement`'s territory): the 12h live-money halt's premise
+  — "the venue gave no fill price" — was FALSE. `venue_order_view` already read
+  `avgPx`; two bugs discarded it, plus a third that treated `0.0000` as a price.
+  **verify: `FILL_ABOVE_LIMIT` 36 firings/hour on `filled=0.0` -> NOTHING;
+  `recorded=0.235`, `fill_cost=3.08555` on four orders, both side conventions.**
 - Commits: `0810e187`, `843fadc5`, `f42008e4`, `fa01a3a4`, `5f773832`,
-  `b34a18a9`, `d7cda903`, `7cea63c5`. Deployed: web, refresh-worker,
-  live-odds-worker.
-- **TWO FILES EDITED ACROSS LANES ON EXPLICIT USER OVERRIDE `[2026-08-30]`.**
-  Both holders' sessions are absent from the roster (active AND archived) and
-  `release_phantom_lane_claims.py` frees neither.
-  `syndicate/blueprints/intelligence.py` (`portfolio-decision-and-execution`) —
-  scope: `board_layer1_api`'s read set + one import, nothing else.
-  `scripts/run_refresh_worker.py` (`portfolio-ledger-service-split`) — scope:
-  `_sport_covers_date` + `_book_grid_forward_days` read the artifact window.
-- OWED, not blocking: the market-basis edge has never been GRADED (no NCAAF 2026
-  outcomes exist) and its two serving constants (3 books, 1.0 pt) are unfitted.
-- Claims: NONE held. All deploy claims released. Worktree clean.
+  `b34a18a9`, `d7cda903`, `a6eeaf17`, `0a7f7923`, `1693dde8` + ledger.
+  Live: web, refresh-worker, live-odds-worker (`fcadd126`).
+- **CROSS-LANE EDITS, each on EXPLICIT user authorisation, scope logged:**
+  `blueprints/intelligence.py` (`portfolio-decision-and-execution`) — the board
+  read set only. `scripts/run_refresh_worker.py`
+  (`portfolio-ledger-service-split`) — artifact window, then the read-only venue
+  probe. `polymarket_us_orders.py` holds no OPEN claim.
+- OWED, not blocking, and handed on: the zero-guard's dangerous path (a BUY
+  reporting `avgPx=0` that THEN fills) has never run in production and is
+  unit-tested only. `_COMPLEMENT_MARGIN = 0.10` is a judgement, not a fit.
+- Narrative + dead ends: `log/2026-08-30.md` (two entries). Facts: `state.md`
+  `[ncaaf-market-basis-edge]`, `[layer1-board-date-scoping]`,
+  `[polymarket-fill-price-is-reported]`, `[live-odds-worker-deploy-gate]`.
+  Measurements: `deploys.md`.
+- Claims: NONE held. All deploy claims released. Worktree clean, 0 unpushed.
 
 ### stale-row-cause-blind-spot — **CLOSED-VERIFIED 2026-08-30** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
 - OUTCOME: `STALE_ROW_CAUSE` classifies EVERY stale row instead of the 3 worst

@@ -575,6 +575,75 @@ version — would have unindexed the whole prop book. 9 tests, 127 passing.
 live-odds-worker over the same 2h window. Execution stamps `ticker_resolver(row)`
 verbatim from the plan, so the ticker is decided at commit time.
 
+## [polymarket-fill-price-is-reported] THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08-30 18:41Z, live-odds-worker `fcadd126`, lane ncaaf-market-basis-picks]`
+
+Three sessions diagnosed the 2026-08-30 execution halt as *"the venue gave no
+price"*. **It gave one.** `venue_order_view` already read `avgPx`; TWO bugs in
+the same function discarded it, and fixing either alone still left
+`fill_price=None` — which is what forced `execution_ledger` onto its contract
+bound, refused `13.13 > 10.8953`, and blocked BOTH venues.
+
+Venue payload for `C65VD0R72KDG`, read by a one-shot probe (`a6eeaf17`):
+
+    cumQuantity 13.13   leavesQuantity 0   ORDER_STATE_FILLED
+    avgPx 0.2350        price(limit) 0.22
+    side ORDER_SIDE_SELL   intent BUY_SHORT   outcomeSide OUTCOME_SIDE_NO
+    commissionNotionalTotalCollected 0.1400
+
+1. **The complement was applied on a side LABEL.** `outcomeSide=NO` turned
+   `0.2350` into `0.7650`, absurd against a `0.22` limit — so the downstream
+   guard correctly refused it. The guard worked; the complement was wrong. The
+   reading is now chosen by which of `{avgPx, 1-avgPx}` the SUBMITTED LIMIT
+   agrees with — semantics-free, because `order["price"]` is our own limit
+   echoed back on the same scale. Reproduces 4/4 of the recorded fills.
+2. **The limit check was DIRECTIONAL and read one way.** "A BUY cannot fill
+   above its limit" is true; the unencoded inverse — a SELL cannot fill BELOW
+   its limit — is equally true. This order is a SELL, so `0.2350 > 0.22` is
+   price IMPROVEMENT and was refused as a violation.
+3. **A value outside (0,1) is ABSENCE wearing a number.** `avgPx='0.0000'` on an
+   unfilled order was treated as a price: on a BUY it survived as
+   `recorded=0.0`, and `fill_stake_dollars` is derived as
+   `contracts x fill_price`, so a real position would book at **$0**.
+
+**verify:** `FILL_PRICE avgPx='0.2350' recorded=0.235`, `fill_cost=3.08555`
+(= `13.13 x 0.235`, now OBSERVED not bounded); four orders across both side
+conventions. **And the strongest reading — `FILL_ABOVE_LIMIT` fired 36 times in
+one hour on orders with `filled=0.0` and now returns NOTHING.** That line means
+"this price was impossible"; it had become noise and is trustworthy again.
+
+**NOT PROVEN:** no BUY has reported `avgPx=0` and THEN filled since the deploy.
+`FILL_PRICE_ZERO_WITH_FILL`/`FILL_PRICE_OUT_OF_RANGE` silence is equally what
+"the condition never arose" looks like. **The halt's RECOVERY is not attributable
+to this** — `9733a01a` + `77ca329a` cleared it; this fixes what is RECORDED.
+
+## [live-odds-worker-deploy-gate] THE DEPLOY GATE IS UNREACHABLE ON live-odds-worker, and the documented override CANNOT WORK AS WRITTEN `[measured 2026-08-30 18:0x-18:35Z]`
+
+`deploy_preflight --service live-odds-worker` returned **`HOLD` on ~76 samples
+across ~30 minutes**, sampled as tightly as every 4s, and never once `CLEAR`.
+Independently reproduces `live-venue-order-placement`'s 36-poll finding.
+
+**Cause: `refresh_odds_sources.py` (pid 2580) is a PERSISTENT sweep** walking the
+soccer league list (`epl -> mls -> eredivisie -> ...`) under a stable parent pid.
+It briefly showed 2 jobs and went straight back to 3. The only window is the gap
+between sweeps, and **a preflight sample itself takes ~10s** — so a shorter gap
+is not observable at all. (A window DID open later at ~18:4xZ and another lane
+took the claim, so this is "unreachable in practice", not "impossible".)
+
+**`SYNDICATE_DEPLOY_GUARD=off` AS AN INLINE PREFIX DOES NOTHING.** The hook is a
+separate process that reads its own environment BEFORE the command runs, so
+prefixing the sanctioned deploy entrypoint is blocked exactly as if unset
+(measured). Making it take means putting the var in Claude Code's own
+environment — `.claude/settings.json` — which disables the guard **repo-wide, for
+every session, permanently**. That is not a per-deploy override.
+
+**The narrow form that works:** the same one-liner run in a HUMAN's own shell,
+where hooks do not apply and nothing persists. Used for `fcadd126` at 18:37:12Z.
+
+**A SECOND, UNRELATED HOOK BEHAVIOUR worth knowing:** the guard pattern-matches
+the COMMAND STRING, so a `cat >>` writing ledger prose that merely NAMES the
+deploy script is blocked as if it were a deploy. Write such prose from a file,
+not from a heredoc.
+
 ## [polymarket-h2h-buys-the-wrong-side] POLYMARKET MONEYLINES BUY THE WRONG TEAM: `outcomes[0]` is not reliably the YES leg `[verified 2026-08-28, lanes portfolio-venue-and-side-integrity / venue-candidate-key-token-guard]`
 
 `outcome_side_for_index` assumes `OUTCOME_SIDE_YES` buys `outcomes[0]`. It does

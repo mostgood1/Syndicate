@@ -7575,3 +7575,67 @@ worked: 0.515 floors to 0.51 at a 0.01 tick, which is a real mechanism that
 produces exactly the observed number. **An arithmetic coincidence that explains
 the data is not evidence that it produced the data.**
 
+
+## 2026-08-30 — FORBIDDEN: presenting an agreement as corroboration without asking what INPUT the two sides share. Three blind cross-checks in one evening, from one root
+
+- **What happened.** Two sessions each produced a "confirmation" that could not
+  have failed. Mine: I offered `limit/implied` agreeing with `count/requested`
+  to four decimals as independent support for a venue's fill count. They are the
+  same expression — both reduce to `limit*count/stake`, the stake cancels — so
+  the "agreement" holds for **every** count, including a 1,089,530-contract
+  fixed-point error, which it duly called self-consistent and price-improving.
+  Theirs, earlier: ten orders agreeing on a fee at -2.37 bps, measured by
+  `exit - entry`, which can never contain a fill-time commission — ten
+  repetitions of one blind spot. Theirs, later: two fee models "distinguished"
+  on five fills whose price band **straddles the exact price where the two models
+  are identical by construction** (`0.015 = 0.03247 * p -> p = 0.4620`, fills at
+  0.43-0.47), so the winner was noise around a crossing point.
+- **The rule going forward, and it costs one line of algebra BEFORE collecting
+  data:** *ask what input the two sides share.* Shared and cancelling -> an
+  identity. Shared and invisible to both -> a blind spot. Shared as a fitting
+  range sitting on the crossover -> a degenerate comparison. If the answer is
+  "nothing", the check may be real; if it is anything else, it is not evidence.
+- **The sibling test, for when nothing is shared but the check is still blind:**
+  *what result would have looked different?* A check with no such result is not
+  a check. Also: compare the model separation against the measurement QUANTUM —
+  all five fills above separated by $0.0009-$0.0051 against a $0.01 rounding
+  step, so **no fill in that fit could ever have decided it**, band width or not.
+
+## 2026-08-30 — FORBIDDEN: concluding "the venue does not report X" from X being absent in OUR stored row. Read the payload, not the record of it
+
+- **What happened.** A Polymarket order halted live execution on both venues for
+  ~12 hours. Three sessions, mine included, diagnosed it as *"this path has no
+  fill price"* and built a fix around that premise (a limit-derived dollar
+  bound). **The venue had reported `avgPx: 0.2350` the whole time.**
+  `venue_order_view` already read the field; two separate lines then discarded
+  it — a complement applied on a side LABEL (`outcomeSide=NO` turned 0.2350 into
+  0.7650), and a limit check that encoded only the BUY direction so a SELL
+  filling ABOVE its limit read as a violation. Fixing either alone still left
+  `fill_price=None`.
+- **The rule going forward:** `field is None` in a stored row is a fact about
+  the WRITER, never about the venue. Before claiming a source does not supply
+  something, read the source — a one-shot read-only probe took minutes and
+  settled what three sessions had been reasoning about for hours. The same
+  applies to `venue_count: None`, which I used to hypothesise a null-comparison
+  bug in a guard that never reads that row at all.
+- **Corollary, measured the same day:** a zero is not an absence marker unless
+  something makes it one. `avgPx='0.0000'` on an unfilled order was treated as a
+  price; on a BUY it survived to `fill_price=0.0`, and `fill_stake_dollars` is
+  derived as `contracts x fill_price`, so a real position would have booked at
+  **$0**. **A value outside a quantity's valid range must be read as ABSENT at
+  the point of extraction** — not corrected downstream, where only one branch
+  (the sell side) happened to catch it.
+
+## 2026-08-30 — FORBIDDEN: trusting a guard that has been crying wolf. Count its false firings before reading its silence OR its alarm
+
+- **What happened.** `FILL_ABOVE_LIMIT` means "this order could not have filled
+  at this price". It was firing **36 times in one hour on orders with
+  `filled=0.0`** — orders that had not filled at all — because a zero price is
+  below any limit. Nobody was reading it, and it was the one line that would
+  have named the real defect on the order that halted trading.
+- **The rule going forward:** before citing a guard's alarm as evidence, or its
+  silence as safety, measure its FALSE firing rate on current production. A
+  guard firing on a routine, healthy state is not a guard; it is noise wearing a
+  guard's name, and it is invisible precisely because everyone has learned to
+  skip it. The fix is to make the routine case silent, not to raise the
+  threshold: the correct end state here is `nothing matched`.
