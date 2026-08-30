@@ -543,7 +543,9 @@ def apply_venue_quotes(
             # works on whichever one you happen to read -- the exact failure
             # that made the first pass land on the function production does not
             # run. Both call the same two helpers.
-            if _unnamed_quote_is_ambiguous(found, candidate, row_claimants.get(sport) or {}):
+            if _unconfirmed_on_a_contested_key(
+                found, row_game, candidate, row_claimants.get(sport) or {}
+            ):
                 ambiguous_unnamed_rejected += 1
                 continue
             quote, key = found, candidate
@@ -775,7 +777,21 @@ def _key_claimants(
             continue
         market = row.get("market")
         line = _as_float_or_none(row.get("line"))
-        for side in (row.get("sides") or []):
+        # BOTH ROW SHAPES. A grid row carries `sides` (a list); a CANDIDATE row
+        # carries `side` (a scalar) -- `_candidate_keys` reads the singular.
+        #
+        # Reading only `sides` produced an EMPTY map on the candidate path,
+        # which made the guard silently inert there: `len(claimants.get(k) or
+        # ()) > 1` is False for a key that is simply absent, so "I have no idea"
+        # took the permissive branch. That is this repo's own
+        # `unknown-must-not-default-permissive` rule, broken in the helper
+        # written to enforce a different one. Measured: the first deploy of this
+        # guard cut multi-fixture refs 11 -> 6 and stopped there.
+        sides = row.get("sides")
+        if not sides:
+            single = row.get("side")
+            sides = [single] if single is not None else []
+        for side in sides:
             key = str(quote_key(sport, market, str(side), line))
             claimants.setdefault(key, set()).add(event_id)
     return claimants
@@ -785,10 +801,14 @@ def _quote_names_no_game(quote: Any) -> bool:
     return not str(getattr(quote, "game", None) or "").strip()
 
 
-def _unnamed_quote_is_ambiguous(
-    quote: Any, candidate_key: Any, claimants: Mapping[str, set[str]]
+def _unconfirmed_on_a_contested_key(
+    quote: Any,
+    row_game: Any,
+    candidate_key: Any,
+    claimants: Mapping[str, set[str]],
 ) -> bool:
-    """May this UNNAMED quote answer this key? Only if ONE game claims it.
+    """May this quote answer this key? On a CONTESTED key, only if both sides
+    NAME the same game.
 
     THE ASYMMETRY THIS REPLACES, and why it had to go. The first `#603` pass
     documented: *"a quote that names none is allowed through exactly as it is
@@ -809,9 +829,26 @@ def _unnamed_quote_is_ambiguous(
     that DOES name its game is untouched here; `_quote_is_for_another_game`
     owns that case.
     """
-    if not _quote_names_no_game(quote):
+    if len(claimants.get(str(candidate_key)) or ()) <= 1:
+        # Only one game could have produced this key. Whatever either side can
+        # or cannot name, there is nothing to confuse it with.
         return False
-    return len(claimants.get(str(candidate_key)) or ()) > 1
+    # CONTESTED. Positive confirmation is now REQUIRED, and it takes BOTH
+    # names. The first version of this guard asked only whether the QUOTE could
+    # name its game, which left the mirror-image hole wide open: when the ROW
+    # cannot be named, `_quote_is_for_another_game` also returns False (it
+    # cannot prove a mismatch), so a quote naming game X sailed onto a row
+    # naming nothing. Measured on `ncaaf`, where `game_token` returns None for
+    # every row -- `Memphis Tigers@UNLV Rebels` -> None.
+    #
+    # Refusing when either half is unnameable is the only rule that is safe in
+    # both directions. It costs coverage precisely where identity is unknown,
+    # which is where a match cannot be justified anyway.
+    quote_game = str(getattr(quote, "game", None) or "").strip()
+    row_token = str(row_game or "").strip()
+    if not quote_game or not row_token:
+        return True
+    return quote_game != row_token
 
 
 def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
@@ -1249,7 +1286,9 @@ def apply_venue_quotes_to_grid(
                 # a key that exactly ONE game claims. Measured: the first pass
                 # rejected 0 of these while 73% of verdict rows were served by a
                 # ref answering more than one fixture.
-                if _unnamed_quote_is_ambiguous(found, candidate, grid_claimants):
+                if _unconfirmed_on_a_contested_key(
+                    found, row_game, candidate, grid_claimants
+                ):
                     ambiguous_unnamed_rejected += 1
                     continue
                 quote = found

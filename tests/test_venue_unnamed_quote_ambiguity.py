@@ -112,6 +112,73 @@ def test_ONE_game_claiming_the_key_still_takes_an_unnamed_quote():
     assert grid[0]["best"]["over"]["price"] == -525
 
 
+def test_an_NCAAF_row_never_takes_a_quote_that_names_a_REAL_fixture():
+    """ncaaf has no club map -- `game_token('ncaaf', ...)` returns None for
+    every row -- so `_row_game_token` falls back to `evt:<event_id>`.
+
+    THE MECHANISM IS GUARD 1, NOT THIS FILE'S GUARD, and the distinction is
+    worth pinning rather than blurring. Because the fallback always yields SOME
+    token, `evt:evt-1` versus a real club pair is a provable mismatch and
+    `_quote_is_for_another_game` refuses it first. The contested-key rule never
+    gets a turn here.
+
+    Pinned anyway, because the OUTCOME is what production depends on and it is
+    reachable from two directions: if the `evt:` fallback were ever removed, the
+    row token would go None, guard 1 could no longer prove a mismatch, and the
+    contested-key rule below would become the only thing standing between a
+    Toledo@Miss State ticker and a Memphis@UNLV row.
+    """
+    now = time.time()
+    grid = [
+        _row("evt-1", "Memphis Tigers", "UNLV Rebels"),
+        _row("evt-2", "Toledo Rockets", "Mississippi State Bulldogs"),
+    ]
+    for row in grid:                      # ncaaf-style: unresolvable to a token
+        row["sport"] = "ncaaf"
+    quotes = {}
+    for side in ("over", "under"):
+        key = str(quote_key("ncaaf", "totals", side, 7.5))
+        quotes[key] = Quote(
+            key=key, source="kalshi", sport="ncaaf", market="totals", side=side,
+            probability=None, american=-525, line=7.5, fetched_at=now - 10.0,
+            venue_ref="tsc-cfb-toledo-mst-2026-09-04-total-49pt5",
+            game="mississippi state bulldogs+toledo rockets",
+        )
+    stats = apply_venue_quotes_to_grid(
+        grid, "ncaaf", "2026-08-29", collected={"quotes": quotes}, now=now
+    )
+    assert stats["repriced"] == 0, "a quote landed on a row it does not name"
+    for row in grid:
+        assert row["best"]["over"]["price"] == -110
+    # SOME guard refused all four sides. Which one is an implementation detail
+    # today and is asserted loosely on purpose -- asserting the wrong counter is
+    # how a test comes to pass for a reason it did not intend.
+    refused = stats["cross_game_rejected"] + stats["ambiguous_unnamed_rejected"]
+    assert refused == 4, stats
+
+
+def test_the_claimant_map_reads_BOTH_row_shapes():
+    """A grid row carries `sides` (list); a CANDIDATE row carries `side`
+    (scalar). Reading only the plural produced an EMPTY map on the candidate
+    path, and an absent key takes the permissive branch -- so the guard was
+    silently inert there. That is `unknown-must-not-default-permissive`, broken
+    inside the helper written to enforce a different rule."""
+    from syndicate.features.shared.venue_quote_fanin import _key_claimants
+
+    plural = [
+        {"sport": "soccer", "event_id": "e1", "market": "totals", "line": 3.5,
+         "sides": ["over", "under"]},
+        {"sport": "soccer", "event_id": "e2", "market": "totals", "line": 3.5,
+         "sides": ["over", "under"]},
+    ]
+    singular = [
+        {"sport": "soccer", "event_id": "e1", "market": "totals", "line": 3.5, "side": "over"},
+        {"sport": "soccer", "event_id": "e2", "market": "totals", "line": 3.5, "side": "over"},
+    ]
+    assert _key_claimants(plural, "soccer")["soccer|totals|over|3.5"] == {"e1", "e2"}
+    assert _key_claimants(singular, "soccer")["soccer|totals|over|3.5"] == {"e1", "e2"}
+
+
 def test_a_quote_that_NAMES_its_game_survives_a_contested_key():
     """The named path is untouched. This guard is about quotes that cannot say
     which game they price, never about ones that can."""
