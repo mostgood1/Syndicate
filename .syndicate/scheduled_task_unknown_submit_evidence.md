@@ -36,6 +36,24 @@ means nothing if no orders were being placed at all.
 
 Output lands in `.syndicate/findings_unknown_submit_live_evidence.md`.
 
+## 2026-08-30 — heartbeat added, because I had built the exact blind spot I keep logging
+
+The task was SILENT on a null run by design (a watcher that speaks hourly is one
+people stop reading). But silent-on-null plus `lastRunAt` recording DISPATCH
+rather than execution means **"it ran and found nothing" and "it never ran"
+are indistinguishable** — and this machine has stalled a scheduled run by 9h13m
+under Modern Standby, so that is not hypothetical.
+
+Step 0 now overwrites (never appends) `.syndicate/.unknown_submit_watch_heartbeat`
+with one line carrying the UTC timestamp and the counts, written FIRST and again
+at the END so a half-finished run is visible as one. **Local only, never
+committed** — it answers a local question ("did this machine run it recently")
+and committing it hourly would be the noise the silence was protecting against.
+
+Also pinned in step 4: when reporting nothing found, the `LIVE_ORDER` count for
+the same window must be stated. Absence of `http_503` is only evidence if orders
+were actually being placed; a zero-order window says nothing about 503s.
+
 ---
 
 ---
@@ -49,27 +67,31 @@ WHY THIS EXISTS. Two code paths shipped 2026-08-29 (`219d79ca` on live-odds-work
 
 Work in `C:\Users\tempadmin\OneDrive\Coding\Syndicate`.
 
+STEP 0 — HEARTBEAT, AND IT IS NOT OPTIONAL. Do this on EVERY run, first, before anything can fail. Overwrite (never append) the local file `.syndicate/.unknown_submit_watch_heartbeat` with ONE line:
+  <UTC timestamp> ran=1 unknown_submits=<n or ?> live_orders=<n or ?> probe_lines=<n or ?> note=<short>
+DO NOT COMMIT THIS FILE — it is a local liveness marker, it is gitignored-by-intent, and committing it hourly would be noise. Its whole purpose: this task is SILENT on a null run, so without a heartbeat "it ran and found nothing" and "it never ran / died on step 1" are indistinguishable, and `lastRunAt` records DISPATCH, not execution (this machine has stalled a scheduled run by 9h13m under Modern Standby). Rewrite the line at the END of the run too, with the real counts, so a half-finished run is visible as one.
+
 STEP 1 — the banner observable (no credentials needed):
   curl -s "https://syndicate-an21.onrender.com/api/portfolio/live?on=all"
-Parse JSON. Look at `unknown_submits`. If the list is EMPTY, there is nothing to capture — go to step 2 only if you want, otherwise stop silently. If it is NON-EMPTY, for every row record verbatim: `idempotency_key`, `venue_ticker`, `selected_date`, `requested_stake_dollars`, `status`, `error`, `venue_order_id`, `submitted_at`, `venue_resolved_at`, `prior_attempts`, and the whole `balance_evidence` object (`verdict`, `reason`, `window`, `opening_dollars`, `closing_dollars`, `delta_dollars`, `confounding_orders`). Also record `unknown_submit_dollars` and `unknown_submits_resolved`.
+Parse JSON. Look at `unknown_submits`. If NON-EMPTY, record verbatim for every row: `idempotency_key`, `venue_ticker`, `selected_date`, `requested_stake_dollars`, `status`, `error`, `venue_order_id`, `submitted_at`, `venue_resolved_at`, `prior_attempts`, and the whole `balance_evidence` object (`verdict`, `reason`, `window`, `opening_dollars`, `closing_dollars`, `delta_dollars`, `confounding_orders`). Also `unknown_submit_dollars` and `unknown_submits_resolved`.
 
 STEP 2 — the probe observable (needs credentials):
-Read `RENDER_API_KEY` from the gitignored `.env` in that directory by sourcing it in the same shell command; never print it. Owner id `tea-d2bb5n95pdvs73cje4fg`, service `srv-d91dpertqb8s73co8lt0` (live-odds-worker). Query the Render logs API for the last 90 minutes:
+Read `RENDER_API_KEY` from the gitignored `.env` by sourcing it in the same shell command; never print it. Owner `tea-d2bb5n95pdvs73cje4fg`, service `srv-d91dpertqb8s73co8lt0` (live-odds-worker). Query the Render logs API over the last 90 minutes:
   https://api.render.com/v1/logs?ownerId=<owner>&resource=<service>&startTime=<now-90min ISO Z>&limit=50&text=UNKNOWN_ORDER_PROBE
-Also query the same window with `text=http_503` and `text=OPERATOR_RESOLUTION`. Record any matching lines verbatim with timestamps. The `UNKNOWN_ORDER_PROBE` line is the prize: it carries `balance_settled=N` and a `findings=[...]` list containing `balance_evidence` per order.
+Also `text=http_503`, `text=OPERATOR_RESOLUTION`, and `text=LIVE_ORDER` (the last is the POSITIVE CONTROL — see step 4). Record matching lines verbatim with timestamps. The `UNKNOWN_ORDER_PROBE` line is the prize: it carries `balance_settled=N` and `findings=[...]` with `balance_evidence` per order.
 
-STEP 3 — write it down, and ONLY if something was found:
-Append to `.syndicate/findings_unknown_submit_live_evidence.md` (create with an `# ...` H1 if absent). Use a dedicated file — do NOT write to `lanes.md` or `state.md`; those are contended by many sessions and a scheduled writer will collide.
-Head each entry with the UTC timestamp. Record: the verbatim payload/log lines, then a one-line reading of what the evidence says — `not_placed` (balance flat across the submit), `placed` (balance fell by at least the stake), or `unknown` with its reason (`confounded` / `no_bracketing_reading` / `unreadable` / `moved_but_not_by_this_order`). `unknown` IS A REAL RESULT and must be recorded as one; on a busy slate `confounded` is the expected answer and is the guard refusing to guess, not a failure.
-Then commit and push ONLY that one file, from a throwaway worktree off origin/main, never from the shared primary tree:
+STEP 3 — write it down, ONLY if something was found:
+Append to `.syndicate/findings_unknown_submit_live_evidence.md` (create with an `# ...` H1 if absent). A DEDICATED file — do NOT write to `lanes.md` or `state.md`; those are contended by many sessions and a scheduled writer will eventually lose someone's work.
+Head each entry with the UTC timestamp. Record the verbatim payload/log lines, then a one-line reading: `not_placed` (balance flat across the submit), `placed` (balance fell by at least the stake), or `unknown` with its reason (`confounded` / `no_bracketing_reading` / `unreadable` / `moved_but_not_by_this_order`). `unknown` IS A REAL RESULT — on a busy slate `confounded` is expected and is the guard refusing to guess, not a failure.
+Then commit and push ONLY that one file, from a throwaway worktree off origin/main, NEVER from the shared primary tree:
   git worktree add --detach /c/tmp/usle origin/main
-  (write the file there, git add that path only, commit, git push origin HEAD:main, then git worktree remove --force /c/tmp/usle)
-Verify before pushing that `git diff --cached --numstat` shows ONLY that file.
+  (write it there, git add that path only, commit, git push origin HEAD:main, git worktree remove --force /c/tmp/usle)
+Before pushing, verify `git diff --cached --numstat` lists ONLY that file.
 
-IDEMPOTENCE: before appending, read the file and skip any `idempotency_key` or log timestamp already recorded. Running hourly must not produce duplicates.
+IDEMPOTENCE: before appending, read the file and skip any `idempotency_key` or log timestamp already recorded. Hourly runs must not duplicate.
 
-BE SILENT WHEN THERE IS NOTHING. If `unknown_submits` is empty and no matching log lines exist, write nothing, commit nothing, and report only "no unknown submit in window". Do not create files, do not open lanes, do not edit any other ledger file. A watcher that speaks every hour is one people stop reading.
+STEP 4 — reporting, and the control that makes a null mean something:
+BE SILENT WHEN THERE IS NOTHING: write no findings file, commit nothing, open no lane, edit no other ledger file. A watcher that speaks every hour is one people stop reading. (The heartbeat in step 0 is not "speaking" — it is a local file, not a message.)
+When you report nothing found, ALWAYS state the `LIVE_ORDER` count in the same window. **Absence of `http_503` is only evidence if orders were actually being placed.** If `LIVE_ORDER` is 0 the worker was idle and your null says nothing about 503s — say exactly that rather than "nothing found".
 
-DO NOT attempt to create an unknown submit. It would mean deliberately failing a real money order. If you see none, that is the correct and expected outcome on most runs.
-
-CAVEAT ON YOUR OWN READING: absence of `http_503` is only evidence if orders are actually being placed. If you report nothing found, also state the count of `LIVE_ORDER` lines in the same window as a positive control — if that is 0 too, the worker is idle and your null says nothing about 503s.
+DO NOT attempt to create an unknown submit. That would mean deliberately failing a real money order. Seeing none is the correct and expected outcome on most runs.
