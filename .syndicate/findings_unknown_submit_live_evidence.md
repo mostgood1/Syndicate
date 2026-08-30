@@ -143,3 +143,89 @@ DID exist observed them 86 times.
 unchanged. It needs a NEW unknown submit occurring after 2026-08-29. The hourly
 watcher is the right instrument and its cadence is adequate; leave it running.
 Nothing here should be read as the measurement the two closed lanes owe.
+
+---
+
+## 2026-08-30T17:56:00Z — CORRECTION to the entry above: the census was incomplete, and the cadence advice was WRONG
+
+A repo-wide grep finished after that entry was written and surfaced
+`.syndicate/findings_2026-08-29_unknown_submit_retry_provenance.md`, which
+records a **third** unknown submit the entry above did not know existed.
+
+### The third row
+
+`5c53789d4d21d05fc501b05d`, polymarket, `tsc-mls-nyr-phi-2026-08-29-3pt5`,
+MLS totals over 3.5, $1.84. Same `http_503` cause. Timeline (UTC):
+
+- 21:06:36 submit #1 -> 21:06:37 `http_503`, no order id, row `failed`
+- 21:12:49 / 21:18:48 `UNKNOWN_ORDER_PROBE unknown=1 evidenced=0 sole_claim=True`
+- **21:22:00 `OPERATOR_RESOLUTION finding=not_placed`**
+- 21:25:39 submit #2 (retry, freed by the resolution) -> ok, `C60JWBG0WKDK`
+- 21:32:20 reconciled `submitted->filled` 3.91 contracts @ $0.47
+
+**Open for 16 minutes**, not hours.
+
+### WHY THE ENTRY ABOVE MISSED IT — the counter is a biased sample, by construction
+
+`unknown_submits_resolved` counts rows with `operator_resolution` set AND an
+empty `venue_order_id`. A `not_placed` resolution sets `rejected`, and `rejected`
+is what lets `record_order` **pop the row and write a fresh one** on the retry —
+which deletes `operator_resolution`, `pre_resolution_status` and
+`pre_resolution_error`. That is DEFECT 1 in the retry-provenance findings, and it
+is confirmed live: today that row reads `status=filled`, `error=None`,
+`operator_resolution=None`, `prior_attempts=None`, with `submitted_at` rewritten
+to the RETRY's time (21:25:38) — no trace of the 503, the 16 unknown minutes, or
+the human judgement that released it.
+
+**So the counter cannot count any unknown submit that was retried. It is a
+census of the ones nobody re-bet** — and being retried is exactly what makes one
+clear FAST. The counter is therefore biased against precisely the short-window
+cases the watcher exists to catch. `unknown_submits_resolved=2` should be read as
+"at least 2", never as the population.
+
+### RETRACTED: "the window is hours, not minutes"
+
+The entry above measured 21h14m and 19h28m from a sample of two it wrongly
+believed was the whole population, and concluded an hourly watcher is
+"comfortably fast enough" and the cadence "should not be raised". **That is
+withdrawn.** With the third row the observed durations are:
+
+| row | cleared by | open for |
+|---|---|---|
+| `5c53789d…` (MLS, 08-29) | operator -> **retry** | **16m** |
+| `639bc193…` (NFL, 08-28) | operator only | 19h 28m |
+| `4b9fbe59…` (MLB, 08-28) | operator only | 21h 14m |
+
+The split is not random: the two long ones were never re-proposed by the board,
+so nothing cleared them but a human; the short one was re-proposed and the retry
+closed it. **The task brief's "clears within minutes" was right, and the entry
+above talked itself out of a correct premise using a sample that had the fast
+cases deleted from it.**
+
+An hourly poll against a 16-minute window catches it roughly **16/60 ≈ 27%** of
+the time. That is the number the cadence decision should be made on, not the two
+day-long rows.
+
+### What still stands from the entry above
+
+- `balance_evidence` still has **ZERO observations**, and this third row does not
+  change that: it closed 21:22Z on 08-29, while `_balance_evidence` was first
+  committed `98e103e1` at 2026-08-29T16:47:19-05:00 = **21:47Z**, 25 minutes
+  later — and that is commit time, with the deploy later still.
+- The 86 probe lines, their window, and the `not_placed` reading for the two
+  08-28 rows are unaffected.
+
+Worth recording: the $1.84 row WAS settled by balance arithmetic — three
+`VENUE_BALANCES` readings flat at 96.05 across 19 minutes spanning the 503, then
+94.15 after the retry filled. That is the same arithmetic `_balance_evidence`
+automates, done by hand from worker logs. So the METHOD has one successful
+observation; the FIELD still has none.
+
+### Consequence for the watcher
+
+A retried unknown submit leaves **nothing** in `/api/portfolio/live` afterwards —
+not the row, not the error, not the resolution. It is recoverable only from
+worker logs, and only while they are in retention. So a missed short window is
+not merely a late catch, it is unrecoverable through the API the watcher uses.
+Whether to raise the cadence is a live question again; this file should not be
+read as having settled it in favour of hourly.
