@@ -7255,3 +7255,48 @@ of the executable risk was real and was not containment.
 - **An enabled-but-broken schedule is worse than none**: it manufactures a dead
   session every hour that looks like activity. Disable it and hand the
   measurement back to a human, rather than leaving a watcher that cannot watch.
+
+## 2026-08-30 — FORBIDDEN: reading a gate's VERDICT without reading what its KEY covers. A measurement about one claim silently denied a different one
+
+- **What happened.** `football/pick_gate.py` measured the NCAAF margin model
+  losing to the close (n=2233, t=+17.20) — correct, and correctly denying. But
+  the registry was keyed `(sport, market)`, so the same verdict also suppressed
+  a claim nobody had measured and that uses no model: *this book's price beats
+  the market's own consensus*. Measured on production 2026-08-29, the cost was
+  total: **90 of 90 board sides carried a computed `edge_vs_consensus_pct` while
+  45 of 45 rows rendered no edge at all**, and `portfolio_commit` refused all 90
+  as `no_model_edge_pct`. The number existed, was served, and was thrown away
+  one layer below the user. Two prior sessions read the gate, agreed it was
+  correct, and moved on — because the VERDICT was sound. Nobody asked what the
+  KEY spanned.
+- **The rule going forward:** when a gate denies, read its KEY, not just its
+  reason. Ask *what else does this key cover that the measurement never
+  touched?* A gate is entitled to deny what it measured; denying a neighbouring
+  claim by sharing a key with it is an accident, not a policy. The fix shape is
+  a BASIS dimension — the claim being made — not a relaxation of the threshold.
+- Corollary, and it is what makes this expensive to find: a correct gate with an
+  over-broad key produces a board that is **empty and self-explanatory**. Every
+  surface says exactly why, in terms that are true. There is no error, no zero
+  counter, and no anomaly to trip over.
+
+## 2026-08-30 — FORBIDDEN: reporting a config key as UNSET without reading its LIVE value. "The knob is not reaching X" does not mean the knob is empty
+
+- **What happened.** I told the user and wrote into two ledger files that
+  `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` was "unset on every service", and
+  built a whole "wired but not enabled" framing on it. `render_env_set` then
+  reported `before 'eu,us_ex'` on refresh-worker and `NO CHANGE NEEDED` on
+  live-odds-worker: **it had been set on both workers the entire time.** The
+  source was `findings_2026-08-26_ncaaf_opener_readiness.md`, which says the
+  knob *"already exists as a knob; it is not reaching the NCAAF capture"* — a
+  statement about a missing READER that I read as a statement about a missing
+  VALUE.
+- **The rule going forward:** a claim that a key is unset is a claim about
+  production, and only a live read of the env is evidence for it. Reading a
+  findings doc is not. Before reporting "not enabled", run the setter/reader and
+  quote its `before`. And distinguish the two failure modes explicitly, because
+  they have different fixes: **absent VALUE** is a config change; **absent
+  READER** is a code change, and setting the value fixes nothing while making
+  the environment look correct.
+- Near-miss worth recording: had I "enabled" it by setting the var without the
+  code change, nothing would have happened and the config would have read as
+  done. Related: [[feedback_presence_is_not_reachability]].

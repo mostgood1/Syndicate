@@ -3875,144 +3875,29 @@ caaf-no-orders`). NOT
   re-deriving it.
 
 
-### ncaaf-market-basis-picks — OPEN — opened 2026-08-29 — session 7b55ff7c-dc3d-46dd-b8bb-e63e4862f11d
-- **TWO FILES EDITED ACROSS LANES ON EXPLICIT USER OVERRIDE `[2026-08-30, this
-  session]`**, recorded here and in each holder's block so they find it without
-  going looking. Both holders' sessions are absent from the roster (active AND
-  archived, 60 entries back to 08-20) and `release_phantom_lane_claims.py` frees
-  NEITHER, so the claims could not be cleared by the sanctioned route.
-  - `syndicate/blueprints/intelligence.py` (held by `portfolio-decision-and-execution`,
-    opened 08-22, session 9324a3e5). Scope: **`board_layer1_api`'s `read_dates`
-    expression and one import — nothing else.** Unrelated to that lane's
-    portfolio/execution work.
-  - `scripts/run_refresh_worker.py` (held by `portfolio-ledger-service-split`).
-    Scope: **`_sport_covers_date` and `_book_grid_forward_days` read the ARTIFACT
-    window instead of the display window — two functions, no behaviour change to
-    any other step.**
-- **CHECKPOINT 2026-08-30 03:1xZ — SHIPPED AND VERIFIED IN PRODUCTION ON TWO
-  SERVICES. Falsification test did NOT fire; one HALF-TRUTH corrected mid-lane;
-  one thing wired but deliberately NOT enabled.**
-  **RE-APPLIED 2026-08-30 03:4xZ — this checkpoint was written once and then
-  VANISHED from the shared tree AND from `origin/main` (0 copies of its own
-  heading, while the lane header survived), during the window another session
-  was resolving a `lanes.md` merge. Recorded here because a lost checkpoint that
-  is silently rewritten is worse than one that never existed: the lane read as
-  un-checkpointed while the work was deployed and verified.**
-  - Commits `0810e187` (edge + gate + board + picks page) and `843fadc5`
-    (shared `odds_regions` owner; NCAAF game lines can reach `us_ex`/`eu`).
-    web live 02:28Z, refresh-worker live ~03:05Z. Measurements in `deploys.md`.
-  - **verify:** same endpoint, same date, across the WORKER deploy —
-    `?sport=ncaaf&date=2026-08-30` went `market_basis` 0 of 20 sides (artifact
-    `gen=02:50:08`) to **24 of 24** (`gen=03:06:03`). Served state at 03:10Z:
-    09-05 600/600 sides carry it, 143 displayed, 5 servable; 09-06 132/132, 25
-    displayed. `/ncaaf/picks?week=1` serves 4 cards; "Picks suppressed" is gone
-    from the served HTML.
-  - **THE FALSIFICATION TEST DID NOT FIRE.** 0 of 90 sides on the 08-29 slate
-    were stale, so the edge is not a stale-quote artefact. But the FIRST framing
-    was still wrong and is corrected here: every double-digit edge I found was
-    on a LIVE or FINISHED game. NC State @ Virginia totals 42.5 carried over at
-    +1200 (DraftKings) against +175 (William Hill) — ten quotes, one line, 115s
-    apart, none stale. Books do not disagree 7x on a live number; they stop
-    updating at different moments. A pregame guard was added and all 19 of the
-    "strong edges" I first listed are now correctly refused.
-  - **THE REAL SIZE OF THIS EDGE, so nobody inherits the optimistic version:**
-    on a well-covered PREGAME slate it is SMALL. 09-05 had 414 of 552 fresh
-    sides quoted by ONE book (edge 0 by construction, now refused rather than
-    reported as 0.0), and only 3 sides cleared 1.0pp with 4+ books. A short or
-    empty pick list is the correct output, not a threshold to tune.
-  - **A SECOND, PRE-EXISTING DEFECT FIXED IN PASSING:** `layer1_board.html` read
-    `edgeWhy` one line before its own `var`, so the hoisted `undefined` meant
-    the "·*" hover marker for a suppressed edge has NEVER rendered. The caveat
-    was in the DOM and unreachable in the UI — the exact "stated refusal nobody
-    could read" that `ncaaf/game_projections.py` picked that field to avoid.
-  - **ENABLED AND VERIFIED 2026-08-30 03:50Z — and the sentence that stood here
-    was WRONG.** It said `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` was "unset on
-    every service". **It was set to `eu,us_ex` on BOTH workers the whole time**
-    (`render_env_set` reported `before 'eu,us_ex'` on refresh-worker and `NO
-    CHANGE NEEDED` on live-odds-worker). I inferred "unset" from
-    `findings_2026-08-26_ncaaf_opener_readiness.md`, which actually says the knob
-    *already exists* and "is not reaching the NCAAF capture", and I never read
-    the live value. **Nothing needed configuring; the workers needed the CODE**,
-    because the key had exactly ONE READER (the MLB fetcher) until this lane.
-    verify: the served NCAAF book set went **11 books / 0 of 5 sharps -> 25
-    books with `pinnacle` (70 rows) and `novig` (158 rows)** after
-    live-odds-worker reached `f42008e4`. Displayed sides 143 -> 418, servable
-    5 -> 125; edges stay SMALL (p50 0.75 pts) — the gain is COVERAGE, not size,
-    because 414 of 552 sides previously had one quoting book and nothing to
-    price against. **Still NOT expected value:** the anchor is
-    `consensus_vigged_price` and nothing de-vigs it; a sharp inside the
-    consensus makes the anchor better, not the output +EV.
-  - **NOT MINE, NAMED SO IT IS NOT LOST:** the book_grid FORWARD artifact window
-    does not cover the NCAAF week in practice — 09-05 is inside the 7-day window
-    yet had no published artifact at 02:3xZ, so `/ncaaf/picks` reported
-    `dates_read 1, dates_absent 4`. The picks page reads artifacts (correct: web
-    does no heavy compute); the gap is producer-side.
-  - Related: `ncaaf-no-orders` (OPEN, session 7b278ebe) named this stage and is
-    diagnostic-only. The SIZING hop (`portfolio_commit.py:210`
-    `no_model_edge_pct`) is held by `portfolio-decision-and-execution` and was
-    NOT touched — surfacing a pick and sizing it are different stages.
-  - Claims: all deploy claims RELEASED. `venue-first-market-universe`'s
-    refresh-worker claim was waited out, never forced.
-- Goal: the NCAAF board serves an EDGE and PICKS on a MARKET basis — best
-  available price vs the fresh multi-book consensus — which asserts nothing
-  about the model. `pick_gate` keeps denying the MODEL basis exactly as
-  measured; what changes is that it stops denying a claim it never measured.
-- Files: `syndicate/features/football/pick_gate.py`,
-  `syndicate/templates/shared/layer1_board.html`,
-  `syndicate/features/ncaaf/picks.py`,
-  `tests/test_football_pick_gate.py`,
-  `tests/test_market_basis_picks.py`
-- Reads but does NOT claim (kept out of the `- Files:` block so the parser does
-  not turn it into a claim): `syndicate/features/shared/book_grid.py` is the
-  PRODUCER of `edge_vs_consensus_pct` and is read-only here;
-  `pipeline/portfolio_commit.py:210` — the `no_model_edge_pct` refusal that
-  makes NCAAF orders zero — is held by OPEN lane
-  `portfolio-decision-and-execution`. **The sizing hop is NOT fixed by this
-  lane.** Surfacing the pick on the board and sizing it into an order are two
-  different stages; this lane does the first and hands the second over.
-- Hypothesis: n/a for the diagnostic half — already settled, and NOT by me.
-  `ncaaf-no-orders` (OPEN, session 7b278ebe) named the stage on 2026-08-29 and
-  falsified its own CFBD-429 hypothesis: all 90 NCAAF candidate rows are
-  refused `no_model_edge_pct`, source `pick_gate._SERVING_REGISTRY`. This lane
-  is the FIX to the surface half of that finding; that lane is diagnostic-only
-  by its own terms ("no fix, no deploy, until the stage is named").
-- The measurement this lane rests on — production, `/api/board/book-grid?sport=ncaaf&date=2026-08-29`,
-  fetched 2026-08-29 by this session, 45 rows / 90 sides:
-
-      sides carrying `best[side].edge_vs_consensus_pct`   90 / 90
-        >= 2.0 pct pts  25      >= 3.0 pct pts  14      max  16.04
-      rows carrying a MODEL edge                           0 / 45
-      books on the row  11 quoting, 7 fresh (stale excluded from the consensus)
-
-  The number is ALREADY COMPUTED and ALREADY SERVED (`book_grid.py:496`). The
-  board discards it at render: `layer1_board.html:943` reads only
-  `projection.edge_vs_market_pct`. This is not a new edge source — it is a
-  field we already have, thrown away one layer below the user.
-- **What this number IS, stated so nobody upgrades it later:** a PRICE-SHOPPING
-  delta against a VIGGED consensus (`consensus_vigged_price`, and `book_grid`'s
-  own comment says "nothing here de-vigs"). It is NOT expected value and must
-  never be labelled as such. Its anchor is 11 soft books with **no sharp and no
-  exchange** — pinnacle/novig/prophetx/kalshi/polymarket are absent because
-  `SYNDICATE_LIVE_ODDS_REFRESH_REGIONS = us`, a USER decision of 2026-08-27
-  (`state.md [ncaaf-props-live]`). Price shopping itself is measured at
-  **+2.79 ROI pts** platform-wide (`state.md [sharp-reference-price]`) and
-  **+2.95** on the NFL prop grade (`lanes.md nfl-props-odds-allowlist`), on
-  controlled identical bets — which is the whole claim being served, and no
-  more.
-- Falsification test: the lane is WRONG if the market edge is an artefact of
-  stale quotes rather than of real price dispersion. Decisive read: recompute
-  the served distribution with `suspect_stale`/`all_quotes_stale` rows removed.
-  If the `>=2 pct pts` population collapses to near zero once stale sides are
-  dropped, there is nothing to surface and this lane closes with a negative
-  result rather than shipping a column of stale-line artefacts.
-- Verification: (a) `off != on` — the EDGE column is non-null on N of 90 NCAAF
-  sides where it was null on 90 of 90, read from the SERVED payload/page, not a
-  fixture; (b) the model gate still denies — a test asserts
-  `market_verdict("ncaaf","spread",basis="model").servable is False` with the
-  n=2233 / t=17.2 numbers intact; (c) the two bases are never spelled the same
-  way on the page, so a market edge can not be read as a model claim.
-- Blocked by: none for the board surfaces. The ORDER path is blocked on
-  `portfolio-decision-and-execution` and is deliberately out of scope.
+### ncaaf-market-basis-picks — **CLOSED-VERIFIED 2026-08-30** — NCAAF serves picks on a MARKET basis; sharps restored; two board-emptying defects fixed — opened 2026-08-29 — session 7b55ff7c-dc3d-46dd-b8bb-e63e4862f11d
+- OUTCOME, all verified on the SERVED payload (evidence + the unverified list:
+  `log/2026-08-30.md`; measurements: `deploys.md`; facts: `state.md`
+  `[ncaaf-market-basis-edge]`, `[layer1-board-date-scoping]`):
+  90/90 sides carried a computed market edge while 45/45 rows rendered none;
+  book set 11 -> 25 (pinnacle, novig); displayed 143 -> 418, servable 5 -> 125;
+  board `window=day` 7 -> 8 games (MEM @ UNLV); `date=2026-09-05` 0 -> 67 games.
+- The MODEL gate is UNCHANGED and still denies at n=2233, t=17.20. What shipped
+  is a BASIS dimension, not a relaxation. The edge is a PRICE-SHOPPING delta
+  against a vigged consensus and is **not** expected value.
+- Commits: `0810e187`, `843fadc5`, `f42008e4`, `fa01a3a4`, `5f773832`,
+  `b34a18a9`, `d7cda903`, `7cea63c5`. Deployed: web, refresh-worker,
+  live-odds-worker.
+- **TWO FILES EDITED ACROSS LANES ON EXPLICIT USER OVERRIDE `[2026-08-30]`.**
+  Both holders' sessions are absent from the roster (active AND archived) and
+  `release_phantom_lane_claims.py` frees neither.
+  `syndicate/blueprints/intelligence.py` (`portfolio-decision-and-execution`) —
+  scope: `board_layer1_api`'s read set + one import, nothing else.
+  `scripts/run_refresh_worker.py` (`portfolio-ledger-service-split`) — scope:
+  `_sport_covers_date` + `_book_grid_forward_days` read the artifact window.
+- OWED, not blocking: the market-basis edge has never been GRADED (no NCAAF 2026
+  outcomes exist) and its two serving constants (3 books, 1.0 pt) are unfitted.
+- Claims: NONE held. All deploy claims released. Worktree clean.
 
 ### stale-row-cause-blind-spot — **CLOSED-VERIFIED 2026-08-30** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
 - OUTCOME: `STALE_ROW_CAUSE` classifies EVERY stale row instead of the 3 worst

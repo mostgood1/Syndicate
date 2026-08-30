@@ -5271,6 +5271,54 @@ basename-collision class this file already records for `live_lens` across
 eight sports. **A disclaimer beside a path does not unclaim it — only deleting
 the path text does.**
 
+## [ncaaf-market-basis-edge] NCAAF SERVES PICKS AGAIN — on a MARKET basis; the model gate is UNCHANGED and still denies `[verified 2026-08-30 03:0x-05:5xZ, web+refresh-worker+live-odds-worker `d7cda903`, lane ncaaf-market-basis-picks]`
+
+**`pick_gate` was keyed `(sport, market)`, so a verdict about the MODEL also
+denied a claim it never measured**: *this book's price beats the market's own
+consensus*. Measured production 2026-08-29: **90 of 90 sides carried
+`best[side].edge_vs_consensus_pct` while 45 of 45 rows rendered no edge.** The
+number was computed (`book_grid.py:496`) and discarded at render. Registry is
+now `(sport, market, BASIS)`; every model verdict is byte-identical and
+`("ncaaf","spread",model)` still denies at n=2233, t=17.20.
+
+**IT IS A PRICE-SHOPPING DELTA, NOT EXPECTED VALUE.** Anchor is
+`consensus_vigged_price`; nothing de-vigs it. Adding Pinnacle improved the
+ANCHOR, not the claim. Upgrading this to +EV owes a de-vig and a measurement.
+
+**Served, verified:** sharps restored (book set **11 -> 25**, `pinnacle` 70 rows,
+`novig` 158) — the env var `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` was **already
+`eu,us_ex` on both workers all along**; its only READER was the MLB fetcher
+until this lane, so it sat inert. Displayed sides **143 -> 418**, servable
+**5 -> 125**, edge **p50 0.75 pts** — the gain is COVERAGE, not size (414 of 552
+sides previously had one quoting book). `/ncaaf/picks` serves its 12-card cap;
+"Picks suppressed" is gone from the served HTML.
+
+**Guards fire on real data and that is why the big numbers are absent:** of 90
+sides on the 08-29 slate, 58 refused "game has started" and 32 "1 book quoting",
+including a 16.04pp outlier that was ten quotes on ONE line 115s apart (over
++1200 vs +175) on a live game.
+
+**UNVERIFIED, and must not be cited as measured:** that this edge is
+profitable; the two serving constants (3 books, 1.0 pt) are unfitted; no NCAAF
+2026 outcome exists to grade the 125 picks against.
+
+## [layer1-board-date-scoping] THE BOARD WAS DROPPING GAMES TWO WAYS — both FIXED AND VERIFIED `[verified 2026-08-30 05:0x-05:5xZ, web+refresh-worker `d7cda903`]`
+
+1. **A 9pm Central game was invisible.** The grid artifact is keyed by **UTC**
+   date; the board scopes by **CENTRAL** game date; the read set was window+today.
+   `window=day&date=2026-08-29` served **7 games** while
+   `book_grid_2026-08-30.json` held Memphis @ UNLV at `02:19Z` = 9:19pm Central
+   on the 29th. **7 -> 8 games, `rows_other_dates=0`.** Same game and cause
+   `ncaaf/sources.py` already recorded; that fix corrected ONE consumer and the
+   board was the second. Rule now lives in `layer1_board.artifact_read_dates`.
+2. **Whole slates had no artifact.** `_SLATE_WINDOW_DAYS["ncaaf"]=7` sized BOTH
+   display and BUILD; NCAAF week 1 spans ten days, so the last three days were
+   unreachable by date. `?date=2026-09-05` **0 -> 67 games / 353 rows**; 09-06
+   and 09-07 also reachable for the first time. Split into
+   `artifact_window_days` (never below the display window). **The display width
+   is UNCHANGED at 7** and `#565`'s per-sport cost pruning survives — three extra
+   shard checks for NCAAF, none for any other sport.
+
 ## [ncaaf-board-surfaces] NCAAF BOARD SURFACES — projections published, compact strip rebuilt, live lens state-aware `[measured 2026-08-27T15:47Z, web 87c36d05]`
 
 **Projections reach the SHARED contract: 0/51 -> 51/51** on `home_mean`,
