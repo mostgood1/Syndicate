@@ -131,6 +131,42 @@ def main() -> int:
         if isinstance(basis, dict) and basis.get("displayable"):
             displayable.append((row, basis))
 
+    # THE `#603` SECOND-PASS METRIC, alias-free.
+    #
+    # A ref answering more than one FIXTURE is wrong for all but one of them, so
+    # this needs no team-name resolution -- which matters, because name matching
+    # is what fails here. A first attempt at this census used team tokens and
+    # reported 100% mismatch, wrongly: `Toronto` -> `toro` misses `TORPHX`, a
+    # ref that is CORRECT.
+    #
+    # Pre-fix baseline, board 2026-08-30T03:42:11Z: 11 of 35 refs answered more
+    # than one fixture, serving 108 of 148 verdict rows.
+    # OVER EVERY ROW A QUOTE MATCHED, not over `keyed`. `keyed` requires the
+    # venue to appear in `book_prices`, which only happens on rows the benchmark
+    # rewrite actually repriced -- a NARROWER set, and using it here would hide
+    # exactly the rows most likely to be wrongly joined. A non-null
+    # `venue_basis` is the honest marker: it means a quote matched this side.
+    matched = [
+        row
+        for row in rows
+        if isinstance((row.get("quote") or {}).get("venue_basis"), dict)
+    ]
+    by_ref: dict[str, set[str]] = {}
+    for row in matched:
+        ref = str(row.get("venue_ref") or "")
+        if ref:
+            by_ref.setdefault(ref, set()).add(
+                f"{row.get('away_team')}@{row.get('home_team')}"
+            )
+    multi = {ref: games for ref, games in by_ref.items() if len(games) > 1}
+    rows_on_multi = sum(1 for row in matched if str(row.get("venue_ref") or "") in multi)
+    headline_wrong = [
+        row
+        for row in matched
+        if str((row.get("quote") or {}).get("bookmaker") or "").lower() in VENUE_BOOKS
+        and str(row.get("venue_ref") or "") in multi
+    ]
+
     reasons = collections.Counter()
     venues = collections.Counter()
     bounded = 0
@@ -147,6 +183,15 @@ def main() -> int:
 
     out = {
         "written_at": written,
+        "rows_a_quote_matched": len(matched),
+        "refs_in_use": len(by_ref),
+        "refs_answering_multiple_fixtures": len(multi),
+        "rows_served_by_such_a_ref": rows_on_multi,
+        "wrong_game_price_as_headline": len(headline_wrong),
+        "worst_ref": (
+            max(((r, len(g)) for r, g in multi.items()), key=lambda kv: kv[1])
+            if multi else None
+        ),
         "rows": len(rows),
         "live_rows": len(live),
         "live_with_venue_price": len(population),
@@ -187,6 +232,20 @@ def main() -> int:
     if venues:
         print(f"  by venue                       {dict(venues)}")
         print(f"  fee is an upper bound on       {bounded} row(s) (kalshi series multiplier absent)")
+
+    print()
+    print("  #603 collidability on venue_ref (alias-free; pre-fix was 11/35 refs, 108 rows):")
+    print(f"    rows a quote MATCHED            {len(matched):5d}   (pre-fix 148)")
+    print(f"    refs in use                     {len(by_ref):5d}")
+    print(f"    refs answering >1 FIXTURE       {len(multi):5d}   <- must be 0")
+    print(f"    rows served by such a ref       {rows_on_multi:5d}   <- must be 0")
+    print(f"    wrong-game price as HEADLINE    {len(headline_wrong):5d}   <- must be 0")
+    if multi:
+        worst = max(multi.items(), key=lambda kv: len(kv[1]))
+        print(f"    worst: {worst[0]} answers {len(worst[1])} fixtures")
+        print("    STILL OPEN -- the guard did not refuse these.")
+    elif by_ref:
+        print("    CLEAN -- every ref in use answers exactly one fixture.")
 
     if not population:
         print(
