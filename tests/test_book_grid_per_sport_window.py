@@ -37,6 +37,7 @@ _SPEC = importlib.util.spec_from_file_location(
 worker = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(worker)
 
+from syndicate.features.shared.layer1_board import artifact_window_days
 from syndicate.features.shared.layer1_board import slate_window_days
 
 ANCHOR = "2026-08-26"
@@ -59,7 +60,10 @@ class PerSportWindowTests(unittest.TestCase):
         # worse bug than the one being fixed -- the board would ask for a date
         # the producer never built.
         for sport in ("nfl", "ncaaf", "ncaab", "soccer", "mlb"):
-            span = slate_window_days(sport)
+            # ARTIFACT width, which is what the gate reads (2026-08-30). It is
+            # >= the display width, so asserting the display width here would
+            # under-test every sport whose artifact window is wider.
+            span = artifact_window_days(sport)
             with self.subTest(sport=sport, span=span):
                 self.assertTrue(
                     worker._sport_covers_date(sport, ANCHOR, _plus(span - 1)),
@@ -69,11 +73,17 @@ class PerSportWindowTests(unittest.TestCase):
     def test_a_sport_is_not_built_past_its_own_window(self):
         # ncaab asks for 1 day and was being built across the widest sport's 7.
         self.assertFalse(worker._sport_covers_date("ncaab", ANCHOR, _plus(1)))
-        # ncaaf is 7 since `#588`, so +3 is now INSIDE its window and this
-        # assertion would test nothing. The invariant -- a sport is not built
-        # past its OWN width -- is kept by asserting it one day past 7.
-        self.assertTrue(worker._sport_covers_date("ncaaf", ANCHOR, _plus(3)))
-        self.assertFalse(worker._sport_covers_date("ncaaf", ANCHOR, _plus(7)))
+        # ncaaf's ARTIFACT window is 10 since 2026-08-30 -- its week 1 spans ten
+        # days (08-29..09-07) and at 7 the last three days of every week had no
+        # artifact at all, so the board answered `grid_rows_all_for_other_dates`
+        # on a real 300-row Friday slate. Its DISPLAY window is still 7 and is
+        # asserted separately. The invariant here is unchanged: a sport is not
+        # built past its OWN width, so the boundary moves with the width rather
+        # than being restated as a literal.
+        span = artifact_window_days("ncaaf")
+        self.assertTrue(worker._sport_covers_date("ncaaf", ANCHOR, _plus(span - 1)))
+        self.assertFalse(worker._sport_covers_date("ncaaf", ANCHOR, _plus(span)))
+        self.assertEqual(slate_window_days("ncaaf"), 7, "the DISPLAY width must not move")
 
     def test_the_weekly_sports_keep_their_seven_days(self):
         # The change that started this must not be undone by the fix to it.
@@ -99,7 +109,7 @@ class PerSportWindowTests(unittest.TestCase):
         self.assertLess(after, before)
         # Not a threshold pulled from the air: every sport whose window is
         # narrower than the max contributes (max - own) skipped dates.
-        expected_skips = sum(max(0, span - slate_window_days(s)) for s in sports)
+        expected_skips = sum(max(0, span - artifact_window_days(s)) for s in sports)
         self.assertEqual(before - after, expected_skips)
 
     def test_the_off_switch_restores_the_old_behaviour(self):

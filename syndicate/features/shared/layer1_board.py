@@ -195,6 +195,48 @@ def slate_window_days(sport: str) -> int:
     return _SLATE_WINDOW_DAYS.get(str(sport or "").strip().lower(), _DEFAULT_SLATE_WINDOW_DAYS)
 
 
+#: How many days of grid ARTIFACT a sport needs PUBLISHED, which is not the same
+#: number as how many days its board SHOWS. Only sports where the two differ.
+#:
+#: NCAAF is the case that forced the split. `_SLATE_WINDOW_DAYS["ncaaf"] = 7` is
+#: a deliberate DISPLAY choice and its own comment says why seven and not ten:
+#: "Ten would pull most of a second NCAAF week onto a today board." That
+#: reasoning is about what a *slate view* shows and is correct. But the same
+#: constant was also sizing what the worker BUILDS, so a user navigating the
+#: board's own day arrows to 2026-09-05 -- a real Friday slate, 300 rows
+#: buildable from a shard web already holds -- got `grid_rows_all_for_other_dates`
+#: and an empty board, because no artifact for that date was ever written.
+#: NCAAF week 1 spans 08-29..09-07, TEN days, so at 7 the last three days of
+#: every week are unreachable by date.
+#:
+#: Wider here is cheap and is NOT the cost `#565` fixed: `_sport_covers_date`
+#: prunes per sport, so raising this for NCAAF adds three shard checks for NCAAF
+#: and nothing at all for ncaab or mlb. It can only ever ADD a published date;
+#: the board's own game-date filter still decides what is shown.
+_ARTIFACT_WINDOW_DAYS = {
+    "ncaaf": 10,
+}
+
+
+def artifact_window_days(sport: str) -> int:
+    """Days of grid artifact this sport needs published. Never below the display window.
+
+    `max()` rather than a bare lookup so this cannot regress below
+    `slate_window_days`, which would break the invariant
+    `max_slate_window_days`' docstring exists for -- the producer must not build
+    a narrower window than the consumer asks for.
+    """
+    slug = str(sport or "").strip().lower()
+    return max(_ARTIFACT_WINDOW_DAYS.get(slug, 0), slate_window_days(slug))
+
+
+def max_artifact_window_days() -> int:
+    """The widest artifact window any sport asks for. Sizes the worker's date list."""
+    return max(
+        [max_slate_window_days(), *(artifact_window_days(s) for s in _ARTIFACT_WINDOW_DAYS)]
+    )
+
+
 def resolve_window_dates(sport: str, anchor_date: str, *, window: str | int = "day") -> list[str]:
     """The dates this board covers, forward from the anchor.
 

@@ -597,3 +597,58 @@ def test_read_set_widening_cannot_change_what_the_board_SHOWS():
     )
     assert board["counts"]["games"] == 0, "an off-window fixture reached the board"
     assert board["counts"]["rows_other_dates"] == 1
+
+
+# --------------------------- artifact coverage vs display window
+
+
+def test_artifact_window_is_never_narrower_than_the_display_window():
+    """The invariant `max_slate_window_days` exists for: the producer must not
+    build a narrower window than the consumer asks for."""
+    from syndicate.features.shared.layer1_board import (
+        _SLATE_WINDOW_DAYS,
+        artifact_window_days,
+        max_artifact_window_days,
+        max_slate_window_days,
+        slate_window_days,
+    )
+
+    for sport in _SLATE_WINDOW_DAYS:
+        assert artifact_window_days(sport) >= slate_window_days(sport), sport
+    assert max_artifact_window_days() >= max_slate_window_days()
+
+
+def test_ncaaf_artifact_window_covers_its_ten_day_week():
+    """NCAAF week 1 spans 2026-08-29..09-07. At 7 the last three days of every
+    week had no artifact, so the board answered `grid_rows_all_for_other_dates`
+    on a real 300-row Friday slate."""
+    from syndicate.features.shared.layer1_board import (
+        artifact_window_days,
+        slate_window_days,
+    )
+
+    assert slate_window_days("ncaaf") == 7, "the DISPLAY choice must not be changed by this"
+    assert artifact_window_days("ncaaf") >= 10
+
+
+def test_widening_artifact_coverage_does_not_widen_any_sports_display():
+    """`#565`'s cost fix must survive: a wider artifact window for one sport
+    must not build every sport further out."""
+    from syndicate.features.shared.layer1_board import (
+        artifact_window_days,
+        slate_window_days,
+    )
+
+    for sport in ("ncaab", "mlb", "nba", "wnba", "nhl"):
+        assert artifact_window_days(sport) == slate_window_days(sport), sport
+
+
+def test_worker_gate_admits_the_ncaaf_dates_the_board_can_ask_for():
+    """The producer-side gate, exercised directly."""
+    import scripts.run_refresh_worker as worker
+
+    anchor = "2026-08-29"
+    assert worker._sport_covers_date("ncaaf", anchor, "2026-09-05") is True
+    assert worker._sport_covers_date("ncaaf", anchor, "2026-09-07") is True
+    # And it still prunes a sport that asks for one day.
+    assert worker._sport_covers_date("ncaab", anchor, "2026-09-05") is False

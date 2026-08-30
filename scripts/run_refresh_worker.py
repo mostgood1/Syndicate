@@ -3936,14 +3936,21 @@ def _sport_covers_date(sport: str, anchor_date: str, build_date: str) -> bool:
     if not _book_grid_per_sport_window_enabled():
         return True
     try:
-        from syndicate.features.shared.layer1_board import slate_window_days
+        # ARTIFACT window, not the display window (2026-08-30). The two were
+        # one constant, so NCAAF's deliberate 7-day DISPLAY choice was also
+        # capping what gets BUILT -- and NCAAF week 1 spans ten days, so the
+        # last three days of every week had no artifact and the board answered
+        # `grid_rows_all_for_other_dates` on a real 300-row slate.
+        # `artifact_window_days` is never below `slate_window_days`, so the
+        # invariant this gate was written for still holds.
+        from syndicate.features.shared.layer1_board import artifact_window_days
 
         offset = (date.fromisoformat(build_date) - date.fromisoformat(anchor_date)).days
     except Exception:
         return True
     if offset <= 0:
         return True
-    return offset <= max(0, int(slate_window_days(sport)) - 1)
+    return offset <= max(0, int(artifact_window_days(sport)) - 1)
 
 
 def _book_grid_forward_days() -> int:
@@ -3966,10 +3973,15 @@ def _book_grid_forward_days() -> int:
         except ValueError:
             pass
     try:
-        from syndicate.features.shared.layer1_board import max_slate_window_days
+        from syndicate.features.shared.layer1_board import max_artifact_window_days
 
         # -1 because a window of N days is today plus N-1 forward.
-        return max(0, max_slate_window_days() - 1)
+        #
+        # The ARTIFACT maximum, which is >= the display maximum. This only sizes
+        # the DATE LIST; `_sport_covers_date` above still prunes per sport, so
+        # widening it costs the widest sport a few shard checks and every other
+        # sport nothing.
+        return max(0, max_artifact_window_days() - 1)
     except Exception:
         return 0
 

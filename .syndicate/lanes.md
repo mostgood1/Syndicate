@@ -3876,6 +3876,19 @@ caaf-no-orders`). NOT
 
 
 ### ncaaf-market-basis-picks — OPEN — opened 2026-08-29 — session 7b55ff7c-dc3d-46dd-b8bb-e63e4862f11d
+- **TWO FILES EDITED ACROSS LANES ON EXPLICIT USER OVERRIDE `[2026-08-30, this
+  session]`**, recorded here and in each holder's block so they find it without
+  going looking. Both holders' sessions are absent from the roster (active AND
+  archived, 60 entries back to 08-20) and `release_phantom_lane_claims.py` frees
+  NEITHER, so the claims could not be cleared by the sanctioned route.
+  - `syndicate/blueprints/intelligence.py` (held by `portfolio-decision-and-execution`,
+    opened 08-22, session 9324a3e5). Scope: **`board_layer1_api`'s `read_dates`
+    expression and one import — nothing else.** Unrelated to that lane's
+    portfolio/execution work.
+  - `scripts/run_refresh_worker.py` (held by `portfolio-ledger-service-split`).
+    Scope: **`_sport_covers_date` and `_book_grid_forward_days` read the ARTIFACT
+    window instead of the display window — two functions, no behaviour change to
+    any other step.**
 - **CHECKPOINT 2026-08-30 03:1xZ — SHIPPED AND VERIFIED IN PRODUCTION ON TWO
   SERVICES. Falsification test did NOT fire; one HALF-TRUTH corrected mid-lane;
   one thing wired but deliberately NOT enabled.**

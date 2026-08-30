@@ -2666,6 +2666,7 @@ def board_layer1_api():
     """
     from syndicate.features.shared.book_grid_artifact import read_book_grid_artifact
     from syndicate.features.shared.layer1_board import (
+        artifact_read_dates,
         build_layer1_board,
         partition_board_by_state,
         resolve_window_dates,
@@ -2698,7 +2699,22 @@ def board_layer1_api():
     #
     # The durable fix is to key the artifact by game date everywhere, as soccer's
     # capture already does. That is worker-side and not this lane's.
-    read_dates = list(dict.fromkeys([*window_dates, central_today_iso()]))
+    #
+    # AND THE READ SET ALSO NEEDS EACH WINDOW DATE'S UTC NEIGHBOUR (2026-08-30).
+    # The artifact is keyed by UTC date; this board scopes by CENTRAL game date,
+    # so a kickoff after 7pm Central is the NEXT day in UTC and its row lives in
+    # the NEXT day's artifact. Measured on production, `window=day&
+    # date=2026-08-29`: the board showed SEVEN games while
+    # `book_grid_2026-08-30.json` held Memphis @ UNLV at 2026-08-30T02:19Z --
+    # 9:19pm Central on the 29th. Saturday's board dropped a Saturday-night
+    # game, and the late window is the marquee one. Same game and same cause
+    # `ncaaf/sources.py` already records ("7 of Saturday 08-29's 8 games"); that
+    # fix corrected one consumer and this is the second.
+    #
+    # `artifact_read_dates` owns the rule so a third consumer calls it instead
+    # of rediscovering the bug. Verified against the two real artifacts: 7 games
+    # -> 8, `rows_other_dates` still 0.
+    read_dates = artifact_read_dates(window_dates, today=central_today_iso())
 
     rows: list = []
     precomputed: dict | None = None
