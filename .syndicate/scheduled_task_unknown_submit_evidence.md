@@ -54,44 +54,70 @@ Also pinned in step 4: when reporting nothing found, the `LIVE_ORDER` count for
 the same window must be stated. Absence of `http_503` is only evidence if orders
 were actually being placed; a zero-order window says nothing about 503s.
 
+## 2026-08-30 03:2xZ — NARROWED TO READ-ONLY after the first run stalled on a permission prompt
+
+**The first version never did anything.** It dispatched at 03:10:47Z, created a
+run session at 03:11:00Z, and then went silent — `lastActivityAt` frozen at
+03:11:00 with `isRunning: true`, no heartbeat, no findings file. It stalled ~13
+seconds in, waiting on a tool approval nobody was there to give. `lastRunAt`
+said it ran.
+
+**That is exactly what the heartbeat was added to catch, caught on run one.**
+Without it, `lastRunAt: 03:10:47` plus a silent-on-null design reads as "ran,
+found nothing" — a clean green from an instrument that had done nothing.
+
+**Narrowed** `[user 2026-08-30: "narrow it to read-only so it runs unattended"]`
+to one unauthenticated GET plus two local file writes. Removed: `.env`, the
+Render logs API, and every `git` command including the push.
+
+**WHAT WAS GIVEN UP, stated so nobody assumes coverage that is gone:**
+`balance_settled` from the worker's `UNKNOWN_ORDER_PROBE`, and the log-derived
+`LIVE_ORDER` positive control. The primary observable survives —
+`balance_evidence` on the payload is the SAME arithmetic
+(`venue_settlement._balance_evidence`, shared by the page and the probe).
+
+**The control was rebuilt, not dropped.** `recent_orders_60m` is now counted
+from `orders[].submitted_at` in the same payload. A null only means something if
+the book is actually placing orders; a zero-order hour says nothing about 5xx
+failures, and the task must say so rather than "nothing found".
+
+Findings are written but LEFT UNCOMMITTED — an interactive session commits
+them. If a row is ever captured, pull the matching `UNKNOWN_ORDER_PROBE` line
+from the worker logs while it is still in retention.
+
 ---
 
 ---
 name: unknown-submit-balance-evidence-capture
-description: Capture balance_evidence / balance_settled the first time a Polymarket submit is lost to a 5xx; the window closes within minutes.
+description: READ-ONLY, unattended: capture balance_evidence from the public portfolio payload the first time a Polymarket submit is lost to a 5xx.
 ---
 
-Capture the first real observation of `balance_evidence` / `balance_settled` on a Polymarket submit the venue never answered.
+Capture the first real observation of `balance_evidence` on a Polymarket submit the venue never answered.
 
-WHY THIS EXISTS. Two code paths shipped 2026-08-29 (`219d79ca` on live-odds-worker, `3371ad96` on web) and NEITHER has ever been observed running, because both require an unknown submit to exist and there were none. THE WINDOW IS SHORT: a retry or an operator clicking "Venue shows no position" clears the row within minutes, and once cleared the evidence is unrecoverable. So CAPTURE, do not merely notify. Full background: `.syndicate/lanes.md` lanes `unknown-submit-retry-provenance` and `unknown-submit-balance-evidence-ui`.
+READ-ONLY AND UNATTENDED BY DESIGN. Do NOT use credentials, do NOT read `.env`, do NOT call the Render API, do NOT run any `git` command, do NOT commit or push. The first version of this task did all of those and STALLED 13 SECONDS INTO ITS FIRST RUN on a permission prompt — `lastRunAt` said it ran, and it had done nothing. A watcher that needs a human to unblock it is not a watcher. Everything below is one unauthenticated HTTP GET plus two local file writes inside the project directory.
+
+WHY THIS EXISTS. `balance_evidence` shipped on 2026-08-29 (`3371ad96`, web) and has NEVER been observed populated, because it requires an unknown submit to exist and there have been none. THE WINDOW IS SHORT: a retry, or an operator clicking "Venue shows no position", clears the row within minutes and the evidence with it. So CAPTURE, do not merely notice. Background: `.syndicate/lanes.md`, lanes `unknown-submit-retry-provenance` and `unknown-submit-balance-evidence-ui` (both CLOSED-VERIFIED; this is the one measurement they still owe).
 
 Work in `C:\Users\tempadmin\OneDrive\Coding\Syndicate`.
 
-STEP 0 — HEARTBEAT, AND IT IS NOT OPTIONAL. Do this on EVERY run, first, before anything can fail. Overwrite (never append) the local file `.syndicate/.unknown_submit_watch_heartbeat` with ONE line:
-  <UTC timestamp> ran=1 unknown_submits=<n or ?> live_orders=<n or ?> probe_lines=<n or ?> note=<short>
-DO NOT COMMIT THIS FILE — it is a local liveness marker, it is gitignored-by-intent, and committing it hourly would be noise. Its whole purpose: this task is SILENT on a null run, so without a heartbeat "it ran and found nothing" and "it never ran / died on step 1" are indistinguishable, and `lastRunAt` records DISPATCH, not execution (this machine has stalled a scheduled run by 9h13m under Modern Standby). Rewrite the line at the END of the run too, with the real counts, so a half-finished run is visible as one.
-
-STEP 1 — the banner observable (no credentials needed):
+STEP 1 — ONE request, no auth:
   curl -s "https://syndicate-an21.onrender.com/api/portfolio/live?on=all"
-Parse JSON. Look at `unknown_submits`. If NON-EMPTY, record verbatim for every row: `idempotency_key`, `venue_ticker`, `selected_date`, `requested_stake_dollars`, `status`, `error`, `venue_order_id`, `submitted_at`, `venue_resolved_at`, `prior_attempts`, and the whole `balance_evidence` object (`verdict`, `reason`, `window`, `opening_dollars`, `closing_dollars`, `delta_dollars`, `confounding_orders`). Also `unknown_submit_dollars` and `unknown_submits_resolved`.
 
-STEP 2 — the probe observable (needs credentials):
-Read `RENDER_API_KEY` from the gitignored `.env` by sourcing it in the same shell command; never print it. Owner `tea-d2bb5n95pdvs73cje4fg`, service `srv-d91dpertqb8s73co8lt0` (live-odds-worker). Query the Render logs API over the last 90 minutes:
-  https://api.render.com/v1/logs?ownerId=<owner>&resource=<service>&startTime=<now-90min ISO Z>&limit=50&text=UNKNOWN_ORDER_PROBE
-Also `text=http_503`, `text=OPERATOR_RESOLUTION`, and `text=LIVE_ORDER` (the last is the POSITIVE CONTROL — see step 4). Record matching lines verbatim with timestamps. The `UNKNOWN_ORDER_PROBE` line is the prize: it carries `balance_settled=N` and `findings=[...]` with `balance_evidence` per order.
+STEP 2 — HEARTBEAT, every run, even when nothing is found. Overwrite (never append) `.syndicate/.unknown_submit_watch_heartbeat` with ONE line:
+  <UTC timestamp> ran=1 http=<code> unknown_submits=<n> recent_orders_60m=<n> note=<short>
+This file is gitignored and must never be committed. Its purpose: this task is SILENT on a null run, and `lastRunAt` records DISPATCH not execution — without this line, "ran and found nothing" and "never ran" are identical. Write it even if step 1 failed (`http=000 note=fetch_failed`).
 
-STEP 3 — write it down, ONLY if something was found:
-Append to `.syndicate/findings_unknown_submit_live_evidence.md` (create with an `# ...` H1 if absent). A DEDICATED file — do NOT write to `lanes.md` or `state.md`; those are contended by many sessions and a scheduled writer will eventually lose someone's work.
-Head each entry with the UTC timestamp. Record the verbatim payload/log lines, then a one-line reading: `not_placed` (balance flat across the submit), `placed` (balance fell by at least the stake), or `unknown` with its reason (`confounded` / `no_bracketing_reading` / `unreadable` / `moved_but_not_by_this_order`). `unknown` IS A REAL RESULT — on a busy slate `confounded` is expected and is the guard refusing to guess, not a failure.
-Then commit and push ONLY that one file, from a throwaway worktree off origin/main, NEVER from the shared primary tree:
-  git worktree add --detach /c/tmp/usle origin/main
-  (write it there, git add that path only, commit, git push origin HEAD:main, git worktree remove --force /c/tmp/usle)
-Before pushing, verify `git diff --cached --numstat` lists ONLY that file.
+STEP 3 — THE POSITIVE CONTROL, computed from the same payload. Count orders in `orders[]` whose `submitted_at` is within the last 60 minutes; that is `recent_orders_60m`. **A null result only means something if the system is actually placing orders.** If `recent_orders_60m` is 0 the book was idle and your null says nothing about 5xx failures — say exactly that, do not say "nothing found".
 
-IDEMPOTENCE: before appending, read the file and skip any `idempotency_key` or log timestamp already recorded. Hourly runs must not duplicate.
+STEP 4 — if `unknown_submits` is NON-EMPTY, capture it. For every row record verbatim: `idempotency_key`, `venue_ticker`, `selected_date`, `requested_stake_dollars`, `status`, `error`, `venue_order_id`, `submitted_at`, `venue_resolved_at`, `prior_attempts`, and the entire `balance_evidence` object (`verdict`, `reason`, `window`, `opening_dollars`, `closing_dollars`, `delta_dollars`, `confounding_orders`). Also `unknown_submit_dollars` and `unknown_submits_resolved`.
+Append to `.syndicate/findings_unknown_submit_live_evidence.md` (create with an `# ...` H1 if absent). A DEDICATED file — never write to `lanes.md` or `state.md`, which many sessions contend for.
+Head each entry with the UTC timestamp, then the verbatim JSON, then a one-line reading: `not_placed` (balance flat across the submit), `placed` (balance fell by at least the stake), or `unknown` with its reason (`confounded` / `no_bracketing_reading` / `unreadable` / `moved_but_not_by_this_order`). **`unknown` IS A REAL RESULT** — on a busy slate `confounded` is expected and is the guard refusing to guess, not a failure.
+LEAVE IT UNCOMMITTED. A later interactive session commits it. Do not run git.
 
-STEP 4 — reporting, and the control that makes a null mean something:
-BE SILENT WHEN THERE IS NOTHING: write no findings file, commit nothing, open no lane, edit no other ledger file. A watcher that speaks every hour is one people stop reading. (The heartbeat in step 0 is not "speaking" — it is a local file, not a message.)
-When you report nothing found, ALWAYS state the `LIVE_ORDER` count in the same window. **Absence of `http_503` is only evidence if orders were actually being placed.** If `LIVE_ORDER` is 0 the worker was idle and your null says nothing about 503s — say exactly that rather than "nothing found".
+IDEMPOTENCE: before appending, read the file and skip any `idempotency_key` already recorded. Hourly runs must not duplicate.
 
-DO NOT attempt to create an unknown submit. That would mean deliberately failing a real money order. Seeing none is the correct and expected outcome on most runs.
+BE SILENT WHEN THERE IS NOTHING: no findings file, no other ledger edits, no messages. A watcher that speaks every hour is one people stop reading. The heartbeat is a local file, not speech.
+
+DO NOT attempt to create an unknown submit — that would mean deliberately failing a real money order. Finding none is the correct and expected outcome on nearly every run.
+
+WHAT THIS VERSION GAVE UP, so nobody assumes it still covers them: the Render log query is gone, so `balance_settled` from `UNKNOWN_ORDER_PROBE` and the log-derived `LIVE_ORDER` control are NOT captured here. `balance_evidence` from the payload is the same arithmetic (`venue_settlement._balance_evidence`, shared by both paths), so the finding is preserved; only the worker-side confirmation is not. If a row IS captured, an interactive session should pull the matching `UNKNOWN_ORDER_PROBE` line from the worker logs while it is still in retention.
