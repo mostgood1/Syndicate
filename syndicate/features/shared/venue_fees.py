@@ -133,16 +133,51 @@ Two of the five actually favour cost-basis. The separation turns on ONE fill
 rounding to nearest cent rather than flooring** — if it floors, both models
 produce 0.28 and nothing here distinguishes them.
 
-**WHY THE MEASUREMENT CANNOT DO BETTER YET: all five fills sit between 0.43 and
-0.47.** A per-contract fee and a per-cost fee are near-degenerate in a price
-band that narrow — the second is just the first with the rate divided by the
-price. Only a fill at a materially different price separates them. (A fee of
-150 bps of STAKE, as opposed to of NOTIONAL, IS ruled out: at ~0.45 it predicts
+**WHY THE MEASUREMENT CANNOT DO BETTER YET, AND IT IS SHARPER THAN "A NARROW
+BAND": THE TWO MODELS ARE IDENTICAL AT p = 0.4620, AND ALL FIVE FILLS STRADDLE
+IT.**
+
+    0.015 = 0.03247 * p   ->   p = 0.4620
+    fills: 0.43, 0.44, 0.47, 0.47, 0.47
+
+The band is centred on the exact price where a per-contract fee and a per-cost
+fee are the SAME NUMBER by construction. Fitting a per-cost rate to
+per-contract data over such a range always produces a rate that crosses at the
+band's centre, so the 0.0111/0.0148 split is noise around a crossing point, not
+evidence. (Raised by a peer 2026-08-30; verified here.)
+
+What the crossover DOES determine, exactly: which model predicts the HIGHER fee
+-- cost-basis above 0.4620, per-contract below. 5 of 5. What it does NOT
+determine is which is CLOSER to the observed value; that turns on the
+cent-rounding direction of each fill, and the same peer's prediction from it
+held on only 2 of 5. **The gaps are $0.0005-$0.006 against a $0.01 rounding
+quantum -- the noise is LARGER than the signal, which is the real reason five
+fills cannot decide this.**
+
+Only a fill at a materially different price separates them. (A fee of 150 bps
+of STAKE, as opposed to of NOTIONAL, IS ruled out: at ~0.45 it predicts
 $0.00675/contract against ~$0.015 observed, wrong by 2.2x on every fill.)
 
 So `POLYMARKET_REJECTED_COST_RATE` is kept as a NAMED and still-live
-alternative, not a closed question. The next fill outside 0.43-0.47 decides it:
-at ~0.22, per-contract and cost-basis diverge by roughly 2x.
+alternative, not a closed question.
+
+**THE DECIDING OBSERVATION, PRE-COMMITTED.** Order `C65VD0R72KDG` (stake $2.89,
+implied fill ~0.2201 -- as far from 0.4620 as anything we hold) predicts three
+values that survive cent-rounding:
+
+    $0.20   per-contract, count 13.13    -> fee model AND count confirmed
+    $0.16   per-contract, count 10.8953  -> fee model confirmed, NO price
+                                            improvement, our count is wrong
+    $0.09   cost-basis 3.247% of $2.89   -> THIS MODEL IS WRONG at low prices,
+                                            and says NOTHING about the count --
+                                            that branch reads only the stake
+    anything else                        -> all three falsified, which is the
+                                            most informative outcome available
+
+At 0.2201 per-contract predicts 2.10x cost-basis, against 1.00x at the
+crossover. So the test resolves the FEE MODEL in every branch and the COUNT in
+two of three -- worth saying, because a three-way test invites the assumption
+that it settles both questions everywhere.
 
 **NEVER READ THE FEE OFF `commissionsBasisPoints`.** It reads `'0'` on every
 order observed, beside real collected totals -- and that is evidence about the
