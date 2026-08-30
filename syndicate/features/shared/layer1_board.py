@@ -215,6 +215,65 @@ def resolve_window_dates(sport: str, anchor_date: str, *, window: str | int = "d
         span = 1
     return [(start + timedelta(days=offset)).isoformat() for offset in range(span)]
 
+
+def artifact_read_dates(window_dates: "Sequence[str] | Iterable[str]", *, today: str | None = None) -> list[str]:
+    """Which grid ARTIFACTS to open to cover a board window. Read set, not scope.
+
+    **THE ARTIFACT IS KEYED BY UTC DATE; THIS BOARD SCOPES BY LOCAL (CENTRAL)
+    GAME DATE, AND A LATE KICKOFF FALLS BETWEEN THEM.** Any game starting after
+    7pm Central is the NEXT day in UTC, so its row lives in the NEXT day's
+    artifact. A read set of the window alone therefore cannot see it.
+
+    Measured on production 2026-08-30, NCAAF, `window=day&date=2026-08-29`:
+
+        board shows                            7 games, all final
+        `book_grid_2026-08-30.json` holds      Memphis @ UNLV, 2026-08-30T02:19Z
+                                               = 9:19pm Central on 08-29
+
+    So Saturday's board dropped a Saturday-night game — and on a football
+    Saturday the late window is the marquee one. **This is the SAME GAME and the
+    SAME CAUSE already recorded in `ncaaf/sources.py`
+    (`ncaaf_week_and_card_keys_for_date`), which found "7 of Saturday 08-29's 8
+    games, silently dropping MEM @ UNLV".** That fix corrected one consumer; the
+    board is a second consumer of the same mismatch, and it was never fixed
+    here. Recurrence is why this lives in a named, tested function rather than
+    inline at one call site: the next consumer should call this, not rediscover
+    the bug.
+
+    **WIDENING THE READ SET CANNOT SHOW A WRONG-DATE GAME.** `build_layer1_board`
+    filters every row by its own LOCAL game date against `window_dates`, so an
+    extra artifact only widens the candidate pool. That is the same argument the
+    caller already makes for reading today's artifact opportunistically. An
+    absent artifact costs one `stat()`.
+
+    Returns window ∪ {each window date + 1 day} ∪ {today}, order-preserving and
+    de-duplicated so the anchor stays first and no artifact is opened twice.
+    """
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def _add(value: str) -> None:
+        token = str(value or "").strip()
+        if token and token not in seen:
+            seen.add(token)
+            ordered.append(token)
+
+    wanted = [str(d).strip() for d in (window_dates or ()) if str(d).strip()]
+    for date_text in wanted:
+        _add(date_text)
+    for date_text in wanted:
+        try:
+            parsed = datetime.strptime(date_text, "%Y-%m-%d").date()
+        except ValueError:
+            # An unparseable window date is not a reason to drop the rest. It
+            # simply contributes no neighbour.
+            continue
+        _add((parsed + timedelta(days=1)).isoformat())
+    if today:
+        _add(today)
+    return ordered
+
+
 # The three states a game can be in, plus the one that matters most here.
 #
 # `unknown` IS A STATE, not a synonym for pregame. A row whose game state failed

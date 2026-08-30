@@ -534,3 +534,66 @@ def test_market_edge_tooltip_explains_the_number_it_shows():
     )
     # And the model reason must still be CARRIED, not dropped -- both facts.
     assert "the model's own edge is withheld here" in body
+
+
+# ------------------------------- the board's artifact read set (UTC vs Central)
+
+
+def test_read_set_includes_the_utc_neighbour_of_every_window_date():
+    """A Central-evening game lives in the NEXT day's UTC artifact.
+
+    Measured on production 2026-08-30: `window=day&date=2026-08-29` showed 7
+    games while `book_grid_2026-08-30.json` held Memphis @ UNLV at
+    2026-08-30T02:19Z — 9:19pm Central on the 29th. Same game and same cause as
+    the one `ncaaf/sources.py` already records dropping.
+    """
+    from syndicate.features.shared.layer1_board import artifact_read_dates
+
+    got = artifact_read_dates(["2026-08-29"], today="2026-08-29")
+    assert "2026-08-30" in got, "the UTC neighbour is not read, so a 9pm CT game is invisible"
+    assert got[0] == "2026-08-29", "the anchor must stay first so provenance comes from it"
+
+
+def test_read_set_is_deduplicated_and_order_preserving():
+    from syndicate.features.shared.layer1_board import artifact_read_dates
+
+    got = artifact_read_dates(["2026-08-29", "2026-08-30"], today="2026-08-29")
+    assert got == ["2026-08-29", "2026-08-30", "2026-08-31"]
+    assert len(got) == len(set(got)), "an artifact would be opened twice"
+
+
+def test_read_set_survives_an_unparseable_window_date():
+    """One bad date must not drop the rest of the window."""
+    from syndicate.features.shared.layer1_board import artifact_read_dates
+
+    got = artifact_read_dates(["not-a-date", "2026-09-05"], today=None)
+    assert "2026-09-05" in got and "2026-09-06" in got
+    assert "not-a-date" in got, "the caller's own date is still passed through to the reader"
+
+
+def test_read_set_widening_cannot_change_what_the_board_SHOWS():
+    """The read set is not the display scope.
+
+    `build_layer1_board` filters on each row's own local game date against
+    `window_dates`, so reading an extra artifact can only widen the candidate
+    pool. This is the property that makes the fix safe; assert it rather than
+    trust the comment.
+    """
+    from syndicate.features.shared.layer1_board import build_layer1_board
+
+    row = {
+        "sport": "ncaaf",
+        "event_id": "next-day",
+        "market": "h2h",
+        "segment": "full",
+        "commence_time": "2026-09-07T23:00:00Z",
+        "home_team": "H",
+        "away_team": "A",
+        "sides": ["away"],
+        "best": {}, "cells": {}, "books": [], "consensus": {},
+    }
+    board = build_layer1_board(
+        [row], sport="ncaaf", selected_date="2026-08-29", window_dates=["2026-08-29"]
+    )
+    assert board["counts"]["games"] == 0, "an off-window fixture reached the board"
+    assert board["counts"]["rows_other_dates"] == 1
