@@ -78,11 +78,45 @@ _QUOTE_GROUP_FIELDS = ("sport", "kind", "event_id", "segment", "market", "player
 # which is the real defect and the only case worth classifying.
 
 
+def _index_last_seen(last_seen: Mapping[str, str]) -> dict[tuple[str, ...], dict[str, str]]:
+    """`{group tuple -> {line -> freshest stamp}}`, built ONCE per sport.
+
+    WHY THIS EXISTS: `_classify_stale_row` rescanned every `last_seen` entry for
+    every row it classified. That was affordable only because the caller
+    classified **3 rows per sport** -- and that cap is precisely what hid the
+    finding this index exists to expose. Lifting the cap without an index would
+    have been 288 x 22,544 = 6.5M string splits for soccer alone, on the
+    memory-constrained worker.
+
+    Indexed, classifying EVERY stale row is cheaper than today's three: one pass
+    to build, then a dict hit per row.
+
+    Malformed keys are skipped here exactly as the scan skipped them, so the
+    index cannot resolve a group the scan would have refused.
+    """
+    index: dict[tuple[str, ...], dict[str, str]] = {}
+    width = len(_QUOTE_KEY_ORDER)
+    group_positions = [_QUOTE_KEY_ORDER.index(f) for f in _QUOTE_GROUP_FIELDS]
+    for key, stamp in last_seen.items():
+        parts = key.split("|")
+        if len(parts) != width:
+            continue
+        group = tuple(parts[i] for i in group_positions)
+        line = parts[-1]
+        bucket = index.setdefault(group, {})
+        # FRESHEST per line, because the scan took the max and this must not
+        # differ from it. Two books quoting the same line write two keys.
+        if stamp > bucket.get(line, ""):
+            bucket[line] = str(stamp)
+    return index
+
+
 def _classify_stale_row(
     row: Mapping[str, Any],
     last_seen: Mapping[str, str],
     now_iso: str,
     sidecar_newest_age: float | None = None,
+    group_index: Mapping[tuple[str, ...], Mapping[str, str]] | None = None,
 ) -> str:
     """`sidecar_frozen` / `orphaned_line` / `market_gone` for one stale row. `#569`.
 
@@ -150,16 +184,27 @@ def _classify_stale_row(
     row_line = str(row.get("line") or "")
 
     freshest_other_line = ""
-    for key, stamp in last_seen.items():
-        parts = key.split("|")
-        if len(parts) != len(_QUOTE_KEY_ORDER):
-            continue
-        if any(parts[idx[f]] != want[f] for f in _QUOTE_GROUP_FIELDS):
-            continue
-        if parts[-1] == row_line:
-            continue  # same line, different book/selection -- not the orphan test
-        if stamp > freshest_other_line:
-            freshest_other_line = str(stamp)
+    if group_index is not None:
+        # SAME ANSWER, ONE DICT HIT. The `!= row_line` filter is preserved: a
+        # sibling on the SAME line is a different book or selection, which is
+        # not the orphan test. Kept identical to the scan below so the index
+        # cannot change a verdict, only the cost of reaching it.
+        for line, stamp in (group_index.get(tuple(want[f] for f in _QUOTE_GROUP_FIELDS)) or {}).items():
+            if line == row_line:
+                continue
+            if stamp > freshest_other_line:
+                freshest_other_line = str(stamp)
+    else:
+        for key, stamp in last_seen.items():
+            parts = key.split("|")
+            if len(parts) != len(_QUOTE_KEY_ORDER):
+                continue
+            if any(parts[idx[f]] != want[f] for f in _QUOTE_GROUP_FIELDS):
+                continue
+            if parts[-1] == row_line:
+                continue  # same line, different book/selection -- not the orphan test
+            if stamp > freshest_other_line:
+                freshest_other_line = str(stamp)
 
     if not freshest_other_line:
         return "market_gone"
@@ -188,12 +233,27 @@ def _classify_stale_row(
     return "orphaned_line" if (float(seen) - sib_age) > 900 else "market_gone"
 
 
-def _report_stale_row_causes(rows: Any, selected_date: Any, *, per_sport: int = 3) -> None:
-    """Attribute the WORST never-refreshing rows to a cause. `#569`.
+def _report_stale_row_causes(rows: Any, selected_date: Any) -> None:
+    """Attribute EVERY never-refreshing row to a cause. `#569`.
 
-    Bounded to the `per_sport` worst rows per sport: this reads a per-sport
-    state file (MLB's is ~2MB) and the question is about the tail, not the
-    distribution. The distribution is already on `QUOTE_AGE_SERVED`.
+    **THE `per_sport=3` CAP THIS USED TO CARRY WAS REMOVED 2026-08-30, and it
+    was the blind spot rather than a saving.** It classified the 3 worst rows
+    per sport, so the emitted line read
+    `soccer[stale=288 ... market_gone=3]` -- which a reader (this one included)
+    takes as "3 of 288 explained" when it means "3 of 3 SAMPLED". The counts
+    could never sum to `stale=`, so the line could not answer the only question
+    worth asking of a staleness tail: does it have ONE cause or several?
+
+    Lifted by hand against the live 22,544-entry soccer state file: **288 of 288
+    `market_gone`, 100%** -- a single cause, structurally invisible at n=3.
+
+    Now every stale row is classified and **the counts SUM to `stale=`**, which
+    is the property that makes the line self-checking: if they ever disagree, a
+    row fell through the classifier rather than being labelled `unknown_*`.
+
+    Affordable because `_index_last_seen` replaced the per-row rescan of the
+    state file -- classifying all of them now costs less than the old three.
+    The distribution stays on `QUOTE_AGE_SERVED`; this answers WHY.
 
     Never raises, and every failure mode reports as its own `unknown_*` label
     rather than defaulting into `market_gone` -- a diagnostic that guesses when
@@ -251,9 +311,19 @@ def _report_stale_row_causes(rows: Any, selected_date: Any, *, per_sport: int = 
             except Exception:
                 sidecar_age = None
 
+            # EVERY stale row, not the worst `per_sport`. The cap was the whole
+            # blind spot: `soccer[stale=288 ... market_gone=3]` reads as "3 of
+            # 288 explained" and is actually "3 of 3 SAMPLED", so the line
+            # could never say whether the tail had one cause or five. Measured
+            # 2026-08-30 once the cap was lifted by hand: **288 of 288
+            # `market_gone`, 100%** -- one cause, invisible at n=3.
+            #
+            # Affordable because `_index_last_seen` replaced the per-row rescan;
+            # see its docstring for the 6.5M-iteration figure this avoids.
+            group_index = _index_last_seen(last_seen)
             counts: dict[str, int] = {}
-            for _age, row in entries[:per_sport]:
-                label = _classify_stale_row(row, last_seen, now_iso, sidecar_age)
+            for _age, row in entries:
+                label = _classify_stale_row(row, last_seen, now_iso, sidecar_age, group_index)
                 counts[label] = counts.get(label, 0) + 1
             age_txt = "unknown" if sidecar_age is None else f"{sidecar_age:.0f}s"
             parts.append(
