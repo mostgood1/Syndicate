@@ -2159,18 +2159,29 @@ def _priceless_reader(orders):
 
 
 def test_PRICE_IMPROVEMENT_without_a_fill_price_is_BOOKED_not_stranded(monkeypatch):
-    """The production halt, reproduced at its measured numbers.
+    """THE ACTUAL BLOCKING ORDER, at its real production values.
 
-    -108 American is 0.5192, so a $5.66 stake requests 10.8953 contracts. The
-    venue filled 13.13 and gave no price. Bounded at OUR OWN LIMIT that is
-    13.13 x 0.5192 = $6.82 against a $7.07 ceiling (1.25x) -- inside tolerance,
-    so it books. A BUY cannot fill above its own limit, so this is an UPPER
-    bound: any real price improvement makes the true figure smaller.
+    `0f0e2a675e86ed5589a9d913` / `C65VD0R72KDG`, read off `/api/portfolio/live`:
+    `requested_price=277.0`, `requested_stake_dollars=2.89`, submitted
+    2026-08-30T03:25:52Z, still `submitted` 11 hours later.
+
+    277 American is 0.265252, so $2.89 requests **10.8953** contracts -- which
+    is exactly the `requested=10.8953` in the production log line, to four
+    decimals. That arithmetic is what proves the logged pair belongs to THIS
+    order; a second session read `requested_stake_dollars=2.89` against
+    `requested=10.8953`, concluded they were different orders, and was wrong:
+    one is dollars, the other is the DERIVED contract count.
+
+    Old bound: 13.13 > 10.8953 + 0.01 -> REFUSED, forever.
+    New bound: 13.13 x 0.265252 = $3.4828 against a $3.6125 ceiling -> BOOKS.
+
+    A BUY cannot fill above its own limit, so $3.4828 is an UPPER bound on what
+    was actually spent; real price improvement only makes it smaller.
     """
     from syndicate.features.shared import execution_ledger as mod
 
     key = _priceless_order(mod, monkeypatch, key="halt-repro",
-                            price=-108.0, stake=5.66, venue_order_id="pm-1")
+                            price=277.0, stake=2.89, venue_order_id="pm-1")
     monkeypatch.setattr(mod, "_venue_reader", lambda venue: _priceless_reader(
         [{"order_id": "pm-1", "client_order_id": key, "filled_count": 13.13}]))
 
@@ -2224,14 +2235,14 @@ def test_an_OVERSPEND_without_a_fill_price_is_BOOKED_AND_FLAGGED(monkeypatch):
 def test_the_limit_price_is_read_as_PROBABILITY_not_raw_american(monkeypatch):
     """The 2026-08-27 units bug, on the branch that now reads `requested_price`.
 
-    Raw, -108 would make 13.13 contracts read as $1,418 against a $5.66 stake
-    and the order would be refused as absurd. Converted, it is $6.82 and books.
+    Raw, 277 would make 13.13 contracts read as $3,637 against a $2.89 stake
+    and the order would be refused as absurd. Converted, it is $3.48 and books.
     A single missing `_price_as_probability` turns this fix back into the halt.
     """
     from syndicate.features.shared import execution_ledger as mod
 
     key = _priceless_order(mod, monkeypatch, key="units",
-                            price=-108.0, stake=5.66, venue_order_id="pm-4")
+                            price=277.0, stake=2.89, venue_order_id="pm-4")
     monkeypatch.setattr(mod, "_venue_reader", lambda venue: _priceless_reader(
         [{"order_id": "pm-4", "client_order_id": key, "filled_count": 13.13}]))
 
