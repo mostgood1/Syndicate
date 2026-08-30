@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-08-30 20:38:53Z — **LIVE EXECUTION RECOVERED AFTER 55 MINUTES** — live-odds-worker `bf1dd290` — lane `polymarket-yes-leg-binding`
+
+    dep-daa98egn74is73a7o34g   fired by ME, claim held 20:18:42Z and RELEASED 20:4xZ
+
+**NO GUARD BYPASS. The HOLD cleared on its own at 20:35:35Z** (the
+`belgian_pro_league` soccer build finished), so a fresh preflight bound to the
+exact SHA returned CLEAR at 20:36:02Z and the deploy went out legitimately at
+20:36:10Z. The user had authorised deploying THROUGH the hold; it was not
+needed, and nothing was killed. An earlier attempt with
+`SYNDICATE_DEPLOY_GUARD=off` as an inline prefix was correctly refused — the
+guard is a PreToolUse hook that reads the command BEFORE it runs, so the switch
+never reaches it. Recorded because the ledger already carries this dead end from
+08-28 and it is now confirmed twice.
+
+**verify: the block cleared and real orders were placed.**
+
+    19:47:24  EXECUTION status=ok            <- last tick before the outage
+    ...55 minutes, every tick BLOCKED_ON_UNRECONCILED, both venues...
+    20:39:51  RECONCILE_NOT_FOUND key='3243b1c994b6a445ae917a45' venue='kalshi'
+              ticker=None venue_order_id=None coverage=book never_sent=True
+    20:39:51  RECONCILE_NOT_FOUND_RESOLVED key='3243b1c994b6a445ae917a45'
+              -- marked rejected so it stops blocking live execution
+    20:42:17  EXECUTION status=ok mode=live venue=kalshi PLACED=2 duplicates=1
+              spent={'dollars': 65.48, 'orders': 18}
+    20:42:37  EXECUTION status=ok mode=live venue=polymarket placed=0
+              refused={'over_max_order_dollars': 1}
+
+    BLOCKED_ON_UNRECONCILED since the deploy: 0
+
+**MY FIX IS NOT WHAT UNBLOCKED THIS, and the reading says so:
+`RECONCILE_RECOVERED = 0`.** `63661af1` (a peer, landed AFTER `dd33c865`) is
+what cleared it. Their diagnosis went further than mine and CORRECTED it: I
+attributed the latch to an order that FILLED or was CANCELLED and so left the
+open book. The actual order carried `venue_order_id=None`, no ticker,
+`market=spreads_alt`, $1.45 — it was NEVER SENT. A write-ahead record was left
+`submitted` when the build failed with `OrderBuildError(ticker=None)`.
+
+My recovery path requires a venue id to read by, so it would have printed
+`RECONCILE_NO_VENUE_ID` and kept blocking — correctly, but unresolved. I
+PREDICTED zero recoveries before taking the reading and got zero, which is the
+only reason that claim is worth anything.
+
+The two fixes COMPOSE and were checked as composed, not assumed: mine handles an
+order WITH a venue id absent from the open book; theirs handles never-sent. The
+shared root cause — `not_found` was a bare `continue`, so the order was counted,
+never stamped, never named — is what both address.
+
+**The `leavesQuantity` instrument is LIVE (`bf1dd290`, cherry-picked from
+`polymarket-buy-limit-tick-floor` with authorship preserved) — 19 `ORDER_STATE`
+lines. IT HAS NOT YET ANSWERED ITS QUESTION.** All 19 are
+`ORDER_STATE_FILLED` with `cum>0, leaves=0.0`. The untouched-vs-partially-stuck
+split it exists for needs a RESTING order (`leaves>0`) and none is in this
+sample: **never-touched 0, touched 19.** Alive, unexercised on its subject.
+
+**STILL OWED, unchanged: the yes-leg leg CHOICE.** `POLYMARKET_YES_LEG` since
+the deploy is 1 line, `aec-mlb-pit-stl` at `yes_leg_index=0` again — and
+`yes_leg_index=0` IS `outcomes[0]`, so the old positional rule agrees. Needs a
+`yes_leg_index=1` market. 4 wnba + 1 boxing carry that shape in the slate.
+
 ## 2026-08-30 19:54:08Z — `#595` step 3 MEASURED — **THE FIELD FLOWS AND A MONEYLINE BUILDS. THE LEG CHOICE IS STILL UNVALIDATED.** — lane `polymarket-yes-leg-binding`
 
 Discharges the `verify:` owed by the 19:14:20Z row above. Same deploy
