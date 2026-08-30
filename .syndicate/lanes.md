@@ -3721,6 +3721,43 @@ caaf-no-orders`). NOT
   next 503; it closes this and the parent's `balance_settled` in one event.
 - Blocked by: none. Parent: `unknown-submit-retry-provenance` (CLOSED-VERIFIED).
 
+### mlb-resolver-write-side-effect — OPEN — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411 — **UNOWNED, handed off**
+- **A PATH RESOLVER WRITES 2.46MB AND SUPPRESSES THE REPAIR THAT WOULD FETCH
+  THE REAL FILE.** Not a test artifact — measured on a FRESH tempdir, 0 files
+  before and 2 after, from a call that only asks WHICH artifacts are required.
+- Chain: `artifact_publisher._required_daily_artifact_paths` →
+  `mlb.sources.daily_artifact_path` → `_resolve_data_path_with_reconcile`
+  (`sources.py:80`) → `shutil.copy2(candidate, target)` at `sources.py:116`,
+  hydrating from the repo's git-tracked `data/mlb_source` into the configured
+  root. `_missing_required_artifact_relative_paths` then sees the two
+  `daily_summary_*` files as present and DOES NOT request them: 5 repairs
+  instead of 7.
+- Why it matters: that function's own comment says presence must be judged
+  "ON THE RUNTIME DISK, never at whatever path the helper returned — asking
+  'does the repo have a copy' answers a question nobody asked." The reconcile
+  copy turns the repo's copy INTO the runtime disk's copy, defeating the guard
+  from the layer beneath it. This is the hazard CLAUDE.md's "Render is the
+  source of truth / data in git is a lossy mirror" section exists for.
+- ACTIVE IN PRODUCTION: `_reconcile_from_repo_enabled()` is just
+  `bool(SYNDICATE_DATA_ROOT)`, always set on Render. `_artifact_roots()` appends
+  the repo's `data/mlb_source` UNCONDITIONALLY — no env var overrides it — so a
+  candidate always exists and `len(roots) > 1` always holds.
+- **NOT YET SHOWN TO SERVE STALE DATA.** There IS an mtime/size `should_copy`
+  guard (`sources.py:99-113`). The proven claim is narrow: the required-artifact
+  REPAIR can be suppressed by a git-tracked mirror copy. Whether a stale copy
+  has ever won on a live worker is UNMEASURED and is the first thing to check.
+- Files: `syndicate/features/mlb/sources.py`,
+  `syndicate/features/shared/artifact_publisher.py`. NOT CLAIMED — nothing is
+  held, so a lane picking this up should claim them.
+- Falsification test: if `should_copy` never fires on a Render worker (compare
+  mtimes of the deploy checkout's `data/mlb_source` against the mounted disk),
+  the production impact is nil and this is test-hygiene only.
+- Verification: a worker-side reading that `_missing_required_artifact_relative_paths`
+  returns the full required set on a real tick.
+- Deliberately NOT fixed on discovery: it changes data-hydration behaviour on a
+  live path, mid-slate. `[user 2026-08-29: fix the tests, open a lane for this]`
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

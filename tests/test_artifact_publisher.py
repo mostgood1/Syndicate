@@ -1212,10 +1212,33 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
                 # it the same way test_wnba_refresh_runner.py/test_intelligence.py
                 # already do.
                 "SYNDICATE_WNBA_SOURCE_ROOT": str(Path(tmp_dir) / "wnba_source"),
+                # SAME LEAK, ONE SPORT OVER -- and this one does not merely
+                # READ the repo, it COPIES from it. `daily_artifact_path` goes
+                # through `mlb.sources._resolve_data_path_with_reconcile`, which
+                # `shutil.copy2`s a candidate from the repo's own
+                # `data/mlb_source` into the configured root. MEASURED
+                # 2026-08-29: merely LISTING the required paths wrote 2.46MB
+                # into a FRESH tempdir (0 files before, 2 after), so
+                # `_missing_required_artifact_relative_paths` then saw both
+                # daily_summary files as present and asked for 5 repairs
+                # instead of 7 -- green on a checkout without those artifacts,
+                # red on any tree that has them.
+                #
+                # PINNING THE ROOT IS NOT ENOUGH and that is worth stating:
+                # `_artifact_roots()` appends the repo's own `data/mlb_source`
+                # UNCONDITIONALLY, with no env var over it, so a candidate
+                # always exists and `len(roots) > 1` stays true. The reconcile
+                # gate is patched below instead. The copy itself is a REAL
+                # defect and is NOT fixed here -- lane
+                # `mlb-resolver-write-side-effect`.
+                "SYNDICATE_MLB_SOURCE_ROOT": str(Path(tmp_dir) / "mlb_source"),
             },
             clear=False,
         ):
-            with patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
+            with patch(
+                "syndicate.features.mlb.sources._reconcile_from_repo_enabled",
+                return_value=False,
+            ), patch("urllib.request.urlopen", return_value=mocked_response) as mocked_urlopen:
                 pull_hot_artifacts(date_str=date_str)
         return [call.args[0].full_url for call in mocked_urlopen.call_args_list]
 

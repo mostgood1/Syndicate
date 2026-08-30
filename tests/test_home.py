@@ -525,8 +525,18 @@ class HomePageCommandCenterTests(unittest.TestCase):
     def test_load_home_pregame_prop_items_uses_mlb_top_props_when_betting_card_is_empty(self) -> None:
         home_games = [{"gamePk": 1, "away": {"abbr": "AWY"}, "home": {"abbr": "HME"}}]
 
+        # STUBBED BECAUSE IT IS ADDITIVE, NOT A FALLBACK. `pregame_props` ends
+        # `return list(mlb_rows) + hr_target_rows` (home.py:6046-6048), so HR
+        # targets are appended whatever the betting card did. Leaving it live
+        # made this assertion depend on how much MLB data the machine happens
+        # to hold: 1 row on a checkout with none, 11 on a populated mirror --
+        # green in CI and red for anyone with a real `data/` tree, which is the
+        # opposite of what an exact-count assertion is for.
         with patch(
             "syndicate.blueprints.home._pregame_prop_rows_from_betting_card",
+            return_value=[],
+        ), patch(
+            "syndicate.blueprints.home._load_mlb_home_hr_target_items",
             return_value=[],
         ), patch(
             "syndicate.blueprints.home._load_mlb_home_top_prop_items",
