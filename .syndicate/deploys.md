@@ -38726,3 +38726,50 @@ It just did not clear the second order.
 like the safe direction and was not. A wrong attribution in the ledger is wrong
 in both directions — the next person debugging a paper-order latch would have
 found a note saying the paper-order fix was not what fixed it.
+
+## 2026-08-30 18:50Z — the duplicate-bet fix, and the guard that shipped INERT first
+
+- **deploys:** `fcadd126` 18:37Z then `165c448f` 18:50Z, BOTH services, both
+  deployed MANUALLY by the user (the sanctioned path stays unreachable for
+  live-odds-worker, and both claims were held by other lanes throughout).
+- **claims:** none held by me. Not forced.
+
+### THE FIX
+`commence_time` left `_POSITION_IDENTITY_FIELDS`. It had put ~$9.12 on the board
+twice (`tsc-mlb-lad-det-2026-08-30-7pt5`, both legs resting) and a second pair
+FILLED AND LOST (`HOU@NYY` h2h, `pnl -3.41` and `-0.78`, a **3m38s**
+restatement). Threshold verified as ZERO: a **one-second** restatement minted a
+new key under the old rule.
+
+### THE PART THAT MATTERED: THE FIRST DEPLOY'S GUARD WAS DECORATION
+
+`fcadd126` shipped the dual-key migration guard. First executor cycle after it:
+
+    EXECUTION status=ok placed=0 duplicates=8   venue=kalshi
+    EXECUTION status=ok placed=0 duplicates=1   venue=polymarket
+    LEGACY_KEY_MATCH                            ZERO times
+
+**`placed=0` is exactly what success looks like, and it was concealing the
+defect.** LEGACY_KEY_MATCH cannot be zero if pre-fix rows matched via the legacy
+path — those 9 matched on the PLAN'S STORED keys, which predate the change. The
+exposure was the next plan rebuild: fresh keys, nothing matching the ledger's
+pre-fix rows, one duplicate per open position.
+
+Cause: `portfolio_commit` emitted `legacy_position_key`, `record_order` checked
+it, and `_order_from_position` between them never copied it. Every unit test
+passed. `presence != reachability`, third instance today.
+
+`165c448f` carries the one line that joins the chain, plus a test asserting the
+JOIN rather than the endpoints.
+
+### verify
+Both services on `165c448f`, confirmed by `live commit` at 18:50Z. **The
+behavioural proof is still owed**: `LEGACY_KEY_MATCH` should fire on the first
+plan REBUILD after this deploy, when fresh keys meet pre-fix ledger rows. If it
+stays silent while `placed` jumps, the guard is still not reached — and
+`placed>0` on a rebuild is the alarm, not `duplicates>0`.
+
+### STILL OUTSTANDING, not code-fixable
+`C6H7WE0DPKDJ` ($4.06) and `C6HN0XD92KDE` ($5.44) are resting live at
+Polymarket. No `cancel_order` adapter exists; one leg needs a human on the
+venue's Orders screen. The fix stops the next one; it does not retire that one.
