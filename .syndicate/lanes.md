@@ -4001,7 +4001,30 @@ caaf-no-orders`). NOT
 - Blocked by: none for the board surfaces. The ORDER path is blocked on
   `portfolio-decision-and-execution` and is deliberately out of scope.
 
-### stale-row-cause-blind-spot — OPEN — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+### stale-row-cause-blind-spot — **CLOSED-VERIFIED 2026-08-30** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+- OUTCOME: `STALE_ROW_CAUSE` classifies EVERY stale row instead of the 3 worst
+  per sport. **VERIFIED IN PRODUCTION 03:42:11Z on `77e61607`** (deploy
+  `dep-da9q7bpf2nfc7389ug30`, live 03:32:26Z), first board publish after boot:
+  `soccer[stale=293 ... market_gone=293]` — counts SUM to `stale=`, where the
+  cap would have printed 3. `mlb[stale=2 counted=2]` also summed but is NOT
+  discriminating (`stale<=3`, the cap would not have bound), and the verifier
+  refused to pass until it saw a sport above the cap.
+- Cost went DOWN: `_index_last_seen` indexes the state file once, so classifying
+  all 288 rows measured **98ms against 172ms for the old 3-row sample** (167x),
+  verdicts identical to the per-row scan on 288 production rows, 0 disagreements.
+- WHAT IT REVEALED, now readable in one line: **293 of 293 stale soccer rows are
+  `market_gone`** — one cause, 100%, ~⅓ of the served board, all PREGAME with
+  kickoff ~15h out. `findings_2026-08-30_layer2_board_assessment.md` §4 carries
+  the RETRACTION of this session's own "DEAD CAPTURE" framing, which was wrong,
+  as were both causes it named.
+- A FALSE FAIL was produced and is recorded rather than smoothed: the first
+  verifier read a `03:20:08Z` line — BEFORE the deploy — and reported FAIL on a
+  working fix. A verification that can read pre-fix output cannot fail honestly.
+  Fixed with a hard cutoff at the deploy's `finishedAt`.
+- NOT TAKEN, and it is a product decision: whether to DROP `market_gone` rows or
+  replace the flat 14h ceiling with a per-family one. Surfaced to the user,
+  deliberately left open. **This lane closing does NOT close that question.**
+- Claims RELEASED. Deploy claim released 03:4xZ. Measurement in `deploys.md`.
 - Goal: make `STALE_ROW_CAUSE` classify EVERY stale row instead of the 3 worst
   per sport, so the board's staleness tail is attributable from a log line
   rather than only by hand. Observability only in this lane — no change to

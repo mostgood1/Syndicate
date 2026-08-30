@@ -214,9 +214,43 @@ went `14,497 -> 33,793s` while `19,269s` of wall-clock elapsed:
 
 **The top decile of the board is not being refreshed at all.** It is the same
 set of quotes aging in place, one second per second, for nine and a half hours.
-That is a DEAD CAPTURE, not a slow cadence. Two named causes are already
-visible: `no_side_in_key: 3647` discarding every MLB OddsAPI quote, and NFL and
-NCAAF having no odds-history shard on this date.
+
+> ### RETRACTED 2026-08-30 — "DEAD CAPTURE" WAS WRONG, AND SO WERE BOTH NAMED CAUSES
+>
+> This paragraph originally read *"That is a DEAD CAPTURE, not a slow cadence"*
+> and named `no_side_in_key: 3647` and the missing NFL/NCAAF shards as the
+> causes. **All three claims are false.** The ratio measurement stands; the
+> diagnosis built on it did not.
+>
+> **The capture is alive.** The sidecar was 23 minutes fresh while rows sat at
+> 10.7h. What the p90 cohort actually is, measured with the production
+> classifier over the FULL cohort rather than a sample, and confirmed in
+> production after deploy `77e61607` at `03:42:11Z`:
+>
+>     STALE_ROW_CAUSE soccer[stale=293 ... market_gone=293]   293 of 293, 100%
+>
+> `market_gone` = the row's `(event, market)` group has not been observed at
+> all. Those rows are **all PREGAME with kickoff ~15h out**, so the feed did not
+> legitimately close either. The mechanism is that market FAMILIES run on
+> different sweeps — `h2h`/`totals` freshest 43.8 min, `alternate_totals_corners`
+> 147.9 min, `player_shots` 403 min, `player_to_receive_card` 664.7 min —
+> against **one flat 50,400s board ceiling**. The slow families dominate the
+> tail and the flat ceiling cannot tell them apart.
+>
+> **`no_side_in_key` was independently disproved** in §6e: it is an honest
+> refusal over data that is 95.7% redundant and 4.2% genuinely unrecoverable,
+> worth ~0 either way. It never touched the p90.
+>
+> **Why it took a deploy to see it.** `_report_stale_row_causes` classified only
+> the 3 worst rows per sport, so the line read `market_gone=3` against
+> `stale=288` — "3 of 288 explained" when it meant "3 of 3 sampled". I read it
+> that way myself. The cap is removed (lane `stale-row-cause-blind-spot`,
+> `f454af96`), and the counts now sum to `stale=`.
+>
+> **Still open, and a product decision rather than a patch:** DROP `market_gone`
+> rows (~⅓ of the served board) or replace the flat 14h ceiling with a
+> per-family one. `value_floor_by_sport` already derives per family
+> (`method: measured_hold`), so there is precedent for the second.
 
 One build in the window (22:42Z) degenerated to `rows=467, seen_p50=25,864s` —
 the whole board went 7h stale and recovered unremarked. **Worth an alert.**
