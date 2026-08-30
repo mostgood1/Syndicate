@@ -133,6 +133,17 @@ than reading its name, its neighbours, or its timestamp.
      RECOVERABLE.** Before sizing work off one, classify a sample of the
      refusals into out-of-scope / recoverable. The two can differ by an order of
      magnitude and nothing in the counter says which.
+  1b. **AND "recoverable" is not "worth having" — check what the refused rows
+     CONTAIN.** `oddsapi no_side_in_key: 3647` is an HONEST counter (a real
+     `continue`) on a sport whose board demand is not in doubt, and it is still
+     worth ~0: 4.2% are game lines with genuinely no side (correct refusal),
+     and 95.7% are props whose side IS present as `selection=` — recoverable in
+     one line, and REDUNDANT. Same capture the board already reads
+     (`oddsapi_hitter_props_*.json`), no bookmaker field against the board's 8
+     named books on 250/250 rows, and OLDER — p50 4.5h against the board's
+     58min, so it loses freshest-wins on 78.5% of rows. **Four scope checks,
+     four near-zeros, and this is the one where the counter was accurate and
+     the demand was real.**
   2. **Two wrong fixes were proposed for this before one was measured** — an
      alias map (already FORBIDDEN the previous day) and a slug-token join (8%,
      dead on the same upstream-vocabulary wall). A named cause sitting next to a

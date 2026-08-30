@@ -21,7 +21,7 @@ plus refresh-worker (`srv-d91dpertqb8s73co8ls0`) logs over the preceding 6h.
 | 1 | Spread sign convention, **MLB + WNBA only** | ~443 quotes vs 139 board rows (was mis-sized as 3,290 — see 6d) | `kalshi-spread-join-sign` (UNOWNED, claims released) |
 | 2 | Kalshi publishes 1,413 NCAAF quotes, wins **0** selections | undiagnosed downstream match failure, not an adapter refusal | unowned |
 | 3 | Polymarket NCAAF h2h keyed by club NAME | **~11-43 markets, NOT 314** — see 6b | held by `live-venue-order-placement`; mechanism proven, prize small |
-| 4 | `oddsapi no_side_in_key` on MLB/WNBA | 3,715 quotes/cycle → 0 rows | unowned |
+| ~~4~~ | ~~`oddsapi no_side_in_key`~~ | **WORTH ~0 — see 6e.** 4.2% unrecoverable (game lines, no side exists); 95.7% recoverable and REDUNDANT (same capture, no bookmaker, p50 4.5h vs the board's 58min) | withdrawn |
 | 5 | NFL + NCAAF have no odds-history shard at all | whole sportsbook feed absent | unowned |
 | 6 | Movement term saturates at 20 pts | 18 of 35 movement rows | unowned |
 | 7 | Freshness ladder tops out at 3h | 95 of 200 served rows pinned at floor | unowned |
@@ -618,6 +618,67 @@ shortlist (1,261 rows), which is post-filter. A sport could hold grid spread row
 that never clear the value/age floors. That would raise NCAAF's 1 — it cannot
 plausibly rescue NFL (2 rows on the entire board) or soccer (does not card
 spreads by design).
+
+## 6e. SCOPE-CHECKED — `oddsapi no_side_in_key`, the item with PROVEN demand. Worth ~0.
+
+This was ranked next-best precisely because MLB's board demand is not in doubt
+(403 available rows, 250 served prop rows). **It still comes out near zero, and
+by a different route than the other three: this counter is honest.**
+
+`venue_quote_adapters.py:1325` is `no_side += 1; continue` — a REAL refusal, not
+a success counter. The name means what it says. What was never checked is what
+the refused rows CONTAIN.
+
+Measured against the live 27.3MB MLB shard
+(`mlb_source/artifacts/mlb/odds_history/2026-08-29.json`, `updated_at
+2026-08-30T02:21:03Z`, streamed from production):
+
+    3,538 market keys, 0 with `side=`   -> the adapter drops 100% of them
+
+    3,388 (95.7%)  PLAYER PROPS   player_name=wilyer abreu|market=batter_hits_runs_rbis|selection=over
+      150 ( 4.2%)  GAME LINES     event_id=..|home_team=..|away_team=..|market=h2h|bookmaker=fanduel
+                                  (h2h 50, spreads 50, totals 50)
+
+**THE TWO HALVES HAVE OPPOSITE ANSWERS AND THE COUNTER MERGES THEM.**
+
+**Game lines — the refusal is CORRECT and the code comment is exactly right.**
+One `last_odds` per (event, market, book) and nothing saying which team it
+belongs to. Not recoverable from this shard at any effort. 4.2%.
+
+**Props — the side IS present, under the field name `selection` (over 1,853 /
+under 1,535).** The adapter reads `parsed_key.get("side")` and gets `None`. That
+is a field-name mismatch, not absent data, and it is a one-line read.
+
+**AND RECOVERING IT IS STILL WORTH NOTHING, which is the point of doing the
+scope check rather than the fix.** Three independent reasons, each measured:
+
+1. **Same capture.** `last_source_path` on every prop entry is
+   `oddsapi_hitter_props_2026_08_29.json` (3,102) / `oddsapi_pitcher_props_…`
+   (286) — the OddsAPI props capture **the board already reads**.
+2. **Strictly less informative.** The shard's prop entry carries ONE aggregated
+   `last_odds` and **no bookmaker field at all**. The board's prop rows already
+   carry `book_prices` from **8 named books** — betmgm 237, draftkings 227,
+   betonlineag 125, bovada 95, williamhill_us 94, betrivers 70, fanatics 23,
+   fanduel 10 — median 3 books per row, on **250 of 250** served prop rows.
+3. **Older, not fresher — so it loses freshest-wins.** Prop entry age against
+   the shard's own `updated_at`: p25 147min, **p50 268.7min (4.5h)**, p75 454min,
+   max 470min. The board's MLB rows sit at ~58min. **Only 730 of 3,388 (21.5%)
+   are fresher than that**, and those bring no bookmaker with them.
+
+So the fan-in would gain a source that is a staler, book-less copy of prices it
+already has. **`no_side_in_key: 3647` is worth ~0 recoverable rows** — 4.2%
+genuinely unrecoverable, 95.7% recoverable and redundant.
+
+**WHY THIS ONE MATTERS MOST OF THE FOUR.** The other three collapsed because a
+counter was mislabelled or its denominator was wrong. This counter is accurate
+and the demand is real — **and the work is still worthless, because nobody had
+asked what the refused rows contained.** A refusal count says how often a reader
+said no. It says nothing about whether the thing refused was worth having.
+
+**NOT ESTABLISHED:** whether soccer's `oddsapi_props` path (18,217 quotes,
+`selected_by_source: 5,174`) is doing real work or the same redundancy — it wins
+selections, so it is at least reaching the board, which MLB's does not. Different
+architecture per sport; not measured here.
 
 ## 7. What this assessment does NOT establish
 
