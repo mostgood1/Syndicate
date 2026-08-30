@@ -170,7 +170,19 @@ def client():
 def _render(client, monkeypatch, order):
     monkeypatch.setattr(
         bp, "_live_portfolio_payload",
-        lambda date, show_all=False, on_date=None: {
+        # `**kwargs` rather than re-listing the route's signature. This stub
+        # went stale when `?venue=` was added (2026-08-28): the real
+        # `_live_portfolio_payload` grew a `venue` kwarg, the stub did not, and
+        # every test routing through `_render` died with
+        # `TypeError: got an unexpected keyword argument 'venue'` -- rendering a
+        # 500 page, so the assertions failed on absent team names rather than on
+        # anything they were written to check.
+        #
+        # EIGHT tests, one helper. The same defect was fixed in
+        # `test_venue_balances.py` on 2026-08-29 and NOT grepped for elsewhere,
+        # which is why these survived another day. Naming the exact kwargs here
+        # just schedules the next occurrence for whenever a filter is added.
+        lambda date, **kwargs: {
             "date": date, "orders": [order], "health": {}, "limits": {},
             "kill_switch": {}, "balances": None,
         },
