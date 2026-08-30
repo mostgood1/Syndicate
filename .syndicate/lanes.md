@@ -3012,6 +3012,18 @@ caaf-no-orders`). NOT
   submitted side matches the team we intended.
 - Blocked by: none. NOT DEPLOYING without a separate decision.
 
+### polymarket-buy-limit-tick-floor — OPEN — opened 2026-08-30 — session 6475567d
+- Goal: Polymarket buy limits stop resting below the venue's own quote. `round_price_to_tick` floors a BUY, so a 0.515 quote is sent as 0.51 and never fills.
+- Files: NONE HELD — released 2026-08-30. db2252b0 is landed and DEPLOYED; no further edits planned. `polymarket-yes-leg-binding` landed 8b0d27df in the same two files under user override and resolved the conflict by KEEPING this lane's snap-before-guard — I verified that on origin/main: the snap (`round_price_to_tick(..., direction="up")`) still precedes the drift check, `tick = row.get("orderPriceMinTickSize")` appears exactly once, and all three of this lane's markers survive. Lane stays OPEN only because the behaviour change is still unobserved.
+- Hypothesis: the tick FLOOR, not price staleness, is what leaves Polymarket orders unfilled. Kalshi is unaffected because its quotes are already on a 1c grid, so the floor is a no-op there.
+- Falsification test: if the submitted limit equalled the resolved price on a market whose tick did not divide it, the floor is not the cause. MEASURED 2026-08-30 on live-odds-worker: POLYMARKET_ARTIFACT_PRICE price=0.515 for tsc-mlb-lad-det-2026-08-30-7pt5, FILL_ABOVE_LIMIT submitted_limit=0.51 filled=0.0. round_price_to_tick is the ONLY transform between them (order_body:428). Hypothesis SURVIVED.
+- Verification: DONE IN CODE, NOT YET IN PRODUCTION. db2252b0 on main. 47 tests pass incl. the lad-det case as a regression; 564 pass across -k polymarket; the 2 failures in that surface are pre-existing (re-ran them with the changes stashed).
+- Scope measured, NOT total: 2 of the 3 orders resting on 2026-08-30 change behaviour (both lad-det, 0.515 quote -> was 0.51, now 0.52). The third (tsc-lal-cel-ath, quote 0.44, sent 0.44) was ALREADY on the tick grid and still rested -- a SECOND cause this change does not touch.
+- Second cause, handed off: the slate carries `prices[]`, one probability per outcome, and NO bid/ask/book. Kalshi prices off an explicit `no_ask_dollars`. Bidding a non-ask exactly may never cross. Fixing it needs a live orderbook read in polymarket_us_markets.py, which is held by `live-venue-order-placement`.
+- NOT DEPLOYED: autoDeploy is off, so this is inert on live-odds-worker until a deploy is run behind the two locks.
+- Handoff NOT DELIVERED: session `5611932c` (lane `polymarket-yes-leg-binding`, which user-overrode this lane's claim on the same two files) is not in the session roster even with archived included. db2252b0 changes `round_price_to_tick` to take a REQUIRED keyword-only `direction` -- any branch of theirs calling it positionally will TypeError until rebased. Recorded here because it could not be sent.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

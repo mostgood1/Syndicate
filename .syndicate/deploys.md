@@ -38823,3 +38823,35 @@ had been running without them.
 **Seen in the same window, not mine, flagged for the venue lane:**
 `LIVE_ORDER status=rejected venue=polymarket ticker=atc-mls-stl-dal sport=soccer
 market=h2h price=257.0 stake=4.43`.
+
+## 2026-08-30 — db2252b0 (in 165c448f) — polymarket BUY limit snaps UP to the tick
+
+- **Deployed by:** the user, manually, all three services on `165c448f`.
+  live-odds-worker live at 18:50:00Z (13:50 local). Build+update ~13 min.
+- **Contains the fix:** verified TWO ways — `db2252b0` is an ancestor of
+  `165c448f`, AND the deployed tree greps `direction="up"` in
+  polymarket_us_orders.py and `snapped=` in execute_portfolio.py. Ancestry alone
+  is not enough here; web has run non-main deploy branches before.
+- **verify: THE CODE RAN — proven by branch, not by deploy state.**
+  `POLYMARKET_ARTIFACT_PRICE` gained three fields that exist only in this build.
+  Same slug, either side of the rollout:
+
+      18:46:53  ... slug=tsc-mlb-sea-tor-2026-08-30-7pt5 price=0.305 planned=0.4807...
+      18:53:11  ... slug=tsc-mlb-sea-tor-2026-08-30-7pt5 price=0.26 quoted=0.26
+                    tick=0.005 snapped=False planned=0.4807...
+
+  Five pre-deploy lines carry no `quoted=`/`tick=`/`snapped=`; the post-deploy
+  line carries all three.
+
+- **NOT YET VERIFIED, and stated as such: the snap itself has never fired.**
+  `snapped=False` — that quote already sat on its 0.005 grid, so the ceiling was
+  a no-op. Reachability of the code is proven; the BEHAVIOUR CHANGE is not.
+  A watcher is looking for `snapped=True`. Until one appears, the correct claim
+  is "deployed and executing", NOT "fixed".
+- **No Polymarket order placed since the deploy**, so no fill evidence either:
+  `EXECUTED ... mode=live venue=polymarket positions=2 placed=0 duplicates=1`.
+  The plan is down to one h2h refused `market_unresolved` (the YES-leg defect,
+  owned by `polymarket-yes-leg-binding`) and one totals that duplicates an order
+  already resting. A quiet venue is not a working venue.
+- **Incidental confirmation:** `tick=0.005` here vs the 0.01 that the lad-det
+  arithmetic implied. Mixed ticks in one slate, as the fix assumed.

@@ -7486,3 +7486,43 @@ artifact, and the number would have looked defensible because it came from data.
   [[feedback-read-the-field-you-already-have]]. Prompted by a peer session
   observing that percentiles would have HIDDEN this had they not been
   degenerate.
+
+## 2026-08-30 — FORBIDDEN: reasoning about a limit order's cost as if the LIMIT were the price paid. It is a CAP; a marketable limit fills at the book.
+
+`round_price_to_tick` floored a BUY, and the docstring gave the reason: rounding
+up "pays more than the price the edge was computed against -- small per
+contract and systematic across a slate." Every clause of that is true and the
+conclusion is still wrong, which is why it survived review.
+
+The error is a unit confusion between two things that are not comparable:
+
+  floor SAVES  <= one tick PER CONTRACT, and only WHEN IT FILLS
+  floor COSTS  THE ENTIRE POSITION, when it does not
+
+MEASURED 2026-08-30, live-odds-worker. `tsc-mlb-lad-det-2026-08-30-7pt5` quoted
+0.515 on a 0.01 tick, sent as `submitted_limit=0.51`, `filled=0.0`. Our bid sat
+a half-tick under the ask and rested.
+
+AND THE SAVING WAS NEVER REAL. A marketable limit fills at the BOOK, not at the
+limit -- order C4N3GPYA4GNQ was submitted at 0.51 and filled at `avgPx=0.4900`.
+So raising the limit does not raise what we pay; it only decides whether we
+trade at all. The floor bought nothing and cost whole positions.
+
+HOW TO APPLY. When a price transform is justified by "this is the conservative
+direction", ask what the conservative direction is conservative ABOUT. Toward
+the venue on a BUY limit is not caution, it is a free option written to
+everyone else: it fills only if the market comes back to us, which is the market
+moving AGAINST the thesis. `kalshi_price_for` had already written that down on
+2026-08-24 -- "a resting order is worse than a missed one" -- and the two
+conclusions sat in two files, opposed, for six days.
+
+WHY KALSHI HID IT: its quotes are already whole cents on a 0.01 tick, so the
+floor is a NO-OP there and the venue filled 15 of 20. Polymarket runs 0.01 and
+0.005 ticks in the same slate. A shared helper can be correct on one caller and
+destroying orders on the next; "it works at the other venue" is not evidence.
+
+SCOPE, MEASURED, NOT TOTAL: this explains 2 of the 3 orders resting that day.
+The third was quoted 0.44, sent 0.44 -- already on the grid -- and still rested.
+The slate carries `prices[]`, one probability per outcome, and NO bid/ask, while
+Kalshi prices off an explicit `no_ask_dollars`. Bidding a non-ask exactly may
+never cross. Fixing one cause does not retire the symptom.
