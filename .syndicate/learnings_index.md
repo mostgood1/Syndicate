@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 687 rules `[generated]`
+## Index — 689 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 179**
+**FORBIDDEN — 180**
 
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
@@ -148,6 +148,7 @@
 - [2026-08-30 — FORBIDDEN: shipping a scheduled task without proving it can complete ONE r…](#2026-08-30-forbidden-shipping-a-scheduled-task-without-proving-it-can-complete-one-run-a-schedule-is-not-a-mechanism)
 - [2026-08-30 — FORBIDDEN: reading a gate's VERDICT without reading what its KEY covers. A…](#2026-08-30-forbidden-reading-a-gates-verdict-without-reading-what-its-key-covers-a-measurement-about-one-claim-silently-denied-a-different-one)
 - [2026-08-30 — FORBIDDEN: reporting a config key as UNSET without reading its LIVE value.…](#2026-08-30-forbidden-reporting-a-config-key-as-unset-without-reading-its-live-value-the-knob-is-not-reaching-x-does-not-mean-the-knob-is-empty)
+- [2026-08-30 — FORBIDDEN: `[ -d data ]` as a check that a worktree is data-complete. Part…](#2026-08-30-forbidden--d-data-as-a-check-that-a-worktree-is-data-complete-partial-is-worse-than-absent-and-it-passes)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -198,7 +199,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 503**
+**Rules and corrections — 504**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -499,6 +500,7 @@
 - [2026-08-30 — RULE: a retraction must reach the DOCSTRING of the module whose behaviour…](#2026-08-30-rule-a-retraction-must-reach-the-docstring-of-the-module-whose-behaviour-changed-prose-is-an-interface-and-it-has-no-test)
 - [2026-08-30 — RULE: `lastRunAt` is DISPATCH. Prove execution from the run's own artifact…](#2026-08-30-rule-lastrunat-is-dispatch-prove-execution-from-the-runs-own-artifact-and-prove-which-failure-it-was-before-naming-it)
 - [2026-08-30 — RULE: a guard that refuses only what it can PROVE wrong is SILENT on the m…](#2026-08-30-rule-a-guard-that-refuses-only-what-it-can-prove-wrong-is-silent-on-the-majority-case-when-identity-is-usually-unknown-measure-what-share-of-the-population-it-can-even-evaluate-before-shipping-it)
+- [2026-08-30 — RULE: two guards in series, each encoding a DIRECTION assumption, can with…](#2026-08-30-rule-two-guards-in-series-each-encoding-a-direction-assumption-can-withhold-a-true-value-with-no-error-anywhere-each-is-individually-correct-and-neither-can-clear-the-other)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

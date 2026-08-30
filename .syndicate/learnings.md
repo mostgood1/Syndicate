@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 687 rules `[generated]`
+## Index — 689 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -7387,3 +7387,50 @@ keys and 992 rows of opportunity.
   regression, an artifact that did not contain what its name claimed, and a
   guard that passed over conflict markers. The common shape is a cheap check
   that cannot distinguish the healthy case from the broken one.
+
+## 2026-08-30 — RULE: two guards in series, each encoding a DIRECTION assumption, can withhold a TRUE value with no error anywhere. Each is individually correct and neither can clear the other
+
+**What happened.** Live execution halted for ~13 hours on both venues. Nothing
+errored, nothing was misconfigured, and every component behaved exactly as
+written:
+
+1. `polymarket_us_orders.FILL_ABOVE_LIMIT` saw `avgPx 0.2350` against our `0.22`
+   limit and WITHHELD the price, on the rule *"a BUY cannot fill above its own
+   limit."* True. **The order was `side=ORDER_SIDE_SELL`,
+   `intent=ORDER_INTENT_BUY_SHORT`** — on a sell, filling above the limit is
+   price improvement, and the inverse rule (a SELL cannot fill BELOW its limit)
+   was never encoded.
+2. `execution_ledger`'s reconcile then found `fill_price=None`, fell back to a
+   CONTRACT bound, and refused `13.13 > 10.8953 + 0.01` as implausible — while
+   its own comment said the failure it guards against is a 100x fixed-point
+   error. 1.21x is price improvement.
+3. A refused order can never be stamped, so it blocked every live slate
+   indefinitely.
+
+**The venue had reported the price all along.** Our own guard suppressed it, and
+the second guard then punished its absence. Neither guard could clear the other,
+because each was doing its job under an assumption the other could not see.
+
+**How to apply:**
+- **When a guard encodes a direction — buy/sell, over/under, long/short, sender/
+  receiver — write the inverse in the same commit or refuse both.** A rule true
+  in one direction is a rule that is silently WRONG in the other, and the wrong
+  case will not raise; it will quietly produce a null, a withhold, or a refusal
+  that looks like data.
+- **Trace what a withhold does DOWNSTREAM before shipping it.** Withholding was
+  the right call at the point of decision (the price could not be validated) and
+  catastrophic two functions later, where "absent" meant something different.
+  `polymarket_us_orders` even DOCUMENTED the intended downstream behaviour —
+  *"reconciliation falls back to the price we ASKED for"* — and reconciliation
+  did no such thing. A documented hand-off nobody tested is a guess.
+- **A halt with no error line is the signature.** Look for a chain of individually
+  correct guards, not a broken component. Every counter here read healthy:
+  `implausible=1` was the only number in the whole system that was unusual, and
+  it named a unit error that had not occurred.
+- **Ask of any guard: what does it emit when it fires, and can the next stage
+  tell that from a genuine absence?** Here it could not — `fill_price=None`
+  meant both "the venue said nothing" and "we suppressed what it said", and the
+  downstream branch was written for the first.
+- Companion to [[feedback-gate-on-the-output-not-the-input]] and
+  [[feedback-unknown-must-not-default-permissive]]. Raised as a generalisation by
+  a peer session that had hit the same shape from the opposite side.
