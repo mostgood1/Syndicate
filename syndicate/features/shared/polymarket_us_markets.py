@@ -1838,9 +1838,49 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
         if sports_market_type(m) == MONEYLINE_MARKET_TYPE
         and (m.get("marketSides") is not None or m.get("question"))
     ]
+    # ONE PER LEAGUE, NOT THREE OFF THE TOP OF A LUMPED LIST.
+    #
+    # `(_preferred + _other)[:3]` looked league-aware because it preferred
+    # bettable sports -- and was not, because it then took the first three of a
+    # single flat list. MEASURED 2026-08-30 over six hours in production:
+    #
+    #     shape lines captured    100
+    #     long_index distribution {'0': 100}
+    #     by league               {'nfl': 100}
+    #
+    # 100 of 100 NFL, ZERO MLB -- and MLB is the sport that bought the wrong
+    # team (`aec-mlb-az-sf-2026-08-27`, SF won, graded LOST at -$5.871). The
+    # comment directly above says "THE SAMPLE MUST BE THE SPORT THAT LOST
+    # MONEY"; the slice underneath it guaranteed the opposite whenever another
+    # league sorted first. Raised by a peer session, verified here.
+    #
+    # A constant `long_index=0` over an all-NFL window is a NULL RESULT for the
+    # varying case, not evidence that outcomes[0] is the YES leg. Reading it as
+    # an answer would restore the positional rule on the strength of the one
+    # league that never disagreed with it.
+    _by_league: dict[str, list] = {}
+    for _m in _moneylines:
+        _by_league.setdefault(_league_of(_m), []).append(_m)
+    _samples = []
+    for _lg in sorted(_by_league, key=lambda l: (l not in _bettable, l)):
+        # One per league, bettable leagues first, so MLB is present whenever
+        # the slate has an MLB moneyline at all -- which is the whole point.
+        _samples.extend(_by_league[_lg][:1])
+    _samples = _samples[:8]
     _preferred = [m for m in _moneylines if _league_of(m) in _bettable]
-    _other = [m for m in _moneylines if _league_of(m) not in _bettable]
-    _samples = (_preferred + _other)[:3]
+
+    # THE DENOMINATOR, so a constant reading is never mistaken for a general
+    # one. `{'0': 100}` and `{'nfl': 100}` are the same fact seen twice, and
+    # only the second says the reading is about one league.
+    _lg_counts = {k: len(v) for k, v in sorted(_by_league.items())}
+    print(
+        "[polymarket_us_markets] MONEYLINE_YES_LEG_POPULATION"
+        f" moneylines={len(_moneylines)} by_league={_lg_counts}"
+        f" sampled_leagues={sorted({_league_of(m) for m in _samples})}"
+        f" mlb_present={'mlb' in _by_league}"
+        " -- a long_index reading is only about the leagues listed as sampled",
+        flush=True,
+    )
     if _samples:
         if not _preferred:
             # A NAMED MISS. Three boxing markets reading `long_index=0` would
@@ -1865,8 +1905,12 @@ def persist_game_slate(*, limit: int = 500, max_pages: int = 200) -> dict[str, A
                 f" sides={_sides!r}"
                 f" long_index={_long_index(_row, _long_desc)!r}"
                 f" question={str(_row.get('question') or '')[:120]!r}"
-                " -- long_index IS the answer: 0 on every market means the YES"
-                " leg is outcomes[0]; varying means it is the name rule",
+                " -- long_index is the CANDIDATE answer for THIS league only."
+                " A constant 0 across one league is a null result for the"
+                " varying case, NOT a licence to restore the positional rule;"
+                " only a reading that VARIES, or one scored against the 8"
+                " settled moneylines where 3 were graded against us, can"
+                " distinguish a correct rule from a sample that agreed by luck",
                 flush=True,
             )
     else:
