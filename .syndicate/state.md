@@ -45,6 +45,76 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [603-cross-game-quote-keys] VENUE QUOTES NAMED NO GAME; FIXED ON EVERY PATH, DEPLOYED, AND STILL UNPROVEN AFTER THREE READINGS `[2026-08-30, lane live-venue-order-placement]`
+
+`quote_key` was `sport|market|side|line` and the fan-in resolves it against a
+SPORT-WIDE pool, so one quote answered every fixture sharing a `(side, line)`.
+Measured 2026-08-29: **26 of 28 live Polymarket totals quotes shared across
+games** — `over 7.5 @ -400` on AZ@SF, COL@ATL, HOU@NYM and SD@TB at once, where
+COL@ATL was worth ~2% and SD@TB had ALREADY WON. `best_any_book` was
+`polymarket` on 28 of 28 of those rows.
+
+**FIXED on all five surfaces** (`0c5243b4` live on refresh-worker
+2026-08-30T01:21:03Z, content-verified): board `_candidate_keys`, the Kalshi
+adapter (ticker blob via `match_event_blob` + schedule), Polymarket (slug clubs,
+and for NCAAF the moneyline's nicknames), OddsAPI (its shard key already named
+both clubs), and the GRID path. Role-keyed markets only — h2h keys by CLUB and
+cannot collide. Bare key first, qualified second, plus a match-time rejection
+(`CROSS_GAME_REJECTED` / `_GRID`) so an unqualified match on the wrong fixture is
+refused rather than used.
+
+**IT IS NOT VERIFIED. Three production readings, none of them evidence:**
+
+    polymarket ncaaf   live=5  keys=5  collidable=0   UNMEASURABLE
+    kalshi     mlb     live=7  keys=7  collidable=0   UNMEASURABLE
+    kalshi     soccer  live=8  keys=6  collidable=2   FAIL
+
+**A zero is only evidence if it could have been a one.** In the first two, no
+two live games shared a `(side, line)`, so the count would read 0 with the
+module deleted. Soccer is the only real reading and it still shares.
+`scripts/verify_603_cross_game.py` now computes COLLIDABILITY FIRST and returns
+`UNMEASURABLE` (exit 3) rather than a soft pass.
+
+**Soccer residual, diagnosed:** four MLS codes (`NYRB`, `POR`, `LAG`, `STL`)
+absent from the soccer alias map, so `match_event_blob` cannot complete a split
+and the key stays bare. Patch verified by monkeypatch (4/4 `no_match` → `ok`,
+no cross-league leakage — `STL`/`POR` collide with other sports so it must stay
+sport-scoped). HANDED OFF: `handoff_2026-08-30_kalshi_soccer_mls_codes.md`;
+`team_aliases.py` has multiple claimants.
+
+**DO NOT fix NCAAF by populating `_alias_map("ncaaf")`** — built, measured and
+REVERTED 2026-08-29; it makes `teams_match` map-authoritative and turns
+`canonical_team("ncaaf","MAS")` → `UMass Dartmouth` into a confident wrong
+answer.
+
+Scheduled task `verify-603-cross-game-mlb` fires 2026-08-30 20:15 CT.
+
+## [venue-fee-economics] FEES ARE READ FROM THE VENUE AND VERIFIED AGAINST 18/18 REAL FILLS; THE ARB THRESHOLD WAS ABOVE BREAK-EVEN EVERYWHERE ON MLB `[2026-08-30, lane live-venue-order-placement]`
+
+Kalshi publishes `fee_type`/`fee_multiplier` per series — four distinct
+combinations, and **every MLB game/total/spread/K series is HALF RATE**. Base
+rate 0.07 measured off 27 of our own fills (21 at multiplier 0.5 → 0.0350, 4 at
+1.0 → 0.0700 — discriminating), checked for circularity first. **Rounding is
+ceil to a HUNDREDTH of a cent: 18/18 exact, vs 9/18 for round-to-4dp and wrong
+for the whole-cent rule every third-party source states.**
+
+`kalshi_polymarket_arb.DEFAULT_FEE_BUFFER = 0.04` demanded a flat 4.00c gap at
+every price while MLB break-even runs **3.38c at even money down to 0.39c at
+0.97** — above break-even everywhere, so that detector was structurally
+incapable of reporting a profitable MLB pair.
+
+**CROSS-VENUE ARB MEASURED: 12 complementary pairs, 0 positive.** Best raw edge
+**+0.00c**, and **−0.87c even with a FREE Polymarket** — the venues agree and
+Kalshi's own MLB fee exceeds the disagreement. All 12 were pregame and at even
+money; the tail regime (break-even 0.52-1.11c against a 1c spread) contributed
+none. **Kalshi trades in-play and is liquid** (14 markets, `vol24 904,281`, 1c
+spreads, prices moving between reads) — so the live opportunity is FEE
+GEOMETRY, not model edge.
+
+**Polymarket's real fee is still unmeasured** (`fees_dollars` null on 13/13
+fills); at even money ~2/3 of modelled pair cost is that unknown. Highest-value
+measurement outstanding.
+
 ## [polymarket-live-totals-quote-names-no-game] 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game identity `[verified 2026-08-29 ~22:3xZ, lane live-venue-order-placement]`
 
 Live Polymarket totals quotes in `quote.book_prices` are keyed on the LINE and
