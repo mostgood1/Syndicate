@@ -7349,3 +7349,41 @@ keys and 992 rows of opportunity.
   grid row shape (`sides`) and returned empty for candidate rows (`side`), and
   an absent key took the permissive branch.
 
+
+
+## 2026-08-30 — FORBIDDEN: `[ -d data ]` as a check that a worktree is data-complete. Partial is worse than absent, and it passes
+
+- **What we believed:** that having confirmed `data/` was "present", a worktree
+  was a valid place to triage test failures. I had already written the rule that
+  a `data/`-less tree fabricates failures, and I checked for it.
+- **What was actually true:** `core.sparseCheckout=true` — set by
+  `scripts/session_worktree.py`, which excludes `data/` BY DESIGN — **survived a
+  later `git checkout --detach origin/main`**. The tree had **12 files** under
+  `data/` against a complete tree's **34,758**, and `[ -d data ]` reported
+  "present" for both. I ran a 23-file triage sweep in it.
+- **What caught it was an IMPOSSIBLE READING, not the check:** isolation
+  reported MORE failures than the full suite (19 vs 1 on
+  `test_ncaaf_team_registry_reachability`; 13 vs 2 on
+  `test_ncaaf_oddsapi_game_lines`). **Running a file alone cannot ADD
+  failures** — that arithmetic is what exposed the environment, after the
+  directory check had already passed.
+- The corrected sweep differed in BOTH directions: pollution files 10 -> 6, real
+  failures 13 files -> 17. The bad sweep under-reported real failures AND
+  inflated their counts, so no part of it was salvageable.
+
+**How to apply:**
+- **Check data COMPLETENESS, never presence.** `find data -type f | wc -l`
+  against `git ls-files data | wc -l`, or `git config core.sparseCheckout`. A
+  directory that exists tells you nothing.
+- **Sparse-checkout is sticky.** Re-pointing a worktree with `checkout --detach`
+  does NOT clear it. `git sparse-checkout disable` does.
+- **Keep one KNOWN-COMPLETE tree and do measurement there.** Mixing a session
+  worktree (deliberately partial) with a measurement tree (must be complete) is
+  the setup for this, and the two look identical to every cheap check.
+- **Trust an arithmetic impossibility over a passing environment check.** If a
+  narrower run produces more failures, or a subset exceeds its superset, stop
+  and re-derive the environment before reading a single result.
+- Fourth form of the same family this session, after: absent `data/` faking a
+  regression, an artifact that did not contain what its name claimed, and a
+  guard that passed over conflict markers. The common shape is a cheap check
+  that cannot distinguish the healthy case from the broken one.
