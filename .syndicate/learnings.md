@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 680 rules `[generated]`
+## Index — 682 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -7092,3 +7092,91 @@ than asserted.
 - Corollary: after committing from a worktree, it is worth confirming the shared
   tree agrees with HEAD on the paths you touched. Nothing warns you, and the
   window between your commit and someone else's `git add` is where it bites.
+
+## 2026-08-30 — METHOD: agreement across a sample cannot distinguish a real signal from a CONSTANT INSTRUMENT. Ask what the method is structurally blind to before counting how many times it agreed
+
+**What happened.** Polymarket's fee was "measured" at zero from the venue's own
+realized P&L on ten settled orders — every value negative-or-zero, total
+−$0.0180, −2.37 bps of notional, one outlier excluded for a documented reason.
+Ten independent orders agreeing to within rounding. It was published, acted on,
+and it inverted a lane's recorded priority ("Polymarket is two thirds of pair
+cost" → "Kalshi is the entire bar").
+
+**The real fee is 150 bps of notional, flat.** Order `C60JWBG0WKDK` implied
+−0.0023 by that method while the venue's own payload recorded **$0.0600
+collected**.
+
+**Why the method could not have worked.** `venue_settlement` grades from
+`delta = after_realized − before_realized`. Realized P&L is `exit − entry`. The
+commission is charged **at fill** and is therefore **not a term in that
+difference**. The method was not a weak measurement of the fee; it was **not a
+measurement of the fee at all** — fee-blind by construction. It would have
+returned approximately zero on a venue charging nothing and, identically, on a
+venue charging plenty.
+
+**The trap is that the blindness LOOKED like corroboration.** Ten orders
+agreeing was read as ten independent confirmations. They were ten repetitions of
+one constant instrument. Tightness of agreement measured the *instrument's*
+consistency, and said nothing whatever about the quantity.
+
+**How to apply:**
+- **Before counting agreements, write down the arithmetic path from the quantity
+  you want to the number you are reading.** If the quantity does not appear as a
+  term, no sample size rescues it. Here: fee → charged at fill; reading →
+  `exit − entry`; the fee is absent from the expression. One line, and it kills
+  the finding before ten orders endorse it.
+- **A null result from an untested instrument is not a null result.** Same shape
+  as [[feedback-instrument-blindness]] (a healthy reading is evidence only once
+  you know what makes it read unhealthy) and
+  [[feedback-absence-in-a-window-is-not-absence]]. This is that failure applied
+  to a *derived* quantity rather than a log line.
+- **Prefer a route where the quantity is NAMED over one where it is inferred.**
+  `commissionNotionalTotalCollected` states the fee. Realized P&L implies it, and
+  the implication was invalid. Two named routes agreed
+  (`commissionNotionalTotalCollected`, and a peer's independent `buyingPower`
+  cash delta); the one inferred route was the one that was wrong.
+- **A single discriminating fill beats a sample that cannot discriminate.** The
+  18.70-contract fill separates flat ($0.2805) from cost-basis ($0.1579) on its
+  own. Ten agreeing small fills separated nothing.
+- **Errors in the CHEAP direction manufacture trades.** A fee understated to zero
+  does not merely mis-rank; it invents opportunities that do not exist. Bias an
+  unverified cost estimate upward — and check that the bound still bounds:
+  `POLYMARKET_ASSUMED_WORST_CASE_RATE` had been tightened to 0.01 **on the
+  strength of the zero finding**, which made the supposedly conservative bound
+  CHEAPER than the truth (0.015). A bound derived from a belief inherits that
+  belief; when the belief falls the bound is just a second wrong number.
+  `test_venue_fees.py:272` now asserts `bound > measured` at every price.
+
+## 2026-08-30 — RULE: a retraction must reach the DOCSTRING of the module whose behaviour changed. Prose is an interface, and it has no test
+
+**What happened.** The zero-fee finding above was retracted and the constant
+fixed the same hour: `polymarket_fee_dollars` returned `0.015 * contracts`.
+**The module docstring went on asserting the retracted finding for four
+commits** — "Polymarket took **no commission** on these fills",
+"`polymarket_fee_dollars` returns the measured 0.0" — and additionally called
+`commissionsBasisPoints` "authoritative where this inference is not", a field
+that reads `'0'` on every order observed. A reader following the prose would
+have been handed a zero fee and landed exactly where the retraction started.
+
+Nothing was red. Every test passed throughout, because tests exercise the
+function and no test reads the paragraph above it.
+
+**A peer had checked this area and cleared it.** Their question was *"does
+anything PRICE off this field"* — answer: no, only a comment and a log line. The
+right question was *"does anything SAY something about this field"*. Containment
+of the executable risk was real and was not containment.
+
+**How to apply:**
+- **A retraction has a checklist and the docstring is on it:** the constant, the
+  function, the module header, the finding, `state.md`. Fixing the value and
+  leaving the prose produces a module that is *internally contradictory in the
+  authoritative voice* — the stale sentence sits beside true ones and inherits
+  their credibility.
+- **When you retract, `grep` the retracted CLAIM, not just the changed symbol.**
+  "zero", "no commission", "0.0" — the wrong belief is stated in prose that does
+  not mention the constant you edited.
+- **"Nothing reads it" is not "nothing says it".** Dead-code reasoning does not
+  transfer to documentation: prose has no callers, so it is never dead and never
+  flagged.
+- Related: [[feedback-documented-caveat-is-a-scheduled-defect]] (a caveat comes
+  due), [[project-closed-todo-not-shipped-gap]] (a closure is not a landing).
