@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 662 rules `[generated]`
+## Index — 669 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -33,6 +33,103 @@
 > **EXONERATED** = ruled out, stop re-investigating.
 
 <!-- LEARNINGS-INDEX:END -->
+
+---
+
+
+
+### 2026-08-30 — FORBIDDEN: offering a backup as a safety net without verifying it contains what its NAME claims. Mine held the RESOLVED file `[lane exchange-join-refusals]`
+
+- **What we believed:** `.syndicate/lanes.md.CONFLICTED.bak` captured the
+  pre-resolution conflicted ledger, so three OPEN lanes that existed on only one
+  side of a `git stash pop` conflict were recoverable whatever anyone did next. I
+  told my user that in those words, and told two peer sessions the same.
+- **What was actually true:** both copies contained **0 conflict markers, 54
+  headings, one `mlb-resolver-write-side-effect` block** — the RESOLVED file. The
+  `cp` raced the resolution: I grepped markers at 3724/3778/3966, and by the time
+  the copy ran (~30s later) another session had resolved it. **The
+  pre-resolution state is gone and was never captured.**
+- **How we found out:** a peer went to use the file as a test fixture and
+  measured it first, rather than trusting the filename. I then verified it
+  myself: `grep -c '^<<<<<<<'` = 0 on both copies.
+- **Why it was worse than no backup:** the name asserts a property the contents
+  do not have, so the next person trusts it. A missing backup fails loudly; a
+  lying one fails at the moment someone needs it.
+- **The rules going forward:**
+  1. **A backup is evidence only once you have checked it contains what its name
+     claims** — for a conflict snapshot that is one `grep -c '^<<<<<<<'`, run
+     against the COPY, not the source.
+  2. **Snapshotting a file under concurrent modification is a RACE.** `cp` of a
+     contended path in a shared tree can land either side of another session's
+     write. Verify after copying, and name the file for what you verified.
+  3. **Never name an artifact for the state you INTENDED to capture.** Rename or
+     delete the moment the contents disagree.
+- **Cost:** no data lost — the union resolution was correct (+153/−0 vs
+  `origin/main`, all three at-risk lanes intact) and the peer built a synthetic
+  fixture instead. But a false assurance stood in three places for ~40 minutes,
+  and the recovery path I advertised did not exist.
+
+---
+
+### 2026-08-30 — FORBIDDEN: sizing work off a REFUSAL COUNTER before checking how much of it is out of scope. `clubs_unresolved: 314` was ~26 recoverable markets `[lane exchange-join-refusals]`
+
+- **What we believed:** Polymarket's `clubs_unresolved: 314` on NCAAF was a join
+  backlog — 314 quotes we were failing to key, and therefore the largest
+  single-sport exchange prize on the board. An assessment ranked it #1 to attack.
+- **What was actually true:** measured n=25 against a 165-market population,
+  **21 of 25 were games this platform does not card** — Campbell v East Tennessee
+  St, VMI v Idaho St, Citadel v Wofford, Stetson v South Dakota St. The registry
+  is 247 D-III / 171 D-II / 128 FCS / 138 FBS and the board cards FBS-vs-FBS.
+  Polymarket lists far more college football than Syndicate boards. Recoverable
+  is **~16%, ~26 markets — not 157.** The counter was accurate; the SIZING was
+  wrong by 6x.
+- **How we found out:** only by building the join and classifying every miss. The
+  counter's own name (`clubs_unresolved`) and the adapter comment beside it
+  ("each one is a missing `team_aliases` entry") both invite reading it as a
+  backlog, and neither is a measurement of recoverability.
+- **The rules going forward:**
+  1. **A refusal counter measures what a reader REFUSED, not what is
+     RECOVERABLE.** Before sizing work off one, classify a sample of the
+     refusals into out-of-scope / recoverable. The two can differ by an order of
+     magnitude and nothing in the counter says which.
+  2. **Two wrong fixes were proposed for this before one was measured** — an
+     alias map (already FORBIDDEN the previous day) and a slug-token join (8%,
+     dead on the same upstream-vocabulary wall). A named cause sitting next to a
+     counter is a HYPOTHESIS. This one had been refuted 24 hours earlier in a
+     file the reader was not reading.
+  3. **A scope test must not leak across the ambiguity it is scoping.** The first
+     cut asked "is any school sharing either mascot FBS?" and called Citadel v
+     Wofford in-scope because "Bulldogs" is also Georgia's — over-reporting
+     recoverable misses **15x, 28.6% against a true ~0%.** Ask whether the PAIR
+     could be in scope, never whether either half could.
+- **Cost:** none shipped — measurement-only lane, fix sites held by another lane
+  and never touched. Two proposals retracted before code.
+- **CONFIRMED THREE TIMES IN ONE SESSION, on the same `reason` string.** The
+  scope check that followed found `h2h_keyed_by_team: 905` is **not a refusal at
+  all** — it increments on the SUCCESS path (`venue_quote_adapters.py:628-631`,
+  no `continue` before `quotes.append`) and its own docstring says it is reported
+  "alongside the refusals rather than only on failure". And `spreads_refused:
+  3288` is 45% NFL+soccer, which carry ZERO board spread rows, with the rest
+  being ladder RUNGS (~8 per game) rather than games. Resized: 905 -> 0,
+  314 -> ~26, 3288 -> ~443. **A ~4,500-quote headline collapsed to a few
+  hundred.**
+- **THE STRUCTURAL CAUSE, and it is a design defect in the emitter, not just a
+  reading error:** `_kalshi_ok_reason` and `_polymarket_ok_reason` format
+  SUCCESS counters and REFUSAL counters identically — `name:count`, space
+  separated, inside one field literally called `reason`. Nothing in the string
+  distinguishes "we could not key these" from "we keyed these fine". A reader
+  cannot tell them apart without opening the increment site, and I did not, three
+  times. **If you emit a diagnostic counter that is not a refusal, it must not
+  share a field named `reason` with the refusals** — or it must carry its own
+  prefix (`ok:h2h_keyed=905`).
+
+**WHAT DOES SURVIVE:** the schedule-constrained mascot-pair join is sound and is
+the right mechanism when the ~26 markets are worth taking — 51 carded games gave
+51 distinct mascot pairs with 0 collisions, and 0 of 25 rows resolved
+ambiguously. It is safe where a global alias map is FORBIDDEN precisely because
+ambiguity is refused per-row against a real slate instead of pre-resolved into a
+map that makes `teams_match` authoritative. Instrument:
+`scripts/probe_polymarket_ncaaf_slug_role_join.py`.
 
 ---
 
