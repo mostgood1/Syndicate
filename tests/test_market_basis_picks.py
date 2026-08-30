@@ -501,3 +501,36 @@ def test_mlb_and_ncaaf_share_one_region_owner():
     from syndicate.features.shared.odds_regions import game_line_regions
 
     assert mlb._game_line_regions("us,us2") == game_line_regions("us,us2")
+
+
+def test_market_edge_tooltip_explains_the_number_it_shows():
+    """REGRESSION, found on the LIVE board 2026-08-30.
+
+    A cell reading "+2.81 mkt" hovered as "margin model loses to the closing
+    line...". The model's suppression reason had unconditional precedence, so
+    `mb.label` -- the one sentence that stops a price-shopping delta being read
+    as a model edge -- was suppressed exactly where the number was visible.
+
+    Asserts on the TEMPLATE source because this branch is client-side JS; the
+    payload half is covered by `test_label_never_says_ev`.
+    """
+    import pathlib
+
+    html = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / "syndicate" / "templates" / "shared" / "layer1_board.html"
+    ).read_text(encoding="utf-8")
+
+    start = html.index("var edgeWhy")
+    body = html[start:html.index("var edgeTitle", start)]
+
+    # The market branch must exist and must lead with the label.
+    assert 'edgeUnit === "mkt"' in body, "no market-basis branch in the tooltip"
+    label_at = body.index("mb.label")
+    model_at = body.index("p.edge_unavailable_reason")
+    assert label_at < model_at, (
+        "the model's suppression reason still precedes the market label, so a "
+        "cell showing a market edge hovers with a model message"
+    )
+    # And the model reason must still be CARRIED, not dropped -- both facts.
+    assert "the model's own edge is withheld here" in body

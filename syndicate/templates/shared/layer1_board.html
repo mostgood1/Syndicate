@@ -1009,15 +1009,35 @@
       // `ncaaf/game_projections.py` chose this field to avoid. It picked the
       // right channel; the channel was broken.
       //
-      // The market-basis reason is appended LAST so it never displaces a model
-      // reason: where the model is suppressed, that is the more important thing
-      // to say, and where it is not, `mb.reason` explains why the market number
-      // is missing or is not a pick.
-      var edgeWhy = p.edge_unavailable_reason
-        || (edge === null ? p.probability_unavailable_reason : "")
-        || (edgeUnit === "line" ? p.probability_unavailable_reason : "")
-        || (mb ? (edgeUnit === "mkt" ? mb.label : mb.reason) : "")
-        || "";
+      // **THE TOOLTIP MUST EXPLAIN THE NUMBER THE CELL IS SHOWING.** First cut
+      // ordered `edge_unavailable_reason` first unconditionally, on the theory
+      // that a model suppression is always the more important thing to say.
+      // Read on the live board 2026-08-30, that put the WRONG sentence on the
+      // right cell: a cell reading "+2.81 mkt" hovered as "margin model loses
+      // to the closing line by 3.563 points of MAE" -- a model message on a
+      // market number, with `mb.label` (the one sentence that stops a
+      // price-shopping delta being read as a model edge) suppressed exactly
+      // where the number was visible. That is worse than no tooltip: it invites
+      // the reader to attach the model's authority to a number the model had no
+      // part in.
+      //
+      // So when the cell SHOWS a market edge, the market label leads and the
+      // model's suppression rides along as secondary context -- both facts,
+      // in the order the reader needs them. Everywhere else the old precedence
+      // stands: with no number on the cell, why it is BLANK is the whole story.
+      var edgeWhy;
+      if (edgeUnit === "mkt" && mb) {
+        edgeWhy = mb.label
+          + (p.edge_unavailable_reason
+             ? " — the model's own edge is withheld here: " + p.edge_unavailable_reason
+             : "");
+      } else {
+        edgeWhy = p.edge_unavailable_reason
+          || (edge === null ? p.probability_unavailable_reason : "")
+          || (edgeUnit === "line" ? p.probability_unavailable_reason : "")
+          || (mb ? mb.reason : "")
+          || "";
+      }
       var edgeCls = edge === null || edge === undefined ? ""
         // A market-basis edge gets its OWN class. It must not be coloured like a
         // model edge -- same colour, same weight, different claim is how a price
