@@ -114,16 +114,43 @@ def test_a_fill_above_our_own_limit_is_WITHHELD_not_recorded(capsys):
         price={"value": "0.43", "currency": "USD"},   # our submitted limit
     ))
 
-    # The fill is REAL and must survive -- only the price is untrustworthy.
+    # The fill is REAL and must survive -- only the price was untrustworthy.
     assert view["state"] == "filled"
     assert view["filled_count"] == 7.11
-    # WITHHELD, not corrected: flipping it back would be a third guess at the
-    # same convention. Reconciliation falls back to the price we asked for.
-    assert view["fill_price"] is None
+
+    # UPDATED 2026-08-30, and this is a BEHAVIOUR IMPROVEMENT, not a relaxation.
+    #
+    # This test asserted the old REMEDY (withhold) rather than the invariant it
+    # names (a BUY does not fill above its own limit). The remedy existed because
+    # the complement rule turned `avgPx 0.43` into `0.57` against a `0.43` limit,
+    # which is impossible -- so the price had to be thrown away.
+    #
+    # The complement is now chosen by which reading the SUBMITTED LIMIT agrees
+    # with, so this order reads DIRECT: |0.43 - 0.43| = 0 against
+    # |0.57 - 0.43| = 0.14. A buy filling exactly at its limit is ordinary; a
+    # complement landing exactly on the limit by coincidence is not. The
+    # invariant still holds at 0.43 -- there is simply nothing left to withhold.
+    #
+    # THE BOOKED NUMBER IS UNCHANGED. Withholding made reconciliation fall back
+    # to the requested price, which for this order IS 0.43. Same value, better
+    # provenance: recorded as an observed fill rather than an assumed one.
+    #
+    # The withhold path is still tested, on both directions, in
+    # `tests/test_market_basis_picks.py`:
+    #   * a BUY above its limit  -> withheld
+    #   * a SELL below its limit -> withheld
+    #   * an unreadable side near 0.5 -> withheld
+    assert view["fill_price"] == 0.43
 
     out = capsys.readouterr().out
-    assert "FILL_ABOVE_LIMIT" in out
-    assert "submitted_limit=0.43" in out
+    assert "FILL_ABOVE_LIMIT" not in out, (
+        "nothing to refuse once the complement is chosen by the limit"
+    )
+    # `submitted_limit=` only ever appeared in the FILL_ABOVE_LIMIT line, which
+    # no longer fires here. The price itself is still logged, and that is the
+    # line this file's own header says was missing when the defect was
+    # diagnosed from a screenshot.
+    assert "avgPx='0.43'" in out and "recorded=0.43" in out
 
 
 def test_a_normal_NO_fill_is_untouched_by_the_limit_check(capsys):

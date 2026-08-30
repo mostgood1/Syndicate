@@ -737,3 +737,112 @@ def test_probe_distinguishes_absent_order_from_empty_read(monkeypatch, capsys):
     worker._probe_polymarket_order_once()
     out = capsys.readouterr().out
     assert "status=not_in_list" in out and "returned_rows=0" in out
+
+
+# ---------------------------- polymarket fill-price side reading (live money)
+
+
+def _pm_order(**over):
+    """The real blocking order C65VD0R72KDG, as the venue returned it."""
+    row = {
+        "id": "C65VD0R72KDG",
+        "state": "ORDER_STATE_FILLED",
+        "cumQuantity": 13.13,
+        "leavesQuantity": 0,
+        "avgPx": {"currency": "USD", "value": "0.2350"},
+        "price": {"currency": "USD", "value": "0.22"},
+        "outcomeSide": "OUTCOME_SIDE_NO",
+        "side": "ORDER_SIDE_SELL",
+        "marketSlug": "tsc-mlb-phi-laa-2026-08-29-7pt5",
+    }
+    row.update(over)
+    return row
+
+
+def test_the_blocking_orders_fill_price_is_no_longer_discarded():
+    """REGRESSION, real money, ~12h outage.
+
+    `outcomeSide=NO` complemented 0.2350 -> 0.7650, which the FILL_ABOVE_LIMIT
+    guard then correctly refused against a 0.22 limit, leaving fill_price None.
+    The ledger fell back to a contract bound and refused 13.13 > 10.8953.
+    """
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(_pm_order())
+    assert view["state"] == "filled"
+    assert view["fill_price"] is not None, "the venue reported avgPx and we dropped it"
+    assert abs(view["fill_price"] - 0.2350) < 1e-6, view["fill_price"]
+
+
+def test_the_side_rule_still_decides_the_fills_it_got_right():
+    """The four recorded fills sit near 0.5, where the limit cannot discriminate.
+    They must keep falling through to the side rule, which is right on all four."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    cases = [
+        # (limit, avgPx, outcomeSide, expected recorded price)
+        (0.4545, 0.55, "OUTCOME_SIDE_NO", 0.45),
+        (0.4902, 0.51, "OUTCOME_SIDE_NO", 0.49),
+        (0.5192, 0.52, "OUTCOME_SIDE_YES", 0.52),
+    ]
+    for limit, avg, side, expected in cases:
+        view = venue_order_view(
+            _pm_order(
+                avgPx={"value": str(avg)}, price={"value": str(limit)}, outcomeSide=side
+            )
+        )
+        assert view["fill_price"] is not None, (limit, avg, side)
+        assert abs(view["fill_price"] - expected) < 1e-6, (limit, avg, side, view["fill_price"])
+
+
+def test_limit_rule_overrides_a_wrong_side_label_when_unambiguous():
+    """Far from 0.5 the limit decides, and it must beat the side label."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    # NO label would complement 0.30 -> 0.70, absurd against a 0.28 limit.
+    view = venue_order_view(
+        _pm_order(avgPx={"value": "0.30"}, price={"value": "0.28"}, outcomeSide="OUTCOME_SIDE_NO")
+    )
+    assert abs(view["fill_price"] - 0.30) < 1e-6
+
+    # And it complements when THAT is what the limit agrees with. Numbers chosen
+    # so the complement lands ABOVE the limit -- this is a SELL, and a sell
+    # filling BELOW its limit is a real violation the guard must still catch
+    # (the first draft of this test asserted the opposite and was wrong).
+    view = venue_order_view(
+        _pm_order(avgPx={"value": "0.75"}, price={"value": "0.22"}, outcomeSide="OUTCOME_SIDE_YES")
+    )
+    assert abs(view["fill_price"] - 0.25) < 1e-6, view["fill_price"]
+
+
+def test_a_sell_filling_below_its_limit_is_still_refused():
+    """The directional rule must not become no rule: a SELL below its limit is
+    as impossible as a BUY above one."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(
+        _pm_order(avgPx={"value": "0.10"}, price={"value": "0.22"}, side="ORDER_SIDE_SELL",
+                  outcomeSide="OUTCOME_SIDE_YES")
+    )
+    assert view["fill_price"] is None
+
+
+def test_a_buy_filling_above_its_limit_is_still_refused():
+    """The original invariant, unchanged."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(
+        _pm_order(avgPx={"value": "0.40"}, price={"value": "0.22"}, side="ORDER_SIDE_BUY",
+                  outcomeSide="OUTCOME_SIDE_YES")
+    )
+    assert view["fill_price"] is None
+
+
+def test_an_unreadable_side_near_half_still_withholds():
+    """Ambiguity is a refusal, not a coin flip -- the pre-existing contract."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(
+        _pm_order(avgPx={"value": "0.51"}, price={"value": "0.49"}, outcomeSide="MYSTERY")
+    )
+    assert view["fill_price"] is None

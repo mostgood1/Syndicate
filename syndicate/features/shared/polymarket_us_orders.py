@@ -128,6 +128,24 @@ from syndicate.features.shared.venue_order_states import (
 
 # SHARED WITH EVERY OTHER VENUE -- see `venue_order_states`. Was a private
 # copy until 2026-08-27 and had drifted from Kalshi's in both directions.
+#: How much closer to the submitted limit one reading must be before it is
+#: allowed to decide direct-vs-complement. Near a 0.5 limit the two are almost
+#: equidistant and the test cannot discriminate; below this separation the
+#: side label decides instead, and an unreadable side still withholds.
+#: 0.10 is deliberately CONSERVATIVE and does NOT decide most recorded fills --
+#: stated precisely because the first draft of this comment claimed it did:
+#:
+#:     limit 0.4405  separation 0.1190  DECIDED by limit -> direct
+#:     limit 0.4545  separation 0.0910  falls through to the side rule
+#:     limit 0.4902  separation 0.0196  falls through to the side rule
+#:     limit 0.5192  separation 0.0384  falls through to the side rule
+#:     limit 0.2200  separation 0.5300  DECIDED by limit -> direct  <- the blocker
+#:
+#: That is the intent: the side rule is right on all four historical fills, so
+#: this must not override it where they are close. It fires only where the two
+#: readings are far apart -- which is exactly where the side rule was wrong.
+_COMPLEMENT_MARGIN = 0.10
+
 _VENUE_FILLED_STATUSES = VENUE_FILLED_STATUSES
 
 _ORDERS_PATH = "/v1/orders"
@@ -1148,7 +1166,66 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     is_no = outcome_side.endswith("NO")
     is_yes = outcome_side.endswith("YES")
 
-    if price is not None and 0.0 < price < 1.0 and is_no:
+    # ------------------------------------------------------------------
+    # CHOOSE THE READING THE SUBMITTED LIMIT AGREES WITH, not the one the
+    # side label implies. (2026-08-30)
+    # ------------------------------------------------------------------
+    #
+    # The `is_no` rule below was inferred from four fills and is right on all
+    # four. It is WRONG on the order that halted live execution for ~12 hours,
+    # and the failure is silent because the guard downstream then correctly
+    # refuses the nonsense it produces:
+    #
+    #     C65VD0R72KDG   avgPx 0.2350   submitted limit 0.22
+    #     outcomeSide OUTCOME_SIDE_NO -> complement -> 0.7650
+    #     0.7650 > 0.22  -> FILL_ABOVE_LIMIT -> price WITHHELD -> None
+    #
+    # `fill_price=None` then forced `execution_ledger` onto its contract bound,
+    # which refused `13.13 > 10.8953` and blocked every live slate. The venue
+    # had reported the fill price the whole time; three sessions diagnosed this
+    # as "this path has no fill price". It had one, and this line discarded it.
+    #
+    # THE DISCRIMINATOR NEEDS NO SIDE SEMANTICS, which is what makes it safe
+    # here: `order["price"]` is OUR submitted limit as the venue itself echoes
+    # it, so it is quoted on the same scale as `avgPx`. A real fill sits near
+    # its limit; the complement sits ~a whole unit away. So pick whichever of
+    # {avgPx, 1-avgPx} is closer to the limit.
+    #
+    # VALIDATED ON EVERY FILL THIS FILE HAS EVER RECORDED -- the four in the
+    # table above, 4/4, plus the blocking order:
+    #
+    #     limit   avgPx   |direct-lim|  |compl-lim|   picks       recorded
+    #     0.4405  0.4000       0.0405      0.1595     direct      direct
+    #     0.4545  0.5500       0.0955      0.0045     COMPLEMENT  COMPLEMENT
+    #     0.4902  0.5100       0.0198      0.0002     COMPLEMENT  COMPLEMENT
+    #     0.5192  0.5200       0.0008      0.0392     direct      direct
+    #     0.2200  0.2350       0.0150      0.5450     direct      (was withheld)
+    #
+    # AMBIGUITY IS A REFUSAL, NOT A COIN FLIP. Near a 0.5 limit the two
+    # readings are nearly equidistant and this cannot tell them apart, so it
+    # falls through to the side rule rather than guessing -- the same choice
+    # the unreadable-side branch already makes. `_COMPLEMENT_MARGIN` is the
+    # separation required before the limit is allowed to decide.
+    decided_by_limit = False
+    if price is not None and 0.0 < price < 1.0:
+        limit_hint = order.get("price")
+        if isinstance(limit_hint, Mapping):
+            limit_hint = limit_hint.get("value")
+        try:
+            limit_hint = float(limit_hint)
+        except (TypeError, ValueError):
+            limit_hint = None
+        if limit_hint is not None and 0.0 < limit_hint < 1.0:
+            direct_gap = abs(price - limit_hint)
+            complement_gap = abs((1.0 - price) - limit_hint)
+            if abs(direct_gap - complement_gap) >= _COMPLEMENT_MARGIN:
+                decided_by_limit = True
+                if complement_gap < direct_gap:
+                    price = round(1.0 - price, 4)
+
+    if decided_by_limit:
+        pass
+    elif price is not None and 0.0 < price < 1.0 and is_no:
         price = round(1.0 - price, 4)
     elif price is not None and not (is_yes or is_no):
         # AN UNREADABLE SIDE IS A REFUSAL, NOT A COIN FLIP. Complementing a YES
@@ -1206,13 +1283,41 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
     except (TypeError, ValueError):
         submitted_limit = None
 
+    # THE RULE IS DIRECTIONAL AND THIS READ IT ONE WAY. (2026-08-30)
+    #
+    # "A BUY cannot fill above its own limit" is true. The inverse is equally
+    # true and was not encoded: **a SELL cannot fill BELOW its own limit**, and
+    # a sell filling ABOVE it is price improvement -- the good outcome. Applying
+    # the buy rule to a sell refuses exactly the fills we want.
+    #
+    # MEASURED on the order that halted live execution for ~12 hours:
+    #
+    #     C65VD0R72KDG   side ORDER_SIDE_SELL   intent ORDER_INTENT_BUY_SHORT
+    #     avgPx 0.2350   submitted limit 0.22
+    #     buy rule:   0.2350 > 0.22 + 0.01  -> VIOLATION -> price withheld
+    #     sell rule:  0.2350 < 0.22 - 0.01  -> fine, and it is IMPROVEMENT
+    #
+    # So even with the complement corrected above, this line discarded the
+    # price a second time. Both halves had to be wrong for the outage, and
+    # fixing either alone leaves `fill_price=None`.
+    #
+    # `side` IS THE VENUE'S OWN ORDER DIRECTION and is a different field from
+    # `outcomeSide` (which names the token). An unreadable direction keeps the
+    # BUY rule -- the conservative branch, and the one this file already had.
+    order_direction = str(order.get("side") or "").strip().upper()
+    is_sell = order_direction.endswith("SELL")
+
     if (
         price is not None
         and submitted_limit is not None
         and 0.0 < submitted_limit < 1.0
         # A tick of slack: the venue snaps and rounds, and this must fire on an
         # inverted price (a whole complement away), never on a rounding step.
-        and price > submitted_limit + 0.01
+        and (
+            price < submitted_limit - 0.01
+            if is_sell
+            else price > submitted_limit + 0.01
+        )
     ):
         print(
             f"[polymarket_us_orders] FILL_ABOVE_LIMIT"
@@ -1220,7 +1325,9 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
             f" slug={order.get('marketSlug')!r} outcome_side={outcome_side!r}"
             f" avgPx={raw_price!r} recorded={price!r} submitted_limit={submitted_limit!r}"
             f" filled={filled!r} complement_of_recorded={round(1.0 - price, 4)!r}"
-            " -- a BUY cannot fill above its own limit, so the recorded price is"
+            f" direction={order_direction!r}"
+            " -- a BUY cannot fill above its own limit (nor a SELL below it), so"
+            " the recorded price is"
             " wrong. Price WITHHELD; reconciliation falls back to the requested"
             " price. Check whether the avgPx complement was applied to the wrong"
             " side for this market.",
