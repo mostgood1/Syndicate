@@ -131,8 +131,41 @@ _POSITION_IDENTITY_FIELDS = (
     "player_name",
     "home_team",
     "away_team",
-    "commence_time",
 )
+
+# `commence_time` USED TO BE IN THE TUPLE ABOVE AND IT PUT REAL MONEY ON THE
+# BOARD TWICE.
+#
+# Measured 2026-08-30, live, found by the USER on Polymarket's own Orders
+# screen:
+#
+#     C6H7WE0DPKDJ  $4.06  16:42:22Z  tsc-mlb-lad-det-2026-08-30-7pt5 under 7.5 @ -104
+#     C6HN0XD92KDE  $5.44  17:19:26Z  tsc-mlb-lad-det-2026-08-30-7pt5 under 7.5 @ -104
+#
+# ~$9.12 resting where ONE bet was intended. Every identity field byte-identical
+# except `commence_time`: `17:41:00Z -> 18:11:00Z`. The Dodgers-Tigers start was
+# restated 30 minutes between board builds, `position_key` changed,
+# `idempotency_key` is derived from it, and `record_order` saw a bet it had
+# never seen.
+#
+# **THE GUARD DID NOT FAIL -- IT WAS NEVER CONSULTED.** `execution_ledger` says
+# "the same bet computed twice yields the same key, so the second write is
+# refused" and "`filled`, `submitted` and `failed` all mean the venue may hold
+# this order". Both hold only while every hashed input is stable, and
+# `commence_time` is the one input a sports feed is EXPECTED to restate.
+#
+# THE CLINCHER: `opening_key`, built for the same joining purpose, ALREADY
+# excludes `commence_time` -- and it was identical across both orders. Two keys
+# for the same bet disagreed about what a bet is, and the unstable one was the
+# one driving idempotency. `event_id` already names the game; the tuple was
+# mixing immutable facts about the BET with mutable attributes of the FIXTURE.
+#
+# Systematic, not a one-off: every rain delay, postponement and doubleheader
+# restatement unlocks a duplicate on any still-open position.
+#
+# Raised by lane `position-key-commence-time-instability`; verified here against
+# both key builders before changing anything.
+_LEGACY_POSITION_IDENTITY_FIELDS = _POSITION_IDENTITY_FIELDS + ("commence_time",)
 
 
 @dataclass(frozen=True)
@@ -277,8 +310,31 @@ def position_key(row: Mapping[str, Any]) -> str:
     C's settlement join will both hang off, so it is an identity or it is
     nothing.
     """
+    return _position_key_over(row, _POSITION_IDENTITY_FIELDS)
+
+
+def legacy_position_key(row: Mapping[str, Any]) -> str:
+    """The PRE-2026-08-30 key, with `commence_time` still in the tuple.
+
+    Emitted alongside the real key so the duplicate guard can recognise orders
+    placed before the fix. WITHOUT THIS, THE FIX CAUSES THE BUG IT REMOVES:
+    `idempotency_key` takes `position_key` as its first component, so changing
+    the formula changes the key of EVERY open position at once, and the very
+    next commit would see the entire open book as bets it had never placed.
+
+    One duplicate is what prompted this change; deploying it naively would have
+    produced one per open position, simultaneously, on live money.
+
+    Delete this and its plumbing once no ledger row predates the change --
+    which is a date, not a judgement: no order older than the deploy remaining
+    in a non-terminal state.
+    """
+    return _position_key_over(row, _LEGACY_POSITION_IDENTITY_FIELDS)
+
+
+def _position_key_over(row: Mapping[str, Any], fields: tuple[str, ...]) -> str:
     quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
-    parts = [str(row.get(field) or "") for field in _POSITION_IDENTITY_FIELDS]
+    parts = [str(row.get(field) or "") for field in fields]
     parts.append(str(row.get("side") or ""))
     parts.append(str(row.get("line") if row.get("line") is not None else ""))
     parts.append(str(quote.get("bookmaker") or ""))
@@ -472,6 +528,9 @@ def commit_portfolio(
         position.update(
             {
                 "position_key": position_key(row),
+                # Carried so `record_order` can recognise a pre-fix order. See
+                # `legacy_position_key`.
+                "legacy_position_key": legacy_position_key(row),
                 # STAMPED FROM THE SAME ROW, IN THE SAME RUN. `record_openings`
                 # wrote this row's opening moments earlier in
                 # `layer2_shortlist.py`, from this same row -- so computing the

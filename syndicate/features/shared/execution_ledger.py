@@ -209,6 +209,10 @@ class OrderRequest:
     home_team: str | None = None
     away_team: str | None = None
     commence_time: str | None = None
+    #: The pre-2026-08-30 `position_key`, with `commence_time` still hashed in.
+    #: Present only while pre-fix rows may still sit in the ledger; see
+    #: `_legacy_idempotency_key`. None is normal for a caller that never had one.
+    legacy_position_key: str | None = None
     opening_key: str | None = None
     game_pk: str | None = None
     # The venue's contract id (a Kalshi ticker). Optional because every order
@@ -261,6 +265,38 @@ def idempotency_key(request: OrderRequest) -> str:
     """
     parts = [
         request.position_key,
+        request.selected_date,
+        request.venue,
+        request.sport,
+        request.event_id,
+        request.market,
+        request.side,
+        "" if request.line is None else f"{float(request.line):g}",
+        request.player_name or "",
+    ]
+    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:24]
+
+
+def _legacy_idempotency_key(request: OrderRequest) -> str | None:
+    """The key this same bet would have had BEFORE `commence_time` left the
+    position identity. None when the caller supplied no legacy key.
+
+    WHY THE FIX NEEDS THIS. `idempotency_key` hashes `position_key` FIRST, so
+    changing the position-key formula changes every order's identity at once.
+    Without recognising the old shape, the first commit after the fix sees the
+    ENTIRE OPEN BOOK as bets it has never placed -- one duplicate per open
+    position, on live money, caused by the change that exists to stop
+    duplicates.
+
+    The duplicate that prompted the fix (`tsc-mlb-lad-det-2026-08-30-7pt5`,
+    ~$9.12 resting as two legs) was one instance. Deploying without this would
+    have been many, at once.
+    """
+    legacy = str(getattr(request, "legacy_position_key", "") or "").strip()
+    if not legacy or legacy == request.position_key:
+        return None
+    parts = [
+        legacy,
         request.selected_date,
         request.venue,
         request.sport,
@@ -813,14 +849,31 @@ def record_order(request: OrderRequest, *, mode: str | None = None) -> tuple[dic
     is a no-op by construction rather than by the caller remembering to check.
     """
     key = idempotency_key(request)
+    # BOTH SHAPES. A pre-fix row carries the legacy key and must still be
+    # recognised as THIS bet -- see `_legacy_idempotency_key`. Matching either
+    # is a duplicate; a fresh row is always written under the NEW key, so the
+    # legacy shape ages out on its own rather than needing a migration.
+    legacy_key = _legacy_idempotency_key(request)
+    match_keys = {key} | ({legacy_key} if legacy_key else set())
     state = _load()
     orders = state.get("orders") or []
     # WHAT THE ATTEMPT WE ARE REPLACING ACTUALLY DID. Empty unless a row is
     # popped below -- see `_prior_attempts_for_retry`.
     prior_attempts: list[dict[str, Any]] = []
     for index, order in enumerate(orders):
-        if order.get("idempotency_key") != key:
+        if order.get("idempotency_key") not in match_keys:
             continue
+        if order.get("idempotency_key") != key:
+            print(
+                "[execution_ledger] LEGACY_KEY_MATCH"
+                f" position_key={request.position_key!r}"
+                f" matched_on={order.get('idempotency_key')!r}"
+                f" status={order.get('status')!r}"
+                " -- a PRE-FIX row for this bet; refused as a duplicate rather"
+                " than re-placed (commence_time left the position identity"
+                " 2026-08-30)",
+                flush=True,
+            )
         if str(order.get("status") or "") != STATUS_REJECTED and not _is_retryable_venue_pause(order):
             return order, False
         # A REJECTED ORDER NEVER REACHED THE VENUE, so re-attempting it cannot

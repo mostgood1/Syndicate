@@ -2312,3 +2312,122 @@ def test_the_limit_price_is_read_as_PROBABILITY_not_raw_american(monkeypatch):
     assert mod.reconcile_live_orders()["changed"] == 1, (
         "requested_price was read raw -- 13.13 x 108 tripped the absurd band"
     )
+
+
+# --------------------------------------------------------------------------
+# A RESTATED START TIME MUST NOT UNLOCK A SECOND BET
+#
+# MEASURED 2026-08-30, live money, found by the USER on Polymarket's Orders
+# screen -- not by any log or counter:
+#
+#   C6H7WE0DPKDJ  $4.06  16:42:22Z  tsc-mlb-lad-det-2026-08-30-7pt5 under 7.5
+#   C6HN0XD92KDE  $5.44  17:19:26Z  tsc-mlb-lad-det-2026-08-30-7pt5 under 7.5
+#
+# ~$9.12 resting where one bet was intended. Every identity field identical
+# except commence_time: 17:41:00Z -> 18:11:00Z. The guard did not fail; it was
+# never consulted, because `position_key` had changed and `idempotency_key`
+# hangs off it.
+# --------------------------------------------------------------------------
+
+
+def _commit_row(commence: str) -> dict:
+    return {
+        "sport": "mlb", "event_id": "evt-lad-det", "kind": "game",
+        "market": "totals", "segment": "full_game", "player_name": None,
+        "home_team": "Detroit Tigers", "away_team": "Los Angeles Dodgers",
+        "commence_time": commence, "side": "under", "line": 7.5,
+        "quote": {"bookmaker": "polymarket"},
+    }
+
+
+def test_a_RESTATED_START_TIME_does_not_change_the_position_key():
+    """The fix itself, on the measured values."""
+    from syndicate.features.shared.portfolio_commit import position_key
+
+    before = position_key(_commit_row("2026-08-30T17:41:00Z"))
+    after = position_key(_commit_row("2026-08-30T18:11:00Z"))
+    assert before == after, "a 30-minute restatement still forks the identity"
+
+
+def test_the_LEGACY_key_still_forks_which_is_why_the_dual_check_exists():
+    """off != on for the hazard. If the legacy key did NOT differ across the
+    restatement there would be nothing to be backward-compatible WITH, and this
+    fixture would prove nothing about the migration path."""
+    from syndicate.features.shared.portfolio_commit import legacy_position_key
+
+    assert legacy_position_key(_commit_row("2026-08-30T17:41:00Z")) != legacy_position_key(
+        _commit_row("2026-08-30T18:11:00Z")
+    )
+
+
+def test_a_PRE_FIX_order_is_recognised_and_NOT_re_placed(monkeypatch):
+    """THE MIGRATION HAZARD, and the reason this fix is not a one-line diff.
+
+    `idempotency_key` hashes `position_key` FIRST. Changing the formula changes
+    every open order's identity at once, so without recognising the old shape
+    the first commit after the fix sees the ENTIRE OPEN BOOK as new bets. One
+    duplicate prompted this change; shipping it naively would have produced one
+    per open position, simultaneously, on live money.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    # A row written BEFORE the fix: its key is the legacy one.
+    old_request = _request(position_key="legacy-abc", venue="kalshi")
+    old_record, created = mod.record_order(old_request, mode=mod.LIVE)
+    assert created is True
+    mod.complete_order(old_record["idempotency_key"], status=mod.STATUS_SUBMITTED)
+
+    # The same bet after the fix: new stable key, carrying the legacy one.
+    new_request = _request(
+        position_key="stable-xyz", venue="kalshi", legacy_position_key="legacy-abc"
+    )
+    again, created_again = mod.record_order(new_request, mode=mod.LIVE)
+
+    assert created_again is False, "the pre-fix order was re-placed -- this doubles the book"
+    assert again["idempotency_key"] == old_record["idempotency_key"]
+
+
+def test_WITHOUT_the_legacy_key_the_same_bet_WOULD_be_re_placed(monkeypatch):
+    """The counterfactual, so the test above cannot pass for the wrong reason.
+
+    Identical to it except the caller supplies no legacy key -- which is exactly
+    the state a naive deploy would have been in. It creates a second record.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    old_record, _ = mod.record_order(
+        _request(position_key="legacy-abc", venue="kalshi"), mode=mod.LIVE
+    )
+    mod.complete_order(old_record["idempotency_key"], status=mod.STATUS_SUBMITTED)
+
+    _, created_again = mod.record_order(
+        _request(position_key="stable-xyz", venue="kalshi"), mode=mod.LIVE
+    )
+    assert created_again is True, (
+        "fixture no longer demonstrates the hazard the legacy key protects against"
+    )
+
+
+def test_a_GENUINELY_different_bet_is_still_placed(monkeypatch):
+    """The guard must not over-match. A different SIDE is a different bet even
+    with the same legacy key present."""
+    from syndicate.features.shared import execution_ledger as mod
+
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+
+    first, _ = mod.record_order(
+        _request(position_key="p1", venue="kalshi", side="over",
+                 legacy_position_key="legacy-1"), mode=mod.LIVE)
+    mod.complete_order(first["idempotency_key"], status=mod.STATUS_SUBMITTED)
+
+    _, created = mod.record_order(
+        _request(position_key="p1", venue="kalshi", side="under",
+                 legacy_position_key="legacy-1"), mode=mod.LIVE)
+    assert created is True, "a different side was refused as a duplicate"
