@@ -6522,3 +6522,49 @@ was editing.**
   `deploy_claim.active_claim` to None to stop six live-state failures produced
   eight. Reverted; the finding is logged unfixed. Related:
   [[feedback-rebaseline-before-judging]].
+---
+
+## 2026-08-30 — CORRECTION to the entry above: my "VENUE_REPRICE never fires" was LOG TRUNCATION, not absence. The rule I wrote from it was right; the evidence I wrote it from was not.
+
+**RETRACTED:** *"`GRID_REPRICE` fires every cycle; `VENUE_REPRICE` appeared ZERO
+times in 45 minutes of production logs"* and the conclusion drawn from it, that
+`apply_venue_quotes` is never called.
+
+**What actually happened.** I queried the Render logs API with `limit=200` and
+no text filter. On a service emitting thousands of lines that returns the newest
+200 — so my window never contained the line I was looking for, and I read the
+empty result as proof the code path does not run.
+
+Re-queried with `text=` filtering, same window:
+
+    VENUE_REPRICE   8 matches  00:15-01:25Z   (00:18:39, 00:30:57, ...)
+    GRID_REPRICE   20 matches
+
+**BOTH PATHS RUN.** A peer lane (`exchange-join-refusals`) cited
+`VENUE_REPRICE_KEYS unmatched 2255` off the 00:53:27Z build in an unrelated
+message. That number could not exist if my finding were true, so I re-measured.
+Credit theirs; I would not have looked again.
+
+**WHAT SURVIVES, stated so this is not over-retracted.** The grid path genuinely
+did lack the game term, and it is the one that calls `_reprice_live_benchmark`
+-> `cells[book][side]` -> `book_prices`, which is where the corrupted prices come
+from. `apply_venue_quotes` stamps freshness on opportunity rows and does not
+write `cells`. **So the FIX was necessary and correct; the REASON I gave for it
+was false.** `0c5243b4` stands.
+
+**THE IRONY IS THE LESSON.** The entry above states *"an absent log line is a
+fact about the path, not about the clock."* Mine was a fact about my QUERY. The
+rule generalises one step further than I wrote it:
+
+**An absent observation is a fact about the INSTRUMENT until you have shown the
+instrument could have seen it.** Clock, path, and query limit are three ways to
+be blind, and I had already written the rule for two of them while standing in
+the third.
+
+**Practical form:** before concluding a log line never appears, either use a
+`text=` filter or prove the window was not truncated — a `limit` that equals the
+number of rows returned is a truncation signal, and mine returned exactly 200.
+
+**Cost:** a wrong causal claim committed to `learnings.md`, `findings_...md` and
+a commit message, live for roughly 40 minutes. No wrong code: the change it
+justified was independently correct.
