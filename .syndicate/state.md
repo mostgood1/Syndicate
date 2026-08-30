@@ -7756,3 +7756,30 @@ are identical by construction.
 (809/809 rows carried the key) and `servable=False` on every row. **No reading
 has yet produced a single scored comparison** — its one live slate refused all
 six eligible rows before the arithmetic. Do not lift `servable` without one.
+
+## [polymarket-order-fills] 2026-08-30 — three causes REFUTED, one instrument waiting
+
+**The tick-floor fix is WITHDRAWN. It was a no-op.** Deployed and measured:
+12 of 12 quotes on-grid across 4 slugs and 45 minutes; the snap never fired.
+The causal claim paired a 17:49 price log with a 17:19 submit — the submit-time
+quote was 0.51 and we sent 0.51. Full retraction in `learnings.md`.
+
+**Also refuted, both by measurement:** stale ask (44s old at submit) and
+"we bid a mid" (`prices[]` sums 1.005–1.030 across 8 binary markets, which is an
+ask with its overround; a mid sums to exactly 1).
+
+**Still broken, cause unknown:** we bid the venue's own ask exactly and do not
+fill. Reproduced fresh under current code — `tsc-mlb-phi-laa-2026-08-30-7pt5`
+submitted 19:32:33 at 0.485 against an on-grid 0.485 quote, `filled=0` eight
+minutes later. Live hypothesis, UNTESTED: no resting size at our price.
+
+**The next reading is written and unlanded:** commit `d8b6c847` on branch
+`handoff/polymarket-order-state-logging` logs `cumQuantity`/`leavesQuantity`,
+which `ORDERS_READ` was fetching and discarding. It separates "never touched"
+from "partial, stuck". Handed to `polymarket-yes-leg-binding` to ship with their
+deploy — see `handoff_2026-08-30_order_state_logging.md`.
+
+**Unrelated and still open:** Polymarket h2h on `['Yes','No']`-outcome markets
+refuses `team_side_not_in_outcomes` (e.g. `atc-mls-stl-dal`). This is why the
+YES-leg fix has had no chance to run and must NOT be read as inert.
+

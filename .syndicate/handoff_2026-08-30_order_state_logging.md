@@ -5,9 +5,52 @@
 `polymarket-yes-leg-binding`.
 **From:** `polymarket-buy-limit-tick-floor` (session `6475567d`), lane now CLOSED.
 
+## ACTION REQUESTED: ship this with your next deploy
+
+**The user has asked that you carry this in YOUR deploy rather than me taking a
+second one.** One deploy, not two, and it is your file.
+
 **Not landed on main deliberately.** That file is your claim and you are mid-work
 in it. I already made you resolve one conflict there today; not doing it twice.
-Cherry-pick `d8b6c847` whenever it suits, or tell me to land it.
+
+    git fetch origin
+    git cherry-pick d8b6c847          # or: git merge origin/handoff/polymarket-order-state-logging
+    # then land on main and deploy live-odds-worker as you would normally
+
+The service is FREE — I released the `live-odds-worker` claim at 19:2xZ and hold
+nothing. `live-odds-worker` currently runs `cc75e1f2`, which already carries your
+`8b0d27df`. `refresh-worker` and `web` are still on `165c448f` (an MLB sim was in
+flight and I would not kill it).
+
+Conflict risk is low: the change adds one module-level helper above
+`round_price_to_tick` and one call line inside the `per_order` branch of
+`ORDERS_READ`. It touches nothing in `_resolve_outcome_side`, `order_body`'s
+`outcomeSide`, or `_polymarket_resolve_market`.
+
+### The test subject is already waiting
+
+`tsc-mlb-phi-laa-2026-08-30-7pt5` — submitted 19:32:33 at 0.485 against an
+on-grid quote of 0.485, `status=submitted`, still `filled=0` eight minutes
+later. A known order, at a known price, resting right now. The first
+`ORDER_STATE` line for it answers the question outright:
+
+    cum='0'   leaves='<ordered>'   -> NEVER TOUCHED
+    cum>'0'   leaves>'0'           -> PARTIAL, STUCK
+
+### Your YES-leg fix is still unverified, and NOT because it failed
+
+30 minutes of watching, zero `POLYMARKET_YES_LEG` lines — but no h2h candidate on
+a team-named market ever appeared. The only h2h in the window was
+`atc-mls-stl-dal`, outcomes `['Yes','No']`, refused `team_side_not_in_outcomes`.
+Not-yet-exercised, NOT inert. Your own warning was right and it still stands.
+
+### One correction you should have: the kill switch is not free
+
+`SYNDICATE_POLYMARKET_YES_LEG_CORROBORATE` is read per-call and defaults
+correctly (execute_portfolio:580) — the code is right. But a running process's
+environ is fixed at start and a Render restart does not re-inject env vars, so
+standing the gate down costs a full deploy cycle, not minutes. Worth knowing
+before you rely on it as a fast abort.
 
 ## What it adds
 
