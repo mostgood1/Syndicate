@@ -3721,39 +3721,57 @@ caaf-no-orders`). NOT
   next 503; it closes this and the parent's `balance_settled` in one event.
 - Blocked by: none. Parent: `unknown-submit-retry-provenance` (CLOSED-VERIFIED).
 
-### mlb-resolver-write-side-effect — OPEN — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411 — **UNOWNED, handed off**
-- **A PATH RESOLVER WRITES 2.46MB AND SUPPRESSES THE REPAIR THAT WOULD FETCH
-  THE REAL FILE.** Measured on a FRESH tempdir: 0 files before, 2 after, from a
-  call that only asks WHICH artifacts are required.
-- Chain: `artifact_publisher._required_daily_artifact_paths` →
+### mlb-resolver-write-side-effect — OPEN, **NARROWED — NOT A LIVE INCIDENT** — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411 — **UNOWNED, handed off**
+- **THE FALSIFICATION TEST THIS LANE ASKED FOR HAS RUN. `should_copy` does NOT
+  fire on the daily path in production.** Priority accordingly LOW. The defect
+  is real; the blast radius is much smaller than this block first said.
+
+- THE DEFECT, unchanged: `artifact_publisher._required_daily_artifact_paths` —
+  which only asks WHICH artifacts are required — reaches
   `mlb.sources.daily_artifact_path` → `_resolve_data_path_with_reconcile` →
-  `shutil.copy2` (`mlb/sources.py:116`). The copies then look present, so
-  `_missing_required_artifact_relative_paths` asks for 5 repairs, not 7.
-- That function's own comment requires presence be judged "ON THE RUNTIME DISK,
-  never at whatever path the helper returned". The copy turns the repo's copy
-  INTO the runtime disk's copy, defeating the guard from underneath.
-- ACTIVE IN PROD: `_reconcile_from_repo_enabled()` is `bool(SYNDICATE_DATA_ROOT)`,
-  always set on Render; `_artifact_roots()` appends the repo path with NO env
-  override (measured: 4 roots even with `SYNDICATE_MLB_SOURCE_ROOT` pinned).
-- **SCOPE OF THE CLAIM: the REPAIR is suppressed. Stale data being SERVED is
-  NOT shown** — an mtime/size `should_copy` guard exists (`sources.py:99-113`).
-  First thing to check, and the falsification test: if `should_copy` never
-  fires on a worker, this is test-hygiene only.
+  `shutil.copy2` (`mlb/sources.py:116`). The copy then looks present, so
+  `_missing_required_artifact_relative_paths` does not request it.
+- **THE TRIGGER IS WORSE THAN 'AN MTIME RACE', WHICH THIS BLOCK GOT WRONG.**
+  `if target_stat is None: should_copy = True` (`sources.py:99-101`) — a MISSING
+  target copies unconditionally. That is exactly the case the repair exists for,
+  so where a candidate exists the suppression is by construction, not by luck.
+
+- **WHY IT IS STILL NOT LIVE: on Render the candidate root holds only
+  GIT-TRACKED files, and that mirror stops at 2026-07-12.** No `.slugignore` and
+  no `buildFilter`, so the checkout is a full clone — but a clone carries
+  tracked files only: **283 `daily_summary_*`, window 2026-05-28 → 2026-07-12**.
+  The daily pull asks for TODAY, which has no tracked candidate.
+  MEASURED against production 2026-08-30: `daily_summary_2026_08_28` and
+  `_2026_08_29` are both git-tracked=NO and both served 200 (2,480,712 B and
+  2,806,937 B) — production's own artifacts, no mirror involved.
+- **THE ORIGINAL 2.46MB MEASUREMENT WAS DRIVEN BY AN UNTRACKED FILE.**
+  `daily_summary_2026_07_26.json` is on a dev disk but `git ls-files` says NO,
+  so it cannot exist in a Render checkout. The tempdir result was real and the
+  mechanism is real; it just does not reproduce on the worker for that date.
+
+- **WHAT REMAINS, and it is the part worth fixing:** any BACKFILL or EVALUATION
+  over **2026-05-28 → 2026-07-12** silently gets the git mirror's copy instead
+  of pulling production's. That is precisely the window CLAUDE.md warns
+  backtests run on ("`data/**` in git is a lossy mirror"), so the failure mode
+  is a backtest that believes it read production and did not.
+- **A CHECK THAT PROVED NOTHING, recorded so nobody repeats it:** production's
+  `daily_summary_2026_07_12.json` is byte-identical to the git copy (same
+  sha256, 2,367,970 B). That is NOT evidence the reconcile copy won —
+  `refresh_mlb_source_mirror.ps1` refreshes the mirror FROM production, so
+  identity is the expected state whichever direction it flowed. The reading
+  cannot discriminate the two hypotheses.
+- Still-open discriminator if anyone wants certainty: instrument the copy (one
+  `print` at `sources.py:116`) and read a worker tick, or compare the mounted
+  disk's mtime against deploy time for a tracked-window date.
+
 - Files: `syndicate/features/mlb/sources.py`,
-  `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED** — a lane
-  picking this up should claim them.
-- Verification wanted: a worker-side reading that
-  `_missing_required_artifact_relative_paths` returns the full required set.
-- Status: FINDING ONLY, nothing changed on the data path. The two TESTS this
-  surfaced through are fixed and green in both trees (`beaf5533`); they now
-  patch the reconcile gate rather than depend on it.
-- Deliberately not fixed on discovery: changes data hydration on a live path,
-  mid-slate. `[user 2026-08-29: fix the tests, open a lane for this]`
+  `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED.**
+- Status: FINDING ONLY. Nothing on the data path was changed. The two tests
+  this surfaced through are fixed and green in both trees (`beaf5533`).
 - ALSO OPEN, same family, NOT fixed: `test_deploy_preflight.TooSoonVerdictTests`
   (6 tests) read the LIVE shared deploy claim via `deploy_claim.active_claim`
   and fail whenever any session holds one. Mocking it to None made it WORSE
-  (6 → 8 failures) and was reverted — needs someone who knows what those tests
-  expect from the claim.
+  (6 → 8) and was reverted.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)

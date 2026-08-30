@@ -149,21 +149,32 @@ they corroborate nothing and the rate rests on the collected total alone. Only
 **5 of 73** filled Polymarket rows carry a fee (reconciliation re-reads open
 candidates; the 68 settled earlier are NOT backfilled), all from one evening.
 
-**A PATH RESOLVER WRITES 2.46MB AND SUPPRESSES THE ARTIFACT REPAIR**
-`[2026-08-29, MEASURED]`. `artifact_publisher._required_daily_artifact_paths`
-— which only asks WHICH artifacts are required — reaches
-`mlb.sources.daily_artifact_path` → `_resolve_data_path_with_reconcile` →
-`shutil.copy2` (`mlb/sources.py:116`), hydrating from the repo's git-tracked
-`data/mlb_source`. On a FRESH tempdir: 0 files before the call, 2 after
-(2,458,484 B + 186,623 B). The copies then look present, so
-`_missing_required_artifact_relative_paths` requests 5 repairs instead of 7 —
-defeating, from underneath, its own rule that presence is judged "ON THE
-RUNTIME DISK, never at whatever path the helper returned".
-Live wherever `SYNDICATE_DATA_ROOT` is set (always, on Render), and
-`_artifact_roots()` appends the repo path with NO env override.
-**NOT SHOWN TO SERVE STALE DATA — an mtime/size `should_copy` guard exists.**
-The proven claim is only that the REPAIR is suppressed. Lane
-`mlb-resolver-write-side-effect`; nothing on the data path was changed.
+**A PATH RESOLVER WRITES AND CAN SUPPRESS THE ARTIFACT REPAIR — REAL, BUT NOT
+LIVE ON THE DAILY PATH** `[2026-08-29 found, 2026-08-30 NARROWED, both MEASURED]`.
+`artifact_publisher._required_daily_artifact_paths` — which only asks WHICH
+artifacts are required — reaches `mlb.sources.daily_artifact_path` →
+`_resolve_data_path_with_reconcile` → `shutil.copy2` (`mlb/sources.py:116`).
+The copy then looks present, so `_missing_required_artifact_relative_paths`
+does not request it. **The trigger is `if target_stat is None: should_copy =
+True` — a MISSING target copies unconditionally**, which is exactly the case
+the repair exists for. (An earlier note here called this an "mtime/size guard";
+that was wrong and is corrected.)
+
+**IT DOES NOT FIRE ON THE DAILY PATH.** Render's checkout is a full clone (no
+`.slugignore`, no `buildFilter`) but carries GIT-TRACKED files only: 283
+`daily_summary_*`, window **2026-05-28 → 2026-07-12**. The daily pull asks for
+TODAY, which has no tracked candidate. Measured 2026-08-30:
+`daily_summary_2026_08_28` / `_2026_08_29` are git-tracked=NO and both served
+200 from production (2,480,712 B / 2,806,937 B). The original 2.46MB tempdir
+result was driven by `daily_summary_2026_07_26.json`, which is UNTRACKED and
+so cannot exist in a Render checkout.
+
+**WHAT REMAINS:** a BACKFILL or EVALUATION over 2026-05-28 → 2026-07-12 gets
+the git mirror's copy instead of production's — the exact window this file's
+"lossy mirror" rule already warns backtests run on. Lane
+`mlb-resolver-write-side-effect` (LOW priority, not a live incident). Nothing
+on the data path has been changed.
+
 
 **AND THE BANNER NOW SAYS SO** `[2026-08-29 23:24Z, web `3371ad96`]`. The
 unknown-submit block on `/portfolio` used to state that only a person opening
