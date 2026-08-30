@@ -3912,14 +3912,23 @@ caaf-no-orders`). NOT
     the "·*" hover marker for a suppressed edge has NEVER rendered. The caveat
     was in the DOM and unreachable in the UI — the exact "stated refusal nobody
     could read" that `ncaaf/game_projections.py` picked that field to avoid.
-  - **NOT ENABLED, ON PURPOSE:** `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` is
-    unset on every service, so `843fadc5`'s region code is inert and the NCAAF
-    consensus is still 11 soft books, 0 sharps. **The knob had exactly ONE
-    reader before this lane (the MLB fetcher), so setting it for NCAAF would
-    have been read by nothing while looking configured.** Enabling needs the key
-    on `live-odds-worker` (direct caller, still on stale `219d79ca`) AND
-    `refresh-worker` (the sweep), then a deploy of each. My `render_env_set.py`
-    call was refused by the permission classifier and was NOT worked around.
+  - **ENABLED AND VERIFIED 2026-08-30 03:50Z — and the sentence that stood here
+    was WRONG.** It said `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` was "unset on
+    every service". **It was set to `eu,us_ex` on BOTH workers the whole time**
+    (`render_env_set` reported `before 'eu,us_ex'` on refresh-worker and `NO
+    CHANGE NEEDED` on live-odds-worker). I inferred "unset" from
+    `findings_2026-08-26_ncaaf_opener_readiness.md`, which actually says the knob
+    *already exists* and "is not reaching the NCAAF capture", and I never read
+    the live value. **Nothing needed configuring; the workers needed the CODE**,
+    because the key had exactly ONE READER (the MLB fetcher) until this lane.
+    verify: the served NCAAF book set went **11 books / 0 of 5 sharps -> 25
+    books with `pinnacle` (70 rows) and `novig` (158 rows)** after
+    live-odds-worker reached `f42008e4`. Displayed sides 143 -> 418, servable
+    5 -> 125; edges stay SMALL (p50 0.75 pts) — the gain is COVERAGE, not size,
+    because 414 of 552 sides previously had one quoting book and nothing to
+    price against. **Still NOT expected value:** the anchor is
+    `consensus_vigged_price` and nothing de-vigs it; a sharp inside the
+    consensus makes the anchor better, not the output +EV.
   - **NOT MINE, NAMED SO IT IS NOT LOST:** the book_grid FORWARD artifact window
     does not cover the NCAAF week in practice — 09-05 is inside the 7-day window
     yet had no published artifact at 02:3xZ, so `/ncaaf/picks` reported

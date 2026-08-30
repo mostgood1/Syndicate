@@ -38199,3 +38199,47 @@ reading.
 - **venue basis verdict: UNMEASURED.** No number here is evidence about in-play
   venue edge. `servable=False` vindicated on first contact with production — at
   -40.9/-39.7/-21.5 points these would have topped an edge-ranked board.
+
+### 2026-08-30 03:31-03:50Z — live-odds-worker `f42008e4` — THE SHARPS ARE ON THE NCAAF BOARD
+
+**verify: the served NCAAF book set went 11 books / 0 of 5 sharps -> 25 books
+carrying `pinnacle` (70 rows) and `novig` (158 rows).** Polled
+`/api/board/book-grid?sport=ncaaf&date=2026-09-05` across the deploy: three
+consecutive reads at 11/NONE, then 25/['novig','pinnacle'] and stable after.
+
+**THE ENV VAR WAS ALREADY SET, ON BOTH WORKERS, THE WHOLE TIME.** `render_env_set`
+reported `before 'eu,us_ex'` on refresh-worker AND `NO CHANGE NEEDED` on
+live-odds-worker. My earlier note in this file and in `lanes.md` said the key was
+"unset on every service" — **that was wrong and is corrected here.** I inferred
+it from `findings_2026-08-26_ncaaf_opener_readiness.md`, which actually says the
+knob *already exists* and "is not reaching the NCAAF capture". The blocker was
+never configuration; it was that the key had exactly ONE READER (the MLB
+fetcher). Nothing needed setting — the workers needed the CODE. I briefly wrote
+`us_ex,eu` to refresh-worker before noticing, and restored `eu,us_ex`; the two
+are semantically identical (extras order does not change which books return) and
+the value is now byte-identical to what it was.
+
+**What the sharps did to the edge, same date, same endpoint, before -> after:**
+
+    displayed sides   143 -> 418     servable picks   5 -> 125
+    anchor_books (displayed) now {2:144, 3:92, 4:44, 5:30, 6:27, 7:27, 8:20, 9:14, 10:18, 12:2}
+    edge pts  min 0.00  p50 0.75  max 3.37
+
+The gain is COVERAGE, not size. Pre-sharp, 414 of 552 fresh sides had one
+quoting book and were refused for having nothing to price against; a real
+consensus now exists on most of the board. The edges themselves stay SMALL
+(p50 0.75 pts) and that is the honest number — more books means a tighter
+consensus, not a bigger edge.
+
+**STILL NOT EXPECTED VALUE, and the sharps do not change that.** The anchor is
+`consensus_vigged_price` and nothing de-vigs it. Having Pinnacle inside the
+consensus makes the anchor far better; it does not make the output +EV. Anyone
+upgrading that claim owes a de-vig and a measurement.
+
+`/ncaaf/picks?week=1` now serves its full 12-card cap (+3.53 down to +2.15 vs
+consensus), so `withheld_by_cap` is live and the count is reported rather than
+silently truncated.
+
+refresh-worker was deployed to `843fadc5` at 03:03Z by this lane and to tip by
+`stale-row-cause-blind-spot`; live-odds-worker is the direct caller of the NCAAF
+capture and is what this deploy carried.
