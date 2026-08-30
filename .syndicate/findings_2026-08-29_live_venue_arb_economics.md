@@ -898,3 +898,91 @@ number of rows returned is a truncation signal, and mine returned exactly 200.
 **Cost:** a wrong causal claim committed to `learnings.md`, `findings_...md` and
 a commit message, live for roughly 40 minutes. No wrong code: the change it
 justified was independently correct.
+
+---
+
+# POLYMARKET'S FEE — MEASURED, AND IT IS ZERO `[2026-08-30 ~02:2xZ]`
+
+The measurement I had called "the single highest-value one left". It did not
+need the order module fixed after all.
+
+## Why the obvious route was blocked, and the route that worked
+
+`fees_dollars` is null on every filled Polymarket order — `venue_order_view`
+hardcodes it, and the venue's `commissionNotionalTotalCollected` never reaches
+the ledger. The production log confirms the field EXISTS
+(`[polymarket_us_orders] ORDERS_READ ... keys=[... 'commissionNotionalTotal
+Collected', 'commissionsBasisPoints', 'makerCommissionsBasisPoints' ...]`) but
+prints only the KEY NAMES, never the values.
+
+So the fee was recovered from the **venue's own realized P&L** instead.
+`venue_settlement` grades a Polymarket order from
+`delta = after_realized - before_realized`, read off the venue's position row,
+stored as `pnl_dollars` with `settled_by="venue"`. If a commission had been
+taken, realized P&L would fall short of the no-fee expectation by exactly that.
+
+**Circularity checked before trusting it**, the same check Kalshi's rate got:
+`delta` is the venue's own realized figure, not a formula of ours.
+
+## The result
+
+Ten venue-settled orders, `$75.98` notional:
+
+    implied fee (expected_no_fee - venue_pnl)   -0.0037 .. +0.0000
+    total                                        -$0.0180
+    effective rate                               -2.37 bps of notional
+
+**Every value negative or zero.** A real commission is strictly positive; a
+negative implied fee is contract-count reconstruction rounding. **Polymarket
+took no commission on these fills.**
+
+ONE ROW EXCLUDED, and not for being inconvenient:
+`tsc-mlb-tex-mil-2026-08-29-8pt5` implied `+$0.42` and carries
+`held_side: POSITION_RESOLUTION_SIDE_SHORT` on an order placed as `under` — the
+`#595` wrong-side signature. Its P&L does not describe the position we think we
+held, so it cannot price a fee.
+
+## What it changes
+
+The break-even bar for a two-leg pair, Polymarket at the old unmeasured 0.10
+bound vs measured:
+
+    kalshi p   MLB old   MLB measured
+      0.50      3.38c        0.88c
+      0.70      2.84c        0.74c
+      0.90      1.21c        0.32c
+      0.97      0.39c        0.10c
+
+**At even money on MLB the bar falls 3.38c -> 0.88c, a 3.8x reduction.** The old
+detector demanded a flat 4.00c.
+
+**AND IT INVERTS THE PRIORITY I RECORDED.** I wrote that Polymarket was "two
+thirds of the modelled pair cost at even money" and the highest-value thing to
+measure. Measured, it is ZERO and **Kalshi is now the entire bar**. The test
+that asserted Polymarket dominant has been inverted to assert Kalshi dominant,
+so the finding is pinned rather than merely written down.
+
+## What it does NOT change
+
+The arb verdict on the observed sample. Best raw edge was **+0.00c** and the
+best pair was **-0.87c even with a free Polymarket** — Kalshi's own fee already
+exceeded the venues' disagreement. Cheaper fees make future opportunities far
+likelier to clear; they do not manufacture one that was not there.
+
+## Bounds on the claim
+
+Ten orders, all `totals`, `$1-$9`. `commissionsBasisPoints` and
+`makerCommissionsBasisPoints` are on the venue payload and are AUTHORITATIVE
+where this inference is not — a different market type or a much larger order
+should read the field. The population is carried in code as
+`POLYMARKET_MEASURED_SAMPLE` so a caller can see how far it generalises without
+reading this. `POLYMARKET_ASSUMED_WORST_CASE_RATE` is kept for callers wanting a
+bound and tightened 0.10 -> 0.01.
+
+## A bug the tests caught in my own code
+
+`net_edge_per_contract(polymarket_fee_bound=False)` returned a net edge
+IDENTICAL to the bounded one — the flag only affected the rounded
+single-contract figure while the rate was always the worst case. A flag whose
+name says "measured" and whose behaviour says "bound" is worse than no flag.
+Fixed; the flag now selects the rate.

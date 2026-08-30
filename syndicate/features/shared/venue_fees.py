@@ -94,23 +94,48 @@ Nothing in the arb path should be resting orders anyway -- see the two-leg note
 in `kalshi_polymarket_arb` -- so the refusal costs nothing today.
 
 --------------------------------------------------------------------------
-POLYMARKET'S FEE IS UNMEASURED. THIS MODULE REFUSES TO GUESS IT.
+POLYMARKET CHARGED NOTHING. MEASURED 2026-08-30 OFF THE VENUE'S OWN REALIZED P&L
 --------------------------------------------------------------------------
 
-`fees_dollars` is recorded on **0 of 13** filled Polymarket orders
-(same reading, 2026-08-29) -- the gap `unknown-submit-retry-provenance` is
-fixing by reading `commissionNotionalTotalCollected` off the venue. Until that
-lands there is no observation of what a Polymarket fill costs.
+`fees_dollars` is still null on every filled Polymarket order -- `venue_order_
+view` hardcodes it and the venue's `commissionNotionalTotalCollected` never
+reaches the ledger. So the fee was measured a different way: from the VENUE'S
+OWN realized P&L on settled positions.
 
-`polymarket_fee_dollars` therefore does not return a number. It raises
-`VenueFeeUnknown`, and the caller must decide -- explicitly, in its own code --
-whether to price the leg with `POLYMARKET_ASSUMED_WORST_CASE_RATE` (a bound
-chosen to be too EXPENSIVE, so an arb that clears it is real even if the true
-fee is higher than we think) or to refuse the opportunity outright.
+`venue_settlement` grades a Polymarket order from
+`delta = after_realized - before_realized`, read off the venue's position row,
+and stores it as `pnl_dollars` with `settled_by="venue"`. That is the venue's
+number, not ours -- checked before it was trusted, the same circularity check
+Kalshi's rate got. If a commission had been taken, realized P&L would fall
+short of the no-fee expectation by exactly that amount.
 
-This is the standing rule `unknown_must_not_default_permissive` applied to
-money: a fee we cannot read must not resolve to the branch that makes trading
-look profitable.
+Ten venue-settled orders, `$75.98` of notional:
+
+    implied fee (expected_no_fee - venue_pnl)   -0.0037 .. +0.0000 dollars
+    total                                       -$0.0180
+    effective rate                              -2.37 bps of notional
+
+**Every value is NEGATIVE OR ZERO.** A real commission is strictly positive; a
+negative implied fee is contract-count reconstruction rounding, nothing else.
+So the measurement is that Polymarket took **no commission** on these fills.
+
+ONE ROW EXCLUDED, and not for being inconvenient:
+`tsc-mlb-tex-mil-2026-08-29-8pt5` implied `+$0.42`, and it carries
+`held_side: POSITION_RESOLUTION_SIDE_SHORT` on an order placed as `under` --
+the `#595` wrong-side signature. Its P&L does not correspond to the position we
+think we held, so it cannot price a fee.
+
+**THE POPULATION IS NARROW AND THAT BOUNDS THE CLAIM.** Ten orders, all
+`totals`, all $1-$9. The venue's own payload carries `commissionsBasisPoints`
+and `makerCommissionsBasisPoints`, so it CAN charge -- and those fields are
+authoritative where this inference is not. `polymarket_fee_dollars` returns the
+measured 0.0 and names the population; a caller pricing a different market type
+or a much larger order should read the venue field rather than lean on this.
+
+`POLYMARKET_ASSUMED_WORST_CASE_RATE` is kept for callers that want a bound
+rather than a measurement, and TIGHTENED from 0.10 to 0.01 -- still an order of
+magnitude above everything observed, no longer a number that made Polymarket
+two thirds of a modelled pair cost on the strength of nothing.
 """
 
 from __future__ import annotations
@@ -125,6 +150,8 @@ __all__ = [
     "KALSHI_BASE_TAKER_RATE",
     "MAKER_FRACTION",
     "POLYMARKET_ASSUMED_WORST_CASE_RATE",
+    "POLYMARKET_MEASURED_TAKER_RATE",
+    "POLYMARKET_MEASURED_SAMPLE",
     "VenueFeeError",
     "VenueFeeUnknown",
     "ceil_to_fee_precision",
@@ -161,12 +188,26 @@ KALSHI_BASE_TAKER_RATE = 0.07
 # refuses rather than apply it silently.
 MAKER_FRACTION = 0.25
 
-# A deliberately EXPENSIVE stand-in for Polymarket, in the same units as
-# Kalshi's rate so the two legs are comparable. Not a claim about the venue --
-# a bound. An arb that survives this is real even if the truth is worse than we
-# think; one that only clears with a cheaper number is not evidence of
-# anything. Callers must opt into it by name.
-POLYMARKET_ASSUMED_WORST_CASE_RATE = 0.10
+# MEASURED 2026-08-30 off the venue's own realized P&L on ten settled orders,
+# $75.98 notional, effective rate -2.37 bps (i.e. zero, with reconstruction
+# rounding). See the module docstring for the population and its bounds.
+POLYMARKET_MEASURED_TAKER_RATE = 0.0
+
+# The population behind that zero, carried in code so a caller can see how far
+# it generalises without reading the docstring.
+POLYMARKET_MEASURED_SAMPLE = {
+    "orders": 10,
+    "notional_dollars": 75.98,
+    "markets": "totals only",
+    "stake_range_dollars": (1.00, 8.79),
+    "measured_at": "2026-08-30",
+}
+
+# A bound for callers that want one rather than the measurement. TIGHTENED from
+# 0.10 -- that number predated any observation and made Polymarket two thirds of
+# a modelled pair cost on the strength of nothing. 0.01 is still an order of
+# magnitude above everything measured.
+POLYMARKET_ASSUMED_WORST_CASE_RATE = 0.01
 
 
 # Decimal places Kalshi rounds a fee to. FOUR -- a hundredth of a cent -- not
@@ -335,20 +376,21 @@ def kalshi_maker_fee_dollars(
 
 
 def polymarket_fee_dollars(contracts: float, price: float) -> float:
-    """Always raises. Polymarket's fee has never been observed.
+    """The MEASURED Polymarket fee: zero.
 
-    Kept as a real function rather than omitted so that a caller reaching for
-    "the Polymarket fee" lands on the reason instead of on an import error or,
-    worse, on a plausible-looking zero. `fees_dollars` is null on all 13 of our
-    filled Polymarket orders.
+    Derived from the venue's own realized P&L on ten settled orders rather than
+    from a fee schedule, because `fees_dollars` never reaches the ledger. See
+    the module docstring for the derivation, the excluded wrong-side row, and
+    the population this rests on (ten `totals` orders, $1-$9, $75.98 notional).
+
+    THIS USED TO RAISE. It raised while the fee was genuinely unobserved, which
+    was correct then and would be false confidence in the other direction now --
+    refusing to price a leg we have measured is as wrong as guessing one we have
+    not. The bound remains available as `polymarket_worst_case_fee_dollars` for
+    callers that want conservatism instead.
     """
-    _quadratic_base(contracts, price)  # still refuse an impossible input first
-    raise VenueFeeUnknown(
-        "polymarket_fee_never_observed: fees_dollars is null on 13/13 filled"
-        " Polymarket orders (2026-08-29). Use"
-        " polymarket_worst_case_fee_dollars() and treat the result as a BOUND,"
-        " or refuse the opportunity."
-    )
+    _quadratic_base(contracts, price)  # an impossible input is still a refusal
+    return POLYMARKET_MEASURED_TAKER_RATE
 
 
 def polymarket_worst_case_fee_dollars(contracts: float, price: float) -> float:

@@ -14,6 +14,8 @@ import pytest
 
 from syndicate.features.shared.venue_fees import (
     FEE_TYPE_QUADRATIC,
+    POLYMARKET_MEASURED_SAMPLE,
+    POLYMARKET_MEASURED_TAKER_RATE,
     ceil_to_cent,
     FEE_TYPE_QUADRATIC_WITH_MAKER,
     KALSHI_BASE_TAKER_RATE,
@@ -181,18 +183,34 @@ def test_maker_refuses_on_maker_fee_series_without_the_flag():
     assert 0 < allowed < taker
 
 
-def test_polymarket_fee_refuses_and_the_bound_is_more_expensive_than_kalshi():
-    """Unknown must not default permissive -- and the bound must be a BOUND."""
-    with pytest.raises(VenueFeeUnknown) as exc:
-        polymarket_fee_dollars(10, 0.5)
-    assert "polymarket_fee_never_observed" in str(exc.value)
+def test_polymarket_fee_is_the_MEASURED_zero_and_no_longer_refuses():
+    """It raised while the fee was genuinely unobserved. It is observed now.
 
+    Measured 2026-08-30 off the venue's own realized P&L on ten settled orders,
+    $75.98 notional, effective rate -2.37 bps -- i.e. zero, with the negative
+    sign being contract-reconstruction rounding. A real commission is strictly
+    positive.
+
+    Refusing to price a leg we HAVE measured is as wrong as guessing one we
+    have not, so the refusal is gone rather than kept for safety's sake.
+    """
+    assert polymarket_fee_dollars(10, 0.5) == 0.0
+    assert POLYMARKET_MEASURED_TAKER_RATE == 0.0
+    # The population is carried in code so a caller can see how far it goes.
+    assert POLYMARKET_MEASURED_SAMPLE["orders"] == 10
+    assert POLYMARKET_MEASURED_SAMPLE["markets"] == "totals only"
+
+
+def test_the_bound_is_still_available_and_still_conservative():
+    """A bound remains for callers that want one -- but it is no longer the
+    absurd 0.10 that predated any observation."""
     bound = polymarket_worst_case_fee_dollars(100, 0.5)
-    kalshi_full_rate = kalshi_taker_fee_dollars(100, 0.5, fee_multiplier=1.0)
-    assert bound > kalshi_full_rate, (
-        "the Polymarket stand-in must be pessimistic relative to the venue we"
-        " HAVE measured, or it is not a bound"
-    )
+    measured = polymarket_fee_dollars(100, 0.5)
+    assert bound > measured, "a bound that is not above the measurement is not a bound"
+    # An order of magnitude over everything observed, and no longer larger than
+    # the venue we HAVE measured a real schedule for.
+    kalshi_full = kalshi_taker_fee_dollars(100, 0.5, fee_multiplier=1.0)
+    assert bound < kalshi_full
 
 
 def test_base_rate_matches_the_measurement_it_claims():

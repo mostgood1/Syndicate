@@ -53,7 +53,10 @@ def test_the_old_flat_buffer_was_above_mlb_break_even_at_every_price():
             f"at p={price} break-even is {break_even:.4f}, already under the"
             f" {DEFAULT_FEE_BUFFER} flat buffer"
         )
-    assert worst_break_even == pytest.approx(0.0338, abs=0.0005)
+    # Was 0.0338 while Polymarket was priced at the unmeasured 0.10 bound.
+    # Polymarket's real fee is now MEASURED AT ZERO, so the whole bar is
+    # Kalshi's half-rate parabola plus the tightened 0.01 bound.
+    assert worst_break_even == pytest.approx(0.01125, abs=0.0005)
 
 
 def test_fees_fall_monotonically_toward_the_tail():
@@ -100,19 +103,30 @@ def test_polymarket_leg_is_labelled_a_bound_not_a_measurement():
     assert detail["polymarket_fee_basis"] == "worst_case_bound"
 
 
-def test_refusing_the_bound_raises_rather_than_returning_a_cheaper_number():
-    """A caller that wants only measured costs gets a refusal, not a discount."""
-    with pytest.raises(VenueFeeUnknown):
-        net_edge_per_contract(0.60, 0.39, kalshi_fee_multiplier=0.5, polymarket_fee_bound=False)
+def test_the_measured_leg_is_cheaper_than_the_bound_and_both_are_priceable():
+    """`polymarket_fee_bound=False` used to RAISE because the fee was unknown.
+
+    It is measured now, so it prices -- and it must price CHEAPER than the
+    bound, or the bound is not conservative.
+    """
+    bounded = net_edge_per_contract(0.60, 0.39, kalshi_fee_multiplier=0.5)
+    measured = net_edge_per_contract(
+        0.60, 0.39, kalshi_fee_multiplier=0.5, polymarket_fee_bound=False
+    )
+    assert measured["net_edge_per_contract"] > bounded["net_edge_per_contract"]
+    assert measured["polymarket_fee_per_contract"] == 0.0
+    assert measured["polymarket_fee_basis"] == "measured"
 
 
-def test_the_polymarket_bound_is_the_dominant_cost_at_even_money():
-    """Stated so the priority is visible: measuring Polymarket's real fee is
-    worth more than any further precision on Kalshi's.
+def test_KALSHI_is_now_the_dominant_cost_and_that_is_the_finding_inverting():
+    """This test used to assert the OPPOSITE, and the inversion is the result.
 
-    Kalshi MLB at half rate contributes 0.00875; the Polymarket bound
-    contributes 0.025. Two thirds of the modelled cost is the number we cannot
-    yet read.
+    While Polymarket sat at the unmeasured 0.10 bound it contributed 0.025
+    against Kalshi's 0.00875 -- two thirds of a modelled pair cost resting on a
+    number nobody had observed. Measured, Polymarket is ZERO, so the entire bar
+    is Kalshi's own schedule. Break-even at even money on MLB falls
+    3.38c -> 0.88c.
     """
     detail = net_edge_per_contract(0.50, 0.50, kalshi_fee_multiplier=0.5)
-    assert detail["polymarket_fee_per_contract"] > 2 * detail["kalshi_fee_per_contract"]
+    assert detail["kalshi_fee_per_contract"] > detail["polymarket_fee_per_contract"]
+    assert detail["total_fee_per_contract"] == pytest.approx(0.01125, abs=0.0005)

@@ -467,15 +467,24 @@ def net_edge_per_contract(
     from syndicate.features.shared.venue_fees import (
         KALSHI_BASE_TAKER_RATE,
         POLYMARKET_ASSUMED_WORST_CASE_RATE,
+        POLYMARKET_MEASURED_TAKER_RATE,
     )
 
     kalshi_rate_cost = (
         KALSHI_BASE_TAKER_RATE * float(kalshi_fee_multiplier)
         * float(kalshi_price) * (1.0 - float(kalshi_price))
     )
+    # THE FLAG DECIDES THE RATE, not merely the rounded single-contract figure.
+    # It did not, and a test caught it: `polymarket_fee_bound=False` returned a
+    # net edge identical to the bounded one, because the rate below was always
+    # the worst case. A flag whose name says "measured" and whose behaviour says
+    # "bound" is worse than no flag.
+    polymarket_rate = (
+        POLYMARKET_ASSUMED_WORST_CASE_RATE if polymarket_fee_bound
+        else POLYMARKET_MEASURED_TAKER_RATE
+    )
     polymarket_rate_cost = (
-        POLYMARKET_ASSUMED_WORST_CASE_RATE
-        * float(polymarket_price) * (1.0 - float(polymarket_price))
+        polymarket_rate * float(polymarket_price) * (1.0 - float(polymarket_price))
     )
     total_rate_cost = kalshi_rate_cost + polymarket_rate_cost
 
