@@ -37993,3 +37993,48 @@ claim: acquired 21:56Z, EXPIRED 22:41Z while waiting for a preflight lull,
 - **Also shipped-but-not-deployed:** `1b21f681` emits `CROSS_GAME_REJECTED`.
   The counter existed and NOTHING PRINTED IT, so the mechanism could not be
   read at all tonight; this reading rests entirely on behavioural evidence.
+
+## 2026-08-30T01:21:03Z — refresh-worker `0c5243b4` — `#603` grid path — **DEPLOYED BY ME; ONE REAL READING, TWO WORTHLESS ZEROS**
+
+- **Claim** acquired 01:04:17Z (replacing an EXPIRED claim, 47.7 min old, held by
+  `venue-first-market-universe` — expiry, not a break-in). Released 01:4xZ.
+- **Preflight** HOLD for 10 min (an MLB daily sim + 9 children in flight; a
+  deploy kills them), then CLEAR at 01:14:41Z in a narrow lull. Four guard
+  refusals before it went through, each correct: chained preflight+deploy (guard
+  reads the last WRITTEN verdict), a peer's preflight run REVOKED my CLEAR, and
+  a CLEAR not bound to a SHA. Deployed on a `--target-commit` CLEAR.
+- **Content-verified, not ancestry:** `_row_game_token` x2,
+  `_quote_is_for_another_game` x2, `CROSS_GAME_REJECTED_GRID` x1,
+  `grid_games = _distinct_games` x1 in the deployed commit.
+- **Worker healthy:** BOOTED 01:21:31Z, no Traceback/ImportError/NameError,
+  headroom 2,634MB. `GRID_REPRICE` ran post-deploy for mlb/wnba/nfl/ncaaf.
+
+- **verify:** board `written_at 01:38:12Z` (> deploy 01:21:03Z, so built by the
+  new code). Live totals rows SHARING ONE PRICE ACROSS DIFFERENT GAMES:
+
+      polymarket ncaaf   live=5   sharing=0   <- NOT COLLIDABLE, proves nothing
+      kalshi     mlb     live=7   sharing=0   <- NOT COLLIDABLE, proves nothing
+      kalshi     soccer  live=8   sharing=4   <- REAL, and still broken
+
+  **The two zeros are worthless and must not be read as success.** Neither
+  population had two live games sharing a `(side,line)`, so a collision was
+  arithmetically impossible and the count would read 0 with the code deleted.
+  The soccer non-zero is the POSITIVE CONTROL proving the census is not blind.
+
+- **`CROSS_GAME_REJECTED_GRID = 0`, and that is consistent with the failure, not
+  with success.** The rejection fires only when a quote NAMES a fixture that
+  differs. Soccer quotes name none, so they pass silently — nothing to reject.
+
+- **Cause of the soccer residual, measured:** four MLS codes absent from the
+  soccer alias map (`NYRB`, `POR`, `LAG`, `STL`), so `match_event_blob` cannot
+  complete a split, the key stays bare and one quote answers every soccer row on
+  that line. Patch VERIFIED by monkeypatch (4/4 `no_match` -> `ok`, correct
+  teams, no leakage into mlb/nhl/ncaaf) and handed off —
+  `handoff_2026-08-30_kalshi_soccer_mls_codes.md`. NOT taken: `team_aliases.py`
+  has TWO open claimants and a third lane announcing intent.
+
+- **`#603` REMAINS UNPROVEN.** Third attempt. MLB and NCAAF unmeasured for lack
+  of a collidable population; soccer measured and still sharing. The settling
+  reading needs >=2 live games sharing a totals line with both clubs resolvable
+  — and the COLLIDABILITY CHECK MUST BE RUN FIRST, so the measurement is known
+  to be capable of failing before it is trusted to pass.
