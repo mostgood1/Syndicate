@@ -94,48 +94,66 @@ Nothing in the arb path should be resting orders anyway -- see the two-leg note
 in `kalshi_polymarket_arb` -- so the refusal costs nothing today.
 
 --------------------------------------------------------------------------
-POLYMARKET CHARGED NOTHING. MEASURED 2026-08-30 OFF THE VENUE'S OWN REALIZED P&L
+POLYMARKET CHARGES 150 BPS OF NOTIONAL, FLAT. AND THE RETRACTION THAT GOT HERE
 --------------------------------------------------------------------------
 
-`fees_dollars` is still null on every filled Polymarket order -- `venue_order_
-view` hardcodes it and the venue's `commissionNotionalTotalCollected` never
-reaches the ledger. So the fee was measured a different way: from the VENUE'S
-OWN realized P&L on settled positions.
+**A PRIOR VERSION OF THIS DOCSTRING SAID THE FEE WAS ZERO, MEASURED. IT WAS
+WRONG, AND THE WAY IT WAS WRONG IS THE USEFUL PART.**
 
-`venue_settlement` grades a Polymarket order from
-`delta = after_realized - before_realized`, read off the venue's position row,
-and stores it as `pnl_dollars` with `settled_by="venue"`. That is the venue's
-number, not ours -- checked before it was trusted, the same circularity check
-Kalshi's rate got. If a commission had been taken, realized P&L would fall
-short of the no-fee expectation by exactly that amount.
+`fees_dollars` is null on every filled Polymarket order -- `venue_order_view`
+hardcodes it and `commissionNotionalTotalCollected` never reaches the ledger --
+so the fee was inferred a different way: from the venue's own realized P&L on
+settled positions, `delta = after_realized - before_realized`.
 
-Ten venue-settled orders, `$75.98` of notional:
+**THAT METHOD IS FEE-BLIND BY CONSTRUCTION.** Realized P&L is `exit - entry`.
+The commission is charged at FILL and is simply not a term in that difference,
+so the method could only ever return approximately zero -- on a venue charging
+nothing, and equally on a venue charging plenty. It was not a weak measurement
+of the fee; it was not a measurement of the fee at all. Ten orders agreeing at
+-2.37 bps looked like ten independent confirmations and were ten repetitions of
+the same blind spot.
 
-    implied fee (expected_no_fee - venue_pnl)   -0.0037 .. +0.0000 dollars
-    total                                       -$0.0180
-    effective rate                              -2.37 bps of notional
+Disproven on its own sample: order `C60JWBG0WKDK` implied `-0.0023` by this
+route while the venue's own payload recorded `$0.0600` collected.
 
-**Every value is NEGATIVE OR ZERO.** A real commission is strictly positive; a
-negative implied fee is contract-count reconstruction rounding, nothing else.
-So the measurement is that Polymarket took **no commission** on these fills.
+**WHAT IS ACTUALLY TRUE**, from `commissionNotionalTotalCollected` on five real
+fills, corroborated independently by a second session's `buyingPower` cash-delta
+route (two routes, one answer):
 
-ONE ROW EXCLUDED, and not for being inconvenient:
-`tsc-mlb-tex-mil-2026-08-29-8pt5` implied `+$0.42`, and it carries
-`held_side: POSITION_RESOLUTION_SIDE_SHORT` on an order placed as `under` --
-the `#595` wrong-side signature. Its P&L does not correspond to the position we
-think we held, so it cannot price a fee.
+    150 bps of NOTIONAL, FLAT, PRICE-INDEPENDENT  ->  $0.015 per contract
 
-**THE POPULATION IS NARROW AND THAT BOUNDS THE CLAIM.** Ten orders, all
-`totals`, all $1-$9. The venue's own payload carries `commissionsBasisPoints`
-and `makerCommissionsBasisPoints`, so it CAN charge -- and those fields are
-authoritative where this inference is not. `polymarket_fee_dollars` returns the
-measured 0.0 and names the population; a caller pricing a different market type
-or a much larger order should read the venue field rather than lean on this.
+A COST-BASIS rate was considered and REJECTED, not merely disfavoured: 3.247% of
+cost reproduces the small fills and fails the 18.70-contract fill outright. See
+`POLYMARKET_REJECTED_COST_RATE`, kept as a named rejection so the alternative
+cannot be silently re-derived.
+
+**NEVER READ THE FEE OFF `commissionsBasisPoints`.** It reads `'0'` on every
+order observed, beside real collected totals -- and that is evidence about the
+fee's SHAPE, never about its ABSENCE. A flat per-contract charge has no
+ad-valorem component for a rate field to express, so a venue with no way to say
+"$0.015 a contract" in a bps field says `0`. An earlier version of this text
+called those fields "authoritative where this inference is not"; taken at face
+value that hands a reader a zero fee and lands them exactly where the retracted
+measurement did. `polymarket_us_orders` guards the other direction with
+`COMMISSION_RATE_APPEARED`, which fires if a NON-ZERO rate ever shows up --
+that would mean the schedule changed under everyone modelling a flat fee.
+
+The shape matters against Kalshi's, and it matters most where in-play prices
+live. Kalshi's `C * P * (1-P)` is a parabola that VANISHES at the tails;
+Polymarket's is flat and does not. At P=0.94 Kalshi's MLB fee is $0.0020 per
+contract and Polymarket's is $0.0150 -- seven times more for the same bet.
+
+**THE POPULATION IS NARROW AND THAT BOUNDS THE CLAIM.** Five fills, all
+`totals`, all $1-$9, one evening. The fee's EXISTENCE and its SHAPE are firmer
+than its exact RATE; a caller pricing a much larger order or a different market
+type should re-measure rather than lean on this.
 
 `POLYMARKET_ASSUMED_WORST_CASE_RATE` is kept for callers that want a bound
-rather than a measurement, and TIGHTENED from 0.10 to 0.01 -- still an order of
-magnitude above everything observed, no longer a number that made Polymarket
-two thirds of a modelled pair cost on the strength of nothing.
+rather than a measurement. It is 0.02 -- FLAT, matching the measured SHAPE, and
+strictly above the measured 0.015 at every price. It was briefly 0.01 while the
+fee was believed to be zero, which made the "bound" CHEAPER than the truth; a
+bound that undercuts the measurement is not conservative, it is just a second
+wrong number. `test_venue_fees` asserts `bound > measured` so that cannot recur.
 """
 
 from __future__ import annotations

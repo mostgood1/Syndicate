@@ -1074,3 +1074,141 @@ now, not less. `commissionsBasisPoints` reading `'0'` on all eight order reads
 while `collected` reads `0.0600` on the SAME payload remains an open
 contradiction — at least one field does not mean its name, and the peer flagged
 it themselves rather than leaning on the one that suited them.
+
+---
+
+## The Kalshi/Polymarket IN-PLAY comparison — `venue_basis_edge` (2026-08-30)
+
+**What it is.** A live board row's in-play exchange price against the book
+consensus, net of the venue's own commission. `syndicate/features/shared/
+venue_basis_edge.py`, attached per side in `apply_venue_quotes_to_grid`.
+
+**Why it is allowed live when `market_basis_edge` is not.** `market_basis_edge`
+refuses every live market and is right to: its anchor is *other books*, and once
+a game starts the cross-book spread is mostly staleness (its header records ten
+quotes on one line, +1200 against +175, none stale by the lag rule). This
+anchors on an EXCHANGE that demonstrably trades in-play — measured 2026-08-29
+22:02Z on `KXMLBGAME`, games in progress: SEA@TOR 0.74/0.75 vol24 904,281;
+MIA@WSH 0.94/0.95 vol24 804,405; AZ@SF 0.63/0.68 vol24 418,031. Every observed
+in-play spread was ONE CENT and prices moved between reads four minutes apart.
+
+**That is an argument, not a measurement.** `servable` is False on every row and
+there is a test pinning it. Nobody has scored venue-vs-book disagreement against
+realised results, and the last unmeasured live edge that reached a picks surface
+priced three props whose over had ALREADY WON at +36.5%/+32.3%/+15.8%.
+
+### The guard this was first written WITHOUT, and it was the dangerous one
+
+The book side can be a PREGAME capture while the venue price is live. The
+difference is then two clocks, not an edge — `_reprice_live_benchmark` has the
+measurement: a team three runs up in the 7th is ~0.90 live and ~0.55 to the
+pregame consensus, a **35-point number shaped exactly like the finding this
+module exists to surface**. The staleness FLAGS do not catch it: when every book
+stopped updating at first pitch, none is stale relative to its peers.
+
+Caught while wiring, not while writing — the attach point made the question
+"which age is this?" unavoidable. Guard 5 now bounds the anchor by
+`opportunity_gate.LIVE_MARKET_MAX_AGE_SECONDS`, read from there so the staleness
+the board ENFORCES and the staleness it ANCHORS AGAINST cannot drift apart. 900s
+is loose for baseball; it reliably excludes the pregame capture, which is the
+defect that produces the 35-point number. **It should be tightened from data.**
+
+### Ordering is the correctness, not a style choice
+
+Both writes below the attach destroy an input the comparison needs:
+
+1. the price reprice overwrites `side_best["age_seconds"]` with the VENUE's age —
+   read after it, guard 5 gets the venue's 10s for a two-hour-old book consensus
+   and passes exactly what it was written to catch;
+2. `_reprice_live_benchmark` sets superseded pregame books ASIDE in
+   `cells`/`consensus` — after it, on the rows where it succeeds, there is no
+   independent book consensus left and the comparison is the venue against
+   itself (0.00, reading as agreement).
+
+`tests/test_venue_basis_wiring.py` pins both by asserting the refusal on a row
+that reads fresh AFTER the call, and the book-side anchor on a row where the
+benchmark rewrite demonstrably ran.
+
+### Two judgement calls, both recorded
+
+**Kalshi's series `fee_multiplier` is ASSUMED, not required.** Nothing writes it
+into `kalshi_markets.json`, so refusing would have made this inert on the one
+venue whose in-play depth is measured — inert-but-principled being the worse
+failure, since it reads as "Kalshi has no live edges". The full 0.07 rate is
+assumed; every MLB game/total/spread series is HALF rate, so the assumption can
+only make an edge look SMALLER, never invent one. Rows carry
+`fee_is_upper_bound: true`. Consistent with `kalshi_polymarket_arb`'s existing
+`float(m.get("kalshi_fee_multiplier") or 1.0)`.
+
+**A negative edge is displayed, not suppressed.** At an identical nominal price
+the books are genuinely cheaper — the venue side costs its commission on top —
+and the reason string says which side is cheaper rather than leaving it to a sign.
+
+### Fixed in passing: a crash that predates this work
+
+`_distinct_games` (added with `#603`, mine) did not guard against a non-mapping
+grid row, while the loop it runs BEFORE does. One `None` in the grid raised
+`AttributeError` and took the entire venue reprice down with it.
+`test_a_malformed_grid_row_does_not_raise` was already asserting this and was
+already red — reproduced with this session's work stashed, so it is not a
+regression from the basis work.
+
+### Status
+
+Unit + wiring tests: 25 pass. Surrounding suites (fanin, grid reprice, live
+benchmark, key-names-game, line join, fees, arb): 147 pass. **No production
+reading yet, and no deploy.** The two numbers most likely to be wrong are
+`MAX_VENUE_QUOTE_AGE_SECONDS = 45` and the 900s anchor ceiling; both are
+starting positions, neither is a measurement.
+
+---
+
+## CLOSED: the `commissionsBasisPoints` "open contradiction" (2026-08-30)
+
+Recorded above as *"remains an open contradiction — at least one field does not
+mean its name."* **It was never a contradiction, and my own flat model is the
+explanation.** Raised by session `local_c1fb3f4e`; verified here before adopting.
+
+`commissionsBasisPoints: '0'` sits beside a real `collected` total because **a
+flat per-contract fee has no ad-valorem component for a rate field to express.**
+Both fields mean exactly what they say. The venue has no way to write "$0.015 a
+contract" in a bps field, so it writes `0`.
+
+`bps == 0` is evidence about the fee's **SHAPE**, never about its **ABSENCE**.
+
+**The line that had to change was mine, in code, and it was worse than the one
+flagged.** `venue_fees.py`'s module docstring still carried the RETRACTED
+zero-fee finding in full — "Polymarket took **no commission**", "`polymarket_
+fee_dollars` returns the measured 0.0" — while the function has returned
+`0.015 * contracts` since the retraction. A reader of the module was told the
+opposite of what runs, and told it in the same authoritative voice as the parts
+that are true. It also called the bps fields "authoritative where this inference
+is not", which at face value hands a reader a zero fee and lands them precisely
+where the retracted measurement did.
+
+Rewritten to state the fee, the shape, the retraction and WHY the old method was
+wrong (realized P&L is `exit − entry`; the commission is charged at fill and is
+not a term in that difference — fee-blind by construction, not merely weak).
+
+Re-verified here rather than accepted, all four numbers:
+
+| claim | checked |
+|---|---|
+| Kalshi MLB @P=0.94 | `0.0020`/contract |
+| Polymarket @P=0.94 | `0.0150`/contract — 7.5x, and the tails are where in-play lives |
+| bound above measurement | `0.02 > 0.015`, pinned by `test_venue_fees.py:272` |
+| cost-basis rejection | 3.247% predicts `$0.1579` on the 18.70-contract fill; flat predicts `$0.2805` |
+
+62 tests green across fees / arb / venue basis.
+
+**Attribution, as the peer recorded it and as I confirm it:** their side
+contributed the fee's EXISTENCE and an independent cash-movement route
+(`buyingPower` delta); the SHAPE is from this lane's five
+`commissionNotionalTotalCollected` values. Their "3.12–3.81% of fill cost" was
+the artifact of dividing a flat charge by a varying cost — the spread was the
+symptom, not the finding. Two independent routes, one answer.
+
+**Standing rule this leaves behind:** a retraction must reach the DOCSTRING of
+the module whose behaviour changed, not only the ledger. The constant was fixed
+the same hour; the prose that explains it survived four commits saying the
+opposite, and nothing was red.
