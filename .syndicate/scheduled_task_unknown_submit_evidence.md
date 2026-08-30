@@ -1,5 +1,36 @@
 # Mirror — scheduled task `unknown-submit-balance-evidence-capture`
 
+> ## ⚠ NOT RUNNING. NEEDS A ONE-TIME HUMAN APPROVAL. `[2026-08-30 04:1xZ]`
+>
+> **Two runs, two stalls, zero work done — and `lastRunAt` said it ran both
+> times.** 03:10:47Z and 04:09:54Z: a session was created each time (so it
+> EXECUTED — not a Modern Standby stall), then froze within a minute. The
+> second run's transcript is TWO messages: the task prompt, then a single
+> `Bash` call, nothing after. **It blocks on the permission prompt for its
+> first `curl`.**
+>
+> **Narrowing it to read-only did NOT fix this and was the wrong remedy** —
+> the blocker is the TOOL, not what the tool does. A brand-new scheduled task
+> has no stored approvals, so its first `Bash` call prompts however innocuous
+> the command is. Removing `.env`, the Render API and `git` changed nothing.
+>
+> **THE FIX IS A ONE-TIME "Run now" + approve.** Approvals granted during a run
+> are stored on the task and auto-applied to every later run. Positive control,
+> measured the same minute: `live-gameline-accuracy-snapshot` fired at 04:33:40Z
+> and progressed normally — same machine, same scheduler, different only in
+> having accumulated approvals.
+>
+> What you would be approving is now small, which is the one thing the
+> narrowing did buy: one unauthenticated GET plus two local file writes. No
+> credentials, no push.
+>
+> Until then the hourly schedule produces a stalled session per hour and NO
+> measurement. Both stalls were archived. If nobody intends to approve it,
+> DISABLE the task rather than leave it generating stalls, and leave the
+> measurement to an interactive session — the lanes already record it as owed
+> and unforceable.
+
+
 **This file is the CANONICAL text of the task prompt.** The live task lives at
 `~/.claude/scheduled-tasks/unknown-submit-balance-evidence-capture/SKILL.md`,
 which is **outside this repo and not under version control on any machine**.
