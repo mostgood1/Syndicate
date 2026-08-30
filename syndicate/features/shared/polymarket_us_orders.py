@@ -433,6 +433,47 @@ def _positive_float(value: Any, name: str) -> float:
     return parsed
 
 
+def _log_order_states(rows: Any, *, mode: str) -> None:
+    """One line per order: is it UNTOUCHED, or partly filled and stuck?
+
+    `ORDERS_READ` already printed `keys=[...]` -- the NAMES of the fields,
+    never the VALUES. So the two numbers that separate the only two stories a
+    resting order can tell were fetched on every poll and thrown away:
+
+        cumQuantity   == 0  and leavesQuantity == ordered   -> NEVER TOUCHED
+        cumQuantity    > 0  and leavesQuantity  > 0         -> PARTIAL, STUCK
+
+    Those have different causes -- no resting size at our price versus not
+    enough of it -- and no reading in this system could tell them apart.
+
+    WHY THIS IS WORTH A LINE. Three separate sessions attributed Polymarket's
+    unfilled orders to three different mechanisms on 2026-08-30 -- a tick-size
+    floor, a stale ask, and bidding a mid -- and MEASUREMENT REFUTED ALL THREE:
+    quotes are on-grid (0 of 9 off-grid), the ask was 44s old at submit, and
+    `prices[]` sums to 1.005-1.030 across 8 binary markets, which is an ask
+    with its overround, not a mid. Meanwhile orders at the same price on the
+    same venue both fill and rest -- `sea-tor` filled 11.17 contracts at 0.435
+    while `lad-det` rested at 10.66 -- so size alone does not explain it.
+
+    The next hypothesis should be tested against a reading rather than argued
+    from a mechanism. This is that reading.
+    """
+    for row in rows or []:
+        if not isinstance(row, Mapping):
+            continue
+        print(
+            f"[polymarket_us_orders] ORDER_STATE mode={mode}"
+            f" order={row.get('id') or row.get('orderId')}"
+            f" slug={str(row.get('marketSlug') or '')!r}"
+            f" state={str(row.get('state') or row.get('orderStatus') or '')!r}"
+            f" side={row.get('outcomeSide')} action={row.get('action')}"
+            f" price={row.get('price')}"
+            f" cum={row.get('cumQuantity')!r} leaves={row.get('leavesQuantity')!r}"
+            f" avgPx={row.get('avgPx')!r}",
+            flush=True,
+        )
+
+
 def round_price_to_tick(price: float, tick: float, *, direction: str) -> float:
     """Snap to a legal tick, TOWARD THE SIDE THAT CAN ACTUALLY TRADE.
 
@@ -1118,6 +1159,7 @@ def fetch_orders(*, limit: int = 100, order_ids: Sequence[str] | None = None) ->
                 f" errors={errors[:2]}",
                 flush=True,
             )
+            _log_order_states(rows, mode="per_order")
         # PER_ORDER, AND SAYING SO IS THE POINT. This branch reads exactly the
         # ids it was handed, so the returned count can never exceed the asked
         # count and an order that exists at Polymarket but not in our ledger is
