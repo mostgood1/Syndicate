@@ -1615,6 +1615,22 @@ unsaved anywhere.
 - **`Bash` bypasses it entirely** — the matcher is
   `Edit|Write|MultiEdit|NotebookEdit`. The guard bounds the file tools, not the
   session.
+- **A CLAIM OUTLIVES ITS SESSION FOREVER — the guard has NO liveness notion**
+  `[verified 2026-08-29T23:2xZ, lane lane-claim-phantom-sweep]`. Nothing released
+  a claim when a session ended, so they accumulated: **26 OPEN lanes holding 133
+  claims while 3 sessions were alive**, 121 of them (91%) enforced on behalf of
+  sessions that no longer existed, plus 56 `.current-lane.<session>` markers for
+  4 live sessions. Already paid for once the same day — `live-venue-order-placement`
+  needed a USER OVERRIDE to take `venue_quote_adapters.py` off `kalshi-line-aware-rungs`,
+  whose session was gone. **A header reading "OPEN, UNOWNED" or "CLAIMS RELEASED"
+  releases NOTHING**: the guard parses the `- Files:` block and never the
+  header's prose. Sweep with `py -3 scripts/release_phantom_lane_claims.py`
+  (dry run by default; verifies against `lane-guard._claims()`, keeps every path
+  as a record). Post-sweep state: claims held ONLY by live sessions' lanes.
+  Verified off != on against the hook itself, not against a claim count —
+  `scripts/build_soccer_artifacts.py` and `syndicate/features/ncaaf/sources.py`
+  went exit 2 -> exit 0 while a live lane's `venue_quote_adapters.py` stayed
+  exit 2.
 - **A HOOK THAT RESOLVES PATHS AGAINST `CLAUDE_PROJECT_DIR` IS ANSWERING ABOUT
   THE WRONG REPOSITORY** `[verified 2026-08-20, shipped 58c63b62]`. Every session
   works in its own linked worktree, so `CLAUDE_PROJECT_DIR` is the PRIMARY
