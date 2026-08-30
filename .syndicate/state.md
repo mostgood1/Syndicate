@@ -167,8 +167,14 @@ seven times larger. MLB two-leg break-even: **2.50c at even money, 1.70c at
 threshold below true break-even manufactures arbs that lose on every fill).
 
 The arb VERDICT is unchanged and fails by MORE: best raw edge +0.00c.
-OPEN CONTRADICTION: `commissionsBasisPoints` reads `'0'` on all eight order
-reads while `collected` reads `0.0600` on the same payload.
+**RESOLVED 2026-08-30 — IT WAS NEVER A CONTRADICTION.** `commissionsBasisPoints`
+reads `'0'` beside a real `collected` because **the fee is FLAT PER CONTRACT
+($0.015) and therefore has no ad-valorem component for a rate field to
+express.** 18.70 contracts -> $0.28, 3.91 -> $0.06, 2.38 -> $0.04. Against the
+$1 notional that equals 150 bps, but the venue does not report it that way.
+**`bps == 0` is evidence of the fee's SHAPE, never of its ABSENCE** — reading it
+as absence is exactly what produced the retracted zero above. Guarded in code:
+`COMMISSION_RATE_APPEARED` fires if a non-zero rate ever shows up (`c0989cfe`).
 
 ## [polymarket-live-totals-quote-names-no-game] 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game identity `[verified 2026-08-29 ~22:3xZ, lane live-venue-order-placement]`
 
@@ -267,12 +273,15 @@ Five reconciled fills, `commission / fill_cost`:
 afternoon from a balance delta ($1.8977 debit vs $1.8377 fill) -- two routes,
 one number.
 
-**DO NOT FIT A RATE ON THIS YET**, and the reason is the same discriminating-
-variable rule Kalshi's fit turned on: `commissionsBasisPoints` and
-`makerCommissionsBasisPoints` are `'0'` on ALL 8 reads -- uniformly zero, so
-they corroborate nothing and the rate rests on the collected total alone. Only
-**5 of 73** filled Polymarket rows carry a fee (reconciliation re-reads open
-candidates; the 68 settled earlier are NOT backfilled), all from one evening.
+**THE RATE IS NOW FITTED AND IT IS NOT A PERCENTAGE.** `[2026-08-30]` The fee is
+FLAT: **$0.015 per contract, independent of price** (= 150 bps of the $1
+notional). My earlier "3.12-3.81% of fill cost" was the ARTIFACT of dividing a
+flat per-contract charge by a VARYING cost — the spread was the symptom, not
+the finding. `commissionsBasisPoints` being uniformly `'0'` is consistent with
+a flat fee rather than evidence against one; see the resolved note above.
+Sample bounds stand: 5 of 73 filled Polymarket rows carry a fee (reconciliation
+re-reads open candidates; the 68 settled earlier are NOT backfilled), all
+`totals`, $1-$9, one evening.
 
 **A PATH RESOLVER WRITES AND CAN SUPPRESS THE ARTIFACT REPAIR — REAL, BUT NOT
 LIVE ON THE DAILY PATH** `[2026-08-29 found, 2026-08-30 NARROWED, both MEASURED]`.
