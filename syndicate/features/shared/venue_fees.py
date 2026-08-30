@@ -122,10 +122,27 @@ route (two routes, one answer):
 
     150 bps of NOTIONAL, FLAT, PRICE-INDEPENDENT  ->  $0.015 per contract
 
-A COST-BASIS rate was considered and REJECTED, not merely disfavoured: 3.247% of
-cost reproduces the small fills and fails the 18.70-contract fill outright. See
-`POLYMARKET_REJECTED_COST_RATE`, kept as a named rejection so the alternative
-cannot be silently re-derived.
+A COST-BASIS rate (3.247% of cost) was considered and DISFAVOURED. **The earlier
+wording here said "REJECTED... fails the 18.70-contract fill outright" and that
+was an OVERCLAIM.** Challenged by a peer 2026-08-30 and re-run:
+
+    total |error| over the five fills   per-contract 0.0111   cost-basis 0.0148
+
+Two of the five actually favour cost-basis. The separation turns on ONE fill
+(18.70 contracts: 0.2805 vs 0.2854 against an observed 0.28) **and on the venue
+rounding to nearest cent rather than flooring** — if it floors, both models
+produce 0.28 and nothing here distinguishes them.
+
+**WHY THE MEASUREMENT CANNOT DO BETTER YET: all five fills sit between 0.43 and
+0.47.** A per-contract fee and a per-cost fee are near-degenerate in a price
+band that narrow — the second is just the first with the rate divided by the
+price. Only a fill at a materially different price separates them. (A fee of
+150 bps of STAKE, as opposed to of NOTIONAL, IS ruled out: at ~0.45 it predicts
+$0.00675/contract against ~$0.015 observed, wrong by 2.2x on every fill.)
+
+So `POLYMARKET_REJECTED_COST_RATE` is kept as a NAMED and still-live
+alternative, not a closed question. The next fill outside 0.43-0.47 decides it:
+at ~0.22, per-contract and cost-basis diverge by roughly 2x.
 
 **NEVER READ THE FEE OFF `commissionsBasisPoints`.** It reads `'0'` on every
 order observed, beside real collected totals -- and that is evidence about the
@@ -238,7 +255,8 @@ POLYMARKET_MEASURED_SAMPLE = {
     "total_cost_dollars": 15.40,
     "total_notional_contracts": 33.32,
     "fill_price_range": (0.43, 0.47),
-    "basis": "notional (cost basis rejected on the 18.70-contract fill)",
+    "basis": "notional (cost basis DISFAVOURED, not rejected -- see the header;"
+             " all five fills sit in 0.43-0.47 and cannot separate the two)",
     "measured_at": "2026-08-30",
 }
 
