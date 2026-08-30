@@ -49,7 +49,16 @@ from typing import Any
 # `priceable` / `withheld_reason` per record. **The version is load-bearing for
 # any reader**: a rate computed across both populations is a rate over two
 # different denominators. Filter on `v` before aggregating, never on date.
-LEDGER_VERSION = 2
+#
+# v3 (2026-08-30) carries `line`, and `record_key` keys on it. This IS a
+# population change, not just a new field: three totals lines on one game used
+# to collapse to ONE key and deduplicate against each other, so v2 holds roughly
+# one totals record per game per book-set where v3 holds one per LINE. Counting
+# records across the boundary counts two different things. v2 records cannot be
+# repaired -- the line is not recoverable from the stored probability -- so a
+# reader that needs `line` (scoring totals/spreads against their own outcomes)
+# must filter to `v >= 3` and will find no history before this date.
+LEDGER_VERSION = 3
 
 # A live slate tops out around 15 games x a handful of priceable markets. 500
 # is far above that and still bounds a pathological build.
@@ -88,16 +97,34 @@ def _enabled() -> bool:
 
 
 def record_key(row: Mapping[str, Any]) -> tuple:
-    """Identity of a market across builds: game, segment, market, book set.
+    """Identity of a market across builds: game, segment, market, LINE, book set.
 
     The book set is part of the key because the same market appears once per
     book-consensus row and their prices genuinely differ; collapsing them would
     silently keep whichever was written last.
+
+    **`line` JOINED THE KEY 2026-08-30. IT IS A LATENT HAZARD CLOSED, NOT AN
+    OBSERVED COLLISION — the first draft of this comment claimed the collision as
+    measured fact and that was WRONG.** A totals market is not one market, it is
+    one per line, and the lines carry genuinely different probabilities (the
+    served MLB board that day quoted one game at 9.5 / 9.0 / 8.5 with model probs
+    0.3167 / 0.3167 / 0.45). But the old four-part key did NOT collide them in
+    practice, and the reason is worth keeping: `books_key` is built from the books
+    quoting THAT LINE, so it varies with the line and was acting as an accidental
+    proxy for it. Checked against production the same day — 6 live records, every
+    line on a distinct book set, **0 groups holding more than one line.**
+
+    So this closes a real gap rather than a bleeding wound: nothing guarantees two
+    lines cannot draw the same book set, and when they do the old key would have
+    had `_moved` compare a 9.5 row against an 8.5 row and dedupe on the answer,
+    silently keeping whichever landed last. `str()` rather than the raw value so
+    `9.5` and `"9.5"` cannot split one market into two.
     """
     return (
         row.get("game_pk"),
         str(row.get("segment") or ""),
         str(row.get("market") or ""),
+        str(row.get("line") if row.get("line") is not None else ""),
         str(row.get("books_key") or ""),
     )
 
@@ -177,6 +204,18 @@ def build_records(
                 "away_team": row.get("away_team"),
                 "segment": row.get("segment"),
                 "market": row.get("market"),
+                # THE LINE THE PROBABILITY IS ABOUT. Absent until 2026-08-30,
+                # and its absence had two costs. (1) It is half of this row's
+                # IDENTITY -- see `record_key`, where three totals lines on one
+                # game collapsed to a single key and deduplicated against each
+                # other. (2) It is the only thing that makes a totals or spreads
+                # probability SCOREABLE: `live_gameline_score` can compare a
+                # home-win probability to a final, but P(over) means nothing
+                # without the number it is over. Historical records cannot be
+                # repaired -- the line is not recoverable from the stored
+                # probability -- so this is what makes that scoring possible
+                # from new records onward, and nothing more.
+                "line": row.get("line"),
                 "books_key": ",".join(books),
                 # --- the OPEN half of CLV ---
                 "model_home_win_prob": lg.get("model_prob"),

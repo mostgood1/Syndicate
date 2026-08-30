@@ -25,9 +25,10 @@ from syndicate.features.shared.live_gameline_ledger import (
 
 
 def _row(*, priceable=True, model=0.6, market=0.4069, edge=19.31, segment="full",
-         books=("pinnacle", "fanduel"), game_pk=824966, reason=None):
+         books=("pinnacle", "fanduel"), game_pk=824966, reason=None,
+         market_key="h2h", line=None):
     return {
-        "kind": "game", "market": "h2h", "segment": segment,
+        "kind": "game", "market": market_key, "segment": segment, "line": line,
         "event_id": "1145a9db", "home_team": "Athletics", "away_team": "Texas Rangers",
         "books": list(books), "age_seconds": 42.5, "updated_at": "2026-08-16T02:00:00Z",
         "game": {"state": "live", "home_score": 3, "away_score": 1},
@@ -126,6 +127,47 @@ class TestDeduplication:
         recs = build_records([_row(segment="full"), _row(segment="first5")],
                              sport="mlb", date_str="d")
         assert append_records(p, recs)["written"] == 2
+
+    def test_two_totals_lines_on_one_game_are_different_records(self, tmp_path):
+        """A LATENT COLLISION CLOSED 2026-08-30 -- not an observed one, and the
+        distinction is deliberate. A totals market is one market PER LINE and the
+        lines carry different probabilities (the served MLB board that day quoted
+        9.5 / 9.0 / 8.5 at 0.3167 / 0.3167 / 0.45), but production was NOT
+        colliding them: `books_key` is built from the books quoting that line, so
+        it varied with the line and stood in for it. 0 collisions across the 6
+        live records checked.
+
+        This fixture makes the book sets IDENTICAL, which is what production does
+        not guarantee. That is the whole point -- it is the case the old key
+        could not survive, and it cannot arise from a fixture that lets
+        `books_key` do the separating.
+        """
+        p = tmp_path / "led.jsonl"
+        rows = [_row(market_key="totals", line=9.5, model=0.3167),
+                _row(market_key="totals", line=9.0, model=0.3167),
+                _row(market_key="totals", line=8.5, model=0.45)]
+        recs = build_records(rows, sport="mlb", date_str="d")
+        assert len({record_key(r) for r in recs}) == 3
+        assert append_records(p, recs)["written"] == 3
+
+    def test_the_line_is_recorded_so_a_totals_probability_can_be_scored_later(self):
+        """`live_gameline_score` can compare a home-win probability to a final,
+        but P(over) means nothing without the number it is over. The line was
+        absent until v3, which is why totals rows are refused rather than scored
+        -- historical records cannot be repaired, the line is not recoverable
+        from the stored probability."""
+        rec = build_records([_row(market_key="totals", line=9.5)],
+                            sport="mlb", date_str="d")[0]
+        assert rec["line"] == 9.5
+        assert rec["market"] == "totals"
+
+    def test_a_line_of_zero_is_kept_and_is_not_the_same_key_as_no_line(self):
+        """0.0 is a real spread. Coercing it with `or ""` would fold a pick-em
+        onto the absent-line key -- the falsy-zero trap."""
+        a = build_records([_row(market_key="spreads", line=0.0)], sport="mlb", date_str="d")[0]
+        b = build_records([_row(market_key="spreads", line=None)], sport="mlb", date_str="d")[0]
+        assert a["line"] == 0.0
+        assert record_key(a) != record_key(b)
 
     def test_differing_book_sets_do_not_collapse_onto_each_other(self, tmp_path):
         """Same market, different book consensus, genuinely different prices --

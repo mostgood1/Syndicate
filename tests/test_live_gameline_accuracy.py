@@ -398,3 +398,27 @@ def test_a_half_written_line_does_not_destroy_the_history(root):
         handle.write('{"date": "2026-08-28", "games_with_ou')
     rows = acc.read_rows(path)
     assert len(rows) == 1 and rows[0]["date"] == "2026-08-27"
+
+
+def test_the_market_mix_survives_into_the_retained_row():
+    """The retained row is what a later reader trusts, and `build_row` copies
+    `extra` keys by ALLOWLIST -- a new counter on the served payload is silently
+    dropped unless named.
+
+    The scorer's 2026-08-30 market defect (totals/spreads probabilities scored
+    against "did the home team win") went unnoticed for weeks precisely because
+    nothing recorded what the sample was made of. Carrying the Brier without the
+    mix would rebuild that blind spot one layer down.
+    """
+    score = {
+        "records_considered": 5,
+        "games_with_outcome": 1,
+        "records_by_market": {"h2h": 2, "totals": 3},
+        "scored_markets": ["h2h"],
+        "unscored": {"market_probability_is_not_a_home_win_probability": 3},
+        "priceable_only": {"model": {"brier": 0.2, "n": 2}},
+    }
+    row = acc.build_row(score, sport="mlb", date_str="2026-08-30")
+    assert row["records_by_market"] == {"h2h": 2, "totals": 3}
+    assert row["scored_markets"] == ["h2h"]
+    assert row["unscored"]["market_probability_is_not_a_home_win_probability"] == 3

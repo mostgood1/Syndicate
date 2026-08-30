@@ -30,10 +30,26 @@ def _grid_row(pk, state, home, away):
     return {"game_pk": pk, "game": {"state": state, "home_score": home, "away_score": away}}
 
 
-def _rec(pk, model, market=None, priceable=True, at="2026-08-16T22:00:00Z"):
+def _rec(pk, model, market=None, priceable=True, at="2026-08-16T22:00:00Z",
+         market_key="h2h"):
+    """One ledger record.
+
+    NOTE THE TWO DIFFERENT SENSES OF "market" HERE, because they were a genuine
+    trap: `market` is the market's PRICE (`market_fair_prob`), while
+    `market_key` is WHICH MARKET the row is (`h2h`, `totals`, `spreads`). The
+    ledger field carrying the price is `market_fair_prob` and the one carrying
+    the kind is `market`; the parameter names are deliberately not symmetrical
+    so a call site cannot mean one and pass the other.
+
+    `market_key` defaults to `h2h` because that is the only market whose
+    probability the scorer can compare against a home-win outcome, and because
+    every test written before 2026-08-30 set no market at all and meant `h2h`.
+    Pass it EXPLICITLY -- including `None` -- to exercise the refusing branch.
+    """
     return {
         "game_pk": pk,
         "recorded_at": at,
+        "market": market_key,
         "model_home_win_prob": model,
         "market_fair_prob": market,
         "priceable": priceable,
@@ -293,3 +309,114 @@ def test_the_new_counter_recovers_no_games_and_moves_no_number():
     assert scored["games_with_outcome"] == 1
     assert scored["all_records"]["model"]["n"] == 1
     assert scored["unscored"]["no_final_outcome_for_game"] == 2
+
+
+# --------------------------------------------------------------------------
+# THE MARKET FILTER. Defect found 2026-08-30: `score_ledger_records` had no
+# market branch and scored every record against `won = did the home team win`,
+# while the ledger carries three markets by design. On the served MLB board that
+# day, 1 of the 6 rows with a `live_gameline` block was h2h -- so ~5/6 of the
+# scored sample was P(over) or P(home covers) compared against a home win.
+#
+# THESE FIXTURES CONTAIN THE ROWS THAT MAKE THE PROPERTY VIOLABLE. The lesson is
+# recorded in `learnings.md` 2026-08-27 against THIS FILE: the previous
+# "load-bearing assertion" passed for weeks while production ran n 94 vs 90,
+# because no fixture row could break it. Every test below fails on pre-fix code.
+# --------------------------------------------------------------------------
+
+
+def test_a_totals_record_is_not_scored_against_a_home_win():
+    """THE REGRESSION. A totals row's probability is P(over), not P(home wins).
+
+    Pre-fix this returned n=2 and a Brier blended from two different questions.
+    """
+    finals = {"g1": True}
+    recs = [
+        _rec("g1", 0.80, 0.60, market_key="h2h"),
+        _rec("g1", 0.3167, 0.4425, market_key="totals"),
+    ]
+    out = score_ledger_records(recs, finals)
+
+    # Only the h2h row is scored, in every cut.
+    for cut in ("all_records", "last_per_game", "priceable_only"):
+        assert out[cut]["model"]["n"] == 1, cut
+        assert out[cut]["market"]["n"] == 1, cut
+        # ... and it is the h2h row, not whichever survived: (0.8-1)^2 = 0.04
+        assert out[cut]["model"]["brier"] == pytest.approx(0.04), cut
+
+    # The refusal is COUNTED and named, never silent.
+    assert out["unscored"]["market_probability_is_not_a_home_win_probability"] == 1
+    assert out["records_considered"] == 2
+
+
+def test_spreads_run_line_and_alt_lines_are_all_refused():
+    """The refusing set is imported from the producer, not re-typed.
+
+    A hand-written copy was wrong on the first attempt -- it had `spread` and
+    lacked `run_line` and `ats`, so an MLB run-line row would have fallen
+    through to `unknown` and been reported as an unclassified-market bug rather
+    than the known, priced, unscoreable row it is.
+    """
+    finals = {"g1": True}
+    kinds = ["totals", "totals_alt", "alternate_totals", "total",
+             "spreads", "spreads_alt", "alternate_spreads", "run_line", "ats"]
+    out = score_ledger_records(
+        [_rec("g1", 0.4, 0.5, market_key=k) for k in kinds], finals
+    )
+    assert out["all_records"]["model"]["n"] == 0
+    assert out["unscored"]["market_probability_is_not_a_home_win_probability"] == len(kinds)
+    # None of them landed in the "nobody classified this" bucket.
+    assert "record_carries_no_recognised_market" not in out["unscored"]
+
+
+@pytest.mark.parametrize("absent", [None, "", "   "])
+def test_an_absent_market_is_refused_not_treated_as_h2h(absent):
+    """UNKNOWN MUST NOT DEFAULT PERMISSIVE.
+
+    Every record `build_records` writes carries `market`, so a null here is a
+    real anomaly. Mapping it onto the scoring branch would turn a failed
+    classification into a silently relaxed rule -- and it would be scored
+    against a home win, which is the exact defect this filter exists to stop.
+    """
+    out = score_ledger_records([_rec("g1", 0.8, 0.6, market_key=absent)], {"g1": True})
+    assert out["all_records"]["model"]["n"] == 0
+    assert out["unscored"]["record_carries_no_recognised_market"] == 1
+    assert out["records_by_market"]["<absent>"] == 1
+
+
+def test_an_unrecognised_market_is_reported_separately_from_a_known_one():
+    """Two different facts. "A totals row we cannot score yet" is expected; "a
+    market nobody classified" is a bug report, and collapsing them into one
+    counter would hide the second behind the volume of the first."""
+    finals = {"g1": True}
+    out = score_ledger_records(
+        [_rec("g1", 0.4, 0.5, market_key="totals"),
+         _rec("g1", 0.4, 0.5, market_key="btts")], finals)
+    assert out["unscored"]["market_probability_is_not_a_home_win_probability"] == 1
+    assert out["unscored"]["record_carries_no_recognised_market"] == 1
+
+
+def test_games_with_outcome_counts_only_games_with_a_scoreable_market():
+    """`games_with_outcome` fed the pooled history and was the headline
+    denominator. A game whose only records are totals rows contributed to it
+    while contributing nothing scoreable -- so the reported game count was
+    larger than the population the Brier actually rested on."""
+    finals = {"g1": True, "g2": True}
+    recs = [
+        _rec("g1", 0.80, 0.60, market_key="h2h"),
+        _rec("g2", 0.30, 0.50, market_key="totals"),   # g2 has NO h2h row
+    ]
+    out = score_ledger_records(recs, finals)
+    assert out["games_with_outcome"] == 1
+
+
+def test_the_market_mix_is_reported_so_the_sample_is_never_opaque():
+    """The defect was invisible for weeks because nothing said what the sample
+    was MADE OF. `records_by_market` is that reading."""
+    finals = {"g1": True}
+    recs = ([_rec("g1", 0.8, 0.6, market_key="h2h")] * 2
+            + [_rec("g1", 0.3, 0.5, market_key="totals")] * 3
+            + [_rec("g1", 0.3, 0.5, market_key="spreads")] * 2)
+    out = score_ledger_records(recs, finals)
+    assert out["records_by_market"] == {"h2h": 2, "totals": 3, "spreads": 2}
+    assert out["scored_markets"] == ["h2h"]

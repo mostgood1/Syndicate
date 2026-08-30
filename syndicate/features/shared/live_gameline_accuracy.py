@@ -211,7 +211,16 @@ def build_row(
         value = score.get(cut)
         if isinstance(value, Mapping):
             row[cut] = dict(value)
-    for extra in ("finals_index", "unscored", "reason"):
+    # `records_by_market` / `scored_markets` ADDED 2026-08-30, and this allowlist
+    # is why they had to be added HERE too. The scorer's market defect (totals
+    # and spreads probabilities scored against "did the home team win") went
+    # unnoticed for weeks because nothing recorded what the sample was MADE OF --
+    # and a retained row that carries the Brier but not the mix reproduces that
+    # blindness one layer down, in exactly the file a later reader would trust.
+    # This loop is an allowlist, so a new counter on the served payload is
+    # silently DROPPED here unless named.
+    for extra in ("finals_index", "unscored", "reason",
+                  "records_by_market", "scored_markets"):
         value = score.get(extra)
         if value is not None:
             row[extra] = value

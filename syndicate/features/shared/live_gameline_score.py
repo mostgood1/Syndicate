@@ -46,6 +46,61 @@ from typing import Any
 # dropped: "we had no outcome" and "the model was wrong" must never look alike.
 _UNSCORED_NO_OUTCOME = "no_final_outcome_for_game"
 _UNSCORED_NO_MODEL_PROB = "record_carries_no_model_probability"
+# THE PROBABILITY DOES NOT DESCRIBE THE OUTCOME THIS SCORER HOLDS. See
+# `_SCOREABLE_MARKETS` below. Two reasons, not one, because "a totals row we
+# know we cannot score yet" and "a market nobody classified" are different
+# facts and the second one is the bug report.
+_UNSCORED_MARKET_NOT_HOME_WIN = "market_probability_is_not_a_home_win_probability"
+_UNSCORED_MARKET_UNKNOWN = "record_carries_no_recognised_market"
+
+# THE ONLY MARKET WHOSE PROBABILITY IS A HOME-WIN PROBABILITY.
+#
+# **THIS SET IS THE FIX FOR A REAL DEFECT, MEASURED 2026-08-30.** The ledger
+# stores `live_gameline.model_prob` under the field name `model_home_win_prob`,
+# and that name is only true for `h2h`. `live_gameline_join.attach_live_gamelines`
+# deliberately prices three markets (`h2h` plus `_DIST_MARKETS` = totals and
+# spreads), and `live_gameline_ledger.build_records` writes all three. On a
+# totals row that field holds **P(over)**; on a spreads row, **P(home covers)**.
+#
+# This loop had no market branch at all, so every one of them was scored against
+# `won = did the home team win`. Measured on the served MLB board that day: of
+# the 6 rows carrying a `live_gameline` block, **1 was h2h** — 3 totals, 2
+# spreads. So ~5/6 of the sample was a category error, and it is why the
+# accumulated history (`reports/live_gameline_accuracy/history.jsonl`, pooled
+# `priceable_only` +0.05749 over 118 games) says nothing about the model.
+#
+# **Why the market appeared to win.** A totals/spread line is set to make its own
+# market a coin flip, so the de-vigged market prob sits near 0.5 by construction
+# (0.3798/0.4425/0.4927/0.4919/0.4765 on that board). Against an event it is not
+# predicting, that is near-OPTIMAL: Brier for an uninformative forecast is
+# minimised at the base rate. The model's numbers are genuinely spread (0.25–0.45)
+# and took the quadratic penalty at chance. The market was not beating the model;
+# it was hedging an unrelated question.
+#
+# **Why totals and spreads are not simply scored properly here instead.** They
+# cannot be, retroactively: the ledger records no `line`, and the same board
+# carried model_prob 0.3167 on BOTH the 9.5 and 9.0 totals — the line is not
+# recoverable from the stored probability, so there is no outcome to score
+# against. `build_records` now records `line` (and keys on it), which makes that
+# version possible from new records onward. It is deliberately NOT built against
+# zero data; see the lane.
+_SCOREABLE_MARKETS: frozenset[str] = frozenset({"h2h"})
+
+# Known, priced, and NOT a home-win probability — so a record can be refused
+# BY NAME rather than as "everything else", and a market in neither set stays
+# visible as unknown instead of being absorbed into whichever branch happens to
+# be the fallthrough. Same explicit-table rule `build_finals_index` follows for
+# level finals.
+#
+# **IMPORTED FROM THE PRODUCER, NOT RE-TYPED HERE.** A hand-copy of this set was
+# written first and was already wrong — it had `spread` and lacked `run_line`
+# and `ats`, so an MLB run-line row would have fallen through to `unknown`.
+# Drift between the set that DECIDES WHAT TO PRICE and the set that DECIDES WHAT
+# THAT PRICE MEANS is the same class of defect this whole module is fixing, and
+# `live_gameline_join` is already resident in this build path (it attaches the
+# blocks these records are written from), so the import costs no memory that the
+# refresh-worker was not already paying.
+from syndicate.features.shared.live_gameline_join import _DIST_MARKETS as _NON_HOME_WIN_MARKETS
 
 # WHAT A LEVEL FINAL MEANS, PER SPORT. Two EXPLICIT tables rather than one table
 # and a relaxed default, for the reason `live_gameline_join.lens_sources_for_sport`
@@ -291,6 +346,15 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
                       Scoring only these measures the publish gate; scoring all
                       of them measures the model. `priceable` is a field, not a
                       filter, precisely so both are available.
+
+    **ALL THREE ARE RESTRICTED TO `_SCOREABLE_MARKETS`.** `finals` answers one
+    question — did the home side win — and only `h2h` carries a probability that
+    answers it. Totals and spreads rows are counted under
+    `market_probability_is_not_a_home_win_probability` rather than scored; see
+    `_SCOREABLE_MARKETS` for the measurement that forced this. Expect
+    `games_with_outcome` and every `n` to DROP against the pre-fix numbers: the
+    rows removed were the ones being scored against the wrong event, so a
+    smaller sample here is the fix working, not a regression.
     """
     model_all: list[tuple[float, bool]] = []
     market_all: list[tuple[float, bool]] = []
@@ -300,6 +364,13 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
     model_priceable_paired: list[tuple[float, bool]] = []
     last: dict[str, tuple[str, float, float | None, bool]] = {}
     unscored: dict[str, int] = {}
+    # THE MIX, REPORTED RATHER THAN INFERRED. The defect this module now refuses
+    # was invisible for weeks precisely because nothing said which markets the
+    # sample was made of -- the headline Brier looked like a model-vs-market
+    # result and was 5/6 something else. Counted over records that reached the
+    # market branch (i.e. already have an outcome and a model probability), so
+    # it describes the scoreable population, not the raw file.
+    by_market: dict[str, int] = {}
     considered = 0
 
     for rec in records if isinstance(records, (list, tuple)) else []:
@@ -331,6 +402,24 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         if model_p is None:
             unscored[_UNSCORED_NO_MODEL_PROB] = unscored.get(_UNSCORED_NO_MODEL_PROB, 0) + 1
             continue
+        # THE PROBABILITY MUST DESCRIBE THE OUTCOME WE HOLD. `finals` answers
+        # exactly one question -- did the home side win -- so only a market whose
+        # probability answers that question may be scored against it. See
+        # `_SCOREABLE_MARKETS`.
+        #
+        # ABSENT IS NOT h2h. An unrecognised or missing `market` takes the
+        # REFUSING branch, never the scoring one: mapping unknown onto the
+        # permissive side is what turns a failed classification into a silently
+        # relaxed rule. Every ledger record written by `build_records` carries
+        # `market`, so a null here is a real anomaly and is counted as one.
+        market_key = str(rec.get("market") or "").strip().lower()
+        if market_key not in _SCOREABLE_MARKETS:
+            reason = (_UNSCORED_MARKET_NOT_HOME_WIN if market_key in _NON_HOME_WIN_MARKETS
+                      else _UNSCORED_MARKET_UNKNOWN)
+            unscored[reason] = unscored.get(reason, 0) + 1
+            by_market[market_key or "<absent>"] = by_market.get(market_key or "<absent>", 0) + 1
+            continue
+        by_market[market_key] = by_market.get(market_key, 0) + 1
         won = bool(finals[key])
         market_p = _finite_prob(rec.get("market_fair_prob"))
 
@@ -412,6 +501,11 @@ def score_ledger_records(records: Any, finals: Mapping[str, bool]) -> dict[str, 
         "records_considered": considered,
         "games_with_outcome": len(last),
         "unscored": unscored,
+        # Which markets the scoreable population was made of. `scored_markets`
+        # is the set actually admitted, so a reader never has to know
+        # `_SCOREABLE_MARKETS` to interpret the number.
+        "records_by_market": by_market,
+        "scored_markets": sorted(_SCOREABLE_MARKETS),
         "all_records": _paired(all_model, all_model_pair, all_market),
         "last_per_game": _paired(lp_model, lp_model_pair, lp_market),
         "priceable_only": _paired(pr_model, pr_model_pair, pr_market),
