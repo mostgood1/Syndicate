@@ -986,3 +986,91 @@ IDENTICAL to the bounded one — the flag only affected the rounded
 single-contract figure while the rate was always the worst case. A flag whose
 name says "measured" and whose behaviour says "bound" is worse than no flag.
 Fixed; the flag now selects the rate.
+
+---
+
+# RETRACTION: "POLYMARKET'S FEE IS ZERO" WAS WRONG. MY METHOD WAS FEE-BLIND. `[2026-08-30 ~03:0xZ]`
+
+**RETRACTED IN FULL:** the finding above that Polymarket charges no commission,
+`POLYMARKET_MEASURED_TAKER_RATE = 0.0`, the claim that Kalshi is the dominant
+leg cost, and the break-even table that followed from them.
+
+## What was wrong
+
+I inferred the fee from the venue's realized P&L at SETTLEMENT
+(`delta = after_realized - before_realized`). **Realized P&L is `(exit - entry)`
+on the position, so a commission taken at FILL is invisible to it by
+construction.** My ten values came out ~zero whether or not a fee was charged.
+
+**A method that cannot return a non-zero answer has not measured zero.** I ran
+the circularity check and skipped the reachability one — on the exact night I
+recorded four other instances of that same class.
+
+## Disproven on the same orders
+
+`C60JWBG0WKDK` is IN my ten. I reported an implied fee of **-0.0023**; the venue
+charged **$0.06**. Two more of the ten were also commissioned and reported ~0:
+`C5Y08RVP8KDK` ($0.28) and `C5SM8P8S4KDC` ($0.05).
+
+Credit: peer lane `unknown-submit-retry-provenance`. Their `98e103e1` removed the
+hardcoded `None` and `fb749d97` printed the values, live as `219d79ca` — so
+`commissionNotionalTotalCollected` became readable AFTER my measurement, which
+is why my premise ("unreadable") was true when written and stale within hours.
+They also had an INDEPENDENT second route: `buyingPower` 96.04765 -> 94.14995,
+**-$1.8977 of real cash for a $1.8377 fill**. Two routes, same $0.06.
+
+## The real fee
+
+Five fills carrying `commissionNotionalTotalCollected`:
+
+    order          contracts  price   fee    modelled@150bps
+    C5Y08RVP8KDK       18.70   0.47   0.28        0.2805
+    C60RZVXYJKDG        4.93   0.43   0.07        0.0740
+    C60JWBG0WKDK        3.91   0.47   0.06        0.0587
+    C5SM8P8S4KDC        3.40   0.47   0.05        0.0510
+    C5Y0GHE4MKDE        2.38   0.44   0.04        0.0357
+
+**150 bps of NOTIONAL (contracts x $1), flat, independent of price.**
+
+A cost basis (3.247% of contracts x price) fits nearly as well and I first
+modelled BOTH, charging the dearer. **A test rejected it**: on the 18.70-contract
+fill — the one where cent-rounding matters least — notional errs $0.0005 and
+cost $0.0054. Rejected on the best-resolved point, not on an average.
+
+## The shape matters as much as the level
+
+Kalshi's fee is a PARABOLA and vanishes at the tails; Polymarket's is FLAT and
+does not. At P=0.94 Kalshi's MLB fee is 0.0020/contract and Polymarket's 0.0150
+— **seven times larger**. My first correction still modelled Polymarket
+quadratically, which understated the tails by an order of magnitude, and the
+tails are exactly where in-play pairs live.
+
+## Corrected break-even, MLB two-leg
+
+    kalshi p   with 0.10 bound   RETRACTED zero   MEASURED
+      0.50          3.38c            0.88c         2.50c
+      0.90          1.21c            0.32c         1.81c
+      0.94          0.76c            0.20c         1.70c
+
+**My zero made the bar 2.8x too permissive at even money.** A threshold below
+true break-even manufactures arbs that lose on every fill — the exact direction
+this module's docstring says to round against.
+
+## Two further defects the correction exposed
+
+1. **The "bound" was cheaper than the measurement.** It was a quadratic while
+   the fee was thought quadratic; after the shape fix it sat BELOW the real fee
+   at every price (0.50 vs 1.50 per hundred contracts at even money). A worst
+   case under the true cost is a trap. Now flat at 200 bps, with a test
+   asserting `bound > measured` at five prices — the relationship nothing had
+   asserted, which is how it survived.
+2. **`POLYMARKET_MEASURED_SAMPLE` said `orders: 10`** — the fee-blind ten. Now
+   the five real commissions, with the rejected basis recorded.
+
+## What still stands
+
+The arb VERDICT on the observed sample: best raw edge +0.00c. It fails by more
+now, not less. `commissionsBasisPoints` reading `'0'` on all eight order reads
+while `collected` reads `0.0600` on the SAME payload remains an open
+contradiction — at least one field does not mean its name, and the peer flagged
+it themselves rather than leaning on the one that suited them.

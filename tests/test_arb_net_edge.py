@@ -46,7 +46,10 @@ def test_the_old_flat_buffer_was_above_mlb_break_even_at_every_price():
     """
     worst_break_even = None
     for price in (0.50, 0.60, 0.70, 0.80, 0.90, 0.94, 0.97):
-        detail = net_edge_per_contract(price, 1.0 - price, kalshi_fee_multiplier=0.5)
+        # MEASURED, not the bound -- the point is the real bar.
+        detail = net_edge_per_contract(
+            price, 1.0 - price, kalshi_fee_multiplier=0.5, polymarket_fee_bound=False
+        )
         break_even = detail["total_fee_per_contract"]
         worst_break_even = break_even if worst_break_even is None else max(worst_break_even, break_even)
         assert break_even < DEFAULT_FEE_BUFFER, (
@@ -56,7 +59,10 @@ def test_the_old_flat_buffer_was_above_mlb_break_even_at_every_price():
     # Was 0.0338 while Polymarket was priced at the unmeasured 0.10 bound.
     # Polymarket's real fee is now MEASURED AT ZERO, so the whole bar is
     # Kalshi's half-rate parabola plus the tightened 0.01 bound.
-    assert worst_break_even == pytest.approx(0.01125, abs=0.0005)
+    # 0.00875 Kalshi (MLB half rate, even money) + 0.015 Polymarket (flat).
+    # Was 0.0338 with the unmeasured 0.10 bound, then briefly 0.01125 on the
+    # RETRACTED zero. This is the measured figure.
+    assert worst_break_even == pytest.approx(0.02375, abs=0.0005)
 
 
 def test_fees_fall_monotonically_toward_the_tail():
@@ -103,7 +109,7 @@ def test_polymarket_leg_is_labelled_a_bound_not_a_measurement():
     assert detail["polymarket_fee_basis"] == "worst_case_bound"
 
 
-def test_the_measured_leg_is_cheaper_than_the_bound_and_both_are_priceable():
+def test_the_measured_leg_is_DEARER_than_the_old_quadratic_bound():
     """`polymarket_fee_bound=False` used to RAISE because the fee was unknown.
 
     It is measured now, so it prices -- and it must price CHEAPER than the
@@ -113,12 +119,14 @@ def test_the_measured_leg_is_cheaper_than_the_bound_and_both_are_priceable():
     measured = net_edge_per_contract(
         0.60, 0.39, kalshi_fee_multiplier=0.5, polymarket_fee_bound=False
     )
-    assert measured["net_edge_per_contract"] > bounded["net_edge_per_contract"]
-    assert measured["polymarket_fee_per_contract"] == 0.0
+    # The MEASURED fee is LARGER than the legacy quadratic "bound", so the
+    # measured net edge is WORSE. That inversion is the whole correction.
+    assert measured["net_edge_per_contract"] < bounded["net_edge_per_contract"]
+    assert measured["polymarket_fee_per_contract"] == pytest.approx(0.015)
     assert measured["polymarket_fee_basis"] == "measured"
 
 
-def test_KALSHI_is_now_the_dominant_cost_and_that_is_the_finding_inverting():
+def test_POLYMARKET_is_the_dominant_cost_after_all():
     """This test used to assert the OPPOSITE, and the inversion is the result.
 
     While Polymarket sat at the unmeasured 0.10 bound it contributed 0.025
@@ -127,9 +135,9 @@ def test_KALSHI_is_now_the_dominant_cost_and_that_is_the_finding_inverting():
     is Kalshi's own schedule. Break-even at even money on MLB falls
     3.38c -> 0.88c.
     """
-    detail = net_edge_per_contract(0.50, 0.50, kalshi_fee_multiplier=0.5)
-    assert detail["kalshi_fee_per_contract"] > detail["polymarket_fee_per_contract"]
-    assert detail["total_fee_per_contract"] == pytest.approx(0.01125, abs=0.0005)
+    detail = net_edge_per_contract(0.50, 0.50, kalshi_fee_multiplier=0.5, polymarket_fee_bound=False)
+    assert detail["polymarket_fee_per_contract"] > detail["kalshi_fee_per_contract"]
+    assert detail["total_fee_per_contract"] == pytest.approx(0.02375, abs=0.0005)
 
 
 # ---------------------------------------------------------------------------
@@ -193,14 +201,20 @@ def test_the_measured_bar_is_BELOW_the_old_buffer_at_every_price():
         POLYMARKET_ASSUMED_WORST_CASE_RATE,
     )
 
+    from syndicate.features.shared.venue_fees import POLYMARKET_MEASURED_NOTIONAL_RATE
+
+    # Kalshi's parabola PLUS Polymarket's flat per-contract charge. The peak is
+    # at even money on Kalshi's full rate: 0.0175 + 0.015.
     worst = max(
-        (KALSHI_BASE_TAKER_RATE * mult * p * (1 - p))
-        + (POLYMARKET_ASSUMED_WORST_CASE_RATE * (1 - p) * p)
+        (KALSHI_BASE_TAKER_RATE * mult * p * (1 - p)) + POLYMARKET_MEASURED_NOTIONAL_RATE
         for mult in (0.5, 1.0)
         for p in [i / 100 for i in range(5, 96)]
     )
-    assert worst == pytest.approx(0.02, abs=0.0005), f"peak bar {worst}"
-    assert worst < DEFAULT_FEE_BUFFER
+    assert worst == pytest.approx(0.0325, abs=0.0005), f"peak bar {worst}"
+    assert worst < DEFAULT_FEE_BUFFER, (
+        "the flat 4c buffer is still above the measured bar everywhere -- but by"
+        " 0.75c at the peak now, not the 2c the retracted zero suggested"
+    )
 
 
 def test_an_unpriceable_row_is_NOT_an_opportunity():

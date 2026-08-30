@@ -15,7 +15,7 @@ import pytest
 from syndicate.features.shared.venue_fees import (
     FEE_TYPE_QUADRATIC,
     POLYMARKET_MEASURED_SAMPLE,
-    POLYMARKET_MEASURED_TAKER_RATE,
+    POLYMARKET_MEASURED_NOTIONAL_RATE,
     ceil_to_cent,
     FEE_TYPE_QUADRATIC_WITH_MAKER,
     KALSHI_BASE_TAKER_RATE,
@@ -183,34 +183,66 @@ def test_maker_refuses_on_maker_fee_series_without_the_flag():
     assert 0 < allowed < taker
 
 
-def test_polymarket_fee_is_the_MEASURED_zero_and_no_longer_refuses():
-    """It raised while the fee was genuinely unobserved. It is observed now.
+# (order_id, contracts, fill_price, commissionNotionalTotalCollected)
+REAL_POLYMARKET_FILLS = [
+    ("C60RZVXYJKDG", 4.93, 0.43, 0.07),
+    ("C60JWBG0WKDK", 3.91, 0.47, 0.06),
+    ("C5Y0GHE4MKDE", 2.38, 0.44, 0.04),
+    ("C5Y08RVP8KDK", 18.70, 0.47, 0.28),
+    ("C5SM8P8S4KDC", 3.40, 0.47, 0.05),
+]
 
-    Measured 2026-08-30 off the venue's own realized P&L on ten settled orders,
-    $75.98 notional, effective rate -2.37 bps -- i.e. zero, with the negative
-    sign being contract-reconstruction rounding. A real commission is strictly
-    positive.
 
-    Refusing to price a leg we HAVE measured is as wrong as guessing one we
-    have not, so the refusal is gone rather than kept for safety's sake.
+def test_polymarket_fee_reproduces_the_REAL_commissions():
+    """The measurement that replaced a RETRACTED zero.
+
+    An earlier version of this file asserted the fee was 0.0, inferred from the
+    venue's realized P&L at settlement. That method is FEE-BLIND: realized P&L
+    is `(exit - entry)` on the position, so a commission taken at FILL is
+    invisible to it by construction, and it returns zero whether or not one was
+    charged. Disproven on the same orders it was measured from --
+    `C60JWBG0WKDK` implied -0.0023 there while the venue charged $0.06.
+
+    These are `commissionNotionalTotalCollected`, the venue's own figure.
     """
-    assert polymarket_fee_dollars(10, 0.5) == 0.0
-    assert POLYMARKET_MEASURED_TAKER_RATE == 0.0
-    # The population is carried in code so a caller can see how far it goes.
-    assert POLYMARKET_MEASURED_SAMPLE["orders"] == 10
-    assert POLYMARKET_MEASURED_SAMPLE["markets"] == "totals only"
+    failures = []
+    for order, contracts, price, actual in REAL_POLYMARKET_FILLS:
+        modelled = polymarket_fee_dollars(contracts, price)
+        if abs(modelled - actual) > 0.005:
+            failures.append(f"{order}: modelled {modelled:.4f} vs actual {actual:.2f}")
+    assert not failures, "fee model disagrees with real commissions: " + "; ".join(failures)
 
 
-def test_the_bound_is_still_available_and_still_conservative():
-    """A bound remains for callers that want one -- but it is no longer the
-    absurd 0.10 that predated any observation."""
-    bound = polymarket_worst_case_fee_dollars(100, 0.5)
-    measured = polymarket_fee_dollars(100, 0.5)
-    assert bound > measured, "a bound that is not above the measurement is not a bound"
-    # An order of magnitude over everything observed, and no longer larger than
-    # the venue we HAVE measured a real schedule for.
-    kalshi_full = kalshi_taker_fee_dollars(100, 0.5, fee_multiplier=1.0)
-    assert bound < kalshi_full
+def test_the_polymarket_fee_is_NOT_zero_and_NOT_quadratic():
+    """Both retracted properties, pinned so neither can come back quietly.
+
+    Zero came from the fee-blind method. Quadratic came from copying Kalshi's
+    shape -- but Polymarket charges a flat proportion, so unlike Kalshi's it
+    does NOT vanish at the tails, which is where in-play pairs live.
+    """
+    assert polymarket_fee_dollars(100, 0.5) > 0
+    tail = polymarket_fee_dollars(100, 0.94)
+    mid = polymarket_fee_dollars(100, 0.50)
+    # A quadratic would collapse at the tail (0.94 -> 0.0564 of the mid). Flat
+    # means IDENTICAL, which is the property that makes tails expensive here
+    # and cheap on Kalshi.
+    assert tail == mid, f"tail {tail} != mid {mid} -- shape is not flat"
+    assert POLYMARKET_MEASURED_NOTIONAL_RATE == 0.015
+    assert "notional" in POLYMARKET_MEASURED_SAMPLE["basis"]
+
+
+def test_polymarket_is_the_DOMINANT_leg_cost_after_all():
+    """The original claim was right and my inversion of it was wrong.
+
+    I inverted this test to assert Kalshi-dominant on the strength of the
+    retracted zero. Measured properly, Polymarket at 150 bps of notional is
+    0.0150/contract flat while Kalshi's MLB half-rate peaks at 0.00875 and
+    falls away at the tails. Polymarket dominates, and by MORE at the tails.
+    """
+    for price in (0.50, 0.94):
+        poly = polymarket_fee_dollars(1, price)
+        kalshi = kalshi_taker_fee_dollars(1, price, fee_multiplier=0.5)
+        assert poly > kalshi, f"at p={price}: poly {poly} !> kalshi {kalshi}"
 
 
 def test_base_rate_matches_the_measurement_it_claims():
@@ -224,3 +256,17 @@ def test_base_rate_matches_the_measurement_it_claims():
     contracts, price = 20, 0.53
     implied = 0.3488 / (contracts * price * (1 - price))
     assert implied == pytest.approx(KALSHI_BASE_TAKER_RATE * 1.0, abs=0.0005)
+
+
+def test_the_bound_is_ABOVE_the_measurement_at_every_price():
+    """The relationship nothing asserted, which is how a trap survived.
+
+    The bound was a QUADRATIC while the fee was thought quadratic. After the
+    shape correction it sat BELOW the measured fee at every price -- 0.50
+    against 1.50 per hundred contracts at even money. A "worst case" cheaper
+    than the real cost is the exact direction this module exists to prevent.
+    """
+    for price in (0.05, 0.30, 0.50, 0.80, 0.95):
+        bound = polymarket_worst_case_fee_dollars(100, price)
+        measured = polymarket_fee_dollars(100, price)
+        assert bound > measured, f"at p={price}: bound {bound} !> measured {measured}"

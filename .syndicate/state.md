@@ -143,61 +143,32 @@ none. **Kalshi trades in-play and is liquid** (14 markets, `vol24 904,281`, 1c
 spreads, prices moving between reads) — so the live opportunity is FEE
 GEOMETRY, not model edge.
 
-**POLYMARKET'S FEE IS MEASURED AND IT IS ZERO** `[2026-08-30]`. `fees_dollars`
-never reaches the ledger and `ORDERS_READ` logs only KEY NAMES, so it was
-recovered from the VENUE'S OWN realized P&L (`venue_settlement`'s
-`delta = after_realized - before_realized`, circularity checked). Ten
-venue-settled orders, $75.98 notional: implied fee -0.0037..+0.0000, total
--$0.0180, **-2.37 bps**. Every value negative or zero; a real commission is
-strictly positive, so the negatives are reconstruction rounding. One row
-excluded for the `#595` wrong-side signature (`held_side ...SIDE_SHORT` on an
-order placed `under`).
+**POLYMARKET'S FEE IS 150 bps OF NOTIONAL** `[2026-08-30, CORRECTED]`.
+`0.015` per contract, FLAT, independent of price. Reproduces all five real
+`commissionNotionalTotalCollected` values within a cent (18.70 contracts ->
+$0.28 modelled $0.2805). A cost basis (3.247% of cost) was REJECTED on the
+largest fill, where cent-rounding matters least.
 
-> **REFUTED 2026-08-30 BY A THREE-WAY TEST. DO NOT ACT ON THE ZERO.**
-> The inference above is FEE-BLIND BY CONSTRUCTION: the venue's realized-P&L
-> field is fee-EXCLUSIVE, so it returns zero whether or not a commission was
-> charged. Every settled row's `pnl_dollars` equals ±(contracts x fill_price)
-> EXACTLY -- `mia-wsh` 3.4x0.47 = -1.598, `sd-tb` 18.7x0.47 = -8.789,
-> `nyr-phi` 3.91-1.8377 = +2.0723 -- which is the no-fee arithmetic, not a
-> reading of what the account paid.
->
-> **THE ACCOUNT DISAGREES, MEASURED ON TWO INDEPENDENT WINDOWS.** Polymarket
-> `buyingPower` 101.33 -> 91.17 across 18:15:44-18:22:40Z, a window containing
-> EXACTLY two filled orders (`sd-tb` 18.7x0.47 and `juv-par` 2.38x0.44):
->
->     fill cost (contracts x price)  9.8362      no-fee expectation   9.84
->     commissions reported           0.3200      with-fee expectation 10.16
->     OBSERVED buyingPower delta                                     10.16
->
-> Exact to the penny WITH fees. The earlier `nyr-phi` window agrees
-> independently: 96.04765 -> 94.14995 = 1.8977 against a 1.8377 fill, a $0.06
-> excess matching that order's reported commission.
->
-> So `commissionNotionalTotalCollected` is REAL DOLLARS, taken at fill:
-> 3.12-3.81% across five fills. Two independent readings (the field, and the
-> cash) agree; the third cannot see it.
->
-> **THE ERROR DIRECTION IS THE DANGEROUS ONE.** Break-even was moved
-> 3.38c -> 0.88c on the zero. A threshold BELOW true break-even manufactures
-> arbs that lose money on every fill -- what `venue_fees.py`'s own docstring
-> says to round against. `venue_fees.py` / `kalshi_polymarket_arb.py` are
-> claimed by `live-venue-order-placement` and are NOT changed here; the owner
-> has the measurement and the reconciliation.
->
-> UNRESOLVED EITHER WAY: `commissionsBasisPoints` and
-> `makerCommissionsBasisPoints` read `'0'` on the SAME payload that reports
-> `commissionNotionalTotalCollected = 0.0600`. Those fields contradict each
-> other; at least one does not mean what its name says.
+**RETRACTED: the entry that stood here said the fee was ZERO.** That was
+inferred from the venue's realized P&L at settlement, and realized P&L is
+`(exit - entry)` on the position, so **a commission taken at FILL is invisible
+to it by construction** — the method returns zero whether or not a fee was
+charged. Disproven on its own sample: `C60JWBG0WKDK` implied -0.0023 there while
+the venue charged $0.06; two more of the ten were also commissioned. Caught by
+peer lane `unknown-submit-retry-provenance`, whose `98e103e1`/`fb749d97` made
+the field readable AFTER my reading, and who had an independent cash-movement
+route agreeing to the cent.
 
-**This INVERTS the priority recorded here earlier.** Polymarket was called "two
-thirds of the modelled pair cost" and the highest-value measurement left; it is
-zero, and **Kalshi is now the entire bar**. MLB break-even at even money falls
-**3.38c -> 0.88c**. The arb VERDICT is unchanged: best raw edge +0.00c and
--0.87c even with a free Polymarket.
+**POLYMARKET IS THE DOMINANT LEG COST, and the earlier inversion of that was
+wrong.** Kalshi's fee is a parabola that vanishes at the tails; Polymarket's is
+flat and does not. At P=0.94 Kalshi MLB is 0.0020/contract, Polymarket 0.0150 —
+seven times larger. MLB two-leg break-even: **2.50c at even money, 1.70c at
+0.94** (the retracted zero said 0.88c / 0.20c, i.e. **2.8x too permissive** — a
+threshold below true break-even manufactures arbs that lose on every fill).
 
-BOUNDS: ten orders, all `totals`, $1-$9. `commissionsBasisPoints` on the venue
-payload is authoritative where this inference is not; population carried in code
-as `POLYMARKET_MEASURED_SAMPLE`.
+The arb VERDICT is unchanged and fails by MORE: best raw edge +0.00c.
+OPEN CONTRADICTION: `commissionsBasisPoints` reads `'0'` on all eight order
+reads while `collected` reads `0.0600` on the same payload.
 
 ## [polymarket-live-totals-quote-names-no-game] 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game identity `[verified 2026-08-29 ~22:3xZ, lane live-venue-order-placement]`
 

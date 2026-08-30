@@ -467,7 +467,7 @@ def net_edge_per_contract(
     from syndicate.features.shared.venue_fees import (
         KALSHI_BASE_TAKER_RATE,
         POLYMARKET_ASSUMED_WORST_CASE_RATE,
-        POLYMARKET_MEASURED_TAKER_RATE,
+        POLYMARKET_MEASURED_NOTIONAL_RATE,
     )
 
     kalshi_rate_cost = (
@@ -479,13 +479,17 @@ def net_edge_per_contract(
     # net edge identical to the bounded one, because the rate below was always
     # the worst case. A flag whose name says "measured" and whose behaviour says
     # "bound" is worse than no flag.
-    polymarket_rate = (
-        POLYMARKET_ASSUMED_WORST_CASE_RATE if polymarket_fee_bound
-        else POLYMARKET_MEASURED_TAKER_RATE
-    )
-    polymarket_rate_cost = (
-        polymarket_rate * float(polymarket_price) * (1.0 - float(polymarket_price))
-    )
+    # POLYMARKET'S FEE IS NOT A PARABOLA. Kalshi's vanishes at the tails;
+    # Polymarket's is a flat proportion and does not. Modelling it quadratically
+    # -- as this line did -- understates the tails by an order of magnitude, and
+    # the tails are exactly where in-play pairs live. Measured: at P=0.94
+    # Kalshi's MLB fee is 0.0020/contract and Polymarket's 0.0150.
+    pmp = float(polymarket_price)
+    if polymarket_fee_bound:
+        polymarket_rate_cost = POLYMARKET_ASSUMED_WORST_CASE_RATE * pmp * (1.0 - pmp)
+    else:
+        # Flat per contract, independent of price -- the measured shape.
+        polymarket_rate_cost = POLYMARKET_MEASURED_NOTIONAL_RATE
     total_rate_cost = kalshi_rate_cost + polymarket_rate_cost
 
     return {
@@ -556,6 +560,9 @@ def detect_arb_opportunities(
                 kalshi_price,
                 polymarket_price,
                 kalshi_fee_multiplier=float(m.get("kalshi_fee_multiplier") or 1.0),
+                # MEASURED, not the bound: the bound is a quadratic stand-in and
+                # would understate the tails now that the real shape is known.
+                polymarket_fee_bound=False,
             )
             net_edge = detail["net_edge_per_contract"]
             fee_basis = detail["polymarket_fee_basis"]

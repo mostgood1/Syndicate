@@ -150,7 +150,8 @@ __all__ = [
     "KALSHI_BASE_TAKER_RATE",
     "MAKER_FRACTION",
     "POLYMARKET_ASSUMED_WORST_CASE_RATE",
-    "POLYMARKET_MEASURED_TAKER_RATE",
+    "POLYMARKET_MEASURED_NOTIONAL_RATE",
+    "POLYMARKET_REJECTED_COST_RATE",
     "POLYMARKET_MEASURED_SAMPLE",
     "VenueFeeError",
     "VenueFeeUnknown",
@@ -188,26 +189,45 @@ KALSHI_BASE_TAKER_RATE = 0.07
 # refuses rather than apply it silently.
 MAKER_FRACTION = 0.25
 
-# MEASURED 2026-08-30 off the venue's own realized P&L on ten settled orders,
-# $75.98 notional, effective rate -2.37 bps (i.e. zero, with reconstruction
-# rounding). See the module docstring for the population and its bounds.
-POLYMARKET_MEASURED_TAKER_RATE = 0.0
+# RETRACTED VALUE WAS 0.0. See the docstring: that came from a FEE-BLIND
+# method and is disproven on the same orders it was measured from.
+#
+# MEASURED from `commissionNotionalTotalCollected` on five real fills:
+# **150 bps of NOTIONAL** (contracts x $1), i.e. 0.015 per contract, flat.
+POLYMARKET_MEASURED_NOTIONAL_RATE = 0.015
+
+# A cost basis (3.247% of contracts x price) fits the same five fills almost as
+# well, and I first modelled BOTH and charged the dearer -- but the data does
+# separate them, and a test caught it:
+#
+#     contracts  actual  notional@1.5%   err   cost@3.247%   err
+#         18.70    0.28      0.2805    0.0005     0.2854   0.0054
+#          2.38    0.04      0.0357    0.0043     0.0340   0.0060
+#     total abs error                   0.0111              0.0148
+#
+# **The largest fill is the discriminator** -- 18.70 contracts is where
+# cent-rounding matters least, and notional fits it ten times better. Cost basis
+# is REJECTED on the best-resolved point, not merely disfavoured on average.
+# Kept as a constant only so the rejection is legible.
+POLYMARKET_REJECTED_COST_RATE = 0.03247
 
 # The population behind that zero, carried in code so a caller can see how far
 # it generalises without reading the docstring.
 POLYMARKET_MEASURED_SAMPLE = {
-    "orders": 10,
-    "notional_dollars": 75.98,
-    "markets": "totals only",
-    "stake_range_dollars": (1.00, 8.79),
+    "orders": 5,
+    "source": "commissionNotionalTotalCollected, per fill",
+    "total_fees_dollars": 0.50,
+    "total_cost_dollars": 15.40,
+    "total_notional_contracts": 33.32,
+    "fill_price_range": (0.43, 0.47),
+    "basis": "notional (cost basis rejected on the 18.70-contract fill)",
     "measured_at": "2026-08-30",
 }
 
-# A bound for callers that want one rather than the measurement. TIGHTENED from
-# 0.10 -- that number predated any observation and made Polymarket two thirds of
-# a modelled pair cost on the strength of nothing. 0.01 is still an order of
-# magnitude above everything measured.
-POLYMARKET_ASSUMED_WORST_CASE_RATE = 0.01
+# A bound for callers that want one. RAISED BACK from 0.01 -- that value was set
+# on the strength of the retracted zero and sat BELOW the true fee, which is the
+# one direction this module exists to prevent.
+POLYMARKET_ASSUMED_WORST_CASE_RATE = 0.02
 
 
 # Decimal places Kalshi rounds a fee to. FOUR -- a hundredth of a cent -- not
@@ -376,30 +396,39 @@ def kalshi_maker_fee_dollars(
 
 
 def polymarket_fee_dollars(contracts: float, price: float) -> float:
-    """The MEASURED Polymarket fee: zero.
+    """The MEASURED Polymarket fee. **NOT zero, and NOT quadratic.**
 
-    Derived from the venue's own realized P&L on ten settled orders rather than
-    from a fee schedule, because `fees_dollars` never reaches the ledger. See
-    the module docstring for the derivation, the excluded wrong-side row, and
-    the population this rests on (ten `totals` orders, $1-$9, $75.98 notional).
+    **150 bps of NOTIONAL** (contracts x $1), flat -- independent of price.
+    Reproduces all five real commissions within a cent. A cost basis was
+    considered and REJECTED: see `POLYMARKET_REJECTED_COST_RATE` for the
+    discriminating comparison on the largest fill.
 
-    THIS USED TO RAISE. It raised while the fee was genuinely unobserved, which
-    was correct then and would be false confidence in the other direction now --
-    refusing to price a leg we have measured is as wrong as guessing one we have
-    not. The bound remains available as `polymarket_worst_case_fee_dollars` for
-    callers that want conservatism instead.
+    THE SHAPE IS DIFFERENT FROM KALSHI'S AND THAT MATTERS. Kalshi charges
+    `rate * C * P * (1-P)` -- a parabola that vanishes at the tails. Polymarket
+    charges a flat proportion, so it does NOT vanish: at P=0.94 Kalshi's MLB fee
+    is 0.0020/contract and Polymarket's is 0.0150, seven times larger. Modelling
+    this as a quadratic (as the first version of `net_edge_per_contract` did)
+    understates the tails by an order of magnitude -- and the tails are exactly
+    where in-play pairs live.
     """
     _quadratic_base(contracts, price)  # an impossible input is still a refusal
-    return POLYMARKET_MEASURED_TAKER_RATE
+    return ceil_to_fee_precision(POLYMARKET_MEASURED_NOTIONAL_RATE * float(contracts))
 
 
 def polymarket_worst_case_fee_dollars(contracts: float, price: float) -> float:
     """A deliberately pessimistic bound on the Polymarket leg, in dollars.
 
-    Same quadratic shape as Kalshi's at a HIGHER rate
-    (`POLYMARKET_ASSUMED_WORST_CASE_RATE`). This is not a claim that Polymarket
-    charges this; it is the number an opportunity has to beat before the
-    unknown stops mattering. Report it as a bound wherever it is used, so no
-    reader mistakes it for a measurement.
+    FLAT PER CONTRACT, matching the measured shape at a higher rate.
+
+    IT WAS A QUADRATIC, copied from Kalshi's form while Polymarket's fee was
+    unobserved. Once the real shape turned out to be flat, that quadratic sat
+    BELOW the measured fee at EVERY price -- 0.50 against 1.50 per hundred
+    contracts at even money. **A bound cheaper than the thing it bounds is not
+    conservative, it is a trap**, and it survived the shape correction because
+    nothing asserted the relationship between the two.
+
+    Report it as a bound wherever it is used, so no reader mistakes it for the
+    measurement.
     """
-    return ceil_to_fee_precision(POLYMARKET_ASSUMED_WORST_CASE_RATE * _quadratic_base(contracts, price))
+    _quadratic_base(contracts, price)  # an impossible input is still a refusal
+    return ceil_to_fee_precision(POLYMARKET_ASSUMED_WORST_CASE_RATE * float(contracts))

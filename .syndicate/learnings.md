@@ -6816,3 +6816,47 @@ justified was independently correct.
      would have passed while the file was wrong.
 - **Cost:** none realised. Caught pre-commit, restored from HEAD, verified at
   2,091,630 bytes with the peer's entry and mine both present.
+
+---
+
+## 2026-08-30 — FORBIDDEN: measuring a FILL-time cost from a SETTLEMENT-time quantity. Realized P&L is `(exit - entry)`; a commission taken at fill is invisible to it BY CONSTRUCTION, so the method returns zero whether or not a fee was charged.
+
+- **What we believed:** Polymarket charges no commission. Ten venue-settled
+  orders, $75.98 notional, implied fee -2.37 bps, every value negative-or-zero.
+  I checked circularity (the delta is the venue's number, not ours) and shipped
+  it — into `state.md`, a lane header, a code constant, and an INVERTED test.
+- **What was actually true:** ~150 bps of notional. Disproven on the same
+  sample: `C60JWBG0WKDK` implied -0.0023 in my table while the venue charged
+  **$0.06**. Two more of the ten were also commissioned and read ~0.
+- **The defect is the INSTRUMENT, not the arithmetic.** `venue_settlement`
+  grades from `after_realized - before_realized` on the position. If the venue
+  books the commission at fill — reducing cash, not the position's entry basis
+  — the settlement delta never contains it. **My method had no path to a
+  non-zero answer.** Ten agreeing zeros felt like strong evidence and were one
+  observation of the instrument, repeated.
+- **How we found out:** a peer's unrelated message quoted a real
+  `commissionNotionalTotalCollected` of `0.0600`, plus an independent
+  `buyingPower` delta of -$1.8977 on a $1.8377 fill. Two routes, same $0.06.
+  They also flagged the one field that SUPPORTED me
+  (`commissionsBasisPoints: '0'`) rather than only the ones that did not.
+- **The rules going forward:**
+  1. **Match the measurement's TIMING to the cost's timing.** A fill-time charge
+     needs a fill-time observable — the commission field, or cash before/after
+     the fill. A settlement-time quantity can only see settlement-time effects.
+  2. **Before believing a zero, construct the case that would make it
+     non-zero.** If you cannot describe an input that flips it, the instrument
+     is blind and the zero is a fact about the instrument. I have written this
+     rule twice tonight in other words and still shipped this.
+  3. **N agreeing samples from ONE method is one observation.** The ten did not
+     corroborate each other; they shared a blind spot.
+  4. **A premise about what is READABLE decays fast in a shared repo.** Mine
+     ("the value never reaches the ledger") was true when written and stale
+     within hours because a peer fixed exactly that.
+- **Two further defects the correction exposed**, both from the same root:
+  the "worst case" bound was a QUADRATIC and after the shape fix sat BELOW the
+  measured fee at every price — a bound cheaper than the thing it bounds; and
+  the first correction still modelled Polymarket quadratically, understating
+  the tails sevenfold where in-play pairs actually live.
+- **Cost:** a wrong money-path threshold live on `main` for ~40 minutes,
+  2.8x too permissive at even money. Not deployed, and the arb verdict was
+  negative either way, so nothing was placed on it. Caught by a peer, not by me.
