@@ -7783,6 +7783,45 @@ that was never generated, which is what a quota failure produces.
 accuracy measurement `pick_gate` demands, and live NCAAF projections. The
 schedule loads from cache (`[games] source=cache`); PPA does not.
 
+**WHAT IS LOCALLY AVAILABLE, and why it is only a PARTIAL unblock** (inventoried
+2026-08-30):
+
+    historical_truth/plays_2025_wk00..16.json.gz   17 files, per-week
+    historical_truth/drives_2023..2025.json.gz
+    historical_truth/games_2023..2026.json.gz      actuals
+    data/cfbd_lines_*.json                          market lines
+    data/smartsim2_projections_2025_wk*.csv         17, stale+leaked (evidence)
+
+**PPA is fully derivable locally and leak-free BY CONSTRUCTION.** The play rows
+carry a per-play `ppa` field: 40,904 of 55,079 non-null across 2025 wk1-4
+(**74.3%**), 224 teams on both offense and defense. Aggregating weeks STRICTLY
+BEFORE N is exactly `load_ppa_ratings_asof`'s definition, and reading only prior
+weeks cannot leak. No CFBD call needed for PPA.
+
+**BUT PPA-ONLY IS THE KNOWN-BAD PATH, so that unblock does not buy a
+production-representative backtest.** `generate_smartsim2_ncaaf_projections`
+prefers SP+ and falls back to PPA per team, and its own comment records why:
+SP+ margin r 0.506 vs PPA 0.372, residual SD 17.63 vs 18.97 over 740 games, and
+"PPA is a per-play rate whose differential SD of 0.136 produced **margin SD 1.74
+against a market 14.46**".
+
+**THIS RESOLVES THE DISPERSION CONTRADICTION recorded above.** The 752-record log
+stamps `rating_source=cfbd_ppa_season_2025` -- the PPA path -- which is why it
+measures **0.463x UNDER-dispersed**, while `pick_gate`'s 1.67x OVER was measured
+on the SP+ production path. Different RATING SOURCES, not only different
+populations or engines. The gate's figure is the production-relevant one; the
+log's is not comparable to it and must not be averaged with it.
+
+**SP+ is the missing input.** No `sp_ratings_*.json` on this disk. Its status on
+Render is UNKNOWN, not absent: the generator dies on `/ppa/teams` before it ever
+reaches SP+ loading, and there are ZERO `[sp_ratings]` log lines on either worker
+in 6 days. The web disk export returns 0, but that is the wrong service.
+
+**NET: the production-representative totals backtest stays blocked until the
+quota rolls (~2026-09-01).** What local data DOES buy: the market benchmark
+(`cfbd_lines_*`) and the actuals (`games_*`) are free, so once ratings exist the
+join is cheap.
+
 **PPA IS NOT CACHED and SP+ IS.** `436686a3` cached SP+ as "the one CFBD call
 with no local substitute" — the same argument applies to `/ppa/games`, which
 `load_ppa_ratings_asof` calls once per prior week (~15 per season). Caching it
