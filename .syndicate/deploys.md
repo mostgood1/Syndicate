@@ -5,6 +5,68 @@
 
 ---
 
+## 2026-08-30 19:14:20Z — `#595` step 3 YES-LEG BINDING LIVE — lane `polymarket-yes-leg-binding` — **UNPROVEN, WATCHER ARMED**
+
+    live-odds-worker  cc75e1f2  19:14:20Z   trigger=api
+
+**I DID NOT FIRE THIS DEPLOY AND DID NOT HOLD THE CLAIM.** I tried to acquire
+and found it HELD by `polymarket-buy-limit-tick-floor` (1.1 min old, session
+live). I did NOT `--force`. They deployed origin/main TIP, and `8b0d27df` is an
+ancestor of it, so my commit shipped on their deploy. I messaged them
+mid-deploy that they were carrying a MONEY-PATH behaviour change that was not
+theirs, and offered `447303c2` (the commit before mine) if they did not want it
+riding on their tick-floor verification. They kept it.
+
+**WHAT SHIPPED.** Polymarket moneylines were refused outright by
+`team_side_needs_verified_yes_leg`. They can now resolve from the venue's own
+`yesLegIndex`, gated on agreement with our independently-derived away-team
+position, and still refuse — named — where the venue states nothing or the two
+sources disagree.
+
+**verify: NOT YET DISCHARGED. The gate has not been exercised on a single
+moneyline.** This is NOT-YET, not never, and must not be read as a pass:
+
+    POLYMARKET_YES_LEG        0 lines since 19:14:20Z
+
+Three of the four ways this could be silently inert are RULED OUT:
+
+  - code deployed    `git grep` on `cc75e1f2`: write at
+                     `polymarket_us_markets.py:1593`, read at
+                     `execute_portfolio.py:1234`. Both sides present.
+  - slate carries it 6 `MONEYLINE_YES_LEG_POPULATION` cycles since the deploy
+                     (897 moneylines, 55 MLB). Each one re-ran
+                     `_slate_row_for_storage`, so rows written before 19:14Z
+                     have been replaced.
+  - emitter missing  NO. All 3 resolutions since deploy were TOTALS
+                     (`tsc-...-9pt5`, `tsc-...-2pt5`), which the gate skips by
+                     design. The only h2h attempted was `atc-mls-stl-dal`,
+                     whose outcomes are literally `['Yes','No']` — it refuses
+                     EARLIER at `team_side_not_in_outcomes` and never reaches
+                     the gate.
+
+  - REMAINING: no polymarket moneyline is entering the PLAN. Not a categorical
+    block — `aec-mlb-mia-wsh-2026-08-30` DID reach the order path today (18:38,
+    18:51, both refused by the exact error this fixes) — but a rejected row is
+    not retried (`positions=3 duplicates=2 retried=1`), so this needs a FRESH
+    moneyline off the evening MLB/WNBA slate.
+
+**THE READING THAT CLOSES THIS**, and the discriminating case is the one that
+would otherwise look like success:
+
+    yes_leg_index=None on EVERY moneyline  -> INERT. The slate is not carrying
+                                              the field, and inert looks
+                                              EXACTLY like today: no h2h orders.
+    non-null with agree=True/False         -> the field reaches the order path
+                                              and the gate is doing real work.
+
+PRE-REGISTERED: `aec-mlb-mia-wsh-2026-08-30` carries
+`outcomes=["Miami Marlins","Washington Nationals"]` with Miami AWAY at index 0
+and `long_index=0`, so it must read `agree=True` and PLACE rather than refuse.
+
+Off-switches, neither needing a deploy: `SYNDICATE_POLYMARKET_YES_LEG_CORROBORATE=0`
+stands the agreement gate down; a market stating no `yesLegIndex` still refuses
+exactly as it does today.
+
 ## 2026-08-28 18:53-19:09Z — `#600` LEDGER MERGE LIVE ON ALL THREE — lane `portfolio-venue-and-side-integrity`
 
     web               a36e3c1a  18:56:35Z   then  89678782  19:09Z
