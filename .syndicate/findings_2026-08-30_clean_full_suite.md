@@ -86,7 +86,7 @@ but is not emitted as a `FAILED <id>` line. So the breakdown below covers 45 of
   gating another lane added 2026-08-30 (`needs_soccer_rosters`), but that was
   NOT verified for all 51 and a skip that should be a run is invisible.
 
-## TRIAGE PROGRESS — 46 → 33 untriaged
+## TRIAGE PROGRESS — 46 → 29 untriaged
 
 Two clusters closed. **Neither was a defect in `main`, and neither was this
 session's.** Both were TEST defects, and they failed in different ways, which is
@@ -144,13 +144,60 @@ behaviour is DELIBERATE, so that a suite run does not delete a live sim's
 pointer on a developer's machine. That trade-off belongs to whoever owns the sim
 path, not to a triage pass.
 
-### What this says about the remaining 33
+### `test_ncaaf_picks_local` (4) — STALE TESTS, deliberately NOT touched
 
-Two clusters, two different causes, zero production defects. That is not a
-prediction about the rest — but it does mean **a raw count from this file is an
-upper bound on real defects, not an estimate of them.** Triage each cluster in
-isolation FIRST; the isolation-vs-suite comparison at one SHA is what separated
-both of these in minutes.
+**Not pollution, and not fixed-since.** These fail IN ISOLATION at both
+`7cea63c5` and current `main`, which is what separates this cluster from the
+one above.
+
+    AssertionError: 'NCAAF pick serving gate'
+                 != 'NCAAF Enhanced Totals Engine picks runtime'
+
+`syndicate/features/ncaaf/picks.py:634` returns that title because **`95602d2a`
+(2026-08-19) deliberately SUPPRESSED NCAAF picks.** That commit is one of the
+better-evidenced in this repo: leak-free, prior-season SP+ against realised 2025
+margins, n=220, 40 seeds — model MAE 13.763 vs market 11.586, paired dMAE
+**+2.176, SE 0.518, t = +4.20**. Every scale 6..24 loses, which is why the
+response was a serving GATE rather than another parameter sweep. `pick_gate.py`
+is DEFAULT-DENY on the stated ground that "a gate that maps 'never measured'
+onto its permissive branch fires only for failures someone already went looking
+for".
+
+**The tests assert the PRE-suppression contract** — that NCAAF picks are served.
+They were left behind when the gate landed, the same shape as the `?venue=`
+stub: one lane changed a contract, a sibling test file did not follow.
+
+**NOT REWRITTEN, and the reason is stronger than for the cluster above.** Making
+these pass means asserting the current gated behaviour on a live money surface
+that was suppressed on a significance test. Whoever owns `pick_gate.py` should
+decide per test whether it becomes "the gate DENIES" or is deleted as testing a
+retired path. A triage pass rewriting them risks encoding "picks are served"
+back into the suite — exactly what the gate exists to prevent.
+
+**A GAP IN THE OTHER DIRECTION, and it is the more important half:** the
+suppression has been live 11 days and its tests were never updated, so **nothing
+in the suite currently pins the gate's behaviour on this surface.** The
+protective behaviour is unasserted. That is worth more attention than the four
+red lines.
+
+### What this says about the remaining 29
+
+Three clusters, three DIFFERENT causes, **zero production defects**:
+
+| cluster | cause | shape |
+|---|---|---|
+| `test_open_bet_live_status` (8) | stale stub vs a new kwarg | fails everywhere |
+| `test_mlb_sim_run_reconcile` (5) | pollution via a real on-disk pointer | passes alone, fails in suite |
+| `test_ncaaf_picks_local` (4) | stale contract vs a deliberate gate | fails everywhere |
+
+That is not a prediction about the rest — but **a raw count from this file is an
+upper bound on real defects, not an estimate of them.** Note that two of the
+three shapes are "a lane changed a contract and a sibling test file did not
+follow", which suggests the tail is worth grouping by CAUSE rather than by file.
+
+Triage each cluster in isolation FIRST. The isolation-vs-suite comparison at one
+SHA separated all three in minutes, and it is the ONLY step that distinguishes
+pollution from a real contract change.
 
 ## For whoever picks this up
 
