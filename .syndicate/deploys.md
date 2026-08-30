@@ -38855,3 +38855,44 @@ market=h2h price=257.0 stake=4.43`.
   already resting. A quiet venue is not a working venue.
 - **Incidental confirmation:** `tick=0.005` here vs the 0.01 that the lad-det
   arithmetic implied. Mixed ticks in one slate, as the fix assumed.
+
+## 2026-08-30 — cc75e1f2 — live-odds-worker — and the RETRACTION of the deploy above
+
+- **Deployed by me**, behind both locks: claim held by
+  `polymarket-buy-limit-tick-floor`, preflight `CLEAR` (only infra processes).
+  live-odds-worker only — refresh-worker had an MLB sim in flight
+  (`sim_1_COL_at_ATL` publishing at 19:08:33) and deploying it would have killed
+  that for a change it does not run. web left on 165c448f for the same reason.
+- Carries `8b0d27df` (another lane's YES-leg fix, which can turn ON live
+  Polymarket h2h) and `cc75e1f2` (ledger). Live 19:14:06Z.
+
+- **verify: THE TICK FIX IS A NO-OP AND THE DEPLOY ABOVE IS RETRACTED.**
+  9 priced quotes, 3 slugs, 27 minutes: **0 off-grid, 9 on-grid, snap never
+  fired.** The venue quotes on its own tick (0.005 and 0.01 both observed).
+  The causal claim in the previous entry paired a 17:49 price log with a 17:19
+  submit. The submit-time quote was 0.51 and we sent 0.51 — see the four
+  consecutive `price=0.51` lines from 17:00:45 to 17:19:27. The floor never
+  moved that order. Full retraction in `learnings.md`.
+  The change is harmless (idempotent on-grid) and the slippage guard now gating
+  the SENT price is a genuine improvement, but it fixes no observed defect.
+
+- **verify (YES-leg): NOT ESTABLISHED — and NOT "inert" either.**
+  `POLYMARKET_YES_LEG` has not appeared, but the instrument cannot fire without
+  an h2h candidate on a team-named market, and there was none in the window:
+  `ORDER_PATH venue=polymarket positions=3 markets={'totals': {'would_build': 2},
+  'h2h': {'market_unresolved': 1}}` — the one h2h is `atc-mls-stl-dal` whose
+  outcomes are `['Yes','No']`, refused `team_side_not_in_outcomes`, a DIFFERENT
+  defect. Not-yet-exercised, not proven inert. That distinction is the whole
+  point of the reading and must not be collapsed.
+
+- **The kill switch is NOT free, contrary to its own docstring.**
+  `SYNDICATE_POLYMARKET_YES_LEG_CORROBORATE` is read per-call
+  (execute_portfolio:580, absent means ON, unknown is not permissive — all
+  correct), but a running process's environ is fixed at start and a Render
+  restart does not re-inject env vars. Standing the gate down costs a full
+  deploy cycle, the same as a revert. "In minutes rather than in a deploy" does
+  not hold on this platform.
+
+- **The open question, unowned:** orders rest because we bid the quote exactly
+  and never re-price or cancel, and the slate carries no bid/ask at all.
+

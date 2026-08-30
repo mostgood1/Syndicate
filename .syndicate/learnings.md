@@ -7526,3 +7526,52 @@ The third was quoted 0.44, sent 0.44 -- already on the grid -- and still rested.
 The slate carries `prices[]`, one probability per outcome, and NO bid/ask, while
 Kalshi prices off an explicit `no_ask_dollars`. Bidding a non-ask exactly may
 never cross. Fixing one cause does not retire the symptom.
+
+## 2026-08-30 — CORRECTION, same day: the tick floor did NOT cause the resting Polymarket orders. I paired two log lines 30 minutes apart and called it a mechanism.
+
+The entry above claims, as MEASURED, that `round_price_to_tick` flooring a BUY
+put our bid under the ask on `tsc-mlb-lad-det-2026-08-30-7pt5`. **That is
+false.** The pairing was:
+
+    17:49:02  POLYMARKET_ARTIFACT_PRICE ... price=0.515      <- read LATER
+    (FILL_ABOVE_LIMIT)  submitted_limit=0.51  filled=0.0     <- order from 17:19
+
+Two different moments, treated as one event. The actual quote at submit time,
+which was in the same log the whole time:
+
+    17:00:45  price=0.51      17:12:57  price=0.51
+    17:08:12  price=0.51      17:18:54  price=0.51
+    17:19:27  price=0.51   -> SUBMIT price={'value': '0.51'}
+
+**The quote was 0.51 and we sent 0.51. The floor changed nothing.** It could
+not have: 0.51 is already on the grid. The 0.515 appeared THIRTY MINUTES LATER,
+after the order was already resting. The price moved after we bid; that is
+market drift, not a rounding defect.
+
+Confirmed by deploying the "fix" and measuring it: **0 of 9 quotes off-grid**
+across 3 slugs and 27 minutes. Every quote the venue publishes sits on that
+market's own tick (0.005 and 0.01 both seen). The snap has never once fired.
+A no-op shipped as a fix.
+
+WHAT SURVIVES. The general point is still true and still worth keeping: a limit
+is a CAP, not the price paid — `C4N3GPYA4GNQ` was submitted at 0.51 and filled
+at `avgPx=0.4900`. And gating slippage on the price actually sent rather than
+the pre-snap quote is a real improvement. Neither of those needed the false
+causal story, and I attached them to it anyway.
+
+WHAT THE REAL CAUSE LOOKS LIKE NOW. We bid the venue's quote exactly, and then
+never re-price or cancel. The order rests; the market moves; the resting limit
+is now behind. `tsc-lal-cel-ath` is the same shape — quoted 0.44, sent 0.44,
+never filled. Bidding AT a quote is not crossing a spread, and the slate carries
+`prices[]` with NO bid/ask, so we may be bidding a mid that no one will hit.
+That is the hypothesis to test next, and it is where I should have stayed.
+
+HOW TO APPLY. **Two log lines are one event only if they carry the same
+identifier for that event.** Same slug is not same order. Before pairing a
+cause line with an effect line, find the cause line whose TIMESTAMP PRECEDES the
+effect and belongs to the same attempt — here that line existed, was one query
+away, and said the opposite. The pairing felt safe because the arithmetic
+worked: 0.515 floors to 0.51 at a 0.01 tick, which is a real mechanism that
+produces exactly the observed number. **An arithmetic coincidence that explains
+the data is not evidence that it produced the data.**
+

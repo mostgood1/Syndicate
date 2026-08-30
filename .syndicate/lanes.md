@@ -623,7 +623,8 @@ comes back ~1.0 the flag is not worth using and this entry says so.**
   - Not claimed, read-only reference: `scripts/run_live_odds_refresh_worker.py`
     — likely relevant (soccer's autorun equivalent lived here), not yet
     confirmed WNBA has an analogous live-phase launcher at all.
-- Hypothesis: WNBA's live-phase odds fetch either (a) does not exist as a
+- Outcome: THE HYPOTHESIS WAS WRONG. Measured after deploy: 0 of 9 quotes off-grid, snap never fired. The submit-time quote for tsc-mlb-lad-det was 0.51 and we sent 0.51 (four consecutive price=0.51 lines, 17:00-17:19); the 0.515 I paired it with was read 30 min LATER. The change is harmless and the slippage guard now gates the SENT price, but it fixes no observed defect. Retraction in learnings.md. Real cause still open: we bid the quote exactly, never re-price or cancel, and the slate carries no bid/ask.
+- Original hypothesis: WNBA's live-phase odds fetch either (a) does not exist as a
   distinct step from the soccer-style `phase=live` odds capture, or (b)
   exists but is failing/never firing, structurally similar to `#343`
   (soccer's bulk-endpoint 422) but a different mechanism, since WNBA's
@@ -3012,7 +3013,7 @@ caaf-no-orders`). NOT
   submitted side matches the team we intended.
 - Blocked by: none. NOT DEPLOYING without a separate decision.
 
-### polymarket-buy-limit-tick-floor — OPEN — opened 2026-08-30 — session 6475567d
+### polymarket-buy-limit-tick-floor — CLOSED 2026-08-30 — PREMISE REFUTED BY ITS OWN DEPLOY — opened 2026-08-30 — session 6475567d
 - Goal: Polymarket buy limits stop resting below the venue's own quote. `round_price_to_tick` floors a BUY, so a 0.515 quote is sent as 0.51 and never fills.
 - Files: NONE HELD — released 2026-08-30. db2252b0 is landed and DEPLOYED; no further edits planned. `polymarket-yes-leg-binding` landed 8b0d27df in the same two files under user override and resolved the conflict by KEEPING this lane's snap-before-guard — I verified that on origin/main: the snap (`round_price_to_tick(..., direction="up")`) still precedes the drift check, `tick = row.get("orderPriceMinTickSize")` appears exactly once, and all three of this lane's markers survive. Lane stays OPEN only because the behaviour change is still unobserved.
 - Hypothesis: the tick FLOOR, not price staleness, is what leaves Polymarket orders unfilled. Kalshi is unaffected because its quotes are already on a 1c grid, so the floor is a no-op there.
