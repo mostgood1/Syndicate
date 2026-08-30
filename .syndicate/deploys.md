@@ -38463,3 +38463,80 @@ seen the group while it is demonstrably fresh (9 min at measurement) — strong,
 not proof. A venue-side check would settle it and was not done.
 
 **Reversible without a deploy:** `SYNDICATE_DROP_MARKET_GONE_ROWS=0`.
+
+
+## 2026-08-30 16:0xZ — the reconcile fix WORKS; execution is still blocked by a SECOND order
+
+- **deploys:** refresh-worker `dd395cde` (mine, `dep-daa4s8p5efls73dpvkm0`, live
+  15:39:45Z, both locks clean). live-odds-worker `57ac70b9` **deployed MANUALLY
+  by the user** (`dep-daa56kqjnfac73fil5b0`, live ~16:02Z) — the sanctioned path
+  is UNAVAILABLE for that service, see below.
+- **claims:** both held by `live-venue-order-placement`; released after this.
+
+- **verify — THE FIX DID WHAT IT CLAIMED, on the code path it changed:**
+
+      15:57:49Z  BLOCKED_ON_UNRECONCILED count=2  ['0f0e2a67…','08e93850…']
+      16:05:16Z  BLOCKED_ON_UNRECONCILED count=1  ['08e93850…']
+
+      RECONCILE venue=polymarket candidates=4 venue_orders=4
+                implausible=0  stamped=4        (was implausible=1, stamped=3)
+      ORDER_PATH venue=polymarket status=ok positions=8
+
+  `implausible` 1 → 0 and `stamped` 3 → 4. The 12-hour blocker
+  `0f0e2a675e86ed5589a9d913` is cleared.
+
+- **BUT EXECUTION HAS NOT RESUMED. `ORDER_SUBMIT`: nothing matched** in the ten
+  minutes after deploy. `08e9385059f46852b160eeab` still blocks — the order the
+  first handoff flagged as unverified and which I carried forward as
+  unestablished rather than assuming it shared a cause. **It did not.**
+
+### THE SECOND ORDER IS NEVER EXAMINED — a permanent-deadlock class
+
+39 log lines mention that key across the day. **Every one is
+`BLOCKED_ON_UNRECONCILED`; not one is a reconcile line.** Both venues report
+everything stamped (`kalshi 1/1`, `polymarket 4/4`, `implausible=0`), so it is
+not being refused — it is never a CANDIDATE.
+
+The two predicates do not match:
+
+    unreconciled_orders()   status == submitted AND not reconciled recently
+                            -- no mode, no outcome, no venue filter
+
+    reconcile candidates    mode == LIVE
+                        AND status in (submitted, filled)
+                        AND outcome is None
+                        AND venue prefix matches the venue being reconciled
+
+**Any order failing one of those three extra conditions blocks live execution
+forever and is never looked at.** The block predicate is strictly broader than
+the fix predicate, so the gate cannot self-clear — the same shape as the
+contract bound, one layer out.
+
+### AND THE WEB AND THE WORKER DISAGREE ABOUT THE LEDGER
+
+    /api/portfolio/live            unreconciled: 0
+    execute_portfolio (worker)     BLOCKED_ON_UNRECONCILED count=1
+    /api/ops/execution/ledger-summary   ZERO `submitted` orders on ANY date,
+                                        ANY mode:venue, in the whole ledger
+
+The web-served views show nothing wrong while the worker is hard-blocked.
+**Anyone reading the page right now would conclude execution is fine.** Almost
+certainly the keyvalue/artifact split already on file
+(`project-keyvalue-artifact-split-blinds-guards`): the web reads a different
+copy from the one the executor writes.
+
+### THE DEPLOY GATE IS UNREACHABLE FOR live-odds-worker
+
+22 preflight polls over 25 minutes, tightened to every 12s: **never fewer than
+3 jobs.** Its `refresh_odds_sources` loop continuously spawns per-league
+children, and a preflight sample takes 10-20s, so no observable window exists.
+The guard's own docstring names this: *"A guard whose allow-branch is
+unreachable is not a throttle, it is an outage."* Every deploy to that service
+must currently be manual. **This is its own defect and is not fixed.**
+
+### Not a defect, checked rather than assumed
+
+`outcomeSide=OUTCOME_SIDE_NO` on outcome "Under" was flagged as a possible
+wrong-side fill. `polymarket_us_orders` documents WHY TOTALS ARE IMMUNE — an
+over/under routes by NAME (`under`→NO) and never consults the index. The name
+rule worked.
