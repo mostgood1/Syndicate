@@ -7035,3 +7035,39 @@ mirror output, and ONE (`tools/ask.py`, 2026-06-22) existed nowhere else.
 higher one, which is how the wrong stash gets deleted. **Record SHAs BEFORE the
 first drop and re-check one AFTER**, so the recovery path is verified rather
 than asserted.
+
+
+## 2026-08-30 — RULE: a shared tree can sit BEHIND its own HEAD, and the diff then reads as YOU reverting someone. Prove whose content is on disk before restoring
+
+- **What we believed:** that `git status` showing my two files as ` M` in the
+  primary tree meant I had uncommitted work there.
+- **What was actually true:** `HEAD == origin/main` and my commit `c0989cfe` was
+  IN it, yet the working copy was the version from BEFORE it — `git diff` read
+  `-53` on the module and `-72` on the tests, i.e. **deleting all eight tests I
+  had just added.** Anyone committing those paths from that tree would have
+  reverted me, and the blame would have read as theirs.
+- **Cause (unconfirmed, but it is the documented one):** a `commit-tree` +
+  `update-ref` / scratch-index recipe moves HEAD and updates NEITHER the index
+  NOR the working tree, so the tree is left behind by exactly whatever landed in
+  between. See [[project-shared-tree-commit-recipes]], which warns the damage
+  "lands later, on a different lane, and presents as *them* reverting *you*."
+  This is that, observed from the victim's side.
+
+**How to apply:**
+- **Before restoring anything in a shared tree, prove WHOSE content is on
+  disk.** Hash the working copy against candidate revisions:
+  `disk == HEAD?` and `disk == <mycommit>^?`. Here it matched `c0989cfe^`
+  exactly — my own pre-commit state, no foreign work — which is what made
+  `git checkout HEAD -- <paths>` safe. Had it matched neither, someone else's
+  edit was in there and the restore would have destroyed it.
+- **Scope the restore to the exact paths and check the blast radius by count:**
+  dirty entries 197 -> 195, exactly two. A restore that moves any other number
+  touched something you did not inspect.
+- **` M` in a shared tree is not evidence of your own uncommitted work.** It
+  means only "disk differs from HEAD", and in a tree several sessions write to,
+  the difference is as likely to be staleness as authorship. Check the direction
+  before assuming: `git diff` showing DELETIONS of your own recent additions is
+  the signature of a stale tree, not of work in progress.
+- Corollary: after committing from a worktree, it is worth confirming the shared
+  tree agrees with HEAD on the paths you touched. Nothing warns you, and the
+  window between your commit and someone else's `git add` is where it bites.
