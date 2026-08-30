@@ -160,8 +160,32 @@ _POSITION_IDENTITY_FIELDS = (
 # one driving idempotency. `event_id` already names the game; the tuple was
 # mixing immutable facts about the BET with mutable attributes of the FIXTURE.
 #
-# Systematic, not a one-off: every rain delay, postponement and doubleheader
-# restatement unlocks a duplicate on any still-open position.
+# THE TRIGGER THRESHOLD IS ZERO, and an earlier version of this comment said
+# "every rain delay, postponement and doubleheader restatement", which
+# UNDERSTATES IT badly enough to mislead. Framed as delays, a reader concludes
+# this is rare and seasonal. It is neither: ANY restatement at all mints a new
+# key, because the whole string is hashed.
+#
+#     +1 second   -> new key
+#     +3m38s      -> new key
+#     +30 min     -> new key
+#
+# A SECOND CONFIRMED INSTANCE, and this one FILLED AND LOST -- found by lane
+# `position-key-commence-time-instability` grouping 398 live orders by
+# `opening_key`, the stable identity:
+#
+#     HOU@NYY  h2h away  2026-08-26   BOTH FILLED, BOTH LOST
+#       15:04:15  stake 3.41  fill 0.465  pnl -3.41   commence 23:05:00Z
+#       01:33:16  stake 1.27  fill 0.040  pnl -0.78   commence 23:08:38Z
+#
+# **A 3m38s delta** -- ordinary feed jitter restating first pitch to the second,
+# not a delay. **$0.78 of real loss on a bet nobody intended**, placed 2h33m
+# AFTER first pitch into a 4-cent longshot on a game already in progress. It is
+# also `h2h` with an empty `line`, so this is not confined to totals.
+#
+# TWO IS A FLOOR, NOT A COUNT: that scan only sees pairs where BOTH legs survive
+# in the book sharing an `opening_key`. A pair whose other leg was hidden,
+# refused, or aged out of retention is invisible to it.
 #
 # Raised by lane `position-key-commence-time-instability`; verified here against
 # both key builders before changing anything.

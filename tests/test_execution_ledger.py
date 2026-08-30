@@ -2431,3 +2431,38 @@ def test_a_GENUINELY_different_bet_is_still_placed(monkeypatch):
         _request(position_key="p1", venue="kalshi", side="under",
                  legacy_position_key="legacy-1"), mode=mod.LIVE)
     assert created is True, "a different side was refused as a duplicate"
+
+
+def test_ONE_SECOND_of_restatement_used_to_mint_a_new_key():
+    """The trigger threshold is ZERO, not "a delay".
+
+    Stated as rain delays and doubleheaders, a reader concludes this is rare and
+    seasonal. The whole `commence_time` string is hashed, so a one-second
+    restatement forked the identity just as completely as thirty minutes.
+
+    The second confirmed instance was a **3m38s** delta -- ordinary feed jitter
+    restating first pitch to the second -- and unlike the resting LAD@DET pair
+    it FILLED AND LOST: HOU@NYY h2h away 2026-08-26, two legs, `pnl -3.41` and
+    `pnl -0.78`, the duplicate placed 2h33m after first pitch into a 4-cent
+    longshot. `h2h` with an empty line, so not confined to totals either.
+    """
+    from syndicate.features.shared.portfolio_commit import (
+        legacy_position_key,
+        position_key,
+    )
+
+    row = {
+        "sport": "mlb", "event_id": "evt-hou-nyy", "kind": "game", "market": "h2h",
+        "segment": "full_game", "player_name": None, "home_team": "New York Yankees",
+        "away_team": "Houston Astros", "side": "away", "line": None,
+        "quote": {"bookmaker": "polymarket"},
+    }
+    base = dict(row, commence_time="2026-08-26T23:05:00Z")
+    for delta in ("2026-08-26T23:05:01Z", "2026-08-26T23:08:38Z", "2026-08-26T23:35:00Z"):
+        moved = dict(row, commence_time=delta)
+        assert legacy_position_key(base) != legacy_position_key(moved), (
+            f"{delta} must fork the LEGACY key or this test proves nothing"
+        )
+        assert position_key(base) == position_key(moved), (
+            f"{delta} still forks the identity -- one second is enough"
+        )
