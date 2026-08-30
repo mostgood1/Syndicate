@@ -25,7 +25,7 @@ plus refresh-worker (`srv-d91dpertqb8s73co8ls0`) logs over the preceding 6h.
 | 5 | NFL + NCAAF have no odds-history shard at all | whole sportsbook feed absent | unowned |
 | 6 | Movement term saturates at 20 pts | 18 of 35 movement rows | unowned |
 | 7 | Freshness ladder tops out at 3h | 95 of 200 served rows pinned at floor | unowned |
-| 8 | Look-ahead builds a second date | ~⅓ of worker board budget | unowned |
+| ~~8~~ | ~~Look-ahead builds a second date~~ | **NOT A DEFECT — it backs the Tomorrow tab and is served. Cost 18.8%, not ⅓. See §3 retraction** | withdrawn |
 | 9 | `/` is 18.5 MB / 6.4s TTFB | every page view | `render-web-request-path` (UNOWNED, released) |
 
 ---
@@ -154,10 +154,39 @@ takes **74-205s** and runs the worker at **90-95% of its 4GB ceiling**
     03:14 date=2026-08-28 elapsed=180.5s
     03:53 date=2026-08-29 elapsed= 74.7s  sports=[ncaaf,nfl,soccer,wnba]
 
-`SYNDICATE_LOOK_AHEAD_ENABLED`. They write different artifacts. Roughly a third
-of the build budget goes to a date web is not serving. The
-today/tomorrow/day-after flip-flop is already documented at
-`intelligence_state.py:6579`.
+`SYNDICATE_LOOK_AHEAD_ENABLED`. They write different artifacts.
+
+> ### RETRACTED 2026-08-30 — "A DATE WEB IS NOT SERVING" IS FALSE, AND "A THIRD" WAS WRONG TOO
+>
+> This paragraph said *"roughly a third of the build budget goes to a date web
+> is not serving"*. **Both halves are wrong, and there is nothing to fix here.**
+>
+> **Web IS serving it.** The second date backs the board's **Tomorrow tab** —
+> `DAY_TABS` in `intelligence.html:507-511` is `[All, Today, Tomorrow]`, and the
+> request returns the artifact that build wrote:
+>
+>     /api/board/layer2-shortlist?date=2026-08-31
+>       -> 767 rows, source=layer2_shortlist_artifact, written 13:13:39Z
+>
+> which is exactly the 13:13:39Z build this section called waste. It is also
+> BOUNDED, not an unbounded look-ahead: `date=2026-09-01` returns 0 rows from
+> `board_state` with no artifact, so nothing past tomorrow is built.
+>
+> **And the cost was overstated.** Re-measured over 6 daytime hours, 8 builds:
+>
+>     2026-08-30 (today)     5 builds   901s   81.2%
+>     2026-08-31 (tomorrow)  3 builds   209s   18.8%
+>
+> 18.8%, not 33% — tomorrow's board is cheaper to build (767 rows against 1,565).
+>
+> **WHY THE ORIGINAL READING WAS WRONG.** It was taken across the 03:00Z CT
+> midnight rollover, which is precisely the window in which a today/tomorrow
+> look-ahead alternates. A rollover-window sample was generalised to the whole
+> day. The alternation is real; calling it waste was not.
+>
+> The `intelligence_state.py:6579` flip-flop note is about a DIFFERENT defect —
+> substituting tomorrow's board for an explicit today request — and citing it
+> here implied it corroborated this claim. It does not.
 
 **Where the throughput actually goes.** 8,444 considered -> 200 served:
 
