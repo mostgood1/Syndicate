@@ -819,6 +819,163 @@ def _order_url(order_id: str) -> str:
     return f"{base.rstrip('/')}{path.rstrip('/')}/{urllib.parse.quote(str(order_id), safe='')}"
 
 
+# THE CANCEL ROUTE IS A GUESS UNTIL A REAL CALL CONFIRMS IT, and that is why
+# `cancel_order` will not fire without `execute=True`.
+#
+# This venue is a gRPC-gateway API -- prefixed enums (`ORDER_STATUS_CANCELED`)
+# and `{"code":12}` UNIMPLEMENTED bodies. Its create route is `POST /v1/orders`
+# and its read is `GET /v1/order/{id}`: sibling spellings differing by one
+# character and one verb, which is exactly how the list route was guessed wrong
+# once already. `DELETE /v1/order/{id}` is the convention-consistent cancel and
+# is the default here, overridable by env without a deploy.
+#
+# IT CANNOT BE PROBED the way the list route was. `probe_order_list_routes` is
+# safe only because every candidate is a GET; there is no read-only way to ask
+# "would this write path work", and a blind write against a money account can
+# create or destroy something. So the first real cancel IS the probe -- which is
+# why this logs the exact method, URL and raw response.
+_ORDER_CANCEL_PATH = "/v1/order"
+_ORDER_CANCEL_METHOD = "DELETE"
+
+#: Venue statuses meaning there is nothing left to cancel. Matched as substrings
+#: because this API prefixes its enums (`ORDER_STATUS_CANCELED`, not `canceled`).
+_NOT_CANCELLABLE = ("CANCELED", "CANCELLED", "FILLED", "EXECUTED", "EXPIRED", "REJECTED")
+
+
+def _order_cancel_url(order_id: str) -> str:
+    from syndicate.features.shared.polymarket_us_auth import BASE_URL
+
+    base = (os.environ.get("POLYMARKET_US_API_BASE") or "").strip() or BASE_URL
+    path = (os.environ.get("POLYMARKET_US_ORDER_CANCEL_PATH") or _ORDER_CANCEL_PATH).strip()
+    if not path.startswith("/"):
+        path = "/" + path
+    return base.rstrip("/") + path.rstrip("/") + "/" + urllib.parse.quote(str(order_id), safe="")
+
+
+def cancel_order(
+    order_id: str,
+    *,
+    execute: bool = False,
+    expect_client_order_id: str | None = None,
+    expect_market_slug: str | None = None,
+) -> dict[str, Any]:
+    """Cancel ONE resting order at Polymarket. DRY RUN unless `execute=True`.
+
+    --------------------------------------------------------------------------
+    WHY THIS EXISTS
+    --------------------------------------------------------------------------
+
+    Measured 2026-08-30: a restated `commence_time` minted a second
+    `position_key` for a bet already placed, and ~$9.12 rested at this venue as
+    two legs where one was intended. The identity defect is fixed. **Retiring
+    the surplus leg was not possible in code at all** -- no cancel path existed,
+    so a human had to find it on the venue's own Orders screen. A second
+    duplicate pair had already FILLED before anyone looked (`pnl -3.41` and
+    `-0.78` on a bet nobody intended).
+
+    --------------------------------------------------------------------------
+    READ BEFORE WRITE, BECAUSE THE HAZARD IS THE WRONG LEG
+    --------------------------------------------------------------------------
+
+    A duplicate pair is two orders on the SAME market, side and line, differing
+    only in id and stake. Cancelling the wrong one keeps the unintended bet AND
+    destroys the intended one -- strictly worse than doing nothing. So this
+    always reads the order first and refuses when:
+
+      * the venue says it is already filled, cancelled, expired or rejected --
+        nothing to cancel, and on a FILLED order the money has already moved;
+      * `expect_client_order_id` or `expect_market_slug` was given and the venue
+        disagrees. **Pass them.** An id copied from a log or a screenshot is
+        precisely the input that lands on the wrong row, and a mismatch means
+        the caller believes something false about this order.
+
+    **DRY RUN BY DEFAULT.** With `execute=False` it does the read and the checks
+    and reports the request it WOULD send, touching the venue only with a GET.
+
+    Nothing in this repo calls it automatically and nothing should: it is a
+    capability for an operator, not a step in a loop. Choosing WHICH leg of a
+    duplicate pair is the intended one is a judgement about sizing intent that
+    this function deliberately does not make.
+    """
+    from syndicate.features.shared import polymarket_us_auth as auth
+
+    order_id = str(order_id or "").strip()
+    if not order_id:
+        return {"status": "refused", "reason": "order_id_empty"}
+    if not auth.credentials_present():
+        return {"status": "skipped", "reason": "credentials_absent", "order_id": order_id}
+
+    try:
+        raw = auth.signed_request("GET", _order_url(order_id))
+    except Exception as exc:  # noqa: BLE001
+        # A FAILED READ IS NOT PERMISSION TO WRITE. Absence in a failed read is
+        # not absence at the venue -- the same rule `reconcile_live_orders`
+        # applies before it will modify any record.
+        return {
+            "status": "error",
+            "reason": ("read_failed: %s: %s" % (type(exc).__name__, exc))[:200],
+            "order_id": order_id,
+        }
+
+    order = raw.get("order") if isinstance(raw.get("order"), Mapping) else raw
+    view = venue_order_view(order) if isinstance(order, Mapping) else {}
+    venue_status = str(view.get("venue_status") or "").upper()
+    client_id = str((order or {}).get("clientOrderId") or (order or {}).get("client_order_id") or "")
+    slug = str((order or {}).get("marketSlug") or (order or {}).get("market_slug") or "")
+
+    plan = {
+        "order_id": order_id,
+        "venue_status": venue_status or None,
+        "state": view.get("state"),
+        "client_order_id": client_id or None,
+        "market_slug": slug or None,
+        "filled_count": view.get("filled_count"),
+        "method": _ORDER_CANCEL_METHOD,
+        "url": _order_cancel_url(order_id),
+    }
+
+    if any(token in venue_status for token in _NOT_CANCELLABLE):
+        plan.update(status="refused", reason="not_cancellable: " + (venue_status or "unknown"))
+        print("[polymarket_us_orders] CANCEL_REFUSED %s" % plan, flush=True)
+        return plan
+
+    for label, expected, actual in (
+        ("client_order_id", expect_client_order_id, client_id),
+        ("market_slug", expect_market_slug, slug),
+    ):
+        if expected is None:
+            continue
+        if str(expected).strip() != actual:
+            plan.update(
+                status="refused",
+                reason="%s_mismatch: expected %r, venue says %r" % (label, expected, actual),
+            )
+            print("[polymarket_us_orders] CANCEL_REFUSED %s" % plan, flush=True)
+            return plan
+
+    if not execute:
+        plan.update(status="dry_run", reason="execute=False; nothing was sent")
+        print("[polymarket_us_orders] CANCEL_DRY_RUN %s" % plan, flush=True)
+        return plan
+
+    print(
+        "[polymarket_us_orders] CANCEL_SEND order_id=%r method=%s url=%r"
+        " client_order_id=%r slug=%r venue_status=%r"
+        % (order_id, _ORDER_CANCEL_METHOD, plan["url"], client_id, slug, venue_status),
+        flush=True,
+    )
+    try:
+        response = auth.signed_request(_ORDER_CANCEL_METHOD, plan["url"])
+    except Exception as exc:  # noqa: BLE001
+        plan.update(status="error", reason=("%s: %s" % (type(exc).__name__, exc))[:300])
+        print("[polymarket_us_orders] CANCEL_FAILED %s" % plan, flush=True)
+        return plan
+
+    plan.update(status="sent", response=response)
+    print("[polymarket_us_orders] CANCEL_SENT %s" % plan, flush=True)
+    return plan
+
+
 def _orders_list_url(limit: int) -> str:
     from syndicate.features.shared.polymarket_us_auth import BASE_URL
 
