@@ -38329,3 +38329,55 @@ ncaab/mlb/nba/wnba/nhl, asserted by test.
 Preflight discipline: refresh-worker returned TOO_SOON (25-min spacing) then HOLD
 on an odds sweep + per-league soccer builds for ~25 min. Neither was overridden;
 `--allow-rapid` was not used. Deployed on the first CLEAR read.
+
+## 2026-08-30 06:2xZ — `#603` CLOSED, measured. Venue basis UNMEASURABLE (no live games)
+
+- **deploy:** none by me, again. `d7cda903` went live on refresh-worker
+  **05:46:18Z** and already contained `04f9bf3b` (the inert-guard fix). Fourth
+  consecutive time a peer's deploy from main tip carried this lane's work. A
+  redundant deploy would have restarted the worker for zero change and burned
+  the spacing window, so I did not fire one. Verified by CONTENT before
+  concluding that: `_unconfirmed_on_a_contested_key` present, scalar-`side`
+  handling present.
+- **holder:** no claim taken. Nothing to release.
+
+- **verify:** board `2026-08-30` pool `written_at 06:18:37Z`, crossing the
+  deploy. `scripts/read_venue_basis.py --after 2026-08-30T05:46:18Z`:
+
+      rows a quote MATCHED             177   (pre-fix 148, DIFFERENT slate)
+      refs in use                       96
+      refs answering >1 FIXTURE          0   <- was 11 of 35, then 6 of 26
+      rows served by such a ref          0   <- was 108 of 148, then 31 of 68
+      wrong-game price as HEADLINE       0   <- was 2, then 8
+      CLEAN -- every ref in use answers exactly one fixture.
+
+- **AND THE READING IS MEASURABLE, which is the part that makes it evidence.**
+  A clean zero is worthless if a collision was impossible — the trap that made
+  three earlier `#603` readings worth nothing. Opportunity in this pool:
+
+      distinct bare keys               378
+      keys claimed by >1 GAME          192   <- the opportunity
+      board rows on a contested key    992
+      MATCHED rows on a contested key  166
+
+  **166 matched rows sit on contested keys and every one resolves to a ref that
+  answers exactly one fixture.** The guard did not blanket-refuse contested
+  keys; it demanded confirmation and 166 rows supplied it. That is the intended
+  behaviour and it is the reason coverage did not collapse.
+
+- **COVERAGE, stated honestly:** 177 matched here against 148 pre-fix, but the
+  slates are NOT comparable — 1,186 rows/0 live now versus 809 rows/348 live
+  then. As a share of rows it is 14.9% against 18.3%. The claim that survives is
+  the narrow one: **coverage did not collapse**, and the earlier simulation said
+  zero plausibly-correct quotes would be lost.
+
+- **VENUE BASIS ITSELF: STILL UNMEASURED.** `live=0` at 01:23 CT — the slate is
+  entirely pregame, so the in-play comparison had nothing to run on. The script
+  reports UNMEASURABLE rather than reading the zero as "no edges". Its first
+  real measurement needs a live slate; the earliest is this afternoon's MLB.
+
+- **Two instrument defects of my own, caught and stated:** a `--wait` script
+  whose spacing regex never matched, so it would have polled forever even when
+  every gate was open (it sat 34 cycles, through at least two windows where
+  jobs=0 and the claim was free); and a first mismatch census using team-name
+  tokens that reported 100% wrong and was itself wrong.
