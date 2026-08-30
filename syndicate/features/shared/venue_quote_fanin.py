@@ -654,6 +654,35 @@ _OFFERED_SAMPLE_LIMIT = 4
 _ROLE_KEYED_MARKETS = {"totals", "totals_alt", "spreads", "spreads_alt"}
 
 
+def _row_game_token(row: Mapping[str, Any], sport: str) -> str | None:
+    """The fixture identity for a board OR grid row. ONE definition, two callers.
+
+    `#603`. Both `apply_venue_quotes` and `apply_venue_quotes_to_grid` need this
+    and they MUST agree: a row that keys one way in one path and another way in
+    the other is a join that works on whichever path you happen to read.
+
+    Club pair first (mlb/nfl/wnba/soccer), our own `event_id` second (ncaaf and
+    any other sport with no club map). See `venue_quote_adapters.game_token` and
+    `event_game_token`.
+    """
+    from syndicate.features.shared.venue_quote_adapters import event_game_token, game_token
+
+    return game_token(sport, row.get("home_team"), row.get("away_team")) or event_game_token(
+        row.get("event_id")
+    )
+
+
+def _quote_is_for_another_game(quote: Any, row_game: str | None) -> bool:
+    """True when the quote NAMES a fixture and it is not this row's.
+
+    `quote.game is None` is NOT another game -- it means the source could not
+    name one, and those pass exactly as they did before `#603`. The asymmetry is
+    what makes this incapable of removing a match that was not provably wrong.
+    """
+    quote_game = getattr(quote, "game", None)
+    return bool(quote_game and row_game and quote_game != row_game)
+
+
 def _distinct_games(
     rows: Sequence[Mapping[str, Any]], sport: str
 ) -> list[dict[str, Any]]:
@@ -1031,10 +1060,29 @@ def apply_venue_quotes_to_grid(
     from syndicate.features.shared.venue_quote_adapters import quote_key
 
     sport_slug = str(sport or "").strip().lower()
-    payload = collected if collected is not None else collect_quotes(sport_slug, selected_date, now=now)
+    # `#603`. THE SCHEDULE COMES FROM THE GRID ITSELF.
+    #
+    # This path -- not `apply_venue_quotes` -- is the one that actually runs on
+    # the board build (`GRID_REPRICE` fires every cycle; `VENUE_REPRICE` did not
+    # appear in 45 minutes of production logs), and it is the one whose
+    # `_reprice_live_benchmark` writes `cells[book][side]` -> `book_prices`.
+    # The whole first cut of `#603` landed on the other function and was
+    # therefore INERT on the only path that produces the defect.
+    #
+    # Grid rows carry `event_id`/`home_team`/`away_team` (`book_grid.py:573,
+    # 581-582`), so the fixture list is derivable here without widening the
+    # caller's signature -- `layer2_shortlist.py` belongs to another lane.
+    grid_games = _distinct_games(grid or [], sport_slug)
+    if collected is not None:
+        payload = collected
+    elif grid_games:
+        payload = collect_quotes(sport_slug, selected_date, now=now, games=grid_games)
+    else:
+        payload = collect_quotes(sport_slug, selected_date, now=now)
     quotes = (payload or {}).get("quotes") or {}
     repriced = 0
     sides_seen = 0
+    cross_game_rejected = 0
     by_source: dict[str, int] = {}
 
     benchmark_rows = 0
@@ -1053,8 +1101,28 @@ def apply_venue_quotes_to_grid(
         # benchmark rewrite below is all-or-nothing per row and cannot be
         # decided one side at a time.
         venue_quotes: dict[str, Any] = {}
+        # `#603`. The BARE key first -- unchanged, so every match that works
+        # today still works -- then the game-qualified one, and a quote naming a
+        # DIFFERENT fixture is refused however well its key matched. Same order
+        # and same rule as `_candidate_keys`, via the same two helpers, because
+        # two paths disagreeing about a row's identity is a join that works on
+        # whichever one you happen to read.
+        row_game = _row_game_token(row, sport_slug)
+        role_keyed = str(market or "").strip().lower() in _ROLE_KEYED_MARKETS
         for side_key in side_names:
-            quote = quotes.get(str(quote_key(sport_slug, market, side_key, line)))
+            candidates = [str(quote_key(sport_slug, market, side_key, line))]
+            if role_keyed and row_game:
+                candidates.append(str(quote_key(sport_slug, market, side_key, line, row_game)))
+            quote = None
+            for candidate in candidates:
+                found = quotes.get(candidate)
+                if found is None:
+                    continue
+                if _quote_is_for_another_game(found, row_game):
+                    cross_game_rejected += 1
+                    continue
+                quote = found
+                break
             if quote is None or quote.source not in _LIVE_QUOTING_VENUES:
                 continue
             if quote.american is None:
@@ -1094,10 +1162,23 @@ def apply_venue_quotes_to_grid(
         elif outcome:
             benchmark_skipped[outcome] = benchmark_skipped.get(outcome, 0) + 1
 
+    if cross_game_rejected:
+        print(
+            "[venue_quote_fanin] CROSS_GAME_REJECTED_GRID"
+            f" sport={sport_slug} count={cross_game_rejected} sides_seen={sides_seen}"
+            " -- venue quotes refused for naming a DIFFERENT fixture (#603)",
+            flush=True,
+        )
+
     return {
         "sport": sport_slug,
         "sides_seen": sides_seen,
         "repriced": repriced,
+        # `#603`. Reported so a zero is attributable and a non-zero is legible.
+        # The first version of this counter existed only in a return value that
+        # NOTHING printed, which made the mechanism unreadable in production --
+        # the instrument-blindness failure this repo has on file five times.
+        "cross_game_rejected": cross_game_rejected,
         "by_source": by_source,
         "benchmark_rows": benchmark_rows,
         "benchmark_skipped": benchmark_skipped,

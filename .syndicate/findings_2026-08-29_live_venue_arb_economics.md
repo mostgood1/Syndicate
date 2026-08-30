@@ -770,3 +770,84 @@ games (t=17.2)** and totals are 1.67x over-dispersed and were never scored
 against the close. **This keying work does not move that by one row.** Lifting
 that gate needs a model that beats the close, or an explicit decision to trade
 one that does not.
+
+---
+
+# `#603` THE GRID PATH — I HAD FIXED THE WRONG FUNCTION `[2026-08-30 ~01:1xZ]`
+
+## The finding, and it supersedes the alias-map explanation
+
+`GRID_REPRICE` fires every board cycle. **`VENUE_REPRICE` did not appear once in
+45 minutes of production logs.** They come from two different functions and I
+had been reasoning about the wrong one all night.
+
+The path that runs is `apply_venue_quotes_to_grid`, and it was doing:
+
+    payload = collected if collected is not None else collect_quotes(sport, date, now=now)
+    ...
+    quote = quotes.get(str(quote_key(sport_slug, market, side_key, line)))
+
+**No `games`. Bare `quote_key`. No `_candidate_keys`. No rejection.** And it is
+this function that calls `_reprice_live_benchmark`, which writes
+`cells[book][side]` -> `book_prices` — the exact write that produced the
+corrupted prices.
+
+**Every part of `#603` up to now landed on `apply_venue_quotes`, which the live
+board build does not call.** The fix was inert on the only path that produces
+the defect.
+
+That, not the empty alias maps, is why the post-deploy reading was flat at
+kalshi 2 -> 2. The alias gaps are real and secondary; this is primary.
+
+**One piece of luck worth naming:** the adapters only emit qualified keys when
+handed `games`, and the grid path passed none — so the deployed `af535a3d8`
+could not have caused a coverage regression either. It did nothing at all.
+
+## The rule this broke
+
+`presence_is_not_reachability`, which I have on file in these exact words:
+*"trace the route to the code, and fix the choke point all callers share, not
+the one you can see."* I traced `book_prices` -> `cells` ->
+`_reprice_live_benchmark` -> `venue_quote_fanin` and stopped one frame early, at
+the wrong caller, because that caller's name matched what I was looking for.
+
+## The fix
+
+- **The schedule comes from the GRID ITSELF.** Grid rows carry
+  `event_id`/`home_team`/`away_team` (`book_grid.py:573, 581-582`), so
+  `_distinct_games(grid, sport)` gives the fixture list with no change to
+  `layer2_shortlist.py` — another lane's file.
+- **Bare key first, qualified second, rejection always** — the same order and
+  the same two helpers as `_candidate_keys`, now extracted so ONE definition
+  serves both callers (`_row_game_token`, `_quote_is_for_another_game`). Two
+  paths disagreeing about a row's identity is a join that works on whichever
+  one you happen to read.
+- **`CROSS_GAME_REJECTED_GRID` is emitted** when non-zero, and
+  `cross_game_rejected` is on the return. The first version of this counter
+  existed only in a return value nothing printed.
+
+## Verification
+
+`434 passed` across nine venue/join/catalogue suites, `131` downstream. 3 new
+grid-path tests.
+
+**A fixture bug caught in the writing, and it matters.** The first grid fixture
+had `best: {}`, so `sides_seen` never incremented and `repriced == 0` passed
+trivially — it would have agreed with an implementation that did nothing. `best`
+now carries a dict per side with a deliberately STALE `age_seconds` (9,999s), so
+a legitimate quote genuinely WOULD win the freshness check and reprice. Only
+then is "0 repriced" evidence of the refusal rather than evidence of an inert
+test. Same species as the inert Kalshi guard, one layer down.
+
+## STILL UNPROVEN IN PRODUCTION, AND TONIGHT'S READING IS GONE
+
+`Jacksonville State @ North Dakota State` went **Final 7-33** — one of the two
+games in the control pair. So the shared `over 47.5` group disappears on the
+next rebuild whether or not anything works, and a post-deploy "0 shared" would
+be unattributable. I stopped the deploy rather than spend a restart producing a
+third "unproven" on a population that had already changed.
+
+**The reading that will settle it is tomorrow's MLB slate** — both alias maps
+are good there, and it is where the original 26-of-28 was measured. Two
+instruments now, not one: the behavioural shared-count AND
+`CROSS_GAME_REJECTED_GRID`.

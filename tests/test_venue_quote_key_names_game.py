@@ -641,3 +641,111 @@ def test_a_game_with_NO_moneyline_in_the_slate_cannot_be_resolved(monkeypatch):
     assert quotes, "the quote must still be emitted, just unqualified"
     assert all("|@" not in q.key for q in quotes), [q.key for q in quotes]
     assert all(q.game is None for q in quotes)
+
+
+# ---------------------------------------------------------------------------
+# `#603` THE GRID PATH -- the one that actually runs.
+#
+# `apply_venue_quotes_to_grid` is what fires on the board build (`GRID_REPRICE`
+# every cycle; `VENUE_REPRICE` absent from 45 minutes of production logs) and it
+# is what calls `_reprice_live_benchmark`, which writes `cells[book][side]` ->
+# `book_prices`. The first cut of `#603` landed entirely on `apply_venue_quotes`
+# and was therefore INERT on the only path that produces the defect. These tests
+# exist so that cannot recur silently.
+# ---------------------------------------------------------------------------
+
+
+def _grid_row(event_id, away, home, line=7.5):
+    """A REALISTIC grid row.
+
+    `best` must carry a dict per side or `sides_seen` never increments and a
+    `repriced == 0` assertion passes trivially -- the fixture would agree with
+    any implementation, including one that does nothing. `age_seconds` is
+    deliberately STALE (9,999s) so a legitimate venue quote genuinely would win
+    the freshness check and reprice; that is what makes "0 repriced" evidence
+    of the refusal rather than evidence of an inert test.
+    """
+    return {
+        "sport": "mlb", "event_id": event_id, "market": "totals", "line": line,
+        "away_team": away, "home_team": home,
+        "sides": ["over", "under"],
+        "best": {
+            "over": {"price": -110, "bookmaker": "draftkings", "age_seconds": 9999.0},
+            "under": {"price": -110, "bookmaker": "draftkings", "age_seconds": 9999.0},
+        },
+        "game": {"state": "live"},
+    }
+
+
+def test_the_GRID_path_refuses_a_quote_naming_another_game():
+    """THE DEFECT, on the path that writes the corrupted price.
+
+    One quote belonging to SD@TB, offered under the bare key, must not price a
+    COL@ATL grid row -- which is exactly what produced `over 7.5 @ -400` on four
+    games at once in production.
+    """
+    from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes_to_grid
+
+    foreign = Quote(
+        key="mlb|totals|over|7.5", source="polymarket_us", sport="mlb",
+        market="totals", side="over", probability=0.80, american=-400,
+        line=7.5, fetched_at=1_000_000.0, game="san diego padres+tampa bay rays",
+    )
+    grid = [_grid_row("evt-col-atl", "Colorado Rockies", "Atlanta Braves")]
+
+    out = apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-08-29", now=1_000_010.0,
+        collected={"quotes": {foreign.key: foreign}},
+    )
+
+    assert out["repriced"] == 0, "a quote naming SD@TB repriced a COL@ATL grid row"
+    assert out["cross_game_rejected"] == 1, (
+        "the rejection must be COUNTED on this path too -- an uncounted zero is"
+        " how the first version stayed invisible"
+    )
+
+
+def test_the_GRID_path_still_takes_a_quote_that_names_no_game():
+    """The asymmetry holds here as well: unknown passes, so no coverage is lost
+    on any source that has not been converted."""
+    from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes_to_grid
+
+    unnamed = Quote(
+        key="mlb|totals|over|7.5", source="polymarket_us", sport="mlb",
+        market="totals", side="over", probability=0.5, american=-110,
+        line=7.5, fetched_at=1_000_000.0, game=None,
+    )
+    grid = [_grid_row("evt-col-atl", "Colorado Rockies", "Atlanta Braves")]
+
+    out = apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-08-29", now=1_000_010.0,
+        collected={"quotes": {unnamed.key: unnamed}},
+    )
+
+    assert out["cross_game_rejected"] == 0
+
+
+def test_the_GRID_path_finds_a_game_QUALIFIED_key():
+    """And it must actually ask for the qualified key, not merely tolerate one.
+
+    Without this the rejection above would still pass while the qualified key
+    was never looked up -- the quote would simply go unmatched, which reads as
+    'safe' and silently drops every converted source.
+    """
+    from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes_to_grid
+
+    qualified = Quote(
+        key="mlb|totals|over|7.5|@atlanta braves+colorado rockies",
+        source="polymarket_us", sport="mlb", market="totals", side="over",
+        probability=0.52, american=-108, line=7.5, fetched_at=1_000_000.0,
+        game="atlanta braves+colorado rockies",
+    )
+    grid = [_grid_row("evt-col-atl", "Colorado Rockies", "Atlanta Braves")]
+
+    out = apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-08-29", now=1_000_010.0,
+        collected={"quotes": {qualified.key: qualified}},
+    )
+
+    assert out["cross_game_rejected"] == 0
+    assert out["sides_seen"] >= 1

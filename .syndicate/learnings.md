@@ -6434,3 +6434,49 @@ was editing.**
 - Third instance in one session of the same family, so it is now a rule rather
   than diligence: see [[feedback-instrument-blindness]] and the entry above on
   running the control before reading a null as absence.
+
+---
+
+## 2026-08-30 — FORBIDDEN: fixing the caller whose NAME matches what you are looking for, without checking which caller actually runs. `#603` shipped inert twice for this. `[lane live-venue-order-placement]`
+
+- **What we believed:** the venue reprice happens in
+  `venue_quote_fanin.apply_venue_quotes`. I traced the corrupted price properly
+  — `book_prices` <- `cells` <- `_reprice_live_benchmark` <- `venue_quote_fanin`
+  — and then stopped one frame early, at the caller whose name matched.
+- **What was actually true:** there are TWO callers.
+  `apply_venue_quotes_to_grid` is the one the board build runs, and it is the
+  one that calls `_reprice_live_benchmark`. It looked up quotes with a bare
+  `quote_key`, passed no schedule, and used none of `_candidate_keys`. **The
+  entire fix landed on the function that does not run.**
+- **The log said so the whole time.** `GRID_REPRICE` fires every cycle;
+  `VENUE_REPRICE` appeared ZERO times in 45 minutes of production logs. I had
+  grepped for both and read the absence as "the build has not reached that
+  stage yet" rather than as "that stage is not on this path".
+- **It survived a deploy and a production reading.** The reading came back flat
+  (kalshi 2 -> 2) and I attributed it to empty NCAAF alias maps — a true fact
+  that was NOT the cause. A real secondary finding made a wrong primary
+  diagnosis feel well-evidenced.
+- **The rules going forward:**
+  1. **Identify the caller by its LOG LINE, not its name.** If two functions
+     could do the job, find which one production actually emits from before
+     editing either. One grep, and it was already in my terminal.
+  2. **An absent log line is a fact about the path, not about the clock.**
+     "It has not got there yet" and "it never goes there" look identical for as
+     long as you are willing to keep waiting.
+  3. **When a fix lands on a shared mechanism, EXTRACT the shared piece.** Both
+     callers now use `_row_game_token` and `_quote_is_for_another_game`. Two
+     paths with their own idea of a row's identity is a join that works on
+     whichever one you happen to read.
+  4. **A flat reading deserves the same scepticism as a green one.** I had a
+     ready explanation (empty alias maps) and stopped looking. The question
+     "could this code have run at all?" was never asked.
+- **Related, same session:** the grid-path test I wrote first had `best: {}`, so
+  `sides_seen` never incremented and `repriced == 0` passed against an
+  implementation that did nothing. Fixed by giving `best` a real dict per side
+  with a deliberately STALE age, so a legitimate quote genuinely would reprice.
+  **A fixture that cannot fail is the same defect as a feature that cannot
+  run.**
+- **Cost:** one wasted deploy, one wasted production reading, and a recorded
+  diagnosis that named the wrong cause. No money path affected — the adapters
+  only qualify keys when handed a schedule, and the grid path passed none, so
+  the inert version could not regress coverage either.
