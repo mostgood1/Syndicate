@@ -7216,3 +7216,42 @@ of the executable risk was real and was not containment.
 - Related: [[project-lastrunat-is-dispatch-not-execution]], and the 2026-08-30
   entry on artifacts being evidence only once you check they contain what their
   name claims.
+
+
+## 2026-08-30 — FORBIDDEN: shipping a scheduled task without proving it can complete ONE run. A schedule is not a mechanism
+
+- **What we believed:** that writing a good task prompt and setting a cron
+  produced a working watcher. Mine was created to close the last open
+  measurement of a long session, and was reported as "the durable version that
+  survives the session".
+- **What was actually true:** it never worked. Two dispatches, two sessions
+  created, two freezes within a minute, **zero measurements**. It blocked on the
+  permission prompt for its FIRST `Bash` call — read directly from the run's
+  transcript, which was two messages: the prompt, then `(called Bash)`.
+- **A NEW SCHEDULED TASK HAS NO STORED TOOL APPROVALS.** Approvals are captured
+  during a run and replayed on later runs, so tasks that already work do so
+  because a human once approved them. A brand-new one has nothing, and its first
+  tool call blocks — regardless of how modest the command is.
+- **I narrowed it to read-only and that was the WRONG REMEDY, recommended by
+  me.** The blocker is the TOOL, not what the tool does. Removing credentials,
+  the Render API and every `git` command changed nothing, because `curl` was
+  always going to prompt first. Diagnosing the *class* of failure is not the
+  same as diagnosing the *cause*.
+
+**How to apply:**
+- **Prove one complete run before believing a schedule.** The proof is the
+  task's own artifact, not `lastRunAt` and not a green-looking session list.
+- **Give any silent-on-null task a liveness artifact.** The heartbeat here was
+  the only reason the failure was visible at all: without it, `lastRunAt` set +
+  silence reads as "ran, found nothing" — a clean green from something that did
+  nothing, twice.
+- **Three artifacts, three questions**: `lastRunAt` = dispatched; a run SESSION
+  with `scheduledTaskId` = started; the written artifact = worked. Name the
+  failure only after all three.
+- **Use a working sibling as the control.** `live-gameline-accuracy-snapshot`
+  fired and COMPLETED in the same minutes on the same machine — which ruled out
+  the scheduler, the machine and Modern Standby in one reading, and left
+  approvals as the only difference.
+- **An enabled-but-broken schedule is worse than none**: it manufactures a dead
+  session every hour that looks like activity. Disable it and hand the
+  measurement back to a human, rather than leaving a watcher that cannot watch.
