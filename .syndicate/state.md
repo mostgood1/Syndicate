@@ -143,9 +143,25 @@ none. **Kalshi trades in-play and is liquid** (14 markets, `vol24 904,281`, 1c
 spreads, prices moving between reads) — so the live opportunity is FEE
 GEOMETRY, not model edge.
 
-**Polymarket's real fee is still unmeasured** (`fees_dollars` null on 13/13
-fills); at even money ~2/3 of modelled pair cost is that unknown. Highest-value
-measurement outstanding.
+**POLYMARKET'S FEE IS MEASURED AND IT IS ZERO** `[2026-08-30]`. `fees_dollars`
+never reaches the ledger and `ORDERS_READ` logs only KEY NAMES, so it was
+recovered from the VENUE'S OWN realized P&L (`venue_settlement`'s
+`delta = after_realized - before_realized`, circularity checked). Ten
+venue-settled orders, $75.98 notional: implied fee -0.0037..+0.0000, total
+-$0.0180, **-2.37 bps**. Every value negative or zero; a real commission is
+strictly positive, so the negatives are reconstruction rounding. One row
+excluded for the `#595` wrong-side signature (`held_side ...SIDE_SHORT` on an
+order placed `under`).
+
+**This INVERTS the priority recorded here earlier.** Polymarket was called "two
+thirds of the modelled pair cost" and the highest-value measurement left; it is
+zero, and **Kalshi is now the entire bar**. MLB break-even at even money falls
+**3.38c -> 0.88c**. The arb VERDICT is unchanged: best raw edge +0.00c and
+-0.87c even with a free Polymarket.
+
+BOUNDS: ten orders, all `totals`, $1-$9. `commissionsBasisPoints` on the venue
+payload is authoritative where this inference is not; population carried in code
+as `POLYMARKET_MEASURED_SAMPLE`.
 
 ## [polymarket-live-totals-quote-names-no-game] 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game identity `[verified 2026-08-29 ~22:3xZ, lane live-venue-order-placement]`
 
