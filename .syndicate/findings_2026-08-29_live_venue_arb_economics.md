@@ -1450,3 +1450,69 @@ produce a single comparison to score.
 Next reading: a full live slate, and the age distribution instrumented before
 anyone touches the ceiling.
 
+---
+
+## THE AGE INSTRUMENT FIRED, AND IT REFRAMES THE CEILING (2026-08-30 17:28Z)
+
+`ad4bc5c6` live on refresh-worker 17:17Z. First board build after boot:
+
+    sport=mlb    n=32  min=4.9  p50=4.9  max=4.9  ceiling=45.0  would_pass=32/32
+    sport=soccer n=2   min=34.5 p50=34.5 max=34.5 ceiling=45.0  would_pass=2/2
+
+### THE PERCENTILES ARE DEGENERATE, AND THAT IS THE FINDING
+
+**Every quote in a sport shares ONE age.** Not approximately — identically, to
+the decimal, across 32 MLB quotes. So `age_seconds` is not per-quote freshness
+at all: it is the age of the whole VENUE CAPTURE for that sport, measured at
+board-build time. Every quote in a build inherits it.
+
+That means the freshness ceiling is **not filtering stale quotes out of fresh
+ones. It is an all-or-nothing gate on one number per sport per build** — either
+the entire sport's venue data passes or none of it does. Which is exactly what
+the readings show, and what looked inexplicable before:
+
+    16:57Z  0 of 6 passed    (the capture was 64s old)
+    17:28Z  32 of 32 passed  (4.9s), 2 of 2 soccer (34.5s)
+
+Not a coincidence and not a slate difference. **A race between the venue capture
+cycle and the board build cycle**, resolved per build.
+
+### WHAT THIS MEANS FOR THE 45s NUMBER
+
+The question was never "how stale are individual quotes". It is **"how far
+behind the capture is a board build, and how often does that exceed 45s"** —
+and that is a property of two schedules, not of market data.
+
+So the quantity to characterise is the SERIES of one value per sport per build,
+not a distribution within a build. The instrument already emits exactly that;
+it just needs samples across builds. Three so far: **4.9, 34.5, and 64
+(inferred from the earlier refusal)** — spanning the ceiling, which is why the
+outcome flips.
+
+**The percentile fields in the log line are therefore near-useless as written**
+and should not be read as a spread. `n` and the single value are the payload.
+Left in place rather than removed: they are what PROVED the degeneracy, and a
+future source with genuine per-quote ages would make them meaningful again.
+
+### WHAT WOULD ACTUALLY FIX IT
+
+Raising the ceiling is the crude answer and it treats a scheduling artifact as a
+data-quality bar. The better ones, in order:
+
+1. **Make the board build read the capture it needs**, or trigger a capture when
+   the one on hand is older than the ceiling. Removes the race instead of
+   widening the tolerance for it.
+2. **Set the ceiling from the observed capture-to-build lag series** once there
+   are enough samples — and state it as "we tolerate a capture up to N seconds
+   behind the build", which is what it actually means, rather than "a quote may
+   be N seconds stale", which is what it currently claims.
+
+Either way the ceiling should stop being described as per-quote freshness. That
+description is what made 45s look like a reasonable guess.
+
+### STATUS
+
+`servable=False` unchanged. Still no scored comparison. But the reason the
+comparison keeps not happening is now a measured scheduling property rather
+than an open question.
+
