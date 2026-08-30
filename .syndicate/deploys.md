@@ -37964,3 +37964,32 @@ claim: acquired 21:56Z, EXPIRED 22:41Z while waiting for a preflight lull,
        Preflight held ~86 attempts across 3 polls; the worker runs a continuous
        league-by-league soccer artifact build during a live slate, so `[JOB]`
        is almost never zero. CLEAR finally at 22:44:38Z.
+
+## 2026-08-30T00:19:36Z — refresh-worker `af535a3d8` — `#603` cross-game quote keys — **RODE ANOTHER LANE'S DEPLOY; READING IS UNPROVEN**
+
+- **Deployed by:** `venue-first-market-universe` (claim 00:16:35Z), not by me.
+  `af535a3d8` is origin/main head and CONTAINS my commits — verified by CONTENT
+  (`game_token`/`_kalshi_game_token` x9 in the adapters, `cross_game_rejected`
+  x3 in the fan-in), not by ancestry alone. I acquired no claim and triggered
+  nothing: a second deploy of the same service would have been a competing
+  restart, and serialisation is not composition.
+- **Service chosen by reading the live env**, not inferred:
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` = true on
+  refresh-worker, false on live-odds-worker and web.
+- **verify:** board `written_at 00:30:59Z` (> deploy 00:19:36Z, so built by the
+  new code) — live totals rows SHARING one price across different games:
+  **kalshi 2 of 19, polymarket 4 of 7. Control at 00:18:41Z: kalshi 2 of 20.**
+  **NO IMPROVEMENT. The fix is INERT on every sport that was live.**
+- **Cause, measured:** `_alias_map` has **0 entries for ncaaf/ncaab/nhl**
+  (mlb 38, nfl 38, wnba 50, soccer 474), so `canonical_team` -> None ->
+  `game_token` -> None -> bare key -> collision survives. And Kalshi's soccer
+  blobs resolve only partially (`CLTATL` ok, `PHINYRB` no_match). The
+  bare-key fallback then passes them through by design.
+- **NOT a failed fix and NOT a working one.** MLB — where the original 26-of-28
+  was measured and both maps are good — FINISHED before the deploy landed
+  (Polymarket live MLB totals 28 at 21:56Z -> 0 at 00:24Z). `#603` must not be
+  reported as fixed in production until an MLB slate exercises it.
+- **Owed:** re-read after the first MLB game on 2026-08-30 (~17:00Z+).
+- **Also shipped-but-not-deployed:** `1b21f681` emits `CROSS_GAME_REJECTED`.
+  The counter existed and NOTHING PRINTED IT, so the mechanism could not be
+  read at all tonight; this reading rests entirely on behavioural evidence.

@@ -575,3 +575,101 @@ species of defect as the inert Kalshi guard.
 - **No production reading exists**, and cannot until this deploys. The number
   that proves it: `cross_game_rejected` on a live slate, and live Polymarket
   totals no longer sharing a price across games.
+
+---
+
+# THE PRODUCTION READING — `#603` IS DEPLOYED AND **UNPROVEN**. NOT PROVEN WORKING, NOT PROVEN BROKEN. `[2026-08-30 00:31Z]`
+
+## Deploy
+
+Shipped on ANOTHER lane's deploy, not mine: `venue-first-market-universe` held
+the refresh-worker claim (00:16:35Z) and deployed `af535a3d8`, which is
+origin/main's head and CONTAINS my work — verified by CONTENT, not ancestry
+(`game_token`/`_kalshi_game_token` x9, `cross_game_rejected` x3). Live
+**00:19:36.947Z**. I took no claim and triggered nothing; a second deploy would
+have been a competing restart of the same service.
+
+Service chosen by READING THE LIVE ENV, not inferring:
+`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `true` on
+refresh-worker, `false` on live-odds-worker and web. refresh-worker is the only
+service that runs the fan-in.
+
+## Gate
+
+Board `written_at` **00:30:59Z** > deploy **00:19:36Z**. The pool read below was
+built by the new code. The control (`00:18:41Z`) predates the deploy by 55
+seconds — reading it as "after" would have been the exact false verdict the
+build-stamp rule exists to prevent.
+
+## THE READING — the collision is STILL THERE
+
+    source       totals  live   live rows sharing a price ACROSS GAMES
+    kalshi           25    19   2   over 2.5 @ -270 -> Charlotte FC@Atlanta Utd
+                                                       Philadelphia Union@NY RB
+    polymarket       13     7   4   over 47.5 @ +108  -> Jacksonville St, New Mexico St
+                                    under 47.5 @ -113 -> the same two
+    draftkings      138     0   0
+    fanduel         139     0   0
+
+CONTROL for comparison: kalshi 2 shared of 20 live; polymarket live=0.
+**Kalshi 2 -> 2. No improvement.**
+
+## WHY, measured rather than assumed — and it is TWO different causes
+
+**1. NCAAF has no club map at all.** `_alias_map` entry counts, read live:
+
+    mlb 38 | nfl 38 | wnba 50 | soccer 474 | ncaaf 0 | ncaab 0 | nhl 0
+
+`canonical_team("ncaaf", "Jacksonville State Gamecocks")` -> **None**, so
+`game_token` -> None, so the key stays bare and the collision survives. This
+was DOCUMENTED before I started — `test_a_sport_with_NO_club_map_offers_no_
+token_keys` says `_alias_map` returns `{}` for ncaaf/ncaab/nhl — and I did not
+connect it to my own precondition.
+
+**2. Soccer resolves on the BOARD side and only PARTIALLY on Kalshi's.**
+`game_token("soccer", "Philadelphia Union", "New York Red Bulls")` ->
+`philadelphia union+red bull new york`, fine. But Kalshi's side must resolve a
+ticker BLOB, and that is where it splits:
+
+    match_event_blob('CLTATL')  -> ok, Atlanta United FC
+    match_event_blob('PHINYRB') -> no_match
+    match_event_blob('PHINY')   -> no_match
+
+So one fixture resolves and the other does not.
+
+**3. The bare-key fallback then does exactly what I designed it to do, and
+that is the hole.** A quote whose game cannot be named keys BARE and carries
+`game=None`, and the rejection check passes `None` through by design — "a quote
+that names none is allowed through exactly as it is today". So an unresolvable
+fixture keeps the OLD behaviour, INCLUDING THE OLD BUG.
+
+## WHAT THIS DOES AND DOES NOT SAY
+
+**It does NOT say the fix is broken.** Every unit test passes, including the
+off!=on pairs, and MLB resolves cleanly on both sides
+(`atlanta braves+colorado rockies`).
+
+**It does NOT say the fix works.** The population that would exercise it —
+MLB, where the original 26-of-28 was measured and where both maps are good —
+**finished for the night before the deploy landed.** Polymarket live MLB totals
+went 28 (21:56Z) -> 0 (00:24Z).
+
+**The honest state is UNPROVEN**, and the fix is INERT on every sport that was
+live when it shipped. That is not a coincidence of timing I should wave away:
+NCAAF and NHL and NCAAB have NO club map, so the fix can never work there until
+one exists.
+
+## THE NEXT STEP IS A DECISION, NOT A FIX
+
+The bare-key fallback preserves coverage and preserves the bug. The two ways
+out are in tension and this is the user's call:
+
+- **Tighten:** for role-keyed markets, no game token -> NO match. Closes the
+  collision everywhere immediately, and drops venue pricing on ncaaf/ncaab/nhl
+  entirely plus the soccer fixtures Kalshi cannot resolve.
+- **Populate:** build the ncaaf/ncaab/nhl alias maps and widen Kalshi's soccer
+  codes. Keeps coverage, and the collision stays live until each map lands.
+
+**VERIFICATION STILL OWED:** an MLB slate. The first MLB game after ~17:00Z
+2026-08-30 will exercise the path the original defect was measured on. Until
+then `#603` must NOT be reported as fixed in production.
