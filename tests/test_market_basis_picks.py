@@ -846,3 +846,77 @@ def test_an_unreadable_side_near_half_still_withholds():
         _pm_order(avgPx={"value": "0.51"}, price={"value": "0.49"}, outcomeSide="MYSTERY")
     )
     assert view["fill_price"] is None
+
+
+# ------------------------------------ avgPx = 0.0000 is absence, not a price
+
+
+def test_a_zero_avgpx_is_absent_on_both_sides(capsys):
+    """REGRESSION, production 2026-08-30. The SAME `avgPx='0.0000'` recorded
+    0.0 on one leg and None on the other. Zero is an UNFILLED order, not a
+    fill at zero, and it must read identically whatever the side."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    for side in ("OUTCOME_SIDE_YES", "OUTCOME_SIDE_NO"):
+        view = venue_order_view(
+            _pm_order(
+                avgPx={"value": "0.0000"},
+                price={"value": "0.51"},
+                outcomeSide=side,
+                cumQuantity=0,
+                state="ORDER_STATE_NEW",
+            )
+        )
+        assert view["fill_price"] is None, f"{side} booked a zero as a price"
+    # And it must not masquerade as an impossible-fill alarm on a resting order.
+    assert "FILL_ABOVE_LIMIT" not in capsys.readouterr().out
+
+
+def test_a_zero_price_never_books_a_position_at_zero_dollars():
+    """The hazard the guard is placed for: on a BUY the zero used to survive,
+    and `fill_stake_dollars` is derived as contracts x fill_price."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(
+        _pm_order(
+            avgPx={"value": "0.0000"},
+            price={"value": "0.51"},
+            side="ORDER_SIDE_BUY",
+            outcomeSide="OUTCOME_SIDE_YES",
+            cumQuantity=13.13,
+        )
+    )
+    assert view["state"] == "filled", "the fill itself must survive"
+    assert view["fill_price"] is None, "a filled row must not carry a $0 price"
+
+
+def test_a_zero_WITH_a_fill_is_loud_and_a_resting_zero_is_quiet(capsys):
+    """A resting zero is normal and must not spam; a zero on a FILLED order is
+    the dangerous combination and must say so."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    venue_order_view(
+        _pm_order(avgPx={"value": "0.0000"}, cumQuantity=0, state="ORDER_STATE_NEW")
+    )
+    assert "FILL_PRICE_ZERO_WITH_FILL" not in capsys.readouterr().out
+
+    venue_order_view(_pm_order(avgPx={"value": "0.0000"}, cumQuantity=13.13))
+    assert "FILL_PRICE_ZERO_WITH_FILL" in capsys.readouterr().out
+
+
+def test_an_out_of_range_price_is_refused_and_named_as_a_units_error(capsys):
+    """>= 1 is the units error this file records costing $347.36 on a $1.64 stake."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(_pm_order(avgPx={"value": "104.0"}, cumQuantity=13.13))
+    assert view["fill_price"] is None
+    out = capsys.readouterr().out
+    assert "FILL_PRICE_OUT_OF_RANGE" in out and "104.0" in out
+
+
+def test_a_real_price_still_reads_through_unchanged():
+    """The blocking order must keep working -- this guard must not eat it."""
+    from syndicate.features.shared.polymarket_us_orders import venue_order_view
+
+    view = venue_order_view(_pm_order())
+    assert abs(view["fill_price"] - 0.2350) < 1e-6

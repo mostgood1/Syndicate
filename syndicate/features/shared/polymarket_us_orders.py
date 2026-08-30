@@ -1115,6 +1115,12 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
 
     price = None
     raw_price = None
+    # Fields whose value was rejected as NOT A PRICE, kept so the reason is
+    # visible rather than the price silently being absent. A zero and a 104.0
+    # are different problems -- an unfilled order versus a units error -- and
+    # collapsing them would hide the one that matters.
+    zero_price_fields: list[str] = []
+    out_of_range_fields: list[tuple[str, float]] = []
     # `avgPx` is the venue's own average fill price, from the measured keys.
     for field in ("avgPx", "averageFillPrice", "average_fill_price", "avgPrice", "fillPrice"):
         raw_price = order.get(field)
@@ -1123,10 +1129,45 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
         if raw_price in (None, ""):
             continue
         try:
-            price = round(float(raw_price), 4)
+            candidate = round(float(raw_price), 4)
         except (TypeError, ValueError):
             price = None
         else:
+            # A VALUE OUTSIDE (0, 1) IS NOT A PRICE. `avgPx` is `0.0000` on an
+            # order the venue has not filled: that zero is ABSENCE wearing a
+            # number, and treating it as a price is not cosmetic.
+            #
+            # MEASURED IN PRODUCTION 2026-08-30, live-odds-worker `77ca329a`:
+            #
+            #   * The same `avgPx='0.0000'` recorded `0.0` on one leg and `None`
+            #     on another. The split was the DIRECTION check, not the side:
+            #     a zero is below any limit, so it tripped the sell branch and
+            #     was withheld -- the right answer reached by an argument about
+            #     an impossible fill, on an order with `filled=0.0`.
+            #   * `FILL_ABOVE_LIMIT` fired **36 times in one hour on orders with
+            #     `filled=0.0`**. A guard that cries wolf on every resting order
+            #     cannot be believed when it fires for real.
+            #   * On a BUY the zero SURVIVED as `recorded=0.0`. That is the
+            #     hazard: `fill_stake_dollars` is derived as `contracts x
+            #     fill_price` (`execution_ledger`), so once `cumQuantity` goes
+            #     positive a real position books at **$0**. Same class as the
+            #     $347.36-against-a-$1.64-stake units bug, inverted -- and
+            #     harder to catch, because zero reads as nothing rather than as
+            #     a mistake.
+            #
+            # This is why the guard belongs HERE and not at the limit check:
+            # the limit check can only ever catch the sell half, and by then the
+            # value has already been treated as a price.
+            #
+            # `continue`, not `break` -- a zero in `avgPx` must not stop the
+            # search, because a later field may carry a real price.
+            if not (0.0 < candidate < 1.0):
+                if candidate == 0.0:
+                    zero_price_fields.append(field)
+                else:
+                    out_of_range_fields.append((field, candidate))
+                continue
+            price = candidate
             break
 
     # --------------------------------------------------------------------
@@ -1334,6 +1375,37 @@ def venue_order_view(order: Mapping[str, Any]) -> dict[str, Any]:
             flush=True,
         )
         price = None
+
+    # NOT-A-PRICE, REPORTED. A refusal nobody can read is one somebody deletes,
+    # so a rejected value says which field and why -- but the two cases are
+    # logged at very different volumes on purpose.
+    #
+    # A zero on a RESTING order is the normal case and is SILENT: it is what
+    # every unfilled order looks like, and logging it is what turned
+    # FILL_ABOVE_LIMIT into 36 lines an hour of noise. A zero WITH a fill is the
+    # dangerous combination -- the venue says quantity moved and reports no
+    # price -- and is loud. Anything outside (0,1) that is not zero is a units
+    # error and says so in those words.
+    if out_of_range_fields:
+        print(
+            f"[polymarket_us_orders] FILL_PRICE_OUT_OF_RANGE"
+            f" order={order.get('id') or order.get('orderId')}"
+            f" rejected={out_of_range_fields!r}"
+            " -- outside (0,1), so not a probability. Price treated as ABSENT."
+            " A value >= 1 is the units error this file records costing $347.36"
+            " against a $1.64 stake.",
+            flush=True,
+        )
+    elif zero_price_fields and filled:
+        print(
+            f"[polymarket_us_orders] FILL_PRICE_ZERO_WITH_FILL"
+            f" order={order.get('id') or order.get('orderId')}"
+            f" filled={filled!r} fields={zero_price_fields!r}"
+            " -- venue reports a FILL with a zero price. Price treated as"
+            " ABSENT; reconciliation falls back to the requested price rather"
+            " than booking the position at $0.",
+            flush=True,
+        )
 
     # THE RAW FIELD, LOGGED. This defect was diagnosed from a screenshot and
     # arithmetic because no log line carried `avgPx`, so the one input that

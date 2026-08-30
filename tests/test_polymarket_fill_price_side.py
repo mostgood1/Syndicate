@@ -70,9 +70,22 @@ def test_the_raw_avgPx_is_logged(capsys):
 @pytest.mark.parametrize("price", ["0", "1", "1.0", "0.0"])
 def test_a_price_at_or_outside_the_bounds_is_never_complemented(price):
     """0 and 1 are not prices -- they are an empty side of the book. Complementing
-    either manufactures a real-looking number from an absent one."""
+    either manufactures a real-looking number from an absent one.
+
+    UPDATED 2026-08-30: this now asserts ABSENCE rather than pass-through, which
+    is what the sentence above already said. Not complementing a 0 was only half
+    the fix -- the value still reached the row AS A PRICE, and on a BUY it
+    survived to `fill_price=0.0`. `fill_stake_dollars` is derived as
+    `contracts x fill_price`, so once the venue reported quantity the position
+    would book at $0. Measured in production the same day: the identical
+    `avgPx='0.0000'` recorded `0.0` on one leg and `None` on another, and
+    `FILL_ABOVE_LIMIT` fired 36 times in an hour on orders with `filled=0.0`.
+
+    "Not a price" and "absent" are the same statement; this now makes them the
+    same value.
+    """
     view = venue_order_view(_order(avgPx=price))
-    assert view["fill_price"] == float(price)
+    assert view["fill_price"] is None
 
 
 def test_the_blocked_order_now_passes_the_dollar_bound():
