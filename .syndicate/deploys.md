@@ -38606,3 +38606,36 @@ lifting: either restore an order-aware assertion against whatever now owns
 side, or establish that side is decided purely from the SLUG with no dependence
 on board home/away — and then DELETE the old test deliberately, so the next
 reader is not told a protection exists that does not.
+
+### 2026-08-30 ~17:0xZ — live-odds-worker `77ca329a` — the fill-price fix is LIVE; its EFFECT is NOT YET OBSERVED
+
+**Shipped, not deployed by me.** `0a7f7923` (two bugs discarding `avgPx`) rode
+along on `live-venue-order-placement`'s deploy from tip, which is what I asked
+them to do rather than take a second deploy on the live-money service. I never
+held the live-odds-worker claim; they held it throughout.
+
+**VERIFIED BY CONTENT, not ancestry** — `git show 77ca329a:...polymarket_us_orders.py`
+carries `_COMPLEMENT_MARGIN`, `decided_by_limit` and `is_sell = order_direction`.
+
+**verify (execution restored):** `/api/portfolio/live` — `mode=live armed=True
+kill_switch=False`, `UNRECONCILED 0`, `ledger_error None`, `health.ok True`, and
+**9 orders with Kalshi fills booking real prices** (0.43/$9.46, 0.42/$3.36,
+0.53/$1.59, 0.55/$6.05). The ~12h halt is over.
+
+**THE HALT WAS CLEARED BY THEIR COMMITS, NOT MINE** — `9733a01a` (reconcile) and
+`77ca329a` (the block predicate was broader than the fix predicate). My change
+is a correctness fix to what gets RECORDED, and by the time it deployed the
+outage was already over. Recorded plainly so this deploy is not later credited
+with the recovery.
+
+**MY FIX'S EFFECT IS UNVERIFIED IN PRODUCTION AND MUST NOT BE CALLED VERIFIED.**
+It only fires on a FILLED Polymarket order. Every Polymarket order since the
+deploy is `submitted`/resting (4 of 4, `fill_price None`, which is correct for
+an unfilled order); the Kalshi fills above go through a different reader. So
+nothing yet exercises `venue_order_view`'s complement or direction branches on
+live data. **The reading that would prove it:** the next FILLED Polymarket order
+carrying a non-null `fill_price` whose value sits on the same side of the
+submitted limit as the order's direction. Owed, not done.
+
+Backing evidence for the change itself is offline: the rule reproduces 4/4 of
+the fills this file records plus the blocker, and 824 tests pass.
