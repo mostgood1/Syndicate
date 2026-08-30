@@ -2466,3 +2466,59 @@ def test_ONE_SECOND_of_restatement_used_to_mint_a_new_key():
         assert position_key(base) == position_key(moved), (
             f"{delta} still forks the identity -- one second is enough"
         )
+
+
+def test_the_LEGACY_KEY_SURVIVES_THE_WHOLE_CHAIN_commit_to_request():
+    """END TO END, because every half of this passed while the chain was broken.
+
+    `portfolio_commit` emitted `legacy_position_key`, `record_order` checked it,
+    and the OrderRequest built in between never carried it -- so
+    `_legacy_idempotency_key` returned None on every order and the migration
+    guard was decoration.
+
+    Caught in production 2026-08-30 18:41Z on the first executor cycle after the
+    fix: `placed=0 duplicates=8` LOOKED like the guard working, while
+    `LEGACY_KEY_MATCH` had fired ZERO times. Those duplicates matched on the
+    plan's STORED keys, which predate the change; the real exposure was the next
+    plan rebuild.
+
+    So this asserts the JOIN, not the endpoints: a position dict as
+    `portfolio_commit` writes it, through the real request builder, must arrive
+    at a request whose legacy idempotency key is computable.
+    """
+    from pipeline.execute_portfolio import _order_from_position
+    from syndicate.features.shared import execution_ledger as mod
+    from syndicate.features.shared.portfolio_commit import (
+        legacy_position_key,
+        position_key,
+    )
+
+    row = {
+        "sport": "mlb", "event_id": "evt-lad-det", "kind": "game", "market": "totals",
+        "segment": "full_game", "player_name": None, "home_team": "Detroit Tigers",
+        "away_team": "Los Angeles Dodgers", "commence_time": "2026-08-30T17:41:00Z",
+        "side": "under", "line": 7.5, "quote": {"bookmaker": "polymarket"},
+    }
+    position = {
+        **{k: row[k] for k in (
+            "sport", "event_id", "kind", "market", "segment", "player_name",
+            "home_team", "away_team", "commence_time", "side", "line")},
+        "position_key": position_key(row),
+        "legacy_position_key": legacy_position_key(row),
+        "price": -104.0,
+        "stake_dollars": 4.06,
+    }
+    assert position["position_key"] != position["legacy_position_key"], (
+        "fixture must have two distinct keys or it proves nothing"
+    )
+
+    request = _order_from_position(position, "2026-08-30", "polymarket")
+    assert request is not None, "the request builder rejected a well-formed position"
+    assert request.legacy_position_key == position["legacy_position_key"], (
+        "the legacy key was dropped between the plan and the request -- "
+        "the migration guard is inert"
+    )
+    assert mod._legacy_idempotency_key(request) is not None, (
+        "the legacy idempotency key is not computable, so record_order cannot "
+        "recognise a pre-fix order"
+    )

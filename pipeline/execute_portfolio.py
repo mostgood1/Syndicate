@@ -133,6 +133,22 @@ def _order_from_position(position: Mapping[str, Any], selected_date: str, venue:
         home_team=position.get("home_team"),
         away_team=position.get("away_team"),
         commence_time=position.get("commence_time"),
+        # THE PRE-2026-08-30 KEY, and WITHOUT THIS LINE THE MIGRATION GUARD IS
+        # INERT. `portfolio_commit` emits it and `record_order` checks it, but
+        # the request in between never carried it -- so `_legacy_idempotency_key`
+        # returned None on every order and the dual-key check was decoration.
+        #
+        # Caught in production 2026-08-30 18:41Z, on the first executor cycle
+        # after the fix deployed: `placed=0 duplicates=8` on kalshi and
+        # `duplicates=1` on polymarket looked like the guard working, and
+        # `LEGACY_KEY_MATCH` had fired ZERO times. Those duplicates matched on
+        # the plan's STORED keys, which still predate the change -- the real
+        # test arrives on the next plan rebuild, when fresh keys are computed
+        # and nothing would have matched the ledger's pre-fix rows.
+        #
+        # `presence != reachability`: three modules each held a correct half and
+        # the chain was never joined.
+        legacy_position_key=position.get("legacy_position_key"),
         opening_key=position.get("opening_key"),
         game_pk=(str(position.get("game_pk")).strip() or None)
         if position.get("game_pk") is not None
