@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 669 rules `[generated]`
+## Index — 670 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -189,7 +189,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 494**
+**Rules and corrections — 495**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -481,6 +481,7 @@
 - [2026-08-29 — ancestry is a DEPLOY-TIME MEASUREMENT, never a claim](#2026-08-29-ancestry-is-a-deploy-time-measurement-never-a-claim)
 - [2026-08-29 — a null from an instrument you have not calibrated is not evidence. RUN THE…](#2026-08-29-a-null-from-an-instrument-you-have-not-calibrated-is-not-evidence-run-the-control)
 - [2026-08-30 — CORRECTION to the entry above: my "VENUE_REPRICE never fires" was LOG TRUN…](#2026-08-30-correction-to-the-entry-above-my-venue_reprice-never-fires-was-log-truncation-not-absence-the-rule-i-wrote-from-it-was-right-the-evidence-i-wrote-it-from-was-not)
+- [2026-08-30 — RULE: an artifact is evidence only once you have checked it contains what…](#2026-08-30-rule-an-artifact-is-evidence-only-once-you-have-checked-it-contains-what-its-name-claims-four-instances-in-one-session)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

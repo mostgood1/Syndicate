@@ -550,11 +550,63 @@ which we card 51 — and we card their MAIN line, not the ladder (`spreads: 1`,
 existing board spread rows.** That is where demand and supply actually overlap.
 It is worth doing. It is not 3,290.
 
-### The three exchange items, resized
+### A FOURTH INSTANCE — `leg_without_price` / `no_price`, found by a peer session
 
-    h2h_keyed_by_team      905  ->  0        not a defect at all
-    clubs_unresolved       314  ->  ~26      markets, rest out of scope (6b)
-    spreads_refused      3,288  ->  ~443     with real board demand (mlb+wnba)
+Same shape, two lines above the one analysed above, and this one APPENDS:
+
+    626  probability = _kalshi_leg_probability(row, "yes")
+    627  if probability is None:
+    628      no_price += 1                 <- no `continue`
+    648  if primary_key is None: ...; continue    <- the ONLY continue
+    651  quotes.append(Quote(... probability=probability,
+                             american=probability_to_american(probability) ...))
+
+`probability` is never reassigned between 626 and the append (checked), and
+`probability_to_american(None)` returns `None` silently. **So a Quote with
+`probability=None, american=None` IS published.**
+
+**THE ASYMMETRY IS THE PROOF THIS IS AN OVERSIGHT, NOT A DESIGN CHOICE.** The
+MIRROR leg in the same function guards correctly — `if mirror_probability is
+None: no_price += 1` / `else: ... quotes.append(...)`. Same counter, same
+function, opposite handling. Only the PRIMARY leg publishes priceless.
+
+**IT IS NOT A CORRECTNESS BUG TODAY, and that was traced rather than assumed.**
+`venue_quote_fanin.py:1128` refuses it at the point of use — `if quote.american
+is None: continue`, commented *"No price is not a reprice. Refreshing the clock
+here would be the age-only laundering this function refuses."* And there is **no
+reader of `.probability` outside the adapter at all**, so the fan-in is the sole
+consumer. The priceless quote is published and inert.
+
+**TWO RESIDUAL HAZARDS, STATED:**
+- A future consumer of the quote list that does not repeat the `american is
+  None` guard turns ~700-800 inert quotes per cycle live. The mirror leg already
+  shows what the primary leg should do.
+- `status = "ok" if quotes else "no_rows"` means a source producing ONLY
+  priceless quotes still reports `ok`. That is precisely the past incident
+  `_kalshi_ok_reason`'s own comment records ("Every Kalshi quote was published
+  priceless for as long as the adapter read `yes_bid`, and nothing said so").
+
+Production magnitude, `leg_without_price`: mlb 557->679, nfl 69->79, ncaaf 49,
+soccer 9->6, wnba 0. That count spans BOTH legs, so the published-priceless
+subset is smaller than the number shown.
+
+### The exchange items, resized — AND WHICH RESIZES ARE PERMANENT
+
+**Two different kinds of number here, and conflating them would make this
+finding read as unreliable when it is the SLATE that moved.**
+
+| item | from | to | basis | reproducible? |
+|---|---|---|---|---|
+| `h2h_keyed_by_team` | 905 | **0** | INCREMENT SITE — code | **PERMANENT.** Re-reading the code gives 0 forever |
+| `leg_without_price` | ~800 | **0 live** | INCREMENT SITE + consumer guard — code | **PERMANENT**, subject to the two hazards above |
+| `clubs_unresolved` | 314 | ~11-43 | production slate, `2026-08-30T01-02Z` | **NO** — slate moved 166->163 within the hour |
+| `spreads_refused` | 3,288 | ~443 | production slate + served board, same window | **NO** — same reason |
+
+The first two rest on reading an increment site and cannot drift. The last two
+are readings with a timestamp: someone re-running next week will reproduce the
+zeros and will NOT reproduce 443 or 26. **That is the slate having moved, not
+the method being unreliable** — and it is why the interval and the drift
+measurement in 6b matter more than either point estimate.
 
 **A headline of ~4,500 discarded exchange quotes collapses to a few hundred
 genuinely actionable ones.** Every one of the three was oversized by reading a

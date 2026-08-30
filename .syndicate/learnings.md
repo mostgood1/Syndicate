@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 669 rules `[generated]`
+## Index — 670 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -113,6 +113,22 @@
   being ladder RUNGS (~8 per game) rather than games. Resized: 905 -> 0,
   314 -> ~26, 3288 -> ~443. **A ~4,500-quote headline collapsed to a few
   hundred.**
+- **FOUR INSTANCES, NOT THREE.** A peer session found `no_price` /
+  `leg_without_price` two lines above `h2h_keyed_by_team` — same shape, and this
+  one APPENDS a `Quote(probability=None, american=None)`; the MIRROR leg in the
+  same function guards correctly (`if None: count; else: append`) while the
+  PRIMARY leg does not, which is what proves it an oversight rather than a
+  design choice. **Traced, not assumed: it is NOT a correctness bug today** —
+  `venue_quote_fanin.py:1128` refuses it at the point of use (`if quote.american
+  is None: continue`) and nothing outside the adapter reads `.probability`. It
+  is inert, and one unguarded future consumer away from not being.
+- **MARK WHICH CORRECTIONS ARE PERMANENT.** `905 -> 0` and the `no_price`
+  finding rest on reading an INCREMENT SITE and cannot drift. `314 -> ~11-43`
+  and `3288 -> ~443` rest on production slate state that moved 166 -> 163 within
+  the hour. Written the same way, a reader re-running next week reproduces the
+  zeros, fails to reproduce the rest, and concludes the METHOD is unreliable
+  rather than that the SLATE moved. Timestamp the readings; leave the
+  code-derived corrections undated.
 - **THE STRUCTURAL CAUSE, and it is a design defect in the emitter, not just a
   reading error:** `_kalshi_ok_reason` and `_polymarket_ok_reason` format
   SUCCESS counters and REFUSAL counters identically — `name:count`, space
@@ -6715,3 +6731,36 @@ justified was independently correct.
 - Same family as [[feedback-instrument-blindness]] and the 2026-08-29 entry on
   running the control before reading a null as absence — this is the fourth
   distinct instance, so it is a standing rule, not diligence.
+
+---
+
+## 2026-08-30 — FORBIDDEN: `git checkout --theirs .` to clear a conflict in an append-only ledger. It is a DELETION TOOL, and it staged 929 of them over a peer's work.
+
+- **What we believed:** that after hand-resolving a stash-pop conflict in
+  `deploys.md`, a trailing `git checkout --theirs .` was a harmless tidy-up.
+- **What was actually true:** the stashed side of both conflict regions was
+  EMPTY — an older copy of the ledger. `--theirs` therefore replaced the
+  working tree with nothing, staging **929 deletions**, including a peer lane's
+  `da2de430` entry. My own python resolution, run seconds earlier, had been
+  CORRECT; the git shortcut undid it.
+- **How we found out:** `git diff --cached --stat` before committing, which
+  read `929 deletions(-)` on a file that should only ever grow. That habit is
+  the only reason this is a near-miss and not an incident — the repo already
+  carries a 4,993-staged-deletion entry from the same family.
+- **A second trap inside the recovery.** After restoring from HEAD I checked for
+  my own entry using the phrase from the COMMIT TITLE ("one real reading, two
+  worthless zeros"), which never appears in the file. It reported missing and I
+  briefly believed I had lost my own work. **Grep the artifact for text that is
+  in the artifact, not for what you called the commit.**
+- **The rules going forward:**
+  1. **On an append-only file, `--ours`/`--theirs` are both wrong by default.**
+     The correct resolution is a UNION, and it has to be reasoned about. If one
+     side is empty, that side is a stale copy and taking it deletes history.
+  2. **A negative line count on a ledger is an alarm, not a diff.** `deploys.md`,
+     `learnings.md`, `lanes.md` and `state.md` grow. Any staged deletion in them
+     is a mistake until proven otherwise.
+  3. **Verify a restore by CONTENT, both directions.** Mine present AND the
+     peer's present, plus byte count and zero markers. One of those four alone
+     would have passed while the file was wrong.
+- **Cost:** none realised. Caught pre-commit, restored from HEAD, verified at
+  2,091,630 bytes with the peer's entry and mine both present.
