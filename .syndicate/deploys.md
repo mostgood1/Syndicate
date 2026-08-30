@@ -38639,3 +38639,42 @@ submitted limit as the order's direction. Owed, not done.
 
 Backing evidence for the change itself is offline: the rule reproduces 4/4 of
 the fills this file records plus the blocker, and 824 tests pass.
+
+### 2026-08-30 17:13Z — THE OWED READING IS DISCHARGED: the fill-price fix ran on live data
+
+The previous entry said this fix's effect was NOT observed and named the reading
+that would prove it. It has now been taken, from live-odds-worker's own logs
+(`77ca329a`, live 16:38:59Z), on the exact order the fix was written for:
+
+    [polymarket_us_orders] FILL_PRICE order=C65VD0R72KDG
+      outcome_side='OUTCOME_SIDE_NO'  avgPx='0.2350'  recorded=0.235
+    [polymarket_us_orders] COMMISSION order=C65VD0R72KDG
+      fill_price=0.235  filled=13.13  fill_cost=3.08555
+
+**`recorded=0.235`** -- not complemented to 0.7650, not withheld. Under the
+prior code this order produced `fill_price=None`, which is what forced the
+contract bound that halted both venues. `fill_cost=3.08555` is the predicted
+`13.13 x 0.235 = $3.0856`, now OBSERVED rather than bounded. The opposite
+direction is confirmed too: `C6HEC805TKDN outcome_side=YES avgPx=0.4400
+recorded=0.44 fill_cost=3.388`.
+
+**EXECUTION IS HEALTHY, CONFIRMED WORKER-SIDE and not from the web page** --
+which matters because a peer had warned the two disagreed:
+
+    EXECUTION status=ok reason=None mode=live  spent={'dollars': 11.37, 'orders': 4}
+    RECONCILE kalshi     candidates=9 stamped=9 implausible=0
+    RECONCILE polymarket candidates=8 stamped=8 implausible=0
+    UNRECONCILABLE_ORDER key='08e9385059f46852b160eeab' venue='paper:polymarket'
+      mode='paper' reason=mode_not_live  blocks_live=False
+
+Zero `BLOCKED_ON_UNRECONCILED` since 16:39Z. The survivor is a PAPER order and
+is explicitly non-blocking. **The recovery is still NOT attributable to this
+fix** -- `9733a01a` and `77ca329a` cleared the halt; this fix corrects what gets
+RECORDED, and that is now demonstrated.
+
+**FLAGGED, NOT FIXED, and handed to `live-venue-order-placement`:** two resting
+orders log `avgPx='0.0000'` and disagree on the result -- `YES -> recorded=0.0`,
+`NO -> recorded=None`. `0.0` is not a price and is worse than `None` on an
+unfilled order. Both are `submitted` so it likely never reaches a stamp; I did
+not touch it because I cannot tell from outside whether the asymmetry predates
+this change, and guessing on the live-money path is what started this thread.
