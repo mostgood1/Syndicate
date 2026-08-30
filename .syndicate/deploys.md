@@ -38540,3 +38540,69 @@ must currently be manual. **This is its own defect and is not fixed.**
 wrong-side fill. `polymarket_us_orders` documents WHY TOTALS ARE IMMUNE — an
 over/under routes by NAME (`under`→NO) and never consults the index. The name
 rule worked.
+
+
+## 2026-08-30 16:42Z — LIVE EXECUTION RESUMED after ~13h
+
+- **deploys:** refresh-worker `77ca329a` (mine, `dep-daa5js4s728c73feup50`, live
+  16:29:56Z, both locks clean). live-odds-worker `77ca329a` **deployed MANUALLY
+  by the user** at 16:39 — the sanctioned path remains unreachable for that
+  service (36 preflight polls over ~45 min, never fewer than 3 jobs).
+
+- **verify — ORDERS ARE SUBMITTING:**
+
+      16:42:24Z LIVE_ORDER status=submitted polymarket tsc-mlb-lad-det-2026-08-30-7pt5 under 7.5 $4.06
+      16:42:26Z LIVE_ORDER status=submitted polymarket tsc-mlb-phi-laa-2026-08-30-7pt5 over  7.5 $2.73
+
+      BLOCKED_ON_UNRECONCILED   gone      (was count=1, count=2 before)
+      unreconciled              0
+      RECONCILE polymarket      changed=2 implausible=0 stamped=4
+
+- **ATTRIBUTION, and it is NOT my deadlock fix.** ZERO `UNRECONCILABLE_ORDER`
+  lines means `08e93850` was RECONCILED, not excused — almost certainly the
+  peer's `avgPx` reader fix (`0a7f7923`) populating `fill_price` so the pass
+  could complete. Mine cleared the FIRST order (`implausible` 1 → 0) and closed
+  the latch class so it cannot recur silently. Saying so rather than banking the
+  clearing event.
+
+- **TWO INSTRUMENT ERRORS OF MINE IN THIS READING, both caught before reporting:**
+  1. `grep -c "ORDER_SUBMIT"` matched the log tool's OWN HEADER
+     (`# text='ORDER_SUBMIT'`), so the watcher reported a submission on
+     genuinely empty output. Corrected counter validated against known-empty
+     output first: 1 vs 0.
+  2. `ORDER_SUBMIT` was **the wrong needle entirely** — this path emits
+     `LIVE_ORDER status=...`, and `ORDER_PATH ... would_build` is a DRY RUN that
+     builds the order body and stops. I would have reported "executor runs but
+     never submits", a false blocker, had I not checked what the code emits.
+
+- **STILL OPEN, unfixed, both recorded:** the deploy gate is unreachable for
+  live-odds-worker (every deploy manual), and `/api/portfolio/live` +
+  `/api/ops/execution/ledger-summary` both read CLEAN while the worker was hard
+  blocked — the keyvalue/artifact split, so the page cannot be trusted on this.
+
+### PREREQUISITE ON `#595` STEP 3 — DO NOT LIFT THE h2h GATE WITHOUT THIS
+
+Raised by `Polymarket order submission failure`; **all three claims verified here.**
+
+    test_soccer_fixture_pair_resolution::test_the_join_refuses_when_the_sides_are_swapped
+        -> FAILING on main
+    SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE in render.yaml   -> 0 (absent)
+    team_side_needs_verified_yes_leg refusal              -> present
+
+`c5a89b44` correctly made the pair resolver authoritative and compares the
+fixture as an UNORDERED pair, deliberately splitting wrong-GAME from wrong-SIDE.
+**Nothing replaced the assertion that pinned side-order**, and it is red rather
+than rewritten.
+
+It is not biting TODAY only because h2h is refused outright: totals are
+orientation-insensitive (they route by NAME), spreads are not carded, and the
+positional home/away path raises `team_side_needs_verified_yes_leg` unless an
+env var that is absent from production sets it. **The protection is the very
+refusal `#595` step 3 exists to remove.**
+
+So the moment h2h is unblocked, orientation becomes load-bearing on a
+live-money path and the suite will NOT catch a swapped-fixture bet. Before
+lifting: either restore an order-aware assertion against whatever now owns
+side, or establish that side is decided purely from the SLUG with no dependence
+on board home/away — and then DELETE the old test deliberately, so the next
+reader is not told a protection exists that does not.
