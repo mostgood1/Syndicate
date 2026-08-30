@@ -2894,6 +2894,60 @@ caaf-no-orders`). NOT
   showing soccer down with mlb/ncaaf/wnba unchanged.
 - Blocked by: none. Claims released.
 
+### position-key-commence-time-instability — OPEN — opened 2026-08-30 — session 6475567d-f806-45a7-880c-f633718f2411 — **FINDING, HANDED OFF, NOT CLAIMED**
+- **A DUPLICATE LIVE BET IS RESTING AT POLYMARKET RIGHT NOW.** Two orders, one
+  position: `C6H7WE0DPKDJ` ($4.06, 16:42:22Z) and `C6HN0XD92KDE` ($5.44,
+  17:19:26Z) on `tsc-mlb-lad-det-2026-08-30-7pt5`, both `under 7.5` at -104.
+  ~$9.12 of exposure where one bet was intended. Reported by the USER from
+  Polymarket's own Orders screen; our ledger holds both and matches the venue
+  share for share (7.96 + 10.66).
+- **CAUSE, measured field-by-field:** every identity field is byte-identical
+  ACROSS the two rows except one —
+
+      commence_time  2026-08-30T17:41:00Z   ->   2026-08-30T18:11:00Z   (+30 min)
+
+  `commence_time` is in `_POSITION_IDENTITY_FIELDS`
+  (`syndicate/features/shared/portfolio_commit.py:125-135`), so the game start
+  being restated 30 minutes changed `position_key`, which changed
+  `idempotency_key` (derived from it), so `record_order` saw a bet it had never
+  seen and placed it again.
+- **THE GUARD DID NOT FAIL — IT WAS NEVER CONSULTED.** `execution_ledger`'s own
+  words: "the same bet computed twice yields the same key, so the second write
+  is refused" and "`filled`, `submitted` and `failed` all mean the venue may
+  hold this order, and re-sending any of them is how one bet becomes two".
+  Both hold only while every hashed input is stable, and `commence_time` is the
+  one input a sports feed is EXPECTED to change.
+- **THE IDENTITY TUPLE MIXES TWO KINDS OF FIELD:** immutable facts about the
+  bet (`sport`, `event_id`, `market`, `segment`, `side`, `line`, `player_name`,
+  book) and MUTABLE attributes of the fixture (`commence_time`, and arguably
+  `home_team`/`away_team` if a feed renames a club). `event_id` already names
+  the game; `commence_time` adds nothing to identity and imports every feed
+  correction into it.
+- **THE STRONGEST EVIDENCE THAT THIS IS THE DEFECT AND NOT A JUDGEMENT CALL:**
+  `opening_key`, built for the same joining purpose, DELIBERATELY EXCLUDES
+  `commence_time` — and it was IDENTICAL across both orders. Two keys for the
+  same bet disagree about what a bet is, and the stable one is the one NOT used
+  for idempotency.
+- **SYSTEMATIC, not a one-off.** Any delay or restatement unlocks a duplicate on
+  any still-open position: MLB rain delays, postponements, doubleheader
+  restatements. MLB is the highest-volume sport on this platform.
+- Falsification test: if two rows with an identical `opening_key` can be shown
+  to need DIFFERENT `position_key`s for some legitimate reason, this is wrong
+  and `commence_time` belongs in the hash.
+- Verification wanted: a second submit on one position must be refused across a
+  `commence_time` change — and check the ledger for OTHER duplicate pairs
+  sharing an `opening_key`, since this one was only found because a human
+  looked at the venue screen.
+- Files: `syndicate/features/shared/portfolio_commit.py` (`position_key`,
+  `_POSITION_IDENTITY_FIELDS`). **NOT CLAIMED** — live-money identity change,
+  belongs to whoever owns the commit path. `pipeline/portfolio_commit.py` is a
+  DIFFERENT file and is claimed by `live-prob-producer-reader-gap`.
+- **IMMEDIATE, and not fixable in code:** one leg should be cancelled at the
+  venue. There is NO Polymarket cancel path — `kalshi_orders` has
+  `cancel_order`, `polymarket_us_orders` does not — so it must be done on
+  Polymarket's own screen.
+- Blocked by: none.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
