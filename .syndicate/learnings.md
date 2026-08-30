@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 682 rules `[generated]`
+## Index — 687 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -7300,3 +7300,52 @@ of the executable risk was real and was not containment.
 - Near-miss worth recording: had I "enabled" it by setting the var without the
   code change, nothing would have happened and the config would have read as
   done. Related: [[feedback_presence_is_not_reachability]].
+
+## 2026-08-30 — RULE: a guard that refuses only what it can PROVE wrong is SILENT on the majority case when identity is usually unknown. Measure what share of the population it can even evaluate, before shipping it
+
+**What happened.** `#603` — venue quotes answering the wrong game. The first fix
+added a game-qualified key and refused any quote that **named a different
+fixture**. It was correct, tested, deployed, and on its first production board
+it **rejected exactly zero**.
+
+The quotes doing the damage named nothing at all. A bare key is
+`sport|market|side|line` and carries no game term, so one unnamed quote answers
+every row that shares it:
+
+    refs answering >1 FIXTURE       11 of 35
+    rows served by such a ref      108 of 148   (73%)
+    one Belgian tie ticker answered 33 fixtures across five countries
+    a White Sox@Twins ticker was the SERVED HEADLINE price on Orioles@Athletics
+
+The fix documented its own asymmetry as a virtue: *"a quote that names none is
+allowed through exactly as it is today... it can only ever remove a match that
+is provably wrong."* True, and the wrong bar. **"Cannot regress coverage" and
+"cannot fix anything" were the same property**, and nothing in the design said
+which one it would be.
+
+**The rule that replaced it inverts the burden**: on a CONTESTED key — one more
+than one game claims — a match now requires POSITIVE confirmation. Absent
+identity refuses instead of passing. Result: 0 of 96 refs, against 192 contested
+keys and 992 rows of opportunity.
+
+**How to apply:**
+- **Before shipping a guard, compute its DENOMINATOR: on today's data, how many
+  of the bad cases does it have enough information to judge?** Not "is the rule
+  correct" — a correct rule with no jurisdiction is inert. One query would have
+  said 73% of the population carried no game name and the guard could not see
+  any of them.
+- **"Refuses only what is provably wrong" is a red flag wherever the missing
+  proof IS the failure mode.** Identity guards are the common case: the join
+  breaks precisely because something could not be identified, so a rule keyed on
+  successful identification is scoped to the healthy rows.
+- **Prefer confirmation to refutation when the population is mostly unknown.**
+  Require a positive match on the contested subset and let the uncontested pass
+  — that preserves coverage exactly where it is safe. Measured cost here: 107
+  rows dropped, and 0 of them had a plausibly-correct ticker.
+- Companion to [[feedback-unknown-must-not-default-permissive]], which is the
+  same failure at the level of ONE branch; this is it at the level of a whole
+  guard's scope. Both were live in the same file on the same night: the
+  replacement rule ALSO shipped inert, because its claimant map read only the
+  grid row shape (`sides`) and returned empty for candidate rows (`side`), and
+  an absent key took the permissive branch.
+

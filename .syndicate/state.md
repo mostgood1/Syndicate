@@ -7620,3 +7620,32 @@ must retain it.
 **Kalshi refusals now say WHICH KIND.** `unreadable_title` 1,371 -> 458 with
 `recognised_but_no_board_market` 838: a grammar to WRITE is separated from a
 market we understand and will never price. Segments remain untradeable.
+
+---
+
+**`#603` CLOSED AND MEASURED 2026-08-30 06:18Z.** Venue quotes no longer answer
+the wrong game. Board `2026-08-30` pool `06:18:37Z`, after `d7cda903`:
+`refs answering >1 fixture 0 of 96`, `rows served by one 0 of 177`,
+`wrong-game price as served HEADLINE 0` (was 2). **The zero is discriminating**
+— 192 contested keys and 992 rows of opportunity existed, and 166 matched rows
+sat on contested keys, all resolving to single-fixture refs. Rule:
+`venue_quote_fanin._unconfirmed_on_a_contested_key` — on a key more than one
+game claims, a match needs BOTH sides to name the same game.
+
+**The venue basis (`venue_basis_edge.py`) is WIRED and UNMEASURED.** Live in-play
+exchange price vs book consensus net of venue fee, attached in the grid path and
+carried through `layer2_board`'s `quote` fan-out. Proven to run: 809/809 rows
+carried the key, and the same script read `NOT WIRED` against the pre-deploy
+pool. **`servable=False` on every row and no reading has yet produced a real
+number** — its only measurement was a slate where all 7 displayable rows were
+wrong-game artifacts, and the post-fix slate was `live=0`. Its two freshness
+constants (45s venue, 900s anchor) are UNFITTED guesses.
+
+**Polymarket's fee is 150 bps of NOTIONAL, flat, price-independent** (five
+`commissionNotionalTotalCollected` fills + an independent `buyingPower` route).
+The earlier "fee is zero" is RETRACTED: realized P&L is `exit − entry` and the
+commission is charged at fill, so that method was fee-blind by construction.
+`commissionsBasisPoints: '0'` is evidence of the fee's SHAPE, never its ABSENCE.
+Shape matters at the tails: at P=0.94 Kalshi MLB is `0.0020`/contract and
+Polymarket `0.0150`.
+
