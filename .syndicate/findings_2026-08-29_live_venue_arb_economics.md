@@ -1213,6 +1213,8 @@ the module whose behaviour changed, not only the ledger. The constant was fixed
 the same hour; the prose that explains it survived four commits saying the
 opposite, and nothing was red.
 
+---
+
 ## THE READING, 2026-08-30 03:42Z — the instrument works and it found `#603` STILL LIVE
 
 Deploy `dep-da9q7bpf2nfc7389ug30`, commit `77e61607`, refresh-worker live
@@ -1311,3 +1313,80 @@ edge-ranked board at -40.9, -39.7 and -21.5 points.
 The honest state: the comparison is WIRED and PROVEN to run end to end, and its
 first reading measured the join, not the market. It cannot measure the market
 until the game-resolution gap is closed.
+
+---
+
+## CLOSING THE RESOLUTION GAP — `#603` second pass (2026-08-30)
+
+The first pass refused a quote that **names** a different fixture. In production
+it rejected nothing, because the quotes doing the damage **name nothing**. This
+pass adds the rule the passthrough never had.
+
+### The rule: COLLIDABILITY, applied as a guard rather than a test
+
+An unnamed quote may answer a bare key only if **exactly one game claims it**.
+
+    _key_claimants(rows, sport)   -> {bare_key: {event_id, ...}}
+    _quote_names_no_game(quote)
+    _unnamed_quote_is_ambiguous(quote, key, claimants)
+
+Claimants are counted by **`event_id`, never by team-name token**. The alias map
+is precisely what fails on the sports where this defect lives — soccer and NCAAF
+were 129 of the 148 verdict rows — and a claimant count that collapses two games
+into one because it cannot name either would re-open the hole it is closing.
+
+Wired into **both** call sites through the same two helpers. Two paths
+disagreeing about whether a quote may answer a row is a join that works on
+whichever one you happen to read, which is how the first pass came to land on
+the function production does not run.
+
+### What it replaces, and why that asymmetry had to go
+
+The first pass documented: *"a quote that names none is allowed through exactly
+as it is today... it can only ever remove a match that is provably wrong."* That
+was true, and it was the wrong bar — it made the fix structurally unable to touch
+the majority case, and the majority case was wrong.
+
+### THE COVERAGE COST, MEASURED ON THE REAL BOARD, NOT ARGUED
+
+Simulated against the served pool `written_at 2026-08-30T03:42:11Z`:
+
+    verdict rows                                    148
+      bare key CONTESTED (>1 game claims it)        107
+        ...ref answers >1 fixture  -> PROVABLY WRONG 107
+        ...ref answers 1 fixture   -> would be LOST    0
+      bare key uniquely claimed -> UNAFFECTED        41
+
+**Zero plausibly-correct quotes are lost.** Every row the guard removes is one
+whose ticker is already answering more than one fixture, where at most one can
+be right. The 41 rows on uniquely-claimed keys keep working unchanged.
+
+Two honest bounds on that number: it is ONE slate and ONE pool, and it is an
+UPPER bound on loss because it assumes every contested-key quote is unnamed —
+a quote that names its game is untouched by this guard.
+
+### Tests: five, and the coverage half matters as much as the safety half
+
+- two games sharing a key -> **both refused**, the measured CWS@MIN-on-Orioles case
+- **one** game claiming the key -> **still matched** (or this trades a wrong-price
+  bug for a no-price bug)
+- a quote that NAMES its game -> survives a contested key; the first pass's
+  by-name refusal still fires for the other game
+- 33 fixtures on one ticker -> 0 matches, 66 rejections (the Belgian tie ticker
+  at its measured scale)
+- `over 7.5` and `over 8.5` do NOT contest each other — over-refusing per market
+  instead of per key would silently delete a whole slate's coverage
+
+`AMBIGUOUS_UNNAMED_REJECTED` prints unconditionally with its denominator,
+including the zero. A guard whose only evidence is a counter nobody prints is
+how the first pass looked like it was working while rejecting nothing.
+
+### What this does NOT do
+
+It does not make the venue name its game. Resolution is still failing for the
+Belgian/Bundesliga Kalshi tickers and the `tsc-cfb` Polymarket slugs; this stops
+those quotes from answering the wrong row, and the 107 rows now go UNPRICED by
+the venue rather than WRONGLY priced. Restoring that coverage is alias/resolver
+work — the four missing MLS codes already handed off are the same class of gap.
+
+206 tests green.

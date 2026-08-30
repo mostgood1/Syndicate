@@ -455,6 +455,8 @@ def apply_venue_quotes(
     # A zero here after the adapters all name their games is the signal that
     # the cross-game bleed is actually gone; a non-zero one is the fix working.
     cross_game_rejected = 0
+    ambiguous_unnamed_rejected = 0
+    row_claimants: dict[str, dict[str, set[str]]] = {}
     per_source: dict[str, int] = {}
     per_source_by_sport: dict[str, dict[str, int]] = {}
     wanted_by_sport: dict[str, set[str]] = {}
@@ -469,6 +471,8 @@ def apply_venue_quotes(
         if not sport:
             out.append(row)
             continue
+        if sport not in row_claimants:
+            row_claimants[sport] = _key_claimants(rows, sport)
         if sport not in by_sport:
             try:
                 # `games` is passed ONLY when the board actually named some.
@@ -533,6 +537,14 @@ def apply_venue_quotes(
             # coverage to zero on sources that have not been converted.
             if found.game and row_game and found.game != row_game:
                 cross_game_rejected += 1
+                continue
+            # `#603` second pass, SAME RULE AS THE GRID PATH. Two paths
+            # disagreeing about whether a quote may answer a row is a join that
+            # works on whichever one you happen to read -- the exact failure
+            # that made the first pass land on the function production does not
+            # run. Both call the same two helpers.
+            if _unnamed_quote_is_ambiguous(found, candidate, row_claimants.get(sport) or {}):
+                ambiguous_unnamed_rejected += 1
                 continue
             quote, key = found, candidate
             break
@@ -599,11 +611,19 @@ def apply_venue_quotes(
             flush=True,
         )
 
+    print(
+        "[venue_quote_fanin] AMBIGUOUS_UNNAMED_REJECTED_ROWS"
+        f" count={ambiguous_unnamed_rejected} rows_in={len(rows)} stamped={stamped}"
+        " -- unnamed venue quotes refused for a key >1 game claims (#603)",
+        flush=True,
+    )
+
     return {
         "rows": out,
         "rows_in": len(rows),
         "stamped": stamped,
         "cross_game_rejected": cross_game_rejected,
+        "ambiguous_unnamed_rejected": ambiguous_unnamed_rejected,
         # The number that predicts whether this actually helped. Rows left
         # unstamped keep whatever age they had and will be gated on it.
         "unstamped": len(rows) - stamped,
@@ -712,6 +732,86 @@ def _distinct_games(
             continue
         seen[event_id] = {"event_id": event_id, "home_team": home, "away_team": away}
     return list(seen.values())
+
+
+def _key_claimants(
+    rows: Sequence[Mapping[str, Any]], sport: str
+) -> dict[str, set[str]]:
+    """For each bare quote key, WHICH GAMES could legitimately claim it.
+
+    `#603`, second pass. The first pass added a game-qualified key and refused a
+    quote that NAMES a different fixture. Measured in production 2026-08-30 it
+    caught nothing, because the quotes doing the damage NAME NOTHING:
+
+        distinct venue_refs in use      35
+        refs answering >1 FIXTURE       11
+        rows served by such a ref      108 / 148   (73%)
+        KXBELGIANPLGAME-26SEP06BEVOHL-TIE  claimed by 33 fixtures, five countries
+
+    A bare key is `sport|market|side|line` and carries NO GAME TERM, so an
+    unnamed quote can answer every row that shares one. One Belgian Pro League
+    tie ticker was pricing the draw on Real Madrid, Barcelona, Sheffield United
+    and thirty others; a White Sox@Twins totals ticker was the SERVED HEADLINE
+    price on Orioles@Athletics at -525.
+
+    So this counts, per key, how many distinct games are in play. That is the
+    number the passthrough needs and never had.
+    """
+    from syndicate.features.shared.venue_quote_adapters import quote_key
+
+    claimants: dict[str, set[str]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        if str(row.get("sport") or "").strip().lower() != sport:
+            continue
+        # EVENT ID, not the team-name token. Identity here must not depend on an
+        # alias map -- the alias map is exactly what fails on the sports where
+        # this defect lives (soccer and NCAAF were 129 of the 148 rows), and a
+        # claimant count that collapses two games into one because it cannot
+        # name either would re-open the hole it is closing.
+        event_id = str(row.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        market = row.get("market")
+        line = _as_float_or_none(row.get("line"))
+        for side in (row.get("sides") or []):
+            key = str(quote_key(sport, market, str(side), line))
+            claimants.setdefault(key, set()).add(event_id)
+    return claimants
+
+
+def _quote_names_no_game(quote: Any) -> bool:
+    return not str(getattr(quote, "game", None) or "").strip()
+
+
+def _unnamed_quote_is_ambiguous(
+    quote: Any, candidate_key: Any, claimants: Mapping[str, set[str]]
+) -> bool:
+    """May this UNNAMED quote answer this key? Only if ONE game claims it.
+
+    THE ASYMMETRY THIS REPLACES, and why it had to go. The first `#603` pass
+    documented: *"a quote that names none is allowed through exactly as it is
+    today... it can only ever remove a match that is provably wrong."* That was
+    true and it was the wrong bar. It made the fix unable to touch the majority
+    case, and the majority case was wrong -- 73% of verdict rows were served by
+    a ref that answers more than one fixture, and at most one of those can be
+    right.
+
+    The rule now is COLLIDABILITY, the same test the verifier uses to decide
+    whether a reading means anything: if only one game could have produced this
+    key, an unnamed quote answering it is unambiguous and is kept. If two or
+    more could, the quote cannot say which and MUST NOT GUESS -- a wrong price
+    is worse than no price, because no price shows an empty cell while a wrong
+    one shows a spectacular edge.
+
+    Coverage is preserved exactly where it is safe, and nowhere else. A quote
+    that DOES name its game is untouched here; `_quote_is_for_another_game`
+    owns that case.
+    """
+    if not _quote_names_no_game(quote):
+        return False
+    return len(claimants.get(str(candidate_key)) or ()) > 1
 
 
 def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
@@ -1091,6 +1191,8 @@ def apply_venue_quotes_to_grid(
     repriced = 0
     sides_seen = 0
     cross_game_rejected = 0
+    ambiguous_unnamed_rejected = 0
+    grid_claimants: dict[str, set[str]] | None = None
     venue_basis_rows = 0
     by_source: dict[str, int] = {}
 
@@ -1117,6 +1219,10 @@ def apply_venue_quotes_to_grid(
         # two paths disagreeing about a row's identity is a join that works on
         # whichever one you happen to read.
         row_game = _row_game_token(row, sport_slug)
+        # `#603` second pass: how many GAMES could claim each bare key. Computed
+        # once for the sport, not per row -- see `_key_claimants`.
+        if grid_claimants is None:
+            grid_claimants = _key_claimants(grid, sport_slug)
         # Same vocabulary and same source of truth as `_reprice_live_benchmark`
         # below, read once per row rather than per side so the two cannot
         # disagree about whether a game has started.
@@ -1138,6 +1244,13 @@ def apply_venue_quotes_to_grid(
                     continue
                 if _quote_is_for_another_game(found, row_game):
                     cross_game_rejected += 1
+                    continue
+                # `#603` second pass. A quote that names NO game may only answer
+                # a key that exactly ONE game claims. Measured: the first pass
+                # rejected 0 of these while 73% of verdict rows were served by a
+                # ref answering more than one fixture.
+                if _unnamed_quote_is_ambiguous(found, candidate, grid_claimants):
+                    ambiguous_unnamed_rejected += 1
                     continue
                 quote = found
                 break
@@ -1228,6 +1341,17 @@ def apply_venue_quotes_to_grid(
         flush=True,
     )
 
+    # UNCONDITIONAL, including the zero, and WITH ITS DENOMINATOR. A guard whose
+    # only evidence is a counter nobody prints is how the first `#603` pass came
+    # to look like it was working while rejecting nothing.
+    print(
+        "[venue_quote_fanin] AMBIGUOUS_UNNAMED_REJECTED"
+        f" sport={sport_slug} count={ambiguous_unnamed_rejected} sides_seen={sides_seen}"
+        f" keys={len(grid_claimants or {})}"
+        " -- unnamed venue quotes refused for a key >1 game claims (#603)",
+        flush=True,
+    )
+
     if cross_game_rejected:
         print(
             "[venue_quote_fanin] CROSS_GAME_REJECTED_GRID"
@@ -1248,6 +1372,7 @@ def apply_venue_quotes_to_grid(
         # Reported for the same reason, and the DENOMINATOR beside it:
         # "no live venue edges" and "the comparison never ran" are different
         # facts that look identical without `sides_seen`.
+        "ambiguous_unnamed_rejected": ambiguous_unnamed_rejected,
         "venue_basis_rows": venue_basis_rows,
         "by_source": by_source,
         "benchmark_rows": benchmark_rows,

@@ -1,0 +1,177 @@
+"""`#603`, second pass: an UNNAMED venue quote may not answer a contested key.
+
+WHY A SECOND PASS WAS NEEDED
+----------------------------
+
+The first pass added a game-qualified key and refused a quote that NAMES a
+different fixture. Measured in production 2026-08-30, on the first board pool
+built after it deployed, it rejected NOTHING -- because the quotes doing the
+damage name nothing at all:
+
+    distinct venue_refs in use      35
+    refs answering >1 FIXTURE       11
+    rows served by such a ref      108 / 148   (73%)
+
+    KXBELGIANPLGAME-26SEP06BEVOHL-TIE   claimed by 33 fixtures, five countries
+    KXMLBTOTAL-26AUG301410CWSMIN-5      the SERVED HEADLINE price, at -525,
+                                        on Baltimore Orioles@Athletics
+
+A bare key is `sport|market|side|line` and carries no game term, so one unnamed
+quote answers every row that shares it. The first pass documented its own
+asymmetry -- "a quote that names none is allowed through exactly as it is
+today" -- which was true, and was the wrong bar: it made the fix unable to touch
+the majority case, and the majority case was wrong.
+
+The rule now is COLLIDABILITY: an unnamed quote may answer a key only if
+exactly ONE game claims it.
+"""
+
+from __future__ import annotations
+
+import time
+
+from syndicate.features.shared.venue_quote_adapters import quote_key
+from syndicate.features.shared.venue_quote_fanin import Quote, apply_venue_quotes_to_grid
+
+
+def _row(event_id: str, away: str, home: str, *, line: float = 7.5) -> dict:
+    return {
+        "sport": "mlb",
+        "kind": "game",
+        "event_id": event_id,
+        "market": "totals",
+        "segment": "full_game",
+        "line": line,
+        "sides": ["over", "under"],
+        "home_team": home,
+        "away_team": away,
+        "game": {"state": "live"},
+        "books": ["fanduel"],
+        "books_quoting": 1,
+        "age_seconds": 600.0,
+        "best": {
+            side: {"price": -110, "bookmaker": "fanduel", "age_seconds": 600.0}
+            for side in ("over", "under")
+        },
+        "cells": {"fanduel": {"over": {"price": -110}, "under": {"price": -110}}},
+        "consensus": {"over": -110, "under": -110},
+    }
+
+
+def _quote(now: float, side: str, *, game: str | None, line: float = 7.5, price: int = -525):
+    key = str(quote_key("mlb", "totals", side, line))
+    return key, Quote(
+        key=key, source="kalshi", sport="mlb", market="totals", side=side,
+        probability=None, american=price, line=line, fetched_at=now - 10.0,
+        venue_ref="KXMLBTOTAL-26AUG301410CWSMIN-8", game=game,
+    )
+
+
+def _apply(grid, quotes, now):
+    return apply_venue_quotes_to_grid(
+        grid, "mlb", "2026-08-29", collected={"quotes": quotes}, now=now
+    )
+
+
+def test_TWO_games_sharing_a_key_refuse_an_unnamed_quote():
+    """THE PRODUCTION CASE. One CWS@MIN ticker priced Orioles@Athletics at -525.
+
+    Neither game may take it: the quote cannot say which it belongs to, and a
+    wrong price is worse than none -- no price shows an empty cell, a wrong one
+    shows a spectacular edge.
+    """
+    now = time.time()
+    grid = [
+        _row("evt-bal-ath", "Baltimore Orioles", "Athletics"),
+        _row("evt-phi-laa", "Philadelphia Phillies", "Los Angeles Angels"),
+    ]
+    quotes = dict([_quote(now, "over", game=None), _quote(now, "under", game=None)])
+    stats = _apply(grid, quotes, now)
+
+    assert stats["ambiguous_unnamed_rejected"] == 4, stats
+    assert stats["repriced"] == 0, "a contested key was allowed to reprice"
+    for row in grid:
+        assert row["best"]["over"]["price"] == -110, "the wrong-game price landed"
+        assert row["best"]["over"].get("price_source") is None
+
+
+def test_ONE_game_claiming_the_key_still_takes_an_unnamed_quote():
+    """off != on, and the COVERAGE half of it.
+
+    The guard must bite only where the key is contested. A sport with one live
+    game must keep working exactly as before, or this trades a wrong-price bug
+    for a no-price bug.
+    """
+    now = time.time()
+    grid = [_row("evt-bal-ath", "Baltimore Orioles", "Athletics")]
+    quotes = dict([_quote(now, "over", game=None), _quote(now, "under", game=None)])
+    stats = _apply(grid, quotes, now)
+
+    assert stats["ambiguous_unnamed_rejected"] == 0
+    assert stats["repriced"] == 2, stats
+    assert grid[0]["best"]["over"]["price"] == -525
+
+
+def test_a_quote_that_NAMES_its_game_survives_a_contested_key():
+    """The named path is untouched. This guard is about quotes that cannot say
+    which game they price, never about ones that can."""
+    now = time.time()
+    grid = [
+        _row("evt-bal-ath", "Baltimore Orioles", "Athletics"),
+        _row("evt-phi-laa", "Philadelphia Phillies", "Los Angeles Angels"),
+    ]
+    token = "athletics+baltimore orioles"
+    quotes = dict([
+        _quote(now, "over", game=token),
+        _quote(now, "under", game=token),
+    ])
+    stats = _apply(grid, quotes, now)
+
+    assert stats["ambiguous_unnamed_rejected"] == 0
+    # It names Orioles@Athletics, so that row takes it and the other REFUSES it
+    # by name -- which is the FIRST pass's guard, still working.
+    assert grid[0]["best"]["over"]["price"] == -525
+    assert grid[1]["best"]["over"]["price"] == -110
+    assert stats["cross_game_rejected"] >= 1
+
+
+def test_THIRTY_THREE_fixtures_on_one_ticker_yield_ZERO_matches():
+    """The Belgian tie ticker, at its measured scale.
+
+    Reduced but faithful: one unnamed quote, many games sharing the key. The
+    old behaviour stamped every one of them.
+    """
+    now = time.time()
+    grid = [_row(f"evt-{i}", f"Away {i}", f"Home {i}") for i in range(33)]
+    quotes = dict([_quote(now, "over", game=None), _quote(now, "under", game=None)])
+    stats = _apply(grid, quotes, now)
+
+    assert stats["repriced"] == 0
+    assert stats["ambiguous_unnamed_rejected"] == 66  # 33 games x 2 sides
+    assert all(r["best"]["over"]["price"] == -110 for r in grid)
+
+
+def test_the_guard_is_keyed_per_LINE_not_per_market():
+    """Two games on DIFFERENT lines do not contest each other.
+
+    `over 7.5` and `over 8.5` are different keys, so each is claimed by one game
+    and both keep their quote. Over-refusing here would silently delete good
+    coverage across a whole slate.
+    """
+    now = time.time()
+    grid = [
+        _row("evt-a", "Away A", "Home A", line=7.5),
+        _row("evt-b", "Away B", "Home B", line=8.5),
+    ]
+    quotes = dict([
+        _quote(now, "over", game=None, line=7.5),
+        _quote(now, "under", game=None, line=7.5),
+        _quote(now, "over", game=None, line=8.5, price=-300),
+        _quote(now, "under", game=None, line=8.5, price=-300),
+    ])
+    stats = _apply(grid, quotes, now)
+
+    assert stats["ambiguous_unnamed_rejected"] == 0, "distinct lines were treated as contested"
+    assert stats["repriced"] == 4
+    assert grid[0]["best"]["over"]["price"] == -525
+    assert grid[1]["best"]["over"]["price"] == -300
