@@ -377,15 +377,59 @@ def _positive_float(value: Any, name: str) -> float:
     return parsed
 
 
-def round_price_to_tick(price: float, tick: float) -> float:
-    """Down to the nearest legal tick.
+def round_price_to_tick(price: float, tick: float, *, direction: str) -> float:
+    """Snap to a legal tick, TOWARD THE SIDE THAT CAN ACTUALLY TRADE.
 
-    DOWN, not nearest. For a BUY, rounding up pays more than the price the edge
-    was computed against -- small per contract and systematic across a slate.
-    Rounding toward the venue is never the safe direction.
+    `direction` is REQUIRED and keyword-only. There is no safe default: the
+    same snap that makes a buy marketable makes a sell non-marketable, so a
+    caller that has not stated its side has not yet made the decision this
+    function encodes.
+
+    --------------------------------------------------------------------------
+    WHY THIS USED TO FLOOR, AND WHY THAT WAS WRONG FOR A BUY
+    --------------------------------------------------------------------------
+
+    The original rule was DOWN always, reasoning that "for a BUY, rounding up
+    pays more than the price the edge was computed against -- small per
+    contract and systematic across a slate."
+
+    That is true and it is not the whole trade. Flooring saves at most one tick
+    PER CONTRACT WHEN IT FILLS, and costs the ENTIRE POSITION when it does not.
+    Those are not the same units, and the second is much larger.
+
+    MEASURED 2026-08-30 on live-odds-worker. `tsc-mlb-lad-det-2026-08-30-7pt5`
+    resolved at the venue's own quote of 0.515 on a 0.01 tick:
+
+        POLYMARKET_ARTIFACT_PRICE slug=tsc-mlb-lad-det-2026-08-30-7pt5 price=0.515
+        FILL_ABOVE_LIMIT ... submitted_limit=0.51 filled=0.0
+
+    The floor put our bid a half-tick BELOW the price the venue was asking, so
+    it rested instead of filling. Four of fifteen Polymarket orders that day
+    were resting unfilled; the two whose quotes did not land on the tick grid
+    are explained entirely by this line.
+
+    Kalshi never showed this because its quotes are already whole cents on a
+    0.01 tick, so the floor is a no-op there. Polymarket quotes are not: ticks
+    of 0.01 and 0.005 both occur in one slate, so a 0.515 is legal in one
+    market and needs snapping in the next.
+
+    `kalshi_price_for` reached the same conclusion from the other direction on
+    2026-08-24 -- "a resting order is worse than a missed one" -- because a
+    standing limit at a price we no longer believe is a free option written to
+    everyone else. It fills only if the market comes back to us, which is the
+    market moving AGAINST the thesis.
+
+    The overpay this admits is bounded by ONE TICK and is guarded: the caller
+    checks slippage against the SNAPPED price, not the raw quote, so a snap
+    that pushes past tolerance is refused rather than silently paid.
     """
     tick_value = _positive_float(tick, "tick_size")
-    steps = math.floor(round(price / tick_value, 9))
+    if direction == "up":
+        steps = math.ceil(round(price / tick_value, 9))
+    elif direction == "down":
+        steps = math.floor(round(price / tick_value, 9))
+    else:
+        raise OrderBuildError(f"tick_direction_unknown: {direction!r}")
     snapped = steps * tick_value
     # Float division leaves 0.30000000000000004; the venue is comparing against
     # its own tick grid and a value that is one ULP off may simply be rejected.
@@ -443,9 +487,27 @@ def order_body(
         # settled market or a unit error, and both should stop here.
         raise OrderBuildError(f"price_out_of_range: {price}")
 
-    snapped = round_price_to_tick(price, tick_size)
+    # UP, because this body is always an `ORDER_ACTION_BUY` (see `action`
+    # below). Snapping a buy limit DOWN puts it under the venue's own quote,
+    # which is how four Polymarket orders rested unfilled on 2026-08-30.
+    if price < _positive_float(tick_size, "tick_size"):
+        # A QUOTE THIS GRID CANNOT EXPRESS. Under the old DOWN snap this fell
+        # out for free -- it floored to zero and was refused. Snapping UP would
+        # instead turn a 0.004 quote into a 0.01 order, so the refusal is now
+        # stated rather than implied. It is a refusal, not a rounding: a price
+        # below one tick is not a price this market trades at.
+        raise OrderBuildError(f"price_below_one_tick: price={price} tick={tick_size}")
+
+    snapped = round_price_to_tick(price, tick_size, direction="up")
     if snapped <= 0:
         raise OrderBuildError(f"price_below_one_tick: price={price} tick={tick_size}")
+    if not snapped < 1.0:
+        # Snapping UP can leave the open interval that snapping DOWN could not:
+        # 0.995 on a 0.01 tick becomes 1.00, which is a settled market or a unit
+        # error, never a price. The pre-snap range check above cannot see this.
+        raise OrderBuildError(
+            f"price_out_of_range_after_snap: price={price} tick={tick_size} snapped={snapped}"
+        )
 
     stake = float(getattr(request, "requested_stake_dollars", 0.0) or 0.0)
     # SIZED AGAINST THE PRICE WE WILL PAY, which is the snapped one. Sizing off

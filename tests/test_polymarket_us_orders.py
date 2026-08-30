@@ -109,14 +109,47 @@ def test_a_fractional_minimum_quantity_is_respected():
     assert body["quantity"] == pytest.approx(0.5)
 
 
-def test_the_price_is_snapped_DOWN_to_the_tick():
-    """Down, not nearest. For a BUY, rounding up pays more than the price the
-    edge was computed against -- small per contract, systematic across a
-    slate, and never the safe direction."""
-    assert round_price_to_tick(0.5678, 0.01) == pytest.approx(0.56)
-    assert round_price_to_tick(0.5699, 0.01) == pytest.approx(0.56)
+def test_a_buy_limit_is_snapped_UP_to_the_tick():
+    """UP for a buy. This test asserted DOWN until 2026-08-30, when the floor
+    was measured putting our bid under the venue's own quote: a 0.515 ask on a
+    0.01 tick went out as 0.51 and rested unfilled. Flooring saves at most one
+    tick per contract when it fills and costs the whole position when it does
+    not."""
+    assert round_price_to_tick(0.5678, 0.01, direction="up") == pytest.approx(0.57)
+    assert round_price_to_tick(0.5601, 0.01, direction="up") == pytest.approx(0.57)
     body = _body(price_dollars=0.5678, tick_size=0.01)
-    assert body["price"]["value"] == "0.56"
+    assert body["price"]["value"] == "0.57"
+
+
+def test_the_lad_det_order_that_rested_would_now_cross():
+    """The measured case, as a regression. 0.515 on a 0.01 tick was sent as
+    0.51 -- below the ask -- and filled 0.0."""
+    assert round_price_to_tick(0.515, 0.01, direction="up") == pytest.approx(0.52)
+    assert _body(price_dollars=0.515, tick_size=0.01)["price"]["value"] == "0.52"
+
+
+def test_a_price_already_on_the_grid_is_left_alone():
+    """The snap must be idempotent, because the caller now snaps before its
+    slippage check and `order_body` snaps again. Two snaps must equal one."""
+    assert round_price_to_tick(0.495, 0.005, direction="up") == pytest.approx(0.495)
+    assert round_price_to_tick(0.52, 0.01, direction="up") == pytest.approx(0.52)
+    assert _body(price_dollars=0.495, tick_size=0.005)["price"]["value"] == "0.495"
+
+
+def test_the_rounding_direction_has_no_default():
+    """A caller that has not stated its side has not made the decision. The
+    same snap that makes a buy marketable makes a sell non-marketable."""
+    with pytest.raises(TypeError):
+        round_price_to_tick(0.5678, 0.01)
+    with pytest.raises(OrderBuildError, match="tick_direction_unknown"):
+        round_price_to_tick(0.5678, 0.01, direction="sideways")
+
+
+def test_snapping_up_out_of_range_is_refused():
+    """Snapping UP can leave (0, 1) where snapping DOWN could not. 0.995 on a
+    0.01 tick becomes 1.00, which is never a price."""
+    with pytest.raises(OrderBuildError, match="price_out_of_range_after_snap"):
+        _body(price_dollars=0.995, tick_size=0.01)
 
 
 def test_a_price_below_one_tick_is_refused():
@@ -146,12 +179,13 @@ def test_a_stake_too_small_for_one_increment_is_a_named_refusal():
 
 def test_sizing_uses_the_SNAPPED_price_not_the_requested_one():
     """Sizing off the unsnapped price buys a quantity the order cannot afford
-    at the price actually sent."""
-    # $10 at a requested 0.599 snaps to 0.59 -> floor(10/0.59) = 16.
+    at the price actually sent. This matters MORE now that the snap goes up:
+    the sent price is >= the quote, so sizing off the quote overspends."""
+    # $10 at a requested 0.599 snaps UP to 0.60 -> floor(10/0.60) = 16.
     body = _body(request=_Request(stake=10.0), price_dollars=0.599, tick_size=0.01)
-    assert body["price"]["value"] == "0.59"
+    assert body["price"]["value"] == "0.6"
     assert body["quantity"] == 16
-    assert body["quantity"] * 0.59 <= 10.0
+    assert body["quantity"] * 0.60 <= 10.0
 
 
 # --------------------------------------------------------------------------

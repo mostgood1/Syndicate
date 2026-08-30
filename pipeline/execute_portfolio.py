@@ -1067,6 +1067,35 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
         return None
 
     fetched_at = (payload or {}).get("fetched_at")
+
+    # SNAP FIRST, THEN GUARD -- the guard has to judge the price we will
+    # ACTUALLY SEND. `order_body` snaps the limit up to the market's tick, so
+    # checking slippage against the raw quote measured a number that never
+    # reaches the venue and let up to one tick of drift past a tolerance whose
+    # default is only three. Snapping here makes the two agree: `order_body`
+    # re-snaps an already-legal price to itself.
+    tick = row.get("orderPriceMinTickSize")
+    min_qty = row.get("minimumTradeQty")
+    tick_value = tick if tick is not None else ticker_tick
+    min_qty_value = min_qty if min_qty is not None else ticker_min_qty
+
+    quoted = price
+    if tick_value is not None:
+        from syndicate.features.shared.polymarket_us_orders import round_price_to_tick
+
+        try:
+            price = round_price_to_tick(price, tick_value, direction="up")
+        except Exception as exc:
+            # UNREADABLE TICK IS NOT A ZERO TICK. Leave the quote untouched and
+            # say so; `order_body` refuses on the same value a moment later,
+            # which is the right place for that refusal to be raised.
+            print(
+                f"[execute_portfolio] POLYMARKET_TICK_UNREADABLE slug={slug}"
+                f" tick={tick_value!r} {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            price = quoted
+
     planned_raw = getattr(request, "requested_price", None)
     planned = planned_probability(planned_raw)
     if planned_raw is not None and planned is None:
@@ -1081,14 +1110,20 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
         if drift > max_slippage_dollars():
             raise _SlippageExceeded(
                 f"polymarket_slippage: slug={slug} planned={planned_raw}"
-                f" planned_prob={planned:.4f} price={price}"
+                f" planned_prob={planned:.4f} price={price} quoted={quoted}"
                 f" drift={drift:+.4f} max={max_slippage_dollars()} fetched_at={fetched_at}"
             )
     # THE NAME WE RESOLVED, not just the number. A price alone cannot be
     # checked against the venue's own order screen; the outcome name can, and
     # that screen is what caught the inverted order.
+    # `quoted` AND `price`, not just one. The tick snap silently moved the
+    # limit for every order this venue placed and appeared in no log line: the
+    # 0.515 that was sent as 0.51 on 2026-08-30 could only be found by pairing
+    # this line against FILL_ABOVE_LIMIT. A transform that decides whether an
+    # order fills belongs in the log a person reads while money is moving.
     print(
         f"[execute_portfolio] POLYMARKET_ARTIFACT_PRICE slug={slug} price={price}"
+        f" quoted={quoted} tick={tick_value!r} snapped={price != quoted}"
         f" planned={planned} fetched_at={fetched_at}"
         f" our_side={getattr(request, 'side', None)}"
         f" outcome_index={outcome_index} outcome={outcomes[outcome_index]!r}"
@@ -1102,15 +1137,7 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
     # refresh earlier. `order_body` refuses to INFER either, so having a second
     # source for them is the difference between an order and a refusal when the
     # artifact row is thin.
-    tick = row.get("orderPriceMinTickSize")
-    min_qty = row.get("minimumTradeQty")
-    return (
-        slug,
-        price,
-        tick if tick is not None else ticker_tick,
-        min_qty if min_qty is not None else ticker_min_qty,
-        outcome_index,
-    )
+    return (slug, price, tick_value, min_qty_value, outcome_index)
 
 
 def verify_order_paths(
