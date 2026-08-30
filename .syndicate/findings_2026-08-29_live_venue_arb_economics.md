@@ -1390,3 +1390,63 @@ the venue rather than WRONGLY priced. Restoring that coverage is alias/resolver
 work — the four missing MLS codes already handed off are the same class of gap.
 
 206 tests green.
+
+---
+
+## THE FIRST REAL VENUE-BASIS READING ON A LIVE SLATE (2026-08-30 16:57Z)
+
+The thing this lane opened on. Board pool `written_at 2026-08-30T16:57:50Z`,
+crossing the `77ca329a` deploy at 16:29:56Z.
+
+    rows 1229   live 26
+    live rows with a venue price       6   <- the population
+    carrying the venue_basis key       6   <- attach + fan-out both ran
+    displayable                        0   <- the finding
+
+    refusals
+      3  the venue never quoted this side
+      2  venue quote is 64s old against a 45s ceiling
+      1  the book consensus is 1297s old against a 900s ceiling
+
+### THE RESULT IS "IT NEVER GOT TO COMPARE", NOT "NO EDGES"
+
+**Zero of the six reached the arithmetic.** Every one was refused by a guard
+before a number was computed. That distinction is the entire reason the
+instrument separates its populations, and it is the difference between "the
+in-play exchange and the books agree" (a finding about markets) and "our own
+ceilings excluded every row" (a finding about us). This is the second.
+
+`#603` stays clean on a much larger population than the one that closed it:
+**216 rows matched, 123 refs, 0 answering more than one fixture.**
+
+### THE 45s CEILING IS THE LEADING SUSPECT AND n=2
+
+Both freshness refusals were at **64s against my 45s ceiling** — close enough to
+suggest the venue capture cadence is simply slower than the bar I set. My own
+docstring predicted this: *"45s is a starting position chosen to be
+conservative, NOT a measurement -- it is the number here most likely to be
+wrong, and it should be set from observed venue update cadence once someone has
+read one."*
+
+**I am NOT retuning it on two samples.** Widening a live guard until edges
+appear is the exact failure this lane has spent a day cataloguing, and a
+ceiling moved to make a number show up is not a ceiling. What the tuning needs:
+
+- the venue quote age DISTRIBUTION, not the two values that happened to be
+  refused. The board payload cannot supply it — a row that PASSES freshness
+  carries no age in its reason string, so the sample is censored by
+  construction and biased toward the slow tail. It needs instrumentation in
+  `venue_quote_fanin` emitting the age of every venue quote it considers.
+- a FULL live slate. 26 live rows at 11:57 CT is the pre-MLB trough; the
+  afternoon and evening card is many times that.
+
+### STATUS
+
+The module is **wired, proven end to end, and still unmeasured as a claim about
+markets.** `servable=False` is unchanged and should stay so: nothing here scores
+venue-vs-book disagreement against results, and the first reading did not
+produce a single comparison to score.
+
+Next reading: a full live slate, and the age distribution instrumented before
+anyone touches the ceiling.
+
