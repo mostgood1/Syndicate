@@ -7757,50 +7757,37 @@ are identical by construction.
 has yet produced a single scored comparison** — its one live slate refused all
 six eligible rows before the arithmetic. Do not lift `servable` without one.
 
-## [polymarket-order-fills] 2026-08-30 — three causes REFUTED, one instrument waiting
+## [polymarket-order-fills] 2026-08-30 — four causes REFUTED; fills are mostly fine
 
-**The tick-floor fix is WITHDRAWN. It was a no-op.** Deployed and measured:
-12 of 12 quotes on-grid across 4 slugs and 45 minutes; the snap never fired.
-The causal claim paired a 17:49 price log with a 17:19 submit — the submit-time
-quote was 0.51 and we sent 0.51. Full retraction in `learnings.md`.
+**5 of 7 Polymarket orders FILLED today.** The two that did not (`lad-det`,
+`phi-laa`) ended `order_state_canceled` with 0 contracts — CANCELLED, not
+resting. The premise "we bid the ask and never fill" was overstated.
 
-**Also refuted, both by measurement:** stale ask (44s old at submit) and
-"we bid a mid" (`prices[]` sums 1.005–1.030 across 8 binary markets, which is an
-ask with its overround; a mid sums to exactly 1).
+**Four proposed causes are refuted by measurement, not argument:**
+- tick-size floor — 12 of 12 quotes on-grid post-deploy, snap never fired. The
+  submit-time quote for `lad-det` was 0.51 and we sent 0.51; the 0.515 was read
+  30 minutes later. My claim, retracted. The fix is a NO-OP and stays only
+  because the slippage guard now gates the SENT price.
+- stale ask — 44s old at submit.
+- bidding a mid — `prices[]` sums 1.005–1.030 over 8 binary markets: an ASK.
+- "orders rest forever" — they are cancelled, not resting.
 
-**Still broken, cause unknown:** we bid the venue's own ask exactly and do not
-fill. Reproduced fresh under current code — `tsc-mlb-phi-laa-2026-08-30-7pt5`
-submitted 19:32:33 at 0.485 against an on-grid 0.485 quote, `filled=0` eight
-minutes later. Live hypothesis, UNTESTED: no resting size at our price.
+**Still unexplained:** why two orders were cancelled. `ORDER_STATE` logging of
+`cumQuantity`/`leavesQuantity` shipped (`bf1dd290`) and HAS NOT BEEN READ yet.
+That is the next reading.
 
-**The next reading is written and unlanded:** commit `d8b6c847` on branch
-`handoff/polymarket-order-state-logging` logs `cumQuantity`/`leavesQuantity`,
-which `ORDERS_READ` was fetching and discarding. It separates "never touched"
-from "partial, stuck". Handed to `polymarket-yes-leg-binding` to ship with their
-deploy — see `handoff_2026-08-30_order_state_logging.md`.
+**Why the board is game-totals only** — four separate limits, only one now lifted:
+- h2h: FIXED by `8b0d27df`, verified live 19:54:08 (`yes_leg_index=0 agree=True`).
+  Not yet proven to pick the right SIDE — `yes_leg_index=0` equals the old
+  positional answer; the discriminating case needs `yes_leg_index=1`.
+- props: refused BY DESIGN in `polymarket_board_join.py` — a prop priced by a
+  guessed player token is a real order on the wrong person.
+- spreads: 71 spread rows on the board reach `ORDER_PATH` ZERO times. UNTRACED.
+- alt/period totals: the venue carries them (`tsc-...-1q-17pt5`); we never
+  attempt them. UNTRACED.
 
-**Unrelated and still open:** Polymarket h2h on `['Yes','No']`-outcome markets
-refuses `team_side_not_in_outcomes` (e.g. `atc-mls-stl-dal`). This is why the
-YES-leg fix has had no chance to run and must NOT be read as inert.
+**`not_found` latch:** live execution was halted on BOTH venues from 19:47:34Z
+by one order with no venue id. Fixed correctly by `dd33c865` (per-order read;
+three refusing paths keep blocking). My `63661af1` auto-reject was UNSAFE and is
+reverted (`ef0d2d47`) — absent from the OPEN book is not absent from the venue.
 
-**THE `commence_time` DUPLICATE DEFECT IS FIXED AND LIVE** (`165c448f`, both
-workers, 2026-08-30 18:50Z). `commence_time` left `_POSITION_IDENTITY_FIELDS`:
-ANY restatement — verified down to ONE SECOND — minted a new `position_key`, and
-`idempotency_key` hangs off it, so the duplicate guard was never consulted. Two
-pairs resulted. `HOU@NYY` h2h FILLED AND LOST (`pnl -3.41` and `-0.78`);
-`LAD@DET` totals 7.5 EXPIRED UNFILLED and cost nothing (user-confirmed on the
-venue screen). **Measured cost of the defect: $0.78.** Two is a FLOOR — the scan
-only sees pairs where both legs survive sharing an `opening_key`.
-
-A dual-key migration guard (`legacy_position_key` / `_legacy_idempotency_key`)
-stops the fix re-placing the open book, since changing the key formula changes
-every open order's identity at once. **Its behavioural proof is still OWED**:
-`LEGACY_KEY_MATCH` must fire on a plan REBUILD. `placed=0 duplicates=N` is NOT
-proof — that exact reading appeared at 18:41Z while the guard was inert.
-
-**`polymarket_us_orders.cancel_order` now EXISTS** (`3170db13`) — dry-run by
-default, reads before writing, refuses on a wrong-leg mismatch. Never fired in
-anger; its route (`DELETE /v1/order/{id}`) is a convention guess and the first
-real call is the probe. **Not wired into any automatic path**, because Kalshi's
-equivalent rests on "cancelling costs nothing at Kalshi" and nobody has
-established that for Polymarket.

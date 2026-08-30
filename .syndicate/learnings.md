@@ -7639,3 +7639,42 @@ the data is not evidence that it produced the data.**
   guard's name, and it is invisible precisely because everyone has learned to
   skip it. The fix is to make the routine case silent, not to raise the
   threshold: the correct end state here is `nothing matched`.
+
+## 2026-08-30 — FORBIDDEN: writing to a money-path file without first reading what landed on it. I shipped an unsafe rule that silently overrode a correct fix committed 20 minutes earlier.
+
+`63661af1` auto-resolved a `not_found` order to `rejected`, reasoning that "no
+`venue_order_id` AND absent from a complete book read" proved it was never
+accepted, so it could not double a position.
+
+**The premise was false.** `kalshi_orders.fetch_orders` covers the **OPEN** book.
+An order that FILLED or was CANCELLED is legitimately missing from a completely
+successful read. An order that filled after a lost submit response has no venue
+id, does not match by client id, and is not in the open book — exactly my
+branch's conditions — and would have been marked `rejected`, **deleting a real
+position from the money record**.
+
+**And it was already fixed, correctly, 20 minutes before I wrote it.**
+`dd33c865` had landed the right answer: a `not_found` candidate on `book`
+coverage gets a PER-ORDER read, and its three failing paths
+(`RECONCILE_NO_VENUE_ID`, `RECONCILE_SINGLE_READ_FAILED`, `recovery_skipped`)
+KEEP BLOCKING on purpose. My block ran immediately after all three and rejected
+the order anyway, turning every deliberate refusal into a silent write. The
+no-venue-id case is the one their code explicitly routes to *"it will keep
+blocking until it is resolved by an operator"*.
+
+**HOW TO APPLY.** Before editing a file you do not hold: `git log -3 -- <file>`
+and read the diffs. I had `git fetch`ed, rebased cleanly, and run 193 green
+tests — none of which can tell you that someone else just solved your problem
+better. A clean rebase means no TEXT conflict; it says nothing about a SEMANTIC
+one, and my change and theirs did not touch the same lines.
+
+**THE TEST PROTECTED THE WRONG RULE.** I wrote a test asserting the unsafe
+behaviour and it passed, which felt like verification. A test written from the
+same wrong premise cannot falsify it — it only makes it durable. The test is now
+inverted and asserts the order is NOT auto-rejected.
+
+**Related, same session:** 126 tests passed over a version containing
+`changed += 1` where `changed` is a LIST — a guaranteed runtime `TypeError`.
+Only a test that ENTERED the branch found it. Passing suites are evidence about
+covered lines and nothing else.
+
