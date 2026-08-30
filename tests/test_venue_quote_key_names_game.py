@@ -500,3 +500,144 @@ def test_oddsapi_h2h_is_left_unqualified(monkeypatch):
 
     assert quotes
     assert all("|@" not in q.key for q in quotes), [q.key for q in quotes]
+
+
+# ---------------------------------------------------------------------------
+# `#603` NCAAF. No club map exists, so the club-pair token is unbuildable and
+# the slug's team tokens are Polymarket's own abbreviations. Real production
+# slugs and outcomes, read from /api/ops/polymarket/slate on 2026-08-29.
+# ---------------------------------------------------------------------------
+
+
+_NCAAF_GAMES = [
+    {"event_id": "evt-nmxst-flst",
+     "away_team": "New Mexico State Aggies", "home_team": "Florida State Seminoles"},
+    {"event_id": "evt-jaxst-ndkst",
+     "away_team": "Jacksonville State Gamecocks", "home_team": "North Dakota State Bison"},
+]
+
+
+def _ncaaf_slate():
+    """The REAL shapes. `aec-` is the moneyline, `tsc-...-total-` the total, and
+    the team tokens (`nmxst`, `flst`) are identical across both."""
+    import time
+
+    return {
+        "fetched_at": time.time(),
+        "markets": [
+            {"slug": "aec-cfb-nmxst-flst-2026-08-29",
+             "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+             "outcomes": '["Seminoles","Aggies"]', "outcomePrices": '["0.90","0.10"]'},
+            {"slug": "tsc-cfb-nmxst-flst-2026-08-29-total-53pt5",
+             "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL", "line": 53.5,
+             "outcomes": '["Over","Under"]', "outcomePrices": '["0.52","0.48"]'},
+            {"slug": "aec-cfb-jaxst-ndkst-2026-08-29",
+             "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+             "outcomes": '["Gamecocks","Bison"]', "outcomePrices": '["0.35","0.65"]'},
+            {"slug": "tsc-cfb-jaxst-ndkst-2026-08-29-total-53pt5",
+             "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL", "line": 53.5,
+             "outcomes": '["Over","Under"]', "outcomePrices": '["0.61","0.39"]'},
+        ],
+    }
+
+
+def test_ncaaf_totals_on_the_same_line_stop_colliding_OFF_vs_ON(monkeypatch):
+    """THE DEFECT MEASURED IN PRODUCTION: 4 of 7 live Polymarket NCAAF totals
+    rows shared one price across games on the 00:30:59Z board.
+
+    Two different games, the same 53.5 line. Without a schedule the tokens
+    cannot be resolved and both key bare -- one pool entry, one price answering
+    both. With it, the moneyline's nicknames resolve each pair and the totals
+    inherit the answer.
+    """
+    import time
+
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    monkeypatch.setattr(adapters, "_artifact", lambda parts: (_ncaaf_slate(), time.time()))
+
+    off = {q.key for q in adapters.polymarket_us_outcome("ncaaf", "2026-08-29").quotes
+           if q.market in ("totals", "totals_alt")}
+    on = [q for q in adapters.polymarket_us_outcome("ncaaf", "2026-08-29", games=_NCAAF_GAMES).quotes
+          if q.market in ("totals", "totals_alt")]
+    on_keys = {q.key for q in on}
+
+    assert off, "fixture produced no totals quotes at all"
+    # OFF: both games collapse onto the same over/under keys.
+    assert not any("|@" in k for k in off), off
+    # ON: each game gets its own, and they are DIFFERENT from each other.
+    assert on_keys != off, "passing `games` changed nothing -- the NCAAF path is inert"
+    assert all("|@evt:" in k for k in on_keys), on_keys
+    assert len(on_keys) == len(off) * 2, (
+        f"the two games did not separate: off={off} on={on_keys}"
+    )
+    assert {q.game for q in on} == {"evt:evt-nmxst-flst", "evt:evt-jaxst-ndkst"}
+
+
+def test_the_board_row_derives_the_SAME_ncaaf_token():
+    """Both halves must agree or the qualified key never matches.
+
+    The board side cannot build a club-pair token either (`_alias_map('ncaaf')`
+    is empty), so it falls back to the same `evt:` identity.
+    """
+    row = {"sport": "ncaaf", "market": "totals", "side": "over", "line": 53.5,
+           "event_id": "evt-nmxst-flst",
+           "home_team": "Florida State Seminoles", "away_team": "New Mexico State Aggies"}
+
+    keys = _candidate_keys(row, "ncaaf")
+
+    assert keys[0] == "ncaaf|totals|over|53.5", f"role key must stay first: {keys}"
+    assert "ncaaf|totals|over|53.5|@evt:evt-nmxst-flst" in keys, keys
+
+
+def test_an_ncaaf_pair_matching_TWO_games_refuses(monkeypatch):
+    """Ambiguity is dropped, not assigned.
+
+    Two fixtures sharing a nickname is exactly what the PAIR constraint exists
+    for; when the pair cannot separate them either, silence is the right answer.
+    """
+    import time
+
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    slate = {"fetched_at": time.time(), "markets": [
+        {"slug": "aec-cfb-aaa-bbb-2026-08-29",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+         "outcomes": '["Aggies","Bulldogs"]', "outcomePrices": '["0.5","0.5"]'},
+    ]}
+    twins = [
+        {"event_id": "g1", "away_team": "Texas A&M Aggies", "home_team": "Georgia Bulldogs"},
+        {"event_id": "g2", "away_team": "Utah State Aggies", "home_team": "Fresno Bulldogs"},
+    ]
+    monkeypatch.setattr(adapters, "_artifact", lambda parts: (slate, time.time()))
+
+    pairs = adapters._polymarket_pair_games(slate["markets"], "ncaaf", twins)
+
+    assert pairs == {}, f"an ambiguous pair was assigned a game: {pairs}"
+
+
+def test_a_game_with_NO_moneyline_in_the_slate_cannot_be_resolved(monkeypatch):
+    """THE LIMITATION, pinned so it is a known bound and not a surprise.
+
+    The pair is learned from the MONEYLINE, because that is the only market
+    family whose `outcomes` name the teams. A game whose moneyline is absent
+    from the slate keeps a bare key and stays exposed to the collision -- which
+    is the pre-`#603` behaviour, not a new failure, but it IS a hole and the
+    count of such games is worth watching.
+    """
+    import time
+
+    from syndicate.features.shared import venue_quote_adapters as adapters
+
+    totals_only = {"fetched_at": time.time(), "markets": [
+        {"slug": "tsc-cfb-nmxst-flst-2026-08-29-total-53pt5",
+         "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL", "line": 53.5,
+         "outcomes": '["Over","Under"]', "outcomePrices": '["0.52","0.48"]'},
+    ]}
+    monkeypatch.setattr(adapters, "_artifact", lambda parts: (totals_only, time.time()))
+
+    quotes = adapters.polymarket_us_outcome("ncaaf", "2026-08-29", games=_NCAAF_GAMES).quotes
+
+    assert quotes, "the quote must still be emitted, just unqualified"
+    assert all("|@" not in q.key for q in quotes), [q.key for q in quotes]
+    assert all(q.game is None for q in quotes)

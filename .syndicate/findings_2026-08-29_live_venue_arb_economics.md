@@ -673,3 +673,100 @@ out are in tension and this is the user's call:
 **VERIFICATION STILL OWED:** an MLB slate. The first MLB game after ~17:00Z
 2026-08-30 will exercise the path the original defect was measured on. Until
 then `#603` must NOT be reported as fixed in production.
+
+---
+
+# `#603` NCAAF — resolved WITHOUT touching the reverted alias map `[2026-08-30 ~01:0xZ]`
+
+**LANDED, NOT DEPLOYED.**
+
+## What was asked, and why it could not be done as asked
+
+"Populate the ncaaf alias map." That exact change was **built, measured and
+REVERTED earlier the same day** (`handoff_2026-08-29_ncaaf_umass_alias_gap.md`):
+it does not resolve the names anyway, and it makes `teams_match`
+MAP-AUTHORITATIVE, turning `canonical_team("ncaaf","MAS")` -> `UMass Dartmouth`
+from a harmless miss into a confident wrong answer. Not re-landed.
+
+## The root, and it is more central than "the map is empty"
+
+`_side_for_team` — the nickname/token-subset resolver every venue join leans on
+— **short-circuits before its own fallback**:
+
+    away = canonical_team(sport, resolution.get("away_team"))
+    home = canonical_team(sport, resolution.get("home_team"))
+    if not away or not home:
+        return None
+
+With `_alias_map("ncaaf")` at **0 entries**, both are None, so it returns before
+reaching the token-subset logic that exists precisely for bare nicknames. One
+empty map disables `game_token`, `teams_match`'s heuristics AND
+`_side_for_team`'s fallback simultaneously.
+
+## Why the slug tokens cannot simply be looked up
+
+Real slugs, read from `/api/ops/polymarket/slate?league=ncaaf` (14,900 markets;
+`ncaaf|totals 620`, `spreads 867`, `h2h 168`):
+
+    aec-cfb-nmxst-flst-2026-08-29                  moneyline
+    tsc-cfb-jaxst-ndkst-2026-08-29-total-26pt5     total
+
+Against `unambiguous_team_index` (2,214 entries): `jaxst`, `ndkst`, `nmxst`,
+`flst`, `sacst`, `emich` **all miss**; `hawaii` and `stan` happen to hit. And no
+derivation rescues them — **`jaxst` is not even a SUBSEQUENCE of "jacksonville
+state"**, because Polymarket's "jax" contributes an `x` the real name lacks.
+Subsequence pair-matching against the schedule scored 2 of 4. Inventing a rule
+from six examples is the trap `kalshi_board_join`'s header records costing a day.
+
+## The route that works, and it uses only data already present
+
+**The moneyline names its teams; the totals do not; and a game's slug token
+pair is CONSTANT across its markets.** So resolve the pair ONCE from the
+moneyline and let the other families reuse it:
+
+    aec-cfb-nmxst-flst   outcomes ["Seminoles","Aggies"]  -> which board game?
+    -> token-subset against each board game's two names, PAIR must match
+    -> exactly one game, or refuse
+    -> learn (nmxst, flst) -> event_id
+    -> every tsc-cfb-nmxst-flst-* total inherits it
+
+Matched by direct token subset, NOT through `_side_for_team` (which cannot help
+here, per the short-circuit above). Measured against the live 08-29 board: **3
+of 4 observed pairs resolved to exactly one game**, the fourth being a game not
+on the board at all — a correct no-match.
+
+## The identity is our own `event_id`, not a club pair
+
+`game_token` needs `canonical_team`, so it is unbuildable for NCAAF.
+`event_game_token(event_id)` -> `evt:<id>` is the one identity both halves can
+agree on without a club vocabulary. It is prefixed so it cannot be confused
+with a club-pair token, and it is a **FALLBACK ONLY** — club-pair is tried
+first, so mlb/nfl/wnba/soccer keep exactly the keys they have today.
+
+## KNOWN BOUNDS, pinned by tests rather than left to be discovered
+
+- **A game with no MONEYLINE in the slate cannot be resolved.** Its totals keep
+  a bare key and stay exposed. That is the pre-`#603` behaviour, not a new
+  failure, but it is a hole worth counting.
+- **An ambiguous pair refuses.** Two fixtures sharing both nicknames
+  ("Aggies"/"Bulldogs") yield no mapping rather than a guess.
+
+## Verification
+
+`429 passed` across nine venue/join/catalogue suites, `119` downstream. 4 new
+tests including the off!=on pair: without a schedule both games' totals collapse
+onto the same keys; with one they separate into `|@evt:evt-nmxst-flst` and
+`|@evt:evt-jaxst-ndkst`.
+
+## AND THE THING THIS DOES NOT FIX, WHICH IS WHAT WAS ACTUALLY OBSERVED
+
+The user's report was "nothing NCAAF live hits the boards". NCAAF **is** on the
+board — 74 rows on 08-29, 7 live — but **0 of 74 carry `model_edge_pct`**, so
+all are refused `no_model_edge_pct` before Kelly and none can ever be sized.
+That is `football/pick_gate.py::_SERVING_REGISTRY`: ncaaf spread, moneyline and
+total are all `servable=False`, measured 2026-08-19 clean out-of-sample — the
+margin model **loses to the closing line by 3.563 points of MAE over 2,233
+games (t=17.2)** and totals are 1.67x over-dispersed and were never scored
+against the close. **This keying work does not move that by one row.** Lifting
+that gate needs a model that beats the close, or an explicit decision to trade
+one that does not.

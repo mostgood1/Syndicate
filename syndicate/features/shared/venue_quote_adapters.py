@@ -34,6 +34,7 @@ __all__ = [
     "probability_to_american",
     "quote_key",
     "game_token",
+    "event_game_token",
 ]
 
 
@@ -85,6 +86,37 @@ def quote_key(sport: str, market: str, side: str, line: float | None, game: str 
         f"{str(sport or '').lower()}|{str(market or '').lower()}"
         f"|{str(side or '').lower()}{line_part}{game_part}"
     )
+
+
+def event_game_token(event_id: Any) -> str | None:
+    """Our OWN game id as a token, for sports where clubs cannot be canonicalised.
+
+    --------------------------------------------------------------------------
+    WHY A SECOND SHAPE EXISTS AT ALL
+    --------------------------------------------------------------------------
+
+    `game_token` resolves both clubs through `canonical_team`, and for NCAAF
+    that returns None on everything: `_alias_map("ncaaf")` has **0 entries**
+    (measured 2026-08-29 against mlb 38, nfl 38, wnba 50, soccer 474). So the
+    club-pair token is unbuildable there, and NCAAF quotes kept colliding
+    across games after the rest of `#603` shipped -- 4 of 7 live Polymarket
+    NCAAF totals rows shared one price on the 00:30:59Z board.
+
+    **THE OBVIOUS FIX IS THE ONE THAT WAS ALREADY REVERTED.** Populating
+    `_alias_map("ncaaf")` was built, measured and backed out the same day
+    (`handoff_2026-08-29_ncaaf_umass_alias_gap.md`): it does not resolve the
+    names anyway, and it makes `teams_match` MAP-AUTHORITATIVE, turning
+    `canonical_team("ncaaf", "MAS")` -> `UMass Dartmouth` from a harmless miss
+    into a confident wrong answer. This deliberately does not go near it.
+
+    `event_id` is the identity we already have on every board row, and the one
+    thing both halves of the join can agree on without a club vocabulary. It is
+    prefixed so it can never be confused with a club-pair token, and it is a
+    FALLBACK only: any sport whose clubs canonicalise keeps the club-pair token
+    and exactly today's behaviour.
+    """
+    text = str(event_id or "").strip().lower()
+    return f"evt:{text}" if text else None
 
 
 def game_token(sport: Any, home: Any, away: Any) -> str | None:
@@ -738,7 +770,109 @@ def _kalshi_ok_reason(spread_rows: int, h2h_keyed: int, h2h_unresolved: int, no_
 # --------------------------------------------------------------------------
 
 
-def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
+def _polymarket_pair_games(rows: Any, sport: Any, games: Any) -> dict[tuple[str, str], str]:
+    """`(away_token, home_token)` -> our `event_id`, learned from MONEYLINE rows.
+
+    --------------------------------------------------------------------------
+    THE SLUG'S TEAM TOKENS ARE POLYMARKET'S OWN ABBREVIATIONS AND CANNOT BE
+    DERIVED. THE `outcomes` ON THE MONEYLINE CAN BE READ.
+    --------------------------------------------------------------------------
+
+    NCAAF slugs look like `tsc-cfb-jaxst-ndkst-2026-08-29-total-26pt5`. Measured
+    against the live registry, those tokens resolve to nothing: `jaxst`,
+    `ndkst`, `nmxst`, `flst`, `sacst`, `emich` all miss `unambiguous_team_index`
+    (2,214 entries), while `hawaii` and `stan` happen to hit. And no derivation
+    rule can rescue them -- `jaxst` is not even a SUBSEQUENCE of
+    "jacksonville state", because Polymarket's "jax" contributes an `x` the real
+    name does not contain. Inventing a rule from six examples is exactly the
+    trap `kalshi_board_join`'s header records costing a full day.
+
+    What IS readable: the MONEYLINE market for the same game carries real
+    nicknames in `outcomes` (`["Seminoles","Aggies"]`, `["Gamecocks","Bison"]`),
+    and **a game's slug token pair is constant across all its markets**. So the
+    pair is resolved ONCE from the market family that names its teams, and that
+    answer is reused by the families that do not (totals, spreads).
+
+    Matched by TOKEN SUBSET against the board's own two team names, not through
+    `canonical_team` -- `_side_for_team` cannot help here because it resolves
+    BOTH board teams through `canonical_team` FIRST and returns None before
+    reaching its own nickname fallback, which is precisely what an empty
+    `_alias_map` does to NCAAF. Measured on the 08-29 board: 3 of 4 observed
+    pairs resolved to exactly one game, and the fourth was a game not on the
+    board at all -- a correct no-match, not a failure.
+
+    AMBIGUITY REFUSES. A pair matching two games is dropped rather than
+    assigned; on a slate where two fixtures share a nickname ("Aggies") the pair
+    constraint is what separates them, and when it cannot, silence is the right
+    answer.
+    """
+    import re as _re
+
+    if not games:
+        return {}
+
+    # Imported here rather than at module scope: this module's convention is
+    # local imports for cross-feature helpers, and `polymarket_board_join`
+    # imports back into this area.
+    from syndicate.features.shared.polymarket_board_join import parse_slug
+
+    def _toks(value: Any) -> set:
+        return set(_re.sub(r"[^a-z0-9 ]", " ", str(value or "").lower()).split())
+
+    def _side(name: Any, game: Any) -> str | None:
+        n = _toks(name)
+        if not n:
+            return None
+        in_home = n <= _toks(game.get("home_team"))
+        in_away = n <= _toks(game.get("away_team"))
+        if in_home and not in_away:
+            return "home"
+        if in_away and not in_home:
+            return "away"
+        return None
+
+    out: dict[tuple[str, str], str] = {}
+    for row in rows or []:
+        if not isinstance(row, Mapping):
+            continue
+        if str(row.get("sportsMarketTypeV2") or "").upper() != _MONEYLINE_TYPE_V2:
+            continue
+        parsed = parse_slug(row.get("slug"))
+        if not parsed:
+            continue
+        pair = (str(parsed.get("away") or ""), str(parsed.get("home") or ""))
+        if not all(pair) or pair in out:
+            continue
+        names = _decode_outcome_names(row.get("outcomes"))
+        if len(names) != 2:
+            continue
+        hits = [g for g in games if {_side(n, g) for n in names} == {"home", "away"}]
+        if len(hits) == 1:
+            event_id = str(hits[0].get("event_id") or "").strip()
+            if event_id:
+                out[pair] = event_id
+    return out
+
+
+def _decode_outcome_names(value: Any) -> list:
+    """`outcomes` is a JSON STRING on the wire as often as it is a list."""
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    if isinstance(value, str):
+        import json as _json
+
+        try:
+            decoded = _json.loads(value)
+        except (ValueError, TypeError):
+            return []
+        return [str(v) for v in decoded] if isinstance(decoded, list) else []
+    return []
+
+
+_MONEYLINE_TYPE_V2 = "SPORTS_MARKET_TYPE_MONEYLINE"
+
+
+def polymarket_us_outcome(sport: str, selected_date: str, *, games: Any = None) -> SourceOutcome:
     payload, mtime = _artifact(("intelligence", "polymarket_us_games.json"))
     if not isinstance(payload, Mapping):
         # The catalogue is reachable (7,585 game markets measured 2026-08-24)
@@ -784,6 +918,13 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
     # confusion this whole module is built to prevent.
     spread_rows = 0
     unresolved_clubs: list[str] = []
+    # `#603` NCAAF. The slug's team tokens are Polymarket's own abbreviations
+    # and cannot be derived (`jaxst` is not even a subsequence of "jacksonville
+    # state"). The MONEYLINE rows DO name their teams, and a game's token pair
+    # is constant across its markets -- so resolve the pair once here and let
+    # totals/spreads reuse it. Empty when no schedule was passed, which leaves
+    # every key exactly as it is today.
+    _pair_games = _polymarket_pair_games(rows, sport, games)
     for row in rows:
         if not isinstance(row, Mapping):
             continue
@@ -830,11 +971,18 @@ def polymarket_us_outcome(sport: str, selected_date: str) -> SourceOutcome:
         # already names the game implicitly (its side is the CLUB), so
         # qualifying it adds a key nothing asks for. Totals and spreads name
         # nothing, which is where every one of the 26 shared quotes was.
-        pm_game = (
-            game_token(sport, parsed_slug.get("home"), parsed_slug.get("away"))
-            if market in _ROLE_KEYED_MARKETS
-            else None
-        )
+        pm_game = None
+        if market in _ROLE_KEYED_MARKETS:
+            # The club-pair token first -- unchanged for every sport whose clubs
+            # canonicalise (mlb, nfl, wnba, soccer). Only when that is
+            # impossible does the event fallback apply, so nothing that works
+            # today changes shape.
+            pm_game = game_token(sport, parsed_slug.get("home"), parsed_slug.get("away"))
+            if pm_game is None:
+                learned = _pair_games.get(
+                    (str(parsed_slug.get("away") or ""), str(parsed_slug.get("home") or ""))
+                )
+                pm_game = event_game_token(learned)
         for side, probability in sides:
             quotes.append(
                 Quote(

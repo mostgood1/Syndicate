@@ -503,11 +503,13 @@ def apply_venue_quotes(
         # Every key this sport ASKED FOR, for the overlap counter below.
         wanted_by_sport.setdefault(sport, set()).update(str(k) for k in keys)
         quotes_for_sport = payload.get("quotes") or {}
-        from syndicate.features.shared.venue_quote_adapters import game_token
+        from syndicate.features.shared.venue_quote_adapters import event_game_token, game_token
 
         quote = None
         key = keys[0] if keys else None
-        row_game = game_token(sport, row.get("home_team"), row.get("away_team"))
+        row_game = game_token(sport, row.get("home_team"), row.get("away_team")) or event_game_token(
+            row.get("event_id")
+        )
         for candidate in keys:
             found = quotes_for_sport.get(str(candidate))
             if found is None:
@@ -696,6 +698,7 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     itself.
     """
     from syndicate.features.shared.venue_quote_adapters import (
+        event_game_token,
         game_token,
         prop_quote_key,
         quote_key,
@@ -836,7 +839,14 @@ def _candidate_keys(row: Mapping[str, Any], sport: str) -> list[str]:
     # change six assertions for no defect fixed. Scoped to where the collision
     # is real.
     if market in _ROLE_KEYED_MARKETS:
-        game = game_token(sport, row.get("home_team"), row.get("away_team"))
+        # `#603` NCAAF. The club-pair token is unbuildable where `canonical_team`
+        # resolves nothing -- `_alias_map("ncaaf")` has 0 entries -- so fall back
+        # to OUR OWN event id, which is the one identity both halves can agree on
+        # without a club vocabulary. Club-pair FIRST, so every sport that works
+        # today keeps exactly the key it has.
+        game = game_token(sport, row.get("home_team"), row.get("away_team")) or event_game_token(
+            row.get("event_id")
+        )
         if game:
             qualified = quote_key(sport, market, side, line, game)
             if qualified not in keys:
@@ -937,7 +947,11 @@ def _default_adapters(
 
     return {
         "kalshi": partial(adapters.kalshi_outcome, games=games) if games else adapters.kalshi_outcome,
-        "polymarket_us": adapters.polymarket_us_outcome,
+        "polymarket_us": (
+            partial(adapters.polymarket_us_outcome, games=games)
+            if games
+            else adapters.polymarket_us_outcome
+        ),
         "novig": adapters.novig_outcome,
         "oddsapi": adapters.oddsapi_outcome,
         "oddsapi_props": adapters.oddsapi_props_outcome,
