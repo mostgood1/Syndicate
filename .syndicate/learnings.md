@@ -6278,6 +6278,16 @@ was editing.**
 **How to apply:**
 - **Only a clean worktree at `origin/main` answers "is main green."** `git
   worktree add --detach /c/tmp/<x> origin/main`, run, remove. It costs ~40s.
+- **CHEAPER CONTROL, and usually the right one first** `[session 4465737c,
+  2026-08-30]`: you rarely need a whole clean tree. `git diff origin/main --
+  <path>` returning 0 lines PROVES that file matches main, so a dirty tree is a
+  valid environment for anything whose inputs you can enumerate. They cleared a
+  probe this way over three modules plus its registry CSV — no worktree, no 40s.
+  **The caveat is the enumeration, not the method:** it is only sufficient once
+  you have listed every input, TRANSITIVE IMPORTS AND `data/` INCLUDED. Miss one
+  and you have proved something about the files you thought of. Use the diff
+  when the input set is small and known; use the clean worktree when it is not,
+  or when the question is "is the SUITE green" rather than "is this file main's".
 - Before attributing ANY test failure to a commit, reproduce it there. If you
   cannot, the failure is yours, not the code's.
 - **Never "fix" a red in the primary tree without checking `git status` on the
