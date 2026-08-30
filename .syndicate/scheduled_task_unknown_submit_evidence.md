@@ -1,6 +1,6 @@
 # Mirror — scheduled task `unknown-submit-balance-evidence-capture`
 
-> ## ⚠ NOT RUNNING. NEEDS A ONE-TIME HUMAN APPROVAL. `[2026-08-30 04:1xZ]`
+> ## ⚠ DISABLED 2026-08-30 `[user decision]`. IT NEVER WORKED — 2 runs, 2 stalls, 0 measurements.
 >
 > **Two runs, two stalls, zero work done — and `lastRunAt` said it ran both
 > times.** 03:10:47Z and 04:09:54Z: a session was created each time (so it
@@ -29,6 +29,18 @@
 > DISABLE the task rather than leave it generating stalls, and leave the
 > measurement to an interactive session — the lanes already record it as owed
 > and unforceable.
+>
+> **THAT IS WHAT WAS DONE.** `enabled: false` as of 2026-08-30, no `nextRunAt`.
+> The measurement is now owed to whoever next works this area INTERACTIVELY:
+> read `unknown_submits[].balance_evidence` off
+> `https://syndicate-an21.onrender.com/api/portfolio/live?on=all` while a row
+> exists, and pull the matching `UNKNOWN_ORDER_PROBE` line (carrying
+> `balance_settled`) from live-odds-worker's logs before it leaves retention.
+>
+> **TO REVIVE IT:** set `enabled: true`, then hit "Run now" ONCE and approve the
+> `Bash` call. Approvals are stored on the task and auto-applied thereafter. Do
+> NOT re-enable without that approval — it will just resume producing one dead
+> session per hour.
 
 
 **This file is the CANONICAL text of the task prompt.** The live task lives at
