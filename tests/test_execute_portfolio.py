@@ -836,7 +836,10 @@ def test_resolves_the_artifact_price_for_our_named_team(monkeypatch):
     # CHW (home, requested) is "White Sox" in outcomes[0] at 0.55. The INDEX
     # comes back too: it is what `order_body` uses to pick `outcomeSide`, so
     # the side cannot disagree with the price it was resolved beside.
-    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1", 0)
+    # 6th element `[2026-08-30]`: the venue's stated YES leg, `(index, reason)`.
+    # `(None, None)` here because this fixture row carries no `yesLegIndex` --
+    # which is the REFUSING case, so the resolution below is unchanged.
+    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1", 0, (None, None))
 
 
 def test_the_away_side_gets_the_away_price_not_positional(monkeypatch):
@@ -854,7 +857,7 @@ def test_the_away_side_gets_the_away_price_not_positional(monkeypatch):
     # Rangers (away, requested) sit at outcomes[0] here, so the index is 0 for
     # an AWAY side -- which is exactly the point: the index tracks our team,
     # never the home/away role.
-    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.42, "0.001", "1", 0)
+    assert resolved == ("aec-mlb-tex-chw-2026-08-24", 0.42, "0.001", "1", 0, (None, None))
 
 
 def test_no_venue_ticker_refuses_without_reading_the_artifact(monkeypatch):
@@ -885,7 +888,7 @@ def test_never_calls_the_venue_directly(monkeypatch):
     monkeypatch.setattr(polymarket_us_markets, "fetch_markets", explode)
     runner = _artifact_env(monkeypatch)
     assert runner._polymarket_resolve_market(_PolyReq()) == (
-        "aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1", 0
+        "aec-mlb-tex-chw-2026-08-24", 0.55, "0.001", "1", 0, (None, None)
     )
 
 
@@ -978,6 +981,12 @@ def test_venue_submitter_polymarket_end_to_end(monkeypatch):
         # positionally and can contradict the price -- the 2026-08-25 inverted
         # order. This seam is where that thread would silently break again.
         "outcome_index": 0,
+        # AND SO DOES THE VENUE'S STATED YES LEG `[2026-08-30]`, for exactly the
+        # same reason: a resolver that reads `yesLegIndex` off the row and a
+        # submitter that never receives it is this defect one layer out. `None`
+        # here because the fixture row states no leg -- the refusing case.
+        "yes_leg_index": None,
+        "yes_leg_reason": None,
     }]
 
 

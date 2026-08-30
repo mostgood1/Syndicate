@@ -144,7 +144,10 @@ def test_a_fresh_slate_still_RESOLVES(_artifact, monkeypatch):
     resolved = execute_portfolio._polymarket_resolve_market(_Request())
 
     assert resolved is not None, "a 60s-old slate was refused"
-    slug, price, tick, min_qty, outcome_index = resolved
+    # `[2026-08-30]` the resolver now also returns the venue's stated YES leg.
+    # Sliced rather than widened: this test is about SLATE FRESHNESS and has
+    # no business pinning the resolver's arity.
+    slug, price, tick, min_qty, outcome_index = resolved[:5]
     assert slug == _Request.venue_ticker
     assert price == pytest.approx(0.55)
     # Tick size and minimum quantity come FROM THE MARKET, never inferred.

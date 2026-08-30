@@ -232,6 +232,32 @@ def outcome_side_for_index(index: Any) -> str:
     return _SIDE_YES if position == yes_outcome_index() else _SIDE_NO
 
 
+def _readable_index(index: Any) -> int | None:
+    """`0`/`1` from whatever we were handed, or `None` -- NEVER a raise.
+
+    A separate parser from `outcome_side_for_index`'s deliberately. That one
+    RAISES, because a position it cannot read means an order it must not build.
+    This one is asked "is there a usable index here at all", and the answer
+    "no" is a normal branch that falls through to a NAMED refusal further down.
+    Making absence raise here would report a missing `yesLegIndex` as
+    `outcome_index_unreadable`, which names the wrong field.
+    """
+    if index is None or isinstance(index, bool):
+        # `int(True) == 1`, so a bool would resolve as a real leg.
+        return None
+    try:
+        position = int(index)
+    except (TypeError, ValueError):
+        return None
+    if position != index and str(index).strip() != str(position):
+        # NON-INTEGRAL INPUT IS JUNK, NOT A LEG. `int(1.5) == 1` truncates a
+        # malformed index into a perfectly valid one, which is the silent
+        # default this whole file exists to remove. Caught by a test that
+        # expected None and got a tradeable answer.
+        return None
+    return position if position in (0, 1) else None
+
+
 # The sides a club name identifies, and therefore the ones that carry no
 # yes/no axis of their own. There is no sound rule for these on this venue
 # today -- see `_resolve_outcome_side`.
@@ -255,7 +281,12 @@ def team_side_allowed() -> bool:
     return str(os.environ.get(_ALLOW_TEAM_SIDE_ENV) or "").strip() == "1"
 
 
-def _resolve_outcome_side(side: Any, outcome_index: Any) -> str:
+def _resolve_outcome_side(
+    side: Any,
+    outcome_index: Any,
+    yes_leg_index: Any = None,
+    yes_leg_reason: Any = None,
+) -> str:
     """Which leg to buy: by NAME where the name states it, and REFUSED where
     nothing states it.
 
@@ -287,11 +318,20 @@ def _resolve_outcome_side(side: Any, outcome_index: Any) -> str:
     positionally only because its outcomes ARE team names, which answers which
     team each entry is and not which leg either entry is.
 
-    WHY THIS IS A REFUSAL AND NOT A FIX. The sound rule needs the venue to say
-    which outcome the YES token pays, by name. `/v1/markets` returns
-    `marketSides` and `question` -- both are already in
-    `polymarket_us_markets._KEEP` -- and `_slate_row_for_storage` drops both
-    before the order path ever sees a row, so no name rule is writable today.
+    THE REFUSAL IS NO LONGER UNCONDITIONAL `[2026-08-30]`. It was written when
+    "`_slate_row_for_storage` drops `marketSides` before the order path ever
+    sees a row, so no name rule is writable today" was TRUE. It is now false:
+    that function DERIVES the answer while the full venue payload is still in
+    hand and persists it as `yesLegIndex` on every stored row. This function
+    now READS it, and refuses only where the venue did not state it -- carrying
+    `yesLegReason` so a census can separate "the venue never says" from "our
+    matching is broken".
+
+    WHAT IS NOT CLAIMED. `yesLegIndex` is the VENUE's answer, not a verified
+    one. The caller is expected to corroborate it against an independent source
+    and to refuse on disagreement; `_polymarket_resolve_market` does that
+    against the AWAY team's position. This function does not second-guess an
+    index it is handed -- one owner for that decision, not two.
     Neither field's SHAPE has ever been logged, only its key, so writing one
     now would be a guess. `learnings.md 2026-08-28` is explicit about what a
     guess costs here: flipping the constant on an unconfirmed diagnosis "would
@@ -305,13 +345,29 @@ def _resolve_outcome_side(side: Any, outcome_index: Any) -> str:
     `_side_to_outcome` raises for those and is still reached here.
     """
     raw = str(side or "").strip().lower()
-    if raw in _POSITIONAL_SIDES and not team_side_allowed():
-        raise OrderBuildError(
-            f"team_side_needs_verified_yes_leg: {side!r} -- this venue's YES leg"
-            " is not `outcomes[0]` (measured wrong on 3 of 8 settled moneylines,"
-            " 2026-08-28) and nothing in the stored market row names it."
-            f" Set {_ALLOW_TEAM_SIDE_ENV}=1 to restore the positional rule."
-        )
+    if raw in _POSITIONAL_SIDES:
+        verified = _readable_index(yes_leg_index)
+        if verified is not None:
+            # THE VENUE'S OWN ANSWER, and it outranks the escape hatch. The
+            # hatch restores a rule measured wrong on 3 of 8 settled
+            # moneylines; a stated YES leg is strictly better evidence than
+            # that, so a market carrying one is never resolved positionally
+            # even when the hatch is open.
+            position = _readable_index(outcome_index)
+            if position is None:
+                raise OrderBuildError(
+                    f"outcome_index_unreadable: {outcome_index!r} -- the YES leg"
+                    f" is known ({verified}) but our own position is not"
+                )
+            return _SIDE_YES if position == verified else _SIDE_NO
+        if not team_side_allowed():
+            raise OrderBuildError(
+                f"team_side_needs_verified_yes_leg: {side!r} -- this venue's YES"
+                " leg is not `outcomes[0]` (measured wrong on 3 of 8 settled"
+                " moneylines, 2026-08-28) and the stored market row does not"
+                f" name it: yesLegReason={yes_leg_reason!r}."
+                f" Set {_ALLOW_TEAM_SIDE_ENV}=1 to restore the positional rule."
+            )
     if raw in _POSITIONAL_SIDES and outcome_index is not None:
         return outcome_side_for_index(outcome_index)
     # Everything else lands on the NAME rule, which resolves
@@ -469,6 +525,8 @@ def order_body(
     tick_size: Any,
     minimum_trade_qty: Any,
     outcome_index: Any = None,
+    yes_leg_index: Any = None,
+    yes_leg_reason: Any = None,
 ) -> dict[str, Any]:
     """The JSON body for one order. PURE -- no clock, no network, no env.
 
@@ -562,7 +620,10 @@ def order_body(
         # buying YES (`Over`) at `outcomePrices[1]` (Over's price) describes
         # one outcome again.
         "outcomeSide": _resolve_outcome_side(
-            getattr(request, "side", None), outcome_index
+            getattr(request, "side", None),
+            outcome_index,
+            yes_leg_index=yes_leg_index,
+            yes_leg_reason=yes_leg_reason,
         ),
         "action": _ACTION_BUY,
         "manualOrderIndicator": _MANUAL_INDICATOR,
@@ -595,6 +656,8 @@ def submit_order(
     tick_size: Any,
     minimum_trade_qty: Any,
     outcome_index: Any = None,
+    yes_leg_index: Any = None,
+    yes_leg_reason: Any = None,
 ) -> dict[str, Any]:
     """Send one order. Returns the shape `place_order` expects from an adapter.
 
@@ -611,6 +674,8 @@ def submit_order(
         tick_size=tick_size,
         minimum_trade_qty=minimum_trade_qty,
         outcome_index=outcome_index,
+        yes_leg_index=yes_leg_index,
+        yes_leg_reason=yes_leg_reason,
     )
     url = _orders_url()
     # THE REQUEST, BEFORE THE RESPONSE. If the venue rejects the body, the
@@ -626,7 +691,12 @@ def submit_order(
         # `side=OUTCOME_SIDE_YES` and said nothing about WHICH TEAM that buys,
         # so the log agreed with itself while the venue bought the other team.
         f" our_side={getattr(request, 'side', None)} outcome_index={outcome_index}"
-        f" yes_index={yes_outcome_index()}",
+        f" yes_index={yes_outcome_index()}"
+        # WHICH RULE PICKED THE SIDE. `yes_leg_index` present means the venue
+        # stated its YES leg and the positional constant above was NOT used --
+        # without this the two are indistinguishable in the log, which is how
+        # the inverted order of 2026-08-25 stayed invisible.
+        f" yes_leg_index={yes_leg_index!r} yes_leg_reason={yes_leg_reason!r}",
         flush=True,
     )
     response = signed_request("POST", url, body=body)
@@ -675,7 +745,19 @@ def polymarket_us_submitter(resolve_market):
         if not resolved:
             raise OrderBuildError("market_unresolved_for_position")
         outcome_index = None
-        if len(resolved) == 5:
+        yes_leg_index = None
+        yes_leg_reason = None
+        # LENGTH-TOLERANT ON PURPOSE. Three resolver shapes are in the tree at
+        # once and a hard unpack turns an older one into a TypeError at submit
+        # time -- on the money path, at the worst moment. Each extra value is
+        # additive and defaults to "not stated", which is the refusing branch.
+        if len(resolved) == 6:
+            slug, price, tick, min_qty, outcome_index, yes_leg = resolved
+            if isinstance(yes_leg, tuple):
+                yes_leg_index, yes_leg_reason = yes_leg
+            else:
+                yes_leg_index = yes_leg
+        elif len(resolved) == 5:
             slug, price, tick, min_qty, outcome_index = resolved
         else:
             slug, price, tick, min_qty = resolved
@@ -686,6 +768,8 @@ def polymarket_us_submitter(resolve_market):
             tick_size=tick,
             minimum_trade_qty=min_qty,
             outcome_index=outcome_index,
+            yes_leg_index=yes_leg_index,
+            yes_leg_reason=yes_leg_reason,
         )
 
     return submit

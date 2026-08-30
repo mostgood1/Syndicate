@@ -565,6 +565,24 @@ def _venue_submitter(venue: str):
     return None
 
 
+def _yes_leg_corroboration_required() -> bool:
+    """Must the venue's `yesLegIndex` agree with our own away-team position
+    before a team side is placed? YES by default, and that default is the fix.
+
+    An env switch rather than a code edit because the answer is empirical and
+    the log line beside it (`POLYMARKET_YES_LEG ... agree=`) is what will
+    settle it. If disagreements turn out to be common AND the venue's index
+    turns out to be the right one, this comes off in minutes rather than in a
+    deploy. It does not open team betting on its own -- with it off, a market
+    still needs a stated `yesLegIndex`, and one that states none is refused by
+    `_resolve_outcome_side` exactly as it is today.
+    """
+    raw = (os.environ.get("SYNDICATE_POLYMARKET_YES_LEG_CORROBORATE") or "").strip()
+    # ABSENT MEANS ON. `bool(os.environ.get(...))` would read "false" as True,
+    # and an unknown value must not land on the permissive branch.
+    return raw.lower() not in {"0", "false", "no", "off"}
+
+
 def max_slippage_dollars() -> float:
     """How far worse than the planned price we will still pay, in dollars.
 
@@ -807,7 +825,7 @@ def _polymarket_max_price_age_seconds() -> float:
     return parsed if parsed > 0 else _slate_ceiling_default()
 
 
-def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | None:
+def _polymarket_resolve_market(request) -> tuple | None:
     """`(slug, price, tick_size, min_qty)` for one Polymarket US position, or
     `None` to refuse cleanly -- which `polymarket_us_submitter` turns into an
     `OrderBuildError` (recorded as failed, never sent at a price nobody chose,
@@ -1032,6 +1050,7 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
     # moneylines ever resolved, because only moneyline outcomes are teams.
     price = None
     outcome_index = None
+    away_index = None
     refusal = None
 
     if market in _TOTAL_MARKETS:
@@ -1062,14 +1081,34 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
     else:
         for position, (name, raw_price) in enumerate(zip(outcomes, prices)):
             side = _side_for_team(name, resolution, sport=sport)
-            if side is not None and (side == "home") == wants_home:
+            if side == "away":
+                # THE CORROBORATING WITNESS, collected in the pass that is
+                # already running. Independent of `marketSides`: this comes
+                # from OUR board's home/away designation matched against the
+                # outcome NAMES, while `yesLegIndex` comes from the venue's own
+                # `long` flag. Two sources that can disagree are the only thing
+                # standing in for the 8 settled markets that no longer exist.
+                away_index = position
+            if (
+                outcome_index is None
+                and price is None
+                and side is not None
+                and (side == "home") == wants_home
+            ):
+                # FIRST MATCH WINS, pinned explicitly. The `break` that used to
+                # enforce that is gone -- it stopped the scan at our own team
+                # and left `away_index` unset whenever ours came first, so the
+                # gate below would read "not corroborated" on half the markets
+                # for a reason that is an artifact of loop order. Dropping the
+                # break without this guard would have let a SECOND matching
+                # outcome overwrite the first, which is a different bug and a
+                # silent one.
                 try:
                     price = float(raw_price)
                 except (TypeError, ValueError):
                     price = None
                 else:
                     outcome_index = position
-                break
         if outcome_index is None:
             refusal = "team_side_not_in_outcomes"
 
@@ -1153,7 +1192,83 @@ def _polymarket_resolve_market(request) -> tuple[str, float, Any, Any, int] | No
     # refresh earlier. `order_body` refuses to INFER either, so having a second
     # source for them is the difference between an order and a refusal when the
     # artifact row is thin.
-    return (slug, price, tick_value, min_qty_value, outcome_index)
+    # ----------------------------------------------------------------------
+    # WHICH LEG DOES THE YES TOKEN PAY -- AND DOES A SECOND SOURCE AGREE?
+    # ----------------------------------------------------------------------
+    #
+    # `yesLegIndex` is derived by `polymarket_us_markets._slate_row_for_storage`
+    # from the venue's own `marketSides[].long` and persisted on EVERY row. It
+    # has been sitting on the row unread while `_resolve_outcome_side` refused
+    # every moneyline for want of exactly this field.
+    #
+    # WHY A GATE AND NOT A STRAIGHT READ. `yes_leg_index_from_market` says the
+    # rule must be "scored against all 8 venue-settled moneylines" first. That
+    # cannot be done: `marketSides` is deliberately never persisted, so the rule
+    # cannot be re-run against a market that has already settled. The sentence
+    # blocks the fix permanently rather than gating it. What replaces it is a
+    # SECOND, INDEPENDENT WITNESS -- our own board's away-team designation --
+    # and a refusal whenever the two disagree.
+    #
+    # THE ASYMMETRY THAT MAKES THIS SAFE: today EVERY team side is refused. A
+    # market where the two sources disagree is refused exactly as it is now, so
+    # the gate cannot be worse than the status quo. It can only add the markets
+    # where two independent encodings already agree.
+    #
+    # EVIDENCE, 2026-08-30 (`findings_2026-08-30_polymarket_yes_leg_evidence.md`):
+    # `long_index` VARIES (wnba 1, boxing 1; mlb/nfl/cfb 0), killing the all-NFL
+    # constant-0 null result. On 9 real markets `outcomes` order runs 5 matching
+    # the slug and 4 REVERSED, so `outcomes[0]` is a coin flip. And on
+    # `aec-mlb-az-sf-2026-08-27` -- outcome_index=0 (SF), submitted YES, SF won
+    # 6-1, venue graded LOST, held_side=SHORT -- the YES leg is provably the
+    # AWAY team. This code sends NO there, which is the token that pays SF.
+    #
+    # NOT CLAIMED: that "YES == away" is a venue contract. It is an observed
+    # regularity over five team-sport markets, and `outcome_side_for_index`
+    # already records a market whose outcomes are reversed against its own slug.
+    # That is why it is a corroborator that can only REFUSE, never a resolver.
+    from syndicate.features.shared.polymarket_us_markets import (
+        YES_LEG_INDEX_FIELD,
+        YES_LEG_REASON_FIELD,
+    )
+
+    yes_leg_index = row.get(YES_LEG_INDEX_FIELD)
+    yes_leg_reason = row.get(YES_LEG_REASON_FIELD)
+    if market not in _TOTAL_MARKETS and market not in _SPREAD_MARKETS:
+        agree = (
+            yes_leg_index is not None
+            and away_index is not None
+            and int(yes_leg_index) == int(away_index)
+        )
+        print(
+            f"[execute_portfolio] POLYMARKET_YES_LEG slug={slug}"
+            f" yes_leg_index={yes_leg_index!r} away_index={away_index!r}"
+            f" our_index={outcome_index} agree={agree}"
+            f" reason={yes_leg_reason!r} outcomes={outcomes!r}",
+            flush=True,
+        )
+        if yes_leg_index is not None and not agree:
+            # NAMED, and it returns None like every other refusal here rather
+            # than raising: a disagreement is a market we decline, not a broken
+            # run. `unknown` must not land on the permissive branch, so an
+            # UNSET `away_index` counts as disagreement and refuses too.
+            print(
+                f"[execute_portfolio] POLYMARKET_SIDE_REFUSED slug={slug}"
+                f" market={market!r} side={our_side!r}"
+                " reason=yes_leg_disagrees_with_away_index"
+                f" yes_leg_index={yes_leg_index!r} away_index={away_index!r}",
+                flush=True,
+            )
+            if _yes_leg_corroboration_required():
+                return None
+
+    return (
+        slug,
+        price,
+        tick_value,
+        min_qty_value,
+        outcome_index,
+        (yes_leg_index, yes_leg_reason),
+    )
 
 
 def verify_order_paths(
@@ -1256,12 +1371,18 @@ def verify_order_paths(
                     if not resolved:
                         note(market, "market_unresolved", str(ticker))
                         continue
-                    slug, price, tick, min_qty, index = resolved
+                    slug, price, tick, min_qty, index = resolved[:5]
+                    yes_leg = resolved[5] if len(resolved) > 5 else (None, None)
                     from syndicate.features.shared.polymarket_us_orders import order_body
 
+                    # THE DRY RUN MUST BUILD THE SAME BODY THE LIVE PATH DOES.
+                    # Dropping the yes-leg here would make `verify_order_paths`
+                    # report `would_build` for a moneyline the real submit
+                    # refuses -- a green check for a path that does not run.
                     order_body(
                         request, market_slug=slug, price_dollars=price,
                         tick_size=tick, minimum_trade_qty=min_qty, outcome_index=index,
+                        yes_leg_index=yes_leg[0], yes_leg_reason=yes_leg[1],
                     )
                     note(market, "would_build", f"{slug} @ {price}")
                 else:
