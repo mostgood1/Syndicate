@@ -151,3 +151,76 @@ def _write(text: str) -> str:
     p = _TMP / "lanes.md"
     p.write_text(text, encoding="utf-8")
     return str(p)
+
+
+# --------------------------------------------------------------------------
+# 3. A CONFLICTED FILE IS NOT A LEDGER WITH VIOLATIONS -- it is two files.
+#
+# MEASURED 2026-08-30: lanes.md sat `UU` in the shared tree with markers at
+# 3724/3778/3966 and this script printed INVARIANTS HOLD, having parsed BOTH
+# sides as real lanes. Three OPEN lanes existed only on one side, with zero
+# copies in HEAD and zero in origin/main.
+# --------------------------------------------------------------------------
+
+CONFLICTED = """## OPEN
+
+<<<<<<< Updated upstream
+### alpha — OPEN — opened 2026-08-17
+- Files: `a/one.py`.
+=======
+### alpha — OPEN — opened 2026-08-17
+- Files: `a/one.py`.
+
+### only-on-the-stashed-side — OPEN — opened 2026-08-30
+- Files: `b/two.py`.
+>>>>>>> Stashed changes
+"""
+
+
+def test_a_conflicted_ledger_is_refused_with_its_own_exit_code():
+    """3, not 1. "This cannot be checked" is a different answer from "this
+    failed", and both are different from the green it used to print."""
+    assert mod.main([_write(CONFLICTED)]) == 3
+
+
+def test_the_marker_lines_are_named(capsys):
+    """A refusal nobody can act on is a refusal people learn to bypass."""
+    mod.main([_write(CONFLICTED)])
+    out = capsys.readouterr().out
+    assert "UNRESOLVED MERGE MARKERS" in out
+    # Derived, not hardcoded: the point is that EVERY marker the parser found
+    # is named in the output, not that they sit at particular offsets.
+    for number, _line in mod.conflict_markers(CONFLICTED):
+        assert f"line {number}:" in out
+    assert "INVARIANTS HOLD" not in out
+
+
+def test_the_regression_itself_the_duplicate_no_longer_reads_as_two_lanes():
+    """`alpha` appears on BOTH sides. The old code counted that as two
+    legitimate OPEN lanes contesting `a/one.py` -- or, with identical Files
+    blocks, as a clean ledger. Either way it answered a question about a file
+    that does not exist."""
+    assert len(mod.conflict_markers(CONFLICTED)) == 2
+    assert mod.main([_write(CONFLICTED)]) == 3
+
+
+def test_a_lane_present_on_only_one_side_is_why_this_matters():
+    """The refusal has to fire BEFORE parsing, because after parsing the
+    one-sided lane looks exactly like a normal lane and nothing flags that
+    choosing the other side deletes it."""
+    assert "only-on-the-stashed-side" in CONFLICTED
+    assert mod.main([_write(CONFLICTED)]) == 3
+
+
+def test_a_setext_underline_is_NOT_a_conflict_marker():
+    """`=======` on its own line is a markdown H1 underline. Keying on it would
+    refuse legitimate ledgers, so only the labelled open/close markers count."""
+    setext = "Heading\n=======\n\n## OPEN\n\n### alpha — OPEN — opened 2026-08-17\n- Files: `a/one.py`.\n"
+    assert mod.conflict_markers(setext) == []
+    assert mod.main([_write(setext)]) == 0
+
+
+def test_a_clean_ledger_still_passes():
+    """The guard must not have made everything red."""
+    assert mod.conflict_markers(ONE_HOLDER) == []
+    assert mod.main([_write(ONE_HOLDER)]) == 0

@@ -93,6 +93,47 @@ PATH_RE = re.compile(r"[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+")
 PROSE_HINT_RE = re.compile(r"\bnames?\b|\bDIFFERENT file\b|\bcandidate\b|\bclaimed by\b")
 
 
+# The two markers `git` writes that CANNOT occur in prose. `=======` is
+# deliberately NOT in this tuple: a markdown setext H1 underline is a run of
+# `=` on its own line, so keying on it would refuse a legitimate ledger. The
+# open/close markers carry seven chars plus a label and have no honest reading.
+_CONFLICT_MARKERS = ("<<<<<<< ", ">>>>>>> ")
+
+
+def conflict_markers(text: str) -> list[tuple[int, str]]:
+    """Unresolved merge markers, as (line number, line).
+
+    ----------------------------------------------------------------------
+    WHY THIS RUNS BEFORE EVERY OTHER CHECK
+    ----------------------------------------------------------------------
+
+    MEASURED 2026-08-30. `.syndicate/lanes.md` sat in the shared tree as `UU`
+    with markers at lines 3724/3778/3966 -- a `git stash pop` nobody finished --
+    and this script printed **INVARIANTS HOLD** against it. It parsed BOTH
+    sides as real lanes, so `mlb-resolver-write-side-effect` existed twice and
+    was counted as two legitimate blocks rather than as the signature of a
+    corrupted file.
+
+    That is worse than having no check. This script is what a session runs
+    BEFORE committing the ledger, so a green here is exactly the reassurance
+    that precedes writing the damage in. Three OPEN lanes existed only inside
+    the "Stashed changes" side, with zero copies in HEAD and zero in
+    `origin/main`; resolving toward the other side would have dropped them to
+    zero copies anywhere -- the `todo.md` scenario CLAUDE.md warns about.
+
+    A CONFLICTED FILE IS NOT A LEDGER WITH VIOLATIONS. It is a file whose
+    contents are two files, so every downstream count is meaningless -- claims,
+    headings, holders. Hence a distinct exit code (3) and an early return: the
+    honest answer is "this cannot be checked", not "this failed", and certainly
+    not "this passed".
+    """
+    found: list[tuple[int, str]] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.startswith(_CONFLICT_MARKERS):
+            found.append((number, line.rstrip()))
+    return found
+
+
 def _claimable_prefix(line: str) -> str:
     """Everything in `line` before the first disclaimer marker -- copied from
     lane-guard.py's function of the same name. A marker GOVERNS WHAT FOLLOWS
@@ -205,6 +246,19 @@ def main(argv=None) -> int:
     except OSError as exc:
         print(f"cannot read {args.path}: {exc}")
         return 2
+
+    # BEFORE ANY PARSING. See `conflict_markers`: a conflicted file is two
+    # files, so every count below would be computed over both sides at once.
+    conflicted = conflict_markers(text)
+    if conflicted:
+        print(f"[FAIL] {args.path} has UNRESOLVED MERGE MARKERS -- not a ledger")
+        for number, line in conflicted:
+            print(f"        line {number}: {line[:72]}")
+        print()
+        print("CANNOT CHECK: resolve the conflict first. Do NOT commit this file.")
+        print("A lane may exist on ONLY ONE side -- resolving toward the other")
+        print("drops it to zero copies. Diff both sides before choosing.")
+        return 3
 
     claim_set = claims(text)
     contested = contested_files(claim_set)
