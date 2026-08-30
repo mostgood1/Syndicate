@@ -2097,3 +2097,144 @@ def test_a_build_error_reclassification_is_also_carried(tmp_path, monkeypatch):
     assert first["reclassified_from"] == EL.STATUS_FAILED
     assert first["reclassified_at"]
     assert "OrderBuildError" in first["error"]
+
+
+# --------------------------------------------------------------------------
+# THE NO-FILL-PRICE FALLBACK: bound in DOLLARS at our own limit
+#
+# MEASURED IN PRODUCTION 2026-08-30T03:31:37Z, live money, ~11 HOURS OF HALTED
+# TRADING on both venues:
+#
+#     RECONCILE_COUNT_IMPLAUSIBLE bound=contracts
+#       venue_count=13.13  requested=10.8953  fill_price=None raw_fill_price=None
+#     BLOCKED_ON_UNRECONCILED count=2
+#     ORDER_SUBMIT 0   VENUE_ORDER 0   on BOTH workers
+#
+# 13.13/10.8953 = 1.21x is PRICE IMPROVEMENT. The dollar branch was written on
+# 2026-08-25 to stop exactly this, after it halted both venues once already --
+# and the no-fill-price fallback kept comparing CONTRACTS against a ROUNDING
+# epsilon while its own comment said the failure mode is 100x. An order refused
+# here can never be stamped, so the gate cannot self-clear.
+# --------------------------------------------------------------------------
+
+
+def _priceless_order(mod, monkeypatch, *, key, price, stake, venue_order_id):
+    """Routed through the KALSHI harness the other reconcile tests use.
+
+    The production instance was Polymarket, but the branch under test lives in
+    `reconcile_live_orders` and is venue-agnostic -- it reads `requested_price`
+    and `filled_count` and knows nothing about which venue produced them. Using
+    the established path keeps the fixture honest about what it exercises
+    instead of hand-rolling a second reader shape that could drift.
+    """
+    monkeypatch.setenv("SYNDICATE_EXECUTION_MODE", "live")
+    monkeypatch.setenv("SYNDICATE_EXECUTION_LIVE_ARMED", "1")
+    request = _request(
+        position_key=key, venue="kalshi", venue_ticker="KX-TEST-1",
+        requested_price=price, requested_stake_dollars=stake,
+    )
+    record, _ = mod.record_order(request, mode=mod.LIVE)
+    mod.complete_order(record["idempotency_key"], status=mod.STATUS_SUBMITTED,
+                       venue_order_id=venue_order_id)
+    return record["idempotency_key"]
+
+
+def _priceless_reader(orders):
+    """A venue reporting a FILL and a COUNT but NO price -- exactly what the
+    halted orders showed (`fill_price=None raw_fill_price=None`)."""
+    def fetch(*, limit=100, order_ids=None):
+        return {"status": "ok", "orders": list(orders), "coverage": "book"}
+
+    def view(order):
+        return {
+            "state": "filled",
+            "venue_status": "executed",
+            "client_order_id": order.get("client_order_id"),
+            "order_id": order.get("order_id"),
+            "filled_count": order["filled_count"],
+            "fill_price": None,          # THE POINT
+            "fill_cost_dollars": None,
+        }
+    return fetch, view, "book"
+
+
+def test_PRICE_IMPROVEMENT_without_a_fill_price_is_BOOKED_not_stranded(monkeypatch):
+    """The production halt, reproduced at its measured numbers.
+
+    -108 American is 0.5192, so a $5.66 stake requests 10.8953 contracts. The
+    venue filled 13.13 and gave no price. Bounded at OUR OWN LIMIT that is
+    13.13 x 0.5192 = $6.82 against a $7.07 ceiling (1.25x) -- inside tolerance,
+    so it books. A BUY cannot fill above its own limit, so this is an UPPER
+    bound: any real price improvement makes the true figure smaller.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _priceless_order(mod, monkeypatch, key="halt-repro",
+                            price=-108.0, stake=5.66, venue_order_id="pm-1")
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: _priceless_reader(
+        [{"order_id": "pm-1", "client_order_id": key, "filled_count": 13.13}]))
+
+    result = mod.reconcile_live_orders()
+    assert result["changed"] == 1, result
+    booked = mod.find_order(key)
+    assert booked["status"] == mod.STATUS_FILLED
+    assert booked["contracts"] == 13.13
+    # AND THE GATE CLEARS -- the whole point. A stranded order blocks every
+    # live slate indefinitely.
+    assert mod.unreconciled_orders() == []
+
+
+def test_a_FIXED_POINT_scale_error_is_still_refused(monkeypatch):
+    """off != on. The bound must still catch what it exists for.
+
+    Widening a guard is only safe if the original failure still trips it: an
+    `_fp` scale error lands ~100x out, far beyond the 10x absurd band.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _priceless_order(mod, monkeypatch, key="fp-scale",
+                            price=-108.0, stake=5.66, venue_order_id="pm-2")
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: _priceless_reader(
+        [{"order_id": "pm-2", "client_order_id": key, "filled_count": 1089530.0}]))
+
+    assert mod.reconcile_live_orders()["changed"] == 0
+    assert mod.find_order(key)["status"] == mod.STATUS_SUBMITTED
+    assert len(mod.unreconciled_orders()) == 1
+
+
+def test_an_OVERSPEND_without_a_fill_price_is_BOOKED_AND_FLAGGED(monkeypatch):
+    """Between the two bands. A real fill that cost more than planned must
+    reach the ledger -- the money moved whether we write it down or not, and
+    the day budget cannot charge for what it cannot see -- while still being
+    named. Same two-band rule the dollar branch already applies.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _priceless_order(mod, monkeypatch, key="overspend",
+                            price=-108.0, stake=5.66, venue_order_id="pm-3")
+    # 20 contracts x 0.5192 = $10.38, over the $7.07 ceiling, far under absurd.
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: _priceless_reader(
+        [{"order_id": "pm-3", "client_order_id": key, "filled_count": 20.0}]))
+
+    assert mod.reconcile_live_orders()["changed"] == 1
+    assert mod.find_order(key)["status"] == mod.STATUS_FILLED
+    assert mod.unreconciled_orders() == []
+
+
+def test_the_limit_price_is_read_as_PROBABILITY_not_raw_american(monkeypatch):
+    """The 2026-08-27 units bug, on the branch that now reads `requested_price`.
+
+    Raw, -108 would make 13.13 contracts read as $1,418 against a $5.66 stake
+    and the order would be refused as absurd. Converted, it is $6.82 and books.
+    A single missing `_price_as_probability` turns this fix back into the halt.
+    """
+    from syndicate.features.shared import execution_ledger as mod
+
+    key = _priceless_order(mod, monkeypatch, key="units",
+                            price=-108.0, stake=5.66, venue_order_id="pm-4")
+    monkeypatch.setattr(mod, "_venue_reader", lambda venue: _priceless_reader(
+        [{"order_id": "pm-4", "client_order_id": key, "filled_count": 13.13}]))
+
+    assert mod.reconcile_live_orders()["changed"] == 1, (
+        "requested_price was read raw -- 13.13 x 108 tripped the absurd band"
+    )

@@ -1259,6 +1259,14 @@ _FILL_DOLLAR_TOLERANCE = 1.25
 # fixed-point scale error.
 _FILL_COUNT_TOLERANCE = 0.01
 
+#: The contract-count multiple that is a UNIT ERROR rather than a good fill.
+#: Mirrors `_FILL_DOLLAR_ABSURD` and exists for the same reason: the failure
+#: being guarded against is an `_fp` fixed-point scale error, which lands ~100x
+#: out, so anything near 1x is a real fill. The rounding epsilon above is for
+#: comparing a venue's 2-decimal report against our raw float -- it was never a
+#: plausibility band, and using it as one halted both venues twice.
+_FILL_COUNT_ABSURD = 10.0
+
 # ABOVE THIS MULTIPLE OF THE STAKE, THE NUMBER IS A UNIT ERROR, NOT A FILL.
 #
 # The `_fp` scale worry this guard exists for is 100x or 1e6x. An overspend of
@@ -1616,22 +1624,73 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                 implausible_count = filled_dollars > stake * _FILL_DOLLAR_ABSURD
                 over_budget = (not implausible_count) and filled_dollars > stake_ceiling
             else:
-                # No readable fill price: fall back to the contract bound rather
-                # than to no bound at all.
+                # NO READABLE FILL PRICE -- STILL BOUND IN DOLLARS, using OUR
+                # OWN LIMIT as the per-contract ceiling.
                 #
-                # WITH A ROUNDING TOLERANCE, because the venues round and we do
-                # not. Measured 2026-08-26 00:27:38Z: `venue_count=2.39
-                # requested=2.3920000000000003` -- the venue reported two
-                # decimals against our raw float, and an exact `>` on that pair
-                # is a coin flip on the third digit. The failure this guards
-                # against is a fixed-point scale error, which is 100x; two
-                # thousandths of a contract is not it.
-                bound = "contracts"
-                implausible_count = (
-                    contracts is not None
-                    and requested_contracts is not None
-                    and float(contracts) > float(requested_contracts) + _FILL_COUNT_TOLERANCE
+                # THIS BRANCH CARRIED THE 2026-08-25 DEFECT THE DOLLAR BRANCH
+                # ABOVE WAS WRITTEN TO REMOVE. It compared CONTRACTS against a
+                # ROUNDING epsilon (`_FILL_COUNT_TOLERANCE`, 0.01) while its own
+                # comment said "the failure this guards against is a fixed-point
+                # scale error, which is 100x". Those two statements cannot both
+                # be true, and the epsilon won.
+                #
+                # MEASURED IN PRODUCTION 2026-08-30T03:31:37Z, live money, and
+                # it halted BOTH venues for ~11 hours:
+                #
+                #   RECONCILE_COUNT_IMPLAUSIBLE bound=contracts
+                #     venue_count=13.13  requested=10.8953
+                #     fill_price=None    raw_fill_price=None
+                #   BLOCKED_ON_UNRECONCILED count=2
+                #
+                # 13.13/10.8953 = 1.21x. That is PRICE IMPROVEMENT -- more
+                # contracts for the same money -- which is the good outcome, and
+                # this refused it as a parse failure. Exactly what the comment
+                # 40 lines above condemns, on the path that comment did not fix.
+                # An order refused here can never be stamped, so it blocks every
+                # live slate indefinitely: the gate cannot self-clear.
+                #
+                # WHY THE LIMIT PRICE IS A LEGITIMATE BOUND, not a guess. A BUY
+                # cannot fill above the price we ourselves sent -- this repo
+                # asserts it elsewhere as the one thing it can prove without
+                # knowing the venue's side convention (`polymarket_us_orders`'s
+                # FILL_ABOVE_LIMIT check, which WITHHOLDS a price that violates
+                # it). So `contracts * requested_price` is an UPPER BOUND on
+                # dollars actually spent. If even that upper bound is inside the
+                # tolerance, the fill is provably fine. Price improvement makes
+                # the true figure smaller, never larger.
+                #
+                # That also makes the fallback agree with what
+                # `polymarket_us_orders` already documents as the intent of
+                # withholding a price: "reconciliation falls back to the price
+                # we ASKED for -- a known number". It did not; it fell back to
+                # a different invariant.
+                #
+                # THROUGH `_price_as_probability`. The board stores AMERICAN
+                # odds; reading `requested_price` raw multiplies contracts by
+                # 104 instead of 0.49, which is the units bug measured
+                # 2026-08-27 that booked $347.36 against a $1.64 stake.
+                bound = "dollars_at_limit"
+                limit_price = _price_as_probability(order.get("requested_price"))
+                filled_dollars = (
+                    None if (contracts is None or limit_price is None)
+                    else float(contracts) * float(limit_price)
                 )
+                if filled_dollars is not None and stake_ceiling is not None:
+                    implausible_count = filled_dollars > stake * _FILL_DOLLAR_ABSURD
+                    over_budget = (not implausible_count) and filled_dollars > stake_ceiling
+                else:
+                    # NEITHER a price nor a stake. Now there is genuinely nothing
+                    # to bound in dollars, so the contract comparison is all that
+                    # is left -- but against the ABSURD-MULTIPLE band, not the
+                    # rounding epsilon. A `_fp` scale error is ~100x; 1.21x is
+                    # not the failure mode and must not be refused as one.
+                    bound = "contracts_absurd"
+                    implausible_count = (
+                        contracts is not None
+                        and requested_contracts is not None
+                        and float(contracts)
+                        > float(requested_contracts) * _FILL_COUNT_ABSURD
+                    )
             if implausible_count:
                 implausible += 1
                 # THE NUMBERS THE BRANCH ACTUALLY COMPARED, not a pair that
