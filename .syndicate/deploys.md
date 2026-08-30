@@ -38038,3 +38038,72 @@ claim: acquired 21:56Z, EXPIRED 22:41Z while waiting for a preflight lull,
   reading needs >=2 live games sharing a totals line with both clubs resolvable
   — and the COLLIDABILITY CHECK MUST BE RUN FIRST, so the measurement is known
   to be capable of failing before it is trusted to pass.
+
+
+## 2026-08-30 02:23-02:34Z — web `843fadc5` — NCAAF market-basis edge, lane `ncaaf-market-basis-picks`
+
+**What shipped.** `843fadc5` (+ `0810e187`): the model-free market-basis edge
+(`best[side].market_basis`), the Layer 1 EDGE-cell fallback that renders it, the
+`(sport, market, basis)` re-key of `pick_gate`, market-basis cards on
+`/ncaaf/picks`, and the shared `odds_regions` owner so NCAAF game lines can
+reach `us_ex`/`eu`. **No env var was set** — the region knob is wired, not enabled.
+
+**verify: `market_basis` present on 596 of 596 sides of the served
+`/api/board/book-grid?sport=ncaaf&date=2026-09-05`, 140 displayable, 6 servable
+— against 0 of 45 rows carrying any edge at all before.** Read from the served
+payload at 02:34Z, not from a fixture. Preflight CLEAR (only infra processes),
+claim held by this lane, deploy `dep-da9p84hf2nfc73877ir0`, live 02:28Z.
+
+**THE HALF THAT IS NOT DONE, and the reading that proves it.** The same fetch
+against `date=2026-08-30` carries `market_basis` on **0 of 12** sides:
+
+    2026-09-05  artifact_version None  enrichment_state None         -> web builds INLINE, new code, 596/596
+    2026-08-30  artifact_version 2     enrichment_state from_artifact -> refresh-worker `7d5addba`, OLD code, 0/12
+
+So the web deploy only covers dates the worker has NOT published — i.e. the
+opposite of the dates a user looks at. **refresh-worker must deploy for this to
+be visible on today's board.** Its claim is HELD by `venue-first-market-universe`
+(36.6 min of a 45 min TTL at 02:34Z); NOT forced, coordination message sent.
+Until that lands, treat "the NCAAF board shows an edge" as TRUE ONLY for dates
+with no worker artifact.
+
+**Guards verified firing on real production data, which is why the big numbers
+are gone rather than shipped:** of 90 sides on the 08-29 slate, 58 refused "the
+game has started" and 32 refused "1 book quoting" — including the 16.04pp NC
+State totals outlier (ten quotes, one line, 115s apart, over at +1200 vs +175).
+On 09-05, 418 refused for one book and 38 for staleness.
+
+### 2026-08-30 02:58-03:10Z — refresh-worker `843fadc5` — the artifact half, VERIFIED
+
+**verify: same endpoint, same date, across the worker deploy —
+`/api/board/book-grid?sport=ncaaf&date=2026-08-30` went `market_basis` on
+0 of 20 sides (artifact `gen=02:50:08`, worker `7d5addba`) to 24 of 24
+(artifact `gen=03:06:03`, worker `843fadc5`).** That is the before/after the web
+deploy alone could not produce, because near dates are served `from_artifact`.
+
+Preflight HELD first — 7-10 jobs in flight including `run_mlb_daily_sim_job.py`
+and `daily_update.py --workflow ui-daily` with multiprocessing children. NOT
+forced; polled 7->10->10->3->CLEAR over ~20 min and deployed on the clear read.
+The refresh-worker claim had been held by `venue-first-market-universe`; it was
+NOT forced either, waited out its 45-min TTL (coordination message sent).
+
+Served state, production, 03:10Z:
+
+    2026-08-30  from_artifact   24 sides   24 market_basis    0 displayed  (all games started - correct)
+    2026-09-05  inline         600 sides  600 market_basis  143 displayed  5 servable
+    2026-09-06  inline         132 sides  132 market_basis   25 displayed  0 servable
+
+`/ncaaf/picks?week=1` serves **4 market-basis cards** ("+1.95 / +1.88 / +1.41 /
++1.16 vs consensus"), with team names and side-correct spread lines (Akron
++24.5 / Wake Forest -24.5), beside the model-suppression panel. The string
+"Picks suppressed" is GONE from the served HTML; "price shopping", "not
+expected value" and "MODEL picks" are present.
+
+**NOT DONE — the sharps are wired but NOT ENABLED.**
+`SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` is unset on every service, so the code
+shipped in `843fadc5` is deliberately inert and the NCAAF consensus is still
+anchored on 11 soft books with 0 sharps. Enabling needs the key set on
+`live-odds-worker` (the direct caller of the NCAAF capture, still on the stale
+`219d79ca`) and on `refresh-worker` (the sweep), then a deploy of each — an env
+change does not reach a running process. My `render_env_set.py` call was refused
+by the permission classifier and was NOT worked around.

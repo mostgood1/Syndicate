@@ -3864,6 +3864,61 @@ caaf-no-orders`). NOT
 
 
 ### ncaaf-market-basis-picks — OPEN — opened 2026-08-29 — session 7b55ff7c-dc3d-46dd-b8bb-e63e4862f11d
+- **CHECKPOINT 2026-08-30 03:1xZ — SHIPPED AND VERIFIED IN PRODUCTION ON TWO
+  SERVICES. Falsification test did NOT fire; one HALF-TRUTH corrected mid-lane;
+  one thing wired but deliberately NOT enabled.**
+  **RE-APPLIED 2026-08-30 03:4xZ — this checkpoint was written once and then
+  VANISHED from the shared tree AND from `origin/main` (0 copies of its own
+  heading, while the lane header survived), during the window another session
+  was resolving a `lanes.md` merge. Recorded here because a lost checkpoint that
+  is silently rewritten is worse than one that never existed: the lane read as
+  un-checkpointed while the work was deployed and verified.**
+  - Commits `0810e187` (edge + gate + board + picks page) and `843fadc5`
+    (shared `odds_regions` owner; NCAAF game lines can reach `us_ex`/`eu`).
+    web live 02:28Z, refresh-worker live ~03:05Z. Measurements in `deploys.md`.
+  - **verify:** same endpoint, same date, across the WORKER deploy —
+    `?sport=ncaaf&date=2026-08-30` went `market_basis` 0 of 20 sides (artifact
+    `gen=02:50:08`) to **24 of 24** (`gen=03:06:03`). Served state at 03:10Z:
+    09-05 600/600 sides carry it, 143 displayed, 5 servable; 09-06 132/132, 25
+    displayed. `/ncaaf/picks?week=1` serves 4 cards; "Picks suppressed" is gone
+    from the served HTML.
+  - **THE FALSIFICATION TEST DID NOT FIRE.** 0 of 90 sides on the 08-29 slate
+    were stale, so the edge is not a stale-quote artefact. But the FIRST framing
+    was still wrong and is corrected here: every double-digit edge I found was
+    on a LIVE or FINISHED game. NC State @ Virginia totals 42.5 carried over at
+    +1200 (DraftKings) against +175 (William Hill) — ten quotes, one line, 115s
+    apart, none stale. Books do not disagree 7x on a live number; they stop
+    updating at different moments. A pregame guard was added and all 19 of the
+    "strong edges" I first listed are now correctly refused.
+  - **THE REAL SIZE OF THIS EDGE, so nobody inherits the optimistic version:**
+    on a well-covered PREGAME slate it is SMALL. 09-05 had 414 of 552 fresh
+    sides quoted by ONE book (edge 0 by construction, now refused rather than
+    reported as 0.0), and only 3 sides cleared 1.0pp with 4+ books. A short or
+    empty pick list is the correct output, not a threshold to tune.
+  - **A SECOND, PRE-EXISTING DEFECT FIXED IN PASSING:** `layer1_board.html` read
+    `edgeWhy` one line before its own `var`, so the hoisted `undefined` meant
+    the "·*" hover marker for a suppressed edge has NEVER rendered. The caveat
+    was in the DOM and unreachable in the UI — the exact "stated refusal nobody
+    could read" that `ncaaf/game_projections.py` picked that field to avoid.
+  - **NOT ENABLED, ON PURPOSE:** `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` is
+    unset on every service, so `843fadc5`'s region code is inert and the NCAAF
+    consensus is still 11 soft books, 0 sharps. **The knob had exactly ONE
+    reader before this lane (the MLB fetcher), so setting it for NCAAF would
+    have been read by nothing while looking configured.** Enabling needs the key
+    on `live-odds-worker` (direct caller, still on stale `219d79ca`) AND
+    `refresh-worker` (the sweep), then a deploy of each. My `render_env_set.py`
+    call was refused by the permission classifier and was NOT worked around.
+  - **NOT MINE, NAMED SO IT IS NOT LOST:** the book_grid FORWARD artifact window
+    does not cover the NCAAF week in practice — 09-05 is inside the 7-day window
+    yet had no published artifact at 02:3xZ, so `/ncaaf/picks` reported
+    `dates_read 1, dates_absent 4`. The picks page reads artifacts (correct: web
+    does no heavy compute); the gap is producer-side.
+  - Related: `ncaaf-no-orders` (OPEN, session 7b278ebe) named this stage and is
+    diagnostic-only. The SIZING hop (`portfolio_commit.py:210`
+    `no_model_edge_pct`) is held by `portfolio-decision-and-execution` and was
+    NOT touched — surfacing a pick and sizing it are different stages.
+  - Claims: all deploy claims RELEASED. `venue-first-market-universe`'s
+    refresh-worker claim was waited out, never forced.
 - Goal: the NCAAF board serves an EDGE and PICKS on a MARKET basis — best
   available price vs the fresh multi-book consensus — which asserts nothing
   about the model. `pick_gate` keeps denying the MODEL basis exactly as
