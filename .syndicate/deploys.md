@@ -5,6 +5,57 @@
 
 ---
 
+## 2026-08-30 19:54:08Z — `#595` step 3 MEASURED — **THE FIELD FLOWS AND A MONEYLINE BUILDS. THE LEG CHOICE IS STILL UNVALIDATED.** — lane `polymarket-yes-leg-binding`
+
+Discharges the `verify:` owed by the 19:14:20Z row above. Same deploy
+(`cc75e1f2`, live-odds-worker); no new deploy, no claim taken.
+
+**verify: `ORDER_PATH` — five consecutive readings of `market_unresolved`, then
+`would_build`, on the same instrument.**
+
+    19:17:07  h2h {'market_unresolved': 1}
+    19:25:39  h2h {'market_unresolved': 1}
+    19:32:09  h2h {'market_unresolved': 1}
+    19:39:58  h2h {'market_unresolved': 1}
+    19:46:50  h2h {'market_unresolved': 1}
+    19:54:08  h2h {'would_build': 1, 'market_unresolved': 1}   <- FIRST
+
+    19:54:08 POLYMARKET_YES_LEG slug=aec-mlb-pit-stl-2026-08-30
+             yes_leg_index=0 away_index=0 our_index=0 agree=True reason=None
+             outcomes=['Pittsburgh Pirates', 'St. Louis Cardinals']
+
+`yes_leg_index=0` is NON-NULL, which kills the inert case: the slate carries the
+field and the resolver reads it. First buildable Polymarket moneyline since
+2026-08-28. The surviving `market_unresolved` is the MLS market whose outcomes
+are literally `['Yes','No']` — a different, pre-existing refusal.
+
+**THE BEFORE/AFTER IS ACROSS MARKETS, NOT ONE MARKET TWICE**, and that is stated
+rather than glossed: `pit-stl` ENTERED the plan at 19:54 (positions 3 -> 4). The
+comparison holds because the old refusal was CATEGORICAL — every team side, any
+market — and `aec-mlb-mia-wsh-2026-08-30` was rejected on exactly that error
+today at 18:38 and 18:51.
+
+**WHAT THIS DOES NOT PROVE, and it is the important half.** This case CANNOT
+distinguish the new rule from the old one. `yes_leg_index=0` IS `outcomes[0]`,
+which is precisely what the positional constant assumed, so the old code would
+have produced the same side here. What is validated is the PLUMBING and the
+GATE. The LEG CHOICE is not. The discriminating reading is a market with
+`yes_leg_index=1` — the WNBA/boxing shape, where `outcomes` is listed reversed —
+and until one appears, "it works" means "it builds", not "it buys the right
+team". Watcher still armed for it.
+
+**NO MONEY MOVED: zero SUBMIT lines.** Live execution has been blocked on both
+venues since 19:47:34 —
+
+    BLOCKED_ON_UNRECONCILED count=1 keys=['3243b1c994b6a445ae917a45']
+
+A NEW key, NOT this morning's paper order, which now correctly reports
+`blocks_live=False` — the deadlock fix from `live-venue-order-placement` is
+holding. NOT RECORDED AS A RECURRENCE: the key appears only in `BLOCKED` lines
+and never in a reconcile line, which IS the latch signature, but it is seven
+minutes old against a 900s reconcile window. Seven minutes is not a latch. It is
+watch-worthy, not an incident, and it belongs to the venue lane, not this one.
+
 ## 2026-08-30 19:14:20Z — `#595` step 3 YES-LEG BINDING LIVE — lane `polymarket-yes-leg-binding` — **UNPROVEN, WATCHER ARMED**
 
     live-odds-worker  cc75e1f2  19:14:20Z   trigger=api
