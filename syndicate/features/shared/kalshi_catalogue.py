@@ -332,6 +332,58 @@ REASON_UNREADABLE_TITLE = "unreadable_title"
 REASON_RECOGNISED_UNPRICEABLE = "recognised_but_no_board_market"
 
 
+# SEGMENT WINNER, in the five wordings production actually sends. Sampled
+# 2026-08-30T00:32:45Z from `unreadable_titles`, not invented -- this module's
+# header records three grammars once written against imagined phrasing that
+# matched NONE of production.
+#
+#   'TCU wins the 1st half'                                   KXNCAAF1H  400
+#   'New Mexico St. wins the 1st quarter'                     KXNCAAF1Q-4Q
+#   'Schalke wins 1st Half'            (no "the")             soccer 1H
+#   'Cincinnati first 3 innings winner'                       KXMLBF3/F5/F7
+#   'Chicago vs Tennessee: Will Tennessee win the 1st Half?'  KXNFL1H/1Q-4Q
+#   'Tie wins the 1st half?'                                  KXWNBA1HWINNER
+#
+# MATCHED ONLY TO REFUSE. A segment winner needs a segment MONEYLINE on the
+# board and there is none -- 3 segment rows exist in total (`h1: 2`, `q2: 1`).
+# Reading one as a full-game winner is the `#563` mistake: five orders, $7.08.
+#
+# THE FULL-GAME WORDINGS MUST NOT MATCH, and they are close enough that this is
+# the real risk in the pattern:
+#   'Seattle wins the game by over 6.5 points'   KXWNBASPREAD    (full-game)
+#   'Barcelona vs Vallecano Winner?'             KXLALIGAGAME    (full-game)
+#   'Barcelona wins'                             (full-game moneyline)
+# So the period word is REQUIRED, `the game` is excluded explicitly, and
+# `test_a_FULL_GAME_winner_is_not_read_as_a_segment` pins all three.
+_SEGMENT_WINNER = re.compile(
+    r"^\s*(?:.+?:\s*)?"                                  # optional "A vs B: " prefix
+    r"(?:will\s+)?"                                       # optional "Will "
+    r"(?P<team>.+?)\s+"
+    r"wins?\s+"
+    r"(?:the\s+)?"                                       # "the" optional (soccer omits it)
+    r"(?P<ord>1st|2nd|3rd|4th|first|second|third|fourth)\s+"
+    r"(?:half|quarter)"
+    r"(?:\s+\(excluding[^)]*\))?"                        # NFL 4Q carries this tail
+    r"\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# 'Cincinnati first 3 innings winner' -- the same contract, MLB's wording.
+_INNINGS_WINNER = re.compile(
+    r"^\s*(?P<team>.+?)\s+first\s+(?P<innings>\d+)\s+innings\s+winner\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+# 'Minnesota wins the 1st half by over 6.5 points?' -- a segment SPREAD.
+# `_TEAM_SPREAD_WINS_BY` expects the compact `1H` form and cannot read this one.
+_SEGMENT_SPREAD_WORDS = re.compile(
+    r"^\s*(?P<team>.+?)\s+wins?\s+the\s+"
+    r"(?P<ord>1st|2nd|3rd|4th)\s+(?:half|quarter)\s+by\s+"
+    r"(?:over|under|more\s+than|less\s+than)\s+\d+(?:\.\d+)?\s+.+?\s*\??\s*$",
+    re.IGNORECASE,
+)
+
+
 def recognised_unpriceable_title(title: Any) -> str | None:
     """A title we UNDERSTAND and decline, or None. Never admits anything.
 
@@ -348,7 +400,14 @@ def recognised_unpriceable_title(title: Any) -> str | None:
     text = " ".join(str(title or "").strip().split())
     if not text:
         return None
-    for pattern in (_INNINGS_TIE, _NEITHER_TEAM_WINS, _SEGMENT_TIE):
+    for pattern in (
+        _INNINGS_TIE,
+        _NEITHER_TEAM_WINS,
+        _SEGMENT_TIE,
+        _SEGMENT_SPREAD_WORDS,   # before _SEGMENT_WINNER: "wins the 1st half BY over"
+        _SEGMENT_WINNER,
+        _INNINGS_WINNER,
+    ):
         if pattern.match(text):
             return REASON_RECOGNISED_UNPRICEABLE
     return None

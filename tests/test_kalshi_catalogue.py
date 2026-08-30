@@ -1621,3 +1621,52 @@ def test_a_recognised_segment_shape_outranks_an_unmapped_series():
     verdict = cat.classify_market(_market("1st quarter tie", series="KXNCAAF1Q"))
     assert verdict["status"] == "refused"
     assert verdict["reason"] == cat.REASON_RECOGNISED_UNPRICEABLE
+
+
+SEGMENT_WINNER_TITLES = [
+    ("KXNCAAF1H", "TCU wins the 1st half"),
+    ("KXNCAAF2H", "SMU wins the 2nd half"),
+    ("KXNCAAF1Q", "New Mexico St. wins the 1st quarter"),
+    ("KXWNBA3QWINNER", "Toronto wins the 3rd quarter"),
+    ("KXLALIGA1H", "Vallecano wins 1st Half"),
+    ("KXMLBF3", "Cincinnati first 3 innings winner"),
+    ("KXMLBF5", "Cincinnati first 5 innings winner"),
+    ("KXNFL1H", "Chicago vs Tennessee: Will Tennessee win the 1st Half?"),
+    ("KXNFL4Q", "Chicago vs Tennessee: Will Tennessee win the 4th Quarter (excluding overtime)?"),
+    ("KXWNBA1HWINNER", "Tie wins the 1st half?"),
+    ("KXWNBA1HSPREAD", "Minnesota wins the 1st half by over 6.5 points?"),
+]
+
+
+def test_every_SEGMENT_WINNER_wording_is_recognised_and_declined():
+    """Sampled from production 2026-08-30T00:32:45Z, not invented -- this
+    module's header records three grammars written against imagined phrasing
+    that matched NONE of production.
+
+    A segment winner needs a segment MONEYLINE on the board and there is none:
+    3 segment rows exist in total (`h1: 2`, `q2: 1`). So these are recognised
+    ONLY to refuse them by name -- reading one as a full-game winner is the
+    `#563` mistake, five orders, $7.08.
+    """
+    for series, title in SEGMENT_WINNER_TITLES:
+        verdict = cat.classify_market(_market(title, series=series))
+        assert verdict["status"] == "refused", (series, title, verdict)
+        assert verdict["reason"] == cat.REASON_RECOGNISED_UNPRICEABLE, (series, title, verdict)
+
+
+def test_a_FULL_GAME_winner_is_not_read_as_a_segment():
+    """THE REAL RISK IN THE PATTERN. These wordings sit one word away from the
+    segment ones, and matching them would refuse markets we CAN price -- or
+    worse, file a full-game contract under a segment reason.
+
+    `Seattle wins the game by over 6.5 points` differs from
+    `Minnesota wins the 1st half by over 6.5 points?` only in the period word.
+    """
+    for title in [
+        "Seattle wins the game by over 6.5 points",
+        "Barcelona vs Vallecano Winner?",
+        "Barcelona wins",
+        "Minnesota over 96.5 points scored",
+        "Tie is the result",
+    ]:
+        assert cat.recognised_unpriceable_title(title) is None, title
