@@ -678,6 +678,43 @@
     initialIntelligenceResponse = {};
   }
 
+  // REHYDRATE THE EMBED'S DROPPED ALIASES. See
+  // `blueprints/intelligence.py::_slim_embedded_board_payload` for the
+  // measurement: the same 685-row list was serialised SIX times, 82% of an
+  // 11.3MB blob that was itself 98.4% of this page.
+  //
+  // The server drops a key ONLY when it proved byte-identical to its canonical
+  // form, so this rebuild cannot invent data -- a payload with no `_embed_aliases`
+  // (an older server, or one where nothing was provably redundant) falls through
+  // untouched and every consumer below sees exactly what it saw before.
+  //
+  // PLACED IMMEDIATELY AFTER THE PARSE ON PURPOSE. Consumers read
+  // `board_contract` and `boardContract` in different places (~:1434 and ~:3450),
+  // so any read that happened before this ran would see an absent key rather
+  // than a slimmer payload -- which is the one way this change could break the
+  // page, and the reason it is not deferred into a function that runs later.
+  (function rehydrateEmbedAliases(payload) {
+    if (!payload || typeof payload !== "object") return;
+    const aliases = payload._embed_aliases;
+    if (!aliases || typeof aliases !== "object") return;
+    Object.keys(aliases).forEach(function (key) {
+      const source = aliases[key];
+      if (source === "__group_ranked_all_by_sport__") {
+        const rows = Array.isArray(payload.ranked_all) ? payload.ranked_all : [];
+        const grouped = {};
+        rows.forEach(function (row) {
+          const sport = String((row && row.sport) || "");
+          (grouped[sport] = grouped[sport] || []).push(row);
+        });
+        payload[key] = grouped;
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, source)) {
+        payload[key] = payload[source];
+      }
+    });
+  })(initialIntelligenceResponse);
+
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",

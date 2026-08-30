@@ -1570,6 +1570,86 @@ def read_latest_intelligence_state(payload: dict[str, object] | None = None) -> 
     return _empty_default_intelligence_response()
 
 
+def _slim_embedded_board_payload(response: Any) -> Any:
+    """Drop keys from the HTML EMBED that are byte-identical to another key.
+
+    MEASURED on the served `/` page 2026-08-30 (12,437,156 bytes, TTFB ~4.9-5.9s):
+    of an 11,283,324-char JSON blob -- 98.4% of the page, against 8,501 chars of
+    actual markup -- the SAME 685-row list is serialised SIX times.
+
+        top_opportunities   685 rows  1,860,287  sha1 2e6b803dfe9b
+        recommendations     685 rows  1,860,287  sha1 2e6b803dfe9b   identical
+        ranked_all          685 rows  1,860,287  sha1 2e6b803dfe9b   identical
+        boardContract       ...       1,860,034  == board_contract, same object
+        by_sport (flat)     685 rows  1,860,325  == ranked_all, grouped by sport
+
+    **82% of the payload is duplication.** `boardContract` is a deliberate
+    camelCase alias minted at `features/intelligence.py:277` and here at
+    `:1034`, and `intelligence.html` reads BOTH spellings in different places
+    (`:1434` vs `:3450`) -- which is why neither can simply be deleted. The fix
+    is to send one copy and rebuild the aliases on load.
+
+    TWO RULES, and they are what make this safe rather than clever:
+
+      1. **NOTHING IS DROPPED THAT IS NOT PROVABLY REDUNDANT.** Each candidate is
+         compared against its canonical form and dropped ONLY on an exact match.
+         If a payload ever carries a genuinely different `recommendations`, it
+         survives untouched and the page is merely as large as it is today. The
+         failure mode is "no saving", never "wrong data".
+      2. **THE EMBED ONLY.** `_hydrate_board_response_payload` is shared with
+         `/api/intelligence/query`; slimming there would change an API contract
+         with consumers this lane has not surveyed. This runs after hydration,
+         on the copy handed to the template, and nowhere else.
+
+    The client rebuilds from `_embed_aliases` immediately after `JSON.parse`,
+    before any consumer reads the payload.
+    """
+    if not isinstance(response, dict):
+        return response
+    import json as _json
+
+    def _same(a: Any, b: Any) -> bool:
+        try:
+            return _json.dumps(a, sort_keys=True, default=str) == _json.dumps(b, sort_keys=True, default=str)
+        except Exception:
+            # Unserialisable means "cannot prove redundant", which means keep.
+            return False
+
+    slim = dict(response)
+    aliases: dict[str, str] = {}
+
+    canonical_rows = slim.get("ranked_all")
+    if isinstance(canonical_rows, list) and canonical_rows:
+        for key in ("top_opportunities", "recommendations"):
+            if key in slim and _same(slim.get(key), canonical_rows):
+                slim.pop(key, None)
+                aliases[key] = "ranked_all"
+
+    if "boardContract" in slim and _same(slim.get("boardContract"), slim.get("board_contract")):
+        slim.pop("boardContract", None)
+        aliases["boardContract"] = "board_contract"
+
+    # `by_sport` is the same rows PARTITIONED. Rebuilt by grouping on each row's
+    # own `sport`, and dropped only if that reconstruction is exact -- so a
+    # payload whose grouping differs in any way (ordering, a row with no sport,
+    # a sport key the rows do not carry) keeps the original.
+    by_sport = slim.get("by_sport")
+    if isinstance(by_sport, dict) and by_sport and isinstance(canonical_rows, list):
+        rebuilt: dict[str, list] = {}
+        for row in canonical_rows:
+            if not isinstance(row, dict):
+                rebuilt = {}
+                break
+            rebuilt.setdefault(str(row.get("sport") or ""), []).append(row)
+        if rebuilt and _same(rebuilt, by_sport):
+            slim.pop("by_sport", None)
+            aliases["by_sport"] = "__group_ranked_all_by_sport__"
+
+    if aliases:
+        slim["_embed_aliases"] = aliases
+    return slim
+
+
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
     # #93 follow-up, extended alongside intelligence_query_api's identical
@@ -1589,7 +1669,7 @@ def intelligence_home():
             initial_response = _empty_default_intelligence_response()
         return render_template(
             "intelligence.html",
-            initial_intelligence_response=initial_response,
+            initial_intelligence_response=_slim_embedded_board_payload(initial_response),
             initial_intelligence_selected_date=selected_date if explicit_date else None,
             initial_intelligence_today_iso=central_today_iso(),
         )
@@ -1633,7 +1713,7 @@ def intelligence_home():
         initial_response = _empty_default_intelligence_response()
     return render_template(
         "intelligence.html",
-        initial_intelligence_response=initial_response,
+        initial_intelligence_response=_slim_embedded_board_payload(initial_response),
         initial_intelligence_selected_date=selected_date,
         initial_intelligence_today_iso=selected_date,
     )

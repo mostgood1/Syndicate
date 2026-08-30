@@ -4147,6 +4147,57 @@ caaf-no-orders`). NOT
   `deploys.md`. Deploy claim released.
 - Claims released.
 
+### home-payload-duplication — **CLOSED 2026-08-30, MEASURED NOT DEPLOYED** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+- Goal met: the `/` page no longer inlines the SAME 685 board rows six times.
+- Files: (none held) — `blueprints/intelligence.py`, `templates/intelligence.html`,
+  `tests/test_home_payload_duplication.py`, all released.
+- THE DEFECT, measured on the served page (12,437,156 bytes, TTFB 4.9-5.9s):
+
+      <script> blocks   12,428,521 chars = 99.9% of the page
+      markup/text            8,501 chars
+      one JSON blob     11,283,324 chars = 98.4% of the page
+
+      top_opportunities  685 rows 1,860,287 sha1 2e6b803dfe9b       recommendations    685 rows 1,860,287 sha1 2e6b803dfe9b  > byte-identical
+      ranked_all         685 rows 1,860,287 sha1 2e6b803dfe9b /
+      boardContract               1,860,034 == board_contract (same object)
+      by_sport flattened 685 rows 1,860,325 == ranked_all grouped by sport
+
+  **82% of the payload was duplication.** `boardContract` is a deliberate
+  camelCase alias (`features/intelligence.py:277`, `blueprints/intelligence.py`)
+  and the template reads BOTH spellings (`:1434` vs `:3450`), which is why
+  neither could simply be deleted server-side.
+- RESULT on the real payload: **12,236,732 -> 4,167,114 chars, 65.9% saved**,
+  round-trip EXACT, keys lost none, keys added none. Page ~12.4MB -> ~4.37MB.
+- **THE TEMPLATE'S OWN JS was extracted and executed in chromium** against that
+  payload, not a Python mirror of it: all four keys restored exactly.
+- **THE BROWSER SMOKE WAS INCONCLUSIVE AND IS RECORDED AS SUCH.** The local data
+  mirror is empty, so nothing was deduped and the rehydrate never ran. The
+  control (same page, slim neutralised to a passthrough) rendered IDENTICALLY --
+  "0 live 0 pregame", same empty board -- which proves the change did not break
+  the page and proves NOTHING about the rehydrate. That gap is why the JS was
+  run directly.
+- **A FALSE FAILURE WAS PRODUCED AND CAUGHT BY A CONTROL.** Comparing the
+  rehydrated payload against the Python original reported `False` on every key.
+  Cause: `page.evaluate` round-trips floats through JS (`1.0` -> `1`), so an
+  UNTOUCHED payload through the same call also compares `False`. Against the
+  correct baseline everything matches. Fourth instrument-level false verdict
+  this session.
+- SAFETY PROPERTY, which the tests lead with: a key is dropped ONLY when proven
+  byte-identical to its canonical form. Failure mode is "no saving", never
+  "wrong data" — four of the eight tests assert a DIFFERING list survives.
+- Scope held: the HTML EMBED only. `_hydrate_board_response_payload` is shared
+  with `/api/intelligence/query` and was NOT touched.
+- Tests: 8 new; 132 green across `test_home_payload_duplication` + `test_home`.
+- **NOT DEPLOYED.** This is a WEB-service change, unlike tonight's two worker
+  lanes. Reading it owes when it ships: served `/` bytes on a comparable slate,
+  and the board still rendering rows.
+- **NOT ADDRESSED: the 4.9-5.9s TTFB.** Cause unmeasured — the route's
+  `_log_intelligence_timing` calls sit in the branch
+  `combined_board_default_enabled()` does NOT take, so production emits zero
+  `INTEL_STATUS_TIMING` lines for `/`. Cutting 8MB of serialise+transfer should
+  help; I am not claiming by how much.
+- Blocked by: none. Claims released.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
