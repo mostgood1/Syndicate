@@ -2931,6 +2931,26 @@ caaf-no-orders`). NOT
 - **SYSTEMATIC, not a one-off.** Any delay or restatement unlocks a duplicate on
   any still-open position: MLB rain delays, postponements, doubleheader
   restatements. MLB is the highest-volume sport on this platform.
+- **LEDGER SCANNED, AND IT HAS ALREADY COST MONEY.** 398 live orders grouped by
+  `opening_key` (the STABLE identity): **2 keys carry more than one order, and
+  BOTH have differing `position_key` — this defect's exact signature.**
+
+      HOU@NYY h2h away, 2026-08-26 -- BOTH FILLED, BOTH LOST
+        15:04:15  stake 3.41  fill 0.465  pnl -3.41   commence 23:05:00Z
+        01:33:16  stake 1.27  fill 0.040  pnl -0.78   commence 23:08:38Z
+
+  **The delta that unlocked it was 3 MINUTES 38 SECONDS.** Not a rain delay —
+  ordinary feed jitter restating first pitch to the second. **The threshold is
+  effectively ZERO**, so "delays and postponements" understates it: ANY
+  restatement mints a new key.
+- **$0.78 of REAL LOSS on a bet nobody intended.** The duplicate was placed
+  02:33 AFTER first pitch and bought a 4-cent longshot on a game in progress.
+  Small, but it is the confirmed-loss existence proof the LAD@DET pair lacks.
+- **NOT confined to totals:** this pair is `h2h` with an empty `line`, so the
+  defect spans market types.
+- **2 IS A FLOOR, NOT A COUNT.** The scan only sees pairs where BOTH legs
+  survive in the book sharing an `opening_key`. A pair whose other leg was
+  hidden, refused, or predates retention is invisible to it.
 - Falsification test: if two rows with an identical `opening_key` can be shown
   to need DIFFERENT `position_key`s for some legitimate reason, this is wrong
   and `commence_time` belongs in the hash.
