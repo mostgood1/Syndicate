@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 689 rules `[generated]`
+## Index — 690 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -199,7 +199,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 504**
+**Rules and corrections — 505**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -501,6 +501,7 @@
 - [2026-08-30 — RULE: `lastRunAt` is DISPATCH. Prove execution from the run's own artifact…](#2026-08-30-rule-lastrunat-is-dispatch-prove-execution-from-the-runs-own-artifact-and-prove-which-failure-it-was-before-naming-it)
 - [2026-08-30 — RULE: a guard that refuses only what it can PROVE wrong is SILENT on the m…](#2026-08-30-rule-a-guard-that-refuses-only-what-it-can-prove-wrong-is-silent-on-the-majority-case-when-identity-is-usually-unknown-measure-what-share-of-the-population-it-can-even-evaluate-before-shipping-it)
 - [2026-08-30 — RULE: two guards in series, each encoding a DIRECTION assumption, can with…](#2026-08-30-rule-two-guards-in-series-each-encoding-a-direction-assumption-can-withhold-a-true-value-with-no-error-anywhere-each-is-individually-correct-and-neither-can-clear-the-other)
+- [2026-08-30 — METHOD: a DEGENERATE distribution is not a boring result. It is evidence t…](#2026-08-30-method-a-degenerate-distribution-is-not-a-boring-result-it-is-evidence-the-field-is-not-measuring-what-its-name-says)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

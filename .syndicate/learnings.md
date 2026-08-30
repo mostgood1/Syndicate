@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 689 rules `[generated]`
+## Index — 690 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -7434,3 +7434,55 @@ because each was doing its job under an assumption the other could not see.
 - Companion to [[feedback-gate-on-the-output-not-the-input]] and
   [[feedback-unknown-must-not-default-permissive]]. Raised as a generalisation by
   a peer session that had hit the same shape from the opposite side.
+
+## 2026-08-30 — METHOD: a DEGENERATE distribution is not a boring result. It is evidence the field is not measuring what its NAME says
+
+**What happened.** A freshness ceiling (`MAX_VENUE_QUOTE_AGE_SECONDS = 45`) was
+refusing live venue quotes, and the two ages recoverable from refusals were both
+64s. Rather than move the ceiling on n=2 from the censored side, the age
+distribution was instrumented UNCENSORED — every quote considered, passing and
+failing. First production emission:
+
+    sport=mlb    n=32  min=4.9  p25=4.9  p50=4.9  p75=4.9  p90=4.9  max=4.9
+    sport=soccer n=2   min=34.5 ... max=34.5
+
+**Thirty-two values, identical to the decimal.** The expected reading was "the
+spread is wider than I thought" or "the tail is long". The actual reading was
+that `age_seconds` **is not a per-quote age at all** — it is the age of the whole
+venue CAPTURE for that sport, and every quote in a build inherits it.
+
+**That changed what the guard is.** It is not filtering stale quotes out of
+fresh ones; it is an ALL-OR-NOTHING gate on one number per sport per build — a
+race between the capture cycle and the board build cycle. Two readings that had
+looked like different market conditions were the same mechanism:
+
+    16:57Z  capture 64s old   ->  0 of 6 passed
+    17:28Z  capture 4.9s old  ->  32 of 32 passed
+
+Raising the ceiling would have "fixed" it by widening tolerance for a scheduling
+artifact, and the number would have looked defensible because it came from data.
+
+**How to apply:**
+- **When a distribution collapses to one value, stop and ask what the field
+  actually is.** Zero variance across a population that should vary is not a
+  quiet result to note and move past; it means the quantity is constant by
+  CONSTRUCTION, which almost always means it is measuring a different thing
+  from the one its name promises.
+- **The name is the hypothesis.** `age_seconds` on a per-quote object reads as
+  per-quote freshness. Nothing asserted that, and 32 identical values disproved
+  it in one line.
+- **This is why the sample had to be uncensored.** Refusals alone would have
+  given 64, 64 — also degenerate, but degenerate for a second reason (one
+  build's worth of failures), and indistinguishable from a real slow tail. The
+  passing values are what made the constancy legible.
+- **A guard whose input is constant across a population is a coin flip on a
+  schedule, not a filter.** Look for that shape wherever a per-item threshold
+  sits on a field populated once per batch.
+- Corollary for the fix: prefer removing the race (have the consumer read or
+  trigger the capture it needs) over widening the bar, and RENAME the bar to
+  what it gates. The mis-description is what made the original number look
+  reasonable.
+- Related: [[feedback-instrument-blindness]] and
+  [[feedback-read-the-field-you-already-have]]. Prompted by a peer session
+  observing that percentiles would have HIDDEN this had they not been
+  degenerate.
