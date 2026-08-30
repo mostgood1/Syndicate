@@ -201,7 +201,11 @@ def simulate_drive(
 ) -> DriveResult:
     rng = rng or Random(simulation_input.seed)
     state = possession_state
-    priors = build_drive_priors(simulation_input, possession_state=state)
+    # PROFILE THREADED. `profile` was already in scope here and simply was not
+    # passed down, so `drive_priors` could never see a sport's calibration --
+    # which is why the drive-loop scoring rate was unreachable from NCAAF's
+    # profile while the rating weights beside it were tunable.
+    priors = build_drive_priors(simulation_input, possession_state=state, profile=profile)
     play_state = build_play_state_from_possession_state(state)
     steps: list[PossessionStepResult] = []
     total_yards = 0

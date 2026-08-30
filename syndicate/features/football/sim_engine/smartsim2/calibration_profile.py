@@ -78,6 +78,50 @@ class CalibrationProfile:
     explosive_rating_offense_weight: float = 4.0
     explosive_rating_defense_weight: float = 2.5
 
+    # --------------------------------------------------------------------
+    # DRIVE-SUCCESS SENSITIVITY -- the carrier the note above points at
+    # --------------------------------------------------------------------
+    #
+    # The comment above ends "the remaining over-dispersion is generated
+    # upstream, most likely in `drive_priors` `scoring_environment` or the
+    # drive/touchdown probability chain, and that is where the next
+    # investigation belongs." This is that place.
+    #
+    # `drive_priors.build_drive_priors` computes
+    #
+    #     drive_success_probability = 0.24 + offense_index*0.28 + ... - defense_index*0.22
+    #
+    # and `drive_success_probability` drives BOTH scoring outcomes:
+    # `touchdown_probability` is directly proportional to it, and
+    # `field_goal_probability` carries it at 0.08. So it IS the drive-loop
+    # scoring rate, which `pick_gate` records swinging **20.8 -> 53.9 percent
+    # against a real 35-45**.
+    #
+    # The offense and defense terms alone span ~0.45 across the clamped index
+    # range [0.05, 0.95], against a real per-drive scoring spread of roughly
+    # 0.10. The engine is far more sensitive to team quality than football is.
+    # That is what widens the TOTAL without touching the MARGIN -- margin
+    # depends on the DIFFERENCE of the two teams' scoring rates, the total on
+    # their SUM, which is why the measured mean was right (51.56 vs 53.02)
+    # while the SD was 1.67x (5.77 vs 3.46).
+    #
+    # Applied as a shrink toward an anchor rather than as smaller coefficients:
+    #
+    #     p = anchor + sensitivity * (raw - anchor)
+    #
+    # so `sensitivity` is a single dial with a meaning ("how much of the raw
+    # spread survives") instead of seven coefficients that must be kept in
+    # proportion by hand. `anchor` is the population per-drive scoring level,
+    # NOT a fitted value -- moving it moves the MEAN, which is already correct
+    # and must not be disturbed while fixing the SPREAD.
+    #
+    # DEFAULT 1.0 IS AN EXACT NO-OP: p = anchor + 1.0*(raw - anchor) = raw, for
+    # any anchor. NFL's frozen Production Candidate is byte-identical, and so
+    # is NCAAF until its own profile overrides it. This field being present
+    # changes nothing on its own -- it only makes the dial reachable.
+    drive_success_sensitivity: float = 1.0
+    drive_success_anchor: float = 0.40
+
     # Ordinary-gain yardage magnitude ("drive-yardage generation"): multiplies
     # the GAIN outcome's yardage base in play_simulator.simulate_play.
     drive_yardage_multiplier: float = 1.0

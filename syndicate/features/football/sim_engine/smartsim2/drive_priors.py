@@ -284,7 +284,12 @@ def _market_prior_index(market_features: Mapping[str, Any]) -> float:
     return _clamp(score, 0.0, 1.0)
 
 
-def build_drive_priors(source: SmartSim2SimulationInput | Mapping[str, Any], *, possession_state: PossessionState | None = None) -> DrivePriorProfile:
+def build_drive_priors(
+    source: SmartSim2SimulationInput | Mapping[str, Any],
+    *,
+    possession_state: PossessionState | None = None,
+    profile: "CalibrationProfile | None" = None,
+) -> DrivePriorProfile:
     if isinstance(source, SmartSim2SimulationInput):
         payload = _copy_mapping(source.feature_generation_payload)
         fallback_offense = _clamp(0.5 + float(source.home_offense_rating or 0.0), _INDEX_FLOOR, _INDEX_CEILING)
@@ -319,14 +324,24 @@ def build_drive_priors(source: SmartSim2SimulationInput | Mapping[str, Any], *, 
 
     aggressiveness = _clamp(0.5 + pace_index * 0.15 + (coach_index - 0.5) * 0.12 + (0.5 - transfer_volatility) * 0.08, 0.05, 0.95)
     scoring_environment = _clamp(0.35 + market_prior_index * 0.35 + offense_index * 0.18 - defense_index * 0.08, 0.05, 0.95)
-    drive_success_probability = _clamp(
+    # SHRUNK TOWARD AN ANCHOR, NOT RE-COEFFICIENTED. See
+    # `CalibrationProfile.drive_success_sensitivity` for why this is the carrier
+    # of NCAAF's total over-dispersion and why the dial has this shape.
+    # `sensitivity == 1.0` is an exact algebraic no-op for ANY anchor, so the
+    # default path is byte-identical to the hardcoded formula it replaces.
+    _drive_success_raw = (
         0.24
         + offense_index * 0.28
         + returning_index * 0.06
         + coach_index * 0.04
         + market_prior_index * 0.03
         - defense_index * 0.22
-        - transfer_volatility * 0.04,
+        - transfer_volatility * 0.04
+    )
+    _anchor = float(getattr(profile, "drive_success_anchor", 0.40))
+    _sensitivity = float(getattr(profile, "drive_success_sensitivity", 1.0))
+    drive_success_probability = _clamp(
+        _anchor + _sensitivity * (_drive_success_raw - _anchor),
         0.08,
         0.82,
     )
