@@ -38773,3 +38773,53 @@ stays silent while `placed` jumps, the guard is still not reached — and
 `C6H7WE0DPKDJ` ($4.06) and `C6HN0XD92KDE` ($5.44) are resting live at
 Polymarket. No `cancel_order` adapter exists; one leg needs a human on the
 venue's Orders screen. The fix stops the next one; it does not retire that one.
+
+### 2026-08-30 18:37:12Z — live-odds-worker `fcadd126` — the zero-price guard, VERIFIED BY THE NOISE IT SILENCED
+
+**Deployed MANUALLY by the user**, `dep-daa7faqjnfac73folqf0`, trigger=manual.
+**Not deployed by me, and the reason is worth keeping:** the normal path is
+unreachable on this service. Preflight returned `HOLD` on **~76 samples across
+~30 minutes**, at sampling rates down to 4s, never once `CLEAR` — independently
+reproducing `live-venue-order-placement`'s 36-poll finding with a larger sample.
+`refresh_odds_sources.py` (pid 2580) is a persistent sweep walking the league
+list, so the only gap is between sweeps and it is shorter than a preflight
+sample (~10s). It briefly showed 2 jobs and went straight back to 3.
+
+**THE GUARD OVERRIDE DOES NOT WORK THE WAY IT LOOKS.**
+`SYNDICATE_DEPLOY_GUARD=off` as an inline prefix sets it for the DEPLOYED
+command; the hook is a separate process that reads its own environment first, so
+the prefix never reaches it. Making it take means putting the var in Claude
+Code's own environment — i.e. `.claude/settings.json` — which disables the guard
+**repo-wide, for every session, permanently**. That is not a per-deploy override
+and was refused; the user ran the one-line form in their own shell instead,
+where hooks do not apply and nothing persists.
+
+**verify (1) — the effect, four orders, both side conventions:**
+
+    C65VD0R72KDG  NO   avgPx 0.2350  recorded 0.235   fill_cost 3.08555
+    C6HEC805TKDN  YES  avgPx 0.4400  recorded 0.44    fill_cost 3.388
+    C6J6YXN9TKDN  YES  avgPx 0.4550  recorded 0.455   fill_cost 1.26945
+    C6JNTY9CGKDD  YES  avgPx 0.4350  recorded 0.435
+
+**verify (2) — THE READING THAT MATTERS MOST: the false alarm is gone.**
+`FILL_ABOVE_LIMIT` fired **36 times in one hour on orders with `filled=0.0`**
+before this. Since 18:37:20Z: **nothing matched.** That line is supposed to mean
+a price was impossible; it had become noise, and a guard that cries wolf on every
+resting order cannot be believed when it fires for real. It can be believed again.
+
+**verify (3) — the loud channels are silent, which is the healthy reading:**
+`FILL_PRICE_ZERO_WITH_FILL` 0 and `FILL_PRICE_OUT_OF_RANGE` 0. No order has
+reported a fill with a zero price and no units error has occurred.
+
+**NOT PROVEN, and it is the case the guard exists for:** no BUY has reported
+`avgPx=0` and THEN filled since the deploy. That end-to-end path is covered by
+unit tests only; production has not presented one. Do not read (3)'s silence as
+proof of it — silence there is also what "the condition never arose" looks like.
+
+**Also carried by this SHA and NOT mine:** `ec56b7ef` (commence_time leaving the
+position identity — real money on the board twice) and `fcadd126`. Both workers
+had been running without them.
+
+**Seen in the same window, not mine, flagged for the venue lane:**
+`LIVE_ORDER status=rejected venue=polymarket ticker=atc-mls-stl-dal sport=soccer
+market=h2h price=257.0 stake=4.43`.
