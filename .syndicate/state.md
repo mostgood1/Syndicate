@@ -7649,3 +7649,41 @@ commission is charged at fill, so that method was fee-blind by construction.
 Shape matters at the tails: at P=0.94 Kalshi MLB is `0.0020`/contract and
 Polymarket `0.0150`.
 
+**LIVE EXECUTION IS RUNNING, 2026-08-30 16:42Z**, after a ~13h halt.
+`LIVE_ORDER status=submitted` ×2, then `EXECUTION status=ok
+spent={'dollars': 11.37, 'orders': 4}`, both venues stamping, unreconciled 0.
+Both blockers were our own guards, each correct under an assumption the other
+could not see: `FILL_ABOVE_LIMIT` withheld a real `avgPx 0.2350` assuming a BUY
+on an `ORDER_SIDE_SELL` order, and the reconcile then refused the order for the
+price's absence. Fixed at both layers.
+
+**A PAPER ORDER CAN NO LONGER HALT LIVE EXECUTION.** `unreconciled_orders()`
+blocked on any stale `submitted` row while `reconcile_live_orders` only selects
+`mode==LIVE` / `outcome is None` / matching venue — a permanent latch. Measured:
+`08e9385059f46852b160eeab`, `venue='paper:polymarket'`, blocked live for hours
+and was never once examined. Now excused with `UNRECONCILABLE_ORDER
+... blocks_live=False`; a venue with no reader still blocks, by design, and is
+named on every pass.
+
+**`venue_quote_fanin.age_seconds` IS THE CAPTURE'S AGE, NOT A PER-QUOTE AGE.**
+32 MLB quotes in one build share it to the decimal. So
+`venue_basis_edge.MAX_VENUE_QUOTE_AGE_SECONDS = 45` is an ALL-OR-NOTHING gate on
+a race between the venue capture cycle and the board build cycle — 0-of-6 at
+64s and 32-of-32 at 4.9s are the same mechanism. Do not tune it as per-quote
+staleness. `VENUE_QUOTE_AGE` now emits the uncensored series.
+
+**`#603` IS CLOSED AND THE READING IS DISCRIMINATING.** Board 06:18:37Z: 0 of 96
+refs answer more than one fixture, 0 rows served by one, 0 wrong-game headline
+prices — against 192 contested keys and 992 rows of opportunity, with 166
+matched rows sitting on contested keys.
+
+**`POLYMARKET_MEASURED_NOTIONAL_RATE = 0.015` IS KNOWN WRONG BELOW p≈0.43.**
+Probe of `C65VD0R72KDG`: actual commission `$0.1400` against a predicted
+`$0.197`; `$0.010663`/contract at a 0.235 fill. The five fitted fills sit at
+0.43-0.47, straddling the p=0.4620 point where per-contract and per-cost models
+are identical by construction.
+
+**THE VENUE BASIS IS WIRED AND UNMEASURED.** `venue_basis_edge` runs end to end
+(809/809 rows carried the key) and `servable=False` on every row. **No reading
+has yet produced a single scored comparison** — its one live slate refused all
+six eligible rows before the arithmetic. Do not lift `servable` without one.
