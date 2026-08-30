@@ -4324,11 +4324,112 @@ def _kalshi_auth_probe_at_boot() -> None:
         )
 
 
+def _probe_polymarket_order_once() -> None:
+    """READ ONE VENUE ORDER AND PRINT ITS COMMISSION. Read-only, off by default.
+
+    WHY THIS RUNS ON A WORKER AND NOT BEHIND AN OPS ROUTE. The obvious shape is
+    a read-only route on web. **Web does not have the credentials.** Measured
+    2026-08-30 via `audit_blueprint_drift.py` against the live env of all three
+    services:
+
+        live-odds-worker   POLYMARKET_US_API_KEY_ID/PRIVATE_KEY  present
+        refresh-worker     POLYMARKET_US_API_KEY_ID/PRIVATE_KEY  present
+        syndicate (web)    both ABSENT
+
+    So a route would have deployed, returned an auth error, and looked like a
+    venue problem. The readout is a printed line instead, because
+    `logger.info` never reaches Render's collector and worker artifacts do not
+    reach web without an allowlist -- a `print` read back through the logs API
+    is the one channel that needs neither.
+
+    WHAT IT IS FOR. Order `C65VD0R72KDG` blocked live execution for ~12h. Its
+    stored row has `fill_price: None` and no persisted count, so whether it
+    filled 13.13 contracts (price improvement) or 10.8953 (what we asked for)
+    could not be decided from anything already recorded. `commission` is a
+    SEPARATE field from `filled_count`, so it does not inherit a wrong count --
+    which is what makes it a real cross-check rather than an identity. The
+    three predictions were pre-committed before this ran:
+
+        $0.197  per-contract fee, count 13.13    -> count CONFIRMED
+        $0.163  per-contract fee, count 10.8953  -> our count is WRONG
+        $0.094  cost-basis 3.247% of $2.89       -> fee model wrong, count OPEN
+        anything else                            -> all three falsified
+
+    STRICTLY READ-ONLY, and gated so it cannot fire by accident: it does
+    nothing unless `SYNDICATE_PROBE_POLYMARKET_ORDER` names an order. It calls
+    `fetch_orders`, which is a GET. It places nothing, cancels nothing, and
+    writes nothing -- not to the ledger, not to an artifact, not to the venue.
+    A failure prints and returns; it must never take the worker down, because
+    this is a diagnostic riding inside a service that has real work to do.
+    """
+    order_id = str(os.environ.get("SYNDICATE_PROBE_POLYMARKET_ORDER") or "").strip()
+    if not order_id:
+        return
+    try:
+        from syndicate.features.shared.polymarket_us_orders import fetch_orders
+
+        payload = fetch_orders(limit=100, order_ids=[order_id])
+        orders = payload.get("orders") if isinstance(payload, dict) else None
+        rows = [o for o in (orders or []) if isinstance(o, Mapping)]
+        match = next(
+            (
+                o
+                for o in rows
+                if order_id in {str(o.get("orderId") or ""), str(o.get("id") or "")}
+            ),
+            None,
+        )
+        if match is None:
+            # NOT an empty result -- say which, because "the venue has no such
+            # order" and "the list call returned nothing" are different facts.
+            print(
+                f"[refresh_worker] PM_ORDER_PROBE id={order_id} status=not_in_list "
+                f"returned_rows={len(rows)} keys={sorted(payload)[:8] if isinstance(payload, dict) else None}",
+                flush=True,
+            )
+            return
+        fields = {
+            k: match.get(k)
+            for k in (
+                "orderId",
+                "status",
+                "commissionNotionalTotalCollected",
+                "commissionsBasisPoints",
+                "filledCount",
+                "filled_count",
+                "filledPrice",
+                "price",
+                "size",
+            )
+            if k in match
+        }
+        print(
+            f"[refresh_worker] PM_ORDER_PROBE id={order_id} status=ok "
+            f"fields={json.dumps(fields, sort_keys=True, default=str)}",
+            flush=True,
+        )
+        # The whole payload once, truncated, because ten wrong field names on
+        # `kalshi_client`'s first live run were corrected by exactly this.
+        print(
+            f"[refresh_worker] PM_ORDER_PROBE_RAW id={order_id} "
+            f"{json.dumps(match, sort_keys=True, default=str)[:1400]}",
+            flush=True,
+        )
+    except Exception as exc:  # never take the worker down for a diagnostic
+        print(
+            f"[refresh_worker] PM_ORDER_PROBE_ERROR id={order_id} "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def main() -> int:
     store = _refresh_state_store()
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
     read_json_file = store["read_json_file"]
     print("[refresh_worker] BOOTED", flush=True)
+    # One-shot, env-gated, read-only. Inert unless the env var names an order.
+    _probe_polymarket_order_once()
     # `#409` phase 1. THIS SERVICE HAD NO SIGNAL HANDLER AT ALL, so every deploy
     # killed it silently -- a board build 20 minutes into a 23-minute run left no
     # line, no artifact, nothing. "The board is stale and nobody knows why" is

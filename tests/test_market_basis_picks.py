@@ -652,3 +652,88 @@ def test_worker_gate_admits_the_ncaaf_dates_the_board_can_ask_for():
     assert worker._sport_covers_date("ncaaf", anchor, "2026-09-07") is True
     # And it still prunes a sport that asks for one day.
     assert worker._sport_covers_date("ncaab", anchor, "2026-09-05") is False
+
+
+# ------------------------------------- the venue order probe (read-only, gated)
+
+
+def test_polymarket_order_probe_is_inert_without_the_env_var(monkeypatch, capsys):
+    """It must not fire by accident: this rides inside a worker with real work."""
+    import scripts.run_refresh_worker as worker
+
+    monkeypatch.delenv("SYNDICATE_PROBE_POLYMARKET_ORDER", raising=False)
+    called = {"n": 0}
+
+    def _boom(*a, **k):
+        called["n"] += 1
+        raise AssertionError("the venue must not be contacted when the gate is unset")
+
+    monkeypatch.setattr(
+        "syndicate.features.shared.polymarket_us_orders.fetch_orders", _boom, raising=False
+    )
+    worker._probe_polymarket_order_once()
+    assert called["n"] == 0
+    assert capsys.readouterr().out == "", "an inert probe must not even log"
+
+
+def test_polymarket_order_probe_reads_and_never_writes(monkeypatch, capsys):
+    """Asserts the CALL, not the output: exactly one GET, no submit/cancel."""
+    import scripts.run_refresh_worker as worker
+    from syndicate.features.shared import polymarket_us_orders as pmo
+
+    monkeypatch.setenv("SYNDICATE_PROBE_POLYMARKET_ORDER", "C65VD0R72KDG")
+    seen = {}
+
+    def _fetch(*, limit=100, order_ids=None):
+        seen["limit"] = limit
+        seen["order_ids"] = list(order_ids or [])
+        return {
+            "orders": [
+                {
+                    "orderId": "C65VD0R72KDG",
+                    "status": "filled",
+                    "commissionNotionalTotalCollected": 0.197,
+                    "filledCount": 13.13,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(pmo, "fetch_orders", _fetch)
+    # Any write path must be untouched; make them explode if reached.
+    for name in ("submit_order", "cancel_order"):
+        if hasattr(pmo, name):
+            monkeypatch.setattr(
+                pmo, name, lambda *a, **k: (_ for _ in ()).throw(AssertionError(f"{name} called"))
+            )
+
+    worker._probe_polymarket_order_once()
+
+    assert seen["order_ids"] == ["C65VD0R72KDG"], "probe did not scope to the one order"
+    out = capsys.readouterr().out
+    assert "PM_ORDER_PROBE id=C65VD0R72KDG status=ok" in out
+    assert "commissionNotionalTotalCollected" in out, "the discriminating field was not printed"
+
+
+def test_polymarket_order_probe_survives_a_venue_error(monkeypatch, capsys):
+    """A diagnostic must never take the worker down."""
+    import scripts.run_refresh_worker as worker
+    from syndicate.features.shared import polymarket_us_orders as pmo
+
+    monkeypatch.setenv("SYNDICATE_PROBE_POLYMARKET_ORDER", "C65VD0R72KDG")
+    monkeypatch.setattr(
+        pmo, "fetch_orders", lambda **k: (_ for _ in ()).throw(RuntimeError("http_401"))
+    )
+    worker._probe_polymarket_order_once()  # must not raise
+    assert "PM_ORDER_PROBE_ERROR" in capsys.readouterr().out
+
+
+def test_probe_distinguishes_absent_order_from_empty_read(monkeypatch, capsys):
+    """'the venue has no such order' and 'the list returned nothing' differ."""
+    import scripts.run_refresh_worker as worker
+    from syndicate.features.shared import polymarket_us_orders as pmo
+
+    monkeypatch.setenv("SYNDICATE_PROBE_POLYMARKET_ORDER", "C65VD0R72KDG")
+    monkeypatch.setattr(pmo, "fetch_orders", lambda **k: {"orders": []})
+    worker._probe_polymarket_order_once()
+    out = capsys.readouterr().out
+    assert "status=not_in_list" in out and "returned_rows=0" in out
