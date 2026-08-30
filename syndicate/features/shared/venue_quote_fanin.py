@@ -577,6 +577,26 @@ def apply_venue_quotes(
         by_sport_bucket = per_source_by_sport.setdefault(sport, {})
         by_sport_bucket[quote.source] = by_sport_bucket.get(quote.source, 0) + 1
 
+    # `#603`. EMITTED FROM HERE, because the caller does not print it.
+    #
+    # `layer2_shortlist`'s `VENUE_REPRICE` line reports `stamped`/`unstamped`/
+    # `by_source` and NOT this counter, and that file belongs to another lane.
+    # A counter that exists only in a return value nothing prints is invisible
+    # in production -- which is the instrument-blindness failure this repo has
+    # recorded five times over: a healthy reading is evidence only once you
+    # know what makes it read unhealthy.
+    #
+    # ONLY WHEN NON-ZERO, so a quiet board adds no line. A non-zero count is
+    # the fix WORKING -- it is quotes that named the wrong fixture and were
+    # refused -- so this is a success signal, not an error, and it says so.
+    if cross_game_rejected:
+        print(
+            "[venue_quote_fanin] CROSS_GAME_REJECTED"
+            f" count={cross_game_rejected} rows_in={len(rows)} stamped={stamped}"
+            " -- quotes refused because they named a DIFFERENT fixture (#603)",
+            flush=True,
+        )
+
     return {
         "rows": out,
         "rows_in": len(rows),
