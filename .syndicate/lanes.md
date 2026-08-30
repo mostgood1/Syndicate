@@ -3054,6 +3054,81 @@ caaf-no-orders`). NOT
 - STEP 2 COST, measured not guessed: 36.6 ms per single-game sim on this machine; 17 artifacts cover 812 games; at 300 seeds that is 243,600 sims ≈ **2.5 h single-process**, parallelisable. Plus as-of CFBD rating loads per week. It is a RE-SIMULATION, not a re-compute — which is what (a) and (b) together force.
 - Blocked by: none
 
+### layer1-model-edge-join — OPEN — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+- Goal: raise Layer 1's MODEL-EDGE coverage across every sport/market, so Layer 2
+  / Kalshi / Polymarket rank on the sim's disagreement rather than on book hold.
+  Baseline MEASURED on production 2026-08-30: `/api/board/layer1?window=slate`
+  over mlb/wnba/ncaaf/soccer = 13,262 rows, 7,970 with a projection, **465 with
+  `edge_vs_market_pct` (3.5%)**, **0 with `edge_vs_modelled_fair_pct`**. Layer 2's
+  own ingest counters agree: `rows_with_model_edge / sides_priced` = mlb 318/5316,
+  ncaaf 0/939, nfl 674/2494, soccer 339/15682, wnba 75/2404 — **1,406 of 26,835
+  (5.2%)**.
+- Files: syndicate/features/shared/board_enrichment.py
+  syndicate/features/shared/layer2_board.py
+  syndicate/features/shared/wnba_game_projections.py
+  syndicate/features/shared/wnba_projections.py
+  syndicate/features/shared/nfl_game_projections.py
+  syndicate/features/shared/prop_projections.py
+  scripts/audit_layer1_completeness.py
+  tests/test_modelled_fair_edge_reachability.py
+  tests/test_wnba_game_projections.py tests/test_nfl_game_projections.py
+- NOT CLAIMED, DELIBERATELY: `syndicate/features/shared/live_projection_join.py`
+  is held by OPEN lane `live-prob-producer-reader-gap`, a declared
+  no-code-change diagnostic lane. MLB's live tier is a confirmed second gap
+  (`snapshot_live_prob_seen: 0`; 294 live rows, `with_live_projection: 256`,
+  `with_live_prob: 0`) whose cause is the PRODUCER at
+  `syndicate/features/mlb/live_lens.py:1298` — cards props win, so the MC props
+  that are the sole source of `liveModelProbOver` are discarded whenever the
+  cards artifact has any. Surfaced to that lane, not taken here.
+- **RESULT `[2026-08-30, pushed `787e6532`]` — SEVEN DEFECTS, ALL MEASURED.**
+  Full audit: `.syndicate/findings_2026-08-30_layer1_model_edge_join.md`.
+  **D1** the modelled-fair edge had never once run, on any sport, on any path —
+  THREE breaks in series: ordering (`modelled_fair_edge` reads
+  `row["modelled_fair"]`, and all three paths call `attach_projections` BEFORE
+  `attach_margin_model`), the reader (`_model_edge_for` accepted
+  `edge_vs_market_pct` only), and the side key (`modelled_fair` is keyed by the
+  ROW's side; 1,278 soccer rows stamp `"over"` against a `("yes",)` row and
+  1,939 stamp the PLAYER'S NAME). 9,161 rows carried a `modelled_fair`, 0
+  carried the edge. Fixed; measured over production payloads at 3.2% -> 21.9%.
+  **D2** WNBA spreads compared an AWAY-framed row line against a HOME-framed sim
+  line, so `p_home_cover` was unreachable for every non-zero spread — 0 of 58
+  edged, while totals (no side, no frame) matched first try. Every test fixture
+  used `line=2.0` with `sim_market_home_spread=2.0`, a state production cannot
+  produce. **D3** WNBA's alternate ladder was documented since `#263` and
+  filtered out before the loop — 260 pregame rows, six times the main line, with
+  no projection AND no reason. **D4** four producers served a blank edge with the
+  reason key ABSENT (NFL h2h 25, NFL spreads 50, WNBA props 42, WNBA game 11).
+  **D5** NFL h2h never set `edge_vs_market_pct` at all, and `skill_note` returns
+  None for a REGULAR-season profile — the season opens 2026-09-10. **D6** NFL
+  spreads refused on "the row's line does not say which side it belongs to",
+  a premise `#262` settled; the real blocker is the margin model's -0.047.
+  **D7** betrivers publishes pitcher strikeouts under `batter_strikeouts`.
+- **AND THE HONEST HALF: THE RANKING IMPACT IS ZERO.** Scored with the same
+  `blended_score` Layer 2 uses, the 2,611 newly-priced rows top out at **-4.73**
+  against a live shortlist whose #50 is +0.64 and whose #1 is +4.69. EV against
+  a `book_margin_model` fair is `-hold` for every such row by construction
+  (`_row_ev_is_hold_restatement` says so), and the hold term dominates whatever
+  the model edge says. The rows are now correct, visible, attributable and
+  SIZABLE — a null `model_edge_pct` makes Kelly exactly zero, so those rows
+  could rank and could never be bet (`f8c5c260`, peer session: 980 of 1198 board
+  rows). They are not yet BETTABLE. Making them so means pricing EV against the
+  MODEL's probability rather than against the modelled fair — a product decision
+  on models whose `model_skill` reads `sample_games: 0`, and NOT taken here.
+- Falsification test (run, not reasoned): with `modelled_fair` attached first,
+  the identical call on the identical row shape returns
+  `{'edge_vs_modelled_fair_pct': 3.75, ...}` where it returned `None` before.
+- Verification: 445 tests green across every touched module, including
+  `tests/test_modelled_fair_edge_reachability.py` (new, 20 cases + 3 subtests)
+  whose FIRST test is a REACHABILITY test — a correctness test over a hand-built
+  projection passed against the broken code the entire time.
+  **STILL OWED, and it is the one that counts:** re-measure
+  `rows_with_model_edge / sides_priced` per sport on the SERVED payload after
+  deploy, plus the count carrying `edge_vs_modelled_fair_pct`, plus
+  `rows_at_sim_market_line` for WNBA spreads (structurally 0 today).
+- **NOT DEPLOYED.** `board_enrichment.py` + `layer2_board.py` are refresh-worker
+  and web. Needs both locks and the measurement above.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
