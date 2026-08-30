@@ -7757,6 +7757,52 @@ are identical by construction.
 has yet produced a single scored comparison** — its one live slate refused all
 six eligible rows before the arithmetic. Do not lift `servable` without one.
 
+## [board-model-edge-coverage] 2026-08-30 — 82% of the board is UNSIZABLE, and every `_alt` market is 0%
+
+**MEASURED on the full board**, `/api/board/layer2-shortlist?date=2026-08-30&limit=2000`,
+1198 rows -- the same `rows_in` `PLAN_WRITTEN` reports. My count of rows carrying
+`model_edge_pct` is 218/1198 = 18.2%, which reproduces production's own
+`no_model_edge_pct=980` exactly, so this is the same population the sizer sees.
+
+`no_model_edge_pct` is not a threshold. Without a model view `model_probability`
+== `fair`, so Kelly is exactly ZERO and the row cannot be SIZED at all
+(`portfolio_commit.py:259`). Those rows can rank; they can never be bet.
+
+    market              rows   w/ view   coverage
+    totals               344        34      9.9%
+    h2h                  142        65     45.8%
+    spreads_alt          131         0      0.0%
+    totals_alt           128         0      0.0%
+    spreads               63         2      3.2%
+    batter_hits           45        23     51.1%
+    batter_hits_runs_rbis 40        21     52.5%
+    batter_total_bases    32        19     59.4%
+    strikeouts            10         0      0.0%
+    TOTAL               1198       218     18.2%
+
+**EVERY `_alt` MARKET IS EXACTLY ZERO** -- `spreads_alt` 0/131, `totals_alt`
+0/128, and the other zero rows are small prop families. That is 259 rows, 22% of
+the board, that can never produce a bet no matter what the venues quote.
+
+**The whole plan funnel, arithmetic closing exactly:**
+1198 rows -> 980 no model view -> 218 -> 213 below min EV -> 5 -> 2 below min
+stake -> 3 sized -> 2 zero Kelly -> **1 position**.
+
+**This is why "the ranker only picks one spread".** 63 spread rows existed, TWO
+were sizable, and one survived EV and Kelly. The ranker did about as well as its
+inputs allowed. The constraint is MODEL COVERAGE, not selection, and not any
+part of the venue join / tick logic / order path -- none of which refuse spreads.
+
+The code's own baseline comment records 65 of 108 rows carrying `model_edge_pct`
+on 2026-08-16 (60%). Coverage is now 18%, but the board grew ~11x (108 -> 1198)
+while covered rows grew ~3x (65 -> 218). That is the board outgrowing the model,
+which is a different problem from the model breaking -- do NOT read it as a
+regression without checking per-market coverage against that date.
+
+Venue-scoped coverage is much better than board-wide: the Polymarket line
+reports `sim_view_on=14/29` (48%). The unprojected mass is mostly rows the
+venues do not quote anyway.
+
 ## [polymarket-order-fills] 2026-08-30 — four causes REFUTED; fills are mostly fine
 
 **5 of 7 Polymarket orders FILLED today.** The two that did not (`lad-det`,
