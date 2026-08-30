@@ -7782,7 +7782,23 @@ That is the next reading.
   positional answer; the discriminating case needs `yes_leg_index=1`.
 - props: refused BY DESIGN in `polymarket_board_join.py` — a prop priced by a
   guessed player token is a real order on the wrong person.
-- spreads: 71 spread rows on the board reach `ORDER_PATH` ZERO times. UNTRACED.
+- spreads: TRACED 2026-08-30. NOT a coverage gap and NOT the team-mapping gate.
+  The venue carries 200 `mlb|spreads` (1,900 spreads overall, from
+  `/api/ops/polymarket/slate`). Spreads DO reach `ORDER_PATH` -- 9 times in 12h,
+  correcting an earlier "zero" that came from a 6-tick window -- and every one is
+  dropped `no_venue_ticker`, i.e. the JOIN produced no slug.
+  `spread_side_needs_verified_team_mapping` fires ZERO times, so we never even
+  build a candidate for the order-time sign gate to refuse: the drop is at the
+  join's EXACT signed line match (`abs(candidate.line - board_line) > 1e-9`),
+  upstream of it. `POLYMARKET_BOARD_JOIN` (refresh-worker, NOT live-odds-worker)
+  matches 48 of 1197 board rows, with `no_matching_polymarket_market: 140`.
+  `SPREAD_SIGN_AUDIT` -- the instrument that would settle whether the venue's
+  `pos`/`neg` means home or away -- reports `fixtures=0 rate=None
+  verdict=NON-IDENTIFYING` and has never identified anything.
+  STILL UNVERIFIED: whether the miss is magnitude or sign. Settling it needs the
+  candidate line set for ONE known board row (e.g. KC@CLE `home -1.5`);
+  `/api/ops/polymarket/slate` returns AGGREGATES ONLY (`rows: 0` even with
+  `?league=mlb&market=spreads`), so nothing can currently enumerate them.
 - alt/period totals: the venue carries them (`tsc-...-1q-17pt5`); we never
   attempt them. UNTRACED.
 
