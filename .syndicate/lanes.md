@@ -2974,6 +2974,44 @@ caaf-no-orders`). NOT
   CONTESTED — the trap its own `[hint]` line warns about.
 - Blocked by: none.
 
+### polymarket-yes-leg-binding — OPEN — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+- Goal: a Polymarket moneyline resolves its YES/NO leg from the VENUE's own
+  `yesLegIndex` instead of being refused, and refuses BY NAME where the venue
+  did not state it. Testable outcome: an `aec-mlb-az-sf`-shaped market (outcomes
+  REVERSED vs slug) builds side NO, not YES.
+- Files: syndicate/features/shared/polymarket_us_orders.py
+  pipeline/execute_portfolio.py
+  tests/test_polymarket_yes_leg_binding.py
+- **CLAIM PROVENANCE — `[2026-08-30, USER OVERRIDE: "take it to the
+  user-override route"]`.** The first two are held by
+  `polymarket-buy-limit-tick-floor` (session `6475567d`, opened TODAY, session
+  RUNNING). That is a LIVE claim, not a phantom — surfaced to the user BEFORE
+  the override, and a scope request went to that session first
+  (`local_c1fb3f4e`) and was unanswered. NON-OVERLAPPING BY FUNCTION: they hold
+  `round_price_to_tick` in `order_body` (~:428); this lane touches
+  `_resolve_outcome_side` (~:240-310), the `outcomeSide` key (~:484), and
+  `_polymarket_resolve_market` (execute_portfolio ~:1000-1112). They can
+  reclaim by striking this note. `tests/test_polymarket_us_orders.py` is
+  DELIBERATELY NOT TAKEN — it is theirs.
+- **THE STATED GATE IS UNSATISFIABLE AND IS BEING REPLACED, NOT IGNORED.**
+  `yes_leg_index_from_market` requires scoring "against all 8 venue-settled
+  moneylines" first. `marketSides` is NEVER PERSISTED, so the rule cannot be
+  re-run on a settled market — that sentence blocks the fix permanently rather
+  than gating it. Replaced by a CORROBORATION GATE: resolve only where the
+  venue's `yesLegIndex` and the SLUG-derived index AGREE; refuse, named, where
+  they do not. Evidence:
+  `.syndicate/findings_2026-08-30_polymarket_yes_leg_evidence.md`.
+- Hypothesis: `outcomes[0]` is not the YES leg, `yesLegIndex` is, and the order
+  path already has the answer on the stored row and never reads it.
+- Falsification test: the fix is WRONG if, on a market whose `outcomes` are
+  reversed vs its slug, it still builds the leg the positional rule built.
+  Scored on `aec-mlb-az-sf-2026-08-27`, where the venue graded us LOST on a team
+  that WON: correct behaviour is side NO.
+- Verification: unit `off != on` in BOTH directions, then a production reading —
+  `POLYMARKET_YES_LEG` agree/disagree counts, and a moneyline order whose
+  submitted side matches the team we intended.
+- Blocked by: none. NOT DEPLOYING without a separate decision.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
