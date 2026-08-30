@@ -3806,6 +3806,16 @@ caaf-no-orders`). NOT
   `segment_market_not_full_game` are the fix for five orders / $7.08 of segment
   bets matched to full-game series, and lifting that guard needs segment-aware
   keys on BOTH sides first. Doing it after the grammar, not before.
+- FLAGGED TO `#603` (`live-venue-order-placement`, session 69f9e24f), 02:2xZ:
+  Kalshi `matched` fell 287 -> 205 -> 26 across their deploy and mine.
+  `SendMessage` could not reach their session; written to
+  `handoff_2026-08-30_kalshi_matched_fall_for_603.md`. The 287 -> 205 step is on
+  THEIR binary with `board_rows` RISING, which is not slate decay. My own
+  footprint is a near-transfer (`unreadable_title` 1112 -> 458,
+  `recognised_but_no_board_market` 247 -> 838) and my change can only
+  reclassify already-refused titles -- a MECHANICAL argument, not a measurement,
+  so I am not ruled out. CONFOUND THAT IS MINE: baseline read at 00:55 against
+  02:14 on a finishing Saturday MLB slate is a moving denominator.
 - Blocked by: none
 
 
