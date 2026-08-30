@@ -7757,6 +7757,38 @@ are identical by construction.
 has yet produced a single scored comparison** — its one live slate refused all
 six eligible rows before the arithmetic. Do not lift `servable` without one.
 
+## [cfbd-monthly-quota-exhausted] 2026-08-30 — LIVE: NCAAF projections are FAILING in production, on opener weekend
+
+**MEASURED 2026-08-30T22:03:34Z**, one direct call to
+`api.collegefootballdata.com/ppa/teams`:
+
+    HTTP 429   {"message":"Monthly call quota exceeded."}
+
+Not a rate limit. Not transient. The MONTHLY quota is gone and does not clear
+until the month rolls (2026-09-01, ~2 days).
+
+**Production is already failing on it.** refresh-worker, 21:07:50-21:08:01Z:
+`generate_smartsim2_ncaaf_projections.py` -> `cfbd_backoff.call_with_retry`
+exhausted 5 attempts on `GET /ppa/teams` and raised. The backoff (`bf184804`)
+works correctly; there is nothing left to back off to.
+
+**This is a SECOND cause of NCAAF's 0% model coverage, and it was previously
+attributed entirely to the pick_gate suppression.** Of 373 NCAAF board rows:
+~193 carry the gate's own named refusals (139 totals over-dispersion, 54
+margin-loses-to-close), but ~180 carry **"no projection object at all"** — no
+edge_unavailable_reason, no projection dict. That is the shape of a projection
+that was never generated, which is what a quota failure produces.
+
+**Blocked by this until the quota rolls:** any NCAAF backtest, the totals
+accuracy measurement `pick_gate` demands, and live NCAAF projections. The
+schedule loads from cache (`[games] source=cache`); PPA does not.
+
+**PPA IS NOT CACHED and SP+ IS.** `436686a3` cached SP+ as "the one CFBD call
+with no local substitute" — the same argument applies to `/ppa/games`, which
+`load_ppa_ratings_asof` calls once per prior week (~15 per season). Caching it
+would make backtests repeatable and quota-independent after one fetch. It does
+not help before the roll: the cache is empty and cannot be filled.
+
 ## [board-model-edge-coverage] 2026-08-30 — 82% of the board is UNSIZABLE, and every `_alt` market is 0%
 
 **MEASURED on the full board**, `/api/board/layer2-shortlist?date=2026-08-30&limit=2000`,
