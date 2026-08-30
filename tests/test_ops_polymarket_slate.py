@@ -208,3 +208,65 @@ def test_decode_refusals_are_split_by_whether_the_fixture_already_played(client,
     assert cut["outcomes_count_mismatch|past"] == 1
     assert cut["ok|upcoming"] == 1
     assert "outcomes_count_mismatch|upcoming" not in cut
+
+
+def _spreads(fixtures):
+    """Four rungs per fixture, the shape production actually returns."""
+    rows = []
+    for fx in fixtures:
+        for sign, line in (("neg", "1pt5"), ("pos", "1pt5"), ("neg", "2pt5"), ("pos", "2pt5")):
+            rows.append({
+                "slug": f"asc-mlb-{fx}-2026-08-30-{sign}-{line}",
+                "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD",
+            })
+    return rows
+
+
+def test_the_sample_can_be_AIMED_at_one_fixture(client, monkeypatch):
+    """MEASURED 2026-08-30. `?league=mlb&market=spreads` reported 200 markets and
+    returned 25 samples -- all from the first three fixtures in slate order. The
+    fixture being diagnosed (`kc-cle`) was neither present nor absent: the sample
+    stopped before reaching it and no parameter could push it further. A bounded
+    sample that cannot be aimed answers "what does the slate look like" and never
+    "is THIS market there", which is the question a refusal actually raises."""
+    _install(monkeypatch, _slate(_spreads(["hou-nym", "lad-det", "tex-mil", "kc-cle"])))
+
+    body = json.loads(client.get(
+        "/api/ops/polymarket/slate?league=mlb&market=spreads&slug=kc-cle", headers=ADMIN).data)
+    slugs = [s["slug"] for s in body["samples"]]
+    assert slugs, "the fixture is in the slate and must be reachable"
+    assert all("kc-cle" in s for s in slugs)
+    assert body["filter"]["slug"] == "kc-cle"
+    # THE POINT OF THE TRACE: the signed rungs are there, so a board row at
+    # -1.5 is not missing for want of a market at that line.
+    assert "asc-mlb-kc-cle-2026-08-30-neg-1pt5" in slugs
+
+
+def test_a_fixture_the_venue_does_NOT_list_returns_an_empty_sample(client, monkeypatch):
+    """Absent must be distinguishable from truncated -- that is the whole point."""
+    _install(monkeypatch, _slate(_spreads(["hou-nym", "lad-det"])))
+    body = json.loads(client.get(
+        "/api/ops/polymarket/slate?league=mlb&market=spreads&slug=kc-cle", headers=ADMIN).data)
+    assert body["samples"] == []
+    assert body["matched_samples"] == 0
+    assert body["samples_truncated"] is False
+
+
+def test_a_TRUNCATED_sample_says_so_rather_than_looking_complete(client, monkeypatch):
+    """`len(samples) == limit` must not read as "that many exist"."""
+    _install(monkeypatch, _slate(_spreads([f"aa{i}-bb{i}" for i in range(10)])))
+    body = json.loads(client.get(
+        "/api/ops/polymarket/slate?league=mlb&market=spreads&limit=5", headers=ADMIN).data)
+    assert len(body["samples"]) == 5
+    assert body["matched_samples"] == 40
+    assert body["samples_truncated"] is True
+
+
+def test_the_limit_is_bounded_because_this_endpoint_is_a_summary(client, monkeypatch):
+    """An unbounded sample reintroduces the 2.1MB blob this endpoint avoids."""
+    _install(monkeypatch, _slate(_spreads([f"aa{i}-bb{i}" for i in range(80)])))
+    body = json.loads(client.get(
+        "/api/ops/polymarket/slate?league=mlb&market=spreads&limit=99999", headers=ADMIN).data)
+    assert body["filter"]["limit"] == 200
+    assert len(body["samples"]) == 200
+    assert body["matched_samples"] == 320

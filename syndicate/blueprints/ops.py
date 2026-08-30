@@ -506,7 +506,32 @@ def api_ops_polymarket_slate() -> Any:
 
     want_league = str(request.args.get("league") or "").strip().lower()
     want_market = str(request.args.get("market") or "").strip().lower()
+    # `?slug=` NARROWS TO ONE FIXTURE, and without it the samples could not
+    # answer the question they exist for.
+    #
+    # MEASURED 2026-08-30. Tracing why board spread rows never get a Polymarket
+    # ticker, `?league=mlb&market=spreads` reported 200 markets and returned 25
+    # samples -- all of them `hou-nym`, `lad-det` and `tex-mil`, because the cap
+    # takes the FIRST 25 in slate order. The fixture actually being diagnosed
+    # (`kc-cle`) was neither present nor absent: the sample simply stopped
+    # before reaching it, and no parameter could push it further. A bounded
+    # sample that cannot be aimed answers "what does the slate look like" and
+    # never "is THIS market there", which is the question a refusal raises.
+    #
+    # A SUBSTRING, matched against the slug, because the slug IS the join's key
+    # (`<prefix>-<league>-<away>-<home>-<date>[-<modifiers>]`) and a caller
+    # holding a refusal holds team tokens, not a market id.
+    want_slug = str(request.args.get("slug") or "").strip().lower()
+    # `?limit=` raises the cap when a fixture has many rungs. Bounded at 200:
+    # this endpoint's whole premise is "a summary, not the blob", and an
+    # unbounded sample would reintroduce the 2.1MB payload it exists to avoid.
+    try:
+        sample_limit = int(str(request.args.get("limit") or "25").strip())
+    except (TypeError, ValueError):
+        sample_limit = 25
+    sample_limit = max(1, min(sample_limit, 200))
 
+    matched_samples = 0
     by_type: Counter = Counter()
     by_league_market: Counter = Counter()
     samples: list[dict[str, Any]] = []
@@ -583,6 +608,8 @@ def api_ops_polymarket_slate() -> Any:
             continue
         if want_market and board_market != want_market:
             continue
+        if want_slug and want_slug not in str(row.get("slug") or "").lower():
+            continue
         # OUTCOME READABILITY, CUT BY WHETHER THE FIXTURE HAS ALREADY PLAYED.
         #
         # WHY THE CUT AND NOT JUST THE COUNT. `POLYMARKET_BOARD_JOIN` reports
@@ -606,7 +633,13 @@ def api_ops_polymarket_slate() -> Any:
             bucket = "past" if str(parsed.get("date") or "") < _today else "upcoming"
             outcome_readability[f"{decode_reason or 'ok'}|{bucket}"] += 1
 
-        if (want_league or want_market) and len(samples) < 25:
+        # `matched_samples` counts every row that PASSED the filters, whether or
+        # not it fit in the sample. Without it a full sample and a sample that
+        # ran out of room look identical, and "25 shown" would read as "25
+        # exist" -- the same conflation of a bounded sample with a rate that
+        # made this trace take a day.
+        matched_samples += 1
+        if (want_league or want_market or want_slug) and len(samples) < sample_limit:
             samples.append({
                 "slug": row.get("slug"),
                 "line": row.get("line"),
@@ -639,7 +672,16 @@ def api_ops_polymarket_slate() -> Any:
             else None
         ),
         "samples": samples,
-        "filter": {"league": want_league or None, "market": want_market or None},
+        # HOW MANY MATCHED vs how many are SHOWN. `len(samples) == limit` means
+        # the sample is truncated, not that the slate holds exactly that many.
+        "matched_samples": matched_samples,
+        "samples_truncated": matched_samples > len(samples),
+        "filter": {
+            "league": want_league or None,
+            "market": want_market or None,
+            "slug": want_slug or None,
+            "limit": sample_limit,
+        },
     })
 
 
