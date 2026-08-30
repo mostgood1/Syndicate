@@ -7180,3 +7180,39 @@ of the executable risk was real and was not containment.
   flagged.
 - Related: [[feedback-documented-caveat-is-a-scheduled-defect]] (a caveat comes
   due), [[project-closed-todo-not-shipped-gap]] (a closure is not a landing).
+
+
+## 2026-08-30 — RULE: `lastRunAt` is DISPATCH. Prove execution from the run's own artifact, and prove WHICH failure it was before naming it
+
+- **What we believed:** that a scheduled task with `lastRunAt` set had run. Mine
+  showed `lastRunAt: 2026-08-30T03:10:47Z` and had done **nothing at all** — no
+  heartbeat, no output, no findings.
+- **What was actually true:** it stalled ~13 seconds in, waiting on a tool
+  approval no human was present to grant. `lastActivityAt` froze at 03:11:00
+  while `isRunning` stayed `true` for fifteen minutes.
+- **The heartbeat caught it on run one**, having been added an hour earlier for
+  exactly this. A task that is SILENT on a null result plus a `lastRunAt` that
+  records dispatch = "ran and found nothing" and "never ran" are the same
+  observation. **Any silent-on-null watcher needs a liveness artifact or its
+  silence is uninterpretable.**
+
+**And the second half, which is where I nearly stopped too early:**
+
+- I first called it a Modern Standby stall — the documented failure on this
+  machine (`lastRunAt is dispatch`, a 9h13m suspension). Wrong. `get_session`
+  showed a session existing with `scheduledTaskId` set, which **proves it
+  executed**. Same symptom, different cause, different fix: a stall needs
+  waking, a permission block needs the task narrowed or pre-approved.
+- **How to apply:** two artifacts, not one. `lastRunAt` answers *was it
+  dispatched*. A run SESSION with `scheduledTaskId` answers *did it start*. The
+  task's own written artifact answers *did it work*. Naming the failure without
+  the middle one gets the remedy wrong.
+- **Design consequence:** a scheduled task whose first action needs approval is
+  not unattended, whatever its schedule says. Prefer unauthenticated reads and
+  local writes; put credentials and `git push` in an interactive session. When
+  narrowing costs coverage, say what was given up — here `balance_settled` and
+  the log-derived control — and REBUILD the control from what remains rather
+  than dropping it (`recent_orders_60m` off the same public payload).
+- Related: [[project-lastrunat-is-dispatch-not-execution]], and the 2026-08-30
+  entry on artifacts being evidence only once you check they contain what their
+  name claims.
