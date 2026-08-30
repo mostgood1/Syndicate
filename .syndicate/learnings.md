@@ -7678,3 +7678,35 @@ inverted and asserts the order is NOT auto-rejected.
 Only a test that ENTERED the branch found it. Passing suites are evidence about
 covered lines and nothing else.
 
+## 2026-08-30 — FORBIDDEN: carrying a count across a population boundary. "71 board spread rows never reach ORDER_PATH" compared an ODDS-BOARD row count against a PORTFOLIO position count, and I spent a day tracing the gap between them.
+
+`SPREAD_SIGN_AUDIT` reports `board_rows=1230 board_spread_rows=65`. Those are
+ODDS-BOARD rows, all sports -- every spread the book quotes. `ORDER_PATH` reports
+PORTFOLIO POSITIONS scoped to a venue. The two numbers describe different
+populations, and the "gap" between them was never evidence of anything.
+
+MEASURED, unfiltered, on `/api/portfolio/live?all_dates=1`: the entire portfolio
+holds **one** spread row. It is MLB, it was assigned to KALSHI, and it PLACED AND
+FILLED. There is no spread pipeline defect. There never was.
+
+WHAT IT COST. From that one malformed premise I produced, in order: a claim that
+spreads reach `ORDER_PATH` zero times (they reach it 9 times -- I had sampled six
+ticks); a claim that the join never matches spreads (withdrawn -- my only example
+was a fixture that had already left the slate); and a request to the user to
+deploy an endpoint change to answer a question that did not exist. The endpoint
+improvement is real and stands on its own. The investigation it served did not.
+
+HOW TO APPLY. Before comparing two counts, say OUT LOUD what one row of each
+is. "A row of the odds board" and "a position the portfolio committed" are not
+the same object, and no amount of tracing between them finds a bug. The check is
+one query: count the thing you actually care about, UNFILTERED, before
+explaining why it is missing. I had `/api/portfolio/live` open hours earlier and
+never asked it "how many spread positions are there".
+
+RELATED, SAME SESSION: five other wrong zeros, each from reading the wrong field
+(`markets` vs `samples`), the wrong service (live-odds-worker vs refresh-worker),
+the wrong log name (`POLYMARKET_RESOLVER` vs `POLYMARKET_BOARD_JOIN`), or too
+narrow a window (6 ticks vs 12h). Every one read as "this does not exist". The
+only one caught before it was recorded was caught by a CONTROL -- running the
+same query against a case known to be non-empty.
+

@@ -7782,7 +7782,24 @@ That is the next reading.
   positional answer; the discriminating case needs `yes_leg_index=1`.
 - props: refused BY DESIGN in `polymarket_board_join.py` — a prop priced by a
   guessed player token is a real order on the wrong person.
-- spreads: NOT ESTABLISHED. My earlier "the join never matches them" is WITHDRAWN
+- spreads: **THERE IS NO SPREAD DEFECT. The question was malformed and the error
+  was mine.** I said "71 board spread rows reach ORDER_PATH zero times" and built
+  a day of tracing on it. Those 71/65 come from `SPREAD_SIGN_AUDIT`'s
+  `board_spread_rows`, which counts ODDS-BOARD rows (of `board_rows=1230`) across
+  all sports. They are NOT portfolio candidates.
+  MEASURED 2026-08-30T21:25Z on `/api/portfolio/live?all_dates=1`, unfiltered:
+  the ENTIRE portfolio holds **1 spread row** -- mlb, `KC@CLE away 2.5`, venue
+  KALSHI, ticker `KXMLBSPREAD-26AUG301340KCCLE-CLE3`, and it PLACED AND FILLED.
+  All markets in the portfolio: totals 12, earned_runs 4, spreads 1, and one each
+  of four prop types.
+  So the portfolio selects almost no spreads, and the one it selected succeeded.
+  That is a SELECTION outcome (edge/threshold), not a plumbing failure, and no
+  part of the venue join, the tick logic or the order path is implicated.
+  A cheap follow-up IF spread volume is wanted: ask why the ranker emits ~1
+  spread candidate a day against 65 board rows. That is a modelling question.
+- spreads, SUPERSEDED TRACE (the join mechanics below are accurate; both
+  conclusions I drew from them were not). Earlier "the join never matches them"
+  was WITHDRAWN
   -- it rested on ONE fixture that had already left the slate.
   KC@CLE started 18:40Z. Its TOTALS resolved fine at 19:05/19:10/19:17Z, and the
   spread `no_venue_ticker` drops are all 19:33-20:24Z, i.e. AFTER it aged out.
