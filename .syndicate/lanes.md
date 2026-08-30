@@ -2983,6 +2983,8 @@ caaf-no-orders`). NOT
 - Files: syndicate/features/shared/polymarket_us_orders.py
   pipeline/execute_portfolio.py
   tests/test_polymarket_yes_leg_binding.py
+  syndicate/features/shared/execution_ledger.py
+  tests/test_reconcile_not_found_recovery.py
 - **CLAIM PROVENANCE — `[2026-08-30, USER OVERRIDE: "take it to the
   user-override route"]`.** The first two are held by
   `polymarket-buy-limit-tick-floor` (session `6475567d`, opened TODAY, session
@@ -3002,6 +3004,22 @@ caaf-no-orders`). NOT
   venue's `yesLegIndex` and the SLUG-derived index AGREE; refuse, named, where
   they do not. Evidence:
   `.syndicate/findings_2026-08-30_polymarket_yes_leg_evidence.md`.
+- **SCOPE EXTENDED `[2026-08-30, USER OVERRIDE: "take it and fix it"]` —
+  `execution_ledger.py`.** A SECOND latch halted live execution on both venues
+  for 18 min from 19:47:34Z, unrelated to the yes-leg work but blocking its
+  verification. `unknown-submit-retry-provenance`, which held this file, is
+  CLOSED-VERIFIED and archived, so no OPEN lane held it; taken under override
+  anyway because `live-venue-order-placement` is the de-facto owner of this
+  code and was told. THE DEFECT: `kalshi_orders.fetch_orders` covers "the whole
+  OPEN book", so a FILLED or CANCELLED order is legitimately absent from a
+  successful read; that absence counted `not_found` and hit `continue`, which
+  SKIPS the freshness stamp — and the stamp is the only input to
+  `unreconciled_orders()`. An order the book can never show again blocked every
+  venue permanently. `fetch_orders`' own docstring names the fix — "the single
+  read is the FALLBACK" — and the fallback was built, documented and never
+  called. Third instance of "a gap in the read side is a latch" in six days.
+  NOTHING IS RELAXED: an order still unaccounted for after a direct per-order
+  read keeps blocking.
 - Hypothesis: `outcomes[0]` is not the YES leg, `yesLegIndex` is, and the order
   path already has the answer on the stored row and never reads it.
 - Falsification test: the fix is WRONG if, on a market whose `outcomes` are

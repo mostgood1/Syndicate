@@ -1299,6 +1299,34 @@ def _venue_reader(venue: str):
     )
 
 
+# HOW MANY PER-ORDER RECOVERY READS ONE PASS MAY MAKE. Bounded because a book
+# read that returns nothing would otherwise fan out into one request per
+# candidate, every cycle, forever. When the budget binds it is REPORTED -- a
+# silent truncation here would read as "we looked at all of them".
+_NOT_FOUND_SINGLE_READ_BUDGET = 8
+
+
+def _venue_single_order_reader(venue: str):
+    """The PER-ORDER read, or `None` where the adapter has none.
+
+    Separate from `_venue_reader` deliberately: that returns the LIST reader and
+    has other callers, and this is a fallback used at exactly one site.
+
+    `kalshi_orders.fetch_orders` already says what this is for -- "The LIST is
+    the primary instrument for reconciliation and THE SINGLE READ IS THE
+    FALLBACK". The fallback was built, documented, and never called. That gap
+    is what latched live execution on 2026-08-30T19:47:34Z.
+    """
+    name = str(venue or "").strip().lower()
+    if name.startswith("kalshi"):
+        from syndicate.features.shared import kalshi_orders as adapter
+    elif name.startswith("polymarket"):
+        from syndicate.features.shared import polymarket_us_orders as adapter
+    else:
+        return None
+    return getattr(adapter, "fetch_order", None)
+
+
 # How far past the requested stake a fill may land before it is refused as a
 # parse error. Generous on purpose: fees and rounding ride along in the venue's
 # numbers, and the failure this bound exists to catch is a fixed-point scale
@@ -1594,6 +1622,11 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
     implausible = 0
     stamped = 0
     resting: list[dict[str, Any]] = []
+    # THE FALLBACK READ, wired at last. See `_venue_single_order_reader`.
+    single_read = _venue_single_order_reader(venue) if declared_coverage == "book" else None
+    recovered = 0
+    recovery_budget = _NOT_FOUND_SINGLE_READ_BUDGET
+    recovery_skipped = 0
 
     for order in candidates:
         key = str(order.get("idempotency_key") or "")
@@ -1602,6 +1635,71 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         # was lost and whose venue id we therefore never learned -- the case
         # the write-ahead record exists for.
         seen = by_client.get(key) or by_venue_id.get(str(order.get("venue_order_id") or ""))
+        if seen is None and single_read is not None:
+            # ------------------------------------------------------------------
+            # A BOOK READ ANSWERS "IS IT OPEN", NOT "DOES IT EXIST".
+            # ------------------------------------------------------------------
+            #
+            # `kalshi_orders.fetch_orders` covers "the whole OPEN book", so an
+            # order that FILLED or was CANCELLED is legitimately absent from a
+            # perfectly successful read. Before this, that absence counted
+            # `not_found` and fell straight to `continue` -- which skips the
+            # stamp at the bottom of this loop. `unreconciled_orders()` blocks on
+            # orders that are `submitted` and not stamped RECENTLY, so an order
+            # the book can never show again blocked live execution on EVERY
+            # venue, permanently, with nothing in the system able to clear it.
+            #
+            # MEASURED 2026-08-30: `candidates` 17 -> 18 at 19:47:28 with
+            # `not_found=1` and `stamped` stuck at 17; every EXECUTION line for
+            # the next 18 minutes was `status=blocked reason=unreconciled_orders`
+            # on BOTH venues, and the key appeared in 7 log lines of which 7 were
+            # `BLOCKED_ON_UNRECONCILED` and none was a reconcile line.
+            #
+            # This is the THIRD instance of one family in six days -- the module
+            # already says it: "A gap in the read side is not a missing feature;
+            # it is a latch." The single read is the documented fallback and was
+            # simply never called.
+            #
+            # THE SAFE DIRECTION IS UNCHANGED. This does not stop blocking on an
+            # unknown order; it goes and RESOLVES the unknown. An order we still
+            # cannot account for after asking about it directly keeps blocking,
+            # which is correct -- placing again could double a live position.
+            venue_id = str(order.get("venue_order_id") or "").strip()
+            if not venue_id:
+                # Nothing to fetch BY. The write-ahead record exists precisely
+                # for a lost submit response, and such an order has no venue id.
+                # It keeps blocking, and it is named rather than silent.
+                print(
+                    f"[execution_ledger] RECONCILE_NO_VENUE_ID key={key}"
+                    f" venue={venue} -- cannot be resolved by a per-order read;"
+                    " it will keep blocking until it is resolved by an operator",
+                    flush=True,
+                )
+            elif recovery_budget <= 0:
+                recovery_skipped += 1
+            else:
+                recovery_budget -= 1
+                single = single_read(venue_id)
+                if isinstance(single, Mapping) and single.get("status") == "ok":
+                    raw_single = single.get("order")
+                    if raw_single is not None:
+                        seen = view(raw_single)
+                        recovered += 1
+                        print(
+                            f"[execution_ledger] RECONCILE_RECOVERED key={key}"
+                            f" venue={venue} venue_order_id={venue_id}"
+                            f" state={seen.get('state')!r} -- absent from the OPEN"
+                            " book, found by the per-order read",
+                            flush=True,
+                        )
+                else:
+                    reason = single.get("reason") if isinstance(single, Mapping) else "unreadable"
+                    print(
+                        f"[execution_ledger] RECONCILE_SINGLE_READ_FAILED key={key}"
+                        f" venue={venue} venue_order_id={venue_id} reason={reason!r}"
+                        " -- still unaccounted for, so it KEEPS blocking",
+                        flush=True,
+                    )
         if seen is None:
             not_found += 1
             continue
@@ -2099,6 +2197,10 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         f"[execution_ledger] RECONCILE venue={venue} candidates={len(candidates)}"
         f" venue_orders={len(read.get('orders') or [])} changed={len(changed)}"
         f" not_found={not_found} unknown={unknown} implausible={implausible}"
+        # RECOVERED is the whole point of the per-order fallback, and SKIPPED
+        # says the budget bound -- a truncation nobody can see reads as full
+        # coverage.
+        f" recovered={recovered} recovery_skipped={recovery_skipped}"
         f" stamped={stamped}"
         # COVERAGE ON THE SAME LINE AS THE COUNTS IT QUALIFIES. Read without
         # it, `not_found=0 venue_orders=15` on a per-order venue looks exactly
@@ -2115,6 +2217,11 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
         "candidates": len(candidates),
         "changed": len(changed),
         "not_found": not_found,
+        # Returned as well as logged: a caller that can see the log line but
+        # not the number cannot assert on it, and these two are exactly what
+        # a test of the latch has to check.
+        "recovered": recovered,
+        "recovery_skipped": recovery_skipped,
         "unknown": unknown,
         "implausible": implausible,
         "stamped": stamped,
