@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 679 rules `[generated]`
+## Index — 680 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -195,7 +195,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 498**
+**Rules and corrections — 499**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -491,6 +491,7 @@
 - [2026-08-30 — checks that AGREE are only independent if they differ in the decisive vari…](#2026-08-30-checks-that-agree-are-only-independent-if-they-differ-in-the-decisive-variable)
 - [2026-08-30 — "not priceable" and "no board row" are different problems with different o…](#2026-08-30-not-priceable-and-no-board-row-are-different-problems-with-different-owners)
 - [2026-08-30 — an orphaned `autostash` is somebody's work, and nothing reads a stash list](#2026-08-30-an-orphaned-autostash-is-somebodys-work-and-nothing-reads-a-stash-list)
+- [2026-08-30 — RULE: a shared tree can sit BEHIND its own HEAD, and the diff then reads a…](#2026-08-30-rule-a-shared-tree-can-sit-behind-its-own-head-and-the-diff-then-reads-as-you-reverting-someone-prove-whose-content-is-on-disk-before-restoring)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`

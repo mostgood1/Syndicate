@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 679 rules `[generated]`
+## Index — 680 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -68,6 +68,27 @@
      apply YOUR edit to that, and commit it via
      `update-index --cacheinfo` / `write-tree` / `commit-tree`. Then the
      committed content is provably `remote + your change` and nothing else.
+  1a. **PIN THE REF TO A SHA FIRST — `BASE=$(git rev-parse origin/main)` — and
+     use `$BASE` for BOTH the `read-tree` and the `-p`.** Naming `origin/main`
+     twice is a race with every other session, and it bit me inside this very
+     entry: `origin/main` advanced between the two steps, so the TREE came from
+     the old tip and the PARENT from the new one, and the resulting commit
+     **deleted 31 lines of another session's `log/2026-08-30.md`.** That is a
+     stale-HEAD revert manufactured by the procedure meant to prevent one.
+     Caught in `git diff --numstat` before pushing; `main` was reset and the
+     commit rebuilt against a pinned base.
+  1b. **Assert the blast radius before `commit-tree`, do not eyeball it.** Sum
+     the deletion column and refuse unless it is `0` — and **do NOT exempt your
+     own paths from that check.** My first version of this guard excluded the
+     files I was editing, which is exactly backwards: the shared ledger file is
+     both the thing I edit AND the thing another session is appending to, so a
+     stale local copy of it reverts their work while the guard reports clean.
+     It fired on the very next attempt: `13 insertions, 36 DELETIONS` on
+     `learnings.md`, because the remote had moved again.
+  1c. **Apply your edit to the REMOTE's bytes, not to your working copy.**
+     `git show $BASE:<path> > tmp`, patch `tmp`, hash THAT. A working copy in a
+     shared tree is stale the moment another session pushes, and re-editing it
+     re-introduces the revert the whole procedure exists to avoid.
   2. **Before committing any shared file, diff the working copy against
      `origin/main` and read every hunk.** If a hunk is not yours, you are about
      to publish someone else's draft. `git diff origin/main -- <file>` is the
