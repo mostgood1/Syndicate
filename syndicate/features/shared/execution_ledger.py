@@ -1702,79 +1702,22 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
                     )
         if seen is None:
             not_found += 1
-            # A LATCH, MEASURED 2026-08-30. This was a bare `continue`: the
-            # order was counted and then neither stamped nor named. So
-            # `_reconciled_recently` stayed false forever, `unreconciled_orders`
-            # kept returning it, and live execution on BOTH venues was blocked
-            # for 22 minutes by ONE order -- `3243b1c994b6a445ae917a45`, which
-            # appeared in seven log lines, every one `BLOCKED_ON_UNRECONCILED`
-            # and not one naming a cause. The aggregate `not_found=1` printed on
-            # every pass was true and useless: it says a number, not WHICH
-            # order, so no reader could act on it.
+            # ABSENT FROM THE OPEN BOOK IS NOT ABSENT FROM THE VENUE.
+            # `fetch_orders` covers the OPEN book, so a FILLED or CANCELLED
+            # order is legitimately missing from a completely successful read.
+            # The recovery above is what resolves this -- a per-order read --
+            # and its three refusing paths (RECONCILE_NO_VENUE_ID,
+            # RECONCILE_SINGLE_READ_FAILED, recovery_skipped) deliberately KEEP
+            # BLOCKING, because an order we cannot account for might be a live
+            # position and placing again could double it.
             #
-            # This module had already written the rule down twice -- "a gap in
-            # the read side is not a missing feature; it is a latch", and "a
-            # warning that cannot be actioned is the same defect reached from
-            # the other side". This is both, in the one branch that had neither
-            # a name nor an exit.
-            venue_order_id = str(order.get("venue_order_id") or "")
-            never_sent = not venue_order_id and declared_coverage == "book"
-            print(
-                "[execution_ledger] RECONCILE_NOT_FOUND"
-                f" key={key!r} venue={venue!r} ticker={order.get('ticker')!r}"
-                f" venue_order_id={venue_order_id or None!r}"
-                f" coverage={declared_coverage} never_sent={never_sent}"
-                " -- the venue read succeeded and does not contain this order",
-                flush=True,
-            )
-            if never_sent:
-                # PROVABLY NEVER REACHED THE VENUE, so it cannot be a position
-                # and cannot be doubled -- which is the ONLY thing this block
-                # exists to prevent.
-                #
-                # `client_order_id` IS the idempotency key by construction (see
-                # the `by_client` lookup above), so an order whose submit
-                # response was LOST -- the case the write-ahead record exists
-                # for -- still matches by client id and never reaches here. To
-                # be absent from a COMPLETE book read AND to carry no venue id
-                # is to have never been accepted. `coverage != "book"` is a
-                # per-order read, where absence means the READ failed rather
-                # than the order is missing, so it is left alone and keeps
-                # blocking.
-                #
-                # `rejected` is ALREADY the status meaning "never reached the
-                # venue": `is_non_position` recognises it, the day's budget
-                # stops charging for it, and `record_order` lets the position be
-                # retried. That is the same resting place
-                # `resolve_unknown_submit(..., not_placed)` gives an operator,
-                # reached automatically only where the evidence is conclusive.
-                order.setdefault("pre_resolution_status", order.get("status"))
-                order.setdefault("pre_resolution_error", order.get("error"))
-                order["status"] = STATUS_REJECTED
-                order["auto_resolution"] = {
-                    "finding": RESOLUTION_NOT_PLACED,
-                    "by": "reconcile_not_found",
-                    "coverage": declared_coverage,
-                    "at": _utc_now(),
-                }
-                changed.append(
-                    {
-                        "idempotency_key": key,
-                        "ticker": order.get("venue_ticker"),
-                        "from": order.get("pre_resolution_status"),
-                        "to": STATUS_REJECTED,
-                        "venue_status": "not_found",
-                        "contracts": order.get("contracts"),
-                        "fill_price": order.get("fill_price"),
-                        "fees_dollars": order.get("fees_dollars"),
-                    }
-                )
-                print(
-                    f"[execution_ledger] RECONCILE_NOT_FOUND_RESOLVED key={key!r}"
-                    " -- no venue id and absent from a complete book read;"
-                    " marked rejected so it stops blocking live execution",
-                    flush=True,
-                )
+            # A previous version of this branch auto-resolved `no venue id +
+            # book coverage` to `rejected`, reasoning it was 'provably never
+            # sent'. THAT WAS WRONG and it overrode all three refusals above:
+            # an order that FILLED after a lost submit response has no venue
+            # id, is not in the OPEN book, and would have been marked rejected
+            # -- deleting a real position from the money record. Only an
+            # operator resolution may make that call.
             continue
 
         venue_state = seen.get("state")

@@ -2524,12 +2524,19 @@ def test_the_LEGACY_KEY_SURVIVES_THE_WHOLE_CHAIN_commit_to_request():
     )
 
 
-def test_an_order_ABSENT_from_a_complete_book_and_carrying_NO_VENUE_ID_stops_blocking(monkeypatch):
-    """MEASURED 2026-08-30. `not_found` was a bare `continue`: counted, never
-    stamped, never named. One order (`3243b1c994b6a445ae917a45`, a spreads_alt
-    row with no ticker and no venue id) blocked live execution on BOTH venues
-    for 22 minutes, appearing in seven log lines that all said
-    BLOCKED_ON_UNRECONCILED and none of which said why."""
+def test_an_order_ABSENT_from_the_OPEN_book_with_NO_VENUE_ID_is_NEVER_auto_rejected(monkeypatch):
+    """ABSENT FROM THE OPEN BOOK IS NOT ABSENT FROM THE VENUE.
+
+    I added the opposite of this test on 2026-08-30 and shipped it: `no venue id
+    + book coverage` was auto-resolved to `rejected` as "provably never sent".
+    It is not provable and it was wrong. `fetch_orders` covers the OPEN book, so
+    an order that FILLED after a lost submit response has no venue id, is not in
+    that book, and would have been marked rejected -- deleting a real position
+    from the money record. It also silently overrode all three of the recovery
+    path's deliberate refusals.
+
+    Only an operator may make that call. This test exists so the shortcut cannot
+    come back."""
     from syndicate.features.shared import execution_ledger as mod
 
     key = _live_order(mod, monkeypatch, key="never-sent", status=mod.STATUS_SUBMITTED)
@@ -2541,12 +2548,11 @@ def test_an_order_ABSENT_from_a_complete_book_and_carrying_NO_VENUE_ID_stops_blo
     result = mod.reconcile_live_orders()
     assert result["not_found"] == 1
 
-    resolved = mod.find_order(key)
-    assert resolved["status"] == mod.STATUS_REJECTED
-    assert resolved["auto_resolution"]["finding"] == mod.RESOLUTION_NOT_PLACED
-    assert resolved["pre_resolution_status"] == mod.STATUS_SUBMITTED
-    # THE POINT: it no longer jams live execution.
-    assert mod.unreconciled_orders() == []
+    after = mod.find_order(key)
+    assert after["status"] == mod.STATUS_SUBMITTED, "the money record must not be rewritten by a guess"
+    assert "auto_resolution" not in after
+    # KEEPS BLOCKING, which is the safe direction: it might be a live position.
+    assert [o["idempotency_key"] for o in mod.unreconciled_orders()] == [key]
 
 
 def test_an_order_WITH_a_venue_id_absent_from_the_book_KEEPS_blocking(monkeypatch):
