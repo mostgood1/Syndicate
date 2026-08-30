@@ -38284,3 +38284,48 @@ row aged 8.2-12.5h, every arrival fresher.
 saying so is the point — `settled` is still 0, no weight was changed, and this is
 a RESOLUTION fix. Reversible without a deploy:
 `SYNDICATE_SCORE_MOVEMENT_SATURATING=0` restores the clip.
+
+### 2026-08-30 04:59-05:55Z — web + refresh-worker `d7cda903` — THE BOARD WAS DROPPING GAMES, TWO WAYS
+
+Both fixes cross-lane on explicit user override; scope logged in `lanes.md`.
+
+**1. A 9PM CENTRAL GAME WAS INVISIBLE.**
+verify, production, `/api/board/layer1?sport=ncaaf&date=2026-08-29&window=day`:
+
+    before   games=7   rows=43   (Memphis @ UNLV absent)
+    after    games=8   rows=54   rows_other_dates=0
+
+The artifact is keyed by UTC date, the board scopes by CENTRAL game date, and
+the read set was window+today — so `book_grid_2026-08-30.json`, which held
+Memphis @ UNLV at 2026-08-30T02:19Z (9:19pm Central on the 29th), was never
+opened. **Same game and same cause `ncaaf/sources.py` already records** ("7 of
+Saturday 08-29's 8 games"); that fix corrected one consumer and the board was
+the second. `artifact_read_dates` now owns the rule. `rows_other_dates=0` proves
+the wider read admitted nothing off-date.
+
+**2. A REAL SLATE HAD NO ARTIFACT AT ALL.**
+verify, same endpoint, `date=2026-09-05`:
+
+    before   games=0    rows=0     empty_reason=grid_rows_all_for_other_dates
+    after    games=67   rows=353   empty_reason=None
+
+`_SLATE_WINDOW_DAYS["ncaaf"]=7` was sizing BOTH what the board displays and what
+the worker builds. Seven is a deliberate DISPLAY choice and is UNCHANGED; as a
+BUILD width it left the last three days of a ten-day NCAAF week with no artifact.
+Split into `artifact_window_days` (never below the display window, so the
+producer-vs-consumer invariant holds). `#565`'s cost fix survives — the per-sport
+gate still prunes, so this adds three shard checks for NCAAF and none for
+ncaab/mlb/nba/wnba/nhl, asserted by test.
+
+**Served board, all four dates, 05:5xZ** (market-basis edges displayed):
+
+    2026-08-29   8 games   55 rows     0 edges   (all final - guard correct)
+    2026-09-05  67 games  353 rows   407 edges
+    2026-09-06   3 games   16 rows    24 edges
+    2026-09-07   1 game     6 rows     0 edges
+
+09-05/09-06/09-07 were ALL unreachable by date before this.
+
+Preflight discipline: refresh-worker returned TOO_SOON (25-min spacing) then HOLD
+on an odds sweep + per-league soccer builds for ~25 min. Neither was overridden;
+`--allow-rapid` was not used. Deployed on the first CLEAR read.
