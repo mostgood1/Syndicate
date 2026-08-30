@@ -95,13 +95,29 @@ def test_a_total_with_no_dispersion_stays_probability_free():
 
 
 def test_spreads_refuse_a_probability_they_cannot_ground():
-    # The row carries `line: 6.5` and `sides: ["away","home"]` with nothing
-    # saying which side owns the number. A guessed sign inverts the edge.
+    # THE REASON THIS TEST PINNED WAS FACTUALLY FALSE, which is why it is
+    # rewritten rather than deleted. It asserted "the row carries `line: 6.5`
+    # and `sides: [away, home]` with nothing saying which side owns the number".
+    # `#262` settled that: `book_grid._canonical_line` is `-line if selection ==
+    # "home" else line`, so a grid row's line is ALWAYS the away side's, and
+    # `prop_projections.project_game_market` has priced MLB spreads off exactly
+    # that guarantee since. The test was enforcing a premise the grid contradicts
+    # and pointing anyone who read it at a labelling problem that does not exist.
+    #
+    # The refusal itself is CORRECT and unchanged -- it is just grounded in the
+    # real blocker, the one the h2h branch already names: correlation -0.047 over
+    # 146 games. No side convention makes a probability off that publishable.
     row = _row("spreads", line=6.5)
     attach_nfl_game_projections([row], _index())
     projection = row["projection"]
     assert projection["model_prob_over"] is None
-    assert "which side" in projection["probability_unavailable_reason"]
+    reason = projection["probability_unavailable_reason"]
+    assert "measured skill" in reason
+    assert "which side" not in reason, "the old reason must not come back"
+    # And the blank edge must state a reason of its own -- 50 of 50 pregame NFL
+    # spreads rows served one with the key ABSENT on 2026-08-30.
+    assert projection["edge_vs_market_pct"] is None
+    assert "measured skill" in projection["edge_unavailable_reason"]
     assert projection["projected"] == -0.035
 
 

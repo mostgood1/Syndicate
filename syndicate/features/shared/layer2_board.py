@@ -1014,6 +1014,54 @@ _MODEL_EDGE_MAX_POINTS = 15.0
 # carry it, this bound is the guard -- and it is a GUARD, not a calibration.
 
 
+MODEL_EDGE_BASIS_MARKET = "market_fair"
+MODEL_EDGE_BASIS_MODELLED = "modelled_fair"
+
+
+def _modelled_fair_edge_for(projection: Mapping[str, Any], side: str) -> float | None:
+    """The edge against the MODELLED fair, for THIS row's side, or None.
+
+    THE SIDE CHECK IS THE WHOLE SAFETY ARGUMENT. `edge_vs_modelled_fair_pct` is
+    priced for one specific side and `modelled_fair_side` names it. Unlike a
+    two-sided market there is NO complement identity to fall back on: each side
+    of a one-sided quote is priced from its own book's measured hold, so the two
+    sides do not sum to one and negating this number answers nothing. So a row
+    whose side does not match is DROPPED rather than negated -- the same rule
+    `_model_edge_for` applies to a three-way market for the same reason.
+
+    Bounded by the same ceiling as the measured edge. A hold-model fair on a
+    longshot is the weakest term on this board; letting it past a guard the
+    measured number has to clear would invert the confidence ordering.
+    """
+    edge = _as_float(projection.get("edge_vs_modelled_fair_pct"))
+    if edge is None:
+        return None
+    priced_side = str(projection.get("modelled_fair_side") or "").strip().lower()
+    if not priced_side or priced_side != str(side or "").strip().lower():
+        return None
+    if abs(edge) > _MODEL_EDGE_MAX_POINTS:
+        return None
+    return edge
+
+
+def model_edge_basis(row: Mapping[str, Any], side: str) -> str | None:
+    """Which fair the row's `model_edge_pct` was priced against, or None.
+
+    Published on the candidate so a consumer can tell a measured disagreement
+    from a modelled one WITHOUT re-deriving it -- the `basis` discipline `#263`
+    asked for, and the thing that keeps this fallback from reading as the
+    measured number it deliberately is not.
+    """
+    projection = row.get("projection")
+    if not isinstance(projection, Mapping):
+        return None
+    if _as_float(projection.get("edge_vs_market_pct")) is not None:
+        return MODEL_EDGE_BASIS_MARKET
+    if _modelled_fair_edge_for(projection, side) is not None:
+        return MODEL_EDGE_BASIS_MODELLED
+    return None
+
+
 def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> float | None:
     """The sim's disagreement with the market, in POINTS OF PROBABILITY.
 
@@ -1034,7 +1082,23 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None) -> floa
         return None
     edge = _as_float(projection.get("edge_vs_market_pct"))
     if edge is None:
-        return None
+        # THE MODELLED FAIR IS THE ONLY VIEW A ONE-SIDED MARKET CAN HAVE, and
+        # until now nothing read it. `board_enrichment.attach_modelled_fair_edges`
+        # prices `edge_vs_modelled_fair_pct` on rows with no two-sided fair;
+        # this function was the SECOND of the two breaks in series that kept
+        # that number off the board. Measured on production 2026-08-30, pregame
+        # only: 2,709 rows carried a projection AND a `modelled_fair` and
+        # reported `one-sided market: no two-sided fair to price against` --
+        # 2,654 soccer, 55 MLB. Every one of them ranked on EV alone, and EV
+        # against a `book_margin_model` fair is `-hold` for every such row
+        # regardless of the bet (see `_row_ev_is_hold_restatement`), so the
+        # board was sorting them by which book quoted.
+        #
+        # SEPARATE FIELD, SEPARATE BASIS, and `blended_score` is told which it
+        # got. `#242`'s rule is that a modelled number must not wear a measured
+        # one's clothes -- so this is a FALLBACK reached only when the measured
+        # term does not exist, never a substitute for one that does.
+        return _modelled_fair_edge_for(projection, side)
     if abs(edge) > _MODEL_EDGE_MAX_POINTS:
         # Dropped, not clamped. Clamping would keep an unusable number in the
         # ranking at the ceiling value and make every affected row tie at the
@@ -1476,6 +1540,13 @@ def build_layer2_rows(
             )
             candidate["ev_pct"] = ev
             candidate["model_edge_pct"] = model_edge
+            # WHICH FAIR THAT EDGE WAS PRICED AGAINST. Stamped beside the number
+            # rather than left for a reader to infer, because a modelled fair
+            # and a measured one are different confidences and `#242` forbids
+            # letting the first wear the second's clothes.
+            candidate["model_edge_basis"] = (
+                model_edge_basis(row, side) if model_edge is not None else None
+            )
             candidate["score"] = score
             if score is not None:
                 scored += 1

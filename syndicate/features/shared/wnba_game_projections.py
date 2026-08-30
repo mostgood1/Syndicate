@@ -90,6 +90,42 @@ from syndicate.features.shared.team_aliases import teams_match
 _MARKET_LINE_MATCH_EPSILON = 1e-6
 
 
+# WHICH BOARD MARKETS ARE WHICH GAME-LINE FAMILY.
+#
+# `spreads_alt` IS `spreads` AT A DIFFERENT LINE and `totals_alt` IS `totals`
+# at a different line -- the same identity `prop_projections.project_game_market`
+# already relies on for MLB. This module's own docstring has described the
+# intended handling of those rows since `#263` was written:
+#
+#   "A `spreads_alt`/`totals_alt` row at a different number stays exactly as
+#    decision 3 describes: projected-only, probability null, honestly labelled
+#    as an alternate line"
+#
+# THE CODE COULD NOT PRODUCE THAT OUTCOME. The market filter was
+# `{"h2h", "spreads", "totals"}`, so an alt row never entered the loop, was
+# never counted in `rows_considered`, and reached the board with NO projection
+# and NO reason -- indistinguishable from a game the sim never simulated.
+# Measured on production 2026-08-30, pregame WNBA: `totals_alt` 162 rows and
+# `spreads_alt` 98 rows, every one of them blank and silent, against 20 `totals`
+# and 22 `spreads` rows. The alternate ladder is SIX TIMES the main line here,
+# so the documented-but-unreachable branch was most of the board.
+#
+# Mapping them in does NOT invent a probability: `_lines_match` is False for an
+# alternate line by definition, so they take the projected-only branch and carry
+# `_mean_only_reason`'s alternate-line sentence -- which is the outcome the
+# docstring promised. What changes is that a reader can now tell "the sim cannot
+# price this line" from "nothing ran".
+_GAME_MARKET_FAMILY: dict[str, str] = {
+    "h2h": "h2h",
+    "spreads": "spreads",
+    "spreads_alt": "spreads",
+    "alternate_spreads": "spreads",
+    "totals": "totals",
+    "totals_alt": "totals",
+    "alternate_totals": "totals",
+}
+
+
 def _norm_team(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
@@ -310,18 +346,24 @@ def attach_wnba_game_projections(
     attached = 0
     unmatched_games = 0
     non_full_segment = 0
+    alternate_rows = 0
+    alternate_attached = 0
+    at_sim_market_line = 0
 
     for row in grid:
         if str(row.get("kind") or "") == "prop":
             continue
-        market = str(row.get("market") or "").strip().lower()
-        if market not in {"h2h", "spreads", "totals"}:
+        market = _GAME_MARKET_FAMILY.get(str(row.get("market") or "").strip().lower())
+        if market is None:
             continue
         considered += 1
         # Decision 4: a full-game mean must not be stamped on a period market.
         if str(row.get("segment") or "full").strip().lower() not in {"", "full"}:
             non_full_segment += 1
             continue
+        is_alternate = str(row.get("market") or "").strip().lower() not in {"h2h", "spreads", "totals"}
+        if is_alternate:
+            alternate_rows += 1
         entry = index.lookup(row.get("home_team"), row.get("away_team"))
         if entry is None:
             unmatched_games += 1
@@ -428,12 +470,44 @@ def attach_wnba_game_projections(
             margin = entry.get("pred_margin")
             if margin is not None:
                 sim_line = entry.get("sim_market_home_spread")
-                # `#263`. Only at the SIM'S OWN line -- see the module
-                # docstring for why an alt line can't be priced from a 3-point
-                # quantile summary. Compared directly against `row.get("line")`,
-                # the same convention `edge_vs_line` below already uses (both
-                # home-positive) -- not newly introduced by this change.
-                at_market_line = _lines_match(_as_float(row.get("line")), sim_line)
+                # `#263`. Only at the SIM'S OWN line -- see the module docstring
+                # for why an alt line can't be priced from a 3-point quantile
+                # summary.
+                #
+                # THE TWO LINES ARE IN OPPOSITE FRAMES AND THIS COMPARED THEM
+                # RAW, so the branch could never be reached for any non-zero
+                # spread. The comment that stood here asserted "both
+                # home-positive"; the row's line is not. `#262` made the grid's
+                # `line` canonical in the AWAY/OVER frame
+                # (`book_grid._canonical_line`: `-line if selection == "home"`),
+                # while `sim_market_home_spread` is the HOME side's number by
+                # its own name. So the same line reads as `L` and `-L` and never
+                # matched itself.
+                #
+                # MEASURED on production 2026-08-30, every WNBA spreads row on
+                # the board:
+                #
+                #     Golden State @ Portland    row -5.5    sim  +5.5
+                #     Connecticut  @ Dallas      row +14.5   sim -13.5
+                #     LA Sparks    @ Seattle     row -15.5   sim  +1.0
+                #
+                # `has_prob` was False on 100% of them, and 0 of 58 WNBA spreads
+                # rows carried an `edge_vs_market_pct`. TOTALS, whose line has no
+                # side and therefore no frame, matched on the first try and
+                # priced (LAS@SEA 174.5 == 174.5) -- which is what makes this
+                # attributable to the SIGN and not to the data: the same
+                # mechanism works one branch over.
+                #
+                # `edge_vs_line` below is NOT affected and is deliberately left
+                # alone: `projected - row_line` is `margin + home_line`, the
+                # cover cushion, which is correct precisely BECAUSE the row's
+                # line is the away frame's. The two uses need opposite handling
+                # and only this one was wrong.
+                at_market_line = _lines_match(
+                    _as_float(row.get("line")), None if sim_line is None else -_as_float(sim_line)
+                )
+                if at_market_line:
+                    at_sim_market_line += 1
                 projection = {
                     "projected": round(margin, 3),
                     "side": str(row.get("home_team") or "").strip(),
@@ -451,7 +525,13 @@ def attach_wnba_game_projections(
             total = entry.get("pred_total")
             if total is not None:
                 sim_line = entry.get("sim_market_total")
+                # No frame conversion here, deliberately: a total has no side,
+                # so `_canonical_line`'s away/over normalisation is a no-op on
+                # it. Verified on production the same day -- 174.5 matched 174.5
+                # and priced, while every spread of the same slate did not.
                 at_market_line = _lines_match(_as_float(row.get("line")), sim_line)
+                if at_market_line:
+                    at_sim_market_line += 1
                 projection = {
                     "projected": round(total, 3),
                     "side": "over",
@@ -471,8 +551,36 @@ def attach_wnba_game_projections(
         projected = _as_float(projection.get("projected"))
         if line is not None and projected is not None and market != "h2h":
             projection["edge_vs_line"] = round(projected - line, 3)
+        # EVERY BLANK EDGE MUST BE DIAGNOSABLE BY REASON, and this producer was
+        # the last one serving blanks with no reason at all.
+        #
+        # `_attach_sim_probability_edge` sets `edge_unavailable_reason` -- but it
+        # is only called when the row's line IS the sim's own market line. Every
+        # off-line spreads/totals row therefore served `edge_vs_market_pct: null`
+        # with the field ABSENT, which is exactly the state `prop_projections`
+        # was fixed for on 2026-08-16 ("284 of MLB's 2,843 served rows landed
+        # here ... a reader could not tell them from a broken join") and which
+        # this file's h2h branch already avoids in terms.
+        #
+        # Measured on production 2026-08-30, pregame WNBA: 11 game rows (7
+        # spreads, 4 totals) with a projection, no edge and no reason. Widening
+        # the market map above would have multiplied that by the alternate
+        # ladder, so the two changes belong in the same pass.
+        #
+        # The reason RESTATES the probability refusal rather than inventing a
+        # second vocabulary: there is no edge because there is no probability,
+        # and `probability_unavailable_reason` already says precisely why.
+        if projection.get("edge_vs_market_pct") is None and not projection.get("edge_unavailable_reason"):
+            probability_reason = projection.get("probability_unavailable_reason")
+            projection["edge_unavailable_reason"] = (
+                "no probability to price: %s" % probability_reason
+                if probability_reason
+                else "this projection carries no probability, so no edge was priced"
+            )
         row["projection"] = projection  # type: ignore[index]
         attached += 1
+        if is_alternate:
+            alternate_attached += 1
 
     return {
         "supported": True,
@@ -480,6 +588,18 @@ def attach_wnba_game_projections(
         "rows_with_projection": attached,
         "unmatched_game_rows": unmatched_games,
         "non_full_segment_rows": non_full_segment,
+        # SPLIT OUT, because these two populations have different ceilings and a
+        # merged number cannot be read. An alternate-line row can carry a mean
+        # and never a probability; a main-line row can carry both. Reporting one
+        # `rows_with_projection` over both would make coverage look like it
+        # dropped every time the alternate ladder got longer.
+        "alternate_line_rows": alternate_rows,
+        "alternate_line_rows_with_projection": alternate_attached,
+        # THE REACHABILITY COUNTER. A probability is only priced at the sim's own
+        # line, so this is the population that CAN carry an edge. It read 0 for
+        # every spread on every slate while the frame bug stood, and nothing on
+        # the board said so -- the rows just looked like a model with no opinion.
+        "rows_at_sim_market_line": at_sim_market_line,
         "games_in_index": index.games,
         "source_artifact": index.source_path,
     }

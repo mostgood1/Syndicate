@@ -95,6 +95,9 @@ _HITTER_BUCKETS: dict[str, tuple[str, str]] = {
 
 _HR_MARKET = "batter_home_runs"
 _HRR_MARKET = "batter_hits_runs_rbis"
+# See `PropProjectionIndex.project`: this key carries a PITCHER's strikeouts at
+# at least one book, and is resolved by subject rather than by name.
+_BATTER_K_MARKET = "batter_strikeouts"
 
 # `#429`. HRR is not an independently simulated stat -- it is Hits + Runs +
 # RBIs, a SUMMATION of three primitives the sim already models separately.
@@ -400,6 +403,26 @@ class PropProjectionIndex:
             line_value = float(line)
         except (TypeError, ValueError):
             return None
+
+        # A PITCHER MARKET UNDER A BATTER MARKET'S KEY, and the discriminator is
+        # the SUBJECT, not the key.
+        #
+        # One book (betrivers, measured 2026-08-30) publishes starting-pitcher
+        # strikeouts under `batter_strikeouts`. Four rows on the board that day:
+        # Seth Lugo 4.5, Parker Messick 6.5, Drew Rasmussen 5.5, Zebby Matthews
+        # 4.5 -- all starters, all lines in the 4.5-6.5 band a batter cannot
+        # reach. They joined to nothing while the identical market under
+        # `strikeouts` ran at 94.3%.
+        #
+        # NOT a blanket alias: `batter_strikeouts` is a REAL OddsAPI market (a
+        # batter's own strikeouts, lines around 0.5-1.5), and mapping it
+        # unconditionally would price a batter's K prop off a pitcher's
+        # distribution the moment a book quotes one. The alias applies only when
+        # the named subject is a pitcher THIS SLATE'S sim actually projected --
+        # `self._pitchers` is that index, so a batter simply falls through to
+        # the hitter path below exactly as before.
+        if market_key == _BATTER_K_MARKET and name in self._pitchers:
+            market_key = "strikeouts"
 
         if market_key in _PITCHER_DISTS:
             payload = self._pitchers.get(name)

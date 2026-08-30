@@ -326,6 +326,60 @@ def attach_nfl_game_projections(
                     # Shown WITH its skill rather than silently, because a bare
                     # 0.53 reads as a real read on the game.
                     projection["model_skill"] = note
+
+                # `#426` AGAIN, IN THE BRANCH IT WAS NOT APPLIED TO.
+                #
+                # The totals branch below records at length that it "produced a
+                # probability and no edge, and said nothing about why" -- the key
+                # ABSENT, not None-with-a-reason. That fix was made for totals
+                # and this branch was left exactly as it was, so an NFL moneyline
+                # carried `model_prob_over` and NO `edge_vs_market_pct` key at
+                # all. Measured on production 2026-08-30: 25 of 25 pregame NFL
+                # h2h rows, and 272 h2h rows on the board overall.
+                #
+                # THE PRESEASON/REGULAR SPLIT IS THE WHOLE DECISION, and it is
+                # why this could not just call `_no_vig_over_probability`.
+                # `skill_note` returns None for a REGULAR-SEASON profile, so the
+                # caveat that justifies withholding an edge does not exist there
+                # -- and the 2026 regular season opens 2026-09-10, eleven days
+                # after this measurement. Left alone, the silent branch becomes
+                # the silent branch on every real NFL moneyline of the season.
+                #
+                #   preseason profile -> REFUSE, naming the measured verdict.
+                #                        `#377`'s argument, unchanged: a -0.047
+                #                        correlation is no read on the game and
+                #                        an edge off it is a fabricated number.
+                #   regular season    -> PRICE it, exactly as totals does.
+                #
+                # Either way the key is now always SET and a null always carries
+                # a reason, which is the invariant this branch was breaking.
+                if note:
+                    projection["edge_vs_market_pct"] = None
+                    projection["edge_unavailable_reason"] = (
+                        f"margin model has no measured skill "
+                        f"(corr {note.get('correlation')} over {note.get('sample_games')} games), "
+                        f"so its win probability is not priced"
+                    )
+                else:
+                    from syndicate.features.shared.prop_projections import (
+                        _edge_unavailable_reason,
+                        _no_vig_over_probability,
+                    )
+
+                    market_fair = _no_vig_over_probability(row)
+                    projection["market_fair_prob_over"] = market_fair
+                    if market_fair is None:
+                        projection["edge_vs_market_pct"] = None
+                        # REUSED, not a seventh phrasing -- the same enumeration
+                        # every other sport's game market reports for the
+                        # identical failure.
+                        projection["edge_unavailable_reason"] = _edge_unavailable_reason(
+                            row, model_prob=projection.get("model_prob_over"), fair=market_fair
+                        )
+                    else:
+                        projection["edge_vs_market_pct"] = round(
+                            (float(projection["model_prob_over"]) - float(market_fair)) * 100.0, 2
+                        )
         elif market == "totals":
             mean = entry.get("total_mean")
             stdev = entry.get("total_stdev")
@@ -452,10 +506,41 @@ def attach_nfl_game_projections(
                     "generated_at": entry.get("generated_at"),
                     "model_prob_over": None,
                     "edge_vs_market_pct": None,
-                    # See the module docstring: the row's `line` does not say
-                    # which side it belongs to, and a guessed sign inverts the
-                    # edge while looking plausible.
-                    "probability_unavailable_reason": "spread row does not state which side its line belongs to",
+                    # THE OLD REASON HERE WAS FACTUALLY WRONG, AND IT SENT
+                    # READERS TO FIX SOMETHING THAT IS NOT BROKEN.
+                    #
+                    # It said "spread row does not state which side its line
+                    # belongs to". It does. `#262` made the grid's `line`
+                    # canonical in the AWAY frame -- `book_grid._canonical_line`
+                    # is literally `-line if selection == "home" else line` --
+                    # specifically so a row's line is unambiguous, and
+                    # `prop_projections.project_game_market` has relied on that
+                    # for MLB's spreads ever since ("THE LINE ARRIVES IN THE
+                    # AWAY/OVER FRAME").
+                    #
+                    # The real blocker is the one the branch above already
+                    # states and this one restated as a data problem: the margin
+                    # model has correlation **-0.047** over 146 games. There is
+                    # no side convention that would make a probability off that
+                    # worth publishing, and saying "we don't know which side the
+                    # line is" implies the opposite -- that a labelling fix
+                    # would unlock it. It would not.
+                    #
+                    # NOT a licence to price it once a stdev appears: that needs
+                    # a measured margin model, which is engine work under
+                    # `docs/ai_context/model_engine_standard.md`, not a join.
+                    "probability_unavailable_reason": (
+                        "the margin model has no measured skill, so no cover "
+                        "probability is derived from it"
+                    ),
+                    # ALWAYS SET, ALWAYS WITH A REASON. This branch served
+                    # `edge_vs_market_pct: null` with no `edge_unavailable_reason`
+                    # -- 50 of 50 pregame NFL spreads rows on production
+                    # 2026-08-30 -- which is the same silent state `#426` fixed
+                    # for totals and this pass fixed for h2h.
+                    "edge_unavailable_reason": (
+                        "no cover probability: the margin model has no measured skill"
+                    ),
                 }
                 if margin_skill:
                     projection["model_skill"] = margin_skill

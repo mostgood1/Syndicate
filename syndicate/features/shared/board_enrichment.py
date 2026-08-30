@@ -1245,10 +1245,217 @@ def attach_margin_model(grid: list) -> dict:
         )
 
         profile = build_margin_profile(grid)
-        return apply_margin_model(grid, profile)
+        coverage = apply_margin_model(grid, profile)
     except Exception:
         _LOGGER.exception("BOOK_GRID_MARGIN_MODEL_FAILURE")
         return {"rows_modelled": 0, "error": "margin model failed"}
+    # THE SECOND HALF OF THE ONE-SIDED CONTRACT, AND THE ONLY HOP THAT CAN RUN IT.
+    #
+    # See `attach_modelled_fair_edges` for the reasoning. In one line: the
+    # fallback is written INSIDE the projection joins, which every production
+    # path calls BEFORE this one, so it read a `modelled_fair` that did not
+    # exist yet. Here is the only placement downstream of both halves on all
+    # three call sites.
+    try:
+        coverage.update(attach_modelled_fair_edges(grid))
+    except Exception:
+        # Same rule the projection wrapper states: a sweep must never be able to
+        # break the join it extends. The margin model's own coverage stands.
+        _LOGGER.exception("MODELLED_FAIR_EDGE_SWEEP_FAILURE")
+        coverage["modelled_fair_edge"] = "failed"
+    return coverage
+
+
+# WHICH SIDE TOKENS MEAN "THE THING HAPPENED" AND WHICH MEAN "IT DID NOT".
+#
+# Used ONLY to decide whether a projection framed on one side describes the
+# row's own side or its complement. Deliberately a closed set: an unrecognised
+# token refuses rather than defaulting to the affirmative, because defaulting
+# would silently price the complement of what the model said, and an inverted
+# edge on a board that sorts by edge is worse than a blank one.
+_AFFIRMATIVE_SIDES = frozenset({"over", "yes", "home", "1"})
+_NEGATIVE_SIDES = frozenset({"under", "no", "away", "2"})
+
+# The refusals `live_edge_policy` raises, matched by SUBSTRING because each join
+# phrases its own sentence around the same facts. Keyed on the words the policy
+# itself owns rather than on an exact string, so a re-worded reason cannot
+# silently start passing this gate.
+_LIVE_EDGE_REFUSAL_TOKENS = (
+    "game is live",
+    "game is final",
+    "already decided",
+    "market is settled",
+)
+
+
+def _row_side_polarity(token):
+    key = str(token or "").strip().lower()
+    if key in _AFFIRMATIVE_SIDES:
+        return "affirmative"
+    if key in _NEGATIVE_SIDES:
+        return "negative"
+    return None
+
+
+def _is_live_edge_refusal(projection) -> bool:
+    if not isinstance(projection, dict):
+        return False
+    reason = str(projection.get("edge_unavailable_reason") or "").strip().lower()
+    if not reason:
+        return False
+    return any(token in reason for token in _LIVE_EDGE_REFUSAL_TOKENS)
+
+
+def attach_modelled_fair_edges(grid: list) -> dict:
+    """Price a projection against the MODELLED fair on rows with no market fair.
+
+    WHY THIS EXISTS AS A SEPARATE HOP, which is the whole defect.
+
+    `book_margin_model.modelled_fair_edge` was written for exactly this and is
+    called from three projection joins (`prop_projections`, `soccer_projections`,
+    `live_projection_join`). It reads `row["modelled_fair"]`, which
+    `attach_margin_model` writes -- and on EVERY production path the projection
+    join runs FIRST:
+
+        book_grid_artifact.py      attach_projections :222   attach_margin_model :340
+        pipeline/layer2_shortlist  attach_projections :1066  attach_margin_model :1069
+        blueprints/intelligence    attach_projections :2670  attach_margin_model :2677
+
+    So the field was absent at the only moment it was ever read, on every sport,
+    on every path. MEASURED on production 2026-08-30 over
+    `/api/board/layer1?window=slate` for mlb/wnba/ncaaf/soccer: 13,262 rows,
+    **9,161 carrying a `modelled_fair`**, and `edge_vs_modelled_fair_pct`
+    present on **0**. The fallback shipped with a user decision behind it
+    (2026-08-17) and had never once run.
+
+    Verified by construction rather than inferred: with `modelled_fair` attached
+    first, the same call returns `{'edge_vs_modelled_fair_pct': 3.75, ...}` on
+    the same row shape that returns None before it.
+
+    THE SIDE KEY IS THE ROW'S, NOT THE PROJECTION'S, and that is a second
+    independent break. `modelled_fair` is keyed by the row's own side vocabulary
+    and every row carrying one has exactly ONE side (measured: 9,161 of 9,161,
+    key == side in every case). The projection's `side` is its own framing and
+    is frequently a different token for the same outcome -- 1,278 soccer
+    goal-scorer rows stamp `"over"` against a `("yes",)` row, and 1,939 stamp
+    the PLAYER'S NAME. So the KEY comes from the row and only the POLARITY comes
+    from the projection:
+
+        same polarity      -> price `model_prob_over` directly
+        opposite polarity  -> price its complement (73 rows measured: a model
+                              framed `under` against an `over`-only quote)
+        side is the row's own player -> affirmative; the market is that
+                              player's outcome and carries no other side
+        anything else      -> REFUSED and named, never guessed
+
+    Only rows with NO market edge are touched, and `edge_vs_market_pct` is left
+    exactly as it was: `#242`'s rule is that a modelled number must not wear a
+    measured one's clothes, so this writes its own field and its own basis.
+
+    A LIVE OR SETTLED ROW IS SKIPPED. `live_edge_policy` already refused it and
+    said why; filling a modelled edge would route around a suppression the
+    projection joins apply deliberately.
+    """
+    from syndicate.features.shared.book_margin_model import (
+        EDGE_FIELD as MODELLED_EDGE_FIELD,
+        modelled_fair_edge,
+    )
+
+    priced = 0
+    flipped = 0
+    considered = 0
+    refusals: dict[str, int] = {}
+
+    def _refuse(reason: str) -> None:
+        refusals[reason] = refusals.get(reason, 0) + 1
+
+    for row in grid:
+        if not isinstance(row, dict):
+            continue
+        projection = row.get("projection")
+        if not isinstance(projection, dict):
+            continue
+        modelled = row.get("modelled_fair")
+        if not isinstance(modelled, dict) or not modelled:
+            continue
+        # A measured two-sided edge already exists -- leave it alone. This is a
+        # fallback for rows the market cannot price, not a second opinion on
+        # rows it can.
+        if projection.get("edge_vs_market_pct") is not None:
+            continue
+        # Idempotent: this runs on every build, and a producer that one day gets
+        # the ordering right must not have its value recomputed underneath it.
+        if projection.get(MODELLED_EDGE_FIELD) is not None:
+            continue
+        considered += 1
+
+        if _is_live_edge_refusal(projection):
+            _refuse("live_or_settled_market")
+            continue
+
+        sides = [str(s).strip().lower() for s in (row.get("sides") or []) if str(s).strip()]
+        keys = {str(k).strip().lower() for k in modelled}
+        row_side = next((s for s in sides if s in keys), None)
+        if row_side is None:
+            # More than one side, or a side the margin model did not fill.
+            # Guessing which entry to price would price the wrong leg.
+            _refuse("no_modelled_fair_for_any_row_side")
+            continue
+
+        raw_prob = projection.get("model_prob_over")
+        try:
+            model_prob = None if raw_prob is None else float(raw_prob)
+        except (TypeError, ValueError):
+            model_prob = None
+        if model_prob is None:
+            _refuse("projection_carries_no_probability")
+            continue
+
+        projected_side = str(projection.get("side") or "").strip().lower()
+        row_polarity = _row_side_polarity(row_side)
+        projected_polarity = _row_side_polarity(projected_side)
+        player = str(row.get("player_name") or "").strip().lower()
+
+        if projected_polarity is not None and row_polarity is not None:
+            if projected_polarity == row_polarity:
+                side_prob = model_prob
+            else:
+                side_prob = 1.0 - model_prob
+                flipped += 1
+        elif projected_side and player and projected_side == player:
+            side_prob = model_prob
+        else:
+            _refuse("projection_side_polarity_unknown")
+            continue
+
+        edge = modelled_fair_edge(row, model_prob=side_prob, side=row_side)
+        if not edge:
+            # `modelled_fair_edge`'s own refusals: not a `book_margin_model`
+            # fair, or a probability outside (0, 1). Attributed, not silent.
+            _refuse("modelled_fair_edge_refused")
+            continue
+        projection.update(edge)
+        # WHICH SIDE THE MODELLED EDGE DESCRIBES, stamped separately from
+        # `side`. `side` is the projection's own framing and is demonstrably a
+        # different token on 3,217 rows; a consumer that ranks this number needs
+        # the side it was actually priced for, not the one the producer framed.
+        projection["modelled_fair_side"] = row_side
+        # SAY SO ON THE ROW. A reader who sees a blank `edge_vs_market_pct` must
+        # be able to tell "nothing could be priced" from "priced against the
+        # modelled fair instead" -- the same contradiction `prop_projections`
+        # already avoids in its own branch.
+        reason = str(projection.get("edge_unavailable_reason") or "").strip()
+        marker = "priced against the modelled fair instead (see %s)" % MODELLED_EDGE_FIELD
+        if marker not in reason:
+            projection["edge_unavailable_reason"] = ("%s; %s" % (reason, marker)) if reason else marker
+        priced += 1
+
+    return {
+        "modelled_edge_rows_considered": considered,
+        "modelled_edge_rows_priced": priced,
+        "modelled_edge_rows_complemented": flipped,
+        "modelled_edge_refusals": refusals,
+    }
 
 
 # Sports whose published live lens carries a game-line projection this join can

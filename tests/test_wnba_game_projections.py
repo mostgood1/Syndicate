@@ -206,8 +206,31 @@ def test_moneyline_reason_does_not_claim_a_missing_term():
 # the sim's own market line.
 
 
+# THE FIXTURES BELOW USED TO PUT BOTH SPREAD LINES IN THE SAME FRAME, AND THAT
+# IS WHY THE DEFECT SHIPPED. `line=2.0` with `sim_market_home_spread=2.0` is a
+# state production cannot reach: `book_grid._canonical_line` normalises a row's
+# line to the AWAY side (`-line if selection == "home"`), while
+# `sim_market_home_spread` is the HOME side's number. The same line therefore
+# arrives as `L` and `-L`, so `_lines_match` compared a number against its own
+# negation and the "priced at the sim's own line" branch was unreachable for
+# every non-zero spread.
+#
+# The tests passed the whole time, on a slate shape that does not exist.
+# Measured on production 2026-08-30 -- every WNBA spreads row on the board:
+#     Golden State @ Portland  row -5.5   sim  +5.5     <- the SAME line
+#     Connecticut  @ Dallas    row +14.5  sim -13.5
+#     LA Sparks    @ Seattle   row -15.5  sim  +1.0
+# 0 of 58 WNBA spreads rows carried an edge. TOTALS, whose line has no side and
+# therefore no frame, matched on the first try and priced -- which is what
+# attributes this to the sign rather than to the data.
+#
+# So the fixture now uses production's frame (row -2.0 against sim +2.0), and
+# `test_spread_frames_must_be_opposite_to_match` below pins it so a future
+# same-frame fixture fails instead of passing.
+
+
 def test_spreads_at_market_line_gets_a_real_probability_and_edge():
-    row = _row("spreads", line=2.0, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES)
+    row = _row("spreads", line=-2.0, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES)
     index = _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
     attach_wnba_game_projections([row], index)
     projection = row["projection"]
@@ -219,8 +242,12 @@ def test_spreads_at_market_line_gets_a_real_probability_and_edge():
         "a stale reason must not sit beside a real probability"
     )
     # The mean-based fields are UNCHANGED by this -- same convention as before.
+    # `edge_vs_line` is `projected - row_line`, which IS `margin + home_line`
+    # (the cover cushion) precisely BECAUSE the row's line is the away frame's.
+    # That use is correct and deliberately untouched; only `_lines_match` needed
+    # the conversion. 9.32 - (-2.0) = 11.32.
     assert projection["projected"] == 9.32
-    assert projection["edge_vs_line"] == 7.32
+    assert projection["edge_vs_line"] == 11.32
 
 
 def test_totals_at_market_line_gets_a_real_probability_and_edge():
@@ -238,7 +265,11 @@ def test_alt_line_stays_null_with_an_honest_alternate_line_reason():
     # `#263`'s whole point: the sim priced ONE line (2.0), this row asks about
     # a DIFFERENT one (1.5, a spreads_alt row) -- the 3-point quantile summary
     # cannot answer that, so this must stay a blank, never a fabricated number.
-    row = _row("spreads", line=1.5, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES)
+    # -1.5 in the away frame is home +1.5; the sim priced home +2.0. A GENUINE
+    # alternate line, which is what this test meant all along -- before the
+    # frame fix it passed because 1.5 != 2.0 in the wrong frame, so it would
+    # have passed for a row that was actually AT the sim's line.
+    row = _row("spreads", line=-1.5, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES)
     index = _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
     attach_wnba_game_projections([row], index)
     projection = row["projection"]
@@ -255,7 +286,8 @@ def test_alt_line_stays_null_with_an_honest_alternate_line_reason():
     # Mean-based fields still populate for an alt line -- only the
     # probability/edge terms are gated.
     assert projection["projected"] == 9.32
-    assert projection["edge_vs_line"] == 7.82
+    # 9.32 - (-1.5); the away-framed line makes this the cover cushion.
+    assert projection["edge_vs_line"] == 10.82
 
 
 def test_sim_line_absent_keeps_the_original_mean_only_reason():
@@ -276,7 +308,7 @@ def test_market_line_priced_but_one_sided_book_reports_why():
     # rejection than the mean-only one, and it must say so via the SAME
     # `_edge_unavailable_reason` every other sport's game market uses, not a
     # bespoke sixth phrasing.
-    row = _row("spreads", line=2.0, consensus={"home": -110}, sides=["home"])
+    row = _row("spreads", line=-2.0, consensus={"home": -110}, sides=["home"])
     index = _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
     attach_wnba_game_projections([row], index)
     projection = row["projection"]
@@ -559,3 +591,99 @@ def test_a_ten_point_cushion_is_no_longer_compressed_toward_a_coin_flip():
     assert over > 0.70, "a 10-point cushion must not read as a coin flip"
     assert under < 0.30
     assert abs((over + under) - 1.0) < 1e-9, "symmetric about the line"
+
+
+# ---------------------------------------------------------------------------
+# `#601` -- the model-edge join audit. Three defects, one function.
+# ---------------------------------------------------------------------------
+
+
+def test_spread_frames_must_be_opposite_to_match():
+    """The pin. A same-frame pair is what production never produces and what
+    the old fixtures asserted, so it must now FAIL to match."""
+    same_frame = _row("spreads", line=2.0, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES)
+    attach_wnba_game_projections(
+        [same_frame], _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
+    )
+    assert same_frame["projection"]["model_prob_over"] is None, (
+        "row +2.0 is home -2.0; the sim priced home +2.0. Different lines."
+    )
+
+    opposite_frame = _row("spreads", line=-2.0, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES)
+    attach_wnba_game_projections(
+        [opposite_frame], _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
+    )
+    assert opposite_frame["projection"]["model_prob_over"] == 0.3
+
+
+def test_reachability_is_counted_so_a_zero_is_visible():
+    """The frame bug read as `the model has no opinion` because nothing counted
+    how many rows ever reached the priceable branch."""
+    rows = [
+        _row("spreads", line=-2.0, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES),
+        _row("spreads", line=-3.5, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES),
+    ]
+    report = attach_wnba_game_projections(
+        rows, _index(margin=9.32, p_home_cover=0.30, sim_market_home_spread=2.0)
+    )
+    assert report["rows_at_sim_market_line"] == 1
+
+
+def test_the_alternate_ladder_is_projected_and_labelled_not_dropped():
+    """`spreads_alt`/`totals_alt` were filtered out before the loop, so they
+    reached the board with no projection AND no reason -- indistinguishable
+    from a game the sim never ran. The module docstring has described the
+    intended handling since `#263`; the code could not produce it.
+
+    Measured pregame on production 2026-08-30: `totals_alt` 162 rows and
+    `spreads_alt` 98, against 20 `totals` and 22 `spreads`. The ladder was six
+    times the main line and all of it was silent."""
+    rows = [
+        _row("spreads_alt", line=-3.5, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES),
+        _row("totals_alt", line=170.5, consensus=_TOTALS_CONSENSUS, sides=_TOTALS_SIDES),
+    ]
+    report = attach_wnba_game_projections(
+        rows,
+        _index(margin=9.32, total=163.08, p_home_cover=0.30, p_total_over=0.49,
+               sim_market_home_spread=2.0, sim_market_total=164.5),
+    )
+    assert report["alternate_line_rows"] == 2
+    assert report["alternate_line_rows_with_projection"] == 2
+    for row in rows:
+        projection = row["projection"]
+        assert projection["projected"] is not None, "the mean IS available at any line"
+        assert projection["model_prob_over"] is None, "a probability is NOT, and must not be invented"
+        assert "alternate line" in projection["probability_unavailable_reason"]
+
+
+def test_an_alt_row_sitting_on_the_sims_own_line_is_priced():
+    """`totals_alt` is `totals` at a different line -- but sometimes it is the
+    SAME line, and refusing it then would be refusing a number we have."""
+    row = _row("totals_alt", line=164.5, consensus=_TOTALS_CONSENSUS, sides=_TOTALS_SIDES)
+    attach_wnba_game_projections(
+        [row], _index(total=163.08, p_total_over=0.49, sim_market_total=164.5)
+    )
+    assert row["projection"]["model_prob_over"] == 0.49
+    assert row["projection"]["edge_vs_market_pct"] == -1.0
+
+
+def test_every_blank_edge_carries_a_reason():
+    """This producer was the last one serving `edge_vs_market_pct: null` with
+    the reason field ABSENT -- the exact state `prop_projections` was fixed for
+    on 2026-08-16. Measured pregame 2026-08-30: 11 WNBA game rows, no reason."""
+    rows = [
+        _row("spreads", line=-3.5, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES),
+        _row("totals", line=170.5, consensus=_TOTALS_CONSENSUS, sides=_TOTALS_SIDES),
+        _row("spreads_alt", line=-9.5, consensus=_SPREADS_CONSENSUS, sides=_SPREADS_SIDES),
+    ]
+    attach_wnba_game_projections(
+        rows,
+        _index(margin=9.32, total=163.08, p_home_cover=0.30, p_total_over=0.49,
+               sim_market_home_spread=2.0, sim_market_total=164.5),
+    )
+    for row in rows:
+        projection = row["projection"]
+        assert projection["edge_vs_market_pct"] is None
+        reason = projection.get("edge_unavailable_reason")
+        assert reason, f"{row['market']} served a blank edge with no reason"
+        assert "alternate line" in reason, "and the reason must name the real cause"

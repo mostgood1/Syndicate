@@ -354,6 +354,34 @@ def attach_wnba_projections(
             else:
                 projection["edge_vs_line"] = edge
                 projection["side"] = "over" if edge > 0 else "under"
+        # EVERY BLANK EDGE MUST BE DIAGNOSABLE BY REASON (`#601`).
+        #
+        # A mean-only row leaves `edge_vs_market_pct` None and states
+        # `probability_unavailable_reason`, but never `edge_unavailable_reason`
+        # -- and the Layer 1 audit reads the second, because that is the field
+        # every other producer sets and the one that answers "why is this row
+        # not on the board". Measured on production 2026-08-30, pregame WNBA:
+        # 42 prop rows (`player_points_rebounds` 13, `player_points_assists` 19,
+        # `player_rebounds_assists` 10) served a blank edge with the reason key
+        # ABSENT -- the exact state `prop_projections` was fixed for on
+        # 2026-08-16, in the fourth producer that never went through it.
+        #
+        # ABSENT AND None ARE DIFFERENT ANSWERS. Absent indicts the producer
+        # (this path never ran); None indicts the input. A reader could not tell
+        # these rows from a join that had crashed.
+        #
+        # It RESTATES the probability refusal rather than inventing a second
+        # vocabulary: there is no edge because there is no probability, and
+        # `probability_unavailable_reason` already says precisely why. When the
+        # sim ladder DID attach a probability, `_attach_sim_probability_edge`
+        # has already written both fields and this leaves them alone.
+        if projection.get("edge_vs_market_pct") is None and not projection.get("edge_unavailable_reason"):
+            probability_reason = projection.get("probability_unavailable_reason")
+            projection["edge_unavailable_reason"] = (
+                "no probability to price: %s" % probability_reason
+                if probability_reason
+                else "this projection carries no probability, so no edge was priced"
+            )
         row["projection"] = projection  # type: ignore[index]
         rows_with_projection += 1
 
