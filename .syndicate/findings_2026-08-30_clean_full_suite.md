@@ -86,7 +86,7 @@ but is not emitted as a `FAILED <id>` line. So the breakdown below covers 45 of
   gating another lane added 2026-08-30 (`needs_soccer_rosters`), but that was
   NOT verified for all 51 and a skip that should be a run is invisible.
 
-## TRIAGE PROGRESS — 46 → 29 untriaged
+## TRIAGE PROGRESS — 46 → 21 untriaged
 
 Two clusters closed. **Neither was a defect in `main`, and neither was this
 session's.** Both were TEST defects, and they failed in different ways, which is
@@ -180,24 +180,78 @@ in the suite currently pins the gate's behaviour on this surface.** The
 protective behaviour is unasserted. That is worth more attention than the four
 red lines.
 
-### What this says about the remaining 29
+### Group B (2) — FIXED `7c1e842c`: tests that could never pass HERE
 
-Three clusters, three DIFFERENT causes, **zero production defects**:
+- `test_source_root_helpers_prefer_render_disk` compared an UNRESOLVED expected
+  path against production's `.resolve()`d one. A no-op on POSIX for
+  `/opt/render/...`; on Windows `.resolve()` prepends the drive, giving
+  `WindowsPath('C:/opt/...')` vs `WindowsPath('/opt/...')`. Resolving the
+  expected side is symmetric with production and cannot mask a real mismatch.
+- `test_the_real_ledger_parses_and_claims_something` asserted `> 50` claims and
+  hit **22 — because the LEDGER shrank legitimately**: lanes closed, and a
+  phantom sweep released 121 of 133 claims held by dead sessions. A floor on
+  total claims measures how much work is open, not whether the parser works.
+  Replaced with a distinct-lane floor and CALIBRATED: verified it still rejects
+  returns-nothing, reads-one-block and only-two-lanes.
 
-| cluster | cause | shape |
+### Group D (6) — the unexamined tail, now examined
+
+| test | verdict |
+|---|---|
+| `test_soccer_fixture_pair_resolution` | **deliberate semantics** — see below |
+| `test_smartsim2_calibration_profile` | contract drift: NCAAF profile gained `goal_line_touchdown`, `field_goal_attempt_base_probability` |
+| `test_ncaaf_team_registry_reachability` | `resolve_team('Albany State GA')` -> `None`; alias gap `exchange-join-refusals` is actively working |
+| `test_wnba_refresh_runner` (2) | *"cli refresh path should not load"* — UNEXAMINED |
+| `test_live_refresh_loop` | sleep called 6x (`0.15`x5 then `900`), test expects once — a poll loop was added |
+
+#### The one that matters: a red test is the only thing that WAS pinning side-order
+
+`test_the_join_refuses_when_the_sides_are_swapped` fails because
+`_teams_match` now returns **True** for a swapped fixture. That is INTENDED:
+`c5a89b44` made the pair resolver authoritative and compares the fixture as an
+UNORDERED pair, explicitly because *"a wrong-GAME check must not be entangled
+with a wrong-SIDE one"*. The split is right.
+
+**But nothing replaced the assertion.** Its docstring is the hazard verbatim:
+*"Matching a swapped fixture would pair our row with the opposite side of the
+same game."*
+
+**WHY IT IS NOT BITING TODAY, and it is NOT orientation.**
+`orientation_flip_counts` in `polymarket_board_join` is *"Diagnostic only; the
+flip is never applied."* The protection is a REFUSAL one layer down:
+`_resolve_outcome_side` raises `team_side_needs_verified_yes_leg` for any
+positional home/away side unless `SYNDICATE_POLYMARKET_ALLOW_TEAM_SIDE=1`,
+which is **NOT in `render.yaml`** — off in production, and observed firing live
+2026-08-29. So for soccer: totals are orientation-insensitive, spreads are not
+carded, h2h is refused outright.
+
+**THE SEQUENCING RISK.** `live-venue-order-placement` lists that same refusal as
+gate #1 blocking execution and states *"an arb IS a moneyline trade"*. **The
+moment h2h is unblocked, orientation becomes load-bearing on a live-money path,
+and the suite will not catch a swapped-fixture bet** — because the test that
+would have is red. The protection today is a gate someone is actively trying to
+lift. Flagged to that lane 2026-08-30; NOT fixed here (claimed file, semantics
+call on their path).
+
+### What this says about the remaining 21
+
+Five causes now, still **zero CONFIRMED production defects** — though "zero
+confirmed" is a statement about what has been examined, and 2 tests
+(`test_wnba_refresh_runner`) remain unexamined rather than exonerated.
+
+| cause | count | shape |
 |---|---|---|
-| `test_open_bet_live_status` (8) | stale stub vs a new kwarg | fails everywhere |
-| `test_mlb_sim_run_reconcile` (5) | pollution via a real on-disk pointer | passes alone, fails in suite |
-| `test_ncaaf_picks_local` (4) | stale contract vs a deliberate gate | fails everywhere |
+| a lane changed a contract, siblings did not follow | ~11 | fails everywhere |
+| pollution (real on-disk state shared between files) | ~8 | passes alone, fails in suite |
+| environment-dependent (POSIX paths, live ledger) | 2 | can never pass here — FIXED |
+| deliberate behaviour the test predates | 5 | fails everywhere, code is right |
+| unexamined | 2 | — |
 
-That is not a prediction about the rest — but **a raw count from this file is an
-upper bound on real defects, not an estimate of them.** Note that two of the
-three shapes are "a lane changed a contract and a sibling test file did not
-follow", which suggests the tail is worth grouping by CAUSE rather than by file.
-
-Triage each cluster in isolation FIRST. The isolation-vs-suite comparison at one
-SHA separated all three in minutes, and it is the ONLY step that distinguishes
-pollution from a real contract change.
+**A raw count from this file remains an UPPER BOUND on real defects.** The
+dominant cause is contract drift between lanes, which is a coordination
+signal, not a code-quality one. Triage in isolation FIRST: the
+isolation-vs-suite comparison at one SHA separated every cluster in minutes,
+and it is the only step that tells pollution from a real contract change.
 
 ## For whoever picks this up
 
