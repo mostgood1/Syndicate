@@ -205,3 +205,105 @@ def test_a_row_with_no_venue_quote_carries_NO_verdict_at_all():
     row = _row()
     _apply([row], {}, now)
     assert "venue_basis" not in row["best"]["home"]
+
+
+# --------------------------------------------------------------------------
+# THE SECOND HOP: surviving the board fan-out
+#
+# `#382` is on file in `layer2_board.py` at this exact dict: the margin model
+# stamped `assumed_hold_pct` on the grid, the fan-out copied a FIXED FIELD LIST,
+# and the measurement "died here" -- the modelled-hold floor read 0 rows in
+# production while its unit tests passed on hand-built input.
+#
+# A display-only annotation that never reaches a consumer is worse than absent:
+# it reads as "no live venue edges exist" rather than as "never wired", and
+# those call for opposite actions. Verified 2026-08-30 against the served
+# board: `quote` carried no `venue_basis` key at all.
+# --------------------------------------------------------------------------
+
+from syndicate.features.shared.layer2_board import build_layer2_rows
+
+
+def _board_row(venue_basis=None, state="live"):
+    best = {
+        side: {
+            "price": price,
+            "bookmaker": "draftkings",
+            "age_seconds": 20.0,
+            "books_quoting": 4,
+        }
+        for side, price in (("home", 114), ("away", -118))
+    }
+    if venue_basis is not None:
+        best["home"]["venue_basis"] = venue_basis
+    return {
+        "sport": "mlb",
+        "kind": "game",
+        "event_id": "evt-1",
+        "market": "h2h",
+        "segment": "full",
+        "line": None,
+        "player_name": None,
+        "home_team": "Los Angeles Dodgers",
+        "away_team": "Milwaukee Brewers",
+        "commence_time": "2026-08-16T20:10:00Z",
+        "sides": ["home", "away"],
+        "books_quoting": 4,
+        "game": {"state": state, "status_token": "3:10P CT"},
+        "best": best,
+        "cells": {"draftkings": {"home": {"price": 114}, "away": {"price": -118}}},
+    }
+
+
+def _home(result):
+    return next(c for c in result["opportunities"] if c["side"] == "home")
+
+
+def test_the_verdict_SURVIVES_the_board_fan_out():
+    """The hop that killed `#382`. Without this the module is 500 unreachable
+    lines and production reads it as 'no edges' rather than 'not wired'."""
+    verdict = {
+        "basis": "venue",
+        "edge_pct": 4.2,
+        "displayable": True,
+        "servable": False,
+        "venue": "kalshi",
+        "reason": "kalshi at 0.480 plus 0.0087 commission ... DISPLAY ONLY",
+        "venue_fee_per_contract": 0.0087,
+        "fee_is_upper_bound": True,
+        "consensus_probability": 0.5238,
+        "anchor_books": 5,
+    }
+    quote = _home(build_layer2_rows([_board_row(verdict)]))["quote"]
+    assert "venue_basis" in quote, "the fan-out dropped it -- this is #382 again"
+    assert quote["venue_basis"]["edge_pct"] == 4.2
+    # The REASON must survive too. A number without it is not auditable, and
+    # the reason is what makes a refusal attributable instead of bare.
+    assert "DISPLAY ONLY" in quote["venue_basis"]["reason"]
+    assert quote["venue_basis"]["servable"] is False
+
+
+def test_a_REFUSAL_survives_too_and_is_not_flattened_to_absent():
+    """Three states, kept distinct all the way to the consumer: absent (no
+    venue quote), refused (quoted, a named guard declined), and a number."""
+    refusal = {
+        "basis": "venue",
+        "edge_pct": None,
+        "displayable": False,
+        "servable": False,
+        "venue": "polymarket",
+        "reason": "the venue quote names a different fixture (#603)",
+        "anchor_books": 5,
+    }
+    quote = _home(build_layer2_rows([_board_row(refusal)]))["quote"]
+    assert quote["venue_basis"] is not None
+    assert quote["venue_basis"]["edge_pct"] is None
+    assert "#603" in quote["venue_basis"]["reason"]
+
+
+def test_a_row_the_venue_never_quoted_carries_the_key_as_NONE():
+    """Absent stays distinguishable from refused -- and the key's presence is
+    what proves the carry ran at all, rather than the field being missing."""
+    quote = _home(build_layer2_rows([_board_row(None)]))["quote"]
+    assert "venue_basis" in quote
+    assert quote["venue_basis"] is None

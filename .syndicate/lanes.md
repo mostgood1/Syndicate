@@ -3595,6 +3595,15 @@ caaf-no-orders`). NOT
   `syndicate/features/shared/venue_basis_edge.py`,
   `tests/test_venue_basis_edge.py`,
   `tests/test_venue_basis_wiring.py`,
+  NARROW `[2026-08-30]`: `syndicate/features/shared/layer2_board.py` — ONE key
+  added to the `quote` fan-out (`venue_basis`), nothing else in the file. Taken
+  because the only block naming it, `portfolio-decision-and-execution`, states
+  its own claims RELEASED ("phantom sweep, the owning session is gone... a
+  RECORD, not a claim"), and the narrow holder it cites,
+  `layer2-sim-view-and-live-projection`, has no lane header at all. Required,
+  not cosmetic: that fan-out copies a FIXED FIELD LIST and is where `#382`
+  died, so a display-only annotation not named there reaches no consumer and
+  reads in production as "no live venue edges" instead of "never wired".
   `tests/test_venue_quote_key_names_game.py`,
   `tests/test_polymarket_side_vocabulary.py`,
   `tests/test_kalshi_side_vocabulary.py`

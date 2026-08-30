@@ -1314,6 +1314,28 @@ def build_layer2_rows(
                     ((row.get("modelled_fair") or {}).get(side) or {}).get("assumed_hold_pct")
                 ),
                 "suspect_stale": bool(side_best.get("suspect_stale")),
+                # THE VENUE-BASIS VERDICT, carried through THIS EXACT FAN-OUT --
+                # which is where `#382` above died, for the same reason and in
+                # the same dict. `venue_quote_fanin` attaches it to
+                # `best[side]["venue_basis"]`; this projection copies a FIXED
+                # FIELD LIST, so an annotation not named here does not exist to
+                # any consumer of the board. The module is DISPLAY-ONLY by
+                # design, which makes reaching a surface not a nicety but the
+                # entire point: unreachable, it is 500 lines that compute
+                # nothing anyone can see, and it would read in production as
+                # "no live venue edges" rather than as "never wired".
+                #
+                # COST MEASURED, NOT ASSUMED, before carrying the whole dict:
+                # on the served 2026-08-29 board, 33 of 1047 rows are live AND
+                # carry a venue price (kalshi 32, polymarket 9). At ~400 bytes
+                # that is ~0.8% of a 1.96MB payload, so there is no case for a
+                # trimmed variant that would drop the `reason` -- and the reason
+                # is what makes a zero attributable instead of bare.
+                #
+                # Absent on every row the venue did not quote. Three states kept
+                # distinct: absent (no venue quote), a refusal (quoted, and a
+                # named guard declined), and a number.
+                "venue_basis": side_best.get("venue_basis"),
                 # EVERY BOOK'S PRICE FOR THIS SIDE, so CLV can be measured
                 # same-book later. `best` is one book by definition, and pairing
                 # a best-of-N opening against a different book's close is biased
