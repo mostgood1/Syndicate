@@ -38150,3 +38150,52 @@ construction. Also carried by this deploy but owned by other lanes: the NCAAF
 game-line region widening (`odds_regions.py`, `ncaaf-market-basis-picks`) and the
 `venue_basis` fan-out carry (`live-venue-order-placement`) — each owns its own
 reading.
+
+## 2026-08-30 — venue basis live; the reading found `#603` STILL OPEN
+
+- **deploy:** `dep-da9q7bpf2nfc7389ug30`, commit `77e61607`, refresh-worker,
+  live 03:32:26Z. **Fired by `stale-row-cause-blind-spot` under their claim**,
+  not by me — one cumulative deploy from main tip carrying three lanes'
+  work (their `_index_last_seen`, my venue basis, `ncaaf-market-basis-picks`'s
+  region widening). I asked them to carry it rather than wait for the lock,
+  because two deploys of different SHAs do not compose. They waited out the
+  in-flight MLB sim (procs 1→0 at 03:25:13Z) and the 25-min spacing.
+- **holder:** claim never held by me. Nothing to release.
+- **content-verified before reading** (not ancestry): module present, attach
+  present, guard-5 argument present, board fan-out carry present.
+
+- **verify:** board pool `written_at 2026-08-30T03:42:11Z` (crosses the deploy;
+  two earlier attempts were REFUSED against the 03:20:09Z pool by the
+  build-stamp gate). `scripts/read_venue_basis.py`:
+
+      rows 809 | carrying the venue_basis KEY 809 | with a VERDICT 148
+      pregame->market_basis_edge 123 | books<3 13 | DISPLAYABLE 7
+      pregame anchor 4 | venue stale 1 | NOISE FLOOR 0
+
+  **WIRING PROVEN** — 809/809 carry the key, so attach and fan-out both ran.
+  Pre-validated against the old pool where the same script read `NOT WIRED`
+  (33 eligible, 0 keyed), so the non-zero is discriminating.
+
+- **THE FINDING IS NOT THE SEVEN EDGES — ALL SEVEN ARE WRONG-GAME FICTION.**
+  Zero noise-floor agreements out of seven that reached the arithmetic. An
+  agreeing row WOULD have been counted, so that zero is not selection-biased.
+  Alias-free collidability on `venue_ref`: **11 of 35 refs answer more than one
+  fixture, serving 108 of 148 rows (73%)**; one Belgian Pro League tie ticker
+  answers **33 fixtures** across five countries. Cleanest single proof: a soccer
+  DRAW at HT on a 1-0 scoreline priced 0.8099, complement 0.1901 = the book
+  consensus 0.190476 to four decimals.
+
+- **`#603` IS NOT FIXED.** My guard refuses a quote that NAMES a different
+  fixture; these name nothing (`Quote.game is None`, ticker unresolved) and the
+  deliberate "unnamed passes through" asymmetry lets them answer every row
+  sharing `(sport, market, side, line)`. Intact wherever resolution fails —
+  soccer and NCAAF, 129 of 148 verdict rows.
+
+- **PRODUCTION IMPACT BEYOND THE ANNOTATION:** the same quote feeds the price
+  reprice. `best_any_book` is a multi-fixture venue ref on **108 rows**, and on
+  **2 rows the WRONG-GAME price is the served HEADLINE** — `Orioles@Athletics`
+  totals 4.5 at **-525/+488 from a White Sox@Twins ticker**, right now.
+
+- **venue basis verdict: UNMEASURED.** No number here is evidence about in-play
+  venue edge. `servable=False` vindicated on first contact with production — at
+  -40.9/-39.7/-21.5 points these would have topped an edge-ranked board.

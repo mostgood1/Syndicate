@@ -1212,3 +1212,102 @@ symptom, not the finding. Two independent routes, one answer.
 the module whose behaviour changed, not only the ledger. The constant was fixed
 the same hour; the prose that explains it survived four commits saying the
 opposite, and nothing was red.
+
+## THE READING, 2026-08-30 03:42Z — the instrument works and it found `#603` STILL LIVE
+
+Deploy `dep-da9q7bpf2nfc7389ug30`, commit `77e61607`, refresh-worker live
+03:32:26Z (fired by `stale-row-cause-blind-spot` under their claim; one
+cumulative deploy carrying three lanes). Board pool `written_at
+2026-08-30T03:42:11Z`, which crosses the deploy — the build-stamp gate refused
+two earlier attempts against the 03:20:09Z pool.
+
+### The wiring: confirmed, all three hops
+
+    rows                       809
+    carrying the venue_basis KEY   809   <- the board fan-out ran on every row
+    with a VERDICT (non-null)      148   <- the venue quoted this side
+      pregame, routed to market_basis_edge  123
+      guard4 books<3                         13
+      DISPLAYABLE                             7
+      guard5 pregame anchor                   4
+      guard3 venue quote stale                1
+      noise floor (venue and books AGREE)     0
+
+### The finding is NOT the seven edges. It is that all seven are FICTION
+
+**Zero rows landed in the noise floor.** Seven reached the arithmetic and seven
+disagreed, six of them by more than 11 points. A live exchange and live books
+tracking the same game should agree most of the time. Zero agreements out of
+seven is not an edge distribution, it is a broken join — and that inference is
+NOT selection-biased, because an agreeing row would have been counted as a
+noise-floor refusal and none was.
+
+`venue_ref` says what happened:
+
+| board row | venue ticker | the fixture it actually prices |
+|---|---|---|
+| Phillies@Angels over 4.5 | `KXMLBTOTAL-26AUG301410CWSMIN-5` | White Sox@Twins |
+| Orioles@Athletics over 6.5 | `KXMLBTOTAL-...CWSMIN-7` | White Sox@Twins |
+| Tempo@Mercury under 175.5 | `KXWNBATOTAL-26AUG30LASEA-176` | LA@Seattle |
+| LA Galaxy@San Diego draw | `KXBELGIANPLGAME-26SEP06BEVOHL-TIE` | Belgian Pro League, Sep 6 |
+| Memphis@UNLV under 49.5 | `tsc-cfb-toledo-mst-2026-09-04-...` | Toledo@Miss State, Sep 4 |
+
+The soccer row is the cleanest proof and needs no alias map: a DRAW at halftime
+on a 1-0 scoreline priced at 0.8099, whose complement 0.1901 equals the book
+consensus 0.190476 to four decimals.
+
+### The alias-free measurement — collidability on the REF
+
+Team-name matching is unreliable (my first pass reported 100% mismatch and was
+WRONG: `Toronto`→`toro` misses `TORPHX`, a ref that is in fact correct). The
+test that needs no name resolution is how many refs answer more than one
+fixture, because at most one of them can be right:
+
+    distinct venue_refs in use      35
+    refs answering >1 FIXTURE       11
+    rows served by such a ref      108 / 148   (73%)
+
+      KXBELGIANPLGAME-26SEP06BEVOHL-TIE   claimed by 33 fixtures
+      KXBUNDESLIGATOTAL-26SEP05SCHBMU-3   claimed by 25 fixtures
+      KXBUNDESLIGATOTAL-26SEP05SCHBMU-4   claimed by 10 fixtures
+
+One Belgian tie ticker is answering 33 fixtures across Spain, the Netherlands,
+Italy, England and Germany.
+
+### WHY MY `#603` FIX DID NOT CATCH THIS, stated plainly
+
+Guard 2 refuses a quote that **names a different fixture**. These quotes name
+NOTHING — the adapter could not resolve the ticker, so `Quote.game is None`, and
+the documented asymmetry ("a quote that names none is allowed through exactly as
+it is today... it can only ever remove a match that is provably wrong") lets it
+match the bare key and answer every row sharing `(sport, market, side, line)`.
+
+That asymmetry was chosen so the fix could not regress coverage. **The
+measurement now shows it leaves the defect essentially intact wherever game
+resolution FAILS** — which is soccer and NCAAF, i.e. 129 of the 148 verdict
+rows. `#603` is NOT fixed; it is fixed only for venues that can name their game.
+
+### Production impact BEYOND the annotation
+
+This is not confined to a display-only field. The same wrongly-joined quote
+feeds the price reprice and `_reprice_live_benchmark`:
+
+    HEADLINE price is the venue                     17 rows
+      ...and its ref answers >1 fixture              2   <- WRONG-GAME price served
+    best_any_book is the venue                     148
+      ...and its ref answers >1 fixture            108
+
+Served right now: `Baltimore Orioles@Athletics` totals 4.5 carries **-525 / +488
+from a White Sox@Twins ticker** as its headline price.
+
+### Verdict on the venue basis itself
+
+**UNMEASURED, and correctly so.** Not one of the seven numbers is evidence about
+in-play venue edge; every one is a join defect wearing an edge's clothes. The
+`servable=False` default is vindicated by its first contact with production —
+had these been servable they would have sorted straight to the top of an
+edge-ranked board at -40.9, -39.7 and -21.5 points.
+
+The honest state: the comparison is WIRED and PROVEN to run end to end, and its
+first reading measured the join, not the market. It cannot measure the market
+until the game-resolution gap is closed.
