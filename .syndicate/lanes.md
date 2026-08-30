@@ -3955,8 +3955,33 @@ caaf-no-orders`). NOT
   whether the board should DROP `market_gone` rows (288 of 885 = 32.6% of the
   served board today) or carry a per-family staleness ceiling instead of the
   flat 14h. Surfaced to the user; deliberately not taken unilaterally.
-- Blocked by: none. `pipeline/layer2_shortlist.py` is named only by a CLOSED
-  lane (`ncaaf-compact-card-state`, CLOSED-VERIFIED 2026-08-29).
+- STATUS 2026-08-30 03:1xZ: **CODE PUSHED, NOT DEPLOYED, VERIFICATION UNMET.**
+  Fix is `f454af96`, on `origin/main`. refresh-worker is running `843fadc5`,
+  which is **17 commits behind main and does NOT contain it** — checked by
+  CONTENT, not ancestry: `git show 843fadc5:pipeline/layer2_shortlist.py |
+  grep -c _index_last_seen` -> `0`. Ancestry alone would have said "on main"
+  and been useless here.
+- WHY NO DEPLOY WAS TAKEN, three independent reasons, any one sufficient:
+  (1) the deploy claim is held by `ncaaf-market-basis-picks` since 02:44:51Z and
+  that session is LIVE — it deployed 5 min earlier, so this is a working lock,
+  not an orphan to `--force`; (2) preflight returns TOO_SOON, 25-min minimum
+  spacing with ~20 min left, and refresh-worker needs ~21 min from boot to its
+  first board publish (`#563`); (3) an MLB sim was IN FLIGHT — `pid 81
+  run_mlb_daily_sim_job.py` with children 130/207/210, plus
+  `build_soccer_artifacts.py --league ligue_1` and `daily_update.py
+  --workflow ui-daily`. A deploy kills all three.
+- PLAN `[user 2026-08-30: "wait for their deploy"]`: the claim holder was asked
+  to cut their NEXT refresh-worker deploy from `origin/main` tip instead of
+  re-deploying `843fadc5`, so this ships with theirs at no extra board freeze.
+  This change is observability-only and cost-NEGATIVE (98ms vs 172ms), so it
+  carries no risk for the lane whose deploy it rides.
+- THE READING THIS LANE STILL OWES, and it is not "watch the log": a production
+  `STALE_ROW_CAUSE` line whose per-sport counts **SUM to that sport's `stale=`**.
+  Today they sum to at most 3. Record it in `deploys.md` when it lands.
+- Blocked by: none for the CODE. The verification is blocked on any
+  refresh-worker deploy cut from `origin/main` at or after `f454af96`.
+  `pipeline/layer2_shortlist.py` is named only by a CLOSED lane
+  (`ncaaf-compact-card-state`, CLOSED-VERIFIED 2026-08-29).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
