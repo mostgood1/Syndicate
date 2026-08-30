@@ -532,6 +532,40 @@ def detect_arb_opportunities(
             if combo_home_kalshi <= combo_away_kalshi
             else ("away_on_kalshi_home_on_polymarket", combo_away_kalshi)
         )
+
+        # THE MEASURED FEE MODEL DECIDES `is_opportunity`. THE FLAT BUFFER IS
+        # NOW A REPORTED COMPARISON, NOT THE GATE.
+        #
+        # `net_edge_per_contract` existed for hours with NO CALLER: the model
+        # was written, tested and documented while this function went on gating
+        # every opportunity on `DEFAULT_FEE_BUFFER = 0.04`. An unwired model is
+        # indistinguishable from no model, and the deploy that would have
+        # shipped it changed nothing.
+        #
+        # WHY IT MATTERS HERE SPECIFICALLY: the flat 4.00c sat ABOVE MLB
+        # break-even at EVERY price (3.38c at even money, 0.39c at 0.97), so
+        # `is_opportunity` could never once be True on the sport with the most
+        # volume. With Kalshi's real per-series schedule and Polymarket
+        # MEASURED AT ZERO, the bar at even money is 0.88c.
+        if best_combo.startswith("home_on_kalshi"):
+            kalshi_price, polymarket_price = m["kalshi_home_probability"], m["polymarket_away_probability"]
+        else:
+            kalshi_price, polymarket_price = m["kalshi_away_probability"], m["polymarket_home_probability"]
+        try:
+            detail = net_edge_per_contract(
+                kalshi_price,
+                polymarket_price,
+                kalshi_fee_multiplier=float(m.get("kalshi_fee_multiplier") or 1.0),
+            )
+            net_edge = detail["net_edge_per_contract"]
+            fee_basis = detail["polymarket_fee_basis"]
+            modelled_fee = detail["total_fee_per_contract"]
+        except Exception as exc:  # noqa: BLE001
+            # A row we cannot price is NOT an opportunity. Named, never
+            # silently downgraded to the flat buffer -- that would be the old
+            # gate wearing the new one's clothes.
+            net_edge, fee_basis, modelled_fee = None, f"unpriceable:{type(exc).__name__}", None
+
         results.append(
             {
                 **m,
@@ -540,9 +574,15 @@ def detect_arb_opportunities(
                 "best_combo": best_combo,
                 "best_combo_cost": best_cost,
                 "raw_edge": 1.0 - best_cost,
+                # Kept and REPORTED so the old threshold stays visible beside
+                # the new one -- the gap between them IS the finding.
                 "edge_after_buffer": threshold - best_cost,
-                "is_opportunity": best_cost < threshold,
                 "fee_buffer_used": fee_buffer,
+                # The measured model, and the gate.
+                "modelled_fee_per_contract": modelled_fee,
+                "net_edge_per_contract": net_edge,
+                "polymarket_fee_basis": fee_basis,
+                "is_opportunity": bool(net_edge is not None and net_edge > 0),
             }
         )
     return results

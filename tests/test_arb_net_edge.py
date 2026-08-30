@@ -130,3 +130,107 @@ def test_KALSHI_is_now_the_dominant_cost_and_that_is_the_finding_inverting():
     detail = net_edge_per_contract(0.50, 0.50, kalshi_fee_multiplier=0.5)
     assert detail["kalshi_fee_per_contract"] > detail["polymarket_fee_per_contract"]
     assert detail["total_fee_per_contract"] == pytest.approx(0.01125, abs=0.0005)
+
+
+# ---------------------------------------------------------------------------
+# The GATE. `net_edge_per_contract` existed with no caller while
+# `detect_arb_opportunities` still gated on the flat buffer -- an unwired model
+# is indistinguishable from no model.
+# ---------------------------------------------------------------------------
+
+
+def _match(k_home, pm_away, mult=None):
+    m = {
+        "sport": "mlb", "event_id": "e1", "home_team": "H", "away_team": "A",
+        "game_date": "2026-08-29",
+        "kalshi_home_probability": k_home, "kalshi_away_probability": 1 - k_home,
+        "polymarket_home_probability": 1 - pm_away, "polymarket_away_probability": pm_away,
+        "kalshi_ticker": "T", "polymarket_market_id": "M",
+        "polymarket_fee_coefficient": None, "polymarket_tick": 0.01, "polymarket_min_qty": 1,
+    }
+    if mult is not None:
+        m["kalshi_fee_multiplier"] = mult
+    return m
+
+
+def test_a_pair_BETWEEN_the_old_bar_and_the_new_one_is_now_an_opportunity():
+    """off != on for the whole rewiring.
+
+    A ~2c raw gap at the tail clears the measured bar and does NOT clear the
+    flat 4.00c. Before the wiring `is_opportunity` was computed from the buffer
+    and would have been False; the model now decides.
+    """
+    from syndicate.features.shared.kalshi_polymarket_arb import detect_arb_opportunities
+
+    # tail pricing, MLB half rate: break-even ~0.2c, raw gap 2c
+    out = detect_arb_opportunities([_match(0.94, 0.04, mult=0.5)])[0]
+
+    assert out["raw_edge"] > 0
+    assert out["net_edge_per_contract"] > 0
+    assert out["is_opportunity"] is True
+    # The OLD gate would have refused it -- kept visible beside the new one.
+    assert out["edge_after_buffer"] < 0, (
+        "this pair must NOT clear the flat 4c buffer, or it does not discriminate"
+    )
+
+
+def test_the_measured_bar_is_BELOW_the_old_buffer_at_every_price():
+    """I wrote a test asserting the opposite first, and it was wrong.
+
+    The intuition was "the gate is differently SHAPED, so a pair could clear the
+    flat 4c and still fail the model at even money". That WAS true while
+    Polymarket sat at the unmeasured 0.10 bound -- the bar peaked at 4.25c.
+    With Polymarket MEASURED AT ZERO the peak is 2.00c, so the model is
+    UNIFORMLY more permissive and no such pair exists. Asserting the real
+    property instead of contorting a fixture until the wrong one passed.
+
+    The shape claim survives in `test_fees_fall_monotonically_toward_the_tail`;
+    what does not survive is the idea that the shape ever makes it STRICTER
+    than a flat 4c.
+    """
+    from syndicate.features.shared.venue_fees import (
+        KALSHI_BASE_TAKER_RATE,
+        POLYMARKET_ASSUMED_WORST_CASE_RATE,
+    )
+
+    worst = max(
+        (KALSHI_BASE_TAKER_RATE * mult * p * (1 - p))
+        + (POLYMARKET_ASSUMED_WORST_CASE_RATE * (1 - p) * p)
+        for mult in (0.5, 1.0)
+        for p in [i / 100 for i in range(5, 96)]
+    )
+    assert worst == pytest.approx(0.02, abs=0.0005), f"peak bar {worst}"
+    assert worst < DEFAULT_FEE_BUFFER
+
+
+def test_an_unpriceable_row_is_NOT_an_opportunity():
+    """A row we cannot price must never fall back to the flat buffer -- that is
+    the old gate wearing the new one's clothes."""
+    from syndicate.features.shared.kalshi_polymarket_arb import detect_arb_opportunities
+
+    # BOTH Kalshi legs must be invalid: the detector picks the CHEAPER combo,
+    # so corrupting only `home` left it pricing a perfectly valid `away` leg and
+    # the test passed for the wrong reason on its first run.
+    bad = _match(0.50, 0.40)
+    bad["kalshi_home_probability"] = 1.9
+    bad["kalshi_away_probability"] = 1.9
+    out = detect_arb_opportunities([bad])[0]
+    assert out["net_edge_per_contract"] is None
+    assert out["is_opportunity"] is False
+    assert out["polymarket_fee_basis"].startswith("unpriceable:")
+
+
+def test_the_kalshi_multiplier_defaults_CONSERVATIVE_and_that_is_a_known_gap():
+    """`join_kalshi_polymarket_moneylines` does NOT put `kalshi_fee_multiplier`
+    on the match, so the detector defaults to 1.0 — FULL rate.
+
+    Every MLB game series is actually 0.5, so MLB pairs are priced at TWICE
+    their real Kalshi fee. That errs toward refusing a real opportunity, which
+    is the safe direction, but it IS wrong and it is pinned here so the next
+    reader finds it as a known gap rather than rediscovering it as a defect.
+    """
+    from syndicate.features.shared.kalshi_polymarket_arb import detect_arb_opportunities
+
+    unset = detect_arb_opportunities([_match(0.60, 0.39)])[0]
+    real = detect_arb_opportunities([_match(0.60, 0.39, mult=0.5)])[0]
+    assert unset["modelled_fee_per_contract"] > real["modelled_fee_per_contract"]
