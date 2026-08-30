@@ -38381,3 +38381,43 @@ on an odds sweep + per-league soccer builds for ~25 min. Neither was overridden;
   every gate was open (it sat 34 cycles, through at least two windows where
   jobs=0 and the claim was free); and a first mismatch census using team-name
   tokens that reported 100% wrong and was itself wrong.
+
+## 2026-08-30 06:26Z — web `7cea63c5` — the `/` page stopped inlining the same rows six times `[lane home-payload-duplication]`
+
+deploy `dep-da9sqapsrm7s73d89hp0`, trigger `api`, live **06:30Z**. Locks: claim
+held by `home-payload-duplication`; preflight CLEAR **bound to
+`--target-commit 7cea63c5`**. Target verified BY CONTENT to carry the change and
+live `d7cda903` verified NOT to — a clean before/after rather than an assumed one.
+
+**verify: served `/` bytes.**
+
+    bytes  before   23,850,005   after    8,085,344   saved 66.1%
+    ttfb   before median 2.96s  (range 1.13-4.75, n=3)
+           after  median 1.08s  (range 0.84-3.44, n=7)
+
+**66.1% measured against 66.7% predicted pre-deploy** from the same slate — the
+dedupe ratio held.
+
+**TTFB IS REPORTED AS A CONSEQUENCE, NOT AS THE CLAIM, and it is weaker evidence
+than the byte count.** Three reasons, all stated rather than buried:
+  * the prediction was OPTIMISTIC — 0.73s modelled at 13.5 MB/s, 1.08s measured.
+    The linear model caught the bulk and missed a fixed overhead the smaller
+    payload does not amortise.
+  * the RANGES OVERLAP (1.13-4.75 before, 0.84-3.44 after). The median shift is
+    directionally clear; a confidence interval on it would not be honest at
+    n=3 vs n=7.
+  * this route's TTFB is genuinely noisy — the baseline gave 1.13 / 2.96 / 4.75s
+    on BYTE-IDENTICAL responses. **That noise is also the retrospective
+    explanation for the "5.8-6.4s TTFB" in the original assessment: a single
+    sample from the tail, taken while the platform was busy. The size
+    relationship was the durable fact; that absolute number was not.**
+
+**Sampled with `Accept-Encoding: identity`** so the comparison measures the
+payload rather than the compression ratio. The wire saving under gzip will be
+SMALLER than 66% — repeated JSON compresses well — and was not measured. The
+uncompressed win is real for client parse time and memory; the transfer win is
+unquantified.
+
+**NOT ESTABLISHED:** that 8MB is acceptable. It is one genuine copy of 1,308
+rows plus `board_contract.cards` — real data, not duplication. Cutting further
+means pagination or a client-side fetch, which is a product decision.

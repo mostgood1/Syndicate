@@ -4147,7 +4147,7 @@ caaf-no-orders`). NOT
   `deploys.md`. Deploy claim released.
 - Claims released.
 
-### home-payload-duplication — **CLOSED 2026-08-30, MEASURED NOT DEPLOYED** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+### home-payload-duplication — **CLOSED-VERIFIED 2026-08-30** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
 - Goal met: the `/` page no longer inlines the SAME 685 board rows six times.
 - Files: (none held) — `blueprints/intelligence.py`, `templates/intelligence.html`,
   `tests/test_home_payload_duplication.py`, all released.
@@ -4188,9 +4188,16 @@ caaf-no-orders`). NOT
 - Scope held: the HTML EMBED only. `_hydrate_board_response_payload` is shared
   with `/api/intelligence/query` and was NOT touched.
 - Tests: 8 new; 132 green across `test_home_payload_duplication` + `test_home`.
-- **NOT DEPLOYED.** This is a WEB-service change, unlike tonight's two worker
-  lanes. Reading it owes when it ships: served `/` bytes on a comparable slate,
-  and the board still rendering rows.
+- **DEPLOYED AND VERIFIED IN PRODUCTION.** web `7cea63c5` live 06:30Z
+  (`dep-da9sqapsrm7s73d89hp0`). Target verified BY CONTENT to carry the change
+  and live `d7cda903` verified NOT to, so the before/after is clean:
+
+      bytes  before 23,850,005  after 8,085,344   saved 66.1%
+      ttfb   before median 2.96s (1.13-4.75, n=3)
+             after  median 1.08s (0.84-3.44, n=7)
+
+  66.1% measured against 66.7% predicted pre-deploy — the ratio held.
+  Measurement and its caveats in `deploys.md`; deploy claim released.
 - **NOT ADDRESSED: the 4.9-5.9s TTFB.** Cause unmeasured — the route's
   `_log_intelligence_timing` calls sit in the branch
   `combined_board_default_enabled()` does NOT take, so production emits zero
