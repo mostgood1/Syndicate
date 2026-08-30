@@ -7793,6 +7793,39 @@ were sizable, and one survived EV and Kelly. The ranker did about as well as its
 inputs allowed. The constraint is MODEL COVERAGE, not selection, and not any
 part of the venue join / tick logic / order path -- none of which refuse spreads.
 
+**WHY totals is 9.9%: NCAAF dominates an opener-weekend board and its model is
+DELIBERATELY WITHHELD.** 281 of the 344 totals rows are NCAAF, and NCAAF carries
+a named, measured refusal:
+
+    totals   "totals are 1.67x over-dispersed against the market and were
+              never scored against the close"                        139 rows
+    spreads  "margin model loses to the closing line by 3.563 points
+    /h2h      of MAE over 2233 [games]"                               54 rows
+
+That is a model that was BACKTESTED, FOUND WORSE THAN THE CLOSE, and suppressed.
+Correct behaviour. NCAAF is 373 rows, ZERO covered, across every market.
+
+**EXCLUDING NCAAF, totals coverage is 34/63 = 54%.** The 9.9% is composition.
+
+Coverage by sport, whole board:
+    soccer   103 rows   87 covered   84.5%
+    mlb      332 rows  117 covered   35.2%
+    wnba     390 rows   14 covered    3.6%
+    ncaaf    373 rows    0 covered    0.0%
+
+MLB + soccer = 435 rows, 47% covered -- the sports with a working model.
+NCAAF + WNBA = 763 rows (64% OF THE BOARD), 1.8% covered.
+
+WNBA's near-zero is a DIFFERENT cause: its board is mostly alternate lines
+(`spreads_alt` 126, `totals_alt` 115) and the reason given is
+`analytic_probability_is_only_valid_at_its_own_line` -- the analytic model
+cannot price away from the line it was computed at. That is also why every
+`_alt` market is 0% board-wide.
+
+So "the board outgrew the model" is too vague. Precisely: the board added two
+sports, one whose model is gated because it MEASURED WORSE THAN THE CLOSE, and
+one whose board is mostly alt lines its model structurally cannot price.
+
 The code's own baseline comment records 65 of 108 rows carrying `model_edge_pct`
 on 2026-08-16 (60%). Coverage is now 18%, but the board grew ~11x (108 -> 1198)
 while covered rows grew ~3x (65 -> 218). That is the board outgrowing the model,
