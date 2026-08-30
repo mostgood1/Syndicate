@@ -307,3 +307,58 @@ def test_a_row_the_venue_never_quoted_carries_the_key_as_NONE():
     quote = _home(build_layer2_rows([_board_row(None)]))["quote"]
     assert "venue_basis" in quote
     assert quote["venue_basis"] is None
+
+
+# --------------------------------------------------------------------------
+# THE AGE DISTRIBUTION MUST BE UNCENSORED
+#
+# The first live venue-basis reading (2026-08-30 16:57Z) refused 2 of 6 rows at
+# 64s against a 45s ceiling and 0 of 6 reached the arithmetic. The only ages
+# recoverable afterwards were the two that FAILED -- a refusal prints its age,
+# a pass prints nothing. Setting a ceiling from that sample means fitting to the
+# slow tail, which can justify almost any bar you already believed.
+# --------------------------------------------------------------------------
+
+
+def test_the_age_distribution_includes_quotes_that_PASS_the_ceiling():
+    """The censoring bug this exists to prevent, stated as a test.
+
+    Two quotes well inside the ceiling and one well outside. All three must be
+    collected; a distribution holding only the failure is the biased sample.
+    """
+    from syndicate.features.shared.venue_basis_edge import MAX_VENUE_QUOTE_AGE_SECONDS
+
+    now = time.time()
+    fresh, stale = 5.0, MAX_VENUE_QUOTE_AGE_SECONDS + 40.0
+    grid = [_row(), _row()]
+    grid[1]["event_id"] = "evt-2"
+    grid[1]["line"] = 9.5
+    quotes = {}
+    for row, age in ((grid[0], fresh), (grid[1], stale)):
+        for side in ("home", "away"):
+            key = str(quote_key("mlb", "h2h", side, row["line"]))
+            quotes[key] = Quote(
+                key=key, source="kalshi", sport="mlb", market="h2h", side=side,
+                probability=None, american=250, line=row["line"],
+                fetched_at=now - age,
+            )
+    for row in grid:
+        row["market"] = "h2h"
+    stats = _apply(grid, quotes, now)
+
+    ages = stats.get("live_venue_ages")
+    assert ages is not None, "the distribution is not being collected at all"
+    assert len(ages) == 4, f"expected all 4 sides, got {ages}"
+    passing = [a for a in ages if a <= MAX_VENUE_QUOTE_AGE_SECONDS]
+    failing = [a for a in ages if a > MAX_VENUE_QUOTE_AGE_SECONDS]
+    assert passing, "PASSING quotes were dropped -- the sample is censored"
+    assert failing, "fixture must contain a failing quote or it proves nothing"
+
+
+def test_a_PREGAME_row_contributes_no_age():
+    """The ceiling only judges live rows, so the distribution that sets it must
+    be drawn from the same population. Mixing pregame in would dilute it with
+    quotes the guard never examines."""
+    now = time.time()
+    stats = _apply([_row(state="pregame")], _quotes(now), now)
+    assert stats.get("live_venue_ages") == []

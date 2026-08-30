@@ -736,6 +736,22 @@ def _distinct_games(
     return list(seen.values())
 
 
+def _venue_freshness_ceiling() -> float:
+    """The ceiling the age distribution is judged against.
+
+    Read from `venue_basis_edge` rather than restated here, so the log line
+    cannot quote a bar the guard does not actually apply. The two drifting
+    apart is how an instrument comes to certify the wrong thing.
+    """
+    try:
+        from syndicate.features.shared.venue_basis_edge import (
+            MAX_VENUE_QUOTE_AGE_SECONDS,
+        )
+    except ImportError:  # pragma: no cover - import-order guard
+        return 45.0
+    return float(MAX_VENUE_QUOTE_AGE_SECONDS)
+
+
 def _key_claimants(
     rows: Sequence[Mapping[str, Any]], sport: str
 ) -> dict[str, set[str]]:
@@ -1231,6 +1247,8 @@ def apply_venue_quotes_to_grid(
     ambiguous_unnamed_rejected = 0
     grid_claimants: dict[str, set[str]] | None = None
     venue_basis_rows = 0
+    live_venue_ages: list[float] = []
+    live_venue_ages_by_source: dict[str, list[float]] = {}
     by_source: dict[str, int] = {}
 
     benchmark_rows = 0
@@ -1345,6 +1363,27 @@ def apply_venue_quotes_to_grid(
                 if side_best["venue_basis"].get("displayable"):
                     venue_basis_rows += 1
 
+            # THE VENUE-QUOTE AGE DISTRIBUTION, UNCENSORED.
+            #
+            # Collected for EVERY live-row venue quote considered, passing or
+            # failing. That is the point: the only ages visible anywhere else
+            # are the ones that FAILED, because a refusal prints its age and a
+            # pass prints nothing. Reading the cadence off refusals samples
+            # exclusively from the slow tail and would justify almost any
+            # ceiling you already believed.
+            #
+            # Measured 2026-08-30 16:57Z, and why this exists: the first live
+            # venue-basis reading refused 2 of 6 rows at 64s against a 45s
+            # ceiling and 0 of 6 reached the arithmetic. 45s was never a
+            # measurement -- `venue_basis_edge` says so in its own docstring --
+            # and n=2 from the censored side is not evidence to move a live
+            # guard with. This line is.
+            if row_is_live:
+                live_venue_ages.append(float(venue_age))
+                live_venue_ages_by_source.setdefault(quote.source, []).append(
+                    float(venue_age)
+                )
+
             existing_age = _as_float_or_none(side_best.get("age_seconds"))
             if existing_age is not None and existing_age <= venue_age:
                 # The book really is fresher. Leave it entirely alone.
@@ -1366,6 +1405,38 @@ def apply_venue_quotes_to_grid(
             benchmark_rows += 1
         elif outcome:
             benchmark_skipped[outcome] = benchmark_skipped.get(outcome, 0) + 1
+
+    # THE CADENCE, PRINTED WITH ITS DENOMINATOR AND ITS TAIL.
+    #
+    # Percentiles rather than a mean: a cadence is a step function with a long
+    # tail, and a mean sits in a gap no quote ever lands in. `would_pass` states
+    # what the CURRENT ceiling does to this population, so the cost of the bar
+    # is readable beside the distribution that should set it -- and a later
+    # change can be justified by a shift HERE rather than by whether edges
+    # appeared, which is the only honest way to move a live guard.
+    if live_venue_ages:
+        _sorted = sorted(live_venue_ages)
+
+        def _pct(fraction):
+            index = min(
+                len(_sorted) - 1, max(0, int(round(fraction * (len(_sorted) - 1))))
+            )
+            return round(_sorted[index], 1)
+
+        _ceiling = _venue_freshness_ceiling()
+        _pass = sum(1 for age in _sorted if age <= _ceiling)
+        _by_src = {k: len(v) for k, v in sorted(live_venue_ages_by_source.items())}
+        print(
+            "[venue_quote_fanin] VENUE_QUOTE_AGE"
+            f" sport={sport_slug} n={len(_sorted)}"
+            f" min={_pct(0.0)} p25={_pct(0.25)} p50={_pct(0.5)}"
+            f" p75={_pct(0.75)} p90={_pct(0.9)} max={_pct(1.0)}"
+            f" ceiling={_ceiling} would_pass={_pass}/{len(_sorted)}"
+            f" by_source={_by_src}"
+            " -- UNCENSORED: every live-row venue quote, passing and failing."
+            " Set the ceiling from THIS, never from refusal ages (slow tail only)",
+            flush=True,
+        )
 
     # A COUNTER NOTHING PRINTS IS NOT AN INSTRUMENT. `cross_game_rejected`'s
     # first version lived only in a return value nothing read, which made the
@@ -1413,6 +1484,8 @@ def apply_venue_quotes_to_grid(
         # facts that look identical without `sides_seen`.
         "ambiguous_unnamed_rejected": ambiguous_unnamed_rejected,
         "venue_basis_rows": venue_basis_rows,
+        # The raw ages, so a caller can aggregate across sports.
+        "live_venue_ages": live_venue_ages,
         "by_source": by_source,
         "benchmark_rows": benchmark_rows,
         "benchmark_skipped": benchmark_skipped,
