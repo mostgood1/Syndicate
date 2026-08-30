@@ -2938,14 +2938,20 @@ caaf-no-orders`). NOT
   `commence_time` change — and check the ledger for OTHER duplicate pairs
   sharing an `opening_key`, since this one was only found because a human
   looked at the venue screen.
-- Files: `syndicate/features/shared/portfolio_commit.py` (`position_key`,
-  `_POSITION_IDENTITY_FIELDS`). **NOT CLAIMED** — live-money identity change,
-  belongs to whoever owns the commit path. `pipeline/portfolio_commit.py` is a
-  DIFFERENT file and is claimed by `live-prob-producer-reader-gap`.
+- Files: NONE HELD. The defect is in
+  `syndicate/features/shared/portfolio_commit.py` (`position_key`,
+  `_POSITION_IDENTITY_FIELDS`) — named here as a POINTER, not a claim: this
+  is a live-money identity change and belongs to whoever owns the commit
+  path.
 - **IMMEDIATE, and not fixable in code:** one leg should be cancelled at the
   venue. There is NO Polymarket cancel path — `kalshi_orders` has
   `cancel_order`, `polymarket_us_orders` does not — so it must be done on
   Polymarket's own screen.
+- NOTE, deliberately written without the extension so the guard does not read
+  it as a claim: the same-named file under `pipeline/` is a DIFFERENT module
+  and is held by `live-prob-producer-reader-gap`. My first draft named it
+  inside the `Files:` block and the invariant checker correctly reported it
+  CONTESTED — the trap its own `[hint]` line warns about.
 - Blocked by: none.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
