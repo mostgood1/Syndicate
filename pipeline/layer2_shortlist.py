@@ -233,6 +233,132 @@ def _classify_stale_row(
     return "orphaned_line" if (float(seen) - sib_age) > 900 else "market_gone"
 
 
+def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None) -> Any:
+    """Remove rows the FEED HAS STOPPED QUOTING. `[user 2026-08-30: "Drop them"]`
+
+    A `market_gone` row advertises a price no book is offering. Serving it is
+    worse than serving nothing: it is unbettable, and until now it outranked
+    rows you can actually bet.
+
+    --------------------------------------------------------------------------
+    WHY THIS DROPS ONLY `market_gone` AND NOT "STALE"
+    --------------------------------------------------------------------------
+
+    The obvious version of this -- drop rows past some age -- would have deleted
+    most of the board. Measured on the 13:56:30Z board, 1,565 rows, with the
+    classifier over the live state files:
+
+        soccer   stale= 289  sidecar=   9min   market_gone 288
+        mlb      stale= 304  sidecar= 152min   as_fresh_as_sweep 304
+        ncaaf    stale= 192  sidecar= 540min   as_fresh_as_sweep 192
+        wnba     stale= 360  sidecar= 168min   as_fresh_as_sweep 359
+
+    **855 of 1,145 "stale" rows are AS FRESH AS THE SWEEP ITSELF.** NCAAF's
+    sidecar is nine HOURS old, so a nine-hour-old NCAAF row is the freshest
+    price that exists for it. An age rule deletes every NCAAF and WNBA row on
+    the board and calls it a cleanup.
+
+    `market_gone` is the discriminating fact and age cannot express it: soccer's
+    sidecar is nine MINUTES, so those 288 groups are absent from a capture that
+    is demonstrably running. That is a dead market; a slow sweep is not.
+
+    --------------------------------------------------------------------------
+    Reversible without a deploy: `SYNDICATE_DROP_MARKET_GONE_ROWS=0`.
+    Never raises -- on any failure the rows are returned untouched, because
+    serving a stale row is a smaller harm than serving an empty board.
+    """
+    if not isinstance(rows, list) or not rows:
+        return rows
+    try:
+        import os as _os
+
+        raw = str(_os.environ.get("SYNDICATE_DROP_MARKET_GONE_ROWS") or "").strip().lower()
+        if raw in {"0", "false", "no", "off"}:
+            return rows
+
+        from datetime import datetime, timezone
+
+        from syndicate.features.shared.odds_book_quotes import read_quote_last_seen
+
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        by_sport: dict[str, list] = {}
+        for row in rows:
+            if isinstance(row, Mapping):
+                by_sport.setdefault(str(row.get("sport") or "").strip().lower(), []).append(row)
+
+        kept: list = []
+        dropped: dict[str, int] = {}
+        for slug, sport_rows in by_sport.items():
+            try:
+                last_seen = read_quote_last_seen(slug, str(selected_date or ""))
+            except Exception:
+                kept.extend(sport_rows)
+                continue
+            if not last_seen:
+                # No state file is NOT evidence a market is gone. Keep everything.
+                kept.extend(sport_rows)
+                continue
+            try:
+                newest = max(last_seen.values())
+                parsed = datetime.fromisoformat(str(newest).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                sidecar_age = max(0.0, (datetime.now(timezone.utc) - parsed).total_seconds())
+            except Exception:
+                kept.extend(sport_rows)
+                continue
+
+            group_index = _index_last_seen(last_seen)
+            if not group_index:
+                # A state file with entries but NO PARSEABLE KEYS is a broken
+                # file, not a dead market -- and it would classify every row as
+                # `market_gone`, because "no sibling was seen" is exactly what an
+                # empty index says. Found by a test whose premise was that this
+                # produced an `unknown_*` label; it does not, it produces a
+                # confident mass drop. Keep everything and say why.
+                print(
+                    f"[layer2_shortlist] MARKET_GONE_DROP_SKIPPED sport={slug} "
+                    f"reason=state_file_has_no_parseable_keys entries={len(last_seen)}",
+                    flush=True,
+                )
+                kept.extend(sport_rows)
+                continue
+            for row in sport_rows:
+                quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+                seen = quote.get("quote_seen_age_seconds") if isinstance(quote, Mapping) else None
+                if not isinstance(seen, (int, float)) or isinstance(seen, bool) or float(seen) < 900:
+                    kept.append(row)
+                    continue
+                label = _classify_stale_row(row, last_seen, now_iso, sidecar_age, group_index)
+                # ONLY `market_gone`. Every other label -- including every
+                # `unknown_*` -- keeps the row. An unclassifiable row is not
+                # evidence of a dead market, and defaulting the unknown case to
+                # DROP is how a diagnostic gap becomes silent data loss.
+                if label == "market_gone":
+                    dropped[slug] = dropped.get(slug, 0) + 1
+                    continue
+                kept.append(row)
+
+        if dropped:
+            print(
+                "[layer2_shortlist] MARKET_GONE_DROPPED "
+                + " ".join(f"{s}={n}" for s, n in sorted(dropped.items()))
+                + f" total={sum(dropped.values())} of {len(rows)}",
+                flush=True,
+            )
+        else:
+            # A zero is a reading too -- "ran and found none" must not look the
+            # same as "never ran".
+            print(f"[layer2_shortlist] MARKET_GONE_DROPPED none of {len(rows)}", flush=True)
+        if isinstance(shortlist, dict):
+            shortlist["rows_market_gone_dropped"] = sum(dropped.values())
+            shortlist["rows_market_gone_dropped_by_sport"] = dropped
+        return kept
+    except Exception as exc:  # noqa: BLE001
+        print(f"[layer2_shortlist] MARKET_GONE_DROP_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return rows
+
+
 def _report_stale_row_causes(rows: Any, selected_date: Any) -> None:
     """Attribute EVERY never-refreshing row to a cause. `#569`.
 
@@ -1438,6 +1564,12 @@ def build_layer2_shortlist(
     # board is what a user calls stale, and the quote-age gate has already
     # dropped rows past `max_quote_age_seconds` by here -- so this reports the
     # ages that SURVIVED, which is the number the board actually shows.
+    # `market_gone` ROWS ARE DROPPED HERE, BEFORE the diagnostics run, so the
+    # STALE_ROW_CAUSE line reports what SURVIVED and the drop count is emitted
+    # separately. A drop that made its own population invisible would be the
+    # exact failure `_report_stale_row_causes` was fixed to stop.
+    shortlist["rows"] = _drop_market_gone_rows(shortlist.get("rows"), selected_date, shortlist)
+
     _report_served_quote_ages(shortlist.get("rows"))
     _report_stale_row_causes(shortlist.get("rows"), selected_date)
 

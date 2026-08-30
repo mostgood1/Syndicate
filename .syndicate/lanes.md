@@ -4090,6 +4090,46 @@ caaf-no-orders`). NOT
   help; I am not claiming by how much.
 - Blocked by: none. Claims released.
 
+### market-gone-rows-drop — **CLOSED 2026-08-30, MEASURED NOT DEPLOYED** — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+- Goal met: rows whose market the feed has stopped quoting no longer reach the
+  board. `[user 2026-08-30: "Drop them"]`
+- Files: (none held) — `pipeline/layer2_shortlist.py`,
+  `tests/test_market_gone_drop.py`, released.
+- **RE-BASELINING CHANGED THE ANSWER AND WOULD OTHERWISE HAVE BROKEN THE BOARD.**
+  The framing inherited from `stale-row-cause-blind-spot` was "drop the ~1/3 of
+  the board that is stale". Measured on the 13:56:30Z board (1,565 rows) with
+  the production classifier over the live state files:
+
+      soccer   stale= 289  sidecar=   9min   market_gone 288, orphaned_line 1
+      mlb      stale= 304  sidecar= 152min   as_fresh_as_sweep 304
+      ncaaf    stale= 192  sidecar= 540min   as_fresh_as_sweep 192
+      wnba     stale= 360  sidecar= 168min   as_fresh_as_sweep 359, orphaned 1
+
+      market_gone 288 (18.4%)   as_fresh_as_sweep 855
+
+  **855 of 1,145 "stale" rows are AS FRESH AS THE SWEEP ITSELF.** NCAAF's
+  sidecar is nine HOURS old, so its nine-hour-old rows ARE the freshest prices
+  that exist. An age rule deletes every NCAAF and WNBA row and calls it a
+  cleanup. Only soccer's 288 are genuinely dead, against a NINE-MINUTE sidecar.
+- RESULT on that production payload: **1,565 -> 1,277, soccer 400 -> 112, and
+  mlb 400->400 / ncaaf 365->365 / wnba 400->400 UNCHANGED.** Falsification test
+  ran on the real data: **0 non-`market_gone` rows dropped.**
+- A TEST FOUND A HAZARD AND THE CODE WAS FIXED RATHER THAN THE TEST: a state
+  file with entries but NO PARSEABLE KEYS yields an empty group index, which
+  reads as `market_gone` for every row — a corrupt file would have emptied a
+  sport's board. Now guarded, reported as `MARKET_GONE_DROP_SKIPPED`.
+- THE NAIVE VERSION IS PINNED AS FAILING: sabotaging the predicate to drop on
+  AGE alone fails 4 tests including the slow-sweep protection.
+- Unknown classifications, absent state files, orphaned lines and any exception
+  all KEEP the row. Serving a stale row is a smaller harm than an empty board.
+- Tests: 10 new; 98 green across market_gone / stale_row_cause / served_quote_age
+  / shortlist floors + api.
+- Reversible without a deploy: `SYNDICATE_DROP_MARKET_GONE_ROWS=0`.
+- **NOT DEPLOYED.** Worker change; inert until a refresh-worker deploy. Reading
+  it owes: `MARKET_GONE_DROPPED` in production, and per-sport served row counts
+  showing soccer down with mlb/ncaaf/wnba unchanged.
+- Blocked by: none. Claims released.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
