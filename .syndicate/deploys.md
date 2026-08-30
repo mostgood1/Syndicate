@@ -38421,3 +38421,45 @@ unquantified.
 **NOT ESTABLISHED:** that 8MB is acceptable. It is one genuine copy of 1,308
 rows plus `board_contract.cards` — real data, not duplication. Cutting further
 means pagination or a client-side fetch, which is a product decision.
+
+## 2026-08-30 14:29Z — refresh-worker `5367af5a` — `market_gone` rows leave the board `[lane market-gone-rows-drop]`
+
+deploy `dep-daa3t5cs728c73faco0g`, trigger `api`, live **14:36:34Z**. Locks: claim
+held by `market-gone-rows-drop` from 14:11:24Z; preflight CLEAR **bound to
+`--target-commit 5367af5a`**; waited out a 25-min spacing behind a MANUAL
+dashboard deploy (`dep-daa3fsp42hec739e618g`, `3f5a3791`) that took no lock. No
+`--allow-rapid`, no `--force`.
+
+**verify: `MARKET_GONE_DROPPED` non-zero AND soccer down AND mlb/ncaaf/wnba
+FLAT.** All three required — the flat sports are what make the soccer drop a fix
+rather than a general shrink. Read off the served board `written_at 14:46:03Z`,
+the first publish after the deploy (a `written_at` cutoff was enforced; an
+earlier verifier this session read a PRE-deploy line and reported FAIL on a
+working fix):
+
+    sport     before   after   delta
+    mlb          400     400      +0
+    ncaaf        365     365      +0
+    wnba         400     400      +0
+    soccer       400     120    -280
+    rows        1565    1285
+
+    [14:46:02Z] MARKET_GONE_DROPPED soccer=280 total=280 of 1565
+
+Pre-deploy estimate on the 13:56Z payload was 288; production dropped 280 four
+hours later on a moved slate. Same magnitude.
+
+**WHAT THE FLAT SPORTS PROVE.** The framing this lane inherited was "drop the
+~1/3 of the board that is stale". Measured first: **855 of 1,145 stale rows were
+`as_fresh_as_sweep`** — as fresh as the capture itself. NCAAF's sidecar was NINE
+HOURS old, so its 9h-old rows ARE the freshest prices that exist. An age rule
+deletes every NCAAF and WNBA row and calls it a cleanup. `ncaaf 365 -> 365` and
+`wnba 400 -> 400` in production is that hazard being measured as avoided, not
+argued away.
+
+**NOT ESTABLISHED:** that the dropped rows were unbettable in the market rather
+than merely unobserved by our capture. `market_gone` means OUR sidecar has not
+seen the group while it is demonstrably fresh (9 min at measurement) — strong,
+not proof. A venue-side check would settle it and was not done.
+
+**Reversible without a deploy:** `SYNDICATE_DROP_MARKET_GONE_ROWS=0`.
