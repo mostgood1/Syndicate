@@ -3552,11 +3552,15 @@ caaf-no-orders`). NOT
   NOT taken: `blueprints/intelligence.py`, `templates/portfolio.html`
   (`open-bet-live-status`).
 - Commits: `98e103e1` `1795f3dc` `fb749d97` `9f898acf`.
-- OWED, and it cannot be forced: `balance_evidence`/`balance_settled` in
-  `UNKNOWN_ORDER_PROBE` has NEVER been observed — the probe only fires when an
-  unknown submit exists and there are none. The balance-history WRITE is
-  believed-not-verified (call site ran, 0 `HISTORY_WRITE_FAILED`, stored rows
-  never read back). **Next genuine 503 on Polymarket is the test.**
+- OWED, AND NOW DISCHARGED TO A DURABLE WATCHER. The measurement still
+  has not happened — no unknown submit has existed since the fix shipped —
+  but it is no longer owed to a session that dies. Scheduled task
+  `unknown-submit-balance-evidence-capture` runs hourly, CAPTURES rather
+  than alerts (the window is minutes: a retry or an operator answering
+  clears the row and the evidence), and appends to
+  `.syndicate/findings_unknown_submit_live_evidence.md`. Mirrored at
+  `.syndicate/scheduled_task_unknown_submit_evidence.md` because the live
+  task is outside version control. NOTHING IS OWED TO THIS LANE.
 - FOLLOW-UP for whoever holds `intelligence.py`/`portfolio.html`: surface
   `balance_evidence` in the unknown-submit banner, and correct the stale claim
   at `intelligence.py:3969` that no venue read can settle these — `/account/balances` can.
@@ -3715,66 +3719,48 @@ caaf-no-orders`). NOT
 - Design invariant to preserve: the page calls the SAME `_balance_evidence` as
   the worker probe, via `balance_evidence_for_unknown_submits`. A test asserts
   the two agree. Do not reimplement it in the blueprint.
-- OWED, same gate as the parent lane and NOT forceable: **the evidence line has
-  never rendered in production** — zero unknown submits exist, so the block is
-  absent entirely. Verified only by tests through a real Flask+Jinja render.
-  A `Monitor` watch is armed on live-odds-worker (baseline 23:12:15Z) for the
-  next 503; it closes this and the parent's `balance_settled` in one event.
+- OWED, AND NOW DISCHARGED TO A DURABLE WATCHER. The measurement still
+  has not happened — no unknown submit has existed since the fix shipped —
+  but it is no longer owed to a session that dies. Scheduled task
+  `unknown-submit-balance-evidence-capture` runs hourly, CAPTURES rather
+  than alerts (the window is minutes: a retry or an operator answering
+  clears the row and the evidence), and appends to
+  `.syndicate/findings_unknown_submit_live_evidence.md`. Mirrored at
+  `.syndicate/scheduled_task_unknown_submit_evidence.md` because the live
+  task is outside version control. NOTHING IS OWED TO THIS LANE.
 - Blocked by: none. Parent: `unknown-submit-retry-provenance` (CLOSED-VERIFIED).
 
-### mlb-resolver-write-side-effect — OPEN, **NARROWED — NOT A LIVE INCIDENT** — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411 — **UNOWNED, handed off**
-- **THE FALSIFICATION TEST THIS LANE ASKED FOR HAS RUN. `should_copy` does NOT
-  fire on the daily path in production.** Priority accordingly LOW. The defect
-  is real; the blast radius is much smaller than this block first said.
-
-- THE DEFECT, unchanged: `artifact_publisher._required_daily_artifact_paths` —
-  which only asks WHICH artifacts are required — reaches
-  `mlb.sources.daily_artifact_path` → `_resolve_data_path_with_reconcile` →
-  `shutil.copy2` (`mlb/sources.py:116`). The copy then looks present, so
-  `_missing_required_artifact_relative_paths` does not request it.
-- **THE TRIGGER IS WORSE THAN 'AN MTIME RACE', WHICH THIS BLOCK GOT WRONG.**
-  `if target_stat is None: should_copy = True` (`sources.py:99-101`) — a MISSING
-  target copies unconditionally. That is exactly the case the repair exists for,
-  so where a candidate exists the suppression is by construction, not by luck.
-
-- **WHY IT IS STILL NOT LIVE: on Render the candidate root holds only
-  GIT-TRACKED files, and that mirror stops at 2026-07-12.** No `.slugignore` and
-  no `buildFilter`, so the checkout is a full clone — but a clone carries
-  tracked files only: **283 `daily_summary_*`, window 2026-05-28 → 2026-07-12**.
-  The daily pull asks for TODAY, which has no tracked candidate.
-  MEASURED against production 2026-08-30: `daily_summary_2026_08_28` and
-  `_2026_08_29` are both git-tracked=NO and both served 200 (2,480,712 B and
-  2,806,937 B) — production's own artifacts, no mirror involved.
-- **THE ORIGINAL 2.46MB MEASUREMENT WAS DRIVEN BY AN UNTRACKED FILE.**
-  `daily_summary_2026_07_26.json` is on a dev disk but `git ls-files` says NO,
-  so it cannot exist in a Render checkout. The tempdir result was real and the
-  mechanism is real; it just does not reproduce on the worker for that date.
-
-- **WHAT REMAINS, and it is the part worth fixing:** any BACKFILL or EVALUATION
-  over **2026-05-28 → 2026-07-12** silently gets the git mirror's copy instead
-  of pulling production's. That is precisely the window CLAUDE.md warns
-  backtests run on ("`data/**` in git is a lossy mirror"), so the failure mode
-  is a backtest that believes it read production and did not.
-- **A CHECK THAT PROVED NOTHING, recorded so nobody repeats it:** production's
-  `daily_summary_2026_07_12.json` is byte-identical to the git copy (same
-  sha256, 2,367,970 B). That is NOT evidence the reconcile copy won —
-  `refresh_mlb_source_mirror.ps1` refreshes the mirror FROM production, so
-  identity is the expected state whichever direction it flowed. The reading
-  cannot discriminate the two hypotheses.
-- Still-open discriminator if anyone wants certainty: instrument the copy (one
-  `print` at `sources.py:116`) and read a worker tick, or compare the mounted
-  disk's mtime against deploy time for a tracked-window date.
-
-- Files: `syndicate/features/mlb/sources.py`,
-  `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED.**
-- Status: FINDING ONLY. Nothing on the data path was changed. The two tests
-  this surfaced through are fixed and green in both trees (`beaf5533`).
-- ALSO OPEN, same family, NOT fixed: `test_deploy_preflight.TooSoonVerdictTests`
-  (6 tests) read the LIVE shared deploy claim via `deploy_claim.active_claim`
-  and fail whenever any session holds one. Mocking it to None made it WORSE
-  (6 → 8) and was reverted.
+### mlb-resolver-write-side-effect — CLOSED 2026-08-30 — session 6475567d-f806-45a7-880c-f633718f2411 — **FINDING RECORDED, DEFECT UNFIXED BY DECISION**
+- Goal was to establish whether a path resolver's write side effect suppresses
+  the required-artifact repair in production. **IT DOES NOT, on the daily path.**
+  The falsification test this lane asked for RAN and returned an answer.
+- The defect is real: `_required_daily_artifact_paths` → `daily_artifact_path` →
+  `_resolve_data_path_with_reconcile` → `shutil.copy2` (`mlb/sources.py:116`)
+  wrote 2.46MB into a FRESH tempdir, and the copies then stop looking missing.
+  Trigger is `if target_stat is None: should_copy = True` — a MISSING target
+  copies unconditionally, which is exactly the case the repair exists for.
+- **WHY IT CANNOT BITE THE DAILY PATH:** Render's checkout carries git-TRACKED
+  files only — 283 `daily_summary_*`, window 2026-05-28 → 2026-07-12 — and the
+  pull asks for TODAY. Measured against production: `daily_summary_2026_08_28`
+  and `_2026_08_29` are git-tracked=NO and both served 200 (2,480,712 B /
+  2,806,937 B). The original 2.46MB result came from an UNTRACKED file that
+  cannot exist in a Render checkout.
+- **RESIDUAL, and it is why the finding is kept in `state.md` rather than
+  deleted with this lane:** a BACKFILL or EVALUATION over 2026-05-28 →
+  2026-07-12 silently reads the git mirror instead of pulling production — the
+  window CLAUDE.md already warns backtests run on. Section
+  `[mlb-resolver-write-side-effect]` in `state.md` carries the whole finding.
+- CLOSED WITH THE DEFECT UNFIXED, deliberately: fixing it changes data
+  hydration on a live path, and the measurement says the priority is low.
+  `mlb/sources.py` and `artifact_publisher.py` are NOT claimed by anyone —
+  a lane picking this up should claim them and start from the discriminator
+  below.
+- Discriminator for anyone wanting certainty on the backfill window: one
+  `print` at `sources.py:116` and a worker tick, or compare the mounted disk's
+  mtime against deploy time for a tracked-window date.
+- Outcome: the two TESTS this surfaced through are fixed and green in both a
+  populated tree and a clean `origin/main` worktree (`beaf5533`).
 - Blocked by: none.
-
 
 ### venue-first-market-universe — OPEN — opened 2026-08-29 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
 - Goal: let what Kalshi and Polymarket ACTUALLY LIST define the tradeable set,
