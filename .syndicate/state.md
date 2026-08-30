@@ -7795,10 +7795,19 @@ That is the next reading.
   `SPREAD_SIGN_AUDIT` -- the instrument that would settle whether the venue's
   `pos`/`neg` means home or away -- reports `fixtures=0 rate=None
   verdict=NON-IDENTIFYING` and has never identified anything.
-  STILL UNVERIFIED: whether the miss is magnitude or sign. Settling it needs the
-  candidate line set for ONE known board row (e.g. KC@CLE `home -1.5`);
-  `/api/ops/polymarket/slate` returns AGGREGATES ONLY (`rows: 0` even with
-  `?league=mlb&market=spreads`), so nothing can currently enumerate them.
+  CORRECTION: I reported that endpoint as "aggregates only, rows:0". WRONG --
+  the key is `samples`, not `markets`/`rows`, and I read the wrong field. It
+  returned rows all along.
+  What it could NOT do was aim: `?league=mlb&market=spreads` capped at 25
+  samples in slate order, all `hou-nym`/`lad-det`/`tex-mil`, so the fixture
+  being diagnosed was neither present nor absent. `?slug=` and `?limit=` now
+  exist, with `matched_samples`/`samples_truncated` (`508a7e79`) -- NOT YET
+  DEPLOYED, web still runs 165c448f.
+  Already shown by the un-aimed sample: `asc-mlb-<fixture>-2026-08-30-neg-1pt5`
+  carries `line=-1.5 orderable=true`, so a board row at `home -1.5` is NOT
+  missing for want of a market at that line. The open question is now narrow and
+  answerable: is the KC@CLE fixture in the venue's spread list at all? One call
+  to `?league=mlb&market=spreads&slug=kc-cle` settles it once deployed.
 - alt/period totals: the venue carries them (`tsc-...-1q-17pt5`); we never
   attempt them. UNTRACED.
 
