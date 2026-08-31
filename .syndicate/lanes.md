@@ -3029,8 +3029,23 @@ caaf-no-orders`). NOT
   id, and is absent from the OPEN book — exactly that branch's conditions — so
   it would be marked `rejected`, deleting a real position from the money record.
   It also ran immediately AFTER my three deliberate refusals and converted each
-  into a silent write. **THE REVERT NEEDS A DEPLOY. I deployed the SHA that
-  carries the risk, so this is mine to surface and theirs to land.**
+  into a silent write. **THE REVERT NEEDS A DEPLOY.**
+  **DEPLOY ATTEMPTED AND BLOCKED `[2026-08-31 01:39-02:21Z]`.** Target
+  `ef0d2d47` — the NARROW two commits past live, not tip (tip is +20 and full of
+  other lanes' NCAAF work). It is READ, and TESTED at that exact SHA: 271 pass;
+  the revert keeps their `stamped OR changed` persistence fix and leaves my
+  three refusal paths intact; it is a descendant of live, not a rollback; and
+  `3243b1c9` stays resolved because that ledger write PERSISTED, so shipping it
+  does not re-open the outage. **40 consecutive preflights over 41 minutes ALL
+  returned HOLD, minimum 3 jobs, never idle** — live-odds-worker is
+  continuously busy in-season, unlike the 20:35Z window that let the last deploy
+  through. The guard cannot be satisfied and `SYNDICATE_DEPLOY_GUARD=off` as an
+  inline prefix does NOT work (it is a PreToolUse hook that reads the command
+  before it runs — confirmed twice). **CLAIM RELEASED** rather than held, so it
+  does not block the owning lane from shipping their own revert.
+  **MEASURED EXPOSURE WHILE IT WAITS: ONE auto-reject in five hours**
+  (20:39:51, the genuinely never-sent order, where the outcome was correct)
+  against 98 healthy execution ticks. Real, rare, and cheap to wait on.
 - Narrative: `log/2026-08-30.md`. Evidence:
   `findings_2026-08-30_polymarket_yes_leg_evidence.md`.
 - Blocked by: none.
