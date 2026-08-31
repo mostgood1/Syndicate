@@ -122,6 +122,52 @@ def _as_float(value: Any) -> float | None:
         return None
 
 
+# The rating source is FBS-ONLY, and that is a coverage BOUNDARY rather than a
+# gap. Measured 2026-08-31 over the whole of 2026 week 1: 99 scheduled games,
+# 51 projections, and the split is total --
+#
+#     missing   48 of 48   (fbs, fcs)
+#     projected 51 of 51   (fbs, fbs)
+#
+# `rating_source` on every row is
+# `cfbd_sp_plus_2026[scale=10]+cfbd_ppa_season_2025_fallback_for_2026`, and
+# CFBD's SP+ covers FBS. An FBS-vs-FCS fixture has no rating for one side, so it
+# can never be projected by this model no matter how healthy the pipeline is.
+#
+# WHY THIS IS WORTH A STRING. Without it the board shows an FBS-vs-FCS row with
+# no model and no explanation, which is indistinguishable from a failed
+# generation — and the failure it most resembles is real and current (a peer
+# session found the CFBD monthly quota exhausted the same week). I read
+# `games_indexed: 1` against `scheduled_games: 39` and concluded the join was
+# broken; it was not, and the one game that date was the only game that date.
+# The next reader should not have to run that probe.
+_RATED_CLASSIFICATION = "fbs"
+
+
+def _unratable_reason(game: Mapping[str, Any]) -> str | None:
+    """Why this scheduled fixture can never be projected, or None.
+
+    Deliberately conservative: an ABSENT or unrecognised classification returns
+    None rather than "unratable". An unknown must not be reported as a stated
+    boundary — that would turn a data gap into a confident explanation, which is
+    the failure this string exists to prevent.
+    """
+    home = str(game.get("homeClassification") or "").strip().lower()
+    away = str(game.get("awayClassification") or "").strip().lower()
+    if not home or not away:
+        return None
+    if home == _RATED_CLASSIFICATION and away == _RATED_CLASSIFICATION:
+        return None
+    other = away if home == _RATED_CLASSIFICATION else home
+    if other == _RATED_CLASSIFICATION:
+        return None
+    side = "away" if home == _RATED_CLASSIFICATION else "home"
+    return (
+        f"the {side} team is {other.upper()}, and the rating source (CFBD SP+) "
+        f"covers FBS only -- this fixture has no model by construction, not by failure"
+    )
+
+
 @dataclass
 class NcaafGameProjectionIndex:
     """(kickoff date, home, away) -> one projection row.
@@ -137,6 +183,27 @@ class NcaafGameProjectionIndex:
     games: int = 0
     sources: list[str] = field(default_factory=list)
     rows_unresolved_team: int = 0
+    # (date, home, away) -> why this SCHEDULED fixture can never carry a
+    # projection. Populated from the schedule's own classifications, so a board
+    # row with no model can say WHICH kind of absence it is. See
+    # `_unratable_reason`.
+    unratable: dict[tuple[str, str, str], str] = field(default_factory=dict)
+    unratable_games: int = 0
+
+    def unratable_reason(self, game_date: str, home: Any, away: Any) -> str | None:
+        """Why this fixture has no projection, or None if it is not that case.
+
+        Resolved through the SAME `resolve_team` path as `lookup`, so a fixture
+        cannot be called unratable on a name the lookup would have matched.
+        """
+        date_key = str(game_date or "")[:10]
+        if not date_key or not self.unratable:
+            return None
+        home_canonical = resolve_team(home)
+        away_canonical = resolve_team(away)
+        if not (home_canonical and away_canonical):
+            return None
+        return self.unratable.get((date_key, _norm(home_canonical), _norm(away_canonical)))
 
     def lookup(self, game_date: str, home: Any, away: Any) -> dict[str, Any] | None:
         date_key = str(game_date or "")[:10]
@@ -206,6 +273,10 @@ def load_ncaaf_game_projections(selected_date: str) -> NcaafGameProjectionIndex:
         away = str(game.get("awayTeam") or "").strip()
         if home and away:
             kickoff[(_norm(home), _norm(away))] = game_date
+            reason = _unratable_reason(game)
+            if reason:
+                index.unratable[(game_date, _norm(home), _norm(away))] = reason
+    index.unratable_games = len(index.unratable)
     if not weeks:
         return index
 
@@ -262,6 +333,7 @@ def attach_ncaaf_game_projections(
     from syndicate.features.shared.prop_projections import _no_vig_over_probability
 
     considered = attached = unmatched = non_full_segment = 0
+    unratable_rows = 0
 
     for row in grid:
         if str(row.get("kind") or "") == "prop":
@@ -276,7 +348,27 @@ def attach_ncaaf_game_projections(
             continue
         entry = index.lookup(str(row.get("commence_time") or "")[:10], row.get("home_team"), row.get("away_team"))
         if entry is None:
-            unmatched += 1
+            # SAY WHICH KIND OF ABSENCE THIS IS. An FBS-vs-FCS fixture can never
+            # carry a projection (see `_unratable_reason`); a row that is
+            # unmatched for any OTHER reason is a real miss worth chasing.
+            # Counting them together is what makes a healthy boundary look like
+            # a broken pipeline.
+            #
+            # The reason goes on the ROW, NOT inside a `projection` dict, and
+            # that placement is load-bearing: `layer1_board` counts any
+            # `projection` dict as `rows_with_projection`, so stamping one here
+            # would inflate coverage with rows that have no model at all --
+            # improving the number that made this look broken while making the
+            # board less true. `projection_unavailable_reason` (this file, and
+            # NFL) stays what it is: a reason INSIDE a projection that exists.
+            reason = index.unratable_reason(
+                str(row.get("commence_time") or "")[:10], row.get("home_team"), row.get("away_team")
+            )
+            if reason:
+                row["projection_absent_reason"] = reason  # type: ignore[index]
+                unratable_rows += 1
+            else:
+                unmatched += 1
             continue
 
         projection: dict[str, Any] | None = None
@@ -394,9 +486,19 @@ def attach_ncaaf_game_projections(
         "supported": True,
         "rows_considered": considered,
         "rows_with_projection": attached,
+        # `rows_unmatched` now means "unmatched for a reason we do NOT know",
+        # which is the only population worth investigating. It used to include
+        # every FBS-vs-FCS row and was therefore ~half the board on an opener
+        # weekend.
         "rows_unmatched": unmatched,
+        "rows_unratable_opponent": unratable_rows,
         "rows_non_full_segment": non_full_segment,
         "games_indexed": index.games,
+        # Scheduled fixtures on this date that no model can cover. Reported
+        # beside `games_indexed` so the pair reads as a RATE: measured over 2026
+        # week 1, 51 of 99 scheduled games are rateable and 51 of 51 of those
+        # are projected.
+        "games_unratable_opponent": index.unratable_games,
         "sources": index.sources,
         # Stated on every payload, not only when something is wrong: a consumer
         # that reads `rows_with_projection` without it would treat these as
