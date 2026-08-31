@@ -162,7 +162,7 @@ def _measure(monkeypatch, rows_n: int, cards_inline: bool) -> dict[str, int]:
         written[str(path).replace("\\", "/").rsplit("/", 1)[-1]] = len(_json.dumps(payload, default=str))
 
     monkeypatch.setattr(istate, "write_json_file", fake_write)
-    monkeypatch.setattr(istate, "_warn_if_shortlist_near_keyvalue_ceiling", lambda p: None)
+    monkeypatch.setattr(istate, "_warn_if_layer2_keys_near_ceiling", lambda *a, **k: None)
     monkeypatch.setattr(istate, "_shadow_verify_layer2_shards", lambda *a, **k: None)
     monkeypatch.setenv("SYNDICATE_LAYER2_COMBINED_ROWS", "0")
     monkeypatch.setenv("SYNDICATE_LAYER2_CARDS_INLINE", "1" if cards_inline else "0")

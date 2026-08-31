@@ -2126,7 +2126,6 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
     payload = dict(shortlist or {})
     payload["selected_date"] = normalized_date
     payload["written_at"] = _utc_now()
-    _warn_if_shortlist_near_keyvalue_ceiling(payload)
 
     keeps_rows = _layer2_combined_keeps_rows()
     if keeps_rows:
@@ -2136,8 +2135,9 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
         # `written_at` is the ambiguity this whole change is meant to remove.
         payload = _shed_rows_to_fit_keyvalue(payload)
 
+    key_sizes: dict[str, int] = {}
     rows = payload.get("rows") or []
-    shards = _write_layer2_shards(normalized_date, payload, rows)
+    shards = _write_layer2_shards(normalized_date, payload, rows, sizes=key_sizes)
 
     # CARDS ARE THE OTHER HALF OF THE PAYLOAD, and the half that actually capped
     # the board. They are built one-per-row, so the combined key scaled at
@@ -2146,7 +2146,7 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
     # (`SHORTLIST_SHED_IMPOSSIBLE`). Sharding rows alone moved the ceiling by
     # almost nothing; this is the change that removes it.
     cards = payload.get("cards") or []
-    card_shards = _write_layer2_card_shards(normalized_date, payload, cards)
+    card_shards = _write_layer2_card_shards(normalized_date, payload, cards, sizes=key_sizes)
 
     combined = dict(payload)
     if shards:
@@ -2163,6 +2163,10 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
         # keeping the rows, so this line does not run until somebody turns it on
         # having SEEN the shards land.
         combined["rows"] = []
+    # Measured on the COMBINED dict as it will actually be written, and on the
+    # shard sizes the writers reported -- one number per KEY, because a key is
+    # the unit the store refuses.
+    _warn_if_layer2_keys_near_ceiling(combined, key_sizes, rows=len(rows), cards=len(cards))
     try:
         write_json_file(_layer2_shortlist_path(normalized_date), combined)
     except Exception:
@@ -2275,7 +2279,8 @@ def shards_of(payload: Mapping[str, Any]) -> list[str]:
 
 
 def _write_layer2_shards(
-    selected_date: str, payload: Mapping[str, Any], rows: list[Any]
+    selected_date: str, payload: Mapping[str, Any], rows: list[Any],
+    sizes: dict[str, int] | None = None,
 ) -> list[str]:
     """One key per sport. Returns the sports actually written.
 
@@ -2310,9 +2315,19 @@ def _write_layer2_shards(
                 # PER-SHARD TRIM, so one enormous sport cannot cost another its
                 # rows. Rows and positions are trimmed TOGETHER -- dropping one
                 # without the other would silently misplace every row after it.
-                while len(json.dumps(shard, default=str)) > int(ceiling * 0.95) and shard["rows"]:
+                #
+                # The size is hoisted into a variable rather than recomputed in
+                # the `while` header. Identical number of `json.dumps` calls,
+                # but the final one is now REPORTABLE -- which is what lets the
+                # size warning measure keys that are actually written instead of
+                # a payload that has not been written as one key since sharding.
+                measured = len(json.dumps(shard, default=str))
+                while measured > int(ceiling * 0.95) and shard["rows"]:
                     shard["rows"] = shard["rows"][:-1]
                     shard["positions"] = shard["positions"][:-1]
+                    measured = len(json.dumps(shard, default=str))
+                if sizes is not None:
+                    sizes[f"rows:{sport}"] = measured
                 if not shard["rows"]:
                     print(
                         f"[intelligence_state] LAYER2_SHARD_EMPTIED sport={sport}"
@@ -2346,7 +2361,8 @@ def _write_layer2_shards(
 
 
 def _write_layer2_card_shards(
-    selected_date: str, payload: Mapping[str, Any], cards: list[Any]
+    selected_date: str, payload: Mapping[str, Any], cards: list[Any],
+    sizes: dict[str, int] | None = None,
 ) -> list[str]:
     """One CARDS key per sport. Returns the sports actually written.
 
@@ -2376,9 +2392,13 @@ def _write_layer2_card_shards(
                 "positions": bucket["positions"],
             }
             if ceiling:
-                while len(json.dumps(shard, default=str)) > int(ceiling * 0.95) and shard["cards"]:
+                measured = len(json.dumps(shard, default=str))
+                while measured > int(ceiling * 0.95) and shard["cards"]:
                     shard["cards"] = shard["cards"][:-1]
                     shard["positions"] = shard["positions"][:-1]
+                    measured = len(json.dumps(shard, default=str))
+                if sizes is not None:
+                    sizes[f"cards:{sport}"] = measured
                 if not shard["cards"]:
                     print(
                         f"[intelligence_state] LAYER2_CARD_SHARD_EMPTIED sport={sport}"
@@ -2579,27 +2599,29 @@ def _shed_rows_to_fit_keyvalue(payload: dict[str, Any]) -> dict[str, Any]:
         return payload
 
 
-def _warn_if_shortlist_near_keyvalue_ceiling(payload: Mapping[str, Any]) -> None:
-    """Warn on the size of what is ACTUALLY WRITTEN, before writing it.
+def _warn_if_layer2_keys_near_ceiling(
+    combined: Mapping[str, Any],
+    shard_sizes: Mapping[str, int],
+    rows: int,
+    cards: int,
+) -> None:
+    """Warn on the size of each key ACTUALLY WRITTEN, and name the right lever.
 
-    `layer2_board.select_shortlist` already had a guard, and it measured the
-    wrong thing: `len(json.dumps(selected))` — the ROWS. The persisted artifact
-    also carries `per_sport`, `cards`, `openings_records`, `clv_openings` and
-    every coverage payload. Measured 2026-08-22 20:56:30Z immediately after the
-    per-sport cap went 100 -> 400:
+    REPLACES `_warn_if_shortlist_near_keyvalue_ceiling`, which measured the
+    whole payload -- rows, cards and all -- as though it were one key. That was
+    true when it was written and stopped being true when the board was sharded,
+    and the stale version was actively misleading in BOTH directions:
 
-        rows-only guard   under its half-ceiling trigger, silent
-        ACTUAL artifact   4,434,665 B = 53% of the 8 MB ceiling
+        healthy board 2026-08-31 18:54Z   pct=93.3   rows=1600   ALARM, nothing wrong
+        the build that broke it 18:25Z    pct=237.9  rows=4552   right, for the wrong key
 
-    So the guard reported comfort while the real payload sat just above the
-    4.37 MB the ceiling's own comment records as the largest known-good state.
-    A guard that measures a SUBSET of what it guards is worse than none: it is
-    an all-clear nobody has reason to doubt.
+    Its advice was also backwards after the cards split: at `pct=93.3` it said
+    "lower SYNDICATE_LAYER2_ROWS_PER_SPORT" while the actual combined key was
+    a few hundred KB and the cap was not the constraint.
 
-    Placed here because this is the only place the whole payload exists. The
-    store's own `KEYVALUE_WRITE_LARGE` does see the true size, but it warns at
-    1 MB — which every board payload exceeds — so it is noise at exactly the
-    moment it would need to be signal, and it fires AFTER the write.
+    THE RULE THIS ENCODES: a size instrument must measure the unit the store
+    refuses -- one KEY -- not the object the code happens to hold. The store
+    raises per key; there is no ceiling on "the payload".
 
     Never raises: an instrument that can break the write it measures is worse
     than no instrument.
@@ -2608,25 +2630,47 @@ def _warn_if_shortlist_near_keyvalue_ceiling(payload: Mapping[str, Any]) -> None
         from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
 
         ceiling = int(_keyvalue_max_bytes())
-        size = len(json.dumps(payload, default=str))
-    except Exception:
+        if not ceiling:
+            return
+        combined_bytes = len(json.dumps(combined, default=str))
+    except Exception:  # noqa: BLE001
         return
-    if not ceiling or size <= ceiling // 2:
+
+    keys = dict(shard_sizes or {})
+    keys["combined"] = combined_bytes
+    over = {k: v for k, v in keys.items() if v > ceiling // 2}
+    if not over:
         return
-    rows = payload.get("rows")
+
+    worst_key = max(over, key=lambda k: over[k])
+    worst = over[worst_key]
+    # THE LEVER DEPENDS ON WHICH KEY IS BIG, which is the whole point of
+    # measuring them separately. Naming the wrong knob is how the previous
+    # version sent a reader toward lowering a cap that was not binding.
+    if worst_key == "combined":
+        if combined.get("cards"):
+            lever = "set SYNDICATE_LAYER2_CARDS_INLINE=0 -- the combined key still carries cards"
+        elif combined.get("rows"):
+            lever = "set SYNDICATE_LAYER2_COMBINED_ROWS=0 -- the combined key still carries rows"
+        else:
+            lever = (
+                "the combined key is large WITHOUT rows or cards -- some other field scales;"
+                " find it before lowering any cap, a row cap will not shrink this"
+            )
+    else:
+        kind, _, sport = worst_key.partition(":")
+        lever = (
+            f"lower SYNDICATE_LAYER2_ROWS_PER_SPORT -- {sport}'s {kind} shard is the"
+            " biggest key, and a per-sport cap is what bounds it"
+        )
     print(
-        f"[intelligence_state] SHORTLIST_PERSIST_LARGE bytes={size} "
-        f"ceiling={ceiling} pct={round(100.0 * size / ceiling, 1)} "
-        f"rows={len(rows) if isinstance(rows, list) else None} "
-        f"per_sport_limit={payload.get('per_sport_limit')} "
-        # NAMED, because a warning that does not say what to turn is a warning
-        # that gets read and not acted on. The failure at the ceiling is an
-        # opaque "Connection closed by server", so this must fire early enough
-        # to be useful.
-        f"-- lower SYNDICATE_LAYER2_ROWS_PER_SPORT before this reaches {ceiling}",
+        f"[intelligence_state] LAYER2_KEY_LARGE worst={worst_key} bytes={worst} "
+        f"ceiling={ceiling} pct={round(100.0 * worst / ceiling, 1)} "
+        f"rows={rows} cards={cards} per_sport_limit={combined.get('per_sport_limit')} "
+        f"keys={{{', '.join(f'{k}={v}' for k, v in sorted(keys.items()))}}} "
+        f"-- {lever}",
         flush=True,
     )
-
 
 def read_layer2_shortlist(selected_date: str | None) -> dict[str, Any] | None:
     """The combined key, with per-sport shards merged back in when it has none.

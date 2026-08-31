@@ -1025,7 +1025,6 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
     phrase that `lane-guard._claims` parsed as a FILE PATH, so this lane held a
     PHANTOM claim on a path that does not exist. Flagged by session 1c88bcca.)
   tests/test_layer2_shard_by_sport.py
-  tests/test_shortlist_persist_ceiling_guard.py
   syndicate/features/shared/layer2_board.py
   tests/test_layer2_model_value_term.py
 - Claims taken under `[2026-08-30, USER OVERRIDE]` x3 ("take it to the
@@ -1266,6 +1265,15 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Blocked by: none. The soccer engine was unclaimed at open (verified with
   `lane_claim_audit.py`).
 
+### layer2-cap-raise — OPEN — opened 2026-08-31 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3 — **GOAL MET. Sharding live, caps at 1000, rollback fix live, and THE CARDS FLIP IS VERIFIED IN PRODUCTION 22:50:26Z — the ~3,600-row ceiling is gone. 3000/sport corrupted the board ~29 min earlier and was reverted; that cause is now FIXED, not merely avoided.**
+- Goal: board carries >400 rows for a sport. **MET** at 1000 (932 → 1634 rows, no sport lost).
+- Files: `pipeline/intelligence_state.py` **[claim REASSIGNED from `polymarket-yes-leg-binding`, same session]**; Render ENV on refresh-worker via the single-key API — never `render.yaml`. **NOW ALSO CLAIMS CODE:** `pipeline/intelligence_state.py`, `tests/test_layer2_shard_index_stale.py`, `tests/test_layer2_cards_shards.py`, `tests/test_shortlist_persist_ceiling_guard.py` — the last MOVED here from `polymarket-yes-leg-binding`, which had misfiled it. Same session owns both lanes; the file is the layer2 size instrument, not a venue file.
+- Env live: `ROWS_PER_SPORT=1000`, `ROWS_TOTAL=3000`, `COMBINED_ROWS=0` (refresh-worker only; other two services clean).
+- **DO NOT RAISE THE CAP AGAIN AS A CONFIG CHANGE.** The ceiling is the COMBINED key (~2,200 B/row even with `rows: []`) ⇒ ~3,600 TOTAL rows. Shard headroom is not evidence about it.
+- **NEXT ACTION: nothing is owed on this lane. A cap raise above 1000 is now DEFENSIBLE but UNATTEMPTED — and must be measured against the COMBINED key, not the shards, which is the exact mistake that corrupted the board at 18:25Z. One defect remains unfixed and will mislead: `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key and its advice to lower `ROWS_PER_SPORT` is backwards.** REVERT of the flip is one step: `SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy.
+- Verification: DONE for the cap raise and the rollback fix. **UNEXERCISED, BOTH:** `ROWS_TOTAL=3000` (board ~1,600 rows, never bound) and the cards split (deployed, but no rebuild has run under it — `LAYER2_CARD_SHARDS_WRITTEN` never once observed).
+- OWED, code not config: `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key (`pct=93.3` on a healthy board, advice backwards). The skipped-shed item is CLOSED by the cards split — the shed could never have helped (`SHORTLIST_SHED_IMPOSSIBLE`).
+- Narrative: `log/2026-08-31.md` (session 5611932c). Blocked by: none.
 ### layer2-accuracy-audit — OPEN, UNOWNED — **CLAIMS: NONE HELD (all four services free, released 2026-08-31 ~22:4xZ).** 7-day board accuracy DELIVERED; MLB game-line join FIXED, DEPLOYED and VERIFIED (`13 -> 0` misses, `(pregame-freeze, 14 games)`, 20:33:17Z) — but it did NOT raise graded rows, which falsified my own causal claim. Two follow-ups opened as `todo #610` (caps: ml 12 candidates -> cap 1) and `todo #611` (prop seal dead since 08-16; cadence is the lead). **ONE THING OWED: `5be4381d` is on main and NOT DEPLOYED** — preflight HOLD, 3 jobs in flight on live-odds-worker. **AT RISK: 18 local commits incl. all ledger writes are NOT on origin/main.** — opened 2026-08-31 — session ef7e22fc-d592-43f7-b326-31ddea9258ef
 - Goal: a per-sport x per-bet-type accuracy read on the Layer 2 board for the last 7 days, with an explicit statement of how many days and rows it actually rests on, plus ranked optimizations.
 - Files: **CLAIMED 2026-08-31 ~18:3xZ, user asked for the MLB join fix:** `vendor/mlb_bettingv2/tools/eval/build_season_betting_cards_manifest.py` (`_odds_paths` + helpers only), `tests/test_season_betting_cards_odds_paths.py`. **EXTENDED ~18:4xZ, user asked for the backlog regrade:** `scripts/run_refresh_worker.py` (`_mlb_betting_day_backfill_*` only — NOT `_season_projection_should_launch`, which lanes.md flags as contended), `tests/test_refresh_worker.py`. Every OPEN-lane reference to `run_refresh_worker.py` is RELEASED; checked. Checked against every OPEN lane: no lane holds either. Still NOT editing `graded_outcomes.py`, `evaluation_settlement.py`, `layer2_shortlist.py`, `layer2_board.py`, `refresh_mlb_oddsapi.py`.
