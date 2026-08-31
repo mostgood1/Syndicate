@@ -15000,3 +15000,79 @@ precondition remains unmeasured — nobody has established cancelling is free at
 Polymarket — so `C6H7WE0DPKDJ` / `C6HN0XD92KDE` still need a human decision, and
 their current status is unknown (no log lines in the window, which is not
 evidence of cancellation).
+
+
+## 2026-08-31 16:48Z — `cffbbd89` — refresh-worker: the board ranks one-sided rows on model EDGE, not model EV — lane `layer2-board-opportunities` (change) / `layer1-model-edge-join` (measurement)
+
+**DEPLOYED AND UNVERIFIED AT THE TIME OF WRITING. The reading that closes it is
+named below and is not a thing to watch — it is a single assertion with a
+control already taken.**
+
+    16:45:10.196Z  build_started    mostgood@gmail.com  manual
+    16:45:10.254Z  deploy_started
+    16:47:13.891Z  build_ended
+    16:48:11.056Z  deploy_ended     dep-daaqv5ajnfac73a6tsl0
+    live commit    cffbbd89   (= origin/main at deploy time)
+
+**DEPLOYED BY THE USER MANUALLY**, not through `deploy_claim` + `render_deploy`.
+At the moment it fired, `refresh-worker` was HELD by lane
+`polymarket-yes-leg-binding`, which had been polling a preflight `HOLD` on three
+soccer artifact builds since 16:19Z. That lane did NOT fire; it was told the
+manual deploy was in flight and stood down, then released the claim. **Two
+deploys minutes apart would not have composed — the later one wins — so the
+coordination is the reason there is one entry here and not two.**
+
+**Verified by CONTENT, not by ancestry alone** (`47514159` is an ancestor of
+`cffbbd89`, and separately the deployed tree carries
+`EV_BASIS_MODEL_EDGE = "model_edge"` at `layer2_board.py:1024`, used at 1646).
+
+**Collateral, stated because it is not free:** the deploy killed
+`build_soccer_artifacts --league primeira_liga` and the `refresh_odds_sources`
+job under it — the very HOLD the other lane was waiting to clear. No MLB sim was
+at risk; it had finished on its own at 16:27:07Z. `render_events` CLEAN over the
+window, no `server_failed`.
+
+### verify: `score.value_pct` must stop equalling `model_ev_pct` and start equalling `model_edge_pct`, per row
+
+**CONTROL, taken under the OLD code, two independent readings:**
+
+    written_at 16:32:42Z   18 model-basis rows   value_pct==model_ev 18/18   ==model_edge 0/18
+    written_at 16:45:29Z   50 model-basis rows   value_pct==model_ev 50/50   ==model_edge 0/50
+    rows_uninformative_ev  1416 -> 1345
+
+**PASSES only if that inverts to `0/N` and `N/N`, and `ev_basis` on one-sided
+rows reads `model_edge` instead of `model_probability`.**
+
+**WHY THIS METRIC AND NOT THE OBVIOUS ONE — this is the load-bearing part of the
+entry.** The change's author predicted the top-25 would go from
+`hr_1plus` 23 to 8. **That metric is unusable on this timescale and would have
+produced a false PASS.** Measured, with NO code change, across twenty minutes:
+
+    16:30:50Z   batter_home_runs 23, totals 1, hits_runs_rbis 1
+    16:32:42Z   player_shots 12, shots_on_target 6, h2h 5, totals 1, corners 1
+    16:45:29Z   batter_home_runs 22, totals 2, hits_runs_rbis 1
+
+Three composition swings, MLB -> soccer -> MLB, driven by the slate rotating,
+not by scoring. Reading "hr_1plus fell to 8" after the deploy would have
+attributed slate rotation to the change, **in the direction that looks like
+success**. `score.value_pct` is stamped per row, so the question has an exact
+per-row answer that is immune to which sport is on the board, how many rows
+there are, or whether `batter_home_runs` is present at all — and ONE model-basis
+row decides it, so rotation cannot starve the verification either.
+
+**DEPLOYED IS NOT REBUILT, and the gap is real here.** The shortlist is an
+artifact (`source: layer2_shortlist_artifact`) republished on the worker's own
+cadence, ~13 min. The board rebuilt at `written_at 16:45:29Z` **during the
+build**, still under the old code — so the first post-deploy republish is the
+earliest payload that can carry `model_edge`. A reading taken off deploy
+completion rather than off `written_at` moving would have failed for the wrong
+reason.
+
+**And the structural finding the verification does not depend on but which
+outlived the framing:** at 16:32:42Z the #1 row was soccer `player_shots`,
+`ev_pct -6.13`, `model_ev_pct 114.2`, `model_edge_pct 13.37` — ratio 8.5, the
+same `1/p` amplification, with MLB not on the board at all. **This was never a
+home-run-props problem; it is a ONE-SIDED-MARKET problem that follows whichever
+sport is one-sided today.** The original framing would have survived exactly as
+long as MLB was in season and the fix would have looked over-tuned when it kept
+firing on soccer shots in October.
