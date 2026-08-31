@@ -5275,3 +5275,56 @@ blast radius even though its diff does not touch them. Ask what the new values
 CLUSTER on, then check every `>`/`>=`/`<=` they will meet. Tick-aligned prices
 cluster on ticks; timestamps cluster on the minute; percentages cluster on
 integers. Floats compare badly at exactly those points.
+
+---
+
+## 2026-08-31 — TWO THINGS ABOUT GATED DEPLOYS THAT COST AN HOUR EACH TO REDISCOVER
+
+Both measured while deploying a scoring change through `deploy-guard`, and
+neither is visible from the guard's own output.
+
+### 1. `deploy-guard` judges the WHOLE COMMAND against the STANDING preflight, at SUBMISSION
+
+So **poll-and-deploy cannot be bundled.** This is refused:
+
+    for i in $(seq 1 40); do
+      OUT=$(deploy_preflight ...); case "$V" in CLEAR*) render_deploy ...;; esac
+      sleep 60
+    done
+
+The guard sees `render_deploy` in the command text and evaluates it against the
+preflight result that exists WHEN THE COMMAND IS SUBMITTED — which is the HOLD
+you are waiting to clear. It never reaches the loop.
+
+That is the correct behaviour and worth stating as such: it stops a deploy being
+smuggled in behind a loop that might fire against state nobody re-read. But it
+means a gated deploy is necessarily TWO steps — poll alone until CLEAR, then a
+separate deploy call — and the guard's message does not say so.
+
+HOW TO APPLY. Never write a loop that ends in a deploy. Poll in one command,
+deploy in the next, and take a FRESH preflight in the second: the CLEAR that
+ended the poll can be minutes stale, and the 15-minute freshness bound is on the
+preflight, not on your intent.
+
+### 2. A preflight HOLD DOES NOT DRAIN MONOTONICALLY
+
+Measured on refresh-worker, one minute apart:
+
+    16:19  jobs=7   16:21  jobs=11   16:22  jobs=10
+    16:26  jobs=5   16:27  jobs=3
+
+**It went UP before it went down.** New sweeps queue behind finishing ones, so
+the job count is a level, not a countdown.
+
+HOW TO APPLY. Do not estimate a wait from one reading, and specifically do not
+reason "3 jobs left, nearly there" — the next tick can be 11. Poll to CLEAR.
+The error is asymmetric: an estimate that says "almost done" is the one that
+tempts a `--allow-rapid` or a manual deploy through the HOLD, and the thing a
+HOLD most often contains on this service is `run_mlb_daily_sim_job`, which was
+killed by a deploy TWICE this week. Waiting cost 13 minutes; the kill cost a
+day's MLB artifacts and presents later as a data gap with no obvious cause.
+
+RELATED, same session: the count also cannot tell you WHAT is holding. `jobs=7`
+and `jobs=3` were the same verdict from the guard, but one contained the MLB sim
+and the other was three soccer artifact builds that re-run for free. Grep the
+process list for the expensive job by name rather than reading the number.
