@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 706 rules `[generated]`
+## Index — 707 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5166,3 +5166,55 @@ FINALLY: a rule like this is a SELECTION change, not an execution fix. It shifts
 the bet mix toward longshots. Fill volume will rise and that is NOT evidence it
 helped; only EV or CLV on the orders it admits can say.
 
+
+
+## 2026-08-31 — `lane-guard` strips the leading dot, so every claim under `.syndicate/` or `.claude/` is UNENFORCED
+
+**FOUND, NOT FIXED, and the reason it is not fixed is the interesting half.**
+
+`_claims()` extracts a claimed path with a strip that removes a LEADING `.` as
+well as trailing punctuation, and the matcher is `rel.endswith("/" + f)`.
+Reproduced minimally against the live hook:
+
+    - Files: `.syndicate/findings_x.md`, `.claude/hooks/thing.py`, `scripts/ok.py`
+      ->  'syndicate/findings_x.md'      <- dot gone
+          'claude/hooks/thing.py'        <- dot gone
+          'scripts/ok.py'                <- fine
+
+An edit to the real `.syndicate/findings_x.md` is then tested as
+`".syndicate/findings_x.md".endswith("/syndicate/findings_x.md")` — **False**.
+The claim can never match the file it names. Live instance today:
+`exchange-join-refusals` claims `.syndicate/findings_2026-08-30_layer2_board_assessment.md`
+and that file is guarded by nothing.
+
+**HOW IT WAS FOUND, which is the transferable part.** Not by reading the hook.
+By listing every enforced claim and asking whether the path EXISTS
+(`git ls-files`): 35 claims, 1 naming a file not in the repo. A claim that names
+a nonexistent path is either stale or mangled, and both are silent. The
+extension check that found the `1/p` phantoms earlier the same day would NOT
+have caught this one — `syndicate/findings_x.md` ends in `.md` and looks
+perfectly well-formed. **Two different wrong-claim shapes need two different
+checks: does this token look like a path, and does this path exist.**
+
+**WHY I DID NOT FIX IT, and this is a standing caution rather than laziness.**
+The obvious patch — stop stripping the leading dot — does not merely restore a
+missing guard, it CREATES enforcement that has never existed. Every lane block
+that ever named `.syndicate/lanes.md`, `.syndicate/state.md` or `.claude/hooks/`
+inside a `- Files:` line would begin blocking other sessions from writing the
+LEDGERS, including from checkpointing. That exact failure is already on the
+record in `repo-coordination`: `lanes.md`, mentioned only as the file that was
+grepped, got read as a claim and blocked an unrelated worktree session from
+writing `.syndicate/lanes.md` at all. A fix here needs the claim set audited for
+dot-directory paths FIRST, then the strip narrowed, then a deploy-free way to
+back it out.
+
+**DO NOT CONFUSE THIS WITH THE EXONERATION.** `learnings.md` records lane-guard
+EXONERATED on a mangled RELPATH question with "do NOT fix its `root`; the
+PRIMARY tree is correct for it". That is a different defect in a different
+function. This one is in claim EXTRACTION and is not covered by that ruling.
+
+**HOW TO APPLY.** Audit claims two ways, not one: reject tokens that do not look
+like paths (catches `1/p`, `15.0`, prose read as a claim), AND reject claims
+whose path is absent from `git ls-files` (catches this, and stale claims on
+deleted files). `check_lane_invariants` does neither — it verifies that each
+claim has exactly one holder, which is true of a claim that guards nothing.

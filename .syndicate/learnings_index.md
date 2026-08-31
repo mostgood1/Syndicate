@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 706 rules `[generated]`
+## Index — 707 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -208,7 +208,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 512**
+**Rules and corrections — 513**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -513,6 +513,7 @@
 - [2026-08-31 — THREE HYPOTHESES DIED ON ONE DATASET, AND ALL THREE WERE ONE-DIMENSIONAL P…](#2026-08-31-three-hypotheses-died-on-one-dataset-and-all-three-were-one-dimensional-projections-of-a-two-variable-rule)
 - [2026-08-31 — A reachability test in TWO STATES says nothing about the EDGE between them](#2026-08-31-a-reachability-test-in-two-states-says-nothing-about-the-edge-between-them)
 - [2026-08-31 — A tidier rendering of a `- Files:` list SILENTLY DECLAIMS](#2026-08-31-a-tidier-rendering-of-a---files-list-silently-declaims)
+- [2026-08-31 — `lane-guard` strips the leading dot, so every claim under `.syndicate/` or…](#2026-08-31-lane-guard-strips-the-leading-dot-so-every-claim-under-syndicate-or-claude-is-unenforced)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
