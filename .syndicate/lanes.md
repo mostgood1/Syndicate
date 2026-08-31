@@ -3024,21 +3024,14 @@ caaf-no-orders`). NOT
 - Incident handled: live execution halted on BOTH venues 19:47:34Z. Correct fix was another lane's dd33c865. My 63661af1 auto-reject was UNSAFE and is reverted (ef0d2d47).
 - Shipped and useful: ORDER_STATE logging of cumQuantity/leavesQuantity (d8b6c847, landed as bf1dd290) — NOT YET READ.
 - Next: read ORDER_STATE for the cancelled orders; trace why 71 board spread rows reach ORDER_PATH zero times.
-### ncaaf-totals-dispersion — OPEN — opened 2026-08-30 — session 6475567d
-- Goal: compress NCAAF simulated-total dispersion (SD 5.77 vs market 3.46 = 1.67x) at its carrier, and MEASURE totals skill vs market -- a measurement `pick_gate` says has never existed.
-- Files: NONE HELD — c5afcf27 is landed; no further edits planned.
-- Status: DIAL BUILT AND VERIFIED, VALUE NOT FITTED, GATE NOT OPENED.
-- Verified: carrier confirmed -- `drive_success_probability` bottoms at 0.214 against the gate's measured 0.208, and it drives BOTH touchdown (proportional) and field-goal (0.08) probability. Default sensitivity 1.0 is an EXACT algebraic no-op for any anchor, so NFL's frozen profile and NCAAF alike are unchanged by this commit. Dial authority measured: scoring-rate spread 14.9pp -> 9.8 -> 7.2 -> 5.8 at sensitivity 1.0/0.6/0.4/0.3, with the even-teams level moving <5pp. `drive_priors` now receives the profile at all -- `drive_simulator` had one in scope and never passed it down.
-- NOT DONE, and both are required before any bet is placed on this: (1) FIT the sensitivity against a production-representative slate -- a synthetic sweep understates the range because `offense_index` is averaged with a fallback pulling it toward 0.5; `scripts/refit_ncaaf_smartsim2_payload.py` is the harness shape, benchmarked against the market rather than the model's own past. (2) MEASURE totals accuracy vs market -- `pick_gate` refuses on TWO grounds and dispersion is only one: "no model-vs-market accuracy measurement exists for totals at all, so default-deny applies on its own terms".
-- Do NOT re-sweep the rating weights: `calibration_profile.py:51-64` records that as a measured dead end (parity made totals WORSE, 7.83 vs 7.51).
-- STEP 1 DONE 2026-08-30 — THE EXISTING TOTALS MEASUREMENT IS UNUSABLE. It exists and it runs: `smartsim2_performance_log.jsonl` holds 752 season-2025 records carrying `market_total`, `smartsim_total` and `actual_total`, and computing it gives totals model MAE 13.394 vs market 12.354 — the model losing to the close by only **1.04** points, against **3.56** for margins. That is a tempting number and it CANNOT BE USED, for two independent reasons:
-  (a) **STALE ENGINE.** The projection CSVs stamp `profile_name=ncaaf_v2`, `generated_at=2026-07-16`, and carry NO `profile_version` column. Today's profile is `ncaaf` / `ncaaf-goal-line-refit-1`, promoted in `600a753a` on 2026-08-27 — six weeks LATER. The measurement describes an engine that no longer exists.
-  (b) **LEAKAGE.** `rating_source=cfbd_ppa_season_2025` on season-2025 games — the season aggregate CONTAINING the games being predicted. `refit_ncaaf_smartsim2_payload.py` documents this exact trap inflating apparent skill 30% (r 0.663 vs 0.509 as-of, 558 games). So 1.04 is optimistic; clean is worse.
-  The clean path already exists unused: the generator has `load_ppa_ratings_asof(season, week)` beside the leaking `load_ppa_ratings_with_fallback`.
-- ALSO FOUND, and it must not be mixed with the gate's figure: dispersion on this 752-game set is model SD 2.851 vs market SD 6.152 = **0.463x, UNDER-dispersed** — the opposite sign to `pick_gate`'s 1.67x OVER (5.77 vs 3.46). Both are internally same-population and valid; they are different populations (full season 2025 vs one 2026 wk1 slate, where market SD is naturally compressed) AND different engines per (a). DO NOT reconcile these by picking one.
-- STEP 2 COST, measured not guessed: 36.6 ms per single-game sim on this machine; 17 artifacts cover 812 games; at 300 seeds that is 243,600 sims ≈ **2.5 h single-process**, parallelisable. Plus as-of CFBD rating loads per week. It is a RE-SIMULATION, not a re-compute — which is what (a) and (b) together force.
-- Blocked by: none
-
+### ncaaf-totals-dispersion — BLOCKED 2026-08-30 — CFBD monthly quota exhausted until the month rolls
+- Goal: compress NCAAF simulated-total dispersion at its carrier, and MEASURE totals skill vs market — the measurement `pick_gate` says has never existed.
+- Files: NONE HELD — c5afcf27 landed; no further edits planned.
+- Status: dial BUILT and VERIFIED (exact no-op at default). Value NOT FITTED. Gate NOT OPENED. Step-1 provenance DONE: the existing 752-record measurement is unusable (stale engine `ncaaf_v2`/2026-07-16 vs today's `ncaaf-goal-line-refit-1`/2026-08-27, AND `rating_source=cfbd_ppa_season_2025` leaks).
+- BLOCKED BY: CFBD monthly quota exhausted (measured 22:03:34Z). Clears ~2026-09-01. Also blocking LIVE NCAAF projections in production.
+- Unblock path when the quota rolls: PPA needs NO CFBD call (derivable from `historical_truth/plays_*`, 74.3% coverage, leak-free by construction); only SP+ needs ONE fetch per completed season, and completed-season ratings never change — cache and COMMIT both so this cannot recur.
+- Do NOT re-sweep the rating weights: `calibration_profile.py:51-64` records that dead end (parity made totals WORSE).
+- Blocked by: cfbd-monthly-quota
 ### layer1-model-edge-join — OPEN — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
 - Goal: raise Layer 1's MODEL-EDGE coverage across every sport/market, so Layer 2
   / Kalshi / Polymarket rank on the sim's disagreement rather than on book hold.

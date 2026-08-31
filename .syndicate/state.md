@@ -7893,6 +7893,12 @@ were sizable, and one survived EV and Kelly. The ranker did about as well as its
 inputs allowed. The constraint is MODEL COVERAGE, not selection, and not any
 part of the venue join / tick logic / order path -- none of which refuse spreads.
 
+**AND NCAAF IS SEPARATELY BROKEN, not only gated.** Of its 373 rows ~193 carry
+the gate's named refusals; **~180 carry "no projection object at all"** — no
+reason, no projection dict. That is a generator that never ran, and it has a
+cause: see `[cfbd-monthly-quota-exhausted]`. Deliberate suppression and a failed
+generator were being counted as one thing.
+
 **WHY totals is 9.9%: NCAAF dominates an opener-weekend board and its model is
 DELIBERATELY WITHHELD.** 281 of the 344 totals rows are NCAAF, and NCAAF carries
 a named, measured refusal:

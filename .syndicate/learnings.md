@@ -7766,3 +7766,34 @@ BEFORE taking the post-deploy reading, precisely because my path needs a venue
 id. It read 0. A prediction made before the measurement is the only thing that
 made "my fix is not what unblocked this" worth stating rather than a
 face-saving reconstruction afterwards.
+
+## 2026-08-30 — FORBIDDEN: keying a predicate to a field name you have not confirmed the record STORES. My log printed `ticker=None` for every order because `ticker` is not a key on it.
+
+`reconcile_live_orders`' `not_found` branch logged
+`ticker={order.get("ticker")!r}`. The ledger stores **`venue_ticker`**
+(`record_order`, and it is in `_LEAN_FIELDS`). `ticker` is not a key on that
+record at all, so `.get` returned None every time and the line reported
+`ticker=None` for EVERY order, whether or not one existed.
+
+I then nearly wrote a safety predicate keyed to that same field. It would have
+evaluated "no ticker" as TRUE for every order in the system -- **matching
+everything**, which is strictly worse than the bug it was meant to fix, and it
+would have looked correct in the logs because the logs were reading the same
+wrong key.
+
+Caught only because I stopped to ask WHICH field before writing, having said out
+loud that a predicate on the wrong field is silently permissive. The confirmation
+took two readings: `record_order` writing `venue_ticker`, and production's
+`LIVE_ORDER` line reading `record["venue_ticker"]` and printing `ticker=None`
+every tick for the order that actually had none.
+
+HOW TO APPLY. `dict.get("wrong_key")` returns None, which is indistinguishable
+from a real absent value -- there is no error, no warning, and the log looks
+plausible. Before a predicate or a log line depends on a field, find the WRITER
+of that field, not another reader of it. A second reader can be wrong the same
+way.
+
+RELATED: this is the same family as the session's other five wrong zeros -- wrong
+service, wrong window, wrong log name, wrong population, wrong key. Every one
+read as "this does not exist".
+
