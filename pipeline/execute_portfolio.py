@@ -1165,6 +1165,11 @@ def _polymarket_resolve_market(request) -> tuple | None:
     outcome_index = None
     away_index = None
     refusal = None
+    # Set when a soccer Yes/No h2h is resolved by its SLUG SUBJECT. The
+    # away-index corroboration below cannot apply to a market whose outcomes
+    # are literally `Yes`/`No` -- no outcome names a team -- and its
+    # corroborator is the subject match itself.
+    yes_no_subject_index = None
 
     if market in _TOTAL_MARKETS:
         # UNAMBIGUOUS. `Over` and `Under` name the side directly, and our own
@@ -1224,6 +1229,80 @@ def _polymarket_resolve_market(request) -> tuple | None:
                     outcome_index = position
         if outcome_index is None:
             refusal = "team_side_not_in_outcomes"
+            # ------------------------------------------------------------------
+            # SOCCER h2h IS THREE MARKETS, AND ITS OUTCOMES ARE `Yes`/`No`.
+            # ------------------------------------------------------------------
+            #
+            # Polymarket splits a 3-way into one binary per outcome with the
+            # SUBJECT in the slug: `atc-epl-liv-not-2026-08-29-liv` is
+            # "Liverpool win?", `-draw` is "draw?". So `_side_for_team` above is
+            # matching "home"/"away" against `["Yes","No"]` and can never
+            # succeed -- every soccer moneyline refused as
+            # `team_side_not_in_outcomes` and never reached the yes-leg gate at
+            # all. Measured 2026-08-31: 9 markets resolved, 0 gate lines.
+            #
+            # `polymarket_board_join` ALREADY solved this on the read side and
+            # its helpers are imported rather than re-implemented -- a second
+            # decoder here could disagree with the one that actually refuses,
+            # which is the rule this file already applies to `_outcome_reason_of`.
+            #
+            # BUYING `No` IS NOT BETTING THE OTHER TEAM. A soccer 3-way has a
+            # DRAW leg, so `No` on "will SHA win?" pays on SHE **or** a draw.
+            # Only the market whose subject IS our side is takeable, and it is
+            # taken as `Yes`. Anything else refuses by name.
+            #
+            # The `Yes` index is found BY NAME, never by position: the same
+            # fixture ships `["Yes","No"]` for one leg and `["No","Yes"]` for
+            # the other (measured, `atc-irlp-sha-she-2026-08-21`).
+            try:
+                from syndicate.features.shared.polymarket_board_join import (
+                    _is_yes_no_market,
+                    _subject_is_side,
+                    parse_slug,
+                )
+            except Exception as exc:  # noqa: BLE001
+                # LOUD, not silent. The first version of this import named the
+                # wrong module for `parse_slug`; the bare `except` swallowed the
+                # ImportError and the whole branch became inert while three of
+                # its own tests still "passed" -- because they assert a REFUSAL,
+                # and everything refuses when the decoder is missing. A wiring
+                # failure that disables a feature must say so.
+                _is_yes_no_market = None
+                print(
+                    f"[execute_portfolio] YES_NO_DECODER_UNAVAILABLE {exc!r}"
+                    " -- every soccer moneyline will refuse",
+                    flush=True,
+                )
+            if _is_yes_no_market is not None and _is_yes_no_market(
+                [(str(n), None) for n in outcomes]
+            ):
+                candidate = {"parsed": parse_slug(slug) or {}}
+                if _subject_is_side(candidate, row, our_side, sport):
+                    for position, name in enumerate(outcomes):
+                        if str(name or "").strip().lower() != "yes":
+                            continue
+                        try:
+                            price = float(prices[position])
+                        except (TypeError, ValueError, IndexError):
+                            price = None
+                        else:
+                            outcome_index = position
+                            # THE YES LEG, BY NAME. On a literal Yes/No market
+                            # the YES leg IS the index of the string "Yes", so
+                            # this rides the same channel as a team market's
+                            # `yesLegIndex` and `_resolve_outcome_side` returns
+                            # OUTCOME_SIDE_YES for our home/away side without a
+                            # second code path.
+                            yes_no_subject_index = position
+                            refusal = None
+                        break
+                    if outcome_index is None and refusal is not None:
+                        refusal = "yes_leg_unpriced_on_yes_no_market"
+                else:
+                    # NAMED, and deliberately not a fallback to `No`. The
+                    # subject is the other team or the draw; taking the
+                    # complement would buy an outcome nobody chose.
+                    refusal = "yes_no_market_subject_is_not_our_side"
 
     if price is None or outcome_index is None:
         print(
@@ -1403,7 +1482,20 @@ def _polymarket_resolve_market(request) -> tuple | None:
 
     yes_leg_index = row.get(YES_LEG_INDEX_FIELD)
     yes_leg_reason = row.get(YES_LEG_REASON_FIELD)
-    if market not in _TOTAL_MARKETS and market not in _SPREAD_MARKETS:
+    if yes_no_subject_index is not None:
+        # RESOLVED BY SUBJECT, so the away-index gate is skipped -- but SAID,
+        # not silently. A gate that quietly stops applying is indistinguishable
+        # from one that is passing.
+        print(
+            f"[execute_portfolio] POLYMARKET_YES_LEG slug={slug}"
+            f" yes_leg_index={yes_no_subject_index} away_index=None"
+            f" our_index={outcome_index} agree=subject reason='yes_no_market'"
+            f" outcomes={outcomes!r}",
+            flush=True,
+        )
+        yes_leg_index = yes_no_subject_index
+        yes_leg_reason = "yes_no_market_subject"
+    elif market not in _TOTAL_MARKETS and market not in _SPREAD_MARKETS:
         agree = (
             yes_leg_index is not None
             and away_index is not None
