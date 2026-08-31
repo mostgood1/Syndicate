@@ -8185,6 +8185,35 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-gate-is-self-confirming] 2026-08-31T13:42Z — THE GATE DESTROYED ITS OWN FALSIFIER
+
+**Asked whether `sf-atl` (pregame, ~0.400, the closest observation to the
+boundary) ever filled. IT WAS NEVER PLACED — the gate held it.** There is no
+order, so there is no answer, and there never will be while the gate runs.
+
+    tracked orders now: 5, ALL FILLED, resting: NONE
+      0.210 juv-par(past)  0.240 ata-bol  0.250 osa-get
+      0.335 ath-tex        0.490 lar-lac(past)
+
+**Every surviving order fits the rule perfectly, and that is exactly what a
+self-confirming filter looks like.** The stated falsifier is "a PREGAME FILL
+above 0.410" — but near-even pregame orders are the ONLY population that could
+produce one, and the gate suppresses all of them. The evidence base is now
+frozen at n=3 pregame fills and cannot grow.
+
+**THIS IS A DESIGN DEFECT, NOT A DATA GAP.** The 0.35 ceiling was chosen as a
+risk decision pending more evidence, and the gate as built guarantees that
+evidence never arrives. Any threshold in 0.335-0.410 will look correct forever.
+
+**THE FIX IS AN EXPLORATION ARM.** Let a small, bounded fraction of near-even
+pregame orders through — a holdout — so the boundary keeps being tested at a
+known, capped cost. Without one, the rule cannot be re-derived and the
+"re-derive as the gap fills in" note in `_polymarket_max_pregame_price` is
+unachievable by construction.
+
+**NOT BUILT. Flagged only.** It is a live-money selection change and this
+session has already deployed one gate on a hypothesis that died within the hour.
+
 ## [polymarket-cheap-side-selection-risk] 2026-08-31 — HIGHER FILL VOLUME IS NOT SUCCESS. The gate changes the BET MIX.
 
 **Raised by `polymarket-yes-leg-binding` and it is the most important
