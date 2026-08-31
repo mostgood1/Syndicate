@@ -1980,6 +1980,71 @@ def _layer2_shortlist_path(selected_date: str) -> Path:
     return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}.json"
 
 
+def _layer2_shortlist_shard_path(selected_date: str, sport: str) -> Path:
+    """One key per sport. **The 8MB ceiling is PER KEY, and that is the point.**
+
+    A single combined key makes every sport compete for one budget: measured
+    2026-08-31, three active sports (mlb, ncaaf, soccer) held 1,180 rows in
+    5,806,147 bytes -- 69.2% of the ceiling at 4,920 bytes/row. The 400/sport
+    cap was sized on ~1.0 KB/row, which understates the real figure by 4.8x, so
+    a six-sport slate computes to ~11.8MB and an eight-sport one to ~15.7MB.
+
+    That does NOT break the board -- `_shed_rows_to_fit_keyvalue` drops the
+    lowest-ranked rows and stamps what it dropped. What it does is make the
+    configured cap a lie: at six sports the guard sheds roughly half, so 400
+    silently becomes ~200 and one sport's slate shrinks another's. Sharding
+    gives each its own 8MB, so the cap means what it says.
+    """
+    suffix = str(selected_date or "").strip().replace("-", "_") or _intelligence_state_daily_suffix()
+    # Imported HERE: `re` is not a module-level import in this file, and a
+    # NameError inside the WRITE path would take the board down for a filename.
+    # Caught by running the helper rather than reading it.
+    import re as _re
+
+    token = _re.sub(r"[^a-z0-9]+", "_", str(sport or "").strip().lower()).strip("_") or "unknown"
+    return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}__{token}.json"
+
+
+def _layer2_combined_keeps_rows() -> bool:
+    """Does the COMBINED key still carry the rows? Default YES, deliberately.
+
+    THE ONLY DANGEROUS PART OF SHARDING IS THE ORDER OF TWO DEPLOYS. If the
+    writer stops filling the combined key before every reader can merge shards,
+    the board serves nothing -- a self-inflicted outage in exchange for
+    headroom nobody is short of yet.
+
+    So the default writes BOTH: shards land and are verifiable while the
+    combined key keeps working exactly as before, which is a no-op for every
+    reader. Flipping this to `0` is what actually unlocks the headroom, and it
+    is an env flip rather than a deploy, so it is reversible in seconds if the
+    merge is wrong.
+    """
+    raw = str(os.environ.get("SYNDICATE_LAYER2_COMBINED_ROWS") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _shard_rows_by_sport(rows: list[Any]) -> dict[str, dict[str, list[Any]]]:
+    """`{sport -> {rows, positions}}`, carrying each row's GLOBAL INDEX.
+
+    POSITIONS, NOT A RE-SORT. The board is RANKED, and concatenating shards
+    sport-by-sport would silently reorder it -- the top of the board would
+    become "all of mlb, then all of soccer" rather than the best rows. Re-sorting
+    on the reader would mean re-deriving the ranking key, and a second sort that
+    disagrees with the first is the same class of defect as a second decoder.
+    Storing the index makes the merge exact and independent of how rows were
+    ranked.
+    """
+    buckets: dict[str, dict[str, list[Any]]] = {}
+    for index, row in enumerate(rows):
+        sport = ""
+        if isinstance(row, Mapping):
+            sport = str(row.get("sport") or "").strip().lower()
+        bucket = buckets.setdefault(sport or "unknown", {"rows": [], "positions": []})
+        bucket["rows"].append(row)
+        bucket["positions"].append(index)
+    return buckets
+
+
 def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dict[str, Any] | None:
     """Persist L2-A as its OWN artifact, independent of the canonical migration.
 
@@ -2007,9 +2072,101 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
     payload["selected_date"] = normalized_date
     payload["written_at"] = _utc_now()
     _warn_if_shortlist_near_keyvalue_ceiling(payload)
-    payload = _shed_rows_to_fit_keyvalue(payload)
-    write_json_file(_layer2_shortlist_path(normalized_date), payload)
+
+    keeps_rows = _layer2_combined_keeps_rows()
+    if keeps_rows:
+        # STATUS QUO while the combined key is still the one being read. The
+        # shed must happen BEFORE sharding so the shards describe exactly what
+        # the combined key holds -- two different row sets under one
+        # `written_at` is the ambiguity this whole change is meant to remove.
+        payload = _shed_rows_to_fit_keyvalue(payload)
+
+    rows = payload.get("rows") or []
+    shards = _write_layer2_shards(normalized_date, payload, rows)
+
+    combined = dict(payload)
+    if shards:
+        combined["shards"] = sorted(shards)
+        combined["shard_row_total"] = len(rows)
+    if shards and not keeps_rows:
+        # THE HEADROOM UNLOCK, and the only step that can empty a board that
+        # cannot merge shards. Guarded by the env flag, which defaults to
+        # keeping the rows, so this line does not run until somebody turns it on
+        # having SEEN the shards land.
+        combined["rows"] = []
+    write_json_file(_layer2_shortlist_path(normalized_date), combined)
     return payload
+
+
+def _write_layer2_shards(
+    selected_date: str, payload: Mapping[str, Any], rows: list[Any]
+) -> list[str]:
+    """One key per sport. Returns the sports actually written.
+
+    NEVER RAISES, and returns `[]` on any failure. A shard write that throws
+    would take down the COMBINED write beside it, which is the artifact
+    everything currently reads -- turning an optimisation into an outage. The
+    caller only advertises `shards` when this returns a non-empty list, so a
+    partial failure degrades to exactly today's behaviour.
+    """
+    if not rows:
+        return []
+    try:
+        from syndicate.features.shared.refresh_state_store import _keyvalue_max_bytes
+
+        ceiling = int(_keyvalue_max_bytes()) or 0
+    except Exception:  # noqa: BLE001
+        ceiling = 0
+    written: list[str] = []
+    try:
+        buckets = _shard_rows_by_sport(rows)
+        for sport, bucket in sorted(buckets.items()):
+            shard = {
+                "selected_date": str(payload.get("selected_date") or selected_date),
+                "written_at": payload.get("written_at"),
+                "sport": sport,
+                "rows": bucket["rows"],
+                # The GLOBAL index of each row, so the merge restores the
+                # board's ranking exactly instead of re-deriving it.
+                "positions": bucket["positions"],
+            }
+            if ceiling:
+                # PER-SHARD TRIM, so one enormous sport cannot cost another its
+                # rows. Rows and positions are trimmed TOGETHER -- dropping one
+                # without the other would silently misplace every row after it.
+                while len(json.dumps(shard, default=str)) > int(ceiling * 0.95) and shard["rows"]:
+                    shard["rows"] = shard["rows"][:-1]
+                    shard["positions"] = shard["positions"][:-1]
+                if not shard["rows"]:
+                    print(
+                        f"[intelligence_state] LAYER2_SHARD_EMPTIED sport={sport}"
+                        f" -- a single sport did not fit {ceiling}; its rows are"
+                        " NOT in the shard set",
+                        flush=True,
+                    )
+                    continue
+                dropped = len(bucket["rows"]) - len(shard["rows"])
+                if dropped:
+                    print(
+                        f"[intelligence_state] LAYER2_SHARD_TRIMMED sport={sport}"
+                        f" kept={len(shard['rows'])} dropped={dropped}",
+                        flush=True,
+                    )
+            write_json_file(_layer2_shortlist_shard_path(selected_date, sport), shard)
+            written.append(sport)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[intelligence_state] LAYER2_SHARD_WRITE_FAILED {exc!r}"
+            " -- falling back to the combined key alone",
+            flush=True,
+        )
+        return []
+    print(
+        f"[intelligence_state] LAYER2_SHARDS_WRITTEN sports={written}"
+        f" rows={len(rows)} combined_keeps_rows={_layer2_combined_keeps_rows()}",
+        flush=True,
+    )
+    return written
 
 
 def _shed_rows_to_fit_keyvalue(payload: dict[str, Any]) -> dict[str, Any]:
@@ -2163,11 +2320,89 @@ def _warn_if_shortlist_near_keyvalue_ceiling(payload: Mapping[str, Any]) -> None
 
 
 def read_layer2_shortlist(selected_date: str | None) -> dict[str, Any] | None:
+    """The combined key, with per-sport shards merged back in when it has none.
+
+    ORDER OF PRECEDENCE IS DELIBERATE: rows on the combined key WIN. While the
+    writer still fills it (the default), this function behaves exactly as it did
+    before and the shards are dead weight being proven. Only when the combined
+    key arrives empty -- which one env flag causes -- does the merge run.
+
+    That ordering is what makes the two deploys safe in either sequence: a new
+    reader against an old writer reads rows and ignores shards; an old reader
+    against a new writer still reads rows, because the writer keeps filling them
+    until somebody flips the flag.
+    """
     normalized_date = str(selected_date or "").strip()
     if not normalized_date:
         return None
     payload = read_json_file(_layer2_shortlist_path(normalized_date))
-    return payload if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("rows"):
+        return payload
+    shards = payload.get("shards")
+    if not isinstance(shards, list) or not shards:
+        return payload
+    return _merge_layer2_shards(normalized_date, payload, shards)
+
+
+def _merge_layer2_shards(
+    selected_date: str, payload: dict[str, Any], shards: list[Any]
+) -> dict[str, Any]:
+    """Rebuild the ranked row list from per-sport shards.
+
+    BY POSITION, NOT BY CONCATENATION. Each shard carries the GLOBAL index of
+    every row it holds, so the board's ranking is restored exactly. Appending
+    shard after shard would order the board "all of one sport, then all of the
+    next" -- which looks populated, reads plausibly, and is wrong in the one
+    way this board must never be wrong.
+
+    A MISSING OR UNREADABLE SHARD COSTS ITS OWN ROWS AND NOTHING ELSE. Its
+    positions simply stay empty and are compacted out, so the remaining rows
+    keep their relative order. The shortfall is REPORTED rather than inferred
+    from a count, because "this sport is quiet today" and "this sport's key did
+    not load" are different facts.
+    """
+    total = payload.get("shard_row_total")
+    total = int(total) if isinstance(total, int) and total >= 0 else 0
+    slots: list[Any] = [None] * total
+    loaded: list[str] = []
+    missing: list[str] = []
+    overflow = 0
+    for sport in shards:
+        name = str(sport or "").strip().lower()
+        if not name:
+            continue
+        shard = read_json_file(_layer2_shortlist_shard_path(selected_date, name))
+        if not isinstance(shard, dict) or not isinstance(shard.get("rows"), list):
+            missing.append(name)
+            continue
+        rows = shard.get("rows") or []
+        positions = shard.get("positions")
+        if not isinstance(positions, list) or len(positions) != len(rows):
+            # A shard we cannot place is not a shard we guess at.
+            missing.append(name)
+            continue
+        for row, position in zip(rows, positions):
+            if isinstance(position, int) and 0 <= position < total:
+                slots[position] = row
+            else:
+                overflow += 1
+        loaded.append(name)
+    merged = [row for row in slots if row is not None]
+    if missing or overflow or len(merged) != total:
+        print(
+            f"[intelligence_state] LAYER2_SHARD_MERGE date={selected_date}"
+            f" loaded={loaded} missing={missing} rows={len(merged)}/{total}"
+            f" unplaceable={overflow}",
+            flush=True,
+        )
+    out = dict(payload)
+    out["rows"] = merged
+    out["rows_from_shards"] = True
+    out["shards_loaded"] = loaded
+    out["shards_missing"] = missing
+    return out
 
 
 def _game_chips_path(selected_date: str) -> Path:
