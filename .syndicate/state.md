@@ -8159,6 +8159,38 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-placement-hold] 2026-08-31 — LIVE, and it holds 13 of 17 positions
+
+**Deployed `f6f45321`, live 04:36Z. First tick:**
+
+    EXECUTED positions=17 placed=0 duplicates=2 retried=2 skipped=13
+             refused={'too_early_to_place': 13}
+
+    held: 38.1h, 86.4h, 129.4h, 129.4h, 131.4h, 131.9h ... (threshold 24.0h)
+
+**NOTHING BORDERLINE IS CAUGHT.** Every held order is 38h+ out; the 0-24h window
+is untouched, which is the design. But **13 of 17 is a large suppression** and it
+is the dominant refusal on the venue now — that is a real behavioural change, not
+a marginal one.
+
+**AND IT INTERACTS WITH THE YES-LEG FIX.** Almost every held order is an `atc-`
+**h2h** market — the moneylines `8b0d27df` unblocked earlier today. Opening h2h
+produced a large set of far-future soccer moneyline candidates, and this gate is
+now holding them. Neither change is wrong; the combination is what produces
+`placed=0`, and reading either one alone would mislead.
+
+**WHY HOLDING THEM IS RIGHT ON THE EVIDENCE:** pregame orders do not fill at any
+price we have tried (quote, and a tick above), while 8 of 8 fills came on
+live-or-past markets. An order 5 days out cannot fill and only buys the
+submit -> cancel -> resubmit churn that produced the $9.12 duplicate.
+
+**WHAT WOULD MAKE THIS WRONG, and how it would show:** if far-out orders DO fill
+given enough time, this suppresses real bets. The test is already running for
+free — `lec-rom` and `ast-ars` sit live at 0.49 with kickoffs ~12h out, inside
+the window and therefore still placed. If they fill near kickoff and nothing
+ever fills far out, the gate is justified and 24h can be tuned from evidence
+instead of judgement.
+
 ## [polymarket-crossing-RESULT] 2026-08-31 — CROSSING DOES NOT HELP. Price is not the constraint pregame.
 
 **THE EXPERIMENT RAN PROPERLY AND ANSWERED.** The user cancelled the three
