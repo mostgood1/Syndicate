@@ -1833,9 +1833,23 @@ def test_soccer_THREE_WAY_picks_the_right_leg(monkeypatch):
     2026-08-29T05:16:29Z, sample `offered: ['liv-not@None'] x3`.
 
     Each side must now select exactly one leg and take its YES price.
+
+    USES A DISCRIMINATING RESOLVER, deliberately. This test used to pin
+    `teams_match` to always-True and still passed, because the leg was chosen
+    POSITIONALLY from `parse_slug` -- the code path that bought Getafe on a bet
+    for CA Osasuna on 2026-08-31 and lost $5.96. A resolver that matches every
+    team must no longer yield a confident leg, which is pinned separately in
+    `test_a_PERMISSIVE_resolver_now_REFUSES_instead_of_picking_positionally`.
+
+    So the stub here answers the way the real resolver does -- `liv` is
+    Liverpool and nothing else, `not` is Nottingham Forest and nothing else
+    (both verified against the real `teams_match`). The leg selection is then
+    testing team identity, which is what actually decides it now.
     """
     import syndicate.features.shared.team_aliases as aliases
-    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    _pairs = {("liv", "liverpool"), ("not", "nottingham forest")}
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: (
+        str(a or "").strip().lower(), str(b or "").strip().lower()) in _pairs)
     monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
     markets = [_threeway("liv", "0.60"), _threeway("draw", "0.25"),
                _threeway("not", "0.15")]
@@ -2396,3 +2410,92 @@ def test_a_SINGLE_RUNG_fixture_is_not_judged(monkeypatch):
         selected_date="2026-08-29")
     assert out["matched"] == 1, out
     assert not out["ladder_counts"], out["ladder_counts"]
+
+
+# ---------------------------------------------------------------------------
+# THE WRONG-SIDE LOSS, 2026-08-31. Two live orders bought the opposite team.
+# ---------------------------------------------------------------------------
+
+import pytest as _pytest
+
+
+@_pytest.mark.parametrize("slug,home,away,subject,side,expected,why", [
+    # atc-lal-osa-get-2026-08-31-get -- board says "Getafe @ CA Osasuna", we bet
+    # HOME (Osasuna). The subject is Getafe, so this contract is NOT ours.
+    # SHIPPED BEHAVIOUR WAS True: parse_slug reads <away>-<home>, so it called
+    # `get` the home code and matched. Osasuna WON and the bet LOST. -$5.96.
+    ("atc-lal-osa-get-2026-08-31-get", "CA Osasuna", "Getafe", "get", "home", False,
+     "subject is the AWAY team; betting home must refuse"),
+    ("atc-lal-osa-get-2026-08-31-get", "CA Osasuna", "Getafe", "get", "away", True,
+     "subject IS the away team; betting away is exactly this contract"),
+    # atc-sea-ata-bol-2026-08-31-bol -- "Bologna @ Atalanta BC", we bet HOME.
+    ("atc-sea-ata-bol-2026-08-31-bol", "Atalanta BC", "Bologna", "bol", "home", False,
+     "subject is Bologna, the away team; betting home must refuse"),
+    ("atc-sea-ata-bol-2026-08-31-bol", "Atalanta BC", "Bologna", "bol", "away", True,
+     "subject IS Bologna; betting away is this contract"),
+])
+def test_the_subject_leg_is_decided_by_TEAM_NAMES_not_slug_position(
+    slug, home, away, subject, side, expected, why
+):
+    """Soccer slugs are `<home>-<away>`; MLB's are `<away>-<home>`.
+
+    `parse_slug` documents one shape and applies it to every sport, so the
+    positional check answered these backwards and the alias fallback -- which
+    gets all four legs right -- never ran. The "definitive NO" guard could not
+    catch it either: it reads the SAME inverted parse, so it confirmed the wrong
+    answer instead of contradicting it.
+
+    These cases are the two real orders, with the board's own home/away."""
+    from syndicate.features.shared.polymarket_board_join import _subject_is_side, parse_slug
+    candidate = {"parsed": parse_slug(slug) or {}}
+    row = {"home_team": home, "away_team": away}
+    assert _subject_is_side(candidate, row, side, "soccer") is expected, why
+
+
+def test_an_UNRESOLVABLE_subject_refuses_rather_than_falling_back_to_position():
+    """No team names on the row means the alias resolver cannot answer, and the
+    positional parse is a known-broken input for this sport. Refuse."""
+    from syndicate.features.shared.polymarket_board_join import _subject_is_side, parse_slug
+    candidate = {"parsed": parse_slug("atc-lal-osa-get-2026-08-31-get") or {}}
+    assert _subject_is_side(candidate, {}, "home", "soccer") is False
+    assert _subject_is_side(candidate, {"home_team": ""}, "home", "soccer") is False
+
+
+def test_a_subject_matching_BOTH_teams_refuses():
+    """A resolver that cannot separate the two teams has not identified a leg."""
+    from syndicate.features.shared.polymarket_board_join import _subject_is_side, parse_slug
+    candidate = {"parsed": parse_slug("atc-lal-osa-get-2026-08-31-get") or {}}
+    row = {"home_team": "Getafe", "away_team": "Getafe"}
+    assert _subject_is_side(candidate, row, "home", "soccer") is False
+
+
+def test_the_DRAW_leg_still_resolves_in_both_directions():
+    """Unchanged by the fix, and it has no team to match on."""
+    from syndicate.features.shared.polymarket_board_join import _subject_is_side, parse_slug
+    candidate = {"parsed": parse_slug("atc-lal-osa-get-2026-08-31-draw") or {}}
+    row = {"home_team": "CA Osasuna", "away_team": "Getafe"}
+    assert _subject_is_side(candidate, row, "draw", "soccer") is True
+    assert _subject_is_side(candidate, row, "home", "soccer") is False
+
+
+def test_a_PERMISSIVE_resolver_now_REFUSES_instead_of_picking_positionally(monkeypatch):
+    """THE INVERTED REQUIREMENT, and the reason the loss was possible.
+
+    `test_soccer_THREE_WAY_picks_the_right_leg` used to assert that a
+    maximally permissive `teams_match` STILL picked the right leg -- which was
+    true, and true only because `parse_slug`'s positional `<away>-<home>` made
+    the choice. That convention is sport-dependent: MLB really is away-first
+    (`aec-mlb-bal-col` reports away_index=1 = Baltimore, and `bal` leads), while
+    the two live soccer orders on 2026-08-31 were home-first, and the parser has
+    one rule for both.
+
+    A resolver that matches every team has not identified anything. It must now
+    cost the match rather than hand back a leg chosen by position."""
+    import syndicate.features.shared.team_aliases as aliases
+    monkeypatch.setattr(aliases, "teams_match", lambda sport, a, b: True)
+    monkeypatch.setattr(aliases, "canonical_team", lambda sport, n: "x")
+    for side in ("home", "away"):
+        out = mod.join_polymarket_to_board(
+            [_threeway("liv", "0.60"), _threeway("not", "0.15")],
+            _threeway_board(side), selected_date="2026-08-29")
+        assert out["matched"] == 0, (side, out)

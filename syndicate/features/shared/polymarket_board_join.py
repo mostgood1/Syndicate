@@ -877,25 +877,61 @@ def _subject_is_side(
     if wanted == "draw" or subject == "draw":
         # A draw contract can only ever be the draw leg, in either direction.
         return wanted == "draw" and subject == "draw"
-    parsed = candidate.get("parsed") or {}
-    # The slug's OWN tri-code for that role first -- no alias table needed, and
-    # `parse_slug` already read `<away>-<home>` positionally.
-    if subject == str(parsed.get(wanted) or "").strip().lower():
-        return True
-    # THE OPPOSITE LEG IS A DEFINITIVE NO, and it is checked BEFORE the alias
-    # fallback rather than left to it. The slug names BOTH tri-codes, so
-    # `subject == parsed[other]` settles it from data already in hand -- no
-    # resolver, no table, no chance of a permissive alias answering yes.
+
+    # ------------------------------------------------------------------
+    # THE BOARD'S OWN TEAM NAMES DECIDE. THE SLUG'S POSITIONS NEVER DO.
+    # ------------------------------------------------------------------
     #
-    # Caught by `test_soccer_THREE_WAY_picks_the_right_leg` running against a
-    # maximally permissive `teams_match` (always True): without this, `not`
-    # resolved as Liverpool's leg too and all three legs stayed ambiguous. A
-    # real alias table would have hidden that, and the guard would have been
-    # resting on the resolver being well-behaved.
+    # This used to check `subject == parsed[wanted]` FIRST and return True on
+    # it. `parse_slug` documents the shape as `<away>-<home>` and applies it to
+    # every sport. MEASURED 2026-08-31, two live orders, both wrong-side:
+    #
+    #   atc-lal-osa-get-2026-08-31-get   board: Getafe @ CA Osasuna, we bet HOME
+    #     parsed as away=osa home=get -> subject 'get' == parsed['home'] -> TRUE
+    #     bought GETAFE. Osasuna WON. The bet LOST. -$5.96.
+    #   atc-sea-ata-bol-2026-08-31-bol   board: Bologna @ Atalanta, we bet HOME
+    #     parsed as away=ata home=bol -> subject 'bol' == parsed['home'] -> TRUE
+    #     bought BOLOGNA.
+    #
+    # SOCCER SLUGS ARE `<home>-<away>`; MLB'S ARE `<away>-<home>`. Verified on
+    # MLB from the venue's own outcome order -- `aec-mlb-bal-col` reports
+    # away_index=1 = Baltimore Orioles, and `bal` is the FIRST token. So the
+    # positional convention is SPORT-DEPENDENT and the parser has one rule.
+    #
+    # The alias check below was already here, as a third-stage fallback, and it
+    # answers all four legs of both fixtures correctly (`get`/Getafe True,
+    # `get`/CA Osasuna False, and so on). It never ran, because the positional
+    # branch returned first -- and the "definitive NO" branch could not save it
+    # either, since that reads the SAME inverted parse and so confirms the wrong
+    # answer rather than contradicting it. Two checks, one shared broken input.
+    #
+    # So the positional parse is gone from this decision entirely. It is not
+    # repaired here: `parse_slug`'s soccer orientation is used elsewhere for
+    # FIXTURE matching, where both teams are present and the roles do not
+    # change which game is found, and widening this fix into that is a
+    # different change with a different blast radius.
+    #
+    # REFUSES WHEN IT CANNOT TELL, which is this file's existing rule and the
+    # reason the wrong-side loss was possible at all: a confident answer from a
+    # broken input is worse than no answer.
     other = "away" if wanted == "home" else "home"
-    if subject == str(parsed.get(other) or "").strip().lower():
-        return False
-    team = (board_row or {}).get(f"{wanted}_team")
+    ours = _subject_names_team(subject, (board_row or {}).get(f"{wanted}_team"), sport)
+    theirs = _subject_names_team(subject, (board_row or {}).get(f"{other}_team"), sport)
+    if ours and not theirs:
+        return True
+    # Names the OTHER side, or names both, or names neither: all refuse. Both
+    # is a resolver that cannot separate the teams, and neither is a subject we
+    # cannot place -- guessing from either is what this function exists to stop.
+    return False
+
+
+def _subject_names_team(subject: Any, team: Any, sport: Any) -> bool:
+    """Does the slug's subject token name THIS team, by the alias resolver?
+
+    False on anything unresolvable -- an absent team, a missing resolver, or a
+    raise. The caller treats False as "cannot confirm", and every path that
+    cannot confirm refuses.
+    """
     if not str(team or "").strip():
         return False
     try:
