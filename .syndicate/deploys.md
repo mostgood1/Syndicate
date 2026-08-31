@@ -40542,3 +40542,32 @@ the 18:25Z incident.
 
 3. `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key and
    its advice to lower `ROWS_PER_SPORT` is backwards. Unfixed.
+
+
+## 2026-08-31T23:01:29Z — live-odds-worker `d04d9f49` -> `8743ee1d` — lane `layer2-accuracy-audit`
+
+**what:** the `PREGAME_FREEZE date=... by_family={...}` log line (`5be4381d`) plus the
+cron_meta allowlist/publish, carried on the current `origin/main` tip. **This service is
+where MLB odds refresh actually runs** — measured, `run_stamp 20260831_221230
+sports=mlb,soccer lane=live-odds-worker`. refresh-worker's odds lane was soccer-only tonight.
+
+**locks:** claim ACQUIRED 22:58:10Z. Preflight refused **HOLD: 1 job(s) in flight**
+(`fetch_espn_live_status`), then 3, then 1 — **not overridden**. Went CLEAR 23:01:07Z with
+only a defunct child awaiting reap (already dead; a deploy cannot kill it). Preflight
+**re-run immediately before the POST** rather than trusting the 4-second-old watcher reading.
+Deploy `dep-dab0fif10e5c739g6qeg`, trigger=api.
+
+**verify:** live-odds-worker reached **`8743ee1d` at 23:04:55Z**, confirmed by SHA. **THE
+INSTRUMENT IS DEPLOYED; ITS READING IS NOT YET TAKEN.** Zero `PREGAME_FREEZE` lines in the
+first ~18 minutes — the logs API was responding (the watcher's own empty-API branch never
+fired), so this is a genuine absence: **no MLB refresh pass has run since the deploy.** Do
+NOT read that as the freeze failing.
+
+**WHAT THE LINE DECIDES (`todo #611`), and the discriminating detail is NOT its presence:**
+`by_family={'game_lines': N, 'hitter_props': 0, 'pitcher_props': 0}` on a pass that ran
+**AFTER** first pitch is CADENCE working as designed (the `slate_started` guard) — fix is
+scheduling. The same zeros on a pass that ran **BEFORE** first pitch means the seal is
+genuinely broken and cadence is exonerated. **Tonight's slate is already under way
+(first pitch 22:05:00Z), so the first useful PRE-slate reading is tomorrow's pregame window.**
+
+**claim RELEASED** on confirmation of the SHA; all four services free.
