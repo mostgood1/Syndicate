@@ -8232,7 +8232,7 @@ Encumbrance is precisely what that field would express, and it did not move.
 justified by duplicate-exposure risk alone — never by tied-up capital. Anyone
 arguing the hold saves money is arguing something this measurement refutes.
 
-## [polymarket-price-gate-leaks-by-crossing] 2026-08-31T15:35Z — the ceiling is checked against a price the venue never receives
+## [polymarket-price-gate-leaks-by-crossing] 2026-08-31T16:05Z — FIXED AND DEPLOYED. The ceiling used to be checked against a price the venue never receives
 
 **VERIFIED BY CODE TRACE, not by inference:**
 
@@ -8262,12 +8262,25 @@ no hold/place call flips today. The moment the ceiling is tuned NEAR the real
 boundary — which is the whole point of the exploration arm — the leak lands
 exactly where it does damage.
 
+**FIXED `34d43512`, live 15:50:18Z.** `_polymarket_submit_price` resolves through
+the SAME `_polymarket_resolve_market` placement uses, so there is no second copy
+of the venue's rounding to go stale. Every `None` path — unresolvable side, stale
+artifact, `_SlippageExceeded` — means "cannot tell" and PLACES, because the real
+path refuses each by name moments later. The raise is caught deliberately: the
+gate's call site does not handle it, so an escape would abort the placement loop
+for every remaining position on the tick.
+
+**VERIFIED by branch assertion:** `submit_price=` exists only in the new code and
+appeared 4x at 15:53:26Z. HELD/EXPLORE now log `submit_price=` for the same
+reason — the old field was a planned price attributed to an order resting higher,
+and I reasoned from it wrongly once.
+
 **FIX IS NOT "subtract a tick".** The gate must evaluate the price that will be
 submitted, which means resolving tick/cross BEFORE the gate or applying the same
 arithmetic in it. Anything else re-derives the venue's rounding by hand and goes
 stale the next time tick size changes.
 
-## [polymarket-explore-arm-FIRING] 2026-08-31T15:25Z — the arm is placing boundary orders; the falsifier is live
+## [polymarket-explore-arm-FIRING] 2026-08-31T16:05Z — the arm fired, STALLED on a float edge, and fires again; the falsifier is live
 
 **`e8392f1b` live 15:21:40Z at rate 0.5. First tick after rollout:**
 
@@ -8298,6 +8311,22 @@ the line is logged distinctly.
 **AND STILL: A FILL HERE IS NOT PROFIT.** These are near-even sides chosen to
 test a boundary, not because they are good bets. Whatever they do, the EV
 question is separate and unanswered.
+
+**CORRECTION, and it is why "the arm is firing" was not enough.** It fired twice
+at 15:25Z and then STALLED. `0.35 + 0.10` is `0.44999999999999996`, so a 0.450
+order fell outside a band whose configured top is 0.45. LATENT ALL DAY and made
+reachable by the submit-price fix: planned prices (0.441, 0.444) are arbitrary
+and never land on the edge, while SUBMIT prices are snapped to the tick and land
+on round boundaries constantly — 0.45 is exactly where a 0.44 or 0.445 quote
+crosses to. The arm's single most probable price was the one it could not place.
+Fixed `3db201bc`, live 15:59:13Z; verified 16:03:16Z, `EXPLORE bal-col
+submit_price=0.450`, with 0.460/0.465/0.490 correctly held.
+
+**THE EXPERIMENTS, as of 16:20Z:** both rest at 0.45, `cum=0`, full `leaves`,
+across FIVE independent book reads. The pregame price rule holds on its first
+DELIBERATE test — the evidence moved from 3 passive observations to 5, and from
+observed to probed. Kickoff is the decisive reading: `ast-ars` ~18:57Z,
+`bal-col` ~00:45Z.
 
 ## [polymarket-explore-arm-too-slow] 2026-08-31T15:11Z — the arm is LIVE and CORRECT, and its sample rate is close to zero
 

@@ -1176,6 +1176,27 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Narrative: `.syndicate/log/2026-08-31.md`, `.syndicate/lanes_history.md`.
 - Blocked by: none
 
+### polymarket-pregame-price-gate — OPEN — opened 2026-08-31 — session 6475567d-f806-45a7-880c-f633718f2411
+- Rationale: opened RETROACTIVELY at checkpoint. This session shipped two
+  live-money deploys with no open lane, under the holder `ncaaf-totals-dispersion`
+  — a BLOCKED NCAAF lane in `lanes_history.md`. The locks serialise on whatever
+  name they are given, so nothing was double-deployed, but the audit trail reads
+  NCAAF for a Polymarket change. Opened so the next session does not inherit that.
+  The engine file is claimed by `polymarket-yes-leg-binding` and is DELIBERATELY
+  NOT listed below: every edit to it this session was cross-lane with explicit
+  user authorisation, and claiming it here would contest a lane that owns it
+  (the invariant checker flags exactly that). It stays theirs.
+- Goal: a near-even pregame Polymarket order is either placed because it can
+  fill, or held because it cannot — decided on the price the VENUE receives.
+- Files: tests/test_execute_portfolio.py
+- Hypothesis: pregame only CHEAP sides fill; once live everything fills.
+- Falsification test: an explored order filling above 0.410 pregame. TWO ARE
+  LIVE AT 0.45 RIGHT NOW (`bal-col`, `ast-ars`) — placed on purpose.
+- Verification: DONE for the gate (branch assertion `submit_price=` 15:53:26Z;
+  band edge `EXPLORE ... submit_price=0.450` 16:03:16Z). NOT DONE for the rule —
+  kickoff is the reading: ast-ars ~18:57Z, bal-col ~00:45Z, watcher bqopjstn0.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.

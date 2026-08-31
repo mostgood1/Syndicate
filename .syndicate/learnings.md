@@ -5226,3 +5226,52 @@ like paths (catches `1/p`, `15.0`, prose read as a claim), AND reject claims
 whose path is absent from `git ls-files` (catches this, and stale claims on
 deleted files). `check_lane_invariants` does neither — it verifies that each
 claim has exactly one holder, which is true of a claim that guards nothing.
+
+## 2026-08-31 — a branch assertion proves the code RAN, not that it did the right thing
+
+**OVERTURNED:** my own standard, that a field which exists only in the new code
+is sufficient verification of a deploy. I have argued this repeatedly and it is
+still the right FIRST check. It is not a sufficient one.
+
+Deploy `d97cee5a` (15:50:18Z) passed its assertion cleanly — `submit_price=`
+appeared 4x at 15:53:26Z, so the new gate demonstrably executed. The deploy was
+also broken. The same tick read `HELD x4, EXPLORE x0, placed=0` where every
+earlier tick read `2/2`: the exploration arm had silently stopped firing, because
+`0.35 + 0.10` is `0.44999999999999996` and a 0.450 order fell outside a band
+whose configured top is 0.45.
+
+**The defect was invisible in the assertion and obvious in the SHAPE of the
+output.** Nothing about "did my code run" could have caught it; only the counts,
+compared against what the same tick produced before.
+
+**HOW TO APPLY.** After a branch assertion passes, read one more thing: the
+DISTRIBUTION the changed code produces, against its own prior distribution. Same
+tick, same fields, before vs after. If a fix cannot change those counts, say so
+and move on; if it can, that comparison is the verification and the assertion was
+only the precondition. "It ran" and "it works" are two readings, and I stopped at
+the first one while money was moving.
+
+Related: [[feedback_confirm_the_code_ran]] (assert the branch, not the outcome)
+is the rule this extends rather than replaces — the branch assertion still comes
+first, it just no longer comes last.
+
+## 2026-08-31 — a correct fix can make a latent bug REACHABLE, and that is the fix's problem
+
+The float band edge above had been in the code all day and never fired. It became
+live within three minutes of a change that touched nothing near it.
+
+**The mechanism generalises.** The gate used to read PLANNED prices — 0.441,
+0.444 — which are arbitrary and essentially never land on a round boundary. The
+fix made it read SUBMIT prices, which are SNAPPED TO THE TICK and therefore land
+on round boundaries constantly. Correcting the input did not change the
+comparison; it changed the DISTRIBUTION of values reaching it, and moved the mass
+onto exactly the point where the comparison was wrong. 0.45 is where a 0.44 or
+0.445 quote crosses to, so the arm's most probable price was its blind spot.
+
+**HOW TO APPLY.** When a change alters WHICH VALUES flow into existing
+comparisons — rounding, snapping, quantising, unit conversion, a different source
+for the same field — the downstream boundary conditions are part of that change's
+blast radius even though its diff does not touch them. Ask what the new values
+CLUSTER on, then check every `>`/`>=`/`<=` they will meet. Tick-aligned prices
+cluster on ticks; timestamps cluster on the minute; percentages cluster on
+integers. Floats compare badly at exactly those points.
