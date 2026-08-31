@@ -9035,3 +9035,79 @@ P(shots>=2) bias -0.0001 over 597 players / 759 matches) and the finding that
 the fixture's team total is approximately right while the top shooter's share is
 roughly double. Both rest on the 2025 outcome file alone and neither needs the
 prediction archive.
+
+### THE SKILL NUMBER `[measured 2026-08-31]` — the shots model OVER-PREDICTS BY 36%, and it is worst exactly where the board's edges come from
+
+**`model_skill` on these rows has read `sample_games: 0, status: unmeasured`
+since they shipped. It is now measured. n=2,476 (player, match) pairs over 55
+matches and 8 leagues.**
+
+The join nobody had made: archived predictions
+(`api/recommendations/recommendations_<DATE>.json`) carry `expected_shots` — the
+model's MEAN, already stored, no inversion and no replay — keyed by **ESPN**
+match id; `espn_shot_events.extract_shot_events` reads shot events **from ESPN**.
+Same id space, direct join. 55 of 55 matches fetched.
+
+    predicted mean   0.5242
+    realized  mean   0.3849
+    BIAS            +0.1393        RATIO 1.362
+    MAE              0.5558        constant-mean baseline 0.6035
+                                   -> the model BEATS the baseline by 7.9%
+
+**IT CARRIES REAL SIGNAL AND IS BADLY SCALED. Both halves matter.** Beating a
+constant-mean baseline by 7.9% means the per-player ordering is informative —
+this is not noise, and the fix is not to discard the model. It is level.
+
+**CALIBRATION — over-prediction in every decile above the second, worsening:**
+
+     pred range      n     pred   real     bias   ratio
+     0.00-0.03     247    0.000  0.016   -0.016    0.03
+     0.03-0.12     247    0.081  0.089   -0.008    0.91
+     0.13-0.19     247    0.158  0.134   +0.024    1.18
+     0.19-0.27     247    0.232  0.206   +0.025    1.12
+     0.27-0.36     247    0.311  0.227   +0.084    1.37
+     0.36-0.45     247    0.397  0.279   +0.117    1.42
+     0.45-0.58     247    0.514  0.381   +0.134    1.35
+     0.58-0.77     247    0.673  0.538   +0.134    1.25
+     0.77-1.18     247    0.937  0.623   +0.313    1.50
+     1.18-3.69     247    1.849  1.348   +0.501    1.37
+     3.76-4.92       6    4.254  0.667   +3.587    6.38   <- n=6, treat as a flag
+
+**THE TOP BUCKET IS WHERE THE BOARD'S EDGES LIVE.** Budimir's implied mean was
+**4.57**, which lands in that last row. Six observations is not a result — but
+the direction is consistent with every bucket beneath it and the magnitude is
+not marginal, so it is recorded as **a flag with its denominator attached**, not
+as a measurement.
+
+**STARTER AWARENESS IS NOT CLEANLY IMPLICATED — the earlier suspect weakens.**
+Bias by `expected_minutes_share`: sub/fringe **1.28** (n=860), rotation **1.44**
+(n=1007), near-ever-present **1.33** (n=609). Present in every band and NOT
+concentrated in the players a lineup renormalization would inflate most. This is
+a broad level error, not a starter-share artefact.
+
+**VALIDATION OF THE INSTRUMENT ITSELF, because a wrong outcome side would
+manufacture exactly this result:**
+- ESPN capture is complete: **24.15 shots/match extracted vs a 23.4/match
+  season benchmark, ratio 1.03**, and all 1,328 events carry a player name.
+- **A first pass reported ratio 1.434 and was WRONG.** Name matching was exact,
+  so accented shooters (`Martin Ødegaard`, `Gabriel Magalhães`) scored as ZERO
+  shots — 48 events, inflating the bias. Re-run with NFKD folding gives 1.362.
+  The number above is the folded one.
+- The remaining 375 unattributed shots belong to players absent from the
+  prediction set entirely. That does not bias a per-row comparison; each
+  predicted row is scored against its own realized count.
+
+**STATED LIMITS.** 55 matches, dates 2026-07-20..2026-08-28 — the season's
+opening weeks, when the model's own per-90 inputs rest on the fewest games, so
+this may be a worst case rather than a steady state. Single snapshot of the
+mirror; production holds more recommendation files and the measurement should be
+re-run against them before anything is calibrated on it.
+
+**WHAT THIS LICENSES.** `model_skill` for soccer shot props can stop saying
+`unmeasured`: the honest verdict is **"beats a constant baseline by 7.9%, and
+over-predicts the mean by 36%"**. A 1.36x level error is a sufficient and
+measured reason to shrink these edges — the thing the units argument was
+reaching for and could not justify. **It is NOT yet a licence to divide by 1.36
+in the engine:** a calibrated engine needs the rates that were absorbing this
+re-fit alongside it, and this lane's standing rule is that any single-parameter
+fit clears a HELD-OUT validation on different matches than the fit.
