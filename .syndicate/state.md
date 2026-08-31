@@ -8185,6 +8185,41 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-price-gate-leaks-by-crossing] 2026-08-31T15:35Z — the ceiling is checked against a price the venue never receives
+
+**VERIFIED BY CODE TRACE, not by inference:**
+
+    execute_portfolio.py:498   gate  _polymarket_hold_price(request, venue)
+                               reads planned_probability(request.requested_price)
+    execute_portfolio.py:1816  submit _polymarket_resolve_market(request)
+                               applies crossing (+N ticks) THEN snap direction="up"
+
+The gate runs ~1300 lines EARLIER than price resolution. Both crossing and the
+snap round UP by design, so **the submitted price is systematically higher than
+the price the ceiling was tested against.** Measured on the two live explores:
+
+    gate saw   0.444 / 0.441      (logged in EXPLORE_PREGAME_BOUNDARY)
+    venue got  0.45  / 0.45       (SUBMIT ... price={'value': '0.45'})
+
+**CONSEQUENCE 1 — the ceiling is NOMINAL.** A planned 0.349 against a 0.35
+ceiling passes the gate and is submitted at ~0.355+. There is no price at which
+the gate actually bounds what is bought; it bounds an intermediate value.
+
+**CONSEQUENCE 2 — every HELD/EXPLORE price in the logs is the WRONG NUMBER to
+reason from.** Anyone deriving a boundary from those lines is reading planned
+prices and attributing them to orders that rested at a higher price.
+
+**NOT CURRENTLY MOVING A DECISION, and that is luck, not design.** The overshoot
+is one tick, and 0.349 -> 0.36 stays inside the unobserved gap 0.335..0.410, so
+no hold/place call flips today. The moment the ceiling is tuned NEAR the real
+boundary — which is the whole point of the exploration arm — the leak lands
+exactly where it does damage.
+
+**FIX IS NOT "subtract a tick".** The gate must evaluate the price that will be
+submitted, which means resolving tick/cross BEFORE the gate or applying the same
+arithmetic in it. Anything else re-derives the venue's rounding by hand and goes
+stale the next time tick size changes.
+
 ## [polymarket-explore-arm-FIRING] 2026-08-31T15:25Z — the arm is placing boundary orders; the falsifier is live
 
 **`e8392f1b` live 15:21:40Z at rate 0.5. First tick after rollout:**
