@@ -19396,3 +19396,436 @@ caaf-no-orders`). NOT
 - Blocked by: none
 
 
+
+
+## COMPACTED 2026-08-31 (third pass) — the eleven small lanes, full bodies VERBATIM
+
+
+### portfolio-ledger-service-split — OPEN — opened 2026-08-22 — session 74a0966a-a9fe-57cd-8320-f46f235aeed1
+- Goal: a bet logged on WEB can be settled by the autorun on REFRESH-WORKER, so
+  `/portfolio` stops reading every position as pending.
+- Files: released: `syndicate/features/prediction_ledger.py`,
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: `syndicate/features/shared/ledger_bridge.py`,
+  RELEASED `[2026-08-24 to exchange-markets-api-integration]`: `scripts/run_refresh_worker.py`
+  Reworded 2026-08-28 so the parser can SEE the release this lane already
+  recorded in prose; a marker governs what FOLLOWS it on ITS OWN LINE, and the
+  old wording put both the strikethrough and the word after the path. Session
+  `74a0966a` archived 2026-08-22, `lane-guard` was blocking a narrow,
+  released: additive, try/except-wrapped diagnostic hook on the strength of a dead
+  session's claim; rest of this lane's file list untouched),
+  released: `scripts/backfill_portfolio_settlement.py`,
+  released: `tests/test_prediction_ledger_shared_store.py`,
+  released: `tests/test_evaluation_settlement_autorun_ordering.py`,
+  released: `tests/test_ledger_bridge_identity_join.py`,
+  released: `tests/test_backfill_portfolio_settlement.py`
+- **Status: three defects found, all FIXED AND DEPLOYED. The goal is NOT met —
+  nothing has settled yet.** Narrative and evidence: `log/2026-08-22.md`.
+  Subject facts: `state.md [portfolio-settlement]`.
+  - `#502` ledger crosses the service boundary — live both services `2aa1df54`
+  - `#504` settlement 13th -> 2nd in the chain — live `4eeffb5c`, VERIFIED 1.3ms
+  - `#505` join on a stable identity — live `a1e89ff3`, refresh-worker only
+- **Unverified and load-bearing:** `#505`'s `entity` field mapping was never
+  measured against real evaluation records (worker-local, not in
+  `HOT_ARTIFACT_PATTERNS`).
+- Backfill tool BUILT and NOT RUN against production:
+  `scripts/backfill_portfolio_settlement.py`, preview-by-default. Ran in preview
+  in-session; it proved the tool works and nothing about production (no local
+  portfolio ledger; the one local evaluation chunk holds a single
+  `record_type: prediction` row, not a wager).
+- Verification still owed: the next `[ledger_bridge]` line, 2026-08-23 after
+  06:00 CT. `matched_by_identity > 0` = the join works; `by_identity` large with
+  `matched_by_identity: 0` = the entity mapping is wrong. **That same line also
+  gates the backfill** — do not run it with `--commit` before that reading.
+- Session `74a0966a` ARCHIVED 2026-08-22. All four deploy claims free at exit.
+- **NOTE for whoever owns `refresh-worker-oom-recurrence`:** this lane edited
+  `scripts/run_refresh_worker.py`, which your lane nominally holds. Your block is
+  no longer in `lanes.md` so `lane-guard` saw no claim. Flagged because the
+  change moves an expensive job earlier in the tick chain.
+- Blocked by: none.
+
+
+### exchange-markets-api-integration — OPEN, GOAL COMPLETE, lane idle — opened 2026-08-24 — session 71a74bb7-67ff-5c39-af7a-c11c2d94cce8
+- Goal (DONE): read-only market/odds-pulling client modules for six
+  prediction/event-market venues (coinbase, prophetx, novig, polymarket,
+  robinhood, crypto.com "OG"). Full research findings, per-venue status, and
+  the Novig/ProphetX order-automation scoping work: `todo.md #544` (canonical)
+  and `lanes_history.md` (this lane's full narrative, moved 2026-08-25).
+- Files still claimed: released: `syndicate/features/shared/{coinbase,prophetx,novig,
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: polymarket,robinhood,cryptocom}_client.py`, matching `scripts/probe_*.py` and
+  released: `tests/test_*_client.py`, `.syndicate/scope_2026-08-24_exchange_markets_api_integration.md`,
+  released: `scripts/probe_exchange_markets.py`.
+  RELEASED `[2026-08-29, USER OVERRIDE, to ncaaf-no-orders]`: `scripts/run_refresh_worker.py`
+  This lane's claim on it was always **NARROW** and self-described as "one
+  small, additive, opt-in-only boot-probe hook"; the lane is idle with
+  "nothing outstanding". `ncaaf-no-orders` needs a DIFFERENT region of the same
+  file (`_season_projection_should_launch`), `lane-guard` BLOCKED it, the
+  conflict was surfaced to the user rather than worked around, and the user
+  granted the override. Marker on its own line so the parser SEES the release,
+  per the note in `portfolio-ledger-service-split` — which released this same
+  path to this same lane on 2026-08-24 for the same reason.
+- **Status: nothing outstanding for this lane.** `#544`'s stated NEXT phase
+  (order automation for whichever of polymarket/novig/prophetx clears
+  legal/ToS review) is externally resolved: Polymarket order automation
+  shipped via a sibling session; Novig buy-side automation is OFF by explicit
+  user decision (2026-08-24); ProphetX is blocked on a partner credential with
+  no self-serve path. Checked against `todo.md` on 2026-08-25 — unchanged,
+  still the same answer.
+- **2026-08-25 follow-up work, same conversation, not this lane's original
+  scope:** real-money execution-cap change (bankroll $1000 unchanged, Kalshi
+  $50/day, Polymarket $100/day, $10 max order, 15 combined orders/day) — PR #62
+  merged, `live-odds-worker` + `web` redeployed, `live-odds-worker` env vars
+  fixed to match (was drifted to a flat $40/day for both venues), **verified
+  live in production 2026-08-25T19:35Z**. PR #63 (deploys.md record) merged.
+  Both feature branches (`claude/exchange-market-apis-jr2lqy`,
+  `claude/record-deploys-2026-08-25`) deleted post-merge — deletion itself had
+  to be done by the user; this session's git/API credentials are blocked from
+  ref-deletion (confirmed via both `git push --delete` and a direct GitHub API
+  `DELETE`, both 403). One confirming comment posted on PR #61 (a different
+  session's work) as one of two named owners of `run_refresh_worker.py`; the
+  other named owner's session (`portfolio-ledger-service-split`, `74a0966a`)
+  was archived before that PR opened and could not respond. User merged PR #61
+  directly. Full narrative, evidence, and what's believed-not-verified:
+  `.syndicate/log/2026-08-25.md`; deploy measurements: `.syndicate/deploys.md`.
+- Blocked by: none. All deploy claims released (`deploy_claim.py status`: all
+  four services free).
+
+
+### kalshi-line-aware-rungs — OPEN — **CLAIMS RELEASED 2026-08-26 03:3xZ, session archived** — BLOCKED ON TWO MEASUREMENTS, do not resume the original goal first — opened 2026-08-25 — session 281da8c3-1df9-5c77-9e34-ee6f15f37b45 (GONE)
+
+- **CLAIMS RELEASED. The files below are FREE to take.** The lane stays OPEN
+  because real work remains, but no live session holds it — do not treat the
+  `Files:` list as a lock. Whoever picks this up should re-claim what they need.
+  Nothing here is uncommitted: tree clean at `d2d44dbaf`, all shipped code live
+  under `34717822`.
+
+- **Files: released:** `tests/test_kalshi_odds_cadence.py`,
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: `tests/test_kalshi_precap_cut_by_date.py` (NEW),
+  released: `syndicate/features/shared/kalshi_board.py`, `tests/test_kalshi_board.py`,
+  released: `syndicate/features/shared/kalshi_catalogue.py`,
+  released: test_kalshi_side_vocabulary (transferred to
+  `live-venue-order-placement` 2026-08-29, `#603`), test_kalshi_futures_eviction.
+  Written without `.py` so the guard stops enforcing paths this lane released.
+- **RE-CLAIM NOTE (moved OUT of the `Files:` block 2026-08-29 — it was creating
+  the very phantom claim it describes).** The venue quote adapter and fan-in
+  modules, and the Kalshi odds-refresh module, were RE-CLAIMED by lane
+  `venue-quote-line-join` on 2026-08-27, exactly as the released-claims note
+  above instructs. They were struck from the `Files:` list rather than left
+  contested. **But the striking note itself NAMED THEM INSIDE THE `Files:`
+  BLOCK, and `.claude/hooks/lane-guard.py` turns any path inside that block
+  into a CLAIM** — so this lane, whose session is GONE and whose claims are
+  explicitly RELEASED, went on blocking edits to two files it had already given
+  up. Measured 2026-08-29: the guard refused
+  `live-venue-order-placement` on the adapter naming THIS lane as holder, while
+  `check_lane_invariants.py` reported no violation (the two parse the block
+  differently). Filenames are now written without their `.py` extension in this
+  bullet, and the bullet sits outside `Files:`, so the note can be read without
+  being enforced: venue_quote_adapters, venue_quote_fanin, kalshi_odds_refresh.
+- **SHIPPED AND VERIFIED (evidence in `log/2026-08-26.md`, rows in `deploys.md`):**
+  side vocabulary; futures eviction; `board_by_game_date` on the ticker's game
+  date with `BY_CLOSE_DATE` alongside; ticker zone settled Eastern;
+  `PRECAP_CUT_BY_DATE`. All live under `34717822`.
+- **FOUR HYPOTHESES KILLED, none by argument:** (1) "the working set holds
+  nothing for the board's date" — refuted, 1958 markets on it; (2) NCAAF has no
+  game on the board's date — true but NOT binding, the join's board side has no
+  NCAAF rows at all **[NOW STALE, 2026-08-27: NCAAF reaches the board side.
+  The Layer 2 projection-window fix `5e6ef685` admitted it to the candidate set,
+  and `VENUE_REPRICE` read `sports=['ncaaf', 'soccer', 'wnba']` at 02:56:06Z with
+  `ncaaf` unmatched at only 62. A successor re-deriving this lane's numbers must
+  re-measure rather than inherit them]**; (3) `market_is_for_another_date` is a defect — it is a
+  description; (4) eviction re-prioritisation recovers ~1,600 markets — measured
+  **133**.
+- **BLOCKED ON, in order. Do NOT write an eviction change before both:**
+  1. `PRECAP_CUT_BY_DATE` taken **during a live slate**. The `03:11Z` reading is
+     post-slate and systematically understates it (`KXMLBHRR` cut 747 at 01:49Z,
+     132 at 03:11Z). Code is already live; this needs only a reading.
+  2. The **outer `MAX_STORED_MARKETS` trim dated the same way**. `cut_total=3940`
+     vs `TICK trimmed=8744` — ~4,800 markets are cut by a second date-blind bound
+     that nothing dates.
+- **THEN, and only if those numbers support it:** line-aware rungs, the lane's
+  original goal. Currently unjustified.
+- **Largest addressable bucket is now `no_matching_board_row=1838`**, not the
+  date bucket. Any successor should start there.
+
+
+### kalshi-spread-join-sign — **OPEN (reopened 2026-08-26)** — session syndicate-43 (ENDED) — UNOWNED — six things verified; WNBA settlement is BUILT, LANDED and NOT DEPLOYED
+- Note: this lane was CLOSED earlier on 2026-08-26 and its block correctly moved
+  to `lanes_history.md`. Work continued after that close, so this is a fresh
+  block for what is still OWED — the history entry stays as the record.
+- Files: released: `syndicate/features/shared/{kalshi_board_join,kalshi_orders,bet_status_wnba,bet_status_soccer,polymarket_us_orders,board_enrichment}.py`,
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: `scripts/build_wnba_boxscores.py`,
+  released: `syndicate/blueprints/wnba.py` and their tests. **ALL CLAIMS RELEASED.**
+- Claim reconciliation `[2026-08-27, USER DECISION]`: the intelligence-state
+  pipeline module was REMOVED from the `- Files:` line above by lane
+  `board-cycle-overview-throughput`. This lane already said ALL CLAIMS
+  RELEASED and its session (syndicate-43) has ENDED, but the invariant checker
+  parses that line literally and cannot read prose, so the path still
+  registered as a live claim and reported CONTESTED. Striking it makes the
+  machine-readable claim agree with what this lane already states. None of the
+  five OWED items below involve that module.
+- VERIFIED (evidence `log/2026-08-26.md`, measurements `deploys.md`): Kalshi
+  shard 3 funded (3 MLB fills, `exchange_index=3`) · spreads join sign (15 of 30
+  inverted -> 0) · spreads PLACE correctly (`AZ2` home -1.5 -> YES, filled
+  3 @ 0.33, venue title matches the row) · WNBA id barrier
+  (`game_not_in_live_box` 9 -> absent, graded 0 -> 3) · soccer per-league read
+  (`no_soccer_live_state_for_date` -> `match_not_in_soccer_live_state`) · ESPN
+  host split (`{"ok":true,"games":3}` after the swap; 403 minutes before).
+- **OWED, in priority order:**
+  1. **DEPLOY refresh-worker, THEN read `SETTLED date=2026-08-25`.** All code is
+     on `origin/main`; the worker was NOT deployed (preflight HOLD, jobs
+     climbing 1 -> 10). `not_decided_yet: 6` is UNCHANGED and still reflects the
+     ESPN 403. PASSES only if it falls below 6 and Citron (1 reb vs over 3.5) /
+     Amoore (3 ast vs over 3.5) grade **LOST**. **DO NOT REPORT WNBA SETTLEMENT
+     AS FIXED BEFORE THAT READING** — and treat its all-time `win 100%` as
+     wins-only by construction until a loss can settle.
+  2. **Re-do the 2026-05-25..08-26 backfill through the KEYVALUE store.** The 84
+     files published via `/api/ops/artifacts/publish` sit on WEB'S FILESYSTEM
+     while the consumer reads keyvalue on refresh-worker — in production and
+     invisible to settlement. `build_wnba_boxscores.py --via-web --start --end`
+     run ON a worker lands in the right place.
+  3. **Soccer: still 0 settled all-time.** The read is fixed; needs an order
+     whose match finished with finals captured after 2026-08-26T16:11Z.
+  4. **Polymarket side resolution UNRESOLVED.** `over`->YES/`under`->NO is a
+     fixed constant while the price comes from the name-matched index, and the
+     `outcomes` array orientation VARIES per market. A cross-check guard was
+     built and REVERTED — it silently enthroned the positional reading, the
+     disputed question, and contradicted three deliberate tests. Needs venue
+     ground truth (Polymarket US credentials, on Render; the env read was
+     blocked by the permission classifier). `FILL_ABOVE_LIMIT` ships as
+     detection only.
+  5. **33 pre-existing test failures** in the soccer/board selection, confirmed
+     NOT caused by this lane (identical counts with and without the change).
+     `test_team_aliases.py` is 9 of them and the soccer join leans on it.
+- Blocked by: none
+
+
+### ncaaf-pace-block — OPEN — NCAAF calibration re-fitted and PROMOTED (15.00% -> 7.24%, impossible drives 159 -> 0); NFL deliberately NOT re-fitted (best as shipped); production read of the profile still owed — opened 2026-08-27 — session de363735
+- **`syndicate/features/ncaaf/sources.py` WAS EDITED OUT FROM UNDER THIS LANE
+  ON EXPLICIT USER OVERRIDE `[2026-08-29, session 6dc988f8, lane
+  ncaaf-compact-card-state]`.** Scope: `ncaaf_week_and_card_keys_for_date`
+  ONLY — it depended on `cfbd_lines_*.json`, which has no producer on any
+  service and exists at no git SHA (`#557`), so NCAAF served **0 game chips
+  on every service on every date** and Layer 2's NCAAF rows carried no game
+  state. Nothing else in the file was touched; the calibration/pace work this
+  lane owns is elsewhere in it. Recorded here rather than only in my own lane
+  so the holder finds it without going looking.
+- Goal: the NCAAF `pace` block carries a REAL per-team seconds-per-play, so the
+  engine stops running every game on the hardcoded 24.0 (`pace_index +0.400`).
+- Files: released: `scripts/build_ncaaf_pace_snapshot.py`,
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+  released: `syndicate/features/ncaaf/feature_payload.py`,
+  released: `syndicate/features/ncaaf/sources.py`,
+  released: `tests/test_ncaaf_pace_payload.py`
+- Hypothesis: the totals over-dispersion (`1.94x`, measured on the live slate)
+  is driven in part by pace. MEASURED, not assumed: with no pace block the
+  engine runs 151.6 s/drive while the league-average team is 179.5 — ~18% too
+  fast, so more drives fit in a game and totals inflate. `drive_success_
+  probability` is unchanged across the whole pace range (0.3270), so the effect
+  is cleanly isolated.
+- Falsification test: if a re-fit with the pace block ON does not reduce TOTAL
+  error against the market, pace is not the driver and the block stays off. The
+  correlation study already showed these payload features carry NO information
+  the market misses on margin (residual |r| <= 0.021, n=690) — pace is being
+  tried because it targets a surface the model is KNOWN to get wrong, not
+  because an edge is expected.
+- Verification: (a) reachability, off != on, already demonstrated across the
+  real range 21.0..33.4 s/play; (b) per-team coverage reported as a RATE over
+  FBS teams, not a count; (c) a re-fit reporting TOTAL error, not just margin.
+  DONE separately and verified on production: projections 0/51 -> 51/51, strip
+  435px -> 181px uniform with crests, live lens state-aware. NOT verifiable in
+  production: `_EngineRowProjection` (cards route takes a WEEK only; 2026 has no
+  engine rows) and the live lens under real in-game data (no game until Sat).
+- Blocked by: none. Ships DEFAULT-OFF behind the existing payload flag — the
+  profile was calibrated with pace_index pinned at +0.4, so turning this on is
+  a mechanism added to a calibrated engine and owes a re-fit before any deploy.
+
+
+### boot-sync-healthcheck-kill — OPEN — opened 2026-08-27 — session 64625b4d
+- Goal: a web boot must not cost the container a long blocking file walk, so
+  sync I/O cannot starve `/healthz` inside Render's 5s budget.
+- Files: released: `scripts/bootstrap_data_root.py`, `syndicate/app.py`
+  **CLAIMS RELEASED 2026-08-29 — phantom sweep, the owning session is gone. The paths in this block are a RECORD, not a claim. A lane that resumes this work reclaims them by striking this note and the `released:` tokens.**
+- Status: **both fixes LIVE.** `188a89fa` (compare depth follows root policy)
+  rode in on `d281995b`; `48833112` (boot sync decides from a name set) deployed
+  by this lane 21:54:46Z. Boot sync **72.20s -> 0.65s**, reproduced at 0.59s on
+  an unrelated lane's next deploy. `present=33316` + `unchanged=76` = 33,392 =
+  `git ls-files` over the roots, so nothing was skipped.
+- **Open ONLY on the rate.** 2 deploys since the fix, 0 `server_failed`. Against
+  a ~1-in-5 base rate that is not yet evidence. Close when >=5 deploys have
+  accumulated with no kill — they will arrive from other lanes' work; do not
+  manufacture deploys for this.
+- Verification: NOT a per-boot `/healthz` trace — that does not discriminate,
+  since two PRE-fix boots that survived were equally clean (5.13s, 5.59s). Count
+  `server_failed` per deploy over >=5 deploys.
+- Not this lane: `GET /` at 8.1s (`home.py`, claimed elsewhere) is the other
+  documented route to the same 5s budget.
+- Narrative + dead ends: `.syndicate/log/2026-08-27.md`; measurements:
+  `deploys.md`; full working block: `lanes_history.md`.
+- Blocked by: none.
+
+
+### live-prob-producer-reader-gap — OPEN — opened 2026-08-29 — session d617eefd-1628-4795-9e11-7b6aaa3f2ff3
+- Goal: decide, with ONE measurement, whether MLB live prop probabilities are
+  LOST IN THE JOIN (a keying mismatch, a day of work) or NEVER PRODUCED (engine
+  work under `model_engine_standard.md`, a week). No code change until it is
+  decided.
+- Files: syndicate/features/shared/live_projection_join.py,
+  syndicate/features/shared/polymarket_board_join.py,
+  pipeline/portfolio_commit.py
+- CLAIM CORRECTION, 2026-08-29 ~17:0xZ CT, recorded rather than quietly fixed:
+  the last two paths were being EDITED WITHOUT A CLAIM. `venue-join-refusal-
+  visibility` was CLOSED and its claims RELEASED at ~19:10Z, and five further
+  commits went into those two files afterwards under a lane that no longer
+  held them (the wrong-game fix, the competition check, the inversion refusal,
+  the prop census, the ladder check). Nothing collided -- no OPEN lane held
+  either path -- but two sessions are live on adjacent code
+  (`Kalshi/Polymarket live game orders`, `Polymarket order submission failure`)
+  and `live-venue-order-placement` had already picked up
+  `polymarket_us_markets.py` the moment my lane released it. A peer could have
+  taken these two the same way at any point tonight. Claimed here so the
+  enforcement matches what is actually being written.
+- Hypothesis: the probabilities ARE produced and the join cannot find them.
+  `[live_props] LIVE_MC_PRICED game=822770 outcomes={'priced': 82,
+  'no_dist_for_player_or_stat': 36}` against `LIVE_PROJECTION_JOIN sport=mlb
+  projected=598 prob_withheld=598`. A producer writing 82 priced outcomes and a
+  reader reporting none is the exact shape of the five defects the
+  `venue-join-refusal-visibility` lane closed today (`refusals` vs `reasons`,
+  corners on `question`, `fh`/`sh`, `row["line"]`, `"line"` absent from `_KEEP`).
+- Falsification test: read ONE `LIVE_MC_PRICED` payload and the key
+  `live_projection_join` looks it up under. If the priced outcomes carry a
+  probability the join simply misses -> KEYING. If the priced rows carry a MEAN
+  and no probability -> ENGINE, hypothesis dead, and the lane re-scopes.
+- Verification: the answer is stated with the two keys printed side by side,
+  not inferred from counts.
+- PRIOR EVIDENCE THAT CONSTRAINS THE OUTCOME, both to be surfaced before any
+  edge work:
+  1. A live-edge attempt was SHIPPED AND BACKED OUT. It priced `modelProbOver`,
+     which measured bit-identical to the PREGAME probability on 24 of 28 rows;
+     three props whose over had ALREADY WON still read 0.659/0.655/0.745,
+     producing +36.5%/+32.3%/+15.8%. Mean |edge| on decided rows 28.2% vs 12.0%
+     on undecided — fabricated numbers twice the size of real ones, sorting
+     straight to the top of an edge-ranked board. Documented in
+     `live_projection_join.py`; treat as a standing decision.
+  2. `live-game-line-projection` (CLOSED 2026-08-29) measured the live model
+     TRAILING the market: `priceable_only` model minus market Brier positive on
+     8 of 9 scored dates. **A live edge computed against a model that trails the
+     market is a false edge.** Even a clean keying fix does not by itself make
+     live opportunities safe to place.
+- Blocked by: none
+
+
+### mlb-resolver-write-side-effect — OPEN, **NARROWED — NOT A LIVE INCIDENT** — opened 2026-08-29 — session 6475567d-f806-45a7-880c-f633718f2411 — **UNOWNED, handed off**
+- **THE FALSIFICATION TEST THIS LANE ASKED FOR HAS RUN. `should_copy` does NOT
+  fire on the daily path in production.** Priority accordingly LOW. The defect
+  is real; the blast radius is much smaller than this block first said.
+
+- THE DEFECT, unchanged: `artifact_publisher._required_daily_artifact_paths` —
+  which only asks WHICH artifacts are required — reaches
+  `mlb.sources.daily_artifact_path` → `_resolve_data_path_with_reconcile` →
+  `shutil.copy2` (`mlb/sources.py:116`). The copy then looks present, so
+  `_missing_required_artifact_relative_paths` does not request it.
+- **THE TRIGGER IS WORSE THAN 'AN MTIME RACE', WHICH THIS BLOCK GOT WRONG.**
+  `if target_stat is None: should_copy = True` (`sources.py:99-101`) — a MISSING
+  target copies unconditionally. That is exactly the case the repair exists for,
+  so where a candidate exists the suppression is by construction, not by luck.
+
+- **WHY IT IS STILL NOT LIVE: on Render the candidate root holds only
+  GIT-TRACKED files, and that mirror stops at 2026-07-12.** No `.slugignore` and
+  no `buildFilter`, so the checkout is a full clone — but a clone carries
+  tracked files only: **283 `daily_summary_*`, window 2026-05-28 → 2026-07-12**.
+  The daily pull asks for TODAY, which has no tracked candidate.
+  MEASURED against production 2026-08-30: `daily_summary_2026_08_28` and
+  `_2026_08_29` are both git-tracked=NO and both served 200 (2,480,712 B and
+  2,806,937 B) — production's own artifacts, no mirror involved.
+- **THE ORIGINAL 2.46MB MEASUREMENT WAS DRIVEN BY AN UNTRACKED FILE.**
+  `daily_summary_2026_07_26.json` is on a dev disk but `git ls-files` says NO,
+  so it cannot exist in a Render checkout. The tempdir result was real and the
+  mechanism is real; it just does not reproduce on the worker for that date.
+
+- **WHAT REMAINS, and it is the part worth fixing:** any BACKFILL or EVALUATION
+  over **2026-05-28 → 2026-07-12** silently gets the git mirror's copy instead
+  of pulling production's. That is precisely the window CLAUDE.md warns
+  backtests run on ("`data/**` in git is a lossy mirror"), so the failure mode
+  is a backtest that believes it read production and did not.
+- **A CHECK THAT PROVED NOTHING, recorded so nobody repeats it:** production's
+  `daily_summary_2026_07_12.json` is byte-identical to the git copy (same
+  sha256, 2,367,970 B). That is NOT evidence the reconcile copy won —
+  `refresh_mlb_source_mirror.ps1` refreshes the mirror FROM production, so
+  identity is the expected state whichever direction it flowed. The reading
+  cannot discriminate the two hypotheses.
+- Still-open discriminator if anyone wants certainty: instrument the copy (one
+  `print` at `sources.py:116`) and read a worker tick, or compare the mounted
+  disk's mtime against deploy time for a tracked-window date.
+
+- Files: `syndicate/features/mlb/sources.py`,
+  `syndicate/features/shared/artifact_publisher.py`. **NOT CLAIMED.**
+- Status: FINDING ONLY. Nothing on the data path was changed. The two tests
+  this surfaced through are fixed and green in both trees (`beaf5533`).
+- ALSO OPEN, same family, NOT fixed: `test_deploy_preflight.TooSoonVerdictTests`
+  (6 tests) read the LIVE shared deploy claim via `deploy_claim.active_claim`
+  and fail whenever any session holds one. Mocking it to None made it WORSE
+  (6 → 8) and was reverted.
+- Blocked by: none.
+
+
+
+### exchange-join-refusals — OPEN — opened 2026-08-30 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3
+- Goal: establish, as a MEASUREMENT rather than a belief, how many of the
+  exchange quotes the Layer 2 board discards at the venue-adapter boundary are
+  RECOVERABLE, and by which mechanism. No fix in this lane — the fix lives in
+  files another lane holds (see Blocked by).
+- Files: `scripts/probe_polymarket_ncaaf_slug_role_join.py`,
+  `.syndicate/findings_2026-08-30_layer2_board_assessment.md`
+- NOT CLAIMED, AND DELIBERATELY NAMED OUTSIDE THE `Files:` BLOCK ABOVE: the two
+  fix sites (the venue quote adapters module and the venue quote fan-in module,
+  both under syndicate/features/shared/) are held by `live-venue-order-placement`.
+  This lane does not touch them. The paths are written un-backticked and out of
+  the block on purpose — `check_lane_invariants.py` reads any backticked path
+  inside a `- Files:` block as a live CLAIM, which is how this lane briefly
+  contested a file it is explicitly staying off. Same trap the holder's own
+  block records.
+- A measurement script will go under scripts/ with a distinct name; it will be
+  added to the `Files:` line above before it is written, not after.
+- Hypothesis: the 314 NCAAF `clubs_unresolved` refusals are recoverable WITHOUT
+  an alias map, because `_polymarket_pair_games` already learns
+  `(away_token, home_token) -> event_id` from the moneyline row's own slug, so
+  the game identity never required the club NAME. The h2h path keys on
+  `canonical_team` (adapters:1198) only because that measured better for MLB and
+  WNBA, where the resolver works; for NCAAF it resolves nothing at all.
+- Falsification test: if the slug token pair fails to resolve the game on a
+  material fraction of the same rows that fail `canonical_team`, the role key is
+  not a fix and the gap is upstream registry/feed data — same verdict the
+  2026-08-29 FORBIDDEN rule reached for the alias map. Report the RATE with its
+  denominator, not a count.
+- Verification: a per-row table over a real production Polymarket NCAAF payload:
+  rows | canonical_team resolves | slug pair resolves | both | neither.
+  Recoverable = (slug resolves AND canonical_team does not).
+- Standing rule this lane is subordinate to: `learnings.md` 2026-08-29
+  "FORBIDDEN: closing a name-join gap by POPULATING an alias map, without first
+  checking the map's source carries the missing name". NOT overridden. This lane
+  exists partly to supply the evidence that rule demands before any fix.
+- RESULT `[measured 2026-08-30, n=25 of a 165-market population]`: **HYPOTHESIS
+  FALSIFIED, and the replacement is sound but small.** `canonical_team` resolves
+  0/25 (today's path). The slug-token pair resolves **2/25 = 8%** — Polymarket's
+  abbreviations are not the registry's (`nmxst` vs `NMSU`, `flst` vs `FSU`,
+  `emich` vs `EMU`), the SAME upstream-vocabulary wall the reverted alias map
+  hit. A schedule-constrained mascot-pair join resolves **4/25 = 16%** with
+  **0 ambiguity** (51 carded games -> 51 distinct mascot pairs, 0 colliding).
+  **21 of 25 sampled markets are games this platform does not card** — FCS/D-II/
+  D-III — so `clubs_unresolved: 314` is ~157 markets of which **~26 are ours**.
+  The counter is not a backlog and anything sized off 314 is sized wrong.
+  Full write-up + the correction to a 15x-wrong first scope test:
+  `.syndicate/findings_2026-08-30_layer2_board_assessment.md` §6b.
+- Next, and NOT this lane's to take: the Kalshi `h2h_keyed_by_team` 905 and the
+  ~3,290 spread refusals have NOT had this scope check. Do it before sizing
+  either — the NCAAF result is the reason to distrust a raw refusal count.
+- Blocked by: `live-venue-order-placement` (holds both fix sites). Coordination
+  message sent 2026-08-30 to the two running sessions in that territory; no
+  reply at lane open. This lane produces the measurement regardless, so the
+  holder — whoever it turns out to be — inherits the evidence rather than
+  re-deriving it.
+
+
