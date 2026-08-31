@@ -916,21 +916,36 @@ def _polymarket_max_price_age_seconds() -> float:
 def _polymarket_max_pregame_price() -> float:
     """Hold a PREGAME Polymarket order priced above this. Place it if cheaper.
 
-    `SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE`. **0.37 IS A MIDPOINT GUESS, NOT A
-    MEASUREMENT**, and it is labelled so nobody later mistakes it for one. The
-    boundary lies somewhere in a gap that has never been observed:
+    `SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE`. **0.35 IS A RISK CHOICE, NOT A
+    MEASUREMENT.** Observed pregame, with no overlap across 11 orders:
 
-        pregame FILLED   0.240  0.250  0.335
-        pregame RESTING  0.410  0.435  0.460  0.460  0.490 x3
+        FILLED   0.240  0.250  0.335
+        RESTING  0.410  0.435  0.460  0.460  0.490 x4
 
-    n=3 fills. 0.37 splits 0.335 and 0.410 and nothing has been seen between
-    them. Re-derive it as the gap fills in.
+    **Nothing has ever been observed between 0.335 and 0.410**, so every
+    threshold in that gap fits the data equally well and the choice is about
+    which way to be wrong:
+
+      0.35  places only what has actually been WATCHED to fill. Worst case it
+            misses fills in the unmeasured 0.35-0.41 band.
+      0.41  places that whole band on the assumption it behaves like the cheap
+            side. If it behaves like the near-even side instead, all of it
+            rests -- and resting is what drives the submit -> cancel -> resubmit
+            churn that produced a DUPLICATE LIVE BET ($9.12 on lad-det).
+
+    Since churn is the stated harm, the threshold errs toward NOT placing into
+    an unmeasured band. **0.37 was used first and was the worst available
+    choice: the midpoint of the gap is the one value with no evidence behind it
+    at all.** Argument owed to `polymarket-yes-leg-binding`.
+
+    THE FALSIFIER, either of which ends this rule: a PREGAME FILL above 0.410,
+    or a PREGAME REST below 0.335. Only the ORDERING is claimed.
 
     `0` disables the hold entirely.
     """
     raw = str(os.environ.get("SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE") or "").strip()
     if not raw:
-        return 0.37
+        return 0.35
     try:
         return max(0.0, float(raw))
     except (TypeError, ValueError):

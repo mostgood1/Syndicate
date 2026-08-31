@@ -8159,6 +8159,42 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-cheap-side-selection-risk] 2026-08-31 — HIGHER FILL VOLUME IS NOT SUCCESS. The gate changes the BET MIX.
+
+**Raised by `polymarket-yes-leg-binding` and it is the most important
+consequence of the price gate, not a footnote.**
+
+The rule places cheap pregame sides and holds near-even ones. That is not a
+neutral execution filter — **it is a SELECTION CHANGE**. It systematically
+shifts what we bet toward LONGSHOTS, because those are the sides with a book
+pregame.
+
+**Everything established tonight is about whether an order FILLS. Nothing
+establishes whether a cheap pregame fill is a GOOD BET.** Those are different
+questions and the 11-order sample answers only the first.
+
+**SO DO NOT READ RISING FILL VOLUME AS SUCCESS.** A gate that doubles fills
+while shifting the mix toward longshots could easily be EV-negative and would
+look like progress on every count we currently print. The EV of the cheap-side
+population must be scored SEPARATELY, against the closing line or realised
+settlement, before this gate is judged to have helped.
+
+**Concretely: `placed`, `filled` and fill-rate are now MISLEADING as success
+metrics for this change.** The honest metric is P&L or CLV on the orders the
+gate lets through, versus what the un-gated policy would have produced.
+
+**THE CEILING IS 0.35, AND THAT IS A RISK CHOICE, NOT A MEASUREMENT.** Nothing
+has ever been observed between 0.335 and 0.410; every threshold in that gap fits
+the data equally. 0.35 places only what has been watched to fill; 0.41 would
+place an unmeasured band on the assumption it behaves like the cheap side. Since
+churn is the stated harm, it errs toward not placing. **0.37 shipped first and
+was the worst available choice — the midpoint of a gap is the one value with no
+evidence behind it.**
+
+**FALSIFIER, either ends the rule:** a pregame FILL above 0.410, or a pregame
+REST below 0.335. Only the ORDERING is claimed. `sf-atl` at 0.400 is the closest
+live observation to the boundary.
+
 ## [polymarket-price-gate-LIVE] 2026-08-31T05:58Z — the price gate is live and holding the right population
 
 **`0c3f102f` deployed THROUGH a preflight HOLD `[user: "deploy it through
