@@ -2895,7 +2895,26 @@ caaf-no-orders`). NOT
   showing soccer down with mlb/ncaaf/wnba unchanged.
 - Blocked by: none. Claims released.
 
-### position-key-commence-time-instability — OPEN — opened 2026-08-30 — session 6475567d-f806-45a7-880c-f633718f2411 — **FINDING, HANDED OFF, NOT CLAIMED**
+### position-key-commence-time-instability — CLOSED 2026-08-30 — the exposure is GONE and the defect is fixed by its owner
+- **RESOLVED. THE HEADER ABOVE USED TO SAY A DUPLICATE BET WAS RESTING RIGHT NOW; IT IS NOT.**
+  Measured 2026-08-30 via per-order reconcile: `tsc-mlb-lad-det-2026-08-30-7pt5`
+  ended `venue_status='order_state_canceled'` with `contracts=0` — it EXPIRED
+  UNFILLED, so the ~$9.12 of duplicated exposure never became a position.
+  Independently recorded on main as `2a1417d0` ("the resting duplicate EXPIRED
+  UNFILLED — closed, and the defect's cost stays $0.78").
+- **The cause is fixed and not by me:** the owner removed `commence_time` from
+  `_POSITION_IDENTITY_FIELDS` in `ec56b7ef`, adding
+  `_LEGACY_POSITION_IDENTITY_FIELDS` / `legacy_position_key()` so pre-fix rows
+  still match. Production confirmed it working: `LEGACY_KEY_MATCH
+  position_key='ae59d573e256c5fe' ... refused as a duplicate rather than
+  re-placed`.
+- **The gap this exposed is also closed:** `3170db13` adds a Polymarket
+  `cancel_order` adapter — "the capability that did not exist when it was
+  needed" — which is what forced a human to cancel on the venue screen.
+- Left OPEN as a live-money alarm long after the money was safe. A finding block
+  that states a present-tense risk must be re-measured before it is trusted; the
+  cost of not doing so is a permanent false alarm in the file every session reads
+  first.
 - **A DUPLICATE LIVE BET IS RESTING AT POLYMARKET RIGHT NOW.** Two orders, one
   position: `C6H7WE0DPKDJ` ($4.06, 16:42:22Z) and `C6HN0XD92KDE` ($5.44,
   17:19:26Z) on `tsc-mlb-lad-det-2026-08-30-7pt5`, both `under 7.5` at -104.
