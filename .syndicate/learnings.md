@@ -8208,3 +8208,62 @@ fitted across both populations describes neither.
 field on the order marks it. In a 26h window, **17 log lines were 3 distinct
 tickers**, because the same order re-logs every tick. Count distinct tickers and
 join to the ledger; a line count overstates by ~6x.
+
+
+## 2026-08-31 — FORBIDDEN: choosing a hypothesis from what is VISIBLE rather than what DISCRIMINATES
+
+**Three hypotheses on one question in one night, all confidently reasoned, all wrong**
+(lane `layer2-accuracy-audit`, `todo #611`): the MLB prop pregame freeze has produced nothing
+since 2026-08-16, and I successively blamed (1) the freeze being unreachable on the worker's
+disk, (2) the seal's `source_path` being absent under `market/oddsapi`, and (3) the freeze
+never being invoked for MLB. Each was refuted within the hour, twice by evidence I already
+held.
+
+**The single discriminating datum was constant throughout and cheap: WHEN did the MLB refresh
+run, relative to first pitch.** `refresh_status_by_lane[*].history` answers it in one read
+(`run_stamp 20260831_221230 sports=mlb,soccer` vs first pitch 22:05:00Z -> seven minutes
+late, so `slate_started` was True and props were skipped by design).
+
+**Two specific traps, both worth naming because they are structural, not careless:**
+- **An unallowlisted path is INVISIBLE, not ABSENT.** `/api/ops/artifacts/export` serves only
+  `HOT_ARTIFACT_PATTERNS`; `market/oddsapi/**` and `live_lens/cron_meta/**` match nothing, so
+  they return empty exactly as a deleted file would. I read that null as absence TWICE.
+- **A `manifest` is the LATEST run, not the history.** Reading per-lane `manifest.oddsSports`
+  gave "only the `web` lane ever ran MLB, and not since 08-06" — flatly wrong; MLB was in the
+  shared `history` in the same payload, and I had already printed `mlb_in_history=1` for every
+  lane.
+
+**How to apply.** Before testing a hypothesis, name the reading that would SEPARATE it from
+its rivals, and check that reading is reachable at all. If the only available instrument
+cannot distinguish "absent" from "not permitted to be seen", it is not evidence and the
+hypothesis is not yet testable — fix the instrument first. Relatedly: an instrument's SILENCE
+means nothing until it has been shown capable of registering the event (two watchers polled a
+web endpoint for 35 minutes for a worker-side write that had no publisher).
+
+**What this cost:** roughly three hours, three retractions in the ledger, and one wrong
+causal claim ("the ~7% join rate is what starves settlement") that survived long enough to be
+written into `state.md` before its own fix disproved it.
+
+## [08-31 FORBIDDEN: matching a guarded status on a GUESSED STRING instead of the condition you care about]
+
+**Twice in one session, same shape, both in my own deploy watchers.**
+
+1. A watcher polled the **LIVE** deploy to decide whether one was in flight. A
+   deploy that is `build_in_progress` is not live, so it read "nothing happening"
+   and **took the deploy claim while another deploy was mid-build** — the exact
+   race the claim exists to prevent.
+2. A watcher gated acquisition on the status line containing `free`. The real line
+   read `EXPIRED (does not block)` — my own 61-minute-old claim, which was not
+   blocking anything and which `acquire` would have replaced immediately. It
+   polled for **six minutes and would have polled forever**, in the middle of a
+   sequence whose next step was a production flip.
+
+Both are the same error: I encoded a **guess about how the state would be
+spelled** rather than the condition. `free` and `EXPIRED (does not block)` are
+both "you may acquire"; `live` and `build_in_progress` are both "a deploy exists".
+
+**How to apply.** When gating on a tool's output, gate on the tool's OWN verdict —
+its exit code, or the explicit set of states it documents — never on a substring
+you expect to see. If you must match text, enumerate every terminal AND permissive
+spelling, and assume the one you did not think of is the one that will appear. A
+watcher that stalls is the benign outcome; the other one deployed into a race.

@@ -70,15 +70,20 @@ STALE not WRONG, and `written_at` comes from the shards when stamps disagree —
 without that the corrupted board reported `18:02:05Z` while serving 18:25 rows and
 was **unfalsifiable** to any watcher keyed on `written_at`.
 
-**DEPLOYED 2026-08-31 21:20:36Z (`8876b823`), NOT YET EXERCISED:** `cards` split
-into per-sport keys makes the combined key FLAT in row count (451 → **0 B/row**,
-measured on the real writer). The deploy reached `live`; **the board had not
-rebuilt under it as of 21:22Z**, so `LAYER2_CARD_SHARDS_WRITTEN` has never been
-observed and the 3-extra-keyvalue-writes-per-build behaviour has never run.
-`SYNDICATE_LAYER2_CARDS_INLINE` unset = inline = inert, so NO headroom is unlocked
-yet. **That flag, not a cap raise, is what unlocks it** — and only after the shard
-lines are seen and `cards_present` stays non-zero across a few cycles. `openings`
-needs no split — `openings_index` never reaches the artifact.
+**THE FLIP IS LIVE AND UNVERIFIED `[2026-08-31 22:30:57Z]`.** `cards` split into
+per-sport keys makes the combined key FLAT in row count (451 → **0 B/row**,
+measured on the real writer). `SYNDICATE_LAYER2_CARDS_INLINE=0` is live on
+refresh-worker `7e678674`; web `7e678674` was deployed FIRST and its deployed SHA
+confirmed to contain `_hydrate_layer2_cards` (it had ZERO an hour earlier — that
+gate prevented a silent `cards_present=0`). Two clean pre-flip cycles passed
+(1468==rows, 1498==rows, three sports each).
+
+**NOT YET EXERCISED:** as of 22:44Z the board still served `written_at=22:18:57Z`,
+built BEFORE the flip, with **0 `CARD_SHARDS_WRITTEN` lines since it went live** —
+so today's healthy `cards_present=1534` says nothing about the flip. **PASS needs
+BOTH `combined_keeps_cards=False` AND `cards_present` non-zero == rows**; the first
+alone is the silent zero. **REVERT:** set `SYNDICATE_LAYER2_CARDS_INLINE=1` and
+redeploy. `openings` needs no split — `openings_index` never reaches the artifact.
 
 **The board is GROUPED BY SPORT and always was** (FLOOR-THEN-MERIT, `layer2_board.py:2744`,
 `4ef894e3`/#524) — NOT a sharding artifact. Reading `rows[:25]` reads the top of the
