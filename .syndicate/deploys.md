@@ -39421,3 +39421,57 @@ than take this on trust — which you should — the check is
 proves it is present. `RECONCILE_NOT_FOUND` fires about once per 271 minutes and
 none has appeared since the deploy, so silence is not evidence either way.
 
+
+## 2026-08-31 03:14Z — MLB live prop probability: carried across the cards merge — lane `mlb-live-prop-prob-merge`
+
+**Deployed.** refresh-worker `1a841b97` (carries `5bab0685`), `dep-daaf368n74is73ao2ppg`,
+trigger=api, triggered 03:14:33Z, LIVE at 03:21:08Z. Target chosen as the
+`origin/main` TIP rather than my own commit, verified two ways: the live SHA
+`91e1f69e` is an ancestor (not a rollback) and `_carry_live_probability` is
+present in `1a841b97:syndicate/features/mlb/live_lens.py`.
+
+**DEPLOY TARGET WAS refresh-worker, AND state.md WOULD HAVE SENT IT ELSEWHERE.**
+The live-lens loop has MOVED: `[live_lens_loop] TICK_COMPLETE` and
+`[live_props] LIVE_MC_PRICED` both appear on refresh-worker, while
+live-odds-worker matched NOTHING for either over the same window. The 08-15
+entry saying the snapshot is built on live-odds-worker was true then and is
+false now; corrected in `state.md` (`a865bf72`). A fix on the wrong service is
+inert and looks exactly like a fix that did not work.
+
+**verify (what CAN be verified tonight, and it is not the fix):**
+`[live_lens_loop] TICK_COMPLETE results={'mlb': True, 'wnba': True,
+'soccer': True, 'nfl': True} nextIntervalSeconds=60` at 03:22:46Z on the new
+code, and **0 `LIVE_PROB_CARRY_IMPORT_FAILED`** over two passes. The loop is
+healthy and the new import path does not fail. That is all.
+
+**STILL UNVERIFIED, AND SAYING SO IS THE POINT.** The MLB slate was over:
+`LIVE_MC_PRICED rows=0`, no live rows to enrich, so `LIVE_PROB_CARRIED` is
+legitimately absent and its absence is evidence of NOTHING. The reading that
+settles this comes from tomorrow's first live MLB game:
+`snapshot_live_prob_seen > 0` and `rows_live_edged > 0` off
+`/api/board/layer2-shortlist` -> `per_sport_ingest.mlb.enrichment.live_projections`,
+plus `[live_lens] LIVE_PROB_CARRIED gamePk=... carried=N`. **The failure mode to
+watch is `carried=0` with `mc_rows_with_prob>0`** — a key mismatch, which reads
+as success rather than as a crash.
+
+**NO OVERRIDE WAS USED, and the wait cost 26 minutes.** Preflight held on an
+in-flight job chain (`run_refresh_odds_job` -> `refresh_odds_sources` ->
+`build_soccer_artifacts` walking leagues sequentially). It cleared ON ITS OWN at
+03:14:13Z and the deploy fired 20s later. Nothing was broken to get there: not
+the guard, not the WNBA props refresh, not the soccer build. The MLB daily sim
+had already finished before any of it. `deploy-guard` correctly refused two
+earlier attempts and a break-glass grant was correctly refused to me as well —
+recorded because "the guard blocked me" belongs in the log whether or not it was
+eventually satisfied.
+
+**TWO OF MY OWN INSTRUMENTS LIED TONIGHT, both producing confident false
+answers, both caught by asking what the NULL case looks like.**
+(1) A single `LIVE_MC_PRICED rows=0 outcomes={'priced': 14}` tick reads as
+"priced and never emitted" and points at a week of engine work. It is an
+end-of-game artifact — `priced` increments before the already-decided gate drops
+the row. The SERIES over the same game peaks at 27. I believed the tick for
+several minutes and said so out loud.
+(2) A watcher reported `LOOP_ALIVE` and `import_failures=1` on an EMPTY result,
+because `render_logs` echoes the search string in its own header and a bare
+grep matched that header. Fixed by filtering to `^2026-` timestamped lines. The
+readings above are from the corrected version.
