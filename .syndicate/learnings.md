@@ -488,6 +488,8 @@ plays no part". Measured on the SAME evening, on the pre-cutover code:
 The shape that "cannot fit" ran twice, twenty minutes apart, at a fifth of the
 ceiling. **The eight-sport pass is exonerated as a sufficient cause.** The
 20:03:11Z kill remains UNEXPLAINED: something made MLB cost +3.5GB in that pass
+against +1.0GB measured four times since. Do not close `#387` as "solved by
+streaming" — streaming caps the transient, it did not explain the outlier.
 - *Full working in `learnings_evidence.md` under this heading.*
 
 ### 2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, and I had this rule already
@@ -509,6 +511,7 @@ Measured at the 00:41:16 kill, the best-instrumented one:
 **pid 39 — the main worker — grew ~1.47GB in 28 seconds** while its children
 stayed small (`daily_update.py` 166.6MB, soccer odds refresh 95.5MB). The
 payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
+hydration path, NOT the overview.
 - *Full working in `learnings_evidence.md` under this heading.*
 
 ## 2026-08-14 — OVERTURNED: a number that corrects a known bias is the easiest one to believe
@@ -888,6 +891,8 @@ the evidence file are the source of truth.
   PowerShell background environment could not resolve it, while the same command
   from Bash worked.
 - **How we found out:** the owner asked whether it had deployed. Nothing in the
+  poller's own behaviour surfaced it — an error line every 30s reads exactly
+  like a status line every 30s when nobody looks.
 - *Full working in `learnings_evidence.md` under this heading.*
 
 ### 2026-08-16 — do not rebase onto a deploy target that has not shipped
@@ -914,6 +919,8 @@ establishing the number was PRODUCED AFTER the event:
 
 1. **Warm-up read as regression.** 5 and 8 minutes after the fix landed,
    `index_size` was 0 twice. I called it a persistent regression and **asked for
+   a rollback of a working fix.** Two reads inside one warm-up window are one
+   read — a rule I had written earlier the same night and did not apply.
 - *Full working in `learnings_evidence.md` under this heading.*
 
 ### 2026-08-16 — I HELD A CLAIM ONCE AND THEN DEPLOYED OVER SOMEONE ELSE'S, TWICE
@@ -927,6 +934,7 @@ what had just been done to me, while holding the ledger entry about it.
 **Acquiring a claim is not honouring one.** The claim I took at 23:39 gave me a
 sense of ownership that outlived the claim itself; I never re-read it, and it
 had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
+start of the work** — `deploy_preflight --json` returns `deploy_claim.holder`
 - *Full working in `learnings_evidence.md` under this heading.*
 
 ## 2026-08-16 — FORBIDDEN: never read a deploy claim's `target` as a statement about what is running
@@ -3356,7 +3364,7 @@ says.
 
 ## 2026-08-26 — "Done" before the sweep returns is a claim about the future
 
-- *(evidence in `learnings_evidence.md`)*
+- *(the heading states the rule; full working in `learnings_evidence.md`)*
 
 ## 2026-08-26 — `-k` chosen by TOPIC misses the files you edited
 
@@ -3505,7 +3513,7 @@ deploys — the exact deploy-churn mechanism this lane had just documented.
 
 ## 2026-08-27 — FORBIDDEN: reading `pid` in a deploy claim as evidence the holder is alive
 
-- *(evidence in `learnings_evidence.md`)*
+- *(the heading states the rule; full working in `learnings_evidence.md`)*
 
 ## 2026-08-27 — `Path(__file__).parents[1]` MAKES THE PRIMARY TREE THE RENDEZVOUS, AND A WORKTREE INVISIBLE
 
@@ -3727,7 +3735,7 @@ deploys — the exact deploy-churn mechanism this lane had just documented.
 
 ## 2026-08-28 — Pre-registering a confound does not help if you get its SIGN wrong
 
-- *(evidence in `learnings_evidence.md`)*
+- *(the heading states the rule; full working in `learnings_evidence.md`)*
 
 ## 2026-08-28 — FORBIDDEN: reaching for the next knob after a tuning change fails. Three attempts, each refuted by the next reading, when the second should have said "structural".
 
