@@ -1206,6 +1206,38 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   kickoff is the reading: ast-ars ~18:57Z, bal-col ~00:45Z, watcher bqopjstn0.
 - Blocked by: none
 
+### soccer-shot-shrinkage — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+- Goal: the soccer shots model stops over-predicting by ~1.4x. Ship the
+  held-out-validated divisor as a DISK-BACKED, RE-FITTABLE calibration artifact,
+  never a hard-coded constant. Testable: the served board's shot-prop
+  probabilities fall, and `expected_shots` bias on the next backtest run moves
+  toward 0 from +0.166.
+- Files: syndicate/features/soccer/sim_engine/soccersim/player_props.py
+  syndicate/features/soccer/sim_engine/soccersim/shot_calibration.py
+  syndicate/features/shared/artifact_publisher.py
+  scripts/fit_soccer_shot_shrinkage.py
+  tests/test_soccer_shot_shrinkage.py
+- Evidence this rests on (all in `state.md [soccer-shots-prop-skill]`): n=9,840
+  pairs / 247 matches / 9 leagues from production; ratio 1.398; held-out SCALAR
+  MAE 0.5551 vs raw 0.6251 vs baseline 0.6278; SCALAR beats AFFINE in all 9
+  leagues and all 4 splits. On-target RATE is already correct (model 0.345 vs
+  actual 0.342, ratio 1.007), so one divisor at the `expected_shots` choke point
+  fixes shots AND shots-on-target without a second constant.
+- Hypothesis: correcting the MEAN is sufficient; the Poisson FORM needs no change
+  (dispersion 1.07, P(>=2) bias -0.0001 over 597 players / 759 matches).
+- Falsification test: if the served shot-prop probabilities do not fall after
+  deploy, the artifact is not reaching the engine and the change is INERT --
+  which is this repo's most common failure and the reason for the reachability
+  test below.
+- Verification: reachability FIRST (divisor 1.0 vs 1.4 produce different
+  probabilities, driving the real shipped function), then a PRODUCTION read of
+  the served board, then a re-run of
+  `scripts/backtest_soccer_shot_props_production.py` on dates AFTER the deploy.
+- SAFETY: absent/unreadable/out-of-range artifact -> divisor 1.0, i.e. exactly
+  today's behaviour. Clamped to [1.0, 2.0] so a corrupt fit cannot zero the board.
+- Blocked by: none. The soccer engine was unclaimed at open (verified with
+  `lane_claim_audit.py`).
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-08-15 to bring this file back under the digest budget.
