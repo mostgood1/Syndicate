@@ -2484,6 +2484,46 @@ what would make the shed unreachable rather than merely rare.
 
 **Owner: `recommendation-lane-correctness` (model-audit session).**
 
+- **MODEL-EDGE COVERAGE IS THE NUMBER THAT DECIDES WHETHER THIS BOARD IS WORTH
+  READING, AND IT WAS 5.2%. `[verified 2026-08-31 01:43Z, lane
+  layer1-model-edge-join]`** `rows_with_model_edge / sides_priced` from
+  `per_sport_ingest`: **1,406 of 26,835** across five sports. A projection is
+  NOT an edge — 7,970 of 13,262 board rows carried `projection` while 465 (3.5%)
+  carried `edge_vs_market_pct`, and `scripts/audit_layer1_completeness.py`
+  reported the board broadly healthy for weeks because it counted the first.
+  Without an edge, `blended_score` falls back to EV alone, and
+  `portfolio_commit` refuses the row `no_model_edge_pct` because
+  `model_probability == fair` makes Kelly exactly zero — so those rows can rank
+  and can never be bet.
+- **THE MODELLED-FAIR FALLBACK HAD NEVER RUN, ON ANY SPORT OR PATH — three
+  breaks in series, now FIXED AND VERIFIED IN PRODUCTION.**
+  `book_margin_model.modelled_fair_edge` reads `row["modelled_fair"]`, which
+  `attach_margin_model` writes, and all three production paths call
+  `attach_projections` FIRST (`book_grid_artifact.py` 222 vs 340,
+  `layer2_shortlist.py` 1066 vs 1069, `intelligence.py` 2670 vs 2677). Second
+  break: `_model_edge_for` accepted `edge_vs_market_pct` only. Third: the side
+  key — `modelled_fair` is keyed by the ROW's side while the projection's `side`
+  is its own framing (1,278 soccer rows stamp `"over"` against a `("yes",)` row,
+  1,939 stamp the PLAYER'S NAME). **9,161 rows carried a `modelled_fair` and 0
+  carried the edge.** After (soccer, the only sport with a pregame slate that
+  night): **342/16923 (2.0%) -> 2082/16940 (12.3%)**, `modelled_edge_rows_priced`
+  ABSENT -> **3,159**, served top-200 rows with a model edge **1 -> 100**,
+  `rows_uninformative_ev` 274 -> 184. NFL 26.9% -> 39.8%.
+  **`mfair_priced` ABSENT vs 0 is the reachability signal** — absent indicts the
+  producer, 0 indicts the input.
+- **MLB, WNBA and NCAAF post-fix coverage is UNREAD, not flat.** All three sat
+  at 0 pregame games at verification time, and the sweep correctly refuses live
+  and settled rows. WNBA's spread-frame fix (the grid's line is AWAY-framed,
+  `sim_market_home_spread` is HOME-framed, so `p_home_cover` was unreachable for
+  every non-zero spread — 0 of 58 edged) is unit-proven both directions and has
+  **never fired in production**. `rows_at_sim_market_line` is the counter that
+  will say. Read all four with `py -3 scripts/measure_model_edge_coverage.py`.
+- **`[user decision 2026-08-30]` one-sided rows are valued on EV against the
+  MODEL's probability, not the book's margin** — `-hold` is the same number for
+  every such row and buried them. Confined to `book_margin_model` fairs;
+  `ev_pct` itself is untouched because `portfolio_commit` back-derives the fair
+  from it. **Reach measured: 2 rows of 200.** 3,159 were priced; the one-sided
+  pool still scores below the two-sided one.
 - **"ZERO LIVE EDGES EVER PUBLISHED" IS FALSE, AND WHAT IS PUBLISHED IS WRONG.
   `[measured 08-15 02:37Z]`** Served `/api/board/layer2-shortlist`, 105 rows: 51
   carry `market_state: live` — the live tier is not dark — and **5 carry a
