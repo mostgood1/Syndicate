@@ -2094,7 +2094,24 @@ def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dic
         # keeping the rows, so this line does not run until somebody turns it on
         # having SEEN the shards land.
         combined["rows"] = []
-    write_json_file(_layer2_shortlist_path(normalized_date), combined)
+    try:
+        write_json_file(_layer2_shortlist_path(normalized_date), combined)
+    except Exception:
+        # THE SHARDS ARE ALREADY ON DISK AND THE INDEX IS NOT. Say so here, at
+        # the point it becomes true -- the caller only reports that a write
+        # failed, which reads like "the board is stale" and is not what
+        # happened on 2026-08-31. `_merge_layer2_shards` now serves the shards
+        # rather than truncating to the stale total, so this is a DEGRADED
+        # state (current rows, stale sidecar counters), not a corrupt one.
+        if shards:
+            print(
+                f"[intelligence_state] LAYER2_INDEX_BEHIND_SHARDS date={normalized_date}"
+                f" shards={sorted(shards)} shard_row_total={len(rows)}"
+                " -- the shard set advanced and the combined write did NOT."
+                " The merge will serve the shards and log LAYER2_SHARD_INDEX_STALE.",
+                flush=True,
+            )
+        raise
     if shards and keeps_rows:
         _shadow_verify_layer2_shards(normalized_date, combined, rows)
     return payload
@@ -2453,12 +2470,30 @@ def _merge_layer2_shards(
     from a count, because "this sport is quiet today" and "this sport's key did
     not load" are different facts.
     """
-    total = payload.get("shard_row_total")
-    total = int(total) if isinstance(total, int) and total >= 0 else 0
-    slots: list[Any] = [None] * total
+    index_total = payload.get("shard_row_total")
+    index_total = int(index_total) if isinstance(index_total, int) and index_total >= 0 else 0
+    index_stamp = payload.get("written_at")
+
+    # READ EVERY SHARD BEFORE SIZING THE BOARD. The slot count used to come
+    # from `shard_row_total` alone -- a field on the COMBINED key, which is a
+    # SEPARATE write, and one that can refuse after the shards have landed.
+    #
+    # MEASURED 2026-08-31; it corrupted production for ~29 minutes.
+    # `_write_layer2_shards` runs BEFORE `write_json_file(combined)` and there
+    # is no rollback. At `per_sport=3000` the shards advanced to a 4,552-row
+    # board and the combined write refused (9,648,192 > 8,388,608), leaving the
+    # index frozen at `shard_row_total=1635`. Every position at or above 1635
+    # then failed `position < total` and was counted as `overflow`: 2,917 rows
+    # discarded, INCLUDING EVERY NCAAF ROW, on a board that reported itself
+    # healthy. It repeated every cycle and did not self-heal, because each
+    # rebuild re-wrote the shards and the combined write refused again.
+    #
+    # A refused write must leave the board STALE, never WRONG. The shards are
+    # the newer and complete copy, so they -- not the index that failed to keep
+    # up with them -- decide how many slots exist.
+    collected: list[tuple[str, list[Any], list[Any], Any]] = []
     loaded: list[str] = []
     missing: list[str] = []
-    overflow = 0
     for sport in shards:
         name = str(sport or "").strip().lower()
         if not name:
@@ -2473,13 +2508,47 @@ def _merge_layer2_shards(
             # A shard we cannot place is not a shard we guess at.
             missing.append(name)
             continue
+        collected.append((name, rows, positions, shard.get("written_at")))
+        loaded.append(name)
+
+    # The highest global position any shard actually claims. `index_total` still
+    # wins when it is LARGER: a missing shard leaves a real hole, and shrinking
+    # the declared size to hide it would be the same silent-truncation bug in
+    # the other direction. `isinstance(p, bool)` is excluded because bool is an
+    # int in Python and `True` would place a row at index 1.
+    shard_high = max(
+        (int(p) for _, _, positions, _ in collected for p in positions
+         if isinstance(p, int) and not isinstance(p, bool) and p >= 0),
+        default=-1,
+    )
+    total = max(index_total, shard_high + 1)
+    index_is_stale = shard_high + 1 > index_total
+    stale_stamps = sorted({
+        str(stamp) for _, _, _, stamp in collected
+        if stamp and index_stamp and str(stamp) != str(index_stamp)
+    })
+
+    slots: list[Any] = [None] * total
+    overflow = 0
+    for _name, rows, positions, _stamp in collected:
         for row, position in zip(rows, positions):
-            if isinstance(position, int) and 0 <= position < total:
+            if isinstance(position, int) and not isinstance(position, bool) and 0 <= position < total:
                 slots[position] = row
             else:
                 overflow += 1
-        loaded.append(name)
     merged = [row for row in slots if row is not None]
+
+    if index_is_stale or stale_stamps:
+        # Its own line, and loud: this is the signature of a combined write that
+        # refused after the shards landed. Nothing else produces it.
+        print(
+            f"[intelligence_state] LAYER2_SHARD_INDEX_STALE date={selected_date}"
+            f" index_total={index_total} shard_total={shard_high + 1}"
+            f" index_written_at={index_stamp!r} shard_written_at={stale_stamps}"
+            " -- serving the SHARDS; the combined write did not keep up."
+            " Rows are current; the sidecar counters on this payload are not.",
+            flush=True,
+        )
     if missing or overflow or len(merged) != total:
         print(
             f"[intelligence_state] LAYER2_SHARD_MERGE date={selected_date}"
@@ -2492,6 +2561,15 @@ def _merge_layer2_shards(
     out["rows_from_shards"] = True
     out["shards_loaded"] = loaded
     out["shards_missing"] = missing
+    out["shard_index_stale"] = bool(index_is_stale or stale_stamps)
+    if stale_stamps:
+        # Date the rows by the shards they came from. Leaving the index's older
+        # `written_at` here is what made the corrupted board UNFALSIFIABLE: it
+        # reported 18:02:05Z while serving 18:25 rows, so a watcher keyed on
+        # `written_at` -- which is how this board is verified after every deploy
+        # -- could not see that the rows had changed at all.
+        out["written_at"] = stale_stamps[-1]
+        out["index_written_at"] = index_stamp
     return out
 
 
