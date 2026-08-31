@@ -740,6 +740,47 @@ def _odds_data_roots() -> List[Path]:
     return deduped
 
 
+def _odds_dirs(root: Path, date_str: str) -> List[Path]:
+    """Every directory a day's odds doc is written to, under one root.
+
+    `market/oddsapi` was the only one searched until 2026-08-31, and the
+    pregame freeze demonstrably lives in BOTH trees: read from production
+    that day, `source_artifacts/data/daily/snapshots/2026-08-30/
+    oddsapi_game_lines_2026_08_30_pregame.json` carried the FULL 14-game
+    slate, with `away_team`/`home_team` spelled exactly as
+    `_load_game_lines_lookup` keys them -- including CIN @ CHC, the one game
+    that did grade. The live doc beside it carried ZERO games. The builder
+    graded 1 and warned 13, so it read neither: a third copy, holding
+    exactly one game, under a `market/oddsapi` it could see and this
+    function could not reach past.
+    """
+    return [root / "market" / "oddsapi", root / "daily" / "snapshots" / str(date_str)]
+
+
+def _odds_doc_game_count(path: Path) -> int:
+    """How many games a day's odds doc actually carries. -1 = unreadable.
+
+    Counts `games`, because that is exactly what `_load_game_lines_lookup`
+    turns into join keys -- a doc's size in bytes is not the same question
+    (a 1,105-byte live file and a 1,371-byte one held 1 game and 0).
+
+    Never raises: a doc this cannot parse scores -1 and loses to any doc
+    that parses, rather than taking the whole build down.
+    """
+    try:
+        doc = _read_json_dict(path)
+    except Exception:
+        return -1
+    if not isinstance(doc, dict):
+        return -1
+    games = doc.get("games")
+    if isinstance(games, list):
+        return len(games)
+    if isinstance(games, dict):
+        return len(games)
+    return 0
+
+
 def _odds_paths(date_str: str) -> Dict[str, Path]:
     token = _day_token(date_str)
     names = {
@@ -750,7 +791,6 @@ def _odds_paths(date_str: str) -> Dict[str, Path]:
     roots = _odds_data_roots()
     out: Dict[str, Path] = {}
     for key, filename in names.items():
-        chosen: Optional[Path] = None
         # Prefer the sealed pregame freeze over the live file. The live file
         # is rewritten all day with only the events still in progress, so on
         # a finished slate it holds just the last game or two and every other
@@ -759,15 +799,47 @@ def _odds_paths(date_str: str) -> Dict[str, Path]:
         # copy is the slate as it stood at first pitch, which is also the
         # right price for grading and CLV. Falls back to the live file when
         # no freeze exists (every date before the freeze was repaired).
+        #
+        # TWO THINGS CHANGED 2026-08-31, AND THE SECOND IS THE ONE THAT BIT.
+        # This used to break out of the ROOT loop on the first root holding
+        # EITHER file, so a root carrying only a thin live copy beat a later
+        # root carrying the full freeze -- first-found, not best-found. That
+        # is why a PRESENT freeze did not help: `backfill_pregame_game_lines`
+        # measured 2026-08-08 with a 56,864-byte freeze on disk and the day
+        # still grading 2 of 13 games, and this endpoint measured 1 graded
+        # row with 12-13 `Missing game-line match` warnings on 08-28/29/30.
+        # Two prior fixes (2026-08-07 here, 2026-08-16 in
+        # `refresh_mlb_oddsapi._freeze_market_dirs`) each repaired one WRITER
+        # or one path and left the reader's first-found rule intact, so the
+        # same symptom returned a third time from a third cause.
+        #
+        # So: gather EVERY candidate across every root and both directory
+        # layouts, keep the freeze tier strictly ahead of the live tier, and
+        # inside a tier take the doc with the MOST GAMES rather than whichever
+        # root sorted first. Richness never promotes a live doc over a freeze
+        # -- the freeze is the correct PRICE for grading and CLV even when it
+        # is thinner, and a thin freeze is the freeze writer's bug to fix, not
+        # this reader's to paper over.
         stem = filename[: -len(".json")] if filename.endswith(".json") else filename
+        frozen: List[Path] = []
+        live: List[Path] = []
         for root in roots:
-            odds_dir = root / "market" / "oddsapi"
-            for candidate in (odds_dir / f"{stem}_pregame.json", odds_dir / filename):
-                if candidate.exists():
-                    chosen = candidate
-                    break
-            if chosen is not None:
-                break
+            for odds_dir in _odds_dirs(root, date_str):
+                freeze_path = odds_dir / f"{stem}_pregame.json"
+                live_path = odds_dir / filename
+                if freeze_path.exists():
+                    frozen.append(freeze_path)
+                if live_path.exists():
+                    live.append(live_path)
+
+        chosen: Optional[Path] = None
+        for tier in (frozen, live):
+            if not tier:
+                continue
+            # One candidate needs no parse -- keep the common case cheap.
+            chosen = tier[0] if len(tier) == 1 else max(tier, key=_odds_doc_game_count)
+            break
+
         # Fall back to the first root so the caller's own "missing" warning
         # still names a sensible path rather than an empty one.
         out[key] = chosen if chosen is not None else (roots[0] / "market" / "oddsapi" / filename)
@@ -970,6 +1042,20 @@ def _collect_report_game_recommendations(
         return out
 
     line_lookup = _load_game_lines_lookup(game_lines_path)
+    # NAME THE FILE WE ACTUALLY READ, ALWAYS -- not only when it is missing.
+    # `Missing game-line match for <game>` says a join failed and says nothing
+    # about which of the six candidate docs was joined against, so diagnosing
+    # it needed a disk read of a directory `/api/ops/artifacts/export` cannot
+    # reach (`market/oddsapi` is not in `HOT_ARTIFACT_PATTERNS`). This symptom
+    # has now recurred three times from three different causes; each round
+    # started by re-deriving which file was read. This line ends that: the
+    # warnings block on /mlb/api/market-accuracy carries it, so a one-game
+    # doc is visible NEXT to the 13 misses it produced, not inferred from them.
+    warnings.append(
+        f"Game lines read: {_relative_path_str(game_lines_path)} "
+        f"({'pregame-freeze' if game_lines_path.name.endswith('_pregame.json') else 'live'}, "
+        f"{len(line_lookup)} games)"
+    )
     for game in report_obj.get("games") or []:
         if not isinstance(game, dict):
             continue
