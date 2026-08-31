@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 712 rules `[generated]`
+## Index — 718 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -5491,3 +5491,71 @@ neither, and its advice was backwards for the healthy one.
 **How to apply.** When a write is split, every size/health instrument pointed at
 the old single write becomes a liar in both directions. Re-point it at the keys
 that are actually written, in the SAME change that splits them.
+
+
+## 2026-08-31 — FORBIDDEN: shipping a model INPUT artifact without tracing its delivery topology first. "Publish" does not mean "the engine can read it"
+
+**Three separate mechanisms had to be checked before a 867-byte calibration file
+could reach the engine that reads it, and TWO of my first two choices were
+silently wrong. None of them would have failed loudly.**
+
+The topology, measured:
+
+1. **`/api/ops/artifacts/publish` is a RECEIVER ON WEB.** Workers push TO it.
+   Publishing puts the file on **web's** disk. The soccer engine runs on
+   **live-odds-worker**, a different Render disk, and workers run no HTTP server
+   so they cannot be pushed to at all.
+2. **Workers PULL, and the pull is DATE-SCOPED.** `pull_hot_artifacts` requests
+   `?pattern=*<today>*` because an unfiltered pull reproducibly hit Render's
+   proxy timeout. **A file with no date in its name can never be reached by
+   it** — `run_refresh_worker` already records this for `schedule_2026.json`.
+   An undated `shot_shrinkage.json` would have sat on web's disk while the
+   engine read its default forever: no error, no log line, every test green.
+3. **THE RECEIVER VALIDATES AGAINST ITS OWN ALLOWLIST.** I deployed the
+   `HOT_ARTIFACT_PATTERNS` entry to both workers and called web "n/a — it does
+   not run the engine". True, and irrelevant. The publish returned
+   **`403 relative_path is not an allowed hot artifact`** because WEB was two
+   hours behind the allowlist commit. **An artifact change is a THREE-service
+   change even when only one service runs the code.**
+
+**Two mechanisms that look right and are not:** the boot seeder copies only into
+a directory with NONE matching yet, so it can seed a first value and can never
+deliver a re-fit — useless for anything re-fittable. And `write_json_file`
+(keyvalue) IS genuinely cross-service but applies a TTL, so a long-lived
+calibration constant would silently expire back to its default.
+
+**HOW TO APPLY.** Before shipping any artifact an engine READS, write down four
+things and check each: which SERVICE runs the code; which DISK it reads; what
+mechanism moves the file to that disk; and what that mechanism MATCHES ON. Then
+confirm the receiver, the pull filter and the reader all agree — a name that one
+of them cannot match is the failure this rule exists for, and it is invisible.
+`READ IT BACK` after publishing; a 200 is the sender's opinion.
+
+---
+
+## 2026-08-31 — A miscalibration can be REAL and still not worth correcting. Check what carries the LOSS, not what looks wrong in a ratio table
+
+**I pre-registered the wrong expectation and the held-out test refuted it, which
+is the only reason it is not now shipped.**
+
+From a per-decile ratio table I concluded the soccer shots model had a SLOPE
+error — it under-predicted the bottom two deciles (ratios 0.55, 0.93) and
+over-predicted from the fourth up (to 1.63). I recorded, in `deploys.md` and to
+a peer, that "a constant divide-by-1.4 would over-correct the bottom and
+under-correct the top" and that the shape "calls for shrinkage toward the mean,
+a re-fit, not a scalar".
+
+**Held out by date, a plain divisor BEAT the affine fit — in all 9 leagues and
+all 4 splits.** MAE 0.5551 against 0.5748, and on absolute bias too.
+
+**WHY: the bottom deciles predict 0.00-0.22 shots.** Their absolute error is
+tiny, so they carry almost none of the loss, which is dominated by the
+large-prediction rows where the error is a clean level over-shoot. The
+miscalibration is real and it is nearly free.
+
+**HOW TO APPLY.** A ratio table shows where a model is wrong PROPORTIONALLY; it
+says nothing about where the error is EXPENSIVE. Before designing a correction
+around a pattern in ratios, weight it by the magnitude of the quantity — or
+just fit both candidates and let a held-out split choose. **Pre-register which
+you expect to win.** Recording the expectation is what turned this from a
+silently-shipped complication into a measurement.

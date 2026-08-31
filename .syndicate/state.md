@@ -2835,6 +2835,35 @@ what would make the shed unreachable rather than merely rare.
   bigger unit wins the sort on units alone and `ev_basis` cannot fix that.
   **Whether the two should share one sort at all is UNSETTLED and this deploy
   did not settle it.** Full working: `deploys.md`, 2026-08-31 16:48Z.
+  **AND THE UNDERLYING CAUSE IS NOW MEASURED AND CORRECTED AT SOURCE
+  `[2026-08-31, lane soccer-shot-shrinkage]`:** the soccer shots model
+  over-predicts 1.398x, so the large model edges feeding those rows were mostly
+  a level error rather than disagreement. A fitted divisor (1.3979) is deployed
+  to all three services and published; see `[soccer-shots-prop-skill]`. **It has
+  NOT yet been observed changing the board** — the soccer sim runs every 4h and
+  the board carried no shot props at publish time.
+
+## [artifact-delivery-topology] AN ARTIFACT AN ENGINE READS IS A THREE-SERVICE CHANGE `[measured 2026-08-31]`
+
+Getting an 867-byte calibration file to the engine that reads it required all
+three of these to agree, and two plausible choices were silently wrong:
+
+- **`/api/ops/artifacts/publish` is a RECEIVER ON WEB.** Workers push TO it, so
+  publishing lands on WEB's disk. Workers run no HTTP server and cannot be
+  pushed to.
+- **Workers PULL, DATE-SCOPED.** `pull_hot_artifacts` requests
+  `?pattern=*<today>*` (an unfiltered pull hit Render's proxy timeout), so **a
+  file with no date in its name can never arrive** — as `run_refresh_worker`
+  already records for `schedule_2026.json`. Hence `shot_shrinkage_<DATE>.json`.
+- **THE RECEIVER VALIDATES AGAINST ITS OWN ALLOWLIST.** Deploying
+  `HOT_ARTIFACT_PATTERNS` to the workers alone produced
+  `403 relative_path is not an allowed hot artifact` because WEB was behind.
+  **web needs the deploy even when it runs none of the code.**
+
+Rejected, both look right: the boot seeder copies only into a directory with
+NONE matching yet, so it can seed a first value and never a re-fit; keyvalue
+`write_json_file` is cross-service but applies a TTL, so a constant would
+silently expire back to its default.
   **COVERAGE IS UNREAD, NOT FLAT.** MLB/WNBA/NCAAF all read zero at the
   post-deploy check because there were **zero PREGAME games** at that moment.
   Read it with `py -3 scripts/measure_model_edge_coverage.py`, which prints the

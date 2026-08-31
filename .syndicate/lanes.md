@@ -1242,6 +1242,20 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
   `scripts/backtest_soccer_shot_props_production.py` on dates AFTER the deploy.
 - SAFETY: absent/unreadable/out-of-range artifact -> divisor 1.0, i.e. exactly
   today's behaviour. Clamped to [1.0, 2.0] so a corrupt fit cannot zero the board.
+- STATUS: **SHIPPED TO ALL THREE SERVICES, NOT YET OBSERVED WORKING.** web
+  `132559e1` (allowlist), both workers `a35591dc` (wiring + dated resolver), all
+  content-verified on the deployed blob. Artifact published 200 and READ BACK:
+  `divisor=1.3979, n=9840, matches=247`. Divisor measured at 1.398x
+  over-prediction; a SCALAR beat an AFFINE fit held out in all 9 leagues and all
+  4 date splits.
+- **THE VERIFICATION IS OWED AND CANNOT BE FORCED.** At publish time the board
+  carried ZERO soccer shot-prop rows, and the soccer sim runs every FOUR HOURS
+  (`SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS=14400`). **Nothing is
+  confirmed to have reached live-odds-worker.** The closing reading is
+  composition-invariant: implied Poisson mean divided by that player's own
+  season `shots_per90`, which was **1.19** before and must land near **0.85**.
+  A median still near 1.19 WITH rows present means the artifact reached web but
+  not the worker — that is the failure mode, not absence of rows.
 - Blocked by: none. The soccer engine was unclaimed at open (verified with
   `lane_claim_audit.py`).
 

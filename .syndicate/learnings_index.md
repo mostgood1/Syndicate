@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 712 rules `[generated]`
+## Index — 718 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 190**
+**FORBIDDEN — 195**
 
 - [2026-08-30 — FORBIDDEN: `git commit --only -- <shared ledger file>`. The pathspec form…](#2026-08-30-forbidden-git-commit---only----shared-ledger-file-the-pathspec-form-commits-the-working-tree-which-in-this-repo-holds-every-other-sessions-uncommitted-edits-to-that-file-lane-stale-row-cause-blind-spot)
 - [2026-08-30 — FORBIDDEN: inferring WHO wrote a commit from ADJACENCY in a shared branch…](#2026-08-30-forbidden-inferring-who-wrote-a-commit-from-adjacency-in-a-shared-branch-where-every-commit-carries-one-bot-author-lane-exchange-join-refusals)
@@ -149,6 +149,11 @@
 - [2026-08-31 — FORBIDDEN: concluding from ONE tick of a counter that increments before it…](#2026-08-31-forbidden-concluding-from-one-tick-of-a-counter-that-increments-before-its-own-drop-gate-three-wrong-readings-in-one-session-each-confident-and-each-plausible)
 - [2026-08-31 — FORBIDDEN: shipping a gate on a one-variable rule when the sample cannot r…](#2026-08-31-forbidden-shipping-a-gate-on-a-one-variable-rule-when-the-sample-cannot-rule-out-a-second-variable-three-hypotheses-died-on-one-dataset-because-each-was-a-projection-of-a-2-d-structure)
 - [2026-08-31 — FORBIDDEN: verifying a ranking change by TOP-N COMPOSITION. The slate rota…](#2026-08-31-forbidden-verifying-a-ranking-change-by-top-n-composition-the-slate-rotates-faster-than-you-deploy)
+- [2026-08-31 FORBIDDEN: reporting an ROI whose grades we produced ourselves, without nami…](#2026-08-31-forbidden-reporting-an-roi-whose-grades-we-produced-ourselves-without-naming-that-we-produced-them)
+- [[08-31 FORBIDDEN: sizing a payload raise against the key you SHARDED, when another key…](#08-31-forbidden-sizing-a-payload-raise-against-the-key-you-sharded-when-another-key-still-scales-with-the-same-quantity)
+- [[08-31 FORBIDDEN: assuming a refused write degrades to STALE. Check what the reader doe…](#08-31-forbidden-assuming-a-refused-write-degrades-to-stale-check-what-the-reader-does-with-a-half-updated-set)
+- [[08-31 FORBIDDEN: a size instrument that measures a payload the code no longer writes]](#08-31-forbidden-a-size-instrument-that-measures-a-payload-the-code-no-longer-writes)
+- [2026-08-31 — FORBIDDEN: shipping a model INPUT artifact without tracing its delivery to…](#2026-08-31-forbidden-shipping-a-model-input-artifact-without-tracing-its-delivery-topology-first-publish-does-not-mean-the-engine-can-read-it)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](learnings_evidence.md#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](learnings_evidence.md#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
@@ -209,7 +214,7 @@
 - [2026-08-20 — A SUFFIX MATCH CAN HIDE A PATH BUG BY ACCIDENT (`lane-guard` EXONERATED)](#2026-08-20-a-suffix-match-can-hide-a-path-bug-by-accident-lane-guard-exonerated)
 - [2026-08-22 — EXONERATED: forcing the settlement autorun with an interval override](#2026-08-22-exonerated-forcing-the-settlement-autorun-with-an-interval-override)
 
-**Rules and corrections — 517**
+**Rules and corrections — 518**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -519,6 +524,7 @@
 - [2026-08-31 — a correct fix can make a latent bug REACHABLE, and that is the fix's probl…](#2026-08-31-a-correct-fix-can-make-a-latent-bug-reachable-and-that-is-the-fixs-problem)
 - [2026-08-31 — TWO THINGS ABOUT GATED DEPLOYS THAT COST AN HOUR EACH TO REDISCOVER](#2026-08-31-two-things-about-gated-deploys-that-cost-an-hour-each-to-rediscover)
 - [2026-08-31 — A basis LABEL does not make two scales commensurable](#2026-08-31-a-basis-label-does-not-make-two-scales-commensurable)
+- [2026-08-31 — A miscalibration can be REAL and still not worth correcting. Check what ca…](#2026-08-31-a-miscalibration-can-be-real-and-still-not-worth-correcting-check-what-carries-the-loss-not-what-looks-wrong-in-a-ratio-table)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
