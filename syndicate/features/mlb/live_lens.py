@@ -985,6 +985,99 @@ def _live_props_from_prop_groups(card: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _carry_live_probability(
+    card_props: list[dict[str, Any]], live_row: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Stamp the MC re-sim's `liveModelProbOver` onto matching card prop rows.
+
+    KEYED WITH THE READER'S OWN RULE, imported rather than re-derived.
+    `live_projection_join.build_live_prop_index` keys on
+    `(_norm_name(playerName), _snapshot_market(prop), float(line))`, and
+    `_snapshot_market` exists because `market` is a DISPLAY GROUPING that
+    collided 39 unrelated rows onto one key and matched no board market
+    (`#412`, `miss_no_market_alias = 1385 of 1385`). A second copy of that rule
+    here would drift from it silently, and the drift would look exactly like
+    this defect.
+
+    Returns NEW dicts. Mutating the card rows in place would write through to
+    the cards artifact's own structures, which other surfaces read.
+
+    Never overwrites a probability a card row already carries, and never
+    invents one: a card row with no MC counterpart is returned untouched, so
+    "no live probability" stays distinguishable from "here is one".
+    """
+    if not card_props:
+        return card_props
+    try:
+        from syndicate.features.shared.live_projection_join import (
+            _norm_name,
+            _snapshot_market,
+        )
+    except Exception as exc:
+        # A merge must never be able to break the snapshot it is enriching.
+        # Falling through returns exactly today's behaviour.
+        #
+        # `print`, not `logging`: this module has no logger, and `logger.info`
+        # does not reach Render's log collector on these services -- a silent
+        # fallback here would be the failure mode this whole lane is about.
+        print(f"[live_lens] LIVE_PROB_CARRY_IMPORT_FAILED {type(exc).__name__}", flush=True)
+        return card_props
+
+    def _key(prop: dict[str, Any]):
+        name = _norm_name(prop.get("playerName"))
+        market = _snapshot_market(prop)
+        try:
+            line = float(prop.get("line"))
+        except (TypeError, ValueError):
+            return None
+        if not name or not market:
+            return None
+        return (name, market, line)
+
+    source_rows = live_row.get("liveProps") if isinstance(live_row.get("liveProps"), list) else []
+    by_key: dict[Any, dict[str, Any]] = {}
+    for prop in source_rows:
+        if not isinstance(prop, dict) or prop.get("liveModelProbOver") is None:
+            continue
+        key = _key(prop)
+        if key is not None:
+            by_key.setdefault(key, prop)
+    if not by_key:
+        return card_props
+
+    carried = 0
+    out: list[dict[str, Any]] = []
+    for prop in card_props:
+        if not isinstance(prop, dict):
+            out.append(prop)
+            continue
+        if prop.get("liveModelProbOver") is not None:
+            out.append(prop)
+            continue
+        hit = by_key.get(_key(prop)) if _key(prop) is not None else None
+        if hit is None:
+            out.append(prop)
+            continue
+        enriched = dict(prop)
+        enriched["liveModelProbOver"] = hit.get("liveModelProbOver")
+        # Its OWN edge, not a recomputed one -- the producer priced it against
+        # the same quote it priced the probability against.
+        if enriched.get("liveEdge") is None and hit.get("liveEdge") is not None:
+            enriched["liveEdge"] = hit.get("liveEdge")
+        out.append(enriched)
+        carried += 1
+
+    # THE COUNTER IS THE POINT. `snapshot_live_prob_seen: 0` is what this fix
+    # exists to move, and a silent enrichment would be indistinguishable from
+    # no enrichment at the only place anyone looks.
+    print(
+        f"[live_lens] LIVE_PROB_CARRIED gamePk={live_row.get('gamePk')} "
+        f"mc_rows_with_prob={len(by_key)} card_rows={len(card_props)} carried={carried}",
+        flush=True,
+    )
+    return out
+
+
 def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]) -> dict[str, Any]:
     merged = dict(row)
     card_props = _live_props_from_card(card)
@@ -1007,10 +1100,46 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
     if should_replace_game_lens:
         merged["gameLens"] = card_segments
     if card_props:
+        # CARRY THE LIVE PROBABILITY ACROSS BEFORE THE CARDS ROWS REPLACE THE
+        # MC ROWS. This was an unconditional overwrite, and it is why MLB has
+        # never published a live prop edge.
+        #
+        # MEASURED 2026-08-31 on refresh-worker, one live game (824636), reading
+        # the `LIVE_MC_PRICED` SERIES rather than one tick:
+        #
+        #     00:40Z rows=27   01:07Z rows=14   01:42Z rows=4
+        #     00:48Z rows=26   01:21Z rows=10   01:58Z rows=2
+        #     00:58Z rows=18   01:31Z rows=8    02:12Z rows=0  <- end of game
+        #
+        # The Monte Carlo producer emits up to 27 prop rows carrying
+        # `liveModelProbOver`. The published snapshot over the same window:
+        # `live: {rows: 124, with_live_projection: 115, with_live_prob: 0}`.
+        # **Produced 27, published 0** — because these three lines replaced the
+        # MC row set wholesale with the cards row set, which carries a
+        # deterministic `liveProjection` and no probability at all.
+        # `live_projection_join` prices `liveModelProbOver` and nothing else
+        # (`#414`), so every live MLB prop edge was withheld
+        # `no_live_probability` for want of a field that existed one merge
+        # earlier.
+        #
+        # WHY ENRICH RATHER THAN SWAP WHICH SIDE WINS. `#124 follow-up (a)`
+        # makes cards the reliable primary ROW SOURCE and that is not in
+        # question here — 124 card rows against 27 MC rows is most of the
+        # board's live coverage. Preferring the MC set would trade 97 rows for a
+        # probability on 27. So the ROWS stay the cards', and only the
+        # PROBABILITY is carried over, onto the rows that have a counterpart.
+        # Nothing is dropped on either side.
+        #
+        # ONLY `liveModelProbOver` AND ITS OWN `liveEdge` TRAVEL. Not
+        # `modelProbOver`: that fallback was shipped and BACKED OUT (`#414`) —
+        # measured bit-identical to the PREGAME probability on 24 of 28 rows,
+        # with three already-decided props still reading 0.659/0.655/0.745 and
+        # producing +36.5%/+32.3%/+15.8% on a board that sorts by edge. A card
+        # row with no MC counterpart keeps its absent probability, which is the
+        # honest state and the one the reader already reports by name.
+        card_props = _carry_live_probability(card_props, row)
         merged["liveProps"] = card_props
-    if card_props:
         merged["props"] = card_props
-    if card_props:
         merged["trackedProps"] = card_props
     matchup = merged.get("matchup") if isinstance(merged.get("matchup"), dict) else {}
     card_matchup = {"away": card.get("away") if isinstance(card.get("away"), dict) else {}, "home": card.get("home") if isinstance(card.get("home"), dict) else {}}
