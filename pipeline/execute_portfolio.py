@@ -917,7 +917,23 @@ def _polymarket_max_price_age_seconds() -> float:
 def _polymarket_explore_rate() -> float:
     """Fraction of would-be-held boundary orders to PLACE anyway, 0.0-1.0.
 
-    `SYNDICATE_POLYMARKET_EXPLORE_RATE`, default 0.10. `0` disables exploration.
+    `SYNDICATE_POLYMARKET_EXPLORE_RATE`, default 0.50 `[2026-08-31, user
+    decision]`. `0` disables exploration.
+
+    **RAISED FROM 0.10 BECAUSE 0.10 SAMPLED ALMOST NOTHING.** 0.10 was chosen
+    for a large population; the real boundary population is 1-3 positions per
+    tick. Measured on the first live tick: four orders held at 0.485, 0.465,
+    0.461 and 0.450 against a 0.35-0.45 band, so exactly ONE qualified -- and at
+    0.10 a single qualifying order explores a tenth of the time.
+
+    **AND THE ARM SAMPLES POSITIONS, NOT TICKS.** Assignment is deterministic on
+    `position_key` (see `_polymarket_explores`), so re-evaluating the same held
+    order every five minutes gives no further chances -- it never re-rolls. With
+    a handful of NEW boundary positions a day, 0.10 yielded roughly one
+    exploration order every several days, which cannot re-derive a threshold.
+
+    The cost of a higher rate is CHURN, not stake: these orders do not fill, so
+    what is spent is cancel/re-place cycles inside a 10c-wide band, not money.
 
     WHY THIS EXISTS: WITHOUT IT THE GATE CANNOT BE RE-DERIVED. Asked on
     2026-08-31 whether `sf-atl` (pregame, ~0.400, the closest observation to the
@@ -930,7 +946,7 @@ def _polymarket_explore_rate() -> float:
     """
     raw = str(os.environ.get("SYNDICATE_POLYMARKET_EXPLORE_RATE") or "").strip()
     if not raw:
-        return 0.10
+        return 0.50
     try:
         return max(0.0, min(1.0, float(raw)))
     except (TypeError, ValueError):

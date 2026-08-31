@@ -1642,7 +1642,10 @@ def test_exploration_hits_roughly_its_configured_rate(monkeypatch, capsys):
     n = 2000
     placed = sum(_placed(0.40, f"pos-{i}") for i in range(n))
     capsys.readouterr()
-    assert 0.06 <= placed / n <= 0.15, f"got {placed / n:.3f}, expected ~0.10"
+    # 0.50 since 2026-08-31: at 0.10 a boundary population of 1-3 positions per
+    # tick, sampled per POSITION and never re-rolled, yielded about one
+    # exploration order every several days.
+    assert 0.44 <= placed / n <= 0.56, f"got {placed / n:.3f}, expected ~0.50"
 
 
 def test_exploration_is_AIMED_at_the_boundary_not_uniform(monkeypatch, capsys):
