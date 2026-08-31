@@ -8125,3 +8125,47 @@ neither, and its advice was backwards for the healthy one.
 **How to apply.** When a write is split, every size/health instrument pointed at
 the old single write becomes a liar in both directions. Re-point it at the keys
 that are actually written, in the SAME change that splits them.
+
+## [08-31 FORBIDDEN: trusting `git cherry` alone. It gives FALSE POSITIVES, and they push DUPLICATES]
+
+**Refines the standing "remote-absent ≠ content-absent" rule, which said to run
+`git cherry` FIRST. That is still right, and it is not sufficient.**
+
+Measured 2026-08-31. Pushing a second batch, `git cherry -v origin/main HEAD`
+marked **4 commits `+` (absent upstream). Two of them were already upstream** —
+I had pushed them myself an hour earlier as cherry-picks. Their patch-ids no
+longer matched because upstream context around them had moved, so `git cherry`
+could not recognise its own copies.
+
+Acting on that would have appended two `deploys.md` entries a second time.
+
+**How to apply.** `git cherry` is the cheap filter, not the verdict. Before
+pushing, grep the UPSTREAM BLOB for a distinctive string from each commit:
+
+    git show "origin/main:.syndicate/deploys.md" | Select-String '<distinctive phrase>'
+
+and require exactly one occurrence in the tree you are about to push. PowerShell,
+not Git Bash: `origin/main:path` is mangled to `origin\main;path` and the command
+fails, which — with a `|| echo 0` fallback — reads as **"content absent"** and
+argues for pushing MORE. That happened here, in the same check.
+
+## [08-31 FORBIDDEN: running a long test sweep while editing the files under test]
+
+A 72-minute sweep (`-k "layer2 or shard or intelligence_state or shortlist"`)
+returned **5 failures**, two naming the exact function I had changed. All 5 pass
+in isolation and their three full files pass clean.
+
+The cause was mine: during that 72 minutes I edited
+`pipeline/intelligence_state.py` repeatedly AND deliberately swapped it to the
+pre-fix `HEAD` version for about a minute to prove the new tests fail without the
+fix. A long run imports modules as it reaches them, so it read whatever was on
+disk at that moment.
+
+**The result is void in BOTH directions** — it is not evidence of a regression
+and not evidence of correctness, because it never tested one tree. Same class as
+a `git stash` control that stashed nothing: a control that was not controlling.
+
+**How to apply.** A sweep is a measurement, and a measurement needs a frozen
+subject. Either let it finish before touching the files, or run it against a
+worktree pinned to the commit you mean to test. Reading its failures at face
+value sends you hunting a regression that does not exist — or "fixing" working code.

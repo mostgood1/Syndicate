@@ -45,6 +45,41 @@
 > wrong, EDIT THE LINE. Do not append a newer section that contradicts it. The
 > reasoning trail belongs in `deploys.md` (append-only measurement log).
 
+## [layer2-board-keyvalue-ceiling] THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 min `[verified 2026-08-31 18:25-20:0xZ, lane layer2-cap-raise]`
+
+**Rows are sharded per sport and the merge SERVES the board.** `combined_keeps_rows=False`
+on the writer while web served 1,634 rows — an empty combined key cannot otherwise
+yield rows. Board 932 → 1,634 at `per_sport=1000`.
+
+**`per_sport=3000` BROKE IT.** The combined key carries card/metadata that scales at
+~2,200 B/row **even with `rows: []`** (3,754,595 B at 1,634 rows; 9,648,192 B at
+4,552). The write refused at `9,648,192 > 8,388,608` **after the shards had already
+landed**, freezing `shard_row_total=1635`; the merge then dropped
+`unplaceable=2917` rows and **all of NCAAF**, for ≥3 cycles. It does not self-heal.
+So the ceiling is **~3,600 TOTAL rows**, not per-sport, and shard headroom says
+nothing about it.
+
+**Live config (refresh-worker only):** `SYNDICATE_LAYER2_ROWS_PER_SPORT=1000`,
+`SYNDICATE_LAYER2_ROWS_TOTAL=3000`, `SYNDICATE_LAYER2_COMBINED_ROWS=0`. Web and
+live-odds-worker carry NO `LAYER2` keys. **`ROWS_TOTAL=3000` is UNEXERCISED** —
+today's board is ~1,600 rows, so it has never bound.
+
+**Fixed and live** (`865c89be` 19:46:59Z, still in live `132559e1`): the merge sizes
+from `max(index_total, highest_position+1)`, so a refused write leaves the board
+STALE not WRONG, and `written_at` comes from the shards when stamps disagree —
+without that the corrupted board reported `18:02:05Z` while serving 18:25 rows and
+was **unfalsifiable** to any watcher keyed on `written_at`.
+
+**Built, pushed, NOT DEPLOYED:** `cards` split into per-sport keys makes the combined
+key FLAT in row count (451 → **0 B/row**, measured on the real writer). Absent from
+live `132559e1`. `SYNDICATE_LAYER2_CARDS_INLINE` unset = inline = inert. **That flag,
+not a cap raise, is what next unlocks headroom.** `openings` needs no split —
+`openings_index` never reaches the artifact.
+
+**The board is GROUPED BY SPORT and always was** (FLOOR-THEN-MERIT, `layer2_board.py:2744`,
+`4ef894e3`/#524) — NOT a sharding artifact. Reading `rows[:25]` reads the top of the
+FIRST SPORT, not the board.
+
 ## [lane-ledger-conflict-guard] THE LANE CHECKER USED TO PASS A FILE WITH CONFLICT MARKERS IN IT `[fixed 2026-08-30, `10f45a0c`]`
 
 MEASURED: `.syndicate/lanes.md` sat `UU` in the shared tree from an unfinished
@@ -1051,11 +1086,109 @@ it — a DELAY, not a refusal, so a market the venue never settles still reaches
 the ledger. Verified `awaiting_venue: 28`, the exact pre-deploy count of
 filled-and-ungraded live orders.
 
-**UNVERIFIED AND LOAD-BEARING:** the venue/inferred split is **venue 3 bets
--11.88% vs inferred 12 bets +51.07%**, and the page shows the blend **+32.60%**.
-n=3, and those 12 were graded before first-refusal existed. **This is not yet a
-controlled comparison.** `settled_by: "venue"` is the field that keeps them
-separable; `settlement_summary` does not yet split on it.
+**THE VENUE/INFERRED SPLIT IS NOW MEASURED AT SCALE, AND IT IS NOT SMALL.**
+`[re-measured 2026-08-31T17:5xZ, lane layer2-accuracy-audit — supersedes the
+n=3 reading that stood here]` Over 2026-08-24..08-30: the PAPER book (all
+`settled_by=inferred`, 402/402) returns **+9.4% ROI** (47.9% win, +$156.32 on
+$1,656.80); the LIVE book (real fills, venue-settled) returns **-5.5%** (42.3%
+win, -$40.31 on $733.31). Per venue: `paper:kalshi` **+1.1%** (364 settled) vs
+live kalshi **-7.6%** (159); `paper:polymarket` **+28.5%** (165) vs live
+polymarket **-1.3%** (83). Same sign both venues, same direction as the old
+n=3 reading. **STILL NOT A CONTROLLED COMPARISON** — the comparison book stakes
+every eligible row at a venue price while the live book holds only what passed
+the gates and filled, so selection is confounded with grading. Three live
+candidates, none eliminated: optimistic inference, an unattainable paper price,
+worse venue-available subset. **`settlement_summary` still does not split on
+`settled_by` on the surface; the blend is what the page shows.** Zero paper
+orders in the window were venue-settled.
+
+
+## [layer2-realized-accuracy] THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken in four places `[verified 2026-08-31T17:3x-18:0xZ, lane layer2-accuracy-audit]`
+
+**START HERE FOR ANY BOARD-ACCURACY QUESTION, NOT AT THE EVALUATION LEDGER.**
+`pipeline/portfolio_commit.py:357` commits BOTH the paper and live portfolios
+straight off `read_layer2_shortlist`, so `/api/portfolio/paper?date=` and
+`/api/portfolio/live` are direct measurements of this board. The evaluation
+ledger is the learning loop's INPUT, not the accuracy surface, and it currently
+settles 0.2% (19,692 settleable, 35 settled).
+
+**7 days, 2026-08-24..08-30, by bet type (paper):** game_line 142 settled 56.7%
+**+25.3% ROI [95% CI +7.2..+43.4]** — the only bucket excluding zero;
+game_total 141 / 47.5% / +9.8% [-9.3..+29.0]; player_prop 119 / 37.8% /
+**-13.5%** [-33.5..+6.5]. **REAL MONEY INVERTS game_line:** h2h+spreads
+12W-23L = **34.3% win, -23.9% ROI**. By sport (paper): mlb 375 settled (93% of
+all), wnba 22, soccer 5, nfl 0, **ncaaf 0 — never bet, ever**.
+
+**FOUR BROKEN LINKS, each measured, working backward from the board:**
+1. **Board retention is ~4 days.** `/api/board/layer2-shortlist?date=` answers
+   `no_shortlist_artifact` for 08-25/26/27. No retrospective longer than that
+   is possible.
+2. **MLB grading joins ~1 game in 14. FIX IS LIVE AND HAS NOT MOVED THE
+   NUMBER. DO NOT RECORD THIS AS FIXED.** `[2026-08-31, lane layer2-accuracy-audit]`
+   Baseline across the full window, both disks agreeing: `rows.all` =
+   1/1/2/1/1/1/7 for 08-24..08-30 with 0/14/14/6/12/12/13 `Missing game-line
+   match` warnings — **14 graded rows total, 71 lost joins.** That supply is
+   what starves settlement (19,692 settleable, 35 settled).
+   **WHAT IS LIVE:** `49c43aeb` (`_odds_paths` best-found-not-first-found +
+   `daily/snapshots/` search), `04185203` (multi-date backfill), `a35591dc`
+   (publish the rebuilt payload). `132559e1` (re-run a date that built but
+   never published) is on main, NOT live.
+   **THE BACKLOG REGRADE RAN AND RECOVERED NOTHING.** All seven dates rebuilt
+   `ok=True` 19:03:47-19:08:33Z, each in **0.4-0.9 seconds** reporting
+   `cards: 1`. A 14-game slate cannot be joined and graded in 0.4s. `ok=True`
+   is an exit code, not a result.
+   **WHY THE 14/14 PROOF DID NOT TRANSFER — READ THIS BEFORE TRUSTING ANY
+   ARTIFACT-BASED PROOF IN THIS REPO.** The fix was proven on the freeze and
+   live docs pulled from `/api/ops/artifacts/export`, **which runs on WEB and
+   reads WEB's disk**. refresh-worker has its own disk. The proof established
+   "the resolver works given these files present" and was used to claim "works
+   on the worker", which was never tested. Presence is not reachability, across
+   a service boundary this repo documents.
+   **LEADING HYPOTHESIS, UNPROVEN:** the full-slate freeze is absent from
+   refresh-worker's disk, so the builder still resolves a one-game doc. If so
+   the binding defect is **artifact DISTRIBUTION**, not the resolver — and the
+   resolver fix is necessary but not sufficient.
+   **THE READING THAT DECIDES IT** is the always-on diagnostic shipped in
+   `49c43aeb`: `Game lines read: <path> (pregame-freeze|live, N games)` in the
+   payload warnings. `(live, 1 games)` => freeze unreachable worker-side, fix
+   inert in production. `(pregame-freeze, 14 games)` => freeze found, failure
+   is elsewhere. **It needs `132559e1` deployed** — the seven payloads carrying
+   it were built before the publish call existed and nothing exports them.
+   **MARKERS CANNOT BE CLEARED FROM OUTSIDE, measured:**
+   `keyvalue/expire-run-artifacts` returns `matched_keys: 1` (surgical) and
+   `skipped_no_run_stamp: 1` (refuses — run-stamped keys only); `keyvalue/sweep`
+   only touches 10-day-stale keys. Hence the self-heal in `132559e1`.
+   **THREE INSTRUMENTS WERE BLIND, all chosen for reachability rather than for
+   answering the question:** `/mlb/api/market-accuracy` (wrong disk, and the
+   backfill had no publisher), `graded_rows_available` (STALE — `epoch`
+   unchanged for ~2h; moves only when the settlement autorun fires), and the
+   builder's `stdout_tail` (JSON summary only, no warnings).
+3. **NCAAF has never produced a graded row.** `_ncaaf_graded_rows_for_date`
+   reads `cfbd_lines_*.json`; zero in the hot-artifact set.
+4. **Soccer's biggest board market is ungradeable by construction.** Grader
+   covers 3-way ML / totals@2.5 / BTTS; the board's #1 market is
+   `alternate_totals_corners`, **573 of 2,623 rows (22%)**.
+
+**THE FUNNEL IS THE OPTIMIZATION TARGET.** Refusals 08-24..08-31:
+`no_model_edge_pct` **2,506**, `below_min_ev_pct` 1,567, below_min_stake 46,
+zero_kelly 37 — ~4,150 against ~458 orders. Board side agrees:
+**`model_edge_pct` is numeric on only 902 of 2,623 rows (34.4%)**,
+`model_ev_pct` on 201. `ev_basis` = market_fair 1,451 / model_edge 184 /
+model_probability 17 / unset 971 — on a `market_fair` basis the board is a
+stale-price detector, not a model-vs-market edge.
+
+**BOARD QUALITY, n=2,623 over the 4 dated snapshots:** books_quoting<=1 on
+**1,511 (57.6%)**; book_age median 4,498s, **p90 36,816s (10.2h)**, >6h 21.3%,
+`suspect_stale` 8.8%; movement not tracked 42.1%; `ev_pct`>0 on only 444
+(16.9%), median **-2.35%**; model_skill measured 625 / unmeasured 882 / no
+projection block 1,116. **Composition mismatch:** soccer 51% of board / 1.2% of
+settled bets; ncaaf 33% / 0%; mlb 16% / 93%.
+
+**NOT MEASURED, and it is the read that decides how to rank:** whether the
+board's own `ev_pct`/`model_edge_pct`/`score` PREDICT the outcome. The
+portfolio endpoints serve settlement marginals only (`by_sport`,
+`by_market_family`, `by_venue_family`), never per-order rows, so no calibration
+curve exists. Exposing settled orders with their board fields is the unblock.
 
 ## [portfolio-settlement] PORTFOLIO SETTLEMENT — the ledger crossed no service boundary, and the join keyed on a value that drifts `[verified 2026-08-22, lane portfolio-ledger-service-split]`
 
