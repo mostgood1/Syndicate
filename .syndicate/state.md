@@ -8185,6 +8185,38 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-explore-arm-FIRING] 2026-08-31T15:25Z — the arm is placing boundary orders; the falsifier is live
+
+**`e8392f1b` live 15:21:40Z at rate 0.5. First tick after rollout:**
+
+    EXPLORE  aec-mlb-bal-col-2026-08-31       0.444  +9.3h   rate=0.5
+             tsc-epl-ast-ars-2026-08-31-2pt5  0.441  +3.6h   rate=0.5
+    HELD     mia-wsh 0.485 │ nyy-laa 0.461    (both ABOVE the 0.45 band edge)
+    EXECUTED positions=6 placed=2 filled=0 duplicates=2 skipped=2
+
+`rate=0.5` appears in the log line itself, so the new code RAN — asserted by
+branch, not by deploy state. The two held are correctly outside the band; the
+two explored are correctly inside it. `ast-ars` drifted 0.450 -> 0.441, which is
+what brought it into range.
+
+**THESE TWO ORDERS ARE THE LIVE FALSIFIER.** Both are priced ABOVE 0.410, the
+top of the observed resting range, and both were placed ON PURPOSE. The rule
+says they will rest.
+
+    EITHER FILLS  -> the rule is refuted, 0.35 is too low, and the ceiling must
+                     be re-derived from where the fill landed.
+    BOTH REST     -> the ordering survives its first deliberate test and n grows
+                     from 3.
+
+**READ THEM AS EXPLORATION, NOT AS ORDINARY FILLS.** They were selected BECAUSE
+the rule predicts they fail. Pooling an exploration fill with an ordinary one
+would corrupt exactly the measurement the arm exists to produce — that is why
+the line is logged distinctly.
+
+**AND STILL: A FILL HERE IS NOT PROFIT.** These are near-even sides chosen to
+test a boundary, not because they are good bets. Whatever they do, the EV
+question is separate and unanswered.
+
 ## [polymarket-explore-arm-too-slow] 2026-08-31T15:11Z — the arm is LIVE and CORRECT, and its sample rate is close to zero
 
 **Deployed `b6c02dff`, live 15:07:47Z. First tick: `EXPLORE_PREGAME_BOUNDARY 0`,
