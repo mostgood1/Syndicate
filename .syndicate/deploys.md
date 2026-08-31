@@ -5,6 +5,69 @@
 
 ---
 
+## 2026-08-31 03:48:48Z — **`commence_time` RESTORED TO THE POSITION PAYLOAD — VERIFIED 17/17 ON THE SAME SLUGS THAT FAILED** — all three services `0fc174c6` — lane `polymarket-yes-leg-binding`
+
+    web / refresh-worker / live-odds-worker  <- 0fc174c6   trigger=manual
+    **DEPLOYED BY THE USER, not by me.** I held no claim and fired nothing.
+
+**THE DEFECT.** `portfolio_commit.py:551` builds the position PAYLOAD by
+projecting over the IDENTITY tuple:
+
+    position = {field: row.get(field) for field in _POSITION_IDENTITY_FIELDS}
+
+so when `commence_time` left that tuple earlier the same day — CORRECTLY, it had
+minted a second position key on a restated kickoff and put ~$9.12 on the board
+where one bet was intended — it also left the position, the `OrderRequest`, and
+every ledger row after. One list doing two jobs.
+
+**NOT A SOCCER GAP, and I diagnosed it as one first.** Measured across 59 live
+orders, a perfect temporal split with ZERO overlap, every sport:
+
+    WITH commence_time    28   submitted 16:41:53 .. 18:59:26
+    WITHOUT               31   submitted 19:05:14 .. 03:40:39
+
+Soccer read as 18-of-19 missing only because its orders are the recent ones; 9
+MLB orders lose it identically after the cutover. A soccer-specific fix would
+have missed two thirds of the affected rows. The board was never at fault —
+`/api/board/layer2-shortlist` carries `commence_time` on **110/110 soccer h2h
+rows**.
+
+**verify: PASS, 17/17, ON THE SAME SLUGS THAT PREVIOUSLY READ `None`.**
+
+    03:46:54  last PORTFOLIO_COMMIT under the OLD code
+    03:48:48  both workers live on 0fc174c6
+    03:50:53  14 orders written -> 0/14 commence_time   (from the STALE plan)
+    03:55:51  PORTFOLIO_COMMIT runs under the NEW code
+    04:06:45  17 orders written -> 17/17 commence_time  PASS
+
+    atc-eflch-por-der-2026-09-01-der  commence='2026-09-01T18:45:00Z'
+    atc-lal-osa-get-2026-08-31-get    commence='2026-08-31T17:30:00Z'
+    atc-epl-ful-cry-2026-09-05-cry    commence='2026-09-05T14:00:00Z'
+
+Identical markets, `None` before the writer ran and real varied timestamps
+after — a before/after on the same subjects rather than a fresh sample that
+happened to look better.
+
+**I REPORTED FAIL FIRST AND IT WAS WRONG. The verifier was the defect.** It
+gated on an order's `submitted_at` against the DEPLOY time. Orders are placed
+from a STORED PLAN, so submit time says nothing about which code wrote the
+position — the discriminating event is the PLAN BUILD. At 03:50:53 the newest
+plan was 03:46:54, i.e. old code, and 0/14 was the only possible result.
+**Correct verdict at that moment was UNEXERCISED.** Had I stopped there I would
+have recorded a working fix as broken and gone hunting a second defect that does
+not exist. The corrected verifier waits for a `PORTFOLIO_COMMIT` run after the
+cutover FIRST, and reports `unexercised` rather than a verdict when the writer
+has not run.
+
+**WHAT IT UNBLOCKS.** Time-to-event reasoning — staleness, live-vs-pregame,
+hours-to-kickoff — was blind on every order written between 19:05Z and the
+cutover. It is now measurable: the new rows put `hul-ast` and `ful-cry` ~5 days
+from kickoff and `osa-get` ~13 hours, which is the first real evidence on
+whether untouched resting orders are simply far from the event.
+
+**LIMIT: forward only.** The 31 existing blank rows stay blank. The hypothesis
+gets tested on new data, never retroactively.
+
 ## 2026-08-30 20:38:53Z — **LIVE EXECUTION RECOVERED AFTER 55 MINUTES** — live-odds-worker `bf1dd290` — lane `polymarket-yes-leg-binding`
 
     dep-daa98egn74is73a7o34g   fired by ME, claim held 20:18:42Z and RELEASED 20:4xZ
