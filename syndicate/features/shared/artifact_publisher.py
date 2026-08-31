@@ -402,6 +402,25 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # refresh_mlb_oddsapi.py; without publishing them the web board renders
     # ml/totals as null (observed 2026-07-16). Small per-date JSONs, not bulk.
     "*_source/source_artifacts/data/daily/snapshots/*/*.json",
+    # The odds-refresh RECORD, one small JSON rewritten every pass
+    # (refresh_mlb_oddsapi.py's `latest_refresh_oddsapi.json`). It carries
+    # `frozenPregame` -- the freeze's own list of every destination it copied,
+    # per family -- which is the only direct answer to "did the pregame seal
+    # fire, and for which markets".
+    #
+    # Added 2026-08-31 (`#611`) because that question was unanswerable from
+    # outside: the prop seal has produced nothing since 2026-08-16, and
+    # verifying why meant inferring from file sizes and card `inputs` because
+    # neither `market/oddsapi/**` nor this record was reachable. Two successive
+    # hypotheses were built on an export returning nothing, and BOTH were wrong
+    # -- an unallowlisted path is structurally invisible, not absent.
+    #
+    # Allowlisting PERMITS the transfer and nothing more (see the note above);
+    # refresh_mlb_oddsapi.py publishes this explicitly, the same way it already
+    # publishes its live-lens report and render-sync payload.
+    "*_source/source_artifacts/data/live_lens/cron_meta/latest_refresh_oddsapi.json",
+    "*_source/data/live_lens/cron_meta/latest_refresh_oddsapi.json",
+
     # Per-game sim artifacts: cards.py hydrates output segments and starter
     # ladder badges from data/daily/sims/<date>/sim_*.json (and game detail
     # rides the same lookup). In the GHA era these reached web via git sync;
