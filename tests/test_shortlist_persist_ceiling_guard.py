@@ -98,4 +98,14 @@ def test_the_guard_runs_BEFORE_the_write(monkeypatch, capsys) -> None:
     monkeypatch.setattr(state, "write_json_file", lambda path, payload: order.append("write"))
     monkeypatch.setattr(state, "_utc_now", lambda: "2026-08-22T00:00:00Z")
     state.write_layer2_shortlist("2026-08-22", _payload(3))
-    assert order == ["warn", "write"]
+    # THE PROPERTY, NOT THE CALL COUNT. This asserted `== ["warn", "write"]`,
+    # which pins two things: the guard precedes the write, and there is EXACTLY
+    # ONE write. The first is what the test exists for; the second stopped being
+    # true when the board gained a per-sport shard key beside the combined one
+    # (`SYNDICATE_LAYER2_COMBINED_ROWS`). A warning after the write is a warning
+    # after the failure it predicts, so what must hold is that NO write of any
+    # kind precedes the guard. Widened, not deleted: `order[0]` still fails if a
+    # shard write ever moves ahead of it.
+    assert order, "neither the guard nor the write ran"
+    assert order[0] == "warn", f"a write preceded the ceiling guard: {order}"
+    assert "write" in order, "the guard ran but the write did not"
