@@ -194,7 +194,10 @@ if "--apply" in sys.argv:
     }
     root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     base = pathlib.Path(root) if root else pathlib.Path("data")
-    out_path = base / "soccer_source" / "calibration" / "shot_shrinkage.json"
+    # DATE-SUFFIXED so the worker's date-scoped pull_hot_artifacts can reach it;
+    # an undated name is invisible to that pull forever.
+    out_path = (base / "soccer_source" / "calibration"
+                / ("shot_shrinkage_%s.json" % datetime.date.today().isoformat()))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=1, sort_keys=True), encoding="utf-8")
     print("")

@@ -54,7 +54,7 @@ MIN_DIVISOR = 1.0
 MAX_DIVISOR = 2.0
 
 
-def shot_shrinkage_path() -> Path:
+def _calibration_dir() -> Path:
     """Where the fitted divisor lives.
 
     Resolved through `SYNDICATE_DATA_ROOT` -- the MOUNTED DISK on Render -- and
@@ -66,13 +66,39 @@ def shot_shrinkage_path() -> Path:
     """
     root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     base = Path(root) if root else Path(__file__).resolve().parents[5] / "data"
-    return base / "soccer_source" / "calibration" / "shot_shrinkage.json"
+    return base / "soccer_source" / "calibration"
+
+
+def shot_shrinkage_path() -> Path | None:
+    """The NEWEST dated calibration file, or None.
+
+    DATE-SUFFIXED ON PURPOSE, and this is the whole reason the file is named
+    the way it is. The worker does not receive pushes -- it PULLS from web via
+    `pull_hot_artifacts`, and that per-cycle pull is scoped to
+    `?pattern=*<today>*` because an unfiltered pull reproducibly hit Render's
+    proxy timeout. **A file with no date in its name can never be reached by
+    it.** `run_refresh_worker` records exactly this for `schedule_2026.json`.
+
+    The boot seeder is not an alternative: it copies only into a subdirectory
+    with NONE matching yet, so it can seed a first value and can never deliver
+    a re-fit. A monthly re-fit writes a NEW dated file, which the pull picks up
+    on the day it is written; older ones stay on disk and are ignored here.
+    """
+    directory = _calibration_dir()
+    try:
+        dated = sorted(directory.glob("shot_shrinkage_*.json"))
+    except Exception:
+        return None
+    return dated[-1] if dated else None
 
 
 def load_shot_shrinkage() -> dict[str, Any]:
     """The whole artifact, or `{}`. Never raises."""
+    path = shot_shrinkage_path()
+    if path is None:
+        return {}
     try:
-        payload = json.loads(shot_shrinkage_path().read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
     return payload if isinstance(payload, dict) else {}

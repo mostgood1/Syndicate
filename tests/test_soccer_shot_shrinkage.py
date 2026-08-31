@@ -37,7 +37,10 @@ class _Isolated(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
 
     def write(self, payload):
-        p = shot_calibration.shot_shrinkage_path()
+        # Writes a DATED file, because that is the only name the worker's
+        # date-scoped pull can ever deliver. `shot_shrinkage_path()` resolves
+        # the newest one.
+        p = shot_calibration._calibration_dir() / "shot_shrinkage_2026-08-31.json"
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(payload) if not isinstance(payload, str) else payload,
                      encoding="utf-8")
