@@ -1555,7 +1555,17 @@ def _polymarket_resolve_market(request) -> tuple | None:
                 [(str(n), None) for n in outcomes]
             ):
                 candidate = {"parsed": parse_slug(slug) or {}}
-                if _subject_is_side(candidate, row, our_side, sport):
+                # THE REQUEST'S TEAMS, NOT THE SLATE ROW. `_subject_is_side`
+                # decides the leg from `home_team`/`away_team` since
+                # 2026-08-31 -- the positional parse it used before bought
+                # Getafe on a bet for CA Osasuna. `_SLATE_STORAGE_FIELDS`
+                # carries no team names at all (slug, outcomes, prices, line,
+                # gameStartTime, tick, min qty, orderable), so passing `row`
+                # here means the resolver can never confirm ANY leg and every
+                # soccer moneyline refuses -- fail-safe, and silently dead.
+                # `resolution` is built from the request a few lines above and
+                # is the same pair the price lookup already matched on.
+                if _subject_is_side(candidate, resolution, our_side, sport):
                     for position, name in enumerate(outcomes):
                         if str(name or "").strip().lower() != "yes":
                             continue

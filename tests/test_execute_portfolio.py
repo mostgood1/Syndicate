@@ -1857,3 +1857,28 @@ def test_the_EXPLORE_line_carries_EV_from_its_PARAMETER_not_another_frame(monkey
     out = capsys.readouterr().out
     assert "EXPLORE_PREGAME_BOUNDARY" in out, out
     assert "ev_pct=1.25" in out and "edge_pct=2.50" in out, out
+
+
+def test_a_soccer_yes_no_leg_is_tested_against_the_REQUESTS_teams(monkeypatch):
+    """`_SLATE_STORAGE_FIELDS` carries NO team names -- slug, outcomes, prices,
+    line, gameStartTime, tick, min qty, orderable.
+
+    `_subject_is_side` decides the leg from `home_team`/`away_team` since the
+    2026-08-31 wrong-side loss. Handing it the slate row means it can never
+    confirm any leg, so every soccer moneyline refuses: fail-safe, and silently
+    dead. This pins that the REQUEST's teams reach it, so a correct leg still
+    resolves and the wrong one still refuses."""
+    from syndicate.features.shared.polymarket_board_join import _subject_is_side, parse_slug
+    from syndicate.features.shared.polymarket_us_markets import _SLATE_STORAGE_FIELDS
+    assert "home_team" not in _SLATE_STORAGE_FIELDS
+    assert "away_team" not in _SLATE_STORAGE_FIELDS
+
+    candidate = {"parsed": parse_slug("atc-lal-osa-get-2026-08-31-get") or {}}
+    slate_row = {"slug": "atc-lal-osa-get-2026-08-31-get", "orderable": True}
+    # The slate row cannot answer either way.
+    assert _subject_is_side(candidate, slate_row, "home", "soccer") is False
+    assert _subject_is_side(candidate, slate_row, "away", "soccer") is False
+    # The request's teams answer both, and refuse the side that lost money.
+    resolution = {"home_team": "CA Osasuna", "away_team": "Getafe"}
+    assert _subject_is_side(candidate, resolution, "home", "soccer") is False
+    assert _subject_is_side(candidate, resolution, "away", "soccer") is True
