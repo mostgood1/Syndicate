@@ -3061,13 +3061,13 @@ caaf-no-orders`). NOT
 - Incident handled: live execution halted on BOTH venues 19:47:34Z. Correct fix was another lane's dd33c865. My 63661af1 auto-reject was UNSAFE and is reverted (ef0d2d47).
 - Shipped and useful: ORDER_STATE logging of cumQuantity/leavesQuantity (d8b6c847, landed as bf1dd290) — NOT YET READ.
 - Next: read ORDER_STATE for the cancelled orders; trace why 71 board spread rows reach ORDER_PATH zero times.
-### ncaaf-totals-dispersion — BLOCKED 2026-08-30 — CFBD monthly quota exhausted until the month rolls
-- Goal: compress NCAAF simulated-total dispersion at its carrier, and MEASURE totals skill vs market — the measurement `pick_gate` says has never existed.
-- Files: NONE HELD — c5afcf27 landed; no further edits planned.
-- Status: dial BUILT and VERIFIED (exact no-op at default). Value NOT FITTED. Gate NOT OPENED. Step-1 provenance DONE: the existing 752-record measurement is unusable (stale engine `ncaaf_v2`/2026-07-16 vs today's `ncaaf-goal-line-refit-1`/2026-08-27, AND `rating_source=cfbd_ppa_season_2025` leaks).
-- BLOCKED BY: CFBD monthly quota exhausted (measured 22:03:34Z). Clears ~2026-09-01. Also blocking LIVE NCAAF projections in production.
-- Unblock path when the quota rolls: PPA needs NO CFBD call (derivable from `historical_truth/plays_*`, 74.3% coverage, leak-free by construction); only SP+ needs ONE fetch per completed season, and completed-season ratings never change — cache and COMMIT both so this cannot recur.
-- Do NOT re-sweep the rating weights: `calibration_profile.py:51-64` records that dead end (parity made totals WORSE).
+### ncaaf-totals-dispersion — BLOCKED — CFBD monthly quota, clears ~2026-09-01
+- Goal: compress NCAAF simulated-total dispersion at its carrier, and MEASURE totals skill vs market.
+- Files: NONE HELD.
+- Status: dial BUILT and VERIFIED (exact no-op at default, c5afcf27). Value NOT FITTED. Gate NOT OPENED. Step-1 provenance DONE — the existing 752-record measurement is unusable (engine `ncaaf_v2`/2026-07-16 vs today's `ncaaf-goal-line-refit-1`/2026-08-27, AND `rating_source=cfbd_ppa_season_2025` leaks).
+- BLOCKED BY: CFBD monthly quota exhausted (measured 22:03:34Z 08-30). Also blocked live NCAAF projections.
+- Unblock: PPA needs NO CFBD call (derivable from `historical_truth/plays_*`, 74.3% coverage, leak-free by construction); only SP+ needs ONE fetch per completed season — cache and COMMIT both so this cannot recur.
+- Do NOT re-sweep the rating weights: `calibration_profile.py:51-64` is a measured dead end.
 - Blocked by: cfbd-monthly-quota
 ### layer1-model-edge-join — OPEN — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
 - Goal: Layer 1 must join a MODEL edge on every sport/market, so Layer 2 /

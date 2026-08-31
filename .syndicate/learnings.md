@@ -7991,3 +7991,42 @@ and ADDED are both empty. `INVARIANTS HOLD` is a statement about internal
 consistency, never about completeness — the same shape as this repo's standing
 rule that a healthy reading is evidence only once you know what makes it read
 unhealthy.
+
+## 2026-08-31 — FORBIDDEN: shipping a gate on a one-variable rule when the sample cannot rule out a second variable. Three hypotheses died on one dataset because each was a projection of a 2-D structure.
+
+Polymarket fills are governed by TWO variables together: **pregame + cheap
+fills; live + anything fills; pregame + near-even never does.** Every
+one-variable story fitted a slice of that and then broke:
+
+    time-to-event   killed by a fill at +18.6h sitting BETWEEN rests at
+                    +16.8h and +20.4h -- the fill was CHEAP (0.335)
+    price alone     killed by a 0.490 fill -- that market was PAST
+    "soccer never
+     fills"         killed by juv-par at 0.210 -- soccer fills CHEAP
+
+Each looked clean on the data available when it was proposed. I built and
+DEPLOYED a live-money gate on the first one; it was refuted within the hour by
+the first order able to test it.
+
+WHAT MADE THE ORIGINAL EVIDENCE LOOK CLEAN AND WHY IT WAS NOT. "8 of 8 fills on
+live-or-past markets, 3 of 3 pregame orders rest" was CONFOUNDED: the fills were
+older orders on games ALREADY UNDER WAY, so "past" was doing the work while
+"hours to kickoff" took the credit. A clean-looking split across a variable you
+did not choose is the signature of a lurking one.
+
+HOW TO APPLY. Before a rule becomes a GATE, ask what ELSE differs between the
+two groups. Here every filled order was also cheaper than every resting one, and
+nobody looked. **A perfect separation on n<10 is more likely to be two variables
+than one** -- and the cost of finding out late is a deployed rule that suppresses
+real bets.
+
+AND THE THRESHOLD IS THE SAME MISTAKE ONE LEVEL DOWN. I first set the ceiling at
+0.37: the MIDPOINT of the never-observed gap 0.335-0.410, which is the single
+value in that range with no evidence behind it. Where the data is silent, pick
+the end that fails in the direction you can afford -- 0.35 places only what has
+been WATCHED to fill.
+
+FINALLY: a rule like this is a SELECTION change, not an execution fix. It shifts
+the bet mix toward longshots. Fill volume will rise and that is NOT evidence it
+helped; only EV or CLV on the orders it admits can say.
+
