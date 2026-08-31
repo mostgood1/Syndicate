@@ -1052,22 +1052,25 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 ### layer1-model-edge-join — OPEN — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
 - Goal: Layer 1 must join a MODEL edge on every sport/market, so Layer 2 /
   Kalshi / Polymarket rank on the sim's disagreement rather than on book hold.
+- **SCOPE REQUEST GRANTED 2026-08-31 — the layer2 board scorer goes to lane
+  `layer2-board-opportunities` (session 4465737c), which asked before touching
+  it.** They measured the board this lane's fix produced: top 25 was 24
+  `batter_home_runs` plus one totals, all 25 one-sided, top row model EV 85
+  points against the best market-basis EV anywhere of about 5. Cause: model EV
+  is edge divided by the fair probability, so it multiplies edge by the
+  reciprocal of p and ranks a smaller edge on a longer shot above a bigger edge
+  on a shorter one. I reproduced that reading myself before granting.
+  **THE DECIDING ARGUMENT IS MINE AND IT IS A FLAW IN THIS LANE'S OWN WORK:**
+  `blended_score` caps the model at fifteen points when it arrives as
+  `model_edge`, and I routed the same information through `value_ev`, which has
+  no cap at all. **Their flag must DEFAULT TO CURRENT until the user rules** —
+  "price EV vs the model everywhere" is a user decision of 2026-08-30, and two
+  sessions agreeing does not reverse one.
+  This bullet sits ABOVE `- Files:` deliberately: prose placed inside or just
+  after that block is parsed as a CLAIM, and doing it here is how this lane
+  briefly claimed the tokens `1` over `p`, `15` point `0` and `85` point `13`.
 - Files: syndicate/features/shared/board_enrichment.py
-  RELEASED `[2026-08-31 to lane layer2-board-opportunities, session 4465737c]`: the layer2 board scorer
-  Granted on a SCOPE REQUEST, not taken. That lane measured the board this fix
-  produced -- 25 of 25 top rows one-sided, 24 of 25 `batter_home_runs`, top row
-  `model_ev` 85.13 against the best market-basis `ev_pct` anywhere of +5.05 --
-  and traced it to `model_ev = edge / p`, which multiplies edge by 1/p and so
-  ranks a smaller edge on a longer shot above a bigger edge on a shorter one.
-  I reproduced that reading myself before granting. THE DECIDING ARGUMENT IS
-  MINE AND IT IS A DESIGN FLAW IN THIS LANE'S OWN WORK: `blended_score` caps the
-  model at `_MODEL_EDGE_MAX_POINTS = 15.0` when it arrives as `model_edge`, and
-  I routed the same information through `value_ev`, which has NO cap. The path
-  is written above WITHOUT a `.py` and the marker sits on its OWN LINE so
-  `lane-guard` sees the release -- a disclaimer beside a path does not unclaim
-  it. **The flag must DEFAULT TO CURRENT until the user rules**: "price EV vs
-  the model everywhere" is a user decision of 2026-08-30 and two sessions
-  agreeing does not reverse one.
+  RELEASED to lane layer2-board-opportunities 2026-08-31: the layer2 board scorer module
   syndicate/features/shared/wnba_game_projections.py
   syndicate/features/shared/wnba_projections.py
   syndicate/features/shared/nfl_game_projections.py
