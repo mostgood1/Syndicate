@@ -16618,3 +16618,285 @@ Single fetch per date, same instant, `/api/board/book-grid?sport=mlb&date=…`:
   `INTEL_STATUS_TIMING` lines for `/`. Cutting 8MB of serialise+transfer should
   help; I am not claiming by how much.
 - Blocked by: none. Claims released.
+
+
+## SUPERSEDED 2026-08-31 — session 1c88bcca, moved VERBATIM from lanes.md at checkpoint
+
+Full working record. Current STATUS is in `lanes.md`; the narrative is in
+`.syndicate/log/2026-08-31.md`.
+
+
+### layer1-model-edge-join — OPEN — opened 2026-08-30 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+- Goal: raise Layer 1's MODEL-EDGE coverage across every sport/market, so Layer 2
+  / Kalshi / Polymarket rank on the sim's disagreement rather than on book hold.
+  Baseline MEASURED on production 2026-08-30: `/api/board/layer1?window=slate`
+  over mlb/wnba/ncaaf/soccer = 13,262 rows, 7,970 with a projection, **465 with
+  `edge_vs_market_pct` (3.5%)**, **0 with `edge_vs_modelled_fair_pct`**. Layer 2's
+  own ingest counters agree: `rows_with_model_edge / sides_priced` = mlb 318/5316,
+  ncaaf 0/939, nfl 674/2494, soccer 339/15682, wnba 75/2404 — **1,406 of 26,835
+  (5.2%)**.
+- Files: syndicate/features/shared/board_enrichment.py
+  syndicate/features/shared/layer2_board.py
+  syndicate/features/shared/wnba_game_projections.py
+  syndicate/features/shared/wnba_projections.py
+  syndicate/features/shared/nfl_game_projections.py
+  syndicate/features/shared/prop_projections.py
+  scripts/audit_layer1_completeness.py
+  tests/test_modelled_fair_edge_reachability.py
+  tests/test_wnba_game_projections.py tests/test_nfl_game_projections.py
+- NOT CLAIMED, DELIBERATELY: `syndicate/features/shared/live_projection_join.py`
+  is held by OPEN lane `live-prob-producer-reader-gap`, a declared
+  no-code-change diagnostic lane. MLB's live tier is a confirmed second gap
+  (`snapshot_live_prob_seen: 0`; 294 live rows, `with_live_projection: 256`,
+  `with_live_prob: 0`) whose cause is the PRODUCER at
+  `syndicate/features/mlb/live_lens.py:1298` — cards props win, so the MC props
+  that are the sole source of `liveModelProbOver` are discarded whenever the
+  cards artifact has any. Surfaced to that lane, not taken here.
+- **RESULT `[2026-08-30, pushed `787e6532`]` — SEVEN DEFECTS, ALL MEASURED.**
+  Full audit: `.syndicate/findings_2026-08-30_layer1_model_edge_join.md`.
+  **D1** the modelled-fair edge had never once run, on any sport, on any path —
+  THREE breaks in series: ordering (`modelled_fair_edge` reads
+  `row["modelled_fair"]`, and all three paths call `attach_projections` BEFORE
+  `attach_margin_model`), the reader (`_model_edge_for` accepted
+  `edge_vs_market_pct` only), and the side key (`modelled_fair` is keyed by the
+  ROW's side; 1,278 soccer rows stamp `"over"` against a `("yes",)` row and
+  1,939 stamp the PLAYER'S NAME). 9,161 rows carried a `modelled_fair`, 0
+  carried the edge. Fixed; measured over production payloads at 3.2% -> 21.9%.
+  **D2** WNBA spreads compared an AWAY-framed row line against a HOME-framed sim
+  line, so `p_home_cover` was unreachable for every non-zero spread — 0 of 58
+  edged, while totals (no side, no frame) matched first try. Every test fixture
+  used `line=2.0` with `sim_market_home_spread=2.0`, a state production cannot
+  produce. **D3** WNBA's alternate ladder was documented since `#263` and
+  filtered out before the loop — 260 pregame rows, six times the main line, with
+  no projection AND no reason. **D4** four producers served a blank edge with the
+  reason key ABSENT (NFL h2h 25, NFL spreads 50, WNBA props 42, WNBA game 11).
+  **D5** NFL h2h never set `edge_vs_market_pct` at all, and `skill_note` returns
+  None for a REGULAR-season profile — the season opens 2026-09-10. **D6** NFL
+  spreads refused on "the row's line does not say which side it belongs to",
+  a premise `#262` settled; the real blocker is the margin model's -0.047.
+  **D7** betrivers publishes pitcher strikeouts under `batter_strikeouts`.
+- **AND THE HONEST HALF: THE RANKING IMPACT IS ZERO.** Scored with the same
+  `blended_score` Layer 2 uses, the 2,611 newly-priced rows top out at **-4.73**
+  against a live shortlist whose #50 is +0.64 and whose #1 is +4.69. EV against
+  a `book_margin_model` fair is `-hold` for every such row by construction
+  (`_row_ev_is_hold_restatement` says so), and the hold term dominates whatever
+  the model edge says. The rows are now correct, visible, attributable and
+  SIZABLE — a null `model_edge_pct` makes Kelly exactly zero, so those rows
+  could rank and could never be bet (`f8c5c260`, peer session: 980 of 1198 board
+  rows). They are not yet BETTABLE. Making them so means pricing EV against the
+  MODEL's probability rather than against the modelled fair — a product decision
+  on models whose `model_skill` reads `sample_games: 0`, and NOT taken here.
+- Falsification test (run, not reasoned): with `modelled_fair` attached first,
+  the identical call on the identical row shape returns
+  `{'edge_vs_modelled_fair_pct': 3.75, ...}` where it returned `None` before.
+- Verification: 445 tests green across every touched module, including
+  `tests/test_modelled_fair_edge_reachability.py` (new, 20 cases + 3 subtests)
+  whose FIRST test is a REACHABILITY test — a correctness test over a hand-built
+  projection passed against the broken code the entire time.
+  **STILL OWED, and it is the one that counts:** re-measure
+  `rows_with_model_edge / sides_priced` per sport on the SERVED payload after
+  deploy, plus the count carrying `edge_vs_modelled_fair_pct`, plus
+  `rows_at_sim_market_line` for WNBA spreads (structurally 0 today).
+- **NOT DEPLOYED.** `board_enrichment.py` + `layer2_board.py` are refresh-worker
+  and web. Needs both locks and the measurement above.
+- **VERIFIED IN PRODUCTION `[2026-08-31 01:43Z]`, and the lane stays OPEN for one
+  more reading.** web `4028969e` (mine), refresh-worker + live-odds-worker
+  `91e1f69e` (USER-deployed) — the latter checked BY CONTENT, not ancestry.
+  Against a SAME-EVENING control at 01:29Z, not the 22:2xZ baseline (the slate
+  had moved too far and using it would have flattered the result):
+
+      soccer   342/16923 ( 2.0%) -> 2082/16940 (12.3%)   mfair ABSENT -> 3159
+      nfl      670/2490  (26.9%) ->  990/2490  (39.8%)
+      ncaaf      0/945   ( 0.0%) ->    0/945   ( 0.0%)   policy, unchanged
+      mlb        6/5252         ->    3/5209             slate over
+      wnba       6/2339         ->    6/2193             slate over
+
+  Served shortlist top-200: rows carrying `model_edge_pct` **1 -> 100**.
+  `rows_uninformative_ev` 274 -> 184.
+- **STILL OWED, and it is why this lane does not close:** MLB, WNBA and NCAAF are
+  at 0 pregame games, so their flat numbers are NOT evidence — `mfair_priced` is
+  0 for them, which is the sweep RUNNING and declining live/settled rows, not the
+  sweep missing. `rows_at_sim_market_line` for WNBA spreads (D2, structurally 0
+  before the fix) has had no pregame slate to fire on at all. Read all four off
+  TOMORROW'S FIRST BUILD with `py -3 scripts/measure_model_edge_coverage.py`.
+- **The `[user decision]` model-EV change works and reached TWO rows of 200.**
+  `ev_basis` = market_fair 198 / model_probability 2, both soccer
+  `player_shots_on_target`. Teo Quintero is the mechanism end to end: `ev_pct`
+  -8.611 (the book's own margin, identical for every such row) -> `model_ev_pct`
+  +16.194, score 4.05, rank ~93. But 3,159 rows were priced against the modelled
+  fair and 2 cleared the top 200 — the one-sided pool still scores below the
+  two-sided one. Recorded because the decision was taken expecting more.
+- **A DEFECT IN MY OWN TOOLING, recorded rather than quietly fixed:** the watcher
+  I wrote re-ran `deploy_claim.py acquire` each pass, which issues a NEW token
+  and stranded the one I held, so `release` refused and I had to `--force` my own
+  live claim. A poller must re-`status`, never re-`acquire`. `--force` is the
+  gesture reserved for a session that is gone and must not become routine.
+- **The deploy killed an in-flight MLB sim.** `deploy_preflight` returned
+  `HOLD: 7 job(s) in flight` at 01:27:50Z naming `run_mlb_daily_sim_job.py` and
+  the `ui-daily` `daily_update.py` tree; the manual deploy fired 01:29:34Z. The
+  sim needs requeuing. Fact, not complaint.
+- **DEPLOYED AND MEASURED 2026-08-31 03:55Z (`0fc174c6`, all three services,
+  user-deployed).** soccer `339/15682 (2.2%) -> 2107/16940 (12.4%)`,
+  `mfair_priced 0 -> 3159`; nfl `674/2490 (27.0%) -> 988/2494 (39.6%)`; served
+  top-200 rows with a model edge **1 -> 130**; `rows_uninformative_ev`
+  **1269 -> 138**. Full record: `.syndicate/deploys.md`, 2026-08-31 03:55Z.
+- **STILL OWED: MLB, WNBA and NCAAF are UNREAD, not flat.** Both MLB and WNBA
+  were at ZERO pregame games at verification (`games={'final': 14}` /
+  `{'final': 4}`), and `mfair_priced: 0` there is the sweep declining settled
+  rows, not the sweep missing. WNBA's spread-frame fix (D2) has still never
+  fired in production. Read all of it off tomorrow's first build with
+  `py -3 scripts/measure_model_edge_coverage.py`; compare the PREGAME row.
+- Blocked by: none
+
+
+### mlb-live-prop-prob-merge — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+- Goal: get MLB's live prop probability onto the board. The producer emits it
+  and a merge throws it away. `rows_live_edged` is 0 and must become non-zero
+  on a live MLB game, measured on the served payload.
+- Files: syndicate/features/mlb/live_lens.py, tests/test_mlb_live_prop_prob_merge.py (new)
+- NOT CLAIMED, DELIBERATELY: `syndicate/features/shared/live_projection_join.py`
+  is held by OPEN lane `live-prob-producer-reader-gap`. This lane IMPORTS its key
+  rule (read-only) and edits nothing in it. That lane's question — LOST IN THE
+  JOIN vs NEVER PRODUCED — is ANSWERED by the series below: produced, then
+  discarded. It is neither of its two options, which is why it stayed open.
+- MEASURED 2026-08-31, refresh-worker logs, one live game (824636), the full
+  `LIVE_MC_PRICED` series rather than one tick:
+
+      00:40Z rows=27   01:07Z rows=14   01:42Z rows=4
+      00:48Z rows=26   01:21Z rows=10   01:58Z rows=2
+      00:58Z rows=18   01:31Z rows=8    02:12Z rows=0   <- end of game
+
+  The producer emits up to **27 rows carrying `liveModelProbOver`**, decaying to
+  0 only as the game ended. The published snapshot over the same window:
+  `live: {rows: 124, with_live_projection: 115, with_live_prob: 0}`.
+  **Produced 27, published 0.**
+- **A ONE-TICK READ SAYS THE OPPOSITE AND I BRIEFLY BELIEVED IT.** The 02:12Z
+  line is `rows=0 outcomes={'priced': 14}`, which reads as "priced but never
+  emitted" and points at the engine. It is an end-of-game artifact: the
+  `priced` counter increments in `_live_mc_prob_over_for` BEFORE
+  `_live_prop_market_resolved` drops the row, so a decided prop is priced and
+  then discarded — correct behaviour, misleading single sample. The instrument
+  is NOT at fault; it prints both numbers. Read the SERIES.
+- Hypothesis: `_merge_cards_context_into_live_row`
+  (`syndicate/features/mlb/live_lens.py:~1012`) does
+  `if card_props: merged["liveProps"] = card_props` — an UNCONDITIONAL
+  overwrite of the MC rows by the cards rows, which carry `liveProjection` and
+  no probability. 124 published rows against 27 MC rows is the shape of cards
+  winning wholesale. NOTE: `:1298` (`_enhance_card_row_with_live_projection`)
+  is the OTHER direction and is not the operative site; the ledger and my own
+  first reading both named it.
+- Falsification test: if the published snapshot's live rows are NOT the cards
+  set — i.e. a row appears carrying `liveModelProbOver` — the overwrite is not
+  the loss point and the hypothesis is dead.
+- Verification: `off != on` unit both directions, then PRODUCTION —
+  `snapshot_live_prob_seen > 0` and `rows_live_edged > 0` on a live MLB game,
+  read off `/api/board/layer2-shortlist` `per_sport_ingest.mlb.enrichment.live_projections`.
+- CONSTRAINTS THAT SURVIVE THIS LANE, both load-bearing:
+  1. `#414`: the edge prices `liveModelProbOver` and NOTHING else. A fallback to
+     `modelProbOver` was shipped and BACKED OUT — bit-identical to the pregame
+     number on 24 of 28 rows, decided props reading 0.659/0.655/0.745. Do not
+     reintroduce it.
+  2. `#124 follow-up (a)`: cards are the reliable primary ROW SOURCE. The fix
+     must not swap that; it must carry the probability ONTO the card rows.
+  3. `live-game-line-projection` (CLOSED) measured the live GAME-LINE model
+     trailing the market on 8 of 9 dates. Prop live skill has NOT been measured
+     either way. Publishing a live prop edge is not the same as it being safe to
+     bet, and this lane does not claim otherwise.
+- **FIX LANDED, NOT DEPLOYED `[2026-08-31 02:30Z]` — `5bab0685` on `origin/main`.**
+  `_carry_live_probability` stamps the MC row's `liveModelProbOver` (and its own
+  `liveEdge`) onto the matching card row before the cards set replaces the MC
+  set. Keyed with `live_projection_join`'s OWN rule, imported not re-derived.
+  Rows stay the cards' (124 vs 27); only the probability travels; nothing is
+  dropped on either side. 248 tests green across the live-lens surface, 11 new,
+  leading with a reachability test.
+- **NOT DEPLOYED, TWO REASONS, and neither is caution for its own sake.**
+  (1) `deploy_preflight` returned `HOLD: 7 job(s) in flight` — the MLB daily sim
+  that an earlier deploy killed tonight had RESTARTED, and a second kill in one
+  evening is not worth it. (2) There is nothing to verify: the last MLB game was
+  in its final outs, `LIVE_MC_PRICED rows=0`, so a deploy tonight buys a green
+  build and no reading. **Deploy target is refresh-worker** — see the state.md
+  correction; the loop is NOT on live-odds-worker any more.
+- **VERIFICATION OWED, and it is cheap:** on tomorrow's first live MLB game,
+  `snapshot_live_prob_seen > 0` and `rows_live_edged > 0` from
+  `/api/board/layer2-shortlist` -> `per_sport_ingest.mlb.enrichment.live_projections`,
+  plus the new `[live_lens] LIVE_PROB_CARRIED gamePk=... carried=N` line on
+  refresh-worker. `carried=0` with `mc_rows_with_prob>0` would mean the KEY does
+  not match and the fix is inert — that is the failure mode to watch for, not a
+  crash.
+- **MY OWN TOOLING BIT ME TWICE AND BOTH ARE RECORDED.** `TaskStop` killed the
+  harness task but NOT the shell child: `bash /c/tmp/wait_rw.sh` (pid 119148)
+  kept re-acquiring the refresh-worker claim every 2 minutes for 55 minutes
+  under a lane I had already closed out of, so the claim read as held by a stale
+  holder. Killed with `kill -9` after `ps -ef`. And the clean release is
+  `release --service <svc> --token <token>` — without the token it consults a
+  value a re-acquire has invalidated and refuses, which reads as someone else
+  holding it when the holder is you.
+- **DEPLOYED 2026-08-31 (`0fc174c6`, all three services) AND STILL UNVERIFIED.**
+  The MLB slate was over at every reading tonight (`games={'final': 14}`), so
+  `LIVE_PROB_CARRIED` is legitimately absent and its absence is evidence of
+  NOTHING. Loop health WAS confirmed on the new code: `TICK_COMPLETE
+  results={'mlb': True, ...}` and **0** real `LIVE_PROB_CARRY_IMPORT_FAILED`.
+- **THE VERIFICATION IS THE FIRST LIVE MLB GAME TOMORROW.**
+  `snapshot_live_prob_seen > 0` and `rows_live_edged > 0` from
+  `per_sport_ingest.mlb.enrichment.live_projections`, plus
+  `[live_lens] LIVE_PROB_CARRIED gamePk=... carried=N` on refresh-worker.
+  **Watch for `carried=0` with `mc_rows_with_prob>0`** — a key mismatch, which
+  reads as success rather than as a crash.
+- Blocked by: none
+
+
+### ncaaf-cfbd-quota-latch — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
+- Goal: stop NCAAF projection regeneration burning a MONTHLY CFBD quota it has
+  already been told is exhausted, and let it succeed from cache while exhausted.
+  Success = `[ppa] source=cache` in the refresh-worker log and the NCAAF season
+  artifact's `age_seconds` RESETTING, on a build taken while the quota is still 429.
+- Files: syndicate/features/ncaaf/cfbd_quota_latch.py (NEW),
+  scripts/generate_smartsim2_ncaaf_projections.py,
+  syndicate/features/ncaaf/cfbd.py,
+  tests/test_cfbd_quota_latch.py (NEW)
+- RECLAIMED from `ncaaf-no-orders`, which marks these paths `released:` with
+  "a lane that resumes this work reclaims them". Its owning session is gone
+  (phantom sweep 2026-08-29). Its hypothesis names this exact chain and its own
+  analysis proposes the PPA cache; this lane executes it.
+- NOT TOUCHED, DELIBERATELY: `scripts/run_refresh_worker.py::_season_projection_should_launch`,
+  which `cfbd_backoff.py`'s docstring names as the home of the relaunch-cadence
+  fix. It is contended — another session has it STAGED in the shared index — and
+  the launches are cheap while the CALLS are what burn quota. Damping the calls
+  also ends the storm indirectly: a run that succeeds from cache refreshes the
+  artifact, `age_seconds` resets, and the staleness trigger stops firing.
+- MEASURED 2026-08-31 on refresh-worker:
+  `SEASON_PROJECTION_LAUNCHING sport=ncaaf reason=artifact_stale
+   age_seconds=366893 interval_seconds=86400` — **the configured interval is
+  once per DAY and it is firing ~24x that**, because a failing run never
+  refreshes the artifact so every tick re-triggers it. 14 generator attempts
+  today, hourly, each dying in `load_ppa_ratings_asof` -> `_cfbd_get`.
+  `age_seconds` 366,893 = 4.25 days stale, matching "has not rebuilt since
+  2026-08-26". A feedback loop with the wrong sign: it hammers hardest exactly
+  when the quota is scarcest, and ten snapshot builders share the key.
+- Hypothesis: `/games` and `/ratings/sp` are already cached; `/ppa/teams` is not,
+  so it is the ONLY hard CFBD dependency left in a regeneration. Cache it with a
+  STALE-FALLBACK and latch the quota, and a regeneration completes with zero
+  CFBD calls while exhausted.
+- Falsification test: if a regeneration still dies with the latch set and the
+  cache warm, PPA is not the only remaining hard dependency and the premise is
+  wrong.
+- Verification: unit `off != on` both directions for the latch (a latched call
+  makes NO request; an expired latch makes one), plus a PRODUCTION reading of
+  `[ppa] source=cache` and a reset `age_seconds`.
+- HONEST LIMIT: the cache CANNOT be filled before the quota rolls (2026-09-01) —
+  it is empty now and filling it needs the call that is failing. This ships
+  ready; its first successful fetch arms it. Week 2 (09-11..09-13) is NOT at
+  risk either way: the roll is ~9 days ahead of it and the generator retries
+  hourly on its own.
+- A STALE PPA IS USED ONLY WHEN THE ALTERNATIVE IS NOTHING, and it must SAY SO:
+  the age is logged and stamped into the output CSV's `rating_source`, so a
+  downstream reader cannot mistake a cached rating for a fresh one.
+- **STATUS 2026-08-31 04:33Z: DEPLOYED (`bf0811bb`, refresh-worker, preflight
+  CLEAR first try), LOOP HEALTHY, LATCH NOT YET EXERCISED.** The generator had
+  not relaunched since the 04:23Z restart, so `LATCH_SET`/`LATCHED_SKIP` had not
+  appeared — an unfired trigger, not a failure. The PPA stale fallback is INERT
+  until 2026-09-01 by construction: the cache is empty and arming it needs the
+  call that is 429ing. Narrative in `.syndicate/log/2026-08-30.md`; deploy
+  measurement in `.syndicate/deploys.md`.
+- Blocked by: none
+

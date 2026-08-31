@@ -7924,3 +7924,70 @@ pregame fills. Nothing has been observed between 0.335 and 0.410, so ~0.37 is a
 MIDPOINT, not a measured threshold. "Already started" is derived from the slug
 date, not a live-state feed, so that bucket is coarse. What is solid is the
 ORDERING across 11 pregame orders, not the boundary value.
+
+
+## 2026-08-31 — A reachability test in TWO STATES says nothing about the EDGE between them
+
+**FORBIDDEN: claiming a guard is proven because `off != on` passes. That pair
+tests the two resting states and is blind to the TRANSITION, which is where a
+guard that fires late still costs everything it was built to save.**
+
+`cfbd_quota_latch.py` shipped with 11 tests, deliberately led by a reachability
+test (a latched call makes NO request) and its mirror (an unlatched call DOES
+reach the transport). Both passed. Both were the right tests. Neither covered a
+call that starts UNLATCHED and BECOMES latched on its own first 429 — the state
+where the latch and `cfbd_backoff`'s retry ladder interact.
+
+**Production found it in one reading.** 2026-08-31 05:16:39–05:16:58Z: five
+`LATCH_SET` lines at 2s/5s/10s gaps — *exactly* `cfbd_backoff.MAX_ATTEMPTS`.
+`raise_if_latched` ran once BEFORE `call_with_retry` and never again inside it,
+so the first 429 set the latch and the four retries behind it still went out.
+**On the run that DISCOVERS the exhaustion — the only run where the quota is
+still being spent — the latch saved zero calls.** Fixed by raising
+`QuotaExhausted` from `_once` so the ladder is abandoned rather than climbed.
+
+**Why the count was the tell, and why it is worth naming:** five is not a round
+number, it is `MAX_ATTEMPTS`. A signal appearing exactly N times where N is a
+retry bound is never N independent events; it is one event and a ladder. Read
+the multiplicity before reading the signal.
+
+**HOW TO APPLY.** For any guard placed in front of a retrying/backing-off
+caller, enumerate three states and test all three: (1) already guarded, (2) not
+guarded, (3) **becomes guarded during the call**. If the guard is checked
+outside the retry loop, (3) costs the full ladder every time, and (3) is
+precisely the case the guard exists for.
+
+**The second-order lesson, which is the one that generalises:** `LATCH_SET`
+appearing in the log was read as the latch WORKING. It was the latch being SET —
+an emitter firing, not an outcome. The signal that would have shown the defect
+was the one nobody emitted: the call count. **A guard must log what it
+PREVENTED, not that it engaged.** `LATCHED_SKIP` (which does mean prevention)
+was absent for those five lines and its absence said nothing, because nothing
+was looking for it.
+
+---
+
+## 2026-08-31 — A tidier rendering of a `- Files:` list SILENTLY DECLAIMS
+
+**FORBIDDEN: rewriting a lane's `- Files:` block while compacting it. Reuse
+those lines VERBATIM. The claim set is parsed out of them, and a rendering that
+is obviously equivalent to a human is not equivalent to the parser.**
+
+Caught during this checkpoint, before it was committed, and only because the
+count was checked. Compacting three of my own lane blocks, I collapsed ten
+explicit paths into brace shorthand —
+`syndicate/features/shared/{board_enrichment,layer2_board,...}.py` — which reads
+as the same list and is not one. `check_lane_invariants.py` still reported
+**INVARIANTS HOLD**: every remaining claim had exactly one OPEN holder, no OPEN
+lane was stranded, and the seven files that had stopped being claimed simply
+were not there to be checked. **The invariant checker validates the claims that
+EXIST; it cannot see a claim that was deleted.** Baseline 32 claims, mine 25,
+and the green result was fully consistent with both.
+
+**HOW TO APPLY.** Any edit to `lanes.md` that touches a `- Files:` block must
+diff the CLAIM SET before and after, not just re-run the invariant check:
+render `origin/main`'s copy and yours through the same parse and assert LOST
+and ADDED are both empty. `INVARIANTS HOLD` is a statement about internal
+consistency, never about completeness — the same shape as this repo's standing
+rule that a healthy reading is evidence only once you know what makes it read
+unhealthy.

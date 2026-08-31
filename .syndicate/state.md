@@ -2509,6 +2509,19 @@ what would make the shed unreachable rather than merely rare.
   the latch did not expire and is CAUSING an outage**; override is
   `clear_latch()`, file at
   `<SYNDICATE_DATA_ROOT>/ncaaf_source/state/cfbd_quota_latch.json`.
+  **THE LATCH IS PROVEN ACROSS PROCESSES `[verified 2026-08-31]`** — two
+  consecutive hourly runs on the same build `bf0811bb`: `05:16:39Z` set it and
+  spent **5** CFBD calls; `06:19:49Z` spent **0** (`LATCHED_SKIP GET /ppa/teams
+  clears_in_hours=17.7`, `[ppa] season=2025 source=none
+  reason=quota_exhausted_and_cache_empty`, new `LATCH_SET` count 0), all in one
+  second in a fresh process. **The five calls on the DISCOVERING run were a real
+  defect production found and the tests did not:** `raise_if_latched` ran once
+  BEFORE `call_with_retry` and never inside it, so the first 429 set the latch
+  and the four retries behind it still went out — exactly
+  `cfbd_backoff.MAX_ATTEMPTS`. Fixed by raising `QuotaExhausted` from `_once` to
+  abandon the ladder (live `13afa27f`). **That fix's own number — 1 call, not 5 —
+  is UNVERIFIED and not imminent:** it needs a fresh exhaustion event and the
+  latch is already set until the roll.
 - **MLB LIVE PROP PROBABILITIES ARE PRODUCED AND WERE DISCARDED BY A MERGE.
   `[verified 2026-08-31, lane mlb-live-prop-prob-merge]`** `LIVE_MC_PRICED`
   series over one game: **27, 26, 18, 16, 14, 11, 10, 8, 5, 4, 2, 0** (decaying
@@ -2765,10 +2778,23 @@ what would make the shed unreachable rather than merely rare.
 
 ---
 
-- **`edge_vs_modelled_fair_pct` EXISTS AND IS COMMITTED, NOT DEPLOYED**
-  `[user decision 2026-08-17; moved here 2026-08-18 from a WNBA state snapshot]`.
-  Measured on the real payload: 228 of 258 both-terms MLB rows priced. It never
-  writes `edge_vs_market_pct`.
+- **`edge_vs_modelled_fair_pct` IS DEPLOYED AND JOINED TO BOTH BOARDS
+  `[2026-08-31, lane layer1-model-edge-join; SUPERSEDES "COMMITTED, NOT
+  DEPLOYED" of 2026-08-17]`.** `attach_modelled_fair_edges` runs at the tail of
+  `attach_margin_model` — one hop downstream of projections, shared by all three
+  board paths — and `layer2_board._model_edge_for` falls back to it, side-checked
+  and never negated. It still never writes `edge_vs_market_pct`; the two stay
+  distinct on purpose. **Per user decision, EV is now priced against the MODEL
+  where a modelled fair exists** (`model_ev_pct` + `ev_basis`), because
+  `book_margin_model` prices one-sided rows as `fair = implied x (1-hold)` and so
+  made `expected_value_pct` a restatement of the book's own hold. **`ev_pct`
+  itself is deliberately UNTOUCHED — `portfolio_commit` back-derives fair from
+  it.**
+  **COVERAGE IS UNREAD, NOT FLAT.** MLB/WNBA/NCAAF all read zero at the
+  post-deploy check because there were **zero PREGAME games** at that moment.
+  Read it with `py -3 scripts/measure_model_edge_coverage.py`, which prints the
+  pregame/live/final mix precisely so a composition effect cannot be mistaken for
+  a regression, and `mfair_priced: ABSENT` as the reachability signal.
 
 ## [mlb-sim-engine] MLB SIM — INPUTS FULLY FED, STILL NO MARKET EDGE `[measured 2026-08-18, lane convergence-phase7-crps; supersedes seven earlier sim sections]`
 
