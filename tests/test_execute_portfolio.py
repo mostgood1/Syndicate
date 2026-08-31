@@ -1814,3 +1814,46 @@ def test_just_ABOVE_the_band_top_is_still_held(monkeypatch, capsys):
                         lambda request: ("slug", 0.455, 0.005, 0.01, 0, (None, None)))
     assert ep._polymarket_hold_price(_req_keyed("edge-key", 0.455), "polymarket") is not None
     capsys.readouterr()
+
+
+def test_EV_fields_are_formatted_or_explicitly_unknown_never_invented():
+    """The held population exists ONLY in the gate's log lines.
+
+    A held order is `skipped` and never reaches the execution ledger, and the
+    venue-scoped plan that holds `ev_pct` is served by no endpoint -- so asked
+    to score the holds on EV, the answer was that it could not be done from
+    outside the worker at all. The number is now stamped where the decision is
+    made.
+
+    An absent or non-numeric EV must print `?`, never a number: the unscoped
+    plan is a DIFFERENT selection (props where Polymarket picks h2h/totals), so
+    a plausible-looking figure taken from the wrong row is worse than none.
+
+    `_ev_fields_of` is tested directly because the HELD line is printed at the
+    CALL SITE, not inside `_polymarket_hold_price` -- asserting it against the
+    gate function tested nothing and passed on an empty string."""
+    from pipeline.execute_portfolio import _ev_fields_of
+    assert _ev_fields_of({"ev_pct": 3.71, "model_edge_pct": 8.64}) == "ev_pct=3.71 edge_pct=8.64"
+    assert _ev_fields_of({}) == "ev_pct=? edge_pct=?"
+    assert _ev_fields_of(None) == "ev_pct=? edge_pct=?"
+    assert _ev_fields_of({"ev_pct": None, "model_edge_pct": "n/a"}) == "ev_pct=? edge_pct=?"
+    # bool is an int in Python; a flag must not print as an EV.
+    assert _ev_fields_of({"ev_pct": True, "model_edge_pct": False}) == "ev_pct=? edge_pct=?"
+
+
+def test_the_EXPLORE_line_carries_EV_from_its_PARAMETER_not_another_frame(monkeypatch, capsys):
+    """REGRESSION. The EXPLORE print lives inside `_polymarket_hold_price`,
+    where `position` is not a local -- stamping it there by name would
+    NameError on every explore, on a live money path. It is a parameter."""
+    for v in ("SYNDICATE_POLYMARKET_EXPLORE_RATE", "SYNDICATE_POLYMARKET_EXPLORE_BAND",
+              "SYNDICATE_POLYMARKET_MAX_PREGAME_PRICE"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setenv("SYNDICATE_POLYMARKET_EXPLORE_RATE", "1")
+    import pipeline.execute_portfolio as ep
+    monkeypatch.setattr(ep, "_polymarket_resolve_market",
+                        lambda request: ("slug", 0.44, 0.01, 0.01, 0, (None, None)))
+    assert ep._polymarket_hold_price(_req_keyed("ev-key", 0.44), "polymarket",
+                                     {"ev_pct": 1.25, "model_edge_pct": 2.5}) is None
+    out = capsys.readouterr().out
+    assert "EXPLORE_PREGAME_BOUNDARY" in out, out
+    assert "ev_pct=1.25" in out and "edge_pct=2.50" in out, out

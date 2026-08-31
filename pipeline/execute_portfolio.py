@@ -495,7 +495,7 @@ def run_execution(
         # HOLD, DO NOT DROP. `skipped` means "not placed on this pass", and the
         # position stays in the plan, so the next tick inside the window places
         # it normally. Nothing is abandoned.
-        held = _polymarket_hold_price(request, venue)
+        held = _polymarket_hold_price(request, venue, position)
         if held is not None:
             price, hours = held
             skipped += 1
@@ -505,6 +505,7 @@ def run_execution(
                 f" ticker={getattr(request, 'venue_ticker', None)!r}"
                 f" market={getattr(request, 'market', None)}"
                 f" submit_price={price:.3f} ceiling={_polymarket_max_pregame_price()}"
+                f" {_ev_fields_of(position)}"
                 f" hours_to_commence={hours:.1f}"
                 " -- pregame, no book on a near-even side; it places once live",
                 flush=True,
@@ -1054,6 +1055,32 @@ def _polymarket_max_pregame_price() -> float:
         return 0.0
 
 
+def _ev_fields_of(position) -> str:
+    """`ev_pct=` / `edge_pct=` for a gate log line, or explicit unknowns.
+
+    WHY THE GATE LOGS EV AT ALL. The held population is the ONLY population this
+    gate creates, and a held order is `skipped` -- it is never recorded in the
+    execution ledger, so it exists nowhere except this log line. Asked to score
+    the holds on EV on 2026-08-31, the answer was that it could not be done from
+    outside the worker at all: `ev_pct` sits on the PLAN position, the
+    venue-scoped plan is served by no endpoint (`/api/portfolio/paper` exposes
+    per-venue COUNTS only), and the unscoped plan is a different selection
+    entirely -- it picks props where Polymarket picks h2h and totals, so a join
+    by matchup silently matches the wrong rows.
+
+    So the number is stamped where the decision is made, by the code that makes
+    it, rather than reconstructed later from something that was never the same
+    set. `None` prints as `?` and never as a number.
+    """
+    def _one(key):
+        value = position.get(key) if hasattr(position, "get") else None
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "?"
+        return f"{value:.2f}"
+
+    return f"ev_pct={_one('ev_pct')} edge_pct={_one('model_edge_pct')}"
+
+
 def _polymarket_submit_price(request) -> float | None:
     """The price this order will ACTUALLY BE SENT AT, or `None` if unknowable.
 
@@ -1102,7 +1129,7 @@ def _polymarket_submit_price(request) -> float | None:
     return price
 
 
-def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
+def _polymarket_hold_price(request, venue: str, position=None) -> tuple[float, float] | None:
     """`(price, hours_to_commence)` if this order should be HELD, else None.
 
     THE RULE, and it is two-dimensional because one dimension never fitted:
@@ -1157,6 +1184,7 @@ def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
             f" ticker={getattr(request, 'venue_ticker', None)!r}"
             f" submit_price={price:.3f} ceiling={ceiling} band={_polymarket_explore_band()}"
             f" rate={_polymarket_explore_rate()} hours_to_commence={hours:.1f}"
+            f" {_ev_fields_of(position)}"
             " -- placed ON PURPOSE to keep the boundary testable",
             flush=True,
         )
