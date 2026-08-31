@@ -15126,3 +15126,61 @@ model's actual disagreement. Same order at the head, honest quantity, and the
 tail is materially better. **The remaining question — whether a probability-point
 edge and a percentage EV should share one sort at all — is a product decision
 that this deploy did not settle and should not be read as having settled.**
+
+### CORRECTION 2026-08-31 — "the top nine are all model_edge, best market row at rank 10" was a SOCCER-ONLY reading reported as a board-wide one
+
+**I was asked to fix the units mismatch, went to measure it, and found my own
+verification entry above overstates it. The mismatch is real, narrower than I
+wrote, and the change's author was substantially RIGHT where I marked them wrong.**
+
+**THE ORDERING IS GROUPED BY SPORT, and I read the head of the payload as the
+head of the board.** `rows` is soccer 0..128 then mlb 129..199, sorted by score
+WITHIN each sport — one single break in the whole 200-row sequence, at the sport
+boundary, which is what `per_sport_limit=400` and the per-sport shard produce.
+So "top 25" above is the top 25 SOCCER rows.
+
+**Sorted by score and ignoring the grouping, which is the board-wide claim I
+should have made:**
+
+    GLOBAL top-25 basis mix     model_edge 14 / market_fair 11
+    GLOBAL rank of best market  3      (mlb, score 5.7928, ev_pct +3.7128)
+
+    per sport, top-10 basis mix                rank of best market_fair
+      soccer  model_edge 9 / market_fair 1     10
+      mlb     market_fair 7 / model_edge 3      1
+
+**THE PREDICTION I SCORED AS MISSED WAS ESSENTIALLY CORRECT.** The author
+predicted "#1 a market-anchored row at `ev_pct +3.88`". **In MLB the #1 row IS
+market-anchored, at `ev_pct +3.71`.** I marked that a miss because soccer sorts
+ahead of MLB in the payload and soccer's head is model-basis. The prediction was
+about the scoring change; my refutation was about the sport grouping.
+
+**WHAT SURVIVES, CORRECTED:**
+- The mechanism verification is UNAFFECTED — the identity is per-row and
+  sport-blind. 52/52 stands exactly as recorded.
+- The units mismatch is REAL but SPORT-DEPENDENT, not board-wide. Soccer's model
+  edges (11-12 points) outrank soccer's market EVs; MLB's market EVs outrank
+  MLB's model edges. It bites where the model is loudest, not everywhere.
+- "Comparable, not absent" IS achieved in MLB and is NOT achieved in soccer.
+
+**AND THE FIX I WAS ABOUT TO PROPOSE IS WITHDRAWN BEFORE IT WAS WRITTEN.** Two
+candidates, both killed by measurement rather than by argument:
+1. **Rank on Kelly `f* = EV/b`** — appealing because it is dimensionless and is
+   what the sizer already uses. **Refuted:** it WIDENS the gap. Kelly on
+   model rows reaches **0.5096** (51% of bankroll, a p=0.83 favourite at -750
+   carrying an 11.48-point edge) against **0.0368** max on market rows. A 14x
+   separation, worse than the one it was meant to close.
+2. **Cap the model-edge value term** — the codebase-consistent lever, since
+   `_SCORE_SIM_CAP_PCT = 1.5` already caps the sim term. **Unvalidated and not
+   proposed:** my simulation re-sorted purely by score, and the control did NOT
+   reproduce production (it put the best market row at rank 3 where the payload
+   shows 10). A treatment whose control does not reproduce is not evidence.
+
+**THE REAL DISPARITY IS MAGNITUDE, NOT UNITS.** Model EVs on this board run to
+**0.94** while the best market EV anywhere is **0.049** — roughly 20x. No unit
+conversion closes that, because it is not a unit problem: it is a model claiming
+edges an order of magnitude larger than the market offers, on rows whose
+`model_skill` reads `sample_games: 0`. The honest lever is credibility
+shrinkage, and there is no measured skill to shrink by. **Recorded as
+UNSETTLED and NOT ACTED ON.** `layer2_board.py` is held by lane
+`polymarket-yes-leg-binding`; nothing here was edited.
