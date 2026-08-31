@@ -1192,7 +1192,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Narrative: `.syndicate/log/2026-08-31.md`, `.syndicate/lanes_history.md`.
 - Blocked by: none
 
-### polymarket-pregame-price-gate — OPEN — opened 2026-08-31 — session 6475567d-f806-45a7-880c-f633718f2411
+### polymarket-pregame-price-gate — OPEN — opened 2026-08-31 — session 6475567d-f806-45a7-880c-f633718f2411 — **WRONG-SIDE BUG FIXED AND DEPLOYED BOTH SERVICES; POSITIVE CASE UNVERIFIED UNTIL TOMORROW'S SOCCER SLATE**
 - Rationale: opened RETROACTIVELY at checkpoint. This session shipped two
   live-money deploys with no open lane, under the holder `ncaaf-totals-dispersion`
   — a BLOCKED NCAAF lane in `lanes_history.md`. The locks serialise on whatever
@@ -1208,9 +1208,14 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Hypothesis: pregame only CHEAP sides fill; once live everything fills.
 - Falsification test: an explored order filling above 0.410 pregame. TWO ARE
   LIVE AT 0.45 RIGHT NOW (`bal-col`, `ast-ars`) — placed on purpose.
-- Verification: DONE for the gate (branch assertion `submit_price=` 15:53:26Z;
-  band edge `EXPLORE ... submit_price=0.450` 16:03:16Z). NOT DONE for the rule —
-  kickoff is the reading: ast-ars ~18:57Z, bal-col ~00:45Z, watcher bqopjstn0.
+- Verification: gate DONE (`submit_price=` 15:53:26Z; band edge 16:03:16Z).
+  Fill rule DONE — ast-ars rested 3h54m pregame, filled 19:20:09Z at avgPx=0.4500,
+  kick+17m47s. Wrong-side fix: NEGATIVE only (live-odds-worker d04d9f49 21:02:07Z,
+  refresh-worker 8876b823 21:20:36Z, no regression). POSITIVE case NOT observed —
+  no soccer h2h has resolved since; tomorrow's slate is the test.
+- Open, not fixable by deploy: `atc-sea-ata-bol` is a live position on the WRONG
+  side (Bologna, not Atalanta). bal-col rests at 0.45, first pitch ~00:40Z,
+  watcher bxqupmqjq.
 - Blocked by: none
 
 ### soccer-shot-shrinkage — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57

@@ -5559,3 +5559,61 @@ around a pattern in ratios, weight it by the magnitude of the quantity — or
 just fit both candidates and let a held-out split choose. **Pre-register which
 you expect to win.** Recording the expectation is what turned this from a
 silently-shipped complication into a measurement.
+
+## 2026-08-31 FORBIDDEN: two guards that read the SAME input are one guard
+
+`_subject_is_side` had a positional check and a "definitive NO" check that was
+written explicitly to catch what the first one missed. Its own comment says so:
+"the opposite leg is a DEFINITIVE NO, and it is checked BEFORE the alias fallback
+rather than left to it".
+
+Both read `parse_slug`'s roles. The parse was inverted for soccer, so the second
+guard did not contradict the first — it CONFIRMED it, with the same confidence,
+from the same wrong data. Two orders bought the opposite team; one settled at
+-$5.96 and the other is still open on the wrong side.
+
+**Independence is a property of the INPUT, not of the code path.** A second check
+that consumes the first one's source adds only the appearance of redundancy, and
+it reads as defence-in-depth in review precisely because it was written to be.
+
+**HOW TO APPLY.** For any guard justified as "and this second check catches it",
+name the two SOURCES out loud. If they are the same field, the same parse, or the
+same derivation, there is one witness. The real second witness here already
+existed — the board's own `home_team`/`away_team`, matched by the alias resolver,
+which answers all four legs of both fixtures correctly — and it was sitting BELOW
+both broken checks as a fallback, unreachable.
+
+Related: [[feedback_gate_on_the_output_not_the_input]].
+
+## 2026-08-31 A CONVENTION VERIFIED ON ONE SPORT IS NOT A CONVENTION
+
+`parse_slug`'s docstring states the shape as `<prefix>-<league>-<away>-<home>-...`
+flatly, for every sport. It is RIGHT for MLB — `aec-mlb-bal-col` reports
+`away_index=1` = Baltimore Orioles from the venue's own outcome order, and `bal`
+leads. It is BACKWARDS for soccer, where both live fixtures were home-first.
+
+Nothing in the codebase was lying. One sport had been checked, and the finding
+was written as though it were the venue's rule.
+
+**HOW TO APPLY.** When a parser encodes an external system's naming convention,
+the docstring must say WHICH instances it was verified against. A convention
+confirmed on one league, one sport, or one feed is a sample of one. And the
+places that consume the roles POSITIONALLY are the blast radius — here, fixture
+matching survives an inversion (both teams are present, so the game is still
+found) while ROLE selection does not, which is why only the leg choice broke.
+
+## 2026-08-31 A TEST CAN PASS THROUGH THE BUG IT IS NAMED FOR
+
+`test_soccer_THREE_WAY_picks_the_right_leg` pinned `teams_match` to always-True
+and asserted each side still picked its leg. It passed for a year of commits and
+it passed on the wrong-side code, because with the resolver disabled the LEG WAS
+CHOSEN POSITIONALLY — the very mechanism that lost the money. The stub did not
+weaken the test; it routed it through the defect and called the result a pass.
+
+**HOW TO APPLY.** A stub that makes a dependency maximally permissive does not
+"isolate" the unit — it silently selects whichever code path does not consult
+that dependency. When the test's name is about CHOOSING between candidates, an
+always-True matcher guarantees the choice is made somewhere else, and the test
+then pins that somewhere-else forever. Stub discriminatingly, mirroring what the
+real dependency answers, and pin the permissive case as its own explicit test
+with the opposite expectation: a resolver that matches everything must REFUSE.

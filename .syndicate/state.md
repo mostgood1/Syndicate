@@ -8337,6 +8337,51 @@ submitted, which means resolving tick/cross BEFORE the gate or applying the same
 arithmetic in it. Anything else re-derives the venue's rounding by hand and goes
 stale the next time tick size changes.
 
+## [polymarket-soccer-h2h-bought-the-OPPOSITE-team] 2026-08-31T21:25Z — FIXED AND DEPLOYED on both services; the positive case is UNVERIFIED
+
+**USER-REPORTED, LIVE MONEY.** Two orders bought the other team.
+
+    atc-lal-osa-get   board "Getafe @ CA Osasuna", bet HOME -> bought GETAFE
+                      Osasuna WON, the bet LOST.  -$5.96 realised
+    atc-sea-ata-bol   board "Bologna @ Atalanta BC", bet HOME -> bought BOLOGNA
+                      STILL OPEN on the wrong side. No deploy unwinds it.
+
+**CAUSE.** `parse_slug` documents `<away>-<home>` and applies it to EVERY sport.
+MLB really is away-first (`aec-mlb-bal-col` reports away_index=1 = Baltimore and
+`bal` leads); both soccer fixtures are HOME-first. `_subject_is_side` checked
+`subject == parsed[wanted]` FIRST and returned True. Its "definitive NO" guard
+reads the SAME inverted parse, so it CONFIRMED the wrong answer rather than
+contradicting it — two checks, one shared broken input. The alias check that
+answers all four legs correctly sat below both and never ran.
+
+**BLAST RADIUS EXACTLY 2**, by enumerating all 69 distinct Polymarket slugs
+submitted in log retention: the other 67 are totals or team-named markets that
+never route through the subject test.
+
+**FIXED.** `8876b823` — the board's own team names decide, refusing when the
+subject names both or neither; the positional parse is gone from this decision.
+`d04d9f49` — `execute_portfolio` was handing that test the SLATE row, and
+`_SLATE_STORAGE_FIELDS` has no team names, so alone it would have refused EVERY
+soccer moneyline: fail-safe and silently dark.
+
+    live-odds-worker  d04d9f49  live 21:02:07Z
+    refresh-worker    8876b823  live 21:20:36Z  (ancestry-checked on the RUNNING
+                                commit; deployed by `layer2-cap-raise`, not me)
+
+**`parse_slug` IS NOT CHANGED.** Its orientation is still used for FIXTURE
+matching, where both teams are present and the roles do not decide which game is
+found. Anyone touching it should know the soccer orientation is inverted.
+
+**VERIFIED: only the NEGATIVE.** The wrong-side path cannot execute — first tick
+after showed `positions=4 placed=0 skipped=4`, MLB `YES_LEG agree=True`, zero
+`POLYMARKET_SIDE_REFUSED`. **NO soccer h2h has resolved since either deploy**, so
+a correct leg being selected and placed has NOT been observed. Tomorrow's slate.
+
+**AND IT CONFOUNDS THE FILL EVIDENCE.** Two of the three pregame fills cited all
+day as "cheap sides fill" (0.240, 0.250) ARE these wrong-side orders — cheap
+BECAUSE they were away underdogs. The `ast-ars` confirmation stands alone; the
+sample around it was thinner and dirtier than it was presented.
+
 ## [polymarket-two-dimensional-rule-CONFIRMED] 2026-08-31T19:25Z — the probe rested 3h54m pregame and filled 17m47s after kickoff
 
 **THE FIRST DELIBERATE TEST OF THE RULE, AND IT PASSED.** `ast-ars` was placed ON
