@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-08-31 — live-odds-worker — the pregame gate reads the SUBMITTED price, and the band includes its edge
+
+Two deploys, both `live-odds-worker`, claim `be4ed2687fc79ed8`, holder
+`ncaaf-totals-dispersion`. Preflight CLEAR with zero jobs in flight before each,
+so nothing in flight was killed.
+
+    dep-daaq43u7bikc73fjovd0  d97cee5a  live 15:50:18Z  gate reads submit price
+    dep-daaq8167bikc73fk4fm0  3db201bc  live 15:59:13Z  band includes its top edge
+
+**verify (deploy 1):** `submit_price=` is a field that exists ONLY in the new
+code, so its presence is a branch assertion rather than a deploy-state check. It
+appeared 4x at 15:53:26-27Z. The gate ran.
+
+**AND READING PAST THAT ASSERTION FOUND THE SECOND BUG.** The same tick was
+`HELD x4, EXPLORE x0, placed=0` where every previous tick was `HELD x2,
+EXPLORE x2`. `0.35 + 0.10` is `0.44999999999999996`, so a 0.450 order fell
+outside a band whose configured top is 0.45, and the exploration arm had
+silently stopped firing. Latent all day; deploy 1 made it reachable, because
+planned prices (0.441, 0.444) never land on the edge and SUBMIT prices are
+snapped to the tick, so they land on round boundaries constantly.
+
+**verify (deploy 2), the discriminating reading — 16:03:16-17Z:**
+
+    EXPLORE  bal-col  submit_price=0.450  <- the exact value that was excluded
+    HELD     ast-ars  0.460 │ nyy-laa 0.465 │ mia-wsh 0.490   (all outside)
+    EXECUTED positions=6 placed=0 duplicates=3 skipped=3
+             refused={'pregame_price_too_high': 3}
+
+bal-col at exactly the band top now explores where it was held. The three held
+are all genuinely above 0.45 — `ast-ars` re-priced 0.450 -> 0.460 between ticks
+and correctly moved out of the band. `placed=0` with `duplicates=3` is right:
+bal-col passed the gate and was then caught as a duplicate of its own resting
+order, so the fix added no churn and no second exposure.
+
+**NOT VERIFIED, and it is the question that matters:** whether a near-even
+pregame order can EVER fill. Two experiments rest at the venue at 0.45
+(`bal-col`, `ast-ars`), untouched by both deploys because they live at the venue
+and not in the process. `ast-ars` reaches kickoff ~19:00Z, `bal-col` ~00:45Z. A
+fill at 0.45 refutes the price rule and means the ceiling is too low.
+
+**A correction to my own earlier report.** I told the user the arm was "firing
+correctly at the new rate" at 15:25Z. It fired twice and then stalled, and the
+stall was invisible to anyone who stopped at the branch assertion. I also quoted
+prices of 0.444 and 0.441 that the venue never received; it always had 0.45.
+
 ## 2026-08-31 15:11:29Z — **THE SHARD MERGE IS PROVEN ON REAL DATA** — refresh-worker `2f4af574` — lane `polymarket-yes-leg-binding`
 
     refresh-worker  a5e16ae6 -> 2f4af574   trigger=manual, DEPLOYED BY THE USER
