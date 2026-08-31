@@ -1053,7 +1053,21 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Goal: Layer 1 must join a MODEL edge on every sport/market, so Layer 2 /
   Kalshi / Polymarket rank on the sim's disagreement rather than on book hold.
 - Files: syndicate/features/shared/board_enrichment.py
-  syndicate/features/shared/layer2_board.py
+  RELEASED `[2026-08-31 to lane layer2-board-opportunities, session 4465737c]`: the layer2 board scorer
+  Granted on a SCOPE REQUEST, not taken. That lane measured the board this fix
+  produced -- 25 of 25 top rows one-sided, 24 of 25 `batter_home_runs`, top row
+  `model_ev` 85.13 against the best market-basis `ev_pct` anywhere of +5.05 --
+  and traced it to `model_ev = edge / p`, which multiplies edge by 1/p and so
+  ranks a smaller edge on a longer shot above a bigger edge on a shorter one.
+  I reproduced that reading myself before granting. THE DECIDING ARGUMENT IS
+  MINE AND IT IS A DESIGN FLAW IN THIS LANE'S OWN WORK: `blended_score` caps the
+  model at `_MODEL_EDGE_MAX_POINTS = 15.0` when it arrives as `model_edge`, and
+  I routed the same information through `value_ev`, which has NO cap. The path
+  is written above WITHOUT a `.py` and the marker sits on its OWN LINE so
+  `lane-guard` sees the release -- a disclaimer beside a path does not unclaim
+  it. **The flag must DEFAULT TO CURRENT until the user rules**: "price EV vs
+  the model everywhere" is a user decision of 2026-08-30 and two sessions
+  agreeing does not reverse one.
   syndicate/features/shared/wnba_game_projections.py
   syndicate/features/shared/wnba_projections.py
   syndicate/features/shared/nfl_game_projections.py
