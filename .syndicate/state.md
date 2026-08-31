@@ -9111,3 +9111,73 @@ reaching for and could not justify. **It is NOT yet a licence to divide by 1.36
 in the engine:** a calibrated engine needs the rates that were absorbing this
 re-fit alongside it, and this lane's standing rule is that any single-parameter
 fit clears a HELD-OUT validation on different matches than the fit.
+
+### PRODUCTION RE-RUN `[2026-08-31]` — ratio 1.398 on 4x the data, and it is a SLOPE error, not a level error. **This supersedes the mirror number above.**
+
+**n = 9,840 (player, match) pairs, 247 matches, 9 leagues**, against the mirror
+run's 2,476 / 55 / 8. Predictions pulled from production via
+`/api/ops/artifacts/export?pattern=soccer_source/*/api/recommendations/*.json`
+— **144 files / 15,978 rows against the mirror's 22 / 2,476.**
+
+    predicted mean   0.5844
+    realized  mean   0.4181
+    BIAS            +0.1663        RATIO 1.398      (mirror said 1.362)
+    MAE              0.6263        constant-mean baseline 0.6494
+                                   -> model BETTER by 3.6%   (mirror said 7.9%)
+
+The direction and rough magnitude REPLICATE at 4x the sample. The model's margin
+over a constant baseline is **half** what the mirror suggested, which is the
+usual direction for a small-sample advantage.
+
+### THE FINDING THAT CHANGES THE FIX: the bias has a SLOPE
+
+     pred range        n     pred    real    ratio
+     0.00-0.00       984    0.000   0.020     0.00
+     0.00-0.13       984    0.072   0.132     0.55   <- UNDER-predicts
+     0.13-0.22       984    0.176   0.189     0.93   <- UNDER-predicts
+     0.22-0.31       984    0.263   0.226     1.17
+     0.31-0.41       984    0.356   0.238     1.50
+     0.41-0.53       984    0.466   0.335     1.39
+     0.53-0.68       984    0.600   0.478     1.26
+     0.68-0.91       984    0.787   0.577     1.36
+     0.91-1.36       984    1.106   0.679     1.63
+     1.36-5.64       984    2.019   1.307     1.54   <- OVER-predicts
+
+**The model UNDER-predicts the bottom two deciles and OVER-predicts everything
+from the fourth up. Its spread is too WIDE, not uniformly too high.** I recorded
+"the error is level, not discard" off the mirror run; on production that is
+wrong. **A constant divide-by-1.4 would over-correct the bottom and
+under-correct the top.** What this shape calls for is shrinkage toward the mean
+— a regression of predicted onto realized — and that is a re-fit, not a scalar.
+
+**Universal across leagues, magnitude varies:** epl and eredivisie 1.22,
+mls and bundesliga 1.31, serie_a 1.36, ligue_1 1.44, la_liga 1.51,
+championship 1.85, primeira_liga 1.94. **Every league over-predicts**, so this is
+the engine, not one league's inputs.
+
+**By `expected_minutes_share`: 1.29 / 1.47 / 1.41** (sub-fringe / rotation /
+near-ever-present). Broad. Starter awareness remains unimplicated.
+
+### A DATA DEFECT FOUND BY THE INSTRUMENT CHECK, and it nearly inverted the result
+
+**`belgian_pro_league` shot outcomes are UNUSABLE through ESPN: 3.00 shots per
+match extracted against a ~23.4 benchmark, capture 0.13.** ESPN's `bel.1`
+commentary carries no shot detail. Those matches DO return some events, so they
+pass a naive "has events" filter and score as real matches in which nobody shot.
+
+**Included, the pooled result reads ratio 1.524 and "model WORSE than baseline
+by 1.7%". Excluded, it reads 1.398 and "BETTER by 3.6%".** One league with
+missing outcomes flipped the headline verdict. Every other league validates at
+0.92-1.34 capture. **Any future run of this measurement must validate capture
+per league and exclude `belgian_pro_league`** — a missing outcome is not a zero,
+and it biases in the direction that condemns the model.
+
+### WHAT THIS LICENSES NOW
+
+`model_skill` for soccer shot props: **"beats a constant baseline by 3.6% on
+n=9,840; over-predicts the mean by 40%; the error has a slope — too wide, not
+merely too high."** That is enough to justify shrinking these edges and enough to
+say a scalar divisor is the WRONG correction. It is still not a licence to ship
+a fitted shrinkage: this lane's standing rule is that any fit clears a HELD-OUT
+validation on different matches than the fit, and the natural split here is by
+DATE, since the archive spans 2026-07-20..2026-08-30.
