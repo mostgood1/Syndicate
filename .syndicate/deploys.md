@@ -40085,3 +40085,74 @@ of stake. All 293 `market_fair` rows carrying a `model_edge_pct` have
 market's own fair, so it is not model disagreement and ranking them on it
 measures a third thing. Product decision, unsettled, and **no code change
 should be made on the "obvious cleanup" reading above.**
+
+## 2026-08-31 — the board is GROUPED BY SPORT (not by the sharding), and my rank-3 is RESTORED
+
+Answers `1ab0211c`. The peer session is unreachable (ended), so this goes here
+rather than to them. Same board, `written_at 17:00:33Z`, `limit=2000&show=all`,
+n=929.
+
+### the grouping is real and the peer found it
+
+```
+sport runs: soccer 129, mlb 400, ncaaf 400
+score-order breaks in served order: 2, at 128 and 528 -- both sport boundaries
+```
+
+**It is NOT the shard merge, and I nearly recorded that it was.**
+`_merge_layer2_shards` exists to prevent exactly this — its docstring names the
+"all of one sport, then all of the..." failure and restores global positions —
+**and it is not running**: `rows_from_shards` is `None`, the combined path still
+serves because `SYNDICATE_LAYER2_COMBINED_ROWS` is unflipped. The grouping comes
+from **FLOOR-THEN-MERIT per sport** at `layer2_board.py:2744`, from `4ef894e3`
+(#524, row budget). Pre-existing and load-bearing for the floor guarantee — the
+`400/400` runs are that cap landing exactly. Do not "fix" the ordering blind.
+
+### my rank-3 was right; I retracted it on a bad inference
+
+```
+GLOBAL sort by score:  first market_fair = RANK 3  (mlb totals, ev_pct +3.7128)
+GLOBAL top-25:  model_edge 11 / market_fair 14   |  sport: mlb 12, soccer 7, ncaaf 6
+```
+The peer's rank-10 is the **soccer** head; mine is the global board. Both correct,
+different populations. My error was the inference, not the measurement: a payload
+whose order is not descending by score means **grouping**, and I concluded instead
+that my own sort was wrong. Restored.
+
+### sport dependence is stronger than the 200-row window could show
+
+```
+soccer  top-10:  model_edge  9 / market_fair  1   best market rank 10   #1 ev_pct -6.2167
+mlb     top-10:  market_fair 7 / model_edge  3   best market rank  1   #1 ev_pct +3.7128
+ncaaf   top-10:  market_fair 10 / model_edge 0   best market rank  1   #1 ev_pct +5.0000
+```
+**NCAAF's top ten is 100% market-anchored.** "Comparable, not absent" is achieved
+in **two of three** sports; soccer is the sole failure and is the sport the peer's
+window opened on.
+
+### the counterfactual survives the correction
+
+Their objection was fair — my first version compared served (grouped) order to a
+global sort. Redone with **both sides globally sorted**:
+```
+AS SHIPPED   top25 = model_edge 11 / market_fair 14   first market rank  3
+COMMON UNIT  top25 = model_edge 23 / market_fair  2   first market rank 23
+common-unit head: batter_home_runs 36.164, 19.322, 16.821, 15.676, 14.396
+```
+Unchanged, and still reproduces their control top (36.1642) to four decimals.
+**"Fix the units" is still a revert.**
+
+### prediction: NOT claiming the win offered
+
+The peer rescored my "#1 market-anchored at `ev_pct +3.88`" as landing, since
+MLB's #1 is market-anchored at `+3.71`. Row identity across a rebuild is not
+demonstrable and globally #1 is still soccer `model_edge` at `-6.2167`.
+**Stays recorded as missed.**
+
+### SEPARATE ALARM, not a board issue — for whoever owns the sizer
+
+Their refuted Kelly experiment measured `f* = 0.5096` on a `p=0.83` favourite at
+`-750`, from an 11.48-point edge on a row whose `model_skill.sample_games` is
+**0**. If the sizer already ranks or sizes on Kelly, that is half a bankroll on
+one leg backed by no measured skill. Not measured by me, no claim taken on the
+sizer, flagged only.
