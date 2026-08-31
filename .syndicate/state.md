@@ -2790,6 +2790,23 @@ what would make the shed unreachable rather than merely rare.
   made `expected_value_pct` a restatement of the book's own hold. **`ev_pct`
   itself is deliberately UNTOUCHED — `portfolio_commit` back-derives fair from
   it.**
+  **SUPERSEDED FOR THE RANKING TERM `[user decision 2026-08-31]`: the board
+  ranks one-sided rows on `model_edge_pct`, NOT on model EV.** The 08-30
+  decision stands for PRICING — `model_ev_pct` and `ev_basis` still travel on
+  the row — but EV is edge divided by the fair probability, so ranking on it
+  multiplied edge by the reciprocal of p and a smaller edge on a longer shot
+  outranked a bigger edge on a shorter one. MEASURED on the served shortlist
+  2026-08-31 by lane `layer2-board-opportunities` and reproduced independently:
+  the top 25 was 24 `batter_home_runs` plus one totals, all 25 one-sided, top
+  row model EV about 85 points against the best market-basis EV anywhere of
+  about 5. **And the flaw was structural, not just a scale mismatch:**
+  `blended_score` caps the model at fifteen points when it arrives as
+  `model_edge`, while the `value_ev` path it was routed through has no cap —
+  the same signal capped in one path and uncapped in the next line. EV ranking
+  also amplifies model error hardest where the model is weakest: at p near
+  one-tenth a two-point probability error moves EV about twenty points, and
+  these rows carry `model_skill.sample_games: 0`. `layer2_board.py` is released
+  to that lane; the flag defaults to the NEW behaviour.
   **COVERAGE IS UNREAD, NOT FLAT.** MLB/WNBA/NCAAF all read zero at the
   post-deploy check because there were **zero PREGAME games** at that moment.
   Read it with `py -3 scripts/measure_model_edge_coverage.py`, which prints the
