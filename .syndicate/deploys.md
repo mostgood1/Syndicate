@@ -40156,3 +40156,75 @@ Their refuted Kelly experiment measured `f* = 0.5096` on a `p=0.83` favourite at
 **0**. If the sizer already ranks or sizes on Kelly, that is half a bankroll on
 one leg backed by no measured skill. Not measured by me, no claim taken on the
 sizer, flagged only.
+
+## 2026-08-31 17:41Z — `9d0fcb11` — refresh-worker — SHARDING LIVE + caps raised 400 -> 1000 — lane `layer2-cap-raise`
+
+**User decision, 2026-08-31: _"flip the combined rows flag and raise the cap."_**
+
+Env set on **refresh-worker only** (verified web and live-odds-worker still carry
+no `LAYER2` keys), via the single-key env API — NOT `render.yaml`, which fires
+`blueprint_sync` across all three:
+```
+SYNDICATE_LAYER2_COMBINED_ROWS  = 0     (was unset -> keep rows)
+SYNDICATE_LAYER2_ROWS_PER_SPORT = 1000  (was unset -> 400)
+SYNDICATE_LAYER2_ROWS_TOTAL     = 4000  (was unset -> 1600)
+```
+**`ROWS_TOTAL` had to move too or the raise is half-inert** — it caps the WHOLE
+board at 1600 regardless of per-sport, and 3 sports x 1000 asks for ~2400.
+
+Deployed `9d0fcb11` (main tip; a same-SHA redeploy is refused as a rollback).
+One code commit rode along — another session's EV log-stamp in
+`pipeline/execute_portfolio.py` — **inert on this service**, execution runs on
+live-odds-worker. Preflight HELD on 7 in-flight jobs incl. `run_mlb_daily_sim_job`;
+polled to CLEAR at 17:34:50Z, deployed, live 17:41:34Z.
+
+### verify: BOTH changes landed, on the writer's own instrument
+
+```
+17:51:18  LAYER2_SHARDS_WRITTEN sports=['mlb','ncaaf','soccer'] rows=1634 combined_keeps_rows=False
+17:51:17  SHORTLIST_PERSIST_LARGE bytes=7993630 ceiling=8388608 pct=95.3 rows=1634 per_sport_limit=1000
+
+board  932 -> 1634 rows   sports {soccer 132, mlb 400, ncaaf 400} -> {mlb 999, ncaaf 413, soccer 222}
+       no sport lost; mlb and ncaaf both cleared the old 400 cap
+```
+
+**The merge is PROVEN, not assumed:** `combined_keeps_rows=False` means the
+combined key was written with `rows: []` (3,754,595 B, carrying cards/metadata
+only). The web service nonetheless served **1634 rows**. The only path from an
+empty combined key to 1634 served rows is `_merge_layer2_shards`. Web is on
+`592cf643`, which carries it.
+
+### I READ TWO ABSENCES AS FAILURE AND BOTH WERE INSTRUMENT ARTIFACTS
+
+Recorded because this is the third instance of the same class in this file.
+
+1. **`rows_from_shards` is absent from `/api/board/layer2-shortlist`.** I read
+   that as "the merge did not run". The endpoint builds an **EXPLICIT KEY LIST**
+   (`intelligence.py:3052`) and `shards` / `rows_from_shards` / `shard_row_total`
+   are simply not in it. That file's own comments name this failure three times,
+   including verbatim: *"I then read that absence as evidence the code had never
+   deployed"*. Same trap, same file, same reading.
+2. **`LAYER2_SHARDS_WRITTEN` appeared absent** at 17:51 under a
+   `text=LAYER2_SHARDS_WRITTEN` log query returning 17:34 as its newest hit. A
+   time-windowed `text=LAYER2` query over 17:44-17:56 returned it immediately.
+   **The Render filtered-text log search returned a stale result set** — do not
+   treat a filtered-text miss as absence; window it and widen the term.
+
+I stated "the flag didn't take effect" to the user on the strength of these.
+Wrong; withdrawn.
+
+### the 95.3% warning is now a STALE INSTRUMENT — do not act on it
+
+`SHORTLIST_PERSIST_LARGE ... pct=95.3 -- lower SYNDICATE_LAYER2_ROWS_PER_SPORT`
+measures the payload **with rows**, which since this deploy **is never written as
+one key**. Actual writes: combined 3.75 MB (44.8%), mlb shard 2.08 MB, ncaaf and
+soccer smaller (neither tripped the large-write warning). Every key is well under
+the ceiling; the warning's advice is now backwards. It should be re-pointed at
+the per-key sizes.
+
+### headroom for the NEXT raise, measured
+
+mlb shard: 2,082,916 B / 999 rows = **2,085 B/row**, so ~3,800 rows fit 95% of a
+shard's own 8 MB. The combined key is ~3.75 MB of cards/metadata and does not
+shrink with rows — that is the fixed cost, and it is the thing to watch, not the
+row count. `ROWS_TOTAL=4000` is the current binding limit, not the keyvalue ceiling.
