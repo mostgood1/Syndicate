@@ -987,6 +987,19 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Goal: a Polymarket moneyline resolves its YES/NO leg from the VENUE's own
   `yesLegIndex` instead of being refused, and refuses BY NAME where the venue
   did not state it.
+- **`layer2_board.py` WAS RELEASED TO ME, NOT OVERRIDDEN** `[2026-08-31]`, by
+  lane `layer1-model-edge-join` (session 1c88bcca), who struck it from their own
+  `Files:` block after reproducing my diagnosis independently and adding the
+  decisive argument against their own work.
+- **THIS PROSE SITS ABOVE THE `Files:` LINE ON PURPOSE.** `lane-guard._paths_in`
+  treats ANY token containing a slash or a dot as a claimed path, and
+  `_claimable_prefix` only strips text after a disclaimer marker -- so an
+  explanation written INSIDE the block turns words into claims. My previous
+  wording put "layer1-model-edge-join / session" in the continuation and had
+  this lane claiming a bare `/`. The same cause gave 1c88bcca three phantoms
+  (`1/p`, `15.0`, `85.13`) live on main for one commit, and
+  `check_lane_invariants` still reported INVARIANTS HOLD because each phantom
+  had exactly one holder -- so diff the claim SET, do not trust a green checker.
 - Files: syndicate/features/shared/polymarket_us_orders.py
   pipeline/execute_portfolio.py
   tests/test_polymarket_yes_leg_binding.py
@@ -1006,12 +1019,7 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
     PHANTOM claim on a path that does not exist. Flagged by session 1c88bcca.)
   tests/test_layer2_shard_by_sport.py
   tests/test_shortlist_persist_ceiling_guard.py
-  syndicate/features/shared/layer2_board.py `[2026-08-31, RELEASED TO ME by lane
-    layer1-model-edge-join / session 1c88bcca, who struck it from their own
-    Files: block this turn]` -- NOT an override. They granted it after
-    reproducing the diagnosis independently and adding the decisive argument
-    against their own work, with one condition honoured in the code: the flag
-    DEFAULTS TO CURRENT behaviour until the user rules on it.
+  syndicate/features/shared/layer2_board.py
   tests/test_layer2_model_value_term.py
 - Claims taken under `[2026-08-30, USER OVERRIDE]` x3 ("take it to the
   user-override route", "take it and fix it"). Conflicts were surfaced to the
