@@ -8123,6 +8123,39 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-crossing-experiment] 2026-08-31 — LIVE and CORRECT, but it has no test case yet
+
+**Deployed `0fc174c6`, live 03:48:28Z. It fired on all three pending orders at
+03:50:47:**
+
+    tsc-sea-lec-rom-2026-08-31-2pt5  quote=0.48 snapped=0.48 crossed=0.49  tick=0.01
+    tsc-bun-scp-scf-2026-09-05-2pt5  quote=0.44 snapped=0.44 crossed=0.45  tick=0.01
+    tsc-epl-ast-ars-2026-08-31-2pt5  quote=0.48 snapped=0.48 crossed=0.49  tick=0.01
+
+**AND NOTHING WAS SUBMITTED.** `EXECUTED ... positions=17 placed=0 filled=0
+duplicates=3 retried=13`. The three resting orders HOLD THEIR POSITION KEYS, so
+each crossed price was computed and then discarded as a duplicate. Predicted
+before the deploy, and it is why the run is INCONCLUSIVE rather than negative.
+
+**THE CODE IS PROVEN; THE HYPOTHESIS IS NOT TESTED.** Crossing arithmetic is
+confirmed correct on three real orders. Whether a crossed price FILLS is still
+unknown, because no crossed order has ever reached the venue.
+
+**TO GET THE READING — cancel the three resting orders.** The venue's own Orders
+screen has a Cancel button per row (user screenshot). Cancelling frees the
+position keys, and the next tick re-places them at 0.49 / 0.45 / 0.49 instead of
+0.48 / 0.44 / 0.48. Then:
+    fills   -> size sits one tick above; PRICE was the problem
+    rests   -> no book exists pregame; the fix is placement TIMING, not price
+
+A `cancel_order` adapter exists (`3170db13`) and is NEVER CALLED, so this is a
+human action tonight, not an automated one.
+
+**DIAGNOSTIC THAT EARNED ITS KEEP:** the watcher logged `price evals since
+deploy=0` for the first three checks. Without that counter, three minutes of
+silence would have read as "crossed and did not fill" when the order path simply
+had not ticked since the reboot.
+
 ## [polymarket-pregame-orders-rest] 2026-08-31 — THREE pending orders, ALL pregame, ALL bid AT the quote
 
 **USER SCREENSHOT of Polymarket's own Orders screen, 03:2xZ**, corroborated
