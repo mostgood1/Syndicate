@@ -8308,6 +8308,42 @@ submitted, which means resolving tick/cross BEFORE the gate or applying the same
 arithmetic in it. Anything else re-derives the venue's rounding by hand and goes
 stale the next time tick size changes.
 
+## [polymarket-two-dimensional-rule-CONFIRMED] 2026-08-31T19:25Z — the probe rested 3h54m pregame and filled 17m47s after kickoff
+
+**THE FIRST DELIBERATE TEST OF THE RULE, AND IT PASSED.** `ast-ars` was placed ON
+PURPOSE at a price the rule predicted could not fill, to try to break it.
+
+    created      15:25:45Z   pregame, submit_price 0.45
+    kickoff      19:02:22Z   (hours_to_commence=1.5 @ 17:32:22Z)
+    lastTransact 19:20:09Z   FILLED, kick+17m47s
+    avgPx        0.4500      exactly the limit, no price improvement
+    cum          19.97/19.97 leaves=0, complete fill
+    ledger       RECONCILED submitted->filled fill_price=0.45
+
+**PREGAME: ~20 book reads over 3h54m, cum=0 throughout, zero partials.
+LIVE: filled inside 18 minutes.** `bal-col` is still resting and still pregame
+(kickoff ~00:45Z), which is the control and it behaves.
+
+**THE PRICE RULE IS NOT REFUTED.** It did NOT fill pregame at 0.45, well above
+the 0.410 top of the observed resting range. The ceiling does not move on this.
+
+**AND THE BIG ONE: THE HELD POPULATION IS DEFERRED, NOT FORFEITED.** The gate's
+cost was recorded hours ago as "a bet that ~11.5% mean EV across six positions is
+unreachable". That framing is now WRONG in the good direction: a held order
+places once `hours <= 0` and fills like this one did. The EV is not thrown away.
+
+**BUT DO NOT READ THIS AS A WIN FOR THE GATE — IT WEAKENS THE CASE FOR IT.**
+This order was PLACED EARLY and nothing bad happened: no churn, no cancel, no
+duplicate, and it filled at exactly its limit. Meanwhile the price it locked was
+0.45 while the same market read 0.460 at 17:32Z, so placing early plausibly beat
+placing at kickoff by ~1c on 19.97 shares. One instance, and the earlier drift
+measurement was 3 up / 2 down / 2 flat with mean +0.005 — no systematic
+direction. The honest position: the gate prevents duplicate exposure (a real,
+measured $9.12 incident) and buys nothing else that this fill demonstrates.
+
+**WHAT IS STILL UNMEASURED:** whether the model was RIGHT. `ev_pct=22.68` on this
+position is the model's own claim. The bet settles with the match.
+
 ## [polymarket-held-population-is-6-of-6-POSITIVE-EV] 2026-08-31T17:33Z — the gate suppresses positive-EV bets; its whole defence is that they cannot fill
 
 **FIRST MEASUREMENT OF WHAT THE HOLD COSTS.** `9d0fcb11` stamps `ev_pct` on every
