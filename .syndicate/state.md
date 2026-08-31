@@ -8049,6 +8049,38 @@ The `created` timestamps close the TTL question outright: `C6RNQZ8B2KDE` has bee
 `C6R7RS83JKDD` died at ~28. Cancellation is not a clock. **Sixth cause
 eliminated.**
 
+**THE 18:18:51 BATCH, CHASED 2026-08-31. Four more causes eliminated, and my own
+framing of it is now suspect.**
+
+Window bounded to **18:13:12 -> 18:18:51**: the prior polymarket reconcile pass
+reported `changed=0`, this one `changed=4`. Inside that window:
+
+- **NOT an account-wide sweep.** `candidates=10 venue_orders=10 changed=4` -- ten
+  orders read, four cancelled. Selective. But the six survivors were already
+  FILLED, i.e. terminal and uncancellable, so the four may still have been ALL
+  the OPEN orders. That distinction is unresolved.
+- **NOT insufficient collateral.** Balance FLAT at $87.26 across the window
+  (18:12:47 / 18:18:36 / 18:26:44), and it did not RISE afterwards either, so
+  those orders were not holding reserved funds.
+- **NOT a restart or OOM.** The Render EVENTS API is empty from 17:30 to
+  18:34:20Z.
+- **NOT a deploy.** The nearest one STARTED 18:34:20, after the fact.
+
+**THE VENUE DOES NOT SAY WHY.** Its per-order payload carries 24 fields and no
+cancellation-reason field; `state` is the only status-bearing one.
+
+**AND "FOUR AT ONCE" IS MY WORDING, NOT A MEASUREMENT.** We OBSERVED four
+transitions in ONE reconcile pass spanning 5.6 minutes. Whether they were
+cancelled SIMULTANEOUSLY is a different claim. `lastTransactTime` is returned on
+every order and has never been logged: if the four share one timestamp it is a
+single sweep; if they differ, they are independent events being treated as one
+phenomenon.
+
+**NEXT, CHEAP:** log `lastTransactTime` (exact transition time), `marketMetadata`
+(market state -- the leading remaining explanation) and `intent`. Log-only, same
+ORDER_STATE line, one deploy.
+
+
 WHAT REMAINS: cancellations are SPORADIC EVENTS, not a rule. Three transitions in
 12h, one of which took FOUR orders at once (18:18:51) with no restart in the
 surrounding logs. That batch is now the whole remaining thread — a simultaneous
