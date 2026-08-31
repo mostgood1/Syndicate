@@ -1,5 +1,286 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#611` — **THE MLB PROP PREGAME FREEZE STOPPED ON 2026-08-16. Every hitter/pitcher prop since has been graded against a post-slate remnant covering ~ONE GAME.** — found by lane `layer2-accuracy-audit`, 2026-08-31 — **OPEN, MEASURED, NOT FIXED — belongs to the freeze WRITER (`scripts/refresh_mlb_oddsapi.py`), not to card generation**
+
+**THE EVIDENCE, worker-side and direct.** `locked_cards_retuned/daily_summary_2026_08_30_locked_policy.json`
+records the paths the builder ACTUALLY read (`inputs`):
+
+    game_lines     .../data/daily/snapshots/2026-08-30/oddsapi_game_lines_2026_08_30_pregame.json
+    hitter_lines   .../data/market/oddsapi/oddsapi_hitter_props_2026_08_30.json      <- LIVE
+    pitcher_lines  .../data/market/oddsapi/oddsapi_pitcher_props_2026_08_30.json     <- LIVE
+
+Game lines resolved to the sealed pregame freeze. **Both prop families resolved to the
+LIVE file.** `_odds_paths` (post-`49c43aeb`) prefers the frozen tier whenever one exists
+anywhere, so a live resolution proves **no prop freeze existed to find**. This is the
+card's own record from the worker's own run — it does not depend on any web-side listing.
+
+**THE INVENTORY confirms it and dates it:**
+
+    family           pregame freezes   newest freeze
+    game_lines             48            2026-08-31   (current)
+    hitter_props            9            2026-08-16   <- STOPPED
+    pitcher_props           9            2026-08-16   <- STOPPED
+
+**WHY THAT DESTROYS PROP GRADING.** The live prop file is rewritten all day and collapses
+once books pull player props after first pitch:
+
+    oddsapi_hitter_props_2026_08_29.json     43,587 bytes
+    oddsapi_hitter_props_2026_08_30.json      2,893 bytes   <- what 08-30 was graded on
+    oddsapi_hitter_props_2026_08_31.json    501,103 bytes   <- today, pre-slate
+
+2,893 bytes is roughly ONE GAME, and the card agrees: every
+`other_playable_candidates` entry on 08-30 names the same `game_pk 824636` (CIN @ CHC).
+Hence `raw_candidates_n: 1` in all six hitter submarkets and `0` for pitcher props, on a
+14-game slate.
+
+**THIS IS NOT A DATA-ACQUISITION PROBLEM.** Today's pre-slate capture is 501KB — the market
+is there and is being fetched. The SEAL is what is missing.
+
+**THIS IS THE SAME FAILURE MODE AS THE GAME-LINE ONE FIXED TONIGHT (`49c43aeb`), ONE FAMILY
+OVER — and it is NOT fixed by that change.** For game lines the freeze existed and the
+reader looked in the wrong directory. For props the freeze **is not being produced at all**,
+so no reader change can help.
+
+**THE MACHINERY ALREADY EXISTS**, which is why this reads as a regression rather than a gap:
+`scripts/refresh_mlb_oddsapi.py` has `_oddsapi_props_richness`, written specifically to keep
+the prop seal monotone so that "a post-slate fetch (which returns an empty market once books
+pull player props) can never overwrite a real pregame capture", and `_freeze_market_dirs`
+writes freezes to every tree the reader searches. Something stopped firing for the PROP
+families around 2026-08-16 while the game-line freeze kept working. **The cause has NOT been
+investigated.**
+
+**RELATION TO `#610`:** `#610` is the CAP question (moneyline: 12 candidates, cap 1 —
+cap-bound). This is the SUPPLY question, and the two need opposite fixes. Raising
+`caps.hitter_props` would do nothing: it is already 11 against a supply of ~1.
+
+**CADENCE IS THE LEADING EXPLANATION AFTER ALL. I EXONERATED IT AND WAS WRONG — see the
+correction at the end of this item before acting on anything above.**
+
+**TESTED LIVE 2026-08-31 (reasoning below is SUPERSEDED; kept because the observations are
+real and the correction turns on which of them discriminates):**
+Tonight's first pitch was 22:05:00Z (earliest `commence_time` in the 12-game game-line
+freeze), so there was a real pre-slate window. Watched it end to end:
+
+    21:35:20Z  PRE-SLATE      seals=0   hitter 501,103   pitcher 46,231
+    21:50:48Z  PRE-SLATE      seals=0   hitter 501,103   pitcher 47,514
+    21:55:25Z  PRE-SLATE      seals=0   hitter 501,103   pitcher 47,513
+    21:58:52Z  PRE-SLATE      seals=0   hitter 494,146   pitcher 47,514
+    22:01:08Z  PRE-SLATE      seals=0   hitter 494,146   pitcher 47,513
+    22:06:38Z  SLATE STARTED  seals=0
+    22:07:52Z  SLATE STARTED  seals=0
+
+**The prop files were being ACTIVELY REWRITTEN throughout the pre-slate window** (pitcher
+46,231 -> 47,514 -> 47,513 -> 47,514; hitter 501,103 -> 494,146), so the refresh WAS running
+pre-slate with a ~494KB source doc available. **Zero seals were produced.** Cadence — "the
+fetch runs post-slate" — cannot explain tonight, so it is not the whole cause of the 08-16
+stoppage either.
+
+**CAUSE, BY ELIMINATION (leading, not proven).** Inside the prop loop the only skips are
+`slate_started`, `source_path` missing, and the richness comparison:
+- `slate_started` was FALSE for the whole window above.
+- richness cannot block a FIRST seal: with no existing frozen file `best_frozen` is `-1`,
+  and the guard is `if best_frozen >= 0 and candidate <= best_frozen`.
+- which leaves `source_path.exists()`.
+
+**RETRACTED, SAME SESSION: `source_path` is almost certainly PRESENT, so the elimination
+above does NOT land.** Two pieces of evidence I had and had not joined:
+(a) `refresh_mlb_oddsapi.py:861` fetches with
+`out_dir=source_root / "data" / "market" / "oddsapi"` — the props ARE written to the very
+directory the seal reads from; and (b) the 08-30 card's `inputs.hitter_lines` resolved to
+`.../data/market/oddsapi/oddsapi_hitter_props_2026_08_30.json` **and produced
+`raw_candidates_n: 1`**, i.e. the builder read a real file with content there, not the
+`_odds_paths` fallback sentinel (a missing file yields 0 candidates, not 1). The
+`market/oddsapi` copy therefore exists on the worker. My "every copy sits under
+`daily/snapshots`" claim came from `/api/ops/artifacts/export`, which is allowlisted to
+`*/daily/snapshots/*/*.json` with **no `market/oddsapi` pattern at all** — so its silence
+was structural blindness, not absence. **That is the second time this session I read an
+export null as an absence; it was wrong both times.**
+
+**STRONGEST LEAD YET, 2026-08-31 ~22:3xZ: THE FREEZE IS PROBABLY NEVER CALLED FOR MLB.**
+`/api/ops/odds-refresh/status` -> `refresh_status_by_lane` shows odds refresh running on
+ALL THREE services, lane-scoped, each with its own `launcherServiceId`:
+
+    lane                          service            oddsSports            phase     generatedAt
+    live-odds-worker              live-odds-worker   soccer                pregame   2026-08-31T22:18Z
+    live-odds-worker-wnba-live    live-odds-worker   wnba                  live      2026-08-30
+    refresh-worker                refresh-worker     soccer                live      2026-08-31T22:25Z
+    web                           web                mlb,wnba,nfl,soccer   pregame   **2026-08-06**
+
+**The ONLY lane whose scope includes `mlb` is the `web` lane, and it last generated on
+2026-08-06 — 25 days ago.** Tonight's two live lanes are soccer-only.
+`_freeze_oddsapi_pregame_markets` is reachable ONLY from
+`refresh_mlb_oddsapi._refresh_source_artifacts` (`:858`), which is invoked only via
+`refresh_odds_sources.py`. If MLB no longer flows through that orchestrator, **the seal is
+not broken — it is never invoked**, which fits a seal that produced nothing across a valid
+37-minute pre-slate window with a present source file.
+
+**WHAT DOES NOT FIT, stated rather than smoothed over:** MLB prop files ARE being rewritten
+(observed changing at 21:50/21:55/21:58/22:01Z tonight), so *something* refreshes MLB odds
+by a path not represented in these lane manifests — and a 12-game `oddsapi_game_lines_
+2026_08_31_pregame.json` DOES exist for today, which a never-invoked freeze cannot explain.
+Also the dates do not line up: the web lane went quiet on **08-06**, the prop seals stopped
+on **08-16**. Do not treat this lead as settled until both are reconciled.
+
+**CORRECTION, 2026-08-31 ~22:4xZ — THIRD ONE ON THIS QUESTION, AND THE PATTERN IS THE POINT.**
+`refresh_status_by_lane[*].history` (a GLOBAL list, not per-lane — every lane returns the
+same six entries) carries:
+
+    run_stamp 20260831_221230   sports=mlb,soccer   exit_code=0   elapsed=291s
+
+**An MLB refresh DID run tonight, at 22:12:30Z. First pitch was 22:05:00Z.** It ran SEVEN
+MINUTES AFTER the slate started, so `slate_started` was True and the props took the
+`if slate_started: continue` branch. That is precisely the failure the code's own comment
+describes — *"the props fetch usually runs AFTER the slate (`retrieved_at` 02:00-05:00Z the
+FOLLOWING day)"* and *"a refresh pass that first runs after first pitch contributes nothing,
+forever"* — i.e. **cadence**, the thing I declared exonerated.
+
+**WHAT MADE ME WRONG:** I saw the prop FILES change pre-slate (21:50/21:55/21:58/22:01Z) and
+inferred "the refresh ran pre-slate, therefore cadence is not the cause". **I never
+established which process wrote those files.** A different writer (live-odds-worker's own
+capture) rewriting the live doc is fully consistent with the orchestrator's MLB pass not
+running until 22:12Z. The observation was real; the inference from it was not.
+
+**ALSO RETRACTED: "the only lane with mlb is `web`, last run 2026-08-06."** `manifest` is the
+LATEST run per lane, so a lane that ran MLB earlier and soccer later displays soccer. MLB is
+present in the shared history. That reading was an artifact of the field I chose, and I had
+`mlb_in_history=1` on every lane in front of me at the time.
+
+**THE METHODOLOGICAL POINT, which is worth more than the finding:** three hypotheses on this
+one question — freeze-unreachable, source_path-missing, freeze-never-invoked — and all three
+were built on *what happened to be visible* rather than on what would DISCRIMINATE. Two came
+from reading an unallowlisted export null as an absence. The discriminating datum was always
+the same one: **when did the MLB refresh actually run, relative to first pitch.**
+
+**SO THE CAUSE IS OPEN, but much narrower.** With `slate_started` false, richness unable to block a first seal,
+and `source_path` present, none of the three documented skips explains tonight. The next
+hypothesis to test is that **`_freeze_oddsapi_pregame_markets` is not being CALLED on the
+path that actually refreshes props in production** — it is invoked only from
+`_refresh_source_artifacts` (`:858`), and something else may be writing these files. Note
+the counter-evidence: a 12-game game-line freeze for 08-31 DOES exist, which suggests the
+freeze ran today; but game-line freezes are self-sustaining from their own seed, so an
+existing freeze being rewritten does not prove a fresh invocation.
+
+That is the MIRROR of the reader bug fixed tonight in `49c43aeb`: there the freeze existed
+and the READER looked in the wrong directory; here the props exist and the FREEZER looks in
+the wrong directory. It also explains why game lines keep sealing while props do not — game
+lines merge from a SEED built out of existing freezes (`_merge_pregame_game_lines`, seeded
+across every tree) and are therefore self-sustaining, whereas props are a bare
+`shutil.copy2(source_path, ...)` with no seed: no source, no seal, ever.
+
+**WHAT CANNOT BE READ FROM OUTSIDE, and this is the blocker.** Three routes all refuse:
+`market/oddsapi/**` is not in `HOT_ARTIFACT_PATTERNS` (the allowlist covers
+`*/daily/snapshots/*/*.json` only); `live_lens/cron_meta/latest_refresh_oddsapi.json` —
+which records `frozenPregame`, the freeze's own list of every destination it copied, and
+would answer this outright — is likewise not allowlisted; and the Render logs API has been
+intermittently empty. **Whoever takes this needs worker-side visibility first.** The cheapest
+honest step is to allowlist `live_lens/cron_meta/latest_refresh_oddsapi.json` (one small
+per-date JSON, already written every pass) and read `frozenPregame` — it names exactly which
+families were sealed and to which trees, and turns this whole item into a single read.
+
+**THE TEST THAT WOULD CLOSE THIS, and it is cheap:** find one date where an MLB orchestrator
+run completed BEFORE that day's first pitch, and check whether prop `_pregame.json` files
+exist for it. If seals appear on exactly those dates, cadence is the whole cause and the fix
+is scheduling (`odds-cadence-off-the-mlb-peak`), not the freeze. `5be4381d`'s
+`PREGAME_FREEZE date=... by_family={...}` log line answers this in one grep once deployed —
+it fires per pass and names which families sealed.
+
+**DO NOT "FIX" THE SOURCE-PATH SEARCH ON THE STRENGTH OF THIS ITEM.** The multi-directory
+search would be harmless, but the retraction above means it is not established that
+`source_path` is the problem, and shipping it would look like a fix while changing nothing.
+
+
+### `#610` — **MLB graded-row supply is PICK-limited, not join-limited. ~14 graded rows per WEEK, and repairing the join changed it by zero.** — found by lane `layer2-accuracy-audit`, 2026-08-31 — **OPEN, MEASURED, NOT MINE TO FIX (MLB card generation)**
+
+**THE NUMBER.** Across 2026-08-24..08-30, `/mlb/api/market-accuracy` returns
+`rows.all` = 1, 1, 2, 1, 1, 1, 7 — **14 graded rows for a full week of MLB**. That
+supply is what the evaluation ledger joins against, and it settles **35 of 19,692
+settleable records (0.2%)**, with `unmatched_no_graded_rows` 4,187 and
+`unmatched_no_key_match` 15,470. Every consumer of the ledger — reliability
+multipliers, dynamic thresholds, CLV, stake credibility, policy promotion — is
+starved by this one number.
+
+**WHAT WAS ALREADY RULED OUT, TONIGHT, WITH A MEASUREMENT.** The obvious suspect was
+the game-line join: the same window carried 0/14/14/6/12/12/13 `Missing game-line
+match` warnings, i.e. ~1 game in 14 was joining. That failure was REAL and is now
+FIXED and DEPLOYED (`49c43aeb` + `132559e1`, refresh-worker, live 20:33:17Z):
+
+    2026-08-30   Game lines read: .../daily/snapshots/2026-08-30/
+                 oddsapi_game_lines_2026_08_30_pregame.json (pregame-freeze, 14 games)
+                 Missing game-line match:  13 -> 0
+
+**AND THE GRADED ROW COUNT DID NOT MOVE.** 08-30 was `all=7 official=2 playable=5`
+before and `all=7 official=2 playable=5` after. **Repairing 13 lost joins produced
+exactly ZERO additional graded rows.** So the join was never the constraint — I
+claimed it was, and that claim is falsified by its own fix.
+
+**WHERE THE CONSTRAINT ACTUALLY IS.** Graded rows are emitted from the day's LOCKED
+CARD (`locked_cards_retuned`) — the policy's own selections. Joining more games adds
+market context, not picks. The builder reported `cards: 1` on every one of the seven
+regraded dates. So the question this item owns is: **why does the policy select ~1-2
+bets per MLB slate?** Is that the intended selectivity of `retuned`, or is card
+generation itself dropping candidates? Nobody has looked; the join hid it.
+
+**WHY IT MATTERS BEYOND ACCURACY.** If ~1-2 picks/slate is intended, then the
+evaluation ledger can NEVER corroborate the board at scale and the paper/live
+portfolio book is the only usable accuracy surface (see below). If it is a defect,
+fixing it unblocks the entire learning loop at once.
+
+**COLLATERAL EVIDENCE FROM THE SAME SESSION** (full detail: `.syndicate/log/2026-08-31.md`,
+`state.md [layer2-realized-accuracy]`, `deploys.md` 20:26:34Z):
+- The Layer 2 board's realized accuracy IS measurable today, via
+  `/api/portfolio/paper` + `/api/portfolio/live` — both commit off
+  `read_layer2_shortlist` (`pipeline/portfolio_commit.py:357`). 7 days:
+  paper **+9.4%** (402 settled, all `settled_by=inferred`) vs live real money
+  **-5.5%** (239 settled). That ~15-point gap is its own open question.
+- `graded_rows_available` on `/api/ops/evaluation-settlement/status` is a POOR
+  instrument for this: it is the settlement autorun's cached summary and went ~2h
+  without refreshing (`epoch` byte-identical).
+- `/mlb/api/market-accuracy` responses FLAP between old and new payloads across
+  successive requests — consistent with a per-gunicorn-worker in-process cache on
+  web. Sample repeatedly before concluding anything from one response.
+
+**ANSWERED 2026-08-31 ~21:1xZ — IT IS SELECTIVITY BY DESIGN, AND THE JOIN FIX DID
+WORK AFTER ALL.** Read `locked_cards_retuned/daily_summary_2026_08_30_locked_policy.json`
+(the post-fix card — it carries `Game lines read: ... (pregame-freeze, 14 games)`)
+against three pre-fix cards as controls:
+
+    date      card       ml raw -> selected    combined raw -> selected
+    08-27     pre-fix         1 -> 1                    1 -> 1
+    08-28     pre-fix         3 -> 1                    3 -> 1
+    08-29     pre-fix         4 -> 1                    4 -> 1
+    08-30     POST-FIX       12 -> 1                   18 -> 2
+
+**The join fix raised raw moneyline candidates from 1-4 to 12** — a 3-12x increase in
+candidate supply, exactly what it was built to do. `selected_n` stayed at **1** because
+**`caps.ml = 1`**. So "repairing the join produced zero additional graded rows" is true
+and was the wrong frame: the fix produced 3-12x more CANDIDATES, and the CAP PROFILE is
+what stops that becoming picks.
+
+**The cap profile is explicit and deliberate:** `cap_profile:
+nototals_p1_tbheavy11_r1_nohr`, `caps = {totals: 0, ml: 1, pitcher_props: 1,
+hitter_props: 11}`, hitter subcaps `{HR: 0, hits: 4, H+R+R: 0, total_bases: 6, runs: 1,
+RBIs: 0}`. Three of six hitter submarkets and totals entirely are set to ZERO.
+
+**WHICH MARKETS ARE CAP-BOUND vs SUPPLY-BOUND — they need different fixes:**
+- **moneyline: CAP-BOUND.** 12 candidates, cap 1. Raising `caps.ml` is the single
+  highest-leverage change available to graded-row supply.
+- **hitter props: SUPPLY-BOUND.** ~1 raw candidate per submarket against caps of 4/6/1.
+  Raising those caps would do nothing; candidate generation is the constraint.
+- **totals: BOTH.** 0 candidates AND `cap: 0`.
+- **pitcher props: SUPPLY-BOUND.** 0 raw candidates against cap 1.
+
+**SO THE ORIGINAL QUESTION IS CLOSED and replaced by two sharper ones, neither owned yet:**
+(1) Is `caps.ml = 1` still the right number now that the slate actually joins? It was
+    presumably fitted when a "slate" was 1-4 candidates. **Re-fitting a cap on a supply
+    that just grew 12x is a MECHANISM-vs-ESTIMATOR change** — see
+    `docs/ai_context/model_engine_standard.md`; the rates that were absorbing the old
+    supply need re-fitting with it, not just a bigger number.
+(2) Why does a 14-game slate yield ~1 raw hitter-prop candidate per submarket and ZERO
+    pitcher-prop candidates? **ANSWERED AND SPLIT OUT AS ** — the prop pregame
+    freeze stopped on 2026-08-16, so props are graded against a post-slate remnant
+    covering ~one game. Supply-bound, and it belongs to the freeze writer, not here.
+
+
 ### `#604` — **I shipped a named refusal that can never fire. `#601`'s own stated verification is not executable.** — lane `portfolio-venue-and-side-integrity`, 2026-08-28 — **FIXED, LANDED (`361d8940`), DEPLOYED in `420dddaa`, COUNTER VERIFIED FIRING (`segment_has_no_matching_series: 2`, 22:09:15Z)**
 
 `kalshi_board_join.py:121` defines `REASON_SEGMENT_MISMATCH =

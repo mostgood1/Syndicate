@@ -5492,6 +5492,147 @@ neither, and its advice was backwards for the healthy one.
 the old single write becomes a liar in both directions. Re-point it at the keys
 that are actually written, in the SAME change that splits them.
 
+## [08-31 FORBIDDEN: trusting `git cherry` alone. It gives FALSE POSITIVES, and they push DUPLICATES]
+
+**Refines the standing "remote-absent ≠ content-absent" rule, which said to run
+`git cherry` FIRST. That is still right, and it is not sufficient.**
+
+Measured 2026-08-31. Pushing a second batch, `git cherry -v origin/main HEAD`
+marked **4 commits `+` (absent upstream). Two of them were already upstream** —
+I had pushed them myself an hour earlier as cherry-picks. Their patch-ids no
+longer matched because upstream context around them had moved, so `git cherry`
+could not recognise its own copies.
+
+Acting on that would have appended two `deploys.md` entries a second time.
+
+**How to apply.** `git cherry` is the cheap filter, not the verdict. Before
+pushing, grep the UPSTREAM BLOB for a distinctive string from each commit:
+
+    git show "origin/main:.syndicate/deploys.md" | Select-String '<distinctive phrase>'
+
+and require exactly one occurrence in the tree you are about to push. PowerShell,
+not Git Bash: `origin/main:path` is mangled to `origin\main;path` and the command
+fails, which — with a `|| echo 0` fallback — reads as **"content absent"** and
+argues for pushing MORE. That happened here, in the same check.
+
+## [08-31 FORBIDDEN: running a long test sweep while editing the files under test]
+
+A 72-minute sweep (`-k "layer2 or shard or intelligence_state or shortlist"`)
+returned **5 failures**, two naming the exact function I had changed. All 5 pass
+in isolation and their three full files pass clean.
+
+The cause was mine: during that 72 minutes I edited
+`pipeline/intelligence_state.py` repeatedly AND deliberately swapped it to the
+pre-fix `HEAD` version for about a minute to prove the new tests fail without the
+fix. A long run imports modules as it reaches them, so it read whatever was on
+disk at that moment.
+
+**The result is void in BOTH directions** — it is not evidence of a regression
+and not evidence of correctness, because it never tested one tree. Same class as
+a `git stash` control that stashed nothing: a control that was not controlling.
+
+**How to apply.** A sweep is a measurement, and a measurement needs a frozen
+subject. Either let it finish before touching the files, or run it against a
+worktree pinned to the commit you mean to test. Reading its failures at face
+value sends you hunting a regression that does not exist — or "fixing" working code.
+
+## [08-31 RETRACTED: the pregame PRICE rule. A pregame fill at 0.45 exists, and I handed that rule to a peer as a threshold]
+
+**What I claimed, earlier this session, and passed on as a usable threshold:**
+pregame fills and resting orders separate cleanly on PRICE — *max filled pregame
+`0.335`, min resting `0.410`, zero overlap* — with live/past fills at `0.490`.
+
+**The counter-example, measured 2026-08-31 from the served ledger:**
+
+```
+tsc-epl-ast-ars-2026-08-31-2pt5   totals over 2.5   polymarket
+  fill_price          0.45          <- ABOVE the 0.410 "nothing fills pregame above this"
+  submitted_at        15:25:45.239Z
+  venue_resolved_at   15:25:45.994Z  <- filled in 0.75 SECONDS
+  commence_time       19:00:00Z
+  => PREGAME at both submit and resolve, by 3.57 hours
+```
+
+A pregame fill at `0.45` cannot coexist with "pregame fills top out at 0.335".
+**The rule is FALSIFIED.** Anyone gating on it is using a bound that has a live
+counter-example.
+
+**The likely reframe, NOT yet established:** the discriminator is probably
+MARKETABILITY, not price. This order resolved in 0.75s, which is a taker crossing
+the book, not a maker resting on it. My original population almost certainly mixed
+aggressive orders (fill instantly at whatever they are priced) with passive ones
+(rest until the market comes to them), and read the mixture as a price boundary.
+`EXPLORE_PREGAME_BOUNDARY` deliberately prices ABOVE the ceiling, so exploration
+orders land in the aggressive population by construction.
+
+**How to apply.** Do not gate on the 0.335/0.410 numbers. Before any replacement
+rule, split fills by `venue_resolved_at - submitted_at`: sub-second is a taker and
+tells you nothing about whether a resting order would have filled. A threshold
+fitted across both populations describes neither.
+
+**Also, on counting these at all:** `EXPLORE_*` exists ONLY as a log line — no
+field on the order marks it. In a 26h window, **17 log lines were 3 distinct
+tickers**, because the same order re-logs every tick. Count distinct tickers and
+join to the ledger; a line count overstates by ~6x.
+
+
+## 2026-08-31 — FORBIDDEN: choosing a hypothesis from what is VISIBLE rather than what DISCRIMINATES
+
+**Three hypotheses on one question in one night, all confidently reasoned, all wrong**
+(lane `layer2-accuracy-audit`, `todo #611`): the MLB prop pregame freeze has produced nothing
+since 2026-08-16, and I successively blamed (1) the freeze being unreachable on the worker's
+disk, (2) the seal's `source_path` being absent under `market/oddsapi`, and (3) the freeze
+never being invoked for MLB. Each was refuted within the hour, twice by evidence I already
+held.
+
+**The single discriminating datum was constant throughout and cheap: WHEN did the MLB refresh
+run, relative to first pitch.** `refresh_status_by_lane[*].history` answers it in one read
+(`run_stamp 20260831_221230 sports=mlb,soccer` vs first pitch 22:05:00Z -> seven minutes
+late, so `slate_started` was True and props were skipped by design).
+
+**Two specific traps, both worth naming because they are structural, not careless:**
+- **An unallowlisted path is INVISIBLE, not ABSENT.** `/api/ops/artifacts/export` serves only
+  `HOT_ARTIFACT_PATTERNS`; `market/oddsapi/**` and `live_lens/cron_meta/**` match nothing, so
+  they return empty exactly as a deleted file would. I read that null as absence TWICE.
+- **A `manifest` is the LATEST run, not the history.** Reading per-lane `manifest.oddsSports`
+  gave "only the `web` lane ever ran MLB, and not since 08-06" — flatly wrong; MLB was in the
+  shared `history` in the same payload, and I had already printed `mlb_in_history=1` for every
+  lane.
+
+**How to apply.** Before testing a hypothesis, name the reading that would SEPARATE it from
+its rivals, and check that reading is reachable at all. If the only available instrument
+cannot distinguish "absent" from "not permitted to be seen", it is not evidence and the
+hypothesis is not yet testable — fix the instrument first. Relatedly: an instrument's SILENCE
+means nothing until it has been shown capable of registering the event (two watchers polled a
+web endpoint for 35 minutes for a worker-side write that had no publisher).
+
+**What this cost:** roughly three hours, three retractions in the ledger, and one wrong
+causal claim ("the ~7% join rate is what starves settlement") that survived long enough to be
+written into `state.md` before its own fix disproved it.
+
+## [08-31 FORBIDDEN: matching a guarded status on a GUESSED STRING instead of the condition you care about]
+
+**Twice in one session, same shape, both in my own deploy watchers.**
+
+1. A watcher polled the **LIVE** deploy to decide whether one was in flight. A
+   deploy that is `build_in_progress` is not live, so it read "nothing happening"
+   and **took the deploy claim while another deploy was mid-build** — the exact
+   race the claim exists to prevent.
+2. A watcher gated acquisition on the status line containing `free`. The real line
+   read `EXPIRED (does not block)` — my own 61-minute-old claim, which was not
+   blocking anything and which `acquire` would have replaced immediately. It
+   polled for **six minutes and would have polled forever**, in the middle of a
+   sequence whose next step was a production flip.
+
+Both are the same error: I encoded a **guess about how the state would be
+spelled** rather than the condition. `free` and `EXPIRED (does not block)` are
+both "you may acquire"; `live` and `build_in_progress` are both "a deploy exists".
+
+**How to apply.** When gating on a tool's output, gate on the tool's OWN verdict —
+its exit code, or the explicit set of states it documents — never on a substring
+you expect to see. If you must match text, enumerate every terminal AND permissive
+spelling, and assume the one you did not think of is the one that will appear. A
+watcher that stalls is the benign outcome; the other one deployed into a race.
 
 ## 2026-08-31 — FORBIDDEN: shipping a model INPUT artifact without tracing its delivery topology first. "Publish" does not mean "the engine can read it"
 
