@@ -15661,3 +15661,70 @@ rather than quietly deleted, because a grant that was written at all belongs in
 the audit trail whether or not it was used.
 
 Claim released with its own token (`release --token`), no `--force`.
+## 2026-08-31 19:46Z — `865c89be` — refresh-worker — the shard-index rollback fix — lane `layer2-cap-raise`
+
+**User decision, 2026-08-31: _"fix the rollback defect"_ then _"deploy it."_**
+Fixes defect (1) of the three recorded in the 18:25Z incident entry.
+
+`_merge_layer2_shards` no longer sizes the board from `shard_row_total` alone —
+that field lives on the COMBINED key, a separate write that can refuse after the
+shards land. It now reads every shard first and uses
+`max(index_total, highest_claimed_position + 1)`, so the newer and complete shard
+set decides how many slots exist. `index_total` still **wins when larger**: a
+missing shard leaves a real hole, and shrinking to fit the loaded rows would be
+the same silent truncation in the other direction (its own test).
+
+The served `written_at` is now taken from the shards when the stamps disagree.
+**That is what made the incident unfalsifiable** — the board reported `18:02:05Z`
+while serving 18:25 rows, so my own watcher polled it for 7 minutes and read
+"unchanged" while the contents had completely changed. Two log lines unique to
+this failure: `LAYER2_INDEX_BEHIND_SHARDS` at the write that refuses,
+`LAYER2_SHARD_INDEX_STALE` at the merge.
+
+### verify: what production CAN and CANNOT show
+
+**The fix is INERT on a consistent set**, and `per_sport=1000` makes the failure
+unreachable, so production cannot positively confirm it. **The positive evidence
+is the 6 unit tests, verified to FAIL against `HEAD`** — the incident case fails
+there with `assert 3 == 6`, exactly the rows the old merge discarded, and with
+ncaaf vanishing. `test_layer2_shard_by_sport.py` 11/11 unchanged.
+
+Production shows the ABSENCE of a regression, which is the honest claim:
+```
+19:46:59Z  LIVE 865c89be   (preflight CLEAR, 0 jobs -- waited for the odds jobs)
+20:02:25Z  board rebuilt   rows 1567 -> 1586
+           {mlb 974, soccer 180, ncaaf 413} -> {mlb 984, soccer 189, ncaaf 413}
+20:02:25Z  LAYER2_SHARDS_WRITTEN rows=1586 combined_keeps_rows=False
+           LAYER2_SHARD_INDEX_STALE   0 lines  (expected 0 -- the set is consistent)
+           LAYER2_INDEX_BEHIND_SHARDS 0 lines  (expected 0)
+```
+A stale-flag firing on a healthy board would have meant my detection was wrong.
+It did not fire. One transient `502` on a board fetch at 19:57:57Z, single
+occurrence, recovered on the next poll — noted, not diagnosed.
+
+### getting it onto main, in a shared tree
+
+`git cherry` found **2 of 9 "unpushed" commits were already upstream by content**
+(other sessions' work committed into the shared tree); rebasing would have pushed
+duplicates. Cherry-picked my 7 onto `origin/main` in an **isolated worktree** so
+the peer's 3 staged files were never at risk — confirmed untouched throughout.
+
+Two Windows traps worth the note: `git worktree add` fails on long paths under
+`data/`, and **Git Bash rewrote `!/data/` into `!C:/Program Files/Git/data/`**
+(the standing MSYS path-conversion rule), excluding everything and showing 38,493
+phantom deletions. Written from PowerShell instead. Checked for conflict markers
+before pushing — one hit, `tests/test_check_lane_invariants.py`, an upstream
+`CONFLICTED = """..."""` fixture untouched by my commits.
+
+### STILL OWED — the other two defects from the incident
+
+2. `_shed_rows_to_fit_keyvalue` is skipped when sharding is on, so nothing trims
+   the combined key when it overflows. **Note the shed already reports it cannot
+   help here** (`SHORTLIST_SHED_IMPOSSIBLE`: the non-row base exceeds the ceiling)
+   and names the real fix: **move `cards`/`openings` to their own keys.**
+3. `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key —
+   `pct=93.3` on a healthy board, advice backwards.
+
+Config unchanged and still the guardrail: `PER_SPORT=1000`, `ROWS_TOTAL=3000`,
+`COMBINED_ROWS=0`. **`ROWS_TOTAL=3000` remains UNEXERCISED** — today's board is
+~1,600 rows, so it has never bound.
