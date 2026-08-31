@@ -8159,6 +8159,39 @@ NAMES only, and `ORDER_STATE` logs cum/leaves/avgPx but not this. One line added
 to `ORDER_STATE` would settle it. `polymarket_us_orders.py` is claimed by
 `polymarket-yes-leg-binding`, so it needs that lane or an override, plus a deploy.
 
+## [polymarket-TIME-IS-NOT-THE-VARIABLE] 2026-08-31T05:29Z — TIME-TO-EVENT IS REFUTED. The gate's premise is false.
+
+**A PREGAME ORDER FILLED, 18.6 HOURS BEFORE KICKOFF, WITHIN ~18 MINUTES.**
+
+    aec-mlb-ath-tex-2026-08-31   mlb h2h   kickoff 09-01T00:05Z  18.6h out  FILLED cum=5.25 @0.335
+    tsc-sea-lec-rom-...-2pt5     soccer totals  kickoff 08-31T16:30Z  11.0h out  resting 1.4h
+    tsc-epl-ast-ars-...-2pt5     soccer totals  kickoff 08-31T19:00Z  13.5h out  resting 1.4h
+
+**The order that FILLED was FURTHER from kickoff than the two that did not.**
+Time-to-event cannot explain that, and it was the hypothesis `f6f45321` was
+built on. **The gate's stated premise — "pregame orders do not fill at any
+price" — is FALSE.**
+
+**WHAT ACTUALLY SEPARATES THEM IS THE MARKET, NOT THE CLOCK.** Filled: an MLB
+MONEYLINE (`aec-`). Resting: SOCCER TOTALS (`tsc-`). Also newly placed and
+resting are three more MLB moneylines (det-min, nyy-laa, sf-atl) at 16-20h, so
+one h2h fill out of four is not yet a rate either — but one fill is enough to
+kill "pregame never fills".
+
+**THE GATE IS LIVE AND SUPPRESSING 13 OF 17 POSITIONS ON A FALSE PREMISE.** It
+did not block this fill (18.6h is inside the 24h window), so nothing is known to
+have been lost yet. But it is keyed on the WRONG AXIS, and the orders it holds
+are mostly far-out SOCCER h2h — a market family we have never seen fill at any
+horizon, which is a different reason from the one written into the code.
+
+**RECOMMENDED: disable it** (`SYNDICATE_POLYMARKET_MIN_HOURS_TO_COMMENCE=0`, or
+revert `f6f45321`) until the axis is established. On Render an env change needs
+a deploy, so a revert is the faster off-switch.
+
+**THE REAL QUESTION IS NOW LIQUIDITY BY MARKET FAMILY:** do soccer `tsc-` totals
+EVER fill, at any horizon? Every fill on record is MLB or NFL. If soccer totals
+never fill, the fix is not timing at all -- it is not offering them.
+
 ## [polymarket-placement-hold] 2026-08-31 — LIVE, and it holds 13 of 17 positions
 
 **Deployed `f6f45321`, live 04:36Z. First tick:**
