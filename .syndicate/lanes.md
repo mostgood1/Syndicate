@@ -3177,6 +3177,17 @@ caaf-no-orders`). NOT
   `HOLD: 7 job(s) in flight` at 01:27:50Z naming `run_mlb_daily_sim_job.py` and
   the `ui-daily` `daily_update.py` tree; the manual deploy fired 01:29:34Z. The
   sim needs requeuing. Fact, not complaint.
+- **DEPLOYED AND MEASURED 2026-08-31 03:55Z (`0fc174c6`, all three services,
+  user-deployed).** soccer `339/15682 (2.2%) -> 2107/16940 (12.4%)`,
+  `mfair_priced 0 -> 3159`; nfl `674/2490 (27.0%) -> 988/2494 (39.6%)`; served
+  top-200 rows with a model edge **1 -> 130**; `rows_uninformative_ev`
+  **1269 -> 138**. Full record: `.syndicate/deploys.md`, 2026-08-31 03:55Z.
+- **STILL OWED: MLB, WNBA and NCAAF are UNREAD, not flat.** Both MLB and WNBA
+  were at ZERO pregame games at verification (`games={'final': 14}` /
+  `{'final': 4}`), and `mfair_priced: 0` there is the sweep declining settled
+  rows, not the sweep missing. WNBA's spread-frame fix (D2) has still never
+  fired in production. Read all of it off tomorrow's first build with
+  `py -3 scripts/measure_model_edge_coverage.py`; compare the PREGAME row.
 - Blocked by: none
 
 ### mlb-live-prop-prob-merge — OPEN — opened 2026-08-31 — session 1c88bcca-be25-4164-a288-3a27d7e9dd57
@@ -3261,6 +3272,17 @@ caaf-no-orders`). NOT
   `release --service <svc> --token <token>` — without the token it consults a
   value a re-acquire has invalidated and refuses, which reads as someone else
   holding it when the holder is you.
+- **DEPLOYED 2026-08-31 (`0fc174c6`, all three services) AND STILL UNVERIFIED.**
+  The MLB slate was over at every reading tonight (`games={'final': 14}`), so
+  `LIVE_PROB_CARRIED` is legitimately absent and its absence is evidence of
+  NOTHING. Loop health WAS confirmed on the new code: `TICK_COMPLETE
+  results={'mlb': True, ...}` and **0** real `LIVE_PROB_CARRY_IMPORT_FAILED`.
+- **THE VERIFICATION IS THE FIRST LIVE MLB GAME TOMORROW.**
+  `snapshot_live_prob_seen > 0` and `rows_live_edged > 0` from
+  `per_sport_ingest.mlb.enrichment.live_projections`, plus
+  `[live_lens] LIVE_PROB_CARRIED gamePk=... carried=N` on refresh-worker.
+  **Watch for `carried=0` with `mc_rows_with_prob>0`** — a key mismatch, which
+  reads as success rather than as a crash.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
