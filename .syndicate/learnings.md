@@ -7797,3 +7797,65 @@ RELATED: this is the same family as the session's other five wrong zeros -- wron
 service, wrong window, wrong log name, wrong population, wrong key. Every one
 read as "this does not exist".
 
+
+## 2026-08-31 — FORBIDDEN: concluding from ONE tick of a counter that increments before its own drop gate. Three wrong readings in one session, each confident and each plausible
+
+**What was overturned.** Three separate claims I stated as findings and had to
+retract, all from the same shape: a reading that was true of its sample and
+false of the system.
+
+1. **"The producer emits nothing."** From ONE line —
+   `LIVE_MC_PRICED rows=0 outcomes={'priced': 14}` — which reads as "priced and
+   never emitted" and points at a week of engine work. It is an end-of-game
+   artifact: `_live_mc_prob_over_for` increments `priced` BEFORE
+   `_live_prop_market_resolved` drops an already-decided prop. **The series over
+   the same game peaks at 27** and decays monotonically as props resolve. The
+   monotonic decay is the signature of correct behaviour, and one tick cannot
+   show it.
+2. **"NCAAF indexes 1 game of 39."** `games_indexed` is the ANCHOR DATE;
+   `scheduled_games` is the 7-DAY WINDOW. 2026-08-30 has exactly one scheduled
+   NCAAF game and it was projected — 100%, not 2.6%. Same family as
+   [[feedback-rate-not-count]]: a numerator and a denominator that describe
+   different populations.
+3. **A watcher reporting `LOOP_ALIVE` and `import_failures=1` on an EMPTY
+   result.** `scripts/render_logs.py` ECHOES THE SEARCH STRING IN ITS OWN HEADER
+   (`# refresh-worker text='TICK_COMPLETE'`), so a bare `grep <token>` matches
+   the header and reports a hit when nothing matched. I nearly reported it as a
+   post-deploy health check.
+
+**Why they are one rule.** Each instrument produced a CONFIDENT, WELL-FORMED,
+PLAUSIBLE answer. None looked broken. The tell in all three was the same
+question, and it is cheap: **what does this instrument print when the answer is
+NOTHING?** For the tick, a resolved prop. For the ratio, a one-game date. For
+the grep, its own header.
+
+**How to apply:**
+- On a counter, find out whether it increments before or after the gate that
+  drops the row. `priced: 14, rows: 0` is not a contradiction if `priced` counts
+  attempts.
+- Never conclude from one sample of a time series that has a shape. Pull the
+  series; a monotonic trend is itself evidence.
+- Before believing a log grep, run it against a window you KNOW is empty and
+  confirm it returns nothing. Filter tool output to timestamped lines (`^2026-`).
+- Before comparing two fields as a ratio, confirm they share a population.
+  Per-date vs per-week is the specific trap here.
+- See [[feedback-instrument-blindness]],
+  [[feedback-absence-in-a-window-is-not-absence]],
+  [[feedback-a-projection-is-not-a-model-edge]].
+
+## 2026-08-31 — `TaskStop` does not kill the shell child, and a poller that re-`acquire`s strands its own deploy claim
+
+A background watcher kept re-running `deploy_claim.py acquire` every 2 minutes
+"to keep the claim warm". `acquire` on a held claim issues a NEW token, so the
+token I held went stale and `release` REFUSED my own live claim — forcing a
+`--force`, which is the gesture reserved for a session that is gone.
+
+Worse: after `TaskStop`, `bash /c/tmp/wait_rw.sh` (pid 119148) was **still
+running 55 minutes later**, still re-acquiring, so the claim read as held by a
+lane I had closed out of. The harness task was gone; the process was not.
+
+**How to apply:** a poll loop reads `deploy_claim.py status` and NEVER
+`acquire`. Acquire once, keep the token, release with
+`release --service <svc> --token <t>`. After any `TaskStop` on a shell loop,
+confirm with `ps -ef | grep <script>` and `kill -9` the survivor. Prefer bounded
+loops (`for i in $(seq 1 N)`) so a stray child expires on its own.

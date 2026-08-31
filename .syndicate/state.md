@@ -2484,6 +2484,42 @@ what would make the shed unreachable rather than merely rare.
 
 **Owner: `recommendation-lane-correctness` (model-audit session).**
 
+- **NCAAF PROJECTION COVERAGE IS A BOUNDARY, NOT A GAP, AND THE RATIO IS 51/99.
+  `[verified 2026-08-31, lane ncaaf-cfbd-quota-latch]`** Week 1 2026: 99
+  scheduled games, 51 projected. **48 of 48 missing are `(fbs, fcs)`; 51 of 51
+  projected are `(fbs, fbs)`.** CFBD SP+ rates FBS only, so an FBS-vs-FCS
+  fixture has no rating for one side and can never be projected. Coverage of the
+  RATEABLE population is **100%**, and the team-pair join matched 50 of 51 CSV
+  rows. **`games_indexed` is the ANCHOR DATE and `scheduled_games` is the 7-DAY
+  WINDOW** — comparing them produced "1 game indexed of 39", which is a
+  denominator error and not a defect. Unprojectable fixtures now carry
+  `projection_absent_reason`; `rows_unmatched` means only "unmatched for a
+  reason we do not know".
+- **THE NCAAF SEASON-PROJECTION RELAUNCH IS SELF-AMPLIFYING WHEN IT FAILS.
+  `[verified 2026-08-31]`** `SEASON_PROJECTION_LAUNCHING reason=artifact_stale
+  age_seconds=366893 interval_seconds=86400` — **configured once per DAY, firing
+  ~24x that**, because a failing run never refreshes the artifact so every
+  worker tick re-triggers it. Ten snapshot builders share the CFBD key. It
+  hammers hardest exactly when the quota is scarcest. `cfbd_quota_latch.py`
+  (live on refresh-worker `bf0811bb`) makes every caller fail fast with NO
+  request once CFBD says the MONTHLY quota is gone, expiring at the month roll;
+  `/ppa/teams` is now cached with a stale fallback stamped into `rating_source`.
+  **Both are INERT until 2026-09-01** — the cache is empty and arming it needs
+  the call that is failing. **After the roll, `LATCHED_SKIP` still firing means
+  the latch did not expire and is CAUSING an outage**; override is
+  `clear_latch()`, file at
+  `<SYNDICATE_DATA_ROOT>/ncaaf_source/state/cfbd_quota_latch.json`.
+- **MLB LIVE PROP PROBABILITIES ARE PRODUCED AND WERE DISCARDED BY A MERGE.
+  `[verified 2026-08-31, lane mlb-live-prop-prob-merge]`** `LIVE_MC_PRICED`
+  series over one game: **27, 26, 18, 16, 14, 11, 10, 8, 5, 4, 2, 0** (decaying
+  as props RESOLVE), against a published snapshot of `live: {rows: 124,
+  with_live_projection: 115, with_live_prob: 0}` — produced 27, published 0.
+  `_merge_cards_context_into_live_row` replaced the MC row set wholesale with
+  the cards set. FIXED in `5bab0685` by carrying the probability ONTO the card
+  rows; **DEPLOYED AND UNVERIFIED** — no live MLB game since. **A SINGLE
+  `LIVE_MC_PRICED rows=0 outcomes={'priced': 14}` TICK SAYS THE OPPOSITE and is
+  an end-of-game artifact** (`priced` increments before the already-decided gate
+  drops the row). Read the SERIES.
 - **MODEL-EDGE COVERAGE IS THE NUMBER THAT DECIDES WHETHER THIS BOARD IS WORTH
   READING, AND IT WAS 5.2%. `[verified 2026-08-31 01:43Z, lane
   layer1-model-edge-join]`** `rows_with_model_edge / sides_priced` from

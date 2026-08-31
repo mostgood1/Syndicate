@@ -3331,6 +3331,13 @@ caaf-no-orders`). NOT
 - A STALE PPA IS USED ONLY WHEN THE ALTERNATIVE IS NOTHING, and it must SAY SO:
   the age is logged and stamped into the output CSV's `rating_source`, so a
   downstream reader cannot mistake a cached rating for a fresh one.
+- **STATUS 2026-08-31 04:33Z: DEPLOYED (`bf0811bb`, refresh-worker, preflight
+  CLEAR first try), LOOP HEALTHY, LATCH NOT YET EXERCISED.** The generator had
+  not relaunched since the 04:23Z restart, so `LATCH_SET`/`LATCHED_SKIP` had not
+  appeared — an unfired trigger, not a failure. The PPA stale fallback is INERT
+  until 2026-09-01 by construction: the cache is empty and arming it needs the
+  call that is 429ing. Narrative in `.syndicate/log/2026-08-30.md`; deploy
+  measurement in `.syndicate/deploys.md`.
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
