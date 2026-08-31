@@ -1180,12 +1180,12 @@ released: - **`syndicate/blueprints/home.py` IS NOT LISTED ABOVE ON PURPOSE `[20
 - Narrative: `.syndicate/log/2026-08-31.md`, `.syndicate/lanes_history.md`.
 - Blocked by: none
 
-### layer2-cap-raise — OPEN — opened 2026-08-31 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3 — **SHARDING LIVE, CAPS AT 1000 (VERIFIED). 3000 CORRUPTED THE BOARD ~29 MIN AND WAS REVERTED. ROLLBACK FIX LIVE. THE CARDS FLIP IS LIVE 22:30:57Z AND UNVERIFIED — first exercise still pending.**
+### layer2-cap-raise — OPEN — opened 2026-08-31 — session 5611932c-e849-4388-8da7-2c6b00c1c8a3 — **GOAL MET. Sharding live, caps at 1000, rollback fix live, and THE CARDS FLIP IS VERIFIED IN PRODUCTION 22:50:26Z — the ~3,600-row ceiling is gone. 3000/sport corrupted the board ~29 min earlier and was reverted; that cause is now FIXED, not merely avoided.**
 - Goal: board carries >400 rows for a sport. **MET** at 1000 (932 → 1634 rows, no sport lost).
 - Files: `pipeline/intelligence_state.py` **[claim REASSIGNED from `polymarket-yes-leg-binding`, same session]**; Render ENV on refresh-worker via the single-key API — never `render.yaml`.
 - Env live: `ROWS_PER_SPORT=1000`, `ROWS_TOTAL=3000`, `COMBINED_ROWS=0` (refresh-worker only; other two services clean).
 - **DO NOT RAISE THE CAP AGAIN AS A CONFIG CHANGE.** The ceiling is the COMBINED key (~2,200 B/row even with `rows: []`) ⇒ ~3,600 TOTAL rows. Shard headroom is not evidence about it.
-- **NEXT ACTION: the flip is LIVE and UNVERIFIED. Watch the FIRST rebuild after 2026-08-31T22:30:57Z. PASS needs BOTH `combined_keeps_cards=False` AND `cards_present` non-zero == rows — the first alone is the silent zero. REVERT if cards are lost: set `SYNDICATE_LAYER2_CARDS_INLINE=1` on `srv-d91dpertqb8s73co8ls0` and redeploy.** Watcher `verify_flip.py` re-armed after the previous one was stopped mid-verification.
+- **NEXT ACTION: nothing is owed on this lane. A cap raise above 1000 is now DEFENSIBLE but UNATTEMPTED — and must be measured against the COMBINED key, not the shards, which is the exact mistake that corrupted the board at 18:25Z. One defect remains unfixed and will mislead: `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key and its advice to lower `ROWS_PER_SPORT` is backwards.** REVERT of the flip is one step: `SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy.
 - Verification: DONE for the cap raise and the rollback fix. **UNEXERCISED, BOTH:** `ROWS_TOTAL=3000` (board ~1,600 rows, never bound) and the cards split (deployed, but no rebuild has run under it — `LAYER2_CARD_SHARDS_WRITTEN` never once observed).
 - OWED, code not config: `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key (`pct=93.3` on a healthy board, advice backwards). The skipped-shed item is CLOSED by the cards split — the shed could never have helped (`SHORTLIST_SHED_IMPOSSIBLE`).
 - Narrative: `log/2026-08-31.md` (session 5611932c). Blocked by: none.
