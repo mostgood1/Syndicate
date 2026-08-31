@@ -15797,3 +15797,179 @@ before pushing — one hit, `tests/test_check_lane_invariants.py`, an upstream
 Config unchanged and still the guardrail: `PER_SPORT=1000`, `ROWS_TOTAL=3000`,
 `COMBINED_ROWS=0`. **`ROWS_TOTAL=3000` remains UNEXERCISED** — today's board is
 ~1,600 rows, so it has never bound.
+
+
+## 2026-08-31T20:26:34Z — refresh-worker `a35591dc` -> `132559e1` — lane `layer2-accuracy-audit`
+
+**what:** self-heal for the MLB betting-day backfill — a date that BUILT but was never
+PUBLISHED is not complete, so the 08-24..08-30 window rebuilt at 19:03-19:08Z (before the
+publish call existed) re-runs once each and publishes. Rides with `a35591dc` (publish call)
+and `49c43aeb` (`_odds_paths` best-found + `daily/snapshots/` search).
+
+**locks:** claim ACQUIRED by `layer2-accuracy-audit` 20:26:13Z; preflight **CLEAR** for
+`132559e1` on `origin/main`, 35 min past the 25-min spacing, only infra processes (no sim
+killed). Deploy `dep-daau6ujtqb8s73b7ga8g`, trigger=api. Live **20:33:17Z**.
+
+**verify:** `/mlb/api/market-accuracy?date=2026-08-30` warnings now carry
+**`Game lines read: .../daily/snapshots/2026-08-30/oddsapi_game_lines_2026_08_30_pregame.json
+(pregame-freeze, 14 games)`** and **`Missing game-line match` count 13 -> 0**.
+
+**THE RESOLVER FIX WORKS IN PRODUCTION. THE HYPOTHESIS IT WAS MEANT TO TEST IS REFUTED, AND
+SO IS MY ORIGINAL CAUSAL CLAIM.**
+- The freeze IS reachable on refresh-worker's disk, at `daily/snapshots/<date>/` — the
+  directory `_odds_paths` never searched before `49c43aeb`. My "leading hypothesis" that the
+  freeze was absent worker-side is **WRONG**.
+- The join is genuinely repaired: **13 lost game-line matches -> 0**, reading a 14-game
+  pregame freeze instead of a 1-game live doc.
+- **AND THE GRADED ROW COUNT DID NOT MOVE.** 2026-08-30 was `all=7 official=2 playable=5`
+  before the fix and is `all=7 official=2 playable=5` after. **Fixing 13 missing joins
+  produced exactly ZERO additional graded rows.**
+
+**WHAT THAT MEANS, and it reframes this whole lane.** I claimed the ~7% join rate was what
+starved settlement (19,692 settleable, 35 settled, ~14 graded rows/week). **That claim is now
+falsified.** Graded rows come from the day's LOCKED CARD — the policy's own picks — and
+joining more games adds market context, not picks. The binding constraint on graded-row
+supply is that the policy selects ~1-2 bets per slate, not that the join was dropping games.
+The join failure was REAL, is now FIXED, and was not the cause of the starvation.
+
+**CAVEAT ON THE OTHER DATES:** 08-25/28/29 flap between the new payload (marker, misses=0)
+and the old one (no marker, misses=14/12/12) across successive requests — consistent with a
+per-gunicorn-worker in-process cache on web (two workers observed in preflight), not with a
+data problem. 08-30 reads new consistently. Do not read a "no marker" response as the
+regrade having failed without sampling repeatedly.
+
+**next:** the graded-supply question is NOT this fix's — it belongs to whoever owns MLB card
+generation. `todo.md` should carry it as its own item.
+
+## 2026-08-31 21:20Z — `8876b823` — refresh-worker — the CARDS SPLIT is live and EXERCISED — lane `layer2-cap-raise`
+
+**User decision, 2026-08-31: _"fix the cards/openings key split"_ then _"deploy it."_**
+Closes defect (2) of the three from the 18:25Z incident entry.
+
+Claim was held by `layer2-accuracy-audit`; **waited out its full 45-min TTL rather
+than `--force`** (43.2 min observed, freed 21:10:17Z), then held again through
+`7 → 10 → 8 → 5 → 3 → 0` in-flight jobs. Live 21:20:36Z. **Ride-along carried
+deliberately:** another session's `polymarket_board_join.py` fix — *soccer h2h
+bought the OPPOSITE team; the leg is decided by team names now*.
+
+### verify: the shards land, and no cards are lost
+
+```
+21:35:37Z  board rebuilt   written_at 20:52:51Z -> 21:35:37Z
+           cards_present   1562 -> 1477   NON-ZERO, and == rows
+21:35:38Z  LAYER2_SHARDS_WRITTEN      sports=['mlb','ncaaf','soccer'] rows=1477  combined_keeps_rows=False
+21:35:38Z  LAYER2_CARD_SHARDS_WRITTEN sports=['mlb','ncaaf','soccer'] cards=1477 combined_keeps_cards=True
+```
+
+`cards_present` was the load-bearing check — it is what would catch the reader
+silently losing cards, and it held. `combined_keeps_cards=True` confirms the
+change is running **INERT** exactly as designed: cards are still inline, the card
+shards are dead weight being proven, and **no headroom is unlocked by this deploy.**
+
+**The `1562 → 1477` drop is SLATE DRIFT, not the change.** `cards_present == rows`
+in both readings, before and after. Do not read it as loss.
+
+### what is NOT yet true
+
+**ONE cycle observed.** The bar before flipping is ~3 clean rebuilds. Until
+`SYNDICATE_LAYER2_CARDS_INLINE=0`, the combined key still carries the cards and
+still scales at ~2,200 B/row, so the **~3,600-row ceiling is unchanged and
+`ROWS_PER_SPORT` must not be raised.**
+
+The measured unlock (combined key 451 → **0 B/row**, flat in row count) is a
+WRITER-side measurement from the real code path, not yet a production reading.
+
+### remaining defect from the incident — one, not two
+
+3. `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key
+   (`pct=93.3` on a healthy board; its advice to lower `ROWS_PER_SPORT` is
+   backwards). Defect (2), the skipped shed, is CLOSED by this split — the shed
+   could never have helped, and said so itself as `SHORTLIST_SHED_IMPOSSIBLE`.
+
+## 2026-08-31 22:30Z — `7e678674` — THE CARDS FLIP IS VERIFIED IN PRODUCTION — lane `layer2-cap-raise`
+
+**User decision, 2026-08-31: _"deploy web then flip."_** Closes the last step of the
+cards split. `SYNDICATE_LAYER2_CARDS_INLINE=0` live on refresh-worker `7e678674`
+(22:30:57Z); web `7e678674` deployed FIRST (22:05:33Z).
+
+### verify: BOTH halves, on the first rebuild under the flip
+
+```
+22:50:26Z  board written_at 22:18:57Z -> 22:50:26Z
+  LAYER2_CARD_SHARDS_WRITTEN sports=['mlb','ncaaf','soccer'] cards=2216 combined_keeps_cards=False
+  LAYER2_SHARDS_WRITTEN      sports=['mlb','ncaaf','soccer'] rows=2216  combined_keeps_rows=False
+  cards_present = 2216,  == rows
+```
+
+**Both halves were required and both hold.** The writer stopped filling the
+combined key AND web served all 2,216 cards back out of the shards.
+`combined_keeps_cards=False` alone would have been the silent zero this whole
+sequence existed to avoid. **The hydration path is now proven in production**, which
+the unit tests could not do — they mock the store.
+
+### the gate that did the real work
+
+Web was on `132559e1` with **ZERO** occurrences of `_hydrate_layer2_cards` an hour
+before the flip. Flipping first would have served `cards_present=0` with nothing
+raised. The sequence deployed web, then **grepped the DEPLOYED SHA** for the
+function rather than trusting a green deploy, then confirmed the board still served
+BEFORE any flag change so a web fault could not be blamed on the flip.
+
+### what the numbers do NOT say
+
+The board went 1534 → 2216 rows across the flip. **That is SLATE, not headroom** —
+soccer went 187 → 834 on the evening fixtures, and **no sport is at the 1000 cap**
+(mlb 970, soccer 834, ncaaf 196 within the returned slice). The flip removes a BYTE
+ceiling; it does not raise a row cap. Do not cite it as a capacity gain.
+
+Also: `/api/board/layer2-shortlist` caps returned `rows` at **2000** regardless of
+`limit`, while `cards_present` reports the true 2216. The two disagreeing is that
+slice cap, NOT lost cards.
+
+### state now
+
+```
+web / refresh-worker  7e678674     live-odds-worker d04d9f49
+CARDS_INLINE=0  COMBINED_ROWS=0  ROWS_PER_SPORT=1000  ROWS_TOTAL=3000
+```
+The combined key is now FLAT in row count (451 → 0 B/row on the real writer), so
+the ~3,600-row ceiling that made `per_sport=3000` corrupt the board is GONE. **A cap
+raise is now defensible — but it has not been attempted and must still be measured
+against the COMBINED key, not the shards.** That is the exact mistake that caused
+the 18:25Z incident.
+
+**REVERT, still one step:** `SYNDICATE_LAYER2_CARDS_INLINE=1` and redeploy.
+
+### remaining from the incident: ONE defect
+
+3. `SHORTLIST_PERSIST_LARGE` measures a payload no longer written as one key and
+   its advice to lower `ROWS_PER_SPORT` is backwards. Unfixed.
+
+
+## 2026-08-31T23:01:29Z — live-odds-worker `d04d9f49` -> `8743ee1d` — lane `layer2-accuracy-audit`
+
+**what:** the `PREGAME_FREEZE date=... by_family={...}` log line (`5be4381d`) plus the
+cron_meta allowlist/publish, carried on the current `origin/main` tip. **This service is
+where MLB odds refresh actually runs** — measured, `run_stamp 20260831_221230
+sports=mlb,soccer lane=live-odds-worker`. refresh-worker's odds lane was soccer-only tonight.
+
+**locks:** claim ACQUIRED 22:58:10Z. Preflight refused **HOLD: 1 job(s) in flight**
+(`fetch_espn_live_status`), then 3, then 1 — **not overridden**. Went CLEAR 23:01:07Z with
+only a defunct child awaiting reap (already dead; a deploy cannot kill it). Preflight
+**re-run immediately before the POST** rather than trusting the 4-second-old watcher reading.
+Deploy `dep-dab0fif10e5c739g6qeg`, trigger=api.
+
+**verify:** live-odds-worker reached **`8743ee1d` at 23:04:55Z**, confirmed by SHA. **THE
+INSTRUMENT IS DEPLOYED; ITS READING IS NOT YET TAKEN.** Zero `PREGAME_FREEZE` lines in the
+first ~18 minutes — the logs API was responding (the watcher's own empty-API branch never
+fired), so this is a genuine absence: **no MLB refresh pass has run since the deploy.** Do
+NOT read that as the freeze failing.
+
+**WHAT THE LINE DECIDES (`todo #611`), and the discriminating detail is NOT its presence:**
+`by_family={'game_lines': N, 'hitter_props': 0, 'pitcher_props': 0}` on a pass that ran
+**AFTER** first pitch is CADENCE working as designed (the `slate_started` guard) — fix is
+scheduling. The same zeros on a pass that ran **BEFORE** first pitch means the seal is
+genuinely broken and cadence is exonerated. **Tonight's slate is already under way
+(first pitch 22:05:00Z), so the first useful PRE-slate reading is tomorrow's pregame window.**
+
+**claim RELEASED** on confirmation of the SHA; all four services free.

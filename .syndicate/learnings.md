@@ -5634,6 +5634,37 @@ you expect to see. If you must match text, enumerate every terminal AND permissi
 spelling, and assume the one you did not think of is the one that will appear. A
 watcher that stalls is the benign outcome; the other one deployed into a race.
 
+
+## 2026-08-31 — FORBIDDEN: shipping a diagnostic without first proving its OUTPUT is readable
+
+I diagnosed `#611` down to one missing observation, wrote an unconditional
+`print(... PREGAME_FREEZE ... by_family={...})` into `refresh_mlb_oddsapi.py`, took both
+deploy locks, waited out three preflight HOLDs, and shipped it to live-odds-worker
+(`8743ee1d`, live 23:04:55Z). **The line cannot be read.** That script runs as a CHILD of
+`refresh_odds_sources.py` and its stdout is discarded — absent from Render's container logs
+AND from `odds_refresh.json` for the very run that emitted it (verified: the script ran
+23:43:39->23:43:51Z, `return_code: 0`, on the new code).
+
+**The check that would have caught it costs one query and I did not run it:** before adding a
+log line, confirm that SOME EXISTING line from the same process reaches the reader you intend
+to use. I had the evidence to do this — I had already been told the odds-refresh subprocess's
+stdout is captured to a file, and I had already watched Render's logs API return MLB refresh
+activity only as `ALL_PROCESS_MEMORY` process-list entries, never as script output.
+
+**A near-miss in the same hour:** `text=refresh_mlb_oddsapi` returns 10 log lines. All ten are
+`ALL_PROCESS_MEMORY` entries that merely NAME the script in a process list. Read as "the
+script is logging", that is a false positive that would have hidden the defect indefinitely.
+
+**How to apply.** A new instrument is not done when it is deployed; it is done when you have
+READ ITS OUTPUT once. Until then treat it as unverified, and never let a downstream plan
+(a scheduled check, a handoff) depend on it. If the reader cannot be demonstrated, prefer an
+instrument that writes to a surface already known to be readable — here, the ARTIFACT
+(`daily/snapshots/`, allowlisted) and the run HISTORY
+(`refresh_status_by_lane[*].history`), both of which had already been read successfully.
+
+**Companion rule, same night:** `market/oddsapi/**` and `live_lens/cron_meta/**` are not in
+`HOT_ARTIFACT_PATTERNS`, so `/api/ops/artifacts/export` returns empty for them exactly as it
+would for a deleted file. Three wrong hypotheses came from reading that null as an absence.
 ## 2026-08-31 — FORBIDDEN: shipping a model INPUT artifact without tracing its delivery topology first. "Publish" does not mean "the engine can read it"
 
 **Three separate mechanisms had to be checked before a 867-byte calibration file

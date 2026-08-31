@@ -184,6 +184,70 @@ is scheduling (`odds-cadence-off-the-mlb-peak`), not the freeze. `5be4381d`'s
 `PREGAME_FREEZE date=... by_family={...}` log line answers this in one grep once deployed —
 it fires per pass and names which families sealed.
 
+**2026-08-31 ~23:4xZ — THE LOG LINE I DEPLOYED FOR THIS IS UNREACHABLE, AND A BIGGER LEAD APPEARED.**
+
+`refresh_mlb_oddsapi.py` **DID run after the deploy** — from
+`/api/ops/odds-refresh/logs?stream=stdout&lane=live-odds-worker`, run_stamp
+`20260831_234338`, step `mlb_oddsapi_refresh`, `return_code: 0`,
+23:43:39 -> 23:43:51Z, `phase=live`, `sports=['mlb']`, on `8743ee1d`. So the new code
+executed and the UNCONDITIONAL `print(... PREGAME_FREEZE ...)` fired.
+
+**The line appears NOWHERE.** Render container logs: 0 hits (API responding — a
+`text=refresh_mlb_oddsapi` query returns 10 lines, but they are `ALL_PROCESS_MEMORY`
+entries that merely NAME the script in a process list, not its output). `odds_refresh.json`
+for that very run: 0 hits, and it carries no `stdout` capture at all. **The child's stdout is
+discarded, so this instrument cannot be read.** Fourth instance tonight of instrument
+blindness — this time in an instrument built specifically to avoid it.
+
+**CORRECTED ~23:5xZ, BEFORE ANYONE ACTED ON IT — the `/src` lead below is WEAKER than I
+first wrote, and the write side is fine.** Full captured command:
+
+    --source-root    /opt/render/project/src/data/mlb_source    <- ephemeral checkout
+    --artifact-root  /opt/render/project/data/mlb_source        <- mounted disk
+
+and **`MLB_BETTING_DATA_ROOT = /opt/render/project/data/mlb_source/source_artifacts/data`
+IS SET on live-odds-worker** (and web; absent on refresh-worker). So
+`_freeze_market_dirs(source_root)` yields THREE destinations — `/src/.../market/oddsapi`,
+the **mounted disk** via that env var, and `/src/source_artifacts/.../market/oddsapi`. The
+freeze therefore DOES write to the disk, which is why game-line seals survive. "Prop seals
+land in /src and vanish on deploy" is **not correct as stated**.
+
+**WHAT SURVIVES OF IT, and it is narrower:** the props' READ side is ephemeral-only —
+`source_path = market_dirs[0] / f"{prefix}_{slug}.json"`, i.e. `/src/data/mlb_source/data/
+market/oddsapi/`, and the fetch writes there too (`out_dir=source_root/data/market/oddsapi`).
+The freeze runs BEFORE the fetch in each pass, so the FIRST pass after any deploy finds no
+prop source and skips — but later passes should find it. That cannot explain a 15-day
+outage on its own.
+
+**ALSO WORTH KNOWING FOR ANY VERIFICATION:** a sealed prop file landing on the disk goes to
+`.../source_artifacts/data/market/oddsapi/`, and **`market/oddsapi/**` is NOT in
+`HOT_ARTIFACT_PATTERNS`** — so `/api/ops/artifacts/export` CANNOT see it. Checking for a
+prop seal via the export tests only the `daily/snapshots/` copy. Do not read an empty export
+result as "the seal did not fire".
+
+**`slate_started` (cadence) therefore remains the leading explanation.**
+
+**THE ORIGINAL LEAD AS FIRST WRITTEN (superseded by the correction above):**
+
+    "scripts/refresh_mlb_oddsapi.py", "--date", "2026-08-31",
+    "--source-root", "/opt/render/project/src/data/mlb_source"
+
+**`/src/` is the EPHEMERAL CHECKOUT, not the mounted disk** (`/opt/render/project/data/`).
+The freeze writes its snapshot copy to `source_root/data/daily/snapshots/...`, i.e. into the
+checkout — which every deploy recreates empty — while the grading builder reads the DISK
+(the 08-30 card's `inputs.game_lines` names
+`/opt/render/project/data/mlb_source/source_artifacts/data/daily/snapshots/...`). Game-line
+freezes still reach the disk because `_freeze_market_dirs` ALSO derives a destination from
+`MLB_BETTING_DATA_ROOT`; the props' snapshot-only copy has no such second home. **This is a
+candidate root cause and is NOT yet proven** — it predicts prop seals landing in `/src/` and
+vanishing on deploy, which would look exactly like "the seal never fires".
+
+**NEXT STEP CHANGED.** Do not chase the log line; it cannot be read. Read the OUTCOME
+instead: whether `oddsapi_*_props_<date>_pregame.json` appears under the allowlisted
+`daily/snapshots/` path, plus whether the MLB pass ran pre- or post-slate (from
+`refresh_status_by_lane[*].history`, which IS reachable). To make the log line usable at all,
+`refresh_odds_sources.py` would have to capture and surface child stdout.
+
 **DO NOT "FIX" THE SOURCE-PATH SEARCH ON THE STRENGTH OF THIS ITEM.** The multi-directory
 search would be harmless, but the retraction above means it is not established that
 `source_path` is the problem, and shipping it would look like a fix while changing nothing.
