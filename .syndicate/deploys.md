@@ -39604,3 +39604,69 @@ and reports a hit on an EMPTY result — it produced a false `LOOP_ALIVE` and a
 false `import_failures=1`. Filter to `^2026-` timestamped lines. Separately, a
 single `LIVE_MC_PRICED rows=0 outcomes={'priced': 14}` tick reads as an engine
 failure and is an end-of-game artifact; read the SERIES, which peaks at 27.
+
+## 2026-08-31 04:20Z — CFBD monthly-quota latch + PPA cache — lane `ncaaf-cfbd-quota-latch`
+
+**Deployed.** refresh-worker `bf0811bb`, `dep-daag1stg1s2s73d2svog`, trigger=api,
+triggered 04:20:03Z, LIVE 04:23:24Z. web and live-odds-worker remain `0fc174c6`
+— the generator and the shared `CfbdClient` both run on refresh-worker, so this
+is the service that matters. Target verified BY CONTENT before triggering
+(`raise_if_latched` present in all three files) and the live SHA `0fc174c6` is
+an ancestor, so not a rollback.
+
+**Cleanest deploy of the night: preflight returned CLEAR on the FIRST try** —
+`only infrastructure processes running` — so no wait, no override, no job
+killed.
+
+**verify (what is measured, and it is NOT the fix):** the lens loop ticks on the
+new code — `[live_lens_loop] TICK_COMPLETE results={'mlb': True, 'wnba': True,
+'soccer': True, 'nfl': True}` at 04:28:56Z — and no import failure. That is all
+that is provable at the time of writing.
+
+**THE LATCH IS NOT YET EXERCISED, and the reason is timing, not doubt.** The
+generator fires roughly hourly (last pre-deploy attempt 03:16:20Z) and had not
+fired again since the 04:23Z restart. The two lines that will prove it, in
+order, both on refresh-worker:
+
+    [cfbd_quota] LATCH_SET until=2026-09-01T00:00:00+00:00     <- first 429 after deploy
+    [cfbd_quota] LATCHED_SKIP GET /ppa/teams clears_in_hours=N <- every attempt after, NO request
+
+The second line IS the fix. Its absence right now is an unfired trigger, not a
+failure, and must not be read as one.
+
+**`[ppa] source=cache_stale` CANNOT appear before 2026-09-01.** The cache is
+empty and arming it needs the very call that is 429ing. The stale-fallback half
+of this change is therefore INERT until the month rolls, by construction. Do not
+read its silence as a defect either.
+
+**WHAT THIS FIXES, measured 2026-08-31 before the deploy:**
+
+    SEASON_PROJECTION_LAUNCHING sport=ncaaf reason=artifact_stale
+      age_seconds=366893  interval_seconds=86400
+
+The configured interval is once per DAY and it was firing ~24x that — a failing
+run never refreshes the artifact, so every worker tick re-triggered it. 14
+generator attempts that day, hourly, each dying in `load_ppa_ratings_asof` ->
+`_cfbd_get`, artifact 4.25 days stale, ten snapshot builders sharing the key. A
+feedback loop that hammers hardest exactly when the quota is scarcest.
+
+**WEEK 2 WAS NEVER AT RISK and this deploy is not what saves it.** Quota rolls
+2026-09-01; week 2 is 09-11..09-13; the generator retries hourly on its own. ~9
+days of margin, self-healing. The risk was the BURN RATE, not the deadline —
+recorded because "check the week-2 quota risk" invited the opposite conclusion
+and I nearly reported it.
+
+**Verified end to end BEFORE deploy, against the real module rather than
+fixtures:** quota gone + cache warm -> **0 HTTP requests**, stale PPA served,
+`age_hours=120.0` stamped into `rating_source`; quota gone + cache empty -> 0
+requests, raises `QuotaExhausted` loudly, no silent zero; not latched -> the
+transport IS reached. The latch computed `clears_in_hours=19.8` unaided, which
+independently confirms the 09-01 roll.
+
+**THE FAILURE MODE TO WATCH AFTER THE ROLL:** `LATCHED_SKIP` still firing on or
+after 2026-09-01 means the latch did not expire and is now CAUSING an outage
+rather than preventing one. Manual override is `clear_latch()`; the file is
+`<SYNDICATE_DATA_ROOT>/ncaaf_source/state/cfbd_quota_latch.json`.
+
+**Claim:** acquired 04:1xZ under this lane, released cleanly with its token
+(`release --service refresh-worker --token <t>`) — no `--force`.
