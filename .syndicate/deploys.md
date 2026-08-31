@@ -39475,3 +39475,69 @@ several minutes and said so out loud.
 because `render_logs` echoes the search string in its own header and a bare
 grep matched that header. Fixed by filtering to `^2026-` timestamped lines. The
 readings above are from the corrected version.
+
+## 2026-08-31 03:55Z — ALL FOUR of the night's fixes live on ALL THREE services — lanes `layer1-model-edge-join` + `mlb-live-prop-prob-merge`
+
+**Deployed by the USER**, manual, started 03:45:53Z; web / refresh-worker /
+live-odds-worker all on `0fc174c6` at 03:50:09Z. The SHA is NOT any of mine —
+they deployed a newer tip — so it was checked BY CONTENT, which is the only test
+that means anything here:
+
+    _unratable_reason           ncaaf/game_projections.py        present
+    _carry_live_probability     mlb/live_lens.py                 present
+    attach_modelled_fair_edges  shared/board_enrichment.py       present
+    _model_value_ev             shared/layer2_board.py           present
+
+**verify — first post-deploy build, `written_at 2026-08-31T03:54:59Z`.**
+`rows_with_model_edge / sides_priced`, against tonight's pre-fix baseline:
+
+    soccer   339/15682 ( 2.2%)  ->  2107/16940  (12.4%)   mfair_priced 0 -> 3159
+    nfl      674/2490  (27.0%)  ->   988/2494   (39.6%)
+    ncaaf      0/939   ( 0.0%)  ->     0/953    ( 0.0%)   policy, unchanged
+    mlb      318/5316  ( 6.0%)  ->     0/5195   ( 0.0%)   UNREAD, see below
+    wnba      75/2404  ( 3.1%)  ->     0/2213   ( 0.0%)   UNREAD, see below
+
+Served shortlist top-200 rows carrying `model_edge_pct`: **1 -> 130**.
+`rows_uninformative_ev` **1269 -> 138**. `rows_below_value_floor` 801 -> 622.
+
+**MLB 6.0% -> 0.0% AND WNBA 3.1% -> 0.0% ARE NOT REGRESSIONS, AND THE STATE MIX
+IS THE PROOF.** `mlb games={'final': 14}`, `wnba games={'final': 4}` — **zero
+pregame games in either**. These fixes touch pregame rows only; `mfair_priced: 0`
+on both is the sweep RUNNING and correctly declining settled rows, not the sweep
+missing. MLB's projection rate is still 77.1%. Both sports are UNREAD tonight.
+Anyone quoting the 0.0% without the state mix beside it is quoting a slate that
+finished, not a fix that failed.
+
+**NCAAF attribution is LIVE AND FIRING** (`4a541ee5`, carried in `0fc174c6`):
+`games_unratable_opponent: 4`, `rows_unratable_opponent: 25`. Those rows were
+previously inside `rows_unmatched`, which now means ONLY "unmatched for a reason
+we do not know" (465).
+
+**THE NCAAF FIELDS ARE PER-DATE AND THE SCHEDULE IS PER-WEEK, which is the trap
+that produced the whole investigation.** `games_indexed: 1` /
+`games_unratable_opponent: 4` are anchor-date values and 2026-08-30 has ONE
+scheduled game. The week-1 truth, measured directly: **99 scheduled, 51
+projected, 48 missing — and the split is total, 48 of 48 (fbs, fcs) against 51
+of 51 (fbs, fbs)**. CFBD SP+ is FBS-only, so coverage of the RATEABLE population
+is 51/51 = 100%. "1 game indexed of 39" was my own misreading of an anchor-date
+numerator against a window-wide denominator. Nothing was ever broken.
+
+**NCAAF still contributes ZERO edges and this does not change that** —
+`pick_gate` suppresses every market on a measured out-of-sample loss. The
+attribution changed WHY the board is silent, not WHETHER it is.
+
+**STILL UNVERIFIED: the MLB live-prop carry (`5bab0685`).** `games={'final': 14}`
+— no live game, so `LIVE_PROB_CARRIED` is legitimately absent and its absence is
+evidence of NOTHING. Owed on tomorrow's first live MLB game:
+`snapshot_live_prob_seen > 0` and `rows_live_edged > 0` from
+`per_sport_ingest.mlb.enrichment.live_projections`, plus
+`[live_lens] LIVE_PROB_CARRIED gamePk=... carried=N` on refresh-worker.
+**The failure mode to watch is `carried=0` with `mc_rows_with_prob>0`** — a key
+mismatch, which reads as success rather than as a crash.
+
+**Instrument note, because it cost me twice tonight.** `render_logs` echoes the
+search string in its own header, so a bare `grep <token>` matches that header
+and reports a hit on an EMPTY result — it produced a false `LOOP_ALIVE` and a
+false `import_failures=1`. Filter to `^2026-` timestamped lines. Separately, a
+single `LIVE_MC_PRICED rows=0 outcomes={'priced': 14}` tick reads as an engine
+failure and is an end-of-game artifact; read the SERIES, which peaks at 27.
