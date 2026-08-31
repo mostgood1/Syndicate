@@ -5617,3 +5617,50 @@ always-True matcher guarantees the choice is made somewhere else, and the test
 then pins that somewhere-else forever. Stub discriminatingly, mirroring what the
 real dependency answers, and pin the permissive case as its own explicit test
 with the opposite expectation: a resolver that matches everything must REFUSE.
+
+## 2026-08-31 FORBIDDEN: two guards that read the SAME input are ONE guard
+
+`_subject_is_side` had a positional check and a "definitive NO" check, and its
+own comment presented the second as protection against the first:
+
+    if subject == parsed[wanted]:  return True
+    # THE OPPOSITE LEG IS A DEFINITIVE NO ... settles it from data already in hand
+    if subject == parsed[other]:   return False
+
+Both read `parse_slug`. `parse_slug` had soccer's team order INVERTED. So the
+"definitive NO" could only ever agree with the branch it was meant to catch — it
+CONFIRMED the wrong leg instead of contradicting it. Two named checks, one shared
+broken input, zero independence. Cost: two live orders on the opposite team, one
+settled at **-$5.96**, one still open.
+
+The correct check was ALREADY IN THE FUNCTION, third in line: an alias match of
+the slug's subject against the BOARD's own `home_team`/`away_team`. It answers all
+four legs of both fixtures correctly. It never ran, because a confident wrong
+answer returned first.
+
+**HOW TO APPLY.** When a comment claims one check guards another, ask what each
+READS. Independence is about INPUTS, not about being separate code. Two checks
+over one derived value are one check with extra words — and the redundancy makes
+it look safer than a single check would. Prefer the check that reads a DIFFERENT
+SOURCE (here: the board's own team names, not the slug's positions), and put it
+FIRST when it is the authoritative one. Related: [[feedback_gate_on_the_output_not_the_input]].
+
+## 2026-08-31 FORBIDDEN: fixing a decision's INPUT without checking every CALLER supplies it
+
+The fix above made `_subject_is_side` decide from `board_row["home_team"]`. One
+caller — `execute_portfolio`'s soccer branch — passes the SLATE row, and
+`_SLATE_STORAGE_FIELDS` is `slug, sportsMarketTypeV2, outcomes, outcomePrices,
+line, gameStartTime, orderPriceMinTickSize, minimumTradeQty, orderable`. No team
+names. So the repaired check could confirm NOTHING there and every soccer
+moneyline would have refused: **fail-safe, and an entire market silently dark.**
+
+229 tests passed on the half-fix. The tests exercised the FUNCTION, not the call
+site, and "refuses" is what the wrong-side tests assert — so a function that
+refuses EVERYTHING satisfies them.
+
+**HOW TO APPLY.** Changing which field a decision reads is a change to every
+caller, whether or not their code changes. Enumerate the call sites and check
+each supplies the new field — the schema is the evidence
+(`_SLATE_STORAGE_FIELDS`), not the passing suite. And when the new failure mode
+is "refuses", a green suite is especially weak evidence: most safety tests assert
+exactly that.
