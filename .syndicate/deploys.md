@@ -15268,3 +15268,70 @@ three services carry the merge and three clean shadow cycles are recorded
 exactly each time). Until that flag flips, the 8MB keyvalue ceiling still binds
 the combined key and **`SYNDICATE_LAYER2_ROWS_PER_SPORT` cannot go above 400** —
 which was the original request and is still not done.
+
+## 2026-08-31 — the unit mismatch is REAL, and fixing it is a REVERT — measured
+
+Extends `ea1aef3c` (peer session `Layer 1 board model edge pct audit`, now
+ended — this could not be sent to them, so it goes here). Same board both
+sessions read: `written_at 17:00:33Z`, mine at `limit=2000&show=all`, n=929.
+
+### their reading holds; one of mine did not
+
+`ev_basis` 184 `model_edge` / 745 `market_fair` full board (their 52/148 is the
+top-200 slice — model rows concentrate at the head, so 26% there against 19.8%
+overall is the expected shape, not a conflict). Identity 184/184.
+
+**My "first `market_fair` at rank 3" was WRONG; theirs at rank 10 is right.**
+I re-sorted by `score.score`. **The served order is not descending by that
+field** (checked: `False`), so I ranked an order no user sees. Top nine are all
+`model_edge`. Withdrawn. This is the standing "read the field you already have"
+rule again — the served order WAS the field, and I computed a different one.
+
+### the unit mismatch, confirmed from code
+
+```
+portfolio_commit.py:67   model_edge_pct = (model_prob - fair) * 100   PROBABILITY POINTS, cap 15.0
+layer2_board.py:774      expected_value_pct = fair/implied - 1        RETURN ON STAKE
+```
+On the served board the sort input splits cleanly:
+```
+model_edge   n=184  sort_input==model_edge_pct 184/184  range [-3.700, 12.430]
+market_fair  n=745  sort_input==ev_pct         745/745  range [-5.755,  5.000]
+```
+
+### DO NOT "fix" it by making the scales commensurable
+
+Counterfactual, every other score term preserved (per-row multiplier recovered
+as `score/ev_component`, so book_confidence / freshness / reliability survive),
+fed a common unit — return on stake for both classes:
+
+```
+common unit   top25 = model_edge 23, market_fair  2    first market_fair rank 23
+as shipped    top25 = model_edge 11, market_fair 14    first market_fair rank 10
+
+counterfactual head:  batter_home_runs 36.164, 19.322, 16.821, 15.676, 14.396
+```
+
+**The peer's independently measured pre-deploy top score was 36.1642. The
+counterfactual's #1 is 36.164.** The common-unit board *is* the pre-deploy
+board to four decimals — so "make the two scales commensurable on
+return-on-stake" and "revert" are the same operation, and the home-run props
+the user complained about come straight back at the head.
+
+Mechanically: return on stake is `edge/p`. Any common unit expressed that way
+reintroduces the 1/p amplifier for **both** classes at once.
+
+**The mixed unit is what ADMITS market rows to the head** (14 of top 25), not
+what excludes them (2 of top 25 if made commensurable). That is the opposite of
+how it reads.
+
+### the real open question, restated
+
+Not "should two units share a sort" but **"do these two row classes make the
+same kind of claim?"** A `model_edge` row says the model disagrees with the
+market by N points. A `market_fair` row says this book is off consensus by N%
+of stake. All 293 `market_fair` rows carrying a `model_edge_pct` have
+`model_edge_basis == "market_fair"` — their "edge" is measured against the
+market's own fair, so it is not model disagreement and ranking them on it
+measures a third thing. Product decision, unsettled, and **no code change
+should be made on the "obvious cleanup" reading above.**
