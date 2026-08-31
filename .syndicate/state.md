@@ -8033,6 +8033,28 @@ leaves **three events in 12h** — 18:18:51 (n=4), 19:59:16 (n=1), 01:30:32 (n=1
 phi-laa, lal-cel-ath). A simultaneous batch looks like a session-level event, but
 no restart appears in the 18:00-18:30Z logs.
 
+**MEASURED 2026-08-31T02:34:51Z — EXPIRY IS DEAD. `goodTillTime=None` ON ALL
+FIVE ORDERS, and `tif='TIME_IN_FORCE_GOOD_TILL_CANCEL'` on all five.**
+
+    C6RNQZ8B2KDE  sea-lec-rom  NEW     created 01:30:36  tif=GTC  goodTillTime=None
+    C6RYD4TDWKDH  bun-scp-scf  NEW     created 01:47:57  tif=GTC  goodTillTime=None
+    C4N3GPYA4GNQ  nfl lar-lac  FILLED  created 08-27     tif=GTC  goodTillTime=None
+
+Two facts, both new. **The venue imposes NO expiry** — there is no clock on these
+orders. And **the venue DID store the good-till-cancel we sent**, which had been
+an assumption nothing ever read back.
+
+The `created` timestamps close the TTL question outright: `C6RNQZ8B2KDE` has been
+`ORDER_STATE_NEW` for **64 minutes** and counting, while its predecessor
+`C6R7RS83JKDD` died at ~28. Cancellation is not a clock. **Sixth cause
+eliminated.**
+
+WHAT REMAINS: cancellations are SPORADIC EVENTS, not a rule. Three transitions in
+12h, one of which took FOUR orders at once (18:18:51) with no restart in the
+surrounding logs. That batch is now the whole remaining thread — a simultaneous
+multi-order cancel is a session- or account-level action, not a per-order one.
+
+Superseded, kept for the record:
 **THE DECISIVE FIELD IS `goodTillTime`, AND WE NEITHER SET NOR LOG IT.** We send
 `tif=TIME_IN_FORCE_GOOD_TILL_CANCEL` and no expiry, so the venue applies its own
 default. It RETURNS `goodTillTime` on every order — `ORDERS_READ` prints the KEY
