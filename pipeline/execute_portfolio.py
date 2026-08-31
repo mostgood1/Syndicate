@@ -504,7 +504,7 @@ def run_execution(
                 f"[execute_portfolio] HELD_PREGAME_NEAR_EVEN venue={venue}"
                 f" ticker={getattr(request, 'venue_ticker', None)!r}"
                 f" market={getattr(request, 'market', None)}"
-                f" price={price:.3f} ceiling={_polymarket_max_pregame_price()}"
+                f" submit_price={price:.3f} ceiling={_polymarket_max_pregame_price()}"
                 f" hours_to_commence={hours:.1f}"
                 " -- pregame, no book on a near-even side; it places once live",
                 flush=True,
@@ -1040,6 +1040,54 @@ def _polymarket_max_pregame_price() -> float:
         return 0.0
 
 
+def _polymarket_submit_price(request) -> float | None:
+    """The price this order will ACTUALLY BE SENT AT, or `None` if unknowable.
+
+    THE GATE HAS TO JUDGE THE PRICE THE VENUE RECEIVES. This function exists
+    because it did not. MEASURED 2026-08-31T15:25Z on two live orders:
+
+        gate saw   0.444 / 0.441   `planned_probability(requested_price)`
+        venue got  0.45  / 0.45    SUBMIT price={'value': '0.45'}
+
+    `_polymarket_resolve_market` snaps UP to the tick and then crosses UP by
+    `SYNDICATE_POLYMARKET_CROSS_TICKS`, so the submitted price is systematically
+    ABOVE the planned one. A ceiling checked against the planned price bounds a
+    number nobody pays: planned 0.349 under a 0.35 ceiling is bought at ~0.355+.
+
+    This is the SAME correction `_polymarket_resolve_market` already applied one
+    level down -- its own comment reads "SNAP FIRST, THEN GUARD -- the guard has
+    to judge the price we will ACTUALLY SEND", for the slippage check, for
+    exactly this reason. The pregame gate was the same bug one layer up.
+
+    `None` MEANS "CANNOT TELL", AND THE GATE TREATS THAT AS PLACE. Every way
+    this returns `None` -- an unresolvable side, a stale artifact, a slippage
+    raise -- is a condition the REAL placement path is about to refuse by name,
+    a few lines later, with a log line that says which. Holding here would
+    replace a named refusal with a silent skip and hide it. Refusal ownership
+    stays in one place.
+    """
+    try:
+        resolved = _polymarket_resolve_market(request)
+    except Exception:
+        # INCLUDING `_SlippageExceeded`, which this call CAN raise. Nothing at
+        # the gate's call site catches it -- it is handled around the real
+        # submit -- so letting it escape here would take down the placement
+        # loop for every remaining position on the tick. The order is refused
+        # by that same raise moments later, where it is caught and recorded.
+        return None
+    if not resolved or len(resolved) < 2:
+        return None
+    try:
+        price = float(resolved[1])
+    except (TypeError, ValueError):
+        return None
+    # A price outside (0,1) is not a probability and cannot be compared to a
+    # ceiling. `order_body` refuses it downstream; say nothing about it here.
+    if not 0.0 < price < 1.0:
+        return None
+    return price
+
+
 def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
     """`(price, hours_to_commence)` if this order should be HELD, else None.
 
@@ -1076,7 +1124,11 @@ def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
     if hours <= 0:
         return None
 
-    price = planned_probability(getattr(request, "requested_price", None))
+    # THE PRICE THE VENUE WILL RECEIVE, not the one we planned. See
+    # `_polymarket_submit_price`: snap and cross both round UP, so the planned
+    # price this used to read is always at or below what is actually bought,
+    # and a ceiling tested against it does not bound the purchase.
+    price = _polymarket_submit_price(request)
     if price is None:
         return None
     if price <= ceiling:
@@ -1089,7 +1141,7 @@ def _polymarket_hold_price(request, venue: str) -> tuple[float, float] | None:
         print(
             f"[execute_portfolio] EXPLORE_PREGAME_BOUNDARY"
             f" ticker={getattr(request, 'venue_ticker', None)!r}"
-            f" price={price:.3f} ceiling={ceiling} band={_polymarket_explore_band()}"
+            f" submit_price={price:.3f} ceiling={ceiling} band={_polymarket_explore_band()}"
             f" rate={_polymarket_explore_rate()} hours_to_commence={hours:.1f}"
             " -- placed ON PURPOSE to keep the boundary testable",
             flush=True,
